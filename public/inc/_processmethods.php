@@ -81,8 +81,8 @@ class ProcessMethods {
 
                 self::$msgArr['BFILETEXT'] = $translatedText['BFILETEXT']."\n\n";
                 self::$msgArr['BFILETEXT'] .= "Translated from this:\n".self::$msgArr['BFILETEXT'];
-                $langSQL = "UPDATE BMESSAGES SET BFILETEXT = '".db::EscString(self::$msgArr['BFILETEXT'])."' WHERE BID = ".self::$msgArr['BID'];
-                db::Query($langSQL);
+                $langSQL = "UPDATE BMESSAGES SET BFILETEXT = '".DB::EscString(self::$msgArr['BFILETEXT'])."' WHERE BID = ".self::$msgArr['BID'];
+                DB::Query($langSQL);
 
                 if(self::$stream) {
                     Frontend::statusToStream(self::$msgId, 'pre', 'File description translated. ');
@@ -106,7 +106,10 @@ class ProcessMethods {
     public static function sortMessage(): void {
         // -----------------------------------------------------
         // -----------------------------------------------------
-        if(substr(self::$msgArr['BTEXT'], 0, 1) != '/') {
+        // Detect tool commands using safer method
+        $isToolCommand = isset(self::$msgArr['BTEXT'][0]) && self::$msgArr['BTEXT'][0] === '/';
+        
+        if(!$isToolCommand) {
             // -----------------------------------------------------
             // it is NOT a tool request
             // -----------------------------------------------------
@@ -119,13 +122,13 @@ class ProcessMethods {
             $metaArr = DB::FetchArr($metaRes);
 
             // ----------------------------------------------------- override the topic with the selected prompt
-            if(isset($metaArr['BVALUE']) AND strlen($metaArr['BVALUE'])>1 AND $metaArr['BVALUE'] != 'tools:sort') {
+            if($metaArr && is_array($metaArr) && isset($metaArr['BVALUE']) AND strlen($metaArr['BVALUE'])>1 AND $metaArr['BVALUE'] != 'tools:sort') {
                 $promptId = $metaArr['BVALUE'];
                 // Override the topic with the selected prompt
                 self::$msgArr['BTOPIC'] = $promptId;
                 // Update the message in database to reflect the prompt-based topic
-                $updateSQL = "update BMESSAGES set BTOPIC = '".db::EscString($promptId)."' where BID = ".intval(self::$msgArr['BID']);
-                db::Query($updateSQL);
+                $updateSQL = "update BMESSAGES set BTOPIC = '".DB::EscString($promptId)."' where BID = ".intval(self::$msgArr['BID']);
+                DB::Query($updateSQL);
                 // target prompt set previously
                 if(self::$stream) {
                     Frontend::statusToStream(self::$msgId, 'pre', 'Target set: '.self::$msgArr['BTOPIC'].' ');
@@ -163,9 +166,9 @@ class ProcessMethods {
                     $answerJson = $AIGENERAL::sortingPrompt($sortingArr, self::$threadArr);
                 } catch (Exception $err) {
                     if($GLOBALS["debug"]) error_log($err->getMessage());
-                    $answerJson = 'Error: '.$err->getMessage();
+                    $answerJson = '{}';
                     if(self::$stream) {
-                        Frontend::statusToStream(self::$msgId, 'ai', $answerJson);
+                        Frontend::statusToStream(self::$msgId, 'pre', 'Sorting unavailable. Continuing with defaults. ');
                     }
                 }
 
@@ -181,8 +184,8 @@ class ProcessMethods {
                 }
 
                 // Preserve original BTEXT if not provided by sorter
-                if (!isset($answerJsonArr['BTEXT']) || $answerJsonArr['BTEXT'] === null) {
-                    $answerJsonArr['BTEXT'] = self::$msgArr['BTEXT'] ?? '';
+                if (!isset($answerJsonArr['BTEXT'])) {
+                    $answerJsonArr['BTEXT'] = '';
                 }
 
                 // Ensure topic and language defaults
@@ -196,9 +199,9 @@ class ProcessMethods {
                 }
 
                 // Apply resolved values
-                self::$msgArr['BTEXT'] = $answerJsonArr['BTEXT'];
+                self::$msgArr['BTEXT']  = $answerJsonArr['BTEXT'];
                 self::$msgArr['BTOPIC'] = $answerJsonArr['BTOPIC'];
-                self::$msgArr['BLANG'] = $answerJsonArr['BLANG'];
+                self::$msgArr['BLANG']  = $answerJsonArr['BLANG'];
 
                 // Notify via stream if we had to fallback
                 if ($fallbackUsed && self::$stream) {
@@ -208,11 +211,21 @@ class ProcessMethods {
                 if(self::$stream) {
                     Frontend::statusToStream(self::$msgId, 'pre', 'Topic and language determined: '.self::$msgArr['BTOPIC'].' ('.self::$msgArr['BLANG'].'). ');
                 }
-                // add the tools: prefix to the text
+                // Convert tools:xyz to /xyz format and set processed flag
                 // error_log('BTOPIC: '.self::$msgArr['BTOPIC']);
                 if(substr(self::$msgArr['BTOPIC'], 0, 6) == 'tools:') {
                     self::$toolProcessed = true;
-                    self::$msgArr['BTEXT'] = str_replace('tools:', '/', self::$msgArr['BTOPIC'])." ".self::$msgArr['BTEXT'];
+                    $toolCmd = str_replace('tools:', '/', self::$msgArr['BTOPIC']);
+                    if(isset(self::$msgArr['BTEXT']) && strlen(trim(self::$msgArr['BTEXT'])) > 0) {
+                        self::$msgArr['BTEXT'] = $toolCmd.' '.self::$msgArr['BTEXT'];
+                    } else {
+                        self::$msgArr['BTEXT'] = $toolCmd;
+                    }
+                    
+                    // Stream once and return to prevent double processing
+                    if(self::$stream) {
+                        Frontend::statusToStream(self::$msgId, 'pre', 'Tool target converted: ' . self::$msgArr['BTOPIC'] . '. ');
+                    }
                 }
                 // count bytes
                 XSControl::countBytes(self::$msgArr, 'SORT', self::$stream);
@@ -233,7 +246,22 @@ class ProcessMethods {
             }       
 
             // ************************* CALL THE TOOL *************
-            self::$toolAnswer = BasicAI::toolPrompt(self::$msgArr, self::$stream);
+            self::$toolAnswer = BasicAI::toolPrompt(self::$msgArr, false);
+
+            // Normalize tool result text for OUT: prefer OUTTEXT -> CAPTION -> TEXT -> BTEXT
+            if (is_array(self::$toolAnswer)) {
+                $toolText = self::$toolAnswer['OUTTEXT'] ?? self::$toolAnswer['CAPTION'] ?? self::$toolAnswer['TEXT'] ?? self::$toolAnswer['BTEXT'] ?? '';
+                self::$toolAnswer['BTEXT'] = $toolText;
+            } elseif (is_string(self::$toolAnswer)) {
+                self::$toolAnswer = [
+                    'BTEXT'  => self::$toolAnswer,
+                    'BTOPIC' => self::$msgArr['BTOPIC'] ?? 'general',
+                    'BLANG'  => self::$msgArr['BLANG'] ?? 'en'
+                ];
+            }
+            
+            // Set tool processed flag unconditionally after tool execution
+            self::$toolProcessed = true;
             
             // Preserve essential fields from original message when merging tool answer
             /*
@@ -257,14 +285,12 @@ class ProcessMethods {
             }
             
             //error_log('msgArr: '. print_r(self::$msgArr, true));
-            $outText = Tools::addMediaToText(self::$msgArr);
-
-            // print to stream
-            if(self::$stream) {
-                Frontend::statusToStream(self::$msgId, 'ai', $outText);
-            }
-            self::$AIdetailArr['TARGET'] = substr(self::$msgArr['BTEXT'], 0, strpos(self::$msgArr['BTEXT'], ' '));
+            $posSpace = strpos(self::$msgArr['BTEXT'], ' ');
+            self::$AIdetailArr['TARGET'] = ($posSpace === false) ? self::$msgArr['BTEXT'] : substr(self::$msgArr['BTEXT'], 0, $posSpace);
             XSControl::storeAIDetails(self::$msgArr, 'AITOOL', self::$AIdetailArr['TARGET'], self::$stream);
+            // Centralized processing and streaming
+            self::processMessage();
+            return;
         }
         // -----------------------------------------------------
         // ----------------------------------------------------- maybe process it
@@ -274,414 +300,512 @@ class ProcessMethods {
         return;
     }
 
-    /**
-     * Process the message based on topic and user intent
-     * 
-     * Handles message processing according to the determined topic and user's intent
-     * 
-     * @return void
-     */
-    // ****************************************************************************************************** 
-    public static function processMessage(): void {
-        $answerJsonArr = [];
-        $answerSorted = [];
-        $ragArr = [];
-        
-        // Initialize answer array with file information
-        if(self::$msgArr['BFILE']>0) {
-            if(self::$msgArr['BFILE']==2) {
-                $storedInArr = self::$msgArr;
-            }
-            $answerJsonArr['BFILE'] = 1;
-            $answerJsonArr['BFILETEXT'] = self::$msgArr['BFILETEXT'];
-            $answerJsonArr['BUNIXTIMES'] = self::$msgArr['BUNIXTIMES'];
-        }
-        // -----------------------------------------------------
-        $AIGENERAL = $GLOBALS["AI_CHAT"]["SERVICE"];
+   /**
+ * Process the message based on topic and user intent
+ *
+ * @return void
+ */
+// ******************************************************************************************************
+public static function processMessage(): void {
+    $answerJsonArr = [];
+    $answerSorted  = [];
+    $ragArr        = [];
 
-        // get the tools for the prompt
-        // --- check for: aiModel, tool_internet, tool_files, tool_screenshot, tool_transfer
-        
-        // Ensure BTOPIC is set and valid before calling getPromptDetails
-        if (!isset(self::$msgArr['BTOPIC']) || empty(self::$msgArr['BTOPIC'])) {
-            self::$msgArr['BTOPIC'] = 'general'; // Default fallback
-            //error_log('Warning: BTOPIC was missing or empty, defaulting to "general"');
+    // --- File-Infos vorbereiten (nur Kontext, kein Stream) ---
+    if (isset(self::$msgArr['BFILE']) && self::$msgArr['BFILE'] > 0) {
+        if (self::$msgArr['BFILE'] == 2) {
+            $storedInArr = self::$msgArr; // optional
         }
-        
-        // For tool-generated responses, skip prompt processing and just return the response
-        if(self::$toolProcessed) {
-            if(self::$stream) {
-                Frontend::statusToStream(self::$msgId, 'ai', Tools::addMediaToText(self::$msgArr['BTEXT']));
-            }
-            return;
-        }
-        
-        $promptDetails = BasicAI::getPromptDetails(self::$msgArr['BTOPIC']);
-        $promptSettings = [];
+        $answerJsonArr['BFILE']      = 1;
+        $answerJsonArr['BFILETEXT']  = self::$msgArr['BFILETEXT'];
+        $answerJsonArr['BUNIXTIMES'] = self::$msgArr['BUNIXTIMES'];
+    }
 
-        foreach($promptDetails['SETTINGS'] as $setting) {
+    // --- Forced Model für Again, sonst Defaults ---
+    if (!empty($GLOBALS["IS_AGAIN"]) && !empty($GLOBALS["FORCED_AI_SERVICE"])) {
+        $AIGENERAL      = $GLOBALS["FORCED_AI_SERVICE"];
+        $AIGENERALmodel = $GLOBALS["FORCED_AI_MODEL"];
+        $AIGENERALmodelId = $GLOBALS["FORCED_AI_MODELID"];
+
+        // in globale Defaults spiegeln
+        $GLOBALS["AI_CHAT"]["MODEL"]   = $AIGENERALmodel;
+        $GLOBALS["AI_CHAT"]["MODELID"] = $AIGENERALmodelId;
+        $GLOBALS["AI_CHAT"]["SERVICE"] = $AIGENERAL;
+    } else {
+        $AIGENERAL        = $GLOBALS["AI_CHAT"]["SERVICE"];
+        $AIGENERALmodel   = $GLOBALS["AI_CHAT"]["MODEL"];
+        $AIGENERALmodelId = $GLOBALS["AI_CHAT"]["MODELID"];
+    }
+
+    // --- Topic-Fallback ---
+    if (empty(self::$msgArr['BTOPIC'])) {
+        self::$msgArr['BTOPIC'] = 'general';
+    }
+
+    // --- Wenn bereits Tool verarbeitet wurde: Antwort übernehmen, später zentral streamen ---
+    if (self::$toolProcessed) {
+        $answerSorted = self::$msgArr; // fallthrough to centralized merge/stream
+    } else {
+
+    // --- Prompt-Settings einlesen ---
+    $promptDetails  = BasicAI::getPromptDetails(self::$msgArr['BTOPIC']);
+    $promptSettings = [];
+
+    if (isset($promptDetails['SETTINGS']) && is_array($promptDetails['SETTINGS'])) {
+        foreach ($promptDetails['SETTINGS'] as $setting) {
+            if (!is_array($setting) || !isset($setting['BTOKEN'], $setting['BVALUE'])) continue;
             $promptSettings[$setting['BTOKEN']] = $setting['BVALUE'];
-            //error_log('setting: '.$setting['BTOKEN'].' = '.$setting['BVALUE']);
 
-            // ------------------------------------------------
-            // ------------------------------------------------ tool_internet
-            // ------------------------------------------------
-            // do internet search before the prompt is executed!
-            if($setting['BTOKEN'] == 'tool_internet' AND $setting['BVALUE'] == '1') {
-                
-                $searchArr = self::$msgArr;
-                $searchArr['BTOPIC'] = "tools:search";
-                $answerJsonArr = $AIGENERAL::topicPrompt($searchArr, self::$threadArr);
+            // Internet-Tool vor Prompt
+            if ($setting['BTOKEN'] === 'tool_internet' && $setting['BVALUE'] == '1') {
+                $searchArr            = self::$msgArr;
+                $searchArr['BTOPIC']  = "tools:search";
+                $answerJsonArr        = $AIGENERAL::topicPrompt($searchArr, self::$threadArr);
 
-                if(isset($answerJsonArr['SEARCH_TERM'])) {
-                    $searchArr = Tools::searchWeb($searchArr, $answerJsonArr['SEARCH_TERM']);
-                    if(isset($searchArr['BTEXT'])) {
-                        self::$msgArr['BTEXT'] .= "\n\n\n---\n\n\n".$searchArr['BTEXT'];
+                if (is_string($answerJsonArr)) {
+                    if (self::$stream) {
+                        Frontend::statusToStream(self::$msgId, 'pre', 'Internet search skipped due to error. ');
                     }
-                    if(self::$stream) {
-                        Frontend::statusToStream(self::$msgId, 'pre', 'Web search '.$answerJsonArr['SEARCH_TERM'].". ");
+                } elseif (!empty($answerJsonArr['SEARCH_TERM'])) {
+                    $searchArr = Tools::searchWeb($searchArr, $answerJsonArr['SEARCH_TERM']);
+                    if (isset($searchArr['BTEXT'])) {
+                        // Kontext anreichern ist ok – hat nichts mit AGAIN-OUT zu tun
+                        self::$msgArr['BTEXT'] .= "\n\n\n---\n\n\n" . $searchArr['BTEXT'];
+                    }
+                    if (self::$stream) {
+                        Frontend::statusToStream(self::$msgId, 'pre', 'Web search ' . $answerJsonArr['SEARCH_TERM'] . '. ');
                     }
                 }
             }
-            
-            // ------------------------------------------------
-            // ------------------------------------------------ tool_files
-            // ------------------------------------------------
-            // do file search before the prompt is executed!
-            // the file contents get added to the threadArr
-            if($setting['BTOKEN'] == 'tool_files' AND $setting['BVALUE'] == '1') {
-                $searchArr = self::$msgArr;
-                $ragArr = Tools::searchRAG($searchArr);
-                if(self::$stream) {
-                    Frontend::statusToStream(self::$msgId, 'pre', 'RAG Search: '.count($ragArr).' files... ');
+
+            // Files (RAG) vor Prompt
+            if ($setting['BTOKEN'] === 'tool_files' && $setting['BVALUE'] == '1') {
+                $searchArr   = self::$msgArr;
+                $ragArr      = Tools::searchRAG($searchArr);
+                if (self::$stream) {
+                    Frontend::statusToStream(self::$msgId, 'pre', 'RAG Search: ' . count($ragArr) . ' files... ');
                 }
                 self::$threadArr = array_merge(self::$threadArr, $ragArr);
             }
 
-            // ------------------------------------------------
-            // ------------------------------------------------ aiModel selection
-            // ------------------------------------------------
-            if($setting['BTOKEN'] == 'aiModel' AND intval($setting['BVALUE']) > 0) {
+            // aiModel-Override pro Prompt
+            if ($setting['BTOKEN'] === 'aiModel' && intval($setting['BVALUE']) > 0) {
                 $modelDetails = BasicAI::getModelDetails(intval($setting['BVALUE']));
-                $AIGENERAL = "AI".$modelDetails['BSERVICE'];
-            }
-        }
-
-        // **************************************************************************************************
-        // ----------------------------------------------------- now call the topic prompt
-        // **************************************************************************************************
-        // **************************************************************************************************
-        // **************************************************************************************************
-        // **************************************************************************************************
-        // error_log('calling '.$AIGENERAL."::topicPrompt");
-        // $answerSorted = AIGoogle::topicPrompt(self::$msgArr, self::$threadArr);
-
-        // run exceptions for specific topics
-        $defaultPromptArr = ['analyzefile','mediamaker'];
-        // check of the the a call was done
-        $previousCall = false;
-        // ----------------------------------------------------- default or extra?
-        if(!in_array(self::$msgArr['BTOPIC'], $defaultPromptArr)) {
-            if(self::$stream) {
-                Frontend::statusToStream(self::$msgId, 'pre', 'Calling standard '.$AIGENERAL.'. ');
-            }
-            $answerSorted = $AIGENERAL::topicPrompt(self::$msgArr, self::$threadArr, self::$stream);
-            
-            // Get the actual model used from the AI response
-            $usedModel = $GLOBALS["AI_CHAT"]["MODEL"]; // Default fallback
-            $usedService = $AIGENERAL; // Default fallback
-            
-            if (is_array($answerSorted)) {
-                if (isset($answerSorted['_USED_MODEL'])) {
-                    $usedModel = $answerSorted['_USED_MODEL'];
-                    // Remove the internal fields from the response
-                    unset($answerSorted['_USED_MODEL']);
-                }
-                if (isset($answerSorted['_AI_SERVICE'])) {
-                    $usedService = $answerSorted['_AI_SERVICE'];
-                    // Remove the internal fields from the response
-                    unset($answerSorted['_AI_SERVICE']);
+                if (!empty($modelDetails['BSERVICE'])) {
+                    $AIGENERAL = "AI" . $modelDetails['BSERVICE'];
                 }
             }
-            
-            XSControl::storeAIDetails(self::$msgArr, 'AISERVICE', $usedService, self::$stream);
-            XSControl::storeAIDetails(self::$msgArr, 'AIMODEL', $usedModel, self::$stream);
-            $previousCall = true;
-        } else {
-            if(self::$stream) {
-                Frontend::statusToStream(self::$msgId, 'pre', 'Calling extra ' . self::$msgArr['BTOPIC'] . '. ');
-            }
         }
-        // **************************************************************************************************
-        // **************************************************************************************************
-        // **************************************************************************************************
-        // **************************************************************************************************
-        if (self::$msgArr['BTOPIC'] === 'mediamaker') {
-            // Call specific method for media creation tasks
-            if(self::$stream) {
-                Frontend::statusToStream(self::$msgId, 'pre', 'Modifying prompt with '.$AIGENERAL.'. ');
-            }
+    }
+
+    // --- Hauptaufruf (ausgenommen Spezial-Themen) ---
+    $defaultPromptArr = ['analyzefile', 'mediamaker'];
+    $previousCall     = false;
+
+    if (!in_array(self::$msgArr['BTOPIC'], $defaultPromptArr, true)) {
+        if (self::$stream) {
+            Frontend::statusToStream(self::$msgId, 'pre', 'Calling standard ' . $AIGENERAL . '. ');
+        }
+
+        $answerSorted = $AIGENERAL::topicPrompt(self::$msgArr, self::$threadArr, self::$stream);
+
+        if (is_string($answerSorted)) {
+            $answerSorted = [
+                'BTEXT'  => $answerSorted,
+                'BTOPIC' => self::$msgArr['BTOPIC'],
+                'BLANG'  => self::$msgArr['BLANG']
+            ];
+        }
+
+        // Model-/Service-Details protokollieren (falls mitgeliefert)
+        $usedModel   = $GLOBALS["AI_CHAT"]["MODEL"];
+        $usedService = $AIGENERAL;
+        if (is_array($answerSorted)) {
+            if (isset($answerSorted['_USED_MODEL'])) { $usedModel   = $answerSorted['_USED_MODEL'];   unset($answerSorted['_USED_MODEL']); }
+            if (isset($answerSorted['_AI_SERVICE'])) { $usedService = $answerSorted['_AI_SERVICE'];   unset($answerSorted['_AI_SERVICE']); }
+        }
+        XSControl::storeAIDetails(self::$msgArr, 'AISERVICE', $usedService, self::$stream);
+        XSControl::storeAIDetails(self::$msgArr, 'AIMODEL',  $usedModel,   self::$stream);
+
+        $previousCall = true;
+    } else {
+        if (self::$stream) {
+            Frontend::statusToStream(self::$msgId, 'pre', 'Calling extra ' . self::$msgArr['BTOPIC'] . '. ');
+        }
+    }
+
+    // --- Spezial: mediamaker (ohne IN-Text-Pre/Append – nur OUT-Payload) ---
+    if (self::$msgArr['BTOPIC'] === 'mediamaker') {
+        $originalPrompt = self::$msgArr['BTEXT'];
+        $providerFailed = false;
+
+        // Guess requested media from prompt keywords (defaults handled below)
+        $requestedMedia = '';
+        $lowerPrompt = mb_strtolower($originalPrompt);
+        if (preg_match('/\\b(audio|sound|musik|sprich)\\b/u', $lowerPrompt)) {
+            $requestedMedia = 'audio';
+        } elseif (preg_match('/\\b(video|film)\\b/u', $lowerPrompt)) {
+            $requestedMedia = 'video';
+        } elseif (preg_match('/\\b(bild|image|picture|foto|photo)\\b/u', $lowerPrompt)) {
+            $requestedMedia = 'image';
+        }
+
+        // Priority: forced tag > requested keywords > default image
+        $mediaType = 'image';
+        if (!empty($GLOBALS['FORCED_AI_BTAG'])) {
+            $forcedBtagLocal = $GLOBALS['FORCED_AI_BTAG'];
+            $mediaType = ($forcedBtagLocal === 'text2vid') ? 'video' : (($forcedBtagLocal === 'text2sound') ? 'audio' : 'image');
+        } elseif (!empty($requestedMedia)) {
+            $mediaType = $requestedMedia;
+        }
+
+        try {
             $answerSorted = $AIGENERAL::topicPrompt(self::$msgArr, [], false);
-            
-            // Get the actual model used from the AI response
-            $usedModel = $GLOBALS["AI_CHAT"]["MODEL"]; // Default fallback
-            $usedService = $AIGENERAL; // Default fallback
-            
-            if (is_array($answerSorted)) {
-                if (isset($answerSorted['_USED_MODEL'])) {
-                    $usedModel = $answerSorted['_USED_MODEL'];
-                    // Remove the internal fields from the response
-                    unset($answerSorted['_USED_MODEL']);
-                }
-                if (isset($answerSorted['_AI_SERVICE'])) {
-                    $usedService = $answerSorted['_AI_SERVICE'];
-                    // Remove the internal fields from the response
-                    unset($answerSorted['_AI_SERVICE']);
-                }
+        } catch (Exception $err) {
+            $providerFailed = true;
+            if (self::$stream) {
+                Frontend::statusToStream(self::$msgId, 'pre', 'Mediamaker provider failed — using fallback. ');
             }
-            
-            XSControl::storeAIDetails(self::$msgArr, 'AISERVICE', $usedService, self::$stream);
-            XSControl::storeAIDetails(self::$msgArr, 'AIMODEL', $usedModel, self::$stream);
-            $previousCall = true;
+            $answerSorted = null;
+        }
 
-            // DEBUG: Log the raw response for troubleshooting
-            if($GLOBALS["debug"]) error_log('MEDIAMAKER DEBUG - Raw response: ' . json_encode($answerSorted));
-            
-            // Validate the response structure
-            if (!is_array($answerSorted)) {
-                if($GLOBALS["debug"]) error_log('MEDIAMAKER ERROR - Response is not an array: ' . gettype($answerSorted));
-                
-                // Fallback: Try to parse as JSON string if it's a string
+        // Detect provider error surfaced as plain string
+        if (!$providerFailed && is_string($answerSorted)) {
+            $lower = strtolower($answerSorted);
+            if (strpos($lower, 'error') !== false || strpos($lower, 'failed') !== false || strpos($lower, 'server') !== false) {
+                $providerFailed = true;
+                if (self::$stream) {
+                    Frontend::statusToStream(self::$msgId, 'pre', 'Mediamaker provider failed — using fallback. ');
+                }
+                $answerSorted = null;
+            } else {
+                // robuste Normalisierung (respect computed $mediaType)
+                $answerSorted = [
+                    'BTEXT'  => $originalPrompt,
+                    'BTOPIC' => 'mediamaker',
+                    'BLANG'  => self::$msgArr['BLANG'] ?? 'en',
+                    'BMEDIA' => $mediaType
+                ];
+            }
+        }
+        // Enforce media type to avoid flips to audio unless explicitly requested/forced
+        if (is_array($answerSorted)) {
+            $answerSorted['BMEDIA'] = $mediaType;
+        }
+
+        // Validate; fallback if invalid or provider failed
+        $isValid = is_array($answerSorted)
+            && !empty($answerSorted['BMEDIA'])
+            && in_array($answerSorted['BMEDIA'], ['image','video','audio'], true)
+            && isset($answerSorted['BTEXT']) && $answerSorted['BTEXT'] !== '';
+
+        if (!$isValid || $providerFailed) {
+            $fallbackArr = Tools::migrateArray(self::$msgArr, [
+                'BTEXT'  => $originalPrompt,
+                'BTOPIC' => 'mediamaker',
+                'BLANG'  => self::$msgArr['BLANG'] ?? 'en',
+                'BMEDIA' => $mediaType
+            ]);
+            $fallbackArr['BID'] = self::$msgId;
+
+            if ($mediaType === 'image') {
+                $fallbackArr['BTEXT'] = "/pic " . $fallbackArr['BTEXT'];
+            } elseif ($mediaType === 'video') {
+                $fallbackArr['BTEXT'] = "/vid " . $fallbackArr['BTEXT'];
+            } else { // audio
+                $fallbackArr['BTEXT'] = "/audio " . $fallbackArr['BTEXT'];
+            }
+            $answerSorted = BasicAI::toolPrompt($fallbackArr, false);
+            if (is_string($answerSorted)) {
+                $answerSorted = [
+                    'BTEXT'  => $answerSorted,
+                    'BTOPIC' => 'mediamaker',
+                    'BLANG'  => self::$msgArr['BLANG'] ?? 'en',
+                    'BMEDIA' => $mediaType
+                ];
+            } elseif (is_array($answerSorted)) {
+                // Prefer tool-provided text; fallback to original prompt only if tool gave nothing
+                $toolText = $answerSorted['OUTTEXT'] ?? $answerSorted['CAPTION'] ?? $answerSorted['TEXT'] ?? $answerSorted['BTEXT'] ?? '';
+                $answerSorted['BTEXT'] = ($toolText !== '') ? $toolText : $originalPrompt;
+                // Enforce previously computed media type
+                $answerSorted['BMEDIA'] = $mediaType;
+            }
+
+            // Tool wurde ausgeführt – ab jetzt zentral weiter
+            self::$toolProcessed = true;
+        } else {
+            // Normal flow: migrate and execute tool without streaming
+            $answerSorted = Tools::migrateArray(self::$msgArr, $answerSorted);
+            $answerSorted['BID'] = self::$msgId;
+
+            if ($mediaType === 'image') {
+                $answerSorted['BTEXT'] = "/pic " . $answerSorted['BTEXT'];
+                $answerSorted = BasicAI::toolPrompt($answerSorted, false);
                 if (is_string($answerSorted)) {
-                    if($GLOBALS["debug"]) error_log('MEDIAMAKER DEBUG - Attempting to parse response as JSON string');
-                    $parsedResponse = json_decode($answerSorted, true);
-                    if (json_last_error() === JSON_ERROR_NONE && is_array($parsedResponse)) {
-                        $answerSorted = $parsedResponse;
-                        if($GLOBALS["debug"]) error_log('MEDIAMAKER DEBUG - Successfully parsed JSON string');
-                    } else {
-                        if($GLOBALS["debug"]) error_log('MEDIAMAKER ERROR - Failed to parse JSON string: ' . json_last_error_msg());
-                        if(self::$stream) {
-                            Frontend::statusToStream(self::$msgId, 'ai', 'Error: Invalid response format from media generation service.');
-                        }
-                        return;
-                    }
-                } else {
-                    if(self::$stream) {
-                        Frontend::statusToStream(self::$msgId, 'ai', 'Error: Invalid response format from media generation service.');
-                    }
-                    return;
+                    $answerSorted = [
+                        'BTEXT'  => $answerSorted,
+                        'BTOPIC' => 'mediamaker',
+                        'BLANG'  => self::$msgArr['BLANG'] ?? 'en',
+                        'BMEDIA' => $mediaType
+                    ];
+                } elseif (is_array($answerSorted)) {
+                    $toolText = $answerSorted['OUTTEXT'] ?? $answerSorted['CAPTION'] ?? $answerSorted['TEXT'] ?? $answerSorted['BTEXT'] ?? '';
+                    $answerSorted['BTEXT'] = ($toolText !== '') ? $toolText : $originalPrompt;
+                    $answerSorted['BMEDIA'] = $mediaType;
+                }
+            } elseif ($mediaType === 'video') {
+                $answerSorted['BTEXT'] = "/vid " . $answerSorted['BTEXT'];
+                $answerSorted = BasicAI::toolPrompt($answerSorted, false);
+                if (is_string($answerSorted)) {
+                    $answerSorted = [
+                        'BTEXT'  => $answerSorted,
+                        'BTOPIC' => 'mediamaker',
+                        'BLANG'  => self::$msgArr['BLANG'] ?? 'en',
+                        'BMEDIA' => $mediaType
+                    ];
+                } elseif (is_array($answerSorted)) {
+                    $toolText = $answerSorted['OUTTEXT'] ?? $answerSorted['CAPTION'] ?? $answerSorted['TEXT'] ?? $answerSorted['BTEXT'] ?? '';
+                    $answerSorted['BTEXT'] = ($toolText !== '') ? $toolText : $originalPrompt;
+                    $answerSorted['BMEDIA'] = $mediaType;
+                }
+            } else { // audio
+                $answerSorted['BTEXT'] = "/audio " . $answerSorted['BTEXT'];
+                $answerSorted = BasicAI::toolPrompt($answerSorted, false);
+                if (is_string($answerSorted)) {
+                    $answerSorted = [
+                        'BTEXT'  => $answerSorted,
+                        'BTOPIC' => 'mediamaker',
+                        'BLANG'  => self::$msgArr['BLANG'] ?? 'en',
+                        'BMEDIA' => $mediaType
+                    ];
+                } elseif (is_array($answerSorted)) {
+                    $toolText = $answerSorted['OUTTEXT'] ?? $answerSorted['CAPTION'] ?? $answerSorted['TEXT'] ?? $answerSorted['BTEXT'] ?? '';
+                    $answerSorted['BTEXT'] = ($toolText !== '') ? $toolText : $originalPrompt;
+                    $answerSorted['BMEDIA'] = $mediaType;
                 }
             }
-            
-            // Check if BMEDIA field exists
-            if (!isset($answerSorted['BMEDIA']) || empty($answerSorted['BMEDIA'])) {
-                if($GLOBALS["debug"]) error_log('MEDIAMAKER ERROR - BMEDIA field missing or empty: ' . json_encode($answerSorted));
-                if(self::$stream) {
-                    Frontend::statusToStream(self::$msgId, 'ai', 'Error: Could not determine media type (image/video/audio).');
-                }
-                return;
-            }
-            
-            // Validate BMEDIA value
-            $validMediaTypes = ['image', 'video', 'audio'];
-            if (!in_array($answerSorted['BMEDIA'], $validMediaTypes)) {
-                if($GLOBALS["debug"]) error_log('MEDIAMAKER ERROR - Invalid BMEDIA value: ' . $answerSorted['BMEDIA']);
-                if(self::$stream) {
-                    Frontend::statusToStream(self::$msgId, 'ai', 'Error: Invalid media type specified.');
-                }
-                return;
-            }
-            
-            // Check if BTEXT field exists
-            if (!isset($answerSorted['BTEXT']) || empty($answerSorted['BTEXT'])) {
-                if($GLOBALS["debug"]) error_log('MEDIAMAKER ERROR - BTEXT field missing or empty: ' . json_encode($answerSorted));
-                if(self::$stream) {
-                    Frontend::statusToStream(self::$msgId, 'ai', 'Error: No prompt text generated for media creation.');
-                }
-                return;
-            }
 
-            $task = $answerSorted['BMEDIA'];
-            $answerText = '';
-            if($previousCall) {
-                $previousAnswerText = $answerSorted['BTEXT']."\n\n";
-            }           
-            $answerSorted = Tools::migrateArray(self::$msgArr, $answerSorted);
-            $answerSorted['BTEXT'] = $answerText.$answerSorted['BTEXT'];
-
-            // DEBUG: Log the task and processed text
-            if($GLOBALS["debug"]) error_log('MEDIAMAKER DEBUG - Task: ' . $task . ', Text: ' . substr($answerSorted['BTEXT'], 0, 100) . '...');
-
-            if($task == 'image') {
-                $answerSorted['BTEXT'] = "/pic ".$answerSorted['BTEXT'];
-                $answerSorted = BasicAI::toolPrompt($answerSorted, self::$threadArr);
-            }
-            if($task == 'video') {
-                $answerSorted['BTEXT'] = "/vid  ".$answerSorted['BTEXT'];
-                $answerSorted = BasicAI::toolPrompt($answerSorted, self::$threadArr);
-            }
-            if($task == 'audio') {
-                $answerSorted['BTEXT'] = "/audio ".$answerSorted['BTEXT'];
-                $answerSorted = BasicAI::toolPrompt($answerSorted, self::$threadArr);
-            }
-            if(substr($answerSorted['BTEXT'], 0, 1) == '/') {
-                XSControl::storeAIDetails(self::$msgArr, 'AIMODEL', $task, self::$stream);
-
-                self::$msgArr = self::preserveEssentialFields($answerSorted);
-                self::sortMessage();
-                return;
-            }
-            // $answerSorted['BTEXT'] = Tools::addMediaToText($answerSorted);
+            // Tool wurde ausgeführt – ab jetzt zentral weiter
+            self::$toolProcessed = true;
         }
-        // **************************************************************************************************
-        // **************************************************************************************************
-        // **************************************************************************************************
-        // **************************************************************************************************
-        if (self::$msgArr['BTOPIC'] === 'officemaker') {
-            // Call specific method for office document creation tasks
-            $previousCall = true;
-            $task = $answerSorted['BMEDIA'];
-            $answerSorted = Tools::migrateArray(self::$msgArr, $answerSorted);
-            if($task == 'xls' || $task == 'ppt' || $task == 'doc') {
-                /*
-                $result['success'] = true;
-                $result['filePath'] = $filePath;
-                $result['fileName'] = $fileName;
-                $result['fileType'] = $fileExtension;
-                */
-                $answerText = '';
-                if($previousCall) {
-                    $answerText = $answerSorted['BTEXT']."\n\n";
-                }                
-                $result = AIOpenAI::createOfficeFile($answerSorted, self::$usrArr, self::$stream);
-                $answerSorted['BTEXT'] = $answerText.$answerSorted['BTEXT'];
-                $feNote = 'No file created';
+        // (answerSorted enthält bereits das finale OUT-Payload für Merge/Stream unten)
+    }
 
-                if($result['success']) {
-                    $answerSorted['BFILE'] = 1;
-                    $answerSorted['BFILEPATH'] = $result['filePath'];
-                    $answerSorted['BFILETYPE'] = $result['fileType'];
-                    if(strlen($result['textContent']) > 0) {
-                        $answerSorted['BTEXT'] = Tools::processComplexHtml($result['textContent']);
-                    }
-                    if(strlen($result['filePath']) > 0) {
-                        $feNote = 'File created successfully ';
-                    }
-                }
+    // --- Spezial: officemaker ---
+    if (self::$msgArr['BTOPIC'] === 'officemaker') {
+        $previousCall = true;
+        $task         = $answerSorted['BMEDIA'] ?? '';
+        $answerSorted = Tools::migrateArray(self::$msgArr, $answerSorted);
 
-                if(self::$stream) {
-                    //error_log('result: '.print_r($result, true));
-                    Frontend::statusToStream(self::$msgId, 'pre', $feNote);
+        if (in_array($task, ['xls','ppt','doc'], true)) {
+            $result = AIOpenAI::createOfficeFile($answerSorted, self::$usrArr, self::$stream);
+            $feNote = 'No file created';
+
+            if (!empty($result['success'])) {
+                $answerSorted['BFILE']     = 1;
+                $answerSorted['BFILEPATH'] = $result['filePath'] ?? '';
+                $answerSorted['BFILETYPE'] = $result['fileType'] ?? '';
+                if (!empty($result['textContent'])) {
+                    $answerSorted['BTEXT'] = Tools::processComplexHtml($result['textContent']);
                 }
-                XSControl::storeAIDetails(self::$msgArr, 'AISERVICE', 'AIOpenAI', self::$stream);
-                XSControl::storeAIDetails(self::$msgArr, 'AIMODEL', 'CreateOfficeFile', self::$stream);
-                XSControl::storeAIDetails(self::$msgArr, 'AIMODELID', '0', self::$stream);
+                if (!empty($result['filePath'])) {
+                    $feNote = 'File created successfully ';
+                }
             }
-            // $answerSorted['BTEXT'] = Tools::addMediaToText($answerSorted);
+
+            if (self::$stream) {
+                Frontend::statusToStream(self::$msgId, 'pre', $feNote);
+            }
+            XSControl::storeAIDetails(self::$msgArr, 'AISERVICE', 'AIOpenAI',       self::$stream);
+            XSControl::storeAIDetails(self::$msgArr, 'AIMODEL',   'CreateOfficeFile', self::$stream);
+            XSControl::storeAIDetails(self::$msgArr, 'AIMODELID', '0',              self::$stream);
         }
-        // **************************************************************************************************
-        // **************************************************************************************************
-        // **************************************************************************************************
-        // **************************************************************************************************
+    }
 
-        if (self::$msgArr['BTOPIC'] === 'analyzefile' && self::$msgArr['BFILE'] == 1 && substr(self::$msgArr['BFILEPATH'], -4) == '.pdf') {
-            $previousCall = true;
-            $answerSorted = Tools::migrateArray(self::$msgArr, $answerSorted);
-            $answerText = '';
-            if($previousCall) {
-                $answerText = $answerSorted['BTEXT']."\n\n";
-            }                
-            $answerSorted = AIGoogle::analyzeFile($answerSorted, self::$stream);
-            $answerSorted['BTEXT'] = $answerText.$answerSorted['BTEXT'];
+    // --- Spezial: analyzefile (PDF -> Text) ---
+    if (
+        self::$msgArr['BTOPIC'] === 'analyzefile' &&
+        !empty(self::$msgArr['BFILE']) && self::$msgArr['BFILE'] == 1 &&
+        !empty(self::$msgArr['BFILEPATH']) && substr(self::$msgArr['BFILEPATH'], -4) === '.pdf'
+    ) {
+        $previousCall = true;
+        $answerSorted = Tools::migrateArray(self::$msgArr, $answerSorted);
+        $answerSorted = AIGoogle::analyzeFile($answerSorted, self::$stream);
 
-            if(is_string($answerSorted)) {
-                if($GLOBALS["debug"]) error_log($answerSorted);
-                $answerSorted['BTEXT'] = $answerSorted;
-            }
-            $answerSorted['BFILE'] = 0;
-            $answerSorted['BFILEPATH'] = '';
-            $answerSorted['BFILETYPE'] = '';
-            $answerSorted['BTEXT'] = Tools::processComplexHtml($answerSorted['BFILETEXT']);
+        if (is_string($answerSorted)) {
+            if ($GLOBALS["debug"]) error_log($answerSorted);
+            $answerSorted = ['BTEXT' => $answerSorted];
+        }
+
+        // Als Text-Antwort normalisieren (keine Datei echoen)
+        $answerSorted['BFILE']     = 0;
+        $answerSorted['BFILEPATH'] = '';
+        $answerSorted['BFILETYPE'] = '';
+        if (!empty($answerSorted['BFILETEXT'])) {
+            $answerSorted['BTEXT']     = Tools::processComplexHtml($answerSorted['BFILETEXT']);
             $answerSorted['BFILETEXT'] = '';
-            XSControl::storeAIDetails(self::$msgArr, 'AISERVICE', 'AIGoogle', self::$stream);
-            XSControl::storeAIDetails(self::$msgArr, 'AIMODEL', 'AnalyzeFile', self::$stream);
-            XSControl::storeAIDetails(self::$msgArr, 'AIMODELID', '0', self::$stream);
         }
 
-        // **************************************************************************************************
-        // **************************************************************************************************
-        // Handle web search if needed
-        error_log('BFILE: '.print_r($answerSorted, true));
+        XSControl::storeAIDetails(self::$msgArr, 'AISERVICE', 'AIGoogle',   self::$stream);
+        XSControl::storeAIDetails(self::$msgArr, 'AIMODEL',   'AnalyzeFile', self::$stream);
+        XSControl::storeAIDetails(self::$msgArr, 'AIMODELID', '0',          self::$stream);
+    }
 
-        if($answerSorted['BFILE'] == 10 && strlen($answerSorted['BFILETEXT']) > 0 AND strlen($answerSorted['BFILETEXT']) < 64) {
-            $answerText = '';
-            if($previousCall) {
-                $answerText = $answerSorted['BTEXT']."\n\n";
-            }    
-            $answerSorted = Tools::searchWeb(self::$msgArr, $answerSorted['BFILETEXT']);
-            $answerSorted['BTEXT'] = $answerText.$answerSorted['BTEXT'];
-            $answerSorted['BFILE'] = 0;
+    // --- Websearch Quick Path (BFILE==10) ---
+    if (!empty($answerSorted['BFILE']) && $answerSorted['BFILE'] == 10 &&
+        !empty($answerSorted['BFILETEXT']) && strlen($answerSorted['BFILETEXT']) < 64
+    ) {
+        // direkt ersetzen, kein Prepend
+        $answerSorted        = Tools::searchWeb(self::$msgArr, $answerSorted['BFILETEXT']);
+        $answerSorted['BFILE'] = 0;
+    }
+
+    // --- Fallback Hauptaufruf falls noch nichts lief (außer mediamaker) ---
+    if (!$previousCall && self::$msgArr['BTOPIC'] !== 'mediamaker') {
+        self::$msgArr['BTOPIC'] = 'general';
+        if (self::$stream) {
+            Frontend::statusToStream(self::$msgId, 'pre', 'Calling ' . $AIGENERAL . '. ');
         }
+        $answerSorted = $AIGENERAL::topicPrompt(self::$msgArr, self::$threadArr, self::$stream);
+        if (is_string($answerSorted)) {
+            $answerSorted = [
+                'BTEXT'  => $answerSorted,
+                'BTOPIC' => self::$msgArr['BTOPIC'],
+                'BLANG'  => self::$msgArr['BLANG']
+            ];
+        }
+    }
+    } // end else for !self::$toolProcessed
 
-        // **************************************************************************************************
-        // **************************************************************************************************        
-        // do we have found files for this answer?
-        if(count($ragArr) > 0) {
-            $previousCall = true;
-            foreach($ragArr as $rag) {
-                if(strlen(basename($rag['BFILEPATH'])) > 0) {
-                    $answerSorted['BTEXT'] .= "\n".'* ['.basename($rag['BFILEPATH']).']('.$GLOBALS["baseUrl"].'up/'.$rag['BFILEPATH'].')';
-                }
+    // **************************************************************************************************
+    // ----------------------------- ZENTRAL: MERGE → STREAM → (später SAVE außerhalb) -------------------
+    // **************************************************************************************************
+    self::$msgArr = self::preserveEssentialFields($answerSorted);
+
+    // Zentraler Stream: immer aus self::$msgArr (Single Source of Truth)
+    if (self::$stream && empty(self::$msgArr['ALREADYSHOWN'])) {
+        $outText = Tools::addMediaToText(self::$msgArr);
+        Frontend::statusToStream(self::$msgId, 'ai', $outText);
+        self::$msgArr['ALREADYSHOWN'] = true;
+    }
+
+    // WhatsApp TTS (optional) – only for audio targets; avoid overwriting non-mp3 files
+    if (
+        !empty(self::$answerMethod) && self::$answerMethod == 'WA' &&
+        (
+            (isset(self::$msgArr['BMEDIA']) && self::$msgArr['BMEDIA'] === 'audio') ||
+            (isset(self::$AIdetailArr['BTAG']) && self::$AIdetailArr['BTAG'] === 'text2sound')
+        )
+    ) {
+        $hasNonMp3File = (
+            isset(self::$msgArr['BFILE']) && self::$msgArr['BFILE'] == 1 &&
+            isset(self::$msgArr['BFILETYPE']) && self::$msgArr['BFILETYPE'] !== 'mp3'
+        );
+        if (!$hasNonMp3File && !empty(self::$msgArr['BTEXT'])) {
+            $soundArr = AIOpenAI::textToSpeech(self::$msgArr, self::$usrArr);
+            if (!empty($soundArr)) {
+                self::$msgArr['BFILE']     = 1;
+                self::$msgArr['BFILEPATH'] = $soundArr['BFILEPATH'];
+                self::$msgArr['BFILETYPE'] = $soundArr['BFILETYPE'];
             }
         }
-        // **************************************************************************************************
-        // **************************************************************************************************
-        // check, if we have called anything
-        if(!$previousCall) {
-            self::$msgArr['BTOPIC'] = 'general';
-            if(self::$stream) {
-                Frontend::statusToStream(self::$msgId, 'pre', 'Calling '.$AIGENERAL.'. ');
-            }
-            $answerSorted = $AIGENERAL::topicPrompt(self::$msgArr, self::$threadArr, self::$stream);
-        }
+    }
+
+    // WhatsApp Cleanup wenn keine Datei
+    if (!empty(self::$answerMethod) && self::$answerMethod == 'WA' &&
+        isset(self::$msgArr['BFILE']) && self::$msgArr['BFILE'] == 0
+    ) {
+        self::$msgArr['BFILEPATH'] = '';
+        self::$msgArr['BFILETYPE'] = '';
+    }
+
+    // Einziger Reset-Punkt für Again
+    if (!empty($GLOBALS['IS_AGAIN'])) {
+        $GLOBALS['IS_AGAIN'] = false;
+        unset(
+            $GLOBALS['FORCED_AI_MODEL'],
+            $GLOBALS['FORCED_AI_MODELID'],
+            $GLOBALS['FORCED_AI_SERVICE'],
+            $GLOBALS['FORCED_AI_BTAG']
+        );
+    }
+
+    return;
+}
+
 
         // **************************************************************************************************
         // **************************************************************************************************
         // ----------------------------------------------------- DONE
         // **************************************************************************************************
 
-        self::$msgArr = self::preserveEssentialFields($answerSorted);
+    
+    
+    
+    
+    /**
+     * Direct chat generation bypassing sorter (for Again functionality)
+     * 
+     * @return void
+     */
+    public static function directChatGeneration(): void {
+        // For Again requests, process like a normal message but skip sorter
+        // Set topic to general for direct chat
+        self::$msgArr['BTOPIC'] = 'general';
         
-        $outText = Tools::addMediaToText($answerSorted);
-        // print to stream
         if(self::$stream) {
-            //error_log('outText: '.$outText);
-            if(!isset(self::$msgArr['ALREADYSHOWN'])) {
-                Frontend::statusToStream(self::$msgId, 'ai', $outText);
-            }
-        }
-
-        // **************************************************************************************************
-        // **************************************************************************************************        
-        // Handle audio file generation for WhatsApp
-        if(self::$msgArr['BFILE'] == 1 && self::$answerMethod == 'WA' && strlen(self::$msgArr['BTEXT']) > 0 && self::$msgArr['BFILETYPE'] == 'mp3') {
-            $soundArr = AIOpenAI::textToSpeech(self::$msgArr, self::$usrArr);
-            if(count($soundArr) > 0) {
-                self::$msgArr['BFILE'] = 1;
-                self::$msgArr['BFILEPATH'] = $soundArr['BFILEPATH'];
-                self::$msgArr['BFILETYPE'] = $soundArr['BFILETYPE'];
-            }
+            Frontend::statusToStream(self::$msgId, 'pre', 'Calling standard AI (Again). ');
         }
         
-        // **************************************************************************************************
-        // **************************************************************************************************        
-        // Clean up file information for WhatsApp messages without files
-        if(self::$answerMethod == 'WA' && self::$msgArr['BFILE'] == 0) {
-            self::$msgArr['BFILEPATH'] = '';
-            self::$msgArr['BFILETYPE'] = '';    
-        }
-
+        // Use the same logic as normal processing but skip sorter
+        self::processMessage();
+        
         return;
+    }
+
+    /**
+     * BTAG-based dispatch for Again requests
+     * Calls the appropriate generator function based on BTAG
+     */
+    public static function dispatchByBTag(string $btag): void {
+        try {
+            switch ($btag) {
+                case 'text2pic':
+                case 'text2vid':
+                case 'text2sound':
+                    $GLOBALS['IS_AGAIN'] = true;
+                    $GLOBALS['FORCED_AI_BTAG'] = $btag;
+                    // Use mediamaker flow for media generation - skip sorter for Again requests
+                    self::$msgArr['BTOPIC'] = 'mediamaker';
+                    if(self::$stream) {
+                        Frontend::statusToStream(self::$msgId, 'pre', "Calling $btag generator (Again). ");
+                    }
+                    ProcessMethods::processMessage();
+                    break;
+                
+                case 'pic2text':
+                case 'sound2text':
+                    // Use analyzefile flow for analysis tasks
+                    self::$msgArr['BTOPIC'] = 'analyzefile';
+                    if(self::$stream) {
+                        Frontend::statusToStream(self::$msgId, 'pre', "Calling $btag analyzer (Again). ");
+                    }
+                    ProcessMethods::processMessage();
+                    break;
+                
+                case 'chat':
+                default:
+                    // Use direct chat generation for chat models
+                    if(self::$stream) {
+                        Frontend::statusToStream(self::$msgId, 'pre', 'Calling chat generator (Again). ');
+                    }
+                    ProcessMethods::processMessage();
+                    break;
+            }
+        } catch (\Throwable $e) {
+            error_log("dispatchByBTag error for BTAG '$btag': " . $e->getMessage());
+            throw $e; // Re-throw to be caught by caller
+        }
     }
     
     /**
@@ -689,7 +813,7 @@ class ProcessMethods {
      * 
      * @return int The last inserted ID
      */
-    public static function saveAnswerToDB(): int {
+    public static function saveAnswerToDB() {
         // **************************************************************************************************
         // get the incoming id
         $incomingId = self::$msgArr['BID'];
@@ -754,7 +878,7 @@ class ProcessMethods {
                     $values[] = $val;
                 } else {
                     if(is_string($val)) {
-                        $values[] = "'" . db::EscString($val) . "'";
+                        $values[] = "'" . DB::EscString($val) . "'";
                     } else {
                         $values[] = 0;
                     }
@@ -764,8 +888,8 @@ class ProcessMethods {
         
         // Insert the processed message into the database
         $newSQL = "insert into BMESSAGES (" . implode(",", $fields) . ") values (" . implode(",", $values) . ")";
-        $newRes = db::Query($newSQL);
-        $aiLastId = db::LastId();
+        $newRes = DB::Query($newSQL);
+        $aiLastId = DB::LastId();
 
         // **************************************************************************************************
         // count bytes
@@ -775,17 +899,90 @@ class ProcessMethods {
         // **************************************************************************************************
         XSControl::storeAIDetails($aiAnswer, 'AISYSPROMPT', self::$msgArr['BTOPIC'], self::$stream);
 
-        // Fetch AI service and model information for AI messages
-        $serviceSQL = "SELECT BVALUE FROM BMESSAGEMETA WHERE BMESSID = ".intval($incomingId)." AND BTOKEN = 'AISERVICE' ORDER BY BID DESC LIMIT 1";
-        $serviceRes = db::Query($serviceSQL);
-        if($serviceArr = db::FetchArr($serviceRes)) {
-            XSControl::storeAIDetails($aiAnswer, 'AISERVICE', $serviceArr['BVALUE'], self::$stream);
-        }
-        //
-        $modelSQL = "SELECT BVALUE FROM BMESSAGEMETA WHERE BMESSID = ".intval($incomingId)." AND BTOKEN = 'AIMODEL' ORDER BY BID DESC LIMIT 1";
-        $modelRes = db::Query($modelSQL);
-        if($modelArr = db::FetchArr($modelRes)) {
-            XSControl::storeAIDetails($aiAnswer, 'AIMODEL', $modelArr['BVALUE'], self::$stream);
+        // For Again requests, use forced AI model information; otherwise use incoming message data
+        if (isset($GLOBALS["IS_AGAIN"]) && $GLOBALS["IS_AGAIN"] === true) {
+            // Use forced AI model information for Again requests
+            if (isset($GLOBALS["FORCED_AI_SERVICE"])) {
+                XSControl::storeAIDetails($aiAnswer, 'AISERVICE', $GLOBALS["FORCED_AI_SERVICE"], self::$stream);
+            }
+            if (isset($GLOBALS["FORCED_AI_MODEL"])) {
+                XSControl::storeAIDetails($aiAnswer, 'AIMODEL', $GLOBALS["FORCED_AI_MODEL"], self::$stream);
+            }
+            if (isset($GLOBALS["FORCED_AI_MODELID"])) {
+                $modelId = intval($GLOBALS["FORCED_AI_MODELID"]);
+                XSControl::storeAIDetails($aiAnswer, 'AIMODELID', strval($modelId), self::$stream);
+                
+                if ($modelId > 0) {
+                    // Update BPROVIDX with the forced model ID for OUT messages
+                    $updateSQL = "UPDATE BMESSAGES SET BPROVIDX = " . $modelId . " WHERE BID = " . $aiLastId;
+                    DB::Query($updateSQL);
+                    
+                    // Store BTAG from final model for the original IN message
+                    $modelSQL = "SELECT BTAG FROM BMODELS WHERE BID = " . $modelId . " LIMIT 1";
+                    $modelRes = DB::Query($modelSQL);
+                    $modelRow = DB::FetchArr($modelRes);
+                    if ($modelRow && is_array($modelRow) && !empty($modelRow['BTAG'])) {
+                        // Store BTAG for the original IN message (overwrite any existing)
+                        $inMessageForBtag = ['BID' => $incomingId];
+                        XSControl::storeAIDetails($inMessageForBtag, 'BTAG', $modelRow['BTAG'], self::$stream);
+                    }
+                } else {
+                    // If forced model ID is invalid, leave BPROVIDX empty
+                    $updateSQL = "UPDATE BMESSAGES SET BPROVIDX = '' WHERE BID = " . $aiLastId;
+                    DB::Query($updateSQL);
+                }
+            }
+            // Store Again flag
+            XSControl::storeAIDetails($aiAnswer, 'IS_AGAIN', 'true', self::$stream);
+        } else {
+            // Fetch AI service and model information from incoming message for regular requests
+            $serviceSQL = "SELECT BVALUE FROM BMESSAGEMETA WHERE BMESSID = ".intval($incomingId)." AND BTOKEN = 'AISERVICE' ORDER BY BID DESC LIMIT 1";
+            $serviceRes = DB::Query($serviceSQL);
+            $serviceArr = DB::FetchArr($serviceRes);
+            if($serviceArr && is_array($serviceArr)) {
+                XSControl::storeAIDetails($aiAnswer, 'AISERVICE', $serviceArr['BVALUE'], self::$stream);
+            }
+            //
+            $modelSQL = "SELECT BVALUE FROM BMESSAGEMETA WHERE BMESSID = ".intval($incomingId)." AND BTOKEN = 'AIMODEL' ORDER BY BID DESC LIMIT 1";
+            $modelRes = DB::Query($modelSQL);
+            $modelArr = DB::FetchArr($modelRes);
+            if($modelArr && is_array($modelArr)) {
+                XSControl::storeAIDetails($aiAnswer, 'AIMODEL', $modelArr['BVALUE'], self::$stream);
+            }
+            
+            // Fetch and set AIMODELID to BPROVIDX for OUT messages
+            $modelIdSQL = "SELECT BVALUE FROM BMESSAGEMETA WHERE BMESSID = ".intval($incomingId)." AND BTOKEN = 'AIMODELID' ORDER BY BID DESC LIMIT 1";
+            $modelIdRes = DB::Query($modelIdSQL);
+            $modelIdArr = DB::FetchArr($modelIdRes);
+            if($modelIdArr && is_array($modelIdArr)) {
+                $modelId = intval($modelIdArr['BVALUE']);
+                if ($modelId > 0) {
+                    // Update BPROVIDX with the actual model ID for OUT messages
+                    $updateSQL = "UPDATE BMESSAGES SET BPROVIDX = " . $modelId . " WHERE BID = " . $aiLastId;
+                    DB::Query($updateSQL);
+                    
+                    XSControl::storeAIDetails($aiAnswer, 'AIMODELID', $modelIdArr['BVALUE'], self::$stream);
+                    
+                    // Store BTAG from final model for the IN message (overwrite any existing)
+                    $modelSQL = "SELECT BTAG FROM BMODELS WHERE BID = " . $modelId . " LIMIT 1";
+                    $modelRes = DB::Query($modelSQL);
+                    $modelRow = DB::FetchArr($modelRes);
+                    if ($modelRow && is_array($modelRow) && !empty($modelRow['BTAG'])) {
+                        $inMessageForBtag = ['BID' => $incomingId];
+                        XSControl::storeAIDetails($inMessageForBtag, 'BTAG', $modelRow['BTAG'], self::$stream);
+                    }
+                } else {
+                    // If AIMODELID exists but is invalid (0 or negative), leave BPROVIDX empty
+                    $updateSQL = "UPDATE BMESSAGES SET BPROVIDX = '' WHERE BID = " . $aiLastId;
+                    DB::Query($updateSQL);
+                    
+                    XSControl::storeAIDetails($aiAnswer, 'AIMODELID', $modelIdArr['BVALUE'], self::$stream);
+                }
+            } else {
+                // If no AIMODELID found, leave BPROVIDX empty for OUT messages
+                $updateSQL = "UPDATE BMESSAGES SET BPROVIDX = '' WHERE BID = " . $aiLastId;
+                DB::Query($updateSQL);
+            }
         }
         // **************************************************************************************************
         // **************************************************************************************************
@@ -801,7 +998,7 @@ class ProcessMethods {
      * @param array $newMsgArr The new message array to use
      * @return array The new message array with essential fields preserved
      */
-    private static function preserveEssentialFields($newMsgArr): array {
+    private static function preserveEssentialFields($newMsgArr) {
         // Essential fields that should be preserved from the original message
         $essentialFields = ['BID', 'BUSERID', 'BTRACKID', 'BMESSTYPE', 'BDIRECT'];
         

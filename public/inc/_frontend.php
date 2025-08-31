@@ -111,18 +111,24 @@ Class Frontend {
         $cRes = DB::Query($cSQL);
         $allMessages = [];
         while($cArr = DB::FetchArr($cRes)) {
-            if(strlen($cArr['BFILETEXT']) > 64) {
+            if (!$cArr || !is_array($cArr)) {
+                continue;
+            }
+            
+            if(isset($cArr['BFILETEXT']) && strlen($cArr['BFILETEXT']) > 64) {
                 $cArr['BFILETEXT'] = substr($cArr['BFILETEXT'], 0, 64)."...";
             }
             
             // Get file metadata for this message
-            $metaSQL = "SELECT * FROM BMESSAGEMETA WHERE BMESSID = ".$cArr['BID']." AND BTOKEN = 'FILECOUNT' ORDER BY BID DESC LIMIT 1";
-            $metaRes = DB::Query($metaSQL);
-            $metaArr = DB::FetchArr($metaRes);
-            if($metaArr) {
-                $cArr['FILECOUNT'] = intval($metaArr['BVALUE']);
-            } else {
-                $cArr['FILECOUNT'] = 0;
+            if (isset($cArr['BID'])) {
+                $metaSQL = "SELECT * FROM BMESSAGEMETA WHERE BMESSID = ".$cArr['BID']." AND BTOKEN = 'FILECOUNT' ORDER BY BID DESC LIMIT 1";
+                $metaRes = DB::Query($metaSQL);
+                $metaArr = DB::FetchArr($metaRes);
+                if($metaArr && is_array($metaArr)) {
+                    $cArr['FILECOUNT'] = intval($metaArr['BVALUE']);
+                } else {
+                    $cArr['FILECOUNT'] = 0;
+                }
             }
             
             $allMessages[] = $cArr;
@@ -217,7 +223,7 @@ Class Frontend {
                     ORDER BY BID ASC";
             $res = DB::Query($sql);
             while($fileArr = DB::FetchArr($res)) {
-                if(!empty($fileArr['BFILEPATH']) && !empty($fileArr['BFILETYPE'])) {
+                if($fileArr && is_array($fileArr) && !empty($fileArr['BFILEPATH']) && !empty($fileArr['BFILETYPE'])) {
                     $files[] = [
                         'BID' => $fileArr['BID'],
                         'BFILEPATH' => $fileArr['BFILEPATH'],
@@ -273,12 +279,12 @@ Class Frontend {
         // Handle file uploads if any
         if(!empty($_FILES['files'])) {
             foreach ($_FILES['files']['tmp_name'] as $i => $tmpName) {
+                $originalName = $_FILES['files']['name'][$i];
+                
                 if (!is_uploaded_file($tmpName)) {
                     $retArr['error'] .= "Invalid upload: ".$originalName."\n";
                     continue; // skip invalid upload
                 }
-                
-                $originalName = $_FILES['files']['name'][$i];
                 $fileSize = $_FILES['files']['size'][$i];
 
                 if($fileSize > 1024*1024*90) {
@@ -563,35 +569,211 @@ Class Frontend {
      * @return array Empty array (output is sent directly to client)
      */
     public static function chatStream(): array {
-        // Handle anonymous widget sessions
-        if (isset($_SESSION["is_widget"]) && $_SESSION["is_widget"] === true) {
-            // Use widget owner ID for anonymous sessions
-            $userId = $_SESSION["widget_owner_id"];
-        } else {
-            // Regular authenticated user sessions
-            $userId = $_SESSION["USERPROFILE"]["BID"];
-        }
-        $fileCount = 0;
-        // ------------------------------------------------------------
-        header('Content-Type: text/event-stream');
-        header('Cache-Control: no-cache');
+        // SSE hardening
+        if (function_exists('apache_setenv')) { @apache_setenv('no-gzip', '1'); }
+        @ini_set('zlib.output_compression', '0');
+        @ini_set('implicit_flush', '1');
+        @ini_set('output_buffering', '0');
+        @ini_set('display_errors', '0');        // log errors, don't print
+        error_reporting(E_ALL);
+
+        header('Content-Type: text/event-stream; charset=UTF-8');
+        header('Cache-Control: no-cache, no-transform');
+        header('X-Accel-Buffering: no');
         header('Connection: keep-alive');
+        
+        // Register cleanup function for unexpected exits
+        register_shutdown_function(function() {
+            self::cleanupAgainGlobals();
+        });
+        
+        // Safe flush function
+        $flush = function () {
+            if (ob_get_level() > 0) { @ob_flush(); }
+            @flush();
+        };
+        
+        // Safe SSE send function
+        $send = function(array $payload) use ($flush) {
+            echo 'data: ' . json_encode($payload, JSON_UNESCAPED_UNICODE) . "\n\n";
+            $flush();
+        };
+        
+        // Read all needed session values into local variables before streaming
+        $isWidget = isset($_SESSION["is_widget"]) && $_SESSION["is_widget"] === true;
+        $widgetOwnerId = isset($_SESSION["widget_owner_id"]) ? $_SESSION["widget_owner_id"] : null;
+        $anonymousSessionId = isset($_SESSION["anonymous_session_id"]) ? $_SESSION["anonymous_session_id"] : null;
+        $userProfile = isset($_SESSION["USERPROFILE"]) ? $_SESSION["USERPROFILE"] : null;
+        
+        // Determine user ID from session data
+        if ($isWidget) {
+            $userId = $widgetOwnerId;
+        } else {
+            $userId = $userProfile ? $userProfile["BID"] : null;
+        }
+        
+        // Close session immediately to prevent session locks on multiple requests
+        session_write_close();
+        
+        $fileCount = 0;
+    
+        // Check if this is an "Again" request
+        $isAgainRequest = isset($_REQUEST['again']) && $_REQUEST['again'] == '1';
+        
+        if ($isAgainRequest) {
+            try {
+                // For Again requests, use explicit in_id or auto-resolve
+                $inId = isset($_REQUEST['in_id']) ? intval($_REQUEST['in_id']) : null;
+                
+                if (!$inId) {
+                    $inId = self::getLastInMessageIdForCurrentContextLocal($isWidget, $widgetOwnerId, $anonymousSessionId, $userProfile);
+                }
+                
+                if ($inId <= 0) {
+                    $send(['status' => 'error', 'message' => 'No previous IN message found for Again request', 'timestamp' => time()]);
+                    exit;
+                }
+                
+                // Validate the IN message
+                $msgArr = Central::getMsgById($inId);
+                if (!$msgArr || $msgArr['BDIRECT'] !== 'IN') {
+                    $send(['status' => 'error', 'message' => 'Invalid IN message ID for Again request', 'timestamp' => time()]);
+                    exit;
+                }
+                
+                $lastIds = [$inId];
+            } catch (\Throwable $e) {
+                error_log("SSE Again request error: " . $e->getMessage());
+                $send(['status' => 'error', 'message' => 'Again request failed: ' . $e->getMessage(), 'timestamp' => time()]);
+                exit;
+            }
+        } else {
+            // For normal requests, validate lastIds parameter exists
+            if (!isset($_REQUEST['lastIds']) || empty($_REQUEST['lastIds'])) {
+                $send(['status' => 'error', 'message' => 'Missing lastIds parameter', 'timestamp' => time()]);
+                exit;
+            }
     
         $lastIds = explode(",", $_REQUEST['lastIds']);
         //error_log("LASTIDS: ". print_r($lastIds, true));
 
-        if (!is_array($lastIds)) {
-            http_response_code(400);
-            echo "event: error\ndata: Invalid ID list\n\n";
+            if (!is_array($lastIds) || empty($lastIds)) {
+                $send(['status' => 'error', 'message' => 'Invalid ID list format', 'timestamp' => time()]);
             exit;
         }
-        // START OUTPUT 
-        $update = [
+        }
+        
+        // Handle "Again" functionality - model override
+        $modelId = isset($_REQUEST['model_id']) ? intval($_REQUEST['model_id']) : null;
+        $selectedModel = null;
+        
+        if ($isAgainRequest) {
+            try {
+                // Handle "Again" requests with or without specific model_id
+                if ($modelId) {
+                    // Validate and load the specified model
+                    $modelSQL = "SELECT * FROM BMODELS WHERE BID = " . $modelId . " AND BSELECTABLE = 1 LIMIT 1";
+                    $modelRes = db::Query($modelSQL);
+                    $selectedModel = db::FetchArr($modelRes);
+                    
+                    if (!$selectedModel) {
+                        error_log("SSE Again: Model ID $modelId not found or not selectable");
+                    }
+                } else {
+                    // Auto-select using AgainLogic
+                    try {
+                        $inId = $lastIds[0];
+                        $msgArr = Central::getMsgById($inId);
+                        $replayUserId = $msgArr ? $msgArr['BUSERID'] : ($userProfile ? $userProfile["BID"] : 0);
+                        
+                        $replay = AgainLogic::replay($inId, null, $replayUserId);
+                        $selectedModel = $replay['selectedModel'];
+                    } catch (\Throwable $e) {
+                        error_log("SSE Again auto-select error: " . $e->getMessage());
+                        $selectedModel = null;
+                    }
+                }
+                
+                if (!$selectedModel) {
+                    $send(['status' => 'error', 'message' => 'Invalid model ID or model not selectable', 'meta' => ['isAgain' => true], 'timestamp' => time()]);
+                    self::cleanupAgainGlobals();
+                    exit;
+                }
+            } catch (\Throwable $e) {
+                error_log("SSE Again model selection error: " . $e->getMessage());
+                $send(['status' => 'error', 'message' => 'Model selection failed: ' . $e->getMessage(), 'meta' => ['isAgain' => true], 'timestamp' => time()]);
+                self::cleanupAgainGlobals();
+                exit;
+            }
+            
+            // Validate BTAG matches the context using AgainLogic
+            try {
+                $inId = $lastIds[0];
+                $msgArr = Central::getMsgById(intval($inId));
+                $btagUserId = $msgArr ? $msgArr['BUSERID'] : ($userProfile ? $userProfile["BID"] : 0);
+                
+                // Get the last OUT message for proper BTAG resolution
+                $lastOut = AgainLogic::getLastOutForIn($inId);
+                
+                // Use AgainLogic to determine the correct BTAG for this context
+                $expectedBtag = AgainLogic::resolveTagForReplay($inId, $lastOut);
+                
+                // Check if selected model BTAG matches expected BTAG
+                if ($selectedModel['BTAG'] !== $expectedBtag) {
+                    error_log("SSE Again BTAG mismatch: Model BTAG ({$selectedModel['BTAG']}) vs Expected BTAG ($expectedBtag)");
+                    $send([
+                        'status' => 'error', 
+                        'message' => "Model BTAG mismatch: Selected model '{$selectedModel['BNAME']}' has BTAG '{$selectedModel['BTAG']}' but expected BTAG '$expectedBtag' for this context",
+                        'meta' => ['btag' => $expectedBtag, 'selectedBtag' => $selectedModel['BTAG'], 'isAgain' => true], 
+                        'timestamp' => time()
+                    ]);
+                    self::cleanupAgainGlobals();
+                    exit;
+                }
+            } catch (\Throwable $e) {
+                // If BTAG validation fails, send error instead of allowing any model
+                error_log("SSE Again BTAG validation failed: " . $e->getMessage());
+                $send([
+                    'status' => 'error', 
+                    'message' => 'Unable to validate model compatibility for this request context',
+                    'timestamp' => time()
+                ]);
+                self::cleanupAgainGlobals();
+                exit;
+            }
+            
+            // Validate service class exists before proceeding
+            $forcedServiceClass = "AI" . $selectedModel['BSERVICE'];
+            if (!class_exists($forcedServiceClass)) {
+                $send(['status' => 'error', 'message' => 'Model service not available: ' . $forcedServiceClass, 'meta' => ['isAgain' => true], 'timestamp' => time()]);
+                self::cleanupAgainGlobals();
+                exit;
+            }
+            
+            // Set temporary globals for Again bypass (no permanent mutations)
+            $GLOBALS["FORCE_AI_MODEL"] = true;
+            $GLOBALS["IS_AGAIN"] = true;
+            $GLOBALS["FORCED_AI_SERVICE"] = $forcedServiceClass;
+            // Use BNAME if BPROVID is empty
+            $GLOBALS["FORCED_AI_MODEL"] = !empty($selectedModel['BPROVID']) ? $selectedModel['BPROVID'] : $selectedModel['BNAME'];
+            $GLOBALS["FORCED_AI_MODELID"] = $selectedModel['BID'];
+            $GLOBALS["FORCED_AI_BTAG"] = $selectedModel['BTAG'];
+            
+            // For Again requests, ignore promptId to avoid going through sorter
+            unset($_REQUEST['promptId']);
+            unset($_GET['promptId']);
+            unset($_POST['promptId']);
+        }
+        
+        // Send starting heartbeat frame first
+        $send([
             'msgId' => "START_".$lastIds[0],
             'status' => 'starting',
-            'message' => 'Starting'
-        ];
-        self::printToStream($update);
+            'message' => 'Starting',
+            'timestamp' => time()
+        ]);
+        
+
         //error_log("START: ". print_r($_REQUEST, true));
 
         // for each id, get the message
@@ -600,56 +782,506 @@ Class Frontend {
             if($msgArr['BFILE'] > 0) {
                 $msgArr = Central::parseFile($msgArr, true);
             } else {
-                $update = [
+                $send([
                     'msgId' => $msgId,
                     'status' => 'pre_processing',
-                    'message' => 'Processing message '.$msgId.'. '
-                ];
-                self::printToStream($update);
+                    'message' => 'Processing message '.$msgId.'. ',
+                    'timestamp' => time()
+                ]);
             }
         }
         // ------------------------------------------------------------        
         // ------------------------------------------------------------
-        $update = [
+        $send([
             'msgId' => $msgId,
             'status' => 'pre_processing',
-            'message' => 'Finished pre-processing message(s). '
-        ];
-        self::printToStream($update);
+            'message' => 'Finished pre-processing message(s). ',
+            'timestamp' => time()
+        ]);
         // ------------------------------------------------------------
         // now work on the message itself, sort it and process it
-        self::createAnswer($msgId);
+                try {
+        $aiLastId = self::createAnswer($msgId);
+        } catch (\Throwable $e) {
+            error_log("SSE createAnswer failed: " . $e->getMessage());
+            $send(['status' => 'error', 'message' => 'Message processing failed: ' . $e->getMessage(), 'timestamp' => time()]);
+            self::cleanupAgainGlobals();
+            exit;
+        }
         
-        $update = [
+        // Prepare final SSE payload with meta
+        $finalPayload = [
             'msgId' => $msgId,
             'status' => 'done',
-            'message' => 'That should end the stream. '
+            'message' => 'That should end the stream. ',
+            'timestamp' => time()
         ];
-        self::printToStream($update);
-
-        // ------------------------------------------------------------
-        // Finish the stream nicely
-        echo "event: done\ndata: Stream ended successfully\n\n";
-        ob_flush();
-        flush();
-        return [];
+        
+        // Add comprehensive meta information with error handling
+        try {
+            if ($isAgainRequest) {
+                $inId = $lastIds[0];
+                
+                if ($selectedModel) {
+                    // Use selected model info
+                    $service = $selectedModel['BSERVICE'];
+                    $model = $selectedModel['BNAME'];
+                    $btag = $selectedModel['BTAG'];
+                    $currentModelId = $selectedModel['BID'];
+                } else {
+                    // Auto-select was already done above, use the selectedModel 
+                    if ($selectedModel) {
+                        $service = $selectedModel['BSERVICE'];
+                        $model = $selectedModel['BNAME'];
+                        $btag = $selectedModel['BTAG'];
+                        $currentModelId = $selectedModel['BID'];
+                    } else {
+                        // Fallback to chat if auto-select failed
+                        $btag = 'chat';
+                        $service = 'Unknown';
+                        $model = 'unknown';
+                        $currentModelId = 0;
+                    }
+                }
+                
+                // Get track ID for debugging (reuse $msgArr if available)
+                if (!isset($msgArr)) {
+                    $msgArr = Central::getMsgById($inId);
+                }
+                $trackId = $msgArr ? $msgArr['BTRACKID'] : null;
+                
+                // Get eligible models and predicted next with error handling
+                $eligible = [];
+                $predictedNext = null;
+                try {
+                    $eligible = self::getEligibleModels($btag);
+                    
+                    // If no eligible models found, try fallback from BCONFIG
+                    if (empty($eligible)) {
+                        $fallbackModel = self::getFallbackModel($btag);
+                        if ($fallbackModel) {
+                            $eligible = [$fallbackModel];
+                        } else {
+                            error_log("No eligible models found for BTAG: $btag (Again request)");
+                        }
+                    }
+                    
+                    $predictedNext = self::getPredictedNext($eligible, $currentModelId);
+                } catch (\Throwable $e) {
+                    error_log("Error getting model lists: " . $e->getMessage());
+                }
+                
+                // Get full OUT message information if available
+                $outId = isset($aiLastId) && $aiLastId > 0 ? $aiLastId : null;
+                $filePath = '';
+                $fileType = '';
+                $outText = '';
+                
+                if ($outId) {
+                    $outSQL = "SELECT BTEXT, BFILEPATH, BFILETYPE FROM BMESSAGES WHERE BID = " . intval($outId) . " LIMIT 1";
+                    $outRes = db::Query($outSQL);
+                    $outRow = db::FetchArr($outRes);
+                    if ($outRow) {
+                        $outText = $outRow['BTEXT'] ?: '';
+                        $filePath = $outRow['BFILEPATH'] ?: '';
+                        $fileType = $outRow['BFILETYPE'] ?: '';
+                    }
+                }
+                
+                // Normalize service name for logo compatibility
+                $normalizedService = $service;
+                if (strtolower($service) === 'open') {
+                    $normalizedService = 'OpenAI';
+                }
+                
+                $finalPayload['meta'] = [
+                    'service' => $normalizedService,
+                    'model' => $model,
+                    'btag' => $btag,
+                    'isAgain' => true,
+                    'inId' => $inId,
+                    'trackId' => $trackId,
+                    'outId' => $outId,
+                    'filePath' => $filePath,
+                    'fileType' => $fileType,
+                    'predictedNext' => $predictedNext,
+                    'eligible' => $eligible
+                ];
+            } else {
+            // For normal processing, get actual model info from database
+            $inId = $lastIds[0];
+            
+            // Get track ID for debugging
+            $msgArr = Central::getMsgById($inId);
+            $trackId = $msgArr ? $msgArr['BTRACKID'] : null;
+            
+            // Get actual AI service and model from BMESSAGEMETA
+            $serviceSQL = "SELECT BVALUE FROM BMESSAGEMETA WHERE BMESSID = " . intval($inId) . " AND BTOKEN = 'AISERVICE' ORDER BY BID DESC LIMIT 1";
+            $serviceRes = db::Query($serviceSQL);
+            $serviceRow = db::FetchArr($serviceRes);
+            $currentService = $serviceRow ? str_replace("AI", "", $serviceRow['BVALUE']) : "Unknown";
+            
+            $modelSQL = "SELECT BVALUE FROM BMESSAGEMETA WHERE BMESSID = " . intval($inId) . " AND BTOKEN = 'AIMODEL' ORDER BY BID DESC LIMIT 1";
+            $modelRes = db::Query($modelSQL);
+            $modelRow = db::FetchArr($modelRes);
+            $currentModel = $modelRow ? $modelRow['BVALUE'] : "unknown";
+            
+            $modelIdSQL = "SELECT BVALUE FROM BMESSAGEMETA WHERE BMESSID = " . intval($inId) . " AND BTOKEN = 'AIMODELID' ORDER BY BID DESC LIMIT 1";
+            $modelIdRes = db::Query($modelIdSQL);
+            $modelIdRow = db::FetchArr($modelIdRes);
+            $currentModelId = $modelIdRow ? intval($modelIdRow['BVALUE']) : 0;
+            
+            // Determine BTAG dynamically from the message context
+            $currentBtag = "chat"; // Default fallback
+            try {
+                // Get the last OUT message for proper BTAG resolution
+                $lastOut = AgainLogic::getLastOutForIn($inId);
+                
+                // Resolve BTAG using AgainLogic with proper lastOut context
+                $resolvedBtag = AgainLogic::resolveTagForReplay($inId, $lastOut);
+                if (!empty($resolvedBtag)) {
+                    $currentBtag = $resolvedBtag;
+                }
+            } catch (\Throwable $e) {
+                error_log("Error resolving BTAG for normal request, using default 'chat': " . $e->getMessage());
+            }
+            
+            // Get eligible models and predicted next with error handling
+            $eligible = [];
+            $predictedNext = null;
+            try {
+                $eligible = self::getEligibleModels($currentBtag);
+                
+                // If no eligible models found, try fallback from BCONFIG
+                if (empty($eligible)) {
+                    $fallbackModel = self::getFallbackModel($currentBtag);
+                    if ($fallbackModel) {
+                        $eligible = [$fallbackModel];
+                    } else {
+                        error_log("No eligible models found for BTAG: $currentBtag");
+                    }
+                }
+                
+                $predictedNext = $currentModelId > 0 ? self::getPredictedNext($eligible, $currentModelId) : (isset($eligible[0]) ? $eligible[0] : null);
+            } catch (\Throwable $e) {
+                error_log("Error getting model lists: " . $e->getMessage());
+            }
+            
+            // Get full OUT message information if available
+            $outId = isset($aiLastId) && $aiLastId > 0 ? $aiLastId : null;
+            $filePath = '';
+            $fileType = '';
+            $outText = '';
+            
+            if ($outId) {
+                $outSQL = "SELECT BTEXT, BFILEPATH, BFILETYPE FROM BMESSAGES WHERE BID = " . intval($outId) . " LIMIT 1";
+                $outRes = db::Query($outSQL);
+                $outRow = db::FetchArr($outRes);
+                if ($outRow) {
+                    $outText = $outRow['BTEXT'] ?: '';
+                    $filePath = $outRow['BFILEPATH'] ?: '';
+                    $fileType = $outRow['BFILETYPE'] ?: '';
+                }
+            }
+            
+            // Normalize service name for logo compatibility
+            $normalizedService = $currentService;
+            if (strtolower($currentService) === 'open') {
+                $normalizedService = 'OpenAI';
+            }
+            
+            $finalPayload['meta'] = [
+                'service' => $normalizedService,
+                'model' => $currentModel,
+                'btag' => $currentBtag,
+                'isAgain' => false,
+                'inId' => $inId,
+                'trackId' => $trackId,
+                'outId' => $outId,
+                'filePath' => $filePath,
+                'fileType' => $fileType,
+                'predictedNext' => $predictedNext,
+                'eligible' => $eligible
+            ];
+        }
+        } catch (\Throwable $e) {
+            error_log("Error creating SSE meta: " . $e->getMessage());
+            // Minimal meta on error
+            $finalPayload['meta'] = [
+                'service' => 'Unknown',
+                'model' => 'Unknown',
+                'btag' => 'chat',
+                'isAgain' => $isAgainRequest,
+                'inId' => $lastIds[0] ?? 0,
+                'trackId' => null,
+                'predictedNext' => null,
+                'eligible' => []
+            ];
+        }
+        
+        // Add OUT message text if available (overrides default message)
+        if (isset($outText) && !empty($outText)) {
+            $finalPayload['message'] = $outText;
+        }
+        
+        $send($finalPayload);
+        
+        // Global cleanup after streaming
+        self::cleanupAgainGlobals();
+        
+        exit;
     }
+    
+    /**
+     * Get the last IN message ID for the current context (user or widget)
+     */
+    public static function getLastInMessageIdForCurrentContext(): int {
+        $isWidget = isset($_SESSION["is_widget"]) && $_SESSION["is_widget"] === true;
+
+        if ($isWidget) {
+            if (!isset($_SESSION["anonymous_session_id"]) || !isset($_SESSION["widget_owner_id"])) {
+                return 0;
+            }
+            $userId = intval($_SESSION["widget_owner_id"]);
+            $trackId = crc32($_SESSION["anonymous_session_id"]);
+            $sql = "SELECT BID FROM BMESSAGES
+                    WHERE BUSERID = {$userId} AND BDIRECT = 'IN' AND BTRACKID = {$trackId}
+                    ORDER BY BID DESC LIMIT 1";
+        } else {
+            if (!isset($_SESSION["USERPROFILE"]["BID"])) {
+                return 0;
+            }
+            $userId = intval($_SESSION["USERPROFILE"]["BID"]);
+            $sql = "SELECT BID FROM BMESSAGES
+                    WHERE BUSERID = {$userId} AND BDIRECT = 'IN'
+                    ORDER BY BID DESC LIMIT 1";
+        }
+        
+        $res = DB::Query($sql);
+        $row = DB::FetchArr($res);
+        return $row ? intval($row['BID']) : 0;
+    }
+    
+    /**
+     * Get the last IN message ID for the current context using local variables (SSE-safe)
+     */
+    public static function getLastInMessageIdForCurrentContextLocal(bool $isWidget, ?int $widgetOwnerId, ?string $anonymousSessionId, ?array $userProfile): int {
+        if ($isWidget) {
+            if (!$anonymousSessionId || !$widgetOwnerId) {
+                return 0;
+            }
+            $userId = intval($widgetOwnerId);
+            $trackId = crc32($anonymousSessionId);
+            $sql = "SELECT BID FROM BMESSAGES
+                    WHERE BUSERID = {$userId} AND BDIRECT = 'IN' AND BTRACKID = {$trackId}
+                    ORDER BY BID DESC LIMIT 1";
+        } else {
+            if (!$userProfile || !isset($userProfile["BID"])) {
+                return 0;
+            }
+            $userId = intval($userProfile["BID"]);
+            $sql = "SELECT BID FROM BMESSAGES
+                    WHERE BUSERID = {$userId} AND BDIRECT = 'IN'
+                    ORDER BY BID DESC LIMIT 1";
+        }
+        
+        $res = DB::Query($sql);
+        $row = DB::FetchArr($res);
+        return $row ? intval($row['BID']) : 0;
+    }
+
+    /**
+     * Get eligible models for SSE meta (using AgainLogic)
+     */
+    private static function getEligibleModels(string $btag): array {
+        $models = AgainLogic::getEligibleModels($btag);
+        
+        // Convert to the format expected by SSE meta
+        $result = [];
+        foreach ($models as $model) {
+            $result[] = [
+                'model_id' => intval($model['BID']),
+                'service' => $model['BSERVICE'],
+                // Use BPROVID if available, fallback to BNAME
+                'model' => !empty($model['BPROVID']) ? $model['BPROVID'] : $model['BNAME']
+            ];
+        }
+        
+        return $result;
+    }
+    
+    /**
+     * Get predicted next model using AgainLogic round-robin
+     */
+    private static function getPredictedNext(array $eligible, int $currentModelId): ?array {
+        if (empty($eligible)) {
+            return null;
+        }
+        
+        // Convert eligible back to AgainLogic format
+        $eligibleForLogic = [];
+        foreach ($eligible as $model) {
+            $eligibleForLogic[] = [
+                'BID' => $model['model_id'],
+                'BSERVICE' => $model['service'],
+                'BPROVID' => $model['model'],
+                'BTAG' => '', // Not needed for pickModel logic
+                'BNAME' => $model['model'] // In case needed
+            ];
+        }
+        
+        // Use AgainLogic to pick the next model
+        try {
+            $nextModel = AgainLogic::pickModel($eligibleForLogic, $currentModelId);
+            
+            // Convert back to SSE meta format
+            return [
+                'model_id' => intval($nextModel['BID']),
+                'service' => $nextModel['BSERVICE'],
+                // Use BPROVID if available, fallback to BNAME
+                'model' => !empty($nextModel['BPROVID']) ? $nextModel['BPROVID'] : $nextModel['BNAME']
+            ];
+        } catch (\Throwable $e) {
+            return null;
+        }
+    }
+
+    /**
+     * Get fallback model from BCONFIG when no eligible models found
+     */
+    private static function getFallbackModel(string $btag): ?array {
+        try {
+            // Map BTAG to BSETTING for BCONFIG lookup
+            $btagToSetting = [
+                'chat' => 'CHAT',
+                'text2pic' => 'TEXT2PIC',
+                'text2vid' => 'TEXT2VID',
+                'text2audio' => 'TEXT2SOUND',
+                'text2sound' => 'TEXT2SOUND',
+                'pic2text' => 'PIC2TEXT',
+                'sound2text' => 'SOUND2TEXT'
+            ];
+            
+            $bsetting = $btagToSetting[$btag] ?? null;
+            if (!$bsetting) {
+                error_log("No BCONFIG mapping found for BTAG: $btag");
+                return null;
+            }
+            
+            // Get current user ID for scope resolution
+            $userId = null;
+            if (isset($_SESSION['USERPROFILE']['BID'])) {
+                $userId = intval($_SESSION['USERPROFILE']['BID']);
+            }
+            
+            // Try user-specific default first, then global fallback
+            $defaultModelId = null;
+            
+            if ($userId > 0) {
+                // Try user-specific scope first
+                $userConfigSQL = "SELECT BVALUE FROM BCONFIG 
+                                  WHERE BGROUP = 'DEFAULTMODEL' 
+                                  AND BSETTING = '" . DB::EscString($bsetting) . "' 
+                                  AND BOWNERID = " . $userId . " 
+                                  LIMIT 1";
+                $userConfigRes = DB::Query($userConfigSQL);
+                $userConfigRow = DB::FetchArr($userConfigRes);
+                
+                if ($userConfigRow && is_array($userConfigRow) && !empty($userConfigRow['BVALUE'])) {
+                    $defaultModelId = intval($userConfigRow['BVALUE']);
+                }
+            }
+            
+            // Fallback to global default (BOWNERID=0)
+            if (!$defaultModelId) {
+                $globalConfigSQL = "SELECT BVALUE FROM BCONFIG 
+                                   WHERE BGROUP = 'DEFAULTMODEL' 
+                                   AND BSETTING = '" . DB::EscString($bsetting) . "' 
+                                   AND BOWNERID = 0 
+                                   LIMIT 1";
+                $globalConfigRes = DB::Query($globalConfigSQL);
+                $globalConfigRow = DB::FetchArr($globalConfigRes);
+                
+                if ($globalConfigRow && is_array($globalConfigRow) && !empty($globalConfigRow['BVALUE'])) {
+                    $defaultModelId = intval($globalConfigRow['BVALUE']);
+                }
+            }
+            
+            if (!$defaultModelId) {
+                error_log("No default model configured for BSETTING: $bsetting (user: $userId, global fallback tried)");
+                return null;
+            }
+            
+            // Get the default model from BMODELS
+            $modelSQL = "SELECT * FROM BMODELS WHERE BID = " . $defaultModelId . " LIMIT 1";
+            $modelRes = DB::Query($modelSQL);
+            $modelRow = DB::FetchArr($modelRes);
+            
+            if (!$modelRow || !is_array($modelRow)) {
+                error_log("Default model ID $defaultModelId not found in BMODELS");
+                return null;
+            }
+            
+            // Verify BTAG consistency (optional validation)
+            if ($modelRow['BTAG'] !== $btag) {
+                error_log("Warning: Default model BTAG ({$modelRow['BTAG']}) does not match requested BTAG ($btag), but using anyway");
+            }
+            
+            // Convert to SSE meta format (use BPROVID consistently for model names)
+            return [
+                'model_id' => intval($modelRow['BID']),
+                'service' => $modelRow['BSERVICE'],
+                // Use BPROVID if available, fallback to BNAME
+                'model' => !empty($modelRow['BPROVID']) ? $modelRow['BPROVID'] : $modelRow['BNAME']
+            ];
+            
+        } catch (\Throwable $e) {
+            error_log("Error getting fallback model: " . $e->getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * Clean up Again-related global variables
+     */
+    private static function cleanupAgainGlobals(): void {
+        $globalsToClean = [
+            'FORCE_AI_MODEL', 'IS_AGAIN', 'FORCED_AI_SERVICE', 
+            'FORCED_AI_MODEL', 'FORCED_AI_MODELID', 'FORCED_AI_BTAG'
+        ];
+        
+        foreach ($globalsToClean as $key) {
+            if (isset($GLOBALS[$key])) {
+                unset($GLOBALS[$key]);
+            }
+        }
+    }
+    
     // ********************************************** process the message **********************************************
     /**
      * Process the message
      * 
      */
     public static function createAnswer($msgId) {
+        try {
         // Process the message using the provided message ID
+            $statusMessage = (isset($GLOBALS["IS_AGAIN"]) && $GLOBALS["IS_AGAIN"] === true) 
+                ? 'Direct run (Again)...' 
+                : 'Sorting. ';
+                
         $update = [
             'msgId' => $msgId,
             'status' => 'pre_processing',
-            'message' => 'Sorting. '
+                'message' => $statusMessage
         ];
         self::printToStream($update);
         // error_log("createAnswer: ".print_r(ProcessMethods::$msgArr, true));
         
         ProcessMethods::init($msgId, true);
+        } catch (\Throwable $e) {
+            error_log("createAnswer init failed: " . $e->getMessage());
+            throw $e; // Re-throw to be caught by caller
+        }
 
         // Handle file translation if needed
         // todo: check the config of the user, if he wants it in English as well!
@@ -659,13 +1291,65 @@ Class Frontend {
         $timeSeconds = 1200;
         ProcessMethods::$threadArr = Central::getThread(ProcessMethods::$msgArr, $timeSeconds);
 
+        // Again bypass: use BTAG-based dispatch instead of direct chat generation
+        if (isset($GLOBALS["IS_AGAIN"]) && $GLOBALS["IS_AGAIN"] === true) {
+            try {
+                // Get the BTAG from forced globals (set during Again request processing)
+                $btag = isset($GLOBALS["FORCED_AI_BTAG"]) ? $GLOBALS["FORCED_AI_BTAG"] : 'chat';
+                
+                // Use BTAG-based dispatch to call the correct generator function
+                ProcessMethods::dispatchByBTag($btag);
+                
+                self::printToStream([
+                    'msgId' => $msgId,
+                    'status' => 'pre_processing',
+                    'message' => 'Again processing completed.'
+                ]);
+                
+            } catch (\Throwable $e) {
+                error_log("Again processing error: " . $e->getMessage());
+                self::printToStream([
+                    'msgId' => $msgId,
+                    'status' => 'error',
+                    'message' => 'Error during Again processing: ' . $e->getMessage()
+                ]);
+                return;
+            }
+        } else {
+            try {
         // Sort and process the message (sort is calling the processor to split tools and topics)
         ProcessMethods::sortMessage();
+            } catch (\Throwable $e) {
+                error_log("sortMessage error: " . $e->getMessage());
+                self::printToStream([
+                    'msgId' => $msgId,
+                    'status' => 'error',
+                    'message' => 'Error during sorting: ' . $e->getMessage()
+                ]);
+                return 0;
+            }
+        }
 
         // Prepare AI answer for database storage
+        try {
         $aiLastId = ProcessMethods::saveAnswerToDB();
+            
+            self::printToStream([
+                'msgId' => $msgId,
+                'status' => 'pre_processing',
+                'message' => 'Answer saved to database.'
+            ]);
 
         return $aiLastId;
+        } catch (\Throwable $e) {
+            error_log("saveAnswerToDB error: " . $e->getMessage());
+            self::printToStream([
+                'msgId' => $msgId,
+                'status' => 'error',
+                'message' => 'Error saving to database: ' . $e->getMessage()
+            ]);
+            return 0;
+        }
     }
 
     // ********************************************** PRINT TO STREAM **********************************************
@@ -679,9 +1363,9 @@ Class Frontend {
      */
     public static function printToStream($data) {
         $data['timestamp'] = time();
-        echo "data: " . json_encode($data,JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . "\n\n";
-        ob_flush();
-        flush();
+        echo "data: " . json_encode($data, JSON_UNESCAPED_UNICODE) . "\n\n";
+        if (ob_get_level() > 0) { @ob_flush(); }
+        @flush();
     }
     // ****************************************************************************************************** 
     // print to the stream, either AI or status...
@@ -796,7 +1480,7 @@ Class Frontend {
         
         $res = DB::Query($sql);
         while($fileArr = DB::FetchArr($res)) {
-            if(!empty($fileArr['BFILEPATH']) && !empty($fileArr['BFILETYPE'])) {
+            if($fileArr && is_array($fileArr) && !empty($fileArr['BFILEPATH']) && !empty($fileArr['BFILETYPE'])) {
                 $files[] = [
                     'BID' => $fileArr['BID'],
                     'BFILEPATH' => $fileArr['BFILEPATH'],
@@ -841,21 +1525,33 @@ Class Frontend {
         
         if(count($historyChatArr) > 0) {
             foreach($historyChatArr as $chat) {
-                // Fetch AI service and model information for AI messages
+                // Fetch AI service and model information for AI messages, and SYSTEMTEXT for all messages
                 $aiService = '';
                 $aiModel = '';
+                $systemText = '';
+                
                 if($chat['BDIRECT'] == 'OUT') {
                     $serviceSQL = "SELECT BVALUE FROM BMESSAGEMETA WHERE BMESSID = ".intval($chat['BID'])." AND BTOKEN = 'AISERVICE' ORDER BY BID DESC LIMIT 1";
                     $serviceRes = DB::Query($serviceSQL);
-                    if($serviceArr = DB::FetchArr($serviceRes)) {
+                    $serviceArr = DB::FetchArr($serviceRes);
+                    if($serviceArr && is_array($serviceArr)) {
                         $aiService = $serviceArr['BVALUE'];
                     }
                     
                     $modelSQL = "SELECT BVALUE FROM BMESSAGEMETA WHERE BMESSID = ".intval($chat['BID'])." AND BTOKEN = 'AIMODEL' ORDER BY BID DESC LIMIT 1";
                     $modelRes = DB::Query($modelSQL);
-                    if($modelArr = DB::FetchArr($modelRes)) {
+                    $modelArr = DB::FetchArr($modelRes);
+                    if($modelArr && is_array($modelArr)) {
                         $aiModel = $modelArr['BVALUE'];
                     }
+                }
+                
+                // Fetch SYSTEMTEXT for all messages (both IN and OUT)
+                $systemSQL = "SELECT BVALUE FROM BMESSAGEMETA WHERE BMESSID = ".intval($chat['BID'])." AND BTOKEN = 'SYSTEMTEXT' ORDER BY BID DESC LIMIT 1";
+                $systemRes = DB::Query($systemSQL);
+                $systemArr = DB::FetchArr($systemRes);
+                if($systemArr && is_array($systemArr)) {
+                    $systemText = $systemArr['BVALUE'];
                 }
                 
                 // Process message data
@@ -870,20 +1566,35 @@ Class Frontend {
                     'BFILEPATH' => $chat['BFILEPATH'],
                     'BFILETYPE' => $chat['BFILETYPE'],
                     'aiService' => $aiService,
-                    'aiModel' => $aiModel
+                    'aiModel' => $aiModel,
+                    'SYSTEMTEXT' => $systemText
                 ];
                 
                 // Process display text for AI messages
                 if($chat['BDIRECT'] == 'OUT') {
+                    // Always preserve the original BTEXT as displayText
                     $displayText = $chat['BTEXT'];
-                    if(substr($chat['BTEXT'], 0, 1) == '/') {
-                        $displayText = "File generated";
-                    }
                     
                     $hasFile = ($chat['BFILE'] > 0 && !empty($chat['BFILETYPE']) && !empty($chat['BFILEPATH']) && strpos($chat['BFILEPATH'], '/') !== false);
                     
-                    // If the message starts with a tool command but has a file, show a better message
-                    if ($hasFile && substr($chat['BTEXT'], 0, 1) == '/') {
+                    // If there's a file and BTEXT is not empty, optionally append file type info
+                    if ($hasFile && !empty($displayText)) {
+                        $fileTypeLabel = '';
+                        if ($chat['BFILETYPE'] == 'mp4' || $chat['BFILETYPE'] == 'webm') {
+                            $fileTypeLabel = 'Video';
+                        } elseif (in_array($chat['BFILETYPE'], ['png', 'jpg', 'jpeg', 'gif'])) {
+                            $fileTypeLabel = 'Image';
+                        } else {
+                            $fileTypeLabel = 'File';
+                        }
+                        
+                        // Only append file type if BTEXT doesn't already mention it
+                        if (!empty($fileTypeLabel) && stripos($displayText, $fileTypeLabel) === false) {
+                            $displayText .= " ($fileTypeLabel)";
+                        }
+                    }
+                    // If BTEXT is empty but there's a file, use the file type as fallback
+                    elseif ($hasFile && empty($displayText)) {
                         if ($chat['BFILETYPE'] == 'mp4' || $chat['BFILETYPE'] == 'webm') {
                             $displayText = "Video";
                         } elseif (in_array($chat['BFILETYPE'], ['png', 'jpg', 'jpeg', 'gif'])) {
@@ -933,6 +1644,9 @@ Class Frontend {
         
         $widgets = [];
         while($row = DB::FetchArr($res)) {
+            if (!$row || !is_array($row) || !isset($row['BGROUP']) || !isset($row['BSETTING']) || !isset($row['BVALUE'])) {
+                continue;
+            }
             $group = $row['BGROUP'];
             $setting = $row['BSETTING'];
             $value = $row['BVALUE'];
@@ -1112,6 +1826,9 @@ Class Frontend {
         $cfgSQL = "SELECT BSETTING, BVALUE FROM BCONFIG WHERE BOWNERID = " . $userId . " AND BGROUP = 'mailhandler'";
         $cfgRes = DB::Query($cfgSQL);
         while($row = DB::FetchArr($cfgRes)) {
+            if (!$row || !is_array($row) || !isset($row['BSETTING']) || !isset($row['BVALUE'])) {
+                continue;
+            }
             switch ($row['BSETTING']) {
                 case 'server': $config['mailServer'] = $row['BVALUE']; break;
                 case 'port': $config['mailPort'] = $row['BVALUE']; break;
@@ -1134,6 +1851,9 @@ Class Frontend {
         $deptRes = DB::Query($deptSQL);
         $departments = [];
         while($row = DB::FetchArr($deptRes)) {
+            if (!$row || !is_array($row) || !isset($row['BVALUE'])) {
+                continue;
+            }
             // stored as email|description|isDefault
             $parts = explode('|', $row['BVALUE']);
             $departments[] = [
@@ -1389,7 +2109,11 @@ Class Frontend {
         $sql = "SELECT BID, BOWNERID, BNAME, CONCAT(SUBSTRING(BKEY,1,12),'...',RIGHT(BKEY,4)) AS BMASKEDKEY, BSTATUS, BCREATED, BLASTUSED FROM BAPIKEYS WHERE BOWNERID = ".$uid." ORDER BY BID DESC";
         $res = DB::Query($sql);
         $rows = [];
-        while($row = DB::FetchArr($res)) { $rows[] = $row; }
+        while($row = DB::FetchArr($res)) { 
+            if ($row && is_array($row)) {
+                $rows[] = $row; 
+            }
+        }
         $ret["success"] = true;
         $ret["keys"] = $rows;
         return $ret;

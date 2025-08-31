@@ -75,6 +75,12 @@ function _s($str, $file='', $t='en') {
 class db {
     // sends a query to the database and returns the result
     public static function Query($strSQL): mysqli_result|bool {
+        // Guard against empty SQL
+        if (!is_string($strSQL) || trim($strSQL) === '') {
+            error_log('db::Query called with empty SQL');
+            return false;
+        }
+        
         //error_log("****************************** QUERY: " . $strSQL);
         $adminEmail = getenv('ADMIN_EMAIL') ?: 'admin@example.com'; // Fallback to a generic email if not set
         

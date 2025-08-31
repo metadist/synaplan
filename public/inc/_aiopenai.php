@@ -159,7 +159,13 @@ class AIOpenAI {
             }
             if(isset($systemPrompt['aiModel']) AND intval($systemPrompt['aiModel']) > 0) {
                 $modelArr = BasicAI::getModelDetails(intval($systemPrompt['aiModel']));
-                $myModel = $modelArr['BPROVID'];
+                // Use BPROVID if available, fallback to BNAME, then to global model
+                if (!empty($modelArr) && is_array($modelArr)) {
+                    $myModel = !empty($modelArr['BPROVID']) ? $modelArr['BPROVID'] : 
+                              (!empty($modelArr['BNAME']) ? $modelArr['BNAME'] : $GLOBALS["AI_CHAT"]["MODEL"]);
+                } else {
+                    $myModel = $GLOBALS["AI_CHAT"]["MODEL"];
+                }
             } else {
                 $myModel = $GLOBALS["AI_CHAT"]["MODEL"];
             }
@@ -491,8 +497,8 @@ class AIOpenAI {
 
         // save file to
         // hive: $fileUrl = $arrRes['output'][0]['url'];
-        $fileOutput = substr($usrArr["BPROVIDERID"], -5, 3) . '/' . substr($usrArr["BPROVIDERID"], -2, 2) . '/' . date("Ym");
-        $filePath = $fileOutput . '/oai_' . $msgArr['BID'] . '.' . $fileType;
+        $fileOutput = substr($usrArr["BID"], -5, 3) . '/' . substr($usrArr["BID"], -2, 2) . '/' . date("Ym");
+        $filePath = $fileOutput . '/oai_' . time() . '_' . $msgArr['BID'] . '.' . $fileType;
         // create the directory if it doesn't exist
         if(!is_dir('up/'.$fileOutput)) {
             mkdir('up/'.$fileOutput, 0777, true);
@@ -957,8 +963,8 @@ class AIOpenAI {
             }
 
             // Create dynamic file path similar to picPrompt method
-            $fileOutput = substr($usrArr["BPROVIDERID"], -5, 3) . '/' . substr($usrArr["BPROVIDERID"], -2, 2) . '/' . date("Ym");
-            $fileName = 'oai_' . time() . '.' . $fileExtension;
+                    $fileOutput = substr($usrArr["BID"], -5, 3) . '/' . substr($usrArr["BID"], -2, 2) . '/' . date("Ym");
+        $fileName = 'oai_' . time() . '.' . $fileExtension;
             $filePath = $fileOutput . '/' . $fileName;
             
             if ($isLocalhost) {

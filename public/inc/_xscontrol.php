@@ -171,7 +171,7 @@ class XSControl {
                 $sortBytes = intval($sortBytesArr['BVALUE']) + strlen($msgArr['BTEXT']) + strlen($msgArr["BFILETEXT"]);
                 // save the chat bytes to the database
                 $sortBytesSQL = "UPDATE BMESSAGEMETA SET BVALUE = '".intval($sortBytes)."' WHERE BMESSID = ".intval($msgArr['BID'])." AND BTOKEN = 'SORTBYTES'";
-                db::Query($chatBytesSQL);
+                db::Query($sortBytesSQL);
             } else {
                 // save the chat bytes to the database
                 $sortBytes = strlen($msgArr['BTEXT']) + strlen($msgArr["BFILETEXT"]);

@@ -57,7 +57,16 @@ Class BasicAI {
                 if($stream) {
                     Frontend::statusToStream($msgArr['BID'], 'pre', ' - calling '.$AIT2P.' ');
                 }
-                $msgArr = $AIT2P::picPrompt($msgArr, $stream);
+                // For Again requests, add a unique identifier to force new generation
+                if (isset($GLOBALS["IS_AGAIN"]) && $GLOBALS["IS_AGAIN"] === true) {
+                    $originalText = $msgArr['BTEXT'];
+                    $msgArr['BTEXT'] = $originalText . ' [Again-' . time() . ']';
+                    $msgArr = $AIT2P::picPrompt($msgArr, $stream);
+                    // Keep the AI-generated text, don't restore original
+                    // This ensures proper output text is displayed
+                } else {
+                    $msgArr = $AIT2P::picPrompt($msgArr, $stream);
+                }
                 XSControl::storeAIDetails($msgArr, 'AISERVICE', $AIT2P, $stream);
                 XSControl::storeAIDetails($msgArr, 'AIMODEL', $AIT2Pmodel, $stream);
                 XSControl::storeAIDetails($msgArr, 'AIMODELID', $AIT2PmodelId, $stream);
@@ -66,7 +75,16 @@ Class BasicAI {
                 if($stream) {
                     Frontend::statusToStream($msgArr['BID'], 'pre', ' - video! Patience please (around 40s): ');
                 }
-                $msgArr = $AIT2V::createVideo($msgArr, $stream);
+                // For Again requests, add a unique identifier to force new generation
+                if (isset($GLOBALS["IS_AGAIN"]) && $GLOBALS["IS_AGAIN"] === true) {
+                    $originalText = $msgArr['BTEXT'];
+                    $msgArr['BTEXT'] = $originalText . ' [Again-' . time() . ']';
+                    $msgArr = $AIT2V::createVideo($msgArr, $stream);
+                    // Keep the AI-generated text, don't restore original
+                    // This ensures proper output text is displayed
+                } else {
+                    $msgArr = $AIT2V::createVideo($msgArr, $stream);
+                }
                 XSControl::storeAIDetails($msgArr, 'AISERVICE', $AIT2V, $stream);
                 XSControl::storeAIDetails($msgArr, 'AIMODEL', $AIT2Vmodel, $stream);
                 XSControl::storeAIDetails($msgArr, 'AIMODELID', $AIT2VmodelId, $stream);
@@ -97,7 +115,18 @@ Class BasicAI {
                     Frontend::statusToStream($msgArr['BID'], 'pre', ' - TTS generating... ');
                 }
                 $msgArr['BTEXT'] = str_replace("/audio ","",$msgArr['BTEXT']);
-                $soundArr = $AIT2S::textToSpeech($msgArr, $_SESSION['USERPROFILE']);
+                
+                // For Again requests, add a unique identifier to force new generation
+                if (isset($GLOBALS["IS_AGAIN"]) && $GLOBALS["IS_AGAIN"] === true) {
+                    $originalText = $msgArr['BTEXT'];
+                    $msgArr['BTEXT'] = $originalText . ' [Again-' . time() . ']';
+                    $soundArr = $AIT2S::textToSpeech($msgArr, $_SESSION['USERPROFILE']);
+                    // Keep the AI-generated text, don't restore original
+                    // This ensures proper output text is displayed
+                } else {
+                    $soundArr = $AIT2S::textToSpeech($msgArr, $_SESSION['USERPROFILE']);
+                }
+                
                 if(count($soundArr) > 0) {
                     $msgArr['BFILE'] = 1;
                     $msgArr['BFILEPATH'] = $soundArr['BFILEPATH'];
@@ -182,7 +211,7 @@ Class BasicAI {
         $promptSQL = "select * from BPROMPTS where BID=".intval($promptId);
         $promptRes = DB::Query($promptSQL);
         $promptArr = DB::FetchArr($promptRes);
-        if($promptArr) {
+        if($promptArr && is_array($promptArr)) {
             $promptKey = $promptArr['BTOPIC'];
         }
         return self::getAprompt($promptKey, "en", [], false);
@@ -207,7 +236,7 @@ Class BasicAI {
         $pArr = DB::FetchArr($pRes);
         
         // ****************************************************************************************************** 
-        if($pArr) {
+        if($pArr && is_array($pArr)) {
             $arrPrompt = $pArr;
         } else {
             // No prompt found - create a default one to prevent errors
@@ -243,7 +272,7 @@ Class BasicAI {
                 $fileSQL = "select * from BMESSAGEMETA where BMESSID=".intval($msgArr['BID'])." AND BTOKEN='FILECOUNT' ORDER BY BID DESC LIMIT 1";  
                 $fileRes = DB::Query($fileSQL);
                 $fileArr = DB::FetchArr($fileRes);
-                if($fileArr && $addInfos) {
+                if($fileArr && is_array($fileArr) && $addInfos) {
                     $arrPrompt['BPROMPT'] .= "\n\n"."(Original message contained ".($fileArr["BVALUE"])." files)";
                 }
             }
@@ -271,7 +300,9 @@ Class BasicAI {
                 $toolRes = DB::Query($toolSQL);
 
                 while($toolArr = DB::FetchArr($toolRes)) {
-                    $arrPrompt['SETTINGS'][] = $toolArr;
+                    if ($toolArr && is_array($toolArr)) {
+                        $arrPrompt['SETTINGS'][] = $toolArr;
+                    }
                 }
             }
         }
@@ -289,9 +320,15 @@ Class BasicAI {
         $outerDynaSQL = "select DISTINCT BTOPIC from BPROMPTS where (BOWNERID=".$userId." OR BOWNERID=0) AND BTOPIC NOT LIKE 'tools:%' ORDER BY BOWNERID DESC";
         $outerDynaRes = DB::Query($outerDynaSQL);
         while($outerDynaLine = DB::FetchArr($outerDynaRes)) {
+            if (!$outerDynaLine || !is_array($outerDynaLine) || !isset($outerDynaLine['BTOPIC'])) {
+                continue;
+            }
             $dynaSQL = "select * from BPROMPTS where BTOPIC='".$outerDynaLine['BTOPIC']."' AND (BOWNERID=".$userId." OR BOWNERID=0) ORDER BY BOWNERID DESC";
             $dynaRes = DB::Query($dynaSQL);
             while($dynaLine = DB::FetchArr($dynaRes)) {
+                if (!$dynaLine || !is_array($dynaLine) || !isset($dynaLine['BTOPIC']) || !isset($dynaLine['BID'])) {
+                    continue;
+                }
                 if(!in_array($dynaLine['BTOPIC'], $topicArr)) {
                     $topicArr[] = $dynaLine['BTOPIC'];
                     // ****************************************************************************************************** 
@@ -302,7 +339,9 @@ Class BasicAI {
                     $toolRes = DB::Query($toolSQL);
 
                     while($toolArr = DB::FetchArr($toolRes)) {
-                        $dynaLine['SETTINGS'][] = $toolArr;
+                        if ($toolArr && is_array($toolArr)) {
+                            $dynaLine['SETTINGS'][] = $toolArr;
+                        }
                     }
                     // ****************************************************************************************************** 
                     $prompts[] = $dynaLine;
@@ -321,7 +360,9 @@ Class BasicAI {
         $dynaSQL = "select * from BMODELS ORDER BY BTAG ASC";
         $dynaRes = DB::Query($dynaSQL);
         while($dynaLine = DB::FetchArr($dynaRes)) {
-            $models[] = $dynaLine;
+            if ($dynaLine && is_array($dynaLine)) {
+                $models[] = $dynaLine;
+            }
         }
         return $models;
     }
@@ -347,7 +388,10 @@ Class BasicAI {
         $mArr = [];
         $mSQL = "select * from BMODELS where BID=".intval($modelId);
         $mRes = DB::Query($mSQL);
-        $mArr = DB::FetchArr($mRes);
+        $result = DB::FetchArr($mRes);
+        if($result && is_array($result)) {
+            $mArr = $result;
+        }
         return $mArr;
     }
     // ****************************************************************************************************** 
@@ -480,7 +524,9 @@ Class BasicAI {
             $toolSQL = "select * from BPROMPTMETA where BPROMPTID=".$arrPrompt['BID'];
             $toolRes = DB::Query($toolSQL);
             while($toolArr = DB::FetchArr($toolRes)) {
-                $arrPrompt['SETTINGS'][] = $toolArr;
+                if ($toolArr && is_array($toolArr)) {
+                    $arrPrompt['SETTINGS'][] = $toolArr;
+                }
             }
         } else {
             if($GLOBALS["debug"]) error_log('Warning: getPromptDetails could not find prompt for key: ' . $promptKey);

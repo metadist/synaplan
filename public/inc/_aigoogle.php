@@ -163,7 +163,13 @@ class AIGoogle {
         $myModel = $GLOBALS["AI_CHAT"]["MODEL"];
         if (isset($systemPrompt['SETTINGS']['aiModel']) && $systemPrompt['SETTINGS']['aiModel'] > 0) {
             $modelArr = BasicAI::getModelDetails(intval($systemPrompt['SETTINGS']['aiModel']));
-            $myModel = $modelArr['BPROVID'];
+            // Use BPROVID if available, fallback to BNAME, then to global model
+            if (!empty($modelArr) && is_array($modelArr)) {
+                $myModel = !empty($modelArr['BPROVID']) ? $modelArr['BPROVID'] : 
+                          (!empty($modelArr['BNAME']) ? $modelArr['BNAME'] : $GLOBALS["AI_CHAT"]["MODEL"]);
+            } else {
+                $myModel = $GLOBALS["AI_CHAT"]["MODEL"];
+            }
         } else {
             $myModel = $GLOBALS["AI_CHAT"]["MODEL"];
         }
@@ -235,12 +241,36 @@ class AIGoogle {
                 } else {
                     try {
                         $arrAnswer = json_decode($answer, true);
+                        
+                        // If json_decode returns a string instead of array, wrap it
+                        if (is_string($arrAnswer)) {
+                            $arrAnswer = [
+                                'BTEXT' => $arrAnswer,
+                                'BDIRECT' => 'OUT'
+                            ];
+                            // Preserve essential fields from original message
+                            if (isset($msgArr['BID'])) $arrAnswer['BID'] = $msgArr['BID'];
+                            if (isset($msgArr['BUSERID'])) $arrAnswer['BUSERID'] = $msgArr['BUSERID'];
+                            if (isset($msgArr['BTOPIC'])) $arrAnswer['BTOPIC'] = $msgArr['BTOPIC'];
+                        }
+                        
+                        // Ensure $arrAnswer is always an array
+                        if (!is_array($arrAnswer)) {
+                            $arrAnswer = [
+                                'BTEXT' => is_string($arrAnswer) ? $arrAnswer : 'Invalid response format',
+                                'BDIRECT' => 'OUT'
+                            ];
+                            // Preserve essential fields from original message
+                            if (isset($msgArr['BID'])) $arrAnswer['BID'] = $msgArr['BID'];
+                            if (isset($msgArr['BUSERID'])) $arrAnswer['BUSERID'] = $msgArr['BUSERID'];
+                            if (isset($msgArr['BTOPIC'])) $arrAnswer['BTOPIC'] = $msgArr['BTOPIC'];
+                        }
                     } catch (Exception $err) {
                         return "*APItopic Error - Ralf made a bubu - please mail that to him: * " . $err->getMessage();
                     }    
                 }
 
-                // Add model information to the response
+                // Add model information to the response (now safe since $arrAnswer is guaranteed to be an array)
                 $arrAnswer['_USED_MODEL'] = $myModel;
                 $arrAnswer['_AI_SERVICE'] = 'AIGoogle';
 
@@ -509,8 +539,8 @@ class AIGoogle {
 
         // Save file to
         if (!empty($base64)) {
-            $fileOutput = substr($usrArr["BPROVIDERID"], -5, 3) . '/' . substr($usrArr["BPROVIDERID"], -2, 2) . '/' . date("Ym");
-            $filePath = $fileOutput . '/google_' . uniqid() . '.' . $fileType;
+            $fileOutput = substr($usrArr["BID"], -5, 3) . '/' . substr($usrArr["BID"], -2, 2) . '/' . date("Ym");
+            $filePath = $fileOutput . '/google_' . time() . '_' . uniqid() . '.' . $fileType;
             if (!is_dir('up/' . $fileOutput)) {
                 mkdir('up/' . $fileOutput, 0777, true);
             }
@@ -656,8 +686,8 @@ class AIGoogle {
                         
                         if (!empty($videoData)) {
                             // Save video file
-                            $fileOutput = substr($usrArr["BPROVIDERID"], -5, 3) . '/' . substr($usrArr["BPROVIDERID"], -2, 2) . '/' . date("Ym");
-                            $filePath = $fileOutput . '/google_video_' . uniqid() . '.mp4';
+                            $fileOutput = substr($usrArr["BID"], -5, 3) . '/' . substr($usrArr["BID"], -2, 2) . '/' . date("Ym");
+                            $filePath = $fileOutput . '/google_video_' . time() . '_' . uniqid() . '.mp4';
                             
                             if (!is_dir('up/' . $fileOutput)) {
                                 mkdir('up/' . $fileOutput, 0777, true);

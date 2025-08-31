@@ -133,7 +133,13 @@ class AIOllama {
                     }
                     if(isset($systemPrompt['aiModel']) AND intval($systemPrompt['aiModel']) > 0) {
                         $modelArr = BasicAI::getModelDetails(intval($systemPrompt['aiModel']));
-                        $myModel = $modelArr['BPROVID'];
+                        // Use BPROVID if available, fallback to BNAME, then to global model
+                        if (!empty($modelArr) && is_array($modelArr)) {
+                            $myModel = !empty($modelArr['BPROVID']) ? $modelArr['BPROVID'] : 
+                                      (!empty($modelArr['BNAME']) ? $modelArr['BNAME'] : $GLOBALS["AI_CHAT"]["MODEL"]);
+                        } else {
+                            $myModel = $GLOBALS["AI_CHAT"]["MODEL"];
+                        }
                     } else {
                         $myModel = $GLOBALS["AI_CHAT"]["MODEL"];
                     }

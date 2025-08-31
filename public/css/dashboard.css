@@ -63,21 +63,23 @@ body, html {
 }
 
 @media (max-width: 767.98px) {
-  .sidebar {
-    /* Drop-down layout under the top navbar (no side overlay) */
-    position: relative;
-    top: 0;
-    left: 0;
-    height: auto;
-    min-height: auto;
-    z-index: 1;
-    width: 100%;
-    margin-top: 0;
+  /* Mobile body padding for fixed navbar */
+  body {
+    padding-top: 0 !important; /* Remove global padding, use Bootstrap approach */
   }
   
-  /* Add padding to body on mobile to prevent overlap */
-  body {
-    padding-top: 60px;
+  /* Main content area adjustment for fixed navbar */
+  #contentMain {
+    margin-top: 60px; /* Space for fixed navbar */
+    padding-top: 15px;
+  }
+  
+  /* Mobile navbar styling */
+  .navbar.fixed-top {
+    height: 60px;
+    padding: 0.5rem 1rem;
+    background: linear-gradient(135deg, #02102a, #061a36 80%);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
   }
   
   /* Ensure navbar-toggler is visible */
@@ -86,18 +88,46 @@ body, html {
     padding: 0.25rem 0.5rem;
   }
   
-  /* Remove white gap between navbar and sidebar */
+  .navbar-toggler-icon {
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 30 30'%3e%3cpath stroke='rgba%28255, 255, 255, 0.8%29' stroke-linecap='round' stroke-miterlimit='10' stroke-width='2' d='m4 7h22M4 15h22M4 23h22'/%3e%3c/svg%3e");
+  }
+  
+  /* Sidebar mobile adjustments */
   .sidebar {
-    margin-top: -4.5px !important;
-    border-top: none !important;
+    position: relative;
+    top: 0;
+    left: 0;
+    height: auto;
+    min-height: auto;
+    z-index: 1;
+    width: 100%;
+    margin-top: 0;
+    border-top: none;
+    background: linear-gradient(135deg, #02102a, #061a36 80%);
   }
   
   .sidebar .position-sticky {
-  padding-top: 0 !important;
-}
+    padding-top: 0 !important;
+  }
   
   .sidebar hr {
-    margin-top: 0 !important;
+    margin: 5px 10px 12px 10px !important;
+    border-top: 1px solid rgba(255, 255, 255, 0.2);
+  }
+  
+  /* Hide sidebar by default on mobile, show when collapsed */
+  .sidebar:not(.show) {
+    display: none;
+  }
+  
+  .sidebar.show {
+    display: block;
+    position: absolute;
+    top: 60px;
+    left: 0;
+    right: 0;
+    z-index: 1020;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
   }
 }
 
@@ -1009,6 +1039,26 @@ CHAT INTERFACE STYLES
   height: calc(100vh - 100px);
 }
 
+/* Mobile chat container adjustments */
+@media (max-width: 767.98px) {
+  .chat-container {
+    height: calc(100vh - 140px); /* Account for mobile navbar + content padding */
+    margin-top: 0;
+  }
+  
+  /* Ensure main content doesn't get clipped */
+  .content-main-bg {
+    padding-top: 15px;
+    margin-top: 0;
+  }
+  
+  /* Mobile chat page header adjustments */
+  .chat-page-header {
+    margin-bottom: 10px;
+    padding: 10px 0;
+  }
+}
+
 .chatbox {
   background: white; 
   border-radius: 10px; 
@@ -1499,6 +1549,135 @@ CHAT INTERFACE STYLES
 /* Hidden Class */
 .hidden {
   display: none;
+}
+
+/* ------------------------------------------------------------ */
+
+/* AI Model Dropdown Styles */
+.message-item, .message-content, .message-bubble { 
+  overflow: visible !important; 
+}
+
+.dropdown-menu { 
+  z-index: 1060 !important; 
+  box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15) !important;
+  border: 1px solid rgba(0, 0, 0, 0.1) !important;
+}
+
+#chatHistory { 
+  overflow: visible; 
+}
+
+.ai-message .message-content { 
+  position: relative; 
+  overflow: visible; 
+}
+
+/* Responsive dropdown improvements */
+.js-again-menu {
+  font-size: 0.875rem;
+}
+
+.js-again-menu .dropdown-item {
+  transition: background-color 0.15s ease-in-out;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.js-again-menu .dropdown-item:last-child {
+  border-bottom: none;
+}
+
+.js-again-menu .dropdown-item:hover {
+  background-color: #f8f9fa;
+}
+
+.js-again-menu .dropdown-item:active {
+  background-color: #e9ecef;
+}
+
+/* Mobile responsive adjustments */
+@media (max-width: 576px) {
+  .js-again-menu {
+    min-width: 200px !important;
+    max-width: 280px !important;
+    margin-right: 10px !important;
+  }
+  
+  .js-again-menu .dropdown-item {
+    padding: 0.75rem 1rem;
+  }
+  
+  /* Force inline layout for AI meta on mobile */
+  .js-ai-meta {
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    flex-wrap: nowrap !important;
+    gap: 0.5rem !important;
+  }
+  
+  .js-ai-meta .ai-meta-logo-wrapper {
+    flex-shrink: 0 !important;
+    display: inline-flex !important;
+  }
+  
+  .js-ai-meta .js-ai-meta-text {
+    flex: 1 !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+  }
+  
+  /* Make footer logos smaller on mobile */
+  .ai-meta-logo-wrapper img {
+    width: 10px !important;
+    height: 10px !important;
+  }
+  
+  /* Avatar logos responsive */
+  .ai-avatar .ai-logo {
+    width: 14px !important;
+    height: 14px !important;
+  }
+}
+
+/* AI service name highlighting */
+.js-ai-meta-text {
+  font-weight: 500; /* Bootstrap's fw-medium equivalent */
+}
+
+/* Subtle highlight for AI service name in meta text */
+.js-ai-meta-text strong,
+.js-ai-meta-text .fw-semibold {
+  color: var(--bs-primary);
+  font-weight: 600; /* Bootstrap's fw-semibold */
+}
+
+/* Touch device improvements */
+@media (pointer: coarse) {
+  .js-again-menu .dropdown-item {
+    min-height: 44px;
+    padding: 0.75rem 1rem;
+  }
+}
+
+/* Custom scrollbar for dropdown */
+.js-again-menu::-webkit-scrollbar {
+  width: 6px;
+}
+
+.js-again-menu::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 3px;
+}
+
+.js-again-menu::-webkit-scrollbar-thumb {
+  background: #c1c1c1;
+  border-radius: 3px;
+}
+
+.js-again-menu::-webkit-scrollbar-thumb:hover {
+  background: #a8a8a8;
 }
 
 /* ------------------------------------------------------------ */
