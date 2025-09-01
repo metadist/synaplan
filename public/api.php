@@ -145,7 +145,6 @@ if ($GLOBALS["debug"]) {
 // Define which endpoints are allowed for anonymous widget users
 $anonymousAllowedEndpoints = [
     'messageNew',
-    'messageAgain',
     'againOptions',
     'chatStream',
     'getMessageFiles',
@@ -167,6 +166,7 @@ $authenticatedOnlyEndpoints = [
     'getWidgets',
     'saveWidget',
     'deleteWidget',
+    'messageAgain',
     'getApiKeys',
     'createApiKey',
     'setApiKeyStatus',
@@ -264,96 +264,7 @@ switch($apiAction) {
         $resArr = AgainLogic::prepareAgain($_REQUEST);
         break;
     case 'againOptions':
-        try {
-            // Get userId from session (same logic as other endpoints)
-            if (isset($_SESSION["is_widget"]) && $_SESSION["is_widget"] === true) {
-                $userId = $_SESSION["widget_owner_id"];
-            } else {
-                $userId = $_SESSION["USERPROFILE"]["BID"];
-            }
-            
-            // Validate required parameters
-            if (!isset($_REQUEST['prev_message_id'])) {
-                http_response_code(400);
-                $resArr = ['success' => false, 'error' => 'Missing required parameter: prev_message_id'];
-                break;
-            }
-            
-            $prevMessageId = intval($_REQUEST['prev_message_id']);
-            
-            // Get the IN message
-            $inMessage = AgainLogic::getPrevInMessage($prevMessageId, $userId);
-            $inId = intval($inMessage['BID']);
-            
-            // Get last OUT for this IN
-            $lastOut = AgainLogic::getLastOutForIn($inId);
-            
-            // Resolve BTAG
-            $btag = AgainLogic::resolveTagForReplay($inId, $lastOut);
-            
-            // Get eligible models
-            $eligible = AgainLogic::getEligibleModels($btag);
-            
-            // Get current model info from last OUT
-            $current = null;
-            if ($lastOut && !empty($lastOut['BPROVIDX'])) {
-                $modelId = intval($lastOut['BPROVIDX']);
-                if ($modelId > 0) {
-                    $modelSQL = "SELECT * FROM BMODELS WHERE BID = " . $modelId . " LIMIT 1";
-                    $modelRes = db::Query($modelSQL);
-                    $modelRow = db::FetchArr($modelRes);
-                    if ($modelRow && is_array($modelRow)) {
-                        $current = [
-                            'model_id' => intval($modelRow['BID']),
-                            'service' => $modelRow['BSERVICE'],
-                            // Use BPROVID if available, fallback to BNAME
-                            'model' => !empty($modelRow['BPROVID']) ? $modelRow['BPROVID'] : $modelRow['BNAME'],
-                            'btag' => $modelRow['BTAG']
-                        ];
-                    }
-                }
-            }
-            
-            // Get predicted next model
-            $predictedNext = null;
-            if (!empty($eligible)) {
-                $prevModelId = null;
-                if ($lastOut && !empty($lastOut['BPROVIDX'])) {
-                    $prevModelId = intval($lastOut['BPROVIDX']);
-                }
-                
-                $selectedModel = AgainLogic::pickModel($eligible, $prevModelId);
-                $predictedNext = [
-                    'model_id' => intval($selectedModel['BID']),
-                    'service' => $selectedModel['BSERVICE'],
-                    // Use BPROVID if available, fallback to BNAME
-                    'model' => !empty($selectedModel['BPROVID']) ? $selectedModel['BPROVID'] : $selectedModel['BNAME']
-                ];
-            }
-            
-            // Format eligible models
-            $eligibleFormatted = [];
-            foreach ($eligible as $model) {
-                $eligibleFormatted[] = [
-                    'model_id' => intval($model['BID']),
-                    'service' => $model['BSERVICE'],
-                    // Use BPROVID if available, fallback to BNAME
-                    'model' => !empty($model['BPROVID']) ? $model['BPROVID'] : $model['BNAME'],
-                    'ranking' => floatval($model['BRATING'])
-                ];
-            }
-            
-            $resArr = [
-                'success' => true,
-                'current' => $current,
-                'predictedNext' => $predictedNext,
-                'eligible' => $eligibleFormatted
-            ];
-            
-        } catch (Exception $e) {
-            // HTTP status code should already be set by AgainLogic
-            $resArr = ['success' => false, 'error' => $e->getMessage()];
-        }
+        $resArr = AgainLogic::againOptionsForCurrentSession();
         break;
     case 'ragUpload':
         $resArr = Frontend::saveRAGFiles();

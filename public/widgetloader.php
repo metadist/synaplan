@@ -77,11 +77,14 @@ header('Pragma: no-cache');
     <title>Chat Widget</title>
     <base href="<?php echo ($_SERVER['HTTPS'] ?? '') === 'on' ? 'https://' : 'http://' . $_SERVER['HTTP_HOST'] . dirname($_SERVER['REQUEST_URI']) . '/'; ?>">
     <!-- Bootstrap CSS -->
-    <link href="node_modules/bootstrap/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="node_modules/bootstrap/dist/css/bootstrap.min.css?v=<?php echo @filemtime('node_modules/bootstrap/dist/css/bootstrap.min.css'); ?>" rel="stylesheet">
     <!-- Dashboard CSS - includes all chat interface styles -->
-    <link href="css/dashboard.css" rel="stylesheet">
+    <link href="css/dashboard.css?v=<?php echo @filemtime('css/dashboard.css'); ?>" rel="stylesheet">
     <style>
         /* Widget-specific overrides */
+        html, body {
+            height: 100%;
+        }
         body {
             margin: 0;
             padding: 0;
@@ -99,7 +102,19 @@ header('Pragma: no-cache');
         
         .widget-content {
             height: calc(100vh - 60px);
-            overflow: auto;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden; /* avoid double scrollbars; let .chat-messages scroll */
+        }
+
+        /* Remove default padding/margins from embedded main container */
+        #contentMain {
+            padding: 0 !important;
+            margin: 0 !important;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            background: transparent;
         }
         
         /* Widget-specific chat container adjustments */
@@ -107,18 +122,23 @@ header('Pragma: no-cache');
             height: 100%;
             display: flex;
             flex-direction: column;
+            flex: 1 1 auto;
+            min-height: 0; /* allow inner scroller to size correctly */
         }
         
         .chatbox {
             height: 100%;
             display: flex;
             flex-direction: column;
+            flex: 1 1 auto;
+            min-height: 0; /* allow .chat-messages to use remaining height */
             border: none;
             box-shadow: none;
         }
         
         .chat-messages {
-            flex: 1;
+            flex: 1 1 auto;
+            min-height: 0;
             overflow-y: auto;
             padding: 15px;
         }
@@ -127,6 +147,12 @@ header('Pragma: no-cache');
             border-top: 1px solid #e9ecef;
             background: white;
             padding: 15px;
+            flex-shrink: 0; /* keep input anchored at bottom */
+        }
+
+        /* Hide action row (copy, Again, models dropdown) in widget mode only */
+        .message-footer .js-ai-actions { 
+            display: none !important; 
         }
         
         /* Hide file preview by default in widget mode */
@@ -172,7 +198,7 @@ header('Pragma: no-cache');
             .message-input {
                 min-height: 36px;
                 padding: 8px 12px;
-                font-size: 13px;
+                font-size: 16px;
             }
             
             .send-btn, .attach-btn {
@@ -182,7 +208,7 @@ header('Pragma: no-cache');
         }
     </style>
     <!-- jQuery - needed for chat functionality -->
-    <script src="node_modules/jquery/dist/jquery.min.js"></script>
+    <script src="node_modules/jquery/dist/jquery.min.js?v=<?php echo @filemtime('node_modules/jquery/dist/jquery.min.js'); ?>"></script>
 </head>
 <body>
     <div class="widget-header">
@@ -192,6 +218,6 @@ header('Pragma: no-cache');
         <?php include('snippets/c_chat.php'); ?>
     </div>
     <!-- Bootstrap JS - needed for dropdowns and other components -->
-    <script src="node_modules/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="node_modules/bootstrap/dist/js/bootstrap.bundle.min.js?v=<?php echo @filemtime('node_modules/bootstrap/dist/js/bootstrap.bundle.min.js'); ?>"></script>
 </body>
 </html> 

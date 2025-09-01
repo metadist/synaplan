@@ -381,4 +381,97 @@ class AgainLogic {
             return ['success' => false, 'error' => $e->getMessage()];
         }
     }
+
+    /**
+     * Build Again options (current, predictedNext, eligible) for the current session
+     * Consolidates API logic for the againOptions endpoint.
+     *
+     * @return array
+     */
+    public static function againOptionsForCurrentSession(): array {
+        try {
+            // Determine user ID from session (supports widget sessions)
+            if (isset($_SESSION["is_widget"]) && $_SESSION["is_widget"] === true) {
+                $userId = isset($_SESSION["widget_owner_id"]) ? intval($_SESSION["widget_owner_id"]) : 0;
+            } else {
+                $userId = isset($_SESSION["USERPROFILE"]["BID"]) ? intval($_SESSION["USERPROFILE"]["BID"]) : 0;
+            }
+
+            // Validate required parameters
+            if (!isset($_REQUEST['prev_message_id'])) {
+                http_response_code(400);
+                return ['success' => false, 'error' => 'Missing required parameter: prev_message_id'];
+            }
+
+            $prevMessageId = intval($_REQUEST['prev_message_id']);
+
+            // Get the IN message and context
+            $inMessage = self::getPrevInMessage($prevMessageId, $userId);
+            $inId = intval($inMessage['BID']);
+
+            $lastOut = self::getLastOutForIn($inId);
+
+            // Resolve BTAG and eligible models
+            $btag = self::resolveTagForReplay($inId, $lastOut);
+            $eligible = self::getEligibleModels($btag);
+
+            // Current model (from last OUT)
+            $current = null;
+            if ($lastOut && !empty($lastOut['BPROVIDX'])) {
+                $modelId = intval($lastOut['BPROVIDX']);
+                if ($modelId > 0) {
+                    $modelSQL = "SELECT * FROM BMODELS WHERE BID = " . $modelId . " LIMIT 1";
+                    $modelRes = db::Query($modelSQL);
+                    $modelRow = db::FetchArr($modelRes);
+                    if ($modelRow && is_array($modelRow)) {
+                        $current = [
+                            'model_id' => intval($modelRow['BID']),
+                            'service' => $modelRow['BSERVICE'],
+                            // Use BPROVID if available, fallback to BNAME
+                            'model' => !empty($modelRow['BPROVID']) ? $modelRow['BPROVID'] : $modelRow['BNAME'],
+                            'btag' => $modelRow['BTAG']
+                        ];
+                    }
+                }
+            }
+
+            // Predicted next model using rotation logic
+            $predictedNext = null;
+            if (!empty($eligible)) {
+                $prevModelId = null;
+                if ($lastOut && !empty($lastOut['BPROVIDX'])) {
+                    $prevModelId = intval($lastOut['BPROVIDX']);
+                }
+                $selectedModel = self::pickModel($eligible, $prevModelId);
+                $predictedNext = [
+                    'model_id' => intval($selectedModel['BID']),
+                    'service' => $selectedModel['BSERVICE'],
+                    // Use BPROVID if available, fallback to BNAME
+                    'model' => !empty($selectedModel['BPROVID']) ? $selectedModel['BPROVID'] : $selectedModel['BNAME']
+                ];
+            }
+
+            // Format eligible models for the client
+            $eligibleFormatted = [];
+            foreach ($eligible as $model) {
+                $eligibleFormatted[] = [
+                    'model_id' => intval($model['BID']),
+                    'service' => $model['BSERVICE'],
+                    // Use BPROVID if available, fallback to BNAME
+                    'model' => !empty($model['BPROVID']) ? $model['BPROVID'] : $model['BNAME'],
+                    'ranking' => floatval($model['BRATING'])
+                ];
+            }
+
+            return [
+                'success' => true,
+                'current' => $current,
+                'predictedNext' => $predictedNext,
+                'eligible' => $eligibleFormatted
+            ];
+        } catch (Exception $e) {
+            // HTTP status code should already be set upstream when applicable
+            return ['success' => false, 'error' => $e->getMessage()];
+        }
+    }
 }
