@@ -438,6 +438,7 @@ public static function processMessage(): void {
     if (self::$msgArr['BTOPIC'] === 'mediamaker') {
         $originalPrompt = self::$msgArr['BTEXT'];
         $providerFailed = false;
+        $improvedPrompt = null;
 
         // Guess requested media from prompt keywords (defaults handled below)
         $requestedMedia = '';
@@ -469,7 +470,7 @@ public static function processMessage(): void {
             $answerSorted = null;
         }
 
-        // Detect provider error surfaced as plain string
+        // Detect provider error/result surfaced as plain string
         if (!$providerFailed && is_string($answerSorted)) {
             $lower = strtolower($answerSorted);
             if (strpos($lower, 'error') !== false || strpos($lower, 'failed') !== false || strpos($lower, 'server') !== false) {
@@ -480,12 +481,14 @@ public static function processMessage(): void {
                 $answerSorted = null;
             } else {
                 // robuste Normalisierung (respect computed $mediaType)
+                $returnedText = $answerSorted;
                 $answerSorted = [
-                    'BTEXT'  => $originalPrompt,
+                    'BTEXT'  => $returnedText,
                     'BTOPIC' => 'mediamaker',
                     'BLANG'  => self::$msgArr['BLANG'] ?? 'en',
                     'BMEDIA' => $mediaType
                 ];
+                $improvedPrompt = $returnedText;
             }
         }
         // Enforce media type to avoid flips to audio unless explicitly requested/forced
@@ -537,6 +540,7 @@ public static function processMessage(): void {
             // Normal flow: migrate and execute tool without streaming
             $answerSorted = Tools::migrateArray(self::$msgArr, $answerSorted);
             $answerSorted['BID'] = self::$msgId;
+            if (isset($answerSorted['BTEXT'])) { $improvedPrompt = $answerSorted['BTEXT']; }
 
             if ($mediaType === 'image') {
                 $answerSorted['BTEXT'] = "/pic " . $answerSorted['BTEXT'];
@@ -550,7 +554,7 @@ public static function processMessage(): void {
                     ];
                 } elseif (is_array($answerSorted)) {
                     $toolText = $answerSorted['OUTTEXT'] ?? $answerSorted['CAPTION'] ?? $answerSorted['TEXT'] ?? $answerSorted['BTEXT'] ?? '';
-                    $answerSorted['BTEXT'] = ($toolText !== '') ? $toolText : $originalPrompt;
+                    $answerSorted['BTEXT'] = ($toolText !== '') ? $toolText : ($improvedPrompt ?? $originalPrompt);
                     $answerSorted['BMEDIA'] = $mediaType;
                 }
             } elseif ($mediaType === 'video') {
@@ -565,7 +569,7 @@ public static function processMessage(): void {
                     ];
                 } elseif (is_array($answerSorted)) {
                     $toolText = $answerSorted['OUTTEXT'] ?? $answerSorted['CAPTION'] ?? $answerSorted['TEXT'] ?? $answerSorted['BTEXT'] ?? '';
-                    $answerSorted['BTEXT'] = ($toolText !== '') ? $toolText : $originalPrompt;
+                    $answerSorted['BTEXT'] = ($toolText !== '') ? $toolText : ($improvedPrompt ?? $originalPrompt);
                     $answerSorted['BMEDIA'] = $mediaType;
                 }
             } else { // audio
@@ -580,7 +584,7 @@ public static function processMessage(): void {
                     ];
                 } elseif (is_array($answerSorted)) {
                     $toolText = $answerSorted['OUTTEXT'] ?? $answerSorted['CAPTION'] ?? $answerSorted['TEXT'] ?? $answerSorted['BTEXT'] ?? '';
-                    $answerSorted['BTEXT'] = ($toolText !== '') ? $toolText : $originalPrompt;
+                    $answerSorted['BTEXT'] = ($toolText !== '') ? $toolText : ($improvedPrompt ?? $originalPrompt);
                     $answerSorted['BMEDIA'] = $mediaType;
                 }
             }
