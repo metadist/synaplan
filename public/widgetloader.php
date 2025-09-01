@@ -77,9 +77,9 @@ header('Pragma: no-cache');
     <title>Chat Widget</title>
     <base href="<?php echo ($_SERVER['HTTPS'] ?? '') === 'on' ? 'https://' : 'http://' . $_SERVER['HTTP_HOST'] . dirname($_SERVER['REQUEST_URI']) . '/'; ?>">
     <!-- Bootstrap CSS -->
-    <link href="node_modules/bootstrap/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="node_modules/bootstrap/dist/css/bootstrap.min.css?v=<?php echo @filemtime('node_modules/bootstrap/dist/css/bootstrap.min.css'); ?>" rel="stylesheet">
     <!-- Dashboard CSS - includes all chat interface styles -->
-    <link href="css/dashboard.css" rel="stylesheet">
+    <link href="css/dashboard.css?v=<?php echo @filemtime('css/dashboard.css'); ?>" rel="stylesheet">
     <style>
         /* Widget-specific overrides */
         html, body {
@@ -208,7 +208,7 @@ header('Pragma: no-cache');
         }
     </style>
     <!-- jQuery - needed for chat functionality -->
-    <script src="node_modules/jquery/dist/jquery.min.js"></script>
+    <script src="node_modules/jquery/dist/jquery.min.js?v=<?php echo @filemtime('node_modules/jquery/dist/jquery.min.js'); ?>"></script>
 </head>
 <body>
     <div class="widget-header">
@@ -218,6 +218,6 @@ header('Pragma: no-cache');
         <?php include('snippets/c_chat.php'); ?>
     </div>
     <!-- Bootstrap JS - needed for dropdowns and other components -->
-    <script src="node_modules/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="node_modules/bootstrap/dist/js/bootstrap.bundle.min.js?v=<?php echo @filemtime('node_modules/bootstrap/dist/js/bootstrap.bundle.min.js'); ?>"></script>
 </body>
 </html> 

@@ -184,9 +184,9 @@ window.isWidgetMode = <?php echo $isWidgetMode ? 'true' : 'false'; ?>;
 <script src="node_modules/@highlightjs/cdn-assets/languages/xml.min.js"></script>
 <script src="node_modules/@highlightjs/cdn-assets/languages/sql.min.js"></script>
 <script src="node_modules/@highlightjs/cdn-assets/languages/go.min.js"></script>
-<script src="js/speech.js"></script>
-<script src="js/chat.js"></script>
-<script src="js/chathistory.js"></script>
+<script src="js/speech.js?v=<?php echo filemtime('js/speech.js'); ?>"></script>
+<script src="js/chat.js?v=<?php echo filemtime('js/chat.js'); ?>"></script>
+<script src="js/chathistory.js?v=<?php echo filemtime('js/chathistory.js'); ?>"></script>
 
 <script>
     // enable everything
