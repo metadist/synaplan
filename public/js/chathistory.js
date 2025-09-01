@@ -147,7 +147,7 @@ function renderChatHistory(messages) {
             if (chat.aiService) {
                 // Remove "AI" prefix from service name for logo path (e.g., "AIOpenAI" -> "openai")
                 const serviceName = chat.aiService.replace(/^AI/, '').toLowerCase();
-                const logoUrl = `/img/ai-logos/${serviceName}.svg`;
+                const logoUrl = `img/ai-logos/${serviceName}.svg`;
                 logoHtml = `
                     <span class="d-inline-flex align-items-center justify-content-center bg-white border rounded p-1 me-1 ai-meta-logo-wrapper">
                         <img class="d-block ai-meta-logo" src="${logoUrl}" width="12" height="12" alt="AI Provider" 
@@ -161,7 +161,7 @@ function renderChatHistory(messages) {
             if (chat.aiService) {
                 // Remove "AI" prefix from service name for logo path (e.g., "AIOpenAI" -> "openai")
                 const serviceName = chat.aiService.replace(/^AI/, '').toLowerCase();
-                const avatarLogoUrl = `/img/ai-logos/${serviceName}.svg`;
+                const avatarLogoUrl = `img/ai-logos/${serviceName}.svg`;
                 avatarHtml = `
                     <span class="d-inline-flex align-items-center justify-content-center bg-white border rounded p-1 d-none ai-logo-wrapper">
                         <img class="d-block ai-logo" src="${avatarLogoUrl}" width="16" height="16" alt="${chat.aiService}" 

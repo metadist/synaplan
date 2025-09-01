@@ -25,6 +25,11 @@ $isAnonymousWidget = isset($_SESSION["is_widget"]) && $_SESSION["is_widget"] ===
 <link rel="stylesheet" href="fa/css/all.min.css">
 <!-- Add highlight.js CSS -->
 <link rel="stylesheet" href="node_modules/@highlightjs/cdn-assets/styles/googlecode.min.css">
+<script>
+// Initialize widget flags early so downstream scripts (chat.js) can read them
+window.isAnonymousWidget = <?php echo $isAnonymousWidget ? 'true' : 'false'; ?>;
+window.isWidgetMode = <?php echo $isWidgetMode ? 'true' : 'false'; ?>;
+</script>
 <main class="col-md-9 ms-sm-auto col-lg-10 px-1 px-md-3 py-2 py-md-1 content-main-bg" id="contentMain">
     <!-- Chat Page Header (now inside main, above chat-container) -->
     <?php if (!$isWidgetMode): ?>
@@ -272,6 +277,17 @@ $isAnonymousWidget = isset($_SESSION["is_widget"]) && $_SESSION["is_widget"] ===
 
     // Widget-specific functionality
     <?php if ($isWidgetMode): ?>
+    // Style override for widget meta line
+    const style = document.createElement('style');
+    style.textContent = `
+      /* Only style the widget meta label, not other text like inputs */
+      .message-footer .js-ai-meta .widget-meta {
+        color: #6c757d !important;
+        font-size: 0.85rem !important;
+      }
+    `;
+    document.head.appendChild(style);
+
     // Set the widget prompt as the current prompt configuration
     // Only need the topic/ID - the backend handles the actual prompt text
     currentPromptConfig = {

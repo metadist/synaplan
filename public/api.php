@@ -145,7 +145,6 @@ if ($GLOBALS["debug"]) {
 // Define which endpoints are allowed for anonymous widget users
 $anonymousAllowedEndpoints = [
     'messageNew',
-    'messageAgain',
     'againOptions',
     'chatStream',
     'getMessageFiles',
@@ -167,6 +166,7 @@ $authenticatedOnlyEndpoints = [
     'getWidgets',
     'saveWidget',
     'deleteWidget',
+    'messageAgain',
     'getApiKeys',
     'createApiKey',
     'setApiKeyStatus',

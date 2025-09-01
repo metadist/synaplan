@@ -444,8 +444,15 @@
             showAlert('Please save the widget first', 'warning');
             return;
         }
-        
-        const previewUrl = `widgettest.php?widgetid=${widgetId}`;
+        // Resolve userId like in integration code
+        let userId = <?php echo $_SESSION["USERPROFILE"]["BID"]; ?>;
+        if (currentWidgetId) {
+            const widget = widgets.find(w => w.widgetId === parseInt(widgetId));
+            if (widget && widget.userId) {
+                userId = widget.userId;
+            }
+        }
+        const previewUrl = `widgettest.php?uid=${userId}&widgetid=${widgetId}`;
         window.open(previewUrl, '_blank');
     }
 

@@ -138,7 +138,7 @@ $uid = $_REQUEST['uid'] ?? 2; // Default to user ID 2 if not provided
         <script>
         (function() {
             var script = document.createElement('script');
-            script.src = 'widget.php?uid=2&widgetid=1';
+            script.src = 'widget.php?uid=<?php echo htmlspecialchars($uid); ?>&widgetid=<?php echo htmlspecialchars($widgetId); ?>';
             script.async = true;
             document.head.appendChild(script);
         })();
