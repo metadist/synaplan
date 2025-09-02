@@ -430,6 +430,16 @@ function renderChatHistory(messages) {
                         ${avatarHtml}
                     </div>
                     <div class="message-content">
+                        <div class="reasoning-toggle" id="reasoning-toggle-rep${chat.BID}" style="display: none; margin-bottom: 0.5rem;">
+                          <button class="btn btn-link btn-sm p-0 text-muted" type="button" data-bs-toggle="collapse" data-bs-target="#reasoning-rep${chat.BID}" aria-expanded="false" aria-controls="reasoning-rep${chat.BID}" style="font-size: 0.75rem; text-decoration: none;">
+                            <i class="fas fa-brain me-1" style="font-size: 0.7rem;"></i><span class="reasoning-text">Show reasoning</span>
+                          </button>
+                        </div>
+                        <div class="collapse reasoning-content mb-2" id="reasoning-rep${chat.BID}">
+                          <div class="reasoning-content" style="max-height:200px;overflow-y:auto;font-size:.875rem;line-height:1.5;background-color:#f8f9fa;border-radius:0.375rem;padding:0.75rem;border-left:3px solid #dee2e6;max-width:100%;box-sizing:border-box;">
+                            <pre class="mb-0 text-muted" style="white-space:pre-wrap;font-family:inherit;word-wrap:break-word;overflow-wrap:break-word;font-size:0.8rem;line-height:1.4;margin:0;"></pre>
+                          </div>
+                        </div>
                         <span id="system${chat.BID}" class="system-message">${systemMessageContent}</span>
                         <div class="message-bubble ai-bubble">
                             <div id="rep${chat.BID}" class="message-content">
