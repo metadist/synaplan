@@ -605,6 +605,7 @@ class AIGoogle {
         if (strlen($videoPrompt) > 1) {
             // Get the model from configuration
             $myModel = $GLOBALS["AI_TEXT2VID"]["MODEL"];
+            // error_log("Model: " . $myModel);
             
             // Start video generation
             $url = "https://generativelanguage.googleapis.com/v1beta/models/" . $myModel . ":predictLongRunning?key=" . self::$key;
