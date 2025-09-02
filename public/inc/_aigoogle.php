@@ -593,7 +593,6 @@ class AIGoogle {
     public static function createVideo($msgArr, $stream = false): array {
         // Load user data
         $usrArr = Central::getUsrById($msgArr['BUSERID']);
-
         // Prepare prompt
         if (substr($msgArr['BTEXT'], 0, 1) == '/') {
             $videoPrompt = substr($msgArr['BTEXT'], strpos($msgArr['BTEXT'], " "));
@@ -605,7 +604,6 @@ class AIGoogle {
         if (strlen($videoPrompt) > 1) {
             // Get the model from configuration
             $myModel = $GLOBALS["AI_TEXT2VID"]["MODEL"];
-            // error_log("Model: " . $myModel);
             
             // Start video generation
             $url = "https://generativelanguage.googleapis.com/v1beta/models/" . $myModel . ":predictLongRunning?key=" . self::$key;
@@ -645,6 +643,8 @@ class AIGoogle {
                     $checkUrl = "https://generativelanguage.googleapis.com/v1beta/" . $operationName . "?key=" . self::$key;
                     $checkRes = Curler::callJson($checkUrl, $headers, null);
                     
+                    error_log("Check Res: " . json_encode($checkRes,JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
+
                     $isDone = $checkRes['done'] ?? false;
                     $attempt++;
 

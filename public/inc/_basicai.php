@@ -72,6 +72,7 @@ Class BasicAI {
                 XSControl::storeAIDetails($msgArr, 'AIMODELID', $AIT2PmodelId, $stream);
                 break;
             case "/vid":
+
                 if($stream) {
                     Frontend::statusToStream($msgArr['BID'], 'pre', ' - video! Patience please (around 40s): ');
                 }
