@@ -40,7 +40,9 @@ if ($authHeader && stripos($authHeader, 'Bearer ') === 0) {
     }
 }
 
+// ******************************************************
 // Check if this is a JSON-RPC request
+// ******************************************************
 $isJsonRpc = false;
 $jsonRpcRequest = null;
 
@@ -67,8 +69,10 @@ if ($isJsonRpc) {
     exit;
 }
 
+// ******************************************************
 // If not JSON-RPC, continue with REST handling
 // Detect OpenAI-compatible routes BEFORE action switch
+// ******************************************************
 $requestUri = $_SERVER['REQUEST_URI'] ?? '';
 $requestPath = parse_url($requestUri, PHP_URL_PATH);
 $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
