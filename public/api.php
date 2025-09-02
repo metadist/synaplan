@@ -12,19 +12,10 @@ session_start();
 // core app files with relative paths
 $root = __DIR__ . '/';
 require_once($root . '/inc/_coreincludes.php');
+require_once($root . '/inc/_api-openapi.php');
 
 // ----------------------------- Bearer API key authentication (override session if provided)
-function getAuthHeaderValue(): string {
-    $headers = [];
-    if (function_exists('getallheaders')) { $headers = getallheaders(); }
-    $auth = '';
-    if (isset($headers['Authorization'])) { $auth = $headers['Authorization']; }
-    elseif (isset($headers['authorization'])) { $auth = $headers['authorization']; }
-    elseif (isset($_SERVER['HTTP_AUTHORIZATION'])) { $auth = $_SERVER['HTTP_AUTHORIZATION']; }
-    return trim($auth);
-}
-
-$authHeader = getAuthHeaderValue();
+$authHeader = Tools::getAuthHeaderValue();
 if ($authHeader && stripos($authHeader, 'Bearer ') === 0) {
     $apiKey = trim(substr($authHeader, 7));
     if (strlen($apiKey) > 20) {
@@ -72,11 +63,55 @@ if (!empty($rawPostData) && Tools::isValidJson($rawPostData)) {
 
 // Handle JSON-RPC request
 if ($isJsonRpc) {
-    require_once(__DIR__ . '/mcp.php');
+    require_once($root . '/inc/_api-mcp.php');
     exit;
 }
 
 // If not JSON-RPC, continue with REST handling
+// Detect OpenAI-compatible routes BEFORE action switch
+$requestUri = $_SERVER['REQUEST_URI'] ?? '';
+$requestPath = parse_url($requestUri, PHP_URL_PATH);
+$method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
+
+// Normalize a potential /api.php prefix if proxied
+// We match exact /v1/* paths
+if ($requestPath === '/v1/chat/completions' && $method === 'POST') {
+    $payload = [];
+    $raw = file_get_contents('php://input');
+    if (!empty($raw) && Tools::isValidJson($raw)) { $payload = json_decode($raw, true); }
+    $streamFlag = false;
+    // stream may be in body or query
+    if (isset($payload['stream']) && ($payload['stream'] === true || $payload['stream'] === 'true' || $payload['stream'] === 1 || $payload['stream'] === '1')) {
+        $streamFlag = true;
+    }
+    if (isset($_REQUEST['stream']) && ($_REQUEST['stream'] === 'true' || $_REQUEST['stream'] === '1')) { $streamFlag = true; }
+    OpenAICompatController::chatCompletions($payload, $streamFlag);
+    exit;
+}
+
+if ($requestPath === '/v1/images/generations' && $method === 'POST') {
+    $payload = [];
+    $raw = file_get_contents('php://input');
+    if (!empty($raw) && Tools::isValidJson($raw)) { $payload = json_decode($raw, true); }
+    OpenAICompatController::imageGenerations($payload);
+    exit;
+}
+
+if ($requestPath === '/v1/models' && $method === 'GET') {
+    OpenAICompatController::listModels();
+    exit;
+}
+
+if ($requestPath === '/v1/audio/transcriptions' && $method === 'POST') {
+    OpenAICompatController::audioTranscriptions();
+    exit;
+}
+
+if ($requestPath === '/v1/images/analysis' && $method === 'POST') {
+    OpenAICompatController::imageAnalysis();
+    exit;
+}
+
 // what does the user want?
 header('Content-Type: application/json; charset=UTF-8');
 $apiAction = $_REQUEST['action'];
@@ -255,123 +290,4 @@ if (in_array($apiAction, $authenticatedOnlyEndpoints)) {
 // Take form post of user message and files and save to database
 // give back tracking ID of the message
 
-switch($apiAction) {
-    case 'messageNew':
-        $resArr = Frontend::saveWebMessages();
-        break;
-
-    case 'messageAgain':
-        $resArr = AgainLogic::prepareAgain($_REQUEST);
-        break;
-    case 'againOptions':
-        $resArr = AgainLogic::againOptionsForCurrentSession();
-        break;
-    case 'ragUpload':
-        $resArr = Frontend::saveRAGFiles();
-        break;
-    case 'chatStream':
-        $resArr = Frontend::chatStream();
-        exit;
-    case 'docSum':
-        $resArr = BasicAI::doDocSum();
-        break;
-    case 'promptLoad':
-        $resArr = BasicAI::getAprompt($_REQUEST['promptKey'], $_REQUEST['lang'], [], false);
-        break;
-    case 'promptUpdate':
-        $resArr = BasicAI::updatePrompt($_REQUEST['promptKey']);
-        break;
-    case 'deletePrompt':
-        $resArr = BasicAI::deletePrompt($_REQUEST['promptKey']);
-        break;
-    case 'getPromptDetails':
-        $resArr = BasicAI::getPromptDetails($_REQUEST['promptKey']);
-        break;
-    case 'getMessageFiles':
-        $messageId = intval($_REQUEST['messageId']);
-        $files = Frontend::getMessageFiles($messageId);
-        $resArr = ['success' => true, 'files' => $files];
-        break;
-    case 'getFileGroups':
-        $groups = BasicAI::getAllFileGroups();
-        $resArr = ['success' => true, 'groups' => $groups];
-        break;
-    case 'changeGroupOfFile':
-        $fileId = intval($_REQUEST['fileId']);
-        $newGroup = isset($_REQUEST['newGroup']) ? trim($_REQUEST['newGroup']) : '';
-        if($GLOBALS["debug"]) error_log("API changeGroupOfFile called with fileId: $fileId, newGroup: '$newGroup'");
-        $resArr = BasicAI::changeGroupOfFile($fileId, $newGroup);
-        if($GLOBALS["debug"]) error_log("API changeGroupOfFile result: " . json_encode($resArr));
-        break;
-    case 'getProfile':
-        $resArr = Frontend::getProfile();
-        break;
-    case 'loadChatHistory':
-        $amount = isset($_REQUEST['amount']) ? intval($_REQUEST['amount']) : 10;
-        $resArr = Frontend::loadChatHistory($amount);
-        break;
-    case 'getWidgets':
-        $resArr = Frontend::getWidgets();
-        break;
-    case 'saveWidget':
-        $resArr = Frontend::saveWidget();
-        break;
-    case 'deleteWidget':
-        $resArr = Frontend::deleteWidget();
-        break;
-    case 'getApiKeys':
-        $resArr = Frontend::getApiKeys();
-        break;
-    case 'createApiKey':
-        $resArr = Frontend::createApiKey();
-        break;
-    case 'setApiKeyStatus':
-        $resArr = Frontend::setApiKeyStatus();
-        break;
-    case 'deleteApiKey':
-        $resArr = Frontend::deleteApiKey();
-        break;
-    case 'userRegister':
-        $resArr = Frontend::registerNewUser();
-        break;
-    case 'getMailhandler':
-        $resArr = Frontend::getMailhandler();
-        break;
-    case 'saveMailhandler':
-        $resArr = Frontend::saveMailhandler();
-        break;
-    case 'mailOAuthStart':
-        $resArr = Frontend::mailOAuthStart();
-        break;
-    case 'mailOAuthCallback':
-        // Handle OAuth callback and then redirect back to the UI by default
-        $result = Frontend::mailOAuthCallback();
-        if (!isset($_REQUEST['ui']) || $_REQUEST['ui'] !== 'json') {
-            // Override content type and redirect
-            $target = $GLOBALS['baseUrl'] . 'index.php/mailhandler';
-            if (!empty($result['success'])) { $target .= '?oauth=ok'; }
-            else { $target .= '?oauth=error'; }
-            header('Content-Type: text/html; charset=UTF-8');
-            header('Location: ' . $target);
-            echo '<html><head><meta http-equiv="refresh" content="0;url='.$target.'"></head><body>Redirecting...</body></html>';
-            exit;
-        }
-        $resArr = $result;
-        break;
-    case 'mailOAuthStatus':
-        $resArr = Frontend::mailOAuthStatus();
-        break;
-    case 'mailOAuthDisconnect':
-        $resArr = Frontend::mailOAuthDisconnect();
-        break;
-    case 'mailTestConnection':
-        $resArr = Frontend::mailTestConnection();
-        break;
-    default:
-        $resArr = ['error' => 'Invalid action'];
-        break;
-}
-
-// ------------------------------------------------------ Json output
-echo json_encode($resArr);
-exit;
+require_once($root . '/inc/_api_restcalls.php');

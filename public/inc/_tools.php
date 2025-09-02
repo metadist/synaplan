@@ -423,6 +423,16 @@ class Tools {
         json_decode($string);
         return (json_last_error() === JSON_ERROR_NONE);
     }
+    // Get Authorization header value from current request (Bearer ...)
+    public static function getAuthHeaderValue(): string {
+        $headers = [];
+        if (function_exists('getallheaders')) { $headers = getallheaders(); }
+        $auth = '';
+        if (isset($headers['Authorization'])) { $auth = $headers['Authorization']; }
+        elseif (isset($headers['authorization'])) { $auth = $headers['authorization']; }
+        elseif (isset($_SERVER['HTTP_AUTHORIZATION'])) { $auth = $_SERVER['HTTP_AUTHORIZATION']; }
+        return trim($auth);
+    }
     // migrate an half filled array to a full array
     public static function migrateArray($destinationArr, $sourceArr): array { 
         // Create a copy of the destination array to avoid modifying the original
