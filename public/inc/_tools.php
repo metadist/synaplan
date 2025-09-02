@@ -423,6 +423,39 @@ class Tools {
         json_decode($string);
         return (json_last_error() === JSON_ERROR_NONE);
     }
+    // Rate limiting helper used by API endpoints
+    public static function checkRateLimit($key, $window, $maxRequests) {
+        $currentTime = time();
+        $rateLimitKey = 'rate_limit_' . $key;
+
+        if (!isset($_SESSION[$rateLimitKey])) {
+            $_SESSION[$rateLimitKey] = [
+                'count' => 0,
+                'window_start' => $currentTime
+            ];
+        }
+
+        $rateData = $_SESSION[$rateLimitKey];
+
+        // New window
+        if ($currentTime - $rateData['window_start'] >= $window) {
+            $_SESSION[$rateLimitKey] = [
+                'count' => 1,
+                'window_start' => $currentTime
+            ];
+            return ['allowed' => true, 'retry_after' => 0];
+        }
+
+        // Within window
+        if ($rateData['count'] < $maxRequests) {
+            $_SESSION[$rateLimitKey]['count']++;
+            return ['allowed' => true, 'retry_after' => 0];
+        }
+
+        // Exceeded
+        $retryAfter = $window - ($currentTime - $rateData['window_start']);
+        return ['allowed' => false, 'retry_after' => $retryAfter];
+    }
     // Get Authorization header value from current request (Bearer ...)
     public static function getAuthHeaderValue(): string {
         $headers = [];

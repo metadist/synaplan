@@ -77,93 +77,16 @@ $requestUri = $_SERVER['REQUEST_URI'] ?? '';
 $requestPath = parse_url($requestUri, PHP_URL_PATH);
 $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
 
-// Normalize a potential /api.php prefix if proxied
-// We match exact /v1/* paths
-if ($requestPath === '/v1/chat/completions' && $method === 'POST') {
-    $payload = [];
-    $raw = file_get_contents('php://input');
-    if (!empty($raw) && Tools::isValidJson($raw)) { $payload = json_decode($raw, true); }
-    $streamFlag = false;
-    // stream may be in body or query
-    if (isset($payload['stream']) && ($payload['stream'] === true || $payload['stream'] === 'true' || $payload['stream'] === 1 || $payload['stream'] === '1')) {
-        $streamFlag = true;
-    }
-    if (isset($_REQUEST['stream']) && ($_REQUEST['stream'] === 'true' || $_REQUEST['stream'] === '1')) { $streamFlag = true; }
-    OpenAICompatController::chatCompletions($payload, $streamFlag);
-    exit;
-}
-
-if ($requestPath === '/v1/images/generations' && $method === 'POST') {
-    $payload = [];
-    $raw = file_get_contents('php://input');
-    if (!empty($raw) && Tools::isValidJson($raw)) { $payload = json_decode($raw, true); }
-    OpenAICompatController::imageGenerations($payload);
-    exit;
-}
-
-if ($requestPath === '/v1/models' && $method === 'GET') {
-    OpenAICompatController::listModels();
-    exit;
-}
-
-if ($requestPath === '/v1/audio/transcriptions' && $method === 'POST') {
-    OpenAICompatController::audioTranscriptions();
-    exit;
-}
-
-if ($requestPath === '/v1/images/analysis' && $method === 'POST') {
-    OpenAICompatController::imageAnalysis();
-    exit;
+// Delegate any /v1/* path to OpenAI-compatible router
+if (strpos($requestPath, '/v1/') === 0) {
+    ApiOpenAPI::handle($requestPath, $method, $rawPostData);
 }
 
 // what does the user want?
 header('Content-Type: application/json; charset=UTF-8');
 $apiAction = $_REQUEST['action'];
 
-// ------------------------------------------------------ RATE LIMITING FUNCTION --------------------
-/**
- * Check rate limit for API requests
- * 
- * @param string $key Rate limit key (usually user ID or session ID)
- * @param int $window Time window in seconds
- * @param int $maxRequests Maximum requests allowed in the time window
- * @return array Array with 'allowed' boolean and 'retry_after' seconds
- */
-function checkRateLimit($key, $window, $maxRequests) {
-    $currentTime = time();
-    $rateLimitKey = 'rate_limit_' . $key;
-    
-    // Get current rate limit data from session
-    if (!isset($_SESSION[$rateLimitKey])) {
-        $_SESSION[$rateLimitKey] = [
-            'count' => 0,
-            'window_start' => $currentTime
-        ];
-    }
-    
-    $rateData = $_SESSION[$rateLimitKey];
-    
-    // Check if we're in a new time window
-    if ($currentTime - $rateData['window_start'] >= $window) {
-        // Reset for new window
-        $_SESSION[$rateLimitKey] = [
-            'count' => 1,
-            'window_start' => $currentTime
-        ];
-        return ['allowed' => true, 'retry_after' => 0];
-    }
-    
-    // Check if we're within limits
-    if ($rateData['count'] < $maxRequests) {
-        // Increment count
-        $_SESSION[$rateLimitKey]['count']++;
-        return ['allowed' => true, 'retry_after' => 0];
-    }
-    
-    // Rate limit exceeded
-    $retryAfter = $window - ($currentTime - $rateData['window_start']);
-    return ['allowed' => false, 'retry_after' => $retryAfter];
-}
+// Rate limiting moved to Tools::checkRateLimit
 
 // ------------------------------------------------------ API AUTHENTICATION & RATE LIMITING --------------------
 // Check if this is an anonymous widget session
@@ -258,7 +181,7 @@ if (in_array($apiAction, $authenticatedOnlyEndpoints)) {
         
         // Implement rate limiting for anonymous users
         $rateLimitKey = 'anonymous_widget_' . $_SESSION["widget_owner_id"] . '_' . $_SESSION["widget_id"];
-        $rateLimitResult = checkRateLimit($rateLimitKey, 60, 30); // 30 requests per minute
+        $rateLimitResult = Tools::checkRateLimit($rateLimitKey, 60, 30); // 30 requests per minute
         
         if (!$rateLimitResult['allowed']) {
             http_response_code(429);
