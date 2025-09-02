@@ -60,10 +60,10 @@ INSERT INTO `BMODELS` VALUES
 (25,'OpenAI','dall-e-3','text2pic',1,'dall-e-3',0,'-',0.12,'perpic',7,1,'{\"description\":\"Open AIs famous text to image model on OpenAI cloud. Costs are 1:1 funneled.\"}'),
 (29,'OpenAI','gpt-image-1','text2pic',1,'gpt-image-1',0,'-',40,'per1M',9,1,'{\"description\":\"Open AIs powerful image generation model on OpenAI cloud. Costs are 1:1 funneled.\"}'),
 (30,'OpenAI','gpt-4.1','chat',1,'gpt-4.1',2,'per1M',8,'per1M',10,1,'{\"description\":\"Open AIs text model\"}'),
-(33,'Google','ImaGen 3.0','text2pic',1,'models/imagen-3.0-generate-002',0,'-',0.4,'perpic',9,1,'{\"description\":\"Google Imagen 3.0\"}'),
-(37,'Google','Gemini 2.0 Flash','text2sound',1,'models/gemini-2.0-flash',0.1,'per1M',0.4,'per1M',8,1,'{\"description\":\"Google Speech Generation with Gemini 2.0 Flash\"}'),
+(33,'Google','ImaGen 3.0','text2pic',1,'imagen-3.0-generate-002',0,'-',0.4,'perpic',9,1,'{\"description\":\"Google Imagen 3.0\"}'),
+(37,'Google','Gemini 2.0 Flash','text2sound',1,'gemini-2.0-flash',0.1,'per1M',0.4,'per1M',8,1,'{\"description\":\"Google Speech Generation with Gemini 2.0 Flash\"}'),
 (41,'OpenAI','tts-1 with Nova','text2sound',1,'tts-1',0.015,'per1000chars',0,'-',8,1,'{\"description\":\"Open AIs text to speech, defaulting on voice NOVA.\"}'),
-(45,'Google','Veo 2.0','text2vid',1,'models/veo-2.0-generate-001',0,'-',0.35,'persec',9,1,'{\"description\":\"Google Video Generation model Veo2\"}'),
+(45,'Google','Veo 2.0','text2vid',1,'veo-2.0-generate-001',0,'-',0.35,'persec',9,1,'{\"description\":\"Google Video Generation model Veo2\"}'),
 (49,'Groq','llama-4-maverick-17b-128e-instruct','chat',1,'meta-llama/llama-4-maverick-17b-128e-instruct',0.2,'per1M',0.6,'per1M',7,0,'{\"description\":\"Groq Llama4 128e processing and text extraction\",\"prompt\":\"\",\"params\":{\"model\":\"meta-llama/llama-4-maverick-17b-128e-instruct\"}}'),
 (53,'Groq','deepseek-r1-distill-llama-70b','chat',1,'deepseek-r1-distill-llama-70b',0.75,'per1M',0.99,'per1M',7,0,'{\"description\":\"Groq DeepSeek R1 Distill on Llama\",\"prompt\":\"\",\"params\":{\"model\":\"deepseek-r1-distill-llama-70b\"}}'),
 (57,'OpenAI','o3','chat',1,'o3',2,'per1M',8,'per1M',8,1,'{\"description\":\"Open AIs actual reasoning model.\"}'),
@@ -71,6 +71,11 @@ INSERT INTO `BMODELS` VALUES
 (65,'Google','Gemini 2.5 Pro','pic2text',1,'gemini-2.5-pro-preview-06-05',2.5,'per1M',15,'per1M',9,1,'{\"description\":\"Googles Powerhouse can also process images, not just text\"}'),
 (69,'Anthropic','Claude Opus 4','chat',1,'claude-opus-4-20250514',0.2,'per1M',0.05,'per1M',7,0.5,'{\"description\":\"Claude Opus 4 of Anthropic as the alternative chat method.\"}'),
 (70,'OpenAI','gpt-5','chat',1,'gpt-5',2,'per1M',8,'per1M',10,1,'{\"description\":\"Open AIs GPT 5 model - latest release\"}');
+(71,'Google','Gemini 2.5 Flash Image','text2pic',1,'gemini-2.5-flash-image-preview',0,'-',0.039,'perpic',9,1,'{\"description\":\"Google newest image generation and editing model (aka Nano-Banana). Low latency, multi-image fusion, character consistency and precise editing. All outputs are watermarked with SynthID.\",\"params\":{\"model\":\"gemini-2.5-flash-image-preview\"}}')
+(72,'OpenAI','o3-pro','chat',1,'o3-pro',20,'per1M',80,'per1M',10,1,'{\"description\":\"OpenAI premium reasoning model. More compute than o3 with higher reliability. API id: o3-pro. Pricing: $20 per 1M input tokens, $80 per 1M output tokens.\",\"params\":{\"model\":\"o3-pro\"}}')
+(73,'OpenAI','gpt-4o-mini','chat',1,'gpt-4o-mini',0.15,'per1M',0.60,'per1M',8,1,'{\"description\":\"OpenAI lightweight GPT-4o-mini model for fast and cost-efficient chat and reasoning tasks. Optimized for lower latency and cheaper throughput.\",\"params\":{\"model\":\"gpt-4o-mini\"}}')
+(74,'Anthropic','Claude Sonnet 4','chat',1,'claude-sonnet-4-20250514',3,'per1M',15,'per1M',9,1,'{\"description\":\"Anthropic Claude Sonnet 4 model. Mid-tier reasoning and coding performance with large context window. Balanced between quality and cost.\",\"params\":{\"model\":\"claude-sonnet-4-20250514\"}}')
+
 /*!40000 ALTER TABLE `BMODELS` ENABLE KEYS */;
 UNLOCK TABLES;
 /*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;

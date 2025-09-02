@@ -12,6 +12,55 @@
  * - Font Awesome (for icons)
  */
 
+// Central reasoning detection configuration
+const REASONING_CONFIG = {
+  // Explicit reasoning tags
+  tags: ['think', 'reason', 'reasoning', 'thinking'],
+  
+  // Language indicators for implicit reasoning
+  indicators: [
+    'Okay, so',
+    'I remember that',
+    'I should explain',
+    'I\'ll make sure to',
+    'No need for search',
+    'I\'ll structure the response',
+    'I\'ll present this',
+    'Since all the information',
+    'I won\'t need to set',
+    'I think',
+    'I believe',
+    'Let me think',
+    'First, let me',
+    'I need to',
+    'I should',
+    'I\'ll make sure',
+    'I\'ll structure',
+    'I\'ll present'
+  ],
+  
+  // Minimum lengths for detection
+  minComplexLength: 300,
+  minReasoningLength: 100,
+  minAnswerLength: 50
+};
+
+// Function to check if text contains reasoning patterns
+function hasReasoningPatterns(text) {
+  // Check for explicit tags
+  const tagPattern = new RegExp(`<(${REASONING_CONFIG.tags.join('|')})>|<\\/(${REASONING_CONFIG.tags.join('|')})>`, 'i');
+  if (tagPattern.test(text)) {
+    return true;
+  }
+  
+  // Check for implicit reasoning indicators
+  const hasIndicators = REASONING_CONFIG.indicators.some(indicator => 
+    text.toLowerCase().includes(indicator.toLowerCase())
+  );
+  
+  return text.length > REASONING_CONFIG.minComplexLength && hasIndicators;
+}
+
 // Initialize markdown-it once with HTML support (if not already done)
 if (typeof window.markdownit !== 'undefined' && !window.md) {
     window.md = window.markdownit({ 
@@ -19,6 +68,196 @@ if (typeof window.markdownit !== 'undefined' && !window.md) {
         linkify: true, 
         breaks: true 
     });
+}
+
+// Function to handle AI responses with reasoning blocks (flexible detection)
+function handleThinkReasoning(text, targetId) {
+  // Flexible reasoning detection - look for various tags and patterns
+  const reasoningPatterns = [
+    // Standard <think>...</think> pattern
+    /<think>([\s\S]*?)<\/think>/i,
+    // <reason>...</reason> pattern
+    /<reason>([\s\S]*?)<\/reason>/i,
+    // <reasoning>...</reasoning> pattern
+    /<reasoning>([\s\S]*?)<\/reasoning>/i,
+    // <thinking>...</thinking> pattern
+    /<thinking>([\s\S]*?)<\/thinking>/i,
+    // Pattern with only closing tag (common with AI models)
+    /([\s\S]*?)<\/think>/i,
+    /([\s\S]*?)<\/reason>/i,
+    /([\s\S]*?)<\/reasoning>/i,
+    /([\s\S]*?)<\/thinking>/i,
+    // Pattern with only opening tag
+    /<think>([\s\S]*?)$/i,
+    /<reason>([\s\S]*?)$/i,
+    /<reasoning>([\s\S]*?)$/i,
+    /<thinking>([\s\S]*?)$/i
+  ];
+  
+  let reasoning = null;
+  let cleanedText = text;
+  let matchedPattern = null;
+  
+  // Try each pattern to find reasoning content
+  for (let pattern of reasoningPatterns) {
+    const match = pattern.exec(text);
+    if (match) {
+      reasoning = match[1].trim();
+      // Remove the matched pattern from the text
+      cleanedText = text.replace(pattern, '').trim();
+      matchedPattern = pattern;
+      console.log('Found reasoning pattern:', pattern.source);
+      console.log('Reasoning content:', reasoning);
+      break;
+    }
+  }
+  
+  // If no explicit tags found, try to detect reasoning patterns in plain text
+  if (!reasoning) {
+    const reasoningDetection = detectImplicitReasoning(text);
+    if (reasoningDetection) {
+      reasoning = reasoningDetection.reasoning;
+      cleanedText = reasoningDetection.answer;
+      console.log('Detected implicit reasoning');
+    }
+  }
+  
+  if (!reasoning) {
+    // No reasoning block found → render normally
+    console.log('No reasoning pattern found, rendering normally');
+    const rendered = window.md ? window.md.render(text) : text.replace(/\n/g, "<br>");
+    $("#" + targetId).html(rendered);
+    return;
+  }
+
+  console.log('Found reasoning, processing...');
+  console.log('Cleaned text:', cleanedText);
+
+  // Try to parse JSON and extract BTEXT for display only
+  let displayText = cleanedText;
+  try {
+    // First, try to find JSON in the cleaned text
+    const jsonMatch = cleanedText.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      const jsonString = jsonMatch[0];
+      const jsonData = JSON.parse(jsonString);
+      if (jsonData.BTEXT) {
+        displayText = jsonData.BTEXT;
+        console.log('Successfully extracted BTEXT:', displayText);
+      } else {
+        console.log('JSON parsed but no BTEXT found');
+      }
+    } else {
+      console.log('No JSON object found in cleaned text');
+    }
+  } catch (e) {
+    console.log('JSON parsing failed:', e.message);
+    // If not valid JSON, use the cleaned text as is
+    displayText = cleanedText;
+  }
+
+  console.log('Display text:', displayText);
+
+  // Render main answer (only the BTEXT part)
+  const rendered = window.md ? window.md.render(displayText) : displayText.replace(/\n/g, "<br>");
+  $("#" + targetId).html(rendered);
+
+  // Append collapsible reasoning with the ORIGINAL reasoning content
+  const reasoningHtml = `
+    <div class="mt-3 pt-2 border-top">
+      <div class="d-flex align-items-center gap-2">
+        <button class="btn btn-outline-secondary btn-sm" 
+                type="button" 
+                data-bs-toggle="collapse" 
+                data-bs-target="#reasoning-${targetId}"
+                aria-expanded="false"
+                aria-controls="reasoning-${targetId}">
+          <i class="fas fa-brain me-1"></i>
+          <span class="reasoning-text">Show reasoning</span>
+        </button>
+        <small class="text-muted">AI's internal thought process</small>
+      </div>
+      <div class="collapse mt-2" id="reasoning-${targetId}">
+        <div class="card border-0 bg-light">
+          <div class="card-body p-3">
+            <div class="d-flex align-items-center mb-2">
+              <i class="fas fa-lightbulb text-warning me-2"></i>
+              <small class="text-muted fw-medium">AI Reasoning</small>
+            </div>
+            <div class="reasoning-content" style="max-height: 300px; overflow-y: auto; font-size: 0.875rem; line-height: 1.5;">
+              <pre class="mb-0 text-dark" style="white-space: pre-wrap; font-family: inherit;">${reasoning}</pre>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>`;
+  
+  console.log('Appending reasoning HTML');
+  $("#" + targetId).append(reasoningHtml);
+  
+  // Initialize Bootstrap collapse for the new element
+  if (typeof bootstrap !== 'undefined') {
+    const collapseElement = document.getElementById(`reasoning-${targetId}`);
+    if (collapseElement) {
+      new bootstrap.Collapse(collapseElement, { toggle: false });
+    }
+  }
+  
+  // Add click handler to update button text
+  const button = document.querySelector(`[data-bs-target="#reasoning-${targetId}"]`);
+  if (button) {
+    const textSpan = button.querySelector('.reasoning-text');
+    
+    button.addEventListener('click', function() {
+      const isExpanded = this.getAttribute('aria-expanded') === 'true';
+      textSpan.textContent = isExpanded ? 'Show reasoning' : 'Hide reasoning';
+    });
+  }
+  
+  console.log('Reasoning button setup complete');
+}
+
+// Function to detect implicit reasoning in plain text responses
+function detectImplicitReasoning(text) {
+  // Remove message ID prefix if present
+  const cleanText = text.replace(/^\[\d+\]\s*/, '');
+  
+  // Check if text contains reasoning indicators
+  const hasReasoningLanguage = REASONING_CONFIG.indicators.some(indicator => 
+    cleanText.toLowerCase().includes(indicator.toLowerCase())
+  );
+  
+  if (!hasReasoningLanguage) {
+    return null; // No reasoning language detected
+  }
+  
+  // Look for reasoning patterns
+  const reasoningPatterns = [
+    // Reasoning before numbered lists
+    /^(.*?)(?=\n\d+\.\s|^1\.\s|^Schritt\s|^Step\s)/s,
+    // Reasoning before "So," "Therefore," etc.
+    /^(.*?)(?=\n(So|Therefore|Thus|Hence|Consequently|As a result|In conclusion|To answer|The answer is))/s,
+    // Reasoning before action items
+    /^(.*?)(?=\n(Um ein|Um eine|Um das|Um die|To register|To apply|To create|To set up|To start|To begin))/s
+  ];
+  
+  for (let pattern of reasoningPatterns) {
+    const match = pattern.exec(cleanText);
+    if (match && match[1].trim().length > REASONING_CONFIG.minReasoningLength) {
+      const reasoning = match[1].trim();
+      const answer = cleanText.substring(match[0].length).trim();
+      
+      // Only split if we have both parts and answer is not too short
+      if (answer.length > REASONING_CONFIG.minAnswerLength) {
+        return {
+          reasoning: reasoning,
+          answer: answer
+        };
+      }
+    }
+  }
+  
+  return null;
 }
 
 // Function to load chat history via API
@@ -121,8 +360,15 @@ function renderChatHistory(messages) {
             const displayText = chat.displayText || chat.BTEXT;
             const hasFile = chat.hasFile || false;
             
-            // Process markdown with HTML support (do not escape AI messages)
-            const mdText = window.md ? window.md.render(displayText) : displayText;
+            // Check if text contains <think> block
+            let mdText = '';
+            if (displayText.includes('<think>')) {
+                // For <think> blocks, we'll render the content after the message is added to DOM
+                mdText = displayText;
+            } else {
+                // Process markdown with HTML support (do not escape AI messages)
+                mdText = window.md ? window.md.render(displayText) : displayText;
+            }
             
             let fileHtml = '';
             if (hasFile && chat.BFILEPATH) {
@@ -216,6 +462,22 @@ function renderChatHistory(messages) {
         }
         
         chatHistory.innerHTML += messageHtml;
+    });
+    
+    // Handle <think> blocks for AI messages after they're added to DOM
+    messages.forEach(chat => {
+        if (chat.BDIRECT === 'OUT') {
+            const displayText = chat.displayText || chat.BTEXT;
+            
+            // Check if this is from Groq first
+            const isFromGroq = chat.aiService && chat.aiService.toLowerCase().includes('groq');
+            console.log('Chat from Groq:', isFromGroq, 'Service:', chat.aiService);
+            
+            if (isFromGroq && hasGroqReasoningPatterns(displayText)) {
+                const targetId = `rep${chat.BID}`;
+                handleGroqReasoning(displayText, targetId);
+            }
+        }
     });
     
     // Update thread state for history messages
