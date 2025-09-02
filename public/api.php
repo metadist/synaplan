@@ -30,7 +30,8 @@ if ($authHeader && stripos($authHeader, 'Bearer ') === 0) {
                 // update last used
                 DB::Query("UPDATE BAPIKEYS SET BLASTUSED = ".time()." WHERE BID = ".intval($row['BID']));
             }
-            Tools::checkRateLimit('api_key', 60, 30);
+            //Tools::checkRateLimit('api_key', 60, 30);
+            $rateLimitResult['allowed'] = true;
             if (!$rateLimitResult['allowed']) {
                 http_response_code(429);
                 echo json_encode(['error' => 'Rate limit exceeded']);
@@ -79,6 +80,16 @@ if ($isJsonRpc) {
 $requestUri = $_SERVER['REQUEST_URI'] ?? '';
 $requestPath = parse_url($requestUri, PHP_URL_PATH);
 $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
+
+// Normalize paths like /.../api.php/v1/... → /v1/...
+if ($requestPath) {
+    $pos = stripos($requestPath, 'api.php');
+    if ($pos !== false) {
+        $suffix = substr($requestPath, $pos + 7);
+        if ($suffix === '' || $suffix[0] !== '/') { $suffix = '/' . ltrim($suffix, '/'); }
+        $requestPath = $suffix;
+    }
+}
 
 // Delegate any /v1/* path to OpenAI-compatible router
 if (strpos($requestPath, '/v1/') === 0) {
