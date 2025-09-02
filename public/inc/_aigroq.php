@@ -48,7 +48,6 @@ class AIGroq {
      */
     public static function sortingPrompt($msgArr, $threadArr): array|string|bool {
         // prompt builder
-        $threadArr = [];
         $systemPrompt = BasicAI::getAprompt('tools:sort');
 
         $client = self::$client;
@@ -116,15 +115,17 @@ class AIGroq {
             if($GLOBALS["debug"]) error_log("GROQ API ERROR: " . $err->getMessage());
             return "*API sorting Error - Ralf made a bubu - please mail that to him: * " . $err->getMessage();
         }
+        
+        // DEBUG: Log raw response before parsing (only if debug enabled)
+        if ($GLOBALS["debug"]) {
+            error_log("=== GROQ DEBUG: Raw response structure ===");
+            error_log("Full response: " . print_r($chat, true));
+        }
+        
         // ------------------------------------------------
         // Clean and return response
         $answer = $chat['choices'][0]['message']['content'];
         
-        $answer = str_replace("```json\n", "", $answer);
-        $answer = str_replace("\n```", "", $answer);
-        $answer = str_replace("```json", "", $answer);
-        $answer = str_replace("```", "", $answer);
-        $answer = trim($answer);
         return $answer;
     }
     /**
@@ -152,7 +153,29 @@ class AIGroq {
 
         // Build message history
         foreach($threadArr as $msg) {
-            $arrMessages[] = ['role' => 'user', 'content' => "[".$msg['BID']."] ".$msg['BTEXT']];
+            if($msg['BDIRECT'] == 'IN') {
+                $msg['BTEXT'] = Tools::cleanTextBlock($msg['BTEXT']);
+                $msgText = $msg['BTEXT'];
+                if(strlen($msg['BFILETEXT']) > 1) {
+                    $msgText .= " User provided a file: ".$msg['BFILETYPE'].", saying: '".$msg['BFILETEXT']."'\n\n";
+                }
+                $arrMessages[] = ['role' => 'user', 'content' => $msgText];
+            } 
+            if($msg['BDIRECT'] == 'OUT') {
+                if(strlen($msg['BTEXT'])>1000) {
+                    // Truncate at word boundary to avoid breaking JSON or quotes
+                    $truncatedText = substr($msg['BTEXT'], 0, 1000);
+                    // Find the last complete word
+                    $lastSpace = strrpos($truncatedText, ' ');
+                    if ($lastSpace !== false && $lastSpace > 800) {
+                        $truncatedText = substr($truncatedText, 0, $lastSpace);
+                    }
+                    // Clean up any trailing quotes or incomplete JSON
+                    $truncatedText = rtrim($truncatedText, '"\'{}[]');
+                    $msg['BTEXT'] = $truncatedText . "...";
+                }
+                $arrMessages[] = ['role' => 'assistant', 'content' => "[".$msg['BID']."] ".$msg['BTEXT']];
+            }
         }
 
         // Add current message
@@ -163,18 +186,110 @@ class AIGroq {
         $myModel = $GLOBALS["AI_CHAT"]["MODEL"];
 
         try {
-            $chat = $client->chat()->completions()->create([
-                'model' => $myModel,
-                'reasoning_format' => 'hidden',
-                'messages' => $arrMessages
-            ]);
+            if ($stream) {
+                // Use streaming mode
+                $chat = $client->chat()->completions()->create([
+                    'model' => $myModel,
+                    'reasoning_format' => 'raw',
+                    'messages' => $arrMessages,
+                    'stream' => true
+                ]);
+
+                $answer = '';
+                $pendingText = '';
+                
+                try {
+                    foreach ($chat->chunks() as $chunk) {
+                        $deltaText = '';
+                        
+                        // Extract delta content with fallbacks
+                        if (isset($chunk['choices'][0]['delta']['content'])) {
+                            $deltaText = $chunk['choices'][0]['delta']['content'];
+                        }
+                        
+                        // Skip empty chunks
+                        if (empty($deltaText)) {
+                            continue;
+                        }
+                        
+                        $answer .= $deltaText;
+                        $pendingText .= $deltaText;
+                        
+                        // Throttle ultra-small deltas (whitespace-only)
+                        if (trim($pendingText) !== '' || strlen($pendingText) > 10) {
+                            Frontend::statusToStream($msgArr["BID"], 'ai', $pendingText);
+                            $pendingText = '';
+                        }
+                    }
+                    
+                    // Flush any remaining pending text
+                    if (!empty($pendingText)) {
+                        Frontend::statusToStream($msgArr["BID"], 'ai', $pendingText);
+                    }
+                    
+                } catch (Exception $streamErr) {
+                    return "*API topic Error - Streaming failed: " . $streamErr->getMessage();
+                }
+                
+                // Graceful completion fallback
+                if (empty($answer)) {
+                    return "*API topic Error - Streaming completed with no content";
+                }
+                
+                // Return assembled structure for streaming
+                $arrAnswer = $msgArr;
+                $arrAnswer['BTEXT'] = $answer;
+                $arrAnswer['BDIRECT'] = 'OUT';
+                $arrAnswer['BDATETIME'] = date('Y-m-d H:i:s');
+                $arrAnswer['BUNIXTIMES'] = time();
+                
+                // Clear file-related fields
+                $arrAnswer['BFILE'] = 0;
+                $arrAnswer['BFILEPATH'] = '';
+                $arrAnswer['BFILETYPE'] = '';
+                $arrAnswer['BFILETEXT'] = '';
+
+                // Add model information to the response
+                $arrAnswer['_USED_MODEL'] = $myModel;
+                $arrAnswer['_AI_SERVICE'] = 'AIGroq';
+                
+                // avoid double output to the chat window
+                $arrAnswer['ALREADYSHOWN'] = true;
+
+                return $arrAnswer;
+                
+            } else {
+                // Use non-streaming mode (existing logic)
+                $chat = $client->chat()->completions()->create([
+                    'model' => $myModel,
+                    'reasoning_format' => 'raw',
+                    'messages' => $arrMessages
+                ]);
+            }
+            
+            // DEBUG: Log raw response before parsing (only if debug enabled)
+            if ($GLOBALS["debug"]) {
+                error_log("=== GROQ TOPIC DEBUG: Raw response structure ===");
+                error_log("Full response: " . print_r($chat, true));
+            }
+            
         } catch (GroqException $err) {
+            if ($stream) {
+                return "*API topic Error - Streaming failed: " . $err->getMessage();
+            }
             return "*APItopic Error - Ralf made a bubu - please mail that to him: * " . $err->getMessage();
         }
 
         $answer = $chat['choices'][0]['message']['content'];
 
-        // error_log("***************** DEBUG: GROQ answer: ".$answer);
+        // DEBUG: Log answer before parsing (only if debug enabled)
+        if ($GLOBALS["debug"]) {
+            error_log("=== GROQ TOPIC DEBUG: Answer before parsing ===");
+            error_log("Raw answer: " . $answer);
+        }
+        
+        // COMMENTED OUT: Parsing logic temporarily disabled
+        /*
         // Clean JSON response - only if it starts with JSON markers
         if (strpos($answer, "```json\n") === 0) {
             $answer = substr($answer, 8); // Remove "```json\n" from start
@@ -194,20 +309,18 @@ class AIGroq {
         }
         
         $answer = trim($answer);
-
-        if(Tools::isValidJson($answer) == false) {
-            // error_log(" __________________________ GROQ ANSWER: ".$answer);
-            // return "*API topic Error - Ralf made a bubu - please mail that to him: * " . "Answer is not valid JSON";
-            $arrAnswer = $msgArr;
-            $arrAnswer['BTEXT'] = $answer;
-            $arrAnswer['BDIRECT'] = 'OUT';
-        } else {
-            try {
-                $arrAnswer = json_decode($answer, true);
-            } catch (GroqException $err) {
-                return "*APItopic Error - Ralf made a bubu - please mail that to him: * " . $err->getMessage();
-            }    
+        */
+        
+        // DEBUG: Log final answer (only if debug enabled)
+        if ($GLOBALS["debug"]) {
+            error_log("=== GROQ TOPIC DEBUG: Final answer (no parsing) ===");
+            error_log("Final answer: " . $answer);
         }
+
+        // Always return the raw answer to preserve <think> blocks
+        $arrAnswer = $msgArr;
+        $arrAnswer['BTEXT'] = $answer;
+        $arrAnswer['BDIRECT'] = 'OUT';
 
         // Add model information to the response
         $arrAnswer['_USED_MODEL'] = $myModel;

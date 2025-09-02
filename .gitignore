@@ -6,5 +6,6 @@ public/up/*
 public/inc/models
 public/whispermodels/large-v3-turbo.pt
 public/whispermodels/medium.pt
+.specstory
 
 vendor/

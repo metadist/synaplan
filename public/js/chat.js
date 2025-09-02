@@ -8,6 +8,149 @@ const isAnonymousWidget = typeof window.isAnonymousWidget !== 'undefined' ? wind
 // Widget mode flag (compact embedded UI)
 const isWidgetMode = typeof window.isWidgetMode !== 'undefined' ? window.isWidgetMode : false;
 
+// ========================================
+// GROQ/DeepSeek REASONING HANDLING
+// ========================================
+// Handles <think>/<reason> tags: shows final answer,
+// reasoning hidden behind collapsible toggle.
+// Uses BTEXT from JSON when available.
+// ========================================
+
+
+const GROQ_REASONING_CONFIG = {
+  tags: ['think', 'reason', 'reasoning', 'thinking'],
+  maxInputChars: 10000,
+  maxReasoningChars: 2000
+};
+
+function hasGroqReasoningPatterns(text) {
+  if (!text || text.length > GROQ_REASONING_CONFIG.maxInputChars) return false;
+  
+  // Only detect reasoning if explicit tags are present
+  const tagPattern = new RegExp(`<(${GROQ_REASONING_CONFIG.tags.join('|')})>`, 'i');
+  return tagPattern.test(text);
+}
+
+function findReasoningBlock(text) {
+  const tagGroup = GROQ_REASONING_CONFIG.tags.join('|');
+  const patterns = [
+    new RegExp(`<(${tagGroup})>([\\s\\S]*?)<\\/\\1>`, 'i'),  // paired
+    new RegExp(`<(${tagGroup})>([\\s\\S]*?)$`, 'i'),         // opening-only
+    new RegExp(`^([\\s\\S]*?)<\\/(?:${tagGroup})>`, 'i')     // closing-only
+  ];
+  for (let i = 0; i < patterns.length; i++) {
+    const m = patterns[i].exec(text);
+    if (m) {
+      const content = (i === 2) ? m[1] : m[2];
+      const cleaned = text.replace(m[0], '').trim();
+      return { reasoning: content.trim(), cleaned };
+    }
+  }
+  return null;
+}
+
+// helpers
+function normalizeQuotes(s) {
+  return s
+    .replace(/[\u201C\u201D\u201E\u00AB\u00BB]/g, '"')
+    .replace(/[\u2018\u2019]/g, "'");
+}
+
+function extractLastJson(s) {
+  if (typeof s !== 'string') return null;
+  const txt = normalizeQuotes(s).trim();
+  const m = txt.match(/\{[\s\S]*\}\s*$/);
+  if (!m) return null;
+  try { return JSON.parse(m[0]); } catch { return null; }
+}
+
+function extractBTEXT(text) {
+  const match = text.match(/"BTEXT"\s*:\s*"([^"]*(?:\\.[^"]*)*)"/);
+  if (!match) return null;
+  try {
+    const escaped = match[1].replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\r?\n/g, '\\n');
+    return JSON.parse('"' + escaped + '"');
+  } catch { return null; }
+}
+
+function handleGroqReasoning(text, targetId, renderFn) {
+  const safeRender = renderFn || ((t) => t.replace(/[<>&]/g, (c) => ({'<':'&lt;','>':'&gt;','&':'&amp;'}[c])).replace(/\n/g, '<br>'));
+
+  if (!text || text.length > GROQ_REASONING_CONFIG.maxInputChars) {
+    $("#" + targetId).html(safeRender(text));
+    return;
+  }
+
+  const fenceIndex = text.indexOf('```');
+  const prefix = fenceIndex > -1 ? text.slice(0, fenceIndex) : text;
+  const suffix = fenceIndex > -1 ? text.slice(fenceIndex) : '';
+
+  let reasoning = null;
+  let cleanedPrefix = prefix;
+
+  const tagResult = findReasoningBlock(prefix);
+  if (tagResult) { reasoning = tagResult.reasoning; cleanedPrefix = tagResult.cleaned; }
+
+  // no reasoning → try last JSON first, else BTEXT regex, else raw
+  if (!reasoning) {
+    const obj = extractLastJson(text);
+    if (obj && typeof obj.BTEXT === 'string') {
+      $("#" + targetId).html(safeRender(obj.BTEXT));
+      return;
+    }
+    const btext = extractBTEXT(text);
+    $("#" + targetId).html(safeRender(btext || text));
+    return;
+  }
+
+  if (reasoning.length > GROQ_REASONING_CONFIG.maxReasoningChars) {
+    reasoning = reasoning.slice(0, GROQ_REASONING_CONFIG.maxReasoningChars) + ' …';
+  }
+
+  const cleanedText = cleanedPrefix + suffix;
+  const displayText =
+    extractBTEXT(cleanedText) ||
+    (extractLastJson(cleanedText)?.BTEXT) ||
+    cleanedText;
+
+  const escapedReasoning = reasoning.replace(/[<>&]/g, (c) => ({'<':'&lt;','>':'&gt;','&':'&amp;'}[c]));
+
+  $("#" + targetId).html(safeRender(displayText));
+  $("#" + targetId).append(`
+    <div class="mt-3 pt-2 border-top">
+      <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+        <button class="btn btn-outline-secondary btn-sm py-1 px-2" type="button" data-bs-toggle="collapse" data-bs-target="#reasoning-${targetId}" aria-expanded="false" aria-controls="reasoning-${targetId}" style="font-size: 0.75rem;">
+          <i class="fas fa-brain me-1" style="font-size: 0.7rem;"></i><span class="reasoning-text">Show</span>
+        </button>
+        <small class="text-muted flex-shrink-0">AI's internal thought process</small>
+      </div>
+      <div class="collapse mt-2" id="reasoning-${targetId}">
+        <div class="reasoning-content w-100" style="max-height:300px;overflow-y:auto;font-size:.875rem;line-height:1.5;background-color:#f8f9fa;border-radius:0.375rem;padding:1rem;">
+          <pre class="mb-0 text-dark" style="white-space:pre-wrap;font-family:inherit;">${escapedReasoning}</pre>
+        </div>
+      </div>
+    </div>
+  `);
+
+  if (typeof bootstrap !== 'undefined') {
+    const el = document.getElementById(`reasoning-${targetId}`);
+    if (el) new bootstrap.Collapse(el, { toggle: false });
+  }
+
+  const btn = document.querySelector(`[data-bs-target="#reasoning-${targetId}"]`);
+  if (btn) {
+    const span = btn.querySelector('.reasoning-text');
+    btn.addEventListener('click', function() {
+      span.textContent = this.getAttribute('aria-expanded') === 'true' ? 'Show' : 'Hide';
+    });
+  }
+}
+
+// ========================================
+// END GROQ AI REASONING HANDLING
+// ========================================
+
+
 // Initialize markdown-it once with HTML support
 if (typeof window.markdownit !== 'undefined' && !window.md) {
     window.md = window.markdownit({ 
@@ -496,26 +639,33 @@ function handleSendMessage() {
           let actionsHtml = '';
           if (!isWidgetMode) {
             actionsHtml = `
-                    <div class="d-flex align-items-center gap-2 justify-content-end js-ai-actions">
-                      <button class="btn btn-outline-secondary btn-sm js-copy-message" 
+                    <div class="d-flex align-items-center gap-1 justify-content-end js-ai-actions">
+                      <button class="btn btn-outline-secondary btn-sm py-1 px-2 js-copy-message" 
                               data-message-id="${AItextBlock}"
                               aria-label="Copy message content">
-                        <i class="fas fa-copy"></i>
+                        <i class="fas fa-copy small"></i>
                       </button>
                       
-                      <button class="btn btn-outline-secondary btn-sm js-again" aria-label="Again">
-                        Again…
+                      <button class="btn btn-outline-secondary btn-sm py-1 px-2 js-again" aria-label="Again">
+                        <!-- Large screens: full text -->
+                        <span class="d-none d-lg-inline">
+                          <small class="again-text">Again…</small>
+                        </span>
+                        <!-- Small/medium screens: icon + model name -->
+                        <span class="d-inline d-lg-none">
+                          <i class="fas fa-recycle me-1"></i><small class="again-text-mobile">Again…</small>
+                        </span>
                       </button>
 
                       <div class="dropdown">
-                        <button class="btn btn-outline-secondary btn-sm dropdown-toggle js-again-dd"
+                        <button class="btn btn-outline-secondary btn-sm py-1 px-2 dropdown-toggle js-again-dd"
                                 data-bs-toggle="dropdown"
                                 data-bs-display="static"
                                 data-bs-boundary="viewport"
                                 data-bs-offset="0,8"
                                 aria-expanded="false">
                         </button>
-                        <ul class="dropdown-menu dropdown-menu-end js-again-menu" style="max-height: 300px; overflow-y: auto; min-width: 250px; max-width: 350px;"></ul>
+                        <ul class="dropdown-menu dropdown-menu-end js-again-menu small" style="max-height: 250px; overflow-y: auto; min-width: 200px; max-width: 280px;"></ul>
                       </div>
                     </div>`;
           }
@@ -533,13 +683,13 @@ function handleSendMessage() {
                   <span class="message-time ai-time">${data.time}</span>
                   
                   <!-- Bootstrap responsive footer -->
-                  <div class="mt-2 pt-2 border-top d-flex flex-column flex-sm-row justify-content-between align-items-stretch align-items-sm-end gap-2 message-footer">
+                  <div class="mt-1 pt-1 border-top d-flex flex-column flex-sm-row justify-content-between align-items-stretch align-items-sm-end gap-1 message-footer">
                     <!-- Left: meta -->
                     <div class="text-muted small d-flex align-items-center flex-wrap gap-2 js-ai-meta">
                       <span class="d-inline-flex align-items-center justify-content-center bg-white border rounded p-1 me-1 d-none ai-meta-logo-wrapper">
                         <img class="d-block ai-meta-logo" src="img/single_bird.svg" width="12" height="12" alt="AI Provider">
                       </span>
-                      <span class="${metaTextClass}">${metaTextInitial}</span>
+                      <span class="${metaTextClass} small">${metaTextInitial}</span>
                     </div>
                     <!-- Right: actions (omitted in widget mode) -->
                     ${actionsHtml}
@@ -743,8 +893,19 @@ function sseStream(data, outputObject, originalButton = null) {
 
 // function AI RENDER
 function aiRender(targetId) {
-  // Always render a string - guard against undefined buffer
   const text = typeof aiTextBuffer[targetId] === 'string' ? aiTextBuffer[targetId] : '';
+
+   // Debug: Log what we're rendering
+   console.log('aiRender called for targetId:', targetId);
+   console.log('Text content:', text);
+  
+  // Only handle Groq reasoning if there are actual reasoning patterns
+  const hasReasoningPatterns = hasGroqReasoningPatterns(text);
+  
+  if (hasReasoningPatterns) {
+    handleGroqReasoning(text, targetId);
+    return;
+  }
   
   // Detect if text looks like HTML (starts with < or contains common HTML tags)
   const looksLikeHTML = text.startsWith('<') || 
@@ -764,9 +925,6 @@ function aiRender(targetId) {
   }
   
   $("#" + targetId).html(renderedText);
-  
-  // Clear the buffer only during final render (not during streaming)
-  // Keep buffer during streaming for consistency
 }
 
 // Function to show file details for a specific message
@@ -939,8 +1097,10 @@ $(document).on('click', '.js-model-choice', function(e) {
   const model = $link.data('model');
   
   const $againBtn = $link.closest('.js-ai-actions').find('.js-again');
-  $againBtn.text(`Again with ${model}`)
-    .attr('data-chosen-model-id', modelId)
+  // Update both desktop and mobile text
+  $againBtn.find('.again-text').text(`Again with ${model}`);
+  $againBtn.find('.again-text-mobile').text(model);
+  $againBtn.attr('data-chosen-model-id', modelId)
     .attr('title', `Replay with ${service} ${model}`);
 });
 
@@ -975,36 +1135,43 @@ function handleAgainMessage(modelId, promptId, $originalButton) {
               <span class="message-time ai-time">${data.time}</span>
               
               <!-- Bootstrap responsive footer -->
-              <div class="mt-2 pt-2 border-top d-flex flex-column flex-sm-row justify-content-between align-items-stretch align-items-sm-end gap-2 message-footer">
+              <div class="mt-1 pt-1 border-top d-flex flex-column flex-sm-row justify-content-between align-items-stretch align-items-sm-end gap-1 message-footer">
                 <!-- Left: meta -->
                 <div class="text-muted small d-flex align-items-center flex-wrap gap-2 js-ai-meta">
                   <span class="d-inline-flex align-items-center justify-content-center bg-white border rounded p-1 me-1 d-none ai-meta-logo-wrapper">
                     <img class="d-block ai-meta-logo" width="12" height="12" alt="AI Provider">
                   </span>
-                  <span class="js-ai-meta-text">Generated by … / … · …</span>
+                  <span class="js-ai-meta-text small">Generated by … / … · …</span>
                 </div>
 
                 <!-- Right: actions -->
-                <div class="d-flex align-items-center gap-2 justify-content-end js-ai-actions">
-                  <button class="btn btn-outline-secondary btn-sm js-copy-message" 
+                <div class="d-flex align-items-center gap-1 justify-content-end js-ai-actions">
+                  <button class="btn btn-outline-secondary btn-sm py-1 px-2 js-copy-message" 
                           data-message-id="${AItextBlock}"
                           aria-label="Copy message content">
-                    <i class="fas fa-copy"></i>
+                    <i class="fas fa-copy small"></i>
                   </button>
                   
-                  <button class="btn btn-outline-secondary btn-sm js-again" aria-label="Again">
-                    Again…
+                  <button class="btn btn-outline-secondary btn-sm py-1 px-2 js-again" aria-label="Again">
+                    <!-- Large screens: full text -->
+                    <span class="d-none d-lg-inline">
+                      <small class="again-text">Again…</small>
+                    </span>
+                    <!-- Small/medium screens: icon + model name -->
+                    <span class="d-inline d-lg-none">
+                      <i class="fas fa-recycle me-1"></i><small class="again-text-mobile">Again…</small>
+                    </span>
                   </button>
 
                   <div class="dropdown">
-                    <button class="btn btn-outline-secondary btn-sm dropdown-toggle js-again-dd"
+                    <button class="btn btn-outline-secondary btn-sm py-1 px-2 dropdown-toggle js-again-dd"
                             data-bs-toggle="dropdown"
                             data-bs-display="static"
                             data-bs-boundary="viewport"
                             data-bs-offset="0,8"
                             aria-expanded="false">
                     </button>
-                    <ul class="dropdown-menu dropdown-menu-end js-again-menu" style="max-height: 300px; overflow-y: auto; min-width: 250px; max-width: 350px;"></ul>
+                    <ul class="dropdown-menu dropdown-menu-end js-again-menu small" style="max-height: 250px; overflow-y: auto; min-width: 200px; max-width: 280px;"></ul>
                   </div>
                 </div>
               </div>
@@ -1186,8 +1353,10 @@ function hydrateFromSSEMeta($messageItem, meta) {
     // Update Again button with predicted next
     const $againBtn = $messageItem.find('.js-again');
     if (meta.predictedNext) {
-      $againBtn.text(`Again with ${meta.predictedNext.model}`)
-        .attr('data-next-model-id', meta.predictedNext.model_id);
+      // Update desktop and mobile text separately
+      $againBtn.find('.again-text').text(`Again with ${meta.predictedNext.model}`);
+      $againBtn.find('.again-text-mobile').text(meta.predictedNext.model);
+      $againBtn.attr('data-next-model-id', meta.predictedNext.model_id);
     }
     
     // Populate dropdown with eligible models
