@@ -224,7 +224,7 @@ class Tools {
             $chromiumDestPath = './up/'.$userRelPath.$userDatePath.$fileBasename;
             $fileDBPath = $userRelPath.$userDatePath.$fileBasename;
 
-            $cmd = 'chromium-browser --headless --no-sandbox --force-device-scale-factor=1 --window-size='.$x.','.$y.' --screenshot='.$chromiumDestPath.' "'.($url).'"'; // 2>/dev/null';
+            $cmd = 'chromium --headless --no-sandbox --force-device-scale-factor=1 --window-size='.$x.','.$y.' --screenshot='.$chromiumDestPath.' "'.($url).'"'; // 2>/dev/null';
             $result=exec($cmd);
             
             //error_log($result);
