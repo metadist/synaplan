@@ -8,7 +8,6 @@
 // Set execution time limit to 6 minutes
 set_time_limit(360);
 session_start();
-
 // core app files with relative paths
 $root = __DIR__ . '/';
 require_once($root . '/inc/_coreincludes.php');
@@ -31,6 +30,12 @@ if ($authHeader && stripos($authHeader, 'Bearer ') === 0) {
                 // update last used
                 DB::Query("UPDATE BAPIKEYS SET BLASTUSED = ".time()." WHERE BID = ".intval($row['BID']));
             }
+            Tools::checkRateLimit('api_key', 60, 30);
+            if (!$rateLimitResult['allowed']) {
+                http_response_code(429);
+                echo json_encode(['error' => 'Rate limit exceeded']);
+                exit;
+            }
         } else {
             http_response_code(401);
             header('Content-Type: application/json; charset=UTF-8');
@@ -40,6 +45,7 @@ if ($authHeader && stripos($authHeader, 'Bearer ') === 0) {
     }
 }
 
+// ******************************************************
 // ******************************************************
 // Check if this is a JSON-RPC request
 // ******************************************************
@@ -58,10 +64,6 @@ if (!empty($rawPostData) && Tools::isValidJson($rawPostData)) {
         $isJsonRpc = true;
     }
 }
-// first, check if the user sent a bearer token
-// $bearerToken = $_SERVER['HTTP_AUTHORIZATION'];
-// it not, check for session id
-// later filled with the right user check for devleopment, we use plain posts
 
 // Handle JSON-RPC request
 if ($isJsonRpc) {
@@ -69,6 +71,7 @@ if ($isJsonRpc) {
     exit;
 }
 
+// ******************************************************
 // ******************************************************
 // If not JSON-RPC, continue with REST handling
 // Detect OpenAI-compatible routes BEFORE action switch
@@ -86,9 +89,11 @@ if (strpos($requestPath, '/v1/') === 0) {
 header('Content-Type: application/json; charset=UTF-8');
 $apiAction = $_REQUEST['action'];
 
-// Rate limiting moved to Tools::checkRateLimit
+// ******************************************************
+// ******************************************************
+// Web client routes
+// ******************************************************
 
-// ------------------------------------------------------ API AUTHENTICATION & RATE LIMITING --------------------
 // Check if this is an anonymous widget session
 $isAnonymousWidget = isset($_SESSION["is_widget"]) && $_SESSION["is_widget"] === true;
 
@@ -143,14 +148,14 @@ $authenticatedOnlyEndpoints = [
 ];
 
 // Check authentication for the requested action
-if (in_array($apiAction, $authenticatedOnlyEndpoints)) {
+if(in_array($apiAction, $authenticatedOnlyEndpoints)) {
     // These endpoints require authenticated user sessions
     if (!isset($_SESSION["USERPROFILE"]) || !isset($_SESSION["USERPROFILE"]["BID"])) {
         http_response_code(401);
         echo json_encode(['error' => 'Authentication required for this endpoint']);
         exit;
     }
-} elseif (in_array($apiAction, $anonymousAllowedEndpoints)) {
+} elseif(in_array($apiAction, $anonymousAllowedEndpoints)) {
     // These endpoints allow both anonymous widget sessions and authenticated user sessions
     
     // Check if this is an anonymous widget session
