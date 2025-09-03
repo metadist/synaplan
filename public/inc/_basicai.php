@@ -8,6 +8,7 @@ Class BasicAI {
     // ****************************************************************************************************** 
     public static function toolPrompt($msgArr, $stream = false): array|string|bool { 
         $textArr = explode(" ", $msgArr['BTEXT']);
+        
         if($stream) {
             Frontend::statusToStream($msgArr['BID'], 'pre', $textArr[0].' ');
         }

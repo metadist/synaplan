@@ -260,7 +260,7 @@ class ProcessMethods {
             }       
 
             // ************************* CALL THE TOOL *************
-            self::$toolAnswer = BasicAI::toolPrompt(self::$msgArr, false);
+            self::$toolAnswer = BasicAI::toolPrompt(self::$msgArr, self::$stream);
 
             // Normalize tool result text for OUT: prefer OUTTEXT -> CAPTION -> TEXT -> BTEXT
             if (is_array(self::$toolAnswer)) {
