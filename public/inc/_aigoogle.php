@@ -591,6 +591,8 @@ class AIGoogle {
      * @return array Updated message array with generated video file information or error details
      */
     public static function createVideo($msgArr, $stream = false): array {
+        $debug = !empty($GLOBALS["debug"]) ? true : false;
+        $startTime = microtime(true);
         // Load user data
         $usrArr = Central::getUsrById($msgArr['BUSERID']);
         // Prepare prompt
@@ -621,14 +623,18 @@ class AIGoogle {
             ];
 
             try {
+                if ($debug) {
+                    error_log("[AIGoogle::createVideo] Starting long-running prediction. Model=" . $myModel . ", PromptLen=" . strlen($videoPrompt));
+                }
                 $arrRes = Curler::callJson($url, $headers, $postData);
                 
                 // Extract operation name
                 $operationName = $arrRes['name'] ?? '';
                 
                 if (empty($operationName)) {
+                    $errDetails = $debug ? (" Response=" . json_encode($arrRes,JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)) : '';
                     $msgArr['BFILEPATH'] = '';
-                    $msgArr['BFILETEXT'] = "Error: No operation name returned";
+                    $msgArr['BFILETEXT'] = "Error: No operation name returned." . $errDetails;
                     return $msgArr;
                 }
 
@@ -636,14 +642,38 @@ class AIGoogle {
                 $maxAttempts = 60; // 5 minutes max (5 seconds * 60)
                 $attempt = 0;
                 $isDone = false;
+                $lastError = '';
                 
                 while (!$isDone && $attempt < $maxAttempts) {
                     sleep(5); // Wait 5 seconds
     
                     $checkUrl = "https://generativelanguage.googleapis.com/v1beta/" . $operationName . "?key=" . self::$key;
-                    $checkRes = Curler::callJson($checkUrl, $headers, null);
+                    $checkRes = [];
+                    try {
+                        $checkRes = Curler::callJson($checkUrl, $headers, null);
+                    } catch (Exception $e) {
+                        $lastError = $e->getMessage();
+                        if ($debug) {
+                            error_log("[AIGoogle::createVideo] Poll attempt=" . ($attempt+1) . " error: " . $lastError);
+                        }
+                        // Continue polling; transient failures are possible
+                        $attempt++;
+                        if($stream) {
+                            $update = [
+                                'msgId' => $msgArr['BID'],
+                                'status' => 'pre_processing',
+                                'message' => 'Transient polling error; retrying... '
+                            ];
+                            Frontend::printToStream($update);
+                        }
+                        continue;
+                    }
                     
-                    error_log("Check Res: " . json_encode($checkRes,JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
+                    if ($debug) {
+                        error_log("[AIGoogle::createVideo] Poll attempt=" . ($attempt+1) . ", done=" . (isset($checkRes['done']) && $checkRes['done'] ? 'true' : 'false'));
+                        // Only log full response in debug to avoid noise
+                        error_log("[AIGoogle::createVideo] Check Res: " . json_encode($checkRes,JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
+                    }
 
                     $isDone = $checkRes['done'] ?? false;
                     $attempt++;
@@ -676,11 +706,17 @@ class AIGoogle {
                             curl_setopt($ch, CURLOPT_URL, $videoUri);
                             curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
                             curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+                            curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 15);
+                            curl_setopt($ch, CURLOPT_TIMEOUT, 180);
                             $videoData = curl_exec($ch);
                             $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+                            $curlErr = curl_error($ch);
                             curl_close($ch);
                             
                             if ($httpCode != 200 || $videoData === false) {
+                                if ($debug) {
+                                    error_log("[AIGoogle::createVideo] Video download failed. HTTP=" . $httpCode . ", error=" . $curlErr);
+                                }
                                 $videoData = '';
                             }
                         }
@@ -701,9 +737,20 @@ class AIGoogle {
                             $msgArr['BFILEPATH'] = $filePath;
                             $msgArr['BFILETYPE'] = 'mp4';
                             $msgArr['BTEXT'] = "Video generated successfully: " . $videoPrompt;
+                            if ($debug) {
+                                $took = round((microtime(true) - $startTime), 2);
+                                error_log("[AIGoogle::createVideo] Success. Took=" . $took . "s, Attempts=" . $attempt);
+                            }
                         } else {
                             $msgArr['BFILEPATH'] = '';
-                            $msgArr['BFILETEXT'] = "Error: No video data returned";
+                            $detail = '';
+                            if ($debug) {
+                                $detail = " Details: Response keys=" . implode(',', array_keys($checkRes));
+                                if (isset($checkRes['response'])) {
+                                    $detail .= "; responseKeys=" . implode(',', array_keys($checkRes['response']));
+                                }
+                            }
+                            $msgArr['BFILETEXT'] = "Error: No video data returned." . $detail;
                         }
                         break;
                     }
@@ -711,12 +758,17 @@ class AIGoogle {
                 
                 if (!$isDone) {
                     $msgArr['BFILEPATH'] = '';
-                    $msgArr['BFILETEXT'] = "Error: Video generation timeout after " . ($maxAttempts * 5) . " seconds";
+                    $extra = $debug ? (" (lastError=" . ($lastError !== '' ? $lastError : 'none') . ")") : '';
+                    $msgArr['BFILETEXT'] = "Error: Video generation timeout after " . ($maxAttempts * 5) . " seconds." . $extra;
                 }
                 
             } catch (Exception $err) {
                 $msgArr['BFILEPATH'] = '';
-                $msgArr['BFILETEXT'] = "Error: " . $err->getMessage();
+                $extra = '';
+                if ($debug) {
+                    $extra = " Response=" . (isset($arrRes) ? json_encode($arrRes,JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) : 'n/a');
+                }
+                $msgArr['BFILETEXT'] = "Error: " . $err->getMessage() . $extra;
             }
         } else {
             $msgArr['BFILEPATH'] = '';

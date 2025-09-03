@@ -136,6 +136,20 @@ class ProcessMethods {
 
             }
 
+            // For anonymous widget sessions without explicit per-message prompt: enforce widget-selected prompt
+            if ($promptId == 'tools:sort' && isset($_SESSION["is_widget"]) && $_SESSION["is_widget"] === true) {
+                $widgetPrompt = $_SESSION['WIDGET_PROMPT'] ?? '';
+                if (is_string($widgetPrompt) && strlen(trim($widgetPrompt)) > 0) {
+                    $promptId = $widgetPrompt;
+                    self::$msgArr['BTOPIC'] = $promptId;
+                    $updateSQL = "update BMESSAGES set BTOPIC = '".DB::EscString($promptId)."' where BID = ".intval(self::$msgArr['BID']);
+                    DB::Query($updateSQL);
+                    if(self::$stream) {
+                        Frontend::statusToStream(self::$msgId, 'pre', 'Target set: '.self::$msgArr['BTOPIC'].' ');
+                    }
+                }
+            }
+
             // ----------------------------------------------------- Standard sorting
             // -----------------------------------------------------
             if($promptId == 'tools:sort') {
@@ -246,7 +260,7 @@ class ProcessMethods {
             }       
 
             // ************************* CALL THE TOOL *************
-            self::$toolAnswer = BasicAI::toolPrompt(self::$msgArr, false);
+            self::$toolAnswer = BasicAI::toolPrompt(self::$msgArr, self::$stream);
 
             // Normalize tool result text for OUT: prefer OUTTEXT -> CAPTION -> TEXT -> BTEXT
             if (is_array(self::$toolAnswer)) {
@@ -310,6 +324,22 @@ public static function processMessage(): void {
     $answerJsonArr = [];
     $answerSorted  = [];
     $ragArr        = [];
+
+    // Temporarily switch prompt/model resolution context to widget owner during processing
+    $___savedUserProfile = null;
+    $___usingOwnerCtx = false;
+    if (isset($_SESSION["is_widget"]) && $_SESSION["is_widget"] === true) {
+        $ownerId = intval($_SESSION["widget_owner_id"] ?? 0);
+        if ($ownerId > 0) {
+            $ownerArr = Central::getUsrById($ownerId);
+            if ($ownerArr && is_array($ownerArr)) {
+                $ownerArr["DETAILS"] = json_decode($ownerArr["BUSERDETAILS"], true);
+                $___savedUserProfile = $_SESSION['USERPROFILE'] ?? null;
+                $_SESSION['USERPROFILE'] = $ownerArr;
+                $___usingOwnerCtx = true;
+            }
+        }
+    }
 
     // --- File-Infos vorbereiten (nur Kontext, kein Stream) ---
     if (isset(self::$msgArr['BFILE']) && self::$msgArr['BFILE'] > 0) {
@@ -734,6 +764,14 @@ public static function processMessage(): void {
         );
     }
 
+    // Restore original user session context after processing (important for anonymous widgets)
+    if ($___usingOwnerCtx) {
+        if ($___savedUserProfile !== null) {
+            $_SESSION['USERPROFILE'] = $___savedUserProfile;
+        } else {
+            unset($_SESSION['USERPROFILE']);
+        }
+    }
     return;
 }
 
