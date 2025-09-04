@@ -84,7 +84,7 @@ RUN install-php-extensions \
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
 # Install Node.js
-COPY --from=node:20 /usr/local /usr/local
+COPY --from=node:22 /usr/local /usr/local
 RUN node --version && npm --version
 
 COPY . .

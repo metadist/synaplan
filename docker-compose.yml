@@ -75,7 +75,7 @@ services:
 
   # NPM Dependencies Installer
   npm-install:
-    image: node:20-alpine
+    image: node:22-alpine
     container_name: synaplan-npm-install
     working_dir: /var/www/html/public
     volumes:
