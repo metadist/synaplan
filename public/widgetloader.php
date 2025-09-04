@@ -1,4 +1,23 @@
 <?php
+// Ensure session cookies work inside third-party iframes by setting SameSite=None; Secure
+// Robust HTTPS detection: X-Forwarded-Proto or baseUrl prefix
+$forwardedProto = isset($_SERVER['HTTP_X_FORWARDED_PROTO']) ? strtolower($_SERVER['HTTP_X_FORWARDED_PROTO']) : '';
+$baseHttps = isset($GLOBALS['baseUrl']) && strpos($GLOBALS['baseUrl'], 'https://') === 0;
+$isHttps = ($forwardedProto === 'https') ||
+           (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ||
+           (isset($_SERVER['SERVER_PORT']) && $_SERVER['SERVER_PORT'] == 443) ||
+           $baseHttps;
+if (function_exists('session_set_cookie_params')) {
+    $cookieParams = [
+        'lifetime' => 0,
+        'path' => '/',
+        'domain' => '',
+        'secure' => $isHttps ? true : false,
+        'httponly' => true,
+        'samesite' => 'None'
+    ];
+    @session_set_cookie_params($cookieParams);
+}
 session_start();
 // core app files with relative paths
 $root = __DIR__.'/';
@@ -75,7 +94,7 @@ header('Pragma: no-cache');
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Chat Widget</title>
-    <base href="<?php echo ($_SERVER['HTTPS'] ?? '') === 'on' ? 'https://' : 'http://' . $_SERVER['HTTP_HOST'] . dirname($_SERVER['REQUEST_URI']) . '/'; ?>">
+    <base href="<?php echo $GLOBALS['baseUrl']; ?>">
     <!-- Bootstrap CSS -->
     <link href="node_modules/bootstrap/dist/css/bootstrap.min.css?v=<?php echo @filemtime('node_modules/bootstrap/dist/css/bootstrap.min.css'); ?>" rel="stylesheet">
     <!-- Dashboard CSS - includes all chat interface styles -->

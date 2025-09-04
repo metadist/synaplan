@@ -5,6 +5,27 @@ require_once('inc/_confdb.php');
 
 header('Content-Type: application/javascript');
 
+// Force session cookies to be compatible with third-party iframes (SameSite=None; Secure)
+// This ensures that the widget iframe can send session cookies for API calls
+// Robust HTTPS detection: X-Forwarded-Proto or baseUrl prefix
+$forwardedProto = isset($_SERVER['HTTP_X_FORWARDED_PROTO']) ? strtolower($_SERVER['HTTP_X_FORWARDED_PROTO']) : '';
+$baseHttps = isset($GLOBALS['baseUrl']) && strpos($GLOBALS['baseUrl'], 'https://') === 0;
+$isHttps = ($forwardedProto === 'https') ||
+           (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ||
+           (isset($_SERVER['SERVER_PORT']) && $_SERVER['SERVER_PORT'] == 443) ||
+           $baseHttps;
+if (function_exists('session_set_cookie_params')) {
+    $cookieParams = [
+        'lifetime' => 0,
+        'path' => '/',
+        'domain' => '',
+        'secure' => $isHttps ? true : false,
+        'httponly' => true,
+        'samesite' => 'None'
+    ];
+    @session_set_cookie_params($cookieParams);
+}
+
 // Get parameters
 $uid = isset($_REQUEST['uid']) ? intval($_REQUEST['uid']) : 0;
 $widgetId = isset($_REQUEST['widgetid']) ? intval($_REQUEST['widgetid']) : 1;
@@ -50,6 +71,20 @@ switch ($config['position']) {
         break;
 }
 
+// Determine chat panel side CSS so it opens on the same side as the button
+$panelSideCSS = '';
+switch ($config['position']) {
+    case 'bottom-left':
+        $panelSideCSS = 'left: 20px; right: auto;';
+        break;
+    case 'bottom-center':
+        $panelSideCSS = 'left: 50%; transform: translateX(-50%);';
+        break;
+    default: // bottom-right
+        $panelSideCSS = 'right: 20px; left: auto;';
+        break;
+}
+
 // Output the widget JavaScript
 ?>
 (function() {
@@ -60,7 +95,7 @@ switch ($config['position']) {
         position: fixed;
         bottom: 20px;
         <?php echo $positionCSS; ?>
-        z-index: 999999;
+        z-index: 2147483645;
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
     `;
 
@@ -82,7 +117,7 @@ switch ($config['position']) {
         color: white;
         font-size: 30px;
         padding-bottom: 5px;
-        z-index: 999999;
+        z-index: 2147483645;
     `;
     chatButton.innerHTML = '&#x1F5E9;';
     chatButton.setAttribute('aria-label', 'Open chat');
@@ -99,7 +134,7 @@ switch ($config['position']) {
         width: 100%;
         height: 100%;
         background: rgba(0, 0, 0, 0.5);
-        z-index: 9999998;
+        z-index: 2147483646;
         display: none;
         opacity: 0;
         transition: opacity 0.3s ease;
@@ -111,14 +146,14 @@ switch ($config['position']) {
     chatContainer.style.cssText = `
         position: fixed;
         bottom: 20px;
-        right: 20px;
+        <?php echo $panelSideCSS; ?>
         width: 420px;
         max-width: 500px;
         height: 600px;
         background: white;
         border-radius: 12px;
         box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
-        z-index: 9999999;
+        z-index: 2147483647;
         display: none;
         opacity: 0;
         transition: all 0.3s ease;
@@ -183,6 +218,28 @@ switch ($config['position']) {
       }
     `;
     document.head.appendChild(responsiveStyle);
+
+    // Add enforced z-index and side rules with !important to beat host CSS
+    const enforcedStyle = document.createElement('style');
+    enforcedStyle.textContent = `
+      #synaplan-chat-widget { 
+        position: fixed !important; 
+        bottom: 20px !important; 
+        z-index: 2147483645 !important; 
+      }
+      #synaplan-chat-overlay { 
+        position: fixed !important; 
+        top: 0 !important; 
+        left: 0 !important; 
+        z-index: 2147483646 !important; 
+      }
+      #synaplan-chat-container { 
+        position: fixed !important; 
+        bottom: 20px !important; 
+        z-index: 2147483647 !important; 
+      }
+    `;
+    document.head.appendChild(enforcedStyle);
 
     // Function to create and load iframe
     const loadChatFrame = () => {
