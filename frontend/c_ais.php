@@ -4,7 +4,7 @@
     
     <!-- Image map container -->
     <div class="image-map-container" style="position: relative; max-height: 70vh;">
-        <img src="img/architecture_1.png" 
+        <img src="assets/statics/img/architecture_1.png" 
              alt="Configuration of your setup" 
              class="img-fluid responsive-image" 
              style="max-height: 70vh; height: auto;"
