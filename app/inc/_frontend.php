@@ -1462,7 +1462,8 @@ Class Frontend {
                         'color' => '#007bff',
                         'position' => 'bottom-right',
                         'autoMessage' => '',
-                        'prompt' => 'general'
+                        'prompt' => 'general',
+                        'autoOpen' => '0'
                     ];
                 }
                 
@@ -1479,6 +1480,9 @@ Class Frontend {
                         break;
                     case 'prompt':
                         $widgets[$widgetId]['prompt'] = $value;
+                        break;
+                    case 'autoOpen':
+                        $widgets[$widgetId]['autoOpen'] = $value;
                         break;
                 }
             }
@@ -1536,7 +1540,9 @@ Class Frontend {
             'color' => $color,
             'position' => $position,
             'autoMessage' => $autoMessage,
-            'prompt' => $prompt
+            'prompt' => $prompt,
+            // autoOpen is optional; default is '0' (disabled)
+            'autoOpen' => isset($_REQUEST['autoOpen']) && ($_REQUEST['autoOpen'] === '1' || $_REQUEST['autoOpen'] === 'true' || $_REQUEST['autoOpen'] === 'on') ? '1' : '0'
         ];
         
         foreach ($settings as $setting => $value) {

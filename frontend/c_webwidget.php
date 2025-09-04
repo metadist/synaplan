@@ -64,6 +64,17 @@
                         <input type="text" class="form-control" name="autoMessage" id="autoMessage" placeholder="Hello! How can I help you today?" value="Hello! How can I help you today?">
                         <div class="form-text">Automated first message shown to visitors</div>
                     </div>
+                    <label for="autoOpen" class="col-sm-2 col-form-label"><strong>Auto-open Popup:</strong></label>
+                    <div class="col-sm-4 d-flex align-items-center">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" value="1" id="autoOpen" name="autoOpen">
+                            <label class="form-check-label" for="autoOpen">
+                                Open automatically after a few seconds
+                            </label>
+                        </div>
+                    </div>
+                </div>
+                <div class="row mb-3">
                     <label for="widgetPrompt" class="col-sm-2 col-form-label"><strong>AI Prompt:</strong></label>
                     <div class="col-sm-4">
                         <select class="form-select" name="widgetPrompt" id="widgetPrompt">
@@ -266,7 +277,8 @@
                                     <strong>Color:</strong> <span style="color: ${widget.color};">${widget.color}</span><br>
                                     <strong>Position:</strong> ${widget.position}<br>
                                     <strong>Prompt:</strong> ${widget.prompt}<br>
-                                    <strong>Auto Message:</strong> ${widget.autoMessage ? 'Yes' : 'No'}
+                                    <strong>Auto Message:</strong> ${widget.autoMessage ? 'Yes' : 'No'}<br>
+                                    <strong>Auto-open:</strong> ${widget.autoOpen == '1' ? 'Enabled' : 'Disabled'}
                                 </small>
                             </p>
                         </div>
@@ -324,6 +336,8 @@
         document.getElementById('widgetPosition').value = 'bottom-right';
         document.getElementById('autoMessage').value = 'Hello! How can I help you today?';
         document.getElementById('widgetPrompt').value = 'general';
+        const autoOpenEl = document.getElementById('autoOpen');
+        if (autoOpenEl) autoOpenEl.checked = false; // default off
         
         updateIntegrationCode();
         document.getElementById('webwidgetForm').style.display = 'block';
@@ -346,6 +360,8 @@
         document.getElementById('widgetPosition').value = widget.position;
         document.getElementById('autoMessage').value = widget.autoMessage;
         document.getElementById('widgetPrompt').value = widget.prompt;
+        const autoOpenEditEl = document.getElementById('autoOpen');
+        if (autoOpenEditEl) autoOpenEditEl.checked = (widget.autoOpen == '1');
         
         updateIntegrationCode();
         document.getElementById('webwidgetForm').style.display = 'block';

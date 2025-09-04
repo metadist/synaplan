@@ -1219,7 +1219,7 @@ CHAT INTERFACE STYLES
 /* Message Content Container */
 .message-content {
   flex: 1; 
-  max-width: calc(100% - 48px);
+  max-width: calc(100% - 12px);
 }
 
 /* System Messages */

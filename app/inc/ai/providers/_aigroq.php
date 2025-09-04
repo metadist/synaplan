@@ -31,6 +31,14 @@ class AIGroq {
             if($GLOBALS["debug"]) error_log("Groq API key not configured");
             return false;
         }
+        // Local debug: output the key only when running on localhost and debug is enabled
+        /*
+        $isLocalhost = in_array($_SERVER['HTTP_HOST'] ?? '', ['localhost', '127.0.0.1', '::1']) ||
+                       (isset($_SERVER['SERVER_NAME']) && in_array($_SERVER['SERVER_NAME'], ['localhost', '127.0.0.1', '::1']));
+        if (!empty($GLOBALS['debug']) && $isLocalhost) {
+            error_log('GROQ DEBUG: Using API key: ' . self::$key);
+        }
+        */
         self::$client = new Groq(self::$key);
         return true;
     }
