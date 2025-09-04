@@ -73,7 +73,7 @@ DEBUG=false
 **Recommended AI Service:** We recommend [Groq.com](https://groq.com) as a cost-effective, super-fast AI service for production use.
 
 #### 5. Update Configuration Paths
-If you're not installing in `/wwwroot/synaplan/public/`, update the paths in `public/inc/_confsys.php`:
+If you're not installing in `/wwwroot/synaplan/public/`, update URLs in `app/inc/config/_confsys.php`:
 
 ```php
 // Update these values to match your installation path
@@ -109,7 +109,7 @@ You can also deploy Synaplan on a regular Linux server using Apache, PHP 8.3, an
 6. File permissions
    - Ensure `public/up/` exists with writable permissions for the web server user
 7. App URLs
-   - Adjust `$devUrl` and `$liveUrl` in `public/inc/_confsys.php` to match your domains/paths
+   - Adjust `$devUrl` and `$liveUrl` in `app/inc/config/_confsys.php` to match your domains/paths
 8. Test
    - Open your site (e.g., `https://your-domain/`) and log in with the default credentials above
 
@@ -122,14 +122,40 @@ You can also deploy Synaplan on a regular Linux server using Apache, PHP 8.3, an
 
 ### Architecture (brief)
 ```
+app/
+├─ director.php                  # Front-controller (includes frontend content)
+└─ inc/
+   ├─ config/                    # _confsys.php, _confdb.php, _confkeys.php, _confdefaults.php
+   ├─ api/                       # ApiRouter.php, ApiAuthenticator.php, procedural endpoints (included by public/api.php)
+   ├─ ai/                        # providers/, core/
+   ├─ domain/                    # domain logic (e.g., files)
+   ├─ mail/                      # email services
+   ├─ support/                   # tools, helpers
+   └─ _frontend.php              # legacy helpers used by UI
+
+frontend/
+├─ c_chat.php, c_login.php, c_prompts.php, c_inbound.php, ...
+
 public/
-├─ index.php            # Entry
-├─ snippets/            # UI (routed by snippets/director.php)
-├─ inc/                 # Business logic & AI integrations
-├─ api.php              # REST gateway
-└─ webhookwa.php        # WhatsApp handler
+├─ index.php                     # Web entry point (uses Composer + _coreincludes)
+├─ api.php                       # API entry point
+├─ widget.php / widgetloader.php # Embeddable widget endpoints
+├─ assets/statics/
+│  ├─ css/dashboard.css
+│  ├─ js/ (chat.js, chathistory.js, speech.js, dashboard.js)
+│  ├─ fa/ (css, webfonts, svgs)
+│  └─ img/ (ai-logos/, etc.)
+├─ up/                           # Uploaded files (served by web)
+└─ webhookwa.php                 # WhatsApp handler
+
+dev/
+├─ docker/                       # Dockerfiles
+└─ db-loadfiles/                 # SQL init data
+
+cron/
+└─ mailhandler.php               # CLI cron for Gmail processing
 ```
-Configuration-driven AI selection via `$GLOBALS` and centralized key management in `ApiKeys`.
+Configuration-driven AI selection via `$GLOBALS` and centralized key management in `app/inc/config/_confkeys.php`.
 
 ### API & Integrations
 - REST endpoints, embeddable web widget, Gmail and WhatsApp integrations.
@@ -137,7 +163,7 @@ Configuration-driven AI selection via `$GLOBALS` and centralized key management 
 ### Troubleshooting
 - Vector search: ensure MariaDB 11.7+
 - Uploads: check `public/up/` permissions
-- AI calls: verify API keys in `public/.env`
+- AI calls: verify API keys in `.env` (project root)
 - DB errors: verify credentials and service status
 - **Whisper models:** If you need to re-download models, delete the volume and restart:
   ```bash
@@ -158,8 +184,18 @@ Configuration-driven AI selection via `$GLOBALS` and centralized key management 
   docker compose up -d
   ```
 
+### Cron (mail handler)
+- Run once without starting services:
+  ```bash
+  docker compose run --rm app php cron/mailhandler.php --user=2 --debug
+  ```
+- Or exec into a running container:
+  ```bash
+  docker compose exec app php cron/mailhandler.php --user=2 --debug
+  ```
+
 ### Contributing
-PRs welcome for providers, channels, docs, and performance. Start from `web/`, review `snippets/director.php`, and follow existing patterns.
+PRs welcome for providers, channels, docs, and performance. Start from `app/Director.php` and `frontend/` components, and follow existing patterns.
 
 ### License
 See "LICENSE": Apache 2.0 real open core, because we love it!
