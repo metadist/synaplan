@@ -79,13 +79,10 @@ switch ($config['position']) {
         justify-content: center;
         transition: all 0.3s ease;
         color: white;
+        font-size: 28px;
         z-index: 999999;
     `;
-    chatButton.innerHTML = `
-        <svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="currentColor">
-            <path d="M2.25 6.75c0-1.657 1.343-3 3-3h13.5c1.657 0 3 1.343 3 3v6.75c0 1.657-1.343 3-3 3H9.005a.75.75 0 0 0-.53.22L4.5 20.25v-3.75h-.75c-1.657 0-3-1.343-3-3V6.75z"/>
-        </svg>
-    `;
+    chatButton.innerHTML = '&#x1F5E9;';
     chatButton.setAttribute('aria-label', 'Open chat');
     chatButton.setAttribute('title', 'Chat');
     chatButton.setAttribute('type', 'button');
