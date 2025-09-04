@@ -24,7 +24,8 @@ $config = [
     'color' => '#007bff',
     'position' => 'bottom-right',
     'autoMessage' => '',
-    'prompt' => 'general'
+    'prompt' => 'general',
+    'autoOpen' => '0'
 ];
 
 while ($row = db::FetchArr($res)) {
@@ -79,13 +80,11 @@ switch ($config['position']) {
         justify-content: center;
         transition: all 0.3s ease;
         color: white;
+        font-size: 30px;
+        padding-bottom: 5px;
         z-index: 999999;
     `;
-    chatButton.innerHTML = `
-        <svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="currentColor">
-            <path d="M2.25 6.75c0-1.657 1.343-3 3-3h13.5c1.657 0 3 1.343 3 3v6.75c0 1.657-1.343 3-3 3H9.005a.75.75 0 0 0-.53.22L4.5 20.25v-3.75h-.75c-1.657 0-3-1.343-3-3V6.75z"/>
-        </svg>
-    `;
+    chatButton.innerHTML = '&#x1F5E9;';
     chatButton.setAttribute('aria-label', 'Open chat');
     chatButton.setAttribute('title', 'Chat');
     chatButton.setAttribute('type', 'button');
@@ -108,11 +107,13 @@ switch ($config['position']) {
 
     // Create chat container
     const chatContainer = document.createElement('div');
+    chatContainer.id = 'synaplan-chat-container';
     chatContainer.style.cssText = `
         position: fixed;
         bottom: 20px;
         right: 20px;
-        width: 380px;
+        width: 420px;
+        max-width: 500px;
         height: 600px;
         background: white;
         border-radius: 12px;
@@ -167,6 +168,22 @@ switch ($config['position']) {
     document.body.appendChild(widgetContainer);
     document.body.appendChild(overlay);
 
+    // Responsive rules for small screens (e.g., iPhone 14)
+    const responsiveStyle = document.createElement('style');
+    responsiveStyle.textContent = `
+      #synaplan-chat-container { width: 420px; max-width: 500px; }
+      @media (max-width: 500px) {
+        #synaplan-chat-container {
+          left: 10px !important;
+          right: 10px !important;
+          width: auto !important;
+          bottom: 10px !important;
+          height: calc(100vh - 20px) !important;
+        }
+      }
+    `;
+    document.head.appendChild(responsiveStyle);
+
     // Function to create and load iframe
     const loadChatFrame = () => {
         if (iframeContainer.children.length === 0) {
@@ -220,10 +237,10 @@ switch ($config['position']) {
         chatButton.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.15)';
     };
 
-    // Auto-open functionality (if auto message is configured)
-    <?php if (!empty($config['autoMessage'])): ?>
+    // Auto-open functionality if explicitly enabled in config
+    <?php if (!empty($config['autoOpen']) && $config['autoOpen'] === '1'): ?>
     setTimeout(() => {
         chatButton.click();
-    }, 3000); // Auto-open after 3 seconds
+    }, 3000);
     <?php endif; ?>
 })(); 

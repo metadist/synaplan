@@ -285,6 +285,19 @@ window.isWidgetMode = <?php echo $isWidgetMode ? 'true' : 'false'; ?>;
         color: #6c757d !important;
         font-size: 0.85rem !important;
       }
+
+      /* Widget-mode font scaling */
+      html, body, #contentMain {
+        font-size: 90% !important;
+      }
+      h1, h2 {
+        font-size: 70% !important;
+      }
+
+      /* Hide AI avatar in widget mode to maximize message width */
+      .ai-avatar {
+        display: none !important;
+      }
     `;
     document.head.appendChild(style);
 
