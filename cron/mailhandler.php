@@ -3,8 +3,8 @@
 // Usage (CLI): php cron/mailhandler.php
 
 // Bootstrap
-$root = __DIR__ . '/../public/';
-require_once($root . 'inc/_coreincludes.php');
+require_once(__DIR__ . '/../vendor/autoload.php');
+require_once(__DIR__ . '/../app/inc/_coreincludes.php');
 
 // Ensure this runs only via CLI for now
 if (php_sapi_name() !== 'cli') {

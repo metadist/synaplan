@@ -9,3 +9,16 @@ public/whispermodels/medium.pt
 .specstory
 
 vendor/
+
+# IDE/editor settings
+.vscode/
+.idea/
+*.code-workspace
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Test/coverage artifacts
+coverage/
+testing/reports/

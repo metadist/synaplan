@@ -13,9 +13,9 @@ if(isset($_REQUEST["lang"])) {
 }
 
 // ------------------------------------------------------ include files
-// core app files with relative paths
-$root = __DIR__ . '/';
-require_once($root . 'inc/_coreincludes.php');
+// Use Composer autoload and new app core includes
+require_once __DIR__ . '/../vendor/autoload.php';
+require_once __DIR__ . '/../app/inc/_coreincludes.php';
 
 // ------------------------------------------------------ handle authentication actions that need redirects
 // Only handle actions that require redirects BEFORE HTML output
@@ -62,20 +62,21 @@ if (!isset($_SESSION['USERPROFILE']) &&
     <meta name="generator" content="Manually crafted by Ralf, Yusuf and with help from Cursor">
     <title>synaplan - digital thinking</title>
     <link href="node_modules/bootstrap/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="assets/statics/fa/css/all.min.css" rel="stylesheet">
     <!-- Custom styles for this template -->
-    <link href="css/dashboard.css?v=<?php echo date("Ymd"); ?>-1" rel="stylesheet">
+    <link href="assets/statics/css/dashboard.css?v=<?php echo date("Ymd"); ?>-1" rel="stylesheet">
     <!-- JQuery we need quickly, sorry SEO -->
     <script src="node_modules/jquery/dist/jquery.min.js"></script>
   </head>
   <body>    
     <div class="container-fluid">
       <div class="row">
-        <?php include("snippets/director.php"); ?>
+        <?php \App\Director::dispatch(); ?>
       </div>
     </div>
     <script src="node_modules/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
     <script src="node_modules/feather-icons/dist/feather.min.js"></script>
-    <script src="js/dashboard.js"></script>
+    <script src="assets/statics/js/dashboard.js"></script>
     
 
 

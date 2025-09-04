@@ -1,7 +1,7 @@
 <?php
 // Set content type to JavaScript
-require_once('inc/_confsys.php');
-require_once('inc/_confdb.php');
+require_once __DIR__ . '/../vendor/autoload.php';
+require_once __DIR__ . '/../app/inc/_coreincludes.php';
 
 header('Content-Type: application/javascript');
 

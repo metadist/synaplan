@@ -81,7 +81,7 @@ if($answerMethod == 'MAIL') {
     // print "MAIL\n";
     // print_r($aiAnswer);
     $htmlText = nl2br(htmlspecialchars(Tools::ensure_utf8($aiAnswer['BTEXT'])));
-    $fileAttachment = "./up/".$aiAnswer['BFILEPATH'];
+    $fileAttachment = rtrim(UPLOAD_DIR, '/').'/'.$aiAnswer['BFILEPATH'];
     // print $fileAttachment."\n";
 
     $sentRes = EmailService::sendEmail(

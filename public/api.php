@@ -8,10 +8,13 @@
 // Set execution time limit to 6 minutes
 set_time_limit(360);
 session_start();
-// core app files with relative paths
-$root = __DIR__ . '/';
-require_once($root . '/inc/_coreincludes.php');
-require_once($root . '/inc/_api-openapi.php');
+// Prevent PHP warnings/notices from corrupting JSON responses
+@ini_set('display_errors', '0');
+@ini_set('log_errors', '1');
+// Use Composer autoload and new app core includes
+require_once __DIR__ . '/../vendor/autoload.php';
+require_once __DIR__ . '/../app/inc/_coreincludes.php';
+require_once __DIR__ . '/../app/inc/api/_api-openapi.php';
 
 // ----------------------------- Bearer API key authentication
 ApiAuthenticator::handleBearerAuth();
@@ -31,19 +34,23 @@ if (ApiRouter::route($rawPostData)) {
 // ******************************************************
 header('Content-Type: application/json; charset=UTF-8');
 
-$apiAction = $_REQUEST['action'] ?? '';
+try {
+    $apiAction = $_REQUEST['action'] ?? '';
 
-// Debug logging
-ApiAuthenticator::logSessionDebugInfo();
-if ($GLOBALS["debug"]) {
-    error_log("API Action: " . $apiAction);
+    // Debug logging
+    ApiAuthenticator::logSessionDebugInfo();
+    if ($GLOBALS["debug"]) {
+        error_log("API Action: " . $apiAction);
+    }
+
+    // Check if action is allowed for current session
+    ApiAuthenticator::isActionAllowed($apiAction);
+
+    // ------------------------------------------------------ API OPTIONS --------------------
+    // Take form post of user message and files and save to database
+    // give back tracking ID of the message
+    require_once __DIR__ . '/../app/inc/api/_api-restcalls.php';
+} catch (\Throwable $e) {
+    http_response_code(500);
+    echo json_encode(["error" => "Server error", "message" => ($GLOBALS["debug"] ?? false) ? $e->getMessage() : null]);
 }
-
-// Check if action is allowed for current session
-ApiAuthenticator::isActionAllowed($apiAction);
-
-// ------------------------------------------------------ API OPTIONS --------------------
-// Take form post of user message and files and save to database
-// give back tracking ID of the message
-
-require_once($root . '/inc/_api_restcalls.php');
