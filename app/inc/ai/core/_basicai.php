@@ -32,6 +32,7 @@ Class BasicAI {
         $AIT2SmodelId = $GLOBALS["AI_TEXT2SOUND"]["MODELID"];
 
         switch($textArr[0]) {
+            
             case "/aboutai":
                 ProcessMethods::$toolProcessed = false;
                 if($msgArr['BFILE']<1) {
@@ -48,21 +49,23 @@ Class BasicAI {
                 $msgArr['BFILETEXT'] = $msgArr['BFILETEXT']."\n\nExtra Info:\n".$promptAi['BPROMPT'];
                 $msgArr['BTEXT'] = str_replace("/aboutai ","",$msgArr['BTEXT']) . " <loading><br>\n";
                 break;
+
             case "/web":
                 $msgArr = Tools::webScreenshot($msgArr);
                 break;
+
             case "/link":
                 $msgArr = Tools::memberLink($msgArr);
                 break;
+
             case "/pic":
                 if($stream) {
                     Frontend::statusToStream($msgArr['BID'], 'pre', ' - calling '.$AIT2P.' ');
                 }
                 // For Again requests, add a unique identifier to force new generation
                 if (isset($GLOBALS["IS_AGAIN"]) && $GLOBALS["IS_AGAIN"] === true) {
-                    $originalText = $msgArr['BTEXT'];
-                    $msgArr['BTEXT'] = $originalText . ' [Again-' . time() . ']';
                     $msgArr = $AIT2P::picPrompt($msgArr, $stream);
+                    $msgArr['BTEXT'] =  $msgArr['BTEXT'] . ' [Again-' . time() . ']';
                     // Keep the AI-generated text, don't restore original
                     // This ensures proper output text is displayed
                 } else {
@@ -72,8 +75,8 @@ Class BasicAI {
                 XSControl::storeAIDetails($msgArr, 'AIMODEL', $AIT2Pmodel, $stream);
                 XSControl::storeAIDetails($msgArr, 'AIMODELID', $AIT2PmodelId, $stream);
                 break;
-            case "/vid":
 
+            case "/vid":
                 if($stream) {
                     Frontend::statusToStream($msgArr['BID'], 'pre', ' - video! Patience please (around 40s): ');
                 }
@@ -91,18 +94,22 @@ Class BasicAI {
                 XSControl::storeAIDetails($msgArr, 'AIMODEL', $AIT2Vmodel, $stream);
                 XSControl::storeAIDetails($msgArr, 'AIMODELID', $AIT2VmodelId, $stream);
                 break;
+
             case "/search":
                 $qTerm = "";
                 $qTerm = str_replace("/search ","",$msgArr['BTEXT']);
                 $msgArr = Tools::searchWeb($msgArr, $qTerm);
                 XSControl::storeAIDetails($msgArr, 'WEBSEARCH', 'YES', $stream);
                 break;
+
             case "/docs":
                 $msgArr = Tools::searchDocs($msgArr);
                 break;
+
             case "/filesort":
                 $msgArr['BTEXT'] = $msgArr['BTEXT']=str_replace("/filesort ","",$msgArr['BTEXT']);
                 break;
+
             case "/lang":
                 if($stream) {
                     Frontend::statusToStream($msgArr['BID'], 'pre', ' - calling '.$AIGENERAL.' ');
@@ -112,6 +119,7 @@ Class BasicAI {
                 XSControl::storeAIDetails($msgArr, 'AIMODEL', $AIGENERALmodel, $stream);
                 XSControl::storeAIDetails($msgArr, 'AIMODELID', $AIGENERALmodelId, $stream);
                 break;
+
             case "/audio":
                 if($stream) {
                     Frontend::statusToStream($msgArr['BID'], 'pre', ' - TTS generating... ');
@@ -138,6 +146,7 @@ Class BasicAI {
                     XSControl::storeAIDetails($msgArr, 'AIMODELID', $AIT2SmodelId, $stream);
                 }
                 break;
+                
             default:
                 // Default to /list functionality when no other cases match
                 $msgArr['BTEXT'] = $AIGENERAL::welcomePrompt($msgArr);

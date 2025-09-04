@@ -457,6 +457,7 @@ class AIOpenAI {
      * @return array Message array with image file information
      */
     public static function picPrompt($msgArr, $stream = false): array {
+        
         $usrArr = Central::getUsrById($msgArr['BUSERID']);
 
         if(substr($msgArr['BTEXT'], 0, 1) == '/') {

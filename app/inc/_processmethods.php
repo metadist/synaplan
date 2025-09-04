@@ -584,7 +584,13 @@ public static function processMessage(): void {
                     ];
                 } elseif (is_array($answerSorted)) {
                     $toolText = $answerSorted['OUTTEXT'] ?? $answerSorted['CAPTION'] ?? $answerSorted['TEXT'] ?? $answerSorted['BTEXT'] ?? '';
-                    $answerSorted['BTEXT'] = ($toolText !== '') ? $toolText : ($improvedPrompt ?? $originalPrompt);
+                    $fallbackText = ($toolText !== '') ? $toolText : ($answerSorted['BFILETEXT'] ?? '');
+                    if ($fallbackText === '') { $fallbackText = ($improvedPrompt ?? $originalPrompt); }
+                    if (is_string($fallbackText)) {
+                        $fallbackText = preg_replace('/\s*\[Again-\d+\]\s*/', '', $fallbackText);
+                        $fallbackText = preg_replace('/^\/[a-zA-Z]+\s+/', '', $fallbackText);
+                    }
+                    $answerSorted['BTEXT'] = $fallbackText;
                     $answerSorted['BMEDIA'] = $mediaType;
                 }
             } elseif ($mediaType === 'video') {
@@ -599,7 +605,13 @@ public static function processMessage(): void {
                     ];
                 } elseif (is_array($answerSorted)) {
                     $toolText = $answerSorted['OUTTEXT'] ?? $answerSorted['CAPTION'] ?? $answerSorted['TEXT'] ?? $answerSorted['BTEXT'] ?? '';
-                    $answerSorted['BTEXT'] = ($toolText !== '') ? $toolText : ($improvedPrompt ?? $originalPrompt);
+                    $fallbackText = ($toolText !== '') ? $toolText : ($answerSorted['BFILETEXT'] ?? '');
+                    if ($fallbackText === '') { $fallbackText = ($improvedPrompt ?? $originalPrompt); }
+                    if (is_string($fallbackText)) {
+                        $fallbackText = preg_replace('/\s*\[Again-\d+\]\s*/', '', $fallbackText);
+                        $fallbackText = preg_replace('/^\/[a-zA-Z]+\s+/', '', $fallbackText);
+                    }
+                    $answerSorted['BTEXT'] = $fallbackText;
                     $answerSorted['BMEDIA'] = $mediaType;
                 }
             } else { // audio
@@ -614,7 +626,13 @@ public static function processMessage(): void {
                     ];
                 } elseif (is_array($answerSorted)) {
                     $toolText = $answerSorted['OUTTEXT'] ?? $answerSorted['CAPTION'] ?? $answerSorted['TEXT'] ?? $answerSorted['BTEXT'] ?? '';
-                    $answerSorted['BTEXT'] = ($toolText !== '') ? $toolText : ($improvedPrompt ?? $originalPrompt);
+                    $fallbackText = ($toolText !== '') ? $toolText : ($answerSorted['BFILETEXT'] ?? '');
+                    if ($fallbackText === '') { $fallbackText = ($improvedPrompt ?? $originalPrompt); }
+                    if (is_string($fallbackText)) {
+                        $fallbackText = preg_replace('/\s*\[Again-\d+\]\s*/', '', $fallbackText);
+                        $fallbackText = preg_replace('/^\/[a-zA-Z]+\s+/', '', $fallbackText);
+                    }
+                    $answerSorted['BTEXT'] = $fallbackText;
                     $answerSorted['BMEDIA'] = $mediaType;
                 }
             }
