@@ -483,7 +483,7 @@ public static function processMessage(): void {
 
         // Priority: forced tag > requested keywords > default image
         $mediaType = 'image';
-        if (!empty($GLOBALS['FORCED_AI_BTAG'])) {
+        if(!empty($GLOBALS['FORCED_AI_BTAG'])) {
             $forcedBtagLocal = $GLOBALS['FORCED_AI_BTAG'];
             $mediaType = ($forcedBtagLocal === 'text2vid') ? 'video' : (($forcedBtagLocal === 'text2sound') ? 'audio' : 'image');
         } elseif (!empty($requestedMedia)) {
