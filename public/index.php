@@ -29,7 +29,7 @@ if(isset($_REQUEST['action'])) {
             $success = Frontend::setUserFromWebLogin();
             break;
         case 'register':
-            $result = Frontend::registerNewUser();
+            $result = UserRegistration::registerNewUser();
             $_SESSION['registration_result'] = $result;
             break;
         case 'logout':

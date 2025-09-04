@@ -35,7 +35,7 @@ class XSControl {
         $msgTxt .= "Please note that this is a BETA version we are working on it!<BR>\n";
         $msgTxt .= "Best regards,<BR>\n";
         $msgTxt .= "Ralfs.AI Team<BR>\n";
-        _mymail("info@metadist.de", $usrArr["DETAILS"]["MAIL"], "Ralfs.AI - confirm email", $msgTxt, $msgTxt, "smart@ralfs.ai");
+        EmailService::sendEmailConfirmation($usrArr["DETAILS"]["MAIL"]);
     }
 
     // method to notify the user that their account has been limited
@@ -65,13 +65,11 @@ class XSControl {
         // mail
         if($msgArr['BMESSTYPE'] == 'MAIL' AND isset($usrArr["DETAILS"])) {
             //print_r($msgArr);
-            $sentRes = _mymail("info@metadist.de", $usrArr["DETAILS"]["MAIL"], "Ralfs.AI - limit!", 
-                $msgTxt, strip_tags($msgTxt), "smart@ralfs.ai");    
+            $sentRes = EmailService::sendLimitNotification($usrArr["DETAILS"]["MAIL"], "usage", "Rate limit exceeded");    
         }
         if($msgArr['BMESSTYPE'] == 'MAIL' AND !isset($usrArr["DETAILS"])) {
             //print_r($msgArr);
-            $sentRes = _mymail("info@metadist.de", "info@metadist.de", "Ralfs.AI - limit!", 
-                print_r($msgArr, true), print_r($msgArr, true), "smart@ralfs.ai");    
+            $sentRes = EmailService::sendAdminNotification("Rate Limit Alert", "User without details exceeded limit: " . print_r($msgArr, true));    
         }
         exit;
     }

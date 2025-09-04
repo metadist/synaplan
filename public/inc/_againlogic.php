@@ -134,7 +134,7 @@ class AgainLogic {
         
         $sql = "SELECT * FROM BMODELS 
                 WHERE BTAG = '" . $btag . "' AND BSELECTABLE = 1" . $ratingFilter . "
-                ORDER BY BRATING DESC, BID ASC";
+                ORDER BY BQUALITY DESC, BID ASC";
         $res = DB::Query($sql);
         
         $models = [];

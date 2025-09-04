@@ -84,8 +84,13 @@ if($answerMethod == 'MAIL') {
     $fileAttachment = "./up/".$aiAnswer['BFILEPATH'];
     // print $fileAttachment."\n";
 
-    $sentRes = _mymail("info@metadist.de", $usrArr["DETAILS"]["MAIL"], "Ralfs.AI - ".$aiAnswer['BTOPIC'], 
-        $htmlText, $htmlText, "smart@ralfs.ai", $fileAttachment);
+    $sentRes = EmailService::sendEmail(
+        $usrArr["DETAILS"]["MAIL"], 
+        "Ralfs.AI - ".$aiAnswer['BTOPIC'], 
+        $htmlText, 
+        $htmlText, 
+        "smart@ralfs.ai"
+    );
 }
 //----- 
 exit;

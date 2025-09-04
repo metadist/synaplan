@@ -20,6 +20,16 @@ require_once($root . 'inc/_xscontrol.php');
 // oidc authentication
 require_once($root . 'inc/_oidc.php');
 require_once($root . 'inc/_logout.php');
+// auth management classes
+require_once($root . 'inc/auth/ApiKeyManager.php');
+require_once($root . 'inc/auth/UserRegistration.php');
+// file management classes
+require_once($root . 'inc/files/FileManager.php');
+// service classes
+require_once($root . 'inc/services/EmailService.php');
+// api classes
+require_once($root . 'inc/api/ApiAuthenticator.php');
+require_once($root . 'inc/api/ApiRouter.php');
 // frontend tools
 require_once($root . 'inc/_frontend.php');
 // central tool

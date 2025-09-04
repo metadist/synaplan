@@ -1,0 +1,71 @@
+services:
+  # Test Database
+  db-test:
+    image: mariadb:11.8.2
+    container_name: synaplan-db-test
+    restart: "no"
+    environment:
+      MYSQL_DATABASE: synaplan_test
+      MYSQL_USER: synaplan_test_user
+      MYSQL_PASSWORD: synaplan_test_password
+      MYSQL_ROOT_PASSWORD: root_test_password
+    ports:
+      - "3307:3306"
+    volumes:
+      - mysql_test_data:/var/lib/mysql
+      - ../../dev/db-loadfiles:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD", "mariadb", "-h", "localhost", "-u", "root", "-proot_test_password", "-e", "SELECT 1;"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - synaplan-test-network
+
+  # PHP Test Environment
+  app-test:
+    build:
+      context: ../../
+      dockerfile: dev/docker/Dockerfile
+    container_name: synaplan-app-test
+    working_dir: /var/www/html
+    volumes:
+      - ../../:/var/www/html
+    environment:
+      - APP_ENV=testing
+      - TESTING=true
+      - DB_HOST=db-test
+      - DB_NAME=synaplan_test
+      - DB_USER=synaplan_test_user
+      - DB_PASSWORD=synaplan_test_password
+      - XDEBUG_MODE=coverage
+      - PHPUNIT_TESTSUITE=Unit
+      - MOCK_MAIL=1
+      - USE_REAL_DB=0
+    depends_on:
+      db-test:
+        condition: service_started
+    command: >
+      sh -c "
+        echo 'Running PHPUnit with comprehensive HTML reports...' &&
+        echo 'Waiting for database...' &&
+        sleep 10 &&
+        cd /var/www/html/testing &&
+        mkdir -p reports &&
+        ../vendor/bin/phpunit --configuration config/phpunit.xml --testsuite=Unit --colors=always &&
+        echo '✅ Comprehensive reports generated!' &&
+        echo '📊 Coverage: testing/reports/coverage/index.html' &&
+        echo '📄 TestDox: testing/reports/testdox.html' &&
+        echo '🔧 JUnit: testing/reports/junit.xml'
+      "
+    restart: "no"
+    networks:
+      - synaplan-test-network
+
+volumes:
+  mysql_test_data:
+
+networks:
+  synaplan-test-network:
+    driver: bridge

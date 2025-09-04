@@ -28,7 +28,7 @@
 
     // Get dashboard statistics
     $stats = Frontend::getDashboardStats();
-    $latestFiles = Frontend::getLatestFiles(8);
+    $latestFiles = FileManager::getLatestFiles(8);
     ?>
 
     <!-- Message Statistics Card -->

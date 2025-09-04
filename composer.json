@@ -17,6 +17,9 @@
         "stevenmaguire/oauth2-microsoft": "^2.2",
         "jumbojett/openid-connect-php": "^1.0"
     },
+    "require-dev": {
+        "phpunit/phpunit": "*"
+    },
     "scripts": {
         "pre-autoload-dump": "Google\\Task\\Composer::cleanup"
     },

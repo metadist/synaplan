@@ -16,7 +16,7 @@ switch($apiAction) {
         $resArr = AgainLogic::againOptionsForCurrentSession();
         break;
     case 'ragUpload':
-        $resArr = Frontend::saveRAGFiles();
+        $resArr = FileManager::saveRAGFiles();
         break;
     case 'chatStream':
         $resArr = Frontend::chatStream();
@@ -38,7 +38,7 @@ switch($apiAction) {
         break;
     case 'getMessageFiles':
         $messageId = intval($_REQUEST['messageId']);
-        $files = Frontend::getMessageFiles($messageId);
+        $files = FileManager::getMessageFiles($messageId);
         $resArr = ['success' => true, 'files' => $files];
         break;
     case 'getFileGroups':
@@ -69,19 +69,19 @@ switch($apiAction) {
         $resArr = Frontend::deleteWidget();
         break;
     case 'getApiKeys':
-        $resArr = Frontend::getApiKeys();
+        $resArr = ApiKeyManager::getApiKeys();
         break;
     case 'createApiKey':
-        $resArr = Frontend::createApiKey();
+        $resArr = ApiKeyManager::createApiKey();
         break;
     case 'setApiKeyStatus':
-        $resArr = Frontend::setApiKeyStatus();
+        $resArr = ApiKeyManager::setApiKeyStatus();
         break;
     case 'deleteApiKey':
-        $resArr = Frontend::deleteApiKey();
+        $resArr = ApiKeyManager::deleteApiKey();
         break;
     case 'userRegister':
-        $resArr = Frontend::registerNewUser();
+        $resArr = UserRegistration::registerNewUser();
         break;
     case 'getMailhandler':
         $resArr = Frontend::getMailhandler();

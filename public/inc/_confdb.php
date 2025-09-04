@@ -84,10 +84,12 @@ class db {
         //error_log("****************************** QUERY: " . $strSQL);
         $adminEmail = getenv('ADMIN_EMAIL') ?: 'admin@example.com'; // Fallback to a generic email if not set
         
-        $result = mysqli_query($GLOBALS["dbcon"],$strSQL)
-            or _mymail($adminEmail, $adminEmail, "AI - query failed in SQL... ",
-            __FILE__." ".__LINE__."\n<BR>".$strSQL."<BR>\n".print_r(debug_backtrace(),true) . db::Error(),
-            $strSQL."<BR>\n".print_r(debug_backtrace(),true));
+        $result = mysqli_query($GLOBALS["dbcon"],$strSQL);
+        
+        if (!$result) {
+            $errorDetails = __FILE__." ".__LINE__."\n<BR>".$strSQL."<BR>\n".print_r(debug_backtrace(),true) . db::Error();
+            EmailService::sendAdminNotification("SQL Query Failed", $errorDetails, $adminEmail);
+        }
 
         // myDebug(substr(strip_tags($strSQL),0,800),__FUNCTION__,__LINE__);
         if(!$result) {

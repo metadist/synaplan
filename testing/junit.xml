@@ -1,0 +1,116 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites>
+  <testsuite name="/home/ysf/projects/synaplan/phpunit.xml" tests="29" assertions="21" errors="12" failures="0" skipped="0" time="0.010820">
+    <testsuite name="Unit" tests="29" assertions="21" errors="12" failures="0" skipped="0" time="0.010820">
+      <testsuite name="ApiKeyManagerTest" file="/home/ysf/projects/synaplan/tests/Unit/ApiKeyManagerTest.php" tests="5" assertions="4" errors="2" failures="0" skipped="0" time="0.006288">
+        <testcase name="testGetApiKeysWithoutSession" file="/home/ysf/projects/synaplan/tests/Unit/ApiKeyManagerTest.php" line="30" class="ApiKeyManagerTest" classname="ApiKeyManagerTest" assertions="2" time="0.000325"/>
+        <testcase name="testCreateApiKeyWithoutSession" file="/home/ysf/projects/synaplan/tests/Unit/ApiKeyManagerTest.php" line="40" class="ApiKeyManagerTest" classname="ApiKeyManagerTest" assertions="1" time="0.000156"/>
+        <testcase name="testSetApiKeyStatusWithInvalidStatus" file="/home/ysf/projects/synaplan/tests/Unit/ApiKeyManagerTest.php" line="49" class="ApiKeyManagerTest" classname="ApiKeyManagerTest" assertions="0" time="0.005073">
+          <error type="Error">ApiKeyManagerTest::testSetApiKeyStatusWithInvalidStatus
+Error: Class "DB" not found
+
+/home/ysf/projects/synaplan/public/inc/auth/ApiKeyManager.php:106
+/home/ysf/projects/synaplan/tests/Unit/ApiKeyManagerTest.php:54</error>
+        </testcase>
+        <testcase name="testSetApiKeyStatusWithInvalidId" file="/home/ysf/projects/synaplan/tests/Unit/ApiKeyManagerTest.php" line="59" class="ApiKeyManagerTest" classname="ApiKeyManagerTest" assertions="0" time="0.000542">
+          <error type="Error">ApiKeyManagerTest::testSetApiKeyStatusWithInvalidId
+Error: Class "DB" not found
+
+/home/ysf/projects/synaplan/public/inc/auth/ApiKeyManager.php:106
+/home/ysf/projects/synaplan/tests/Unit/ApiKeyManagerTest.php:64</error>
+        </testcase>
+        <testcase name="testDeleteApiKeyWithInvalidId" file="/home/ysf/projects/synaplan/tests/Unit/ApiKeyManagerTest.php" line="69" class="ApiKeyManagerTest" classname="ApiKeyManagerTest" assertions="1" time="0.000193"/>
+      </testsuite>
+      <testsuite name="EmailServiceTest" file="/home/ysf/projects/synaplan/tests/Unit/EmailServiceTest.php" tests="10" assertions="10" errors="0" failures="0" skipped="0" time="0.002110">
+        <testcase name="testSendEmailReturnsTrue" file="/home/ysf/projects/synaplan/tests/Unit/EmailServiceTest.php" line="21" class="EmailServiceTest" classname="EmailServiceTest" assertions="1" time="0.000191"/>
+        <testcase name="testSendRegistrationConfirmation" file="/home/ysf/projects/synaplan/tests/Unit/EmailServiceTest.php" line="33" class="EmailServiceTest" classname="EmailServiceTest" assertions="1" time="0.000135"/>
+        <testcase name="testSendEmailConfirmation" file="/home/ysf/projects/synaplan/tests/Unit/EmailServiceTest.php" line="44" class="EmailServiceTest" classname="EmailServiceTest" assertions="1" time="0.000143"/>
+        <testcase name="testSendLimitNotification" file="/home/ysf/projects/synaplan/tests/Unit/EmailServiceTest.php" line="51" class="EmailServiceTest" classname="EmailServiceTest" assertions="1" time="0.000136"/>
+        <testcase name="testSendAdminNotification" file="/home/ysf/projects/synaplan/tests/Unit/EmailServiceTest.php" line="62" class="EmailServiceTest" classname="EmailServiceTest" assertions="1" time="0.000799"/>
+        <testcase name="testSendAdminNotificationWithCustomEmail" file="/home/ysf/projects/synaplan/tests/Unit/EmailServiceTest.php" line="72" class="EmailServiceTest" classname="EmailServiceTest" assertions="1" time="0.000153"/>
+        <testcase name="testSetDefaultSender" file="/home/ysf/projects/synaplan/tests/Unit/EmailServiceTest.php" line="83" class="EmailServiceTest" classname="EmailServiceTest" assertions="1" time="0.000143"/>
+        <testcase name="testSetDefaultReplyTo" file="/home/ysf/projects/synaplan/tests/Unit/EmailServiceTest.php" line="98" class="EmailServiceTest" classname="EmailServiceTest" assertions="1" time="0.000119"/>
+        <testcase name="testSendEmailWithEmptyRecipient" file="/home/ysf/projects/synaplan/tests/Unit/EmailServiceTest.php" line="113" class="EmailServiceTest" classname="EmailServiceTest" assertions="1" time="0.000153"/>
+        <testcase name="testRegistrationConfirmationContainsCorrectLink" file="/home/ysf/projects/synaplan/tests/Unit/EmailServiceTest.php" line="126" class="EmailServiceTest" classname="EmailServiceTest" assertions="1" time="0.000136"/>
+      </testsuite>
+      <testsuite name="FileManagerTest" file="/home/ysf/projects/synaplan/tests/Unit/FileManagerTest.php" tests="8" assertions="4" errors="6" failures="0" skipped="0" time="0.001263">
+        <testcase name="testGetMessageFilesWithInvalidId" file="/home/ysf/projects/synaplan/tests/Unit/FileManagerTest.php" line="32" class="FileManagerTest" classname="FileManagerTest" assertions="0" time="0.000199">
+          <error type="Error">FileManagerTest::testGetMessageFilesWithInvalidId
+Error: Class "DB" not found
+
+/home/ysf/projects/synaplan/public/inc/files/FileManager.php:36
+/home/ysf/projects/synaplan/tests/Unit/FileManagerTest.php:34</error>
+        </testcase>
+        <testcase name="testSaveRAGFilesWithoutGroupKey" file="/home/ysf/projects/synaplan/tests/Unit/FileManagerTest.php" line="40" class="FileManagerTest" classname="FileManagerTest" assertions="0" time="0.000198">
+          <error type="Error">FileManagerTest::testSaveRAGFilesWithoutGroupKey
+Error: Class "db" not found
+
+/home/ysf/projects/synaplan/public/inc/files/FileManager.php:89
+/home/ysf/projects/synaplan/tests/Unit/FileManagerTest.php:45</error>
+        </testcase>
+        <testcase name="testSaveRAGFilesWithoutFiles" file="/home/ysf/projects/synaplan/tests/Unit/FileManagerTest.php" line="51" class="FileManagerTest" classname="FileManagerTest" assertions="0" time="0.000163">
+          <error type="Error">FileManagerTest::testSaveRAGFilesWithoutFiles
+Error: Class "db" not found
+
+/home/ysf/projects/synaplan/public/inc/files/FileManager.php:89
+/home/ysf/projects/synaplan/tests/Unit/FileManagerTest.php:56</error>
+        </testcase>
+        <testcase name="testGetLatestFilesWithDefaultLimit" file="/home/ysf/projects/synaplan/tests/Unit/FileManagerTest.php" line="62" class="FileManagerTest" classname="FileManagerTest" assertions="0" time="0.000152">
+          <error type="Error">FileManagerTest::testGetLatestFilesWithDefaultLimit
+Error: Class "DB" not found
+
+/home/ysf/projects/synaplan/public/inc/files/FileManager.php:218
+/home/ysf/projects/synaplan/tests/Unit/FileManagerTest.php:64</error>
+        </testcase>
+        <testcase name="testGetLatestFilesWithCustomLimit" file="/home/ysf/projects/synaplan/tests/Unit/FileManagerTest.php" line="71" class="FileManagerTest" classname="FileManagerTest" assertions="0" time="0.000150">
+          <error type="Error">FileManagerTest::testGetLatestFilesWithCustomLimit
+Error: Class "DB" not found
+
+/home/ysf/projects/synaplan/public/inc/files/FileManager.php:218
+/home/ysf/projects/synaplan/tests/Unit/FileManagerTest.php:73</error>
+        </testcase>
+        <testcase name="testAnonymousWidgetSession" file="/home/ysf/projects/synaplan/tests/Unit/FileManagerTest.php" line="80" class="FileManagerTest" classname="FileManagerTest" assertions="0" time="0.000150">
+          <error type="Error">FileManagerTest::testAnonymousWidgetSession
+Error: Class "DB" not found
+
+/home/ysf/projects/synaplan/public/inc/files/FileManager.php:36
+/home/ysf/projects/synaplan/tests/Unit/FileManagerTest.php:86</error>
+        </testcase>
+        <testcase name="testSaveRAGFilesDefaultGroupKeyForWidget" file="/home/ysf/projects/synaplan/tests/Unit/FileManagerTest.php" line="91" class="FileManagerTest" classname="FileManagerTest" assertions="2" time="0.000132"/>
+        <testcase name="testSaveRAGFilesDefaultGroupKeyForUser" file="/home/ysf/projects/synaplan/tests/Unit/FileManagerTest.php" line="106" class="FileManagerTest" classname="FileManagerTest" assertions="2" time="0.000119"/>
+      </testsuite>
+      <testsuite name="UserRegistrationTest" file="/home/ysf/projects/synaplan/tests/Unit/UserRegistrationTest.php" tests="6" assertions="3" errors="4" failures="0" skipped="0" time="0.001159">
+        <testcase name="testRegisterNewUserWithEmptyEmail" file="/home/ysf/projects/synaplan/tests/Unit/UserRegistrationTest.php" line="31" class="UserRegistrationTest" classname="UserRegistrationTest" assertions="0" time="0.000204">
+          <error type="Error">UserRegistrationTest::testRegisterNewUserWithEmptyEmail
+Error: Class "DB" not found
+
+/home/ysf/projects/synaplan/public/inc/auth/UserRegistration.php:24
+/home/ysf/projects/synaplan/tests/Unit/UserRegistrationTest.php:37</error>
+        </testcase>
+        <testcase name="testRegisterNewUserWithEmptyPassword" file="/home/ysf/projects/synaplan/tests/Unit/UserRegistrationTest.php" line="43" class="UserRegistrationTest" classname="UserRegistrationTest" assertions="0" time="0.000199">
+          <error type="Error">UserRegistrationTest::testRegisterNewUserWithEmptyPassword
+Error: Class "DB" not found
+
+/home/ysf/projects/synaplan/public/inc/auth/UserRegistration.php:24
+/home/ysf/projects/synaplan/tests/Unit/UserRegistrationTest.php:49</error>
+        </testcase>
+        <testcase name="testRegisterNewUserWithMismatchedPasswords" file="/home/ysf/projects/synaplan/tests/Unit/UserRegistrationTest.php" line="55" class="UserRegistrationTest" classname="UserRegistrationTest" assertions="0" time="0.000172">
+          <error type="Error">UserRegistrationTest::testRegisterNewUserWithMismatchedPasswords
+Error: Class "DB" not found
+
+/home/ysf/projects/synaplan/public/inc/auth/UserRegistration.php:24
+/home/ysf/projects/synaplan/tests/Unit/UserRegistrationTest.php:61</error>
+        </testcase>
+        <testcase name="testRegisterNewUserWithShortPassword" file="/home/ysf/projects/synaplan/tests/Unit/UserRegistrationTest.php" line="67" class="UserRegistrationTest" classname="UserRegistrationTest" assertions="0" time="0.000192">
+          <error type="Error">UserRegistrationTest::testRegisterNewUserWithShortPassword
+Error: Class "DB" not found
+
+/home/ysf/projects/synaplan/public/inc/auth/UserRegistration.php:24
+/home/ysf/projects/synaplan/tests/Unit/UserRegistrationTest.php:73</error>
+        </testcase>
+        <testcase name="testGeneratePinLength" file="/home/ysf/projects/synaplan/tests/Unit/UserRegistrationTest.php" line="79" class="UserRegistrationTest" classname="UserRegistrationTest" assertions="2" time="0.000202"/>
+        <testcase name="testGeneratePinUniqueness" file="/home/ysf/projects/synaplan/tests/Unit/UserRegistrationTest.php" line="92" class="UserRegistrationTest" classname="UserRegistrationTest" assertions="1" time="0.000190"/>
+      </testsuite>
+    </testsuite>
+  </testsuite>
+</testsuites>
