@@ -21,15 +21,15 @@ require_once(__DIR__ . '/_xscontrol.php');
 require_once(__DIR__ . '/api/_oidc.php');
 require_once(__DIR__ . '/api/_logout.php');
 // auth management classes
-require_once(__DIR__ . '/auth/ApiKeyManager.php');
-require_once(__DIR__ . '/auth/UserRegistration.php');
+require_once(__DIR__ . '/auth/apikeymanager.php');
+require_once(__DIR__ . '/auth/userregistration.php');
 // file management classes
-require_once(__DIR__ . '/domain/files/FileManager.php');
+require_once(__DIR__ . '/domain/files/filemanager.php');
 // service classes
-require_once(__DIR__ . '/mail/EmailService.php');
+require_once(__DIR__ . '/mail/emailservice.php');
 // api classes (only classes here; procedural API files are loaded by public/api.php)
-require_once(__DIR__ . '/api/ApiAuthenticator.php');
-require_once(__DIR__ . '/api/ApiRouter.php');
+require_once(__DIR__ . '/api/apiauthenticator.php');
+require_once(__DIR__ . '/api/apirouter.php');
 // frontend tools
 require_once(__DIR__ . '/_frontend.php');
 // central tool
