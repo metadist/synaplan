@@ -105,11 +105,13 @@ switch ($config['position']) {
 
     // Create chat container
     const chatContainer = document.createElement('div');
+    chatContainer.id = 'synaplan-chat-container';
     chatContainer.style.cssText = `
         position: fixed;
         bottom: 20px;
         right: 20px;
-        width: 380px;
+        width: 420px;
+        max-width: 500px;
         height: 600px;
         background: white;
         border-radius: 12px;
@@ -163,6 +165,22 @@ switch ($config['position']) {
     widgetContainer.appendChild(chatButton);
     document.body.appendChild(widgetContainer);
     document.body.appendChild(overlay);
+
+    // Responsive rules for small screens (e.g., iPhone 14)
+    const responsiveStyle = document.createElement('style');
+    responsiveStyle.textContent = `
+      #synaplan-chat-container { width: 420px; max-width: 500px; }
+      @media (max-width: 500px) {
+        #synaplan-chat-container {
+          left: 10px !important;
+          right: 10px !important;
+          width: auto !important;
+          bottom: 10px !important;
+          height: calc(100vh - 20px) !important;
+        }
+      }
+    `;
+    document.head.appendChild(responsiveStyle);
 
     // Function to create and load iframe
     const loadChatFrame = () => {
