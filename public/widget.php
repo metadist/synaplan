@@ -24,7 +24,8 @@ $config = [
     'color' => '#007bff',
     'position' => 'bottom-right',
     'autoMessage' => '',
-    'prompt' => 'general'
+    'prompt' => 'general',
+    'autoOpen' => '0'
 ];
 
 while ($row = db::FetchArr($res)) {
@@ -79,7 +80,8 @@ switch ($config['position']) {
         justify-content: center;
         transition: all 0.3s ease;
         color: white;
-        font-size: 28px;
+        font-size: 30px;
+        padding-bottom: 5px;
         z-index: 999999;
     `;
     chatButton.innerHTML = '&#x1F5E9;';
@@ -235,10 +237,10 @@ switch ($config['position']) {
         chatButton.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.15)';
     };
 
-    // Auto-open functionality (if auto message is configured)
-    <?php if (!empty($config['autoMessage'])): ?>
+    // Auto-open functionality if explicitly enabled in config
+    <?php if (!empty($config['autoOpen']) && $config['autoOpen'] === '1'): ?>
     setTimeout(() => {
         chatButton.click();
-    }, 3000); // Auto-open after 3 seconds
+    }, 3000);
     <?php endif; ?>
 })(); 
