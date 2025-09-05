@@ -92,7 +92,7 @@ header('Pragma: no-cache');
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>Chat Widget</title>
     <base href="<?php echo $GLOBALS['baseUrl']; ?>">
     <!-- Bootstrap CSS -->
@@ -120,10 +120,11 @@ header('Pragma: no-cache');
         }
         
         .widget-content {
-            height: calc(100vh - 60px);
+            height: calc(var(--sp-dvh, 100vh) - 60px);
             display: flex;
             flex-direction: column;
             overflow: hidden; /* avoid double scrollbars; let .chat-messages scroll */
+            position: relative; /* positioning context for cookie banner */
         }
 
         /* Remove default padding/margins from embedded main container */
@@ -233,13 +234,26 @@ header('Pragma: no-cache');
     <div class="widget-header">
         Chat Support
     </div>
-    <div class="widget-content">
+    <div class="widget-content" id="spWidgetContent">
         <?php include __DIR__ . '/../frontend/c_chat.php'; ?>
     </div>
     <!-- Bootstrap JS - needed for dropdowns and other components -->
     <script src="node_modules/bootstrap/dist/js/bootstrap.bundle.min.js?v=<?php echo @filemtime('node_modules/bootstrap/dist/js/bootstrap.bundle.min.js'); ?>"></script>
     <script>
     (function() {
+        // Dynamic viewport height for iOS Safari and mobile browsers
+        const updateSPDVH = () => {
+            const vh = (window.visualViewport && window.visualViewport.height) ? window.visualViewport.height : window.innerHeight;
+            document.documentElement.style.setProperty('--sp-dvh', vh + 'px');
+        };
+        updateSPDVH();
+        window.addEventListener('resize', updateSPDVH, { passive: true });
+        window.addEventListener('orientationchange', updateSPDVH, { passive: true });
+        if (window.visualViewport) {
+            window.visualViewport.addEventListener('resize', updateSPDVH, { passive: true });
+            window.visualViewport.addEventListener('scroll', updateSPDVH, { passive: true });
+        }
+
         // iOS/Safari third-party cookie mitigation using Storage Access API
         const canRequest = document.hasStorageAccess && document.requestStorageAccess;
         if (!canRequest) return; // Not Safari or unsupported
@@ -249,12 +263,14 @@ header('Pragma: no-cache');
             document.hasStorageAccess().then((hasAccess) => {
                 if (hasAccess) return;
                 // Add a small banner prompting user to enable access
+                const parent = document.getElementById('spWidgetContent') || document.body;
                 const bar = document.createElement('div');
-                bar.style.cssText = 'position:fixed;bottom:0;left:0;right:0;background:#fff3cd;color:#856404;padding:10px 12px;border-top:1px solid #ffeeba;font-size:14px;z-index:999999;display:flex;align-items:center;justify-content:space-between;gap:12px;';
+                bar.style.cssText = 'position:absolute;left:0;right:0;bottom:0;background:#fff3cd;color:#856404;padding:10px 12px;border-top:1px solid #ffeeba;font-size:14px;z-index:2147483647;display:flex;align-items:center;justify-content:space-between;gap:12px;pointer-events:auto;touch-action:manipulation;transform:translateZ(0);';
                 bar.innerHTML = '<span>To enable chat on this site, please allow cookie access.</span>';
                 const btn = document.createElement('button');
                 btn.className = 'btn btn-sm btn-primary';
                 btn.textContent = 'Allow';
+                btn.style.cssText = 'pointer-events:auto;';
                 btn.addEventListener('click', function() {
                     document.requestStorageAccess().then(() => {
                         // Reload to use the session cookie
@@ -264,7 +280,7 @@ header('Pragma: no-cache');
                     });
                 });
                 bar.appendChild(btn);
-                document.body.appendChild(bar);
+                parent.appendChild(bar);
             });
         } catch (e) { /* ignore */ }
     })();

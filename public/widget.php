@@ -233,7 +233,12 @@ switch ($config['position']) {
           right: 10px !important;
           width: auto !important;
           bottom: 10px !important;
-          height: calc(100vh - 20px) !important;
+          height: calc(var(--sp-dvh, 100vh) - 20px) !important;
+        }
+        @supports (height: 100dvh) {
+          #synaplan-chat-container {
+            height: calc(100dvh - 20px) !important;
+          }
         }
       }
     `;
@@ -274,6 +279,19 @@ switch ($config['position']) {
       }
     `;
     document.head.appendChild(enforcedStyle);
+
+    // Dynamic viewport height for iOS Safari and mobile browsers
+    const updateSPDVH = () => {
+        const vh = (window.visualViewport && window.visualViewport.height) ? window.visualViewport.height : window.innerHeight;
+        document.documentElement.style.setProperty('--sp-dvh', vh + 'px');
+    };
+    updateSPDVH();
+    window.addEventListener('resize', updateSPDVH, { passive: true });
+    window.addEventListener('orientationchange', updateSPDVH, { passive: true });
+    if (window.visualViewport) {
+        window.visualViewport.addEventListener('resize', updateSPDVH, { passive: true });
+        window.visualViewport.addEventListener('scroll', updateSPDVH, { passive: true });
+    }
 
     // Function to create and load iframe
     const loadChatFrame = () => {
