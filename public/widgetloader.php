@@ -124,6 +124,7 @@ header('Pragma: no-cache');
             display: flex;
             flex-direction: column;
             overflow: hidden; /* avoid double scrollbars; let .chat-messages scroll */
+            position: relative; /* positioning context for cookie banner */
         }
 
         /* Remove default padding/margins from embedded main container */
@@ -233,7 +234,7 @@ header('Pragma: no-cache');
     <div class="widget-header">
         Chat Support
     </div>
-    <div class="widget-content">
+    <div class="widget-content" id="spWidgetContent">
         <?php include __DIR__ . '/../frontend/c_chat.php'; ?>
     </div>
     <!-- Bootstrap JS - needed for dropdowns and other components -->
@@ -262,8 +263,9 @@ header('Pragma: no-cache');
             document.hasStorageAccess().then((hasAccess) => {
                 if (hasAccess) return;
                 // Add a small banner prompting user to enable access
+                const parent = document.getElementById('spWidgetContent') || document.body;
                 const bar = document.createElement('div');
-                bar.style.cssText = 'position:fixed;left:0;right:0;bottom:env(safe-area-inset-bottom,0);background:#fff3cd;color:#856404;padding:10px 12px;padding-bottom:calc(10px + env(safe-area-inset-bottom,0));border-top:1px solid #ffeeba;font-size:14px;z-index:2147483647;display:flex;align-items:center;justify-content:space-between;gap:12px;pointer-events:auto;touch-action:manipulation;transform:translateZ(0);';
+                bar.style.cssText = 'position:absolute;left:0;right:0;bottom:0;background:#fff3cd;color:#856404;padding:10px 12px;border-top:1px solid #ffeeba;font-size:14px;z-index:2147483647;display:flex;align-items:center;justify-content:space-between;gap:12px;pointer-events:auto;touch-action:manipulation;transform:translateZ(0);';
                 bar.innerHTML = '<span>To enable chat on this site, please allow cookie access.</span>';
                 const btn = document.createElement('button');
                 btn.className = 'btn btn-sm btn-primary';
@@ -278,7 +280,7 @@ header('Pragma: no-cache');
                     });
                 });
                 bar.appendChild(btn);
-                document.body.appendChild(bar);
+                parent.appendChild(bar);
             });
         } catch (e) { /* ignore */ }
     })();
