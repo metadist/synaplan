@@ -1,7 +1,6 @@
 <?php
 // ------------------------------------------------------ base config
-$root = __DIR__ . '/';
-require_once($root . 'inc/_coreincludes.php');
+require_once __DIR__ . '/../app/inc/_coreincludes.php';
 // -------------------------------------------------- LOCAL SERVICES CHECK
 $output = [];
 exec('ps afx', $output);
