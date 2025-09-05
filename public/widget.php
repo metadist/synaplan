@@ -43,6 +43,7 @@ $res = db::Query($sql);
 
 $config = [
     'color' => '#007bff',
+    'iconColor' => '#ffffff',
     'position' => 'bottom-right',
     'autoMessage' => '',
     'prompt' => 'general',
@@ -103,23 +104,37 @@ switch ($config['position']) {
     const chatButton = document.createElement('button');
     chatButton.id = 'synaplan-chat-button';
     chatButton.style.cssText = `
-        width: 60px;
-        height: 60px;
-        border-radius: 50%;
-        background: <?php echo $config['color']; ?>;
-        border: none;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-        cursor: pointer;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        transition: all 0.3s ease;
-        color: white;
-        font-size: 30px;
-        padding-bottom: 5px;
-        z-index: 2147483645;
+        width: 60px !important;
+        height: 60px !important;
+        min-width: 60px !important;
+        min-height: 60px !important;
+        max-width: 60px !important;
+        max-height: 60px !important;
+        border-radius: 50% !important;
+        background: <?php echo $config['color']; ?> !important;
+        border: none !important;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
+        cursor: pointer !important;
+        display: inline-flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        transition: transform 0.3s ease, box-shadow 0.3s ease !important;
+        color: <?php echo $config['iconColor']; ?> !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        z-index: 2147483645 !important;
+        box-sizing: border-box !important;
+        outline: none !important;
+        -webkit-appearance: none !important;
+        appearance: none !important;
+        position: relative !important;
     `;
-    chatButton.innerHTML = '&#x1F5E9;';
+    // Inline SVG icon to ensure consistent rendering on iOS/Android and other platforms
+    chatButton.innerHTML = `
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false" style="display:block; pointer-events:none;">
+        <path d="M4 4.75C4 3.7835 4.7835 3 5.75 3H18.25C19.2165 3 20 3.7835 20 4.75V14.25C20 15.2165 19.2165 16 18.25 16H8.41421L5.70711 18.7071C5.07714 19.3371 4 18.8898 4 17.9929V4.75Z" fill="<?php echo $config['iconColor']; ?>"/>
+      </svg>
+    `;
     chatButton.setAttribute('aria-label', 'Open chat');
     chatButton.setAttribute('title', 'Chat');
     chatButton.setAttribute('type', 'button');
@@ -163,23 +178,28 @@ switch ($config['position']) {
     // Create close button
     const closeButton = document.createElement('button');
     closeButton.style.cssText = `
-        position: absolute;
-        top: 12px;
-        right: 12px;
-        background: none;
-        border: none;
-        color: #6c757d;
-        font-size: 20px;
-        cursor: pointer;
-        z-index: 10000000;
-        padding: 4px;
-        border-radius: 50%;
-        width: 32px;
-        height: 32px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        transition: all 0.2s ease;
+        position: absolute !important;
+        top: 12px !important;
+        right: 12px !important;
+        background: none !important;
+        border: none !important;
+        color: #6c757d !important;
+        font-size: 20px !important;
+        cursor: pointer !important;
+        z-index: 10000000 !important;
+        padding: 4px !important;
+        border-radius: 50% !important;
+        width: 32px !important;
+        height: 32px !important;
+        display: inline-flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        transition: background-color 0.2s ease !important;
+        box-sizing: border-box !important;
+        margin: 0 !important;
+        outline: none !important;
+        -webkit-appearance: none !important;
+        appearance: none !important;
     `;
     closeButton.innerHTML = '×';
     closeButton.onmouseover = () => closeButton.style.background = '#f8f9fa';
@@ -232,11 +252,25 @@ switch ($config['position']) {
         top: 0 !important; 
         left: 0 !important; 
         z-index: 2147483646 !important; 
+        width: 100% !important;
+        height: 100% !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        box-sizing: border-box !important;
       }
       #synaplan-chat-container { 
         position: fixed !important; 
         bottom: 20px !important; 
         z-index: 2147483647 !important; 
+        margin: 0 !important;
+        padding: 0 !important;
+        box-sizing: border-box !important;
+      }
+      #synaplan-chat-button {
+        box-sizing: border-box !important;
+      }
+      #synaplan-chat-container button {
+        box-sizing: border-box !important;
       }
     `;
     document.head.appendChild(enforcedStyle);

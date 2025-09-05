@@ -1668,6 +1668,7 @@ Class Frontend {
                         'widgetId' => $widgetId,
                         'userId' => $userId, // Add user ID to widget data
                         'color' => '#007bff',
+                        'iconColor' => '#ffffff',
                         'position' => 'bottom-right',
                         'autoMessage' => '',
                         'prompt' => 'general',
@@ -1679,6 +1680,9 @@ Class Frontend {
                 switch($setting) {
                     case 'color':
                         $widgets[$widgetId]['color'] = $value;
+                        break;
+                    case 'iconColor':
+                        $widgets[$widgetId]['iconColor'] = $value;
                         break;
                     case 'position':
                         $widgets[$widgetId]['position'] = $value;
@@ -1724,6 +1728,7 @@ Class Frontend {
         
         // Validate and sanitize input
         $color = db::EscString($_REQUEST['widgetColor'] ?? '#007bff');
+        $iconColor = db::EscString($_REQUEST['widgetIconColor'] ?? '#ffffff');
         $position = db::EscString($_REQUEST['widgetPosition'] ?? 'bottom-right');
         $autoMessage = db::EscString($_REQUEST['autoMessage'] ?? '');
         $prompt = db::EscString($_REQUEST['widgetPrompt'] ?? 'general');
@@ -1740,12 +1745,17 @@ Class Frontend {
             $retArr["error"] = "Invalid color format";
             return $retArr;
         }
+        if (!preg_match('/^#[0-9A-Fa-f]{6}$/', $iconColor)) {
+            $retArr["error"] = "Invalid icon color format";
+            return $retArr;
+        }
         
         $group = "widget_" . $widgetId;
         
         // Save widget settings
         $settings = [
             'color' => $color,
+            'iconColor' => $iconColor,
             'position' => $position,
             'autoMessage' => $autoMessage,
             'prompt' => $prompt,
