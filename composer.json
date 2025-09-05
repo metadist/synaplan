@@ -9,7 +9,7 @@
         "smalot/pdfparser": "^2.11",
         "phpoffice/phpword": "^1.3",
         "phpoffice/phppresentation": "^1.1",
-        "lucianotonet/groq-php": "^0.0.10",
+        "lucianotonet/groq-php": "^0.1.0",
         "google/apiclient": "^2.18.0",
         "gemini-api-php/client": "^1.7",
         "erusev/parsedown": "^1.7",

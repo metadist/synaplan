@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "e7444db22363991f23cecbb91a042a7c",
+    "content-hash": "44a33bff8503ae11698850cad3f3f550",
     "packages": [
         {
             "name": "ardagnsrn/ollama-php",
@@ -1783,16 +1783,16 @@
         },
         {
             "name": "lucianotonet/groq-php",
-            "version": "0.0.10",
+            "version": "0.1.2",
             "source": {
                 "type": "git",
                 "url": "https://github.com/lucianotonet/groq-php.git",
-                "reference": "c36c5a471d4caf0cec642887371203c6339d9738"
+                "reference": "511bbb0b763085cec0c5b129e9a512cd642f449d"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/lucianotonet/groq-php/zipball/c36c5a471d4caf0cec642887371203c6339d9738",
-                "reference": "c36c5a471d4caf0cec642887371203c6339d9738",
+                "url": "https://api.github.com/repos/lucianotonet/groq-php/zipball/511bbb0b763085cec0c5b129e9a512cd642f449d",
+                "reference": "511bbb0b763085cec0c5b129e9a512cd642f449d",
                 "shasum": ""
             },
             "require": {
@@ -1819,12 +1819,12 @@
                     "email": "tonetlds@gmail.com"
                 }
             ],
-            "description": "PHP library to access Groq REST API",
+            "description": "A powerful PHP library for seamless integration with the GroqCloud API",
             "support": {
                 "issues": "https://github.com/lucianotonet/groq-php/issues",
-                "source": "https://github.com/lucianotonet/groq-php/tree/v0.0.10"
+                "source": "https://github.com/lucianotonet/groq-php/tree/v0.1.2"
             },
-            "time": "2024-10-29T21:45:23+00:00"
+            "time": "2025-02-23T21:41:20+00:00"
         },
         {
             "name": "maennchen/zipstream-php",
