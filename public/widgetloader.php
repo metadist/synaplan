@@ -92,7 +92,7 @@ header('Pragma: no-cache');
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>Chat Widget</title>
     <base href="<?php echo $GLOBALS['baseUrl']; ?>">
     <!-- Bootstrap CSS -->
@@ -120,7 +120,7 @@ header('Pragma: no-cache');
         }
         
         .widget-content {
-            height: calc(100vh - 60px);
+            height: calc(var(--sp-dvh, 100vh) - 60px);
             display: flex;
             flex-direction: column;
             overflow: hidden; /* avoid double scrollbars; let .chat-messages scroll */
@@ -240,6 +240,19 @@ header('Pragma: no-cache');
     <script src="node_modules/bootstrap/dist/js/bootstrap.bundle.min.js?v=<?php echo @filemtime('node_modules/bootstrap/dist/js/bootstrap.bundle.min.js'); ?>"></script>
     <script>
     (function() {
+        // Dynamic viewport height for iOS Safari and mobile browsers
+        const updateSPDVH = () => {
+            const vh = (window.visualViewport && window.visualViewport.height) ? window.visualViewport.height : window.innerHeight;
+            document.documentElement.style.setProperty('--sp-dvh', vh + 'px');
+        };
+        updateSPDVH();
+        window.addEventListener('resize', updateSPDVH, { passive: true });
+        window.addEventListener('orientationchange', updateSPDVH, { passive: true });
+        if (window.visualViewport) {
+            window.visualViewport.addEventListener('resize', updateSPDVH, { passive: true });
+            window.visualViewport.addEventListener('scroll', updateSPDVH, { passive: true });
+        }
+
         // iOS/Safari third-party cookie mitigation using Storage Access API
         const canRequest = document.hasStorageAccess && document.requestStorageAccess;
         if (!canRequest) return; // Not Safari or unsupported
@@ -250,11 +263,12 @@ header('Pragma: no-cache');
                 if (hasAccess) return;
                 // Add a small banner prompting user to enable access
                 const bar = document.createElement('div');
-                bar.style.cssText = 'position:fixed;bottom:0;left:0;right:0;background:#fff3cd;color:#856404;padding:10px 12px;border-top:1px solid #ffeeba;font-size:14px;z-index:999999;display:flex;align-items:center;justify-content:space-between;gap:12px;';
+                bar.style.cssText = 'position:fixed;left:0;right:0;bottom:env(safe-area-inset-bottom,0);background:#fff3cd;color:#856404;padding:10px 12px;padding-bottom:calc(10px + env(safe-area-inset-bottom,0));border-top:1px solid #ffeeba;font-size:14px;z-index:2147483647;display:flex;align-items:center;justify-content:space-between;gap:12px;pointer-events:auto;touch-action:manipulation;transform:translateZ(0);';
                 bar.innerHTML = '<span>To enable chat on this site, please allow cookie access.</span>';
                 const btn = document.createElement('button');
                 btn.className = 'btn btn-sm btn-primary';
                 btn.textContent = 'Allow';
+                btn.style.cssText = 'pointer-events:auto;';
                 btn.addEventListener('click', function() {
                     document.requestStorageAccess().then(() => {
                         // Reload to use the session cookie
