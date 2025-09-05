@@ -1,5 +1,6 @@
 <?php
-require_once("inc/_confdb.php");
+require_once __DIR__ . '/../vendor/autoload.php';
+require_once __DIR__ . '/../app/inc/_coreincludes.php';
 
 $id = intval($_GET['id']);
 $c = DB::EscString($_GET['c']);

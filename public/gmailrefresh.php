@@ -30,5 +30,5 @@ try {
     // set answer method to GMAIL
     myGMail::saveToDatabase($processedMails);   
 } catch (Exception $e) {
-    _mymail("info@metadist.de", "info@metadist.de", "synaplan.AI Gmail Error", "Error: ".$e->getMessage(), "Error: ".$e->getMessage());
+    EmailService::sendAdminNotification("Gmail Error", "Error: ".$e->getMessage());
 }

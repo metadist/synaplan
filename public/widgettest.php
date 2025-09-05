@@ -11,8 +11,8 @@ if(isset($_SESSION['USERPROFILE'])) {
     session_start();
 }
 
-require_once('inc/_confsys.php');
-require_once('inc/_confdb.php');
+require_once __DIR__ . '/../vendor/autoload.php';
+require_once __DIR__ . '/../app/inc/_coreincludes.php';
 
 $widgetId = $_REQUEST['widgetid'] ?? 1;
 $uid = $_REQUEST['uid'] ?? 2; // Default to user ID 2 if not provided

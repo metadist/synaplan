@@ -19,9 +19,9 @@ if (function_exists('session_set_cookie_params')) {
     @session_set_cookie_params($cookieParams);
 }
 session_start();
-// core app files with relative paths
-$root = __DIR__.'/';
-require_once($root . '/inc/_coreincludes.php');
+// Core app files via Composer autoload and centralized includes
+require_once __DIR__ . '/../vendor/autoload.php';
+require_once __DIR__ . '/../app/inc/_coreincludes.php';
 
 // Get parameters
 $uid = isset($_REQUEST['uid']) ? intval($_REQUEST['uid']) : 0;
@@ -98,7 +98,7 @@ header('Pragma: no-cache');
     <!-- Bootstrap CSS -->
     <link href="node_modules/bootstrap/dist/css/bootstrap.min.css?v=<?php echo @filemtime('node_modules/bootstrap/dist/css/bootstrap.min.css'); ?>" rel="stylesheet">
     <!-- Dashboard CSS - includes all chat interface styles -->
-    <link href="css/dashboard.css?v=<?php echo @filemtime('css/dashboard.css'); ?>" rel="stylesheet">
+    <link href="assets/statics/css/dashboard.css?v=<?php echo @filemtime('assets/statics/css/dashboard.css'); ?>" rel="stylesheet">
     <style>
         /* Widget-specific overrides */
         html, body {
@@ -234,7 +234,7 @@ header('Pragma: no-cache');
         Chat Support
     </div>
     <div class="widget-content">
-        <?php include('snippets/c_chat.php'); ?>
+        <?php include __DIR__ . '/../frontend/c_chat.php'; ?>
     </div>
     <!-- Bootstrap JS - needed for dropdowns and other components -->
     <script src="node_modules/bootstrap/dist/js/bootstrap.bundle.min.js?v=<?php echo @filemtime('node_modules/bootstrap/dist/js/bootstrap.bundle.min.js'); ?>"></script>
