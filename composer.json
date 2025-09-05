@@ -3,7 +3,7 @@
         "league/flysystem": "^3.0",
         "netflie/whatsapp-cloud-api": "^2.2",
         "phpmailer/phpmailer": "^6.9",
-        "openai-php/client": "^0.13.0",
+        "openai-php/client": "^0.16.0",
         "codewithkyrian/whisper.php": "^1.1",
         "ardagnsrn/ollama-php": "^1.0",
         "smalot/pdfparser": "^2.11",
