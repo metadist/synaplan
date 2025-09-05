@@ -178,7 +178,7 @@ class ProcessMethods {
 
                 try {
                     $answerJson = $AIGENERAL::sortingPrompt($sortingArr, self::$threadArr);
-                } catch (\Throwable $err) {
+                } catch (Exception $err) {
                     if($GLOBALS["debug"]) error_log($err->getMessage());
                     $answerJson = '{}';
                     if(self::$stream) {
@@ -465,11 +465,33 @@ public static function processMessage(): void {
     }
 
     // --- Spezial: mediamaker (ohne IN-Text-Pre/Append – nur OUT-Payload) ---
-    if (self::$msgArr['BTOPIC'] === 'mediamaker') {
+    if(self::$msgArr['BTOPIC'] === 'mediamaker') {
+        $originalPrompt = self::$msgArr['BTEXT'];
+        $providerFailed = false;
+        $improvedPrompt = null;
+
+        // Guess requested media from prompt keywords (defaults handled below)
+        $requestedMedia = '';
+        $lowerPrompt = mb_strtolower($originalPrompt);
+        if (preg_match('/\\b(audio|sound|musik|sprich)\\b/u', $lowerPrompt)) {
+            $requestedMedia = 'audio';
+        } elseif (preg_match('/\\b(video|film)\\b/u', $lowerPrompt)) {
+            $requestedMedia = 'video';
+        } elseif (preg_match('/\\b(bild|image|picture|foto|photo)\\b/u', $lowerPrompt)) {
+            $requestedMedia = 'image';
+        }
+
+        // Priority: forced tag > requested keywords > default image
         $mediaType = 'image';
+        if(!empty($GLOBALS['FORCED_AI_BTAG'])) {
+            $forcedBtagLocal = $GLOBALS['FORCED_AI_BTAG'];
+            $mediaType = ($forcedBtagLocal === 'text2vid') ? 'video' : (($forcedBtagLocal === 'text2sound') ? 'audio' : 'image');
+        } elseif (!empty($requestedMedia)) {
+            $mediaType = $requestedMedia;
+        }
+
         try {
             $answerSorted = $AIGENERAL::topicPrompt(self::$msgArr, [], false);
-            $mediaType = $answerSorted['BMEDIA'] ?? 'image';
         } catch (Exception $err) {
             $providerFailed = true;
             if (self::$stream) {
@@ -488,7 +510,7 @@ public static function processMessage(): void {
                 }
                 $answerSorted = null;
             } else {
-                // robust Normalization (respect computed $mediaType)
+                // robuste Normalisierung (respect computed $mediaType)
                 $returnedText = $answerSorted;
                 $answerSorted = [
                     'BTEXT'  => $returnedText,
@@ -500,7 +522,7 @@ public static function processMessage(): void {
             }
         }
         // Enforce media type to avoid flips to audio unless explicitly requested/forced
-        if(is_array($answerSorted)) {
+        if (is_array($answerSorted)) {
             $answerSorted['BMEDIA'] = $mediaType;
         }
 
@@ -512,6 +534,7 @@ public static function processMessage(): void {
 
         if (!$isValid || $providerFailed) {
             $fallbackArr = Tools::migrateArray(self::$msgArr, [
+                'BTEXT'  => $originalPrompt,
                 'BTOPIC' => 'mediamaker',
                 'BLANG'  => self::$msgArr['BLANG'] ?? 'en',
                 'BMEDIA' => $mediaType
@@ -525,7 +548,6 @@ public static function processMessage(): void {
             } else { // audio
                 $fallbackArr['BTEXT'] = "/audio " . $fallbackArr['BTEXT'];
             }
-
             $answerSorted = BasicAI::toolPrompt($fallbackArr, false);
             if (is_string($answerSorted)) {
                 $answerSorted = [
@@ -537,7 +559,7 @@ public static function processMessage(): void {
             } elseif (is_array($answerSorted)) {
                 // Prefer tool-provided text; fallback to original prompt only if tool gave nothing
                 $toolText = $answerSorted['OUTTEXT'] ?? $answerSorted['CAPTION'] ?? $answerSorted['TEXT'] ?? $answerSorted['BTEXT'] ?? '';
-                $answerSorted['BTEXT'] = ($toolText !== '') ? $toolText : 'mediamaker';
+                $answerSorted['BTEXT'] = ($toolText !== '') ? $toolText : $originalPrompt;
                 // Enforce previously computed media type
                 $answerSorted['BMEDIA'] = $mediaType;
             }
@@ -548,49 +570,36 @@ public static function processMessage(): void {
             // Normal flow: migrate and execute tool without streaming
             $answerSorted = Tools::migrateArray(self::$msgArr, $answerSorted);
             $answerSorted['BID'] = self::$msgId;
-
             if (isset($answerSorted['BTEXT'])) { $improvedPrompt = $answerSorted['BTEXT']; }
 
             if ($mediaType === 'image') {
                 $answerSorted['BTEXT'] = "/pic " . $answerSorted['BTEXT'];
                 $answerSorted = BasicAI::toolPrompt($answerSorted, false);
-                if(is_string($answerSorted)) {
+                if (is_string($answerSorted)) {
                     $answerSorted = [
                         'BTEXT'  => $answerSorted,
                         'BTOPIC' => 'mediamaker',
                         'BLANG'  => self::$msgArr['BLANG'] ?? 'en',
                         'BMEDIA' => $mediaType
                     ];
-                } elseif(is_array($answerSorted)) {
+                } elseif (is_array($answerSorted)) {
                     $toolText = $answerSorted['OUTTEXT'] ?? $answerSorted['CAPTION'] ?? $answerSorted['TEXT'] ?? $answerSorted['BTEXT'] ?? '';
-                    $fallbackText = ($toolText !== '') ? $toolText : ($answerSorted['BFILETEXT'] ?? '');
-                    if($fallbackText === '') { $fallbackText = ($improvedPrompt ?? self::$msgArr['BTEXT']); }
-                    if(is_string($fallbackText)) {
-                        $fallbackText = preg_replace('/\s*\[Again-\d+\]\s*/', '', $fallbackText);
-                        $fallbackText = preg_replace('/^\/[a-zA-Z]+\s+/', '', $fallbackText);
-                    }
-                    $answerSorted['BTEXT'] = $fallbackText;
+                    $answerSorted['BTEXT'] = ($toolText !== '') ? $toolText : ($improvedPrompt ?? $originalPrompt);
                     $answerSorted['BMEDIA'] = $mediaType;
                 }
-            } elseif($mediaType === 'video') {
+            } elseif ($mediaType === 'video') {
                 $answerSorted['BTEXT'] = "/vid " . $answerSorted['BTEXT'];
                 $answerSorted = BasicAI::toolPrompt($answerSorted, false);
-                if(is_string($answerSorted)) {
+                if (is_string($answerSorted)) {
                     $answerSorted = [
                         'BTEXT'  => $answerSorted,
                         'BTOPIC' => 'mediamaker',
                         'BLANG'  => self::$msgArr['BLANG'] ?? 'en',
                         'BMEDIA' => $mediaType
                     ];
-                } elseif(is_array($answerSorted)) {
+                } elseif (is_array($answerSorted)) {
                     $toolText = $answerSorted['OUTTEXT'] ?? $answerSorted['CAPTION'] ?? $answerSorted['TEXT'] ?? $answerSorted['BTEXT'] ?? '';
-                    $fallbackText = ($toolText !== '') ? $toolText : ($answerSorted['BFILETEXT'] ?? '');
-                    if ($fallbackText === '') { $fallbackText = ($improvedPrompt ?? self::$msgArr['BTEXT']); }
-                    if (is_string($fallbackText)) {
-                        $fallbackText = preg_replace('/\s*\[Again-\d+\]\s*/', '', $fallbackText);
-                        $fallbackText = preg_replace('/^\/[a-zA-Z]+\s+/', '', $fallbackText);
-                    }
-                    $answerSorted['BTEXT'] = $fallbackText;
+                    $answerSorted['BTEXT'] = ($toolText !== '') ? $toolText : ($improvedPrompt ?? $originalPrompt);
                     $answerSorted['BMEDIA'] = $mediaType;
                 }
             } else { // audio
@@ -605,13 +614,7 @@ public static function processMessage(): void {
                     ];
                 } elseif (is_array($answerSorted)) {
                     $toolText = $answerSorted['OUTTEXT'] ?? $answerSorted['CAPTION'] ?? $answerSorted['TEXT'] ?? $answerSorted['BTEXT'] ?? '';
-                    $fallbackText = ($toolText !== '') ? $toolText : ($answerSorted['BFILETEXT'] ?? '');
-                    if ($fallbackText === '') { $fallbackText = ($improvedPrompt ?? self::$msgArr['BTEXT']); }
-                    if (is_string($fallbackText)) {
-                        $fallbackText = preg_replace('/\s*\[Again-\d+\]\s*/', '', $fallbackText);
-                        $fallbackText = preg_replace('/^\/[a-zA-Z]+\s+/', '', $fallbackText);
-                    }
-                    $answerSorted['BTEXT'] = $fallbackText;
+                    $answerSorted['BTEXT'] = ($toolText !== '') ? $toolText : ($improvedPrompt ?? $originalPrompt);
                     $answerSorted['BMEDIA'] = $mediaType;
                 }
             }

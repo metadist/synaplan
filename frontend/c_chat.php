@@ -339,8 +339,8 @@ window.isWidgetMode = <?php echo $isWidgetMode ? 'true' : 'false'; ?>;
 <script>
     // when document is ready, initialize prompt configuration
     $(document).ready(function() {
-        // Only call onPromptConfigChange if it exists (for non-widget mode)
-        if (typeof onPromptConfigChange === 'function') {
+        // Only call onPromptConfigChange if it exists AND not in widget mode
+        if (typeof onPromptConfigChange === 'function' && !window.isWidgetMode) {
             onPromptConfigChange();
         }
         // No need to scroll to bottom since chat history is loaded via buttons now

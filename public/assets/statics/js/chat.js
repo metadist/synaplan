@@ -552,7 +552,8 @@ function handleSendMessage() {
 
     fetch('api.php', {
       method: 'POST',
-      body: formData
+      body: formData,
+      credentials: 'include'
     })
     .then(res => {
       if (!res.ok) {
@@ -969,7 +970,8 @@ function showMessageFiles(messageId) {
         
         fetch('api.php', {
             method: 'POST',
-            body: formData
+            body: formData,
+            credentials: 'include'
         })
         .then(response => response.json())
         .then(data => {
@@ -1125,7 +1127,8 @@ function handleAgainMessage(modelId, promptId, $originalButton) {
   
   fetch('api.php?action=messageAgain', {
     method: 'POST',
-    body: formData
+    body: formData,
+    credentials: 'include'
   })
   .then(response => response.json())
   .then(data => {
