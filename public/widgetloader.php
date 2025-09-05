@@ -238,5 +238,36 @@ header('Pragma: no-cache');
     </div>
     <!-- Bootstrap JS - needed for dropdowns and other components -->
     <script src="node_modules/bootstrap/dist/js/bootstrap.bundle.min.js?v=<?php echo @filemtime('node_modules/bootstrap/dist/js/bootstrap.bundle.min.js'); ?>"></script>
+    <script>
+    (function() {
+        // iOS/Safari third-party cookie mitigation using Storage Access API
+        const canRequest = document.hasStorageAccess && document.requestStorageAccess;
+        if (!canRequest) return; // Not Safari or unsupported
+
+        // Only try when we appear to be in a third-party context
+        try {
+            document.hasStorageAccess().then((hasAccess) => {
+                if (hasAccess) return;
+                // Add a small banner prompting user to enable access
+                const bar = document.createElement('div');
+                bar.style.cssText = 'position:fixed;bottom:0;left:0;right:0;background:#fff3cd;color:#856404;padding:10px 12px;border-top:1px solid #ffeeba;font-size:14px;z-index:999999;display:flex;align-items:center;justify-content:space-between;gap:12px;';
+                bar.innerHTML = '<span>To enable chat on this site, please allow cookie access.</span>';
+                const btn = document.createElement('button');
+                btn.className = 'btn btn-sm btn-primary';
+                btn.textContent = 'Allow';
+                btn.addEventListener('click', function() {
+                    document.requestStorageAccess().then(() => {
+                        // Reload to use the session cookie
+                        location.reload();
+                    }).catch(() => {
+                        // If denied, keep the bar visible
+                    });
+                });
+                bar.appendChild(btn);
+                document.body.appendChild(bar);
+            });
+        } catch (e) { /* ignore */ }
+    })();
+    </script>
 </body>
 </html> 
