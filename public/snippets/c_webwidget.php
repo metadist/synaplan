@@ -47,6 +47,13 @@
                         <input type="color" class="form-control form-control-color" name="widgetColor" id="widgetColor" value="#007bff">
                         <div class="form-text">Color for the chat button</div>
                     </div>
+                    <label for="widgetIconColor" class="col-sm-2 col-form-label"><strong>Icon Color:</strong></label>
+                    <div class="col-sm-4">
+                        <input type="color" class="form-control form-control-color" name="widgetIconColor" id="widgetIconColor" value="#ffffff">
+                        <div class="form-text">Color for the icon inside the button</div>
+                    </div>
+                </div>
+                <div class="row mb-3">
                     <label for="widgetPosition" class="col-sm-2 col-form-label"><strong>Position:</strong></label>
                     <div class="col-sm-4">
                         <select class="form-select" name="widgetPosition" id="widgetPosition">
@@ -275,6 +282,7 @@
                                 <small class="text-muted">
                                     <strong>User ID:</strong> ${widget.userId}<br>
                                     <strong>Color:</strong> <span style="color: ${widget.color};">${widget.color}</span><br>
+                                    <strong>Icon Color:</strong> <span style="color: ${widget.iconColor || '#ffffff'};">${widget.iconColor || '#ffffff'}</span><br>
                                     <strong>Position:</strong> ${widget.position}<br>
                                     <strong>Prompt:</strong> ${widget.prompt}<br>
                                     <strong>Auto Message:</strong> ${widget.autoMessage ? 'Yes' : 'No'}<br>
@@ -338,6 +346,8 @@
         document.getElementById('widgetPrompt').value = 'general';
         const autoOpenEl = document.getElementById('autoOpen');
         if (autoOpenEl) autoOpenEl.checked = false; // default off
+        const iconColorEl = document.getElementById('widgetIconColor');
+        if (iconColorEl) iconColorEl.value = '#ffffff';
         
         updateIntegrationCode();
         document.getElementById('webwidgetForm').style.display = 'block';
@@ -362,6 +372,8 @@
         document.getElementById('widgetPrompt').value = widget.prompt;
         const autoOpenEditEl = document.getElementById('autoOpen');
         if (autoOpenEditEl) autoOpenEditEl.checked = (widget.autoOpen == '1');
+        const iconColorEditEl = document.getElementById('widgetIconColor');
+        if (iconColorEditEl) iconColorEditEl.value = widget.iconColor || '#ffffff';
         
         updateIntegrationCode();
         document.getElementById('webwidgetForm').style.display = 'block';

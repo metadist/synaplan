@@ -282,7 +282,8 @@ function loadChatHistory(amount) {
     
     fetch('api.php', {
         method: 'POST',
-        body: formData
+        body: formData,
+        credentials: 'include'
     })
     .then(response => response.json())
     .then(data => {
