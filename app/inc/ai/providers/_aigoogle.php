@@ -627,7 +627,14 @@ class AIGoogle {
                     error_log("[AIGoogle::createVideo] Starting long-running prediction. Model=" . $myModel . ", PromptLen=" . strlen($videoPrompt));
                 }
                 $arrRes = Curler::callJson($url, $headers, $postData);
-                
+
+                // If Google immediately returns an error, surface it
+                if (isset($arrRes['error'])) {
+                    $msgArr['BFILEPATH'] = '';
+                    $msgArr['BFILETEXT'] = "Error: " . json_encode($arrRes['error'],JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+                    return $msgArr;
+                }
+
                 // Extract operation name
                 $operationName = $arrRes['name'] ?? '';
                 
@@ -670,7 +677,10 @@ class AIGoogle {
                     }
                     
                     if ($debug) {
-                        error_log("[AIGoogle::createVideo] Poll attempt=" . ($attempt+1) . ", done=" . (isset($checkRes['done']) && $checkRes['done'] ? 'true' : 'false'));
+                        // Progress and state if available
+                        $progress = isset($checkRes['metadata']['progressPercent']) ? $checkRes['metadata']['progressPercent'] : (isset($checkRes['metadata']['progress_percent']) ? $checkRes['metadata']['progress_percent'] : null);
+                        $state = isset($checkRes['metadata']['state']) ? $checkRes['metadata']['state'] : (isset($checkRes['metadata']['state_message']) ? $checkRes['metadata']['state_message'] : null);
+                        error_log("[AIGoogle::createVideo] Poll attempt=" . ($attempt+1) . ", done=" . (isset($checkRes['done']) && $checkRes['done'] ? 'true' : 'false') . (is_null($progress) ? '' : ", progress=".$progress) . (is_null($state) ? '' : ", state=".$state));
                         // Only log full response in debug to avoid noise
                         error_log("[AIGoogle::createVideo] Check Res: " . json_encode($checkRes,JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
                     }
@@ -679,10 +689,14 @@ class AIGoogle {
                     $attempt++;
 
                     if($stream) {
+                        $progress = isset($checkRes['metadata']['progressPercent']) ? $checkRes['metadata']['progressPercent'] : (isset($checkRes['metadata']['progress_percent']) ? $checkRes['metadata']['progress_percent'] : null);
+                        $stateMsg = '';
+                        if (isset($checkRes['metadata']['statusMessage'])) $stateMsg = $checkRes['metadata']['statusMessage'];
+                        if ($stateMsg === '' && isset($checkRes['metadata']['state'])) $stateMsg = $checkRes['metadata']['state'];
                         $update = [
                             'msgId' => $msgArr['BID'],
                             'status' => 'pre_processing',
-                            'message' => strval((5 * $attempt)).' '
+                            'message' => (is_null($progress) ? strval((5 * $attempt)) : (strval($progress)."%")) . (strlen($stateMsg) ? (" ".$stateMsg) : '') . ' '
                         ];
                         Frontend::printToStream($update);
                     }
@@ -742,15 +756,36 @@ class AIGoogle {
                                 error_log("[AIGoogle::createVideo] Success. Took=" . $took . "s, Attempts=" . $attempt);
                             }
                         } else {
+                            // Try to capture Google-provided reasons from response payload
+                            $diagnostics = [];
+                            $gvr = isset($checkRes['response']['generateVideoResponse']) ? $checkRes['response']['generateVideoResponse'] : [];
+                            if (isset($gvr['blockReason'])) $diagnostics['blockReason'] = $gvr['blockReason'];
+                            if (isset($gvr['reason'])) $diagnostics['reason'] = $gvr['reason'];
+                            if (isset($gvr['status'])) $diagnostics['status'] = $gvr['status'];
+                            if (isset($gvr['error'])) $diagnostics['error'] = $gvr['error'];
+                            if (isset($gvr['safetyRatings'])) $diagnostics['safetyRatings'] = $gvr['safetyRatings'];
+                            if (isset($gvr['safetyFeedback'])) $diagnostics['safetyFeedback'] = $gvr['safetyFeedback'];
+                            // Also inspect generatedSamples entries for per-sample status
+                            if (isset($gvr['generatedSamples'][0])) {
+                                $sample = $gvr['generatedSamples'][0];
+                                foreach (['status','blockReason','reason','errorMessage'] as $k) {
+                                    if (isset($sample[$k])) $diagnostics['sample_'.$k] = $sample[$k];
+                                }
+                            }
+                            // Fallback: include metadata state/status
+                            if (isset($checkRes['metadata']['statusMessage'])) $diagnostics['statusMessage'] = $checkRes['metadata']['statusMessage'];
+                            if (isset($checkRes['metadata']['state'])) $diagnostics['state'] = $checkRes['metadata']['state'];
+
                             $msgArr['BFILEPATH'] = '';
+                            $reason = (count($diagnostics) > 0) ? (" Google reason: " . json_encode($diagnostics,JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)) : '';
                             $detail = '';
-                            if ($debug) {
+                            if ($debug && $reason === '') {
                                 $detail = " Details: Response keys=" . implode(',', array_keys($checkRes));
                                 if (isset($checkRes['response'])) {
                                     $detail .= "; responseKeys=" . implode(',', array_keys($checkRes['response']));
                                 }
                             }
-                            $msgArr['BFILETEXT'] = "Error: No video data returned." . $detail;
+                            $msgArr['BFILETEXT'] = "Error: No video data returned." . $reason . $detail;
                         }
                         break;
                     }
