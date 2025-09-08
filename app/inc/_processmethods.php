@@ -548,7 +548,7 @@ public static function processMessage(): void {
             } else { // audio
                 $fallbackArr['BTEXT'] = "/audio " . $fallbackArr['BTEXT'];
             }
-            $answerSorted = BasicAI::toolPrompt($fallbackArr, false);
+            $answerSorted = BasicAI::toolPrompt($fallbackArr, self::$stream);
             if (is_string($answerSorted)) {
                 $answerSorted = [
                     'BTEXT'  => $answerSorted,
@@ -574,7 +574,7 @@ public static function processMessage(): void {
 
             if ($mediaType === 'image') {
                 $answerSorted['BTEXT'] = "/pic " . $answerSorted['BTEXT'];
-                $answerSorted = BasicAI::toolPrompt($answerSorted, false);
+                $answerSorted = BasicAI::toolPrompt($answerSorted, self::$stream);
                 if (is_string($answerSorted)) {
                     $answerSorted = [
                         'BTEXT'  => $answerSorted,
@@ -589,7 +589,7 @@ public static function processMessage(): void {
                 }
             } elseif ($mediaType === 'video') {
                 $answerSorted['BTEXT'] = "/vid " . $answerSorted['BTEXT'];
-                $answerSorted = BasicAI::toolPrompt($answerSorted, false);
+                $answerSorted = BasicAI::toolPrompt($answerSorted, self::$stream);
                 if (is_string($answerSorted)) {
                     $answerSorted = [
                         'BTEXT'  => $answerSorted,
@@ -604,7 +604,7 @@ public static function processMessage(): void {
                 }
             } else { // audio
                 $answerSorted['BTEXT'] = "/audio " . $answerSorted['BTEXT'];
-                $answerSorted = BasicAI::toolPrompt($answerSorted, false);
+                $answerSorted = BasicAI::toolPrompt($answerSorted, self::$stream);
                 if (is_string($answerSorted)) {
                     $answerSorted = [
                         'BTEXT'  => $answerSorted,
