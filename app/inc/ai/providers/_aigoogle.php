@@ -848,7 +848,7 @@ class AIGoogle {
                 ];
                 Frontend::printToStream($update);
             }
-            return $errorStop;
+            return ['success' => false, 'error' => $errorStop];
         }
 
         // Get file information
@@ -938,7 +938,7 @@ class AIGoogle {
                 ];
                 Frontend::printToStream($update);
             }
-            return $errorStop;
+            return ['success' => false, 'error' => $errorStop];
         }
 
         try {

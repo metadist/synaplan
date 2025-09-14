@@ -173,7 +173,7 @@
             u.addEventListener('blur', function() {
                 const val = (u.value || '').trim();
                 if (val && val.indexOf('@') === -1 && !warnedUserNoAt) {
-                    alert('Note: Some servers accept usernames without an @ sign. If your login requires a full email address, include the domain.');
+                    if (window.notify) notify('info', 'Some servers accept usernames without an @. If your login requires a full email address, include the domain.', 'Hint'); else alert('Note: Some servers accept usernames without an @ sign. If your login requires a full email address, include the domain.');
                     warnedUserNoAt = true;
                 }
             });
@@ -258,7 +258,7 @@
     // Function to add a new mail department
     function addMailDepartment() {
         if (departmentCount >= maxDepartments) {
-            alert('Maximum of ' + maxDepartments + ' departments allowed');
+            if (window.notify) notify('warning', 'Maximum of ' + maxDepartments + ' departments allowed', 'Limit reached'); else alert('Maximum of ' + maxDepartments + ' departments allowed');
             return;
         }
 
@@ -356,7 +356,7 @@
         const password = document.getElementById('mailPassword').value;
 
         if (!server || !port || !username) {
-            alert('Please fill in server, port and username before testing connection.');
+            if (window.notify) notify('warning', 'Please fill in server, port and username before testing connection.', 'Missing fields'); else alert('Please fill in server, port and username before testing connection.');
             return;
         }
 
@@ -389,7 +389,7 @@
             renderTestConnectionResult(data);
         }).catch(err => {
             console.error(err);
-            alert('Connection test failed to run.');
+            if (window.notify) notify('error', 'Connection test failed to run.', 'Test Failed'); else alert('Connection test failed to run.');
         }).finally(() => {
             if (btn) {
                 btn.disabled = false;
@@ -468,14 +468,14 @@ Yahoo Mail IMAP:
 
 Note: You may need to enable "Less secure app access" or use app-specific passwords for some providers.
         `;
-        alert(helpText);
+        if (window.notify) notify('info', helpText, 'Mail Help'); else alert(helpText);
     }
 
     // Function to preview mail processing
     function previewMailProcessing() {
         // TODO: Implement preview functionality
         console.log('Opening mail processing preview...');
-        alert('Preview feature will show how emails will be processed and forwarded.');
+        if (window.notify) notify('info', 'Preview feature will show how emails will be processed and forwarded.', 'Preview'); else alert('Preview feature will show how emails will be processed and forwarded.');
     }
 
     // Form validation
@@ -483,7 +483,7 @@ Note: You may need to enable "Less secure app access" or use app-specific passwo
         const defaultDept = document.querySelector('input[name="defaultDepartment"]:checked');
         if (!defaultDept) {
             e.preventDefault();
-            alert('Please select a default department.');
+            if (window.notify) notify('warning', 'Please select a default department.', 'Validation'); else alert('Please select a default department.');
             return;
         }
 
@@ -497,7 +497,7 @@ Note: You may need to enable "Less secure app access" or use app-specific passwo
 
         if (!hasValidDepartments) {
             e.preventDefault();
-            alert('Please add at least one department.');
+            if (window.notify) notify('warning', 'Please add at least one department.', 'Validation'); else alert('Please add at least one department.');
             return;
         }
 
@@ -513,14 +513,19 @@ Note: You may need to enable "Less secure app access" or use app-specific passwo
             credentials: 'include'
         }).then(r => r.json()).then(data => {
             if (data && data.success) {
-                alert('Configuration saved');
-                loadMailhandlerConfig();
+                if (window.notify) {
+                    sessionStorage.setItem('notifyAfterReload', JSON.stringify({ type: 'success', title: 'Saved', message: 'Configuration saved' }));
+                } else {
+                    alert('Configuration saved');
+                }
+                // reload to reflect persisted state uniformly
+                window.location.reload();
             } else {
-                alert('Save failed: ' + (data.error || 'Unknown error'));
+                if (window.notify) notify('error', 'Save failed: ' + (data.error || 'Unknown error'), 'Save Failed'); else alert('Save failed: ' + (data.error || 'Unknown error'));
             }
         }).catch(err => {
             console.error(err);
-            alert('Save failed');
+            if (window.notify) notify('error', 'Save failed', 'Save Failed'); else alert('Save failed');
         });
     });
 </script>

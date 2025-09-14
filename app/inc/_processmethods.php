@@ -428,9 +428,23 @@ public static function processMessage(): void {
         }
     }
 
-    // --- Hauptaufruf (ausgenommen Spezial-Themen) ---
     $defaultPromptArr = ['analyzefile', 'mediamaker'];
     $previousCall     = false;
+
+    // Quick path: if an image was uploaded and pic2text already produced BFILETEXT,
+    // answer directly with that text instead of calling a chat model (prevents misclassification).
+    if (
+        !empty(self::$msgArr['BFILE']) && self::$msgArr['BFILE'] == 1 &&
+        isset(self::$msgArr['BFILETYPE']) && in_array(strtolower(self::$msgArr['BFILETYPE']), ['jpeg','jpg','png'], true) &&
+        !empty(self::$msgArr['BFILETEXT'])
+    ) {
+        $answerSorted = self::$msgArr;
+        $answerSorted['BTEXT'] = self::$msgArr['BFILETEXT'];
+        $previousCall = true;
+        if (self::$stream) {
+            Frontend::statusToStream(self::$msgId, 'pre', 'Image analyzed. ');
+        }
+    }
 
     if (!in_array(self::$msgArr['BTOPIC'], $defaultPromptArr, true)) {
         if (self::$stream) {
@@ -465,21 +479,12 @@ public static function processMessage(): void {
     }
 
     // --- Spezial: mediamaker (ohne IN-Text-Pre/Append – nur OUT-Payload) ---
-    if(self::$msgArr['BTOPIC'] === 'mediamaker') {
+    // Skip this block if we already produced an answer (e.g., image analysis quick path)
+    if(self::$msgArr['BTOPIC'] === 'mediamaker' && !$previousCall) {
         $originalPrompt = self::$msgArr['BTEXT'];
         $providerFailed = false;
         $improvedPrompt = null;
 
-        // Guess requested media from prompt keywords (defaults handled below)
-        $requestedMedia = '';
-        $lowerPrompt = mb_strtolower($originalPrompt);
-        if (preg_match('/\\b(audio|sound|musik|sprich)\\b/u', $lowerPrompt)) {
-            $requestedMedia = 'audio';
-        } elseif (preg_match('/\\b(video|film)\\b/u', $lowerPrompt)) {
-            $requestedMedia = 'video';
-        } elseif (preg_match('/\\b(bild|image|picture|foto|photo)\\b/u', $lowerPrompt)) {
-            $requestedMedia = 'image';
-        }
 
         // Priority: forced tag > requested keywords > default image
         $mediaType = 'image';
@@ -557,9 +562,13 @@ public static function processMessage(): void {
                     'BMEDIA' => $mediaType
                 ];
             } elseif (is_array($answerSorted)) {
-                // Prefer tool-provided text; fallback to original prompt only if tool gave nothing
-                $toolText = $answerSorted['OUTTEXT'] ?? $answerSorted['CAPTION'] ?? $answerSorted['TEXT'] ?? $answerSorted['BTEXT'] ?? '';
-                $answerSorted['BTEXT'] = ($toolText !== '') ? $toolText : $originalPrompt;
+                // Prefer tool-provided text; during Again do not fall back to original prompt
+                $toolText = $answerSorted['OUTTEXT'] ?? $answerSorted['CAPTION'] ?? $answerSorted['TEXT'] ?? '';
+                if (!empty($GLOBALS['IS_AGAIN'])) {
+                    $answerSorted['BTEXT'] = $toolText; // allow empty
+                } else {
+                    $answerSorted['BTEXT'] = ($toolText !== '') ? $toolText : $originalPrompt;
+                }
                 // Enforce previously computed media type
                 $answerSorted['BMEDIA'] = $mediaType;
             }
@@ -583,8 +592,12 @@ public static function processMessage(): void {
                         'BMEDIA' => $mediaType
                     ];
                 } elseif (is_array($answerSorted)) {
-                    $toolText = $answerSorted['OUTTEXT'] ?? $answerSorted['CAPTION'] ?? $answerSorted['TEXT'] ?? $answerSorted['BTEXT'] ?? '';
-                    $answerSorted['BTEXT'] = ($toolText !== '') ? $toolText : ($improvedPrompt ?? $originalPrompt);
+                    $toolText = $answerSorted['OUTTEXT'] ?? $answerSorted['CAPTION'] ?? $answerSorted['TEXT'] ?? '';
+                    if (!empty($GLOBALS['IS_AGAIN'])) {
+                        $answerSorted['BTEXT'] = $toolText; // no fallback to prompt during Again
+                    } else {
+                        $answerSorted['BTEXT'] = ($toolText !== '') ? $toolText : ($improvedPrompt ?? $originalPrompt);
+                    }
                     $answerSorted['BMEDIA'] = $mediaType;
                 }
             } elseif ($mediaType === 'video') {
@@ -598,8 +611,12 @@ public static function processMessage(): void {
                         'BMEDIA' => $mediaType
                     ];
                 } elseif (is_array($answerSorted)) {
-                    $toolText = $answerSorted['OUTTEXT'] ?? $answerSorted['CAPTION'] ?? $answerSorted['TEXT'] ?? $answerSorted['BTEXT'] ?? '';
-                    $answerSorted['BTEXT'] = ($toolText !== '') ? $toolText : ($improvedPrompt ?? $originalPrompt);
+                    $toolText = $answerSorted['OUTTEXT'] ?? $answerSorted['CAPTION'] ?? $answerSorted['TEXT'] ?? '';
+                    if (!empty($GLOBALS['IS_AGAIN'])) {
+                        $answerSorted['BTEXT'] = $toolText; // no fallback to prompt during Again
+                    } else {
+                        $answerSorted['BTEXT'] = ($toolText !== '') ? $toolText : ($improvedPrompt ?? $originalPrompt);
+                    }
                     $answerSorted['BMEDIA'] = $mediaType;
                 }
             } else { // audio
@@ -613,8 +630,12 @@ public static function processMessage(): void {
                         'BMEDIA' => $mediaType
                     ];
                 } elseif (is_array($answerSorted)) {
-                    $toolText = $answerSorted['OUTTEXT'] ?? $answerSorted['CAPTION'] ?? $answerSorted['TEXT'] ?? $answerSorted['BTEXT'] ?? '';
-                    $answerSorted['BTEXT'] = ($toolText !== '') ? $toolText : ($improvedPrompt ?? $originalPrompt);
+                    $toolText = $answerSorted['OUTTEXT'] ?? $answerSorted['CAPTION'] ?? $answerSorted['TEXT'] ?? '';
+                    if (!empty($GLOBALS['IS_AGAIN'])) {
+                        $answerSorted['BTEXT'] = $toolText; // no fallback to prompt during Again
+                    } else {
+                        $answerSorted['BTEXT'] = ($toolText !== '') ? $toolText : ($improvedPrompt ?? $originalPrompt);
+                    }
                     $answerSorted['BMEDIA'] = $mediaType;
                 }
             }
@@ -714,6 +735,13 @@ public static function processMessage(): void {
     // **************************************************************************************************
     // ----------------------------- ZENTRAL: MERGE → STREAM → (später SAVE außerhalb) -------------------
     // **************************************************************************************************
+    // Before merge, ensure Again does not carry over original prompt into OUT
+    if (!empty($GLOBALS['IS_AGAIN'])) {
+        // If answerSorted has BTEXT/BFILE payload, prefer it as-is
+        if (is_array($answerSorted)) {
+            // no-op: the merge preserves only essential metadata
+        }
+    }
     self::$msgArr = self::preserveEssentialFields($answerSorted);
 
     // Zentraler Stream: immer aus self::$msgArr (Single Source of Truth)
@@ -753,16 +781,7 @@ public static function processMessage(): void {
         self::$msgArr['BFILETYPE'] = '';
     }
 
-    // Einziger Reset-Punkt für Again
-    if (!empty($GLOBALS['IS_AGAIN'])) {
-        $GLOBALS['IS_AGAIN'] = false;
-        unset(
-            $GLOBALS['FORCED_AI_MODEL'],
-            $GLOBALS['FORCED_AI_MODELID'],
-            $GLOBALS['FORCED_AI_SERVICE'],
-            $GLOBALS['FORCED_AI_BTAG']
-        );
-    }
+    // Keep IS_AGAIN through persistence; reset happens after save
 
     // Restore original user session context after processing (important for anonymous widgets)
     if ($___usingOwnerCtx) {
@@ -858,16 +877,29 @@ public static function processMessage(): void {
     public static function saveAnswerToDB() {
         // **************************************************************************************************
         // get the incoming id
-        $incomingId = self::$msgArr['BID'];
+        $incomingId = self::$msgId;
         // **************************************************************************************************
         // **************************************************************************************************
         $aiAnswer = self::$msgArr;
+        // For Again: strictly use provider OUT payload for BTEXT; never fallback to original prompt or SSE text
+        if (!empty($GLOBALS['IS_AGAIN'])) {
+            $providerText = '';
+            if (isset($aiAnswer['OUTTEXT']) || isset($aiAnswer['CAPTION']) || isset($aiAnswer['TEXT'])) {
+                $providerText = $aiAnswer['OUTTEXT'] ?? $aiAnswer['CAPTION'] ?? $aiAnswer['TEXT'] ?? '';
+            }
+            $aiAnswer['BTEXT'] = $providerText; // allow empty
+        }
         $aiAnswer['BUNIXTIMES'] = time();
         $aiAnswer['BDATETIME'] = date("YmdHis");
         $aiAnswer['BID'] = 'DEFAULT';
         $aiAnswer['BLANG'] = self::$msgArr['BLANG'];
         $aiAnswer['BDIRECT'] = 'OUT';
         $aiAnswer['BSTATUS'] = '';
+        
+        // Add targeted logging for Again workflow
+        if (!empty($GLOBALS['IS_AGAIN'])) {
+            @error_log('AGAIN START | parent_bid=' . $incomingId . ' | track=' . ($aiAnswer['BTRACKID'] ?? 'none'));
+        }
 
         // Handle anonymous widget messages
         if (isset($_SESSION["is_widget"]) && $_SESSION["is_widget"] === true) {
@@ -910,6 +942,14 @@ public static function processMessage(): void {
             }
         }
 
+        // Log Before Persist (Again) right before building INSERT values
+        if (!empty($GLOBALS['IS_AGAIN'])) {
+            $capLen = isset($filteredAnswer['BTEXT']) ? strlen($filteredAnswer['BTEXT']) : 0;
+            $fPath  = $filteredAnswer['BFILEPATH'] ?? '';
+            $fType  = $filteredAnswer['BFILETYPE'] ?? '';
+            @error_log('AGAIN SAVE | direct=' . ($filteredAnswer['BDIRECT'] ?? '') . ' | caption_len=' . $capLen . ' | file=' . $fPath . ' | type=' . $fType);
+        }
+
         // Prepare database fields and values
         foreach($filteredAnswer as $field => $val) {
             $fields[] = $field;
@@ -927,11 +967,19 @@ public static function processMessage(): void {
                 }
             }
         }
-        
+
         // Insert the processed message into the database
         $newSQL = "insert into BMESSAGES (" . implode(",", $fields) . ") values (" . implode(",", $values) . ")";
         $newRes = DB::Query($newSQL);
         $aiLastId = DB::LastId();
+        
+        // Verify correct direction was saved for Again
+        if (!empty($GLOBALS['IS_AGAIN'])) {
+            $mediaCount = (!empty($filteredAnswer['BFILE']) && $filteredAnswer['BFILE'] > 0) ? 1 : 0;
+            $provider = $GLOBALS['FORCED_AI_SERVICE'] ?? 'unknown';
+            @error_log('SAVE OUT | bid=' . $aiLastId . ' | provider=' . $provider . ' | media_count=' . $mediaCount . ' | direct=OUT');
+            @error_log('AGAIN SAVED | bid=' . $aiLastId . ' | direct=OUT | media_count=' . $mediaCount);
+        }
 
         // **************************************************************************************************
         // count bytes
@@ -1042,7 +1090,16 @@ public static function processMessage(): void {
      */
     private static function preserveEssentialFields($newMsgArr) {
         // Essential fields that should be preserved from the original message
-        $essentialFields = ['BID', 'BUSERID', 'BTRACKID', 'BMESSTYPE', 'BDIRECT'];
+        $essentialFields = ['BUSERID', 'BTRACKID', 'BMESSTYPE'];
+        // Only preserve BID for normal requests; for Again we must not carry it over
+        if (empty($GLOBALS['IS_AGAIN'])) {
+            $essentialFields[] = 'BID';
+        }
+        
+        // Don't preserve BDIRECT for Again requests - let saveAnswerToDB set it to 'OUT'
+        if (empty($GLOBALS['IS_AGAIN'])) {
+            $essentialFields[] = 'BDIRECT';
+        }
         
         foreach ($essentialFields as $field) {
             if (isset(self::$msgArr[$field]) && !isset($newMsgArr[$field])) {

@@ -188,17 +188,42 @@ class ApiAuthenticator {
             exit;
         }
         
-        // Check rate limiting for anonymous users
-        $rateLimitKey = 'anonymous_widget_' . $_SESSION["widget_owner_id"] . '_' . $_SESSION["widget_id"];
-        $rateLimitResult = Tools::checkRateLimit($rateLimitKey, 60, 30); // 30 requests per minute
-        
-        if (!$rateLimitResult['allowed']) {
-            http_response_code(429);
-            echo json_encode([
-                'error' => 'Rate limit exceeded',
-                'retry_after' => $rateLimitResult['retry_after']
+        // Apply rate limit primarily to message creation endpoint only,
+        // so SSE streaming (chatStream) doesn't consume the same budget.
+        $currentAction = isset($_REQUEST['action']) ? (string)$_REQUEST['action'] : '';
+        if ($currentAction === 'messageNew') {
+            // Tiny server-side guard against empty messages (in case frontend validation is bypassed)
+            $rawMessage = isset($_POST['message']) ? trim((string)$_POST['message']) : '';
+            $hasFiles = false;
+            if (!empty($_FILES['files']) && isset($_FILES['files']['name']) && is_array($_FILES['files']['name'])) {
+                foreach ($_FILES['files']['name'] as $idx => $name) {
+                    if (!empty($name) && isset($_FILES['files']['size'][$idx]) && (int)$_FILES['files']['size'][$idx] > 0) { $hasFiles = true; break; }
+                }
+            }
+            if ($rawMessage === '' && !$hasFiles) {
+                http_response_code(400);
+                header('Content-Type: application/json; charset=UTF-8');
+                echo json_encode(['error' => 'Empty message']);
+                exit;
+            }
+            $rateLimitKey = Tools::buildRateLimitKey(0, [
+                'owner_id' => (int)$_SESSION["widget_owner_id"],
+                'widget_id' => (int)$_SESSION["widget_id"]
             ]);
-            exit;
+            $rateLimitResult = Tools::checkRateLimit($rateLimitKey, 60, 10); // 10 requests/min
+
+            if (!$rateLimitResult['allowed']) {
+                http_response_code(429);
+                header('Content-Type: application/json; charset=UTF-8');
+                if (isset($rateLimitResult['retry_after'])) {
+                    header('Retry-After: ' . (int)$rateLimitResult['retry_after']);
+                }
+                echo json_encode([
+                    'error' => 'Rate limit exceeded',
+                    'retry_after' => $rateLimitResult['retry_after']
+                ]);
+                exit;
+            }
         }
         
         return true;

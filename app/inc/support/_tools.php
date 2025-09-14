@@ -456,6 +456,68 @@ class Tools {
         $retryAfter = $window - ($currentTime - $rateData['window_start']);
         return ['allowed' => false, 'retry_after' => $retryAfter];
     }
+
+    // --------------------------------------------------------------------------
+    // Cloudflare-aware client identification and rate-limit key building
+    // --------------------------------------------------------------------------
+    public static function getClientIp(): string {
+        // Prefer Cloudflare connecting IP, fallback to remote addr
+        if (!empty($_SERVER['HTTP_CF_CONNECTING_IP'])) {
+            return trim($_SERVER['HTTP_CF_CONNECTING_IP']);
+        }
+        if (!empty($_SERVER['REMOTE_ADDR'])) {
+            return trim($_SERVER['REMOTE_ADDR']);
+        }
+        return '0.0.0.0';
+    }
+
+    public static function getBrowserFingerprint(): string {
+        $ua = $_SERVER['HTTP_USER_AGENT'] ?? '';
+        $al = $_SERVER['HTTP_ACCEPT_LANGUAGE'] ?? '';
+        $ip = self::getClientIp();
+        return substr(hash('sha256', $ua.'|'.$al.'|'.$ip), 0, 16);
+    }
+
+    public static function getCloudflareIdentity(): array {
+        // Gather Cloudflare headers if present
+        $cf = [];
+        $cf['access_email'] = $_SERVER['HTTP_CF_ACCESS_AUTHENTICATED_USER_EMAIL'] ?? ($_SERVER['CF-Access-Authenticated-User-Email'] ?? '');
+        $cf['connecting_ip'] = $_SERVER['HTTP_CF_CONNECTING_IP'] ?? '';
+        $cf['ray'] = $_SERVER['HTTP_CF_RAY'] ?? '';
+        $cf['country'] = $_SERVER['HTTP_CF_IPCOUNTRY'] ?? '';
+        return $cf;
+    }
+
+    // Build unified rate limit key: user-bound when logged in; otherwise CF/IP/UA/session
+    public static function buildRateLimitKey(int $userId = 0, array $opts = []): string {
+        if ($userId > 0) {
+            return 'user_'.$userId;
+        }
+
+        $ownerId = isset($opts['owner_id']) ? (int)$opts['owner_id'] : 0;
+        $widgetId = isset($opts['widget_id']) ? (int)$opts['widget_id'] : 0;
+        $sessId = $_SESSION['anonymous_session_id'] ?? '';
+        $cf = self::getCloudflareIdentity();
+        $ip = self::getClientIp();
+        $fp = self::getBrowserFingerprint();
+
+        // Prefer CF Access user if available
+        if (!empty($cf['access_email'])) {
+            $h = substr(hash('sha256', strtolower($cf['access_email'])), 0, 16);
+            return 'cfuser_'.$ownerId.'_'.$widgetId.'_'.$h;
+        }
+
+        // Otherwise tie to CF connecting IP or REMOTE_ADDR + UA fingerprint + session
+        $parts = [
+            'anon',
+            (string)$ownerId,
+            (string)$widgetId,
+            $ip,
+            $fp,
+        ];
+        if (!empty($sessId)) { $parts[] = substr($sessId, 0, 12); }
+        return implode('_', $parts);
+    }
     // Get Authorization header value from current request (Bearer ...)
     public static function getAuthHeaderValue(): string {
         $headers = [];
@@ -490,11 +552,6 @@ class Tools {
         if($msgArr['BFILE']>0 AND $msgArr['BFILETYPE'] != '' AND str_contains($msgArr['BFILEPATH'], '/')) {
             // add image
             if($msgArr['BFILETYPE'] == 'png' OR $msgArr['BFILETYPE'] == 'jpg' OR $msgArr['BFILETYPE'] == 'jpeg') {
-                // If text still contains the original tool command or Again marker, replace with a clean caption
-                $btextRaw = isset($msgArr['BTEXT']) ? trim($msgArr['BTEXT']) : '';
-                if ($btextRaw !== '' && (strpos(ltrim($btextRaw), '/pic') === 0 || strpos($btextRaw, '[Again-') !== false)) {
-                    $outText = 'Generated Image';
-                }
                 $outText = "<img src='".$GLOBALS["baseUrl"] . "up/" . $msgArr['BFILEPATH']."' style='max-width: 500px;'><BR>\n".$outText;
             }
             // addvideo

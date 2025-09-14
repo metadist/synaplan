@@ -9,6 +9,8 @@ Synaplan is an open-source platform to orchestrate conversations with multiple A
 - **docker compose ≥ v2.20**
 - **npm (of Node.js)** (for frontend dependencies)
 
+Image/PDF processing for file extraction uses Imagick and Poppler (`pdftoppm`). These are installed in the dev Docker image automatically. If you run without Docker, install: `php-imagick`, `imagemagick`, and `poppler-utils`.
+
 for a dockerless installation, see below.
 
 #### 1. Download source code
@@ -41,6 +43,12 @@ docker compose logs -f ollama
 
 **Subsequent starts:** All models are cached and startup is fast.
 
+#### Rebuild after changing PHP extensions (e.g., Imagick)
+```bash
+docker compose build app
+docker compose up -d app
+```
+
 #### 3. Set File Permissions
 ```bash
 # Create upload directory and set permissions
@@ -57,6 +65,21 @@ GROQ_API_KEY=your_groq_api_key_here
 OPENAI_API_KEY=your_openai_api_key_here
 GOOGLE_GEMINI_API_KEY=your_gemini_api_key_here
 OLLAMA_URL=http://localhost:11434  # If using local Ollama
+
+# Document Processing
+# Point to Apache Tika server. Default (when using Docker) resolves to internal service 'tika:9998'.
+# To use a remote Tika instance, set a full URL here (e.g., https://tika.mycorp.internal:9998)
+TIKA_URL=https://your-remote-tika:9998
+# Optional tuning; these have sensible defaults if omitted
+TIKA_TIMEOUT_MS=20000
+TIKA_RETRIES=2
+TIKA_RETRY_BACKOFF_MS=500
+TIKA_MIN_LENGTH=200
+TIKA_MIN_ENTROPY=2.5
+TIKA_OCR_SIGNAL_MIN=1
+RASTERIZE_DPI=150
+RASTERIZE_PAGE_CAP=5
+RASTERIZE_TIMEOUT_MS=60000
 
 # Database Configuration (if different from defaults)
 DB_HOST=localhost
@@ -183,6 +206,13 @@ Configuration-driven AI selection via `$GLOBALS` and centralized key management 
   docker volume rm synaplan_vendor synaplan_node_modules
   docker compose up -d
   ```
+
+#### Tika & File Processing
+- To use local Tika in Docker: run `docker compose up -d` (service `tika` runs internally) and leave `TIKA_URL` unset or set to `http://tika:9998`.
+- To use a remote Tika: set `TIKA_URL` in `.env` to the remote base URL. No code changes required.
+- The app logs the resolved Tika endpoint at startup (sanitized). Check container logs if connectivity fails.
+- Timeouts, retries, and quality thresholds are configurable via env (see Document Processing section above).
+- Rendering/Rasterization: The container installs `imagick` and `poppler-utils (pdftoppm)` for PDF-to-PNG conversion used by the vision fallback.
 
 ### Cron (mail handler)
 - Run once without starting services:

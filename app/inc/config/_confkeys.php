@@ -92,6 +92,19 @@ class ApiKeys {
             'OIDC_SSL_VERIFY',
             'OIDC_AUTO_REDIRECT',
             'APP_ENV',
+            // Document processing / Tika configuration
+            'TIKA_URL',
+            'TIKA_ENABLED',
+            'TIKA_TIMEOUT_MS',
+            'TIKA_RETRIES',
+            'TIKA_RETRY_BACKOFF_MS',
+            'TIKA_MIN_LENGTH',
+            'TIKA_MIN_ENTROPY',
+            'TIKA_MIN_CHAR_PER_KB',
+            'TIKA_OCR_SIGNAL_MIN',
+            'RASTERIZE_DPI',
+            'RASTERIZE_PAGE_CAP',
+            'RASTERIZE_TIMEOUT_MS'
         ];
 
         foreach ($keyConfig as $envKey) {
@@ -211,6 +224,68 @@ class ApiKeys {
      */
     public static function getWhatsApp() {
         return self::get('WHATSAPP_TOKEN');
+    }
+
+    // ---------------------------- Document processing getters
+    public static function isTikaEnabled(): bool {
+        $val = self::get('TIKA_ENABLED');
+        if ($val === null) return true; // default enabled
+        $v = strtolower(trim((string)$val));
+        return !in_array($v, ['0','false','off','no'], true);
+    }
+
+    public static function getTikaUrl(): ?string {
+        return self::get('TIKA_URL');
+    }
+
+    public static function getTikaTimeoutMs(): int {
+        $val = self::get('TIKA_TIMEOUT_MS');
+        return $val !== null ? max(1000, (int)$val) : 20000; // default 20s
+    }
+
+    public static function getTikaRetries(): int {
+        $val = self::get('TIKA_RETRIES');
+        return $val !== null ? max(0, (int)$val) : 2;
+    }
+
+    public static function getTikaRetryBackoffMs(): int {
+        $val = self::get('TIKA_RETRY_BACKOFF_MS');
+        return $val !== null ? max(0, (int)$val) : 500; // default 0.5s
+    }
+
+    public static function getTikaMinLength(): int {
+        $val = self::get('TIKA_MIN_LENGTH');
+        return $val !== null ? max(0, (int)$val) : 200; // characters
+    }
+
+    public static function getTikaMinEntropy(): float {
+        $val = self::get('TIKA_MIN_ENTROPY');
+        return $val !== null ? max(0.0, (float)$val) : 2.5; // bits/char
+    }
+
+    public static function getTikaMinCharPerKb(): float {
+        $val = self::get('TIKA_MIN_CHAR_PER_KB');
+        return $val !== null ? max(0.0, (float)$val) : 10.0; // chars per KB
+    }
+
+    public static function getTikaOcrSignalMin(): int {
+        $val = self::get('TIKA_OCR_SIGNAL_MIN');
+        return $val !== null ? max(0, (int)$val) : 1; // heuristic threshold
+    }
+
+    public static function getRasterizeDpi(): int {
+        $val = self::get('RASTERIZE_DPI');
+        return $val !== null ? max(72, (int)$val) : 150;
+    }
+
+    public static function getRasterizePageCap(): int {
+        $val = self::get('RASTERIZE_PAGE_CAP');
+        return $val !== null ? max(1, (int)$val) : 5;
+    }
+
+    public static function getRasterizeTimeoutMs(): int {
+        $val = self::get('RASTERIZE_TIMEOUT_MS');
+        return $val !== null ? max(1000, (int)$val) : 60000; // default 60s
     }
 
     /**

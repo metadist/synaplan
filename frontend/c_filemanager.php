@@ -48,7 +48,9 @@
         }       
     }
     if (!empty($deleteNotification)) {
-        echo $deleteNotification;
+        // Convert server-side alerts to unified notify on client
+        $msg = strip_tags($deleteNotification);
+        echo '<script>document.addEventListener("DOMContentLoaded",function(){ if(window.notify){ notify("success", '.json_encode($msg).', "File manager"); }});</script>';
     }
     ?>
     
@@ -452,6 +454,7 @@ document.addEventListener('DOMContentLoaded', function() {
         .then(response => response.json())
         .then(data => {
             if (data.success) {
+                if (window.notify) notify('success', data.message || 'Upload completed', 'RAG Upload');
                 ragUploadStatus.textContent = data.message;
                 ragUploadStatus.className = 'text-success';
                 
@@ -467,12 +470,14 @@ document.addEventListener('DOMContentLoaded', function() {
                     window.location.reload();
                 }, 2000);
             } else {
+                if (window.notify) notify('error', (data.error || 'Upload failed'), 'RAG Upload');
                 ragUploadStatus.textContent = 'Error: ' + (data.error || 'Upload failed');
                 ragUploadStatus.className = 'text-danger';
                 ragUploadBtn.disabled = false;
             }
         })
         .catch(error => {
+            if (window.notify) notify('error', error.message, 'RAG Upload');
             ragUploadStatus.textContent = 'Error: ' + error.message;
             ragUploadStatus.className = 'text-danger';
             ragUploadBtn.disabled = false;

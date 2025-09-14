@@ -303,8 +303,8 @@ switch ($config['position']) {
                 border: none;
                 background: white;
             `;
-            // Allow requesting storage access from within the iframe (Safari iOS)
-            try { chatFrame.setAttribute('allow', 'storage-access-by-user-activation'); } catch (e) {}
+            // Allow list kept minimal; avoid unknown/ignored feature policies
+            // Safari/iOS storage access attribute removed to prevent console noise
             chatFrame.src = '<?php echo $widgetUrl; ?>';
             iframeContainer.appendChild(chatFrame);
         }

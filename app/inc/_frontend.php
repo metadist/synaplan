@@ -244,12 +244,35 @@ Class Frontend {
 
         // Handle file uploads if any
         if(!empty($_FILES['files'])) {
+            if (!empty($GLOBALS['debug'])) {
+                error_log('Upload: received files field with ' . (is_array($_FILES['files']['name']) ? count($_FILES['files']['name']) : 0) . ' entries');
+            }
             foreach ($_FILES['files']['tmp_name'] as $i => $tmpName) {
                 $originalName = $_FILES['files']['name'][$i];
-                
+                $uploadErr = $_FILES['files']['error'][$i] ?? UPLOAD_ERR_OK;
+
+                // Handle PHP upload errors first
+                if ($uploadErr !== UPLOAD_ERR_OK) {
+                    $errMsg = 'Unknown upload error';
+                    if ($uploadErr === UPLOAD_ERR_INI_SIZE || $uploadErr === UPLOAD_ERR_FORM_SIZE) { $errMsg = 'File exceeds size limit'; }
+                    elseif ($uploadErr === UPLOAD_ERR_PARTIAL) { $errMsg = 'Partial upload'; }
+                    elseif ($uploadErr === UPLOAD_ERR_NO_FILE) { $errMsg = 'No file uploaded'; }
+                    elseif ($uploadErr === UPLOAD_ERR_NO_TMP_DIR) { $errMsg = 'Missing temp directory'; }
+                    elseif ($uploadErr === UPLOAD_ERR_CANT_WRITE) { $errMsg = 'Failed to write file'; }
+                    elseif ($uploadErr === UPLOAD_ERR_EXTENSION) { $errMsg = 'Upload blocked by extension'; }
+                    $retArr['error'] .= $errMsg.': '.$originalName."\n";
+                    if (!empty($GLOBALS['debug'])) { error_log('Upload: error '.$uploadErr.' for '.$originalName.' (tmp='.$tmpName.')'); }
+                    continue;
+                }
+
+                // Validate tmp file presence
                 if (!is_uploaded_file($tmpName)) {
-                    $retArr['error'] .= "Invalid upload: ".$originalName."\n";
-                    continue; // skip invalid upload
+                    $sizeProbe = @filesize($tmpName);
+                    if ($sizeProbe === false || $sizeProbe <= 0) {
+                        $retArr['error'] .= "Invalid upload: ".$originalName."\n";
+                        if (!empty($GLOBALS['debug'])) { error_log('Upload: invalid tmp file for ' . $originalName . ' (tmp='.$tmpName.', sizeProbe='.var_export($sizeProbe,true).')'); }
+                        continue;
+                    }
                 }
                 $fileSize = $_FILES['files']['size'][$i];
 
@@ -275,16 +298,24 @@ Class Frontend {
                     // Zielpfad 
                     $userRelPath = substr($userId, -5, 3) . '/' . substr($userId, -2, 2) . '/' . date("Ym") . '/';
                     $fullUploadDir = rtrim(UPLOAD_DIR, '/').'/' . $userRelPath;
-                    if (!is_dir($fullUploadDir)) {
-                        mkdir($fullUploadDir, 0755, true);
-                    }
+                    if (!is_dir($fullUploadDir)) { mkdir($fullUploadDir, 0755, true); }
 
                     //$newFileName = 'up-' . date("YmdHis") . '-' . ($fileCount++) . '.' . $fileExtension;
                     $newFileName = Tools::sysStr($originalName);
                     $targetPath = $fullUploadDir . $newFileName;
 
                     // Speichern
-                    move_uploaded_file($tmpName, $targetPath);
+                    $ok = move_uploaded_file($tmpName, $targetPath);
+                    if (!$ok && @is_readable($tmpName)) {
+                        // Fallback for stricter environments: try rename/copy
+                        $ok = @rename($tmpName, $targetPath) || @copy($tmpName, $targetPath);
+                    }
+                    if (!$ok) {
+                        $retArr['error'] .= "Failed to save file: ".$originalName."\n";
+                        if (!empty($GLOBALS['debug'])) { error_log('Upload: move_uploaded_file failed to ' . $targetPath); }
+                        continue;
+                    }
+                    if (!empty($GLOBALS['debug'])) { error_log('Upload: saved ' . $originalName . ' → ' . $targetPath . ' (' . $fileSize . ' bytes, type=' . $fileType . ')'); }
                     $filesArr[] = [
                         'BFILEPATH' => $userRelPath.$newFileName,
                         'BFILETYPE' => $fileExtension,
@@ -641,11 +672,11 @@ Class Frontend {
             exit;
         }
         
-        // Prepare final SSE payload with meta
+        // Prepare final SSE payload with meta (no placeholder message by default)
         $finalPayload = [
             'msgId' => $msgId,
             'status' => 'done',
-            'message' => 'That should end the stream. ',
+            'message' => '',
             'timestamp' => time()
         ];
         
@@ -710,13 +741,18 @@ Class Frontend {
                 $outText = '';
                 
                 if ($outId) {
-                    $outSQL = "SELECT BTEXT, BFILEPATH, BFILETYPE FROM BMESSAGES WHERE BID = " . intval($outId) . " LIMIT 1";
-                    $outRes = db::Query($outSQL);
-                    $outRow = db::FetchArr($outRes);
-                    if ($outRow) {
-                        $outText = $outRow['BTEXT'] ?: '';
-                        $filePath = $outRow['BFILEPATH'] ?: '';
-                        $fileType = $outRow['BFILETYPE'] ?: '';
+                    // Retry up to 3 times to avoid race conditions
+                    for ($i = 0; $i < 3; $i++) {
+                        $outSQL = "SELECT BTEXT, BFILEPATH, BFILETYPE FROM BMESSAGES WHERE BID = " . intval($outId) . " LIMIT 1";
+                        $outRes = db::Query($outSQL);
+                        $outRow = db::FetchArr($outRes);
+                        if ($outRow) {
+                            $outText = $outRow['BTEXT'] ?: '';
+                            $filePath = $outRow['BFILEPATH'] ?: '';
+                            $fileType = $outRow['BFILETYPE'] ?: '';
+                        }
+                        if ($outText !== '' || $filePath !== '' || $fileType !== '') { break; }
+                        usleep(100000);
                     }
                 }
                 
@@ -806,13 +842,17 @@ Class Frontend {
             $outText = '';
             
             if ($outId) {
-                $outSQL = "SELECT BTEXT, BFILEPATH, BFILETYPE FROM BMESSAGES WHERE BID = " . intval($outId) . " LIMIT 1";
-                $outRes = db::Query($outSQL);
-                $outRow = db::FetchArr($outRes);
-                if ($outRow) {
-                    $outText = $outRow['BTEXT'] ?: '';
-                    $filePath = $outRow['BFILEPATH'] ?: '';
-                    $fileType = $outRow['BFILETYPE'] ?: '';
+                for ($i = 0; $i < 3; $i++) {
+                    $outSQL = "SELECT BTEXT, BFILEPATH, BFILETYPE FROM BMESSAGES WHERE BID = " . intval($outId) . " LIMIT 1";
+                    $outRes = db::Query($outSQL);
+                    $outRow = db::FetchArr($outRes);
+                    if ($outRow) {
+                        $outText = $outRow['BTEXT'] ?: '';
+                        $filePath = $outRow['BFILEPATH'] ?: '';
+                        $fileType = $outRow['BFILETYPE'] ?: '';
+                    }
+                    if ($outText !== '' || $filePath !== '' || $fileType !== '') { break; }
+                    usleep(100000);
                 }
             }
             
@@ -851,7 +891,7 @@ Class Frontend {
             ];
         }
         
-        // Add OUT message text if available (overrides default message)
+        // Add OUT message text if available (overrides default message). Leave empty otherwise.
         if (isset($outText) && !empty($outText)) {
             $finalPayload['message'] = $outText;
         }
@@ -1165,6 +1205,16 @@ Class Frontend {
         // Prepare AI answer for database storage
         try {
         $aiLastId = ProcessMethods::saveAnswerToDB();
+            // Reset Again flags after successful save
+            if (!empty($GLOBALS['IS_AGAIN'])) {
+                $GLOBALS['IS_AGAIN'] = false;
+                unset(
+                    $GLOBALS['FORCED_AI_MODEL'],
+                    $GLOBALS['FORCED_AI_MODELID'],
+                    $GLOBALS['FORCED_AI_SERVICE'],
+                    $GLOBALS['FORCED_AI_BTAG']
+                );
+            }
             
             self::printToStream([
                 'msgId' => $msgId,

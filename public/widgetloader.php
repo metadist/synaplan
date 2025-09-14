@@ -239,6 +239,8 @@ header('Pragma: no-cache');
     </div>
     <!-- Bootstrap JS - needed for dropdowns and other components -->
     <script src="node_modules/bootstrap/dist/js/bootstrap.bundle.min.js?v=<?php echo @filemtime('node_modules/bootstrap/dist/js/bootstrap.bundle.min.js'); ?>"></script>
+    <!-- Global dashboard JS (includes notify/toast helper) -->
+    <script src="assets/statics/js/dashboard.js?v=<?php echo @filemtime('assets/statics/js/dashboard.js'); ?>"></script>
     <script>
     (function() {
         // Dynamic viewport height for iOS Safari and mobile browsers

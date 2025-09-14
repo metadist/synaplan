@@ -1,3 +1,28 @@
+// Simple dedupe for previews vs final done messages
+window.__chatMsgByOutId = window.__chatMsgByOutId || {};
+
+function upsertAiMessage(payload) {
+  const outId = payload.meta && payload.meta.outId ? String(payload.meta.outId) : null;
+  const filePath = payload.meta && payload.meta.filePath ? payload.meta.filePath : '';
+  const msgId = payload.msgId ? String(payload.msgId) : '';
+  const key = outId || filePath || msgId;
+  if (!key) {
+    // Fallback: append as usual
+    return appendAiBubble(payload);
+  }
+  if (window.__chatMsgByOutId[key]) {
+    // Replace existing preview bubble
+    const el = window.__chatMsgByOutId[key];
+    try {
+      el.innerHTML = renderAiBubbleHtml(payload);
+    } catch (e) {
+      appendAiBubble(payload);
+    }
+  } else {
+    const el = appendAiBubble(payload);
+    window.__chatMsgByOutId[key] = el;
+  }
+}
 // Anonymous widget mode detection (set in c_chat.php)
 // When true, restricts functionality for anonymous widget users:
 // - File uploads limited to JPG, GIF, PNG, PDF
@@ -161,6 +186,7 @@ if (typeof window.markdownit !== 'undefined' && !window.md) {
 
 // Keep track of user-attached files (pasted or manually selected).
 let attachedFiles = [];
+let isSending = false;
 
 // References
 const attachButton  = document.getElementById('attachButton');
@@ -288,7 +314,7 @@ function initializeEventListeners() {
                 } else {
                     // Show error for disallowed file types
                     if (isAnonymousWidget) {
-                        alert('Anonymous users can only upload JPG, GIF, PNG, and PDF files.');
+                        if (window.notify) notify('warning', 'Anonymous users can only upload JPG, GIF, PNG, and PDF files.', 'Upload restricted'); else alert('Anonymous users can only upload JPG, GIF, PNG, and PDF files.');
                     }
                 }
             }
@@ -312,7 +338,7 @@ function initializeEventListeners() {
                         } else {
                             // Show error for disallowed file types
                             if (isAnonymousWidget) {
-                                alert('Anonymous users can only upload JPG, GIF, PNG, and PDF files.');
+                                if (window.notify) notify('warning', 'Anonymous users can only upload JPG, GIF, PNG, and PDF files.', 'Upload restricted'); else alert('Anonymous users can only upload JPG, GIF, PNG, and PDF files.');
                             }
                         }
                     }
@@ -517,11 +543,111 @@ function placeCaretAtEnd(el) {
 
 
 
+// Append a lightweight bot/system message into the chat (used for rate limits, infos)
+function appendBotSystemMessage(text) {
+    const timeStr = new Date().toLocaleTimeString();
+    const safe = (text || '').toString().replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const html = `
+      <li class="message-item ai-message">
+        <div class="ai-avatar">
+          <i class="fas fa-robot text-white"></i>
+        </div>
+        <div class="message-content">
+          <div class="message-bubble ai-bubble">
+            <div class="message-content">${safe}</div>
+            <span class="message-time ai-time">${timeStr}</span>
+          </div>
+        </div>
+      </li>`;
+    $("#chatHistory").append(html);
+    $("#chatModalBody").scrollTop($("#chatModalBody").prop("scrollHeight"));
+}
+
+// Append a highlighted warning-style bot message
+function appendBotWarnMessage(text) {
+    const timeStr = new Date().toLocaleTimeString();
+    const safe = (text || '').toString().replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const html = `
+      <li class="message-item ai-message">
+        <div class="ai-avatar">
+          <i class="fas fa-robot text-white"></i>
+        </div>
+        <div class="message-content">
+          <div class="message-bubble ai-bubble" style="border-left:3px solid #dc3545;background:#fff5f5;">
+            <div class="message-content"><strong>Notice</strong>: ${safe}</div>
+            <span class="message-time ai-time">${timeStr}</span>
+          </div>
+        </div>
+      </li>`;
+    $("#chatHistory").append(html);
+    $("#chatModalBody").scrollTop($("#chatModalBody").prop("scrollHeight"));
+}
+
+// Ensure CSS for rate-limit pulse highlight is present
+function ensureRateLimitStyles() {
+    if (!document.getElementById('sp-rate-limit-styles')) {
+        const style = document.createElement('style');
+        style.id = 'sp-rate-limit-styles';
+        style.textContent = `@keyframes spPulseWarn{0%{box-shadow:0 0 0 0 rgba(255,193,7,.45)}70%{box-shadow:0 0 0 8px rgba(255,193,7,0)}100%{box-shadow:0 0 0 0 rgba(255,193,7,0)}}`;
+        document.head.appendChild(style);
+    }
+}
+
+// Append a rate-limit countdown bot message with subtle pulse highlight
+function appendRateLimitCountdown(seconds) {
+    ensureRateLimitStyles();
+    const timeStr = new Date().toLocaleTimeString();
+    const id = 'rl-' + Date.now();
+    const html = `
+      <li class="message-item ai-message" id="${id}">
+        <div class="ai-avatar">
+          <i class="fas fa-robot text-white"></i>
+        </div>
+        <div class="message-content">
+          <div class="message-bubble ai-bubble" style="border-left:3px solid #ffc107;animation:spPulseWarn 1.5s infinite;">
+            <div class="message-content">
+              <strong>Rate limit reached</strong><br>
+              Please wait <span class="rl-count">${Math.max(0, parseInt(seconds||0,10))}</span>s before sending another message.
+            </div>
+            <span class="message-time ai-time">${timeStr}</span>
+          </div>
+        </div>
+      </li>`;
+    $("#chatHistory").append(html);
+    $("#chatModalBody").scrollTop($("#chatModalBody").prop("scrollHeight"));
+    const el = document.getElementById(id);
+    if (!el) return;
+    const span = el.querySelector('.rl-count');
+    let left = Math.max(0, parseInt(seconds||0,10));
+    const timer = setInterval(() => {
+        left = left - 1;
+        if (left <= 0) {
+            span.textContent = '0';
+            clearInterval(timer);
+            // De-emphasize pulse after done
+            const bubble = el.querySelector('.ai-bubble');
+            if (bubble) bubble.style.animation = 'none';
+            return;
+        }
+        span.textContent = String(left);
+    }, 1000);
+}
+
 // 3) Sending logic (front-end demonstration)
 function handleSendMessage() {
     // Grab the user's text - use textContent instead of innerText to preserve actual newlines
     if (!messageInput) return;
     const userMessage = messageInput.textContent.trim();
+    // Prevent empty messages in widget only when no files are attached
+    if (isAnonymousWidget && !userMessage && attachedFiles.length === 0) {
+        appendBotWarnMessage('Please type a message before sending.');
+        return;
+    }
+    // Prevent empty messages in full app (non-widget) and show notify
+    if (!isAnonymousWidget && !userMessage && attachedFiles.length === 0) {
+        if (window.notify) notify('warning', 'Please type a message or attach a file before sending.', 'Nothing to send'); else alert('Please type a message or attach a file before sending.');
+        return;
+    }
     const actionMessage = 'messageNew';
     
     // Debug: Log the message to verify newlines are preserved
@@ -540,6 +666,14 @@ function handleSendMessage() {
     }
     historyIndex = -1;
 
+    // Prevent double-submit while a send is in-flight
+    if (isSending) {
+        return;
+    }
+    isSending = true;
+    if (sendButton) sendButton.disabled = true;
+    if (sendButtonMobile) sendButtonMobile.disabled = true;
+
     // Real-world usage: create FormData, append files, send via fetch/AJAX
     let formData = new FormData();
     formData.append('message', userMessage);
@@ -547,7 +681,14 @@ function handleSendMessage() {
     formData.append('promptId', selectedPromptId);
     
     attachedFiles.forEach(file => {
-      formData.append('files[]', file, file.name);
+      // Ensure correct filename and type are sent
+      try {
+        formData.append('files[]', file, file.name || 'upload');
+      } catch (e) {
+        // As a fallback, wrap Blob in File for older browsers
+        const wrapped = new File([file], file.name || 'upload', { type: file.type || 'application/octet-stream' });
+        formData.append('files[]', wrapped, wrapped.name);
+      }
     });
 
     fetch('api.php', {
@@ -555,32 +696,66 @@ function handleSendMessage() {
       body: formData,
       credentials: 'include'
     })
-    .then(res => {
-      if (!res.ok) {
-        if (res.status === 401) {
-          throw new Error('Authentication required. Please refresh the page.');
-        } else if (res.status === 429) {
-          throw new Error('Rate limit exceeded. Please wait a moment before sending another message.');
-        } else {
-          throw new Error('Network response was not ok');
+    .then(async res => {
+      // Ensure toast container exists so notify() won't fall back to alert()
+      if (typeof window.notify === 'function') {
+        var container = document.getElementById('toastContainer');
+        if (!container) {
+          var bodyEl = document.body || document.getElementsByTagName('body')[0];
+          var div = document.createElement('div');
+          div.id = 'toastContainer';
+          div.className = 'toast-container position-fixed top-0 end-0 p-3';
+          bodyEl.appendChild(div);
         }
       }
-      return res.json();
+      if (!res.ok) {
+        if (res.status === 401) throw new Error('Authentication required. Please refresh the page.');
+        if (res.status === 429) {
+          // Try to read retry-after header for nicer UX
+          const retryAfterHeader = res.headers.get('retry-after');
+          const retrySec = retryAfterHeader ? parseInt(retryAfterHeader, 10) : null;
+          if (retrySec && !Number.isNaN(retrySec)) {
+            appendRateLimitCountdown(retrySec);
+          } else {
+            appendBotWarnMessage('Please wait a moment before sending another message.');
+          }
+          throw new Error('__handled_rate_limit__');
+        }
+        throw new Error('Network response was not ok');
+      }
+      const ct = res.headers.get('content-type') || '';
+      try {
+        if (ct.includes('application/json')) return await res.json();
+        const text = await res.text();
+        // Try to extract last JSON object
+        const m = text.match(/\{[\s\S]*\}\s*$/);
+        if (m) { try { return JSON.parse(m[0]); } catch (_) {} }
+        throw new Error('Invalid server response');
+      } catch (e) {
+        throw e;
+      }
     })
     .then(data => {
       console.log('Server response:', data);
       if (data.error) {
         // Handle API errors
         if (data.error.includes('Rate limit exceeded')) {
-          alert('Rate limit exceeded. Please wait a moment before sending another message.');
+          const retryAfter = (typeof data.retry_after === 'number') ? data.retry_after : null;
+          if (retryAfter) {
+            appendRateLimitCountdown(retryAfter);
+          } else {
+            appendBotWarnMessage('Please wait a moment before sending another message.');
+          }
         } else if (data.error.includes('Invalid anonymous widget session')) {
-          alert('Session expired. Please refresh the page.');
+          if (window.notify) notify('warning', 'Session expired. Please refresh the page.', 'Session expired'); else alert('Session expired. Please refresh the page.');
         } else {
-          alert('Error: ' + data.error);
+          if (window.notify) notify('error', 'Error: ' + data.error, 'Error'); else alert('Error: ' + data.error);
         }
         return;
       }
       if (data.success) {
+        // Clear input only on successful submission
+        if (messageInput) { messageInput.textContent = ''; }
         // Clear out the form for demonstration
         data.message = data.message.replace(/\\\"/g, '"');
         
@@ -725,21 +900,27 @@ function handleSendMessage() {
       // Handle specific error messages for anonymous users
       if (isAnonymousWidget) {
         if (err.message.includes('Authentication required')) {
-          alert('Session expired. Please refresh the page to continue.');
+          if (window.notify) notify('warning', 'Session expired. Please refresh the page to continue.', 'Session expired'); else alert('Session expired. Please refresh the page to continue.');
+        } else if (err.message === '__handled_rate_limit__') {
+          // already rendered in-chat
+          return;
         } else if (err.message.includes('Rate limit exceeded')) {
-          alert('Rate limit exceeded. Please wait a moment before sending another message.');
+          appendBotSystemMessage('Please wait a moment before sending another message.');
         } else {
-          alert('Connection error. Please try again.');
+          if (window.notify) notify('error', 'Connection error. Please try again.', 'Network'); else alert('Connection error. Please try again.');
         }
       } else {
-        alert('Error: ' + err.message);
+        if (window.notify) notify('error', 'Error: ' + err.message, 'Error'); else alert('Error: ' + err.message);
       }
       // Don't reset file upload section on error - let user retry with same files
+    })
+    .finally(() => {
+        isSending = false;
+        if (sendButton) sendButton.disabled = false;
+        if (sendButtonMobile) sendButtonMobile.disabled = false;
     });
     
-    // Clear out the form for demonstration
-    messageInput.textContent = '';
-    // Note: File upload section is now reset only on success via resetFileUploadSection()
+    // Note: File upload section is reset only on success via resetFileUploadSection()
 }
 
 // Add event listeners for both send buttons
@@ -786,6 +967,9 @@ function sseStream(data, outputObject, originalButton = null) {
     }
     
     if(eventMessage.status == 'ai_processing') {
+      if (eventMessage.meta && eventMessage.meta.isAgain === true) {
+        return; // Skip previews for Again
+      }
       //stopLoading(outId);
       if(eventMessage.message.includes('<loading>')) {
         stopWaitingLoader(outId);
@@ -858,6 +1042,9 @@ function sseStream(data, outputObject, originalButton = null) {
           injectFilePreview(outId, eventMessage.meta.filePath, eventMessage.meta.fileType);
         }
       }
+
+      // Always upsert final bubble (dedupe/merge with preview if any)
+      try { upsertAiMessage(eventMessage); } catch (e) {}
     } else if (eventMessage.status === 'error') {
       // Handle SSE error frames
       stopWaitingLoader(outId);
@@ -1130,7 +1317,9 @@ function handleAgainMessage(modelId, promptId, $originalButton) {
     body: formData,
     credentials: 'include'
   })
-  .then(response => response.json())
+  .then(async response => {
+    try { return await response.json(); } catch (_) { return { success: false, error: 'Invalid server response' }; }
+  })
   .then(data => {
     if (data.success) {
       // Create new AI message for Again response
@@ -1308,7 +1497,7 @@ function handleAgainMessage(modelId, promptId, $originalButton) {
   })
   .catch(err => {
     console.error(err);
-    alert('Connection error. Please try again.');
+    if (window.notify) notify('error', 'Connection error. Please try again.', 'Network'); else alert('Connection error. Please try again.');
     // Re-enable the original button on error
     if ($originalButton && $originalButton.length) {
       const prevLabel = $originalButton.data('prev-label') || 'Again...';
@@ -1319,9 +1508,9 @@ function handleAgainMessage(modelId, promptId, $originalButton) {
 
 function handleAgainError(errorMessage) {
   if (errorMessage && errorMessage.includes('Model not available')) {
-    alert('Model not available or category mismatch.');
+    if (window.notify) notify('warning', 'Model not available or category mismatch.', 'Again failed'); else alert('Model not available or category mismatch.');
   } else {
-    alert('Error: ' + (errorMessage || 'Unknown error'));
+    if (window.notify) notify('error', 'Error: ' + (errorMessage || 'Unknown error'), 'Again failed'); else alert('Error: ' + (errorMessage || 'Unknown error'));
   }
 }
 

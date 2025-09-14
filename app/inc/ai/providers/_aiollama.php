@@ -279,15 +279,26 @@ class AIOllama {
     // local vision AI
     // ****************************************************************
     public static function explainImage($arrMessage): array|string|bool {
+        $absOriginal = rtrim(UPLOAD_DIR, '/').'/'.$arrMessage['BFILEPATH'];
+        if (!is_file($absOriginal) || filesize($absOriginal) === 0) {
+            $arrMessage['BFILETEXT'] = "*API Image Error - input file missing*: " . $arrMessage['BFILEPATH'];
+            return $arrMessage;
+        }
+
         // Handle large images
-        if(filesize(rtrim(UPLOAD_DIR, '/').'/'.$arrMessage['BFILEPATH']) > intval(1024*1024*3.5)) {
+        if(filesize($absOriginal) > intval(1024*1024*3.5)) {
             $imageFile = Tools::giveSmallImage($arrMessage['BFILEPATH'], false, 1200);
             $tmpAbs = rtrim(UPLOAD_DIR, '/').'/'."tmp_del_".$arrMessage['BID'].".png";
             $savedFile = imagepng($imageFile, $tmpAbs);
             chmod($tmpAbs, 0755);
             $imagePath = $tmpAbs;
         } else {
-            $imagePath = rtrim(UPLOAD_DIR, '/').'/'.$arrMessage['BFILEPATH'];
+            $imagePath = $absOriginal;
+        }
+
+        if (!is_file($imagePath) || filesize($imagePath) === 0) {
+            $arrMessage['BFILETEXT'] = "*API Image Error - zero length image after prepare*: " . basename($imagePath);
+            return $arrMessage;
         }
 
         $myImage = base64_encode(file_get_contents($imagePath));
@@ -303,10 +314,18 @@ class AIOllama {
         }
 
         // which model on ollama?
-        
+        $myModel = '';
+        if (isset($GLOBALS["AI_PIC2TEXT"]["MODEL"]) && is_string($GLOBALS["AI_PIC2TEXT"]["MODEL"])) {
+            $myModel = trim($GLOBALS["AI_PIC2TEXT"]["MODEL"]);
+        }
+        if ($myModel === '') {
+            // Safe fallback for offline/local usage
+            $myModel = 'llava:13b';
+        }
+
         try {
             $completions = $client->completions()->create([
-                'model' => $$GLOBALS["AI_PIC2TEXT"]["MODEL"],
+                'model' => $myModel,
                 'prompt' => $imgPrompt,
                 'images' => [$myImage],
             ]); 

@@ -58,6 +58,8 @@ if (isset($_REQUEST['action']) && $_REQUEST['action'] == 'updateProfile') {
         $userDetailsJson = json_encode($userDetails, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
         $updateDetailsSQL = "UPDATE BUSER SET BUSERDETAILS = '" . db::EscString($userDetailsJson) . "' WHERE BID = " . $userId;
         db::Query($updateDetailsSQL);   
+        // Persist notify for after-reload display
+        echo '<script>document.addEventListener("DOMContentLoaded", function(){ try{ sessionStorage.setItem("notifyAfterReload", JSON.stringify({ type: "success", title: "Saved", message: "Profile updated." })); }catch(e){} });</script>';
     }
 }
 ?>

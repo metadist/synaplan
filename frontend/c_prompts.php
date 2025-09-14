@@ -49,12 +49,12 @@
                     </div>
                 </div>
 
-                <!-- Description -->
+                <!-- Criteria (formerly Description) -->
                 <div class="row mb-3">
-                    <label for="promptDescription" class="col-sm-2 col-form-label"><strong>Description:</strong></label>
+                    <label for="promptDescription" class="col-sm-2 col-form-label"><strong>Criteria:</strong></label>
                     <div class="col-sm-10">
-                        <textarea class="form-control" name="promptDescription" id="promptDescription" rows="2" placeholder="Enter a description for the preprocessor..."><?php echo $promptDesc; ?></textarea>
-                        <div class="form-text">Brief description of what this prompt does</div>
+                        <textarea class="form-control" name="promptDescription" id="promptDescription" rows="2" placeholder="Define when this prompt should apply (matching criteria)..."><?php echo $promptDesc; ?></textarea>
+                        <div class="form-text">Conditions or signals to pick this prompt (topic, keywords, input type, etc.)</div>
                     </div>
                 </div>
 
@@ -273,7 +273,7 @@
         .then(data => {
             if (data.error) {
                 console.error('Error:', data.error);
-                alert('Error loading prompt details: ' + data.error);
+                if (window.notify) notify('error', 'Error loading prompt details: ' + data.error, 'Load Failed'); else alert('Error loading prompt details: ' + data.error);
             } else {
                 // Update description field
                 document.getElementById('promptDescription').value = data.BSHORTDESC || '';
@@ -332,14 +332,14 @@
         })
         .catch(error => {
             console.error('Error:', error);
-            alert('An error occurred while loading the prompt details');
+            if (window.notify) notify('error', 'An error occurred while loading the prompt details', 'Load Failed'); else alert('An error occurred while loading the prompt details');
         });
     }
     // save the current prompt as a new one
     function onSavePromptAs() {
         let newName = document.getElementById('newName').value;
         if (!newName) {
-            alert('Please enter a name for the new prompt');
+            if (window.notify) notify('warning', 'Please enter a name for the new prompt', 'Missing name'); else alert('Please enter a name for the new prompt');
             return;
         } else {
             newName = newName
@@ -388,9 +388,14 @@
         .then(response => response.json())
         .then(data => {
             if (data.error) {
-                alert('Error: ' + data.error);
+                if (window.notify) notify('error', 'Error: ' + data.error, 'Save Failed'); else alert('Error: ' + data.error);
             } else {
-                alert('Prompt saved successfully!');
+                if (window.notify) {
+                    // Persist notification for after reload to avoid immediate disappear on navigation
+                    sessionStorage.setItem('notifyAfterReload', JSON.stringify({ type: 'success', title: 'Saved', message: 'Prompt saved successfully!' }));
+                } else {
+                    alert('Prompt saved successfully!');
+                }
                 // Store the prompt name in sessionStorage before reloading
                 sessionStorage.setItem('selectedPrompt', promptName);
                 // Reload the page
@@ -399,7 +404,7 @@
         })
         .catch(error => {
             console.error('Error:', error);
-            alert('An error occurred while saving the prompt');
+            if (window.notify) notify('error', 'An error occurred while saving the prompt', 'Save Failed'); else alert('An error occurred while saving the prompt');
         });
     }
 
@@ -417,16 +422,16 @@
             .then(response => response.json())
             .then(data => {
                 if (data.error) {
-                    alert('Error: ' + data.error);
+                    if (window.notify) notify('error', 'Error: ' + data.error, 'Delete Failed'); else alert('Error: ' + data.error);
                 } else {
-                    alert('Prompt deleted successfully!');
+                    if (window.notify) notify('success', 'Prompt deleted successfully!', 'Deleted'); else alert('Prompt deleted successfully!');
                     // Reload the page to refresh the prompt list
                     window.location.reload();
                 }
             })
             .catch(error => {
                 console.error('Error:', error);
-                alert('An error occurred while deleting the prompt');
+                if (window.notify) notify('error', 'An error occurred while deleting the prompt', 'Delete Failed'); else alert('An error occurred while deleting the prompt');
             });
         }
     }

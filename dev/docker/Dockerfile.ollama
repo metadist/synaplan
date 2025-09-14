@@ -3,5 +3,8 @@ FROM ollama/ollama:latest
 # Install curl for healthcheck
 RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
 
-# Set the entrypoint to start Ollama, wait for ready, pull models, and exec serve
-ENTRYPOINT ["sh", "-c", "ollama serve & until curl -sf localhost:11434/api/tags; do sleep 2; done && ollama pull llama3.2:3b && ollama pull mistral:7b && ollama pull codellama:7b && echo 'All models ready!' && pkill ollama && sleep 2 && exec ollama serve"] 
+# Comma- or space-separated list of models to pre-pull (override via compose env)
+ENV OLLAMA_PULL_MODELS="llama3.2:3b mistral:7b codellama:7b"
+
+# Start Ollama, wait for ready, pull requested models, then restart in foreground
+ENTRYPOINT ["sh", "-lc", "set -e; ollama serve & until curl -sf localhost:11434/api/tags; do sleep 2; done; list=$(echo $OLLAMA_PULL_MODELS | tr ',' ' '); for m in $list; do echo Pulling $m; ollama pull $m || true; done; echo 'All models ready!'; pkill ollama || true; sleep 2; exec ollama serve"]

@@ -21,10 +21,7 @@
                     }
                 }
             }
-            echo '<div class="alert alert-success alert-dismissible fade show" role="alert">
-                    <strong><i class="fas fa-check-circle me-2"></i>Success!</strong> Default model configurations have been updated.
-                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-                  </div>';
+            echo '<script>document.addEventListener("DOMContentLoaded", function(){ if (window.notify) { notify("success", "Default model configurations have been updated.", "Saved"); } });</script>';
         }
     ?>
 

@@ -248,7 +248,8 @@ class Central {
     }
     // mime types allowed
     public static function checkMimeTypes($extension, $mimeType): bool {
-        $allowedExtensions = ['pdf', 'jpg', 'jpeg', 'png', 'gif', 'doc', 'docx', 'xls', 'xlsx', 'mp3', 'mp4','svg','ppt','pptx','csv','txt'];
+        // Allow broad set including common docs/images; if not matched and Tika enabled, allow upload for Tika handling
+        $allowedExtensions = ['pdf', 'jpg', 'jpeg', 'png', 'gif', 'doc', 'docx', 'xls', 'xlsx', 'mp3', 'mp4', 'svg', 'ppt', 'pptx', 'csv', 'txt'];
         $allowedMimeTypes = [
             'application/pdf',
             'image/jpeg',
@@ -266,7 +267,11 @@ class Central {
             'text/csv',
             'text/plain'
         ];
-        if(in_array($extension, $allowedExtensions) OR in_array($mimeType, $allowedMimeTypes)) {
+        if (in_array($extension, $allowedExtensions) || in_array($mimeType, $allowedMimeTypes)) {
+            return true;
+        }
+        // Fallback: if Tika is enabled, accept unknown types for server-side detection
+        if (class_exists('ApiKeys') && ApiKeys::isTikaEnabled()) {
             return true;
         }
         return false;
@@ -413,6 +418,50 @@ class Central {
             // ------------------------------------------------------------
         }
 
+        // excel and tabular files
+        // ********************************************** EXCEL2TEXT (via Tika) **********************************************
+        if($arrMessage['BFILETYPE'] == "xlsx" || $arrMessage['BFILETYPE'] == "xls" || $arrMessage['BFILETYPE'] == "csv") {
+            $fileType = 3; // treat as document
+            list($text, $meta) = UniversalFileHandler::extract($arrMessage['BFILEPATH'], $arrMessage['BFILETYPE']);
+            $arrMessage['BFILETEXT'] = $text;
+
+            if($arrMessage['BID'] > 0) {
+                $updateSQL = "update BMESSAGES set BFILETEXT = '" . db::EscString($arrMessage['BFILETEXT']) . "' where BID = " . ($arrMessage['BID']);
+                db::Query($updateSQL);
+            }
+
+            if($streamOutput) {
+                $update = [
+                    'msgId' => $arrMessage['BID'],
+                    'status' => 'pre_processing',
+                    'message' => 'text extracted from Excel via Tika '
+                ];
+                Frontend::printToStream($update);
+            }
+        }
+
+        // powerpoint files
+        // ********************************************** PPT2TEXT (via Tika) **********************************************
+        if($arrMessage['BFILETYPE'] == "pptx" || $arrMessage['BFILETYPE'] == "ppt") {
+            $fileType = 3; // treat as document
+            list($text, $meta) = UniversalFileHandler::extract($arrMessage['BFILEPATH'], $arrMessage['BFILETYPE']);
+            $arrMessage['BFILETEXT'] = $text;
+
+            if($arrMessage['BID'] > 0) {
+                $updateSQL = "update BMESSAGES set BFILETEXT = '" . db::EscString($arrMessage['BFILETEXT']) . "' where BID = " . ($arrMessage['BID']);
+                db::Query($updateSQL);
+            }
+
+            if($streamOutput) {
+                $update = [
+                    'msgId' => $arrMessage['BID'],
+                    'status' => 'pre_processing',
+                    'message' => 'text extracted from PowerPoint via Tika '
+                ];
+                Frontend::printToStream($update);
+            }
+        }
+
         // mp4 needs to be converted to mp3
         // ********************************************** MP42MP3 **********************************************
         if($arrMessage['BFILETYPE'] == "mp4") {
@@ -551,37 +600,29 @@ class Central {
         }
 
         // pdf, txt or word
-        // ********************************************** PDF2TEXT **********************************************
+        // ********************************************** PDF2TEXT (Tika first; fallback to rasterize+vision) **********************************************
         if ($arrMessage['BFILETYPE'] == "pdf") {
-            // Extract text from PDF
-            try {
-                $fileType = 3;
-                $absPath = rtrim(UPLOAD_DIR, '/').'/'.$arrMessage['BFILEPATH'];
-                if (!is_file($absPath) || filesize($absPath) === 0) {
-                    throw new \RuntimeException('Empty or missing PDF at ' . $arrMessage['BFILEPATH']);
-                }
-                $parser = new \Smalot\PdfParser\Parser();
-                $pdf = $parser->parseFile($absPath);
-                $text = $pdf->getText();
-                $arrMessage['BFILETEXT'] = Tools::cleanTextBlock($text);
-            } catch (\Exception $e) {
-                $arrMessage['BFILETEXT'] = "The PDF can not be processed - error message is: " . $e->getMessage();
-                $text = $arrMessage['BFILETEXT'];
+            $fileType = 3;
+            list($text, $meta) = UniversalFileHandler::extract($arrMessage['BFILEPATH'], $arrMessage['BFILETYPE']);
+            $arrMessage['BFILETEXT'] = $text;
+            if($arrMessage['BID'] > 0) {
+                $updateSQL = "update BMESSAGES set BFILETEXT = '" . db::EscString($arrMessage['BFILETEXT']) . "' where BID = " . ($arrMessage['BID']);
+                db::Query($updateSQL);
             }
-            //echo "PDF text: ".$text;
-            $updateSQL = "update BMESSAGES set BFILETEXT = '" . db::EscString($text) . "' where BID = " . ($arrMessage['BID']);
-            db::Query($updateSQL);
-            // ------------------------------------------------------------
-            // write to stream
             if($streamOutput) {
+                $strategy = isset($meta['strategy']) ? $meta['strategy'] : 'tika';
+                $msg = ($strategy === 'rasterize_vision') ? 'text extracted from PDF via vision ' : 'text extracted from PDF via Tika ';
+                // Add rasterizer engine info if available and vision was used
+                if ($strategy === 'rasterize_vision' && class_exists('Rasterizer') && Rasterizer::$lastEngine) {
+                    $msg .= '(engine: ' . Rasterizer::$lastEngine . ', pages: ' . Rasterizer::$lastPages . ', dpi: ' . Rasterizer::$lastDpi . ') ';
+                }
                 $update = [
                     'msgId' => $arrMessage['BID'],
                     'status' => 'pre_processing',
-                    'message' => 'text extracted from PDF '
+                    'message' => $msg
                 ];
                 Frontend::printToStream($update);
             }
-            // ------------------------------------------------------------
         }
 
 
@@ -686,6 +727,35 @@ class Central {
                 Frontend::printToStream($update);
             }
             // ------------------------------------------------------------
+        }
+
+        // ********************************************** FINAL FALLBACK TO TIKA **********************************************
+        // If still no text extracted and we have a file, attempt universal handler (Tika-first) regardless of extension
+        if (
+            isset($arrMessage['BFILE']) && $arrMessage['BFILE'] == 1 &&
+            isset($arrMessage['BFILEPATH']) && strlen($arrMessage['BFILEPATH']) > 0 &&
+            strlen($arrMessage['BFILETEXT']) === 0
+        ) {
+            list($text, $meta) = UniversalFileHandler::extract($arrMessage['BFILEPATH'], $arrMessage['BFILETYPE']);
+            $arrMessage['BFILETEXT'] = $text;
+            if ($fileType === 0) { $fileType = self::getFileTypeNumber($arrMessage['BFILETYPE']); }
+            if ($fileType === 0) { $fileType = 3; }
+
+            if($arrMessage['BID'] > 0) {
+                $updateSQL = "update BMESSAGES set BFILETEXT = '" . db::EscString($arrMessage['BFILETEXT']) . "' where BID = " . ($arrMessage['BID']);
+                db::Query($updateSQL);
+            }
+
+            if($streamOutput) {
+                $strategy = isset($meta['strategy']) ? $meta['strategy'] : 'tika';
+                $msg = ($strategy === 'rasterize_vision') ? 'text extracted via vision ' : 'text extracted via Tika ';
+                $update = [
+                    'msgId' => $arrMessage['BID'],
+                    'status' => 'pre_processing',
+                    'message' => $msg
+                ];
+                Frontend::printToStream($update);
+            }
         }
 
         // check, if there was a file text and create the vector entry
@@ -923,108 +993,20 @@ class Central {
             }
         }
         
-        // PDF file
-        elseif ($arrMessage['BFILETYPE'] == "pdf") {
-            try {
-                $fileType = 3;
-                $parser = new \Smalot\PdfParser\Parser();
-                $projectRoot = dirname(__DIR__, 3);
-                $candidates = [
-                    $projectRoot . '/up/' . $arrMessage['BFILEPATH'],
-                    $projectRoot . '/public/up/' . $arrMessage['BFILEPATH'],
-                ];
-                $absPath = null;
-                foreach ($candidates as $p) { if (is_file($p)) { $absPath = $p; break; } }
-                if ($absPath === null || filesize($absPath) === 0) {
-                    throw new \RuntimeException('Empty or missing PDF at ' . $arrMessage['BFILEPATH']);
-                }
-                $pdf = $parser->parseFile($absPath);
-                $text = $pdf->getText();
-                $arrMessage['BFILETEXT'] = Tools::cleanTextBlock($text);
-            } catch (\Exception $e) {
-                $arrMessage['BFILETEXT'] = "The PDF can not be processed - error message is: " . $e->getMessage();
-            }
-            
-            if($arrMessage['BID'] > 0) {
-                $updateSQL = "update BMESSAGES set BFILETEXT = '" . db::EscString($arrMessage['BFILETEXT']) . "' where BID = " . ($arrMessage['BID']);
-                db::Query($updateSQL);
-            }
-        }
-        
-        // DOCX file
-        elseif ($arrMessage['BFILETYPE'] == "docx" || $arrMessage['BFILETYPE'] == "doc") {
-            $fileType = 4;
-            $text = '';
-            if($GLOBALS["debug"]) error_log("******************** DEBUG: DOCX file: " . $arrMessage['BFILEPATH']);
-            try {
-                $projectRoot = dirname(__DIR__, 3);
-                $candidates = [
-                    $projectRoot . '/up/' . $arrMessage['BFILEPATH'],
-                    $projectRoot . '/public/up/' . $arrMessage['BFILEPATH'],
-                ];
-                $absPath = null;
-                foreach ($candidates as $p) { if (is_file($p)) { $absPath = $p; break; } }
-                if ($absPath === null || filesize($absPath) === 0) {
-                    throw new \RuntimeException('Empty or missing DOC/DOCX at ' . $arrMessage['BFILEPATH']);
-                }
-                $phpWord = WordIOFactory::load($absPath);
-                
-                $extractText = function($element) use (&$extractText) {
-                    $text = '';
-                    
-                    if ($element instanceof \PhpOffice\PhpWord\Element\TextRun) {
-                        foreach ($element->getElements() as $textElement) {
-                            if ($textElement instanceof \PhpOffice\PhpWord\Element\Text) {
-                                $text .= $textElement->getText() . " ";
-                            }
-                        }
-                    }
-                    elseif ($element instanceof \PhpOffice\PhpWord\Element\Text) {
-                        $text .= $element->getText() . " ";
-                    }
-                    elseif (method_exists($element, 'getElements')) {
-                        foreach ($element->getElements() as $childElement) {
-                            $text .= $extractText($childElement);
-                        }
-                    }
-                    
-                    return $text;
-                };
+        // General document handling (no extension whitelists): use universal handler
+        else {
+            $projectRoot = dirname(__DIR__, 3);
+            $candidates = [
+                $projectRoot . '/up/' . $arrMessage['BFILEPATH'],
+                $projectRoot . '/public/up/' . $arrMessage['BFILEPATH'],
+            ];
+            $absPath = null;
+            foreach ($candidates as $p) { if (is_file($p)) { $absPath = $p; break; } }
+            if ($absPath === null) { $absPath = $candidates[0]; }
 
-                foreach ($phpWord->getSections() as $section) {
-                    foreach ($section->getElements() as $element) {
-                        $text .= $extractText($element) . "\n";
-                    }
-                }
-            } catch (\Exception $e) {
-                $text = "";
-            }
+            list($text, $meta) = UniversalFileHandler::extract($arrMessage['BFILEPATH'], $arrMessage['BFILETYPE']);
+            $arrMessage['BFILETEXT'] = $text;
 
-            $arrMessage['BFILETEXT'] = Tools::cleanTextBlock($text);
-            if($arrMessage['BID'] > 0) {
-                $updateSQL = "update BMESSAGES set BFILETEXT = '" . db::EscString($arrMessage['BFILETEXT']) . "' where BID = " . ($arrMessage['BID']);
-                db::Query($updateSQL);
-            }
-        }
-        
-        // TXT file
-        elseif ($arrMessage['BFILETYPE'] == "txt") {
-            try {
-                $fileType = 5;
-                $projectRoot = dirname(__DIR__, 3);
-                $candidates = [
-                    $projectRoot . '/up/' . $arrMessage['BFILEPATH'],
-                    $projectRoot . '/public/up/' . $arrMessage['BFILEPATH'],
-                ];
-                $absPath = null;
-                foreach ($candidates as $p) { if (is_file($p)) { $absPath = $p; break; } }
-                if ($absPath === null) { $absPath = $candidates[0]; }
-                $text = @file_get_contents($absPath) ?: '';
-                $arrMessage['BFILETEXT'] = Tools::cleanTextBlock($text);
-            } catch (\Exception $e) {
-                $arrMessage['BFILETEXT'] = "The TXT can not be processed - error message is: " . $e->getMessage();
-            }
-            
             if($arrMessage['BID'] > 0) {
                 $updateSQL = "update BMESSAGES set BFILETEXT = '" . db::EscString($arrMessage['BFILETEXT']) . "' where BID = " . ($arrMessage['BID']);
                 db::Query($updateSQL);
@@ -1039,7 +1021,7 @@ class Central {
         $typeMap = [
             'jpg' => 1, 'jpeg' => 1, 'png' => 1,
             'mp3' => 2, 'mp4' => 2,
-            'pdf' => 3,
+            'pdf' => 3, 'ppt' => 3, 'pptx' => 3, 'xls' => 3, 'xlsx' => 3, 'csv' => 3,
             'docx' => 4, 'doc' => 4,
             'txt' => 5
         ];

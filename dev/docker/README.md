@@ -69,6 +69,8 @@ The Docker Compose setup includes the following services:
   - Apache with mod_rewrite enabled
   - Hot-reload for development (volume mounted)
   - Automatic dependency installation via one-shot services
+  - Uses `TIKA_URL` env to reach Apache Tika (local or remote)
+  - Includes Imagick PHP extension and `poppler-utils` (`pdftoppm`) for rasterization
 
 ### 2. **db** (MariaDB Database)
 - **Port:** 3306
@@ -90,6 +92,11 @@ The Docker Compose setup includes the following services:
   - Robust startup with ready-endpoint detection
 
 ### 4. **whisper-models** (Audio Transcription Models)
+### 8. **tika** (Optional Local Apache Tika)
+- **Port:** not published (private)
+- **Base Image:** `apache/tika`
+- **Usage:** The app talks to it via the internal DNS name `tika:9998` when `TIKA_URL` is unset
+
 - **One-shot service** (runs once and exits)
 - **Base Image:** alpine:3.20
 - **Features:**
@@ -142,6 +149,7 @@ The database is automatically configured with:
 - **DB_USER:** synaplan_user
 - **DB_PASSWORD:** synaplan_password
 - **OLLAMA_SERVER:** ollama:11434
+- **TIKA_URL:** (optional) full base URL for Apache Tika. Default uses internal service `http://tika:9998`.
 
 #### Composer Configuration
 - **COMPOSER_ALLOW_SUPERUSER:** 1
@@ -249,6 +257,7 @@ docker compose logs whisper-models
 docker compose build app
 docker compose up -d app
 ```
+Rebuild is required after changing base image packages or PHP extensions (e.g., Imagick).
 
 ### Access Container Shell
 ```bash

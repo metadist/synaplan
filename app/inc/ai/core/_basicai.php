@@ -58,37 +58,69 @@ Class BasicAI {
                 $msgArr = Tools::memberLink($msgArr);
                 break;
 
-            case "/pic":
-                if($stream) {
-                    Frontend::statusToStream($msgArr['BID'], 'pre', ' - calling '.$AIT2P.' ');
-                }
-                // For Again requests, add a unique identifier to force new generation
-                if (isset($GLOBALS["IS_AGAIN"]) && $GLOBALS["IS_AGAIN"] === true) {
-                    $msgArr = $AIT2P::picPrompt($msgArr, $stream);
-                    $msgArr['BTEXT'] =  $msgArr['BTEXT'] . ' [Again-' . time() . ']';
-                    // Keep the AI-generated text, don't restore original
-                    // This ensures proper output text is displayed
-                } else {
-                    $msgArr = $AIT2P::picPrompt($msgArr, $stream);
-                }
-                XSControl::storeAIDetails($msgArr, 'AISERVICE', $AIT2P, $stream);
-                XSControl::storeAIDetails($msgArr, 'AIMODEL', $AIT2Pmodel, $stream);
-                XSControl::storeAIDetails($msgArr, 'AIMODELID', $AIT2PmodelId, $stream);
-                break;
+                case "/pic":
+                    $ssePreviewAllowed = empty($GLOBALS['IS_AGAIN']);
+                    if ($stream && $ssePreviewAllowed) Frontend::statusToStream($msgArr['BID'], 'pre', ' - calling '.$AIT2P.' ');
+
+                    // Log Again start
+                    if (!empty($GLOBALS['IS_AGAIN'])) {
+                        @error_log('AGAIN START | parent_bid=' . ($msgArr['BID'] ?? '0') . ' | track=' . ($msgArr['BTRACKID'] ?? 'none'));
+                    }
+
+                    $req = $msgArr;
+                    if (!empty($GLOBALS['IS_AGAIN'])) {
+                        $req['BTEXT'] = $msgArr['BTEXT'].' [Again-'.time().']';
+                    }
+
+                    $res = $AIT2P::picPrompt($req, $stream);
+
+                    // Normalize provider OUT strictly from structured fields
+                    $caption = '';
+                    $filePath = '';
+                    $fileType = '';
+                    $fileFlag = 0;
+                    if (is_array($res)) {
+                        $caption  = $res['OUTTEXT'] ?? $res['CAPTION'] ?? $res['TEXT'] ?? '';
+                        $fileFlag = (int)($res['BFILE']     ?? 0);
+                        $filePath = $res['BFILEPATH'] ?? '';
+                        $fileType = $res['BFILETYPE'] ?? '';
+                    } elseif (is_string($res)) {
+                        $caption = $res;
+                    }
+
+                    // Log OUT payload
+                    if (!empty($GLOBALS['IS_AGAIN'])) {
+                        @error_log('AGAIN OUT PAYLOAD | caption_len=' . strlen($caption) . ' | file=' . $filePath . ' | type=' . $fileType);
+                    }
+
+                    // Apply OUT payload; do not reapply original prompt
+                    $msgArr['BTEXT']     = $caption; // allow empty
+                    $msgArr['BFILE']     = $fileFlag;
+                    $msgArr['BFILEPATH'] = $filePath;
+                    $msgArr['BFILETYPE'] = $fileType;
+                    $msgArr['BTOPIC']    = 'text2pic';
+
+                    XSControl::storeAIDetails($msgArr,'AISERVICE',$AIT2P,$stream);
+                    XSControl::storeAIDetails($msgArr,'AIMODEL',$AIT2Pmodel,$stream);
+                    XSControl::storeAIDetails($msgArr,'AIMODELID',$AIT2PmodelId,$stream);
+                    break;
+                
+                
 
             case "/vid":
                 if($stream) {
                     Frontend::statusToStream($msgArr['BID'], 'pre', ' - video! Patience please (around 40s): ');
                 }
-                // For Again requests, add a unique identifier to force new generation
-                if (isset($GLOBALS["IS_AGAIN"]) && $GLOBALS["IS_AGAIN"] === true) {
-                    $originalText = $msgArr['BTEXT'];
-                    $msgArr['BTEXT'] = $originalText . ' [Again-' . time() . ']';
-                    $msgArr = $AIT2V::createVideo($msgArr, $stream);
-                    // Keep the AI-generated text, don't restore original
-                    // This ensures proper output text is displayed
-                } else {
-                    $msgArr = $AIT2V::createVideo($msgArr, $stream);
+                $originalPrompt = $msgArr['BTEXT'];
+                // For Again requests, add a unique identifier to prompt but don't save it
+                if (isset($GLOBALS['IS_AGAIN']) && $GLOBALS['IS_AGAIN'] === true) {
+                    $msgArr['BTEXT'] = $originalPrompt . ' [Again-' . time() . ']';
+                }
+                $msgArr = $AIT2V::createVideo($msgArr, $stream);
+                // Normalize OUT caption strictly from provider fields
+                if (is_array($msgArr)) {
+                    $caption = $msgArr['OUTTEXT'] ?? $msgArr['CAPTION'] ?? $msgArr['TEXT'] ?? $msgArr['BTEXT'] ?? '';
+                    $msgArr['BTEXT'] = $caption; // allow empty
                 }
                 XSControl::storeAIDetails($msgArr, 'AISERVICE', $AIT2V, $stream);
                 XSControl::storeAIDetails($msgArr, 'AIMODEL', $AIT2Vmodel, $stream);
@@ -126,21 +158,20 @@ Class BasicAI {
                 }
                 $msgArr['BTEXT'] = str_replace("/audio ","",$msgArr['BTEXT']);
                 
-                // For Again requests, add a unique identifier to force new generation
-                if (isset($GLOBALS["IS_AGAIN"]) && $GLOBALS["IS_AGAIN"] === true) {
-                    $originalText = $msgArr['BTEXT'];
-                    $msgArr['BTEXT'] = $originalText . ' [Again-' . time() . ']';
-                    $soundArr = $AIT2S::textToSpeech($msgArr, $_SESSION['USERPROFILE']);
-                    // Keep the AI-generated text, don't restore original
-                    // This ensures proper output text is displayed
-                } else {
-                    $soundArr = $AIT2S::textToSpeech($msgArr, $_SESSION['USERPROFILE']);
+                // For Again requests, add a unique identifier to prompt but don't save it
+                $originalPrompt = $msgArr['BTEXT'];
+                if (isset($GLOBALS['IS_AGAIN']) && $GLOBALS['IS_AGAIN'] === true) {
+                    $msgArr['BTEXT'] = $originalPrompt . ' [Again-' . time() . ']';
                 }
+                $soundArr = $AIT2S::textToSpeech($msgArr, $_SESSION['USERPROFILE']);
                 
                 if(count($soundArr) > 0) {
                     $msgArr['BFILE'] = 1;
                     $msgArr['BFILEPATH'] = $soundArr['BFILEPATH'];
                     $msgArr['BFILETYPE'] = $soundArr['BFILETYPE'];
+                    // For audio, set BTEXT only from provider payload if available; otherwise leave empty
+                    $caption = $soundArr['OUTTEXT'] ?? $soundArr['CAPTION'] ?? $soundArr['TEXT'] ?? $soundArr['BTEXT'] ?? '';
+                    $msgArr['BTEXT'] = $caption; // allow empty
                     XSControl::storeAIDetails($msgArr, 'AISERVICE', $AIT2S, $stream);
                     XSControl::storeAIDetails($msgArr, 'AIMODEL', $AIT2Smodel, $stream);
                     XSControl::storeAIDetails($msgArr, 'AIMODELID', $AIT2SmodelId, $stream);

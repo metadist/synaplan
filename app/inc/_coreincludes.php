@@ -25,6 +25,9 @@ require_once(__DIR__ . '/auth/apikeymanager.php');
 require_once(__DIR__ . '/auth/userregistration.php');
 // file management classes
 require_once(__DIR__ . '/domain/files/filemanager.php');
+require_once(__DIR__ . '/domain/files/tika_client.php');
+require_once(__DIR__ . '/domain/files/rasterizer.php');
+require_once(__DIR__ . '/domain/files/universal_file_handler.php');
 // service classes
 require_once(__DIR__ . '/mail/emailservice.php');
 // api classes (only classes here; procedural API files are loaded by public/api.php)
@@ -57,3 +60,14 @@ $GLOBALS["filesystem"] = new League\Flysystem\Filesystem($adapter, [
     'directory_visibility' => 'public'
 ]);
 // -----------------------------------------------------
+
+// Log resolved Tika URL (sanitized)
+try {
+    $resolved = TikaClient::resolveBaseUrl();
+    $sanitized = TikaClient::sanitizeUrl($resolved);
+    @error_log('Tika URL resolved to: ' . $sanitized);
+} catch (\Throwable $e) {
+    @error_log('Tika URL resolution error: ' . $e->getMessage());
+}
+
+// ----------------------------------------------------- respect model ranking from DB/config only; no offline forcing
