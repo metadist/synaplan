@@ -552,6 +552,11 @@ class Tools {
         if($msgArr['BFILE']>0 AND $msgArr['BFILETYPE'] != '' AND str_contains($msgArr['BFILEPATH'], '/')) {
             // add image
             if($msgArr['BFILETYPE'] == 'png' OR $msgArr['BFILETYPE'] == 'jpg' OR $msgArr['BFILETYPE'] == 'jpeg') {
+                // If text still contains the original tool command or Again marker, replace with a clean caption
+                $btextRaw = isset($msgArr['BTEXT']) ? trim($msgArr['BTEXT']) : '';
+                if ($btextRaw !== '' && (strpos(ltrim($btextRaw), '/pic') === 0 || strpos($btextRaw, '[Again-') !== false)) {
+                    $outText = 'Generated Image';
+                }
                 $outText = "<img src='".$GLOBALS["baseUrl"] . "up/" . $msgArr['BFILEPATH']."' style='max-width: 500px;'><BR>\n".$outText;
             }
             // addvideo

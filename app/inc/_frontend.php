@@ -672,11 +672,11 @@ Class Frontend {
             exit;
         }
         
-        // Prepare final SSE payload with meta (no placeholder message by default)
+        // Prepare final SSE payload with meta
         $finalPayload = [
             'msgId' => $msgId,
             'status' => 'done',
-            'message' => '',
+            'message' => 'That should end the stream. ',
             'timestamp' => time()
         ];
         
@@ -741,18 +741,13 @@ Class Frontend {
                 $outText = '';
                 
                 if ($outId) {
-                    // Retry up to 3 times to avoid race conditions
-                    for ($i = 0; $i < 3; $i++) {
-                        $outSQL = "SELECT BTEXT, BFILEPATH, BFILETYPE FROM BMESSAGES WHERE BID = " . intval($outId) . " LIMIT 1";
-                        $outRes = db::Query($outSQL);
-                        $outRow = db::FetchArr($outRes);
-                        if ($outRow) {
-                            $outText = $outRow['BTEXT'] ?: '';
-                            $filePath = $outRow['BFILEPATH'] ?: '';
-                            $fileType = $outRow['BFILETYPE'] ?: '';
-                        }
-                        if ($outText !== '' || $filePath !== '' || $fileType !== '') { break; }
-                        usleep(100000);
+                    $outSQL = "SELECT BTEXT, BFILEPATH, BFILETYPE FROM BMESSAGES WHERE BID = " . intval($outId) . " LIMIT 1";
+                    $outRes = db::Query($outSQL);
+                    $outRow = db::FetchArr($outRes);
+                    if ($outRow) {
+                        $outText = $outRow['BTEXT'] ?: '';
+                        $filePath = $outRow['BFILEPATH'] ?: '';
+                        $fileType = $outRow['BFILETYPE'] ?: '';
                     }
                 }
                 
@@ -842,17 +837,13 @@ Class Frontend {
             $outText = '';
             
             if ($outId) {
-                for ($i = 0; $i < 3; $i++) {
-                    $outSQL = "SELECT BTEXT, BFILEPATH, BFILETYPE FROM BMESSAGES WHERE BID = " . intval($outId) . " LIMIT 1";
-                    $outRes = db::Query($outSQL);
-                    $outRow = db::FetchArr($outRes);
-                    if ($outRow) {
-                        $outText = $outRow['BTEXT'] ?: '';
-                        $filePath = $outRow['BFILEPATH'] ?: '';
-                        $fileType = $outRow['BFILETYPE'] ?: '';
-                    }
-                    if ($outText !== '' || $filePath !== '' || $fileType !== '') { break; }
-                    usleep(100000);
+                $outSQL = "SELECT BTEXT, BFILEPATH, BFILETYPE FROM BMESSAGES WHERE BID = " . intval($outId) . " LIMIT 1";
+                $outRes = db::Query($outSQL);
+                $outRow = db::FetchArr($outRes);
+                if ($outRow) {
+                    $outText = $outRow['BTEXT'] ?: '';
+                    $filePath = $outRow['BFILEPATH'] ?: '';
+                    $fileType = $outRow['BFILETYPE'] ?: '';
                 }
             }
             
@@ -891,7 +882,7 @@ Class Frontend {
             ];
         }
         
-        // Add OUT message text if available (overrides default message). Leave empty otherwise.
+        // Add OUT message text if available (overrides default message)
         if (isset($outText) && !empty($outText)) {
             $finalPayload['message'] = $outText;
         }
@@ -1205,16 +1196,6 @@ Class Frontend {
         // Prepare AI answer for database storage
         try {
         $aiLastId = ProcessMethods::saveAnswerToDB();
-            // Reset Again flags after successful save
-            if (!empty($GLOBALS['IS_AGAIN'])) {
-                $GLOBALS['IS_AGAIN'] = false;
-                unset(
-                    $GLOBALS['FORCED_AI_MODEL'],
-                    $GLOBALS['FORCED_AI_MODELID'],
-                    $GLOBALS['FORCED_AI_SERVICE'],
-                    $GLOBALS['FORCED_AI_BTAG']
-                );
-            }
             
             self::printToStream([
                 'msgId' => $msgId,

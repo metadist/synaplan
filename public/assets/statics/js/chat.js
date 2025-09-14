@@ -1,28 +1,3 @@
-// Simple dedupe for previews vs final done messages
-window.__chatMsgByOutId = window.__chatMsgByOutId || {};
-
-function upsertAiMessage(payload) {
-  const outId = payload.meta && payload.meta.outId ? String(payload.meta.outId) : null;
-  const filePath = payload.meta && payload.meta.filePath ? payload.meta.filePath : '';
-  const msgId = payload.msgId ? String(payload.msgId) : '';
-  const key = outId || filePath || msgId;
-  if (!key) {
-    // Fallback: append as usual
-    return appendAiBubble(payload);
-  }
-  if (window.__chatMsgByOutId[key]) {
-    // Replace existing preview bubble
-    const el = window.__chatMsgByOutId[key];
-    try {
-      el.innerHTML = renderAiBubbleHtml(payload);
-    } catch (e) {
-      appendAiBubble(payload);
-    }
-  } else {
-    const el = appendAiBubble(payload);
-    window.__chatMsgByOutId[key] = el;
-  }
-}
 // Anonymous widget mode detection (set in c_chat.php)
 // When true, restricts functionality for anonymous widget users:
 // - File uploads limited to JPG, GIF, PNG, PDF
@@ -967,9 +942,6 @@ function sseStream(data, outputObject, originalButton = null) {
     }
     
     if(eventMessage.status == 'ai_processing') {
-      if (eventMessage.meta && eventMessage.meta.isAgain === true) {
-        return; // Skip previews for Again
-      }
       //stopLoading(outId);
       if(eventMessage.message.includes('<loading>')) {
         stopWaitingLoader(outId);
@@ -1042,9 +1014,6 @@ function sseStream(data, outputObject, originalButton = null) {
           injectFilePreview(outId, eventMessage.meta.filePath, eventMessage.meta.fileType);
         }
       }
-
-      // Always upsert final bubble (dedupe/merge with preview if any)
-      try { upsertAiMessage(eventMessage); } catch (e) {}
     } else if (eventMessage.status === 'error') {
       // Handle SSE error frames
       stopWaitingLoader(outId);
