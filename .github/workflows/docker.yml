@@ -19,6 +19,13 @@ jobs:
       packages: write
 
     steps:
+      - name: Debug GitHub context
+        run: |
+          echo "Repository: ${{ github.repository }}"
+          echo "Repository owner: ${{ github.repository_owner }}"
+          echo "Repository name: ${{ github.event.repository.name }}"
+          echo "Repository full name: ${{ github.event.repository.full_name }}"
+          echo "Default branch: ${{ github.event.repository.default_branch }}"
       - name: Checkout
         uses: actions/checkout@v3
 
