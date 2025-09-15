@@ -177,6 +177,9 @@ class ProcessMethods {
                 $sortingArr["BFILETEXT"]=self::$msgArr['BFILETEXT'];
 
                 try {
+                    if (!empty($GLOBALS['debug'])) {
+                        error_log("sortMessage: calling sorter service {$AIGENERAL} model {$AIGENERALmodel} (id {$AIGENERALmodelId})");
+                    }
                     $answerJson = $AIGENERAL::sortingPrompt($sortingArr, self::$threadArr);
                 } catch (Exception $err) {
                     if($GLOBALS["debug"]) error_log($err->getMessage());
@@ -188,6 +191,21 @@ class ProcessMethods {
 
 
                 $answerJsonArr = json_decode($answerJson, true);
+                if (!empty($GLOBALS['debug'])) {
+                    $rawLen = is_string($answerJson) ? strlen($answerJson) : 0;
+                    error_log("sortMessage: sorter raw length={$rawLen}");
+                    if (is_array($answerJsonArr)) {
+                        $dbgTopic = $answerJsonArr['BTOPIC'] ?? '';
+                        $dbgLang  = $answerJsonArr['BLANG'] ?? '';
+                        $dbgTextL = isset($answerJsonArr['BTEXT']) ? strlen((string)$answerJsonArr['BTEXT']) : 0;
+                        error_log("sortMessage: decoded topic='{$dbgTopic}' lang='{$dbgLang}' btext.len={$dbgTextL}");
+                        if (self::$stream) {
+                            Frontend::statusToStream(self::$msgId, 'pre', '[DBG] Sorter → ' . ($dbgTopic ?: 'n/a') . ' / ' . ($dbgLang ?: 'n/a') . ' ');
+                        }
+                    } else {
+                        error_log("sortMessage: sorter returned non-JSON; using fallbacks");
+                    }
+                }
 
                 // Unified fallback if sorting failed or returned invalid structure
                 $fallbackUsed = false;
@@ -239,6 +257,9 @@ class ProcessMethods {
                     // Stream once and return to prevent double processing
                     if(self::$stream) {
                         Frontend::statusToStream(self::$msgId, 'pre', 'Tool target converted: ' . self::$msgArr['BTOPIC'] . '. ');
+                        if (!empty($GLOBALS['debug'])) {
+                            Frontend::statusToStream(self::$msgId, 'pre', '[DBG] Converted to tool cmd ' . $toolCmd . ' ');
+                        }
                     }
                 }
                 // count bytes
@@ -471,6 +492,12 @@ public static function processMessage(): void {
         $improvedPrompt = null;
 
         // Guess requested media from prompt keywords (defaults handled below)
+        if (!empty($GLOBALS['debug'])) {
+            error_log("mediamaker: trigger for msgId=" . self::$msgId);
+            if (self::$stream) {
+                Frontend::statusToStream(self::$msgId, 'pre', '[DBG] mediamaker start ');
+            }
+        }
         $requestedMedia = '';
         $lowerPrompt = mb_strtolower($originalPrompt);
         if (preg_match('/\\b(audio|sound|musik|sprich)\\b/u', $lowerPrompt)) {
@@ -489,9 +516,19 @@ public static function processMessage(): void {
         } elseif (!empty($requestedMedia)) {
             $mediaType = $requestedMedia;
         }
+        if (!empty($GLOBALS['debug'])) {
+            error_log("mediamaker: decided mediaType={$mediaType} forcedTag=" . ($GLOBALS['FORCED_AI_BTAG'] ?? ''));            
+            if (self::$stream) {
+                Frontend::statusToStream(self::$msgId, 'pre', '[DBG] media=' . $mediaType . ' ');
+            }
+        }
 
         try {
+            if (!empty($GLOBALS['debug'])) {
+                error_log("mediamaker: calling topicPrompt on {$AIGENERAL}");
+            }
             $answerSorted = $AIGENERAL::topicPrompt(self::$msgArr, [], false);
+            if($GLOBALS["debug"]) error_log('answerSorted: '. print_r($answerSorted, true));
         } catch (Exception $err) {
             $providerFailed = true;
             if (self::$stream) {
@@ -548,8 +585,13 @@ public static function processMessage(): void {
             } else { // audio
                 $fallbackArr['BTEXT'] = "/audio " . $fallbackArr['BTEXT'];
             }
+            
+            if (!empty($GLOBALS['debug'])) {
+                error_log("mediamaker: fallback toolPrompt path for mediaType={$mediaType}");
+            }
             $answerSorted = BasicAI::toolPrompt($fallbackArr, self::$stream);
-            if (is_string($answerSorted)) {
+
+            if(is_string($answerSorted)) {
                 $answerSorted = [
                     'BTEXT'  => $answerSorted,
                     'BTOPIC' => 'mediamaker',
