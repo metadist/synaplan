@@ -83,7 +83,16 @@ class Tools {
         }
         // now RAG along:
         $AIVEC = $GLOBALS["AI_VECTORIZE"]["SERVICE"];
-        $embedPrompt = $AIVEC::embed($msgArr['BTEXT']);
+        $embedPrompt = [];
+        try {
+            $embedPrompt = $AIVEC::embed($msgArr['BTEXT']);
+        } catch (\Throwable $e) {
+            if (!empty($GLOBALS['debug'])) error_log('searchRAG embed failed: ' . $e->getMessage());
+        }
+        // If embeddings failed or returned empty, skip RAG gracefully
+        if (!is_array($embedPrompt) || count($embedPrompt) === 0) {
+            return [];
+        }
         $distanceSQL = "SELECT BMESSAGES.BID, BMESSAGES.BFILETEXT, BMESSAGES.BFILEPATH,
             VEC_DISTANCE_EUCLIDEAN(BRAG.BEMBED, VEC_FromText('[".implode(", ", $embedPrompt)."]')) AS distance
             from BMESSAGES, BRAG 

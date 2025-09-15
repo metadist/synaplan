@@ -412,12 +412,21 @@ class AIOllama {
     // ****************************************************************************************************** 
     public static function embed($text) {
         $vecclient = self::$client;
-        $embeds = $vecclient->embed()->create([
-            'model' => $GLOBALS["AI_VECTORIZE"]["MODEL"],
-            'input' => [ $text ]
-        ]);
-        $arrRes = $embeds->toArray();
-        return $arrRes['embeddings'][0];
+        try {
+            $embeds = $vecclient->embed()->create([
+                'model' => $GLOBALS["AI_VECTORIZE"]["MODEL"],
+                'input' => [ $text ]
+            ]);
+            // Best-effort extraction to array
+            $arrRes = method_exists($embeds, 'toArray') ? $embeds->toArray() : (array) $embeds;
+            if (isset($arrRes['embeddings'][0]) && is_array($arrRes['embeddings'][0])) {
+                return $arrRes['embeddings'][0];
+            }
+        } catch (\Throwable $e) {
+            if (!empty($GLOBALS['debug'])) error_log('AIOllama::embed failed: ' . $e->getMessage());
+        }
+        // On failure, return empty to let callers gracefully skip RAG
+        return [];
     }
 
     // ****************************************************************************************************** 
@@ -477,4 +486,4 @@ class AIOllama {
 }
 
 // ****************************************************************************************************** 
-$test = AIOllama::init();
+AIOllama::init();
