@@ -244,9 +244,16 @@ class AIGroq {
                     return "*API topic Error - Streaming completed with no content";
                 }
                 
+                // After streaming completes: if the full content is a JSON object, extract BTEXT
+                $finalText = $answer;
+                $maybeBTEXT = self::extractBTEXTFromJsonString($answer);
+                if ($maybeBTEXT !== null) {
+                    $finalText = $maybeBTEXT;
+                }
+                
                 // Return assembled structure for streaming
                 $arrAnswer = $msgArr;
-                $arrAnswer['BTEXT'] = $answer;
+                $arrAnswer['BTEXT'] = $finalText;
                 $arrAnswer['BDIRECT'] = 'OUT';
                 $arrAnswer['BDATETIME'] = date('Y-m-d H:i:s');
                 $arrAnswer['BUNIXTIMES'] = time();
@@ -296,6 +303,12 @@ class AIGroq {
             error_log("Raw answer: " . $answer);
         }
         
+        // Non-streaming: if JSON came back, extract BTEXT before output
+        $maybeBTEXT = self::extractBTEXTFromJsonString($answer);
+        if ($maybeBTEXT !== null) {
+            $answer = $maybeBTEXT;
+        }
+        
         // COMMENTED OUT: Parsing logic temporarily disabled
         /*
         // Clean JSON response - only if it starts with JSON markers
@@ -325,7 +338,7 @@ class AIGroq {
             error_log("Final answer: " . $answer);
         }
 
-        // Always return the raw answer to preserve <think> blocks
+        // Return final text (plain or extracted from JSON)
         $arrAnswer = $msgArr;
         $arrAnswer['BTEXT'] = $answer;
         $arrAnswer['BDIRECT'] = 'OUT';
@@ -335,6 +348,47 @@ class AIGroq {
         $arrAnswer['_AI_SERVICE'] = 'AIGroq';
 
         return $arrAnswer;
+    }
+    
+    /**
+     * Attempt to extract BTEXT from a JSON string response.
+     * Returns null if no valid BTEXT can be found.
+     */
+    private static function extractBTEXTFromJsonString(string $content): ?string {
+        $candidate = trim($content);
+
+        // Strip code fences such as ```json ... ``` or ``` ... ```
+        if (substr($candidate, 0, 3) === '```') {
+            $candidate = preg_replace('/^```(?:json)?\s*/i', '', $candidate);
+            $candidate = preg_replace('/\s*```\s*$/', '', $candidate);
+        }
+
+        // Locate first JSON object
+        $start = strpos($candidate, '{');
+        $end = strrpos($candidate, '}');
+        if ($start === false || $end === false || $end <= $start) {
+            return null;
+        }
+
+        $jsonStr = substr($candidate, $start, $end - $start + 1);
+
+        // Replace smart quotes with straight quotes
+        $jsonStr = str_replace([
+            "\xE2\x80\x9C", // “
+            "\xE2\x80\x9D", // ”
+            "\xE2\x80\x98", // ‘
+            "\xE2\x80\x99"  // ’
+        ], '"', $jsonStr);
+
+        $data = json_decode($jsonStr, true);
+        if (json_last_error() !== JSON_ERROR_NONE || !is_array($data)) {
+            return null;
+        }
+
+        if (isset($data['BTEXT']) && is_string($data['BTEXT'])) {
+            return trim($data['BTEXT']);
+        }
+        return null;
     }
 
     /**

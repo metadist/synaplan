@@ -606,6 +606,18 @@ class AIGoogle {
         if (strlen($videoPrompt) > 1) {
             // Get the model from configuration
             $myModel = $GLOBALS["AI_TEXT2VID"]["MODEL"];
+            if (!empty($GLOBALS['debug'])) {
+                $dbgModelId = $GLOBALS["AI_TEXT2VID"]["MODELID"] ?? 'n/a';
+                error_log("AIGoogle::createVideo using model={$myModel} (id={$dbgModelId})");
+                if ($stream) {
+                    $update = [
+                        'msgId' => $msgArr['BID'],
+                        'status' => 'pre_processing',
+                        'message' => '[DBG] model ' . $myModel . ' '
+                    ];
+                    Frontend::printToStream($update);
+                }
+            }
             
             // Start video generation
             $url = "https://generativelanguage.googleapis.com/v1beta/models/" . $myModel . ":predictLongRunning?key=" . self::$key;
@@ -626,10 +638,18 @@ class AIGoogle {
                 if ($debug) {
                     error_log("[AIGoogle::createVideo] Starting long-running prediction. Model=" . $myModel . ", PromptLen=" . strlen($videoPrompt));
                 }
+                // call the API
                 $arrRes = Curler::callJson($url, $headers, $postData);
+                //
+                if ($debug) {
+                    error_log("[AIGoogle::createVideo] Response=" . json_encode($arrRes,JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
+                }
 
                 // If Google immediately returns an error, surface it
-                if (isset($arrRes['error'])) {
+                if(isset($arrRes['error'])) {
+                    if ($debug) {
+                        error_log("[AIGoogle::createVideo] Error=" . json_encode($arrRes['error'],JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
+                    }
                     $msgArr['BFILEPATH'] = '';
                     $msgArr['BFILETEXT'] = "Error: " . json_encode($arrRes['error'],JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
                     return $msgArr;

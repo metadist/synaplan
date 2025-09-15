@@ -633,6 +633,9 @@ Class Frontend {
         // ------------------------------------------------------------
         // now work on the message itself, sort it and process it
                 try {
+        if (!empty($GLOBALS['debug'])) {
+            error_log("SSE: createAnswer start msgId=" . $msgId . (isset($isAgainRequest) && $isAgainRequest ? ' (Again)' : ''));
+        }
         $aiLastId = self::createAnswer($msgId);
         } catch (\Throwable $e) {
             error_log("SSE createAnswer failed: " . $e->getMessage());
@@ -856,6 +859,18 @@ Class Frontend {
             $finalPayload['message'] = $outText;
         }
         
+        if (!empty($GLOBALS['debug'])) {
+            try {
+                $dbgMeta = isset($finalPayload['meta']) ? [
+                    'service' => $finalPayload['meta']['service'] ?? '',
+                    'model' => $finalPayload['meta']['model'] ?? '',
+                    'btag' => $finalPayload['meta']['btag'] ?? '',
+                    'inId' => $finalPayload['meta']['inId'] ?? 0,
+                    'outId' => $finalPayload['meta']['outId'] ?? 0
+                ] : [];
+                error_log("SSE: final frame msgId={$msgId} meta=" . json_encode($dbgMeta));
+            } catch (\Throwable $e) {}
+        }
         $send($finalPayload);
         
         // Global cleanup after streaming

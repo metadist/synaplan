@@ -1,0 +1,18 @@
+We need to expand the widget functionality in @widget.php and the connected files. 
+The configuration is done in @c_webwidget.php and the result shall be a second way of integrating the widget. 
+
+That way shall be named "inline-box" and works like this:
+Instead of a floating button, an input field with a larger font can be integrated inline into a web page 
+on another domain. Like the button, the integration shall be via Javascript. 
+The inline input field shall be placeable for external customers on their web pages and 
+when a web user clicks the input field, an overlay div, that covers almost the whole page 
+(like the popup of the current button) shall appear. The styling of the input box should be 
+configurable for our clients on the @c_webwidget.php page and they should able to clearly distinguish 
+the two ways of integration. 
+
+Please create the configuration for the inline-box first. It should be a compact input and button, 
+in a way that pays attention to the "anonymous" settings we currently have. The client shall later be 
+able to integrate it with <script src="https://app.synaplan.com/widget.php?....> like the button now, 
+just with different parameters. 
+
+Do only the config now, the rest later. 
