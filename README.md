@@ -1,6 +1,7 @@
 # Synaplan — AI Communication Management Platform
 
 Synaplan is an open-source platform to orchestrate conversations with multiple AI providers across channels (web, email, WhatsApp), with auditing, usage tracking, and vector search.
+It can be freely tested on https://www.synaplan.com/ and is in use in various projects with partners in Europe. We will continue to localize it in more languages and offer more AI models by default.
 
 ## 🚀 Dev Setup
 
@@ -14,7 +15,7 @@ for a dockerless installation, see below.
 #### 1. Download source code
 ```bash
 # Clone or download the repository
-git clone https://github.com/orgaralf/synaplan.git synaplan/
+git clone https://github.com/metadist/synaplan.git synaplan/
 cd synaplan
 ```
 

@@ -111,6 +111,10 @@ class ApiAuthenticator {
      * @return bool True if action is allowed
      */
     public static function isActionAllowed(string $action): bool {
+        // Public endpoints that require no authentication nor widget session
+        if ($action === 'userRegister') {
+            return true;
+        }
         if (in_array($action, self::$authenticatedOnlyEndpoints)) {
             return self::checkAuthenticatedAccess();
         } elseif (in_array($action, self::$anonymousAllowedEndpoints)) {

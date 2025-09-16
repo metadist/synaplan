@@ -368,11 +368,12 @@ switch ($config['position']) {
           right: 10px !important;
           width: auto !important;
           bottom: 10px !important;
-          height: calc(var(--sp-dvh, 100vh) - 20px) !important;
+          /* reduce height on mobile to avoid covering OS UI */
+          height: calc(var(--sp-dvh, 100vh) - 80px) !important;
         }
         @supports (height: 100dvh) {
           #synaplan-chat-container {
-            height: calc(100dvh - 20px) !important;
+            height: calc(100dvh - 80px) !important;
           }
         }
       }

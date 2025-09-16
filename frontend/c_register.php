@@ -25,7 +25,7 @@
         <span id="errorMessage"></span>
     </div>
     
-    <form id="registrationForm">
+    <form id="registrationForm" target="_top">
         <div class="form-group mt-2">
             <label for="email"><?php _s("Email", __FILE__, $_SESSION["LANG"]); ?></label>
             <input type="email" class="form-control mt-2" id="email" name="email" placeholder="<?php _s("Enter your email address", __FILE__, $_SESSION["LANG"]); ?>" required>
