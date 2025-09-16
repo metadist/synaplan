@@ -438,7 +438,7 @@
             '    script.async = true;\n' +
             '    document.head.appendChild(script);\n' +
             '})();\n' +
-            '\</script\>';
+            '</scr' + 'ipt>';
         document.getElementById('integrationCode').value = code;
     }
 
