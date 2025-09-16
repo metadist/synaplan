@@ -1,28 +1,27 @@
 <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4" id="contentMain">
     <?php
-        // Handle form submission for config updates
+        // Handle form submission for per-user config updates (user is always logged in)
         if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_config'])) {
+            $ownerId = intval($_SESSION['USERPROFILE']['BID']);
+
             foreach ($_POST as $key => $value) {
                 if (strpos($key, 'config_') === 0) {
                     $setting = str_replace('config_', '', $key);
                     $modelId = intval($value);
-                    
-                    // Update or insert config
-                    $checkSQL = "SELECT BID FROM BCONFIG WHERE BGROUP = 'DEFAULTMODEL' AND BSETTING = '" . DB::EscString($setting) . "'";
-                    $checkRES = DB::query($checkSQL);
-                    
-                    if (DB::CountRows($checkRES) > 0) {
-                        $checkROW = DB::FetchArr($checkRES);
-                        $updateSQL = "UPDATE BCONFIG SET BVALUE = '" . DB::EscString($modelId) . "' WHERE BID = " . intval($checkROW['BID']);
-                        DB::query($updateSQL);
-                    } else {
-                        $insertSQL = "INSERT INTO BCONFIG (BOWNERID, BGROUP, BSETTING, BVALUE) VALUES (0, 'DEFAULTMODEL', '" . DB::EscString($setting) . "', '" . DB::EscString($modelId) . "')";
+
+                    // Remove existing override for this user+setting
+                    $deleteSQL = "DELETE FROM BCONFIG WHERE BGROUP = 'DEFAULTMODEL' AND BSETTING = '" . DB::EscString($setting) . "' AND BOWNERID = " . $ownerId;
+                    DB::query($deleteSQL);
+
+                    // Insert new override when a model is selected; empty resets to global default
+                    if ($modelId > 0) {
+                        $insertSQL = "INSERT INTO BCONFIG (BOWNERID, BGROUP, BSETTING, BVALUE) VALUES (" . $ownerId . ", 'DEFAULTMODEL', '" . DB::EscString($setting) . "', '" . DB::EscString($modelId) . "')";
                         DB::query($insertSQL);
                     }
                 }
             }
             echo '<div class="alert alert-success alert-dismissible fade show" role="alert">
-                    <strong><i class="fas fa-check-circle me-2"></i>Success!</strong> Default model configurations have been updated.
+                    <strong><i class="fas fa-check-circle me-2"></i>Success!</strong> Your model preferences have been updated.
                     <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
                   </div>';
         }
@@ -39,8 +38,9 @@
             <form method="POST">
                 <div class="row">
                     <?php
-                        // Get all available tasks from BCONFIG
-                        $taskSQL = "SELECT DISTINCT BSETTING FROM BCONFIG WHERE BGROUP = 'DEFAULTMODEL' ORDER BY BSETTING";
+                        // Get tasks as union of global defaults and current user's overrides
+                        $currentUserId = intval($_SESSION['USERPROFILE']['BID']);
+                        $taskSQL = "SELECT DISTINCT BSETTING FROM BCONFIG WHERE BGROUP = 'DEFAULTMODEL' AND (BOWNERID = 0 OR BOWNERID = " . $currentUserId . ") ORDER BY BSETTING";
                         $taskRES = DB::query($taskSQL);
                         
                         // Get all available models for dropdowns
@@ -51,11 +51,18 @@
                             $allModels[] = $modelROW;
                         }
                         
-                        // Get current config values
-                        $configSQL = "SELECT BSETTING, BVALUE FROM BCONFIG WHERE BGROUP = 'DEFAULTMODEL'";
-                        $configRES = DB::query($configSQL);
+                        // Get current config values with fallback: global baseline + user overrides
                         $currentConfig = [];
-                        while ($configROW = DB::FetchArr($configRES)) {
+                        // Global defaults first
+                        $globalConfigSQL = "SELECT BSETTING, BVALUE FROM BCONFIG WHERE BGROUP = 'DEFAULTMODEL' AND BOWNERID = 0";
+                        $globalConfigRES = DB::query($globalConfigSQL);
+                        while ($configROW = DB::FetchArr($globalConfigRES)) {
+                            $currentConfig[$configROW['BSETTING']] = $configROW['BVALUE'];
+                        }
+                        // Overlay user-specific overrides
+                        $userConfigSQL = "SELECT BSETTING, BVALUE FROM BCONFIG WHERE BGROUP = 'DEFAULTMODEL' AND BOWNERID = " . $currentUserId;
+                        $userConfigRES = DB::query($userConfigSQL);
+                        while ($configROW = DB::FetchArr($userConfigRES)) {
                             $currentConfig[$configROW['BSETTING']] = $configROW['BVALUE'];
                         }
                         

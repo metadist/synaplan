@@ -5,7 +5,7 @@
 
 // It starts with some basic global variables and logic
 if(isset($_REQUEST["logout"]) && $_REQUEST["logout"]=="true") {
-    unset($_SESSION['user']);
+    unset($_SESSION["USERPROFILE"]);
     session_destroy();
     header("Location: index.php");
     exit;
