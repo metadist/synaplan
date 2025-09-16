@@ -1,4 +1,9 @@
 <?php // https://oauth2-client.thephpleague.com/providers/league/ ?>
+<script
+  src="https://challenges.cloudflare.com/turnstile/v0/api.js"
+  async
+  defer
+></script>
 <main class="col-md-12 ms-sm-auto col-lg-12 px-md-4" id="contentMain">
     <H1><?php _s("Please login", __FILE__, $_SESSION["LANG"]); ?></H1>
     
@@ -22,6 +27,8 @@
             <input type="password" class="form-control mt-2" id="password" name="password" placeholder="<?php _s("Enter password", __FILE__, $_SESSION["LANG"]); ?>">
         </div>
         <button type="submit" class="btn btn-primary mt-2"><?php _s("Login", __FILE__, $_SESSION["LANG"]); ?></button>
+        <BR><BR>
+        <div class="cf-turnstile" data-sitekey="0x4AAAAAAB1d8VjDhX7_hJRg" data-theme="light" data-size="normal"></div>
     </form>
     <?php if (OidcAuth::isConfigured()): ?>
     <div class="mt-4 pt-3 border-top">

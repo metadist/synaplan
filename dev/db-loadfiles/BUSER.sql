@@ -26,7 +26,7 @@ DROP TABLE IF EXISTS `BUSER`;
 CREATE TABLE `BUSER` (
   `BID` bigint(20) NOT NULL AUTO_INCREMENT,
   `BCREATED` varchar(20) NOT NULL DEFAULT '',
-  `BINTYPE` varchar(4) NOT NULL DEFAULT 'WA',
+  `BINTYPE` varchar(4) NOT NULL DEFAULT 'WEB',
   `BMAIL` varchar(128) NOT NULL DEFAULT '',
   `BPW` varchar(64) NOT NULL DEFAULT '',
   `BPROVIDERID` varchar(32) NOT NULL DEFAULT '',
@@ -47,7 +47,7 @@ CREATE TABLE `BUSER` (
 LOCK TABLES `BUSER` WRITE;
 /*!40000 ALTER TABLE `BUSER` DISABLE KEYS */;
 INSERT INTO `BUSER` VALUES
-(2,'20250123171248','WA','synaplan@synaplan.com','8d5b7b5d36aceed2de9574184b6c8e52','491754070111','NEW','{\n    \"firstName\": \"Test\",\n    \"lastName\": \"Testuser\",\n    \"phone\": \"+1234567890\",\n    \"companyName\": \"metadist data management GmbH\",\n    \"vatId\": \"\",\n    \"street\": \"\",\n    \"zipCode\": \"\",\n    \"city\": \"\",\n    \"country\": \"\",\n    \"language\": \"en\",\n    \"timezone\": \"\",\n    \"invoiceEmail\": \"\"\n}');
+(2,'20250123171248','ADM','synaplan@synaplan.com','8d5b7b5d36aceed2de9574184b6c8e52','491754070111','NEW','{\n    \"firstName\": \"Test\",\n    \"lastName\": \"Testuser\",\n    \"phone\": \"+1234567890\",\n    \"companyName\": \"metadist data management GmbH\",\n    \"vatId\": \"\",\n    \"street\": \"\",\n    \"zipCode\": \"\",\n    \"city\": \"\",\n    \"country\": \"\",\n    \"language\": \"en\",\n    \"timezone\": \"\",\n    \"invoiceEmail\": \"\"\n}');
 /*!40000 ALTER TABLE `BUSER` ENABLE KEYS */;
 UNLOCK TABLES;
 /*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;

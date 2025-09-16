@@ -113,6 +113,4 @@ class UserRegistration {
         }
         return $pin;
     }
-    
-
 }
