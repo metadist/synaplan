@@ -26,10 +26,21 @@ if(isset($_REQUEST['action'])) {
             exit; // Should redirect, but exit as backup
             break;
         case 'login':
-            $success = Frontend::setUserFromWebLogin();
+            if(Frontend::myCFcaptcha()) {
+                $success = Frontend::setUserFromWebLogin();
+            } else {
+                $success = false;
+                $_SESSION['cf_captcha_error'] = true;
+            }
             break;
         case 'register':
-            $result = UserRegistration::registerNewUser();
+            if(Frontend::myCFcaptcha()) {
+                $result = UserRegistration::registerNewUser();
+                $_SESSION['registration_result'] = $result;
+            } else {
+                $result = false;
+                $_SESSION['cf_captcha_error'] = true;
+            }
             $_SESSION['registration_result'] = $result;
             break;
         case 'logout':

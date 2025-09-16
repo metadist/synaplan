@@ -42,6 +42,16 @@
             </div>
             <div class="card-body">
                 <div class="row mb-3">
+                    <label for="integrationType" class="col-sm-2 col-form-label"><strong>Integration Type:</strong></label>
+                    <div class="col-sm-4">
+                        <select class="form-select" name="integrationType" id="integrationType">
+                            <option value="floating-button">Floating Button (current)</option>
+                            <option value="inline-box">Inline Box (new)</option>
+                        </select>
+                        <div class="form-text">Choose how the widget is embedded on your site</div>
+                    </div>
+                </div>
+                <div class="row mb-3">
                     <label for="widgetColor" class="col-sm-2 col-form-label"><strong>Primary Color:</strong></label>
                     <div class="col-sm-4">
                         <input type="color" class="form-control form-control-color" name="widgetColor" id="widgetColor" value="#007bff">
@@ -94,6 +104,45 @@
                             ?>
                         </select>
                         <div class="form-text">Select the AI prompt to use for this widget</div>
+                    </div>
+                </div>
+
+                <!-- Inline Box Styling (shown for Inline Box) -->
+                <div id="inlineBoxConfig" style="display:none;">
+                    <hr>
+                    <div class="row mb-3">
+                        <label for="inlinePlaceholder" class="col-sm-2 col-form-label"><strong>Inline Placeholder:</strong></label>
+                        <div class="col-sm-4">
+                            <input type="text" class="form-control" name="inlinePlaceholder" id="inlinePlaceholder" placeholder="Ask me anything..." value="Ask me anything...">
+                            <div class="form-text">Placeholder text shown inside the input</div>
+                        </div>
+                        <label for="inlineButtonText" class="col-sm-2 col-form-label"><strong>Button Text:</strong></label>
+                        <div class="col-sm-4">
+                            <input type="text" class="form-control" name="inlineButtonText" id="inlineButtonText" placeholder="Ask" value="Ask">
+                            <div class="form-text">Text for the small submit button</div>
+                        </div>
+                    </div>
+                    <div class="row mb-3">
+                        <label for="inlineFontSize" class="col-sm-2 col-form-label"><strong>Font Size:</strong></label>
+                        <div class="col-sm-4">
+                            <input type="number" class="form-control" name="inlineFontSize" id="inlineFontSize" min="12" max="28" step="1" value="18">
+                            <div class="form-text">Font size in px (12–28)</div>
+                        </div>
+                        <label for="inlineTextColor" class="col-sm-2 col-form-label"><strong>Text Color:</strong></label>
+                        <div class="col-sm-4">
+                            <input type="color" class="form-control form-control-color" name="inlineTextColor" id="inlineTextColor" value="#212529">
+                            <div class="form-text">Text color of the inline input</div>
+                        </div>
+                    </div>
+                    <div class="row mb-3">
+                        <label for="inlineBorderRadius" class="col-sm-2 col-form-label"><strong>Border Radius:</strong></label>
+                        <div class="col-sm-4">
+                            <input type="number" class="form-control" name="inlineBorderRadius" id="inlineBorderRadius" min="0" max="24" step="1" value="8">
+                            <div class="form-text">Rounded corners in px (0–24)</div>
+                        </div>
+                    </div>
+                    <div class="alert alert-info">
+                        Inline Box is optimized for anonymous visitors and embeds inline on your page. Clicking it opens the full chat overlay.
                     </div>
                 </div>
             </div>
@@ -233,6 +282,17 @@
             if (widgetIdInput) {
                 widgetIdInput.addEventListener('change', updateIntegrationCode);
             }
+
+            // Integration type toggle
+            const integrationTypeEl = document.getElementById('integrationType');
+            if (integrationTypeEl) {
+                integrationTypeEl.addEventListener('change', function() {
+                    toggleIntegrationFields();
+                    updateIntegrationCode();
+                });
+                // Initialize on load
+                toggleIntegrationFields();
+            }
         });
 
     // Function to load all widgets for the current user
@@ -262,6 +322,15 @@
         });
     }
 
+    // Show/hide fields based on integration type
+    function toggleIntegrationFields() {
+        const type = document.getElementById('integrationType') ? document.getElementById('integrationType').value : 'floating-button';
+        const inlineCfg = document.getElementById('inlineBoxConfig');
+        if (inlineCfg) {
+            inlineCfg.style.display = (type === 'inline-box') ? 'block' : 'none';
+        }
+    }
+
     // Function to display widgets in the list
     function displayWidgets() {
         const widgetList = document.getElementById('widgetList');
@@ -281,6 +350,7 @@
                             <p class="card-text">
                                 <small class="text-muted">
                                     <strong>User ID:</strong> ${widget.userId}<br>
+                                    <strong>Integration:</strong> ${widget.integrationType === 'inline-box' ? 'Inline Box' : 'Floating Button'}<br>
                                     <strong>Color:</strong> <span style="color: ${widget.color};">${widget.color}</span><br>
                                     <strong>Icon Color:</strong> <span style="color: ${widget.iconColor || '#ffffff'};">${widget.iconColor || '#ffffff'}</span><br>
                                     <strong>Position:</strong> ${widget.position}<br>
@@ -340,6 +410,7 @@
 
         currentWidgetId = newId;
         document.getElementById('widgetId').value = newId;
+        document.getElementById('integrationType').value = 'floating-button';
         document.getElementById('widgetColor').value = '#007bff';
         document.getElementById('widgetPosition').value = 'bottom-right';
         document.getElementById('autoMessage').value = 'Hello! How can I help you today?';
@@ -348,12 +419,24 @@
         if (autoOpenEl) autoOpenEl.checked = false; // default off
         const iconColorEl = document.getElementById('widgetIconColor');
         if (iconColorEl) iconColorEl.value = '#ffffff';
+        // Defaults for inline box
+        const inlinePh = document.getElementById('inlinePlaceholder');
+        const inlineBtn = document.getElementById('inlineButtonText');
+        const inlineFs = document.getElementById('inlineFontSize');
+        const inlineTc = document.getElementById('inlineTextColor');
+        const inlineBr = document.getElementById('inlineBorderRadius');
+        if (inlinePh) inlinePh.value = 'Ask me anything...';
+        if (inlineBtn) inlineBtn.value = 'Ask';
+        if (inlineFs) inlineFs.value = 18;
+        if (inlineTc) inlineTc.value = '#212529';
+        if (inlineBr) inlineBr.value = 8;
         
         updateIntegrationCode();
         document.getElementById('webwidgetForm').style.display = 'block';
         
         // Scroll to form
         document.getElementById('webwidgetForm').scrollIntoView({ behavior: 'smooth' });
+        toggleIntegrationFields();
     }
 
     // Function to edit an existing widget
@@ -366,6 +449,7 @@
 
         currentWidgetId = widgetId;
         document.getElementById('widgetId').value = widgetId;
+        document.getElementById('integrationType').value = (widget.integrationType === 'inline-box') ? 'inline-box' : 'floating-button';
         document.getElementById('widgetColor').value = widget.color;
         document.getElementById('widgetPosition').value = widget.position;
         document.getElementById('autoMessage').value = widget.autoMessage;
@@ -374,12 +458,24 @@
         if (autoOpenEditEl) autoOpenEditEl.checked = (widget.autoOpen == '1');
         const iconColorEditEl = document.getElementById('widgetIconColor');
         if (iconColorEditEl) iconColorEditEl.value = widget.iconColor || '#ffffff';
+        // Inline settings
+        const inlinePh = document.getElementById('inlinePlaceholder');
+        const inlineBtn = document.getElementById('inlineButtonText');
+        const inlineFs = document.getElementById('inlineFontSize');
+        const inlineTc = document.getElementById('inlineTextColor');
+        const inlineBr = document.getElementById('inlineBorderRadius');
+        if (inlinePh) inlinePh.value = widget.inlinePlaceholder || 'Ask me anything...';
+        if (inlineBtn) inlineBtn.value = widget.inlineButtonText || 'Ask';
+        if (inlineFs) inlineFs.value = widget.inlineFontSize || 18;
+        if (inlineTc) inlineTc.value = widget.inlineTextColor || '#212529';
+        if (inlineBr) inlineBr.value = widget.inlineBorderRadius || 8;
         
         updateIntegrationCode();
         document.getElementById('webwidgetForm').style.display = 'block';
         
         // Scroll to form
         document.getElementById('webwidgetForm').scrollIntoView({ behavior: 'smooth' });
+        toggleIntegrationFields();
     }
 
     // Function to delete a widget
@@ -429,16 +525,22 @@
                 userId = widget.userId;
             }
         }
-        
-        const code = '<!-- Synaplan Chat Widget -->\n' +
-            '<script>\n' +
-            '(function() {\n' +
-            '    var script = document.createElement(\'script\');\n' +
-            '    script.src = \'<?php echo $GLOBALS["baseUrl"]; ?>widget.php?uid=' + userId + '&widgetid=' + widgetId + '\';\n' +
-            '    script.async = true;\n' +
-            '    document.head.appendChild(script);\n' +
-            '})();\n' +
-            '\</script\>';
+        const integrationType = document.getElementById('integrationType').value;
+        let code;
+        if (integrationType === 'inline-box') {
+            code = '<!-- Synaplan Chat Inline Box -->\n' +
+                   '<script src="<?php echo $GLOBALS["baseUrl"]; ?>widget.php?uid=' + userId + '&widgetid=' + widgetId + '&mode=inline-box"><\\/script>';
+        } else {
+            code = '<!-- Synaplan Chat Widget -->\n' +
+                   '<script>\n' +
+                   '(function() {\n' +
+                   '    var script = document.createElement(\'script\');\n' +
+                   '    script.src = \'<?php echo $GLOBALS["baseUrl"]; ?>widget.php?uid=' + userId + '&widgetid=' + widgetId + '\';\n' +
+                   '    script.async = true;\n' +
+                   '    document.head.appendChild(script);\n' +
+                   '})();\n' +
+                   '<\\/script>';
+        }
         document.getElementById('integrationCode').value = code;
     }
 
@@ -480,7 +582,8 @@
                 userId = widget.userId;
             }
         }
-        const previewUrl = `widgettest.php?uid=${userId}&widgetid=${widgetId}`;
+        const integrationType = document.getElementById('integrationType').value;
+        const previewUrl = `widgettest.php?uid=${userId}&widgetid=${widgetId}${integrationType === 'inline-box' ? '&mode=inline-box' : ''}`;
         window.open(previewUrl, '_blank');
     }
 

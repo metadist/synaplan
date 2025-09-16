@@ -110,6 +110,12 @@ header('Pragma: no-cache');
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
             background: white;
         }
+        /* Expand embedded chat to full width inside iframe, overriding Bootstrap grid */
+        #contentMain { width: 100% !important; max-width: none !important; }
+        .container, .container-fluid { max-width: none !important; padding-left: 0 !important; padding-right: 0 !important; }
+        .row { margin-left: 0 !important; margin-right: 0 !important; }
+        .col-md-9, .col-lg-10, .ms-sm-auto, .px-md-4 { width: 100% !important; max-width: none !important; flex: 1 1 auto !important; }
+        .chat-container, .chatbox { width: 100% !important; }
         
         .widget-header {
             background: <?php echo $config['color']; ?>;
@@ -253,6 +259,28 @@ header('Pragma: no-cache');
             window.visualViewport.addEventListener('resize', updateSPDVH, { passive: true });
             window.visualViewport.addEventListener('scroll', updateSPDVH, { passive: true });
         }
+
+        // Focus chat input as soon as the widget content is ready
+        function focusMessageInput() {
+            try {
+                var el = document.getElementById('messageInput');
+                if (el && typeof el.focus === 'function') {
+                    el.focus();
+                    // Place caret at end for contenteditable
+                    if (window.getSelection && document.createRange && el.isContentEditable) {
+                        var range = document.createRange();
+                        range.selectNodeContents(el);
+                        range.collapse(false);
+                        var sel = window.getSelection();
+                        sel.removeAllRanges();
+                        sel.addRange(range);
+                    }
+                }
+            } catch (e) { /* ignore */ }
+        }
+        // Try on DOM load and shortly after
+        document.addEventListener('DOMContentLoaded', function(){ setTimeout(focusMessageInput, 50); });
+        window.addEventListener('load', function(){ setTimeout(focusMessageInput, 150); });
 
         // iOS/Safari third-party cookie mitigation using Storage Access API
         const canRequest = document.hasStorageAccess && document.requestStorageAccess;

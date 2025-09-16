@@ -16,6 +16,7 @@ require_once __DIR__ . '/../app/inc/_coreincludes.php';
 
 $widgetId = $_REQUEST['widgetid'] ?? 1;
 $uid = $_REQUEST['uid'] ?? 2; // Default to user ID 2 if not provided
+$mode = isset($_REQUEST['mode']) ? trim((string)$_REQUEST['mode']) : '';
 ?>
 <html>
     <head>
@@ -112,7 +113,7 @@ $uid = $_REQUEST['uid'] ?? 2; // Default to user ID 2 if not provided
             
             <div class="code">
                 <strong>Integration Code Used:</strong><br>
-                &lt;script src="widget.php?uid=<?php echo htmlspecialchars($uid); ?>&amp;widgetid=<?php echo htmlspecialchars($widgetId); ?>"&gt;&lt;/script&gt;
+                &lt;script src="widget.php?uid=<?php echo htmlspecialchars($uid); ?>&amp;widgetid=<?php echo htmlspecialchars($widgetId); ?><?php echo $mode !== '' ? '&amp;mode=' . htmlspecialchars($mode) : ''; ?>"&gt;&lt;/script&gt;
             </div>
             
             <p>If you don't see the widget, please check:</p>
@@ -132,9 +133,15 @@ $uid = $_REQUEST['uid'] ?? 2; // Default to user ID 2 if not provided
                     <li>Rate limiting applies to prevent abuse</li>
                 </ul>
             </div>
+            
+            <!-- Place inline-box immediately below the code block to render inline with text -->
+            <?php if ($mode === 'inline-box'): ?>
+            <script src="widget.php?uid=<?php echo htmlspecialchars($uid); ?>&widgetid=<?php echo htmlspecialchars($widgetId); ?>&mode=inline-box"></script>
+            <?php endif; ?>
         </div>
         
-        <!-- Synaplan Chat Widget -->
+        <!-- Synaplan Chat Widget (floating button mode) -->
+        <?php if ($mode !== 'inline-box'): ?>
         <script>
         (function() {
             var script = document.createElement('script');
@@ -143,6 +150,7 @@ $uid = $_REQUEST['uid'] ?? 2; // Default to user ID 2 if not provided
             document.head.appendChild(script);
         })();
         </script>
+        <?php endif; ?>
     </body>
 </html>
 

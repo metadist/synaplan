@@ -133,6 +133,12 @@ class AIGroq {
         // ------------------------------------------------
         // Clean and return response
         $answer = $chat['choices'][0]['message']['content'];
+
+        // Attempt to extract BTEXT if JSON-like content was returned
+        $maybeBTEXT = self::extractBTEXTFromJsonString($answer);
+        if ($maybeBTEXT !== null) {
+            $answer = $maybeBTEXT;
+        }
         
         return $answer;
     }
@@ -357,6 +363,10 @@ class AIGroq {
     private static function extractBTEXTFromJsonString(string $content): ?string {
         $candidate = trim($content);
 
+        // Strip BOM and zero-width/invisible characters that break JSON
+        $candidate = preg_replace('/^\xEF\xBB\xBF/', '', $candidate);
+        $candidate = preg_replace('/[\x{200B}\x{200C}\x{200D}\x{FEFF}\x{00A0}]/u', '', $candidate);
+
         // Strip code fences such as ```json ... ``` or ``` ... ```
         if (substr($candidate, 0, 3) === '```') {
             $candidate = preg_replace('/^```(?:json)?\s*/i', '', $candidate);
@@ -367,26 +377,51 @@ class AIGroq {
         $start = strpos($candidate, '{');
         $end = strrpos($candidate, '}');
         if ($start === false || $end === false || $end <= $start) {
-            return null;
+            // As a fallback try regex-based extraction on the full content
+            return self::extractBTEXTViaRegex($candidate);
         }
 
         $jsonStr = substr($candidate, $start, $end - $start + 1);
 
-        // Replace smart quotes with straight quotes
+        // Normalize quotes: convert common smart quotes/guillemets/backticks to straight quotes
         $jsonStr = str_replace([
             "\xE2\x80\x9C", // “
             "\xE2\x80\x9D", // ”
+            "\xE2\x80\x9E", // „
+            "\xC2\xAB",     // «
+            "\xC2\xBB",     // »
+            "`",              // backtick
             "\xE2\x80\x98", // ‘
             "\xE2\x80\x99"  // ’
         ], '"', $jsonStr);
 
+        // Remove trailing commas before closing braces/brackets
+        $jsonStr = preg_replace('/,(\s*[}\]])/', '$1', $jsonStr);
+
+        // Attempt to parse JSON
         $data = json_decode($jsonStr, true);
         if (json_last_error() !== JSON_ERROR_NONE || !is_array($data)) {
-            return null;
+            // Fallback: try regex extraction within the normalized JSON string
+            return self::extractBTEXTViaRegex($jsonStr);
         }
 
         if (isset($data['BTEXT']) && is_string($data['BTEXT'])) {
             return trim($data['BTEXT']);
+        }
+        return null;
+    }
+
+    /**
+     * Regex-based fallback to extract BTEXT from malformed JSON-like strings.
+     */
+    private static function extractBTEXTViaRegex(string $content): ?string {
+        // Try to find BTEXT:"..." or BTEXT:'...' with various quote styles
+        $pattern = '/[\"\'\x{201C}\x{201D}\x{201E}]?BTEXT[\"\'\x{201C}\x{201D}\x{201E}]?\s*:\s*([\"\'\x{201C}\x{201D}\x{201E}])(.*?)\1/su';
+        if (preg_match($pattern, $content, $m)) {
+            $raw = $m[2];
+            // Decode common escape sequences
+            $decoded = stripcslashes($raw);
+            return trim($decoded);
         }
         return null;
     }
