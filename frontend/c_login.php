@@ -11,7 +11,7 @@
         <?php _s("You may login with your email address and password.", __FILE__, $_SESSION["LANG"]); ?><BR>
         <?php _s("Registration is free", __FILE__, $_SESSION["LANG"]); ?>: <B><a href="index.php/register"><?php _s("Register", __FILE__, $_SESSION["LANG"]); ?></a></B>
     </p>
-    <form action="index.php" method="post">
+    <form action="index.php" method="post" target="_top">
         <input type="hidden" name="action" value="login">
         <div class="form-group mt-2">
             <label for="email"><?php _s("Email", __FILE__, $_SESSION["LANG"]); ?></label>
@@ -26,7 +26,7 @@
     <?php if (OidcAuth::isConfigured()): ?>
     <div class="mt-4 pt-3 border-top">
         <p class="text-center mb-3"><?php _s("Or sign in with SSO", __FILE__, $_SESSION["LANG"]); ?></p>
-        <form action="index.php" method="post" class="text-center">
+        <form action="index.php" method="post" class="text-center" target="_top">
             <input type="hidden" name="action" value="oidc_login">
             <button type="submit" class="btn btn-outline-primary">
                 <i class="fas fa-sign-in-alt"></i> <?php _s("Sign in with SSO", __FILE__, $_SESSION["LANG"]); ?>
