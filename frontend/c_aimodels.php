@@ -1,5 +1,6 @@
 <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4" id="contentMain">
     <?php
+        $isAdmin = (isset($_SESSION['USERPROFILE']['BINTYPE']) && $_SESSION['USERPROFILE']['BINTYPE'] === 'ADM');
         // Handle form submission for per-user config updates (user is always logged in)
         if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_config'])) {
             $ownerId = intval($_SESSION['USERPROFILE']['BID']);
@@ -24,6 +25,54 @@
                     <strong><i class="fas fa-check-circle me-2"></i>Success!</strong> Your model preferences have been updated.
                     <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
                   </div>';
+        }
+
+        // Admin-only: Handle updates to BMODELS pricing/units/quality
+        if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_models_pricing']) && $isAdmin) {
+            $updated = 0;
+            $errors = 0;
+            // Allowed unit options
+            $allowedUnits = ['per1M','perpic','perhour','per1000chars','persec','-'];
+
+            if (isset($_POST['model']) && is_array($_POST['model'])) {
+                foreach ($_POST['model'] as $modelId => $data) {
+                    $id = intval($modelId);
+                    if ($id <= 0) { $errors++; continue; }
+
+                    $priceIn = isset($data['price_in']) ? floatval($data['price_in']) : 0.0;
+                    $inUnit = isset($data['in_unit']) && in_array($data['in_unit'], $allowedUnits, true) ? $data['in_unit'] : 'per1M';
+                    $priceOut = isset($data['price_out']) ? floatval($data['price_out']) : 0.0;
+                    $outUnit = isset($data['out_unit']) && in_array($data['out_unit'], $allowedUnits, true) ? $data['out_unit'] : 'per1M';
+                    $quality = isset($data['quality']) ? floatval($data['quality']) : 0.0;
+
+                    $sql = "UPDATE BMODELS SET "
+                         . "BPRICEIN = " . ($priceIn) . ", "
+                         . "BINUNIT = '" . DB::EscString($inUnit) . "', "
+                         . "BPRICEOUT = " . ($priceOut) . ", "
+                         . "BOUTUNIT = '" . DB::EscString($outUnit) . "', "
+                         . "BQUALITY = " . ($quality) . " "
+                         . "WHERE BID = " . $id;
+                    try {
+                        DB::query($sql);
+                        $updated++;
+                    } catch (\Throwable $e) {
+                        $errors++;
+                    }
+                }
+            }
+
+            if ($updated > 0) {
+                echo '<div class="alert alert-success alert-dismissible fade show" role="alert">'
+                   . '<strong><i class="fas fa-check-circle me-2"></i>Saved!</strong> Updated ' . intval($updated) . ' model(s).'
+                   . ($errors > 0 ? ' <small class="text-muted">(' . intval($errors) . ' failed)</small>' : '')
+                   . '<button type="button" class="btn-close" data-bs-dismiss="alert"></button>'
+                   . '</div>';
+            } else {
+                echo '<div class="alert alert-warning alert-dismissible fade show" role="alert">'
+                   . '<strong><i class="fas fa-exclamation-triangle me-2"></i>No changes saved.</strong>'
+                   . '<button type="button" class="btn-close" data-bs-dismiss="alert"></button>'
+                   . '</div>';
+            }
         }
     ?>
 
@@ -183,6 +232,7 @@
         </div>
         <div class="card-body">
             <div class="table-responsive">
+                <?php if ($isAdmin) { echo '<form method="POST">'; } ?>
                 <table class="table table-striped table-hover table-sm">
                     <thead class="table-light">
                         <tr style="font-size: 0.85rem;">
@@ -190,6 +240,13 @@
                             <th style="width: 120px;">PURPOSE</th>
                             <th style="width: 100px;">SERVICE</th>
                             <th style="width: 200px;">NAME</th>
+                            <?php if ($isAdmin) { ?>
+                                <th style="width: 140px;">IN PRICE</th>
+                                <th style="width: 120px;">IN UNIT</th>
+                                <th style="width: 140px;">OUT PRICE</th>
+                                <th style="width: 120px;">OUT UNIT</th>
+                                <th style="width: 120px;">QUALITY</th>
+                            <?php } ?>
                             <th>DESCRIPTION</th>
                         </tr>
                     </thead>
@@ -204,6 +261,8 @@
                             }
                             $modelsSQL = "SELECT * FROM BMODELS $whereClause ORDER BY BTAG,BSERVICE";
                             $modelsRES = db::Query($modelsSQL);
+                            // Admin: unit options
+                            $unitOptions = ['per1M','perpic','perhour','per1000chars','persec','-'];
                             
                             if (db::CountRows($modelsRES) > 0) {
                                 while($modelROW = db::FetchArr($modelsRES)) {
@@ -213,7 +272,40 @@
                                     echo "<td><span class='badge bg-primary'>" . htmlspecialchars($modelROW["BTAG"]) . "</span></td>";
                                     echo "<td><span class='badge bg-info'>" . htmlspecialchars($modelROW["BSERVICE"]) . "</span></td>";
                                     echo "<td><strong>" . htmlspecialchars($modelROW["BNAME"]) . "</strong></td>";
-                                    echo "<td><small>" . htmlspecialchars($detailArr["description"]) . "</small></td>";
+                                    if ($isAdmin) {
+                                        $mid = intval($modelROW['BID']);
+                                        // IN price
+                                        echo '<td>'
+                                            . '<input type="number" step="0.001" min="0" class="form-control form-control-sm" name="model['.$mid.'][price_in]" value="'.htmlspecialchars((string)$modelROW['BPRICEIN']).'" />'
+                                            . '</td>';
+                                        // IN unit
+                                        echo '<td>'
+                                            . '<select class="form-select form-select-sm" name="model['.$mid.'][in_unit]">';
+                                        foreach ($unitOptions as $u) {
+                                            $sel = ($modelROW['BINUNIT'] === $u) ? ' selected' : '';
+                                            echo '<option value="'.htmlspecialchars($u).'"'.$sel.'>'.htmlspecialchars($u).'</option>';
+                                        }
+                                        echo '</select>'
+                                            . '</td>';
+                                        // OUT price
+                                        echo '<td>'
+                                            . '<input type="number" step="0.001" min="0" class="form-control form-control-sm" name="model['.$mid.'][price_out]" value="'.htmlspecialchars((string)$modelROW['BPRICEOUT']).'" />'
+                                            . '</td>';
+                                        // OUT unit
+                                        echo '<td>'
+                                            . '<select class="form-select form-select-sm" name="model['.$mid.'][out_unit]">';
+                                        foreach ($unitOptions as $u) {
+                                            $sel = ($modelROW['BOUTUNIT'] === $u) ? ' selected' : '';
+                                            echo '<option value="'.htmlspecialchars($u).'"'.$sel.'>'.htmlspecialchars($u).'</option>';
+                                        }
+                                        echo '</select>'
+                                            . '</td>';
+                                        // QUALITY
+                                        echo '<td>'
+                                            . '<input type="number" step="0.1" min="0" max="10" class="form-control form-control-sm" name="model['.$mid.'][quality]" value="'.htmlspecialchars((string)$modelROW['BQUALITY']).'" />'
+                                            . '</td>';
+                                    }
+                                    echo "<td><small>" . htmlspecialchars(isset($detailArr["description"]) ? $detailArr["description"] : '') . "</small></td>";
                                     echo "</tr>";
                                 }
                             } else {
@@ -222,6 +314,13 @@
                         ?>
                     </tbody>
                 </table>
+                <?php if ($isAdmin) { ?>
+                    <div class="mt-3">
+                        <button type="submit" name="update_models_pricing" class="btn btn-primary">
+                            <i class="fas fa-save me-2"></i>Save Changes
+                        </button>
+                    </div>
+                <?php echo '</form>'; } ?>
             </div>
         </div>
     </div>

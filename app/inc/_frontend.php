@@ -1479,7 +1479,14 @@ Class Frontend {
                         'position' => 'bottom-right',
                         'autoMessage' => '',
                         'prompt' => 'general',
-                        'autoOpen' => '0'
+                        'autoOpen' => '0',
+                        // New: integration type and inline-box defaults
+                        'integrationType' => 'floating-button',
+                        'inlinePlaceholder' => 'Ask me anything...',
+                        'inlineButtonText' => 'Ask',
+                        'inlineFontSize' => '18',
+                        'inlineTextColor' => '#212529',
+                        'inlineBorderRadius' => '8'
                     ];
                 }
                 
@@ -1502,6 +1509,25 @@ Class Frontend {
                         break;
                     case 'autoOpen':
                         $widgets[$widgetId]['autoOpen'] = $value;
+                        break;
+                    // New inline-box and integration settings mapping
+                    case 'integrationType':
+                        $widgets[$widgetId]['integrationType'] = $value === 'inline-box' ? 'inline-box' : 'floating-button';
+                        break;
+                    case 'inlinePlaceholder':
+                        $widgets[$widgetId]['inlinePlaceholder'] = $value;
+                        break;
+                    case 'inlineButtonText':
+                        $widgets[$widgetId]['inlineButtonText'] = $value;
+                        break;
+                    case 'inlineFontSize':
+                        $widgets[$widgetId]['inlineFontSize'] = $value;
+                        break;
+                    case 'inlineTextColor':
+                        $widgets[$widgetId]['inlineTextColor'] = $value;
+                        break;
+                    case 'inlineBorderRadius':
+                        $widgets[$widgetId]['inlineBorderRadius'] = $value;
                         break;
                 }
             }
@@ -1557,6 +1583,27 @@ Class Frontend {
             return $retArr;
         }
         
+        // New: integration type and inline-box options
+        $integrationType = db::EscString($_REQUEST['integrationType'] ?? 'floating-button');
+        $validIntegrationTypes = ['floating-button', 'inline-box'];
+        if (!in_array($integrationType, $validIntegrationTypes)) {
+            $retArr["error"] = "Invalid integration type";
+            return $retArr;
+        }
+        $inlinePlaceholder = db::EscString($_REQUEST['inlinePlaceholder'] ?? 'Ask me anything...');
+        $inlineButtonText = db::EscString($_REQUEST['inlineButtonText'] ?? 'Ask');
+        $inlineFontSize = isset($_REQUEST['inlineFontSize']) ? intval($_REQUEST['inlineFontSize']) : 18;
+        if ($inlineFontSize < 12) { $inlineFontSize = 12; }
+        if ($inlineFontSize > 28) { $inlineFontSize = 28; }
+        $inlineTextColor = db::EscString($_REQUEST['inlineTextColor'] ?? '#212529');
+        if (!preg_match('/^#[0-9A-Fa-f]{6}$/', $inlineTextColor)) {
+            $retArr["error"] = "Invalid inline text color format";
+            return $retArr;
+        }
+        $inlineBorderRadius = isset($_REQUEST['inlineBorderRadius']) ? intval($_REQUEST['inlineBorderRadius']) : 8;
+        if ($inlineBorderRadius < 0) { $inlineBorderRadius = 0; }
+        if ($inlineBorderRadius > 24) { $inlineBorderRadius = 24; }
+        
         $group = "widget_" . $widgetId;
         
         // Save widget settings
@@ -1567,7 +1614,14 @@ Class Frontend {
             'autoMessage' => $autoMessage,
             'prompt' => $prompt,
             // autoOpen is optional; default is '0' (disabled)
-            'autoOpen' => isset($_REQUEST['autoOpen']) && ($_REQUEST['autoOpen'] === '1' || $_REQUEST['autoOpen'] === 'true' || $_REQUEST['autoOpen'] === 'on') ? '1' : '0'
+            'autoOpen' => isset($_REQUEST['autoOpen']) && ($_REQUEST['autoOpen'] === '1' || $_REQUEST['autoOpen'] === 'true' || $_REQUEST['autoOpen'] === 'on') ? '1' : '0',
+            // New inline/integration settings persisted to BCONFIG
+            'integrationType' => $integrationType,
+            'inlinePlaceholder' => $inlinePlaceholder,
+            'inlineButtonText' => $inlineButtonText,
+            'inlineFontSize' => (string)$inlineFontSize,
+            'inlineTextColor' => $inlineTextColor,
+            'inlineBorderRadius' => (string)$inlineBorderRadius
         ];
         
         foreach ($settings as $setting => $value) {
@@ -1931,6 +1985,60 @@ Class Frontend {
         
         return true;
     }
-
-
+    // --
+    public static function validateTurnstile($token, $secret, $remoteip = null) {
+        $url = 'https://challenges.cloudflare.com/turnstile/v0/siteverify';
+    
+        $data = [
+            'secret' => $secret,
+            'response' => $token
+        ];
+    
+        if ($remoteip) {
+            $data['remoteip'] = $remoteip;
+        }
+    
+        $options = [
+            'http' => [
+                'header' => "Content-type: application/x-www-form-urlencoded\r\n",
+                'method' => 'POST',
+                'content' => http_build_query($data)
+            ]
+        ];
+    
+        $context = stream_context_create($options);
+        $response = file_get_contents($url, false, $context);
+    
+        if ($response === FALSE) {
+            return ['success' => false, 'error-codes' => ['internal-error']];
+        }
+    
+        return json_decode($response, true);
+    
+    }
+    
+    public static function myCFcaptcha() {        
+        //  not locally
+        if($GLOBALS["debug"]) {
+            return true;
+        }
+        // usage
+        $secret_key = '0x4AAAAAAB1d8U9YXK29L4dUDlyzC4CeQV8';
+        $token = $_POST['cf-turnstile-response'] ?? '';
+        $remoteip = $_SERVER['HTTP_CF_CONNECTING_IP'] ?? $_SERVER['HTTP_X_FORWARDED_FOR'] ?? $_SERVER['REMOTE_ADDR'];
+        
+        $validation = self::validateTurnstile($token, $secret_key, $remoteip);        
+        
+        if ($validation['success']) {
+            // Valid token - process form
+            return true;
+            //echo "Form submission successful!";
+            // Process your form data here
+        } else {
+            // Invalid token - show error
+            return false;
+            //echo "Verification failed. Please try again.";
+            //error_log('Turnstile validation failed: ' . implode(', ', $validation['error-codes']));
+        } 
+    }
 }	

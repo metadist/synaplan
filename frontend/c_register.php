@@ -1,4 +1,9 @@
 <?php // User registration form ?>
+<script
+  src="https://challenges.cloudflare.com/turnstile/v0/api.js"
+  async
+  defer
+></script>
 <main class="col-md-12 ms-sm-auto col-lg-12 px-md-4" id="contentMain">
     <H1><?php _s("Create Account", __FILE__, $_SESSION["LANG"]); ?></H1>
     <p>
@@ -37,6 +42,8 @@
             <span class="spinner-border spinner-border-sm d-none me-2" id="submitSpinner" role="status" aria-hidden="true"></span>
             <?php _s("Create Account", __FILE__, $_SESSION["LANG"]); ?>
         </button>
+        <BR><BR>
+        <div class="cf-turnstile" data-sitekey="0x4AAAAAAB1d8VjDhX7_hJRg" data-theme="light" data-size="normal"></div>
     </form>
     
     <BR>
