@@ -9,7 +9,7 @@
 // Start session and load core includes
 session_start();
 $root = __DIR__ . '/';
-require_once($root . 'inc/_coreincludes.php');
+require_once($root . '../app/inc/_coreincludes.php');
 
 
 // Handle OIDC callback
@@ -18,16 +18,16 @@ if (isset($_REQUEST['code']) || isset($_REQUEST['error'])) {
     if (isset($_REQUEST['error'])) {
         $error = $_REQUEST['error'];
         $errorDescription = isset($_REQUEST['error_description']) ? $_REQUEST['error_description'] : '';
-        
+
         error_log('OIDC callback error: ' . $error . ' - ' . $errorDescription);
         $_SESSION['oidc_error'] = 'Authentication failed: ' . htmlspecialchars($error) . 
                                   ($errorDescription ? ' - ' . htmlspecialchars($errorDescription) : '');
-        
+
         // Redirect to login page
         header('Location: index.php');
         exit;
     }
-    
+
     // Handle successful callback
     if (OidcAuth::handleCallback()) {
         // Successful authentication - redirect to main application
