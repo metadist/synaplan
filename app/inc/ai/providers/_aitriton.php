@@ -168,40 +168,63 @@ class AITriton {
         }
         $client = self::$client;
         
-        // Build the complete prompt with system context and message history
-        $fullPrompt = $systemPrompt['BPROMPT'] . "\n\n";
+        // Different system prompt handling for streaming vs non-streaming (like OpenAI)
+        if ($stream) {
+            $fullPrompt = 'You are the Synaplan.com AI assistant. Please answer in the language of the user.' . "\n\n";
+        } else {
+            $fullPrompt = $systemPrompt['BPROMPT'] . "\n\n";
+        }
         
-        // Add conversation history
-        $fullPrompt .= "Conversation History:\n";
-        foreach($threadArr as $msg) {
-            if($msg['BDIRECT'] == 'IN') {
-                $msg['BTEXT'] = Tools::cleanTextBlock($msg['BTEXT']);
-                $msgText = $msg['BTEXT'];
-                if(strlen($msg['BFILETEXT']) > 1) {
-                    $msgText .= " User provided a file: ".$msg['BFILETYPE'].", saying: '".$msg['BFILETEXT']."'\n\n";
-                }
-                $fullPrompt .= "User: " . $msgText . "\n";
-            } 
-            if($msg['BDIRECT'] == 'OUT') {
-                if(strlen($msg['BTEXT'])>1000) {
-                    // Truncate at word boundary to avoid breaking JSON or quotes
-                    $truncatedText = substr($msg['BTEXT'], 0, 1000);
-                    // Find the last complete word
-                    $lastSpace = strrpos($truncatedText, ' ');
-                    if ($lastSpace !== false && $lastSpace > 800) {
-                        $truncatedText = substr($truncatedText, 0, $lastSpace);
+        // Add conversation history - different handling for streaming vs non-streaming
+        if ($stream) {
+            // For streaming: simplified history like Ollama
+            $fullPrompt .= "Conversation History:\n";
+            foreach($threadArr as $msg) {
+                $fullPrompt .= "[".$msg['BID']."] ".$msg['BTEXT'] . "\n";
+            }
+        } else {
+            // For non-streaming: detailed history with roles
+            $fullPrompt .= "Conversation History:\n";
+            foreach($threadArr as $msg) {
+                if($msg['BDIRECT'] == 'IN') {
+                    $msg['BTEXT'] = Tools::cleanTextBlock($msg['BTEXT']);
+                    $msgText = $msg['BTEXT'];
+                    if(strlen($msg['BFILETEXT']) > 1) {
+                        $msgText .= " User provided a file: ".$msg['BFILETYPE'].", saying: '".$msg['BFILETEXT']."'\n\n";
                     }
-                    // Clean up any trailing quotes or incomplete JSON
-                    $truncatedText = rtrim($truncatedText, '"\'{}[]');
-                    $msg['BTEXT'] = $truncatedText . "...";
+                    $fullPrompt .= "User: " . $msgText . "\n";
+                } 
+                if($msg['BDIRECT'] == 'OUT') {
+                    if(strlen($msg['BTEXT'])>1000) {
+                        // Truncate at word boundary to avoid breaking JSON or quotes
+                        $truncatedText = substr($msg['BTEXT'], 0, 1000);
+                        // Find the last complete word
+                        $lastSpace = strrpos($truncatedText, ' ');
+                        if ($lastSpace !== false && $lastSpace > 800) {
+                            $truncatedText = substr($truncatedText, 0, $lastSpace);
+                        }
+                        // Clean up any trailing quotes or incomplete JSON
+                        $truncatedText = rtrim($truncatedText, '"\'{}[]');
+                        $msg['BTEXT'] = $truncatedText . "...";
+                    }
+                    $fullPrompt .= "Assistant: [".$msg['BID']."] ".$msg['BTEXT'] . "\n";
                 }
-                $fullPrompt .= "Assistant: [".$msg['BID']."] ".$msg['BTEXT'] . "\n";
             }
         }
 
-        // Add current message
-        $msgText = json_encode($msgArr,JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-        $fullPrompt .= "\nCurrent message: " . $msgText;
+        // Add current message - different handling for streaming vs non-streaming
+        if ($stream) {
+            // For streaming: use plain text like OpenAI and Ollama
+            $msgText = $msgArr['BTEXT'];
+            if(strlen($msgArr['BFILETEXT']) > 1) {
+                $msgText .= "\n\n\n---\n\n\nUser provided a file: ".$msgArr['BFILETYPE'].", saying: '".$msgArr['BFILETEXT']."'\n\n";
+            }
+            $fullPrompt .= "\nCurrent message: " . $msgText;
+        } else {
+            // For non-streaming: use full JSON like other providers
+            $msgText = json_encode($msgArr,JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+            $fullPrompt .= "\nCurrent message: " . $msgText;
+        }
         
         // which model on triton?
         $myModel = $GLOBALS["AI_CHAT"]["MODEL"];
@@ -268,8 +291,15 @@ class AITriton {
                                     $rawData = $rawContents[0];
                                     if (strlen($rawData) >= 4) {
                                         $length = unpack('V', substr($rawData, 0, 4))[1]; // V = little-endian unsigned long
-                                        if ($length > 0 && $length <= strlen($rawData) - 4) {
-                                            $textChunk = substr($rawData, 4, $length);
+                                        // More conservative length validation
+                                        if ($length > 0 && $length <= strlen($rawData) - 4 && $length < 10000) {
+                                            $decodedChunk = substr($rawData, 4, $length);
+                                            // Only use decoded chunk if it looks like valid text (no null bytes)
+                                            if (strpos($decodedChunk, "\0") === false && mb_check_encoding($decodedChunk, 'UTF-8')) {
+                                                $textChunk = $decodedChunk;
+                                            } else {
+                                                $textChunk = $rawData; // Fallback to raw data
+                                            }
                                         } else {
                                             $textChunk = $rawData; // Fallback to raw data
                                         }
@@ -287,6 +317,9 @@ class AITriton {
 
                         // Stream the chunk
                         if (!empty($textChunk)) {
+                            // Clean up any trailing garbage characters
+                            $textChunk = rtrim($textChunk, "\0\x00-\x1F\x7F-\x9F");
+                            
                             $answer .= $textChunk;
                             $pendingText .= $textChunk;
                             
@@ -516,8 +549,15 @@ class AITriton {
                             $rawData = $rawContents[0];
                             if (strlen($rawData) >= 4) {
                                 $length = unpack('V', substr($rawData, 0, 4))[1]; // V = little-endian unsigned long
-                                if ($length > 0 && $length <= strlen($rawData) - 4) {
-                                    $textChunk = substr($rawData, 4, $length);
+                                // More conservative length validation
+                                if ($length > 0 && $length <= strlen($rawData) - 4 && $length < 10000) {
+                                    $decodedChunk = substr($rawData, 4, $length);
+                                    // Only use decoded chunk if it looks like valid text (no null bytes)
+                                    if (strpos($decodedChunk, "\0") === false && mb_check_encoding($decodedChunk, 'UTF-8')) {
+                                        $textChunk = $decodedChunk;
+                                    } else {
+                                        $textChunk = $rawData; // Fallback to raw data
+                                    }
                                 } else {
                                     $textChunk = $rawData; // Fallback to raw data
                                 }
@@ -535,6 +575,9 @@ class AITriton {
 
                 // Collect the chunk
                 if (!empty($textChunk)) {
+                    // Clean up any trailing garbage characters
+                    $textChunk = rtrim($textChunk, "\0\x00-\x1F\x7F-\x9F");
+                    
                     $answer .= $textChunk;
                     $seenAny = true;
                 }
