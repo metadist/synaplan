@@ -91,7 +91,9 @@ class ApiKeys {
             'OIDC_SCOPES',
             'OIDC_SSL_VERIFY',
             'OIDC_AUTO_REDIRECT',
+            'APP_DEBUG',
             'APP_ENV',
+            'APP_URL',
         ];
 
         foreach ($keyConfig as $envKey) {
@@ -110,7 +112,6 @@ class ApiKeys {
         }
 
         // 2. Return null if not found
-        if($GLOBALS["debug"]) error_log("Warning: API key '$envKey' not found in environment");
         return null;
     }
 
