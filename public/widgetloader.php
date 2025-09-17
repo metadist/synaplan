@@ -78,8 +78,8 @@ while ($row = db::FetchArr($res)) {
     $config[$row['BSETTING']] = $row['BVALUE'];
 }
 
-// Set the prompt topic for the chat
-$_SESSION['WIDGET_PROMPT'] = $config['prompt'];
+// Set widget mode prompt to tools:sort to force server-side sorting for every request
+$_SESSION['WIDGET_PROMPT'] = 'tools:sort';
 $_SESSION['WIDGET_AUTO_MESSAGE'] = $config['autoMessage'];
 
 // Set headers to prevent caching and allow iframe embedding
@@ -236,6 +236,8 @@ header('Pragma: no-cache');
     </div>
     <div class="widget-content" id="spWidgetContent">
         <?php include __DIR__ . '/../frontend/c_chat.php'; ?>
+        <!-- Ensure promptId defaults to tools:sort in widget mode so client sends sorting -->
+        <input type="hidden" id="promptConfigSelect" value="tools:sort" />
     </div>
     <!-- Bootstrap JS - needed for dropdowns and other components -->
     <script src="node_modules/bootstrap/dist/js/bootstrap.bundle.min.js?v=<?php echo @filemtime('node_modules/bootstrap/dist/js/bootstrap.bundle.min.js'); ?>"></script>

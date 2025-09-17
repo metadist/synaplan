@@ -7,10 +7,15 @@ Class BasicAI {
     // tool prompt
     // ****************************************************************************************************** 
     public static function toolPrompt($msgArr, $stream = false): array|string|bool { 
-        $textArr = explode(" ", $msgArr['BTEXT']);
+        // Robust command parsing: split on any whitespace, normalize first token
+        $rawText = isset($msgArr['BTEXT']) ? (string)$msgArr['BTEXT'] : '';
+        $rawText = trim($rawText);
+        $parts = preg_split('/\s+/', $rawText, 2);
+        $firstToken = isset($parts[0]) ? strtolower($parts[0]) : '';
+        $restText = $parts[1] ?? '';
         
         if($stream) {
-            Frontend::statusToStream($msgArr['BID'], 'pre', $textArr[0].' ');
+            Frontend::statusToStream($msgArr['BID'], 'pre', ($firstToken !== '' ? $firstToken : '') . ' ');
         }
         // -----------------------------------------------------
         // process the tool
@@ -31,7 +36,7 @@ Class BasicAI {
         $AIT2Smodel = $GLOBALS["AI_TEXT2SOUND"]["MODEL"];
         $AIT2SmodelId = $GLOBALS["AI_TEXT2SOUND"]["MODELID"];
 
-        switch($textArr[0]) {
+        switch($firstToken) {
             
             case "/aboutai":
                 ProcessMethods::$toolProcessed = false;
@@ -59,9 +64,18 @@ Class BasicAI {
                 break;
 
             case "/pic":
+            case "/image":
+                // Hard guard: do not call provider if blocked
+                if (!empty($msgArr['__BLOCK_MEDIA'])) {
+                    $msgArr['BFILE'] = 0; $msgArr['BFILEPATH'] = ''; $msgArr['BFILETYPE'] = '';
+                    $msgArr['BTEXT'] = '';
+                    return $msgArr;
+                }
                 if($stream) {
                     Frontend::statusToStream($msgArr['BID'], 'pre', ' - calling '.$AIT2P.' ');
                 }
+                // Normalize BTEXT to a single-space delimiter after the tool
+                $msgArr['BTEXT'] = '/pic ' . $restText;
                 // For Again requests, add a unique identifier to force new generation
                 if (isset($GLOBALS["IS_AGAIN"]) && $GLOBALS["IS_AGAIN"] === true) {
                     $msgArr = $AIT2P::picPrompt($msgArr, $stream);
@@ -77,13 +91,21 @@ Class BasicAI {
                 break;
 
             case "/vid":
+            case "/video":
+                // Hard guard: do not call provider if blocked
+                if (!empty($msgArr['__BLOCK_MEDIA'])) {
+                    $msgArr['BFILE'] = 0; $msgArr['BFILEPATH'] = ''; $msgArr['BFILETYPE'] = '';
+                    $msgArr['BTEXT'] = '';
+                    return $msgArr;
+                }
                 if($stream) {
                     Frontend::statusToStream($msgArr['BID'], 'pre', ' - video! Patience please (around 40s): ');
                 }
+                // Normalize BTEXT to a single-space delimiter after the tool
+                $msgArr['BTEXT'] = '/vid ' . $restText;
                 // For Again requests, add a unique identifier to force new generation
                 if (isset($GLOBALS["IS_AGAIN"]) && $GLOBALS["IS_AGAIN"] === true) {
-                    $originalText = $msgArr['BTEXT'];
-                    $msgArr['BTEXT'] = $originalText . ' [Again-' . time() . ']';
+                    $msgArr['BTEXT'] = $msgArr['BTEXT'] . ' [Again-' . time() . ']';
                     $msgArr = $AIT2V::createVideo($msgArr, $stream);
                     // Keep the AI-generated text, don't restore original
                     // This ensures proper output text is displayed
@@ -114,22 +136,34 @@ Class BasicAI {
                 if($stream) {
                     Frontend::statusToStream($msgArr['BID'], 'pre', ' - calling '.$AIGENERAL.' ');
                 }
-                $msgArr = $AIGENERAL::translateTo($msgArr, $textArr[1], 'BTEXT');
+                // Determine target language from remaining text if present
+                $langTarget = '';
+                if ($restText !== '') {
+                    $langParts = preg_split('/\s+/', $restText, 2);
+                    $langTarget = $langParts[0] ?? '';
+                }
+                $msgArr = $AIGENERAL::translateTo($msgArr, $langTarget, 'BTEXT');
                 XSControl::storeAIDetails($msgArr, 'AISERVICE', $AIGENERAL, $stream);
                 XSControl::storeAIDetails($msgArr, 'AIMODEL', $AIGENERALmodel, $stream);
                 XSControl::storeAIDetails($msgArr, 'AIMODELID', $AIGENERALmodelId, $stream);
                 break;
 
             case "/audio":
+                // Hard guard: do not call provider if blocked
+                if (!empty($msgArr['__BLOCK_MEDIA'])) {
+                    $msgArr['BFILE'] = 0; $msgArr['BFILEPATH'] = ''; $msgArr['BFILETYPE'] = '';
+                    $msgArr['BTEXT'] = '';
+                    return $msgArr;
+                }
                 if($stream) {
                     Frontend::statusToStream($msgArr['BID'], 'pre', ' - TTS generating... ');
                 }
-                $msgArr['BTEXT'] = str_replace("/audio ","",$msgArr['BTEXT']);
+                // Normalize BTEXT to a single-space delimiter after the tool
+                $msgArr['BTEXT'] = '/audio ' . $restText;
                 
                 // For Again requests, add a unique identifier to force new generation
                 if (isset($GLOBALS["IS_AGAIN"]) && $GLOBALS["IS_AGAIN"] === true) {
-                    $originalText = $msgArr['BTEXT'];
-                    $msgArr['BTEXT'] = $originalText . ' [Again-' . time() . ']';
+                    $msgArr['BTEXT'] = $msgArr['BTEXT'] . ' [Again-' . time() . ']';
                     $soundArr = $AIT2S::textToSpeech($msgArr, $_SESSION['USERPROFILE']);
                     // Keep the AI-generated text, don't restore original
                     // This ensures proper output text is displayed

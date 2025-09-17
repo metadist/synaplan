@@ -524,14 +524,19 @@ class AIGoogle {
 
             $arrRes = Curler::callJson($url, $headers, $postData);
 
-            // Extract base64 image data
+            // Extract optional textual caption and base64 image data
             $base64 = '';
+            $fileType = '';
+            $captionText = '';
             if (isset($arrRes['candidates'][0]['content']['parts'])) {
                 foreach ($arrRes['candidates'][0]['content']['parts'] as $part) {
+                    if (isset($part['text']) && is_string($part['text']) && $captionText === '') {
+                        $captionText = trim($part['text']);
+                    }
                     if (isset($part['inlineData']['mimeType']) && strpos($part['inlineData']['mimeType'], 'image/') === 0) {
                         $base64 = $part['inlineData']['data'];
                         $fileType = explode('/', $part['inlineData']['mimeType'])[1];
-                        break;
+                        // do not break here to still allow capturing text if it appears after
                     }
                 }
             }
@@ -550,9 +555,19 @@ class AIGoogle {
             $msgArr['BFILETEXT'] = json_encode($postData,JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
             $msgArr['BFILEPATH'] = $filePath;
             $msgArr['BFILETYPE'] = $fileType;
+            // Prefer provider caption if available, else generic success text
+            if ($captionText !== '') {
+                $msgArr['BTEXT'] = $captionText;
+            } else {
+                $msgArr['BTEXT'] = "Image generated successfully: " . $picPrompt;
+            }
         } else {
             $msgArr['BFILEPATH'] = '';
             $msgArr['BFILETEXT'] = "Error: No image data returned";
+            // If provider returned any text, surface it for easier debugging
+            if ($captionText !== '') {
+                $msgArr['BTEXT'] = $captionText;
+            }
         }
 
         return $msgArr;
@@ -1024,8 +1039,9 @@ class AIGoogle {
                             ];
                             Frontend::printToStream($update);
                             
-                            // Check if parent process is still running
-                            if (!file_exists('/proc/' . getppid())) {
+                            // Check if parent process is still running (portable-ish check)
+                            $ppid = function_exists('posix_getppid') ? posix_getppid() : getmypid();
+                            if (!file_exists('/proc/' . $ppid)) {
                                 break;
                             }
                         }

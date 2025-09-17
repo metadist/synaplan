@@ -55,7 +55,7 @@ INSERT INTO `BCONFIG` VALUES
 (34,2,'widget_1','color','#007bff'),
 (35,2,'widget_1','position','bottom-right'),
 (36,2,'widget_1','autoMessage','Hello! How can I help you today?'),
-(37,2,'widget_1','prompt','general');
+(37,2,'widget_1','prompt','tools:sort');
 /*!40000 ALTER TABLE `BCONFIG` ENABLE KEYS */;
 UNLOCK TABLES;
 /*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;

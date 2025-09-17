@@ -653,7 +653,10 @@ function handleSendMessage() {
     let formData = new FormData();
     formData.append('message', userMessage);
     formData.append('action', actionMessage);
-    formData.append('promptId', selectedPromptId);
+    // In widget mode, always let the backend sorter decide; don't send promptId
+    if (!(typeof window.isAnonymousWidget !== 'undefined' && window.isAnonymousWidget)) {
+      formData.append('promptId', selectedPromptId);
+    }
     
     attachedFiles.forEach(file => {
       // Ensure correct filename and type are sent

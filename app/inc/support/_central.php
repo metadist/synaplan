@@ -67,6 +67,10 @@ class Central {
     // handle the prompt id for the message
     // ****************************************************************************************************** 
     public static function handlePromptIdForMessage($arrMessage): string {
+        // For anonymous widget sessions, always use sorter and do not persist a prompt override
+        if (isset($_SESSION["is_widget"]) && $_SESSION["is_widget"] === true) {
+            return 'tools:sort';
+        }
         $messPromptId = 'tools:sort';
         if(isset($_REQUEST['promptId'])) {
             $messPromptId = db::EscString($_REQUEST['promptId']);

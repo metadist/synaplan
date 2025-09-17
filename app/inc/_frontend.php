@@ -333,15 +333,22 @@ Class Frontend {
         $cleanPost = Tools::turnURLencodedIntoUTF8($_REQUEST['message']);
         $inMessageArr['BTEXT'] = DB::EscString(trim(strip_tags($cleanPost)));
         // ------------------------------------------------
-        $convArr = Central::searchConversation($inMessageArr);
-        // ------------------------------------------------
-        if(is_array($convArr) AND $convArr['BID'] > 0) {
-            $inMessageArr['BTRACKID'] = $convArr['BTRACKID'];
-            $inMessageArr['BTOPIC'] = $convArr['BTOPIC'];
-            $inMessageArr['BLANG'] = $convArr['BLANG'];
+        // For anonymous widgets, force fresh sorting instead of using conversation context
+        if (isset($_SESSION["is_widget"]) && $_SESSION["is_widget"] === true) {
+            // Let sorter detect language; don't preset from browser
+            $inMessageArr['BLANG'] = '';
+            $inMessageArr['BTOPIC'] = ''; // Force empty topic to trigger sorting
         } else {
-            $inMessageArr['BLANG'] = Central::getLanguageByBrowser();
-            $inMessageArr['BTOPIC'] = ''; 
+            $convArr = Central::searchConversation($inMessageArr);
+            // ------------------------------------------------
+            if(is_array($convArr) AND $convArr['BID'] > 0) {
+                $inMessageArr['BTRACKID'] = $convArr['BTRACKID'];
+                $inMessageArr['BTOPIC'] = $convArr['BTOPIC'];
+                $inMessageArr['BLANG'] = $convArr['BLANG'];
+            } else {
+                $inMessageArr['BLANG'] = Central::getLanguageByBrowser();
+                $inMessageArr['BTOPIC'] = ''; 
+            }
         }
         // --
         if(strlen($inMessageArr['BLANG']) != 2) {
@@ -390,7 +397,16 @@ Class Frontend {
             $inMessageArr['BID'] = $resArr['lastId'];
             XSControl::countBytes($inMessageArr, 'FILE', false);
             // set the prompt id
+            // For anonymous widget sessions, force sorting instead of using widget prompt
+            if (isset($_SESSION["is_widget"]) && $_SESSION["is_widget"] === true) {
+                // Don't set promptId for anonymous widgets - let them go through sorting
+                // The sorter will detect intent (media, files, etc.) and we'll intercept non-general topics
+                unset($_REQUEST['promptId']);
+                unset($_GET['promptId']);
+                unset($_POST['promptId']);
+            }
             $metaRes = Central::handlePromptIdForMessage($inMessageArr);
+            // For anonymous widget sessions, no special meta storage needed - let sorting handle intent detection
             
             // Process RAG for anonymous widget users with "WIDGET" group key
             if (isset($_SESSION["is_widget"]) && $_SESSION["is_widget"] === true && $file['BFILE'] == 1) {
@@ -1241,6 +1257,38 @@ Class Frontend {
         ];
         Frontend::printToStream($update);
         return true;
+    }
+
+    /**
+     * Build a Bootstrap alert HTML block for inline display in chat bubbles
+     *
+     * @param string $variant One of 'info' | 'warning' | 'danger' | 'success'
+     * @param string $title   Bold title text for the alert
+     * @param string $bodyHtml HTML string for the alert body (already-safe or intentionally-formatted)
+     * @param array $actions  Optional action buttons: [['href' => '...', 'label' => '...', 'primary' => true], ...]
+     * @return string Rendered HTML
+     */
+    public static function buildAlert(string $variant, string $title, string $bodyHtml, array $actions = []): string {
+        $btns = '';
+        foreach ($actions as $a) {
+            $cls = !empty($a['primary']) ? 'btn btn-primary btn-sm me-2' : 'btn btn-outline-primary btn-sm me-2';
+            $href = isset($a['href']) ? (string)$a['href'] : '';
+            $label = isset($a['label']) ? (string)$a['label'] : '';
+            $btns .= '<a href="'.htmlspecialchars($href).'" target="_blank" class="'.$cls.'">'.htmlspecialchars($label).'</a>';
+        }
+        return '<div class="alert alert-'.htmlspecialchars($variant).' mb-0" role="alert">'
+             . '<strong>'.htmlspecialchars($title).'</strong><br>'
+             . $bodyHtml
+             . ($btns ? '<div class="mt-2">'.$btns.'</div>' : '')
+             . '</div>';
+    }
+
+    /**
+     * Convenience helper: build and stream an alert as an SSE chunk
+     */
+    public static function alertToStream(int $msgId, string $variant, string $title, string $bodyHtml, array $actions = []): void {
+        $html = self::buildAlert($variant, $title, $bodyHtml, $actions);
+        self::statusToStream($msgId, 'ai', $html);
     }
     // ********************************************** PROFILE MANAGEMENT **********************************************
     
