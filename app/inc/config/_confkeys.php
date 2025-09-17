@@ -84,6 +84,7 @@ class ApiKeys {
             'GOOGLE_OAUTH_CREDENTIALS',
             'GMAIL_OAUTH_TOKEN',
             'OLLAMA_SERVER',
+            'TRITON_SERVER',
             'OIDC_PROVIDER_URL',
             'OIDC_CLIENT_ID',
             'OIDC_CLIENT_SECRET',
@@ -204,6 +205,13 @@ class ApiKeys {
      */
     public static function getBraveSearch() {
         return self::get('BRAVE_SEARCH_API_KEY');
+    }
+
+    /**
+     * Get Triton server URL
+     */
+    public static function getTritonServer() {
+        return self::get('TRITON_SERVER');
     }
 
     /**

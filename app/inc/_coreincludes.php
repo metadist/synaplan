@@ -13,6 +13,7 @@ require_once(__DIR__ . '/ai/providers/_aianthropic.php');
 require_once(__DIR__ . '/ai/providers/_aithehive.php');  
 require_once(__DIR__ . '/ai/providers/_aiopenai.php');
 require_once(__DIR__ . '/ai/providers/_aigoogle.php');
+require_once(__DIR__ . '/ai/providers/_aitriton.php');
 // incoming tools
 require_once(__DIR__ . '/integrations/_wasender.php');
 require_once(__DIR__ . '/mail/_myGMail.php');
