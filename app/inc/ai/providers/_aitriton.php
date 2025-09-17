@@ -74,12 +74,6 @@ class AITriton {
      * @return array|string|bool Sorting result or error message
      */
     public static function sortingPrompt($msgArr, $threadArr): array|string|bool {
-        // Enhanced debug logging for sorting prompt
-        if ($GLOBALS["debug"]) {
-            error_log("=== TRITON SORTING DEBUG: Starting sortingPrompt ===");
-            error_log("Input msgArr: " . print_r($msgArr, true));
-            error_log("Thread count: " . count($threadArr));
-        }
 
         // prompt builder
         $systemPrompt = BasicAI::getAprompt('tools:sort');
@@ -121,58 +115,25 @@ class AITriton {
         $msgText = json_encode($msgArr, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
         $fullPrompt .= "\nCurrent message to analyze: " . $msgText;
 
-        // Enhanced debug logging for request
-        if ($GLOBALS["debug"]) {
-            error_log("=== TRITON SORTING DEBUG: Request details ===");
-            error_log("System prompt length: " . strlen($systemPrompt['BPROMPT']));
-            error_log("Current message: " . $msgText);
-            error_log("Full prompt length: " . strlen($fullPrompt));
-        }
 
         // ------------------------------------------------
         try {
             // Use Triton streaming inference for sorting (collect all output)
             $answer = self::streamInference($fullPrompt, 512, false); // false = collect all output
             
-            if ($GLOBALS["debug"]) {
-                error_log("=== TRITON SORTING DEBUG: Response Success ===");
-                error_log("Response received successfully");
-            }
             
         } catch (Exception $err) {
             if($GLOBALS["debug"]) {
-                error_log("=== TRITON SORTING DEBUG: API Error Details ===");
-                error_log("Error type: " . get_class($err));
-                error_log("Error message: " . $err->getMessage());
-                error_log("Error code: " . $err->getCode());
-                error_log("Error file: " . $err->getFile() . ":" . $err->getLine());
-                error_log("Stack trace: " . $err->getTraceAsString());
+                error_log("Triton sorting error: " . $err->getMessage());
             }
             return "*API sorting Error - Triton error: * " . $err->getMessage();
         }
         
-        // Enhanced DEBUG: Log raw response before parsing (only if debug enabled)
-        if ($GLOBALS["debug"]) {
-            error_log("=== TRITON SORTING DEBUG: Raw Response Analysis ===");
-            error_log("Response type: " . gettype($answer));
-            error_log("Response length: " . strlen($answer));
-            error_log("Response preview (first 200 chars): " . substr($answer, 0, 200));
-        }
         
         // ------------------------------------------------
         // Clean and return response
         if (empty($answer)) {
-            if ($GLOBALS["debug"]) {
-                error_log("=== TRITON SORTING DEBUG: Empty Response Error ===");
-                error_log("Response is empty");
-            }
             return "*API sorting Error - Empty response from Triton API*";
-        }
-
-        if ($GLOBALS["debug"]) {
-            error_log("=== TRITON SORTING DEBUG: Content Processing ===");
-            error_log("Raw answer length: " . strlen($answer));
-            error_log("Raw answer: " . $answer);
         }
 
         // Clean JSON response - only remove code fences, don't extract BTEXT
@@ -182,11 +143,6 @@ class AITriton {
         $answer = str_replace("```", "", $answer);
         $answer = trim($answer);
         
-        if ($GLOBALS["debug"]) {
-            error_log("=== TRITON SORTING DEBUG: Final Result ===");
-            error_log("Final answer: " . $answer);
-            error_log("Answer type: " . gettype($answer));
-        }
         
         return $answer;
     }
@@ -252,11 +208,6 @@ class AITriton {
 
         try {
             if ($stream) {
-                if ($GLOBALS["debug"]) {
-                    error_log("=== TRITON TOPIC DEBUG: Starting streaming mode ===");
-                    error_log("Model: " . $myModel);
-                    error_log("Prompt length: " . strlen($fullPrompt));
-                }
                 
                 // Use streaming mode
                 $answer = '';
@@ -284,47 +235,6 @@ class AITriton {
                         $textChunk = '';
                         $isFinal = false;
 
-                        // LOG: Raw protobuf response analysis
-                        if ($GLOBALS["debug"]) {
-                            error_log("=== TRITON PROTOBUF LOG: Analyzing response ===");
-                            $rawContents = $inferResponse->getRawOutputContents();
-                            error_log("Raw contents count: " . count($rawContents));
-                            if (!empty($rawContents)) {
-                                for ($i = 0; $i < count($rawContents); $i++) {
-                                    error_log("Raw content $i length: " . strlen($rawContents[$i]));
-                                    error_log("Raw content $i hex: " . bin2hex(substr($rawContents[$i], 0, 20)));
-                                }
-                            }
-                            $outputs = $inferResponse->getOutputs();
-                            error_log("Structured outputs count: " . count($outputs));
-                            foreach ($outputs as $output) {
-                                error_log("Output name: " . $output->getName());
-                                $contents = $output->getContents();
-                                if ($contents) {
-                                    $bytesContents = $contents->getBytesContents();
-                                    $boolContents = $contents->getBoolContents();
-                                    $intContents = $contents->getIntContents();
-                                    $floatContents = $contents->getFp32Contents();
-                                    error_log("  Bytes contents count: " . count($bytesContents));
-                                    error_log("  Bool contents count: " . count($boolContents));
-                                    error_log("  Int contents count: " . count($intContents));
-                                    error_log("  Float contents count: " . count($floatContents));
-                                    if (!empty($bytesContents)) {
-                                        error_log("  First bytes content length: " . strlen($bytesContents[0]));
-                                        error_log("  First bytes content hex: " . bin2hex(substr($bytesContents[0], 0, 20)));
-                                        error_log("  First bytes content as string: " . $bytesContents[0]);
-                                    }
-                                    if (!empty($boolContents)) {
-                                        error_log("  First bool content: " . ($boolContents[0] ? 'true' : 'false'));
-                                    }
-                                    if (!empty($intContents)) {
-                                        error_log("  First int content: " . $intContents[0]);
-                                    }
-                                } else {
-                                    error_log("  Contents is null");
-                                }
-                            }
-                        }
 
                         // Try structured output parsing first (more reliable)
                         $outputs = $inferResponse->getOutputs();
@@ -352,23 +262,6 @@ class AITriton {
                         if (empty($textChunk)) {
                             $rawContents = $inferResponse->getRawOutputContents();
                             if (!empty($rawContents)) {
-                                // LOG: Try to decode protobuf data
-                                if ($GLOBALS["debug"]) {
-                                    error_log("=== TRITON PROTOBUF DECODE: Attempting to decode raw contents ===");
-                                    for ($i = 0; $i < count($rawContents); $i++) {
-                                        error_log("Raw content $i full hex: " . bin2hex($rawContents[$i]));
-                                        // Try to decode as length-prefixed protobuf (little-endian)
-                                        if (strlen($rawContents[$i]) >= 4) {
-                                            $length = unpack('V', substr($rawContents[$i], 0, 4))[1]; // V = little-endian unsigned long
-                                            error_log("  Decoded length: $length");
-                                            if ($length > 0 && $length <= strlen($rawContents[$i]) - 4) {
-                                                $decoded = substr($rawContents[$i], 4, $length);
-                                                error_log("  Decoded content: " . $decoded);
-                                                error_log("  Decoded hex: " . bin2hex($decoded));
-                                            }
-                                        }
-                                    }
-                                }
                                 
                                 // Try to decode the first raw content as length-prefixed data
                                 if (isset($rawContents[0])) {
@@ -394,36 +287,12 @@ class AITriton {
 
                         // Stream the chunk
                         if (!empty($textChunk)) {
-                            // LOG: Raw chunk received from Triton
-                            if ($GLOBALS["debug"]) {
-                                error_log("=== TRITON STREAM LOG: Raw chunk received ===");
-                                error_log("Chunk length: " . strlen($textChunk));
-                                error_log("Chunk content: " . $textChunk);
-                                error_log("Chunk hex (first 50 bytes): " . bin2hex(substr($textChunk, 0, 50)));
-                                error_log("Chunk is valid UTF-8: " . (mb_check_encoding($textChunk, 'UTF-8') ? 'YES' : 'NO'));
-                            }
-                            
                             $answer .= $textChunk;
                             $pendingText .= $textChunk;
                             
-                            // LOG: Before sending to frontend
-                            if ($GLOBALS["debug"]) {
-                                error_log("=== TRITON STREAM LOG: Before frontend stream ===");
-                                error_log("Pending text length: " . strlen($pendingText));
-                                error_log("Pending text content: " . $pendingText);
-                                error_log("Pending text hex (first 50 bytes): " . bin2hex(substr($pendingText, 0, 50)));
-                            }
-                            
-                            // Throttle ultra-small deltas (whitespace-only)
-                            if (trim($pendingText) !== '' || strlen($pendingText) > 10) {
+                            // Stream meaningful chunks (avoid flooding with tiny updates)
+                            if (strlen($pendingText) > 5 || (strlen($pendingText) > 0 && trim($pendingText) !== '')) {
                                 Frontend::statusToStream($msgArr["BID"], 'ai', $pendingText);
-                                
-                                // LOG: After sending to frontend
-                                if ($GLOBALS["debug"]) {
-                                    error_log("=== TRITON STREAM LOG: Sent to frontend ===");
-                                    error_log("Sent text: " . $pendingText);
-                                }
-                                
                                 $pendingText = '';
                             }
                         }
@@ -434,10 +303,6 @@ class AITriton {
                         }
                     }
                     
-                    if ($GLOBALS["debug"]) {
-                        error_log("=== TRITON TOPIC DEBUG: Streaming completed ===");
-                        error_log("Final answer length: " . strlen($answer));
-                    }
                     
                     // Flush any remaining pending text
                     if (!empty($pendingText)) {
@@ -446,12 +311,7 @@ class AITriton {
                     
                 } catch (Exception $streamErr) {
                     if ($GLOBALS["debug"]) {
-                        error_log("=== TRITON TOPIC DEBUG: Streaming Exception ===");
-                        error_log("Error type: " . get_class($streamErr));
-                        error_log("Error message: " . $streamErr->getMessage());
-                        error_log("Error code: " . $streamErr->getCode());
-                        error_log("Error file: " . $streamErr->getFile() . ":" . $streamErr->getLine());
-                        error_log("Stack trace: " . $streamErr->getTraceAsString());
+                        error_log("Triton streaming error: " . $streamErr->getMessage());
                     }
                     return "*API topic Error - Streaming failed: " . $streamErr->getMessage();
                 }
@@ -461,37 +321,12 @@ class AITriton {
                     return "*API topic Error - Streaming completed with no content";
                 }
                 
-                // LOG: Final answer before processing
-                if ($GLOBALS["debug"]) {
-                    error_log("=== TRITON STREAM LOG: Final answer processing ===");
-                    error_log("Final answer length: " . strlen($answer));
-                    error_log("Final answer content: " . $answer);
-                    error_log("Final answer hex (first 100 bytes): " . bin2hex(substr($answer, 0, 100)));
-                    error_log("Final answer is valid UTF-8: " . (mb_check_encoding($answer, 'UTF-8') ? 'YES' : 'NO'));
-                }
                 
                 // After streaming completes: if the full content is a JSON object, extract BTEXT
                 $finalText = $answer;
                 $maybeBTEXT = self::extractBTEXTFromJsonString($answer);
                 if ($maybeBTEXT !== null) {
                     $finalText = $maybeBTEXT;
-                    
-                    // LOG: After JSON extraction
-                    if ($GLOBALS["debug"]) {
-                        error_log("=== TRITON STREAM LOG: After JSON extraction ===");
-                        error_log("Extracted BTEXT: " . $finalText);
-                        error_log("Extracted BTEXT hex (first 100 bytes): " . bin2hex(substr($finalText, 0, 100)));
-                    }
-                }
-                
-                // No encoding processing - use raw output like working demo
-                
-                // LOG: Final text being returned
-                if ($GLOBALS["debug"]) {
-                    error_log("=== TRITON STREAM LOG: Final text being returned ===");
-                    error_log("Final text length: " . strlen($finalText));
-                    error_log("Final text content: " . $finalText);
-                    error_log("Final text hex (first 100 bytes): " . bin2hex(substr($finalText, 0, 100)));
                 }
                 
                 // Return assembled structure for streaming
@@ -521,23 +356,10 @@ class AITriton {
                 $answer = self::streamInference($fullPrompt, 1024, false);
             }
             
-            // DEBUG: Log raw response before parsing (only if debug enabled)
-            if ($GLOBALS["debug"]) {
-                error_log("=== TRITON TOPIC DEBUG: Raw response structure ===");
-                error_log("Response length: " . strlen($answer));
-                error_log("Response preview: " . substr($answer, 0, 200));
-            }
             
         } catch (Exception $err) {
             if ($GLOBALS["debug"]) {
-                error_log("=== TRITON TOPIC DEBUG: Exception Details ===");
-                error_log("Error type: " . get_class($err));
-                error_log("Error message: " . $err->getMessage());
-                error_log("Error code: " . $err->getCode());
-                error_log("Error file: " . $err->getFile() . ":" . $err->getLine());
-                error_log("Stack trace: " . $err->getTraceAsString());
-                error_log("Stream mode: " . ($stream ? 'true' : 'false'));
-                error_log("Model: " . $myModel);
+                error_log("Triton topic error: " . $err->getMessage());
             }
             if ($stream) {
                 return "*API topic Error - Streaming failed: " . $err->getMessage();
@@ -545,43 +367,13 @@ class AITriton {
             return "*APItopic Error - Triton error: * " . $err->getMessage();
         }
 
-        // LOG: Non-streaming answer before processing
-        if ($GLOBALS["debug"]) {
-            error_log("=== TRITON NON-STREAM LOG: Answer before processing ===");
-            error_log("Answer length: " . strlen($answer));
-            error_log("Answer content: " . $answer);
-            error_log("Answer hex (first 100 bytes): " . bin2hex(substr($answer, 0, 100)));
-            error_log("Answer is valid UTF-8: " . (mb_check_encoding($answer, 'UTF-8') ? 'YES' : 'NO'));
-        }
         
         // Non-streaming: if JSON came back, extract BTEXT before output
         $maybeBTEXT = self::extractBTEXTFromJsonString($answer);
         if ($maybeBTEXT !== null) {
             $answer = $maybeBTEXT;
-            
-            // LOG: After JSON extraction
-            if ($GLOBALS["debug"]) {
-                error_log("=== TRITON NON-STREAM LOG: After JSON extraction ===");
-                error_log("Extracted BTEXT: " . $answer);
-                error_log("Extracted BTEXT hex (first 100 bytes): " . bin2hex(substr($answer, 0, 100)));
-            }
         }
         
-        // LOG: Final answer being returned
-        if ($GLOBALS["debug"]) {
-            error_log("=== TRITON NON-STREAM LOG: Final answer being returned ===");
-            error_log("Final answer length: " . strlen($answer));
-            error_log("Final answer content: " . $answer);
-            error_log("Final answer hex (first 100 bytes): " . bin2hex(substr($answer, 0, 100)));
-        }
-        
-        // No encoding processing - use raw output like working demo
-        
-        // DEBUG: Log final answer (only if debug enabled)
-        if ($GLOBALS["debug"]) {
-            error_log("=== TRITON TOPIC DEBUG: Final answer (no parsing) ===");
-            error_log("Final answer: " . $answer);
-        }
 
         // Return final text (plain or extracted from JSON)
         $arrAnswer = $msgArr;
@@ -718,23 +510,6 @@ class AITriton {
                 if (empty($textChunk)) {
                     $rawContents = $inferResponse->getRawOutputContents();
                     if (!empty($rawContents)) {
-                        // LOG: Try to decode protobuf data in streamInference
-                        if ($GLOBALS["debug"]) {
-                            error_log("=== TRITON STREAMINFERENCE PROTOBUF DECODE: Attempting to decode raw contents ===");
-                            for ($i = 0; $i < count($rawContents); $i++) {
-                                error_log("Raw content $i full hex: " . bin2hex($rawContents[$i]));
-                                // Try to decode as length-prefixed protobuf (little-endian)
-                                if (strlen($rawContents[$i]) >= 4) {
-                                    $length = unpack('V', substr($rawContents[$i], 0, 4))[1]; // V = little-endian unsigned long
-                                    error_log("  Decoded length: $length");
-                                    if ($length > 0 && $length <= strlen($rawContents[$i]) - 4) {
-                                        $decoded = substr($rawContents[$i], 4, $length);
-                                        error_log("  Decoded content: " . $decoded);
-                                        error_log("  Decoded hex: " . bin2hex($decoded));
-                                    }
-                                }
-                            }
-                        }
                         
                         // Try to decode the first raw content as length-prefixed data
                         if (isset($rawContents[0])) {
@@ -760,15 +535,6 @@ class AITriton {
 
                 // Collect the chunk
                 if (!empty($textChunk)) {
-                    // LOG: Chunk received in streamInference
-                    if ($GLOBALS["debug"]) {
-                        error_log("=== TRITON STREAMINFERENCE LOG: Chunk received ===");
-                        error_log("Chunk length: " . strlen($textChunk));
-                        error_log("Chunk content: " . $textChunk);
-                        error_log("Chunk hex (first 50 bytes): " . bin2hex(substr($textChunk, 0, 50)));
-                        error_log("Chunk is valid UTF-8: " . (mb_check_encoding($textChunk, 'UTF-8') ? 'YES' : 'NO'));
-                    }
-                    
                     $answer .= $textChunk;
                     $seenAny = true;
                 }
@@ -786,94 +552,10 @@ class AITriton {
             throw $e;
         }
 
-        // LOG: Final answer from streamInference
-        if ($GLOBALS["debug"]) {
-            error_log("=== TRITON STREAMINFERENCE LOG: Final answer ===");
-            error_log("Final answer length: " . strlen($answer));
-            error_log("Final answer content: " . $answer);
-            error_log("Final answer hex (first 100 bytes): " . bin2hex(substr($answer, 0, 100)));
-            error_log("Final answer is valid UTF-8: " . (mb_check_encoding($answer, 'UTF-8') ? 'YES' : 'NO'));
-        }
-        
-        // No encoding processing - use raw output like working demo
         
         return $answer;
     }
     
-    /**
-     * Fix text encoding issues from Triton server
-     * 
-     * @param string $text The potentially corrupted text
-     * @return string The fixed text
-     */
-    private static function fixTextEncoding(string $text): string {
-        if (empty($text)) {
-            return $text;
-        }
-        
-        // Debug: Log original text for analysis
-        if ($GLOBALS["debug"]) {
-            error_log("Original text (first 100 chars): " . substr($text, 0, 100));
-            error_log("Original text hex: " . bin2hex(substr($text, 0, 50)));
-        }
-        
-        // Try different encoding approaches
-        $attempts = [
-            // 1. Check if already valid UTF-8
-            function($t) { return mb_check_encoding($t, 'UTF-8') ? $t : null; },
-            
-            // 2. Convert from auto-detected encoding to UTF-8
-            function($t) { return mb_convert_encoding($t, 'UTF-8', 'auto'); },
-            
-            // 3. Try common encodings
-            function($t) { return mb_convert_encoding($t, 'UTF-8', 'ISO-8859-1'); },
-            function($t) { return mb_convert_encoding($t, 'UTF-8', 'Windows-1252'); },
-            function($t) { return mb_convert_encoding($t, 'UTF-8', 'ASCII'); },
-            
-            // 4. Try to clean up common corruption patterns
-            function($t) {
-                // Remove null bytes and control characters
-                $cleaned = preg_replace('/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/', '', $t);
-                return mb_convert_encoding($cleaned, 'UTF-8', 'auto');
-            },
-            
-            // 5. Try to fix UTF-8 sequences that might be corrupted
-            function($t) {
-                // Replace invalid UTF-8 sequences
-                $fixed = mb_convert_encoding($t, 'UTF-8', 'UTF-8');
-                return $fixed;
-            },
-            
-            // 6. Last resort: force UTF-8 with replacement characters
-            function($t) {
-                return mb_convert_encoding($t, 'UTF-8', 'UTF-8');
-            }
-        ];
-        
-        foreach ($attempts as $index => $attempt) {
-            try {
-                $result = $attempt($text);
-                if ($result !== null && $result !== false && mb_check_encoding($result, 'UTF-8')) {
-                    if ($GLOBALS["debug"]) {
-                        error_log("Encoding fix attempt " . ($index + 1) . " succeeded");
-                        error_log("Fixed text (first 100 chars): " . substr($result, 0, 100));
-                    }
-                    return $result;
-                }
-            } catch (Exception $e) {
-                if ($GLOBALS["debug"]) {
-                    error_log("Encoding fix attempt " . ($index + 1) . " failed: " . $e->getMessage());
-                }
-                continue;
-            }
-        }
-        
-        // If all attempts fail, return the original text
-        if ($GLOBALS["debug"]) {
-            error_log("All encoding fix attempts failed, returning original text");
-        }
-        return $text;
-    }
 
     /**
      * Attempt to extract BTEXT from a JSON string response.
