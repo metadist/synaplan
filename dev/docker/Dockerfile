@@ -25,6 +25,8 @@ RUN apt-get update && apt-get install -y \
     liblapack-dev \
     #libatlas-base-dev \
     gfortran \
+    # gRPCs
+    protobuf-compiler \
     # FFmpeg and multimedia dependencies
     ffmpeg \
     libavcodec-extra \

@@ -36,15 +36,11 @@
             "curl -L https://raw.githubusercontent.com/triton-inference-server/common/main/protobuf/grpc_service.proto -o ./dev/triton/grpc_service.proto",
             "curl -L https://raw.githubusercontent.com/triton-inference-server/common/main/protobuf/model_config.proto -o ./dev/triton/model_config.proto"
         ],
-        "setup-protobuf": [
-            "mkdir -p app/inc/ai/grpc-triton",
-            "echo 'Protobuf setup complete. Run composer run generate-proto to generate classes.'"
-        ],
         "generate-proto": [
             "protoc --php_out=app/inc/ai/grpc-triton --proto_path=./dev/triton ./dev/triton/grpc_service.proto ./dev/triton/model_config.proto"
         ],
-        "post-install-cmd": ["@setup-protobuf"],
-        "post-update-cmd": ["@setup-protobuf"]
+        "post-install-cmd": ["@generate-proto"],
+        "post-update-cmd": ["@generate-proto"]
 
     },
     "config": {
