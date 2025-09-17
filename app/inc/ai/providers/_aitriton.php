@@ -65,9 +65,9 @@ class AITriton {
     /**
      * Message sorting prompt handler
      * 
-     * Analyzes and categorizes incoming messages to determine their intent and
-     * appropriate handling method. This helps in routing messages to the correct
-     * processing pipeline.
+     * Analyzes incoming messages to determine their intent and routing.
+     * Uses Triton's mistral-streaming model for classification.
+     * Always uses non-streaming mode and expects JSON response.
      * 
      * @param array $msgArr Current message array
      * @param array $threadArr Conversation thread history
@@ -150,12 +150,14 @@ class AITriton {
     /**
      * Topic-specific response generator
      * 
-     * Generates responses based on the specific topic of the message.
-     * Uses topic-specific prompts to create more focused and relevant responses.
+     * Generates AI responses using Triton's mistral-streaming model.
+     * Streaming mode: Uses plain text input for better performance.
+     * Non-streaming mode: Uses full JSON for complex processing.
+     * Handles protobuf decoding and character cleanup automatically.
      * 
      * @param array $msgArr Message array containing topic information
      * @param array $threadArr Thread context for conversation history
-     * @param bool $stream Whether to use streaming mode
+     * @param bool $stream Whether to use streaming mode (default: false)
      * @return array|string|bool Topic-specific response or error message
      */
     public static function topicPrompt($msgArr, $threadArr, $stream = false): array|string|bool {
@@ -168,23 +170,20 @@ class AITriton {
         }
         $client = self::$client;
         
-        // Different system prompt handling for streaming vs non-streaming (like OpenAI)
-        if ($stream) {
-            $fullPrompt = 'You are the Synaplan.com AI assistant. Please answer in the language of the user.' . "\n\n";
-        } else {
-            $fullPrompt = $systemPrompt['BPROMPT'] . "\n\n";
-        }
+        // System prompt: simplified for streaming, full for non-streaming
+        $fullPrompt = $stream 
+            ? 'You are the Synaplan.com AI assistant. Please answer in the language of the user.' . "\n\n"
+            : $systemPrompt['BPROMPT'] . "\n\n";
         
-        // Add conversation history - different handling for streaming vs non-streaming
+        // Add conversation history
+        $fullPrompt .= "Conversation History:\n";
         if ($stream) {
-            // For streaming: simplified history like Ollama
-            $fullPrompt .= "Conversation History:\n";
+            // Simplified for streaming
             foreach($threadArr as $msg) {
                 $fullPrompt .= "[".$msg['BID']."] ".$msg['BTEXT'] . "\n";
             }
         } else {
-            // For non-streaming: detailed history with roles
-            $fullPrompt .= "Conversation History:\n";
+            // Detailed for non-streaming
             foreach($threadArr as $msg) {
                 if($msg['BDIRECT'] == 'IN') {
                     $msg['BTEXT'] = Tools::cleanTextBlock($msg['BTEXT']);
@@ -196,14 +195,11 @@ class AITriton {
                 } 
                 if($msg['BDIRECT'] == 'OUT') {
                     if(strlen($msg['BTEXT'])>1000) {
-                        // Truncate at word boundary to avoid breaking JSON or quotes
                         $truncatedText = substr($msg['BTEXT'], 0, 1000);
-                        // Find the last complete word
                         $lastSpace = strrpos($truncatedText, ' ');
                         if ($lastSpace !== false && $lastSpace > 800) {
                             $truncatedText = substr($truncatedText, 0, $lastSpace);
                         }
-                        // Clean up any trailing quotes or incomplete JSON
                         $truncatedText = rtrim($truncatedText, '"\'{}[]');
                         $msg['BTEXT'] = $truncatedText . "...";
                     }
@@ -212,19 +208,16 @@ class AITriton {
             }
         }
 
-        // Add current message - different handling for streaming vs non-streaming
+        // Add current message
         if ($stream) {
-            // For streaming: use plain text like OpenAI and Ollama
             $msgText = $msgArr['BTEXT'];
             if(strlen($msgArr['BFILETEXT']) > 1) {
                 $msgText .= "\n\n\n---\n\n\nUser provided a file: ".$msgArr['BFILETYPE'].", saying: '".$msgArr['BFILETEXT']."'\n\n";
             }
-            $fullPrompt .= "\nCurrent message: " . $msgText;
         } else {
-            // For non-streaming: use full JSON like other providers
             $msgText = json_encode($msgArr,JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-            $fullPrompt .= "\nCurrent message: " . $msgText;
         }
+        $fullPrompt .= "\nCurrent message: " . $msgText;
         
         // which model on triton?
         $myModel = $GLOBALS["AI_CHAT"]["MODEL"];
@@ -286,26 +279,9 @@ class AITriton {
                             $rawContents = $inferResponse->getRawOutputContents();
                             if (!empty($rawContents)) {
                                 
-                                // Try to decode the first raw content as length-prefixed data
+                                // Try to decode protobuf length-prefixed data
                                 if (isset($rawContents[0])) {
-                                    $rawData = $rawContents[0];
-                                    if (strlen($rawData) >= 4) {
-                                        $length = unpack('V', substr($rawData, 0, 4))[1]; // V = little-endian unsigned long
-                                        // More conservative length validation
-                                        if ($length > 0 && $length <= strlen($rawData) - 4 && $length < 10000) {
-                                            $decodedChunk = substr($rawData, 4, $length);
-                                            // Only use decoded chunk if it looks like valid text (no null bytes)
-                                            if (strpos($decodedChunk, "\0") === false && mb_check_encoding($decodedChunk, 'UTF-8')) {
-                                                $textChunk = $decodedChunk;
-                                            } else {
-                                                $textChunk = $rawData; // Fallback to raw data
-                                            }
-                                        } else {
-                                            $textChunk = $rawData; // Fallback to raw data
-                                        }
-                                    } else {
-                                        $textChunk = $rawData; // Fallback to raw data
-                                    }
+                                    $textChunk = self::decodeProtobufData($rawContents[0]);
                                 }
                                 // Check if we have is_final indicator in second raw content or detect end
                                 if (count($rawContents) > 1 && isset($rawContents[1])) {
@@ -317,13 +293,11 @@ class AITriton {
 
                         // Stream the chunk
                         if (!empty($textChunk)) {
-                            // Clean up any trailing garbage characters
-                            $textChunk = rtrim($textChunk, "\0\x00-\x1F\x7F-\x9F");
-                            
+                            $textChunk = rtrim($textChunk, "\0\x00-\x1F\x7F-\x9F"); // Clean garbage chars
                             $answer .= $textChunk;
                             $pendingText .= $textChunk;
                             
-                            // Stream meaningful chunks (avoid flooding with tiny updates)
+                            // Stream meaningful chunks
                             if (strlen($pendingText) > 5 || (strlen($pendingText) > 0 && trim($pendingText) !== '')) {
                                 Frontend::statusToStream($msgArr["BID"], 'ai', $pendingText);
                                 $pendingText = '';
@@ -423,12 +397,11 @@ class AITriton {
     /**
      * Image content analyzer
      * 
-     * Analyzes image content and generates a description using Triton's vision capabilities.
-     * Note: This is a placeholder implementation as Triton's mistral-streaming model
-     * may not support vision. Returns an error message indicating the limitation.
+     * Placeholder for image analysis functionality.
+     * Triton's mistral-streaming model does not support vision tasks.
      * 
      * @param array $arrMessage Message array containing image information
-     * @return array|string|bool Image description or error message
+     * @return array|string|bool Error message indicating unsupported feature
      */
     public static function explainImage($arrMessage): array|string|bool {
         // Triton's mistral-streaming model doesn't support vision
@@ -483,6 +456,10 @@ class AITriton {
 
     /**
      * Stream inference from Triton server
+     * 
+     * Handles gRPC communication with Triton Inference Server.
+     * Supports both streaming and non-streaming modes.
+     * Automatically decodes protobuf responses and cleans up binary data.
      * 
      * @param string $prompt The input prompt
      * @param int $maxTokens Maximum tokens to generate
@@ -544,26 +521,9 @@ class AITriton {
                     $rawContents = $inferResponse->getRawOutputContents();
                     if (!empty($rawContents)) {
                         
-                        // Try to decode the first raw content as length-prefixed data
+                        // Try to decode protobuf length-prefixed data
                         if (isset($rawContents[0])) {
-                            $rawData = $rawContents[0];
-                            if (strlen($rawData) >= 4) {
-                                $length = unpack('V', substr($rawData, 0, 4))[1]; // V = little-endian unsigned long
-                                // More conservative length validation
-                                if ($length > 0 && $length <= strlen($rawData) - 4 && $length < 10000) {
-                                    $decodedChunk = substr($rawData, 4, $length);
-                                    // Only use decoded chunk if it looks like valid text (no null bytes)
-                                    if (strpos($decodedChunk, "\0") === false && mb_check_encoding($decodedChunk, 'UTF-8')) {
-                                        $textChunk = $decodedChunk;
-                                    } else {
-                                        $textChunk = $rawData; // Fallback to raw data
-                                    }
-                                } else {
-                                    $textChunk = $rawData; // Fallback to raw data
-                                }
-                            } else {
-                                $textChunk = $rawData; // Fallback to raw data
-                            }
+                            $textChunk = self::decodeProtobufData($rawContents[0]);
                         }
                         // Check if we have is_final indicator in second raw content or detect end
                         if (count($rawContents) > 1 && isset($rawContents[1])) {
@@ -575,9 +535,7 @@ class AITriton {
 
                 // Collect the chunk
                 if (!empty($textChunk)) {
-                    // Clean up any trailing garbage characters
-                    $textChunk = rtrim($textChunk, "\0\x00-\x1F\x7F-\x9F");
-                    
+                    $textChunk = rtrim($textChunk, "\0\x00-\x1F\x7F-\x9F"); // Clean garbage chars
                     $answer .= $textChunk;
                     $seenAny = true;
                 }
@@ -599,6 +557,28 @@ class AITriton {
         return $answer;
     }
     
+
+    /**
+     * Decode protobuf length-prefixed data safely
+     * 
+     * @param string $rawData Raw binary data from Triton
+     * @return string Decoded text or original data if decoding fails
+     */
+    private static function decodeProtobufData(string $rawData): string {
+        if (strlen($rawData) < 4) {
+            return $rawData;
+        }
+        
+        $length = unpack('V', substr($rawData, 0, 4))[1];
+        if ($length > 0 && $length <= strlen($rawData) - 4 && $length < 10000) {
+            $decodedChunk = substr($rawData, 4, $length);
+            if (strpos($decodedChunk, "\0") === false && mb_check_encoding($decodedChunk, 'UTF-8')) {
+                return $decodedChunk;
+            }
+        }
+        
+        return $rawData;
+    }
 
     /**
      * Attempt to extract BTEXT from a JSON string response.
