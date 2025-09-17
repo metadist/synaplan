@@ -55,6 +55,13 @@ class AIGroq {
      * @return array|string|bool Sorting result or error message
      */
     public static function sortingPrompt($msgArr, $threadArr): array|string|bool {
+        // Enhanced debug logging for sorting prompt
+        if ($GLOBALS["debug"]) {
+            error_log("=== GROQ SORTING DEBUG: Starting sortingPrompt ===");
+            error_log("Input msgArr: " . print_r($msgArr, true));
+            error_log("Thread count: " . count($threadArr));
+        }
+
         // prompt builder
         $systemPrompt = BasicAI::getAprompt('tools:sort');
 
@@ -95,49 +102,129 @@ class AIGroq {
         $msgText = json_encode($msgArr, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
         $arrMessages[] = ['role' => 'user', 'content' => $msgText];
 
+        // Enhanced debug logging for request
+        if ($GLOBALS["debug"]) {
+            error_log("=== GROQ SORTING DEBUG: Request details ===");
+            error_log("Total messages count: " . count($arrMessages));
+            error_log("System prompt length: " . strlen($systemPrompt['BPROMPT']));
+            error_log("Current message: " . $msgText);
+            error_log("Messages structure: " . print_r(array_map(function($msg) {
+                return [
+                    'role' => $msg['role'],
+                    'content_length' => strlen($msg['content']),
+                    'content_preview' => substr($msg['content'], 0, 100) . (strlen($msg['content']) > 100 ? '...' : '')
+                ];
+            }, $arrMessages), true));
+        }
+
         // ------------------------------------------------
         try {
             // set model
             $AIGENERALmodel = $GLOBALS["AI_SORT"]["MODEL"];
+            
+            if ($GLOBALS["debug"]) {
+                error_log("=== GROQ SORTING DEBUG: API Request ===");
+                error_log("Model: " . $AIGENERALmodel);
+                error_log("Reasoning format: hidden");
+            }
+            
             $chat = $client->chat()->completions()->create([
                 'model' => $AIGENERALmodel,
                 'reasoning_format' => 'hidden',
                 'messages' => $arrMessages
             ]);
             
-            // Debug: Log the raw response
-            /*
-            if (isset($chat['choices']) && is_array($chat['choices'])) {
-                error_log("Number of choices: " . count($chat['choices']));
-                if (isset($chat['choices'][0])) {
-                    error_log("First choice structure: " . print_r(array_keys($chat['choices'][0]), true));
-                    if (isset($chat['choices'][0]['message'])) {
-                        error_log("Message structure: " . print_r(array_keys($chat['choices'][0]['message']), true));
-                        error_log("Content length: " . strlen($chat['choices'][0]['message']['content']));
-                        error_log("First 200 chars of content: " . substr($chat['choices'][0]['message']['content'], 0, 200));
-                    }
-                }
+            if ($GLOBALS["debug"]) {
+                error_log("=== GROQ SORTING DEBUG: API Response Success ===");
+                error_log("Response received successfully");
             }
-            */
+            
         } catch (GroqException $err) {
-            if($GLOBALS["debug"]) error_log("GROQ API ERROR: " . $err->getMessage());
+            if($GLOBALS["debug"]) {
+                error_log("=== GROQ SORTING DEBUG: API Error Details ===");
+                error_log("Error type: " . get_class($err));
+                error_log("Error message: " . $err->getMessage());
+                error_log("Error code: " . $err->getCode());
+                error_log("Error file: " . $err->getFile() . ":" . $err->getLine());
+                error_log("Stack trace: " . $err->getTraceAsString());
+                error_log("Request model: " . $AIGENERALmodel);
+                error_log("Request messages count: " . count($arrMessages));
+            }
             return "*API sorting Error - Ralf made a bubu - please mail that to him: * " . $err->getMessage();
+        } catch (Exception $err) {
+            if($GLOBALS["debug"]) {
+                error_log("=== GROQ SORTING DEBUG: General Exception ===");
+                error_log("Error type: " . get_class($err));
+                error_log("Error message: " . $err->getMessage());
+                error_log("Error code: " . $err->getCode());
+                error_log("Error file: " . $err->getFile() . ":" . $err->getLine());
+                error_log("Stack trace: " . $err->getTraceAsString());
+            }
+            return "*API sorting Error - Unexpected error: * " . $err->getMessage();
         }
         
-        // DEBUG: Log raw response before parsing (only if debug enabled)
+        // Enhanced DEBUG: Log raw response before parsing (only if debug enabled)
         if ($GLOBALS["debug"]) {
-            error_log("=== GROQ DEBUG: Raw response structure ===");
-            error_log("Full response: " . print_r($chat, true));
+            error_log("=== GROQ SORTING DEBUG: Raw Response Analysis ===");
+            error_log("Response type: " . gettype($chat));
+            error_log("Response keys: " . (is_array($chat) ? implode(', ', array_keys($chat)) : 'Not an array'));
+            
+            if (isset($chat['choices'])) {
+                error_log("Choices count: " . count($chat['choices']));
+                if (isset($chat['choices'][0])) {
+                    error_log("First choice keys: " . implode(', ', array_keys($chat['choices'][0])));
+                    if (isset($chat['choices'][0]['message'])) {
+                        error_log("Message keys: " . implode(', ', array_keys($chat['choices'][0]['message'])));
+                        if (isset($chat['choices'][0]['message']['content'])) {
+                            $content = $chat['choices'][0]['message']['content'];
+                            error_log("Content length: " . strlen($content));
+                            error_log("Content preview (first 200 chars): " . substr($content, 0, 200));
+                            error_log("Content preview (last 200 chars): " . substr($content, -200));
+                        } else {
+                            error_log("ERROR: No 'content' key found in message");
+                        }
+                    } else {
+                        error_log("ERROR: No 'message' key found in first choice");
+                    }
+                } else {
+                    error_log("ERROR: No first choice found in choices array");
+                }
+            } else {
+                error_log("ERROR: No 'choices' key found in response");
+            }
+            
+            error_log("Full response structure: " . print_r($chat, true));
         }
         
         // ------------------------------------------------
         // Clean and return response
+        if (!isset($chat['choices'][0]['message']['content'])) {
+            if ($GLOBALS["debug"]) {
+                error_log("=== GROQ SORTING DEBUG: Missing Content Error ===");
+                error_log("Response structure is invalid - missing content");
+            }
+            return "*API sorting Error - Invalid response structure from Groq API*";
+        }
+        
         $answer = $chat['choices'][0]['message']['content'];
 
-        // Attempt to extract BTEXT if JSON-like content was returned
-        $maybeBTEXT = self::extractBTEXTFromJsonString($answer);
-        if ($maybeBTEXT !== null) {
-            $answer = $maybeBTEXT;
+        if ($GLOBALS["debug"]) {
+            error_log("=== GROQ SORTING DEBUG: Content Processing ===");
+            error_log("Raw answer length: " . strlen($answer));
+            error_log("Raw answer: " . $answer);
+        }
+
+        // Clean JSON response - only remove code fences, don't extract BTEXT
+        $answer = str_replace("```json\n", "", $answer);
+        $answer = str_replace("\n```", "", $answer);
+        $answer = str_replace("```json", "", $answer);
+        $answer = str_replace("```", "", $answer);
+        $answer = trim($answer);
+        
+        if ($GLOBALS["debug"]) {
+            error_log("=== GROQ SORTING DEBUG: Final Result ===");
+            error_log("Final answer: " . $answer);
+            error_log("Answer type: " . gettype($answer));
         }
         
         return $answer;
@@ -201,6 +288,12 @@ class AIGroq {
 
         try {
             if ($stream) {
+                if ($GLOBALS["debug"]) {
+                    error_log("=== GROQ TOPIC DEBUG: Starting streaming mode ===");
+                    error_log("Model: " . $myModel);
+                    error_log("Messages count: " . count($arrMessages));
+                }
+                
                 // Use streaming mode
                 $chat = $client->chat()->completions()->create([
                     'model' => $myModel,
@@ -211,9 +304,17 @@ class AIGroq {
 
                 $answer = '';
                 $pendingText = '';
+                $chunkCount = 0;
                 
                 try {
                     foreach ($chat->chunks() as $chunk) {
+                        $chunkCount++;
+                        
+                        if ($GLOBALS["debug"] && $chunkCount <= 5) {
+                            error_log("=== GROQ TOPIC DEBUG: Chunk #$chunkCount ===");
+                            error_log("Chunk structure: " . print_r($chunk, true));
+                        }
+                        
                         $deltaText = '';
                         
                         // Extract delta content with fallbacks
@@ -223,11 +324,19 @@ class AIGroq {
                         
                         // Skip empty chunks
                         if (empty($deltaText)) {
+                            if ($GLOBALS["debug"] && $chunkCount <= 5) {
+                                error_log("Empty chunk skipped");
+                            }
                             continue;
                         }
                         
                         $answer .= $deltaText;
                         $pendingText .= $deltaText;
+                        
+                        if ($GLOBALS["debug"] && $chunkCount <= 5) {
+                            error_log("Delta text: " . $deltaText);
+                            error_log("Accumulated answer length: " . strlen($answer));
+                        }
                         
                         // Throttle ultra-small deltas (whitespace-only)
                         if (trim($pendingText) !== '' || strlen($pendingText) > 10) {
@@ -236,12 +345,28 @@ class AIGroq {
                         }
                     }
                     
+                    if ($GLOBALS["debug"]) {
+                        error_log("=== GROQ TOPIC DEBUG: Streaming completed ===");
+                        error_log("Total chunks processed: " . $chunkCount);
+                        error_log("Final answer length: " . strlen($answer));
+                    }
+                    
                     // Flush any remaining pending text
                     if (!empty($pendingText)) {
                         Frontend::statusToStream($msgArr["BID"], 'ai', $pendingText);
                     }
                     
                 } catch (Exception $streamErr) {
+                    if ($GLOBALS["debug"]) {
+                        error_log("=== GROQ TOPIC DEBUG: Streaming Exception ===");
+                        error_log("Error type: " . get_class($streamErr));
+                        error_log("Error message: " . $streamErr->getMessage());
+                        error_log("Error code: " . $streamErr->getCode());
+                        error_log("Error file: " . $streamErr->getFile() . ":" . $streamErr->getLine());
+                        error_log("Stack trace: " . $streamErr->getTraceAsString());
+                        error_log("Chunks processed before error: " . $chunkCount);
+                        error_log("Answer so far: " . $answer);
+                    }
                     return "*API topic Error - Streaming failed: " . $streamErr->getMessage();
                 }
                 
@@ -295,10 +420,35 @@ class AIGroq {
             }
             
         } catch (GroqException $err) {
+            if ($GLOBALS["debug"]) {
+                error_log("=== GROQ TOPIC DEBUG: GroqException Details ===");
+                error_log("Error type: " . get_class($err));
+                error_log("Error message: " . $err->getMessage());
+                error_log("Error code: " . $err->getCode());
+                error_log("Error file: " . $err->getFile() . ":" . $err->getLine());
+                error_log("Stack trace: " . $err->getTraceAsString());
+                error_log("Stream mode: " . ($stream ? 'true' : 'false'));
+                error_log("Model: " . $myModel);
+                error_log("Messages count: " . count($arrMessages));
+            }
             if ($stream) {
                 return "*API topic Error - Streaming failed: " . $err->getMessage();
             }
             return "*APItopic Error - Ralf made a bubu - please mail that to him: * " . $err->getMessage();
+        } catch (Exception $err) {
+            if ($GLOBALS["debug"]) {
+                error_log("=== GROQ TOPIC DEBUG: General Exception ===");
+                error_log("Error type: " . get_class($err));
+                error_log("Error message: " . $err->getMessage());
+                error_log("Error code: " . $err->getCode());
+                error_log("Error file: " . $err->getFile() . ":" . $err->getLine());
+                error_log("Stack trace: " . $err->getTraceAsString());
+                error_log("Stream mode: " . ($stream ? 'true' : 'false'));
+            }
+            if ($stream) {
+                return "*API topic Error - Streaming failed: " . $err->getMessage();
+            }
+            return "*APItopic Error - Unexpected error: * " . $err->getMessage();
         }
 
         $answer = $chat['choices'][0]['message']['content'];
