@@ -15,14 +15,18 @@
         "erusev/parsedown": "^1.7",
         "webklex/php-imap": "^6.2",
         "stevenmaguire/oauth2-microsoft": "^2.2",
-        "jumbojett/openid-connect-php": "^1.0"
+        "jumbojett/openid-connect-php": "^1.0",
+        "grpc/grpc": "^1.42",
+        "google/protobuf": "^3.21"
     },
     "require-dev": {
         "phpunit/phpunit": "*"
     },
     "autoload": {
         "psr-4": {
-            "App\\": "app/"
+            "App\\": "app/",
+            "Inference\\": "vendor/inference/Inference/",
+            "GPBMetadata\\": "vendor/inference/GPBMetadata/"
         }
     },
     "scripts": {
