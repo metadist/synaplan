@@ -78,7 +78,8 @@ RUN install-php-extensions \
         zip \
         sodium \
         ffi \
-        xdebug
+        xdebug \
+        grpc
 
 # Install Composer
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
