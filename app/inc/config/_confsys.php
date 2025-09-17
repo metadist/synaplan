@@ -33,8 +33,11 @@ if(isset($_SERVER["REQUEST_URI"])) {
 }
 // -----------------------------------------------------
 
-$GLOBALS["baseUrl"] = ApiKeys::get('APP_URL');
 $GLOBALS["debug"] = ApiKeys::get('APP_DEBUG') === 'true';
+$GLOBALS["baseUrl"] = ApiKeys::get('APP_URL');
+if(!isset($GLOBALS['baseUrl'])) {
+    throw new \RuntimeException('You must set the APP_URL (via environment variable or in the .env file) to the base URL of your Synaplan installation, e.g. http://localhost:8080');
+}
 
 // -----------------------------------------------------
 // Path constants (minimal, environment-agnostic)
