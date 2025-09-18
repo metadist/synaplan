@@ -97,6 +97,7 @@ You can also deploy Synaplan on a regular Linux server using Apache, PHP 8.3, an
    - Apache (or any web server) configured to serve the `public/` directory as the document root
    - PHP 8.3 with extensions: `mysqli`, `mbstring`, `curl`, `json`, `zip`
    - MariaDB 11.7+ (for vector search features)
+   - Some additional packages are needed (eg. protocompiler) to run composer install, on Ubuntu: apt-get install protobuf-compiler
 2. Deploy code
    - Place the repository on the server and point your vhost to the `public/` directory
 3. Install PHP deps and frontend assets
