@@ -62,6 +62,19 @@ class AITriton {
         return true;
     }
 
+    // threadArr fixer for triton/tensor based conversations
+    private static function fixThreadArr($threadArr) {
+        $fixedThreadArr = [];
+        $upCount = 0;
+        foreach($threadArr as $msg) {
+            if($msg['BDIRECT'] == 'OUT' && $upCount == 0) {
+                $upCount++;
+            } else {
+                $fixedThreadArr[] = $msg;
+            }
+        }
+        return $fixedThreadArr;
+    }
     /**
      * Message sorting prompt handler
      * 
@@ -74,17 +87,19 @@ class AITriton {
      * @return array|string|bool Sorting result or error message
      */
     public static function sortingPrompt($msgArr, $threadArr): array|string|bool {
+        $promptArr = [];
+        $lineArr = [];
+        $threadArr = self::fixThreadArr($threadArr);
 
         // prompt builder
         $systemPrompt = BasicAI::getAprompt('tools:sort');
+        $lineArr["role"] = "system";
+        $lineArr["content"] = $systemPrompt['BPROMPT'];
+        $promptArr[] = $lineArr;
 
         $client = self::$client;
         
-        // Build the complete prompt with system context and message history
-        $fullPrompt = $systemPrompt['BPROMPT']."\n\n";
-        
         // Add conversation history
-        $fullPrompt .= "Conversation History:\n";
         foreach($threadArr as $msg) {
             if($msg['BDIRECT'] == 'IN') {
                 $msg['BTEXT'] = Tools::cleanTextBlock($msg['BTEXT']);
@@ -92,7 +107,9 @@ class AITriton {
                 if(strlen($msg['BFILETEXT']) > 1) {
                     $msgText .= " User provided a file: ".$msg['BFILETYPE'].", saying: '".$msg['BFILETEXT']."'\n\n";
                 }
-                $fullPrompt .= "User: " . $msgText . "\n";
+                $lineArr["role"] = "user";
+                $lineArr["content"] = $msgText;
+                $promptArr[] = $lineArr;
             } 
             if($msg['BDIRECT'] == 'OUT') {
                 if(strlen($msg['BTEXT'])>200) {
@@ -107,21 +124,26 @@ class AITriton {
                     $truncatedText = rtrim($truncatedText, '"\'{}[]');
                     $msg['BTEXT'] = $truncatedText . "...";
                 }
-                $fullPrompt .= "Assistant: [".$msg['BID']."] ".$msg['BTEXT'] . "\n";
+                $lineArr["role"] = "assistant";
+                $lineArr["content"] = $msg['BTEXT'];
+                $promptArr[] = $lineArr;
             }
         }
 
         // Add current message
         $msgText = json_encode($msgArr, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-        $fullPrompt .= "\nCurrent message to analyze: " . $msgText;
+        $lineArr["role"] = "user";
+        $lineArr["content"] = $msgText;
+        $promptArr[] = $lineArr;
 
-
+        $fullPrompt = json_encode($promptArr, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        //error_log("Triton sorting prompt: " . $fullPrompt);
+        //error_log("Triton sorting user: " . $msgText);
         // ------------------------------------------------
         try {
             // Use Triton streaming inference for sorting (collect all output)
-            $answer = self::streamInference($fullPrompt, 512, false); // false = collect all output
-            
-            
+            $answer = self::streamInference($fullPrompt, 8192, false); // false = collect all output
+            error_log("Triton sorting answer: " . $answer);
         } catch (Exception $err) {
             if($GLOBALS["debug"]) {
                 error_log("Triton sorting error: " . $err->getMessage());
@@ -142,8 +164,7 @@ class AITriton {
         $answer = str_replace("```json", "", $answer);
         $answer = str_replace("```", "", $answer);
         $answer = trim($answer);
-        
-        
+
         return $answer;
     }
 
@@ -161,64 +182,68 @@ class AITriton {
      * @return array|string|bool Topic-specific response or error message
      */
     public static function topicPrompt($msgArr, $threadArr, $stream = false): array|string|bool {
-        //error_log('topicPrompt: '.print_r($msgArr, true));
-
+        // Build conversation array like in sortingPrompt()
         $systemPrompt = BasicAI::getAprompt($msgArr['BTOPIC'], $msgArr['BLANG'], $msgArr, true);
 
         if(isset($systemPrompt['TOOLS'])) {
             // call tools before the prompt is executed!
         }
         $client = self::$client;
-        
-        // System prompt: simplified for streaming, full for non-streaming
-        $fullPrompt = $stream 
-            ? 'You are the Synaplan.com AI assistant. Please answer in the language of the user.' . "\n\n"
-            : $systemPrompt['BPROMPT'] . "\n\n";
-        
-        // Add conversation history
-        $fullPrompt .= "Conversation History:\n";
-        if ($stream) {
-            // Simplified for streaming
-            foreach($threadArr as $msg) {
-                $fullPrompt .= "[".$msg['BID']."] ".$msg['BTEXT'] . "\n";
-            }
-        } else {
-            // Detailed for non-streaming
-            foreach($threadArr as $msg) {
-                if($msg['BDIRECT'] == 'IN') {
-                    $msg['BTEXT'] = Tools::cleanTextBlock($msg['BTEXT']);
-                    $msgText = $msg['BTEXT'];
-                    if(strlen($msg['BFILETEXT']) > 1) {
-                        $msgText .= " User provided a file: ".$msg['BFILETYPE'].", saying: '".$msg['BFILETEXT']."'\n\n";
-                    }
-                    $fullPrompt .= "User: " . $msgText . "\n";
-                } 
-                if($msg['BDIRECT'] == 'OUT') {
-                    if(strlen($msg['BTEXT'])>1000) {
-                        $truncatedText = substr($msg['BTEXT'], 0, 1000);
-                        $lastSpace = strrpos($truncatedText, ' ');
-                        if ($lastSpace !== false && $lastSpace > 800) {
-                            $truncatedText = substr($truncatedText, 0, $lastSpace);
-                        }
-                        $truncatedText = rtrim($truncatedText, '"\'{}[]');
-                        $msg['BTEXT'] = $truncatedText . "...";
-                    }
-                    $fullPrompt .= "Assistant: [".$msg['BID']."] ".$msg['BTEXT'] . "\n";
+
+        // Clean the thread first
+        $threadArr = self::fixThreadArr($threadArr);
+
+        // Construct role/content conversation array
+        $promptArr = [];
+        $lineArr = [];
+
+        // System instruction
+        $lineArr["role"] = "system";
+        $lineArr["content"] = $systemPrompt['BPROMPT'];
+        $promptArr[] = $lineArr;
+
+        // Conversation history
+        foreach($threadArr as $msg) {
+            if($msg['BDIRECT'] == 'IN') {
+                $msg['BTEXT'] = Tools::cleanTextBlock($msg['BTEXT']);
+                $msgText = $msg['BTEXT'];
+                if(strlen($msg['BFILETEXT']) > 1) {
+                    $msgText .= " User provided a file: ".$msg['BFILETYPE'].", saying: '".$msg['BFILETEXT']."'\n\n";
                 }
+                $lineArr["role"] = "user";
+                $lineArr["content"] = $msgText;
+                $promptArr[] = $lineArr;
+            }
+            if($msg['BDIRECT'] == 'OUT') {
+                if(strlen($msg['BTEXT'])>200) {
+                    // Truncate at word boundary to avoid breaking JSON or quotes
+                    $truncatedText = substr($msg['BTEXT'], 0, 200);
+                    // Find the last complete word
+                    $lastSpace = strrpos($truncatedText, ' ');
+                    if ($lastSpace !== false && $lastSpace > 150) {
+                        $truncatedText = substr($truncatedText, 0, $lastSpace);
+                    }
+                    // Clean up any trailing quotes or incomplete JSON
+                    $truncatedText = rtrim($truncatedText, '\"\'{}[]');
+                    $msg['BTEXT'] = $truncatedText . "...";
+                }
+                $lineArr["role"] = "assistant";
+                $lineArr["content"] = $msg['BTEXT'];
+                $promptArr[] = $lineArr;
             }
         }
 
-        // Add current message
-        if ($stream) {
-            $msgText = $msgArr['BTEXT'];
-            if(strlen($msgArr['BFILETEXT']) > 1) {
-                $msgText .= "\n\n\n---\n\n\nUser provided a file: ".$msgArr['BFILETYPE'].", saying: '".$msgArr['BFILETEXT']."'\n\n";
-            }
-        } else {
-            $msgText = json_encode($msgArr,JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        // Add the last text as the user question
+        $lastText = Tools::cleanTextBlock($msgArr['BTEXT']);
+        if(strlen($msgArr['BFILETEXT']) > 1) {
+            $lastText .= " User provided a file: ".$msgArr['BFILETYPE'].", saying: '".$msgArr['BFILETEXT']."'\n\n";
         }
-        $fullPrompt .= "\nCurrent message: " . $msgText;
-        
+        $lineArr["role"] = "user";
+        $lineArr["content"] = $lastText;
+        $promptArr[] = $lineArr;
+
+        $fullPrompt = json_encode($promptArr, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+
         // which model on triton?
         $myModel = $GLOBALS["AI_CHAT"]["MODEL"];
 
@@ -417,10 +442,10 @@ class AITriton {
      * @param int $maxTokens Maximum tokens to generate
      * @return ModelInferRequest The prepared request
      */
-    private static function createInferRequest($prompt, $maxTokens = 4096) {
+    private static function createInferRequest($prompt, $maxTokens = 8192) {
         // Prepare inputs
         $textInput = new InferInputTensor();
-        $textInput->setName('text_input');
+        $textInput->setName('conversation');
         $textInput->setDatatype('BYTES');
         $textInput->setShape([1, 1]);
 
@@ -466,7 +491,7 @@ class AITriton {
      * @param bool $stream Whether to stream or collect all output
      * @return string The complete response or empty string if streaming
      */
-    private static function streamInference($prompt, $maxTokens = 128, $stream = true) {
+    private static function streamInference($prompt, $maxTokens = 4096, $stream = true) {
         $client = self::$client;
         $answer = '';
         $seenAny = false;
