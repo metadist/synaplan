@@ -51,6 +51,25 @@ if (ApiRouter::route($rawPostData)) {
 // ******************************************************
 // Handle REST API requests
 // ******************************************************
+// Map JSON body `{ service: "...", ... }` to REST-style $_REQUEST['action']
+if (!empty($rawPostData) && isset($_SERVER['CONTENT_TYPE']) && stripos($_SERVER['CONTENT_TYPE'], 'application/json') !== false) {
+    $decoded = json_decode($rawPostData, true);
+    if (is_array($decoded)) {
+        if (!isset($_REQUEST['action']) && isset($decoded['action'])) {
+            $_REQUEST['action'] = $decoded['action'];
+        }
+        if (!isset($_REQUEST['action']) && isset($decoded['service'])) {
+            $_REQUEST['action'] = $decoded['service'];
+        }
+        // Merge JSON fields into $_REQUEST for convenience
+        foreach ($decoded as $k => $v) {
+            if (!isset($_REQUEST[$k])) {
+                $_REQUEST[$k] = $v;
+            }
+        }
+    }
+}
+
 header('Content-Type: application/json; charset=UTF-8');
 
 try {

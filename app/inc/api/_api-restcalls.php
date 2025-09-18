@@ -5,6 +5,12 @@ header('Content-Type: application/json; charset=UTF-8');
 $apiAction = $_REQUEST['action'];
 
 switch($apiAction) {
+    case 'snippetTranslate':
+        $sourceText = isset($_REQUEST['source_text']) ? trim($_REQUEST['source_text']) : '';
+        $sourceLang = isset($_REQUEST['source_lang']) ? trim($_REQUEST['source_lang']) : 'en';
+        $destLang = isset($_REQUEST['dest_lang']) ? trim($_REQUEST['dest_lang']) : '';
+        $resArr = Frontend::translateSnippet($sourceText, $sourceLang, $destLang);
+        break;
     case 'messageNew':
         $resArr = Frontend::saveWebMessages();
         break;
