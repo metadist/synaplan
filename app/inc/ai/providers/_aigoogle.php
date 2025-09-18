@@ -23,7 +23,7 @@ class AIGoogle {
     public static function init() {
         self::$key = ApiKeys::getGoogleGemini();
         if (!self::$key) {
-            if($GLOBALS["debug"]) error_log("Google Gemini API key not configured");
+            //if($GLOBALS["debug"]) error_log("Google Gemini API key not configured");
             return false;
         }
         return true;

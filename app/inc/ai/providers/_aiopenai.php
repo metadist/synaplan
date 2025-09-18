@@ -25,7 +25,7 @@ class AIOpenAI {
     public static function init() {
         self::$key = ApiKeys::getOpenAI();
         if (!self::$key) {
-            if($GLOBALS["debug"]) error_log("OpenAI API key not configured");
+            //if($GLOBALS["debug"]) error_log("OpenAI API key not configured");
             return false;
         }
         self::$client = OpenAI::client(self::$key);

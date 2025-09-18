@@ -28,7 +28,7 @@ class AIGroq {
     public static function init() {
         self::$key = ApiKeys::getGroq();
         if(!self::$key) {
-            if($GLOBALS["debug"]) error_log("Groq API key not configured");
+            //if($GLOBALS["debug"]) error_log("Groq API key not configured");
             return false;
         }
         // Local debug: output the key only when running on localhost and debug is enabled
