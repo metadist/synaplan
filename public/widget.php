@@ -358,7 +358,7 @@ switch ($config['position']) {
     document.body.appendChild(widgetContainer);
     document.body.appendChild(overlay);
 
-    // Responsive rules for small screens (e.g., iPhone 14)
+    // Responsive rules for small screens (e.g., iPhone)
     const responsiveStyle = document.createElement('style');
     responsiveStyle.textContent = `
       #synaplan-chat-container { width: 420px; max-width: 500px; }
@@ -367,13 +367,15 @@ switch ($config['position']) {
           left: 10px !important;
           right: 10px !important;
           width: auto !important;
-          bottom: 10px !important;
-          /* reduce height on mobile to avoid covering OS UI */
-          height: calc(var(--sp-dvh, 100vh) - 80px) !important;
+          bottom: calc(max(10px, env(safe-area-inset-bottom))) !important;
+          /* reduce height on mobile; keep comfortably below full screen */
+          height: min(520px, calc(var(--sp-dvh, 100vh) - 140px)) !important;
+          max-height: 80vh !important;
         }
         @supports (height: 100dvh) {
           #synaplan-chat-container {
-            height: calc(100dvh - 80px) !important;
+            height: min(520px, calc(100dvh - 140px)) !important;
+            max-height: 80dvh !important;
           }
         }
       }
