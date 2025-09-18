@@ -1309,7 +1309,76 @@ Class Frontend {
         
         return $stats;
     }
-    
+	
+	/**
+	 * Translate a short text snippet using summarize model configuration
+	 * and AIGroq::translateTo(). Keeps API layer thin.
+	 */
+	public static function translateSnippet(string $sourceText, string $sourceLang, string $destLang): array {
+		$sourceText = trim($sourceText);
+		$sourceLang = trim($sourceLang ?: 'en');
+		$destLang = trim($destLang);
+
+		if ($sourceText === '' || $destLang === '') {
+			return [
+				'success' => false,
+				'error' => 'Missing parameters: source_text and dest_lang are required'
+			];
+		}
+
+		// Prepare message structure
+		$msgArr = [
+			'BTEXT' => $sourceText,
+			'BLANG' => $destLang,
+		];
+
+		// Resolve provider class from summarize config (dynamic like sorter/topic flows)
+		$serviceClass = isset($GLOBALS["AI_SUMMARIZE"]["SERVICE"]) ? $GLOBALS["AI_SUMMARIZE"]["SERVICE"] : '';
+		if (!is_string($serviceClass) || $serviceClass === '') {
+			$serviceClass = 'AIGroq';
+		}
+
+		// Temporarily use summarize model for translation
+		$oldChatModel = $GLOBALS["AI_CHAT"]["MODEL"] ?? null;
+		if (!empty($GLOBALS["AI_SUMMARIZE"]["MODEL"])) {
+			$GLOBALS["AI_CHAT"]["MODEL"] = $GLOBALS["AI_SUMMARIZE"]["MODEL"];
+		}
+
+		// Call provider translateTo dynamically
+		$translated = [];
+		try {
+			if (class_exists($serviceClass) && method_exists($serviceClass, 'translateTo')) {
+				$translated = $serviceClass::translateTo($msgArr, $destLang, 'BTEXT');
+			} elseif (class_exists('AIGroq') && method_exists('AIGroq', 'translateTo')) {
+				$translated = AIGroq::translateTo($msgArr, $destLang, 'BTEXT');
+			} else {
+				return [
+					'success' => false,
+					'error' => 'Translation provider not available'
+				];
+			}
+		} catch (\Throwable $e) {
+			// Restore previous model before returning error
+			if ($oldChatModel !== null) { $GLOBALS["AI_CHAT"]["MODEL"] = $oldChatModel; }
+			return [
+				'success' => false,
+				'error' => $e->getMessage()
+			];
+		}
+
+		// Restore previous chat model
+		if ($oldChatModel !== null) {
+			$GLOBALS["AI_CHAT"]["MODEL"] = $oldChatModel;
+		}
+
+		return [
+			'success' => true,
+			'source_text' => $sourceText,
+			'source_lang' => $sourceLang,
+			'dest_lang' => $destLang,
+			'translated_text' => $translated['BTEXT'] ?? ''
+		];
+	}
 
 
     // ****************************************************************************************************** 

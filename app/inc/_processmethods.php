@@ -189,9 +189,8 @@ class ProcessMethods {
                     }
                 }
 
-
                 $answerJsonArr = json_decode($answerJson, true);
-                if (!empty($GLOBALS['debug'])) {
+                if(!empty($GLOBALS['debug'])) {
                     $rawLen = is_string($answerJson) ? strlen($answerJson) : 0;
                     error_log("sortMessage: sorter raw length={$rawLen}");
                     if (is_array($answerJsonArr)) {
@@ -209,23 +208,23 @@ class ProcessMethods {
 
                 // Unified fallback if sorting failed or returned invalid structure
                 $fallbackUsed = false;
-                if (!is_array($answerJsonArr)) {
+                if(!is_array($answerJsonArr)) {
                     $fallbackUsed = true;
                     if($GLOBALS["debug"]) error_log("Sorting failed or returned invalid JSON: ".$answerJson);
                     $answerJsonArr = [];
                 }
 
                 // Preserve original BTEXT if not provided by sorter
-                if (!isset($answerJsonArr['BTEXT'])) {
-                    $answerJsonArr['BTEXT'] = '';
+                if(!isset($answerJsonArr['BTEXT'])) {
+                    $answerJsonArr['BTEXT'] = $sortingArr["BTEXT"];
                 }
 
                 // Ensure topic and language defaults
-                if (!isset($answerJsonArr['BTOPIC']) || !is_string($answerJsonArr['BTOPIC']) || strlen(trim($answerJsonArr['BTOPIC'])) === 0) {
+                if(!isset($answerJsonArr['BTOPIC']) || !is_string($answerJsonArr['BTOPIC']) || strlen(trim($answerJsonArr['BTOPIC'])) === 0) {
                     $answerJsonArr['BTOPIC'] = 'general';
                     $fallbackUsed = true;
                 }
-                if (!isset($answerJsonArr['BLANG']) || !is_string($answerJsonArr['BLANG']) || strlen(trim($answerJsonArr['BLANG'])) === 0) {
+                if(!isset($answerJsonArr['BLANG']) || !is_string($answerJsonArr['BLANG']) || strlen(trim($answerJsonArr['BLANG'])) === 0) {
                     $answerJsonArr['BLANG'] = 'en';
                     $fallbackUsed = true;
                 }
