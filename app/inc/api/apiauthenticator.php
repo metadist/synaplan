@@ -23,6 +23,7 @@ class ApiAuthenticator {
     private static $authenticatedOnlyEndpoints = [
         'ragUpload',
         'docSum',
+        'snippetTranslate',
         'promptLoad',
         'promptUpdate',
         'deletePrompt',

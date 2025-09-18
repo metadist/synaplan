@@ -699,10 +699,14 @@ class AIGroq {
 
         $client = self::$client;
 
-        $tPrompt = BasicAI::getAprompt('tools:lang');
-        if($GLOBALS["debug"]) error_log("tPrompt: ".$tPrompt);
+        $arrPrompt = BasicAI::getAprompt('tools:lang');
+        $systemPrompt = is_array($arrPrompt) ? ($arrPrompt['BPROMPT'] ?? '') : (string)$arrPrompt;
+        if($GLOBALS["debug"]) {
+            $len = strlen((string)$systemPrompt);
+            error_log("translateTo: systemPrompt.len=".$len);
+        }
         $arrMessages = [
-            ['role' => 'system', 'content' => $tPrompt]
+            ['role' => 'system', 'content' => $systemPrompt]
         ];
 
         $arrMessages[] = ['role' => 'user', 'content' => $qTerm];
