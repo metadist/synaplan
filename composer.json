@@ -15,18 +15,33 @@
         "erusev/parsedown": "^1.7",
         "webklex/php-imap": "^6.2",
         "stevenmaguire/oauth2-microsoft": "^2.2",
-        "jumbojett/openid-connect-php": "^1.0"
+        "jumbojett/openid-connect-php": "^1.0",
+        "grpc/grpc": "^1.42",
+        "google/protobuf": "^3.21",
+        "psr/log": "^3.0"
     },
     "require-dev": {
         "phpunit/phpunit": "*"
     },
     "autoload": {
         "psr-4": {
-            "App\\": "app/"
+            "App\\": "app/",
+            "Inference\\": "app/inc/ai/grpc-triton/Inference/",
+            "GPBMetadata\\": "app/inc/ai/grpc-triton/GPBMetadata/"
         }
     },
     "scripts": {
-        "pre-autoload-dump": "Google\\Task\\Composer::cleanup"
+        "pre-autoload-dump": "Google\\Task\\Composer::cleanup",
+        "update-protos": [
+            "curl -L https://raw.githubusercontent.com/triton-inference-server/common/main/protobuf/grpc_service.proto -o ./dev/triton/grpc_service.proto",
+            "curl -L https://raw.githubusercontent.com/triton-inference-server/common/main/protobuf/model_config.proto -o ./dev/triton/model_config.proto"
+        ],
+        "generate-proto": [
+            "protoc --php_out=app/inc/ai/grpc-triton --proto_path=./dev/triton ./dev/triton/grpc_service.proto ./dev/triton/model_config.proto"
+        ],
+        "post-install-cmd": ["@generate-proto"],
+        "post-update-cmd": ["@generate-proto"]
+
     },
     "config": {
         "allow-plugins": {
