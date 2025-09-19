@@ -868,20 +868,7 @@ class Central {
                 db::Query($updateSQL);
             }
         }
-        
-        // documents (tika-first, with pdf rasterize→vision fallback via UniversalFileHandler)
-        elseif ($arrMessage['BFILETYPE'] == "pdf" || $arrMessage['BFILETYPE'] == "doc" || $arrMessage['BFILETYPE'] == "docx" || $arrMessage['BFILETYPE'] == "xls" || $arrMessage['BFILETYPE'] == "xlsx" || $arrMessage['BFILETYPE'] == "ppt" || $arrMessage['BFILETYPE'] == "pptx" || $arrMessage['BFILETYPE'] == "csv" || $arrMessage['BFILETYPE'] == "html" || $arrMessage['BFILETYPE'] == "htm" || $arrMessage['BFILETYPE'] == "txt") {
-            $fileType = ($arrMessage['BFILETYPE'] == 'pdf') ? 3 : (($arrMessage['BFILETYPE'] == 'doc' || $arrMessage['BFILETYPE'] == 'docx') ? 4 : (($arrMessage['BFILETYPE'] == 'txt') ? 5 : 0));
-            list($extractedText, $meta) = \UniversalFileHandler::extract($arrMessage['BFILEPATH'], $arrMessage['BFILETYPE']);
-            if (!empty($GLOBALS['debug']) && !empty($meta['strategy'])) {
-                @error_log('DocExtract strategy=' . $meta['strategy'] . ' type=' . $arrMessage['BFILETYPE'] . ' file=' . basename($arrMessage['BFILEPATH']));
-            }
-            $arrMessage['BFILETEXT'] = is_string($extractedText) ? $extractedText : '';
-            if($arrMessage['BID'] > 0) {
-                $updateSQL = "update BMESSAGES set BFILETEXT = '" . db::EscString($arrMessage['BFILETEXT']) . "' where BID = " . ($arrMessage['BID']);
-                db::Query($updateSQL);
-            }
-        }
+
         
         return $arrMessage;
     }
