@@ -612,7 +612,18 @@ Class Frontend {
         foreach($lastIds as $msgId) {
             $msgArr = Central::getMsgById(intval($msgId));
             if($msgArr['BFILE'] > 0) {
-                $msgArr = Central::parseFile($msgArr, true);
+                try {
+                    $msgArr = Central::parseFile($msgArr, true);
+                } catch (\Throwable $e) {
+                    error_log("SSE parseFile error: " . $e->getMessage());
+                    $send([
+                        'msgId' => $msgId,
+                        'status' => 'error',
+                        'message' => 'File preprocessing failed: ' . $e->getMessage(),
+                        'timestamp' => time()
+                    ]);
+                    exit;
+                }
             } else {
                 $send([
                     'msgId' => $msgId,

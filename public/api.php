@@ -22,7 +22,8 @@ if (function_exists('session_set_cookie_params')) {
         'domain' => '',
         'secure' => $isHttps ? true : false,
         'httponly' => true,
-        'samesite' => 'None'
+        // In non-HTTPS dev, avoid SameSite=None without Secure (rejected by modern browsers)
+        'samesite' => $isHttps ? 'None' : 'Lax'
     ];
     @session_set_cookie_params($cookieParams);
 }
