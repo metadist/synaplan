@@ -25,7 +25,7 @@ class AIAnthropic {
     public static function init() {
         self::$key = ApiKeys::getAnthropic();
         if(!self::$key) {
-            if($GLOBALS["debug"]) error_log("Anthropic API key not configured");
+            //if($GLOBALS["debug"]) error_log("Anthropic API key not configured");
             return false;
         }
         return true;

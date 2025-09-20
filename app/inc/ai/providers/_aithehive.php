@@ -7,7 +7,7 @@ class AITheHive {
     public static function init() {
         self::$key = ApiKeys::getTheHive();
         if (!self::$key) {
-            if($GLOBALS["debug"]) error_log("TheHive API key not configured");
+            //if($GLOBALS["debug"]) error_log("TheHive API key not configured");
             return false;
         }
         return true;

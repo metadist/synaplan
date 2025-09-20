@@ -147,7 +147,46 @@ switch ($config['position']) {
             var inputEl = document.getElementById(_spIdBase + '-input');
             var btnEl = document.getElementById(_spIdBase + '-btn');
             var closeEl = document.getElementById(_spIdBase + '-close');
+            var panelEl = document.getElementById(_spIdBase + '-panel');
             var isOpen = false;
+
+            function applyInlineMobileLayout(){
+                try {
+                    if (!panelEl) return;
+                    var isMobile = (window.matchMedia && window.matchMedia('(max-width: 500px)').matches);
+                    if (!isMobile) {
+                        // Desktop defaults
+                        panelEl.style.left = '2.5vw';
+                        panelEl.style.top = '2.5vh';
+                        panelEl.style.right = '';
+                        panelEl.style.bottom = '';
+                        panelEl.style.transform = '';
+                        panelEl.style.width = '95vw';
+                        panelEl.style.height = '95vh';
+                        return;
+                    }
+                    // Centered, reduced size modal on mobile
+                    var dvh = (window.visualViewport && window.visualViewport.height) ? window.visualViewport.height : window.innerHeight;
+                    panelEl.style.left = '50%';
+                    panelEl.style.top = '50%';
+                    panelEl.style.right = 'auto';
+                    panelEl.style.bottom = 'auto';
+                    panelEl.style.transform = 'translate(-50%, -50%)';
+                    panelEl.style.width = 'min(92vw, 420px)';
+                    // target ~70% of dynamic viewport height, clamp between 320px and 90vh-equivalent
+                    var targetHeight = Math.min(Math.max(320, 0.7 * dvh), 0.9 * dvh);
+                    panelEl.style.height = targetHeight + 'px';
+                } catch (_e) {}
+            }
+
+            // Apply once and on viewport changes
+            applyInlineMobileLayout();
+            window.addEventListener('resize', applyInlineMobileLayout, { passive: true });
+            window.addEventListener('orientationchange', applyInlineMobileLayout, { passive: true });
+            if (window.visualViewport) {
+                window.visualViewport.addEventListener('resize', applyInlineMobileLayout, { passive: true });
+                window.visualViewport.addEventListener('scroll', applyInlineMobileLayout, { passive: true });
+            }
 
             function loadFrameOnce(){
                 if (frameWrap && frameWrap.children.length === 0) {
@@ -358,22 +397,26 @@ switch ($config['position']) {
     document.body.appendChild(widgetContainer);
     document.body.appendChild(overlay);
 
-    // Responsive rules for small screens (e.g., iPhone 14)
+    // Responsive rules for small screens (e.g., iPhone)
     const responsiveStyle = document.createElement('style');
     responsiveStyle.textContent = `
       #synaplan-chat-container { width: 420px; max-width: 500px; }
       @media (max-width: 500px) {
         #synaplan-chat-container {
-          left: 10px !important;
-          right: 10px !important;
-          width: auto !important;
-          bottom: 10px !important;
-          /* reduce height on mobile to avoid covering OS UI */
-          height: calc(var(--sp-dvh, 100vh) - 80px) !important;
+          top: 50% !important;
+          left: 50% !important;
+          right: auto !important;
+          bottom: auto !important;
+          transform: translate(-50%, -50%) !important;
+          width: min(92vw, 420px) !important;
+          /* centered modal with reduced height on mobile */
+          height: min(70vh, calc(var(--sp-dvh, 100vh) - 140px)) !important;
+          max-height: 90vh !important;
         }
         @supports (height: 100dvh) {
           #synaplan-chat-container {
-            height: calc(100dvh - 80px) !important;
+            height: min(70vh, calc(100dvh - 140px)) !important;
+            max-height: 90dvh !important;
           }
         }
       }
@@ -412,6 +455,25 @@ switch ($config['position']) {
       }
       #synaplan-chat-container button {
         box-sizing: border-box !important;
+      }
+      /* Mobile overrides to center modal */
+      @media (max-width: 500px) {
+        #synaplan-chat-container {
+          bottom: auto !important;
+          top: 50% !important;
+          left: 50% !important;
+          right: auto !important;
+          transform: translate(-50%, -50%) !important;
+          width: min(92vw, 420px) !important;
+          height: min(70vh, calc(var(--sp-dvh, 100vh) - 140px)) !important;
+          max-height: 90vh !important;
+        }
+        @supports (height: 100dvh) {
+          #synaplan-chat-container {
+            height: min(70vh, calc(100dvh - 140px)) !important;
+            max-height: 90dvh !important;
+          }
+        }
       }
     `;
     document.head.appendChild(enforcedStyle);

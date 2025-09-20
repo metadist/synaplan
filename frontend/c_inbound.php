@@ -7,6 +7,7 @@ require_once __DIR__ . "/../app/inc/api/_inboundconf.php";
 ?>
 <link rel="stylesheet" href="assets/statics/fa/css/all.min.css">
 <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4" id="contentMain">
+    <B>THIS IS NOT YET WORKING, WE ARE BETA</B>
     <h1><?php _s("Inbound", __FILE__, $_SESSION["LANG"]); ?></h1>
     <p>
         <?php _s("You can reach this platform via different channels.", __FILE__, $_SESSION["LANG"]); ?><br>
