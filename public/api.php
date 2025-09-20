@@ -30,6 +30,7 @@ session_start();
 // Prevent PHP warnings/notices from corrupting JSON responses
 @ini_set('display_errors', '0');
 @ini_set('log_errors', '1');
+
 // Use Composer autoload and new app core includes
 require_once __DIR__ . '/../vendor/autoload.php';
 require_once __DIR__ . '/../app/inc/_coreincludes.php';
