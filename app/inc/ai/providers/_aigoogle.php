@@ -868,7 +868,8 @@ class AIGoogle {
                 ];
                 Frontend::printToStream($update);
             }
-            return $errorStop;
+            $msgArr['BFILETEXT'] = $errorStop;
+            return $msgArr;
         }
 
         // Get file information
@@ -958,7 +959,8 @@ class AIGoogle {
                 ];
                 Frontend::printToStream($update);
             }
-            return $errorStop;
+            $msgArr['BFILETEXT'] = $errorStop;
+            return $msgArr;
         }
 
         try {
@@ -1044,9 +1046,10 @@ class AIGoogle {
                             ];
                             Frontend::printToStream($update);
                             
-                            // Check if parent process is still running
-                            if (!file_exists('/proc/' . getppid())) {
-                                break;
+                            // Optional: break if parent likely gone (POSIX only)
+                            if (function_exists('posix_getppid')) {
+                                $ppid = posix_getppid();
+                                if ($ppid <= 1) { break; }
                             }
                         }
                         exit(0);

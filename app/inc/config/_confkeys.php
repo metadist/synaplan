@@ -95,6 +95,19 @@ class ApiKeys {
             'APP_DEBUG',
             'APP_ENV',
             'APP_URL',
+            // Tika / Document extraction
+            'TIKA_ENABLED',
+            'TIKA_URL',
+            'TIKA_TIMEOUT_MS',
+            'TIKA_RETRIES',
+            'TIKA_RETRY_BACKOFF_MS',
+            // Rasterizer / Vision fallback
+            'RASTERIZE_DPI',
+            'RASTERIZE_PAGE_CAP',
+            'RASTERIZE_TIMEOUT_MS',
+            // Quality thresholds
+            'TIKA_MIN_LENGTH',
+            'TIKA_MIN_ENTROPY',
         ];
 
         foreach ($keyConfig as $envKey) {
@@ -122,6 +135,52 @@ class ApiKeys {
     public static function get($key) {
         self::init();
         return self::$keys[$key] ?? null;
+    }
+
+    // ------------------------- TIKA CONFIG -------------------------
+    public static function isTikaEnabled(): bool {
+        $val = self::get('TIKA_ENABLED');
+        if ($val === null) return true; // default enabled
+        $v = strtolower(trim(strval($val)));
+        return !in_array($v, ['0','false','off','no'], true);
+    }
+    public static function getTikaUrl(): ?string {
+        return self::get('TIKA_URL') ?: null;
+    }
+    public static function getTikaTimeoutMs(): int {
+        $v = intval(self::get('TIKA_TIMEOUT_MS'));
+        return $v > 0 ? $v : 15000;
+    }
+    public static function getTikaRetries(): int {
+        $v = intval(self::get('TIKA_RETRIES'));
+        return $v >= 0 ? $v : 1;
+    }
+    public static function getTikaRetryBackoffMs(): int {
+        $v = intval(self::get('TIKA_RETRY_BACKOFF_MS'));
+        return $v >= 0 ? $v : 300;
+    }
+    public static function getTikaMinLength(): int {
+        $v = intval(self::get('TIKA_MIN_LENGTH'));
+        return $v > 0 ? $v : 32;
+    }
+    public static function getTikaMinEntropy(): float {
+        $v = self::get('TIKA_MIN_ENTROPY');
+        $f = $v !== null ? floatval($v) : 2.5;
+        return $f;
+    }
+
+    // ------------------------- RASTERIZER CONFIG -------------------------
+    public static function getRasterizeDpi(): int {
+        $v = intval(self::get('RASTERIZE_DPI'));
+        return $v > 0 ? $v : 150;
+    }
+    public static function getRasterizePageCap(): int {
+        $v = intval(self::get('RASTERIZE_PAGE_CAP'));
+        return $v > 0 ? $v : 5;
+    }
+    public static function getRasterizeTimeoutMs(): int {
+        $v = intval(self::get('RASTERIZE_TIMEOUT_MS'));
+        return $v > 0 ? $v : 20000;
     }
 
     /**

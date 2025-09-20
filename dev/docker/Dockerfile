@@ -13,6 +13,11 @@ RUN apt-get update && apt-get install -y \
     libjpeg62-turbo-dev \
     libwebp-dev \
     libsodium-dev \
+    ghostscript \
+    # Image/PDF processing dependencies
+    imagemagick \
+    libmagickwand-dev \
+    poppler-utils \
     zip \
     unzip \
     libffi-dev \
@@ -77,11 +82,15 @@ RUN install-php-extensions \
         pcntl \
         bcmath \
         gd \
+        imagick \
         zip \
         sodium \
         ffi \
         xdebug \
         grpc
+
+# Increase PHP upload limits inside the container
+RUN printf "upload_max_filesize=128M\npost_max_size=128M\nmax_file_uploads=50\n" > /usr/local/etc/php/conf.d/zz-uploads.ini
 
 # Install Composer
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer

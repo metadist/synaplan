@@ -441,8 +441,20 @@ public static function processMessage(): void {
             // aiModel-Override pro Prompt
             if ($setting['BTOKEN'] === 'aiModel' && intval($setting['BVALUE']) > 0) {
                 $modelDetails = BasicAI::getModelDetails(intval($setting['BVALUE']));
-                if (!empty($modelDetails['BSERVICE'])) {
-                    $AIGENERAL = "AI" . $modelDetails['BSERVICE'];
+                if (!empty($modelDetails) && is_array($modelDetails)) {
+                    // Align provider to model's service
+                    if (!empty($modelDetails['BSERVICE'])) {
+                        $AIGENERAL = "AI" . $modelDetails['BSERVICE'];
+                    }
+                    // Set model name/id from BMODELS (use BPROVID first, fallback to BNAME)
+                    if (!empty($modelDetails['BPROVID']) || !empty($modelDetails['BNAME'])) {
+                        $AIGENERALmodel   = !empty($modelDetails['BPROVID']) ? $modelDetails['BPROVID'] : $modelDetails['BNAME'];
+                        $AIGENERALmodelId = intval($modelDetails['BID'] ?? 0);
+                        // Mirror into globals so providers use the correct model
+                        $GLOBALS["AI_CHAT"]["MODEL"]   = $AIGENERALmodel;
+                        $GLOBALS["AI_CHAT"]["MODELID"] = $AIGENERALmodelId;
+                        // Service global wird weiter unten ggf. nochmal normalisiert
+                    }
                 }
             }
         }
@@ -702,6 +714,8 @@ public static function processMessage(): void {
         self::$msgArr['BTOPIC'] === 'analyzefile' &&
         !empty(self::$msgArr['BFILE']) && self::$msgArr['BFILE'] == 1 &&
         !empty(self::$msgArr['BFILEPATH']) && substr(self::$msgArr['BFILEPATH'], -4) === '.pdf'
+        // Skip analyzefile if we already have usable OCR/Tika text from pre-processing
+        && (!isset(self::$msgArr['BFILETEXT']) || strlen(trim(self::$msgArr['BFILETEXT'])) === 0)
     ) {
         $previousCall = true;
         $answerSorted = Tools::migrateArray(self::$msgArr, $answerSorted);
@@ -724,6 +738,16 @@ public static function processMessage(): void {
         XSControl::storeAIDetails(self::$msgArr, 'AISERVICE', 'AIGoogle',   self::$stream);
         XSControl::storeAIDetails(self::$msgArr, 'AIMODEL',   'AnalyzeFile', self::$stream);
         XSControl::storeAIDetails(self::$msgArr, 'AIMODELID', '0',          self::$stream);
+    } elseif (
+        self::$msgArr['BTOPIC'] === 'analyzefile' &&
+        !empty(self::$msgArr['BFILE']) && self::$msgArr['BFILE'] == 1 &&
+        !empty(self::$msgArr['BFILEPATH']) && substr(self::$msgArr['BFILEPATH'], -4) === '.pdf' &&
+        isset(self::$msgArr['BFILETEXT']) && strlen(trim(self::$msgArr['BFILETEXT'])) > 0
+    ) {
+        // Debug only: the text is already extracted
+        if (self::$stream) {
+            Frontend::statusToStream(self::$msgId, 'pre', 'Analyzer skipped (text already extracted). ');
+        }
     }
 
     // --- Websearch Quick Path (BFILE==10) ---
@@ -749,6 +773,15 @@ public static function processMessage(): void {
                 'BLANG'  => self::$msgArr['BLANG']
             ];
         }
+           // Ensure UI shows the actual provider/model used for the final chat call
+           $usedModel   = $GLOBALS["AI_CHAT"]["MODEL"];
+           $usedService = $AIGENERAL;
+           if (is_array($answerSorted)) {
+               if (isset($answerSorted['_USED_MODEL'])) { $usedModel = $answerSorted['_USED_MODEL']; unset($answerSorted['_USED_MODEL']); }
+               if (isset($answerSorted['_AI_SERVICE'])) { $usedService = $answerSorted['_AI_SERVICE']; unset($answerSorted['_AI_SERVICE']); }
+           }
+           XSControl::storeAIDetails(self::$msgArr, 'AISERVICE', $usedService, self::$stream);
+           XSControl::storeAIDetails(self::$msgArr, 'AIMODEL',  $usedModel,   self::$stream);
     }
     } // end else for !self::$toolProcessed
 

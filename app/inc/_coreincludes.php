@@ -29,6 +29,10 @@ require_once(__DIR__ . '/auth/apikeymanager.php');
 require_once(__DIR__ . '/auth/userregistration.php');
 // file management classes
 require_once(__DIR__ . '/domain/files/filemanager.php');
+// document extraction (tika-first + rasterize/vision fallback)
+require_once(__DIR__ . '/domain/files/tika_client.php');
+require_once(__DIR__ . '/domain/files/rasterizer.php');
+require_once(__DIR__ . '/domain/files/universal_file_handler.php');
 // service classes
 require_once(__DIR__ . '/mail/emailservice.php');
 // api classes (only classes here; procedural API files are loaded by public/api.php)
