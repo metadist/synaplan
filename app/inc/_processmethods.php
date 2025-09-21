@@ -441,8 +441,26 @@ public static function processMessage(): void {
             // aiModel-Override pro Prompt
             if ($setting['BTOKEN'] === 'aiModel' && intval($setting['BVALUE']) > 0) {
                 $modelDetails = BasicAI::getModelDetails(intval($setting['BVALUE']));
-                if (!empty($modelDetails['BSERVICE'])) {
-                    $AIGENERAL = "AI" . $modelDetails['BSERVICE'];
+                if ($modelDetails && is_array($modelDetails)) {
+                    // Decide target service and model BEFORE calling topicPrompt
+                    if (!empty($modelDetails['BSERVICE'])) {
+                        $AIGENERAL = "AI" . $modelDetails['BSERVICE'];
+                    }
+
+                    // Prefer provider model name (BPROVID), fallback to human name (BNAME)
+                    $resolvedModel   = !empty($modelDetails['BPROVID']) ? $modelDetails['BPROVID'] : ($modelDetails['BNAME'] ?? '');
+                    $resolvedModelId = intval($modelDetails['BID'] ?? 0);
+
+                    if ($resolvedModel !== '') {
+                        // Apply to globals so providers read the correct model
+                        $GLOBALS["AI_CHAT"]["SERVICE"] = $AIGENERAL;
+                        $GLOBALS["AI_CHAT"]["MODEL"]   = $resolvedModel;
+                        $GLOBALS["AI_CHAT"]["MODELID"] = $resolvedModelId;
+
+                        // Keep local variables in sync for logging/stream notes
+                        $AIGENERALmodel   = $resolvedModel;
+                        $AIGENERALmodelId = $resolvedModelId;
+                    }
                 }
             }
         }

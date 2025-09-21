@@ -159,26 +159,8 @@ class AIOpenAI {
             $arrMessages[] = ['role' => 'user', 'content' => $msgText];    
         }
 
-        // different model configged?
-        if(isset($systemPrompt['SETTINGS'])) {
-            foreach($systemPrompt['SETTINGS'] as $setting) {
-                $systemPrompt[$setting['BTOKEN']] = $setting['BVALUE'];
-            }
-            if(isset($systemPrompt['aiModel']) AND intval($systemPrompt['aiModel']) > 0) {
-                $modelArr = BasicAI::getModelDetails(intval($systemPrompt['aiModel']));
-                // Use BPROVID if available, fallback to BNAME, then to global model
-                if (!empty($modelArr) && is_array($modelArr)) {
-                    $myModel = !empty($modelArr['BPROVID']) ? $modelArr['BPROVID'] : 
-                              (!empty($modelArr['BNAME']) ? $modelArr['BNAME'] : $GLOBALS["AI_CHAT"]["MODEL"]);
-                } else {
-                    $myModel = $GLOBALS["AI_CHAT"]["MODEL"];
-                }
-            } else {
-                $myModel = $GLOBALS["AI_CHAT"]["MODEL"];
-            }
-        } else {
-            $myModel = $GLOBALS["AI_CHAT"]["MODEL"];
-        }
+        // Respect preselected globals for model (provider already chosen upstream)
+        $myModel = $GLOBALS["AI_CHAT"]["MODEL"];
 
         //error_log(" *************** OPENAI call - response object:" . date("Y-m-d H:i:s"));        
         // now ask the AI and give the stream out or the result when done!

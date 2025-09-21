@@ -159,20 +159,8 @@ class AIGoogle {
             // call tools before the prompt is executed!
         }
         
-        // Determine the model to use
+        // Determine the model to use (respect preselected globals)
         $myModel = $GLOBALS["AI_CHAT"]["MODEL"];
-        if (isset($systemPrompt['SETTINGS']['aiModel']) && $systemPrompt['SETTINGS']['aiModel'] > 0) {
-            $modelArr = BasicAI::getModelDetails(intval($systemPrompt['SETTINGS']['aiModel']));
-            // Use BPROVID if available, fallback to BNAME, then to global model
-            if (!empty($modelArr) && is_array($modelArr)) {
-                $myModel = !empty($modelArr['BPROVID']) ? $modelArr['BPROVID'] : 
-                          (!empty($modelArr['BNAME']) ? $modelArr['BNAME'] : $GLOBALS["AI_CHAT"]["MODEL"]);
-            } else {
-                $myModel = $GLOBALS["AI_CHAT"]["MODEL"];
-            }
-        } else {
-            $myModel = $GLOBALS["AI_CHAT"]["MODEL"];
-        }
         
         // Prepare the API URL
         $url = "https://generativelanguage.googleapis.com/v1beta/models/" . $myModel . ":generateContent?key=" . self::$key;

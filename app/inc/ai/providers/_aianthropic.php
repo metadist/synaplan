@@ -225,26 +225,8 @@ class AIAnthropic {
             $messages[] = ['role' => 'user', 'content' => $msgText];
         }
         
-        // Determine model
-        if(isset($systemPrompt['SETTINGS'])) {
-            foreach($systemPrompt['SETTINGS'] as $setting) {
-                $systemPrompt[$setting['BTOKEN']] = $setting['BVALUE'];
-            }
-            if(isset($systemPrompt['aiModel']) AND intval($systemPrompt['aiModel']) > 0) {
-                $modelArr = BasicAI::getModelDetails(intval($systemPrompt['aiModel']));
-                // Use BPROVID if available, fallback to BNAME, then to global model
-                if (!empty($modelArr) && is_array($modelArr)) {
-                    $myModel = !empty($modelArr['BPROVID']) ? $modelArr['BPROVID'] : 
-                              (!empty($modelArr['BNAME']) ? $modelArr['BNAME'] : $GLOBALS["AI_CHAT"]["MODEL"]);
-                } else {
-                    $myModel = $GLOBALS["AI_CHAT"]["MODEL"];
-                }
-            } else {
-                $myModel = $GLOBALS["AI_CHAT"]["MODEL"];
-            }
-        } else {
-            $myModel = $GLOBALS["AI_CHAT"]["MODEL"];
-        }
+        // Determine model (respect upstream selection in globals)
+        $myModel = $GLOBALS["AI_CHAT"]["MODEL"];
 
         $requestData = [
             'model' => $myModel,
