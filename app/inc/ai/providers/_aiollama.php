@@ -105,9 +105,9 @@ class AIOllama {
         
         $client = self::$client;
         
-        // which model on ollama?
+        // which model on ollama? (respect upstream selection)
         $myModel = $GLOBALS["AI_CHAT"]["MODEL"];
-        
+
         try {
             if ($stream) {
                 // Use streaming mode - simplified prompt for streaming
@@ -126,26 +126,8 @@ class AIOllama {
                 }
                 $fullPrompt .= "\nCurrent message: " . $msgText;
 
-                // different model configured?
-                if(isset($systemPrompt['SETTINGS'])) {
-                    foreach($systemPrompt['SETTINGS'] as $setting) {
-                        $systemPrompt[$setting['BTOKEN']] = $setting['BVALUE'];
-                    }
-                    if(isset($systemPrompt['aiModel']) AND intval($systemPrompt['aiModel']) > 0) {
-                        $modelArr = BasicAI::getModelDetails(intval($systemPrompt['aiModel']));
-                        // Use BPROVID if available, fallback to BNAME, then to global model
-                        if (!empty($modelArr) && is_array($modelArr)) {
-                            $myModel = !empty($modelArr['BPROVID']) ? $modelArr['BPROVID'] : 
-                                      (!empty($modelArr['BNAME']) ? $modelArr['BNAME'] : $GLOBALS["AI_CHAT"]["MODEL"]);
-                        } else {
-                            $myModel = $GLOBALS["AI_CHAT"]["MODEL"];
-                        }
-                    } else {
-                        $myModel = $GLOBALS["AI_CHAT"]["MODEL"];
-                    }
-                } else {
-                    $myModel = $GLOBALS["AI_CHAT"]["MODEL"];
-                }
+                // respect upstream selection; do not override here
+                $myModel = $GLOBALS["AI_CHAT"]["MODEL"];
 
                 $completions = $client->completions()->createStreamed([
                     'model' => $myModel,

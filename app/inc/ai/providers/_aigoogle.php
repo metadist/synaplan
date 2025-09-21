@@ -159,20 +159,8 @@ class AIGoogle {
             // call tools before the prompt is executed!
         }
         
-        // Determine the model to use
+        // Determine the model to use (respect preselected globals)
         $myModel = $GLOBALS["AI_CHAT"]["MODEL"];
-        if (isset($systemPrompt['SETTINGS']['aiModel']) && $systemPrompt['SETTINGS']['aiModel'] > 0) {
-            $modelArr = BasicAI::getModelDetails(intval($systemPrompt['SETTINGS']['aiModel']));
-            // Use BPROVID if available, fallback to BNAME, then to global model
-            if (!empty($modelArr) && is_array($modelArr)) {
-                $myModel = !empty($modelArr['BPROVID']) ? $modelArr['BPROVID'] : 
-                          (!empty($modelArr['BNAME']) ? $modelArr['BNAME'] : $GLOBALS["AI_CHAT"]["MODEL"]);
-            } else {
-                $myModel = $GLOBALS["AI_CHAT"]["MODEL"];
-            }
-        } else {
-            $myModel = $GLOBALS["AI_CHAT"]["MODEL"];
-        }
         
         // Prepare the API URL
         $url = "https://generativelanguage.googleapis.com/v1beta/models/" . $myModel . ":generateContent?key=" . self::$key;
@@ -213,70 +201,146 @@ class AIGoogle {
         ];
 
         try {
-            $arrRes = Curler::callJson($url, $headers, $postData);
-            
-            // Extract response text
-            if (isset($arrRes['candidates'][0]['content']['parts'][0]['text'])) {
-                $answer = $arrRes['candidates'][0]['content']['parts'][0]['text'];
-                
-                // Clean JSON response - only if it starts with JSON markers
-                if (strpos($answer, "```json\n") === 0) {
-                    $answer = substr($answer, 8); // Remove "```json\n" from start
-                    if (strpos($answer, "\n```") !== false) {
-                        $answer = str_replace("\n```", "", $answer);
-                    }
-                } elseif (strpos($answer, "```json") === 0) {
-                    $answer = substr($answer, 7); // Remove "```json" from start
-                    if (strpos($answer, "```") !== false) {
-                        $answer = str_replace("```", "", $answer);
-                    }
-                }
-                $answer = trim($answer);
+            if ($stream) {
+                // Streaming via SSE endpoint
+                $streamUrl = "https://generativelanguage.googleapis.com/v1beta/models/" . $myModel . ":streamGenerateContent?alt=sse&key=" . self::$key;
+                $streamHeaders = $headers;
+                $streamHeaders[] = 'Accept: text/event-stream';
 
-                if(Tools::isValidJson($answer) == false) {
-                    // If not valid JSON, return as text response
-                    $arrAnswer = $msgArr;
-                    $arrAnswer['BTEXT'] = $answer;
-                    $arrAnswer['BDIRECT'] = 'OUT';
-                } else {
-                    try {
-                        $arrAnswer = json_decode($answer, true);
-                        
-                        // If json_decode returns a string instead of array, wrap it
-                        if (is_string($arrAnswer)) {
-                            $arrAnswer = [
-                                'BTEXT' => $arrAnswer,
-                                'BDIRECT' => 'OUT'
-                            ];
-                            // Preserve essential fields from original message
-                            if (isset($msgArr['BID'])) $arrAnswer['BID'] = $msgArr['BID'];
-                            if (isset($msgArr['BUSERID'])) $arrAnswer['BUSERID'] = $msgArr['BUSERID'];
-                            if (isset($msgArr['BTOPIC'])) $arrAnswer['BTOPIC'] = $msgArr['BTOPIC'];
+                $ch = curl_init();
+                curl_setopt_array($ch, [
+                    CURLOPT_URL => $streamUrl,
+                    CURLOPT_POST => true,
+                    CURLOPT_HTTPHEADER => $streamHeaders,
+                    CURLOPT_POSTFIELDS => json_encode($postData, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+                    CURLOPT_RETURNTRANSFER => true,
+                    CURLOPT_SSL_VERIFYPEER => true,
+                    CURLOPT_USERAGENT => 'Synaplan-Gemini/1.0',
+                ]);
+
+                $answer = '';
+
+                curl_setopt($ch, CURLOPT_WRITEFUNCTION, function($ch, $data) use (&$answer, $msgArr) {
+                    $lines = explode("\n", $data);
+                    foreach ($lines as $line) {
+                        if (strpos($line, 'data: ') === 0) {
+                            $jsonData = substr($line, 6);
+                            if ($jsonData === '' || $jsonData === '[DONE]') { continue; }
+                            $event = json_decode($jsonData, true);
+                            if (is_array($event)) {
+                                // Extract text chunks from Gemini SSE payloads
+                                $textChunk = '';
+                                if (isset($event['candidates'][0]['content']['parts'])) {
+                                    foreach ($event['candidates'][0]['content']['parts'] as $part) {
+                                        if (isset($part['text']) && is_string($part['text']) && $part['text'] !== '') {
+                                            $textChunk .= $part['text'];
+                                        }
+                                    }
+                                } elseif (isset($event['candidates'][0]['content']['parts'][0]['text'])) {
+                                    $textChunk = (string)$event['candidates'][0]['content']['parts'][0]['text'];
+                                }
+                                if ($textChunk !== '') {
+                                    $answer .= $textChunk;
+                                    Frontend::statusToStream($msgArr["BID"], 'ai', $textChunk);
+                                }
+                            }
                         }
-                        
-                        // Ensure $arrAnswer is always an array
-                        if (!is_array($arrAnswer)) {
-                            $arrAnswer = [
-                                'BTEXT' => is_string($arrAnswer) ? $arrAnswer : 'Invalid response format',
-                                'BDIRECT' => 'OUT'
-                            ];
-                            // Preserve essential fields from original message
-                            if (isset($msgArr['BID'])) $arrAnswer['BID'] = $msgArr['BID'];
-                            if (isset($msgArr['BUSERID'])) $arrAnswer['BUSERID'] = $msgArr['BUSERID'];
-                            if (isset($msgArr['BTOPIC'])) $arrAnswer['BTOPIC'] = $msgArr['BTOPIC'];
-                        }
-                    } catch (Exception $err) {
-                        return "*APItopic Error - Ralf made a bubu - please mail that to him: * " . $err->getMessage();
-                    }    
+                    }
+                    return strlen($data);
+                });
+
+                curl_exec($ch);
+                $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+                $curlErr = curl_error($ch);
+                curl_close($ch);
+
+                if (!empty($curlErr)) {
+                    return "*APItopic Error - Google streaming failed: * " . $curlErr;
+                }
+                if ($httpCode !== 200 && $httpCode !== 0) {
+                    return "*APItopic Error - Google streaming HTTP " . $httpCode . "*";
                 }
 
-                // Add model information to the response (now safe since $arrAnswer is guaranteed to be an array)
+                // Build final answer array (avoid double output)
+                $arrAnswer = $msgArr;
+                $arrAnswer['BTEXT'] = $answer;
+                $arrAnswer['BDIRECT'] = 'OUT';
+                $arrAnswer['BDATETIME'] = date('Y-m-d H:i:s');
+                $arrAnswer['BUNIXTIMES'] = time();
+                $arrAnswer['BFILE'] = 0;
+                $arrAnswer['BFILEPATH'] = '';
+                $arrAnswer['BFILETYPE'] = '';
+                $arrAnswer['BFILETEXT'] = '';
                 $arrAnswer['_USED_MODEL'] = $myModel;
                 $arrAnswer['_AI_SERVICE'] = 'AIGoogle';
-
+                $arrAnswer['ALREADYSHOWN'] = true;
                 return $arrAnswer;
             } else {
-                return "*API topic Error - Google AI response format error*";
+                $arrRes = Curler::callJson($url, $headers, $postData);
+                
+                // Extract response text
+                if (isset($arrRes['candidates'][0]['content']['parts'][0]['text'])) {
+                    $answer = $arrRes['candidates'][0]['content']['parts'][0]['text'];
+                    
+                    // Clean JSON response - only if it starts with JSON markers
+                    if (strpos($answer, "```json\n") === 0) {
+                        $answer = substr($answer, 8); // Remove "```json\n" from start
+                        if (strpos($answer, "\n```") !== false) {
+                            $answer = str_replace("\n```", "", $answer);
+                        }
+                    } elseif (strpos($answer, "```json") === 0) {
+                        $answer = substr($answer, 7); // Remove "```json" from start
+                        if (strpos($answer, "```") !== false) {
+                            $answer = str_replace("```", "", $answer);
+                        }
+                    }
+                    $answer = trim($answer);
+
+                    if(Tools::isValidJson($answer) == false) {
+                        // If not valid JSON, return as text response
+                        $arrAnswer = $msgArr;
+                        $arrAnswer['BTEXT'] = $answer;
+                        $arrAnswer['BDIRECT'] = 'OUT';
+                    } else {
+                        try {
+                            $arrAnswer = json_decode($answer, true);
+                            
+                            // If json_decode returns a string instead of array, wrap it
+                            if (is_string($arrAnswer)) {
+                                $arrAnswer = [
+                                    'BTEXT' => $arrAnswer,
+                                    'BDIRECT' => 'OUT'
+                                ];
+                                // Preserve essential fields from original message
+                                if (isset($msgArr['BID'])) $arrAnswer['BID'] = $msgArr['BID'];
+                                if (isset($msgArr['BUSERID'])) $arrAnswer['BUSERID'] = $msgArr['BUSERID'];
+                                if (isset($msgArr['BTOPIC'])) $arrAnswer['BTOPIC'] = $msgArr['BTOPIC'];
+                            }
+                            
+                            // Ensure $arrAnswer is always an array
+                            if (!is_array($arrAnswer)) {
+                                $arrAnswer = [
+                                    'BTEXT' => is_string($arrAnswer) ? $arrAnswer : 'Invalid response format',
+                                    'BDIRECT' => 'OUT'
+                                ];
+                                // Preserve essential fields from original message
+                                if (isset($msgArr['BID'])) $arrAnswer['BID'] = $msgArr['BID'];
+                                if (isset($msgArr['BUSERID'])) $arrAnswer['BUSERID'] = $msgArr['BUSERID'];
+                                if (isset($msgArr['BTOPIC'])) $arrAnswer['BTOPIC'] = $msgArr['BTOPIC'];
+                            }
+                        } catch (Exception $err) {
+                            return "*APItopic Error - Ralf made a bubu - please mail that to him: * " . $err->getMessage();
+                        }    
+                    }
+
+                    // Add model information to the response (now safe since $arrAnswer is guaranteed to be an array)
+                    $arrAnswer['_USED_MODEL'] = $myModel;
+                    $arrAnswer['_AI_SERVICE'] = 'AIGoogle';
+
+                    return $arrAnswer;
+                } else {
+                    return "*API topic Error - Google AI response format error*";
+                }
             }
         } catch (Exception $err) {
             return "*APItopic Error - Ralf made a bubu - please mail that to him: * " . $err->getMessage();
