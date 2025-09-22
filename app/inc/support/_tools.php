@@ -633,4 +633,41 @@ class Tools {
         // Try to claim the cron slot
         return !self::addCron($cronId) ? true : false;
     }
+
+    // --------------------------------------------------------------------------
+    // Create a secure random string for passwords/tokens
+    public static function createRandomString(int $minLength = 8, int $maxLength = 12): string {
+        $min = max(4, $minLength);
+        $max = max($min, $maxLength);
+        $length = random_int($min, $max);
+
+        $uppercase = 'ABCDEFGHJKLMNPQRSTUVWXYZ'; // exclude I/O
+        $lowercase = 'abcdefghijkmnopqrstuvwxyz'; // exclude l
+        $digits    = '23456789'; // exclude 0/1
+        $symbols   = '!()*+.-';
+
+        $all = $uppercase . $lowercase . $digits . $symbols;
+
+        // Ensure at least one character from each set
+        $chars = [
+            $uppercase[random_int(0, strlen($uppercase)-1)],
+            $lowercase[random_int(0, strlen($lowercase)-1)],
+            $digits[random_int(0, strlen($digits)-1)],
+            $symbols[random_int(0, strlen($symbols)-1)]
+        ];
+
+        for ($i = count($chars); $i < $length; $i++) {
+            $chars[] = $all[random_int(0, strlen($all)-1)];
+        }
+
+        // Shuffle
+        for ($i = 0; $i < count($chars); $i++) {
+            $j = random_int(0, count($chars)-1);
+            $tmp = $chars[$i];
+            $chars[$i] = $chars[$j];
+            $chars[$j] = $tmp;
+        }
+
+        return implode('', $chars);
+    }
 }

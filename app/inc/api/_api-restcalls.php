@@ -89,6 +89,9 @@ switch($apiAction) {
     case 'userRegister':
         $resArr = UserRegistration::registerNewUser();
         break;
+    case 'lostPassword':
+        $resArr = UserRegistration::lostPassword();
+        break;
     case 'getMailhandler':
         $resArr = Frontend::getMailhandler();
         break;

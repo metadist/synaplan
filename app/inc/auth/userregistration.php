@@ -113,4 +113,50 @@ class UserRegistration {
         }
         return $pin;
     }
+
+    /**
+     * Lost password handler
+     *
+     * Validates Turnstile, generates a new password if user exists,
+     * writes it (MD5) to BUSER and sends an email using EmailService.
+     * Always returns a generic success message (no user enumeration).
+     */
+    public static function lostPassword(): array {
+        // Captcha validation (re-using existing helper)
+        $captchaOk = Frontend::myCFcaptcha();
+        if (!$captchaOk) {
+            return ['success' => false, 'error' => 'Captcha verification failed'];
+        }
+
+        $email = isset($_REQUEST['email']) ? DB::EscString(trim($_REQUEST['email'])) : '';
+        if ($email === '' || strpos($email, '@') === false) {
+            return ['success' => false, 'error' => 'Please provide a valid email address'];
+        }
+
+        // Lookup user
+        $uSQL = "SELECT BID, BMAIL FROM BUSER WHERE BMAIL='".$email."' LIMIT 1";
+        $uRes = DB::Query($uSQL);
+        $uArr = DB::FetchArr($uRes);
+
+        $message = 'If the email exists, we sent a new password.';
+
+        if ($uArr && isset($uArr['BID'])) {
+            // Generate new password
+            $newPassword = Tools::createRandomString(10, 14);
+            $newPasswordMd5 = md5($newPassword);
+
+            // Update DB
+            $upd = "UPDATE BUSER SET BPW='".$newPasswordMd5."' WHERE BID=".(int)$uArr['BID'];
+            DB::Query($upd);
+
+            // Send mail (English)
+            try {
+                EmailService::sendPasswordResetEmail($uArr['BMAIL'], $newPassword);
+            } catch (\Throwable $e) {
+                if (!empty($GLOBALS['debug'])) { error_log('lostPassword mail failed: '.$e->getMessage()); }
+            }
+        }
+
+        return ['success' => true, 'message' => $message];
+    }
 }

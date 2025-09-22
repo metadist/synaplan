@@ -127,6 +127,49 @@ class EmailService {
     }
     
     /**
+     * Send password reset email with the new password
+     * 
+     * @param string $email Recipient email
+     * @param string $newPassword Newly generated password (already stored hashed)
+     * @return bool
+     */
+    public static function sendPasswordResetEmail(string $email, string $newPassword): bool {
+        $loginLink = $GLOBALS["baseUrl"] . "index.php";
+        
+        $htmlText = "
+        <h2>Password Reset</h2>
+        <p>We've generated a new password for your Synaplan account.</p>
+        <p><strong>New password:</strong> <code>" . htmlspecialchars($newPassword) . "</code></p>
+        <p>For your security, please log in and change this password immediately in your account settings.</p>
+        <p><a href='".$loginLink."' style='background-color: #007bff; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block;'>Go to Login</a></p>
+        <p>If you didn't request this, please secure your account and contact support.</p>
+        <p>Best regards,<br>The Synaplan Team</p>
+        ";
+        
+        $plainText = "
+        Password Reset
+        
+        We've generated a new password for your Synaplan account.
+        New password: " . $newPassword . "
+        
+        For your security, please log in and change this password immediately in your account settings.
+        Login: " . $loginLink . "
+        
+        If you didn't request this, please secure your account and contact support.
+        
+        Best regards,
+        The Synaplan Team
+        ";
+        
+        return self::sendEmail(
+            $email,
+            "Synaplan - Your new password",
+            $htmlText,
+            $plainText
+        );
+    }
+    
+    /**
      * Send admin notification email
      * 
      * @param string $subject Email subject

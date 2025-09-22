@@ -16,7 +16,8 @@ class ApiAuthenticator {
         'againOptions', 
         'chatStream',
         'getMessageFiles',
-        'userRegister'
+        'userRegister',
+        'lostPassword'
     ];
     
     /** @var array Endpoints that require authenticated user sessions */
@@ -114,6 +115,9 @@ class ApiAuthenticator {
     public static function isActionAllowed(string $action): bool {
         // Public endpoints that require no authentication nor widget session
         if ($action === 'userRegister') {
+            return true;
+        }
+        if ($action === 'lostPassword') {
             return true;
         }
         if (in_array($action, self::$authenticatedOnlyEndpoints)) {
