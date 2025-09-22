@@ -604,11 +604,26 @@ class AIOpenAI {
         $client = self::$client;
 
         $tPrompt = BasicAI::getAprompt('tools:lang');
+        $systemPrompt = is_array($tPrompt) ? ($tPrompt['BPROMPT'] ?? '') : (string)$tPrompt;
+        // Normalize content like in AIGroq
+        $normalizeContent = function($content) {
+            if (is_string($content)) { return $content; }
+            if (is_array($content)) {
+                $looksLikeParts = true;
+                foreach ($content as $part) {
+                    if (!is_array($part) || !isset($part['type'])) { $looksLikeParts = false; break; }
+                }
+                if ($looksLikeParts) { return $content; }
+                return json_encode($content, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+            }
+            return json_encode($content, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        };
+
         $arrMessages = [
-            ['role' => 'system', 'content' => $tPrompt]
+            ['role' => 'system', 'content' => $normalizeContent($systemPrompt)]
         ];
 
-        $arrMessages[] = ['role' => 'user', 'content' => $qTerm];
+        $arrMessages[] = ['role' => 'user', 'content' => $normalizeContent($qTerm)];
 
         $myModel = $GLOBALS["AI_CHAT"]["MODEL"];
         try {
@@ -617,7 +632,32 @@ class AIOpenAI {
                 'messages' => $arrMessages
             ]);
         } catch (Exception $err) {
-            $msgArr['BTEXT'] = "*APItranslate Error - Ralf made a bubu - please mail that to him: * " . $err->getMessage();
+            // Return structured debug similar to AIGroq
+            $toText = function($value) {
+                if (is_string($value)) { return $value; }
+                if (is_array($value) || is_object($value)) {
+                    $json = json_encode($value, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+                    if ($json !== false && $json !== null) { return $json; }
+                    return print_r($value, true);
+                }
+                return (string)$value;
+            };
+            $sysContent = $arrMessages[0]['content'] ?? '';
+            $usrContent = $arrMessages[1]['content'] ?? '';
+            $sysType = gettype($sysContent);
+            $usrType = gettype($usrContent);
+            if ($sysType === 'object' && function_exists('get_class')) { $sysType .= ':' . get_class($sysContent); }
+            if ($usrType === 'object' && function_exists('get_class')) { $usrType .= ':' . get_class($usrContent); }
+            $debug = "DEBUG translate failure OpenAI\n"
+                . "error: " . $err->getMessage() . "\n"
+                . "model: " . ($myModel ?? '') . "\n"
+                . "systemPrompt.type: " . $sysType . "\n"
+                . "systemPrompt.text: " . $toText($sysContent) . "\n"
+                . "userCommand.type: " . $usrType . "\n"
+                . "userCommand.text: " . $toText($usrContent) . "\n"
+                . "messages.json: " . $toText($arrMessages) . "\n";
+            if (strlen($debug) > 8000) { $debug = substr($debug, 0, 8000) . "..."; }
+            $msgArr['BTEXT'] = $debug;
             return $msgArr;
         }
 

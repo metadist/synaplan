@@ -735,7 +735,32 @@ class AIGroq {
                 'messages' => $arrMessages
             ]);
         } catch (GroqException $err) {
-            $msgArr['BTEXT'] = "*APItranslate Error - Ralf made a bubu - please mail that to him: * " . $err->getMessage();
+            // Enhanced debug output: return structured details with stringified contents
+            $toText = function($value) {
+                if (is_string($value)) { return $value; }
+                if (is_array($value) || is_object($value)) {
+                    $json = json_encode($value, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+                    if ($json !== false && $json !== null) { return $json; }
+                    return print_r($value, true);
+                }
+                return (string)$value;
+            };
+            $sysContent = $arrMessages[0]['content'] ?? '';
+            $usrContent = $arrMessages[1]['content'] ?? '';
+            $sysType = gettype($sysContent);
+            $usrType = gettype($usrContent);
+            if ($sysType === 'object' && function_exists('get_class')) { $sysType .= ':' . get_class($sysContent); }
+            if ($usrType === 'object' && function_exists('get_class')) { $usrType .= ':' . get_class($usrContent); }
+            $debug = "DEBUG translate failure GROQ\n"
+                . "error: " . $err->getMessage() . "\n"
+                . "model: " . ($GLOBALS["AI_CHAT"]["MODEL"] ?? '') . "\n"
+                . "systemPrompt.type: " . $sysType . "\n"
+                . "systemPrompt.text: " . $toText($sysContent) . "\n"
+                . "userCommand.type: " . $usrType . "\n"
+                . "userCommand.text: " . $toText($usrContent) . "\n"
+                . "messages.json: " . $toText($arrMessages) . "\n";
+            if (strlen($debug) > 8000) { $debug = substr($debug, 0, 8000) . "..."; }
+            $msgArr['BTEXT'] = $debug;
             return $msgArr;
         }
 
