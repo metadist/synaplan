@@ -705,11 +705,28 @@ class AIGroq {
             $len = strlen((string)$systemPrompt);
             error_log("translateTo: systemPrompt.len=".$len);
         }
+        // Normalize message contents: Groq API expects string or array of content parts, not objects
+        $normalizeContent = function($content) {
+            if (is_string($content)) { return $content; }
+            if (is_array($content)) {
+                // If it's already an array of parts with type/content, keep it
+                $looksLikeParts = true;
+                foreach ($content as $part) {
+                    if (!is_array($part) || !isset($part['type'])) { $looksLikeParts = false; break; }
+                }
+                if ($looksLikeParts) { return $content; }
+                // Otherwise, stringify array
+                return json_encode($content, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+            }
+            // Objects or other types -> stringify safely
+            return json_encode($content, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        };
+
         $arrMessages = [
-            ['role' => 'system', 'content' => $systemPrompt]
+            ['role' => 'system', 'content' => $normalizeContent($systemPrompt)]
         ];
 
-        $arrMessages[] = ['role' => 'user', 'content' => $qTerm];
+        $arrMessages[] = ['role' => 'user', 'content' => $normalizeContent($qTerm)];
 
 
         try {
