@@ -20,6 +20,8 @@ class TikaClient {
 		$timeoutMs = ApiKeys::getTikaTimeoutMs();
 		$retries = ApiKeys::getTikaRetries();
 		$backoffMs = ApiKeys::getTikaRetryBackoffMs();
+        $authUser = ApiKeys::getTikaHttpUser();
+        $authPass = ApiKeys::getTikaHttpPass();
 
 		// One-time lightweight health check
 		self::maybePingHealth($baseUrl);
@@ -47,7 +49,7 @@ class TikaClient {
 		while ($attempt <= $retries) {
 			$attempt++;
 			try {
-				list($result, $httpCode) = self::curlPutFile($endpoint, $headers, $absoluteFilePath, $timeoutMs);
+				list($result, $httpCode) = self::curlPutFile($endpoint, $headers, $absoluteFilePath, $timeoutMs, $authUser, $authPass);
 				$elapsedMs = (int)((microtime(true) - $startTs) * 1000);
 				self::logCall($endpoint, $attempt, true, $elapsedMs, strlen($result), '', $httpCode);
 				return [$result, ['endpoint' => $baseUrl, 'attempts' => $attempt, 'elapsed_ms' => $elapsedMs, 'http' => $httpCode]];
@@ -64,7 +66,7 @@ class TikaClient {
 		return [null, ['endpoint' => $baseUrl, 'error' => $lastError]];
 	}
 
-	private static function curlPutFile(string $url, array $headers, string $filePath, int $timeoutMs): array {
+	private static function curlPutFile(string $url, array $headers, string $filePath, int $timeoutMs, ?string $authUser = null, ?string $authPass = null): array {
 		if (!is_file($filePath) || filesize($filePath) === 0) {
 			throw new \RuntimeException('Input file missing or empty: ' . $filePath);
 		}
@@ -80,6 +82,10 @@ class TikaClient {
 		curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
 		curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
 		curl_setopt($ch, CURLOPT_ENCODING, 'gzip');
+        if ($authUser !== null) {
+            curl_setopt($ch, CURLOPT_HTTPAUTH, CURLAUTH_BASIC);
+            curl_setopt($ch, CURLOPT_USERPWD, $authUser . ':' . ($authPass ?? ''));
+        }
 		if (function_exists('curl_setopt') && defined('CURLOPT_TIMEOUT_MS')) {
 			curl_setopt($ch, CURLOPT_TIMEOUT_MS, max(1000, $timeoutMs));
 		} else {
@@ -130,6 +136,12 @@ class TikaClient {
 		curl_setopt($ch, CURLOPT_URL, $healthUrl);
 		curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
 		curl_setopt($ch, CURLOPT_TIMEOUT, 3);
+        $authUser = ApiKeys::getTikaHttpUser();
+        $authPass = ApiKeys::getTikaHttpPass();
+        if ($authUser !== null) {
+            curl_setopt($ch, CURLOPT_HTTPAUTH, CURLAUTH_BASIC);
+            curl_setopt($ch, CURLOPT_USERPWD, $authUser . ':' . ($authPass ?? ''));
+        }
 		$start = microtime(true);
 		$response = curl_exec($ch);
 		$code = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);

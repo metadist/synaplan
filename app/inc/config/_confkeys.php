@@ -101,6 +101,8 @@ class ApiKeys {
             'TIKA_TIMEOUT_MS',
             'TIKA_RETRIES',
             'TIKA_RETRY_BACKOFF_MS',
+            'TIKA_HTTP_USER',
+            'TIKA_HTTP_PASS',
             // Rasterizer / Vision fallback
             'RASTERIZE_DPI',
             'RASTERIZE_PAGE_CAP',
@@ -167,6 +169,15 @@ class ApiKeys {
         $v = self::get('TIKA_MIN_ENTROPY');
         $f = $v !== null ? floatval($v) : 2.5;
         return $f;
+    }
+
+    public static function getTikaHttpUser(): ?string {
+        $v = self::get('TIKA_HTTP_USER');
+        return ($v !== null && $v !== '') ? $v : null;
+    }
+    public static function getTikaHttpPass(): ?string {
+        $v = self::get('TIKA_HTTP_PASS');
+        return ($v !== null) ? $v : null;
     }
 
     // ------------------------- RASTERIZER CONFIG -------------------------
