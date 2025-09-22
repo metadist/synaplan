@@ -28,6 +28,8 @@ class Director
             } else {
                 if (count($commandParts) > 0 && $commandParts[0] == "register") {
                     $contentInc = "register";
+                } elseif (count($commandParts) > 0 && $commandParts[0] == "lostpw") {
+                    $contentInc = "lostpw";
                 } else {
                     $contentInc = "login";
                 }
@@ -51,7 +53,7 @@ class Director
             }
         }
 
-        if ($contentInc != "login" && $contentInc != "register" && $contentInc != "confirm") {
+        if ($contentInc != "login" && $contentInc != "register" && $contentInc != "confirm" && $contentInc != "lostpw") {
             include(__DIR__ . "/../frontend/c_menu.php");
             include(__DIR__ . "/../frontend/c_" . $contentInc . ".php");
             $serverIp = $_SERVER['SERVER_ADDR'] ?? ($_SERVER['SERVER_NAME'] ?? 'localhost');
@@ -60,6 +62,8 @@ class Director
             include(__DIR__ . "/../frontend/c_register.php");
         } elseif ($contentInc == "confirm") {
             include(__DIR__ . "/../frontend/c_confirm.php");
+        } elseif ($contentInc == "lostpw") {
+            include(__DIR__ . "/../frontend/c_lostpw.php");
         } else {
             include(__DIR__ . "/../frontend/c_login.php");
         }
