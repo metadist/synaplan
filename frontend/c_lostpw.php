@@ -59,9 +59,10 @@ document.getElementById('lostpwForm').addEventListener('submit', function(e) {
     submitBtn.disabled = true;
     submitSpinner.classList.remove('d-none');
 
-    const formData = new FormData();
+    // build FormData from the form to include Turnstile token automatically
+    const formEl = document.getElementById('lostpwForm');
+    const formData = new FormData(formEl);
     formData.append('action', 'lostPassword');
-    formData.append('email', email);
 
     fetch('api.php', {
         method: 'POST',
