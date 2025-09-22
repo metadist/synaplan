@@ -59,6 +59,13 @@ OPENAI_API_KEY=your_openai_api_key_here
 GOOGLE_GEMINI_API_KEY=your_gemini_api_key_here
 OLLAMA_URL=http://localhost:11434  # If using local Ollama
 
+# Optional: Document extraction via Apache Tika
+TIKA_ENABLED=true
+TIKA_URL=http://localhost:9998
+# Optional: HTTP Basic Auth for Tika (leave empty to disable)
+TIKA_HTTP_USER=
+TIKA_HTTP_PASS=
+
 # Database Configuration (if different from defaults)
 DB_HOST=localhost
 DB_NAME=synaplan
@@ -121,6 +128,8 @@ You can also deploy Synaplan on a regular Linux server using Apache, PHP 8.3, an
 - Vector search (MariaDB 11.7+), built-in RAG
 - Local audio transcription via whisper.cpp
 - Full message logging and usage tracking
+- Tika‑first document text extraction with automatic PDF OCR fallback (Vision AI)
+  - Optional HTTP Basic Authentication supported for Tika via `TIKA_HTTP_USER` and `TIKA_HTTP_PASS`.
 
 ### Architecture (brief)
 ```
@@ -167,6 +176,8 @@ Configuration-driven AI selection via `$GLOBALS` and centralized key management 
 - Uploads: check `public/up/` permissions
 - AI calls: verify API keys in `.env` (project root)
 - DB errors: verify credentials and service status
+- PDFs: if text extraction is empty, ensure Tika is reachable (`TIKA_ENABLED/TIKA_URL`); PDF OCR fallback runs automatically.
+  - If Tika uses HTTP Basic Auth, set `TIKA_HTTP_USER` and `TIKA_HTTP_PASS` (both optional). Leaving them empty disables auth.
 - **Whisper models:** If you need to re-download models, delete the volume and restart:
   ```bash
   docker compose down

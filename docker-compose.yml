@@ -20,6 +20,9 @@ services:
       - DB_USER=synaplan_user
       - DB_PASSWORD=synaplan_password
       - OLLAMA_SERVER=ollama:11434
+      - TIKA_URL=${TIKA_URL:-http://tika:9998}
+      - TIKA_HTTP_USER=${TIKA_HTTP_USER:-}
+      - TIKA_HTTP_PASS=${TIKA_HTTP_PASS:-}
       - XDEBUG_MODE=debug
       - XDEBUG_CONFIG=client_host=host.docker.internal client_port=9003
       - OIDC_PROVIDER_URL=${OIDC_PROVIDER_URL:-}
@@ -129,6 +132,7 @@ services:
       - ollama_data:/root/.ollama
     environment:
       - OLLAMA_HOST=0.0.0.0
+      - OLLAMA_PULL_MODELS=llava:13b,llama3.2:3b,mistral:7b,codellama:7b,deepseek-r1:14b,deepseek-r1:32b,bge-m3
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:11434/api/tags"]
@@ -205,10 +209,32 @@ services:
     networks:
       - synaplan-network
 
+  # Apache Tika (optional;)
+  tika:
+    image: apache/tika:2.9.2.0
+    container_name: synaplan-tika
+    restart: unless-stopped
+    command: -h 0.0.0.0 -p 9998
+    ports:
+      - "9998:9998"
+    healthcheck:
+      test: ["CMD", "sh", "-lc", "wget -qO- http://localhost:9998/version >/dev/null 2>&1 || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 20s
+    logging:
+      options:
+        max-size: "10m"
+        max-file: "3"
+    networks:
+      - synaplan-network
+
 volumes:
   mysql_data:
   ollama_data:
   whisper_models:
+    name: synaplan_whisper_models
 
 networks:
   synaplan-network:
