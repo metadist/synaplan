@@ -87,6 +87,13 @@ class ApiAuthenticator {
             self::sendUnauthorized('User account not found');
             return true;
         }
+
+        // Enforce allowed BUSERLEVEL for API access
+        $allowedLevels = ['NEW','PRO','TEAM','BUSINESS'];
+        if (!in_array($userArr['BUSERLEVEL'] ?? '', $allowedLevels, true)) {
+            self::sendUnauthorized('User level not allowed');
+            return true;
+        }
         
         // Set session
         $_SESSION['USERPROFILE'] = $userArr;
@@ -230,6 +237,15 @@ class ApiAuthenticator {
             
             http_response_code(401);
             echo json_encode(['error' => 'Authentication required']);
+            exit;
+        }
+
+        // Enforce allowed BUSERLEVEL for authenticated sessions
+        $allowedLevels = ['NEW','PRO','TEAM','BUSINESS'];
+        $sessionLevel = $_SESSION["USERPROFILE"]["BUSERLEVEL"] ?? '';
+        if (!in_array($sessionLevel, $allowedLevels, true)) {
+            http_response_code(403);
+            echo json_encode(['error' => 'User level not allowed']);
             exit;
         }
         
