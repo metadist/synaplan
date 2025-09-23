@@ -50,12 +50,6 @@ class ApiKeys {
                 $key = trim($key);
                 $value = trim($value);
                 
-                // Remove quotes if present
-                if (($value[0] === '"' && $value[-1] === '"') || 
-                    ($value[0] === "'" && $value[-1] === "'")) {
-                    $value = substr($value, 1, -1);
-                }
-                
                 // Only set if not already in environment
                 if (!isset($_ENV[$key]) && !getenv($key)) {
                     putenv("$key=$value");
@@ -110,6 +104,8 @@ class ApiKeys {
             // Quality thresholds
             'TIKA_MIN_LENGTH',
             'TIKA_MIN_ENTROPY',
+            // Rate Limiting
+            'RATE_LIMITING_ENABLED',
         ];
 
         foreach ($keyConfig as $envKey) {
@@ -290,6 +286,16 @@ class ApiKeys {
      */
     public static function getWhatsApp() {
         return self::get('WHATSAPP_TOKEN');
+    }
+
+    /**
+     * Check if rate limiting is enabled
+     */
+    public static function isRateLimitingEnabled(): bool {
+        $value = self::get('RATE_LIMITING_ENABLED');
+        if ($value === null) return false; // Default disabled
+        $v = strtolower(trim(strval($value)));
+        return in_array($v, ['1', 'true', 'on', 'yes'], true);
     }
 
     /**
