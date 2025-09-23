@@ -15,7 +15,7 @@ require_once(__DIR__ . '/ai/providers/_aiopenai.php');
 require_once(__DIR__ . '/ai/providers/_aigoogle.php');
 // Triton works on systems with php/grpc installed and with
 // protobuf installed. A triton server is needed!
-// require_once(__DIR__ . '/ai/providers/_aitriton.php');
+require_once(__DIR__ . '/ai/providers/_aitriton.php');
 
 // incoming tools
 require_once(__DIR__ . '/integrations/_wasender.php');

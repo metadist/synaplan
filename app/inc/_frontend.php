@@ -37,7 +37,16 @@ Class Frontend {
             $uArr = DB::FetchArr($uRes);
             
             if($uArr) {
-                // User found - set session
+                // Only allow login for specific user levels
+                $allowedLevels = ['NEW','PRO','TEAM','BUSINESS'];
+                if (!in_array($uArr['BUSERLEVEL'], $allowedLevels, true)) {
+                    // Not allowed (e.g., PIN:xxxx or unsupported level)
+                    unset($_SESSION["USERPROFILE"]);
+                    $success = false;
+                    return $success;
+                }
+
+                // User found and allowed - set session
                 $_SESSION["USERPROFILE"] = $uArr;
                 // Clear any leftover anonymous widget session variables on login
                 unset($_SESSION['is_widget']);
