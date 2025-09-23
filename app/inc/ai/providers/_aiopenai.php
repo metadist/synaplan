@@ -180,8 +180,8 @@ class AIOpenAI {
                     'parallel_tool_calls' => true,
                     'store' => true,
                     'metadata' => [
-                        'user_id' => $msgArr['BUSERID'],
-                        'session_id' => $msgArr['BTRACKID']
+                        'user_id' => (string)$msgArr['BUSERID'],
+                        'session_id' => (string)$msgArr['BTRACKID']
                     ]
                 ]);
 
@@ -274,8 +274,8 @@ class AIOpenAI {
                     'parallel_tool_calls' => true,
                     'store' => true,
                     'metadata' => [
-                        'user_id' => $msgArr['BUSERID'],
-                        'session_id' => $msgArr['BTRACKID']
+                        'user_id' => (string)$msgArr['BUSERID'],
+                        'session_id' => (string)$msgArr['BTRACKID']
                     ]
                 ]);
                 // JSON response processing
