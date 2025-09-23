@@ -50,13 +50,6 @@ class ApiKeys {
                 $key = trim($key);
                 $value = trim($value);
                 
-                // Remove quotes if present (with safety check for empty values)
-                if (strlen($value) >= 2 && 
-                    (($value[0] === '"' && $value[-1] === '"') || 
-                     ($value[0] === "'" && $value[-1] === "'"))) {
-                    $value = substr($value, 1, -1);
-                }
-                
                 // Only set if not already in environment
                 if (!isset($_ENV[$key]) && !getenv($key)) {
                     putenv("$key=$value");
