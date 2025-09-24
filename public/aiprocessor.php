@@ -1,10 +1,11 @@
 <?php
+
 /**
  * AI Processor for Ralfs.AI Messages
- * 
+ *
  * This file handles the processing of messages by taking the message ID and processing it
  * through various AI services and tools.
- * 
+ *
  * @author Ralf Schwoebel (rs@metadist.de)
  * @package AIProcessor
  */
@@ -34,12 +35,12 @@ ProcessMethods::sortMessage();
 $aiLastId = ProcessMethods::saveAnswerToDB();
 
 // Clean up process ID file
-$pidfile = "pids/m".($msgId).".pid";
-if(file_exists($pidfile)) {
+$pidfile = 'pids/m'.($msgId).'.pid';
+if (file_exists($pidfile)) {
     unlink($pidfile);
 }
 
 // Hand over to output processor
-$cmd = "nohup php outprocessor.php ".($aiLastId)." ".($msgId)." > /dev/null 2>&1 &";
+$cmd = 'nohup php outprocessor.php '.($aiLastId).' '.($msgId).' > /dev/null 2>&1 &';
 exec($cmd);
 exit;

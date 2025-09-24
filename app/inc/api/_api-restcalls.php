@@ -1,10 +1,11 @@
 <?php
+
 // Legacy REST action switch moved from api.php
 
 header('Content-Type: application/json; charset=UTF-8');
 $apiAction = $_REQUEST['action'];
 
-switch($apiAction) {
+switch ($apiAction) {
     case 'snippetTranslate':
         $sourceText = isset($_REQUEST['source_text']) ? trim($_REQUEST['source_text']) : '';
         $sourceLang = isset($_REQUEST['source_lang']) ? trim($_REQUEST['source_lang']) : 'en';
@@ -54,9 +55,13 @@ switch($apiAction) {
     case 'changeGroupOfFile':
         $fileId = intval($_REQUEST['fileId']);
         $newGroup = isset($_REQUEST['newGroup']) ? trim($_REQUEST['newGroup']) : '';
-        if($GLOBALS["debug"]) error_log("API changeGroupOfFile called with fileId: $fileId, newGroup: '$newGroup'");
+        if ($GLOBALS['debug']) {
+            error_log("API changeGroupOfFile called with fileId: $fileId, newGroup: '$newGroup'");
+        }
         $resArr = BasicAI::changeGroupOfFile($fileId, $newGroup);
-        if($GLOBALS["debug"]) error_log("API changeGroupOfFile result: " . json_encode($resArr));
+        if ($GLOBALS['debug']) {
+            error_log('API changeGroupOfFile result: ' . json_encode($resArr));
+        }
         break;
     case 'getProfile':
         $resArr = Frontend::getProfile();
@@ -105,8 +110,11 @@ switch($apiAction) {
         $result = Frontend::mailOAuthCallback();
         if (!isset($_REQUEST['ui']) || $_REQUEST['ui'] !== 'json') {
             $target = $GLOBALS['baseUrl'] . 'index.php/mailhandler';
-            if (!empty($result['success'])) { $target .= '?oauth=ok'; }
-            else { $target .= '?oauth=error'; }
+            if (!empty($result['success'])) {
+                $target .= '?oauth=ok';
+            } else {
+                $target .= '?oauth=error';
+            }
             header('Content-Type: text/html; charset=UTF-8');
             header('Location: ' . $target);
             echo '<html><head><meta http-equiv="refresh" content="0;url='.$target.'"></head><body>Redirecting...</body></html>';
@@ -130,4 +138,3 @@ switch($apiAction) {
 
 echo json_encode($resArr);
 exit;
-

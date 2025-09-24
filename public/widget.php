@@ -38,8 +38,8 @@ if ($uid <= 0 || $widgetId < 1 || $widgetId > 9) {
 }
 
 // Get widget configuration from database
-$group = "widget_" . $widgetId;
-$sql = "SELECT BSETTING, BVALUE FROM BCONFIG WHERE BOWNERID = " . $uid . " AND BGROUP = '" . db::EscString($group) . "'";
+$group = 'widget_' . $widgetId;
+$sql = 'SELECT BSETTING, BVALUE FROM BCONFIG WHERE BOWNERID = ' . $uid . " AND BGROUP = '" . db::EscString($group) . "'";
 $res = db::Query($sql);
 
 $config = [
@@ -63,8 +63,8 @@ while ($row = db::FetchArr($res)) {
 }
 
 // Get the base URL for the widget
-$baseUrl = $GLOBALS["baseUrl"];
-$widgetUrl = $baseUrl . "widgetloader.php?uid=" . $uid . "&widgetid=" . $widgetId;
+$baseUrl = $GLOBALS['baseUrl'];
+$widgetUrl = $baseUrl . 'widgetloader.php?uid=' . $uid . '&widgetid=' . $widgetId;
 
 // Determine position CSS
 $positionCSS = '';
