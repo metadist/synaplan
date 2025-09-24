@@ -16,6 +16,45 @@ switch($apiAction) {
         break;
 
     case 'messageAgain':
+        // Smart rate limiting for Again requests - only check relevant operation limits
+        if (XSControl::isRateLimitingEnabled() && isset($_SESSION['USERPROFILE']['BID'])) {
+            $userId = $_SESSION['USERPROFILE']['BID'];
+            $inId = intval($_REQUEST['in_id'] ?? 0);
+            
+            // Get the original message to determine what operation to limit
+            if ($inId > 0) {
+                $originalSQL = "SELECT BTOPIC FROM BMESSAGES WHERE BID = " . $inId . " LIMIT 1";
+                $originalRes = DB::Query($originalSQL);
+                $originalArr = DB::FetchArr($originalRes);
+                
+                if ($originalArr && !empty($originalArr['BTOPIC'])) {
+                    $originalTopic = $originalArr['BTOPIC'];
+                    
+                    // Only check limits relevant to the original operation
+                    $testMsg = ['BUSERID' => $userId, 'BTOPIC' => $originalTopic];
+                    $againLimitCheck = XSControl::checkTopicLimit($testMsg);
+                    
+                    if($againLimitCheck['limited']) {
+                        $resArr = [
+                            'error' => 'rate_limit_exceeded',
+                            'message' => $againLimitCheck['reason'],
+                            'reset_time' => $againLimitCheck['reset_time'] ?? 0
+                        ];
+                        break;
+                    }
+                }
+            }
+        }
+        
+        // Log Again request to BUSELOG using original message ID (tracks operation type)
+        if (isset($_SESSION['USERPROFILE']['BID'])) {
+            $userId = $_SESSION['USERPROFILE']['BID'];
+            $inId = intval($_REQUEST['in_id'] ?? 0);
+            if ($inId > 0) {
+                XSControl::countThis($userId, $inId);
+            }
+        }
+        
         $resArr = AgainLogic::prepareAgain($_REQUEST);
         break;
     case 'againOptions':

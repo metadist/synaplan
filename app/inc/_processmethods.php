@@ -38,6 +38,38 @@ class ProcessMethods {
 
     /** @var array AIdetailArr */
     public static $AIdetailArr = [];
+    
+    /**
+     * Map BTOPIC to operation type for BUSELOG tracking using BCAPABILITIES
+     */
+    private static function getOperationTypeFromTopic($topic): string {
+        try {
+            // Check if topic exists in BCAPABILITIES table
+            $sql = "SELECT BKEY FROM BCAPABILITIES WHERE BKEY = '".DB::EscString($topic)."'";
+            $result = db::Query($sql);
+            $row = db::FetchArr($result);
+            
+            if ($row) {
+                // Direct mapping for known capability types
+                return $row['BKEY'];
+            }
+            
+            // Handle special cases
+            switch ($topic) {
+                case 'mediamaker':
+                    // mediamaker needs special handling - will be updated by mediamaker logic
+                    return 'general'; // Default, will be updated later in mediamaker
+                case 'analyzefile':
+                case 'analyzepdf': // Legacy support
+                    return 'analyzefile';
+                default:
+                    return 'general';
+            }
+        } catch (Exception $e) {
+            error_log("Failed to get operation type from topic: " . $e->getMessage());
+            return 'general'; // Fallback
+        }
+    }
 
     /**
      * Initialize the message processing
@@ -242,6 +274,9 @@ class ProcessMethods {
                 if(self::$stream) {
                     Frontend::statusToStream(self::$msgId, 'pre', 'Topic and language determined: '.self::$msgArr['BTOPIC'].' ('.self::$msgArr['BLANG'].'). ');
                 }
+                
+                // BUSELOG logging will happen after rate limit checks
+                
                 // Convert tools:xyz to /xyz format and set processed flag
                 // error_log('BTOPIC: '.self::$msgArr['BTOPIC']);
                 if(substr(self::$msgArr['BTOPIC'], 0, 6) == 'tools:') {
@@ -279,6 +314,40 @@ class ProcessMethods {
                 Frontend::statusToStream(self::$msgId, 'pre', 'Tool requested. ');
             }       
 
+            // ************************* RATE LIMIT CHECK FOR TOOLS *************
+            if (XSControl::isRateLimitingEnabled()) {
+                $toolCmd = trim(self::$msgArr['BTEXT']);
+                $operation = null;
+                
+                // Map tool commands to operations
+                if (strpos($toolCmd, '/pic ') === 0) {
+                    $operation = 'text2pic';
+                } elseif (strpos($toolCmd, '/vid ') === 0) {
+                    $operation = 'text2vid';
+                } elseif (strpos($toolCmd, '/audio ') === 0) {
+                    $operation = 'text2sound';
+                }
+                
+                // Check tool-specific limits
+                if ($operation) {
+                    $toolLimitCheck = XSControl::checkOperationLimit(self::$msgArr, $operation);
+                    if ($toolLimitCheck['limited']) {
+                        // Create rate limit response
+                        self::$msgArr['BTEXT'] = 'RATE_LIMIT_NOTIFICATION: ' . json_encode([
+                            'error' => 'rate_limit_exceeded',
+                            'message' => $toolLimitCheck['reason'],
+                            'reset_time' => $toolLimitCheck['reset_time']
+                        ]);
+                        self::$msgArr['BDIRECT'] = 'OUT';
+                        
+                        if (self::$stream) {
+                            Frontend::statusToStream(self::$msgId, 'ai', self::$msgArr['BTEXT']);
+                        }
+                        return; // Stop tool processing
+                    }
+                }
+            }
+            
             // ************************* CALL THE TOOL *************
             self::$toolAnswer = BasicAI::toolPrompt(self::$msgArr, self::$stream);
 
@@ -345,9 +414,30 @@ public static function processMessage(): void {
     $answerSorted  = [];
     $ragArr        = [];
 
-    // Temporarily switch prompt/model resolution context to widget owner during processing
-    $___savedUserProfile = null;
-    $___usingOwnerCtx = false;
+        // Topic-based Rate Limiting AFTER sorting (only for non-mediamaker topics)
+        if (XSControl::isRateLimitingEnabled() && !empty(self::$msgArr['BTOPIC']) && 
+            !in_array(self::$msgArr['BTOPIC'], ['mediamaker'], true)) {
+            
+            $topicLimitCheck = XSControl::checkTopicLimit(self::$msgArr);
+            if ($topicLimitCheck['limited']) {
+                // Create rate limit response that frontend will handle elegantly
+                self::$msgArr['BTEXT'] = 'RATE_LIMIT_NOTIFICATION: ' . json_encode([
+                    'error' => 'rate_limit_exceeded',
+                    'message' => $topicLimitCheck['reason'],
+                    'reset_time' => $topicLimitCheck['reset_time']
+                ]);
+                self::$msgArr['BDIRECT'] = 'OUT';
+                
+                if (self::$stream) {
+                    Frontend::statusToStream(self::$msgId, 'ai', self::$msgArr['BTEXT']);
+                }
+                return; // Stop processing - elegant notification will be shown
+            }
+        }
+
+        // Temporarily switch prompt/model resolution context to widget owner during processing
+        $___savedUserProfile = null;
+        $___usingOwnerCtx = false;
     if (isset($_SESSION["is_widget"]) && $_SESSION["is_widget"] === true) {
         $ownerId = intval($_SESSION["widget_owner_id"] ?? 0);
         if ($ownerId > 0) {
@@ -518,6 +608,7 @@ public static function processMessage(): void {
         } elseif (preg_match('/\\b(bild|image|picture|foto|photo)\\b/u', $lowerPrompt)) {
             $requestedMedia = 'image';
         }
+        
 
         // Priority: forced tag > requested keywords > default image
         $mediaType = 'image';
@@ -527,6 +618,35 @@ public static function processMessage(): void {
         } elseif (!empty($requestedMedia)) {
             $mediaType = $requestedMedia;
         }
+        
+        // Determine operation type
+        $operationType = ($mediaType === 'audio') ? 'text2sound' : 
+                        (($mediaType === 'video') ? 'text2vid' : 'text2pic');
+        
+        // CRITICAL: Rate limit check BEFORE updating BUSELOG operation type
+        if (XSControl::isRateLimitingEnabled()) {
+            $operationToCheck = $operationType;
+            
+            $operationCheck = XSControl::checkOperationLimit(self::$msgArr, $operationToCheck);
+            if ($operationCheck['limited']) {
+                // Create rate limit response that frontend will handle
+                self::$msgArr['BTEXT'] = 'RATE_LIMIT_NOTIFICATION: ' . json_encode([
+                    'error' => 'rate_limit_exceeded',
+                    'message' => $operationCheck['reason'],
+                    'reset_time' => $operationCheck['reset_time']
+                ]);
+                self::$msgArr['BDIRECT'] = 'OUT';
+                
+                if (self::$stream) {
+                    Frontend::statusToStream(self::$msgId, 'ai', self::$msgArr['BTEXT']);
+                }
+                return; // Stop mediamaker processing BEFORE AI generation
+            }
+        }
+        
+        // Update BUSELOG operation type AFTER successful rate limit check
+        XSControl::updateOperationType(self::$msgArr['BUSERID'], self::$msgArr['BID'], $operationType);
+        
         if (!empty($GLOBALS['debug'])) {
             error_log("mediamaker: decided mediaType={$mediaType} forcedTag=" . ($GLOBALS['FORCED_AI_BTAG'] ?? ''));            
             if (self::$stream) {

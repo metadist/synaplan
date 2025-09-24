@@ -30,6 +30,7 @@ services:
       - OIDC_CLIENT_SECRET=${OIDC_CLIENT_SECRET:-}
       - OIDC_REDIRECT_URI=${OIDC_REDIRECT_URI:-}
       - OIDC_SCOPES=${OIDC_SCOPES:-openid profile email}
+      - RATE_LIMITING_ENABLED=${RATE_LIMITING_ENABLED:-false}
     depends_on:
       db:
         condition: service_healthy

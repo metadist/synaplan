@@ -127,6 +127,12 @@ function handleThinkReasoning(text, targetId) {
     console.log('No reasoning pattern found, rendering normally');
     const rendered = window.md ? window.md.render(text) : text.replace(/\n/g, "<br>");
     $("#" + targetId).html(rendered);
+    
+    // Make images and videos responsive using Bootstrap classes
+    $("#" + targetId).find('img:not(.ai-logo):not(.ai-meta-logo):not(.dropdown-logo), video').each(function() {
+      $(this).addClass('img-fluid rounded my-2 d-block')
+             .css('object-fit', 'contain');
+    });
     return;
   }
 
@@ -161,6 +167,12 @@ function handleThinkReasoning(text, targetId) {
   // Render main answer (only the BTEXT part)
   const rendered = window.md ? window.md.render(displayText) : displayText.replace(/\n/g, "<br>");
   $("#" + targetId).html(rendered);
+  
+  // Make images and videos responsive using Bootstrap classes
+  $("#" + targetId).find('img:not(.ai-logo):not(.ai-meta-logo):not(.dropdown-logo), video').each(function() {
+    $(this).addClass('img-fluid rounded my-2 d-block')
+           .css('object-fit', 'contain');
+  });
 
   // Append collapsible reasoning with the ORIGINAL reasoning content
   const reasoningHtml = `
@@ -300,6 +312,12 @@ function loadChatHistory(amount) {
                     </button>
                 </div>
             `;
+            // Use unified error notification for rate limits
+            if (data.error.includes('rate_limit_exceeded') || data.error.includes('Rate limit')) {
+                if (typeof showRateLimitNotification !== 'undefined') {
+                    showRateLimitNotification({error: 'rate_limit_exceeded', message: data.error});
+                }
+            }
         } else if (data.success && data.messages) {
             // Remove the buttons container
             buttonsContainer.remove();
@@ -326,6 +344,10 @@ function loadChatHistory(amount) {
                 </button>
             </div>
         `;
+        // Use unified error notification
+        if (typeof showErrorMessage !== 'undefined') {
+            showErrorMessage('Network Error', 'Failed to load chat history');
+        }
     });
 }
 
@@ -376,9 +398,9 @@ function renderChatHistory(messages) {
                 const fileUrl = "up/" + chat.BFILEPATH;
                 
                 if (['png', 'jpg', 'jpeg'].includes(chat.BFILETYPE)) {
-                    fileHtml = `<div class='generated-file-container'><img src='${fileUrl}' class='generated-image' alt='Generated Image' loading='lazy'></div>`;
+                    fileHtml = `<div class='generated-file-container'><img src='${fileUrl}' class='generated-image img-fluid rounded my-2 d-block' alt='Generated Image' loading='lazy' style='object-fit: contain;'></div>`;
                 } else if (['mp4', 'webm'].includes(chat.BFILETYPE)) {
-                    fileHtml = `<div class='generated-file-container'><video src='${fileUrl}' class='generated-video' controls preload='metadata'>Your browser does not support the video tag.</video></div>`;
+                    fileHtml = `<div class='generated-file-container'><video src='${fileUrl}' class='generated-video img-fluid rounded my-2 d-block' controls preload='metadata' style='object-fit: contain;'>Your browser does not support the video tag.</video></div>`;
                 }
             }
             

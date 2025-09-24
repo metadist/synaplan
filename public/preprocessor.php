@@ -41,10 +41,11 @@ if(file_exists($pidfile)) {
 // -----------------------------------------------------
 // hand over to the ai processor
 
+// Note: countThis() is now called directly in _frontend.php after successful message insert
+
 $cmd = "nohup php aiprocessor.php ".$msgArr['BID']." > /dev/null 2>&1 &";
 $pidfile = "pids/p".($msgArr['BID']).".pid";
-// exec(sprintf("%s echo $! >> %s", $cmd, $pidfile));
+exec(sprintf("%s echo $! >> %s", $cmd, $pidfile));
 //error_log(__FILE__.": execute : ".$cmd, 3, "/wwwroot/bridgeAI/customphp.log");
-exec($cmd);
 
 exit;

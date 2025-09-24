@@ -18,7 +18,8 @@ $widgetId = $_REQUEST['widgetid'] ?? 1;
 $uid = $_REQUEST['uid'] ?? 2; // Default to user ID 2 if not provided
 $mode = isset($_REQUEST['mode']) ? trim((string)$_REQUEST['mode']) : '';
 ?>
-<html>
+<!DOCTYPE html>
+<html lang="en">
     <head>
         <title>Widget Test Page</title>
         <style>

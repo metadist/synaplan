@@ -87,6 +87,7 @@ if (!isset($_SESSION['USERPROFILE']) &&
     </div>
     <script src="node_modules/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
     <script src="node_modules/feather-icons/dist/feather.min.js"></script>
+    <script src="assets/statics/js/system-notifications.js"></script>
     <script src="assets/statics/js/dashboard.js"></script>
     
 

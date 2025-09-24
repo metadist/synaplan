@@ -359,6 +359,11 @@ Class Frontend {
             $inMessageArr['BID'] = $resArr['lastId'];
             // also add it to an array for loopings
             $lastInsertsId[] = $resArr['lastId'];
+            
+            // Log message to BUSELOG immediately after successful database insert
+            if($resArr['lastId'] > 0) {
+                XSControl::countThis($userId, $resArr['lastId'], 'general');
+            }
             // new inserts for the meta data
             if($filesAttached > 0) {
                 $metaSQL = "insert into BMESSAGEMETA (BID, BMESSID, BTOKEN, BVALUE) values (DEFAULT, ".(0 + $resArr['lastId']).", 'FILECOUNT', '".($filesAttached)."');";

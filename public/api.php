@@ -39,6 +39,28 @@ require_once __DIR__ . '/../app/inc/api/_api-openapi.php';
 // ----------------------------- Bearer API key authentication
 ApiAuthenticator::handleBearerAuth();
 
+// ----------------------------- Rate Limiting: Block only if MESSAGES limit reached
+// Specific operation limits (images/videos) are checked after sorting
+$action = $_REQUEST['action'] ?? '';
+if (XSControl::isRateLimitingEnabled() && 
+    isset($_SESSION['USERPROFILE']) && 
+    !empty($_SESSION['USERPROFILE']['BID']) &&
+    $action === 'messageNew') {
+    
+    // Only check general MESSAGES limits - specific operations checked after sorting
+    $limitResult = XSControl::checkMessagesLimit($_SESSION['USERPROFILE']['BID']);
+    if ($limitResult !== true) {
+        http_response_code(429);
+        header('Content-Type: application/json');
+        echo json_encode([
+            'error' => 'rate_limit_exceeded',
+            'message' => $limitResult['message'] ?? 'Message limit exceeded',
+            'reset_time' => $limitResult['reset_time'] ?? time() + 3600
+        ]);
+        exit;
+    }
+}
+
 // ******************************************************
 // Route request to appropriate handler
 // ******************************************************

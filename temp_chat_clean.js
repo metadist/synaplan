@@ -946,74 +946,15 @@ function aiRender(targetId) {
       const jsonStr = text.substring('RATE_LIMIT_NOTIFICATION: '.length);
       const rateLimitData = JSON.parse(jsonStr);
       
-      // Show rate limit directly in AI message (no separate system message)
-      const upgradeMessage = (typeof getUpgradeMessage !== 'undefined') ? getUpgradeMessage() : 
-        `<div class="border-top pt-2 mt-2"><small class="text-muted">Need higher limits? <a href="https://www.synaplan.com/" target="_blank" class="text-decoration-none fw-semibold" style="color: #6c757d;">Upgrade your plan →</a></small></div>`;
+      // Use centralized rate limit notification system
+      showRateLimitNotification(rateLimitData);
       
-      const resetTime = rateLimitData.reset_time || (Math.floor(Date.now() / 1000) + 300);
-      const timerId = 'timer-' + Date.now();
-      
+      // Replace AI message content with clean placeholder
       $("#" + targetId).html(`
-        <div style="padding: 4px 0;">
-          <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px;">
-            <span style="font-size: 20px; opacity: 0.7; animation: pulse 2s infinite ease-in-out;">⏳</span>
-            <div>
-              <strong style="color: #495057;">Usage Limit Reached</strong>
-              <div style="color: #6c757d; font-size: 0.9em; margin-top: 2px;">
-                ${rateLimitData.message}
-              </div>
-            </div>
-          </div>
-          <div style="color: #495057; font-size: 0.9em; margin-bottom: 12px;">
-            Next available in: <span id="${timerId}" style="
-              font-family: 'SFMono-Regular', Consolas, monospace;
-              font-weight: 600; color: #212529; padding: 2px 6px;
-              background: rgba(0,0,0,0.05); border-radius: 4px;
-              transition: background-color 0.3s ease;
-            ">calculating...</span>
-          </div>
-          ${upgradeMessage}
-          
-          <style>
-            @keyframes pulse {
-              0%, 100% { opacity: 0.7; transform: scale(1); }
-              50% { opacity: 1; transform: scale(1.05); }
-            }
-          </style>
+        <div style="text-align: center; padding: 20px; color: #6c757d; font-size: 0.9em;">
+          <i class="fas fa-hourglass-half me-2"></i>Operation blocked - see notification above
         </div>
       `);
-      
-      // Start timer if function available
-      if (typeof startMiniTimer !== 'undefined') {
-        startMiniTimer(timerId, resetTime);
-      }
-      
-      // Disable Again button AND dropdown ONLY for this specific rate-limited message
-      setTimeout(() => {
-        const $targetElement = $("#" + targetId);
-        const $messageItem = $targetElement.closest('.message-item.ai-message');
-        
-        if ($messageItem.length) {
-          const $againBtn = $messageItem.find('.js-again');
-          const $againDropdown = $messageItem.find('.js-again-dd');
-          
-          if ($againBtn.length) {
-            $againBtn.prop('disabled', true)
-              .addClass('disabled')
-              .attr('title', 'Rate limit active - cannot regenerate')
-              .find('.again-text, .again-text-mobile').text('Rate limited');
-          }
-          
-          if ($againDropdown.length) {
-            $againDropdown.prop('disabled', true)
-              .addClass('disabled')
-              .attr('title', 'Rate limit active - model selection disabled');
-          }
-          
-          // Mark this message as rate-limited to prevent affecting other messages
-          $messageItem.addClass('rate-limited-message');
-        }
-      }, 100); // Small delay to ensure DOM is ready
       return;
     } catch (e) {
       console.warn('Failed to parse rate limit notification:', e);
@@ -1046,12 +987,6 @@ function aiRender(targetId) {
   }
   
   $("#" + targetId).html(renderedText);
-  
-  // Make images and videos responsive using Bootstrap classes
-  $("#" + targetId).find('img:not(.ai-logo):not(.ai-meta-logo):not(.dropdown-logo), video').each(function() {
-    $(this).addClass('img-fluid rounded my-2 d-block')
-           .css('object-fit', 'contain');
-  });
 }
 
 // Function to show file details for a specific message
@@ -1626,9 +1561,9 @@ function injectFilePreview(outId, filePath, fileType) {
     let fileHtml = '';
     
     if (['png', 'jpg', 'jpeg', 'gif', 'webp'].includes(fileType.toLowerCase())) {
-        fileHtml = `<div class='generated-file-container'><img src='${fileUrl}' class='generated-image img-fluid rounded my-2 d-block' alt='Generated Image' loading='lazy' style='object-fit: contain;'></div>`;
+        fileHtml = `<div class='generated-file-container'><img src='${fileUrl}' class='generated-image' alt='Generated Image' loading='lazy'></div>`;
     } else if (['mp4', 'webm', 'mov', 'avi'].includes(fileType.toLowerCase())) {
-        fileHtml = `<div class='generated-file-container'><video src='${fileUrl}' class='generated-video img-fluid rounded my-2 d-block' controls preload='metadata' style='object-fit: contain;'>Your browser does not support the video tag.</video></div>`;
+        fileHtml = `<div class='generated-file-container'><video src='${fileUrl}' class='generated-video' controls preload='metadata'>Your browser does not support the video tag.</video></div>`;
     } else {
         // For other file types, show download link
         fileHtml = `<div class='generated-file-container'><a href='${fileUrl}' class='btn btn-outline-primary btn-sm' download><i class='fas fa-download'></i> Download ${fileType.toUpperCase()}</a></div>`;
@@ -1640,5 +1575,169 @@ function injectFilePreview(outId, filePath, fileType) {
     }
 }
 
+// ========== SYSTEM NOTIFICATIONS (now handled by system-notifications.js) ==========
 
-// ========== END - Using system-notifications.js for all notifications ==========
+// Legacy function - now using centralized system-notifications.js
+function showBootstrapAlert(message, type = 'info', icon = 'info-circle', duration = 0) {
+    const messageId = 'system-msg-' + Date.now();
+    const iconHtml = icon ? `<i class="fas fa-${icon} me-2"></i>` : '';
+    
+    // Determine styling based on alert type
+    let borderColor, bgColor, textColor;
+    switch(type) {
+        case 'warning':
+            borderColor = '#f39c12'; bgColor = '#fff3cd'; textColor = '#856404';
+            break;
+        case 'danger':
+            borderColor = '#e74c3c'; bgColor = '#f8d7da'; textColor = '#721c24';
+            break;
+        case 'info':
+            borderColor = '#3498db'; bgColor = '#d1ecf1'; textColor = '#0c5460';
+            break;
+        default:
+            borderColor = '#6c757d'; bgColor = '#f8f9fa'; textColor = '#495057';
+    }
+    
+    // Create elegant AI-style system message with modern glassmorphism design
+    const messageHtml = `
+        <li id="${messageId}" class="message-item ai-message" style="
+            animation: slideInScale 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+            transform-origin: left center;
+        ">
+            <div class="ai-avatar" style="
+                background: linear-gradient(135deg, ${borderColor}, ${borderColor}dd);
+                box-shadow: 0 4px 12px ${borderColor}40;
+                border: 2px solid rgba(255,255,255,0.3);
+                transform: scale(1.1);
+                transition: transform 0.3s ease;
+            ">
+                ${iconHtml.replace('me-2', '').replace('fa-', 'fas fa-')}
+            </div>
+            <div class="message-content">
+                <div class="ai-meta mb-2">
+                    <span class="ai-label" style="
+                        color: ${borderColor}; 
+                        font-weight: 700;
+                        font-size: 0.9em;
+                        text-transform: uppercase;
+                        letter-spacing: 0.5px;
+                        background: ${borderColor}15;
+                        padding: 2px 8px;
+                        border-radius: 12px;
+                        display: inline-block;
+                    ">✨ System</span>
+                    <span class="message-time ms-2" style="
+                        color: #6c757d; 
+                        font-size: 0.75em;
+                        opacity: 0.8;
+                    ">
+                        ${new Date().toLocaleTimeString()}
+                    </span>
+                </div>
+                <div class="ai-text" style="
+                    background: linear-gradient(135deg, ${bgColor}, ${bgColor}f0);
+                    backdrop-filter: blur(8px);
+                    border: 1px solid ${borderColor}30;
+                    border-left: 4px solid ${borderColor};
+                    border-radius: 16px;
+                    padding: 20px;
+                    color: ${textColor};
+                    line-height: 1.6;
+                    font-weight: 500;
+                    box-shadow: 
+                        0 8px 32px rgba(0,0,0,0.12),
+                        0 2px 8px rgba(0,0,0,0.08),
+                        inset 0 1px 0 rgba(255,255,255,0.4);
+                    position: relative;
+                    overflow: hidden;
+                ">
+                    <div style="
+                        position: absolute;
+                        top: 0;
+                        left: 0;
+                        right: 0;
+                        height: 1px;
+                        background: linear-gradient(90deg, transparent, ${borderColor}60, transparent);
+                    "></div>
+                    ${message}
+                </div>
+            </div>
+        </li>
+    `;
+    
+    // Add animation styles if not present
+    if (!document.getElementById('chat-message-styles')) {
+        const styleElement = document.createElement('style');
+        styleElement.id = 'chat-message-styles';
+        styleElement.textContent = `
+            @keyframes slideInScale {
+                0% { 
+                    opacity: 0; 
+                    transform: translateX(-20px) scale(0.9); 
+                }
+                60% { 
+                    opacity: 0.8; 
+                    transform: translateX(5px) scale(1.02); 
+                }
+                100% { 
+                    opacity: 1; 
+                    transform: translateX(0) scale(1); 
+                }
+            }
+            @keyframes fadeOut {
+                from { opacity: 1; transform: scale(1); }
+                to { opacity: 0; transform: scale(0.95); }
+            }
+            .system-message-dismiss {
+                animation: fadeOut 0.4s ease-in;
+            }
+            
+            /* Hover effect for system messages */
+            .message-item.ai-message:hover .ai-avatar {
+                transform: scale(1.15) !important;
+                box-shadow: 0 6px 20px rgba(0,0,0,0.2) !important;
+            }
+        `;
+        document.head.appendChild(styleElement);
+    }
+    
+    // Insert into the same chat history where AI messages appear
+    const chatHistory = document.getElementById('chatHistory');
+    if (chatHistory) {
+        chatHistory.insertAdjacentHTML('beforeend', messageHtml);
+        
+        // Scroll to show the new message in the chat container
+        const chatContainer = chatHistory.closest('.chat-messages-container') || chatHistory.parentElement;
+        if (chatContainer) {
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+    } else {
+        // Fallback: Try messageList (alternative chat structure)
+        const messageList = document.getElementById('messageList');
+        if (messageList) {
+            messageList.insertAdjacentHTML('beforeend', messageHtml);
+            messageList.scrollTop = messageList.scrollHeight;
+        } else {
+            // Last resort: console warn and simple alert
+            console.warn('No chat container found (#chatHistory or #messageList)');
+            alert(`System: ${message.replace(/<[^>]*>/g, '')}`);
+        }
+    }
+    
+    // Auto-dismiss if duration specified
+    if (duration > 0) {
+        setTimeout(() => {
+            const messageElement = document.getElementById(messageId);
+            if (messageElement) {
+                messageElement.classList.add('system-message-dismiss');
+                setTimeout(() => {
+                    messageElement.remove();
+                }, 400);
+            }
+        }, duration);
+    }
+}
+
+// Legacy functions removed - now using system-notifications.js
+
+// ------------------------------------------------------------

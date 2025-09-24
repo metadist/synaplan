@@ -94,11 +94,11 @@ if($request) {
                     $inMessageArr['BSTATUS'] = 'NEW';
                     $inMessageArr['BFILETEXT'] = '';
 
-                    // check the user limit first, block if needed                    
-                    if(XSControl::isLimited($inMessageArr, 120, 8) 
-                        OR XSControl::isLimited($inMessageArr, 600, 12)) {
-                            XSControl::notifyUser($inMessageArr);
-                            exit;
+                    // Intelligent rate limiting - only block if ALL expensive operations are exceeded
+                    if (XSControl::isRateLimitingEnabled() && XSControl::areAllExpensiveOperationsBlocked($inMessageArr['BUSERID'])) {
+                        $limitCheck = ['limited' => true, 'reason' => 'All media generation limits exceeded for this month'];
+                        XSControl::notifySmartLimit($inMessageArr, $limitCheck);
+                        exit;
                     }
 
                     // ****************************************************************

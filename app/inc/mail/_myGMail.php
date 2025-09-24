@@ -361,9 +361,9 @@ class myGMail {
                 // is also used to jump over mail when limit is reached
                 $saveToDB = 0;
 
-                // check the user limit first, block if needed
-                if(XSControl::isLimited($inMessageArr, 90, 3) 
-                    OR XSControl::isLimited($inMessageArr, 1200, 8)) {
+                // check the user limit first, block if needed (only if rate limiting enabled)
+                if(XSControl::isRateLimitingEnabled() && 
+                   (XSControl::isLimited($inMessageArr, 90, 3) OR XSControl::isLimited($inMessageArr, 1200, 8))) {
                         XSControl::notifyUser($inMessageArr);
                         $mail['attachments'] = [];
                         $saveToDB = 1;
