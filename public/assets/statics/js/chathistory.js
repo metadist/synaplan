@@ -435,7 +435,11 @@ function renderChatHistory(messages) {
                                         </div>
                                     </div>
                                     <div style="color: #495057; font-size: 0.9em; margin-bottom: 12px;">
-                                        Reset time: <span style="font-family: 'SFMono-Regular', Consolas, monospace; color: #6f42c1; font-weight: 500;">${timeDisplay}</span>
+                                        Next available in: <span style="
+                                            font-family: 'SFMono-Regular', Consolas, monospace;
+                                            font-weight: 600; color: #212529; padding: 2px 6px;
+                                            background: rgba(0,0,0,0.05); border-radius: 4px;
+                                        ">${timeDisplay}</span>
                                     </div>
                                     ${upgradeMessage}
                                 </div>
