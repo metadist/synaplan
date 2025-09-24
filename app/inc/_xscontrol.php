@@ -18,9 +18,100 @@ class XSControl {
         return $countArr["XSCOUNT"];
     }
 
+    /**
+     * Count operations within the current billing cycle
+     * For monthly limits, this respects subscription start/end dates
+     */
+    public static function countInCurrentBillingCycle($userId, $timeframe, $operationType = null):int {
+        try {
+            // For monthly limits (30+ days), use subscription billing cycle
+            if ($timeframe >= 2592000) {
+                $paymentSQL = "SELECT BPAYMENTDETAILS FROM BUSER WHERE BID = " . intval($userId);
+                $paymentResult = db::Query($paymentSQL);
+                $paymentRow = db::FetchArr($paymentResult);
+                
+                if ($paymentRow && !empty($paymentRow['BPAYMENTDETAILS'])) {
+                    $paymentDetails = json_decode($paymentRow['BPAYMENTDETAILS'], true);
+                    if ($paymentDetails && isset($paymentDetails['start_timestamp']) && isset($paymentDetails['end_timestamp'])) {
+                        $startTime = intval($paymentDetails['start_timestamp']);
+                        $endTime = intval($paymentDetails['end_timestamp']);
+                        $currentTime = time();
+                        
+                        // Calculate the current billing cycle period
+                        $billingCycleLength = $endTime - $startTime;
+                        
+                        if ($currentTime <= $endTime) {
+                            // Within current subscription period
+                            $periodStart = $startTime;
+                        } else {
+                            // Subscription expired, find current cycle
+                            $cyclesSinceEnd = floor(($currentTime - $endTime) / $billingCycleLength);
+                            $periodStart = $endTime + ($cyclesSinceEnd * $billingCycleLength);
+                        }
+                        
+                        // Count operations for the current subscription only
+                        $currentSubscriptionId = $paymentDetails['stripe_subscription_id'] ?? null;
+                        
+                        if ($operationType) {
+                            $countSQL = "SELECT COUNT(*) XSCOUNT FROM BUSELOG WHERE BUSERID = " . intval($userId) . 
+                                       " AND BOPERATIONTYPE = '" . DB::EscString($operationType) . "'";
+                        } else {
+                            $countSQL = "SELECT COUNT(*) XSCOUNT FROM BUSELOG WHERE BUSERID = " . intval($userId);
+                        }
+                        
+                        // Add subscription filter - count only current subscription usage
+                        if ($currentSubscriptionId) {
+                            $countSQL .= " AND BSUBSCRIPTION_ID = '" . DB::EscString($currentSubscriptionId) . "'";
+                        } else {
+                            // Fallback: if no subscription ID, use time-based filtering
+                            $countSQL .= " AND BTIMESTAMP > " . intval($periodStart);
+                        }
+                        
+                        $countRes = db::Query($countSQL);
+                        $countArr = db::FetchArr($countRes);
+                        return intval($countArr["XSCOUNT"]);
+                    }
+                }
+            }
+            
+            // For shorter periods or fallback, use traditional time-based counting
+            if ($operationType) {
+                return self::countInByType($userId, $timeframe, $operationType);
+            } else {
+                return self::countIn($userId, $timeframe);
+            }
+            
+        } catch (Exception $e) {
+            error_log("Error counting in billing cycle: " . $e->getMessage());
+            // Fallback to traditional counting
+            if ($operationType) {
+                return self::countInByType($userId, $timeframe, $operationType);
+            } else {
+                return self::countIn($userId, $timeframe);
+            }
+        }
+    }
+
     // update operation type in BUSELOG after sorting is complete
     public static function updateOperationType($userId, $msgId, $operationType):bool {
-        $updateSQL = "UPDATE BUSELOG SET BOPERATIONTYPE = '".DB::EscString($operationType)."' WHERE BUSERID = ".intval($userId)." AND BMSGID = ".intval($msgId);
+        // Also update subscription ID when updating operation type (in case it changed)
+        $subscriptionId = null;
+        try {
+            $paymentSQL = "SELECT BPAYMENTDETAILS FROM BUSER WHERE BID = " . intval($userId);
+            $paymentResult = db::Query($paymentSQL);
+            $paymentRow = db::FetchArr($paymentResult);
+            
+            if ($paymentRow && !empty($paymentRow['BPAYMENTDETAILS'])) {
+                $paymentDetails = json_decode($paymentRow['BPAYMENTDETAILS'], true);
+                if ($paymentDetails && isset($paymentDetails['stripe_subscription_id'])) {
+                    $subscriptionId = $paymentDetails['stripe_subscription_id'];
+                }
+            }
+        } catch (Exception $e) {
+            error_log("Error getting subscription ID for updateOperationType: " . $e->getMessage());
+        }
+        
+        $updateSQL = "UPDATE BUSELOG SET BOPERATIONTYPE = '".DB::EscString($operationType)."', BSUBSCRIPTION_ID = " . ($subscriptionId ? "'".DB::EscString($subscriptionId)."'" : "NULL") . " WHERE BUSERID = ".intval($userId)." AND BMSGID = ".intval($msgId);
         $updateRes = db::Query($updateSQL);
         return $updateRes !== false;
     }
@@ -340,7 +431,24 @@ class XSControl {
     // simple count method: puts details into the database into the BUSELOG table
     // call as XSControl::countThis($userId, $msgId)
     public static function countThis($userId, $msgId, $operationType = 'general'):int {
-        $newSQL = "INSERT INTO BUSELOG (BID, BTIMESTAMP, BUSERID, BMSGID, BOPERATIONTYPE) VALUES (DEFAULT, ".time().", ".($userId).", ".($msgId).", '".DB::EscString($operationType)."')";
+        // Get current subscription ID for tracking
+        $subscriptionId = null;
+        try {
+            $paymentSQL = "SELECT BPAYMENTDETAILS FROM BUSER WHERE BID = " . intval($userId);
+            $paymentResult = db::Query($paymentSQL);
+            $paymentRow = db::FetchArr($paymentResult);
+            
+            if ($paymentRow && !empty($paymentRow['BPAYMENTDETAILS'])) {
+                $paymentDetails = json_decode($paymentRow['BPAYMENTDETAILS'], true);
+                if ($paymentDetails && isset($paymentDetails['stripe_subscription_id'])) {
+                    $subscriptionId = $paymentDetails['stripe_subscription_id'];
+                }
+            }
+        } catch (Exception $e) {
+            error_log("Error getting subscription ID for BUSELOG: " . $e->getMessage());
+        }
+        
+        $newSQL = "INSERT INTO BUSELOG (BID, BTIMESTAMP, BUSERID, BMSGID, BOPERATIONTYPE, BSUBSCRIPTION_ID) VALUES (DEFAULT, ".time().", ".($userId).", ".($msgId).", '".DB::EscString($operationType)."', " . ($subscriptionId ? "'".DB::EscString($subscriptionId)."'" : "NULL") . ")";
         $newRes = db::Query($newSQL);
         return db::LastId();
     }
@@ -599,7 +707,8 @@ class XSControl {
         
         switch ($operation) {
             case 'MESSAGES':
-                $currentCount = self::countIn($msgArr['BUSERID'], $timeframe);
+                // Use billing cycle aware counting for monthly limits
+                $currentCount = self::countInCurrentBillingCycle($msgArr['BUSERID'], $timeframe);
                 $result['current_count'] = $currentCount;
                 if ($currentCount >= $maxCount) {
                     $result['exceeded'] = true;
@@ -636,8 +745,8 @@ class XSControl {
                 $operationMapping = self::getOperationMappingFromCapabilities();
                 $operationType = $operationMapping[$operation] ?? 'general';
                 
-                // Count specific operation type in BUSELOG
-                $currentCount = self::countInByType($msgArr['BUSERID'], $timeframe, $operationType);
+                // Count specific operation type in BUSELOG using billing cycle aware counting
+                $currentCount = self::countInCurrentBillingCycle($msgArr['BUSERID'], $timeframe, $operationType);
                 $result['current_count'] = $currentCount;
                 if ($currentCount >= $maxCount) {
                     $result['exceeded'] = true;
@@ -726,7 +835,8 @@ class XSControl {
             foreach ($limits as $setting => $maxCount) {
                 if (preg_match('/^MESSAGES_(\d+)S$/', $setting, $matches)) {
                     $timeframe = intval($matches[1]);
-                    $currentCount = self::countIn($userId, $timeframe);
+                    // Use billing cycle aware counting for monthly limits
+                    $currentCount = self::countInCurrentBillingCycle($userId, $timeframe);
                     
                     if ($currentCount >= $maxCount) {
                         // Use intelligent message for message limits too
