@@ -94,11 +94,21 @@ if($request) {
                     $inMessageArr['BSTATUS'] = 'NEW';
                     $inMessageArr['BFILETEXT'] = '';
 
-                    // Intelligent rate limiting - only block if ALL expensive operations are exceeded
-                    if (XSControl::isRateLimitingEnabled() && XSControl::areAllExpensiveOperationsBlocked($inMessageArr['BUSERID'])) {
-                        $limitCheck = ['limited' => true, 'reason' => 'All media generation limits exceeded for this month'];
-                        XSControl::notifySmartLimit($inMessageArr, $limitCheck);
-                        exit;
+                    // Rate limiting check - only block if MESSAGES limit reached
+                    if (XSControl::isRateLimitingEnabled()) {
+                        $limitCheck = XSControl::checkMessagesLimit($inMessageArr['BUSERID']);
+                        if (is_array($limitCheck) && $limitCheck['limited']) {
+                            // Send rate limit notification via WhatsApp
+                            $limitMessage = "⏳ Usage Limit Reached\n" . $limitCheck['message'] . "\nNext available in: " . $limitCheck['reset_time_formatted'] . "\nNeed higher limits? 🚀 Upgrade your plan";
+                            $responseMessage = [
+                                'messaging_product' => 'whatsapp',
+                                'to' => $from,
+                                'type' => 'text',
+                                'text' => ['body' => $limitMessage]
+                            ];
+                            SendMessage($responseMessage);
+                            exit;
+                        }
                     }
 
                     // ****************************************************************

@@ -26,79 +26,12 @@ class XSControl {
     }
 
     /**
-     * Get user's effective subscription level based on payments
-     * Returns level based on active subscription or defaults to NEW
+     * Get user's subscription level from BUSER table (primary source)
+     * Fast lookup - BUSERLEVEL is the authoritative source for rate limits
      */
     public static function getUserSubscriptionLevel($userId): string {
         try {
-            // Get the most recent subscription status by analyzing payment sequence
-            // This handles upgrades, downgrades, cancellations properly
-            $sql = "SELECT BAMOUNT, BDATE, BJSON 
-                    FROM BPAYMENTS 
-                    WHERE BUID = " . intval($userId) . "
-                    AND BDATE >= DATE_FORMAT(DATE_SUB(NOW(), INTERVAL 40 DAY), '%Y%m%d0000')
-                    ORDER BY BDATE DESC, BID DESC";
-            
-            $result = db::Query($sql);
-            $runningBalance = 0;
-            $lastActiveSubscription = 0;
-            
-            // Process payments and calculate balance
-            while ($payment = db::FetchArr($result)) {
-                $amount = intval($payment['BAMOUNT']);
-                $runningBalance += $amount;
-            }
-            
-            // If final balance is positive, find the most recent positive payment
-            if ($runningBalance > 0) {
-                // Re-query to get the most recent positive payment
-                $result2 = db::Query($sql);
-                while ($payment = db::FetchArr($result2)) {
-                    $amount = intval($payment['BAMOUNT']);
-                    if ($amount > 0) {
-                        $lastActiveSubscription = $amount;
-                        break; // Found the most recent positive payment
-                    }
-                }
-            }
-            
-            // If we have a recent positive payment, determine the tier
-            if ($lastActiveSubscription > 0) {
-                // Get subscription tiers from database (ordered by price DESC)
-                $tierSQL = "SELECT BUSERLEVEL, ROUND(BPRICE * 100) as price_cents 
-                            FROM BSUBSCRIPTIONS 
-                            WHERE BACTIVE = 1 
-                            AND BUSERLEVEL != 'NEW' 
-                            AND BBILLING_CYCLE = 'monthly'
-                            ORDER BY BPRICE DESC";
-                
-                $tierResult = db::Query($tierSQL);
-                
-                // Find matching tier for the last active subscription amount
-                while ($tier = db::FetchArr($tierResult)) {
-                    $tierPriceCents = intval($tier['price_cents']);
-                    if ($lastActiveSubscription >= $tierPriceCents) {
-                        return strtoupper($tier['BUSERLEVEL']);
-                    }
-                }
-            }
-            
-            // Check if user has any positive balance (grace period)
-            if ($runningBalance > 0) {
-                $graceSQL = "SELECT BUSERLEVEL FROM BSUBSCRIPTIONS 
-                            WHERE BACTIVE = 1 
-                            AND BUSERLEVEL != 'NEW' 
-                            AND BPRICE > 0 
-                            AND BBILLING_CYCLE = 'monthly'
-                            ORDER BY BPRICE ASC LIMIT 1";
-                $graceResult = db::Query($graceSQL);
-                $graceRow = db::FetchArr($graceResult);
-                if ($graceRow) {
-                    return strtoupper($graceRow['BUSERLEVEL']);
-                }
-            }
-            
-            // No positive balance - check BUSER table for manually set level
+            // Primary: Get BUSERLEVEL from BUSER table (fastest)
             $userSQL = "SELECT BUSERLEVEL FROM BUSER WHERE BID = " . intval($userId);
             $userResult = db::Query($userSQL);
             $userRow = db::FetchArr($userResult);
@@ -107,12 +40,73 @@ class XSControl {
                 return strtoupper($userRow['BUSERLEVEL']);
             }
             
-            // Default to NEW (free tier)
+            // Default to NEW if not set
             return 'NEW';
             
         } catch (Exception $e) {
-            error_log("Error determining user subscription level: " . $e->getMessage());
+            error_log("Error getting user subscription level: " . $e->getMessage());
             return 'NEW'; // Safe fallback
+        }
+    }
+
+    /**
+     * Get subscription end timestamp for countdown timer
+     * Uses BPAYMENTDETAILS JSON for accurate expiry dates
+     */
+    public static function getSubscriptionEndTimestamp($userId): int {
+        try {
+            $paymentSQL = "SELECT BPAYMENTDETAILS FROM BUSER WHERE BID = " . intval($userId);
+            $paymentResult = db::Query($paymentSQL);
+            $paymentRow = db::FetchArr($paymentResult);
+            
+            if ($paymentRow && !empty($paymentRow['BPAYMENTDETAILS'])) {
+                $paymentDetails = json_decode($paymentRow['BPAYMENTDETAILS'], true);
+                
+                if (isset($paymentDetails['end_timestamp']) && 
+                    isset($paymentDetails['status']) && 
+                    $paymentDetails['status'] === 'active') {
+                    return intval($paymentDetails['end_timestamp']);
+                }
+            }
+            
+            // Fallback: Return current time + 30 days for NEW users
+            return time() + (30 * 24 * 60 * 60);
+            
+        } catch (Exception $e) {
+            error_log("Error getting subscription end timestamp: " . $e->getMessage());
+            return time() + (30 * 24 * 60 * 60); // Safe fallback
+        }
+    }
+
+    /**
+     * Format time remaining in a human-readable way
+     */
+    private static function formatTimeRemaining($seconds): string {
+        if ($seconds <= 0) return "now";
+        
+        $days = floor($seconds / 86400);
+        $hours = floor(($seconds % 86400) / 3600);
+        $minutes = floor(($seconds % 3600) / 60);
+        
+        if ($days > 0) {
+            return $days . "d " . $hours . "h";
+        } elseif ($hours > 0) {
+            return $hours . "h " . $minutes . "m";
+        } else {
+            return $minutes . "m";
+        }
+    }
+    
+    /**
+     * Format timeframe in a human-readable way
+     */
+    private static function formatTimeframe($seconds): string {
+        if ($seconds >= 86400) {
+            return floor($seconds / 86400) . " day(s)";
+        } elseif ($seconds >= 3600) {
+            return floor($seconds / 3600) . " hour(s)";
+        } else {
+            return floor($seconds / 60) . " minute(s)";
         }
     }
 
@@ -183,23 +177,17 @@ class XSControl {
 
     // method to give a "block" yes/no answer, if the user has sent too many messages in the last x seconds
     // Enhanced with smart rate limiting - backward compatible
+    // DEPRECATED: Use checkMessagesLimit() or checkOperationLimit() instead
     public static function isLimited($msgArr, $secondsCount = null, $maxCount = null):bool {
-        try {
-            // Smart Limiting when no legacy parameters provided
-            if ($secondsCount === null && $maxCount === null) {
-                $smartCheck = self::isSmartLimited($msgArr);
-                return $smartCheck['limited'];
-            }
-            
-            // Legacy functionality unchanged for backward compatibility
-            $count = self::countIn($msgArr['BUSERID'], $secondsCount);
-            //error_log("count: ".$count." maxCount: ".$maxCount." for user: ".$msgArr['BUSERID']);
-            return $count >= $maxCount;
-        } catch (Exception $e) {
-            if($GLOBALS["debug"]) error_log("Rate limiting error: " . $e->getMessage());
-            // Safe fallback to conservative limits
-            return self::countIn($msgArr['BUSERID'], 120) >= 5;
+        // Fallback for legacy code - redirect to new system
+        if ($secondsCount === null && $maxCount === null) {
+            $messageCheck = self::checkMessagesLimit($msgArr['BUSERID']);
+            return is_array($messageCheck) && $messageCheck['limited'];
         }
+        
+        // Legacy direct check
+        $count = self::countIn($msgArr['BUSERID'], $secondsCount);
+        return $count >= $maxCount;
     }
 
     // simple count method: puts details into the database into the BUSELOG table
@@ -596,11 +584,31 @@ class XSControl {
                     $currentCount = self::countIn($userId, $timeframe);
                     
                     if ($currentCount >= $maxCount) {
-                        return [
-                            'exceeded' => true,
-                            'message' => "Message limit exceeded: {$currentCount}/{$maxCount} per {$timeframe}s",
-                            'reset_time' => time() + $timeframe
-                        ];
+                        // For subscription limits (monthly), use subscription end timestamp
+                        if ($timeframe >= 2592000) { // Monthly limits (30 days)
+                            $subscriptionEndTime = self::getSubscriptionEndTimestamp($userId);
+                            $timeFormatted = self::formatTimeRemaining($subscriptionEndTime - time());
+                            
+                            return [
+                                'limited' => true,
+                                'exceeded' => true,
+                                'message' => "Message limit exceeded: {$currentCount}/{$maxCount} per " . self::formatTimeframe($timeframe),
+                                'reset_time' => $subscriptionEndTime,
+                                'reset_time_formatted' => $timeFormatted
+                            ];
+                        } else {
+                            // For short-term limits, use timeframe
+                            $resetTime = time() + $timeframe;
+                            $timeFormatted = self::formatTimeRemaining($resetTime - time());
+                            
+                            return [
+                                'limited' => true,
+                                'exceeded' => true,
+                                'message' => "Message limit exceeded: {$currentCount}/{$maxCount} per " . self::formatTimeframe($timeframe),
+                                'reset_time' => $resetTime,
+                                'reset_time_formatted' => $timeFormatted
+                            ];
+                        }
                     }
                 }
             }
@@ -645,9 +653,23 @@ class XSControl {
                     $limitCheck = self::checkSpecificLimit($msgArr, $limitType, $timeframe, $maxCount);
                     
                     if ($limitCheck['exceeded']) {
-                        $result['limited'] = true;
-                        $result['reason'] = $limitCheck['reason'];
-                        $result['reset_time'] = time() + $timeframe;
+                        // For monthly limits, use subscription end timestamp
+                        if ($timeframe >= 2592000) { // Monthly limits (30 days)
+                            $subscriptionEndTime = self::getSubscriptionEndTimestamp($msgArr['BUSERID']);
+                            $timeFormatted = self::formatTimeRemaining($subscriptionEndTime - time());
+                            
+                            $result['limited'] = true;
+                            $result['reason'] = $limitCheck['reason'];
+                            $result['reset_time'] = $subscriptionEndTime;
+                            $result['reset_time_formatted'] = $timeFormatted;
+                            $result['message'] = ucfirst(strtolower($limitType)) . " generation limit exceeded: " . $limitCheck['current_count'] . "/{$maxCount} per month";
+                        } else {
+                            $result['limited'] = true;
+                            $result['reason'] = $limitCheck['reason'];
+                            $result['reset_time'] = time() + $timeframe;
+                            $result['reset_time_formatted'] = self::formatTimeRemaining($timeframe);
+                            $result['message'] = $limitCheck['reason'];
+                        }
                         return $result;
                     }
                 }

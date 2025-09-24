@@ -361,12 +361,21 @@ class myGMail {
                 // is also used to jump over mail when limit is reached
                 $saveToDB = 0;
 
-                // check the user limit first, block if needed (only if rate limiting enabled)
-                if(XSControl::isRateLimitingEnabled() && 
-                   (XSControl::isLimited($inMessageArr, 90, 3) OR XSControl::isLimited($inMessageArr, 1200, 8))) {
-                        XSControl::notifyUser($inMessageArr);
+                // Rate limiting check - only block if MESSAGES limit reached (only if rate limiting enabled)
+                if (XSControl::isRateLimitingEnabled()) {
+                    $limitCheck = XSControl::checkMessagesLimit($inMessageArr['BUSERID']);
+                    if (is_array($limitCheck) && $limitCheck['limited']) {
+                        // Send rate limit notification via email
+                        $limitMessage = "⏳ Usage Limit Reached\n" . $limitCheck['message'] . "\nNext available in: " . $limitCheck['reset_time_formatted'] . "\nNeed higher limits? 🚀 Upgrade your plan";
+                        
+                        // Send auto-reply email
+                        $replySubject = "Re: " . $mail['subject'];
+                        $replyBody = $limitMessage;
+                        $this->sendEmail($mail['from'], $replySubject, $replyBody);
+                        
                         $mail['attachments'] = [];
                         $saveToDB = 1;
+                    }
                 }
 
                 // Save attachments
