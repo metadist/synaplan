@@ -77,6 +77,61 @@ class XSControl {
     }
 
     /**
+     * Calculate the correct reset time for rate limits based on subscription billing cycle
+     */
+    public static function getCorrectResetTime($userId, $timeframe): int {
+        try {
+            $paymentSQL = "SELECT BPAYMENTDETAILS FROM BUSER WHERE BID = " . intval($userId);
+            $paymentResult = db::Query($paymentSQL);
+            $paymentRow = db::FetchArr($paymentResult);
+            
+            if ($paymentRow && !empty($paymentRow['BPAYMENTDETAILS'])) {
+                $paymentDetails = json_decode($paymentRow['BPAYMENTDETAILS'], true);
+                if ($paymentDetails && isset($paymentDetails['start_timestamp']) && isset($paymentDetails['end_timestamp'])) {
+                    $startTime = intval($paymentDetails['start_timestamp']);
+                    $endTime = intval($paymentDetails['end_timestamp']);
+                    $currentTime = time();
+                    
+                    // For monthly limits (30+ days), use subscription cycle
+                    if ($timeframe >= 2592000) { // 30 days or more
+                        // If we're within subscription period, reset at end_timestamp
+                        if ($currentTime <= $endTime) {
+                            return $endTime;
+                        } else {
+                            // Subscription expired, calculate next monthly cycle
+                            $billingCycle = $endTime - $startTime; // Original subscription duration
+                            $monthsSinceEnd = ceil(($currentTime - $endTime) / $billingCycle);
+                            return $endTime + ($monthsSinceEnd * $billingCycle);
+                        }
+                    }
+                    
+                    // For shorter periods (daily, hourly), calculate next interval
+                    if ($timeframe >= 86400) { // Daily limits
+                        // Reset at start of next day based on subscription timezone
+                        $nextDayStart = strtotime('tomorrow 00:00:00', $currentTime);
+                        return $nextDayStart;
+                    } else {
+                        // For hourly/minute limits, use standard timeframe
+                        return $currentTime + $timeframe;
+                    }
+                }
+            }
+            
+            // Fallback for users without subscription details
+            if ($timeframe >= 2592000) {
+                // Monthly fallback: next month from now
+                return strtotime('+1 month', time());
+            } else {
+                return time() + $timeframe;
+            }
+            
+        } catch (Exception $e) {
+            error_log("Error calculating reset time: " . $e->getMessage());
+            return time() + $timeframe; // Safe fallback
+        }
+    }
+
+    /**
      * Get intelligent rate limit message based on subscription status
      */
     public static function getIntelligentRateLimitMessage($userId, $operationType, $currentCount, $maxCount, $timeframe): array {
@@ -86,21 +141,22 @@ class XSControl {
             $paymentRow = db::FetchArr($paymentResult);
             
             $subscriptionStatus = 'unknown';
-            $endTimestamp = time() + (30 * 24 * 60 * 60); // Default fallback
             $plan = 'NEW';
             
             if ($paymentRow && !empty($paymentRow['BPAYMENTDETAILS'])) {
                 $paymentDetails = json_decode($paymentRow['BPAYMENTDETAILS'], true);
                 if ($paymentDetails) {
                     $subscriptionStatus = $paymentDetails['status'] ?? 'unknown';
-                    $endTimestamp = intval($paymentDetails['end_timestamp'] ?? $endTimestamp);
                     $plan = $paymentDetails['plan'] ?? $paymentRow['BUSERLEVEL'] ?? 'NEW';
                 }
             }
             
+            // Use correct reset time based on billing cycle
+            $correctResetTime = self::getCorrectResetTime($userId, $timeframe);
             $currentTime = time();
-            $isSubscriptionValid = $endTimestamp > $currentTime;
-            $timeRemaining = max(0, $endTimestamp - $currentTime);
+            $isSubscriptionValid = isset($paymentDetails['end_timestamp']) && 
+                                   intval($paymentDetails['end_timestamp']) > $currentTime;
+            $timeRemaining = max(0, $correctResetTime - $currentTime);
             
             // Generate base message
             $operationName = ucfirst($operationType);
@@ -120,7 +176,7 @@ class XSControl {
                     'action_type' => 'upgrade',
                     'action_message' => 'Need higher limits? 🚀 Upgrade your plan',
                     'action_url' => 'https://www.synaplan.com/pricing',
-                    'reset_time' => $endTimestamp,
+                    'reset_time' => $correctResetTime,
                     'reset_time_formatted' => self::formatTimeRemaining($timeRemaining)
                 ];
             } elseif ($subscriptionStatus === 'deactive' && $isSubscriptionValid) {
@@ -130,7 +186,7 @@ class XSControl {
                     'action_type' => 'reactivate',
                     'action_message' => 'Subscription paused/cancelled. 🔄 Reactivate subscription',
                     'action_url' => 'https://www.synaplan.com/account',
-                    'reset_time' => $endTimestamp,
+                    'reset_time' => $correctResetTime,
                     'reset_time_formatted' => self::formatTimeRemaining($timeRemaining)
                 ];
             } elseif ($subscriptionStatus === 'deactive' && !$isSubscriptionValid) {
@@ -140,7 +196,7 @@ class XSControl {
                     'action_type' => 'renew',
                     'action_message' => 'Subscription expired. 🆕 Subscribe to continue',
                     'action_url' => 'https://www.synaplan.com/pricing',
-                    'reset_time' => $endTimestamp,
+                    'reset_time' => $correctResetTime,
                     'reset_time_formatted' => 'expired'
                 ];
             } else {
@@ -150,7 +206,7 @@ class XSControl {
                     'action_type' => 'upgrade',
                     'action_message' => 'Need higher limits? 🚀 Upgrade your plan',
                     'action_url' => 'https://www.synaplan.com/pricing',
-                    'reset_time' => $endTimestamp,
+                    'reset_time' => $correctResetTime,
                     'reset_time_formatted' => self::formatTimeRemaining($timeRemaining)
                 ];
             }
@@ -731,20 +787,18 @@ class XSControl {
                     
                     if ($limitCheck['exceeded']) {
                         // For monthly limits, use subscription end timestamp
-                        if ($timeframe >= 2592000) { // Monthly limits (30 days)
-                            $subscriptionEndTime = self::getSubscriptionEndTimestamp($msgArr['BUSERID']);
-                            $timeFormatted = self::formatTimeRemaining($subscriptionEndTime - time());
-                            
-                            $result['limited'] = true;
-                            $result['reason'] = $limitCheck['reason'];
-                            $result['reset_time'] = $subscriptionEndTime;
-                            $result['reset_time_formatted'] = $timeFormatted;
+                        // Use correct reset time based on subscription billing cycle
+                        $correctResetTime = self::getCorrectResetTime($msgArr['BUSERID'], $timeframe);
+                        $timeFormatted = self::formatTimeRemaining($correctResetTime - time());
+                        
+                        $result['limited'] = true;
+                        $result['reason'] = $limitCheck['reason'];
+                        $result['reset_time'] = $correctResetTime;
+                        $result['reset_time_formatted'] = $timeFormatted;
+                        
+                        if ($timeframe >= 2592000) { // Monthly limits
                             $result['message'] = ucfirst(strtolower($limitType)) . " generation limit exceeded: " . $limitCheck['current_count'] . "/{$maxCount} per month";
                         } else {
-                            $result['limited'] = true;
-                            $result['reason'] = $limitCheck['reason'];
-                            $result['reset_time'] = time() + $timeframe;
-                            $result['reset_time_formatted'] = self::formatTimeRemaining($timeframe);
                             $result['message'] = $limitCheck['reason'];
                         }
                         return $result;
@@ -790,9 +844,10 @@ class XSControl {
                         $limitCheck = self::checkSpecificLimit($msgArr, 'FILE_ANALYSIS', $timeframe, $maxCount);
                         
                         if ($limitCheck['exceeded']) {
+                            $correctResetTime = self::getCorrectResetTime($msgArr['BUSERID'], $timeframe);
                             $result['limited'] = true;
                             $result['reason'] = $limitCheck['reason'];
-                            $result['reset_time'] = time() + $timeframe;
+                            $result['reset_time'] = $correctResetTime;
                             break;
                         }
                     }
@@ -808,9 +863,10 @@ class XSControl {
                 if (isset($limits['MESSAGES_120S'])) {
                     $limitCheck = self::checkSpecificLimit($msgArr, 'MESSAGES', 120, $limits['MESSAGES_120S']);
                     if ($limitCheck['exceeded']) {
+                        $correctResetTime = self::getCorrectResetTime($msgArr['BUSERID'], 120);
                         $result['limited'] = true;
                         $result['reason'] = $limitCheck['reason'];
-                        $result['reset_time'] = time() + 120;
+                        $result['reset_time'] = $correctResetTime;
                         return $result;
                     }
                 }
@@ -819,9 +875,10 @@ class XSControl {
                 if (isset($limits['MESSAGES_3600S'])) {
                     $limitCheck = self::checkSpecificLimit($msgArr, 'MESSAGES', 3600, $limits['MESSAGES_3600S']);
                     if ($limitCheck['exceeded']) {
+                        $correctResetTime = self::getCorrectResetTime($msgArr['BUSERID'], 3600);
                         $result['limited'] = true;
                         $result['reason'] = $limitCheck['reason'];
-                        $result['reset_time'] = time() + 3600;
+                        $result['reset_time'] = $correctResetTime;
                         return $result;
                     }
                 }
