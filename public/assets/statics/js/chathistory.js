@@ -383,6 +383,74 @@ function renderChatHistory(messages) {
             const displayText = chat.displayText || chat.BTEXT;
             const hasFile = chat.hasFile || false;
             
+            // Check for rate limit notification FIRST (before any other processing)
+            if (displayText && displayText.startsWith('RATE_LIMIT_NOTIFICATION: ')) {
+                try {
+                    const jsonStr = displayText.substring('RATE_LIMIT_NOTIFICATION: '.length);
+                    const rateLimitData = JSON.parse(jsonStr);
+                    
+                    // Use the same styling as chat.js but for history display
+                    const upgradeMessage = (typeof getUpgradeMessage !== 'undefined') ? getUpgradeMessage() : 
+                        `<div class="border-top pt-2 mt-2"><small class="text-muted">Need higher limits? <a href="https://www.synaplan.com/" target="_blank" class="text-decoration-none fw-semibold" style="color: #6c757d;">Upgrade your plan →</a></small></div>`;
+                    
+                    const resetTime = rateLimitData.reset_time || (Math.floor(Date.now() / 1000) + 300);
+                    const currentTime = Math.floor(Date.now() / 1000);
+                    const timeRemaining = Math.max(0, resetTime - currentTime);
+                    
+                    // Format the time remaining
+                    let timeDisplay = "expired";
+                    if (timeRemaining > 0) {
+                        const days = Math.floor(timeRemaining / 86400);
+                        const hours = Math.floor((timeRemaining % 86400) / 3600);
+                        const minutes = Math.floor((timeRemaining % 3600) / 60);
+                        
+                        if (days > 0) {
+                            timeDisplay = `${days}d ${hours}h`;
+                        } else if (hours > 0) {
+                            timeDisplay = `${hours}h ${minutes}m`;
+                        } else {
+                            timeDisplay = `${minutes}m`;
+                        }
+                    }
+                    
+                    messageHtml = `
+                        <li class="message-item ai-message">
+                            <div class="message-header">
+                                <img src="/assets/statics/img/chat-avatar.svg" alt="AI" class="ai-avatar">
+                                <div class="provider-info">
+                                    <span class="provider-name">${chat.BVENDOR || 'AI Provider'} / ${chat.BMODEL || 'system'}</span>
+                                    <span class="provider-separator">·</span>
+                                    <span class="provider-type">${chat.BTOPIC || 'notification'}</span>
+                                </div>
+                            </div>
+                            <div class="message-bubble ai-bubble">
+                                <div style="padding: 4px 0;">
+                                    <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px;">
+                                        <span style="font-size: 20px; opacity: 0.7;">⏳</span>
+                                        <div>
+                                            <strong style="color: #495057;">Usage Limit Reached</strong>
+                                            <div style="color: #6c757d; font-size: 0.9em; margin-top: 2px;">
+                                                ${rateLimitData.message}
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div style="color: #495057; font-size: 0.9em; margin-bottom: 12px;">
+                                        Reset time: <span style="font-family: 'SFMono-Regular', Consolas, monospace; color: #6f42c1; font-weight: 500;">${timeDisplay}</span>
+                                    </div>
+                                    ${upgradeMessage}
+                                </div>
+                                <span class="message-time ai-time">${formatDateTime(chat.BDATETIME)}</span>
+                            </div>
+                        </li>
+                    `;
+                    chatHistory.insertAdjacentHTML('beforeend', messageHtml);
+                    return; // Skip normal processing
+                } catch (e) {
+                    console.error('Error parsing rate limit data:', e);
+                    // Fall through to normal processing
+                }
+            }
+            
             // Check if text contains <think> block
             let mdText = '';
             if (displayText.includes('<think>')) {
