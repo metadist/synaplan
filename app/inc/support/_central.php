@@ -128,8 +128,17 @@ class Central {
     public static function getUserByMail($mail, $phoneNumberOrTag, $createNew = true): array|null|bool {
         $arrUser = [];
         // first look in the user kinds
-        $provId = Tools::idFromMail($mail);
-        $getSQL = "select * from BUSER where (BPROVIDERID = '".(db::EscString($provId))."' AND BINTYPE = 'MAIL') OR (BINTYPE = 'WA' AND BUSERDETAILS LIKE '%:\"".$mail."\"%')";
+        $escapedProvId = db::EscString(Tools::idFromMail($mail));
+        $escapedMail = db::EscString($mail);
+        $getSQL = sprintf(
+            "SELECT * FROM BUSER WHERE " .
+            "(BPROVIDERID = '%s' AND BINTYPE = 'MAIL') OR " .
+            "(BINTYPE = 'WA' AND BUSERDETAILS LIKE '%%:\"%s\"%%') OR " .
+            "(BMAIL = '%s' AND BINTYPE = 'OIDC')",
+            $escapedProvId,
+            $escapedMail,
+            $escapedMail
+        );
         $res = db::Query($getSQL);
         $arrUser = db::FetchArr($res);
 
@@ -141,10 +150,10 @@ class Central {
             $userDetails["PHONE"] = ''; //$phoneNumberOrTag;
             $userDetails["CREATED"] = date("YmdHi");
             $newSQL = "insert into BUSER (BID, BCREATED, BINTYPE, BMAIL, BPW, BPROVIDERID, BUSERLEVEL, BUSERDETAILS) 
-                values (DEFAULT, '".date("YmdHis")."', 'MAIL', '".(db::EscString($mail))."', '', '".(db::EscString($provId))."', 'NEW', '".(db::EscString(json_encode($userDetails,JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)))."')";
+                values (DEFAULT, '".date("YmdHis")."', 'MAIL', '".(db::EscString($mail))."', '', '".$escapedProvId."', 'NEW', '".(db::EscString(json_encode($userDetails,JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)))."')";
             db::Query($newSQL);
             // --
-            $getSQL = "select * from BUSER where BPROVIDERID = '".(db::EscString($provId))."'";
+            $getSQL = "select * from BUSER where BPROVIDERID = '".$escapedProvId."'";
             $res = db::Query($getSQL);
             $arrUser = db::FetchArr($res);
             $arrUser['DETAILS'] = json_decode($arrUser['BUSERDETAILS'], true);
