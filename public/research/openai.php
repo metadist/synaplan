@@ -1,4 +1,5 @@
 <?php
+
 $root = '../';
 require_once($root . 'inc/_coreincludes.php');
 
@@ -36,7 +37,7 @@ foreach ($response->output as $output) {
     $output->id; // 'msg_67ccd2bf17f0819081ff3bb2cf6508e6'
     $output->status; // 'completed'
     $output->role; // 'assistant'
-    
+
     foreach ($output->content as $content) {
         $content->type; // 'output_text'
         $content->text; // The response text

@@ -4,60 +4,60 @@
 // -----------------------------------------------------
 if (isset($_REQUEST['action']) && $_REQUEST['action'] == 'updateProfile') {
     // Get current user ID from session
-    $userId = $_SESSION["USERPROFILE"]["BID"] ?? 0;
-    
+    $userId = $_SESSION['USERPROFILE']['BID'] ?? 0;
+
     if ($userId > 0) {
         // Clean and collect form data
         $userDetails = [];
-        
+
         // Personal information
         $userDetails['firstName'] = db::EscString($_REQUEST['firstName'] ?? '');
         $userDetails['lastName'] = db::EscString($_REQUEST['lastName'] ?? '');
         $userDetails['phone'] = db::EscString($_REQUEST['phone'] ?? '');
-        
+
         // Company information
         $userDetails['companyName'] = db::EscString($_REQUEST['companyName'] ?? '');
         $userDetails['vatId'] = db::EscString($_REQUEST['vatId'] ?? '');
-        
+
         // Billing address
         $userDetails['street'] = db::EscString($_REQUEST['street'] ?? '');
         $userDetails['zipCode'] = db::EscString($_REQUEST['zipCode'] ?? '');
         $userDetails['city'] = db::EscString($_REQUEST['city'] ?? '');
         $userDetails['country'] = db::EscString($_REQUEST['country'] ?? 'DE');
-        
+
         // Account settings
         $userDetails['language'] = db::EscString($_REQUEST['language'] ?? 'en');
         $userDetails['timezone'] = db::EscString($_REQUEST['timezone'] ?? 'Europe/Berlin');
         $userDetails['invoiceEmail'] = db::EscString($_REQUEST['invoiceEmail'] ?? '');
-        
+
         // Update email in BMAIL field (clear text)
         $email = db::EscString($_REQUEST['email'] ?? '');
         if (!empty($email)) {
             $updateEmailSQL = "UPDATE BUSER SET BMAIL = '" . $email . "' WHERE BID = " . $userId;
             db::Query($updateEmailSQL);
         }
-        
+
         // Update password if provided
         $currentPassword = $_REQUEST['currentPassword'] ?? '';
         $newPassword = $_REQUEST['newPassword'] ?? '';
-        
+
         if (!empty($currentPassword) && !empty($newPassword)) {
             // Verify current password
-            $checkSQL = "SELECT BPW FROM BUSER WHERE BID = " . $userId;
+            $checkSQL = 'SELECT BPW FROM BUSER WHERE BID = ' . $userId;
             $checkRes = db::Query($checkSQL);
             $checkArr = db::FetchArr($checkRes);
-            
+
             if ($checkArr && $checkArr['BPW'] == md5($currentPassword)) {
                 // Update password with MD5 hash
                 $updatePwSQL = "UPDATE BUSER SET BPW = '" . md5($newPassword) . "' WHERE BID = " . $userId;
                 db::Query($updatePwSQL);
             }
         }
-        
+
         // Update user details JSON
         $userDetailsJson = json_encode($userDetails, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
         $updateDetailsSQL = "UPDATE BUSER SET BUSERDETAILS = '" . db::EscString($userDetailsJson) . "' WHERE BID = " . $userId;
-        db::Query($updateDetailsSQL);   
+        db::Query($updateDetailsSQL);
     }
 }
 ?>

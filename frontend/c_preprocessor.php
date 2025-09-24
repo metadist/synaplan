@@ -1,5 +1,5 @@
 <?php
-    //require_once('inc/_preprocessconf.php');
+//require_once('inc/_preprocessconf.php');
 ?>
 <script src="node_modules/markdown-it/dist/markdown-it.min.js"></script>
 <script>
@@ -17,8 +17,8 @@
         See the <a href="index.php/prompts" style="font-weight: bold;">Prompt Editor</a> to change existing prompts OR add new prompts.
     </p>
     <?php
-        $promptText = BasicAI::getAprompt("tools:sort")["BPROMPT"];
-    ?>
+        $promptText = BasicAI::getAprompt('tools:sort')['BPROMPT'];
+?>
     <HR>
     <ul class="nav nav-tabs" id="mdTabs" role="tablist">
         <li class="nav-item" role="presentation">
@@ -40,8 +40,8 @@
         </div>
         <div class="tab-pane fade" id="editor" role="tabpanel" aria-labelledby="editorTab">
             <textarea id="mdInput" class="form-control" 
-            style="min-height: 500px; width: 100%; font-family: monospace; font-weight: bolder; background-color: #EFEFEF;"><?php 
-            echo $promptText; ?></textarea>
+            style="min-height: 500px; width: 100%; font-family: monospace; font-weight: bolder; background-color: #EFEFEF;"><?php
+        echo $promptText; ?></textarea>
         </div>
         <div class="tab-pane fade" id="json" role="tabpanel" aria-labelledby="jsonTab">
             <div id="jsonOutput" class="p-2 border rounded" style="background-color: #EFEFEF;">

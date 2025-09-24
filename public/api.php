@@ -1,5 +1,6 @@
-<?php 
-/* 
+<?php
+
+/*
     API for synaplan.com. Serving as a bridge between the frontend and the backend.
     Design with a bearer token authentication. Bearer token is the session id.
     The bearer Auth token is saved in the database for each user.
@@ -78,8 +79,8 @@ try {
 
     // Debug logging
     ApiAuthenticator::logSessionDebugInfo();
-    if ($GLOBALS["debug"]) {
-        error_log("API Action: " . $apiAction);
+    if ($GLOBALS['debug']) {
+        error_log('API Action: ' . $apiAction);
     }
 
     // Check if action is allowed for current session
@@ -91,5 +92,5 @@ try {
     require_once __DIR__ . '/../app/inc/api/_api-restcalls.php';
 } catch (\Throwable $e) {
     http_response_code(500);
-    echo json_encode(["error" => "Server error", "message" => ($GLOBALS["debug"] ?? false) ? $e->getMessage() : null]);
+    echo json_encode(['error' => 'Server error', 'message' => ($GLOBALS['debug'] ?? false) ? $e->getMessage() : null]);
 }

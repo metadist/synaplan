@@ -1,4 +1,5 @@
 <?php
+
 $method = $jsonRpcRequest['method'];
 $params = $jsonRpcRequest['params'] ?? [];
 $id = $jsonRpcRequest['id'];

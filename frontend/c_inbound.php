@@ -3,16 +3,16 @@
 // Inbound configuration
 // -----------------------------------------------------
 
-require_once __DIR__ . "/../app/inc/api/_inboundconf.php";
+require_once __DIR__ . '/../app/inc/api/_inboundconf.php';
 ?>
 <link rel="stylesheet" href="assets/statics/fa/css/all.min.css">
 <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4" id="contentMain">
     <B>THIS IS NOT YET WORKING, WE ARE BETA</B>
-    <h1><?php _s("Inbound", __FILE__, $_SESSION["LANG"]); ?></h1>
+    <h1><?php _s('Inbound', __FILE__, $_SESSION['LANG']); ?></h1>
     <p>
-        <?php _s("You can reach this platform via different channels.", __FILE__, $_SESSION["LANG"]); ?><br>
-        <?php _s("Different channels offer different features, if you set those up.", __FILE__, $_SESSION["LANG"]); ?><br>
-        <?php _s("Please take a look at the channels listed below:", __FILE__, $_SESSION["LANG"]); ?><br>
+        <?php _s('You can reach this platform via different channels.', __FILE__, $_SESSION['LANG']); ?><br>
+        <?php _s('Different channels offer different features, if you set those up.', __FILE__, $_SESSION['LANG']); ?><br>
+        <?php _s('Please take a look at the channels listed below:', __FILE__, $_SESSION['LANG']); ?><br>
     </p>
 
     <!-- WhatsApp Channel Card -->
@@ -23,10 +23,10 @@ require_once __DIR__ . "/../app/inc/api/_inboundconf.php";
         <div class="card-body">
             <?php
             $numArr = InboundConf::getWhatsAppNumbers();
-            foreach($numArr as $num) {
-                print "+".$num["BWAOUTNUMBER"].": default handling<br>";
-            }
-            ?>
+foreach ($numArr as $num) {
+    print '+'.$num['BWAOUTNUMBER'].': default handling<br>';
+}
+?>
             <!-- Add your WhatsApp channel form here if needed -->
         </div>
     </div>
