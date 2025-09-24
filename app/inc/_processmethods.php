@@ -333,11 +333,20 @@ class ProcessMethods {
                     $toolLimitCheck = XSControl::checkOperationLimit(self::$msgArr, $operation);
                     if ($toolLimitCheck['limited']) {
                         // Create rate limit response
-                        self::$msgArr['BTEXT'] = 'RATE_LIMIT_NOTIFICATION: ' . json_encode([
+                        $rateLimitData = [
                             'error' => 'rate_limit_exceeded',
                             'message' => $toolLimitCheck['reason'],
                             'reset_time' => $toolLimitCheck['reset_time']
-                        ]);
+                        ];
+                        
+                        // Add intelligent action fields if available
+                        if (isset($toolLimitCheck['action_type'])) {
+                            $rateLimitData['action_type'] = $toolLimitCheck['action_type'];
+                            $rateLimitData['action_message'] = $toolLimitCheck['action_message'];
+                            $rateLimitData['action_url'] = $toolLimitCheck['action_url'];
+                        }
+                        
+                        self::$msgArr['BTEXT'] = 'RATE_LIMIT_NOTIFICATION: ' . json_encode($rateLimitData);
                         self::$msgArr['BDIRECT'] = 'OUT';
                         
                         if (self::$stream) {
@@ -421,11 +430,20 @@ public static function processMessage(): void {
             $topicLimitCheck = XSControl::checkTopicLimit(self::$msgArr);
             if ($topicLimitCheck['limited']) {
                 // Create rate limit response that frontend will handle elegantly
-                self::$msgArr['BTEXT'] = 'RATE_LIMIT_NOTIFICATION: ' . json_encode([
+                $rateLimitData = [
                     'error' => 'rate_limit_exceeded',
                     'message' => $topicLimitCheck['reason'],
                     'reset_time' => $topicLimitCheck['reset_time']
-                ]);
+                ];
+                
+                // Add intelligent action fields if available
+                if (isset($topicLimitCheck['action_type'])) {
+                    $rateLimitData['action_type'] = $topicLimitCheck['action_type'];
+                    $rateLimitData['action_message'] = $topicLimitCheck['action_message'];
+                    $rateLimitData['action_url'] = $topicLimitCheck['action_url'];
+                }
+                
+                self::$msgArr['BTEXT'] = 'RATE_LIMIT_NOTIFICATION: ' . json_encode($rateLimitData);
                 self::$msgArr['BDIRECT'] = 'OUT';
                 
                 if (self::$stream) {
@@ -630,11 +648,20 @@ public static function processMessage(): void {
             $operationCheck = XSControl::checkOperationLimit(self::$msgArr, $operationToCheck);
             if ($operationCheck['limited']) {
                 // Create rate limit response that frontend will handle
-                self::$msgArr['BTEXT'] = 'RATE_LIMIT_NOTIFICATION: ' . json_encode([
+                $rateLimitData = [
                     'error' => 'rate_limit_exceeded',
                     'message' => $operationCheck['reason'],
                     'reset_time' => $operationCheck['reset_time']
-                ]);
+                ];
+                
+                // Add intelligent action fields if available
+                if (isset($operationCheck['action_type'])) {
+                    $rateLimitData['action_type'] = $operationCheck['action_type'];
+                    $rateLimitData['action_message'] = $operationCheck['action_message'];
+                    $rateLimitData['action_url'] = $operationCheck['action_url'];
+                }
+                
+                self::$msgArr['BTEXT'] = 'RATE_LIMIT_NOTIFICATION: ' . json_encode($rateLimitData);
                 self::$msgArr['BDIRECT'] = 'OUT';
                 
                 if (self::$stream) {

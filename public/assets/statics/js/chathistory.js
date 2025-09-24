@@ -389,9 +389,32 @@ function renderChatHistory(messages) {
                     const jsonStr = displayText.substring('RATE_LIMIT_NOTIFICATION: '.length);
                     const rateLimitData = JSON.parse(jsonStr);
                     
-                    // Use the same styling as chat.js but for history display
-                    const upgradeMessage = (typeof getUpgradeMessage !== 'undefined') ? getUpgradeMessage() : 
-                        `<div class="border-top pt-2 mt-2"><small class="text-muted">Need higher limits? <a href="https://www.synaplan.com/" target="_blank" class="text-decoration-none fw-semibold" style="color: #6c757d;">Upgrade your plan →</a></small></div>`;
+                    // Generate intelligent action message based on subscription status (same as chat.js)
+                    let actionMessage = '';
+                    if (rateLimitData.action_type && rateLimitData.action_message && rateLimitData.action_url) {
+                        let buttonClass = 'btn-outline-primary';
+                        let buttonIcon = '🚀';
+                        
+                        if (rateLimitData.action_type === 'reactivate') {
+                            buttonClass = 'btn-outline-warning';
+                            buttonIcon = '🔄';
+                        } else if (rateLimitData.action_type === 'renew') {
+                            buttonClass = 'btn-outline-success';
+                            buttonIcon = '🆕';
+                        }
+                        
+                        actionMessage = `<div class="border-top pt-3 mt-3">
+                            <div class="d-flex align-items-center gap-2">
+                                <a href="${rateLimitData.action_url}" target="_blank" class="btn ${buttonClass} btn-sm text-decoration-none">
+                                    ${buttonIcon} ${rateLimitData.action_message.replace(/🚀|🔄|🆕/g, '').trim()}
+                                </a>
+                            </div>
+                        </div>`;
+                    } else {
+                        // Fallback to default upgrade message
+                        actionMessage = (typeof getUpgradeMessage !== 'undefined') ? getUpgradeMessage() : 
+                            `<div class="border-top pt-2 mt-2"><small class="text-muted">Need higher limits? <a href="https://www.synaplan.com/" target="_blank" class="text-decoration-none fw-semibold" style="color: #6c757d;">Upgrade your plan →</a></small></div>`;
+                    }
                     
                     const resetTime = rateLimitData.reset_time || (Math.floor(Date.now() / 1000) + 300);
                     const currentTime = Math.floor(Date.now() / 1000);
@@ -437,7 +460,7 @@ function renderChatHistory(messages) {
                                                 background: rgba(0,0,0,0.05); border-radius: 4px;
                                             ">${timeDisplay}</span>
                                         </div>
-                                        ${upgradeMessage}
+                                        ${actionMessage}
                                     </div>
                                     <span class="message-time ai-time">${formatDateTime(chat.BDATETIME)}</span>
                                     

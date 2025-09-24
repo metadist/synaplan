@@ -62,9 +62,7 @@ class XSControl {
             if ($paymentRow && !empty($paymentRow['BPAYMENTDETAILS'])) {
                 $paymentDetails = json_decode($paymentRow['BPAYMENTDETAILS'], true);
                 
-                if (isset($paymentDetails['end_timestamp']) && 
-                    isset($paymentDetails['status']) && 
-                    $paymentDetails['status'] === 'active') {
+                if (isset($paymentDetails['end_timestamp'])) {
                     return intval($paymentDetails['end_timestamp']);
                 }
             }
@@ -75,6 +73,99 @@ class XSControl {
         } catch (Exception $e) {
             error_log("Error getting subscription end timestamp: " . $e->getMessage());
             return time() + (30 * 24 * 60 * 60); // Safe fallback
+        }
+    }
+
+    /**
+     * Get intelligent rate limit message based on subscription status
+     */
+    public static function getIntelligentRateLimitMessage($userId, $operationType, $currentCount, $maxCount, $timeframe): array {
+        try {
+            $paymentSQL = "SELECT BPAYMENTDETAILS, BUSERLEVEL FROM BUSER WHERE BID = " . intval($userId);
+            $paymentResult = db::Query($paymentSQL);
+            $paymentRow = db::FetchArr($paymentResult);
+            
+            $subscriptionStatus = 'unknown';
+            $endTimestamp = time() + (30 * 24 * 60 * 60); // Default fallback
+            $plan = 'NEW';
+            
+            if ($paymentRow && !empty($paymentRow['BPAYMENTDETAILS'])) {
+                $paymentDetails = json_decode($paymentRow['BPAYMENTDETAILS'], true);
+                if ($paymentDetails) {
+                    $subscriptionStatus = $paymentDetails['status'] ?? 'unknown';
+                    $endTimestamp = intval($paymentDetails['end_timestamp'] ?? $endTimestamp);
+                    $plan = $paymentDetails['plan'] ?? $paymentRow['BUSERLEVEL'] ?? 'NEW';
+                }
+            }
+            
+            $currentTime = time();
+            $isSubscriptionValid = $endTimestamp > $currentTime;
+            $timeRemaining = max(0, $endTimestamp - $currentTime);
+            
+            // Generate base message
+            $operationName = ucfirst($operationType);
+            if ($operationType === 'IMAGES') $operationName = 'Image generation';
+            elseif ($operationType === 'VIDEOS') $operationName = 'Video generation';
+            elseif ($operationType === 'AUDIOS') $operationName = 'Audio generation';
+            elseif ($operationType === 'FILE_ANALYSIS') $operationName = 'File analysis';
+            
+            $timeframeText = self::formatTimeframe($timeframe);
+            $baseMessage = "$operationName limit exceeded: $currentCount/$maxCount per $timeframeText";
+            
+            // Determine message type and action based on status and validity
+            if ($subscriptionStatus === 'active' && $isSubscriptionValid) {
+                // Active subscription with valid end date - suggest upgrade
+                return [
+                    'message' => $baseMessage,
+                    'action_type' => 'upgrade',
+                    'action_message' => 'Need higher limits? 🚀 Upgrade your plan',
+                    'action_url' => 'https://www.synaplan.com/pricing',
+                    'reset_time' => $endTimestamp,
+                    'reset_time_formatted' => self::formatTimeRemaining($timeRemaining)
+                ];
+            } elseif ($subscriptionStatus === 'deactive' && $isSubscriptionValid) {
+                // Cancelled/paused subscription but still within valid period
+                return [
+                    'message' => $baseMessage,
+                    'action_type' => 'reactivate',
+                    'action_message' => 'Subscription paused/cancelled. 🔄 Reactivate subscription',
+                    'action_url' => 'https://www.synaplan.com/account',
+                    'reset_time' => $endTimestamp,
+                    'reset_time_formatted' => self::formatTimeRemaining($timeRemaining)
+                ];
+            } elseif ($subscriptionStatus === 'deactive' && !$isSubscriptionValid) {
+                // Expired subscription
+                return [
+                    'message' => $baseMessage,
+                    'action_type' => 'renew',
+                    'action_message' => 'Subscription expired. 🆕 Subscribe to continue',
+                    'action_url' => 'https://www.synaplan.com/pricing',
+                    'reset_time' => $endTimestamp,
+                    'reset_time_formatted' => 'expired'
+                ];
+            } else {
+                // Fallback for unknown status or NEW users
+                return [
+                    'message' => $baseMessage,
+                    'action_type' => 'upgrade',
+                    'action_message' => 'Need higher limits? 🚀 Upgrade your plan',
+                    'action_url' => 'https://www.synaplan.com/pricing',
+                    'reset_time' => $endTimestamp,
+                    'reset_time_formatted' => self::formatTimeRemaining($timeRemaining)
+                ];
+            }
+            
+        } catch (Exception $e) {
+            error_log("Error getting intelligent rate limit message: " . $e->getMessage());
+            // Safe fallback
+            return [
+                'message' => "Rate limit exceeded: $currentCount/$maxCount",
+                'action_type' => 'upgrade',
+                'action_message' => 'Need higher limits? 🚀 Upgrade your plan',
+                'action_url' => 'https://www.synaplan.com/pricing',
+                'reset_time' => time() + (30 * 24 * 60 * 60),
+                'reset_time_formatted' => '30 days'
+            ];
         }
     }
 
@@ -494,17 +585,15 @@ class XSControl {
                 $result['current_count'] = $currentCount;
                 if ($currentCount >= $maxCount) {
                     $result['exceeded'] = true;
-                    $timeDisplay = $timeframe >= 2592000 ? 'month' : ($timeframe >= 86400 ? 'day' : 'period');
                     
-                    // Dynamic reason based on operation type
-                    $operationNames = [
-                        'AUDIOS' => 'Audio generation',
-                        'IMAGES' => 'Image generation', 
-                        'VIDEOS' => 'Video generation',
-                        'FILE_ANALYSIS' => 'File analysis'
-                    ];
-                    $operationName = $operationNames[$operation] ?? 'Operation';
-                    $result['reason'] = "{$operationName} limit exceeded: {$currentCount}/{$maxCount} per {$timeDisplay}";
+                    // Use intelligent message based on subscription status
+                    $intelligentMessage = self::getIntelligentRateLimitMessage($msgArr['BUSERID'], $operation, $currentCount, $maxCount, $timeframe);
+                    $result['reason'] = $intelligentMessage['message'];
+                    $result['action_type'] = $intelligentMessage['action_type'];
+                    $result['action_message'] = $intelligentMessage['action_message'];
+                    $result['action_url'] = $intelligentMessage['action_url'];
+                    $result['reset_time'] = $intelligentMessage['reset_time'];
+                    $result['reset_time_formatted'] = $intelligentMessage['reset_time_formatted'];
                 }
                 break;
         }
@@ -584,31 +673,19 @@ class XSControl {
                     $currentCount = self::countIn($userId, $timeframe);
                     
                     if ($currentCount >= $maxCount) {
-                        // For subscription limits (monthly), use subscription end timestamp
-                        if ($timeframe >= 2592000) { // Monthly limits (30 days)
-                            $subscriptionEndTime = self::getSubscriptionEndTimestamp($userId);
-                            $timeFormatted = self::formatTimeRemaining($subscriptionEndTime - time());
-                            
-                            return [
-                                'limited' => true,
-                                'exceeded' => true,
-                                'message' => "Message limit exceeded: {$currentCount}/{$maxCount} per " . self::formatTimeframe($timeframe),
-                                'reset_time' => $subscriptionEndTime,
-                                'reset_time_formatted' => $timeFormatted
-                            ];
-                        } else {
-                            // For short-term limits, use timeframe
-                            $resetTime = time() + $timeframe;
-                            $timeFormatted = self::formatTimeRemaining($resetTime - time());
-                            
-                            return [
-                                'limited' => true,
-                                'exceeded' => true,
-                                'message' => "Message limit exceeded: {$currentCount}/{$maxCount} per " . self::formatTimeframe($timeframe),
-                                'reset_time' => $resetTime,
-                                'reset_time_formatted' => $timeFormatted
-                            ];
-                        }
+                        // Use intelligent message for message limits too
+                        $intelligentMessage = self::getIntelligentRateLimitMessage($userId, 'MESSAGES', $currentCount, $maxCount, $timeframe);
+                        
+                        return [
+                            'limited' => true,
+                            'exceeded' => true,
+                            'message' => $intelligentMessage['message'],
+                            'action_type' => $intelligentMessage['action_type'],
+                            'action_message' => $intelligentMessage['action_message'],
+                            'action_url' => $intelligentMessage['action_url'],
+                            'reset_time' => $intelligentMessage['reset_time'],
+                            'reset_time_formatted' => $intelligentMessage['reset_time_formatted']
+                        ];
                     }
                 }
             }
