@@ -99,6 +99,35 @@ class XSControl {
 
     // update operation type in BUSELOG after sorting is complete
     /**
+     * Check if user has an active subscription
+     */
+    private static function isActiveSubscription($userId): bool {
+        try {
+            $userSQL = "SELECT BPAYMENTDETAILS FROM BUSER WHERE BID = " . intval($userId);
+            $userResult = DB::Query($userSQL);
+            
+            if (!$userRow = DB::FetchArr($userResult)) {
+                return false;
+            }
+            
+            $paymentDetails = json_decode($userRow['BPAYMENTDETAILS'], true);
+            if (!$paymentDetails || !is_array($paymentDetails)) {
+                return false;
+            }
+            
+            $subscriptionStatus = $paymentDetails['status'] ?? null;
+            $endTimestamp = $paymentDetails['end_timestamp'] ?? null;
+            $currentTime = time();
+            
+            return ($subscriptionStatus === 'active' && $endTimestamp && $currentTime <= $endTimestamp);
+            
+        } catch (Exception $e) {
+            if($GLOBALS["debug"]) error_log("Error checking active subscription: " . $e->getMessage());
+            return false;
+        }
+    }
+
+    /**
      * Get current user's subscription ID for BUSELOG tracking
      */
     private static function getCurrentSubscriptionId($userId): ?string {
@@ -1022,10 +1051,31 @@ class XSControl {
                             $result['reason'] = $limitCheck['reason'];
                             $result['reset_time'] = 0; // Never resets
                             $result['reset_time_formatted'] = 'never';
-                            $result['action_type'] = 'info';
-                            $result['action_message'] = 'Free bonus limit reached. Use your ' . $userLevel . ' subscription.';
-                            $result['action_url'] = ApiKeys::getAccountUrl();
-                            $result['message'] = ucfirst(strtolower($limitType)) . " generation free bonus limit exceeded: " . $limitCheck['current_count'] . "/{$maxCount} lifetime";
+                            
+                            // Check if user has an active subscription - if yes, they shouldn't see this message
+                            // This should only happen if they exhausted both paid AND free limits
+                            $subscriptionStatus = self::isActiveSubscription($userId);
+                            
+                            if ($subscriptionStatus) {
+                                // User has active subscription but exhausted both paid and free limits
+                                $result['action_type'] = 'upgrade';
+                                $result['action_message'] = 'All limits exhausted. Consider upgrading your plan.';
+                                $result['action_url'] = ApiKeys::getUpgradeUrl();
+                            } else {
+                                // User has no active subscription - show appropriate message based on their level
+                                if ($userLevel === 'NEW') {
+                                    $result['action_type'] = 'upgrade';
+                                    $result['action_message'] = 'Free limit reached. Get more with a subscription.';
+                                    $result['action_url'] = ApiKeys::getPricingUrl();
+                                } else {
+                                    // User had a subscription (PRO, TEAM, etc.) but it's deactivated/expired
+                                    $result['action_type'] = 'renew';
+                                    $result['action_message'] = 'Free bonus limit reached. Renew your ' . $userLevel . ' subscription for more limits.';
+                                    $result['action_url'] = ApiKeys::getPricingUrl();
+                                }
+                            }
+                            
+                            $result['message'] = ucfirst(strtolower($limitType)) . " generation free limit exceeded: " . $limitCheck['current_count'] . "/{$maxCount} lifetime";
                             return $result;
                         }
                     }
