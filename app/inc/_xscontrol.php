@@ -129,17 +129,36 @@ class XSControl {
 
     /**
      * Get current user's subscription ID for BUSELOG tracking
+     * Only returns ID if subscription is actually active AND user level is not NEW
      */
     private static function getCurrentSubscriptionId($userId): ?string {
         try {
-            $paymentSQL = "SELECT BPAYMENTDETAILS FROM BUSER WHERE BID = " . intval($userId);
-            $paymentResult = db::Query($paymentSQL);
-            $paymentRow = db::FetchArr($paymentResult);
+            $userSQL = "SELECT BUSERLEVEL, BPAYMENTDETAILS FROM BUSER WHERE BID = " . intval($userId);
+            $userResult = db::Query($userSQL);
+            $userRow = db::FetchArr($userResult);
             
-            if ($paymentRow && !empty($paymentRow['BPAYMENTDETAILS'])) {
-                $paymentDetails = json_decode($paymentRow['BPAYMENTDETAILS'], true);
+            if (!$userRow) {
+                return null;
+            }
+            
+            // If user level is NEW, always return NULL (treat as free user)
+            if ($userRow['BUSERLEVEL'] === 'NEW') {
+                return null;
+            }
+            
+            if (!empty($userRow['BPAYMENTDETAILS'])) {
+                $paymentDetails = json_decode($userRow['BPAYMENTDETAILS'], true);
                 if ($paymentDetails && isset($paymentDetails['stripe_subscription_id'])) {
-                    return $paymentDetails['stripe_subscription_id'];
+                    // Only return subscription ID if subscription is active
+                    $subscriptionStatus = $paymentDetails['status'] ?? null;
+                    $endTimestamp = $paymentDetails['end_timestamp'] ?? null;
+                    $currentTime = time();
+                    
+                    $isActive = ($subscriptionStatus === 'active' && $endTimestamp && $currentTime <= $endTimestamp);
+                    
+                    if ($isActive) {
+                        return $paymentDetails['stripe_subscription_id'];
+                    }
                 }
             }
         } catch (Exception $e) {
@@ -1017,31 +1036,37 @@ class XSControl {
                     }
                 }
             } else {
-                // PAID users: Check BOTH subscription limits AND free lifetime limits
+                // PAID users: Check subscription limits first, then free limits only if subscription is inactive
                 
-                // STEP 1: Check SUBSCRIPTION limits (monthly reset, for paid usage)
-                $subscriptionLimits = self::getUserLimits($userId);
-                foreach ($subscriptionLimits as $setting => $maxCount) {
-                    if (preg_match('/^' . $limitType . '_(\d+)S$/', $setting, $matches)) {
-                        $timeframe = intval($matches[1]);
-                        $limitCheck = self::checkSpecificLimitForUsageType($msgArr, $limitType, $timeframe, $maxCount, 'paid');
-                        
-                        if ($limitCheck['exceeded']) {
-                            $result['limited'] = true;
-                            $result['reason'] = $limitCheck['reason'];
-                            $result['reset_time'] = $limitCheck['reset_time'];
-                            $result['reset_time_formatted'] = $limitCheck['reset_time_formatted'];
-                            $result['action_type'] = $limitCheck['action_type'];
-                            $result['action_message'] = $limitCheck['action_message'];
-                            $result['action_url'] = $limitCheck['action_url'];
-                            $result['message'] = ucfirst(strtolower($limitType)) . " generation {$userLevel} limit exceeded: " . $limitCheck['current_count'] . "/{$maxCount} per month";
-                            return $result;
+                // Check if user has active subscription
+                $isActiveSubscription = self::isActiveSubscription($userId);
+                
+                if ($isActiveSubscription) {
+                    // ACTIVE subscription: Only check subscription limits
+                    $subscriptionLimits = self::getUserLimits($userId);
+                    foreach ($subscriptionLimits as $setting => $maxCount) {
+                        if (preg_match('/^' . $limitType . '_(\d+)S$/', $setting, $matches)) {
+                            $timeframe = intval($matches[1]);
+                            $limitCheck = self::checkSpecificLimitForUsageType($msgArr, $limitType, $timeframe, $maxCount, 'paid');
+                            
+                            if ($limitCheck['exceeded']) {
+                                $result['limited'] = true;
+                                $result['reason'] = $limitCheck['reason'];
+                                $result['reset_time'] = $limitCheck['reset_time'];
+                                $result['reset_time_formatted'] = $limitCheck['reset_time_formatted'];
+                                $result['action_type'] = $limitCheck['action_type'];
+                                $result['action_message'] = $limitCheck['action_message'];
+                                $result['action_url'] = $limitCheck['action_url'];
+                                $result['message'] = ucfirst(strtolower($limitType)) . " generation {$userLevel} limit exceeded: " . $limitCheck['current_count'] . "/{$maxCount} per month";
+                                return $result;
+                            }
                         }
                     }
-                }
-                
-                // STEP 2: Check FREE limits (lifetime, for free usage)
-                $freeLimits = self::getFreeLimits();
+                    // Active subscription user is NOT limited - return success
+                    return $result;
+                } else {
+                    // INACTIVE subscription: Only check free limits (user should be treated as free user)
+                    $freeLimits = self::getFreeLimits();
                 foreach ($freeLimits as $setting => $maxCount) {
                     if (preg_match('/^' . $limitType . '_(\d+)S$/', $setting, $matches)) {
                         $limitCheck = self::checkSpecificLimitForUsageType($msgArr, $limitType, 0, $maxCount, 'free'); // 0 = no timeframe = lifetime
@@ -1079,6 +1104,7 @@ class XSControl {
                             return $result;
                         }
                     }
+                }
                 }
             }
             
