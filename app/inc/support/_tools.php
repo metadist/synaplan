@@ -249,7 +249,7 @@ class Tools {
                 $msgArr['BTEXT'] = "Error: Could not create screenshot of the web page.";
             }
         } else {
-            $msgArr['BTEXT'] = "Error: Invalid URL - please make sure the second word is a valid URL, like: /web https://www.ralfs.ai/ - the rest will be ignored.";
+            $msgArr['BTEXT'] = "Error: Invalid URL - please make sure the second word is a valid URL, like: /web " . ApiKeys::getBaseUrl() . "/ - the rest will be ignored.";
         }
 
         // translate the text to the language of the user

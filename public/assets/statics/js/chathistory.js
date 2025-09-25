@@ -413,7 +413,7 @@ function renderChatHistory(messages) {
                     } else {
                         // Fallback to default upgrade message
                         actionMessage = (typeof getUpgradeMessage !== 'undefined') ? getUpgradeMessage() : 
-                            `<div class="border-top pt-2 mt-2"><small class="text-muted">Need higher limits? <a href="https://www.synaplan.com/" target="_blank" class="text-decoration-none fw-semibold" style="color: #6c757d;">Upgrade your plan →</a></small></div>`;
+                            `<div class="border-top pt-2 mt-2"><small class="text-muted">Rate limit exceeded. Please contact support.</small></div>`;
                     }
                     
                     const resetTime = rateLimitData.reset_time || (Math.floor(Date.now() / 1000) + 300);

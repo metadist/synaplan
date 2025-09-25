@@ -55,7 +55,11 @@ if (XSControl::isRateLimitingEnabled() &&
         echo json_encode([
             'error' => 'rate_limit_exceeded',
             'message' => $limitResult['message'] ?? 'Message limit exceeded',
-            'reset_time' => $limitResult['reset_time'] ?? time() + 3600
+            'action_type' => $limitResult['action_type'] ?? 'upgrade',
+            'action_message' => $limitResult['action_message'] ?? 'Upgrade your plan',
+            'action_url' => $limitResult['action_url'] ?? ApiKeys::getPricingUrl(),
+            'reset_time' => $limitResult['reset_time'] ?? time() + 3600,
+            'reset_time_formatted' => $limitResult['reset_time_formatted'] ?? date('Y-m-d H:i:s', time() + 3600)
         ]);
         exit;
     }

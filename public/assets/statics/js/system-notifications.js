@@ -5,10 +5,12 @@
 
 // ========== CENTRALIZED LINK MANAGEMENT ==========
 
-const SYSTEM_LINKS = {
-    upgrade: 'https://www.synaplan.com/',
-    plans: 'https://www.synaplan.com/',
-    demo: 'https://www.synaplan.com/'
+// Note: System links are now loaded from backend/ENV - these are fallbacks only
+// Use dynamic URLs if available from backend injection
+const SYSTEM_LINKS = window.SYNAPLAN_SYSTEM_URLS || {
+    pricing: 'https://www.synaplan.com/pricing',
+    account: 'https://www.synaplan.com/account', 
+    upgrade: 'https://www.synaplan.com/pricing'
 };
 
 // ========== UNIFIED SYSTEM MESSAGE RENDERER ==========
@@ -144,7 +146,7 @@ function getUpgradeMessage() {
                 <div style="font-size: 0.9em; color: #6c757d; margin-bottom: 8px;">
                     💡 This is a demo with limited usage
                 </div>
-                <a href="${SYSTEM_LINKS.demo}" target="_blank" style="
+                <a href="${SYSTEM_LINKS.pricing}" target="_blank" style="
                     display: inline-block;
                     background: linear-gradient(135deg, #007bff, #0056b3);
                     color: white;

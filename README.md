@@ -72,6 +72,12 @@ DB_NAME=synaplan
 DB_USER=synaplan
 DB_PASS=synaplan
 
+# Rate Limiting Configuration
+RATE_LIMITING_ENABLED=true
+SYSTEM_PRICING_URL=https://your-domain.com/pricing
+SYSTEM_ACCOUNT_URL=https://your-domain.com/account
+SYSTEM_UPGRADE_URL=https://your-domain.com/upgrade
+
 # Other Configuration
 DEBUG=false
 ```
@@ -128,6 +134,7 @@ You can also deploy Synaplan on a regular Linux server using Apache, PHP 8.3, an
 - Vector search (MariaDB 11.7+), built-in RAG
 - Local audio transcription via whisper.cpp
 - Full message logging and usage tracking
+- Advanced rate limiting with subscription-based limits
 - Tika‑first document text extraction with automatic PDF OCR fallback (Vision AI)
   - Optional HTTP Basic Authentication supported for Tika via `TIKA_HTTP_USER` and `TIKA_HTTP_PASS`.
 
@@ -176,6 +183,7 @@ Configuration-driven AI selection via `$GLOBALS` and centralized key management 
 - Uploads: check `public/up/` permissions
 - AI calls: verify API keys in `.env` (project root)
 - DB errors: verify credentials and service status
+- Rate limiting: configure `RATE_LIMITING_ENABLED=true` and system URLs in `.env`
 - PDFs: if text extraction is empty, ensure Tika is reachable (`TIKA_ENABLED/TIKA_URL`); PDF OCR fallback runs automatically.
   - If Tika uses HTTP Basic Auth, set `TIKA_HTTP_USER` and `TIKA_HTTP_PASS` (both optional). Leaving them empty disables auth.
 - **Whisper models:** If you need to re-download models, delete the volume and restart:

@@ -48,15 +48,7 @@ INSERT INTO `BCONFIG` (`BOWNERID`, `BGROUP`, `BSETTING`, `BVALUE`) VALUES
 (0, 'RATELIMITS_WIDGET', 'MESSAGES_3600S', '100'),     -- 10 messages per hour for anonymous
 (0, 'RATELIMITS_WIDGET', 'FILEBYTES_3600S', '5242880'), -- 5MB per hour for anonymous
 
--- Default/Fallback Limits (Used when user level not found - most restrictive)
-(0, 'RATELIMITS_DEFAULT', 'MESSAGES_120S', '3'),      -- Very conservative defaults
-(0, 'RATELIMITS_DEFAULT', 'MESSAGES_3600S', '15'),
-(0, 'RATELIMITS_DEFAULT', 'IMAGES_2592000S', '5'),    -- 5 images per month
-(0, 'RATELIMITS_DEFAULT', 'VIDEOS_2592000S', '1'),    -- 1 video per month
-(0, 'RATELIMITS_DEFAULT', 'AUDIOS_2592000S', '2'),    -- 2 audio generations per month  
-(0, 'RATELIMITS_DEFAULT', 'FILE_ANALYSIS_86400S', '2'), -- 2 file analyses per day
-(0, 'RATELIMITS_DEFAULT', 'FILEBYTES_3600S', '5242880'), -- 5MB per hour
-(0, 'RATELIMITS_DEFAULT', 'APICALLS_3600S', '30'),    -- 30 API calls per hour
+-- NOTE: No DEFAULT limits needed - users are either NEW or have specific subscription plans
 
 -- Feature Flags for Smart Rate Limiting
 (0, 'SYSTEM_FLAGS', 'SMART_RATE_LIMITING_ENABLED', '1'),

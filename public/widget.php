@@ -38,7 +38,7 @@ if ($uid <= 0 || $widgetId < 1 || $widgetId > 9) {
 echo "
 document.addEventListener('DOMContentLoaded', function() {
     var script = document.createElement('script');
-    script.src = '{$GLOBALS['baseUrl']}assets/statics/js/widget-notifications.js';
+    script.src = '{$GLOBALS['baseUrl']}assets/statics/js/system-notifications.js';
     script.async = true;
     document.head.appendChild(script);
 });
@@ -107,9 +107,17 @@ switch ($config['position']) {
 ?>
 // Load widget rate limit notifications only if rate limiting enabled
 <?php if (ApiKeys::isRateLimitingEnabled()): ?>
+// Inject centralized URLs for widget
+window.SYNAPLAN_SYSTEM_URLS = {
+    pricing: '<?php echo addslashes(ApiKeys::getPricingUrl()); ?>',
+    account: '<?php echo addslashes(ApiKeys::getAccountUrl()); ?>',
+    upgrade: '<?php echo addslashes(ApiKeys::getUpgradeUrl()); ?>',
+    base: '<?php echo addslashes(ApiKeys::getBaseUrl()); ?>'
+};
+
 (function() {
     var script = document.createElement('script');
-    script.src = '<?php echo rtrim($GLOBALS['baseUrl'], '/'); ?>/assets/statics/js/widget-notifications.js';
+    script.src = '<?php echo rtrim($GLOBALS['baseUrl'], '/'); ?>/assets/statics/js/system-notifications.js';
     script.async = true;
     document.head.appendChild(script);
 })();
