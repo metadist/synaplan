@@ -453,40 +453,32 @@ APP_URL=https://domain.com    # Base application URL
 
 ## Troubleshooting
 
-### Common Issues
+### Current Known Issues
 
-#### Rate Limiting Not Working At All
-- **Most likely cause**: `RATE_LIMITING_ENABLED=false` in `.env` file
-- **Solution**: Set `RATE_LIMITING_ENABLED=true` and restart application
+#### User Level Not Updated After Subscription Expiration
+- **Symptoms**: User shows `BUSERLEVEL = 'PRO'` but subscription is expired
+- **Current behavior**: System correctly treats them as NEW user despite wrong level
+- **Root cause**: `BUSERLEVEL` not automatically updated when subscription expires
+- **Impact**: Cosmetic only - rate limiting still works correctly
+- **Manual fix**: Update `BUSERLEVEL` to 'NEW' for expired users
+
+#### Old Subscription IDs in BUSELOG for Expired Users
+- **Symptoms**: Recent BUSELOG entries have old `BSUBSCRIPTION_ID` instead of NULL
+- **Current behavior**: System correctly blocks new operations
+- **Root cause**: Historical entries from when subscription was active
+- **Impact**: None on rate limiting, but affects usage analytics
+- **Note**: Only new operations get NULL subscription ID correctly
+
+#### Rate Limiting Completely Disabled
+- **Cause**: `RATE_LIMITING_ENABLED=false` in `.env` file
+- **Solution**: Set `RATE_LIMITING_ENABLED=true` and restart Docker container
 - **Impact**: All rate limits completely bypassed
 
-#### Frontend Timer Shows Wrong Values
-- **Symptoms**: Shows "35d 22h" instead of "never", or old countdown values
-- **Cause**: Browser cache storing old timer calculations
-- **Solution**: Hard refresh (Ctrl+F5) or clear browser cache
-- **Note**: Backend provides correct `reset_time`, issue is frontend display only
-
-#### Emergency Mode Activated
-- **Symptoms**: All users get extremely restrictive limits (1 image/month)
-- **Causes**:
-  - Missing `RATELIMITS_NEW` configuration in `BCONFIG` table
-  - Database connectivity issues
-  - Corrupted rate limit configuration
-- **Solutions**:
-  - Verify `RATELIMITS_NEW` exists in `BCONFIG` with 6+ entries
-  - Check database connectivity
-  - Re-import `BRATELIMITS_CONFIG.sql` if needed
-
-#### User with Subscription Shows as NEW User
-- **Symptoms**: PRO/TEAM user gets NEW user limits and generic upgrade message
-- **Cause**: Empty `BPAYMENTDETAILS` JSON (`{}`) or missing subscription data
-- **Solution**: Ensure `BPAYMENTDETAILS` contains valid subscription information
-- **Note**: System treats empty payment details as NEW user for security
-
-#### Widget Users Cannot Access System
-- **Cause**: Missing `RATELIMITS_WIDGET` configuration in `BCONFIG` table
-- **Solution**: Ensure widget limits are properly configured
-- **Impact**: Anonymous widget users get emergency mode limits
+#### Missing Rate Limit Configuration
+- **Symptoms**: Users get extremely restrictive emergency limits (1 image/month)
+- **Cause**: Missing `RATELIMITS_NEW` or subscription tier limits in `BCONFIG` table
+- **Solution**: Re-import `BRATELIMITS_CONFIG.sql` to restore configuration
+- **Check**: Verify `RATELIMITS_NEW` exists with 6+ entries in `BCONFIG`
 
 ### Debugging Tools
 
