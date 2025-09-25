@@ -975,7 +975,7 @@ function aiRender(targetId) {
           `<div class="border-top pt-2 mt-2"><small class="text-muted">Rate limit exceeded. Please contact support.</small></div>`;
       }
       
-      const resetTime = rateLimitData.reset_time || (Math.floor(Date.now() / 1000) + 300);
+      const resetTime = rateLimitData.reset_time !== undefined ? rateLimitData.reset_time : (Math.floor(Date.now() / 1000) + 300);
       const timerId = 'timer-' + Date.now();
       
       $("#" + targetId).html(`
@@ -1008,9 +1008,12 @@ function aiRender(targetId) {
         </div>
       `);
       
-      // Start timer if function available
-      if (typeof startMiniTimer !== 'undefined') {
+      // Start timer if function available and resetTime > 0
+      if (typeof startMiniTimer !== 'undefined' && resetTime > 0) {
         startMiniTimer(timerId, resetTime);
+      } else if (resetTime === 0) {
+        // Show "never" for lifetime limits
+        document.getElementById(timerId).innerHTML = '<span class="text-muted">never</span>';
       }
       
       // Disable Again button AND dropdown ONLY for this specific rate-limited message

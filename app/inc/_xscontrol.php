@@ -99,6 +99,72 @@ class XSControl {
 
     // update operation type in BUSELOG after sorting is complete
     /**
+     * Get intelligent rate limit message for NEW users based on subscription history
+     */
+    private static function getIntelligentMessageForNewUser($userId, $limitType, $currentCount, $maxCount): array {
+        try {
+            $userSQL = "SELECT BPAYMENTDETAILS FROM BUSER WHERE BID = " . intval($userId);
+            $userResult = DB::Query($userSQL);
+            $userRow = DB::FetchArr($userResult);
+            
+            $result = [
+                'reset_time' => 0,
+                'reset_time_formatted' => 'never',
+                'action_type' => 'upgrade',
+                'action_message' => 'Get unlimited access with a subscription 🚀',
+                'action_url' => ApiKeys::getPricingUrl()
+            ];
+            
+            if ($userRow && !empty($userRow['BPAYMENTDETAILS'])) {
+                $paymentDetails = json_decode($userRow['BPAYMENTDETAILS'], true);
+                if ($paymentDetails && is_array($paymentDetails)) {
+                    $status = $paymentDetails['status'] ?? null;
+                    $plan = $paymentDetails['plan'] ?? null;
+                    $autoRenew = $paymentDetails['auto_renew'] ?? false;
+                    $endTimestamp = $paymentDetails['end_timestamp'] ?? null;
+                    $currentTime = time();
+                    
+                    if ($status === 'deactive') {
+                        // User cancelled/paused subscription
+                        $result['action_type'] = 'reactivate';
+                        $result['action_message'] = 'Reactivate your ' . $plan . ' subscription for unlimited access';
+                        $result['action_url'] = ApiKeys::getAccountUrl();
+                    } else if ($status === 'active' && $endTimestamp && $currentTime > $endTimestamp) {
+                        // Subscription expired
+                        if ($autoRenew) {
+                            $result['action_type'] = 'renew';
+                            $result['action_message'] = 'Renewal failed. Please update your payment method';
+                            $result['action_url'] = ApiKeys::getAccountUrl();
+                        } else {
+                            $result['action_type'] = 'renew';
+                            $result['action_message'] = 'Your ' . $plan . ' subscription expired. Renew or enable auto-renew';
+                            $result['action_url'] = ApiKeys::getPricingUrl();
+                        }
+                    } else if ($plan && $plan !== 'NEW') {
+                        // Had a subscription but something else went wrong
+                        $result['action_type'] = 'reactivate';
+                        $result['action_message'] = 'Reactivate your ' . $plan . ' subscription';
+                        $result['action_url'] = ApiKeys::getAccountUrl();
+                    }
+                }
+            }
+            
+            return $result;
+            
+        } catch (Exception $e) {
+            error_log("Error getting intelligent message for NEW user: " . $e->getMessage());
+            // Return default message
+            return [
+                'reset_time' => 0,
+                'reset_time_formatted' => 'never',
+                'action_type' => 'upgrade',
+                'action_message' => 'Get unlimited access with a subscription 🚀',
+                'action_url' => ApiKeys::getPricingUrl()
+            ];
+        }
+    }
+
+    /**
      * Check if user has an active subscription
      */
     private static function isActiveSubscription($userId): bool {
@@ -1025,11 +1091,15 @@ class XSControl {
                         if ($currentCount >= $maxCount) {
                             $result['limited'] = true;
                             $result['reason'] = ucfirst(strtolower($limitType)) . " generation limit exceeded: {$currentCount}/{$maxCount}";
-                            $result['reset_time'] = self::getCorrectResetTime($userId, $timeframe);
-                            $result['reset_time_formatted'] = self::formatTimeRemaining($result['reset_time'] - time());
-                            $result['action_type'] = 'upgrade';
-                            $result['action_message'] = 'Upgrade for higher limits 🚀';
-                            $result['action_url'] = ApiKeys::getPricingUrl();
+                            
+                            // Get intelligent message for NEW users based on their subscription history
+                            $intelligentMessage = self::getIntelligentMessageForNewUser($userId, $limitType, $currentCount, $maxCount);
+                            
+                            $result['reset_time'] = $intelligentMessage['reset_time'];
+                            $result['reset_time_formatted'] = $intelligentMessage['reset_time_formatted'];
+                            $result['action_type'] = $intelligentMessage['action_type'];
+                            $result['action_message'] = $intelligentMessage['action_message'];
+                            $result['action_url'] = $intelligentMessage['action_url'];
                             $result['message'] = $result['reason'];
                             return $result;
                         }

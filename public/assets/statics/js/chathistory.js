@@ -416,13 +416,15 @@ function renderChatHistory(messages) {
                             `<div class="border-top pt-2 mt-2"><small class="text-muted">Rate limit exceeded. Please contact support.</small></div>`;
                     }
                     
-                    const resetTime = rateLimitData.reset_time || (Math.floor(Date.now() / 1000) + 300);
+                    const resetTime = rateLimitData.reset_time !== undefined ? rateLimitData.reset_time : (Math.floor(Date.now() / 1000) + 300);
                     const currentTime = Math.floor(Date.now() / 1000);
                     const timeRemaining = Math.max(0, resetTime - currentTime);
                     
                     // Format the time remaining
                     let timeDisplay = "expired";
-                    if (timeRemaining > 0) {
+                    if (resetTime === 0) {
+                        timeDisplay = "never";
+                    } else if (timeRemaining > 0) {
                         const days = Math.floor(timeRemaining / 86400);
                         const hours = Math.floor((timeRemaining % 86400) / 3600);
                         const minutes = Math.floor((timeRemaining % 3600) / 60);
