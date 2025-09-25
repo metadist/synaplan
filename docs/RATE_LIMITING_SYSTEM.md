@@ -2,7 +2,7 @@
 
 ## Overview
 
-The Rate Limiting System is a comprehensive security and resource management solution that controls user access to AI operations (image generation, video generation, audio generation, file analysis) based on their subscription level and usage patterns. The system implements a dual-layer approach with subscription-based limits and lifetime free usage limits.
+The Rate Limiting System is a comprehensive security and resource management solution that controls user access to AI operations (image generation, video generation, audio generation, file analysis) based on their subscription level and usage patterns. The system implements a sophisticated dual-layer approach with subscription-based limits and lifetime free usage limits, combined with intelligent context-aware messaging that adapts to user subscription status, expiration scenarios, and auto-renewal settings.
 
 ## System Architecture
 
@@ -12,7 +12,9 @@ The Rate Limiting System is a comprehensive security and resource management sol
    - Main rate limiting engine
    - User limit retrieval and validation
    - Usage tracking and counting
-   - Intelligent limit messaging
+   - Intelligent context-aware limit messaging
+   - Subscription status analysis and edge case handling
+   - Auto-renewal awareness for expired subscriptions
 
 2. **Database Tables**
    - `BCONFIG`: Rate limit configuration storage
@@ -60,7 +62,20 @@ Stores user subscription information:
 ```sql
 -- Key fields:
 BUSERLEVEL       -- Subscription level: 'NEW', 'PRO', 'TEAM', 'BUSINESS'
-BPAYMENTDETAILS  -- JSON: subscription status, timestamps, stripe IDs
+BPAYMENTDETAILS  -- JSON: subscription status, timestamps, stripe IDs, auto_renew settings
+```
+
+**BPAYMENTDETAILS JSON Structure:**
+```json
+{
+  "plan": "PRO",
+  "status": "active|deactive",
+  "start_timestamp": 1758614400,
+  "end_timestamp": 1759228907,
+  "stripe_subscription_id": "sub_xxx",
+  "stripe_customer_id": "cus_xxx",
+  "auto_renew": true|false
+}
 ```
 
 ## Rate Limiting Logic
@@ -85,14 +100,46 @@ The system implements two independent limit checks:
 
 #### NEW Users
 - Only subject to NEW tier limits
-- All operations counted against monthly limits
+- All operations counted against monthly limits (for true new users)
+- All operations counted as lifetime limits (for users with deactivated/expired subscriptions)
 - No subscription benefits
+- Intelligent messaging based on subscription history
 
 #### Paid Users (PRO/TEAM/BUSINESS)
 - Subject to **both** subscription AND free limits
 - Subscription limits: Monthly reset, tier-specific
 - Free limits: Lifetime bonus, never reset
 - Both limits enforced independently
+- Only applied when subscription is truly active (status='active' AND current_time <= end_timestamp)
+
+### Intelligent Messaging System
+
+The system provides context-aware messages and actions based on user subscription status:
+
+#### NEW Users with No Subscription History
+- **Message**: "Get unlimited access with a subscription 🚀"
+- **Action**: Upgrade (links to pricing)
+- **Timer**: "never" (lifetime limits)
+
+#### Users with Deactivated Subscriptions
+- **Message**: "Reactivate your [PLAN] subscription for unlimited access"
+- **Action**: Reactivate (links to account page)
+- **Timer**: "never" (lifetime limits)
+
+#### Users with Expired Subscriptions (auto_renew = true)
+- **Message**: "Renewal failed. Please update your payment method"
+- **Action**: Renew (links to account page)
+- **Timer**: "never" (lifetime limits)
+
+#### Users with Expired Subscriptions (auto_renew = false)
+- **Message**: "Your [PLAN] subscription expired. Renew or enable auto-renew"
+- **Action**: Renew (links to pricing)
+- **Timer**: "never" (lifetime limits)
+
+#### Active Paid Users (Exhausted Both Limits)
+- **Message**: "All limits exhausted. Consider upgrading your plan"
+- **Action**: Upgrade (links to upgrade page)
+- **Timer**: Based on next billing cycle
 
 ### Limit Enforcement Flow
 
@@ -110,14 +157,26 @@ User Request → Input Validation → User Level Check → Limit Validation → 
    - Parse `BPAYMENTDETAILS` JSON for subscription status
    - Handle edge cases (empty, malformed data)
 
-3. **Limit Checking**
-   - **NEW Users**: Check only subscription limits (monthly)
-   - **Paid Users**: Check subscription limits (monthly) AND free limits (lifetime)
-   - Both checks are independent and enforced
+3. **Subscription Status Validation**
+   - Parse `BPAYMENTDETAILS` JSON for subscription status
+   - Validate active status: `status === 'active' AND current_time <= end_timestamp`
+   - Handle edge cases: deactive, expired, malformed data
 
-4. **Usage Counting**
+4. **Limit Checking**
+   - **NEW Users (or users with inactive subscriptions)**: Check only NEW tier limits (lifetime for ex-subscribers)
+   - **Active Paid Users**: Check subscription limits (monthly) first, then free limits (lifetime) if not limited
+   - Both checks are independent and enforced
+   - Critical security: inactive subscriptions never get paid limit benefits
+
+5. **Usage Counting**
    - **Paid Usage**: Count within timeframe, filter by `BSUBSCRIPTION_ID IS NOT NULL`
    - **Free Usage**: Count lifetime, filter by `BSUBSCRIPTION_ID IS NULL`
+
+6. **Intelligent Response Generation**
+   - Analyze user subscription history and current status
+   - Generate context-appropriate messages and action buttons
+   - Provide accurate timer information (never vs. specific timestamps)
+   - Direct users to appropriate actions (upgrade, reactivate, renew)
 
 ## Key Functions
 
@@ -134,9 +193,10 @@ User Request → Input Validation → User Level Check → Limit Validation → 
 **Logic Flow**:
 1. Validate inputs (fail-secure for invalid data)
 2. Determine user subscription level
-3. For NEW users: Check only monthly limits
-4. For paid users: Check both subscription and free limits
-5. Return appropriate limit exceeded message
+3. Check subscription status (active vs. inactive)
+4. For NEW users (or inactive subscriptions): Check only lifetime limits with intelligent messaging
+5. For active paid users: Check subscription limits first, then free limits if not exceeded
+6. Generate context-aware response with appropriate action buttons and timers
 
 #### `getUserLimits($userId)`
 **Purpose**: Retrieve subscription-specific rate limits
@@ -193,6 +253,34 @@ User Request → Input Validation → User Level Check → Limit Validation → 
 #### `getCurrentSubscriptionId($userId)`
 **Purpose**: Get current Stripe subscription ID
 **Return**: Subscription ID or NULL for free users
+**Logic**:
+- Returns NULL if `BUSERLEVEL = 'NEW'` (security override)
+- Returns NULL if subscription status is not 'active'
+- Returns NULL if current time > end_timestamp
+- Only returns subscription ID for truly active subscriptions
+
+#### `isActiveSubscription($userId)`
+**Purpose**: Determine if user has an active subscription
+**Return**: Boolean (true for active, false for inactive/expired)
+**Logic**:
+- Checks `status === 'active'`
+- Validates `current_time <= end_timestamp`
+- Critical for security: prevents inactive subscriptions from getting paid benefits
+
+#### `getIntelligentMessageForNewUser($userId, $limitType, $currentCount, $maxCount)`
+**Purpose**: Generate context-aware rate limit messages for users with NEW level
+**Parameters**:
+- `$userId`: User identifier
+- `$limitType`: Operation type that was limited
+- `$currentCount`: Current usage count
+- `$maxCount`: Maximum allowed count
+
+**Return**: Array with intelligent message data
+**Logic**:
+- Analyzes subscription history from `BPAYMENTDETAILS`
+- Handles deactivated, expired, and never-subscribed users differently
+- Considers auto_renew settings for expired subscriptions
+- Provides appropriate action buttons and URLs
 
 ## Configuration
 
@@ -296,10 +384,31 @@ APP_URL=https://domain.com    # Base application URL
 
 ### Subscription Change Handling
 
-1. **Upgrade**: User immediately gains higher limits
+1. **Upgrade**: User immediately gains higher limits for current billing cycle
 2. **Downgrade**: User retains current billing cycle limits until next renewal
-3. **Cancellation**: User falls back to NEW limits
-4. **Expiration**: User automatically moved to NEW limits
+3. **Cancellation (deactive status)**: User immediately falls back to NEW lifetime limits with reactivation message
+4. **Expiration (active status, expired timestamp)**:
+   - **With auto_renew = true**: Shows "Renewal failed. Update payment method"
+   - **With auto_renew = false**: Shows "Subscription expired. Renew or enable auto-renew"
+   - User falls back to NEW lifetime limits until renewal
+5. **Payment Issues**: User retains access until end_timestamp, then falls back to NEW limits
+
+### Edge Case Handling
+
+#### BUSERLEVEL vs. Subscription Status Conflicts
+- If `BUSERLEVEL = 'NEW'` but subscription exists: Treats as NEW (security first)
+- If `BUSERLEVEL = 'PRO'` but subscription deactive: Treats as NEW with reactivation message
+- If `BUSERLEVEL = 'PRO'` but subscription expired: Treats as NEW with renewal message
+
+#### Malformed Payment Data
+- Missing `BPAYMENTDETAILS`: Treats as true NEW user
+- Invalid JSON: Treats as true NEW user with upgrade message
+- Missing critical fields: Falls back to NEW limits with appropriate message
+
+#### Subscription ID Tracking
+- Active subscriptions: Operations tagged with `BSUBSCRIPTION_ID`
+- Inactive/expired: Operations tagged with `NULL` (free usage)
+- Critical: System never accepts old subscription IDs for inactive accounts
 
 ### Free Usage Mechanics
 
@@ -323,9 +432,14 @@ APP_URL=https://domain.com    # Base application URL
 ## Integration Points
 
 ### Frontend Integration
-- JavaScript receives structured rate limit responses
-- Dynamic countdown timers based on subscription billing cycles
-- Intelligent action buttons (upgrade, reactivate, account management)
+- JavaScript receives structured rate limit responses with context-aware data
+- Dynamic countdown timers: "never" for lifetime limits, accurate timestamps for active subscriptions
+- Intelligent action buttons based on user status:
+  - **🚀 Upgrade**: Blue button for new users (links to pricing)
+  - **🔄 Reactivate**: Orange button for cancelled subscriptions (links to account)
+  - **🆕 Renew**: Green button for expired subscriptions (links to pricing/account)
+- Proper handling of `reset_time = 0` vs. actual timestamps
+- Browser cache-resistant timer calculations
 
 ### API Integration
 - RESTful rate limit responses
@@ -341,20 +455,38 @@ APP_URL=https://domain.com    # Base application URL
 
 ### Common Issues
 
-#### User Sees Wrong Limits
-- Check `BUSERLEVEL` in `BUSER` table
-- Verify `BPAYMENTDETAILS` JSON structure
-- Confirm subscription status and timestamps
+#### Rate Limiting Not Working At All
+- **Most likely cause**: `RATE_LIMITING_ENABLED=false` in `.env` file
+- **Solution**: Set `RATE_LIMITING_ENABLED=true` and restart application
+- **Impact**: All rate limits completely bypassed
 
-#### Limits Not Enforcing
-- Verify `RATE_LIMITING_ENABLED=true` in environment
-- Check `BCONFIG` table for subscription tier limits
-- Validate BUSELOG entries have correct `BSUBSCRIPTION_ID`
+#### Frontend Timer Shows Wrong Values
+- **Symptoms**: Shows "35d 22h" instead of "never", or old countdown values
+- **Cause**: Browser cache storing old timer calculations
+- **Solution**: Hard refresh (Ctrl+F5) or clear browser cache
+- **Note**: Backend provides correct `reset_time`, issue is frontend display only
 
-#### Emergency Mode Triggered
-- Check error logs for "CRITICAL" messages
-- Verify `RATELIMITS_NEW` exists in `BCONFIG`
-- Confirm database connectivity
+#### Emergency Mode Activated
+- **Symptoms**: All users get extremely restrictive limits (1 image/month)
+- **Causes**:
+  - Missing `RATELIMITS_NEW` configuration in `BCONFIG` table
+  - Database connectivity issues
+  - Corrupted rate limit configuration
+- **Solutions**:
+  - Verify `RATELIMITS_NEW` exists in `BCONFIG` with 6+ entries
+  - Check database connectivity
+  - Re-import `BRATELIMITS_CONFIG.sql` if needed
+
+#### User with Subscription Shows as NEW User
+- **Symptoms**: PRO/TEAM user gets NEW user limits and generic upgrade message
+- **Cause**: Empty `BPAYMENTDETAILS` JSON (`{}`) or missing subscription data
+- **Solution**: Ensure `BPAYMENTDETAILS` contains valid subscription information
+- **Note**: System treats empty payment details as NEW user for security
+
+#### Widget Users Cannot Access System
+- **Cause**: Missing `RATELIMITS_WIDGET` configuration in `BCONFIG` table
+- **Solution**: Ensure widget limits are properly configured
+- **Impact**: Anonymous widget users get emergency mode limits
 
 ### Debugging Tools
 
@@ -362,17 +494,33 @@ APP_URL=https://domain.com    # Base application URL
 ```php
 $userLevel = XSControl::getUserSubscriptionLevel($userId);
 $limits = XSControl::getUserLimits($userId);
+$isActive = XSControl::isActiveSubscription($userId);
+$subscriptionId = XSControl::getCurrentSubscriptionId($userId);
+
+// Check raw payment details
+$userSQL = "SELECT BUSERLEVEL, BPAYMENTDETAILS FROM BUSER WHERE BID = $userId";
+$userRow = DB::FetchArr(DB::Query($userSQL));
+$paymentDetails = json_decode($userRow['BPAYMENTDETAILS'], true);
 ```
 
 #### Check Usage Counts
 ```php
 $freeUsage = XSControl::countUsageByType($userId, 0, 'text2pic', 'free');
 $paidUsage = XSControl::countUsageByType($userId, 2592000, 'text2pic', 'paid');
+
+// Check recent BUSELOG entries
+$logSQL = "SELECT BOPERATIONTYPE, BSUBSCRIPTION_ID, FROM_UNIXTIME(BTIMESTAMP) as created 
+           FROM BUSELOG WHERE BUSERID = $userId ORDER BY BTIMESTAMP DESC LIMIT 10";
 ```
 
 #### Test Rate Limiting
 ```php
 $result = XSControl::checkOperationLimit(['BUSERID' => $userId], 'text2pic');
+print_r($result); // Check message, action_type, reset_time, etc.
+
+// Test intelligent messaging
+$intelligentMsg = XSControl::getIntelligentMessageForNewUser($userId, 'IMAGES', 5, 2);
+print_r($intelligentMsg);
 ```
 
 ## Maintenance
@@ -412,4 +560,22 @@ $result = XSControl::checkOperationLimit(['BUSERID' => $userId], 'text2pic');
 
 ## Summary
 
-The Rate Limiting System provides comprehensive, secure, and scalable control over AI operation access. It successfully balances user experience with resource protection through intelligent limit enforcement, graceful degradation, and robust security measures. The dual-layer approach ensures fair usage while providing flexibility for different subscription tiers and maintaining strict security boundaries.
+The Rate Limiting System provides comprehensive, secure, and scalable control over AI operation access with intelligent context-aware messaging. It successfully balances user experience with resource protection through sophisticated limit enforcement, graceful degradation, and robust security measures. 
+
+### Key Strengths
+
+- **Dual-Layer Security**: Independent subscription and lifetime free limits
+- **Intelligent Messaging**: Context-aware responses based on subscription history and auto-renewal settings
+- **Bulletproof Security**: Invalid subscriptions never receive paid benefits
+- **Edge Case Handling**: Comprehensive coverage of expiration, cancellation, and malformed data scenarios
+- **User Experience**: Appropriate action buttons and accurate timer displays
+- **Scalability**: Database-driven configuration with emergency fallbacks
+
+### Security Guarantees
+
+- **Zero Privilege Escalation**: Inactive subscriptions cannot access paid limits
+- **Fail-Safe Design**: All errors default to most restrictive limits
+- **Input Validation**: All user inputs validated before processing
+- **Subscription Isolation**: BUSELOG tracking prevents cross-subscription usage counting
+
+The system ensures that users always receive appropriate, actionable guidance while maintaining strict security boundaries and preventing any form of privilege escalation or limit bypass.
