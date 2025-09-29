@@ -23,15 +23,39 @@ class XSControl {
     /**
      * Count operations within the current billing cycle
      * For monthly limits, this respects subscription start/end dates
+     * OPTIMIZED: Skip BPAYMENTDETAILS check if BUSERLEVEL is NEW
      */
     public static function countInCurrentBillingCycle($userId, $timeframe, $operationType = null):int {
         try {
             // For monthly limits (30+ days), use subscription billing cycle
             if ($timeframe >= 2592000) {
-                $paymentSQL = "SELECT BPAYMENTDETAILS FROM BUSER WHERE BID = " . intval($userId);
+                // OPTIMIZATION: Check BUSERLEVEL first before parsing BPAYMENTDETAILS
+                $paymentSQL = "SELECT BUSERLEVEL, BPAYMENTDETAILS FROM BUSER WHERE BID = " . intval($userId);
                 $paymentResult = db::Query($paymentSQL);
                 $paymentRow = db::FetchArr($paymentResult);
                 
+                // If user is NEW, skip BPAYMENTDETAILS parsing entirely
+                if ($paymentRow && $paymentRow['BUSERLEVEL'] === 'NEW') {
+                    // For NEW users, use simple timeframe-based counting
+                    $timeStart = time() - $timeframe;
+                    
+                    if ($operationType) {
+                        $countSQL = "SELECT COUNT(*) XSCOUNT FROM BUSELOG WHERE BUSERID = " . intval($userId) . 
+                                   " AND BOPERATIONTYPE = '" . DB::EscString($operationType) . "'" .
+                                   " AND BTIMESTAMP >= " . $timeStart .
+                                   " AND BSUBSCRIPTION_ID IS NULL";
+                    } else {
+                        $countSQL = "SELECT COUNT(*) XSCOUNT FROM BUSELOG WHERE BUSERID = " . intval($userId) . 
+                                   " AND BTIMESTAMP >= " . $timeStart .
+                                   " AND BSUBSCRIPTION_ID IS NULL";
+                    }
+                    
+                    $countRes = db::Query($countSQL);
+                    $countArr = db::FetchArr($countRes);
+                    return intval($countArr["XSCOUNT"]);
+                }
+                
+                // For non-NEW users, parse BPAYMENTDETAILS
                 if ($paymentRow && !empty($paymentRow['BPAYMENTDETAILS'])) {
                     $paymentDetails = json_decode($paymentRow['BPAYMENTDETAILS'], true);
                     if ($paymentDetails && isset($paymentDetails['start_timestamp']) && isset($paymentDetails['end_timestamp'])) {
@@ -166,16 +190,24 @@ class XSControl {
 
     /**
      * Check if user has an active subscription
+     * OPTIMIZED: Skip BPAYMENTDETAILS check if BUSERLEVEL is NEW
      */
     private static function isActiveSubscription($userId): bool {
         try {
-            $userSQL = "SELECT BPAYMENTDETAILS FROM BUSER WHERE BID = " . intval($userId);
+            // First check BUSERLEVEL - if NEW, guaranteed no active subscription
+            $userSQL = "SELECT BUSERLEVEL, BPAYMENTDETAILS FROM BUSER WHERE BID = " . intval($userId);
             $userResult = DB::Query($userSQL);
             
             if (!$userRow = DB::FetchArr($userResult)) {
                 return false;
             }
             
+            // OPTIMIZATION: If user level is NEW, they cannot have an active subscription
+            if ($userRow['BUSERLEVEL'] === 'NEW') {
+                return false;
+            }
+            
+            // Only parse BPAYMENTDETAILS for non-NEW users (saves LONGTEXT parsing)
             $paymentDetails = json_decode($userRow['BPAYMENTDETAILS'], true);
             if (!$paymentDetails || !is_array($paymentDetails)) {
                 return false;
