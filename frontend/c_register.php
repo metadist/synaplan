@@ -84,12 +84,16 @@ document.getElementById('registrationForm').addEventListener('submit', function(
     submitBtn.disabled = true;
     submitSpinner.classList.remove('d-none');
     
+    // Get Turnstile response
+    const turnstileResponse = document.querySelector('[name="cf-turnstile-response"]')?.value || '';
+    
     // Prepare form data
     const formData = new FormData();
     formData.append('action', 'userRegister');
     formData.append('email', email);
     formData.append('password', password);
     formData.append('confirmPassword', confirmPassword);
+    formData.append('cf-turnstile-response', turnstileResponse);
     
     // Make API call
     fetch('api.php', {

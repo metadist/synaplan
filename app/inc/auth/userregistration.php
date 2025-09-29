@@ -20,6 +20,13 @@ class UserRegistration {
     public static function registerNewUser(): array {
         $retArr = ["success" => false, "error" => ""];
         
+        // Validate Turnstile captcha first
+        $captchaOk = Frontend::myCFcaptcha();
+        if (!$captchaOk) {
+            $retArr["error"] = "Captcha verification failed. Please try again.";
+            return $retArr;
+        }
+        
         // Get email and password from request
         $email = isset($_REQUEST['email']) ? DB::EscString($_REQUEST['email']) : '';
         $password = isset($_REQUEST['password']) ? $_REQUEST['password'] : '';
