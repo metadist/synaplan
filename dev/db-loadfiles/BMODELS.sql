@@ -75,9 +75,8 @@ INSERT INTO `BMODELS` (`BID`, `BSERVICE`, `BNAME`, `BTAG`, `BSELECTABLE`, `BPROV
 (72, 'OpenAI', 'o3-pro', 'chat', 1, 'o3-pro', 20, 'per1M', 80, 'per1M', 10, 1, '{\"description\":\"OpenAI premium reasoning model. More compute than o3 with higher reliability. API id: o3-pro. Pricing: $20 per 1M input tokens, $80 per 1M output tokens.\",\"params\":{\"model\":\"o3-pro\"}}'),
 (73, 'OpenAI', 'gpt-4o-mini', 'chat', 1, 'gpt-4o-mini', 0.15, 'per1M', 0.6, 'per1M', 8, 1, '{\"description\":\"OpenAI lightweight GPT-4o-mini model for fast and cost-efficient chat and reasoning tasks. Optimized for lower latency and cheaper throughput.\",\"params\":{\"model\":\"gpt-4o-mini\"}}'),
 (74, 'Anthropic', 'Claude Sonnet 4', 'chat', 1, 'claude-sonnet-4-20250514', 3, 'per1M', 15, 'per1M', 9, 1, '{\"description\":\"Anthropic Claude Sonnet 4 model. Mid-tier reasoning and coding performance with large context window. Balanced between quality and cost.\",\"params\":{\"model\":\"claude-sonnet-4-20250514\"}}'),
-(75, 'Groq', 'gpt-oss-20b', 'chat', 1, 'openai/gpt-oss-20b', 0.1, 'per1M', 0.5, 'per1M', 9, 0, '{\"description\":\"Groq GPT Open Source 20b\",\"prompt\":\"\",\"params\":{\"model\":\"openai/gpt-oss-20b\"}}'),
-(76, 'Triton', 'mistral-streaming', 'chat', 1, 'mistral-streaming', 0.01, 'per1M', 0.01, 'per1M', 9, 0, '{\"description\":\"Triton Mistral Streaming\",\"prompt\":\"\",\"params\":{\"model\":\"mistral-streaming\"}}');
-
+(75, 'Ollama', 'gpt-oss-20b', 'chat', 1, 'gpt-oss-20b', 0.08, 'per1M', 0.4, 'per1M', 9, 1, '{\"description\":\"Local GPT Open Source 20b model on SynaPlan server in Germany. High-quality open source alternative to commercial GPT models.\",\"params\":{\"model\":\"gpt-oss-20b\"}}'),
+(76, 'Triton', 'mistral-streaming', 'chat', 1, 'mistral-streaming', 0.01, 'per1M', 0.01, 'per1M', 9, 0, '{\"description\":\"Triton Mistral Streaming\",\"prompt\":\"\",\"params\":{\"model\":\"mistral-streaming\"}}')
 --
 -- Indexes for dumped tables
 --

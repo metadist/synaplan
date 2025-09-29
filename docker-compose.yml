@@ -133,7 +133,7 @@ services:
       - ollama_data:/root/.ollama
     environment:
       - OLLAMA_HOST=0.0.0.0
-      - OLLAMA_PULL_MODELS=llava:13b,llama3.2:3b,mistral:7b,codellama:7b,deepseek-r1:14b,deepseek-r1:32b,bge-m3
+      - OLLAMA_PULL_MODELS=llava:13b,llama3.2:3b,mistral:7b,codellama:7b,deepseek-r1:14b,deepseek-r1:32b,bge-m3,gpt-oss:20b
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:11434/api/tags"]
