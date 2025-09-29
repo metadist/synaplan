@@ -41,7 +41,7 @@ class XSControl {
                     
                     if ($operationType) {
                         $countSQL = "SELECT COUNT(*) XSCOUNT FROM BUSELOG WHERE BUSERID = " . intval($userId) . 
-                                   " AND BOPERATIONTYPE = '" . DB::EscString($operationType) . "'" .
+                                   " AND BOPERATIONTYPE = '" . db::EscString($operationType) . "'" .
                                    " AND BTIMESTAMP >= " . $timeStart .
                                    " AND BSUBSCRIPTION_ID IS NULL";
                     } else {
@@ -82,7 +82,7 @@ class XSControl {
                         
                         if ($operationType) {
                             $countSQL = "SELECT COUNT(*) XSCOUNT FROM BUSELOG WHERE BUSERID = " . intval($userId) . 
-                                       " AND BOPERATIONTYPE = '" . DB::EscString($operationType) . "'";
+                                       " AND BOPERATIONTYPE = '" . db::EscString($operationType) . "'";
                         } else {
                             $countSQL = "SELECT COUNT(*) XSCOUNT FROM BUSELOG WHERE BUSERID = " . intval($userId);
                         }
@@ -90,7 +90,7 @@ class XSControl {
                         // Add subscription filter based on ACTUAL subscription status
                         if ($isActiveSubscription && $currentSubscriptionId) {
                             // Active subscription: count only current subscription usage
-                            $countSQL .= " AND BSUBSCRIPTION_ID = '" . DB::EscString($currentSubscriptionId) . "'";
+                            $countSQL .= " AND BSUBSCRIPTION_ID = '" . db::EscString($currentSubscriptionId) . "'";
                         } else {
                             // Inactive/expired/cancelled subscription: count only free usage (NULL subscription_id)
                             $countSQL .= " AND BSUBSCRIPTION_ID IS NULL";
@@ -128,8 +128,8 @@ class XSControl {
     private static function getIntelligentMessageForNewUser($userId, $limitType, $currentCount, $maxCount): array {
         try {
             $userSQL = "SELECT BPAYMENTDETAILS FROM BUSER WHERE BID = " . intval($userId);
-            $userResult = DB::Query($userSQL);
-            $userRow = DB::FetchArr($userResult);
+            $userResult = db::Query($userSQL);
+            $userRow = db::FetchArr($userResult);
             
             $result = [
                 'reset_time' => 0,
@@ -196,9 +196,9 @@ class XSControl {
         try {
             // First check BUSERLEVEL - if NEW, guaranteed no active subscription
             $userSQL = "SELECT BUSERLEVEL, BPAYMENTDETAILS FROM BUSER WHERE BID = " . intval($userId);
-            $userResult = DB::Query($userSQL);
+            $userResult = db::Query($userSQL);
             
-            if (!$userRow = DB::FetchArr($userResult)) {
+            if (!$userRow = db::FetchArr($userResult)) {
                 return false;
             }
             
@@ -730,8 +730,8 @@ class XSControl {
             // Handle widget/anonymous users
             if (isset($_SESSION["is_widget"]) && $_SESSION["is_widget"] === true) {
                 $configSQL = "SELECT BSETTING, BVALUE FROM BCONFIG WHERE BGROUP = 'RATELIMITS_WIDGET' AND BOWNERID = 0";
-                $configRes = DB::Query($configSQL);
-                while ($row = DB::FetchArr($configRes)) {
+                $configRes = db::Query($configSQL);
+                while ($row = db::FetchArr($configRes)) {
                     $limits[$row['BSETTING']] = intval($row['BVALUE']);
                 }
                 return $limits;
@@ -741,10 +741,10 @@ class XSControl {
             $userLevel = strtoupper(self::getUserSubscriptionLevel($userId));
             
             // Load limits from BCONFIG for this user level
-            $configSQL = "SELECT BSETTING, BVALUE FROM BCONFIG WHERE BGROUP = 'RATELIMITS_" . DB::EscString($userLevel) . "' AND BOWNERID = 0";
-            $configRes = DB::Query($configSQL);
+            $configSQL = "SELECT BSETTING, BVALUE FROM BCONFIG WHERE BGROUP = 'RATELIMITS_" . db::EscString($userLevel) . "' AND BOWNERID = 0";
+            $configRes = db::Query($configSQL);
             
-            while ($row = DB::FetchArr($configRes)) {
+            while ($row = db::FetchArr($configRes)) {
                 $limits[$row['BSETTING']] = intval($row['BVALUE']);
             }
             
@@ -852,8 +852,8 @@ class XSControl {
                      AND b.BUNIXTIMES > " . intval($timeFrame) . " 
                      AND m.BTOKEN = 'FILEBYTES'";
         
-        $bytesRes = DB::Query($bytesSQL);
-        $bytesArr = DB::FetchArr($bytesRes);
+        $bytesRes = db::Query($bytesSQL);
+        $bytesArr = db::FetchArr($bytesRes);
         
         return intval($bytesArr['TOTAL_BYTES'] ?? 0);
     }
@@ -873,8 +873,8 @@ class XSControl {
                    AND l.BTIMESTAMP > " . intval($timeFrame) . " 
                    AND b.BMESSTYPE = 'API'";
         
-        $apiRes = DB::Query($apiSQL);
-        $apiArr = DB::FetchArr($apiRes);
+        $apiRes = db::Query($apiSQL);
+        $apiArr = db::FetchArr($apiRes);
         
         return intval($apiArr['API_COUNT'] ?? 0);
     }
@@ -1037,7 +1037,7 @@ class XSControl {
         try {
             $countSQL = "SELECT COUNT(*) as count FROM BUSELOG 
                         WHERE BUSERID = " . intval($userId) . " 
-                        AND BOPERATIONTYPE = '" . DB::EscString($operationType) . "'";
+                        AND BOPERATIONTYPE = '" . db::EscString($operationType) . "'";
             
             if ($usageType === 'paid') {
                 // PAID usage: only count within timeframe (monthly reset with subscription)

@@ -220,8 +220,8 @@ Class BasicAI {
     public static function getApromptById($promptId) {
         $promptKey = "general";
         $promptSQL = "select * from BPROMPTS where BID=".intval($promptId);
-        $promptRes = DB::Query($promptSQL);
-        $promptArr = DB::FetchArr($promptRes);
+        $promptRes = db::Query($promptSQL);
+        $promptArr = db::FetchArr($promptRes);
         if($promptArr && is_array($promptArr)) {
             $promptKey = $promptArr['BTOPIC'];
         }
@@ -243,8 +243,8 @@ Class BasicAI {
 
         // get prompt from BPROMPTS
         $pSQL= "select * from BPROMPTS where BTOPIC='".$keyword."' and (BLANG like '".$lang."' OR BLANG='en') AND (BOWNERID='".$userId."' OR BOWNERID=0) ORDER BY BID DESC LIMIT 1";
-        $pRes = DB::Query($pSQL);
-        $pArr = DB::FetchArr($pRes);
+        $pRes = db::Query($pSQL);
+        $pArr = db::FetchArr($pRes);
         
         // ****************************************************************************************************** 
         if($pArr && is_array($pArr)) {
@@ -281,8 +281,8 @@ Class BasicAI {
             // Only try to get file metadata if we have a valid BID
             if(isset($msgArr['BID']) && intval($msgArr['BID']) > 0) {
                 $fileSQL = "select * from BMESSAGEMETA where BMESSID=".intval($msgArr['BID'])." AND BTOKEN='FILECOUNT' ORDER BY BID DESC LIMIT 1";  
-                $fileRes = DB::Query($fileSQL);
-                $fileArr = DB::FetchArr($fileRes);
+                $fileRes = db::Query($fileSQL);
+                $fileArr = db::FetchArr($fileRes);
                 if($fileArr && is_array($fileArr) && $addInfos) {
                     $arrPrompt['BPROMPT'] .= "\n\n"."(Original message contained ".($fileArr["BVALUE"])." files)";
                 }
@@ -308,9 +308,9 @@ Class BasicAI {
             if(isset($arrPrompt['BID']) && intval($arrPrompt['BID']) > 0) {
                 $toolSQL = "select * from BPROMPTMETA where BPROMPTID=".$arrPrompt['BID'];
                 //error_log($toolSQL);
-                $toolRes = DB::Query($toolSQL);
+                $toolRes = db::Query($toolSQL);
 
-                while($toolArr = DB::FetchArr($toolRes)) {
+                while($toolArr = db::FetchArr($toolRes)) {
                     if ($toolArr && is_array($toolArr)) {
                         $arrPrompt['SETTINGS'][] = $toolArr;
                     }
@@ -329,14 +329,14 @@ Class BasicAI {
 
         // BTOPIC not like 'tools:%
         $outerDynaSQL = "select DISTINCT BTOPIC from BPROMPTS where (BOWNERID=".$userId." OR BOWNERID=0) AND BTOPIC NOT LIKE 'tools:%' ORDER BY BOWNERID DESC";
-        $outerDynaRes = DB::Query($outerDynaSQL);
-        while($outerDynaLine = DB::FetchArr($outerDynaRes)) {
+        $outerDynaRes = db::Query($outerDynaSQL);
+        while($outerDynaLine = db::FetchArr($outerDynaRes)) {
             if (!$outerDynaLine || !is_array($outerDynaLine) || !isset($outerDynaLine['BTOPIC'])) {
                 continue;
             }
             $dynaSQL = "select * from BPROMPTS where BTOPIC='".$outerDynaLine['BTOPIC']."' AND (BOWNERID=".$userId." OR BOWNERID=0) ORDER BY BOWNERID DESC";
-            $dynaRes = DB::Query($dynaSQL);
-            while($dynaLine = DB::FetchArr($dynaRes)) {
+            $dynaRes = db::Query($dynaSQL);
+            while($dynaLine = db::FetchArr($dynaRes)) {
                 if (!$dynaLine || !is_array($dynaLine) || !isset($dynaLine['BTOPIC']) || !isset($dynaLine['BID'])) {
                     continue;
                 }
@@ -347,9 +347,9 @@ Class BasicAI {
                     // ****************************************************************************************************** 
                     $toolSQL = "select * from BPROMPTMETA where BPROMPTID=".$dynaLine['BID'];
                     //error_log($toolSQL);
-                    $toolRes = DB::Query($toolSQL);
+                    $toolRes = db::Query($toolSQL);
 
-                    while($toolArr = DB::FetchArr($toolRes)) {
+                    while($toolArr = db::FetchArr($toolRes)) {
                         if ($toolArr && is_array($toolArr)) {
                             $dynaLine['SETTINGS'][] = $toolArr;
                         }
@@ -369,8 +369,8 @@ Class BasicAI {
         $userId = $_SESSION['USERPROFILE']['BID'];
 
         $dynaSQL = "select * from BMODELS ORDER BY BTAG ASC";
-        $dynaRes = DB::Query($dynaSQL);
-        while($dynaLine = DB::FetchArr($dynaRes)) {
+        $dynaRes = db::Query($dynaSQL);
+        while($dynaLine = db::FetchArr($dynaRes)) {
             if ($dynaLine && is_array($dynaLine)) {
                 $models[] = $dynaLine;
             }
@@ -398,8 +398,8 @@ Class BasicAI {
     public static function getModelDetails($modelId): array {
         $mArr = [];
         $mSQL = "select * from BMODELS where BID=".intval($modelId);
-        $mRes = DB::Query($mSQL);
-        $result = DB::FetchArr($mRes);
+        $mRes = db::Query($mSQL);
+        $result = db::FetchArr($mRes);
         if($result && is_array($result)) {
             $mArr = $result;
         }
@@ -533,8 +533,8 @@ Class BasicAI {
         // Ensure BID exists before using it in SQL query
         if (isset($arrPrompt['BID']) && !empty($arrPrompt['BID'])) {
             $toolSQL = "select * from BPROMPTMETA where BPROMPTID=".$arrPrompt['BID'];
-            $toolRes = DB::Query($toolSQL);
-            while($toolArr = DB::FetchArr($toolRes)) {
+            $toolRes = db::Query($toolSQL);
+            while($toolArr = db::FetchArr($toolRes)) {
                 if ($toolArr && is_array($toolArr)) {
                     $arrPrompt['SETTINGS'][] = $toolArr;
                 }

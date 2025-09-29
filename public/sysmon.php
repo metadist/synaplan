@@ -57,8 +57,8 @@ foreach ($sites as $site) {
 */
 // now count incoming messages to BMESSAGES in database
 $sql = "SELECT COUNT(*) ANZ FROM BMESSAGES WHERE BUNIXTIMES > ".(time()-180);
-$res = DB::query($sql);
-$countArr = DB::FetchArr($res);
+$res = db::query($sql);
+$countArr = db::FetchArr($res);
 $count = $countArr["ANZ"];
 if($count > 50) {
     $errors[] = "Incoming messages: ERROR - ".($count)." messages in the last 3 minutes\n";

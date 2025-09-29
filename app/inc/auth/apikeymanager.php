@@ -35,10 +35,10 @@ class ApiKeyManager {
                 WHERE BOWNERID = " . $uid . " 
                 ORDER BY BID DESC";
         
-        $res = DB::Query($sql);
+        $res = db::Query($sql);
         $rows = [];
         
-        while($row = DB::FetchArr($res)) { 
+        while($row = db::FetchArr($res)) { 
             if ($row && is_array($row)) {
                 $rows[] = $row; 
             }
@@ -67,7 +67,7 @@ class ApiKeyManager {
         }
         
         $uid = intval($_SESSION["USERPROFILE"]["BID"]);
-        $name = isset($_REQUEST['name']) ? DB::EscString($_REQUEST['name']) : '';
+        $name = isset($_REQUEST['name']) ? db::EscString($_REQUEST['name']) : '';
         $now = time();
         
         // Generate secure API key
@@ -76,9 +76,9 @@ class ApiKeyManager {
         
         // Insert new API key into database
         $ins = "INSERT INTO BAPIKEYS (BOWNERID, BNAME, BKEY, BSTATUS, BCREATED, BLASTUSED) 
-                VALUES (" . $uid . ", '" . $name . "', '" . DB::EscString($key) . "', 'active', " . $now . ", 0)";
+                VALUES (" . $uid . ", '" . $name . "', '" . db::EscString($key) . "', 'active', " . $now . ", 0)";
         
-        DB::Query($ins);
+        db::Query($ins);
         
         $ret["success"] = true;
         $ret["key"] = $key;
@@ -103,7 +103,7 @@ class ApiKeyManager {
         
         $uid = intval($_SESSION["USERPROFILE"]["BID"]);
         $id = isset($_REQUEST['id']) ? intval($_REQUEST['id']) : 0;
-        $status = isset($_REQUEST['status']) ? DB::EscString($_REQUEST['status']) : '';
+        $status = isset($_REQUEST['status']) ? db::EscString($_REQUEST['status']) : '';
         
         // Validate input parameters
         if ($id <= 0 || !in_array($status, ['active', 'paused'])) {
@@ -115,10 +115,10 @@ class ApiKeyManager {
                 SET BSTATUS = '" . $status . "' 
                 WHERE BID = " . $id . " AND BOWNERID = " . $uid;
         
-        DB::Query($upd);
+        db::Query($upd);
         
         // Consider success even if no rows were affected (unchanged status)
-        $ret["success"] = DB::AffectedRows() ? true : true;
+        $ret["success"] = db::AffectedRows() ? true : true;
         
         return $ret;
     }
@@ -151,10 +151,10 @@ class ApiKeyManager {
         $del = "DELETE FROM BAPIKEYS 
                 WHERE BID = " . $id . " AND BOWNERID = " . $uid;
         
-        DB::Query($del);
+        db::Query($del);
         
         // Consider success even if no rows were affected (key didn't exist)
-        $ret["success"] = DB::AffectedRows() ? true : true;
+        $ret["success"] = db::AffectedRows() ? true : true;
         
         return $ret;
     }

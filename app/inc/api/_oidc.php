@@ -147,7 +147,7 @@ class OidcAuth {
             // Update user to mark as OIDC type if not already
             if ($user['BINTYPE'] !== 'OIDC') {
                 $updateSQL = "UPDATE BUSER SET BINTYPE = 'OIDC', BPROVIDERID = 'OIDC' WHERE BID = " . $user['BID'];
-                DB::Query($updateSQL);
+                db::Query($updateSQL);
                 $user['BINTYPE'] = 'OIDC';
                 $user['BPROVIDERID'] = 'OIDC';
             }

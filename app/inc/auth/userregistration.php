@@ -28,7 +28,7 @@ class UserRegistration {
         }
         
         // Get email and password from request
-        $email = isset($_REQUEST['email']) ? DB::EscString($_REQUEST['email']) : '';
+        $email = isset($_REQUEST['email']) ? db::EscString($_REQUEST['email']) : '';
         $password = isset($_REQUEST['password']) ? $_REQUEST['password'] : '';
         $confirmPassword = isset($_REQUEST['confirmPassword']) ? $_REQUEST['confirmPassword'] : '';
         
@@ -36,8 +36,8 @@ class UserRegistration {
         if(strlen($email) > 0 && strlen($password) > 0 && $password === $confirmPassword && strlen($password) >= 6) {
             // Check if email already exists
             $checkSQL = "SELECT BID FROM BUSER WHERE BMAIL = '".$email."'";
-            $checkRes = DB::Query($checkSQL);
-            $existingUser = DB::FetchArr($checkRes);
+            $checkRes = db::Query($checkSQL);
+            $existingUser = db::FetchArr($checkRes);
             
             if($existingUser) {
                 // Email already exists
@@ -73,8 +73,8 @@ class UserRegistration {
             $insertSQL = "INSERT INTO BUSER (BCREATED, BINTYPE, BMAIL, BPW, BPROVIDERID, BUSERLEVEL, BUSERDETAILS) 
                          VALUES ('".date("YmdHis")."', 'MAIL', '".$email."', '".$passwordMd5."', '".DB::EscString($email)."', 'PIN:".$pin."', '".DB::EscString(json_encode($userDetails, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES))."')";
             
-            DB::Query($insertSQL);
-            $newUserId = DB::LastId();
+            db::Query($insertSQL);
+            $newUserId = db::LastId();
             
             if($newUserId > 0) {
                 // Send confirmation email
@@ -135,15 +135,15 @@ class UserRegistration {
             return ['success' => false, 'error' => 'Captcha verification failed'];
         }
 
-        $email = isset($_REQUEST['email']) ? DB::EscString(trim($_REQUEST['email'])) : '';
+        $email = isset($_REQUEST['email']) ? db::EscString(trim($_REQUEST['email'])) : '';
         if ($email === '' || strpos($email, '@') === false) {
             return ['success' => false, 'error' => 'Please provide a valid email address'];
         }
 
         // Lookup user
         $uSQL = "SELECT BID, BMAIL FROM BUSER WHERE BMAIL='".$email."' LIMIT 1";
-        $uRes = DB::Query($uSQL);
-        $uArr = DB::FetchArr($uRes);
+        $uRes = db::Query($uSQL);
+        $uArr = db::FetchArr($uRes);
 
         $message = 'If the email exists, we sent a new password.';
 
@@ -154,7 +154,7 @@ class UserRegistration {
 
             // Update DB
             $upd = "UPDATE BUSER SET BPW='".$newPasswordMd5."' WHERE BID=".(int)$uArr['BID'];
-            DB::Query($upd);
+            db::Query($upd);
 
             // Send mail (English)
             try {
