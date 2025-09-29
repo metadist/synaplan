@@ -37,7 +37,7 @@ Class BasicAI {
                 ProcessMethods::$toolProcessed = false;
                 if($msgArr['BFILE']<1) {
                     $researchArr = $msgArr;
-                    $researchArr['BTEXT'] = "/web https://www.synaplan.com/";
+                    $researchArr['BTEXT'] = "/web " . ApiKeys::getBaseUrl() . "/";
                     $researchArr = Tools::webScreenshot($researchArr, 1170, 1200);
                     $msgArr['BFILE'] = $researchArr['BFILE']*2; // indicate that this shall be kept!
                     $msgArr['BFILEPATH'] =  $researchArr['BFILEPATH'];

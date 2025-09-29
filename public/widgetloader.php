@@ -40,6 +40,9 @@ $_SESSION["widget_id"] = $widgetId;
 $_SESSION["anonymous_session_id"] = uniqid('widget_', true); // Generate unique session ID
 $_SESSION["anonymous_session_created"] = time(); // Add creation timestamp for timeout validation
 
+// Note: Rate limiting is now handled in the chat submission API calls, not here
+// This allows the widget interface to load but limits actual message sending
+
 // Validate session timeout for existing sessions
 if (isset($_SESSION["is_widget"]) && $_SESSION["is_widget"] === true) {
     $sessionTimeout = 86400; // 24 hours
@@ -235,8 +238,11 @@ header('Pragma: no-cache');
     </style>
     <!-- jQuery - needed for chat functionality -->
     <script src="node_modules/jquery/dist/jquery.min.js?v=<?php echo @filemtime('node_modules/jquery/dist/jquery.min.js'); ?>"></script>
+    <!-- Centralized System Notifications -->
+    <script src="assets/statics/js/system-notifications.js?v=<?php echo @filemtime('assets/statics/js/system-notifications.js'); ?>"></script>
 </head>
 <body>
+    
     <div class="widget-header">
         Chat Support
     </div>

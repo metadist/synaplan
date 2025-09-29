@@ -28,10 +28,15 @@ CREATE TABLE `BUSELOG` (
   `BTIMESTAMP` bigint(20) NOT NULL,
   `BUSERID` bigint(20) NOT NULL,
   `BMSGID` bigint(20) NOT NULL,
+  `BOPERATIONTYPE` varchar(32) NOT NULL DEFAULT 'general' COMMENT 'Operation type: general, text2pic, text2vid, text2sound, analyzefile',
+  `BSUBSCRIPTION_ID` varchar(64) DEFAULT NULL COMMENT 'Stripe subscription ID when operation was performed',
   PRIMARY KEY (`BID`),
   KEY `BTIMESTAMP` (`BTIMESTAMP`),
   KEY `BUSERID` (`BUSERID`),
-  KEY `BMSGID` (`BMSGID`)
+  KEY `BMSGID` (`BMSGID`),
+  KEY `BOPERATIONTYPE` (`BOPERATIONTYPE`),
+  KEY `BUSERID_BOPERATIONTYPE` (`BUSERID`, `BOPERATIONTYPE`),
+  KEY `BSUBSCRIPTION_ID` (`BSUBSCRIPTION_ID`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3 COLLATE=utf8mb3_general_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 

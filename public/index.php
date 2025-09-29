@@ -87,6 +87,16 @@ if (!isset($_SESSION['USERPROFILE']) &&
     </div>
     <script src="node_modules/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
     <script src="node_modules/feather-icons/dist/feather.min.js"></script>
+    <script>
+    // Inject centralized URLs for frontend
+    window.SYNAPLAN_SYSTEM_URLS = {
+        pricing: '<?php echo addslashes(ApiKeys::getPricingUrl()); ?>',
+        account: '<?php echo addslashes(ApiKeys::getAccountUrl()); ?>',
+        upgrade: '<?php echo addslashes(ApiKeys::getUpgradeUrl()); ?>',
+        base: '<?php echo addslashes(ApiKeys::getBaseUrl()); ?>'
+    };
+    </script>
+    <script src="assets/statics/js/system-notifications.js"></script>
     <script src="assets/statics/js/dashboard.js"></script>
     
 

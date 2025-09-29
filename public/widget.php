@@ -34,6 +34,15 @@ $mode = isset($_REQUEST['mode']) ? trim($_REQUEST['mode']) : '';
 // Validate parameters
 if ($uid <= 0 || $widgetId < 1 || $widgetId > 9) {
     echo "console.error('Invalid widget parameters: uid=$uid, widgetid=$widgetId');";
+// Load widget notifications script
+echo "
+document.addEventListener('DOMContentLoaded', function() {
+    var script = document.createElement('script');
+    script.src = '{$GLOBALS['baseUrl']}assets/statics/js/system-notifications.js';
+    script.async = true;
+    document.head.appendChild(script);
+});
+";
     exit;
 }
 
@@ -62,8 +71,8 @@ while ($row = db::FetchArr($res)) {
     $config[$row['BSETTING']] = $row['BVALUE'];
 }
 
-// Get the base URL for the widget
-$baseUrl = $GLOBALS["baseUrl"];
+// Get the base URL for the widget (ensure trailing slash)
+$baseUrl = rtrim($GLOBALS["baseUrl"], '/') . '/';
 $widgetUrl = $baseUrl . "widgetloader.php?uid=" . $uid . "&widgetid=" . $widgetId;
 
 // Determine position CSS
@@ -96,6 +105,24 @@ switch ($config['position']) {
 
 // Output the widget JavaScript
 ?>
+// Load widget rate limit notifications only if rate limiting enabled
+<?php if (ApiKeys::isRateLimitingEnabled()): ?>
+// Inject centralized URLs for widget
+window.SYNAPLAN_SYSTEM_URLS = {
+    pricing: '<?php echo addslashes(ApiKeys::getPricingUrl()); ?>',
+    account: '<?php echo addslashes(ApiKeys::getAccountUrl()); ?>',
+    upgrade: '<?php echo addslashes(ApiKeys::getUpgradeUrl()); ?>',
+    base: '<?php echo addslashes(ApiKeys::getBaseUrl()); ?>'
+};
+
+(function() {
+    var script = document.createElement('script');
+    script.src = '<?php echo rtrim($GLOBALS['baseUrl'], '/'); ?>/assets/statics/js/system-notifications.js';
+    script.async = true;
+    document.head.appendChild(script);
+})();
+<?php endif; ?>
+
 (function() {
     // Public no-op close callback hook (integrators can override)
     try { window.synaplanWidgetOnClose = window.synaplanWidgetOnClose || function(){}; } catch (e) {}
@@ -192,7 +219,8 @@ switch ($config['position']) {
                 if (frameWrap && frameWrap.children.length === 0) {
                     var chatFrame = document.createElement('iframe');
                     chatFrame.style.cssText = 'width:100%;height:100%;border:none;background:#fff;display:block;';
-                    try { chatFrame.setAttribute('allow', 'storage-access-by-user-activation'); } catch(e) {}
+                    // Note: storage-access-by-user-activation is a newer feature, skip for compatibility
+                    // try { chatFrame.setAttribute('allow', 'storage-access-by-user-activation'); } catch(e) {}
                     chatFrame.src = <?php echo json_encode($widgetUrl); ?>;
                     frameWrap.appendChild(chatFrame);
                 }
@@ -502,7 +530,8 @@ switch ($config['position']) {
                 background: white;
             `;
             // Allow requesting storage access from within the iframe (Safari iOS)
-            try { chatFrame.setAttribute('allow', 'storage-access-by-user-activation'); } catch (e) {}
+            // Note: storage-access-by-user-activation is a newer feature, skip for compatibility
+            // try { chatFrame.setAttribute('allow', 'storage-access-by-user-activation'); } catch (e) {}
             chatFrame.src = '<?php echo $widgetUrl; ?>';
             iframeContainer.appendChild(chatFrame);
         }

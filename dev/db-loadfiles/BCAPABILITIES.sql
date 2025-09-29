@@ -27,7 +27,10 @@ CREATE TABLE `BCAPABILITIES` (
   `BID` bigint(20) NOT NULL AUTO_INCREMENT,
   `BKEY` varchar(64) NOT NULL,
   `BCOMMENT` varchar(128) NOT NULL,
-  PRIMARY KEY (`BID`)
+  `BRATELIMIT_CATEGORY` varchar(32) DEFAULT NULL COMMENT 'Maps to rate limit category (IMAGES, VIDEOS, AUDIOS, FILE_ANALYSIS, MESSAGES)',
+  PRIMARY KEY (`BID`),
+  KEY `BKEY` (`BKEY`),
+  KEY `BRATELIMIT_CATEGORY` (`BRATELIMIT_CATEGORY`)
 ) ENGINE=InnoDB AUTO_INCREMENT=16 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_uca1400_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -38,21 +41,21 @@ CREATE TABLE `BCAPABILITIES` (
 LOCK TABLES `BCAPABILITIES` WRITE;
 /*!40000 ALTER TABLE `BCAPABILITIES` DISABLE KEYS */;
 INSERT INTO `BCAPABILITIES` VALUES
-(1,'sort','Big prompt to classify input, needs a capable LLM'),
-(2,'chat','Classic LLM functionality'),
-(3,'text2sound','Speak the text'),
-(4,'text2music','Make a song'),
-(5,'text2pic','Create an image'),
-(6,'text2vid','Create a video'),
-(7,'pic2pic','Rework a picture'),
-(8,'pic2vid','Create video from image'),
-(9,'pic2text','Explain the picture in text'),
-(10,'sound2text','Transcribe - whisper style'),
-(11,'translate','Translate from one language to another'),
-(12,'vectorize','Put text into the database as vectors and enrich RAG'),
-(13,'text2moderate','Check for insulting language'),
-(14,'pic2moderate','Check for insulting images and nudity'),
-(15,'analyze','Analytical models');
+(1,'sort','Big prompt to classify input, needs a capable LLM',NULL),
+(2,'chat','Classic LLM functionality','MESSAGES'),
+(3,'text2sound','Speak the text','AUDIOS'),
+(4,'text2music','Make a song','AUDIOS'),
+(5,'text2pic','Create an image','IMAGES'),
+(6,'text2vid','Create a video','VIDEOS'),
+(7,'pic2pic','Rework a picture','IMAGES'),
+(8,'pic2vid','Create video from image','VIDEOS'),
+(9,'pic2text','Explain the picture in text','FILE_ANALYSIS'),
+(10,'sound2text','Transcribe - whisper style','FILE_ANALYSIS'),
+(11,'translate','Translate from one language to another','MESSAGES'),
+(12,'vectorize','Put text into the database as vectors and enrich RAG',NULL),
+(13,'text2moderate','Check for insulting language',NULL),
+(14,'pic2moderate','Check for insulting images and nudity',NULL),
+(15,'analyze','Analytical models','FILE_ANALYSIS');
 /*!40000 ALTER TABLE `BCAPABILITIES` ENABLE KEYS */;
 UNLOCK TABLES;
 /*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;

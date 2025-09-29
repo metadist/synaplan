@@ -94,11 +94,21 @@ if($request) {
                     $inMessageArr['BSTATUS'] = 'NEW';
                     $inMessageArr['BFILETEXT'] = '';
 
-                    // check the user limit first, block if needed                    
-                    if(XSControl::isLimited($inMessageArr, 120, 8) 
-                        OR XSControl::isLimited($inMessageArr, 600, 12)) {
-                            XSControl::notifyUser($inMessageArr);
+                    // Rate limiting check - only block if MESSAGES limit reached
+                    if (XSControl::isRateLimitingEnabled()) {
+                        $limitCheck = XSControl::checkMessagesLimit($inMessageArr['BUSERID']);
+                        if (is_array($limitCheck) && $limitCheck['limited']) {
+                            // Send rate limit notification via WhatsApp
+                            $limitMessage = "⏳ Usage Limit Reached\n" . $limitCheck['message'] . "\nNext available in: " . $limitCheck['reset_time_formatted'] . "\nNeed higher limits? 🚀 Upgrade your plan";
+                            $responseMessage = [
+                                'messaging_product' => 'whatsapp',
+                                'to' => $from,
+                                'type' => 'text',
+                                'text' => ['body' => $limitMessage]
+                            ];
+                            SendMessage($responseMessage);
                             exit;
+                        }
                     }
 
                     // ****************************************************************

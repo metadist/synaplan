@@ -106,6 +106,10 @@ class ApiKeys {
             'TIKA_MIN_ENTROPY',
             // Rate Limiting
             'RATE_LIMITING_ENABLED',
+            // System URLs
+            'SYSTEM_PRICING_URL',
+            'SYSTEM_ACCOUNT_URL',
+            'SYSTEM_UPGRADE_URL',
         ];
 
         foreach ($keyConfig as $envKey) {
@@ -296,6 +300,69 @@ class ApiKeys {
         if ($value === null) return false; // Default disabled
         $v = strtolower(trim(strval($value)));
         return in_array($v, ['1', 'true', 'on', 'yes'], true);
+    }
+
+    // ------------------------- SYSTEM URLS -------------------------
+
+    /**
+     * Normalize URL - supports relative, absolute, and :web format
+     */
+    private static function normalizeUrl($url): string {
+        if (empty($url)) return '';
+        
+        // Handle :web prefix for local development  
+        if (strpos($url, ':web') === 0) {
+            $url = str_replace(':web', '', $url);
+        }
+        
+        // If relative URL, prepend APP_URL (base URL)
+        if (strpos($url, 'http') !== 0 && strpos($url, '//') !== 0) {
+            $baseUrl = self::get('APP_URL') ?: 'https://www.synaplan.com';
+            // Remove trailing slash from base, add leading slash to path if needed
+            $baseUrl = rtrim($baseUrl, '/');
+            $url = ltrim($url, '/');
+            return $baseUrl . '/' . $url;
+        }
+        
+        return $url;
+    }
+
+    /**
+     * Get pricing page URL  
+     * Supports absolute URLs (https://example.com/pricing) and relative URLs (pricing)
+     * Relative URLs are combined with APP_URL as base
+     */
+    public static function getPricingUrl(): string {
+        $url = self::get('SYSTEM_PRICING_URL') ?: 'https://www.synaplan.com/pricing';
+        return self::normalizeUrl($url);
+    }
+
+    /**
+     * Get account management URL
+     * Supports absolute URLs (https://example.com/account) and relative URLs (account)
+     * Relative URLs are combined with APP_URL as base
+     */
+    public static function getAccountUrl(): string {
+        $url = self::get('SYSTEM_ACCOUNT_URL') ?: 'https://www.synaplan.com/account';
+        return self::normalizeUrl($url);
+    }
+
+    /**
+     * Get upgrade URL (alias for pricing)
+     * Supports absolute URLs (https://example.com/upgrade) and relative URLs (upgrade)
+     * Relative URLs are combined with APP_URL as base
+     */
+    public static function getUpgradeUrl(): string {
+        $url = self::get('SYSTEM_UPGRADE_URL') ?: self::get('SYSTEM_PRICING_URL') ?: 'https://www.synaplan.com/pricing';
+        return self::normalizeUrl($url);
+    }
+
+    /**
+     * Get base URL - uses existing APP_URL for homepage links and as base for relative URLs
+     * Returns the main application URL (protocol + domain)
+     */
+    public static function getBaseUrl(): string {
+        return self::get('APP_URL') ?: 'https://www.synaplan.com';
     }
 
     /**

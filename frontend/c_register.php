@@ -49,7 +49,10 @@
     <BR>
     <p><?php _s("By creating an account, you agree to our terms of service.", __FILE__, $_SESSION["LANG"]); ?></p>
     <BR>
-    <p><?php _s("Go to our homepage for more information: <a href=\"https://www.synaplan.com/\">https://synaplan.com/</a>", __FILE__, $_SESSION["LANG"]); ?></p>
+    <p><?php 
+    $homeUrl = ApiKeys::getBaseUrl();
+    _s("Go to our homepage for more information: <a href=\"$homeUrl\">$homeUrl</a>", __FILE__, $_SESSION["LANG"]); 
+    ?></p>
 </main>
 
 <script>

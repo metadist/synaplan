@@ -76,6 +76,8 @@ function extractBTEXT(text) {
 function handleGroqReasoning(text, targetId, renderFn) {
   const safeRender = renderFn || ((t) => t.replace(/[<>&]/g, (c) => ({'<':'&lt;','>':'&gt;','&':'&amp;'}[c])).replace(/\n/g, '<br>'));
 
+  // Rate limit notifications are now handled in aiRender function
+
   if (!text || text.length > GROQ_REASONING_CONFIG.maxInputChars) {
     $("#" + targetId).html(safeRender(text));
     return;
@@ -288,7 +290,7 @@ function initializeEventListeners() {
                 } else {
                     // Show error for disallowed file types
                     if (isAnonymousWidget) {
-                        alert('Anonymous users can only upload JPG, GIF, PNG, and PDF files.');
+                        showErrorMessage('File Type Restricted', 'Anonymous users can only upload JPG, GIF, PNG, and PDF files.');
                     }
                 }
             }
@@ -312,7 +314,7 @@ function initializeEventListeners() {
                         } else {
                             // Show error for disallowed file types
                             if (isAnonymousWidget) {
-                                alert('Anonymous users can only upload JPG, GIF, PNG, and PDF files.');
+                                showErrorMessage('File Type Restricted', 'Anonymous users can only upload JPG, GIF, PNG, and PDF files.');
                             }
                         }
                     }
@@ -522,6 +524,13 @@ function handleSendMessage() {
     // Grab the user's text - use textContent instead of innerText to preserve actual newlines
     if (!messageInput) return;
     const userMessage = messageInput.textContent.trim();
+    
+    // Validate that message is not empty (unless files are attached)
+    if (!userMessage && attachedFiles.length === 0) {
+        showEmptyMessageWarning();
+        return;
+    }
+    
     const actionMessage = 'messageNew';
     
     // Debug: Log the message to verify newlines are preserved
@@ -560,7 +569,21 @@ function handleSendMessage() {
         if (res.status === 401) {
           throw new Error('Authentication required. Please refresh the page.');
         } else if (res.status === 429) {
-          throw new Error('Rate limit exceeded. Please wait a moment before sending another message.');
+          // Handle rate limit with proper notification instead of throwing error
+          return res.json().then(data => {
+            showRateLimitNotification({
+              error: 'rate_limit_exceeded',
+              message: data.message || 'Rate limit exceeded. Please wait a moment.',
+              reset_time: data.reset_time
+            });
+            return { error: 'rate_limit_handled' }; // Signal that we handled it
+          }).catch(() => {
+            showRateLimitNotification({
+              error: 'rate_limit_exceeded', 
+              message: 'Rate limit exceeded. Please wait a moment.'
+            });
+            return { error: 'rate_limit_handled' };
+          });
         } else {
           throw new Error('Network response was not ok');
         }
@@ -568,15 +591,23 @@ function handleSendMessage() {
       return res.json();
     })
     .then(data => {
-      console.log('Server response:', data);
+      // Skip console.log for rate limit responses to keep console clean
+      if (data.error !== 'rate_limit_handled' && data.error !== 'rate_limit_exceeded') {
+        console.log('Server response:', data);
+      }
+      
       if (data.error) {
-        // Handle API errors
-        if (data.error.includes('Rate limit exceeded')) {
-          alert('Rate limit exceeded. Please wait a moment before sending another message.');
+        // Skip if rate limit was already handled in fetch response
+        if (data.error === 'rate_limit_handled') {
+          return;
+        }
+        // Handle API errors with unified system notifications (no console errors)
+        if (data.error.includes('Rate limit exceeded') || data.error === 'rate_limit_exceeded') {
+          showRateLimitNotification(data);
         } else if (data.error.includes('Invalid anonymous widget session')) {
-          alert('Session expired. Please refresh the page.');
+          showErrorMessage('Session Expired', 'Please refresh the page.');
         } else {
-          alert('Error: ' + data.error);
+          showErrorMessage('Error', data.error);
         }
         return;
       }
@@ -722,17 +753,17 @@ function handleSendMessage() {
     })
     .catch(err => {
       console.error(err);
-      // Handle specific error messages for anonymous users
+      // Handle specific error messages for anonymous users with unified notifications
       if (isAnonymousWidget) {
         if (err.message.includes('Authentication required')) {
-          alert('Session expired. Please refresh the page to continue.');
+          showErrorMessage('Session Expired', 'Please refresh the page to continue.');
         } else if (err.message.includes('Rate limit exceeded')) {
-          alert('Rate limit exceeded. Please wait a moment before sending another message.');
+          showRateLimitNotification({error: 'rate_limit_exceeded', message: err.message});
         } else {
-          alert('Connection error. Please try again.');
+          showErrorMessage('Connection Error', 'Please try again.');
         }
       } else {
-        alert('Error: ' + err.message);
+        showErrorMessage('Error', err.message);
       }
       // Don't reset file upload section on error - let user retry with same files
     });
@@ -909,6 +940,114 @@ function aiRender(targetId) {
    console.log('aiRender called for targetId:', targetId);
    console.log('Text content:', text);
   
+  // Check for rate limit notification FIRST (before any other processing)
+  if (text && text.startsWith('RATE_LIMIT_NOTIFICATION: ')) {
+    try {
+      const jsonStr = text.substring('RATE_LIMIT_NOTIFICATION: '.length);
+      const rateLimitData = JSON.parse(jsonStr);
+      
+      // Generate intelligent action message based on subscription status
+      let actionMessage = '';
+      if (rateLimitData.action_type && rateLimitData.action_message && rateLimitData.action_url) {
+        let buttonClass = 'btn-outline-primary';
+        let buttonIcon = '🚀';
+        
+        if (rateLimitData.action_type === 'reactivate') {
+          buttonClass = 'btn-outline-warning';
+          buttonIcon = '🔄';
+        } else if (rateLimitData.action_type === 'renew') {
+          buttonClass = 'btn-outline-success';
+          buttonIcon = '🆕';
+        }
+        
+        actionMessage = `<div class="border-top pt-3 mt-3">
+          <div class="d-flex align-items-center gap-2">
+            <a href="${rateLimitData.action_url}" target="_blank" class="btn ${buttonClass} btn-sm text-decoration-none">
+              ${buttonIcon} ${rateLimitData.action_message.replace(/🚀|🔄|🆕/g, '').trim()}
+            </a>
+          </div>
+        </div>`;
+      } else {
+        // Fallback to default upgrade message
+        // Since backend now always provides action_url, this fallback should not happen
+        // But if it does, use dynamic URL from backend or system default
+        actionMessage = (typeof getUpgradeMessage !== 'undefined') ? getUpgradeMessage() : 
+          `<div class="border-top pt-2 mt-2"><small class="text-muted">Rate limit exceeded. Please contact support.</small></div>`;
+      }
+      
+      const resetTime = rateLimitData.reset_time !== undefined ? rateLimitData.reset_time : (Math.floor(Date.now() / 1000) + 300);
+      const timerId = 'timer-' + Date.now();
+      
+      $("#" + targetId).html(`
+        <div style="padding: 4px 0;">
+          <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px;">
+            <span style="font-size: 20px; opacity: 0.7; animation: pulse 2s infinite ease-in-out;">⏳</span>
+            <div>
+              <strong style="color: #495057;">Usage Limit Reached</strong>
+              <div style="color: #6c757d; font-size: 0.9em; margin-top: 2px;">
+                ${rateLimitData.message}
+              </div>
+            </div>
+          </div>
+          <div style="color: #495057; font-size: 0.9em; margin-bottom: 12px;">
+            Next available in: <span id="${timerId}" style="
+              font-family: 'SFMono-Regular', Consolas, monospace;
+              font-weight: 600; color: #212529; padding: 2px 6px;
+              background: rgba(0,0,0,0.05); border-radius: 4px;
+              transition: background-color 0.3s ease;
+            ">calculating...</span>
+          </div>
+          ${actionMessage}
+          
+          <style>
+            @keyframes pulse {
+              0%, 100% { opacity: 0.7; transform: scale(1); }
+              50% { opacity: 1; transform: scale(1.05); }
+            }
+          </style>
+        </div>
+      `);
+      
+      // Start timer if function available and resetTime > 0
+      if (typeof startMiniTimer !== 'undefined' && resetTime > 0) {
+        startMiniTimer(timerId, resetTime);
+      } else if (resetTime === 0) {
+        // Show "never" for lifetime limits
+        document.getElementById(timerId).innerHTML = '<span class="text-muted">never</span>';
+      }
+      
+      // Disable Again button AND dropdown ONLY for this specific rate-limited message
+      setTimeout(() => {
+        const $targetElement = $("#" + targetId);
+        const $messageItem = $targetElement.closest('.message-item.ai-message');
+        
+        if ($messageItem.length) {
+          const $againBtn = $messageItem.find('.js-again');
+          const $againDropdown = $messageItem.find('.js-again-dd');
+          
+          if ($againBtn.length) {
+            $againBtn.prop('disabled', true)
+              .addClass('disabled')
+              .attr('title', 'Rate limit active - cannot regenerate')
+              .find('.again-text, .again-text-mobile').text('Rate limited');
+          }
+          
+          if ($againDropdown.length) {
+            $againDropdown.prop('disabled', true)
+              .addClass('disabled')
+              .attr('title', 'Rate limit active - model selection disabled');
+          }
+          
+          // Mark this message as rate-limited to prevent affecting other messages
+          $messageItem.addClass('rate-limited-message');
+        }
+      }, 100); // Small delay to ensure DOM is ready
+      return;
+    } catch (e) {
+      console.warn('Failed to parse rate limit notification:', e);
+    }
+  }
+
   // Only handle Groq reasoning if there are actual reasoning patterns
   const hasReasoningPatterns = hasGroqReasoningPatterns(text);
   
@@ -935,6 +1074,12 @@ function aiRender(targetId) {
   }
   
   $("#" + targetId).html(renderedText);
+  
+  // Make images and videos responsive using Bootstrap classes
+  $("#" + targetId).find('img:not(.ai-logo):not(.ai-meta-logo):not(.dropdown-logo), video').each(function() {
+    $(this).addClass('img-fluid rounded my-2 d-block')
+           .css('object-fit', 'contain');
+  });
 }
 
 // Function to show file details for a specific message
@@ -1308,7 +1453,7 @@ function handleAgainMessage(modelId, promptId, $originalButton) {
   })
   .catch(err => {
     console.error(err);
-    alert('Connection error. Please try again.');
+    showBootstrapAlert('Connection error. Please try again.', 'danger', 'wifi');
     // Re-enable the original button on error
     if ($originalButton && $originalButton.length) {
       const prevLabel = $originalButton.data('prev-label') || 'Again...';
@@ -1319,9 +1464,11 @@ function handleAgainMessage(modelId, promptId, $originalButton) {
 
 function handleAgainError(errorMessage) {
   if (errorMessage && errorMessage.includes('Model not available')) {
-    alert('Model not available or category mismatch.');
+    showErrorMessage('Model Not Available', 'Model not available or category mismatch.');
+  } else if (errorMessage && (errorMessage.includes('Rate limit exceeded') || errorMessage === 'rate_limit_exceeded')) {
+    showRateLimitNotification({error: 'rate_limit_exceeded', message: errorMessage});
   } else {
-    alert('Error: ' + (errorMessage || 'Unknown error'));
+    showErrorMessage('Error', errorMessage || 'Unknown error');
   }
 }
 
@@ -1507,9 +1654,9 @@ function injectFilePreview(outId, filePath, fileType) {
     let fileHtml = '';
     
     if (['png', 'jpg', 'jpeg', 'gif', 'webp'].includes(fileType.toLowerCase())) {
-        fileHtml = `<div class='generated-file-container'><img src='${fileUrl}' class='generated-image' alt='Generated Image' loading='lazy'></div>`;
+        fileHtml = `<div class='generated-file-container'><img src='${fileUrl}' class='generated-image img-fluid rounded my-2 d-block' alt='Generated Image' loading='lazy' style='object-fit: contain;'></div>`;
     } else if (['mp4', 'webm', 'mov', 'avi'].includes(fileType.toLowerCase())) {
-        fileHtml = `<div class='generated-file-container'><video src='${fileUrl}' class='generated-video' controls preload='metadata'>Your browser does not support the video tag.</video></div>`;
+        fileHtml = `<div class='generated-file-container'><video src='${fileUrl}' class='generated-video img-fluid rounded my-2 d-block' controls preload='metadata' style='object-fit: contain;'>Your browser does not support the video tag.</video></div>`;
     } else {
         // For other file types, show download link
         fileHtml = `<div class='generated-file-container'><a href='${fileUrl}' class='btn btn-outline-primary btn-sm' download><i class='fas fa-download'></i> Download ${fileType.toUpperCase()}</a></div>`;
@@ -1521,4 +1668,5 @@ function injectFilePreview(outId, filePath, fileType) {
     }
 }
 
-// ------------------------------------------------------------
+
+// ========== END - Using system-notifications.js for all notifications ==========

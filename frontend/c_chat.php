@@ -25,6 +25,28 @@ $isAnonymousWidget = isset($_SESSION["is_widget"]) && $_SESSION["is_widget"] ===
 <link rel="stylesheet" href="assets/statics/fa/css/all.min.css">
 <!-- Add highlight.js CSS -->
 <link rel="stylesheet" href="node_modules/@highlightjs/cdn-assets/styles/googlecode.min.css">
+<!-- Responsive media CSS - targeting only content images/videos -->
+<style>
+  /* Only target actual content images/videos, not icons */
+  .message-content img:not(.ai-logo):not(.ai-meta-logo):not(.dropdown-logo),
+  .message-content video,
+  .generated-image,
+  .generated-video,
+  .file-preview-image {
+    max-width: 100% !important;
+    height: auto !important;
+    object-fit: contain !important;
+  }
+  
+  /* Prevent horizontal overflow */
+  .chatbox,
+  .chat-messages,
+  .messages-container {
+    overflow-x: hidden !important;
+    word-wrap: break-word !important;
+    overflow-wrap: break-word !important;
+  }
+</style>
 <script>
 // Initialize widget flags early so downstream scripts (chat.js) can read them
 window.isAnonymousWidget = <?php echo $isAnonymousWidget ? 'true' : 'false'; ?>;
@@ -297,6 +319,16 @@ window.isWidgetMode = <?php echo $isWidgetMode ? 'true' : 'false'; ?>;
       /* Hide AI avatar in widget mode to maximize message width */
       .ai-avatar {
         display: none !important;
+      }
+      
+      /* Responsive images and videos for widget mode - exclude icons */
+      .message-content img:not(.ai-logo):not(.ai-meta-logo):not(.dropdown-logo),
+      .message-content video,
+      .generated-image,
+      .generated-video {
+        max-width: 100% !important;
+        height: auto !important;
+        object-fit: contain !important;
       }
     `;
     document.head.appendChild(style);

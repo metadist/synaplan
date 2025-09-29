@@ -127,6 +127,12 @@ function handleThinkReasoning(text, targetId) {
     console.log('No reasoning pattern found, rendering normally');
     const rendered = window.md ? window.md.render(text) : text.replace(/\n/g, "<br>");
     $("#" + targetId).html(rendered);
+    
+    // Make images and videos responsive using Bootstrap classes
+    $("#" + targetId).find('img:not(.ai-logo):not(.ai-meta-logo):not(.dropdown-logo), video').each(function() {
+      $(this).addClass('img-fluid rounded my-2 d-block')
+             .css('object-fit', 'contain');
+    });
     return;
   }
 
@@ -161,6 +167,12 @@ function handleThinkReasoning(text, targetId) {
   // Render main answer (only the BTEXT part)
   const rendered = window.md ? window.md.render(displayText) : displayText.replace(/\n/g, "<br>");
   $("#" + targetId).html(rendered);
+  
+  // Make images and videos responsive using Bootstrap classes
+  $("#" + targetId).find('img:not(.ai-logo):not(.ai-meta-logo):not(.dropdown-logo), video').each(function() {
+    $(this).addClass('img-fluid rounded my-2 d-block')
+           .css('object-fit', 'contain');
+  });
 
   // Append collapsible reasoning with the ORIGINAL reasoning content
   const reasoningHtml = `
@@ -300,6 +312,12 @@ function loadChatHistory(amount) {
                     </button>
                 </div>
             `;
+            // Use unified error notification for rate limits
+            if (data.error.includes('rate_limit_exceeded') || data.error.includes('Rate limit')) {
+                if (typeof showRateLimitNotification !== 'undefined') {
+                    showRateLimitNotification({error: 'rate_limit_exceeded', message: data.error});
+                }
+            }
         } else if (data.success && data.messages) {
             // Remove the buttons container
             buttonsContainer.remove();
@@ -326,6 +344,10 @@ function loadChatHistory(amount) {
                 </button>
             </div>
         `;
+        // Use unified error notification
+        if (typeof showErrorMessage !== 'undefined') {
+            showErrorMessage('Network Error', 'Failed to load chat history');
+        }
     });
 }
 
@@ -361,6 +383,108 @@ function renderChatHistory(messages) {
             const displayText = chat.displayText || chat.BTEXT;
             const hasFile = chat.hasFile || false;
             
+            // Check for rate limit notification FIRST (before any other processing)
+            if (displayText && displayText.startsWith('RATE_LIMIT_NOTIFICATION: ')) {
+                try {
+                    const jsonStr = displayText.substring('RATE_LIMIT_NOTIFICATION: '.length);
+                    const rateLimitData = JSON.parse(jsonStr);
+                    
+                    // Generate intelligent action message based on subscription status (same as chat.js)
+                    let actionMessage = '';
+                    if (rateLimitData.action_type && rateLimitData.action_message && rateLimitData.action_url) {
+                        let buttonClass = 'btn-outline-primary';
+                        let buttonIcon = '🚀';
+                        
+                        if (rateLimitData.action_type === 'reactivate') {
+                            buttonClass = 'btn-outline-warning';
+                            buttonIcon = '🔄';
+                        } else if (rateLimitData.action_type === 'renew') {
+                            buttonClass = 'btn-outline-success';
+                            buttonIcon = '🆕';
+                        }
+                        
+                        actionMessage = `<div class="border-top pt-3 mt-3">
+                            <div class="d-flex align-items-center gap-2">
+                                <a href="${rateLimitData.action_url}" target="_blank" class="btn ${buttonClass} btn-sm text-decoration-none">
+                                    ${buttonIcon} ${rateLimitData.action_message.replace(/🚀|🔄|🆕/g, '').trim()}
+                                </a>
+                            </div>
+                        </div>`;
+                    } else {
+                        // Fallback to default upgrade message
+                        actionMessage = (typeof getUpgradeMessage !== 'undefined') ? getUpgradeMessage() : 
+                            `<div class="border-top pt-2 mt-2"><small class="text-muted">Rate limit exceeded. Please contact support.</small></div>`;
+                    }
+                    
+                    const resetTime = rateLimitData.reset_time !== undefined ? rateLimitData.reset_time : (Math.floor(Date.now() / 1000) + 300);
+                    const currentTime = Math.floor(Date.now() / 1000);
+                    const timeRemaining = Math.max(0, resetTime - currentTime);
+                    
+                    // Format the time remaining
+                    let timeDisplay = "expired";
+                    if (resetTime === 0) {
+                        timeDisplay = "never";
+                    } else if (timeRemaining > 0) {
+                        const days = Math.floor(timeRemaining / 86400);
+                        const hours = Math.floor((timeRemaining % 86400) / 3600);
+                        const minutes = Math.floor((timeRemaining % 3600) / 60);
+                        
+                        if (days > 0) {
+                            timeDisplay = `${days}d ${hours}h`;
+                        } else if (hours > 0) {
+                            timeDisplay = `${hours}h ${minutes}m`;
+                        } else {
+                            timeDisplay = `${minutes}m`;
+                        }
+                    }
+                    
+                    messageHtml = `
+                        <li class="message-item ai-message" data-in-id="${chat.inId || chat.BID}">
+                            <div class="ai-avatar">
+                                <i class="fas fa-robot text-white ai-robot"></i>
+                            </div>
+                            <div class="message-content">
+                                <div class="message-bubble ai-bubble">
+                                    <div style="padding: 4px 0;">
+                                        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px;">
+                                            <span style="font-size: 20px; opacity: 0.7;">⏳</span>
+                                            <div>
+                                                <strong style="color: #495057;">Usage Limit Reached</strong>
+                                                <div style="color: #6c757d; font-size: 0.9em; margin-top: 2px;">
+                                                    ${rateLimitData.message}
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div style="color: #495057; font-size: 0.9em; margin-bottom: 12px;">
+                                            Next available in: <span style="
+                                                font-family: 'SFMono-Regular', Consolas, monospace;
+                                                font-weight: 600; color: #212529; padding: 2px 6px;
+                                                background: rgba(0,0,0,0.05); border-radius: 4px;
+                                            ">${timeDisplay}</span>
+                                        </div>
+                                        ${actionMessage}
+                                    </div>
+                                    <span class="message-time ai-time">${formatDateTime(chat.BDATETIME)}</span>
+                                    
+                                    <!-- Bootstrap responsive footer -->
+                                    <div class="mt-2 pt-2 border-top d-flex flex-column flex-sm-row justify-content-between align-items-stretch align-items-sm-end gap-2 message-footer">
+                                        <!-- Left: meta -->
+                                        <div class="text-muted small d-flex align-items-center flex-wrap gap-2 js-ai-meta">
+                                            <span class="js-ai-meta-text">${chat.BVENDOR || 'AI Provider'} Generated by ${chat.BMODEL || 'system'} · ${chat.BTOPIC || 'notification'}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </li>
+                    `;
+                    chatHistory.insertAdjacentHTML('beforeend', messageHtml);
+                    return; // Skip normal processing
+                } catch (e) {
+                    console.error('Error parsing rate limit data:', e);
+                    // Fall through to normal processing
+                }
+            }
+            
             // Check if text contains <think> block
             let mdText = '';
             if (displayText.includes('<think>')) {
@@ -376,9 +500,9 @@ function renderChatHistory(messages) {
                 const fileUrl = "up/" + chat.BFILEPATH;
                 
                 if (['png', 'jpg', 'jpeg'].includes(chat.BFILETYPE)) {
-                    fileHtml = `<div class='generated-file-container'><img src='${fileUrl}' class='generated-image' alt='Generated Image' loading='lazy'></div>`;
+                    fileHtml = `<div class='generated-file-container'><img src='${fileUrl}' class='generated-image img-fluid rounded my-2 d-block' alt='Generated Image' loading='lazy' style='object-fit: contain;'></div>`;
                 } else if (['mp4', 'webm'].includes(chat.BFILETYPE)) {
-                    fileHtml = `<div class='generated-file-container'><video src='${fileUrl}' class='generated-video' controls preload='metadata'>Your browser does not support the video tag.</video></div>`;
+                    fileHtml = `<div class='generated-file-container'><video src='${fileUrl}' class='generated-video img-fluid rounded my-2 d-block' controls preload='metadata' style='object-fit: contain;'>Your browser does not support the video tag.</video></div>`;
                 }
             }
             

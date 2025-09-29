@@ -52,5 +52,8 @@
     <BR>
     <p><?php _s("Forgot your password?", __FILE__, $_SESSION["LANG"]); ?> <B><a href="index.php/lostpw"><?php _s("Reset password", __FILE__, $_SESSION["LANG"]); ?></a></B></p>
     <BR>
-    <p><?php _s("Go to our homepage for more information: <a href=\"https://www.synaplan.com/\">https://synaplan.com/</a>", __FILE__, $_SESSION["LANG"]); ?></p>
+    <p><?php 
+    $homeUrl = ApiKeys::getBaseUrl();
+    _s("Go to our homepage for more information: <a href=\"$homeUrl\">$homeUrl</a>", __FILE__, $_SESSION["LANG"]); 
+    ?></p>
 </main>

@@ -71,7 +71,10 @@ if(isset($_GET['PIN']) && isset($_GET['UID'])) {
                     <a href="mailto:info@metadist.de"><?php _s("Contact Support", __FILE__, $_SESSION["LANG"]); ?></a>
                 </p>
                 <p class="text-muted">
-                    <?php _s("Go to our homepage: <a href=\"https://www.synaplan.com/\">https://synaplan.com/</a>", __FILE__, $_SESSION["LANG"]); ?>
+                    <?php 
+                    $homeUrl = ApiKeys::getBaseUrl();
+                    _s("Go to our homepage: <a href=\"$homeUrl\">$homeUrl</a>", __FILE__, $_SESSION["LANG"]); 
+                    ?>
                 </p>
             </div>
         </div>
