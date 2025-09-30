@@ -6,21 +6,21 @@ $errorMessage = '';
 $successMessage = '';
 
 if(isset($_GET['PIN']) && isset($_GET['UID'])) {
-    $pin = DB::EscString($_GET['PIN']);
+    $pin = db::EscString($_GET['PIN']);
     $userId = intval($_GET['UID']);
     
     if(strlen($pin) == 6 && $userId > 0) {
         // Check if user exists and PIN matches
         $checkSQL = "SELECT * FROM BUSER WHERE BID = ".$userId." AND BUSERLEVEL = 'PIN:".$pin."'";
-        $checkRes = DB::Query($checkSQL);
-        $userArr = DB::FetchArr($checkRes);
+        $checkRes = db::Query($checkSQL);
+        $userArr = db::FetchArr($checkRes);
         
         if($userArr) {
             // Update user status to NEW and clear PIN
             $updateSQL = "UPDATE BUSER SET BUSERLEVEL = 'NEW' WHERE BID = ".$userId;
-            DB::Query($updateSQL);
+            db::Query($updateSQL);
             
-            if(DB::AffectedRows() > 0) {
+            if(db::AffectedRows() > 0) {
                 $confirmed = true;
                 $successMessage = "Your email has been successfully confirmed! You can now log in to your account.";
             } else {

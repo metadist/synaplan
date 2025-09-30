@@ -23,7 +23,7 @@ Class Frontend {
         $success = false;
         
         // Get email and password from request
-        $email = isset($_REQUEST['email']) ? DB::EscString($_REQUEST['email']) : '';
+        $email = isset($_REQUEST['email']) ? db::EscString($_REQUEST['email']) : '';
         $password = isset($_REQUEST['password']) ? $_REQUEST['password'] : '';
         
         // Validate input
@@ -33,8 +33,8 @@ Class Frontend {
             
             // Query the database for matching user
             $uSQL = "SELECT * FROM BUSER WHERE BMAIL = '".$email."' AND BPW = '".$passwordMd5."'";
-            $uRes = DB::Query($uSQL);
-            $uArr = DB::FetchArr($uRes);
+            $uRes = db::Query($uSQL);
+            $uArr = db::FetchArr($uRes);
             
             if($uArr) {
                 // Only allow login for specific user levels
@@ -77,11 +77,11 @@ Class Frontend {
     public static function setUserFromTicket() {
         //print_r($_REQUEST);
         $userId = intval($_REQUEST['id']);
-        $ticketVal = DB::EscString($_REQUEST['lid']);
+        $ticketVal = db::EscString($_REQUEST['lid']);
         if(strlen($ticketVal) > 3) {
             $uSQL = "SELECT * FROM BUSER WHERE BID = ".$userId." AND BUSERDETAILS like '%:\"".$ticketVal."\"%'";
-            $uRes = DB::Query($uSQL);
-            $uArr = DB::FetchArr($uRes);
+            $uRes = db::Query($uSQL);
+            $uArr = db::FetchArr($uRes);
             if($uArr) {
                 $_SESSION["USERPROFILE"] = $uArr;
                 return true;
@@ -125,9 +125,9 @@ Class Frontend {
             // Get messages with a larger limit to account for potential grouping
             $cSQL = "SELECT * FROM BMESSAGES WHERE BUSERID = ".$userId." ORDER BY BID DESC LIMIT ".($myLimit);
         }
-        $cRes = DB::Query($cSQL);
+        $cRes = db::Query($cSQL);
         $allMessages = [];
-        while($cArr = DB::FetchArr($cRes)) {
+        while($cArr = db::FetchArr($cRes)) {
             if (!$cArr || !is_array($cArr)) {
                 continue;
             }
@@ -139,8 +139,8 @@ Class Frontend {
             // Get file metadata for this message
             if (isset($cArr['BID'])) {
                 $metaSQL = "SELECT * FROM BMESSAGEMETA WHERE BMESSID = ".$cArr['BID']." AND BTOKEN = 'FILECOUNT' ORDER BY BID DESC LIMIT 1";
-                $metaRes = DB::Query($metaSQL);
-                $metaArr = DB::FetchArr($metaRes);
+                $metaRes = db::Query($metaSQL);
+                $metaArr = db::FetchArr($metaRes);
                 if($metaArr && is_array($metaArr)) {
                     $cArr['FILECOUNT'] = intval($metaArr['BVALUE']);
                 } else {
@@ -309,7 +309,7 @@ Class Frontend {
         $inMessageArr['BUSERID'] = $userId;
        
         $cleanPost = Tools::turnURLencodedIntoUTF8($_REQUEST['message']);
-        $inMessageArr['BTEXT'] = DB::EscString(trim(strip_tags($cleanPost)));
+        $inMessageArr['BTEXT'] = db::EscString(trim(strip_tags($cleanPost)));
         // ------------------------------------------------
         $convArr = Central::searchConversation($inMessageArr);
         // ------------------------------------------------
@@ -376,7 +376,7 @@ Class Frontend {
                         // Rate limit exceeded - clean up and return error
                         // Remove the message we just inserted since it exceeds limits
                         $deleteSQL = "DELETE FROM BMESSAGES WHERE BID = " . intval($resArr['lastId']);
-                        DB::Query($deleteSQL);
+                        db::Query($deleteSQL);
                         
                         // Set rate limit error in return array
                         $retArr['success'] = false;
@@ -400,7 +400,7 @@ Class Frontend {
             // new inserts for the meta data
             if($filesAttached > 0) {
                 $metaSQL = "insert into BMESSAGEMETA (BID, BMESSID, BTOKEN, BVALUE) values (DEFAULT, ".(0 + $resArr['lastId']).", 'FILECOUNT', '".($filesAttached)."');";
-                $metaRes = DB::Query($metaSQL);
+                $metaRes = db::Query($metaSQL);
             }
             // count bytes
             $inMessageArr['BID'] = $resArr['lastId'];
@@ -962,8 +962,8 @@ Class Frontend {
                     ORDER BY BID DESC LIMIT 1";
         }
         
-        $res = DB::Query($sql);
-        $row = DB::FetchArr($res);
+        $res = db::Query($sql);
+        $row = db::FetchArr($res);
         return $row ? intval($row['BID']) : 0;
     }
     
@@ -990,8 +990,8 @@ Class Frontend {
                     ORDER BY BID DESC LIMIT 1";
         }
         
-        $res = DB::Query($sql);
-        $row = DB::FetchArr($res);
+        $res = db::Query($sql);
+        $row = db::FetchArr($res);
         return $row ? intval($row['BID']) : 0;
     }
 
@@ -1086,11 +1086,11 @@ Class Frontend {
                 // Try user-specific scope first
                 $userConfigSQL = "SELECT BVALUE FROM BCONFIG 
                                   WHERE BGROUP = 'DEFAULTMODEL' 
-                                  AND BSETTING = '" . DB::EscString($bsetting) . "' 
+                                  AND BSETTING = '" . db::EscString($bsetting) . "' 
                                   AND BOWNERID = " . $userId . " 
                                   LIMIT 1";
-                $userConfigRes = DB::Query($userConfigSQL);
-                $userConfigRow = DB::FetchArr($userConfigRes);
+                $userConfigRes = db::Query($userConfigSQL);
+                $userConfigRow = db::FetchArr($userConfigRes);
                 
                 if ($userConfigRow && is_array($userConfigRow) && !empty($userConfigRow['BVALUE'])) {
                     $defaultModelId = intval($userConfigRow['BVALUE']);
@@ -1101,11 +1101,11 @@ Class Frontend {
             if (!$defaultModelId) {
                 $globalConfigSQL = "SELECT BVALUE FROM BCONFIG 
                                    WHERE BGROUP = 'DEFAULTMODEL' 
-                                   AND BSETTING = '" . DB::EscString($bsetting) . "' 
+                                   AND BSETTING = '" . db::EscString($bsetting) . "' 
                                    AND BOWNERID = 0 
                                    LIMIT 1";
-                $globalConfigRes = DB::Query($globalConfigSQL);
-                $globalConfigRow = DB::FetchArr($globalConfigRes);
+                $globalConfigRes = db::Query($globalConfigSQL);
+                $globalConfigRow = db::FetchArr($globalConfigRes);
                 
                 if ($globalConfigRow && is_array($globalConfigRow) && !empty($globalConfigRow['BVALUE'])) {
                     $defaultModelId = intval($globalConfigRow['BVALUE']);
@@ -1119,8 +1119,8 @@ Class Frontend {
             
             // Get the default model from BMODELS
             $modelSQL = "SELECT * FROM BMODELS WHERE BID = " . $defaultModelId . " LIMIT 1";
-            $modelRes = DB::Query($modelSQL);
-            $modelRow = DB::FetchArr($modelRes);
+            $modelRes = db::Query($modelSQL);
+            $modelRow = db::FetchArr($modelRes);
             
             if (!$modelRow || !is_array($modelRow)) {
                 error_log("Default model ID $defaultModelId not found in BMODELS");
@@ -1305,8 +1305,8 @@ Class Frontend {
         
         // Query user data from database
         $sql = "SELECT BID, BMAIL, BUSERDETAILS FROM BUSER WHERE BID = " . $userId;
-        $res = DB::Query($sql);
-        $userArr = DB::FetchArr($res);
+        $res = db::Query($sql);
+        $userArr = db::FetchArr($res);
         
         if ($userArr) {
             $retArr = $userArr;
@@ -1353,8 +1353,8 @@ Class Frontend {
                 FROM BMESSAGES 
                 WHERE BUSERID = ".$userId;
         
-        $res = DB::Query($sql);
-        $row = DB::FetchArr($res);
+        $res = db::Query($sql);
+        $row = db::FetchArr($res);
         
         if($row) {
             $stats['total_messages'] = intval($row['total_messages']);
@@ -1474,15 +1474,15 @@ Class Frontend {
                 
                 if($chat['BDIRECT'] == 'OUT') {
                     $serviceSQL = "SELECT BVALUE FROM BMESSAGEMETA WHERE BMESSID = ".intval($chat['BID'])." AND BTOKEN = 'AISERVICE' ORDER BY BID DESC LIMIT 1";
-                    $serviceRes = DB::Query($serviceSQL);
-                    $serviceArr = DB::FetchArr($serviceRes);
+                    $serviceRes = db::Query($serviceSQL);
+                    $serviceArr = db::FetchArr($serviceRes);
                     if($serviceArr && is_array($serviceArr)) {
                         $aiService = $serviceArr['BVALUE'];
                     }
                     
                     $modelSQL = "SELECT BVALUE FROM BMESSAGEMETA WHERE BMESSID = ".intval($chat['BID'])." AND BTOKEN = 'AIMODEL' ORDER BY BID DESC LIMIT 1";
-                    $modelRes = DB::Query($modelSQL);
-                    $modelArr = DB::FetchArr($modelRes);
+                    $modelRes = db::Query($modelSQL);
+                    $modelArr = db::FetchArr($modelRes);
                     if($modelArr && is_array($modelArr)) {
                         $aiModel = $modelArr['BVALUE'];
                     }
@@ -1490,8 +1490,8 @@ Class Frontend {
                 
                 // Fetch SYSTEMTEXT for all messages (both IN and OUT)
                 $systemSQL = "SELECT BVALUE FROM BMESSAGEMETA WHERE BMESSID = ".intval($chat['BID'])." AND BTOKEN = 'SYSTEMTEXT' ORDER BY BID DESC LIMIT 1";
-                $systemRes = DB::Query($systemSQL);
-                $systemArr = DB::FetchArr($systemRes);
+                $systemRes = db::Query($systemSQL);
+                $systemArr = db::FetchArr($systemRes);
                 if($systemArr && is_array($systemArr)) {
                     $systemText = $systemArr['BVALUE'];
                 }
@@ -1582,10 +1582,10 @@ Class Frontend {
         
         // Get all widget configurations for this user
         $sql = "SELECT BGROUP, BSETTING, BVALUE FROM BCONFIG WHERE BOWNERID = " . $userId . " AND BGROUP LIKE 'widget_%' ORDER BY BGROUP, BSETTING";
-        $res = DB::Query($sql);
+        $res = db::Query($sql);
         
         $widgets = [];
-        while($row = DB::FetchArr($res)) {
+        while($row = db::FetchArr($res)) {
             if (!$row || !is_array($row) || !isset($row['BGROUP']) || !isset($row['BSETTING']) || !isset($row['BVALUE'])) {
                 continue;
             }
@@ -1754,16 +1754,16 @@ Class Frontend {
         foreach ($settings as $setting => $value) {
             // Check if setting already exists
             $checkSQL = "SELECT BID FROM BCONFIG WHERE BOWNERID = " . $userId . " AND BGROUP = '" . db::EscString($group) . "' AND BSETTING = '" . db::EscString($setting) . "'";
-            $checkRes = DB::Query($checkSQL);
+            $checkRes = db::Query($checkSQL);
             
-            if (DB::CountRows($checkRes) > 0) {
+            if (db::CountRows($checkRes) > 0) {
                 // Update existing setting
                 $updateSQL = "UPDATE BCONFIG SET BVALUE = '" . $value . "' WHERE BOWNERID = " . $userId . " AND BGROUP = '" . db::EscString($group) . "' AND BSETTING = '" . db::EscString($setting) . "'";
-                DB::Query($updateSQL);
+                db::Query($updateSQL);
             } else {
                 // Insert new setting
                 $insertSQL = "INSERT INTO BCONFIG (BOWNERID, BGROUP, BSETTING, BVALUE) VALUES (" . $userId . ", '" . db::EscString($group) . "', '" . db::EscString($setting) . "', '" . $value . "')";
-                DB::Query($insertSQL);
+                db::Query($insertSQL);
             }
         }
         
@@ -1797,7 +1797,7 @@ Class Frontend {
         
         // Delete all settings for this widget
         $deleteSQL = "DELETE FROM BCONFIG WHERE BOWNERID = " . $userId . " AND BGROUP = '" . db::EscString($group) . "'";
-        DB::Query($deleteSQL);
+        db::Query($deleteSQL);
         
         $retArr["success"] = true;
         $retArr["message"] = "Widget deleted successfully";
@@ -1836,8 +1836,8 @@ Class Frontend {
         
         // Load saved config
         $cfgSQL = "SELECT BSETTING, BVALUE FROM BCONFIG WHERE BOWNERID = " . $userId . " AND BGROUP = 'mailhandler'";
-        $cfgRes = DB::Query($cfgSQL);
-        while($row = DB::FetchArr($cfgRes)) {
+        $cfgRes = db::Query($cfgSQL);
+        while($row = db::FetchArr($cfgRes)) {
             if (!$row || !is_array($row) || !isset($row['BSETTING']) || !isset($row['BVALUE'])) {
                 continue;
             }
@@ -1860,9 +1860,9 @@ Class Frontend {
         
         // Load departments
         $deptSQL = "SELECT BSETTING, BVALUE FROM BCONFIG WHERE BOWNERID = " . $userId . " AND BGROUP = 'mailhandler_dept' ORDER BY CAST(BSETTING AS UNSIGNED) ASC";
-        $deptRes = DB::Query($deptSQL);
+        $deptRes = db::Query($deptSQL);
         $departments = [];
-        while($row = DB::FetchArr($deptRes)) {
+        while($row = db::FetchArr($deptRes)) {
             if (!$row || !is_array($row) || !isset($row['BVALUE'])) {
                 continue;
             }
@@ -1935,13 +1935,13 @@ Class Frontend {
         
         foreach ($settings as $setting => $value) {
             $checkSQL = "SELECT BID FROM BCONFIG WHERE BOWNERID = " . $userId . " AND BGROUP = '" . db::EscString($group) . "' AND BSETTING = '" . db::EscString($setting) . "'";
-            $checkRes = DB::Query($checkSQL);
-            if (DB::CountRows($checkRes) > 0) {
+            $checkRes = db::Query($checkSQL);
+            if (db::CountRows($checkRes) > 0) {
                 $updateSQL = "UPDATE BCONFIG SET BVALUE = '" . $value . "' WHERE BOWNERID = " . $userId . " AND BGROUP = '" . db::EscString($group) . "' AND BSETTING = '" . db::EscString($setting) . "'";
-                DB::Query($updateSQL);
+                db::Query($updateSQL);
             } else {
                 $insertSQL = "INSERT INTO BCONFIG (BOWNERID, BGROUP, BSETTING, BVALUE) VALUES (" . $userId . ", '" . db::EscString($group) . "', '" . db::EscString($setting) . "', '" . $value . "')";
-                DB::Query($insertSQL);
+                db::Query($insertSQL);
             }
         }
 
@@ -1957,7 +1957,7 @@ Class Frontend {
         if (!is_array($descs)) $descs = [];
         
         // Clear previous departments
-        DB::Query("DELETE FROM BCONFIG WHERE BOWNERID = " . $userId . " AND BGROUP = 'mailhandler_dept'");
+        db::Query("DELETE FROM BCONFIG WHERE BOWNERID = " . $userId . " AND BGROUP = 'mailhandler_dept'");
         
         // Insert new departments
         $count = 0;
@@ -1968,7 +1968,7 @@ Class Frontend {
             $isDefault = ($i === $defaultIdx) ? '1' : '0';
             $val = db::EscString($email . '|' . $desc . '|' . $isDefault);
             $ins = "INSERT INTO BCONFIG (BOWNERID, BGROUP, BSETTING, BVALUE) VALUES (" . $userId . ", 'mailhandler_dept', '" . $count . "', '" . $val . "')";
-            DB::Query($ins);
+            db::Query($ins);
             $count++;
         }
         

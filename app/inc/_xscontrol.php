@@ -14,7 +14,7 @@ class XSControl {
     // count specific operation types the user sent in the last x seconds
     public static function countInByType($userId, $secondsCount, $operationType):int {
         $timeFrame = time() - $secondsCount;
-        $countSQL = "SELECT COUNT(*) XSCOUNT FROM BUSELOG WHERE BUSERID = ".($userId)." AND BTIMESTAMP > ".($timeFrame)." AND BOPERATIONTYPE = '".DB::EscString($operationType)."'";
+        $countSQL = "SELECT COUNT(*) XSCOUNT FROM BUSELOG WHERE BUSERID = ".($userId)." AND BTIMESTAMP > ".($timeFrame)." AND BOPERATIONTYPE = '".db::EscString($operationType)."'";
         $countRes = db::Query($countSQL);
         $countArr = db::FetchArr($countRes);
         return $countArr["XSCOUNT"];
@@ -64,7 +64,7 @@ class XSControl {
             
             // Always filter by operation type (including 'general' for MESSAGES)
             if ($operationType) {
-                $countSQL .= " AND BOPERATIONTYPE = '" . DB::EscString($operationType) . "'";
+                $countSQL .= " AND BOPERATIONTYPE = '" . db::EscString($operationType) . "'";
             }
             
             if ($isActiveSubscription && $currentSubscriptionId) {
@@ -77,7 +77,7 @@ class XSControl {
                     $timeStart = time() - $timeframe;
                     $countSQL .= " AND BTIMESTAMP >= " . intval($timeStart);
                 }
-                $countSQL .= " AND BSUBSCRIPTION_ID = '" . DB::EscString($currentSubscriptionId) . "'";
+                $countSQL .= " AND BSUBSCRIPTION_ID = '" . db::EscString($currentSubscriptionId) . "'";
             } else {
                 // NEW/INACTIVE: Use only BSUBSCRIPTION_ID IS NULL (lifetime, no time window)
                 $countSQL .= " AND BSUBSCRIPTION_ID IS NULL";
@@ -100,8 +100,8 @@ class XSControl {
     private static function getIntelligentMessageForNewUser($userId, $limitType, $currentCount, $maxCount): array {
         try {
             $userSQL = "SELECT BPAYMENTDETAILS FROM BUSER WHERE BID = " . intval($userId);
-            $userResult = DB::Query($userSQL);
-            $userRow = DB::FetchArr($userResult);
+            $userResult = db::Query($userSQL);
+            $userRow = db::FetchArr($userResult);
             
             $result = [
                 'reset_time' => 0,
@@ -167,9 +167,9 @@ class XSControl {
     private static function isActiveSubscription($userId): bool {
         try {
             $userSQL = "SELECT BUSERLEVEL, BPAYMENTDETAILS FROM BUSER WHERE BID = " . intval($userId);
-            $userResult = DB::Query($userSQL);
+            $userResult = db::Query($userSQL);
             
-            if (!$userRow = DB::FetchArr($userResult)) {
+            if (!$userRow = db::FetchArr($userResult)) {
                 return false;
             }
             
@@ -240,7 +240,7 @@ class XSControl {
     public static function updateOperationType($userId, $msgId, $operationType):bool {
         $subscriptionId = self::getCurrentSubscriptionId($userId);
         
-        $updateSQL = "UPDATE BUSELOG SET BOPERATIONTYPE = '".DB::EscString($operationType)."', BSUBSCRIPTION_ID = " . ($subscriptionId ? "'".DB::EscString($subscriptionId)."'" : "NULL") . " WHERE BUSERID = ".intval($userId)." AND BMSGID = ".intval($msgId);
+        $updateSQL = "UPDATE BUSELOG SET BOPERATIONTYPE = '".db::EscString($operationType)."', BSUBSCRIPTION_ID = " . ($subscriptionId ? "'".db::EscString($subscriptionId)."'" : "NULL") . " WHERE BUSERID = ".intval($userId)." AND BMSGID = ".intval($msgId);
         $updateRes = db::Query($updateSQL);
         return $updateRes !== false;
     }
@@ -379,7 +379,7 @@ class XSControl {
                 // Active subscription: filter by subscription_id and time window
                 $timeStart = time() - $timeframe;
                 $oldestSQL .= " AND BTIMESTAMP >= " . intval($timeStart);
-                $oldestSQL .= " AND BSUBSCRIPTION_ID = '" . DB::EscString($currentSubscriptionId) . "'";
+                $oldestSQL .= " AND BSUBSCRIPTION_ID = '" . db::EscString($currentSubscriptionId) . "'";
             } else {
                 // NEW/inactive: filter by NULL subscription and time window
                 $timeStart = time() - $timeframe;
@@ -651,7 +651,7 @@ class XSControl {
     public static function countThis($userId, $msgId, $operationType = 'general'):int {
         $subscriptionId = self::getCurrentSubscriptionId($userId);
         
-        $newSQL = "INSERT INTO BUSELOG (BID, BTIMESTAMP, BUSERID, BMSGID, BOPERATIONTYPE, BSUBSCRIPTION_ID) VALUES (DEFAULT, ".time().", ".($userId).", ".($msgId).", '".DB::EscString($operationType)."', " . ($subscriptionId ? "'".DB::EscString($subscriptionId)."'" : "NULL") . ")";
+        $newSQL = "INSERT INTO BUSELOG (BID, BTIMESTAMP, BUSERID, BMSGID, BOPERATIONTYPE, BSUBSCRIPTION_ID) VALUES (DEFAULT, ".time().", ".($userId).", ".($msgId).", '".db::EscString($operationType)."', " . ($subscriptionId ? "'".db::EscString($subscriptionId)."'" : "NULL") . ")";
         $newRes = db::Query($newSQL);
         return db::LastId();
     }
@@ -808,8 +808,8 @@ class XSControl {
                 } else {
                     // Fallback to widget-specific limits if no owner ID
                     $configSQL = "SELECT BSETTING, BVALUE FROM BCONFIG WHERE BGROUP = 'RATELIMITS_WIDGET' AND BOWNERID = 0";
-                    $configRes = DB::Query($configSQL);
-                    while ($row = DB::FetchArr($configRes)) {
+                    $configRes = db::Query($configSQL);
+                    while ($row = db::FetchArr($configRes)) {
                         $limits[$row['BSETTING']] = intval($row['BVALUE']);
                     }
                     return $limits;
@@ -829,10 +829,10 @@ class XSControl {
             }
             
             // Load limits from BCONFIG
-            $configSQL = "SELECT BSETTING, BVALUE FROM BCONFIG WHERE BGROUP = '" . DB::EscString($limitGroup) . "' AND BOWNERID = 0";
-            $configRes = DB::Query($configSQL);
+            $configSQL = "SELECT BSETTING, BVALUE FROM BCONFIG WHERE BGROUP = '" . db::EscString($limitGroup) . "' AND BOWNERID = 0";
+            $configRes = db::Query($configSQL);
             
-            while ($row = DB::FetchArr($configRes)) {
+            while ($row = db::FetchArr($configRes)) {
                 $limits[$row['BSETTING']] = intval($row['BVALUE']);
             }
             
@@ -946,8 +946,8 @@ class XSControl {
             $bytesSQL .= " AND b.BUNIXTIMES > " . intval($timeFrame);
         }
         
-        $bytesRes = DB::Query($bytesSQL);
-        $bytesArr = DB::FetchArr($bytesRes);
+        $bytesRes = db::Query($bytesSQL);
+        $bytesArr = db::FetchArr($bytesRes);
         
         return intval($bytesArr['TOTAL_BYTES'] ?? 0);
     }
@@ -970,8 +970,8 @@ class XSControl {
             $apiSQL .= " AND l.BTIMESTAMP > " . intval($timeFrame);
         }
         
-        $apiRes = DB::Query($apiSQL);
-        $apiArr = DB::FetchArr($apiRes);
+        $apiRes = db::Query($apiSQL);
+        $apiArr = db::FetchArr($apiRes);
         
         return intval($apiArr['API_COUNT'] ?? 0);
     }

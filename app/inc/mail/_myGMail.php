@@ -157,8 +157,8 @@ class myGMail {
                     if(!isset($usrArr["DETAILS"]["MAILCHECKED"])) {
                         $usrArr["DETAILS"]["MAILCHECKED"] = dechex(rand(100000, 999999));
                         $userDetailsJson = json_encode($usrArr["DETAILS"],JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-                        $updateSQL = "UPDATE BUSER SET BUSERDETAILS = '".DB::EscString($userDetailsJson)."' WHERE BID = ".$usrArr["BID"];
-                        DB::Query($updateSQL);
+                        $updateSQL = "UPDATE BUSER SET BUSERDETAILS = '".db::EscString($userDetailsJson)."' WHERE BID = ".$usrArr["BID"];
+                        db::Query($updateSQL);
                     }
                     // create the confirmation link
                     XSControl::createConfirmationLink($usrArr);
@@ -371,7 +371,7 @@ class myGMail {
                         // Send auto-reply email
                         $replySubject = "Re: " . $mail['subject'];
                         $replyBody = $limitMessage;
-                        $this->sendEmail($mail['from'], $replySubject, $replyBody);
+                        _mymail('info@metadist.de', $mail['plainmail'], $replySubject, $replyBody, $replyBody);
                         
                         $mail['attachments'] = [];
                         $saveToDB = 1;
@@ -428,7 +428,7 @@ class myGMail {
                             XSControl::countThis($inMessageArr['BUSERID'], $lastInsertId);
 
                             $metaSQL = "insert into BMESSAGEMETA (BID, BMESSID, BTOKEN, BVALUE) values (DEFAULT, ".(0 + $lastInsertId).", 'FILECOUNT', '".($fileCount)."');";
-                            $metaRes = DB::Query($metaSQL);
+                            $metaRes = db::Query($metaSQL);
                             // count bytes
                             XSControl::countBytes($inMessageArr, 'BOTH', false);
                                 

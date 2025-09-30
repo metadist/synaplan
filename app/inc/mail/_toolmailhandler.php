@@ -14,8 +14,8 @@ class mailHandler {
 		$userId = max(0, (int)$userId);
 		if ($userId <= 0) { return $method; }
 		$sql = "SELECT BVALUE FROM BCONFIG WHERE BOWNERID = ".$userId." AND BGROUP='mailhandler' AND BSETTING='authMethod' LIMIT 1";
-		$res = DB::Query($sql);
-		$row = DB::FetchArr($res);
+		$res = db::Query($sql);
+		$row = db::FetchArr($res);
 		if ($row && strlen($row['BVALUE']) > 0) { $method = $row['BVALUE']; }
 		return $method;
 	}
@@ -23,13 +23,13 @@ class mailHandler {
 	public static function setAuthMethodForUser(int $userId, string $authMethod): void {
 		$userId = max(0, (int)$userId);
 		if ($userId <= 0) { return; }
-		$authMethod = DB::EscString($authMethod);
+		$authMethod = db::EscString($authMethod);
 		$check = "SELECT BID FROM BCONFIG WHERE BOWNERID = ".$userId." AND BGROUP='mailhandler' AND BSETTING='authMethod' LIMIT 1";
-		$res = DB::Query($check);
-		if (DB::CountRows($res) > 0) {
-			DB::Query("UPDATE BCONFIG SET BVALUE='".$authMethod."' WHERE BOWNERID=".$userId." AND BGROUP='mailhandler' AND BSETTING='authMethod'");
+		$res = db::Query($check);
+		if (db::CountRows($res) > 0) {
+			db::Query("UPDATE BCONFIG SET BVALUE='".$authMethod."' WHERE BOWNERID=".$userId." AND BGROUP='mailhandler' AND BSETTING='authMethod'");
 		} else {
-			DB::Query("INSERT INTO BCONFIG (BOWNERID, BGROUP, BSETTING, BVALUE) VALUES (".$userId.", 'mailhandler', 'authMethod', '".$authMethod."')");
+			db::Query("INSERT INTO BCONFIG (BOWNERID, BGROUP, BSETTING, BVALUE) VALUES (".$userId.", 'mailhandler', 'authMethod', '".$authMethod."')");
 		}
 	}
 
@@ -38,29 +38,29 @@ class mailHandler {
 		$rows = [];
 		if ($userId <= 0) { return $rows; }
 		$sql = "SELECT BSETTING, BVALUE FROM BCONFIG WHERE BOWNERID = ".$userId." AND BGROUP='mailhandler_oauth'";
-		$res = DB::Query($sql);
-		while ($row = DB::FetchArr($res)) { $rows[$row['BSETTING']] = $row['BVALUE']; }
+		$res = db::Query($sql);
+		while ($row = db::FetchArr($res)) { $rows[$row['BSETTING']] = $row['BVALUE']; }
 		return $rows;
 	}
 
 	private static function saveOAuthRow(int $userId, string $setting, string $value): void {
 		$userId = max(0, (int)$userId);
 		if ($userId <= 0) { return; }
-		$setting = DB::EscString($setting);
-		$value = DB::EscString($value);
+		$setting = db::EscString($setting);
+		$value = db::EscString($value);
 		$check = "SELECT BID FROM BCONFIG WHERE BOWNERID = ".$userId." AND BGROUP='mailhandler_oauth' AND BSETTING='".$setting."' LIMIT 1";
-		$res = DB::Query($check);
-		if (DB::CountRows($res) > 0) {
-			DB::Query("UPDATE BCONFIG SET BVALUE='".$value."' WHERE BOWNERID = ".$userId." AND BGROUP='mailhandler_oauth' AND BSETTING='".$setting."'");
+		$res = db::Query($check);
+		if (db::CountRows($res) > 0) {
+			db::Query("UPDATE BCONFIG SET BVALUE='".$value."' WHERE BOWNERID = ".$userId." AND BGROUP='mailhandler_oauth' AND BSETTING='".$setting."'");
 		} else {
-			DB::Query("INSERT INTO BCONFIG (BOWNERID, BGROUP, BSETTING, BVALUE) VALUES (".$userId.", 'mailhandler_oauth', '".$setting."', '".$value."')");
+			db::Query("INSERT INTO BCONFIG (BOWNERID, BGROUP, BSETTING, BVALUE) VALUES (".$userId.", 'mailhandler_oauth', '".$setting."', '".$value."')");
 		}
 	}
 
 	private static function clearOAuthRows(int $userId): void {
 		$userId = max(0, (int)$userId);
 		if ($userId <= 0) { return; }
-		DB::Query("DELETE FROM BCONFIG WHERE BOWNERID = ".$userId." AND BGROUP='mailhandler_oauth'");
+		db::Query("DELETE FROM BCONFIG WHERE BOWNERID = ".$userId." AND BGROUP='mailhandler_oauth'");
 	}
 
 	// ----------------------------------------------------------------------------------
@@ -70,9 +70,9 @@ class mailHandler {
 		$userId = max(0, (int)$userId);
 		if ($userId <= 0) { return []; }
 		$sql = "SELECT BSETTING, BVALUE FROM BCONFIG WHERE BOWNERID = ".$userId." AND BGROUP='mailhandler_oauthapp'";
-		$res = DB::Query($sql);
+		$res = db::Query($sql);
 		$data = [];
-		while ($row = DB::FetchArr($res)) { $data[$row['BSETTING']] = $row['BVALUE']; }
+		while ($row = db::FetchArr($res)) { $data[$row['BSETTING']] = $row['BVALUE']; }
 		return $data;
 	}
 
@@ -228,8 +228,8 @@ class mailHandler {
 				     AND b2.BGROUP = 'mailhandler_dept'
 			   )
 		";
-		$res = DB::Query($sql);
-		while ($row = DB::FetchArr($res)) {
+		$res = db::Query($sql);
+		while ($row = db::FetchArr($res)) {
 			$users[] = intval($row['BOWNERID']);
 		}
 		return $users;
@@ -242,8 +242,8 @@ class mailHandler {
 		$list = [];
 		if ($userId > 0) {
 			$sql = "SELECT BSETTING, BVALUE FROM BCONFIG WHERE BOWNERID = " . $userId . " AND BGROUP = 'mailhandler_dept' ORDER BY CAST(BSETTING AS UNSIGNED) ASC";
-			$res = DB::Query($sql);
-			while ($row = DB::FetchArr($res)) {
+			$res = db::Query($sql);
+			while ($row = db::FetchArr($res)) {
 				$parts = explode('|', $row['BVALUE']);
 				$email = trim($parts[0] ?? '');
 				$description = trim($parts[1] ?? '');
@@ -273,8 +273,8 @@ class mailHandler {
 		$list = [];
 		if ($userId > 0) {
 			$sql = "SELECT BSETTING, BVALUE FROM BCONFIG WHERE BOWNERID = " . $userId . " AND BGROUP = 'mailhandler_dept' ORDER BY CAST(BSETTING AS UNSIGNED) ASC";
-			$res = DB::Query($sql);
-			while ($row = DB::FetchArr($res)) {
+			$res = db::Query($sql);
+			while ($row = db::FetchArr($res)) {
 				$parts = explode('|', $row['BVALUE']);
 				$email = trim($parts[0] ?? '');
 				$description = trim($parts[1] ?? '');
@@ -387,8 +387,8 @@ class mailHandler {
 		$userId = max(0, (int)$userId);
 		if ($userId <= 0) { return $cfg; }
 		$sql = "SELECT BSETTING, BVALUE FROM BCONFIG WHERE BOWNERID = ".$userId." AND BGROUP = 'mailhandler'";
-		$res = DB::Query($sql);
-		while ($row = DB::FetchArr($res)) {
+		$res = db::Query($sql);
+		while ($row = db::FetchArr($res)) {
 			switch ($row['BSETTING']) {
 				case 'server': $cfg['server'] = $row['BVALUE']; break;
 				case 'port': $cfg['port'] = (int)$row['BVALUE']; break;
@@ -674,8 +674,8 @@ class mailHandler {
 			$ret['folder'] = $folder;
 			// Load last_seen
 			$stateSQL = "SELECT BVALUE FROM BCONFIG WHERE BOWNERID = ".$userId." AND BGROUP='mailhandler_state' AND BSETTING='last_seen' LIMIT 1";
-			$stateRes = DB::Query($stateSQL);
-			$stateRow = DB::FetchArr($stateRes);
+			$stateRes = db::Query($stateSQL);
+			$stateRow = db::FetchArr($stateRes);
 			$lastSeenTs = 0;
 			if ($stateRow && is_numeric($stateRow['BVALUE'])) { $lastSeenTs = (int)$stateRow['BVALUE']; }
 			if ($lastSeenTs <= 0) { $lastSeenTs = time() - max(60, $fallbackWindowSeconds); }
@@ -768,11 +768,11 @@ class mailHandler {
 		if ($userId <= 0) { return; }
 		$now = time();
 		$check = "SELECT BID FROM BCONFIG WHERE BOWNERID = ".$userId." AND BGROUP='mailhandler_state' AND BSETTING='last_seen'";
-		$res = DB::Query($check);
-		if (DB::CountRows($res) > 0) {
-			DB::Query("UPDATE BCONFIG SET BVALUE='".$now."' WHERE BOWNERID= ".$userId." AND BGROUP='mailhandler_state' AND BSETTING='last_seen'");
+		$res = db::Query($check);
+		if (db::CountRows($res) > 0) {
+			db::Query("UPDATE BCONFIG SET BVALUE='".$now."' WHERE BOWNERID= ".$userId." AND BGROUP='mailhandler_state' AND BSETTING='last_seen'");
 		} else {
-			DB::Query("INSERT INTO BCONFIG (BOWNERID, BGROUP, BSETTING, BVALUE) VALUES (".$userId.", 'mailhandler_state', 'last_seen', '".$now."')");
+			db::Query("INSERT INTO BCONFIG (BOWNERID, BGROUP, BSETTING, BVALUE) VALUES (".$userId.", 'mailhandler_state', 'last_seen', '".$now."')");
 		}
 	}
 
@@ -784,8 +784,8 @@ class mailHandler {
 		$list = [];
 		if ($userId <= 0) { return $list; }
 		$sql = "SELECT BSETTING, BVALUE FROM BCONFIG WHERE BOWNERID = ".$userId." AND BGROUP = 'mailhandler_dept' ORDER BY CAST(BSETTING AS UNSIGNED) ASC";
-		$res = DB::Query($sql);
-		while ($row = DB::FetchArr($res)) {
+		$res = db::Query($sql);
+		while ($row = db::FetchArr($res)) {
 			$parts = explode('|', $row['BVALUE']);
 			$email = trim($parts[0] ?? '');
 			$description = trim($parts[1] ?? '');
@@ -890,8 +890,8 @@ class mailHandler {
 			$folder = $client->getFolder('INBOX');
 			// Load last_seen
 			$stateSQL = "SELECT BVALUE FROM BCONFIG WHERE BOWNERID = ".$userId." AND BGROUP='mailhandler_state' AND BSETTING='last_seen' LIMIT 1";
-			$stateRes = DB::Query($stateSQL);
-			$stateRow = DB::FetchArr($stateRes);
+			$stateRes = db::Query($stateSQL);
+			$stateRow = db::FetchArr($stateRes);
 			$lastSeenTs = 0;
 			if ($stateRow && is_numeric($stateRow['BVALUE'])) { $lastSeenTs = (int)$stateRow['BVALUE']; }
 			Tools::debugCronLog("[IMAP] processNewEmailsForUser userId=".$userId." last_seen=".$lastSeenTs." maxOnFirstRun=".$maxOnFirstRun."\n");
@@ -981,11 +981,11 @@ class mailHandler {
 				// Persist last_seen to latestTs
 				$userId = max(0, (int)$userId);
 				$check = "SELECT BID FROM BCONFIG WHERE BOWNERID = ".$userId." AND BGROUP='mailhandler_state' AND BSETTING='last_seen'";
-				$res = DB::Query($check);
-				if (DB::CountRows($res) > 0) {
-					DB::Query("UPDATE BCONFIG SET BVALUE='".$latestTs."' WHERE BOWNERID= ".$userId." AND BGROUP='mailhandler_state' AND BSETTING='last_seen'");
+				$res = db::Query($check);
+				if (db::CountRows($res) > 0) {
+					db::Query("UPDATE BCONFIG SET BVALUE='".$latestTs."' WHERE BOWNERID= ".$userId." AND BGROUP='mailhandler_state' AND BSETTING='last_seen'");
 				} else {
-					DB::Query("INSERT INTO BCONFIG (BOWNERID, BGROUP, BSETTING, BVALUE) VALUES (".$userId.", 'mailhandler_state', 'last_seen', '".$latestTs."')");
+					db::Query("INSERT INTO BCONFIG (BOWNERID, BGROUP, BSETTING, BVALUE) VALUES (".$userId.", 'mailhandler_state', 'last_seen', '".$latestTs."')");
 				}
 				Tools::debugCronLog("[STATE] Updated last_seen to ".$latestTs."\n");
 			}

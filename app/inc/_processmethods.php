@@ -54,7 +54,7 @@ class ProcessMethods {
             ];
             
             // Check BCAPABILITIES for the topic's category
-            $sql = "SELECT BRATELIMIT_CATEGORY FROM BCAPABILITIES WHERE BKEY = '".DB::EscString($topic)."'";
+            $sql = "SELECT BRATELIMIT_CATEGORY FROM BCAPABILITIES WHERE BKEY = '".db::EscString($topic)."'";
             $result = db::Query($sql);
             $row = db::FetchArr($result);
             
@@ -136,8 +136,8 @@ class ProcessMethods {
 
                 self::$msgArr['BFILETEXT'] = $translatedText['BFILETEXT']."\n\n";
                 self::$msgArr['BFILETEXT'] .= "Translated from this:\n".self::$msgArr['BFILETEXT'];
-                $langSQL = "UPDATE BMESSAGES SET BFILETEXT = '".DB::EscString(self::$msgArr['BFILETEXT'])."' WHERE BID = ".self::$msgArr['BID'];
-                DB::Query($langSQL);
+                $langSQL = "UPDATE BMESSAGES SET BFILETEXT = '".db::EscString(self::$msgArr['BFILETEXT'])."' WHERE BID = ".self::$msgArr['BID'];
+                db::Query($langSQL);
 
                 if(self::$stream) {
                     Frontend::statusToStream(self::$msgId, 'pre', 'File description translated. ');
@@ -173,8 +173,8 @@ class ProcessMethods {
             // -----------------------------------------------------
             $promptId = 'tools:sort';
             $metaSQL = "select BVALUE from BMESSAGEMETA where BMESSID = ".self::$msgArr['BID']." and BTOKEN = 'PROMPTID'";
-            $metaRes = DB::Query($metaSQL);
-            $metaArr = DB::FetchArr($metaRes);
+            $metaRes = db::Query($metaSQL);
+            $metaArr = db::FetchArr($metaRes);
 
             // ----------------------------------------------------- override the topic with the selected prompt
             if($metaArr && is_array($metaArr) && isset($metaArr['BVALUE']) AND strlen($metaArr['BVALUE'])>1 AND $metaArr['BVALUE'] != 'tools:sort') {
@@ -182,8 +182,8 @@ class ProcessMethods {
                 // Override the topic with the selected prompt
                 self::$msgArr['BTOPIC'] = $promptId;
                 // Update the message in database to reflect the prompt-based topic
-                $updateSQL = "update BMESSAGES set BTOPIC = '".DB::EscString($promptId)."' where BID = ".intval(self::$msgArr['BID']);
-                DB::Query($updateSQL);
+                $updateSQL = "update BMESSAGES set BTOPIC = '".db::EscString($promptId)."' where BID = ".intval(self::$msgArr['BID']);
+                db::Query($updateSQL);
                 // target prompt set previously
                 if(self::$stream) {
                     Frontend::statusToStream(self::$msgId, 'pre', 'Target set: '.self::$msgArr['BTOPIC'].' ');
@@ -197,8 +197,8 @@ class ProcessMethods {
                 if (is_string($widgetPrompt) && strlen(trim($widgetPrompt)) > 0) {
                     $promptId = $widgetPrompt;
                     self::$msgArr['BTOPIC'] = $promptId;
-                    $updateSQL = "update BMESSAGES set BTOPIC = '".DB::EscString($promptId)."' where BID = ".intval(self::$msgArr['BID']);
-                    DB::Query($updateSQL);
+                    $updateSQL = "update BMESSAGES set BTOPIC = '".db::EscString($promptId)."' where BID = ".intval(self::$msgArr['BID']);
+                    db::Query($updateSQL);
                     if(self::$stream) {
                         Frontend::statusToStream(self::$msgId, 'pre', 'Target set: '.self::$msgArr['BTOPIC'].' ');
                     }
@@ -1179,7 +1179,7 @@ public static function processMessage(): void {
                     $values[] = $val;
                 } else {
                     if(is_string($val)) {
-                        $values[] = "'" . DB::EscString($val) . "'";
+                        $values[] = "'" . db::EscString($val) . "'";
                     } else {
                         $values[] = 0;
                     }
@@ -1189,8 +1189,8 @@ public static function processMessage(): void {
         
         // Insert the processed message into the database
         $newSQL = "insert into BMESSAGES (" . implode(",", $fields) . ") values (" . implode(",", $values) . ")";
-        $newRes = DB::Query($newSQL);
-        $aiLastId = DB::LastId();
+        $newRes = db::Query($newSQL);
+        $aiLastId = db::LastId();
 
         // **************************************************************************************************
         // count bytes
@@ -1216,12 +1216,12 @@ public static function processMessage(): void {
                 if ($modelId > 0) {
                     // Update BPROVIDX with the forced model ID for OUT messages
                     $updateSQL = "UPDATE BMESSAGES SET BPROVIDX = " . $modelId . " WHERE BID = " . $aiLastId;
-                    DB::Query($updateSQL);
+                    db::Query($updateSQL);
                     
                     // Store BTAG from final model for the original IN message
                     $modelSQL = "SELECT BTAG FROM BMODELS WHERE BID = " . $modelId . " LIMIT 1";
-                    $modelRes = DB::Query($modelSQL);
-                    $modelRow = DB::FetchArr($modelRes);
+                    $modelRes = db::Query($modelSQL);
+                    $modelRow = db::FetchArr($modelRes);
                     if ($modelRow && is_array($modelRow) && !empty($modelRow['BTAG'])) {
                         // Store BTAG for the original IN message (overwrite any existing)
                         $inMessageForBtag = ['BID' => $incomingId];
@@ -1230,7 +1230,7 @@ public static function processMessage(): void {
                 } else {
                     // If forced model ID is invalid, leave BPROVIDX empty
                     $updateSQL = "UPDATE BMESSAGES SET BPROVIDX = '' WHERE BID = " . $aiLastId;
-                    DB::Query($updateSQL);
+                    db::Query($updateSQL);
                 }
             }
             // Store Again flag
@@ -1238,36 +1238,36 @@ public static function processMessage(): void {
         } else {
             // Fetch AI service and model information from incoming message for regular requests
             $serviceSQL = "SELECT BVALUE FROM BMESSAGEMETA WHERE BMESSID = ".intval($incomingId)." AND BTOKEN = 'AISERVICE' ORDER BY BID DESC LIMIT 1";
-            $serviceRes = DB::Query($serviceSQL);
-            $serviceArr = DB::FetchArr($serviceRes);
+            $serviceRes = db::Query($serviceSQL);
+            $serviceArr = db::FetchArr($serviceRes);
             if($serviceArr && is_array($serviceArr)) {
                 XSControl::storeAIDetails($aiAnswer, 'AISERVICE', $serviceArr['BVALUE'], self::$stream);
             }
             //
             $modelSQL = "SELECT BVALUE FROM BMESSAGEMETA WHERE BMESSID = ".intval($incomingId)." AND BTOKEN = 'AIMODEL' ORDER BY BID DESC LIMIT 1";
-            $modelRes = DB::Query($modelSQL);
-            $modelArr = DB::FetchArr($modelRes);
+            $modelRes = db::Query($modelSQL);
+            $modelArr = db::FetchArr($modelRes);
             if($modelArr && is_array($modelArr)) {
                 XSControl::storeAIDetails($aiAnswer, 'AIMODEL', $modelArr['BVALUE'], self::$stream);
             }
             
             // Fetch and set AIMODELID to BPROVIDX for OUT messages
             $modelIdSQL = "SELECT BVALUE FROM BMESSAGEMETA WHERE BMESSID = ".intval($incomingId)." AND BTOKEN = 'AIMODELID' ORDER BY BID DESC LIMIT 1";
-            $modelIdRes = DB::Query($modelIdSQL);
-            $modelIdArr = DB::FetchArr($modelIdRes);
+            $modelIdRes = db::Query($modelIdSQL);
+            $modelIdArr = db::FetchArr($modelIdRes);
             if($modelIdArr && is_array($modelIdArr)) {
                 $modelId = intval($modelIdArr['BVALUE']);
                 if ($modelId > 0) {
                     // Update BPROVIDX with the actual model ID for OUT messages
                     $updateSQL = "UPDATE BMESSAGES SET BPROVIDX = " . $modelId . " WHERE BID = " . $aiLastId;
-                    DB::Query($updateSQL);
+                    db::Query($updateSQL);
                     
                     XSControl::storeAIDetails($aiAnswer, 'AIMODELID', $modelIdArr['BVALUE'], self::$stream);
                     
                     // Store BTAG from final model for the IN message (overwrite any existing)
                     $modelSQL = "SELECT BTAG FROM BMODELS WHERE BID = " . $modelId . " LIMIT 1";
-                    $modelRes = DB::Query($modelSQL);
-                    $modelRow = DB::FetchArr($modelRes);
+                    $modelRes = db::Query($modelSQL);
+                    $modelRow = db::FetchArr($modelRes);
                     if ($modelRow && is_array($modelRow) && !empty($modelRow['BTAG'])) {
                         $inMessageForBtag = ['BID' => $incomingId];
                         XSControl::storeAIDetails($inMessageForBtag, 'BTAG', $modelRow['BTAG'], self::$stream);
@@ -1275,14 +1275,14 @@ public static function processMessage(): void {
                 } else {
                     // If AIMODELID exists but is invalid (0 or negative), leave BPROVIDX empty
                     $updateSQL = "UPDATE BMESSAGES SET BPROVIDX = '' WHERE BID = " . $aiLastId;
-                    DB::Query($updateSQL);
+                    db::Query($updateSQL);
                     
                     XSControl::storeAIDetails($aiAnswer, 'AIMODELID', $modelIdArr['BVALUE'], self::$stream);
                 }
             } else {
                 // If no AIMODELID found, leave BPROVIDX empty for OUT messages
                 $updateSQL = "UPDATE BMESSAGES SET BPROVIDX = '' WHERE BID = " . $aiLastId;
-                DB::Query($updateSQL);
+                db::Query($updateSQL);
             }
         }
         // **************************************************************************************************

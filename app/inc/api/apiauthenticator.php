@@ -70,9 +70,9 @@ class ApiAuthenticator {
         }
         
         // Validate API key
-        $sql = "SELECT BOWNERID, BID, BSTATUS FROM BAPIKEYS WHERE BKEY = '".DB::EscString($apiKey)."' LIMIT 1";
-        $res = DB::Query($sql);
-        $row = DB::FetchArr($res);
+        $sql = "SELECT BOWNERID, BID, BSTATUS FROM BAPIKEYS WHERE BKEY = '".db::EscString($apiKey)."' LIMIT 1";
+        $res = db::Query($sql);
+        $row = db::FetchArr($res);
         
         if (!$row || $row['BSTATUS'] !== 'active') {
             self::sendUnauthorized('Invalid or inactive API key');
@@ -80,8 +80,8 @@ class ApiAuthenticator {
         }
         
         // Load user profile
-        $userRes = DB::Query("SELECT * FROM BUSER WHERE BID = ".intval($row['BOWNERID'])." LIMIT 1");
-        $userArr = DB::FetchArr($userRes);
+        $userRes = db::Query("SELECT * FROM BUSER WHERE BID = ".intval($row['BOWNERID'])." LIMIT 1");
+        $userArr = db::FetchArr($userRes);
         
         if (!$userArr) {
             self::sendUnauthorized('User account not found');
@@ -100,7 +100,7 @@ class ApiAuthenticator {
         $_SESSION['AUTH_MODE'] = 'api_key';
         
         // Update last used timestamp
-        DB::Query("UPDATE BAPIKEYS SET BLASTUSED = ".time()." WHERE BID = ".intval($row['BID']));
+        db::Query("UPDATE BAPIKEYS SET BLASTUSED = ".time()." WHERE BID = ".intval($row['BID']));
         
         // Check rate limit
         $rateLimitResult = ['allowed' => true]; // Simplified for now
