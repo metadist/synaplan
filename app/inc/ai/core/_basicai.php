@@ -624,13 +624,13 @@ Class BasicAI {
         
         if($GLOBALS["debug"]) error_log("BasicAI::changeGroupOfFile - File found: " . json_encode($fileArr));
         
-        // Update existing BRAG records for this file
+        // Update existing BRAG records for this file with user ID check for extra security
         if (empty($newGroup)) {
             // Remove group (set to empty string)
-            $updateSQL = "UPDATE BRAG SET BGROUPKEY = '' WHERE BMID = " . intval($fileId);
+            $updateSQL = "UPDATE BRAG SET BGROUPKEY = '' WHERE BMID = " . intval($fileId) . " AND BUID = " . intval($userId);
         } else {
             // Update group
-            $updateSQL = "UPDATE BRAG SET BGROUPKEY = '" . db::EscString($newGroup) . "' WHERE BMID = " . intval($fileId);
+            $updateSQL = "UPDATE BRAG SET BGROUPKEY = '" . db::EscString($newGroup) . "' WHERE BMID = " . intval($fileId) . " AND BUID = " . intval($userId);
         }
         
         if($GLOBALS["debug"]) error_log("BasicAI::changeGroupOfFile - SQL: $updateSQL");

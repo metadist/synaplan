@@ -32,8 +32,8 @@
                     }
                 }
             }
-            // Delete from BRAG
-            $sqlBrag = "DELETE FROM BRAG WHERE BMID = $fileId";
+            // Delete from BRAG with user ID check for extra security
+            $sqlBrag = "DELETE FROM BRAG WHERE BMID = $fileId AND BUID = " . intval($_SESSION["USERPROFILE"]["BID"]);
             db::Query($sqlBrag);
             // Delete from BMESSAGES
             $sqlMsg = "DELETE FROM BMESSAGES WHERE BID = $fileId AND BUSERID = " . intval($_SESSION["USERPROFILE"]["BID"]);
