@@ -235,6 +235,9 @@ class ProcessMethods {
                     if (!empty($GLOBALS['debug'])) {
                         error_log("sortMessage: calling sorter service {$AIGENERAL} model {$AIGENERALmodel} (id {$AIGENERALmodelId})");
                     }
+                    if(strlen($sortingArr["BFILETEXT"])>200) {
+                        $sortingArr["BFILETEXT"] = substr($sortingArr["BFILETEXT"], 0, 200) . "\n\n[...content truncated for sorting...]";
+                    }
                     $answerJson = $AIGENERAL::sortingPrompt($sortingArr, self::$threadArr);
                 } catch (Exception $err) {
                     if($GLOBALS["debug"]) error_log($err->getMessage());
@@ -245,6 +248,12 @@ class ProcessMethods {
                 }
 
                 $answerJsonArr = json_decode($answerJson, true);
+
+                if(strlen($sortingArr["BFILETEXT"])>200) {
+                    $answerJsonArr["BFILETEXT"] = self::$msgArr['BFILETEXT']; 
+                }
+
+                /*** DEBUG ***/
                 if(!empty($GLOBALS['debug'])) {
                     $rawLen = is_string($answerJson) ? strlen($answerJson) : 0;
                     error_log("sortMessage: sorter raw length={$rawLen}");
@@ -260,6 +269,7 @@ class ProcessMethods {
                         error_log("sortMessage: sorter returned non-JSON; using fallbacks");
                     }
                 }
+                /*** DEBUG ***/
 
                 // Unified fallback if sorting failed or returned invalid structure
                 $fallbackUsed = false;
