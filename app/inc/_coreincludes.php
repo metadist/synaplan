@@ -14,8 +14,8 @@ require_once(__DIR__ . '/ai/providers/_aithehive.php');
 require_once(__DIR__ . '/ai/providers/_aiopenai.php');
 require_once(__DIR__ . '/ai/providers/_aigoogle.php');
 // Triton works on systems with php/grpc installed and with
-// protobuf installed. A triton server is needed!
-require_once(__DIR__ . '/ai/providers/_aitriton.php');
+// protobuf installed. A triton server is needed! Works only with PHP8.4
+// require_once(__DIR__ . '/ai/providers/_aitriton.php');
 
 // incoming tools
 require_once(__DIR__ . '/integrations/_wasender.php');
@@ -47,6 +47,7 @@ require_once(__DIR__ . '/ai/core/_basicai.php');
 // Load utility classes
 require_once(__DIR__ . '/http/_curler.php');
 require_once(__DIR__ . '/support/_listtools.php');
+require_once(__DIR__ . '/support/_messagehistory.php');
 require_once(__DIR__ . '/_processmethods.php');
 require_once(__DIR__ . '/mail/_toolmailhandler.php');
 require_once(__DIR__ . '/domain/_againlogic.php');

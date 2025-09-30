@@ -724,8 +724,15 @@ public static function processMessage(): void {
             if($GLOBALS["debug"]) error_log('answerSorted: '. print_r($answerSorted, true));
         } catch (Exception $err) {
             $providerFailed = true;
+            if (!empty($GLOBALS['debug'])) {
+                error_log("mediamaker: EXCEPTION in topicPrompt - " . $err->getMessage() . " | File: " . $err->getFile() . " | Line: " . $err->getLine());
+                error_log("mediamaker: Stack trace: " . $err->getTraceAsString());
+            }
             if (self::$stream) {
                 Frontend::statusToStream(self::$msgId, 'pre', 'Mediamaker provider failed — using fallback. ');
+                if (!empty($GLOBALS['debug'])) {
+                    Frontend::statusToStream(self::$msgId, 'pre', '[DBG] Exception: ' . $err->getMessage());
+                }
             }
             $answerSorted = null;
         }
@@ -735,8 +742,14 @@ public static function processMessage(): void {
             $lower = strtolower($answerSorted);
             if (strpos($lower, 'error') !== false || strpos($lower, 'failed') !== false || strpos($lower, 'server') !== false) {
                 $providerFailed = true;
+                if (!empty($GLOBALS['debug'])) {
+                    error_log("mediamaker: String response contains error keywords - Response: " . substr($answerSorted, 0, 200));
+                }
                 if (self::$stream) {
                     Frontend::statusToStream(self::$msgId, 'pre', 'Mediamaker provider failed — using fallback. ');
+                    if (!empty($GLOBALS['debug'])) {
+                        Frontend::statusToStream(self::$msgId, 'pre', '[DBG] Error detected in response: ' . substr($answerSorted, 0, 100));
+                    }
                 }
                 $answerSorted = null;
             } else {
@@ -762,6 +775,14 @@ public static function processMessage(): void {
             && in_array($answerSorted['BMEDIA'], ['image','video','audio'], true)
             && isset($answerSorted['BTEXT']) && $answerSorted['BTEXT'] !== '';
 
+        if (!empty($GLOBALS['debug'])) {
+            error_log("mediamaker: Validation result - isValid: " . ($isValid ? 'true' : 'false') . " | providerFailed: " . ($providerFailed ? 'true' : 'false'));
+            if (!$isValid && is_array($answerSorted)) {
+                error_log("mediamaker: Invalid response structure - Keys: " . implode(',', array_keys($answerSorted)));
+                error_log("mediamaker: BMEDIA: " . ($answerSorted['BMEDIA'] ?? 'missing') . " | BTEXT length: " . strlen($answerSorted['BTEXT'] ?? ''));
+            }
+        }
+
         if (!$isValid || $providerFailed) {
             $fallbackArr = Tools::migrateArray(self::$msgArr, [
                 'BTEXT'  => $originalPrompt,
@@ -780,9 +801,27 @@ public static function processMessage(): void {
             }
             
             if (!empty($GLOBALS['debug'])) {
-                error_log("mediamaker: fallback toolPrompt path for mediaType={$mediaType}");
+                error_log("mediamaker: Using fallback toolPrompt for mediaType={$mediaType}");
+                error_log("mediamaker: Fallback text command: " . $fallbackArr['BTEXT']);
             }
-            $answerSorted = BasicAI::toolPrompt($fallbackArr, self::$stream);
+            
+            try {
+                $answerSorted = BasicAI::toolPrompt($fallbackArr, self::$stream);
+                if (!empty($GLOBALS['debug'])) {
+                    error_log("mediamaker: toolPrompt result type: " . gettype($answerSorted));
+                    if (is_string($answerSorted)) {
+                        error_log("mediamaker: toolPrompt string length: " . strlen($answerSorted));
+                    } elseif (is_array($answerSorted)) {
+                        error_log("mediamaker: toolPrompt array keys: " . implode(',', array_keys($answerSorted)));
+                    }
+                }
+            } catch (Exception $toolErr) {
+                if (!empty($GLOBALS['debug'])) {
+                    error_log("mediamaker: EXCEPTION in toolPrompt fallback - " . $toolErr->getMessage());
+                    error_log("mediamaker: toolPrompt stack trace: " . $toolErr->getTraceAsString());
+                }
+                $answerSorted = "Error in image generation: " . $toolErr->getMessage();
+            }
 
             if(is_string($answerSorted)) {
                 $answerSorted = [

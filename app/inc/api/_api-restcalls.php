@@ -169,6 +169,31 @@ switch($apiAction) {
     case 'mailTestConnection':
         $resArr = Frontend::mailTestConnection();
         break;
+    case 'getChatHistoryLog':
+        $page = isset($_REQUEST['page']) ? intval($_REQUEST['page']) : 1;
+        $filters = [
+            'keyword' => isset($_REQUEST['keyword']) ? trim($_REQUEST['keyword']) : '',
+            'hasAttachments' => isset($_REQUEST['hasAttachments']) ? $_REQUEST['hasAttachments'] : '',
+            'dateFrom' => isset($_REQUEST['dateFrom']) ? $_REQUEST['dateFrom'] : '',
+            'dateTo' => isset($_REQUEST['dateTo']) ? $_REQUEST['dateTo'] : ''
+        ];
+        $userId = isset($_SESSION['USERPROFILE']['BID']) ? $_SESSION['USERPROFILE']['BID'] : 0;
+        $resArr = MessageHistory::getUserPrompts($userId, $page, 15, $filters);
+        break;
+    case 'getAnswersForPrompt':
+        $promptId = isset($_REQUEST['promptId']) ? intval($_REQUEST['promptId']) : 0;
+        $userId = isset($_SESSION['USERPROFILE']['BID']) ? $_SESSION['USERPROFILE']['BID'] : 0;
+        $resArr = MessageHistory::getAnswersForPrompt($userId, $promptId);
+        break;
+    case 'getAnswerDetails':
+        $answerId = isset($_REQUEST['answerId']) ? intval($_REQUEST['answerId']) : 0;
+        $userId = isset($_SESSION['USERPROFILE']['BID']) ? $_SESSION['USERPROFILE']['BID'] : 0;
+        $resArr = MessageHistory::getAnswerDetails($userId, $answerId);
+        break;
+    case 'getUserStats':
+        $userId = isset($_SESSION['USERPROFILE']['BID']) ? $_SESSION['USERPROFILE']['BID'] : 0;
+        $resArr = MessageHistory::getUserStats($userId);
+        break;
     default:
         $resArr = ['error' => 'Invalid action'];
         break;
