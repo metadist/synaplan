@@ -936,10 +936,32 @@ public static function processMessage(): void {
         !empty(self::$msgArr['BFILEPATH']) && substr(self::$msgArr['BFILEPATH'], -4) === '.pdf' &&
         isset(self::$msgArr['BFILETEXT']) && strlen(trim(self::$msgArr['BFILETEXT'])) > 0
     ) {
-        // Debug only: the text is already extracted
+        // Text is already extracted - now analyze with AI
+        $previousCall = true;
         if (self::$stream) {
-            Frontend::statusToStream(self::$msgId, 'pre', 'Analyzer skipped (text already extracted). ');
+            Frontend::statusToStream(self::$msgId, 'pre', 'Text extracted, analyzing with AI. ');
         }
+        
+        // Use analyzefile topic with extracted text
+        $answerSorted = $AIGENERAL::topicPrompt(self::$msgArr, [], false);
+        
+        if (is_string($answerSorted)) {
+            if ($GLOBALS["debug"]) error_log($answerSorted);
+            $answerSorted = ['BTEXT' => $answerSorted];
+        }
+
+        // Normalize as text response (no file echo)
+        $answerSorted['BFILE']     = 0;
+        $answerSorted['BFILEPATH'] = '';
+        $answerSorted['BFILETYPE'] = '';
+        if (!empty($answerSorted['BFILETEXT'])) {
+            $answerSorted['BTEXT']     = Tools::processComplexHtml($answerSorted['BFILETEXT']);
+            $answerSorted['BFILETEXT'] = '';
+        }
+
+        XSControl::storeAIDetails(self::$msgArr, 'AISERVICE', $AIGENERAL, self::$stream);
+        XSControl::storeAIDetails(self::$msgArr, 'AIMODEL',   'AnalyzeFile', self::$stream);
+        XSControl::storeAIDetails(self::$msgArr, 'AIMODELID', '0',          self::$stream);
     }
 
     // --- Websearch Quick Path (BFILE==10) ---
