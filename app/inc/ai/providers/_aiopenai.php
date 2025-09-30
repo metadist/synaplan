@@ -440,6 +440,11 @@ class AIOpenAI {
      */
     public static function picPrompt($msgArr, $stream = false): array {
         
+        if (!empty($GLOBALS['debug'])) {
+            error_log("AIOpenAI::picPrompt: Starting image generation for msgId=" . $msgArr['BID']);
+            error_log("AIOpenAI::picPrompt: Original text: " . substr($msgArr['BTEXT'], 0, 100));
+        }
+        
         $usrArr = Central::getUsrById($msgArr['BUSERID']);
 
         if(substr($msgArr['BTEXT'], 0, 1) == '/') {
@@ -450,9 +455,18 @@ class AIOpenAI {
 
         $picPrompt = trim($picPrompt);
 
+        if (!empty($GLOBALS['debug'])) {
+            error_log("AIOpenAI::picPrompt: Cleaned prompt: " . $picPrompt);
+            error_log("AIOpenAI::picPrompt: API key available: " . (self::$key ? 'YES' : 'NO'));
+        }
+
         $client = OpenAI::client(self::$key);
 
         $myModel = $GLOBALS["AI_TEXT2PIC"]["MODEL"];
+        
+        if (!empty($GLOBALS['debug'])) {
+            error_log("AIOpenAI::picPrompt: Using model: " . $myModel);
+        }
 
         if($stream) { 
             $update = [
@@ -463,26 +477,78 @@ class AIOpenAI {
             Frontend::printToStream($update);
         }
 
-        $response = $client->images()->create([
-            'model' => $myModel,
-            'prompt' => $picPrompt,
-            'n' => 1,
-            'size' => '1024x1024'
-        ]);
+        if (!empty($GLOBALS['debug'])) {
+            error_log("AIOpenAI::picPrompt: About to call OpenAI images()->create() API");
+            error_log("AIOpenAI::picPrompt: Request params - model: $myModel, prompt length: " . $picPrompt . ", size: 1024x1024");
+        }
+
+        try {
+            $response = $client->images()->create([
+                'model' => $myModel,
+                'prompt' => $picPrompt,
+                'n' => 1,
+                'size' => '1024x1024'
+            ]);
+            
+            if (!empty($GLOBALS['debug'])) {
+                error_log("AIOpenAI::picPrompt: API call done");
+                error_log("AIOpenAI::picPrompt: Response type: " . gettype($response));
+                if (method_exists($response, 'toArray')) {
+                    $responseArray = $response->toArray();
+                    error_log("AIOpenAI::picPrompt: Response data count: " . (isset($responseArray['data']) ? count($responseArray['data']) : 0));
+                }
+            }
+        } catch (Exception $err) {
+            if (!empty($GLOBALS['debug'])) {
+                error_log("AIOpenAI::picPrompt: EXCEPTION in images()->create() - " . $err->getMessage());
+                error_log("AIOpenAI::picPrompt: Exception file: " . $err->getFile() . " | Line: " . $err->getLine());
+                error_log("AIOpenAI::picPrompt: Stack trace: " . $err->getTraceAsString());
+            }
+            if ($stream) {
+                $update = [
+                    'msgId' => $msgArr["BID"],
+                    'status' => 'pre_processing',
+                    'message' => 'Image generation failed: ' . $err->getMessage() . ' '
+                ];
+                Frontend::printToStream($update);
+            }
+            // Return error in msgArr format
+            $msgArr['BFILE'] = 0;
+            $msgArr['BFILEPATH'] = '';
+            $msgArr['BFILETEXT'] = "API Error: " . $err->getMessage();
+            return $msgArr;
+        }
 
         //error_log(print_r($response->toArray(), true));
+
+        if (!empty($GLOBALS['debug'])) {
+            error_log("AIOpenAI::picPrompt: Processing response data");
+        }
 
         foreach ($response->data as $data) {
             $imgBuffer = $data->b64_json; // 'https://oaidalleapiprodscus.blob.core.windows.net/private/...'
         }
+        
+        if (!empty($GLOBALS['debug'])) {
+            error_log("AIOpenAI::picPrompt: Image buffer length: " . strlen($imgBuffer ?? ''));
+            error_log("AIOpenAI::picPrompt: Buffer starts with data URI: " . (strpos($imgBuffer ?? '', 'data:image') === 0 ? 'YES' : 'NO'));
+        }
+        
         // decode the base64 image
         // Remove the data URI scheme if present
         if (strpos($imgBuffer, 'data:image') === 0) {
             $imgBuffer = preg_replace('/^data:image\/\w+;base64,/', '', $imgBuffer);
+            if (!empty($GLOBALS['debug'])) {
+                error_log("AIOpenAI::picPrompt: Removed data URI prefix, new length: " . strlen($imgBuffer));
+            }
         }
 
         // Decode base64 to binary
         $imageData = base64_decode($imgBuffer);
+        if (!empty($GLOBALS['debug'])) {
+            error_log("AIOpenAI::picPrompt: Decoded image data size: " . strlen($imageData) . " bytes");
+        }
+        
         // should be dynamic!
         $fileType = 'png';
 
@@ -490,23 +556,49 @@ class AIOpenAI {
         // hive: $fileUrl = $arrRes['output'][0]['url'];
         $fileOutput = substr($usrArr["BID"], -5, 3) . '/' . substr($usrArr["BID"], -2, 2) . '/' . date("Ym");
         $filePath = $fileOutput . '/oai_' . time() . '_' . $msgArr['BID'] . '.' . $fileType;
+        
+        if (!empty($GLOBALS['debug'])) {
+            error_log("AIOpenAI::picPrompt: File save path: up/" . $filePath);
+            error_log("AIOpenAI::picPrompt: Directory path: up/" . $fileOutput);
+        }
+        
         // create the directory if it doesn't exist
         if(!is_dir('up/'.$fileOutput)) {
+            if (!empty($GLOBALS['debug'])) {
+                error_log("AIOpenAI::picPrompt: Creating directory: up/" . $fileOutput);
+            }
             mkdir('up/'.$fileOutput, 0777, true);
         }
+        
         $msgArr['BFILE'] = 1;
         $msgArr['BFILETEXT'] = 'OK: OpenAI Image'; //json_encode($msgArr['input']);
         $msgArr['BFILEPATH'] = $filePath;
         $msgArr['BFILETYPE'] = $fileType;    
 
         try {
-            file_put_contents('up/'.$filePath, $imageData);
+            $bytesWritten = file_put_contents('up/'.$filePath, $imageData);
+            if (!empty($GLOBALS['debug'])) {
+                error_log("AIOpenAI::picPrompt: File saved successfully - bytes written: " . $bytesWritten);
+                error_log("AIOpenAI::picPrompt: File exists check: " . (file_exists('up/'.$filePath) ? 'YES' : 'NO'));
+                if (file_exists('up/'.$filePath)) {
+                    error_log("AIOpenAI::picPrompt: Final file size: " . filesize('up/'.$filePath) . " bytes");
+                }
+            }
             // when URL is available, copy($fileUrl, 'up/'.$filePath);
         } catch (Exception $e) {
+            if (!empty($GLOBALS['debug'])) {
+                error_log("AIOpenAI::picPrompt: EXCEPTION during file save - " . $e->getMessage());
+                error_log("AIOpenAI::picPrompt: Exception file: " . $e->getFile() . " | Line: " . $e->getLine());
+            }
             $msgArr['BFILE'] = 0;
             $msgArr['BFILEPATH'] = '';
-            $msgArr['BFILETEXT'] = "Error: " . $e->getMessage();
+            $msgArr['BFILETEXT'] = "File Save Error: " . $e->getMessage();
         }
+        
+        if (!empty($GLOBALS['debug'])) {
+            error_log("AIOpenAI::picPrompt: Completed - BFILE=" . $msgArr['BFILE'] . " | BFILEPATH=" . ($msgArr['BFILEPATH'] ?? 'empty') . " | BFILETEXT=" . substr($msgArr['BFILETEXT'] ?? '', 0, 50));
+        }
+        
         // return the message array
         return $msgArr;
     }

@@ -14,7 +14,9 @@
 //==================================================================================
 // core app files with relative paths
 $root = __DIR__ . '/';
-require_once($root . '/inc/_coreincludes.php');
+// Use Composer autoload and new app core includes
+require_once __DIR__ . '/../vendor/autoload.php';
+require_once __DIR__ . '/../app/inc/_coreincludes.php';
 
 // Initialize the API
 $GLOBALS['WAtoken'] = file_get_contents(__DIR__ . '/.keys/.watoken.txt');

@@ -20,10 +20,15 @@
         <hr style="border: 0; border-top: 1px solid #d1d5db; margin: 5px 10px 12px 10px;">
         <ul class="nav flex-column">
             <li class="nav-item">
-            <a class="nav-link<?php ($contentInc=="chat") ? print " active" : ""; ?>" href="index.php/chat">
+            <a class="nav-link<?php ($contentInc=="chat" || $contentInc=="chat-history") ? print " active" : ""; ?>" href="index.php/chat">
                 <span data-feather="message-square"></span>
                 Chat
             </a>
+            <?php if($contentInc == "chat" || $contentInc == "chat-history") { ?>
+                <ul class="nav flex-column" style="margin-left: 18px;">
+                    <li class="subitem"><a href="index.php/chat-history" id="chatHistoryMenu">History Log</a></li>
+                </ul>
+            <?php } ?>
             </li>
             <li class="nav-item">
             <a class="nav-link<?php ($contentInc=="tools") ? print " active" : ""; ?>" href="index.php/tools">
