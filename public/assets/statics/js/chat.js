@@ -571,10 +571,15 @@ function handleSendMessage() {
         } else if (res.status === 429) {
           // Handle rate limit with proper notification instead of throwing error
           return res.json().then(data => {
+            const rateLimitData = data.rate_limit_data || {};
             showRateLimitNotification({
               error: 'rate_limit_exceeded',
-              message: data.message || 'Rate limit exceeded. Please wait a moment.',
-              reset_time: data.reset_time
+              message: rateLimitData.message || data.message || 'Rate limit exceeded. Please wait a moment.',
+              reset_time: rateLimitData.reset_time || data.reset_time || 0,
+              reset_time_formatted: rateLimitData.reset_time_formatted || 'never',
+              action_type: rateLimitData.action_type || 'upgrade',
+              action_message: rateLimitData.action_message || 'Upgrade to continue',
+              action_url: rateLimitData.action_url || ''
             });
             return { error: 'rate_limit_handled' }; // Signal that we handled it
           }).catch(() => {
@@ -603,7 +608,17 @@ function handleSendMessage() {
         }
         // Handle API errors with unified system notifications (no console errors)
         if (data.error.includes('Rate limit exceeded') || data.error === 'rate_limit_exceeded') {
-          showRateLimitNotification(data);
+          // Use detailed rate limit data if available
+          const rateLimitData = data.rate_limit_data || {};
+          showRateLimitNotification({
+            error: 'rate_limit_exceeded',
+            message: rateLimitData.message || data.error,
+            reset_time: rateLimitData.reset_time || 0,
+            reset_time_formatted: rateLimitData.reset_time_formatted || 'never',
+            action_type: rateLimitData.action_type || 'upgrade',
+            action_message: rateLimitData.action_message || 'Upgrade to continue',
+            action_url: rateLimitData.action_url || ''
+          });
         } else if (data.error.includes('Invalid anonymous widget session')) {
           showErrorMessage('Session Expired', 'Please refresh the page.');
         } else {
@@ -990,12 +1005,10 @@ function aiRender(targetId) {
             </div>
           </div>
           <div style="color: #495057; font-size: 0.9em; margin-bottom: 12px;">
-            Next available in: <span id="${timerId}" style="
-              font-family: 'SFMono-Regular', Consolas, monospace;
-              font-weight: 600; color: #212529; padding: 2px 6px;
-              background: rgba(0,0,0,0.05); border-radius: 4px;
-              transition: background-color 0.3s ease;
-            ">calculating...</span>
+            ${resetTime === 0 
+              ? 'Free plan limits do not reset. <span style="font-family: \'SFMono-Regular\', Consolas, monospace; font-weight: 600; color: #dc3545; padding: 2px 6px; background: rgba(220, 53, 69, 0.1); border-radius: 4px;">Upgrade required</span>'
+              : `Next available in: <span id="${timerId}" style="font-family: 'SFMono-Regular', Consolas, monospace; font-weight: 600; color: #212529; padding: 2px 6px; background: rgba(0,0,0,0.05); border-radius: 4px; transition: background-color 0.3s ease;">calculating...</span>`
+            }
           </div>
           ${actionMessage}
           

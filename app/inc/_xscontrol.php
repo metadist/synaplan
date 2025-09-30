@@ -21,103 +21,75 @@ class XSControl {
     }
 
     /**
-     * Count operations within the current billing cycle
-     * For monthly limits, this respects subscription start/end dates
-     * OPTIMIZED: Skip BPAYMENTDETAILS check if BUSERLEVEL is NEW
+     * Count operations with STRICT timeframe and subscription logic
+     * Always uses operationType and separates paid vs free counting
      */
-    public static function countInCurrentBillingCycle($userId, $timeframe, $operationType = null):int {
+    public static function countInCurrentBillingCycle($userId, $timeframe, $operationType = 'general'):int {
         try {
-            // For monthly limits (30+ days), use subscription billing cycle
-            if ($timeframe >= 2592000) {
-                // OPTIMIZATION: Check BUSERLEVEL first before parsing BPAYMENTDETAILS
-                $paymentSQL = "SELECT BUSERLEVEL, BPAYMENTDETAILS FROM BUSER WHERE BID = " . intval($userId);
-                $paymentResult = db::Query($paymentSQL);
-                $paymentRow = db::FetchArr($paymentResult);
-                
-                // If user is NEW, skip BPAYMENTDETAILS parsing entirely
-                if ($paymentRow && $paymentRow['BUSERLEVEL'] === 'NEW') {
-                    // For NEW users, use simple timeframe-based counting
-                    $timeStart = time() - $timeframe;
+            $userSQL = "SELECT BUSERLEVEL, BPAYMENTDETAILS FROM BUSER WHERE BID = " . intval($userId);
+            $userResult = db::Query($userSQL);
+            $userRow = db::FetchArr($userResult);
+            
+            if (!$userRow) {
+                return 0;
+            }
+            
+            $userLevel = $userRow['BUSERLEVEL'] ?? 'NEW';
+            $isActiveSubscription = false;
+            $currentSubscriptionId = null;
+            $cycleStart = 0;
+            $cycleEnd = 0;
+            
+            // Check for STRICT active subscription
+            if ($userLevel !== 'NEW' && !empty($userRow['BPAYMENTDETAILS'])) {
+                $paymentDetails = json_decode($userRow['BPAYMENTDETAILS'], true);
+                if ($paymentDetails) {
+                    $subscriptionStatus = $paymentDetails['status'] ?? null;
+                    $startTimestamp = intval($paymentDetails['start_timestamp'] ?? 0);
+                    $endTimestamp = intval($paymentDetails['end_timestamp'] ?? 0);
+                    $currentTime = time();
                     
-                    if ($operationType) {
-                        $countSQL = "SELECT COUNT(*) XSCOUNT FROM BUSELOG WHERE BUSERID = " . intval($userId) . 
-                                   " AND BOPERATIONTYPE = '" . DB::EscString($operationType) . "'" .
-                                   " AND BTIMESTAMP >= " . $timeStart .
-                                   " AND BSUBSCRIPTION_ID IS NULL";
-                    } else {
-                        $countSQL = "SELECT COUNT(*) XSCOUNT FROM BUSELOG WHERE BUSERID = " . intval($userId) . 
-                                   " AND BTIMESTAMP >= " . $timeStart .
-                                   " AND BSUBSCRIPTION_ID IS NULL";
-                    }
-                    
-                    $countRes = db::Query($countSQL);
-                    $countArr = db::FetchArr($countRes);
-                    return intval($countArr["XSCOUNT"]);
-                }
-                
-                // For non-NEW users, parse BPAYMENTDETAILS
-                if ($paymentRow && !empty($paymentRow['BPAYMENTDETAILS'])) {
-                    $paymentDetails = json_decode($paymentRow['BPAYMENTDETAILS'], true);
-                    if ($paymentDetails && isset($paymentDetails['start_timestamp']) && isset($paymentDetails['end_timestamp'])) {
-                        $startTime = intval($paymentDetails['start_timestamp']);
-                        $endTime = intval($paymentDetails['end_timestamp']);
-                        $currentTime = time();
-                        
-                        // Calculate the current billing cycle period
-                        $billingCycleLength = $endTime - $startTime;
-                        
-                        if ($currentTime <= $endTime) {
-                            // Within current subscription period
-                            $periodStart = $startTime;
-                        } else {
-                            // Subscription expired, find current cycle
-                            $cyclesSinceEnd = floor(($currentTime - $endTime) / $billingCycleLength);
-                            $periodStart = $endTime + ($cyclesSinceEnd * $billingCycleLength);
-                        }
-                        
-                        // Determine if user is currently using subscription benefits
+                    // STRICT: Only 'active' status AND current time < end_timestamp
+                    $isActiveSubscription = ($subscriptionStatus === 'active' && $endTimestamp > 0 && $currentTime < $endTimestamp);
+                    if ($isActiveSubscription) {
                         $currentSubscriptionId = $paymentDetails['stripe_subscription_id'] ?? null;
-                        $subscriptionStatus = $paymentDetails['status'] ?? null;
-                        $isActiveSubscription = ($subscriptionStatus === 'active' && $currentTime <= $endTime);
-                        
-                        if ($operationType) {
-                            $countSQL = "SELECT COUNT(*) XSCOUNT FROM BUSELOG WHERE BUSERID = " . intval($userId) . 
-                                       " AND BOPERATIONTYPE = '" . DB::EscString($operationType) . "'";
-                        } else {
-                            $countSQL = "SELECT COUNT(*) XSCOUNT FROM BUSELOG WHERE BUSERID = " . intval($userId);
-                        }
-                        
-                        // Add subscription filter based on ACTUAL subscription status
-                        if ($isActiveSubscription && $currentSubscriptionId) {
-                            // Active subscription: count only current subscription usage
-                            $countSQL .= " AND BSUBSCRIPTION_ID = '" . DB::EscString($currentSubscriptionId) . "'";
-                        } else {
-                            // Inactive/expired/cancelled subscription: count only free usage (NULL subscription_id)
-                            $countSQL .= " AND BSUBSCRIPTION_ID IS NULL";
-                        }
-                        
-                        $countRes = db::Query($countSQL);
-                        $countArr = db::FetchArr($countRes);
-                        return intval($countArr["XSCOUNT"]);
+                        $cycleStart = $startTimestamp;
+                        $cycleEnd = $endTimestamp;
                     }
                 }
             }
             
-            // For shorter periods or fallback, use traditional time-based counting
+            // Build count query based on subscription status
+            $countSQL = "SELECT COUNT(*) XSCOUNT FROM BUSELOG WHERE BUSERID = " . intval($userId);
+            
+            // Always filter by operation type (including 'general' for MESSAGES)
             if ($operationType) {
-                return self::countInByType($userId, $timeframe, $operationType);
-            } else {
-                return self::countIn($userId, $timeframe);
+                $countSQL .= " AND BOPERATIONTYPE = '" . DB::EscString($operationType) . "'";
             }
+            
+            if ($isActiveSubscription && $currentSubscriptionId) {
+                // ACTIVE SUBSCRIPTION: Use time window AND subscription_id filter
+                if ($timeframe >= 2592000) {
+                    // Monthly: inclusive start, exclusive end
+                    $countSQL .= " AND BTIMESTAMP >= " . intval($cycleStart) . " AND BTIMESTAMP < " . intval($cycleEnd);
+                } else {
+                    // Hourly: BTIMESTAMP >= now()-3600
+                    $timeStart = time() - $timeframe;
+                    $countSQL .= " AND BTIMESTAMP >= " . intval($timeStart);
+                }
+                $countSQL .= " AND BSUBSCRIPTION_ID = '" . DB::EscString($currentSubscriptionId) . "'";
+            } else {
+                // NEW/INACTIVE: Use only BSUBSCRIPTION_ID IS NULL (lifetime, no time window)
+                $countSQL .= " AND BSUBSCRIPTION_ID IS NULL";
+            }
+            
+            $countRes = db::Query($countSQL);
+            $countArr = db::FetchArr($countRes);
+            return intval($countArr["XSCOUNT"]);
             
         } catch (Exception $e) {
             error_log("Error counting in billing cycle: " . $e->getMessage());
-            // Fallback to traditional counting
-            if ($operationType) {
-                return self::countInByType($userId, $timeframe, $operationType);
-            } else {
-                return self::countIn($userId, $timeframe);
-            }
+            return 0;
         }
     }
 
@@ -136,7 +108,7 @@ class XSControl {
                 'reset_time_formatted' => 'never',
                 'action_type' => 'upgrade',
                 'action_message' => 'Get unlimited access with a subscription 🚀',
-                'action_url' => ApiKeys::getPricingUrl()
+                'action_url' => ApiKeys::getUpgradeUrl()
             ];
             
             if ($userRow && !empty($userRow['BPAYMENTDETAILS'])) {
@@ -162,7 +134,7 @@ class XSControl {
                         } else {
                             $result['action_type'] = 'renew';
                             $result['action_message'] = 'Your ' . $plan . ' subscription expired. Renew or enable auto-renew';
-                            $result['action_url'] = ApiKeys::getPricingUrl();
+                            $result['action_url'] = ApiKeys::getUpgradeUrl();
                         }
                     } else if ($plan && $plan !== 'NEW') {
                         // Had a subscription but something else went wrong
@@ -183,18 +155,17 @@ class XSControl {
                 'reset_time_formatted' => 'never',
                 'action_type' => 'upgrade',
                 'action_message' => 'Get unlimited access with a subscription 🚀',
-                'action_url' => ApiKeys::getPricingUrl()
+                'action_url' => ApiKeys::getUpgradeUrl()
             ];
         }
     }
 
     /**
      * Check if user has an active subscription
-     * OPTIMIZED: Skip BPAYMENTDETAILS check if BUSERLEVEL is NEW
+     * STRICT: Only status==='active' AND now < end_timestamp
      */
     private static function isActiveSubscription($userId): bool {
         try {
-            // First check BUSERLEVEL - if NEW, guaranteed no active subscription
             $userSQL = "SELECT BUSERLEVEL, BPAYMENTDETAILS FROM BUSER WHERE BID = " . intval($userId);
             $userResult = DB::Query($userSQL);
             
@@ -202,22 +173,22 @@ class XSControl {
                 return false;
             }
             
-            // OPTIMIZATION: If user level is NEW, they cannot have an active subscription
+            // NEW users cannot have active subscriptions
             if ($userRow['BUSERLEVEL'] === 'NEW') {
                 return false;
             }
             
-            // Only parse BPAYMENTDETAILS for non-NEW users (saves LONGTEXT parsing)
             $paymentDetails = json_decode($userRow['BPAYMENTDETAILS'], true);
             if (!$paymentDetails || !is_array($paymentDetails)) {
                 return false;
             }
             
             $subscriptionStatus = $paymentDetails['status'] ?? null;
-            $endTimestamp = $paymentDetails['end_timestamp'] ?? null;
+            $endTimestamp = intval($paymentDetails['end_timestamp'] ?? 0);
             $currentTime = time();
             
-            return ($subscriptionStatus === 'active' && $endTimestamp && $currentTime <= $endTimestamp);
+            // STRICT: Only 'active' status AND current time < end_timestamp
+            return ($subscriptionStatus === 'active' && $endTimestamp > 0 && $currentTime < $endTimestamp);
             
         } catch (Exception $e) {
             if($GLOBALS["debug"]) error_log("Error checking active subscription: " . $e->getMessage());
@@ -227,7 +198,7 @@ class XSControl {
 
     /**
      * Get current user's subscription ID for BUSELOG tracking
-     * Only returns ID if subscription is actually active AND user level is not NEW
+     * STRICT: Only returns ID if status==='active' AND now < end_timestamp
      */
     private static function getCurrentSubscriptionId($userId): ?string {
         try {
@@ -239,7 +210,7 @@ class XSControl {
                 return null;
             }
             
-            // If user level is NEW, always return NULL (treat as free user)
+            // NEW users always return NULL (treat as free user)
             if ($userRow['BUSERLEVEL'] === 'NEW') {
                 return null;
             }
@@ -247,12 +218,12 @@ class XSControl {
             if (!empty($userRow['BPAYMENTDETAILS'])) {
                 $paymentDetails = json_decode($userRow['BPAYMENTDETAILS'], true);
                 if ($paymentDetails && isset($paymentDetails['stripe_subscription_id'])) {
-                    // Only return subscription ID if subscription is active
                     $subscriptionStatus = $paymentDetails['status'] ?? null;
-                    $endTimestamp = $paymentDetails['end_timestamp'] ?? null;
+                    $endTimestamp = intval($paymentDetails['end_timestamp'] ?? 0);
                     $currentTime = time();
                     
-                    $isActive = ($subscriptionStatus === 'active' && $endTimestamp && $currentTime <= $endTimestamp);
+                    // STRICT: Only 'active' status AND current time < end_timestamp
+                    $isActive = ($subscriptionStatus === 'active' && $endTimestamp > 0 && $currentTime < $endTimestamp);
                     
                     if ($isActive) {
                         return $paymentDetails['stripe_subscription_id'];
@@ -330,53 +301,100 @@ class XSControl {
      */
     public static function getCorrectResetTime($userId, $timeframe): int {
         try {
-            $paymentSQL = "SELECT BPAYMENTDETAILS FROM BUSER WHERE BID = " . intval($userId);
+            $paymentSQL = "SELECT BPAYMENTDETAILS, BUSERLEVEL FROM BUSER WHERE BID = " . intval($userId);
             $paymentResult = db::Query($paymentSQL);
             $paymentRow = db::FetchArr($paymentResult);
+            
+            // NEW users never get reset time - they must upgrade
+            $userLevel = $paymentRow['BUSERLEVEL'] ?? 'NEW';
+            if ($userLevel === 'NEW') {
+                return 0; // No reset for NEW users
+            }
+            
+            // Check for STRICT active subscription
+            $isActiveSubscription = false;
+            $cycleEnd = 0;
             
             if ($paymentRow && !empty($paymentRow['BPAYMENTDETAILS'])) {
                 $paymentDetails = json_decode($paymentRow['BPAYMENTDETAILS'], true);
                 if ($paymentDetails && isset($paymentDetails['start_timestamp']) && isset($paymentDetails['end_timestamp'])) {
-                    $startTime = intval($paymentDetails['start_timestamp']);
-                    $endTime = intval($paymentDetails['end_timestamp']);
+                    $subscriptionStatus = $paymentDetails['status'] ?? null;
+                    $endTimestamp = intval($paymentDetails['end_timestamp']);
                     $currentTime = time();
                     
-                    // For monthly limits (30+ days), use subscription cycle
-                    if ($timeframe >= 2592000) { // 30 days or more
-                        // If we're within subscription period, reset at end_timestamp
-                        if ($currentTime <= $endTime) {
-                            return $endTime;
-                        } else {
-                            // Subscription expired, calculate next monthly cycle
-                            $billingCycle = $endTime - $startTime; // Original subscription duration
-                            $monthsSinceEnd = ceil(($currentTime - $endTime) / $billingCycle);
-                            return $endTime + ($monthsSinceEnd * $billingCycle);
-                        }
-                    }
-                    
-                    // For shorter periods (daily, hourly), calculate next interval
-                    if ($timeframe >= 86400) { // Daily limits
-                        // Reset at start of next day based on subscription timezone
-                        $nextDayStart = strtotime('tomorrow 00:00:00', $currentTime);
-                        return $nextDayStart;
-                    } else {
-                        // For hourly/minute limits, use standard timeframe
-                        return $currentTime + $timeframe;
+                    // STRICT: Only 'active' status AND current time < end_timestamp
+                    $isActiveSubscription = ($subscriptionStatus === 'active' && $endTimestamp > 0 && $currentTime < $endTimestamp);
+                    if ($isActiveSubscription) {
+                        $cycleEnd = $endTimestamp;
                     }
                 }
             }
             
-            // Fallback for users without subscription details
-            if ($timeframe >= 2592000) {
-                // Monthly fallback: next month from now
-                return strtotime('+1 month', time());
+            // If no active subscription, treat as NEW/free (no reset)
+            if (!$isActiveSubscription) {
+                return 0;
+            }
+            
+            // Active subscription: calculate reset time based on timeframe
+            if ($timeframe === 0) {
+                // TOTAL limits: never reset
+                return 0;
+            } elseif ($timeframe >= 2592000) {
+                // MONTHLY limits: reset at cycle end
+                return $cycleEnd;
             } else {
-                return time() + $timeframe;
+                // HOURLY limits: calculate based on oldest message in current window
+                $oldestMessageTime = self::getOldestMessageInTimeframe($userId, $timeframe);
+                if ($oldestMessageTime > 0) {
+                    // Reset time = oldest message + timeframe
+                    return $oldestMessageTime + $timeframe;
+                } else {
+                    // No messages in timeframe, use current time + timeframe
+                    return time() + $timeframe;
+                }
             }
             
         } catch (Exception $e) {
             error_log("Error calculating reset time: " . $e->getMessage());
-            return time() + $timeframe; // Safe fallback
+            return 0; // Safe fallback: no reset
+        }
+    }
+    
+    /**
+     * Get the timestamp of the oldest message in the current timeframe
+     * Used for precise reset time calculation for rolling windows
+     */
+    private static function getOldestMessageInTimeframe($userId, $timeframe): int {
+        try {
+            // Get current subscription info
+            $currentSubscriptionId = self::getCurrentSubscriptionId($userId);
+            $isActiveSubscription = self::isActiveSubscription($userId);
+            
+            $oldestSQL = "SELECT MIN(BTIMESTAMP) as OLDEST_TIME FROM BUSELOG WHERE BUSERID = " . intval($userId);
+            
+            // Add operation type filter for general messages
+            $oldestSQL .= " AND BOPERATIONTYPE = 'general'";
+            
+            if ($isActiveSubscription && $currentSubscriptionId) {
+                // Active subscription: filter by subscription_id and time window
+                $timeStart = time() - $timeframe;
+                $oldestSQL .= " AND BTIMESTAMP >= " . intval($timeStart);
+                $oldestSQL .= " AND BSUBSCRIPTION_ID = '" . DB::EscString($currentSubscriptionId) . "'";
+            } else {
+                // NEW/inactive: filter by NULL subscription and time window
+                $timeStart = time() - $timeframe;
+                $oldestSQL .= " AND BTIMESTAMP >= " . intval($timeStart);
+                $oldestSQL .= " AND BSUBSCRIPTION_ID IS NULL";
+            }
+            
+            $oldestRes = db::Query($oldestSQL);
+            $oldestArr = db::FetchArr($oldestRes);
+            
+            return intval($oldestArr['OLDEST_TIME'] ?? 0);
+            
+        } catch (Exception $e) {
+            error_log("Error getting oldest message time: " . $e->getMessage());
+            return 0;
         }
     }
 
@@ -391,6 +409,7 @@ class XSControl {
             
             $subscriptionStatus = 'unknown';
             $plan = 'NEW';
+            $paymentDetails = null;  // Initialize safely
             
             if ($paymentRow && !empty($paymentRow['BPAYMENTDETAILS'])) {
                 $paymentDetails = json_decode($paymentRow['BPAYMENTDETAILS'], true);
@@ -407,15 +426,31 @@ class XSControl {
                                    intval($paymentDetails['end_timestamp']) > $currentTime;
             $timeRemaining = max(0, $correctResetTime - $currentTime);
             
-            // Generate base message
-            $operationName = ucfirst($operationType);
-            if ($operationType === 'IMAGES') $operationName = 'Image generation';
-            elseif ($operationType === 'VIDEOS') $operationName = 'Video generation';
-            elseif ($operationType === 'AUDIOS') $operationName = 'Audio generation';
-            elseif ($operationType === 'FILE_ANALYSIS') $operationName = 'File analysis';
+            // Check if this is a widget session to customize messages early
+            $isWidget = isset($_SESSION["is_widget"]) && $_SESSION["is_widget"] === true;
             
-            $timeframeText = self::formatTimeframe($timeframe);
-            $baseMessage = "$operationName limit exceeded: $currentCount/$maxCount per $timeframeText";
+            // Generate base message - different for widgets vs regular users
+            if ($isWidget) {
+                // Widget users get generic demo message without owner details
+                $baseMessage = "Demo chat limit reached";
+            } else {
+                // Regular users get detailed technical message
+                $operationName = ucfirst($operationType);
+                if ($operationType === 'IMAGES') $operationName = 'Image generation';
+                elseif ($operationType === 'VIDEOS') $operationName = 'Video generation';
+                elseif ($operationType === 'AUDIOS') $operationName = 'Audio generation';
+                elseif ($operationType === 'FILE_ANALYSIS') $operationName = 'File analysis';
+                
+                // Use different message format for lifetime limits vs. time-based limits
+                if ($timeframe === 0) {
+                    // Lifetime limit (NEW users)
+                    $baseMessage = "$operationName limit exceeded: $currentCount/$maxCount (free trial)";
+                } else {
+                    // Time-based limit (paid users)
+                    $timeframeText = self::formatTimeframe($timeframe);
+                    $baseMessage = "$operationName limit exceeded: $currentCount/$maxCount per $timeframeText";
+                }
+            }
             
             // Determine message type and action based on status and validity
             if ($subscriptionStatus === 'active' && $isSubscriptionValid) {
@@ -449,15 +484,41 @@ class XSControl {
                     'reset_time_formatted' => 'expired'
                 ];
             } else {
-                // Fallback for unknown status or NEW users
-                return [
-                    'message' => $baseMessage,
-                    'action_type' => 'upgrade',
-                    'action_message' => 'Need higher limits? 🚀 Upgrade your plan',
-                    'action_url' => ApiKeys::getUpgradeUrl(),
-                    'reset_time' => $correctResetTime,
-                    'reset_time_formatted' => self::formatTimeRemaining($timeRemaining)
-                ];
+                // NEW users or unknown status - NO RESET TIME, only upgrade
+                $userLevel = $paymentRow['BUSERLEVEL'] ?? 'NEW';
+                if ($userLevel === 'NEW') {
+                    if ($isWidget) {
+                        // Widget session with NEW owner - special demo message
+                        return [
+                            'message' => 'Demo chat limit reached',
+                            'action_type' => 'widget_signup',
+                            'action_message' => 'This demo has limited usage. 🚀 Create your free SynaPlan account to continue chatting!',
+                            'action_url' => ApiKeys::getUpgradeUrl(),
+                            'reset_time' => 0, // No reset for NEW users
+                            'reset_time_formatted' => 'never'
+                        ];
+                    } else {
+                        // Regular NEW user
+                        return [
+                            'message' => $baseMessage,
+                            'action_type' => 'upgrade',
+                            'action_message' => 'Free plan limit reached. 🚀 Upgrade to continue',
+                            'action_url' => ApiKeys::getUpgradeUrl(),
+                            'reset_time' => 0, // No reset for NEW users
+                            'reset_time_formatted' => 'never'
+                        ];
+                    }
+                } else {
+                    // Fallback for other unknown states
+                    return [
+                        'message' => $baseMessage,
+                        'action_type' => 'upgrade',
+                        'action_message' => 'Need higher limits? 🚀 Upgrade your plan',
+                        'action_url' => ApiKeys::getUpgradeUrl(),
+                        'reset_time' => $correctResetTime,
+                        'reset_time_formatted' => self::formatTimeRemaining($timeRemaining)
+                    ];
+                }
             }
             
         } catch (Exception $e) {
@@ -467,7 +528,7 @@ class XSControl {
                 'message' => "Rate limit exceeded: $currentCount/$maxCount",
                 'action_type' => 'upgrade',
                 'action_message' => 'Need higher limits? 🚀 Upgrade your plan',
-                'action_url' => ApiKeys::getPricingUrl(),
+                'action_url' => ApiKeys::getUpgradeUrl(),
                 'reset_time' => time() + (30 * 24 * 60 * 60),
                 'reset_time_formatted' => '30 days'
             ];
@@ -508,7 +569,7 @@ class XSControl {
 
     /**
      * Get operation type mapping from BCAPABILITIES table dynamically
-     * Maps rate limit categories (IMAGES, VIDEOS, etc.) to actual capability BKEY values
+     * Maps rate limit categories to BUSELOG operation types
      */
     public static function getOperationMappingFromCapabilities(): array {
         static $mapping = null;
@@ -540,15 +601,26 @@ class XSControl {
                         case 'VIDEOS':
                         case 'AUDIOS':
                             // Use priority mapping to pick the primary operation type
-                            if (!isset($mapping[$category]) && in_array($bkey, $priorityMapping[$category])) {
+                            if (!isset($mapping[$category]) && in_array($bkey, $priorityMapping[$category] ?? [])) {
+                                $mapping[$category] = $bkey;
+                            }
+                            // Fallback: use first available key if no priority match found
+                            elseif (!isset($mapping[$category])) {
                                 $mapping[$category] = $bkey;
                             }
                             break;
                         case 'FILE_ANALYSIS':
-                            $mapping[$category] = 'analyzefile'; // Unified under analyzefile
+                            // Consolidate ALL FILE_ANALYSIS under 'analyzefile'
+                            $mapping[$category] = 'analyzefile';
                             break;
                         case 'MESSAGES':
                             $mapping[$category] = 'general';
+                            break;
+                        default:
+                            // Handle new categories dynamically
+                            if (!isset($mapping[$category])) {
+                                $mapping[$category] = $bkey;
+                            }
                             break;
                     }
                 }
@@ -562,7 +634,7 @@ class XSControl {
                     'IMAGES' => 'text2pic',
                     'VIDEOS' => 'text2vid', 
                     'AUDIOS' => 'text2sound',
-                    'FILE_ANALYSIS' => 'analyzefile',
+                    'FILE_ANALYSIS' => 'analyzefile',  // Consolidated
                     'MESSAGES' => 'general'
                 ];
             }
@@ -721,46 +793,58 @@ class XSControl {
     
     /**
      * Get user-specific rate limits from BCONFIG table
-     * Based on BUSERLEVEL: Pro, Team, Business
+     * Inactive subscription = RATELIMITS_NEW, Active = RATELIMITS_[LEVEL]
      */
     public static function getUserLimits($userId): array {
         $limits = [];
         
         try {
-            // Handle widget/anonymous users
-            if (isset($_SESSION["is_widget"]) && $_SESSION["is_widget"] === true) {
-                $configSQL = "SELECT BSETTING, BVALUE FROM BCONFIG WHERE BGROUP = 'RATELIMITS_WIDGET' AND BOWNERID = 0";
-                $configRes = DB::Query($configSQL);
-                while ($row = DB::FetchArr($configRes)) {
-                    $limits[$row['BSETTING']] = intval($row['BVALUE']);
+            // Handle widget/anonymous users - use widget owner's limits
+            if (isset($_SESSION["is_widget"]) && $_SESSION["is_widget"] === true && $userId != intval($_SESSION["widget_owner_id"] ?? 0)) {
+                $ownerId = intval($_SESSION["widget_owner_id"] ?? 0);
+                if ($ownerId > 0) {
+                    // Use widget owner's limits - directly load without recursion
+                    $userId = $ownerId; // Use owner ID for the rest of the function
+                } else {
+                    // Fallback to widget-specific limits if no owner ID
+                    $configSQL = "SELECT BSETTING, BVALUE FROM BCONFIG WHERE BGROUP = 'RATELIMITS_WIDGET' AND BOWNERID = 0";
+                    $configRes = DB::Query($configSQL);
+                    while ($row = DB::FetchArr($configRes)) {
+                        $limits[$row['BSETTING']] = intval($row['BVALUE']);
+                    }
+                    return $limits;
                 }
-                return $limits;
             }
             
-            // Get user level from payment-based subscription system
+            // Determine which limits to use based on subscription status
+            $isActive = self::isActiveSubscription($userId);
             $userLevel = strtoupper(self::getUserSubscriptionLevel($userId));
             
-            // Load limits from BCONFIG for this user level
-            $configSQL = "SELECT BSETTING, BVALUE FROM BCONFIG WHERE BGROUP = 'RATELIMITS_" . DB::EscString($userLevel) . "' AND BOWNERID = 0";
+            if (!$isActive || $userLevel === 'NEW') {
+                // Inactive subscription OR NEW user: use RATELIMITS_NEW
+                $limitGroup = 'RATELIMITS_NEW';
+            } else {
+                // Active subscription: use user's subscription level
+                $limitGroup = 'RATELIMITS_' . $userLevel;
+            }
+            
+            // Load limits from BCONFIG
+            $configSQL = "SELECT BSETTING, BVALUE FROM BCONFIG WHERE BGROUP = '" . DB::EscString($limitGroup) . "' AND BOWNERID = 0";
             $configRes = DB::Query($configSQL);
             
             while ($row = DB::FetchArr($configRes)) {
                 $limits[$row['BSETTING']] = intval($row['BVALUE']);
             }
             
-            // If no limits found for this user level, this is a critical system error
+            // Emergency fallback with NEW format keys
             if (empty($limits)) {
-                error_log("CRITICAL: No rate limits found for user level: $userLevel (User ID: $userId)");
-                // Emergency mode - EXTREMELY restrictive to prevent abuse
+                error_log("CRITICAL: No rate limits found for group: $limitGroup (User ID: $userId)");
                 $limits = [
-                    'MESSAGES_120S' => 1,
-                    'MESSAGES_3600S' => 3,
-                    'IMAGES_2592000S' => 1,
-                    'VIDEOS_2592000S' => 0,  // No videos in emergency mode
-                    'AUDIOS_2592000S' => 0,  // No audio in emergency mode
-                    'FILE_ANALYSIS_86400S' => 1,
-                    'FILEBYTES_3600S' => 1048576,  // 1MB
-                    'APICALLS_3600S' => 5
+                    'MESSAGES_TOTAL' => 50,
+                    'IMAGES_TOTAL' => 5,
+                    'VIDEOS_TOTAL' => 2,
+                    'AUDIOS_TOTAL' => 3,
+                    'FILE_ANALYSIS_TOTAL' => 10
                 ];
             }
             
@@ -772,19 +856,27 @@ class XSControl {
     }
     
     /**
-     * Check a specific limit type (MESSAGES, FILEBYTES, APICALLS)
+     * Check a specific limit type using NEW config keys and unified logic
      */
-    public static function checkSpecificLimit($msgArr, $operation, $timeframe, $maxCount): array {
+    public static function checkSpecificLimit($msgArr, $operation, $limitKey, $maxCount): array {
         $result = ['exceeded' => false, 'reason' => '', 'current_count' => 0];
+        
+        // Determine timeframe from limit key
+        $timeframe = 0; // Default: lifetime
+        if (str_ends_with($limitKey, '_HOURLY')) {
+            $timeframe = 3600;
+        } elseif (str_ends_with($limitKey, '_MONTHLY')) {
+            $timeframe = 2592000; // 30 days
+        }
+        // _TOTAL uses timeframe = 0 (lifetime)
         
         switch ($operation) {
             case 'MESSAGES':
-                // Use billing cycle aware counting for monthly limits
-                $currentCount = self::countInCurrentBillingCycle($msgArr['BUSERID'], $timeframe);
+                $currentCount = self::countInCurrentBillingCycle($msgArr['BUSERID'], $timeframe, 'general');
                 $result['current_count'] = $currentCount;
                 if ($currentCount >= $maxCount) {
                     $result['exceeded'] = true;
-                    $result['reason'] = "Message limit exceeded: {$currentCount}/{$maxCount} in {$timeframe}s";
+                    $result['reason'] = "Message limit exceeded: {$currentCount}/{$maxCount}";
                 }
                 break;
                 
@@ -795,17 +887,16 @@ class XSControl {
                     $result['exceeded'] = true;
                     $fileSizeMB = round($currentBytes / 1048576, 2);
                     $limitMB = round($maxCount / 1048576, 2);
-                    $result['reason'] = "File size limit exceeded: {$fileSizeMB}MB/{$limitMB}MB in {$timeframe}s";
+                    $result['reason'] = "File size limit exceeded: {$fileSizeMB}MB/{$limitMB}MB";
                 }
                 break;
                 
             case 'APICALLS':
-                // For API calls, we can use the same BUSELOG table with different filtering
                 $currentCalls = self::countApiCalls($msgArr['BUSERID'], $timeframe);
                 $result['current_count'] = $currentCalls;
                 if ($currentCalls >= $maxCount) {
                     $result['exceeded'] = true;
-                    $result['reason'] = "API call limit exceeded: {$currentCalls}/{$maxCount} in {$timeframe}s";
+                    $result['reason'] = "API call limit exceeded: {$currentCalls}/{$maxCount}";
                 }
                 break;
                 
@@ -817,7 +908,7 @@ class XSControl {
                 $operationMapping = self::getOperationMappingFromCapabilities();
                 $operationType = $operationMapping[$operation] ?? 'general';
                 
-                // Count specific operation type in BUSELOG using billing cycle aware counting
+                // Count using unified billing cycle logic
                 $currentCount = self::countInCurrentBillingCycle($msgArr['BUSERID'], $timeframe, $operationType);
                 $result['current_count'] = $currentCount;
                 if ($currentCount >= $maxCount) {
@@ -843,14 +934,17 @@ class XSControl {
      * Uses existing BMESSAGEMETA table FILEBYTES entries
      */
     private static function countFileBytes($userId, $timeframe): int {
-        $timeFrame = time() - $timeframe;
-        
         $bytesSQL = "SELECT SUM(CAST(m.BVALUE AS UNSIGNED)) as TOTAL_BYTES 
                      FROM BMESSAGEMETA m 
                      JOIN BMESSAGES b ON m.BMESSID = b.BID 
                      WHERE b.BUSERID = " . intval($userId) . " 
-                     AND b.BUNIXTIMES > " . intval($timeFrame) . " 
                      AND m.BTOKEN = 'FILEBYTES'";
+        
+        // Apply time filter only if timeframe > 0 (not lifetime)
+        if ($timeframe > 0) {
+            $timeFrame = time() - $timeframe;
+            $bytesSQL .= " AND b.BUNIXTIMES > " . intval($timeFrame);
+        }
         
         $bytesRes = DB::Query($bytesSQL);
         $bytesArr = DB::FetchArr($bytesRes);
@@ -863,15 +957,18 @@ class XSControl {
      * Uses BUSELOG table filtering by message type
      */
     private static function countApiCalls($userId, $timeframe): int {
-        $timeFrame = time() - $timeframe;
-        
         // Count messages that came through API (BMESSTYPE = 'API' or similar)
         $apiSQL = "SELECT COUNT(*) as API_COUNT 
                    FROM BUSELOG l 
                    JOIN BMESSAGES b ON l.BMSGID = b.BID 
                    WHERE l.BUSERID = " . intval($userId) . " 
-                   AND l.BTIMESTAMP > " . intval($timeFrame) . " 
                    AND b.BMESSTYPE = 'API'";
+        
+        // Apply time filter only if timeframe > 0 (not lifetime)
+        if ($timeframe > 0) {
+            $timeFrame = time() - $timeframe;
+            $apiSQL .= " AND l.BTIMESTAMP > " . intval($timeFrame);
+        }
         
         $apiRes = DB::Query($apiSQL);
         $apiArr = DB::FetchArr($apiRes);
@@ -899,12 +996,20 @@ class XSControl {
             $limits = self::getUserLimits($userId);
             if (empty($limits)) return true;
             
-            // Check all MESSAGES timeframes
+            // Check MESSAGES limits using new keys only
             foreach ($limits as $setting => $maxCount) {
-                if (preg_match('/^MESSAGES_(\d+)S$/', $setting, $matches)) {
-                    $timeframe = intval($matches[1]);
-                    // Use billing cycle aware counting for monthly limits
-                    $currentCount = self::countInCurrentBillingCycle($userId, $timeframe);
+                if (str_starts_with($setting, 'MESSAGES_') && !preg_match('/\d+S$/', $setting)) {
+                    // Only use new keys: MESSAGES_TOTAL, MESSAGES_HOURLY, MESSAGES_MONTHLY
+                    // Skip deprecated _S keys
+                    
+                    $timeframe = 0; // Default: lifetime
+                    if (str_ends_with($setting, '_HOURLY')) {
+                        $timeframe = 3600;
+                    } elseif (str_ends_with($setting, '_MONTHLY')) {
+                        $timeframe = 2592000;
+                    }
+                    
+                    $currentCount = self::countInCurrentBillingCycle($userId, $timeframe, 'general');
                     
                     if ($currentCount >= $maxCount) {
                         // Use intelligent message for message limits too
@@ -933,132 +1038,7 @@ class XSControl {
     }
 
     
-    /**
-     * Get FREE user limits - LIFETIME limits that apply once per account
-     * These are bonus limits that can be used in addition to subscription limits
-     */
-    private static function getFreeLimits(): array {
-        try {
-            // Use NEW limits as the baseline for free usage
-            $configSQL = "SELECT BSETTING, BVALUE FROM BCONFIG WHERE BGROUP = 'RATELIMITS_NEW' AND BOWNERID = 0";
-            $configResult = db::Query($configSQL);
-            $limits = [];
-            
-            while ($configRow = db::FetchArr($configResult)) {
-                $limits[$configRow['BSETTING']] = intval($configRow['BVALUE']);
-            }
-            
-            // If no NEW limits found, system error - should always exist
-            if (empty($limits)) {
-                error_log("CRITICAL: No RATELIMITS_NEW found in BCONFIG - System misconfigured!");
-                // Emergency fallback - VERY restrictive to prevent abuse
-                return [
-                    'MESSAGES_120S' => 1,
-                    'MESSAGES_3600S' => 3,
-                    'IMAGES_2592000S' => 0, // No images in emergency modes
-                    'VIDEOS_2592000S' => 0,  // No videos in emergency mode
-                    'AUDIOS_2592000S' => 1,  
-                    'FILE_ANALYSIS_86400S' => 1
-                ];
-            }
-            
-            return $limits;
-        } catch (Exception $e) {
-            error_log("CRITICAL ERROR getting free limits: " . $e->getMessage());
-            // Emergency fallback - EXTREMELY restrictive to prevent abuse
-            return [
-                'MESSAGES_120S' => 1,
-                'MESSAGES_3600S' => 3,
-                'IMAGES_2592000S' => 1,
-                'VIDEOS_2592000S' => 0,  // No videos in emergency mode
-                'AUDIOS_2592000S' => 0,  // No audio in emergency mode
-                'FILE_ANALYSIS_86400S' => 1
-            ];
-        }
-    }
 
-    /**
-     * Check specific limit for specific usage type (subscription vs free)
-     */
-    private static function checkSpecificLimitForUsageType($msgArr, $operation, $timeframe, $maxCount, $usageType): array {
-        $result = ['exceeded' => false, 'reason' => '', 'current_count' => 0];
-        $userId = $msgArr['BUSERID'];
-        
-        // Get operation type from capabilities
-        $operationMapping = self::getOperationMappingFromCapabilities();
-        $operationType = $operationMapping[$operation] ?? 'general';
-        
-        // Count based on usage type
-        if ($usageType === 'subscription') {
-            // Count only PAID usage (BSUBSCRIPTION_ID IS NOT NULL)
-            $currentCount = self::countUsageByType($userId, $timeframe, $operationType, 'paid');
-        } else {
-            // Count only FREE usage (BSUBSCRIPTION_ID IS NULL)
-            $currentCount = self::countUsageByType($userId, $timeframe, $operationType, 'free');
-        }
-        
-        $result['current_count'] = $currentCount;
-        
-        if ($currentCount >= $maxCount) {
-            $result['exceeded'] = true;
-            $usageLabel = ($usageType === 'subscription') ? 'subscription' : 'free';
-            
-            // Use intelligent message for subscription limits, simple message for free limits
-            if ($usageType === 'subscription') {
-                $intelligentMessage = self::getIntelligentRateLimitMessage($userId, $operation, $currentCount, $maxCount, $timeframe);
-                $result['reason'] = $intelligentMessage['message'];
-                $result['action_type'] = $intelligentMessage['action_type'];
-                $result['action_message'] = $intelligentMessage['action_message'];
-                $result['action_url'] = $intelligentMessage['action_url'];
-                $result['reset_time'] = $intelligentMessage['reset_time'];
-                $result['reset_time_formatted'] = $intelligentMessage['reset_time_formatted'];
-            } else {
-                // Free limit exceeded - always suggest upgrade
-                $result['reason'] = ucfirst(strtolower($operation)) . " generation free limit exceeded: {$currentCount}/{$maxCount}";
-                $result['action_type'] = 'upgrade';
-                $result['action_message'] = 'Free limit reached. 🚀 Upgrade for higher limits';
-                $result['action_url'] = ApiKeys::getPricingUrl();
-                $result['reset_time'] = self::getCorrectResetTime($userId, $timeframe);
-                $result['reset_time_formatted'] = self::formatTimeRemaining($result['reset_time'] - time());
-            }
-        }
-        
-        return $result;
-    }
-
-    /**
-     * Count usage by type (paid or free)
-     * 
-     * IMPORTANT: 
-     * - PAID usage: counted within timeframe (monthly reset)
-     * - FREE usage: counted LIFETIME (once per account, no reset)
-     */
-    private static function countUsageByType($userId, $timeframe, $operationType, $usageType): int {
-        try {
-            $countSQL = "SELECT COUNT(*) as count FROM BUSELOG 
-                        WHERE BUSERID = " . intval($userId) . " 
-                        AND BOPERATIONTYPE = '" . DB::EscString($operationType) . "'";
-            
-            if ($usageType === 'paid') {
-                // PAID usage: only count within timeframe (monthly reset with subscription)
-                $timeFrame = time() - $timeframe;
-                $countSQL .= " AND BTIMESTAMP > " . intval($timeFrame);
-                $countSQL .= " AND BSUBSCRIPTION_ID IS NOT NULL";
-            } else {
-                // FREE usage: count LIFETIME (no timeframe restriction)
-                // This is a once-per-account bonus, not monthly recurring
-                $countSQL .= " AND BSUBSCRIPTION_ID IS NULL";
-            }
-            
-            $countResult = db::Query($countSQL);
-            $countRow = db::FetchArr($countResult);
-            return intval($countRow['count']);
-            
-        } catch (Exception $e) {
-            error_log("Error counting usage by type: " . $e->getMessage());
-            return 0;
-        }
-    }
 
     /**
      * Check rate limit for specific sorted operation (post-sorting)
@@ -1109,104 +1089,27 @@ class XSControl {
             // 1. NEW users: Only check NEW limits
             // 2. Paid users (PRO/TEAM/BUSINESS): Check specific plan limits + FREE lifetime limits
             
-            if ($userLevel === 'NEW') {
-                // NEW users: Only check NEW limits (monthly reset)
-                $newLimits = self::getFreeLimits(); // Uses NEW limits
-                foreach ($newLimits as $setting => $maxCount) {
-                    if (preg_match('/^' . $limitType . '_(\d+)S$/', $setting, $matches)) {
-                        $timeframe = intval($matches[1]);
-                        
-                        // For NEW users, count everything within timeframe (no subscription separation)
-                        $currentCount = self::countInCurrentBillingCycle($userId, $timeframe, 
-                            self::getOperationMappingFromCapabilities()[$limitType] ?? 'general');
-                        
-                        if ($currentCount >= $maxCount) {
-                            $result['limited'] = true;
-                            $result['reason'] = ucfirst(strtolower($limitType)) . " generation limit exceeded: {$currentCount}/{$maxCount}";
-                            
-                            // Get intelligent message for NEW users based on their subscription history
-                            $intelligentMessage = self::getIntelligentMessageForNewUser($userId, $limitType, $currentCount, $maxCount);
-                            
-                            $result['reset_time'] = $intelligentMessage['reset_time'];
-                            $result['reset_time_formatted'] = $intelligentMessage['reset_time_formatted'];
-                            $result['action_type'] = $intelligentMessage['action_type'];
-                            $result['action_message'] = $intelligentMessage['action_message'];
-                            $result['action_url'] = $intelligentMessage['action_url'];
-                            $result['message'] = $result['reason'];
-                            return $result;
-                        }
+            // Check limits using unified approach
+            $limits = self::getUserLimits($userId);
+            
+            foreach ($limits as $setting => $maxCount) {
+                if (str_starts_with($setting, $limitType . '_') && !preg_match('/\d+S$/', $setting)) {
+                    // Only use new keys: IMAGES_TOTAL, IMAGES_MONTHLY, etc.
+                    // Skip deprecated _S keys
+                    
+                    $limitCheck = self::checkSpecificLimit($msgArr, $limitType, $setting, $maxCount);
+                    
+                    if ($limitCheck['exceeded']) {
+                        $result['limited'] = true;
+                        $result['reason'] = $limitCheck['reason'];
+                        $result['reset_time'] = $limitCheck['reset_time'] ?? 0;
+                        $result['reset_time_formatted'] = $limitCheck['reset_time_formatted'] ?? 'never';
+                        $result['action_type'] = $limitCheck['action_type'] ?? 'upgrade';
+                        $result['action_message'] = $limitCheck['action_message'] ?? 'Need higher limits? Upgrade your plan';
+                        $result['action_url'] = $limitCheck['action_url'] ?? ApiKeys::getUpgradeUrl();
+                        $result['message'] = $limitCheck['reason'];
+                        return $result;
                     }
-                }
-            } else {
-                // PAID users: Check subscription limits first, then free limits only if subscription is inactive
-                
-                // Check if user has active subscription
-                $isActiveSubscription = self::isActiveSubscription($userId);
-                
-                if ($isActiveSubscription) {
-                    // ACTIVE subscription: Only check subscription limits
-                    $subscriptionLimits = self::getUserLimits($userId);
-                    foreach ($subscriptionLimits as $setting => $maxCount) {
-                        if (preg_match('/^' . $limitType . '_(\d+)S$/', $setting, $matches)) {
-                            $timeframe = intval($matches[1]);
-                            $limitCheck = self::checkSpecificLimitForUsageType($msgArr, $limitType, $timeframe, $maxCount, 'paid');
-                            
-                            if ($limitCheck['exceeded']) {
-                                $result['limited'] = true;
-                                $result['reason'] = $limitCheck['reason'];
-                                $result['reset_time'] = $limitCheck['reset_time'];
-                                $result['reset_time_formatted'] = $limitCheck['reset_time_formatted'];
-                                $result['action_type'] = $limitCheck['action_type'];
-                                $result['action_message'] = $limitCheck['action_message'];
-                                $result['action_url'] = $limitCheck['action_url'];
-                                $result['message'] = ucfirst(strtolower($limitType)) . " generation {$userLevel} limit exceeded: " . $limitCheck['current_count'] . "/{$maxCount} per month";
-                                return $result;
-                            }
-                        }
-                    }
-                    // Active subscription user is NOT limited - return success
-                    return $result;
-                } else {
-                    // INACTIVE subscription: Only check free limits (user should be treated as free user)
-                    $freeLimits = self::getFreeLimits();
-                foreach ($freeLimits as $setting => $maxCount) {
-                    if (preg_match('/^' . $limitType . '_(\d+)S$/', $setting, $matches)) {
-                        $limitCheck = self::checkSpecificLimitForUsageType($msgArr, $limitType, 0, $maxCount, 'free'); // 0 = no timeframe = lifetime
-                        
-                        if ($limitCheck['exceeded']) {
-                            $result['limited'] = true;
-                            $result['reason'] = $limitCheck['reason'];
-                            $result['reset_time'] = 0; // Never resets
-                            $result['reset_time_formatted'] = 'never';
-                            
-                            // Check if user has an active subscription - if yes, they shouldn't see this message
-                            // This should only happen if they exhausted both paid AND free limits
-                            $subscriptionStatus = self::isActiveSubscription($userId);
-                            
-                            if ($subscriptionStatus) {
-                                // User has active subscription but exhausted both paid and free limits
-                                $result['action_type'] = 'upgrade';
-                                $result['action_message'] = 'All limits exhausted. Consider upgrading your plan.';
-                                $result['action_url'] = ApiKeys::getUpgradeUrl();
-                            } else {
-                                // User has no active subscription - show appropriate message based on their level
-                                if ($userLevel === 'NEW') {
-                                    $result['action_type'] = 'upgrade';
-                                    $result['action_message'] = 'Free limit reached. Get more with a subscription.';
-                                    $result['action_url'] = ApiKeys::getPricingUrl();
-                                } else {
-                                    // User had a subscription (PRO, TEAM, etc.) but it's deactivated/expired
-                                    $result['action_type'] = 'renew';
-                                    $result['action_message'] = 'Free bonus limit reached. Renew your ' . $userLevel . ' subscription for more limits.';
-                                    $result['action_url'] = ApiKeys::getPricingUrl();
-                                }
-                            }
-                            
-                            $result['message'] = ucfirst(strtolower($limitType)) . " generation free limit exceeded: " . $limitCheck['current_count'] . "/{$maxCount} lifetime";
-                            return $result;
-                        }
-                    }
-                }
                 }
             }
             
@@ -1243,15 +1146,15 @@ class XSControl {
                 if (empty($limits)) return $result;
                 
                 foreach ($limits as $setting => $maxCount) {
-                    if (preg_match('/^FILE_ANALYSIS_(\d+)S$/', $setting, $matches)) {
-                        $timeframe = intval($matches[1]);
-                        $limitCheck = self::checkSpecificLimit($msgArr, 'FILE_ANALYSIS', $timeframe, $maxCount);
+                    if (str_starts_with($setting, 'FILE_ANALYSIS_') && !preg_match('/\d+S$/', $setting)) {
+                        // Only use new keys: FILE_ANALYSIS_TOTAL, FILE_ANALYSIS_MONTHLY
+                        $limitCheck = self::checkSpecificLimit($msgArr, 'FILE_ANALYSIS', $setting, $maxCount);
                         
                         if ($limitCheck['exceeded']) {
-                            $correctResetTime = self::getCorrectResetTime($msgArr['BUSERID'], $timeframe);
                             $result['limited'] = true;
                             $result['reason'] = $limitCheck['reason'];
-                            $result['reset_time'] = $correctResetTime;
+                            $result['reset_time'] = $limitCheck['reset_time'] ?? 0;
+                            $result['reset_time_formatted'] = $limitCheck['reset_time_formatted'] ?? 'never';
                             break;
                         }
                     }
@@ -1263,27 +1166,18 @@ class XSControl {
                 // For general chat and all custom prompts: check message limits
                 $limits = self::getUserLimits($msgArr['BUSERID']);
                 
-                // Check short-term message limits (2 minutes)
-                if (isset($limits['MESSAGES_120S'])) {
-                    $limitCheck = self::checkSpecificLimit($msgArr, 'MESSAGES', 120, $limits['MESSAGES_120S']);
-                    if ($limitCheck['exceeded']) {
-                        $correctResetTime = self::getCorrectResetTime($msgArr['BUSERID'], 120);
-                        $result['limited'] = true;
-                        $result['reason'] = $limitCheck['reason'];
-                        $result['reset_time'] = $correctResetTime;
-                        return $result;
-                    }
-                }
-                
-                // Check hourly message limits
-                if (isset($limits['MESSAGES_3600S'])) {
-                    $limitCheck = self::checkSpecificLimit($msgArr, 'MESSAGES', 3600, $limits['MESSAGES_3600S']);
-                    if ($limitCheck['exceeded']) {
-                        $correctResetTime = self::getCorrectResetTime($msgArr['BUSERID'], 3600);
-                        $result['limited'] = true;
-                        $result['reason'] = $limitCheck['reason'];
-                        $result['reset_time'] = $correctResetTime;
-                        return $result;
+                // Check all message limits with new format
+                foreach ($limits as $setting => $maxCount) {
+                    if (str_starts_with($setting, 'MESSAGES_') && !preg_match('/\d+S$/', $setting)) {
+                        // Only use new keys: MESSAGES_TOTAL, MESSAGES_HOURLY, MESSAGES_MONTHLY
+                        $limitCheck = self::checkSpecificLimit($msgArr, 'MESSAGES', $setting, $maxCount);
+                        if ($limitCheck['exceeded']) {
+                            $result['limited'] = true;
+                            $result['reason'] = $limitCheck['reason'];
+                            $result['reset_time'] = $limitCheck['reset_time'] ?? 0;
+                            $result['reset_time_formatted'] = $limitCheck['reset_time_formatted'] ?? 'never';
+                            return $result;
+                        }
                     }
                 }
                 

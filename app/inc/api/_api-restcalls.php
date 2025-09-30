@@ -16,9 +16,17 @@ switch($apiAction) {
         break;
 
     case 'messageAgain':
+        // Determine user ID for rate limiting (Widget owner or regular user)
+        $userId = 0;
+        if (isset($_SESSION["is_widget"]) && $_SESSION["is_widget"] === true) {
+            $userId = intval($_SESSION["widget_owner_id"] ?? 0);
+        } elseif (isset($_SESSION['USERPROFILE']['BID'])) {
+            $userId = intval($_SESSION['USERPROFILE']['BID']);
+        }
+        
         // Smart rate limiting for Again requests - only check relevant operation limits
-        if (XSControl::isRateLimitingEnabled() && isset($_SESSION['USERPROFILE']['BID'])) {
-            $userId = $_SESSION['USERPROFILE']['BID'];
+        // Skip rate limiting for widgets to avoid errors - they use owner limits anyway
+        if (XSControl::isRateLimitingEnabled() && $userId > 0 && !isset($_SESSION["is_widget"])) {
             $inId = intval($_REQUEST['in_id'] ?? 0);
             
             // Get the original message to determine what operation to limit
@@ -47,8 +55,7 @@ switch($apiAction) {
         }
         
         // Log Again request to BUSELOG using original message ID (tracks operation type)
-        if (isset($_SESSION['USERPROFILE']['BID'])) {
-            $userId = $_SESSION['USERPROFILE']['BID'];
+        if ($userId > 0) {
             $inId = intval($_REQUEST['in_id'] ?? 0);
             if ($inId > 0) {
                 XSControl::countThis($userId, $inId);
