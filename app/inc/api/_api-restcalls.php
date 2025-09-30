@@ -24,8 +24,8 @@ switch($apiAction) {
             // Get the original message to determine what operation to limit
             if ($inId > 0) {
                 $originalSQL = "SELECT BTOPIC FROM BMESSAGES WHERE BID = " . $inId . " LIMIT 1";
-                $originalRes = DB::Query($originalSQL);
-                $originalArr = DB::FetchArr($originalRes);
+                $originalRes = db::Query($originalSQL);
+                $originalArr = db::FetchArr($originalRes);
                 
                 if ($originalArr && !empty($originalArr['BTOPIC'])) {
                     $originalTopic = $originalArr['BTOPIC'];

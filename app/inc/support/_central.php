@@ -87,7 +87,7 @@ class Central {
         if($messPromptId != 'tools:sort') {
             //set the prompt id per message
             $metaSQL = "insert into BMESSAGEMETA (BID, BMESSID, BTOKEN, BVALUE) values (DEFAULT, ".(0 + $arrMessage['BID']).", 'PROMPTID', '".$messPromptId."');";
-            $metaRes = DB::Query($metaSQL);
+            $metaRes = db::Query($metaSQL);
             // update the message itself
             $updateSQL = "update BMESSAGES set BTOPIC = '".db::EscString($messPromptId)."' where BID = ".intval($arrMessage['BID']);
             db::Query($updateSQL);
@@ -730,10 +730,10 @@ class Central {
      */
     public static function updateUserDetails($userId, $details) {
         $detailsJson = json_encode($details, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-        $detailsEscaped = DB::EscString($detailsJson);
+        $detailsEscaped = db::EscString($detailsJson);
         
         $updateSQL = "UPDATE BUSER SET BUSERDETAILS = '" . $detailsEscaped . "' WHERE BID = " . $userId;
-        return DB::Query($updateSQL);
+        return db::Query($updateSQL);
     }
 
     // ****************************************************************************************************** 

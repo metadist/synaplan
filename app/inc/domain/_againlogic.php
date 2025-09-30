@@ -32,8 +32,8 @@ class AgainLogic {
         
         // First, get the message to check if it exists and ownership
         $sql = "SELECT * FROM BMESSAGES WHERE BID = " . $id . " LIMIT 1";
-        $res = DB::Query($sql);
-        $row = DB::FetchArr($res);
+        $res = db::Query($sql);
+        $row = db::FetchArr($res);
         
         if (!$row || !is_array($row)) {
             http_response_code(404);
@@ -63,8 +63,8 @@ class AgainLogic {
                     AND BID < " . $id . " 
                     ORDER BY BID DESC 
                     LIMIT 1";
-            $res = DB::Query($sql);
-            $inRow = DB::FetchArr($res);
+            $res = db::Query($sql);
+            $inRow = db::FetchArr($res);
             
             if (!$inRow || !is_array($inRow)) {
                 http_response_code(404);
@@ -95,8 +95,8 @@ class AgainLogic {
         
         // Get the IN message to find its BTRACKID
         $sql = "SELECT BTRACKID FROM BMESSAGES WHERE BID = " . $inId . " AND BDIRECT = 'IN' LIMIT 1";
-        $res = DB::Query($sql);
-        $inRow = DB::FetchArr($res);
+        $res = db::Query($sql);
+        $inRow = db::FetchArr($res);
         
         if (!$inRow || !is_array($inRow)) {
             return null;
@@ -111,8 +111,8 @@ class AgainLogic {
                 AND BID > " . $inId . " 
                 ORDER BY BID ASC 
                 LIMIT 1";
-        $res = DB::Query($sql);
-        $outRow = DB::FetchArr($res);
+        $res = db::Query($sql);
+        $outRow = db::FetchArr($res);
         
         return ($outRow && is_array($outRow)) ? $outRow : null;
     }
@@ -126,7 +126,7 @@ class AgainLogic {
      * @return array Array of model rows
      */
     public static function getEligibleModels($btag) {
-        $btag = DB::EscString($btag);
+        $btag = db::EscString($btag);
         
         // Get minimum rating from config, fallback to no filtering
         $minRating = self::getMinRatingFromConfig();
@@ -135,10 +135,10 @@ class AgainLogic {
         $sql = "SELECT * FROM BMODELS 
                 WHERE BTAG = '" . $btag . "' AND BSELECTABLE = 1" . $ratingFilter . "
                 ORDER BY BQUALITY DESC, BID ASC";
-        $res = DB::Query($sql);
+        $res = db::Query($sql);
         
         $models = [];
-        while ($row = DB::FetchArr($res)) {
+        while ($row = db::FetchArr($res)) {
             if ($row && is_array($row)) {
                 $models[] = $row;
             }
@@ -154,8 +154,8 @@ class AgainLogic {
     private static function getMinRatingFromConfig() {
         try {
             $sql = "SELECT BVALUE FROM BCONFIG WHERE BGROUP = 'MODEL' AND BSETTING = 'MIN_RATING' LIMIT 1";
-            $res = DB::Query($sql);
-            $row = DB::FetchArr($res);
+            $res = db::Query($sql);
+            $row = db::FetchArr($res);
             
             if ($row && is_array($row) && is_numeric($row['BVALUE'])) {
                 return floatval($row['BVALUE']);
@@ -222,8 +222,8 @@ class AgainLogic {
     public static function resolveTagForReplay($inId, $lastOut) {
         // 1. Primary: Read BTAG from IN message metadata (new approach)
         $btagSQL = "SELECT BVALUE FROM BMESSAGEMETA WHERE BMESSID = " . intval($inId) . " AND BTOKEN = 'BTAG' ORDER BY BID DESC LIMIT 1";
-        $btagRes = DB::Query($btagSQL);
-        $btagRow = DB::FetchArr($btagRes);
+        $btagRes = db::Query($btagSQL);
+        $btagRow = db::FetchArr($btagRes);
         
         if ($btagRow && is_array($btagRow) && !empty($btagRow['BVALUE'])) {
             return $btagRow['BVALUE']; // Direct BTAG from metadata
@@ -234,8 +234,8 @@ class AgainLogic {
             $modelId = intval($lastOut['BPROVIDX']);
             if ($modelId > 0) {
                 $modelSQL = "SELECT BTAG FROM BMODELS WHERE BID = " . $modelId . " LIMIT 1";
-                $modelRes = DB::Query($modelSQL);
-                $modelRow = DB::FetchArr($modelRes);
+                $modelRes = db::Query($modelSQL);
+                $modelRow = db::FetchArr($modelRes);
                 if ($modelRow && is_array($modelRow) && !empty($modelRow['BTAG'])) {
                     return $modelRow['BTAG'];
                 }
@@ -275,8 +275,8 @@ class AgainLogic {
                 // Validate provided model
                 $modelId = intval($modelIdOpt);
                 $sql = "SELECT * FROM BMODELS WHERE BID = " . $modelId . " AND BSELECTABLE = 1 LIMIT 1";
-                $res = DB::Query($sql);
-                $selectedModel = DB::FetchArr($res);
+                $res = db::Query($sql);
+                $selectedModel = db::FetchArr($res);
                 
                 if (!$selectedModel || !is_array($selectedModel)) {
                     http_response_code(422);

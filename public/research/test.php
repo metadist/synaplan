@@ -60,8 +60,8 @@ require_once(__DIR__ . '/inc/_processmethods.php');
         <?php
         $msgArr = [];
         $fillSQL = "SELECT * FROM BMESSAGES WHERE BDIRECT = 'IN' ORDER BY BID DESC LIMIT 1";
-        $fillRes = DB::Query($fillSQL);
-        $msgArr = DB::FetchArr($fillRes);
+        $fillRes = db::Query($fillSQL);
+        $msgArr = db::FetchArr($fillRes);
         $msgArr['BTEXT'] = "Welches Modell bist Du?";
 
         $msgArr = AIOpenAI::topicPrompt($msgArr, []);

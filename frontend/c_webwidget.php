@@ -529,7 +529,7 @@
         let code;
         if (integrationType === 'inline-box') {
             code = '<!-- Synaplan Chat Inline Box -->\n' +
-                   '<script src="<?php echo $GLOBALS["baseUrl"]; ?>widget.php?uid=' + userId + '&widgetid=' + widgetId + '&mode=inline-box"><\\/script>';
+                   '<script src="<?php echo $GLOBALS["baseUrl"]; ?>widget.php?uid=' + userId + '&widgetid=' + widgetId + '&mode=inline-box"><\/script>';
         } else {
             code = '<!-- Synaplan Chat Widget -->\n' +
                    '<script>\n' +
@@ -539,7 +539,7 @@
                    '    script.async = true;\n' +
                    '    document.head.appendChild(script);\n' +
                    '})();\n' +
-                   '<\\/script>';
+                   '<\/script>';
         }
         document.getElementById('integrationCode').value = code;
     }

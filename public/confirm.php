@@ -3,11 +3,11 @@ require_once __DIR__ . '/../vendor/autoload.php';
 require_once __DIR__ . '/../app/inc/_coreincludes.php';
 
 $id = intval($_GET['id']);
-$c = DB::EscString($_GET['c']);
+$c = db::EscString($_GET['c']);
 
 $getSQL = "SELECT * FROM BUSER WHERE BID = ".$id." AND BUSERDETAILS LIKE '%".$c."%'";
-$getRes = DB::Query($getSQL);
-$getArr = DB::FetchArr($getRes);
+$getRes = db::Query($getSQL);
+$getArr = db::FetchArr($getRes);
 
 $confirmed = false;
 if($getArr) {
@@ -16,7 +16,7 @@ if($getArr) {
         $getArr['DETAILS']['MAILCHECKED'] = 1;
         $userDetailsJson = json_encode($getArr['DETAILS'], JSON_UNESCAPED_UNICODE);
         $updateSQL = "UPDATE BUSER SET BUSERDETAILS = '".DB::EscString($userDetailsJson)."' WHERE BID = ".$id;
-        DB::Query($updateSQL);
+        db::Query($updateSQL);
         $confirmed = true;
     }
 }

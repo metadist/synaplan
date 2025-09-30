@@ -8,8 +8,8 @@ Class InboundConf {
         $numArr = [];
         $userId = $_SESSION["USERPROFILE"]["BID"];
         $waSQL = "select * from BWAPHONES where BOWNERID = ".$userId." OR BOWNERID = 0 ORDER BY BOWNERID DESC";
-        $waRes = DB::Query($waSQL);
-        while($row = DB::FetchArr($waRes)) {
+        $waRes = db::Query($waSQL);
+        while($row = db::FetchArr($waRes)) {
             $numArr[] = $row;
         }
         return $numArr;
@@ -19,7 +19,7 @@ Class InboundConf {
     public static function setWidgetDomain($domain) {
         $userId = $_SESSION["USERPROFILE"]["BID"];
         $waSQL = "";
-        $waRes = DB::Query($waSQL);
+        $waRes = db::Query($waSQL);
     }
 }
 ?>

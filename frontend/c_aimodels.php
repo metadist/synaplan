@@ -11,13 +11,13 @@
                     $modelId = intval($value);
 
                     // Remove existing override for this user+setting
-                    $deleteSQL = "DELETE FROM BCONFIG WHERE BGROUP = 'DEFAULTMODEL' AND BSETTING = '" . DB::EscString($setting) . "' AND BOWNERID = " . $ownerId;
-                    DB::query($deleteSQL);
+                    $deleteSQL = "DELETE FROM BCONFIG WHERE BGROUP = 'DEFAULTMODEL' AND BSETTING = '" . db::EscString($setting) . "' AND BOWNERID = " . $ownerId;
+                    db::query($deleteSQL);
 
                     // Insert new override when a model is selected; empty resets to global default
                     if ($modelId > 0) {
-                        $insertSQL = "INSERT INTO BCONFIG (BOWNERID, BGROUP, BSETTING, BVALUE) VALUES (" . $ownerId . ", 'DEFAULTMODEL', '" . DB::EscString($setting) . "', '" . DB::EscString($modelId) . "')";
-                        DB::query($insertSQL);
+                        $insertSQL = "INSERT INTO BCONFIG (BOWNERID, BGROUP, BSETTING, BVALUE) VALUES (" . $ownerId . ", 'DEFAULTMODEL', '" . db::EscString($setting) . "', '" . db::EscString($modelId) . "')";
+                        db::query($insertSQL);
                     }
                 }
             }
@@ -47,13 +47,13 @@
 
                     $sql = "UPDATE BMODELS SET "
                          . "BPRICEIN = " . ($priceIn) . ", "
-                         . "BINUNIT = '" . DB::EscString($inUnit) . "', "
+                         . "BINUNIT = '" . db::EscString($inUnit) . "', "
                          . "BPRICEOUT = " . ($priceOut) . ", "
-                         . "BOUTUNIT = '" . DB::EscString($outUnit) . "', "
+                         . "BOUTUNIT = '" . db::EscString($outUnit) . "', "
                          . "BQUALITY = " . ($quality) . " "
                          . "WHERE BID = " . $id;
                     try {
-                        DB::query($sql);
+                        db::query($sql);
                         $updated++;
                     } catch (\Throwable $e) {
                         $errors++;
@@ -90,13 +90,13 @@
                         // Get tasks as union of global defaults and current user's overrides
                         $currentUserId = intval($_SESSION['USERPROFILE']['BID']);
                         $taskSQL = "SELECT DISTINCT BSETTING FROM BCONFIG WHERE BGROUP = 'DEFAULTMODEL' AND (BOWNERID = 0 OR BOWNERID = " . $currentUserId . ") ORDER BY BSETTING";
-                        $taskRES = DB::query($taskSQL);
+                        $taskRES = db::query($taskSQL);
                         
                         // Get all available models for dropdowns
                         $allModelsSQL = "SELECT BID, BNAME, BTAG, BSERVICE, BSELECTABLE FROM BMODELS ORDER BY BTAG, BNAME";
-                        $allModelsRES = DB::query($allModelsSQL);
+                        $allModelsRES = db::query($allModelsSQL);
                         $allModels = [];
-                        while ($modelROW = DB::FetchArr($allModelsRES)) {
+                        while ($modelROW = db::FetchArr($allModelsRES)) {
                             $allModels[] = $modelROW;
                         }
                         
@@ -104,18 +104,18 @@
                         $currentConfig = [];
                         // Global defaults first
                         $globalConfigSQL = "SELECT BSETTING, BVALUE FROM BCONFIG WHERE BGROUP = 'DEFAULTMODEL' AND BOWNERID = 0";
-                        $globalConfigRES = DB::query($globalConfigSQL);
-                        while ($configROW = DB::FetchArr($globalConfigRES)) {
+                        $globalConfigRES = db::query($globalConfigSQL);
+                        while ($configROW = db::FetchArr($globalConfigRES)) {
                             $currentConfig[$configROW['BSETTING']] = $configROW['BVALUE'];
                         }
                         // Overlay user-specific overrides
                         $userConfigSQL = "SELECT BSETTING, BVALUE FROM BCONFIG WHERE BGROUP = 'DEFAULTMODEL' AND BOWNERID = " . $currentUserId;
-                        $userConfigRES = DB::query($userConfigSQL);
-                        while ($configROW = DB::FetchArr($userConfigRES)) {
+                        $userConfigRES = db::query($userConfigSQL);
+                        while ($configROW = db::FetchArr($userConfigRES)) {
                             $currentConfig[$configROW['BSETTING']] = $configROW['BVALUE'];
                         }
                         
-                        while ($taskROW = DB::FetchArr($taskRES)) {
+                        while ($taskROW = db::FetchArr($taskRES)) {
                             $task = $taskROW['BSETTING'];
                             $currentValue = isset($currentConfig[$task]) ? $currentConfig[$task] : '';
                             
@@ -123,8 +123,8 @@
                             $currentModelSelectable = true;
                             if (!empty($currentValue)) {
                                 $currentModelSQL = "SELECT BSELECTABLE FROM BMODELS WHERE BID = " . intval($currentValue);
-                                $currentModelRES = DB::query($currentModelSQL);
-                                if ($currentModelROW = DB::FetchArr($currentModelRES)) {
+                                $currentModelRES = db::query($currentModelSQL);
+                                if ($currentModelROW = db::FetchArr($currentModelRES)) {
                                     $currentModelSelectable = ($currentModelROW['BSELECTABLE'] == 1);
                                 }
                             }
@@ -212,8 +212,8 @@
                 <div class="col-12">
                     <?php
                         $tagSQL = "SELECT DISTINCT BTAG FROM BMODELS ORDER BY BTAG";
-                        $tagRES = DB::query($tagSQL);
-                        while($tagROW = DB::FetchArr($tagRES)) {
+                        $tagRES = db::query($tagSQL);
+                        while($tagROW = db::FetchArr($tagRES)) {
                             echo '<a href="index.php/aimodels?tag=' . htmlspecialchars($tagROW["BTAG"]) . '" class="btn btn-outline-primary me-2 mb-2">' . 
                                  '<i class="fas fa-tag me-1"></i>' . htmlspecialchars($tagROW["BTAG"]) . '</a>';
                         }

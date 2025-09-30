@@ -33,8 +33,8 @@ class FileManager {
         
         // First get the original message to find its track ID and timestamp
         $msgSQL = "SELECT * FROM BMESSAGES WHERE BUSERID = ".$userId." AND BID = ".intval($messageId);
-        $msgRes = DB::Query($msgSQL);
-        $msgArr = DB::FetchArr($msgRes);
+        $msgRes = db::Query($msgSQL);
+        $msgArr = db::FetchArr($msgRes);
         
         if($msgArr) {
             // Get all messages with files that have the same track ID and are within a few seconds
@@ -44,8 +44,8 @@ class FileManager {
                     AND BFILE > 0 
                     AND ABS(BUNIXTIMES - ".$msgArr['BUNIXTIMES'].") <= ".$timeWindow."
                     ORDER BY BID ASC";
-            $res = DB::Query($sql);
-            while($fileArr = DB::FetchArr($res)) {
+            $res = db::Query($sql);
+            while($fileArr = db::FetchArr($res)) {
                 if($fileArr && is_array($fileArr) && !empty($fileArr['BFILEPATH']) && !empty($fileArr['BFILETYPE'])) {
                     $files[] = [
                         'BID' => $fileArr['BID'],
@@ -215,8 +215,8 @@ class FileManager {
                 ORDER BY BID DESC 
                 LIMIT ".intval($limit);
         
-        $res = DB::Query($sql);
-        while($fileArr = DB::FetchArr($res)) {
+        $res = db::Query($sql);
+        while($fileArr = db::FetchArr($res)) {
             if($fileArr && is_array($fileArr) && !empty($fileArr['BFILEPATH']) && !empty($fileArr['BFILETYPE'])) {
                 $files[] = [
                     'BID' => $fileArr['BID'],
