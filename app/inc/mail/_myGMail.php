@@ -157,7 +157,7 @@ class myGMail {
                     if(!isset($usrArr["DETAILS"]["MAILCHECKED"])) {
                         $usrArr["DETAILS"]["MAILCHECKED"] = dechex(rand(100000, 999999));
                         $userDetailsJson = json_encode($usrArr["DETAILS"],JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-                        $updateSQL = "UPDATE BUSER SET BUSERDETAILS = '".DB::EscString($userDetailsJson)."' WHERE BID = ".$usrArr["BID"];
+                        $updateSQL = "UPDATE BUSER SET BUSERDETAILS = '".db::EscString($userDetailsJson)."' WHERE BID = ".$usrArr["BID"];
                         db::Query($updateSQL);
                     }
                     // create the confirmation link

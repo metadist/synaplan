@@ -360,8 +360,41 @@ Class Frontend {
             // also add it to an array for loopings
             $lastInsertsId[] = $resArr['lastId'];
             
-            // Log message to BUSELOG immediately after successful database insert
+            // CRITICAL: Check rate limits BEFORE counting to avoid off-by-one errors
             if($resArr['lastId'] > 0) {
+                // Create temporary message array for rate limit check
+                $tempMsgArr = [
+                    'BID' => $resArr['lastId'],
+                    'BUSERID' => $userId,
+                    'BTOPIC' => 'general' // Default for messages before sorting
+                ];
+                
+                // Pre-check message limits before counting
+                if (XSControl::isRateLimitingEnabled()) {
+                    $limitCheck = XSControl::checkMessagesLimit($userId);
+                    if (is_array($limitCheck) && $limitCheck['limited']) {
+                        // Rate limit exceeded - clean up and return error
+                        // Remove the message we just inserted since it exceeds limits
+                        $deleteSQL = "DELETE FROM BMESSAGES WHERE BID = " . intval($resArr['lastId']);
+                        db::Query($deleteSQL);
+                        
+                        // Set rate limit error in return array
+                        $retArr['success'] = false;
+                        $retArr['error'] = 'rate_limit_exceeded';
+                        $retArr['rate_limit_data'] = [
+                            'message' => $limitCheck['message'] ?? $limitCheck['reason'] ?? 'Rate limit exceeded',
+                            'reset_time' => $limitCheck['reset_time'] ?? 0,
+                            'reset_time_formatted' => $limitCheck['reset_time_formatted'] ?? 'never',
+                            'action_type' => $limitCheck['action_type'] ?? 'upgrade',
+                            'action_message' => $limitCheck['action_message'] ?? 'Upgrade to continue',
+                            'action_url' => $limitCheck['action_url'] ?? ''
+                        ];
+                        
+                        return $retArr;
+                    }
+                }
+                
+                // Rate limit check passed - now safely count the message
                 XSControl::countThis($userId, $resArr['lastId'], 'general');
             }
             // new inserts for the meta data
@@ -1723,7 +1756,7 @@ Class Frontend {
             $checkSQL = "SELECT BID FROM BCONFIG WHERE BOWNERID = " . $userId . " AND BGROUP = '" . db::EscString($group) . "' AND BSETTING = '" . db::EscString($setting) . "'";
             $checkRes = db::Query($checkSQL);
             
-            if (DB::CountRows($checkRes) > 0) {
+            if (db::CountRows($checkRes) > 0) {
                 // Update existing setting
                 $updateSQL = "UPDATE BCONFIG SET BVALUE = '" . $value . "' WHERE BOWNERID = " . $userId . " AND BGROUP = '" . db::EscString($group) . "' AND BSETTING = '" . db::EscString($setting) . "'";
                 db::Query($updateSQL);
@@ -1903,7 +1936,7 @@ Class Frontend {
         foreach ($settings as $setting => $value) {
             $checkSQL = "SELECT BID FROM BCONFIG WHERE BOWNERID = " . $userId . " AND BGROUP = '" . db::EscString($group) . "' AND BSETTING = '" . db::EscString($setting) . "'";
             $checkRes = db::Query($checkSQL);
-            if (DB::CountRows($checkRes) > 0) {
+            if (db::CountRows($checkRes) > 0) {
                 $updateSQL = "UPDATE BCONFIG SET BVALUE = '" . $value . "' WHERE BOWNERID = " . $userId . " AND BGROUP = '" . db::EscString($group) . "' AND BSETTING = '" . db::EscString($setting) . "'";
                 db::Query($updateSQL);
             } else {

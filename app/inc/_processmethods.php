@@ -44,24 +44,47 @@ class ProcessMethods {
      */
     private static function getOperationTypeFromTopic($topic): string {
         try {
-            // Check if topic exists in BCAPABILITIES table
-            $sql = "SELECT BKEY FROM BCAPABILITIES WHERE BKEY = '".DB::EscString($topic)."'";
+            // Get the operation mapping using the unified mapping from XSControl
+            $operationMapping = [
+                'MESSAGES' => 'general',
+                'IMAGES' => 'text2pic', 
+                'VIDEOS' => 'text2vid',
+                'AUDIOS' => 'text2sound',
+                'FILE_ANALYSIS' => 'analyzefile'
+            ];
+            
+            // Check BCAPABILITIES for the topic's category
+            $sql = "SELECT BRATELIMIT_CATEGORY FROM BCAPABILITIES WHERE BKEY = '".db::EscString($topic)."'";
             $result = db::Query($sql);
             $row = db::FetchArr($result);
             
-            if ($row) {
-                // Direct mapping for known capability types
-                return $row['BKEY'];
+            if ($row && isset($operationMapping[$row['BRATELIMIT_CATEGORY']])) {
+                return $operationMapping[$row['BRATELIMIT_CATEGORY']];
             }
             
-            // Handle special cases
+            // Handle tool commands directly
             switch ($topic) {
-                case 'mediamaker':
-                    // mediamaker needs special handling - will be updated by mediamaker logic
-                    return 'general'; // Default, will be updated later in mediamaker
+                case 'text2pic':
+                case 'pic2pic':
+                    return 'text2pic';
+                case 'text2vid':
+                case 'pic2vid': 
+                    return 'text2vid';
+                case 'text2sound':
+                case 'text2music':
+                    return 'text2sound';
+                case 'pic2text':
+                case 'sound2text':
+                case 'analyze':
                 case 'analyzefile':
                 case 'analyzepdf': // Legacy support
                     return 'analyzefile';
+                case 'mediamaker':
+                    // mediamaker needs special handling - will be updated by mediamaker logic
+                    return 'general'; // Default, will be updated later in mediamaker
+                case 'chat':
+                case 'translate':
+                case 'general':
                 default:
                     return 'general';
             }
@@ -113,7 +136,7 @@ class ProcessMethods {
 
                 self::$msgArr['BFILETEXT'] = $translatedText['BFILETEXT']."\n\n";
                 self::$msgArr['BFILETEXT'] .= "Translated from this:\n".self::$msgArr['BFILETEXT'];
-                $langSQL = "UPDATE BMESSAGES SET BFILETEXT = '".DB::EscString(self::$msgArr['BFILETEXT'])."' WHERE BID = ".self::$msgArr['BID'];
+                $langSQL = "UPDATE BMESSAGES SET BFILETEXT = '".db::EscString(self::$msgArr['BFILETEXT'])."' WHERE BID = ".self::$msgArr['BID'];
                 db::Query($langSQL);
 
                 if(self::$stream) {
@@ -159,7 +182,7 @@ class ProcessMethods {
                 // Override the topic with the selected prompt
                 self::$msgArr['BTOPIC'] = $promptId;
                 // Update the message in database to reflect the prompt-based topic
-                $updateSQL = "update BMESSAGES set BTOPIC = '".DB::EscString($promptId)."' where BID = ".intval(self::$msgArr['BID']);
+                $updateSQL = "update BMESSAGES set BTOPIC = '".db::EscString($promptId)."' where BID = ".intval(self::$msgArr['BID']);
                 db::Query($updateSQL);
                 // target prompt set previously
                 if(self::$stream) {
@@ -174,7 +197,7 @@ class ProcessMethods {
                 if (is_string($widgetPrompt) && strlen(trim($widgetPrompt)) > 0) {
                     $promptId = $widgetPrompt;
                     self::$msgArr['BTOPIC'] = $promptId;
-                    $updateSQL = "update BMESSAGES set BTOPIC = '".DB::EscString($promptId)."' where BID = ".intval(self::$msgArr['BID']);
+                    $updateSQL = "update BMESSAGES set BTOPIC = '".db::EscString($promptId)."' where BID = ".intval(self::$msgArr['BID']);
                     db::Query($updateSQL);
                     if(self::$stream) {
                         Frontend::statusToStream(self::$msgId, 'pre', 'Target set: '.self::$msgArr['BTOPIC'].' ');
@@ -326,6 +349,10 @@ class ProcessMethods {
                     $operation = 'text2vid';
                 } elseif (strpos($toolCmd, '/audio ') === 0) {
                     $operation = 'text2sound';
+                } elseif (strpos($toolCmd, '/analyze ') === 0 || 
+                          strpos($toolCmd, '/pic2text ') === 0 || 
+                          strpos($toolCmd, '/sound2text ') === 0) {
+                    $operation = 'analyzefile';
                 }
                 
                 // Check tool-specific limits
@@ -423,34 +450,42 @@ public static function processMessage(): void {
     $answerSorted  = [];
     $ragArr        = [];
 
-        // Topic-based Rate Limiting AFTER sorting (only for non-mediamaker topics)
+        // Topic-based Rate Limiting AFTER sorting (only for non-general, non-mediamaker topics)
+        // Note: General message limits are already checked in Frontend::saveWebMessages() before counting
         if (XSControl::isRateLimitingEnabled() && !empty(self::$msgArr['BTOPIC']) && 
             !in_array(self::$msgArr['BTOPIC'], ['mediamaker'], true)) {
             
-            $topicLimitCheck = XSControl::checkTopicLimit(self::$msgArr);
-            if ($topicLimitCheck['limited']) {
-                // Create rate limit response that frontend will handle elegantly
-                $rateLimitData = [
-                    'error' => 'rate_limit_exceeded',
-                    'message' => $topicLimitCheck['reason'],
-                    'reset_time' => $topicLimitCheck['reset_time']
-                ];
-                
-                // Add intelligent action fields if available
-                if (isset($topicLimitCheck['action_type'])) {
-                    $rateLimitData['action_type'] = $topicLimitCheck['action_type'];
-                    $rateLimitData['action_message'] = $topicLimitCheck['action_message'];
-                    $rateLimitData['action_url'] = $topicLimitCheck['action_url'];
+            // Use mapped operation type for rate limiting
+            $operationType = self::getOperationTypeFromTopic(self::$msgArr['BTOPIC']);
+            
+            // Only check operation-specific limits for non-general operations
+            // General message limits are already checked in Frontend before counting
+            if ($operationType !== 'general') {
+                $operationCheck = XSControl::checkOperationLimit(self::$msgArr, $operationType);
+                if ($operationCheck['limited']) {
+                    $rateLimitData = [
+                        'error' => 'rate_limit_exceeded',
+                        'message' => $operationCheck['reason'],
+                        'reset_time' => $operationCheck['reset_time']
+                    ];
+                    
+                    // Add intelligent action fields if available
+                    if (isset($operationCheck['action_type'])) {
+                        $rateLimitData['action_type'] = $operationCheck['action_type'];
+                        $rateLimitData['action_message'] = $operationCheck['action_message'];
+                        $rateLimitData['action_url'] = $operationCheck['action_url'];
+                    }
+                    
+                    self::$msgArr['BTEXT'] = 'RATE_LIMIT_NOTIFICATION: ' . json_encode($rateLimitData);
+                    self::$msgArr['BDIRECT'] = 'OUT';
+                    
+                    if (self::$stream) {
+                        Frontend::statusToStream(self::$msgId, 'ai', self::$msgArr['BTEXT']);
+                    }
+                    return; // Stop processing
                 }
-                
-                self::$msgArr['BTEXT'] = 'RATE_LIMIT_NOTIFICATION: ' . json_encode($rateLimitData);
-                self::$msgArr['BDIRECT'] = 'OUT';
-                
-                if (self::$stream) {
-                    Frontend::statusToStream(self::$msgId, 'ai', self::$msgArr['BTEXT']);
-                }
-                return; // Stop processing - elegant notification will be shown
             }
+            // Note: General messages skip rate limiting here as it's handled in Frontend
         }
 
         // Temporarily switch prompt/model resolution context to widget owner during processing
@@ -985,6 +1020,9 @@ public static function processMessage(): void {
         );
     }
 
+    // Ensure BUSELOG operation type is correctly set after processing
+    self::ensureCorrectOperationType();
+    
     // Restore original user session context after processing (important for anonymous widgets)
     if ($___usingOwnerCtx) {
         if ($___savedUserProfile !== null) {
@@ -1272,6 +1310,16 @@ public static function processMessage(): void {
         }
         
         return $newMsgArr;
+    }
+    
+    /**
+     * Ensure BUSELOG operation type is correctly set after processing
+     */
+    private static function ensureCorrectOperationType(): void {
+        if (!empty(self::$msgArr['BTOPIC']) && !empty(self::$msgArr['BID']) && !empty(self::$msgArr['BUSERID'])) {
+            $operationType = self::getOperationTypeFromTopic(self::$msgArr['BTOPIC']);
+            XSControl::updateOperationType(self::$msgArr['BUSERID'], self::$msgArr['BID'], $operationType);
+        }
     }
 }
 

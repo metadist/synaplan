@@ -26,10 +26,10 @@ class mailHandler {
 		$authMethod = db::EscString($authMethod);
 		$check = "SELECT BID FROM BCONFIG WHERE BOWNERID = ".$userId." AND BGROUP='mailhandler' AND BSETTING='authMethod' LIMIT 1";
 		$res = db::Query($check);
-		if (DB::CountRows($res) > 0) {
-			DB::Query("UPDATE BCONFIG SET BVALUE='".$authMethod."' WHERE BOWNERID=".$userId." AND BGROUP='mailhandler' AND BSETTING='authMethod'");
+		if (db::CountRows($res) > 0) {
+			db::Query("UPDATE BCONFIG SET BVALUE='".$authMethod."' WHERE BOWNERID=".$userId." AND BGROUP='mailhandler' AND BSETTING='authMethod'");
 		} else {
-			DB::Query("INSERT INTO BCONFIG (BOWNERID, BGROUP, BSETTING, BVALUE) VALUES (".$userId.", 'mailhandler', 'authMethod', '".$authMethod."')");
+			db::Query("INSERT INTO BCONFIG (BOWNERID, BGROUP, BSETTING, BVALUE) VALUES (".$userId.", 'mailhandler', 'authMethod', '".$authMethod."')");
 		}
 	}
 
@@ -50,17 +50,17 @@ class mailHandler {
 		$value = db::EscString($value);
 		$check = "SELECT BID FROM BCONFIG WHERE BOWNERID = ".$userId." AND BGROUP='mailhandler_oauth' AND BSETTING='".$setting."' LIMIT 1";
 		$res = db::Query($check);
-		if (DB::CountRows($res) > 0) {
-			DB::Query("UPDATE BCONFIG SET BVALUE='".$value."' WHERE BOWNERID = ".$userId." AND BGROUP='mailhandler_oauth' AND BSETTING='".$setting."'");
+		if (db::CountRows($res) > 0) {
+			db::Query("UPDATE BCONFIG SET BVALUE='".$value."' WHERE BOWNERID = ".$userId." AND BGROUP='mailhandler_oauth' AND BSETTING='".$setting."'");
 		} else {
-			DB::Query("INSERT INTO BCONFIG (BOWNERID, BGROUP, BSETTING, BVALUE) VALUES (".$userId.", 'mailhandler_oauth', '".$setting."', '".$value."')");
+			db::Query("INSERT INTO BCONFIG (BOWNERID, BGROUP, BSETTING, BVALUE) VALUES (".$userId.", 'mailhandler_oauth', '".$setting."', '".$value."')");
 		}
 	}
 
 	private static function clearOAuthRows(int $userId): void {
 		$userId = max(0, (int)$userId);
 		if ($userId <= 0) { return; }
-		DB::Query("DELETE FROM BCONFIG WHERE BOWNERID = ".$userId." AND BGROUP='mailhandler_oauth'");
+		db::Query("DELETE FROM BCONFIG WHERE BOWNERID = ".$userId." AND BGROUP='mailhandler_oauth'");
 	}
 
 	// ----------------------------------------------------------------------------------
@@ -769,10 +769,10 @@ class mailHandler {
 		$now = time();
 		$check = "SELECT BID FROM BCONFIG WHERE BOWNERID = ".$userId." AND BGROUP='mailhandler_state' AND BSETTING='last_seen'";
 		$res = db::Query($check);
-		if (DB::CountRows($res) > 0) {
-			DB::Query("UPDATE BCONFIG SET BVALUE='".$now."' WHERE BOWNERID= ".$userId." AND BGROUP='mailhandler_state' AND BSETTING='last_seen'");
+		if (db::CountRows($res) > 0) {
+			db::Query("UPDATE BCONFIG SET BVALUE='".$now."' WHERE BOWNERID= ".$userId." AND BGROUP='mailhandler_state' AND BSETTING='last_seen'");
 		} else {
-			DB::Query("INSERT INTO BCONFIG (BOWNERID, BGROUP, BSETTING, BVALUE) VALUES (".$userId.", 'mailhandler_state', 'last_seen', '".$now."')");
+			db::Query("INSERT INTO BCONFIG (BOWNERID, BGROUP, BSETTING, BVALUE) VALUES (".$userId.", 'mailhandler_state', 'last_seen', '".$now."')");
 		}
 	}
 
@@ -982,10 +982,10 @@ class mailHandler {
 				$userId = max(0, (int)$userId);
 				$check = "SELECT BID FROM BCONFIG WHERE BOWNERID = ".$userId." AND BGROUP='mailhandler_state' AND BSETTING='last_seen'";
 				$res = db::Query($check);
-				if (DB::CountRows($res) > 0) {
-					DB::Query("UPDATE BCONFIG SET BVALUE='".$latestTs."' WHERE BOWNERID= ".$userId." AND BGROUP='mailhandler_state' AND BSETTING='last_seen'");
+				if (db::CountRows($res) > 0) {
+					db::Query("UPDATE BCONFIG SET BVALUE='".$latestTs."' WHERE BOWNERID= ".$userId." AND BGROUP='mailhandler_state' AND BSETTING='last_seen'");
 				} else {
-					DB::Query("INSERT INTO BCONFIG (BOWNERID, BGROUP, BSETTING, BVALUE) VALUES (".$userId.", 'mailhandler_state', 'last_seen', '".$latestTs."')");
+					db::Query("INSERT INTO BCONFIG (BOWNERID, BGROUP, BSETTING, BVALUE) VALUES (".$userId.", 'mailhandler_state', 'last_seen', '".$latestTs."')");
 				}
 				Tools::debugCronLog("[STATE] Updated last_seen to ".$latestTs."\n");
 			}

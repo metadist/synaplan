@@ -20,7 +20,7 @@ if(isset($_GET['PIN']) && isset($_GET['UID'])) {
             $updateSQL = "UPDATE BUSER SET BUSERLEVEL = 'NEW' WHERE BID = ".$userId;
             db::Query($updateSQL);
             
-            if(DB::AffectedRows() > 0) {
+            if(db::AffectedRows() > 0) {
                 $confirmed = true;
                 $successMessage = "Your email has been successfully confirmed! You can now log in to your account.";
             } else {

@@ -70,7 +70,7 @@ class ApiAuthenticator {
         }
         
         // Validate API key
-        $sql = "SELECT BOWNERID, BID, BSTATUS FROM BAPIKEYS WHERE BKEY = '".DB::EscString($apiKey)."' LIMIT 1";
+        $sql = "SELECT BOWNERID, BID, BSTATUS FROM BAPIKEYS WHERE BKEY = '".db::EscString($apiKey)."' LIMIT 1";
         $res = db::Query($sql);
         $row = db::FetchArr($res);
         

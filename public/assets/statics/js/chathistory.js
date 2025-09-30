@@ -315,7 +315,16 @@ function loadChatHistory(amount) {
             // Use unified error notification for rate limits
             if (data.error.includes('rate_limit_exceeded') || data.error.includes('Rate limit')) {
                 if (typeof showRateLimitNotification !== 'undefined') {
-                    showRateLimitNotification({error: 'rate_limit_exceeded', message: data.error});
+                    const rateLimitData = data.rate_limit_data || {};
+                    showRateLimitNotification({
+                        error: 'rate_limit_exceeded', 
+                        message: rateLimitData.message || data.error,
+                        reset_time: rateLimitData.reset_time || 0,
+                        reset_time_formatted: rateLimitData.reset_time_formatted || 'never',
+                        action_type: rateLimitData.action_type || 'upgrade',
+                        action_message: rateLimitData.action_message || 'Upgrade to continue',
+                        action_url: rateLimitData.action_url || ''
+                    });
                 }
             }
         } else if (data.success && data.messages) {
@@ -456,11 +465,10 @@ function renderChatHistory(messages) {
                                             </div>
                                         </div>
                                         <div style="color: #495057; font-size: 0.9em; margin-bottom: 12px;">
-                                            Next available in: <span style="
-                                                font-family: 'SFMono-Regular', Consolas, monospace;
-                                                font-weight: 600; color: #212529; padding: 2px 6px;
-                                                background: rgba(0,0,0,0.05); border-radius: 4px;
-                                            ">${timeDisplay}</span>
+                                            ${timeDisplay === 'never' 
+                                                ? 'Free plan limits do not reset. <span style="font-family: \'SFMono-Regular\', Consolas, monospace; font-weight: 600; color: #dc3545; padding: 2px 6px; background: rgba(220, 53, 69, 0.1); border-radius: 4px;">Upgrade required</span>'
+                                                : `Next available in: <span style="font-family: 'SFMono-Regular', Consolas, monospace; font-weight: 600; color: #212529; padding: 2px 6px; background: rgba(0,0,0,0.05); border-radius: 4px;">${timeDisplay}</span>`
+                                            }
                                         </div>
                                         ${actionMessage}
                                     </div>

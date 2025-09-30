@@ -8,9 +8,9 @@
 // Note: System links are now loaded from backend/ENV - these are fallbacks only
 // Use dynamic URLs if available from backend injection
 const SYSTEM_LINKS = window.SYNAPLAN_SYSTEM_URLS || {
-    pricing: 'https://www.synaplan.com/pricing',
-    account: 'https://www.synaplan.com/account', 
-    upgrade: 'https://www.synaplan.com/pricing'
+    pricing: 'https://www.synaplan.com/',
+    account: 'https://www.synaplan.com/', 
+    upgrade: 'https://www.synaplan.com/'
 };
 
 // ========== UNIFIED SYSTEM MESSAGE RENDERER ==========
@@ -204,6 +204,23 @@ function getUpgradeMessage() {
  */
 function createTimerHtml(messageId, resetTime) {
     const timerId = 'timer-' + messageId;
+    
+    // Handle NEW users who never get reset
+    if (resetTime === 0) {
+        return `
+            <div style="color: #495057; font-size: 0.9em; margin-bottom: 12px;">
+                Free plan limits do not reset. <span style="
+                    font-family: 'SFMono-Regular', Consolas, monospace;
+                    font-weight: 600;
+                    color: #dc3545;
+                    padding: 2px 6px;
+                    background: rgba(220, 53, 69, 0.1);
+                    border-radius: 4px;
+                ">Upgrade required</span>
+            </div>
+        `;
+    }
+    
     return `
         <div style="color: #495057; font-size: 0.9em; margin-bottom: 12px;">
             Next available in: <span id="${timerId}" style="
@@ -223,6 +240,11 @@ function createTimerHtml(messageId, resetTime) {
  * Live timer for rate limits
  */
 function startMiniTimer(timerId, resetTime) {
+    // Handle NEW users who never get reset (resetTime = 0)
+    if (resetTime === 0) {
+        return; // No timer needed for NEW users
+    }
+    
     const timerElement = document.getElementById(timerId);
     if (!timerElement) {
         console.warn('Timer element not found:', timerId);

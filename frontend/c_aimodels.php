@@ -257,7 +257,7 @@
                                 $whereClause = "WHERE BTAG = '" . db::EscString($_GET['tag']) . "'";
                             }
                             if(isset($_REQUEST["tag"])) {
-                                $whereClause = "WHERE BTAG like '".DB::EscString($_REQUEST["tag"])."'";
+                                $whereClause = "WHERE BTAG like '".db::EscString($_REQUEST["tag"])."'";
                             }
                             $modelsSQL = "SELECT * FROM BMODELS $whereClause ORDER BY BTAG,BSERVICE";
                             $modelsRES = db::Query($modelsSQL);

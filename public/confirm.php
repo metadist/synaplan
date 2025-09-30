@@ -15,7 +15,7 @@ if($getArr) {
     if(isset($getArr['DETAILS']['MAILCHECKED']) AND $getArr['DETAILS']['MAILCHECKED'] == $c) {
         $getArr['DETAILS']['MAILCHECKED'] = 1;
         $userDetailsJson = json_encode($getArr['DETAILS'], JSON_UNESCAPED_UNICODE);
-        $updateSQL = "UPDATE BUSER SET BUSERDETAILS = '".DB::EscString($userDetailsJson)."' WHERE BID = ".$id;
+        $updateSQL = "UPDATE BUSER SET BUSERDETAILS = '".db::EscString($userDetailsJson)."' WHERE BID = ".$id;
         db::Query($updateSQL);
         $confirmed = true;
     }

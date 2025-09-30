@@ -71,7 +71,7 @@ class UserRegistration {
             
             // Insert new user
             $insertSQL = "INSERT INTO BUSER (BCREATED, BINTYPE, BMAIL, BPW, BPROVIDERID, BUSERLEVEL, BUSERDETAILS) 
-                         VALUES ('".date("YmdHis")."', 'MAIL', '".$email."', '".$passwordMd5."', '".DB::EscString($email)."', 'PIN:".$pin."', '".DB::EscString(json_encode($userDetails, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES))."')";
+                         VALUES ('".date("YmdHis")."', 'MAIL', '".$email."', '".$passwordMd5."', '".db::EscString($email)."', 'PIN:".$pin."', '".db::EscString(json_encode($userDetails, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES))."')";
             
             db::Query($insertSQL);
             $newUserId = db::LastId();
