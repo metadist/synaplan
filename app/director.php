@@ -28,6 +28,8 @@ class Director
             } else {
                 if (count($commandParts) > 0 && $commandParts[0] == "register") {
                     $contentInc = "register";
+                } elseif (count($commandParts) > 0 && $commandParts[0] == "confirm") {
+                    $contentInc = "confirm";
                 } elseif (count($commandParts) > 0 && $commandParts[0] == "lostpw") {
                     $contentInc = "lostpw";
                 } else {
