@@ -3,7 +3,10 @@
 function _mymail($strFrom, $strTo, $subject, $htmltext, $plaintext, $strReplyTo='',$strFileAttach='') {
     // available SMTP providers
     $arrAWScreds = ApiKeys::getAWS();
-    
+    if($GLOBALS["debug"]) {
+        error_log("AWS SMTP : ".print_r($arrAWScreds, true));
+    }
+
     // Check if AWS credentials are configured
     if (!$arrAWScreds || !isset($arrAWScreds['access_key']) || !isset($arrAWScreds['secret_key'])) {
         // AWS credentials not configured, fall back to PHP mail()

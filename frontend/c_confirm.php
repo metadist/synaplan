@@ -9,20 +9,47 @@ if(isset($_GET['PIN']) && isset($_GET['UID'])) {
     $pin = db::EscString($_GET['PIN']);
     $userId = intval($_GET['UID']);
     
+    if($GLOBALS["debug"]) {
+        error_log("Confirm: Received PIN=$pin, UID=$userId");
+    }
+    
     if(strlen($pin) == 6 && $userId > 0) {
         // Check if user exists and PIN matches
-        $checkSQL = "SELECT * FROM BUSER WHERE BID = ".$userId." AND BUSERLEVEL = 'PIN:".$pin."'";
+        $checkSQL = "SELECT BID, BMAIL, BUSERLEVEL FROM BUSER WHERE BID = ".$userId." AND BUSERLEVEL = 'PIN:".$pin."'";
+        if($GLOBALS["debug"]) {
+            error_log("Confirm SQL: ".$checkSQL);
+        }
         $checkRes = db::Query($checkSQL);
         $userArr = db::FetchArr($checkRes);
+        
+        if($GLOBALS["debug"]) {
+            error_log("Confirm: User found = " . (empty($userArr) ? "NO" : "YES"));
+            if($userArr) {
+                error_log("Confirm: User level = " . $userArr['BUSERLEVEL']);
+            }
+        }
         
         if($userArr) {
             // Update user status to NEW and clear PIN
             $updateSQL = "UPDATE BUSER SET BUSERLEVEL = 'NEW' WHERE BID = ".$userId;
             db::Query($updateSQL);
             
+            if($GLOBALS["debug"]) {
+                error_log("Confirm: Update affected rows = " . db::AffectedRows());
+            }
+            
             if(db::AffectedRows() > 0) {
                 $confirmed = true;
                 $successMessage = "Your email has been successfully confirmed! You can now log in to your account.";
+                
+                // Optionally send confirmation email
+                try {
+                    EmailService::sendEmailConfirmation($userArr['BMAIL']);
+                } catch (\Throwable $e) {
+                    if($GLOBALS["debug"]) {
+                        error_log("Failed to send confirmation email: " . $e->getMessage());
+                    }
+                }
             } else {
                 $errorMessage = "Failed to update account status. Please try again or contact support.";
             }

@@ -50,6 +50,12 @@ class ApiKeys {
                 $key = trim($key);
                 $value = trim($value);
                 
+                // Strip surrounding quotes from value (common in .env files)
+                if ((substr($value, 0, 1) === '"' && substr($value, -1) === '"') ||
+                    (substr($value, 0, 1) === "'" && substr($value, -1) === "'")) {
+                    $value = substr($value, 1, -1);
+                }
+                
                 // Only set if not already in environment
                 if (!isset($_ENV[$key]) && !getenv($key)) {
                     putenv("$key=$value");
@@ -124,7 +130,13 @@ class ApiKeys {
         // 1. Try environment variable
         $value = getenv($envKey) ?: $_ENV[$envKey] ?? null;
         if ($value) {
-            return trim($value);
+            $value = trim($value);
+            // Strip surrounding quotes (common in environment variables)
+            if ((substr($value, 0, 1) === '"' && substr($value, -1) === '"') ||
+                (substr($value, 0, 1) === "'" && substr($value, -1) === "'")) {
+                $value = substr($value, 1, -1);
+            }
+            return $value;
         }
 
         // 2. Return null if not found
