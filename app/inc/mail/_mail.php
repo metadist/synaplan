@@ -3,11 +3,40 @@
 function _mymail($strFrom, $strTo, $subject, $htmltext, $plaintext, $strReplyTo='',$strFileAttach='') {
     // available SMTP providers
     $arrAWScreds = ApiKeys::getAWS();
+    
+    // Check if AWS credentials are configured
+    if (!$arrAWScreds || !isset($arrAWScreds['access_key']) || !isset($arrAWScreds['secret_key'])) {
+        // AWS credentials not configured, fall back to PHP mail()
+        if($GLOBALS["debug"]) {
+            error_log("AWS SMTP credentials not configured, using fallback mail()");
+        }
+        mail("rs@metadist.de","Synaplan.org Mailing Warning - No AWS SMTP",date("YmdHis").": AWS credentials missing, sending to ".$strTo." via fallback mail()");
+        
+        // Send email via PHP's native mail function
+        $headers = "From: " . $strFrom . "\r\n";
+        $headers .= "Reply-To: " . ($strReplyTo ?: $strFrom) . "\r\n";
+        $headers .= "MIME-Version: 1.0\r\n";
+        $headers .= "Content-Type: text/html; charset=UTF-8\r\n";
+        
+        $plainFooter = $plaintext . "\n\nSynaplan.AI by info@metadist.de";
+        
+        // Try HTML version first, fallback to plain text
+        if (mail($strTo, $subject, $htmltext, $headers)) {
+            return true;
+        } else {
+            // If HTML fails, try plain text
+            $plainHeaders = "From: " . $strFrom . "\r\n";
+            $plainHeaders .= "Reply-To: " . ($strReplyTo ?: $strFrom) . "\r\n";
+            mail($strTo, "Plain: " . $subject, $plainFooter, $plainHeaders);
+            return false;
+        }
+    }
+    
     $arrSmtpSrvs = array(
         'aws'    => array('h' => 'email-smtp.eu-west-1.amazonaws.com',
             'auth' => true, 'po'=>587, 'u' => $arrAWScreds['access_key'],
             'p' => $arrAWScreds['secret_key'], 'f'=>'info@metadist.de',
-            'fn' => 'Ralfs.AI Mail Service'),
+            'fn' => 'Synaplan.AI Mail Service'),
     );
 
     // create the mail
