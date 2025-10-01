@@ -97,10 +97,10 @@
                         <select class="form-select" name="widgetPrompt" id="widgetPrompt">
                             <?php
                                 $prompts = BasicAI::getAllPrompts();
-                                foreach($prompts as $prompt) {
-                                    $ownerHint = $prompt['BOWNERID'] != 0 ? "(custom)" : "(default)";
-                                    echo "<option value='".$prompt['BTOPIC']."'>".$ownerHint." ".$prompt['BTOPIC']."</option>";
-                                }
+                            foreach ($prompts as $prompt) {
+                                $ownerHint = $prompt['BOWNERID'] != 0 ? '(custom)' : '(default)';
+                                echo "<option value='".$prompt['BTOPIC']."'>".$ownerHint.' '.$prompt['BTOPIC'].'</option>';
+                            }
                             ?>
                         </select>
                         <div class="form-text">Select the AI prompt to use for this widget</div>
@@ -162,7 +162,7 @@
 <script>
 (function() {
     var script = document.createElement('script');
-    script.src = '<?php echo $GLOBALS["baseUrl"]; ?>widget.php?uid=${userId}&widgetid=${widgetId}';
+    script.src = '<?php echo $GLOBALS['baseUrl']; ?>widget.php?uid=${userId}&widgetid=${widgetId}';
     script.async = true;
     document.head.appendChild(script);
 })();
@@ -516,7 +516,7 @@
     // Function to update integration code
     function updateIntegrationCode() {
         const widgetId = document.getElementById('widgetId').value;
-        let userId = <?php echo $_SESSION["USERPROFILE"]["BID"]; ?>; // Default to current user ID
+        let userId = <?php echo $_SESSION['USERPROFILE']['BID']; ?>; // Default to current user ID
         
         // If editing an existing widget, use the widget's user ID
         if (currentWidgetId) {
@@ -529,13 +529,13 @@
         let code;
         if (integrationType === 'inline-box') {
             code = '<!-- Synaplan Chat Inline Box -->\n' +
-                   '<script src="<?php echo $GLOBALS["baseUrl"]; ?>widget.php?uid=' + userId + '&widgetid=' + widgetId + '&mode=inline-box"><\/script>';
+                   '<script src="<?php echo $GLOBALS['baseUrl']; ?>widget.php?uid=' + userId + '&widgetid=' + widgetId + '&mode=inline-box"><\/script>';
         } else {
             code = '<!-- Synaplan Chat Widget -->\n' +
                    '<script>\n' +
                    '(function() {\n' +
                    '    var script = document.createElement(\'script\');\n' +
-                   '    script.src = \'<?php echo $GLOBALS["baseUrl"]; ?>widget.php?uid=' + userId + '&widgetid=' + widgetId + '\';\n' +
+                   '    script.src = \'<?php echo $GLOBALS['baseUrl']; ?>widget.php?uid=' + userId + '&widgetid=' + widgetId + '\';\n' +
                    '    script.async = true;\n' +
                    '    document.head.appendChild(script);\n' +
                    '})();\n' +
@@ -575,7 +575,7 @@
             return;
         }
         // Resolve userId like in integration code
-        let userId = <?php echo $_SESSION["USERPROFILE"]["BID"]; ?>;
+        let userId = <?php echo $_SESSION['USERPROFILE']['BID']; ?>;
         if (currentWidgetId) {
             const widget = widgets.find(w => w.widgetId === parseInt(widgetId));
             if (widget && widget.userId) {

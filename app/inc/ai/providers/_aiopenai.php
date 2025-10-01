@@ -2,14 +2,15 @@
 
 /**
  * AIOpenAi Class
- * 
+ *
  * Handles interactions with the OpenAI API for various AI processing tasks
  * including text generation, translation, image analysis, and audio processing.
- * 
+ *
  * @package AIOpenAi
  */
 
-class AIOpenAI {
+class AIOpenAI
+{
     /** @var string OpenAI API key */
     private static $key;
     /** @var OpenAI client instance */
@@ -17,12 +18,13 @@ class AIOpenAI {
 
     /**
      * Initialize the OpenAI client
-     * 
+     *
      * Loads the API key from the centralized configuration and creates a new OpenAI client instance
-     * 
+     *
      * @return bool True if initialization is successful
      */
-    public static function init() {
+    public static function init()
+    {
         self::$key = ApiKeys::getOpenAI();
         if (!self::$key) {
             //if($GLOBALS["debug"]) error_log("OpenAI API key not configured");
@@ -34,44 +36,45 @@ class AIOpenAI {
 
     /**
      * Message sorting prompt handler
-     * 
+     *
      * Analyzes and categorizes incoming messages to determine their intent and
      * appropriate handling method. This helps in routing messages to the correct
      * processing pipeline.
-     * 
+     *
      * @param array $msgArr Current message array
      * @param array $threadArr Conversation thread history
      * @return array|string|bool Sorting result or error message
      */
-    public static function sortingPrompt($msgArr, $threadArr): array|string|bool {
+    public static function sortingPrompt($msgArr, $threadArr): array|string|bool
+    {
         // prompt builder
         $systemPrompt = BasicAI::getAprompt('tools:sort');
         // Ensure client is initialized
         $client = self::$client;
         if (!$client) {
             if (!self::init()) {
-                return "*API topic Error - OpenAI not configured*";
+                return '*API topic Error - OpenAI not configured*';
             }
             $client = self::$client;
         }
-    
-        
+
+
         $arrMessages = [
             ['role' => 'system', 'content' => $systemPrompt['BPROMPT']],
         ];
 
         // Build message history
-        foreach($threadArr as $msg) {
-            if($msg['BDIRECT'] == 'IN') {
+        foreach ($threadArr as $msg) {
+            if ($msg['BDIRECT'] == 'IN') {
                 $msg['BTEXT'] = Tools::cleanTextBlock($msg['BTEXT']);
                 $msgText = $msg['BTEXT'];
-                if(strlen($msg['BFILETEXT']) > 1) {
-                    $msgText .= " User provided a file: ".$msg['BFILETYPE'].", saying: '".$msg['BFILETEXT']."'\n\n";
+                if (strlen($msg['BFILETEXT']) > 1) {
+                    $msgText .= ' User provided a file: '.$msg['BFILETYPE'].", saying: '".$msg['BFILETEXT']."'\n\n";
                 }
                 $arrMessages[] = ['role' => 'user', 'content' => $msgText];
-            } 
-            if($msg['BDIRECT'] == 'OUT') {
-                if(strlen($msg['BTEXT'])>1000) {
+            }
+            if ($msg['BDIRECT'] == 'OUT') {
+                if (strlen($msg['BTEXT']) > 1000) {
                     // Truncate at word boundary to avoid breaking JSON or quotes
                     $truncatedText = substr($msg['BTEXT'], 0, 1000);
                     // Find the last complete word
@@ -81,16 +84,16 @@ class AIOpenAI {
                     }
                     // Clean up any trailing quotes or incomplete JSON
                     $truncatedText = rtrim($truncatedText, '"\'{}[]');
-                    $msg['BTEXT'] = $truncatedText . "...";
+                    $msg['BTEXT'] = $truncatedText . '...';
                 }
-                $arrMessages[] = ['role' => 'assistant', 'content' => "[".$msg['BID']."] ".$msg['BTEXT']];
+                $arrMessages[] = ['role' => 'assistant', 'content' => '['.$msg['BID'].'] '.$msg['BTEXT']];
             }
         }
 
         // Add current message
-        $msgText = json_encode($msgArr,JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        $msgText = json_encode($msgArr, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
         $arrMessages[] = ['role' => 'user', 'content' => $msgText];
-        $myModel = $GLOBALS["AI_CHAT"]["MODEL"];
+        $myModel = $GLOBALS['AI_CHAT']['MODEL'];
 
         try {
             $chat = $client->chat()->create([
@@ -98,33 +101,36 @@ class AIOpenAI {
                 'messages' => $arrMessages
             ]);
         } catch (\Throwable $err) {
-            if($GLOBALS["debug"]) error_log("OpenAI sortingPrompt error: ".$err->getMessage());
-            return "*API sorting Error - " . $err->getMessage();
+            if ($GLOBALS['debug']) {
+                error_log('OpenAI sortingPrompt error: '.$err->getMessage());
+            }
+            return '*API sorting Error - ' . $err->getMessage();
         }
 
         // Clean and return response
         $answer = $chat['choices'][0]['message']['content'];
-        $answer = str_replace("```json\n", "", $answer);
-        $answer = str_replace("\n```", "", $answer);
-        $answer = str_replace("```json", "", $answer);
-        $answer = str_replace("```", "", $answer);
+        $answer = str_replace("```json\n", '', $answer);
+        $answer = str_replace("\n```", '', $answer);
+        $answer = str_replace('```json', '', $answer);
+        $answer = str_replace('```', '', $answer);
         $answer = trim($answer);
         return $answer;
     }
 
     /**
      * Topic-specific response generator
-     * 
+     *
      * Generates responses based on the specific topic of the message.
      * Uses topic-specific prompts to create more focused and relevant responses.
      * Supports both streaming and non-streaming modes.
-     * 
+     *
      * @param array $msgArr Message array containing topic information
      * @param array $threadArr Thread context for conversation history
      * @param bool $stream Whether to use streaming mode
      * @return array|string|bool Topic-specific response or error message
      */
-    public static function topicPrompt($msgArr, $threadArr, $stream = false): array|string|bool {
+    public static function topicPrompt($msgArr, $threadArr, $stream = false): array|string|bool
+    {
         set_time_limit(3600);
         $systemPrompt = BasicAI::getAprompt($msgArr['BTOPIC'], $msgArr['BLANG'], $msgArr, true);
 
@@ -139,30 +145,30 @@ class AIOpenAI {
             ];
         }
         // Build message history
-        foreach($threadArr as $msg) {
+        foreach ($threadArr as $msg) {
             $role = 'user';
-            if($msg['BDIRECT'] == 'OUT') {
+            if ($msg['BDIRECT'] == 'OUT') {
                 $role = 'assistant';
-            }   
-            $arrMessages[] = ['role' => $role, 'content' => "[".$msg['BDATETIME']."]: ".$msg['BTEXT']];
+            }
+            $arrMessages[] = ['role' => $role, 'content' => '['.$msg['BDATETIME'].']: '.$msg['BTEXT']];
         }
 
         // Add current message
-        if($stream) {
+        if ($stream) {
             $msgText = $msgArr['BTEXT'];
-            if(strlen($msgArr['BFILETEXT']) > 1) {
+            if (strlen($msgArr['BFILETEXT']) > 1) {
                 $msgText .= "\n\n\n---\n\n\nUser provided a file: ".$msgArr['BFILETYPE'].", saying: '".$msgArr['BFILETEXT']."'\n\n";
             }
             $arrMessages[] = ['role' => 'user', 'content' => $msgText];
         } else {
-            $msgText = json_encode($msgArr,JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-            $arrMessages[] = ['role' => 'user', 'content' => $msgText];    
+            $msgText = json_encode($msgArr, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+            $arrMessages[] = ['role' => 'user', 'content' => $msgText];
         }
 
         // Respect preselected globals for model (provider already chosen upstream)
-        $myModel = $GLOBALS["AI_CHAT"]["MODEL"];
+        $myModel = $GLOBALS['AI_CHAT']['MODEL'];
 
-        //error_log(" *************** OPENAI call - response object:" . date("Y-m-d H:i:s"));        
+        //error_log(" *************** OPENAI call - response object:" . date("Y-m-d H:i:s"));
         // now ask the AI and give the stream out or the result when done!
         try {
             if ($stream) {
@@ -171,8 +177,8 @@ class AIOpenAI {
                     'model' => $myModel,
                     'tools' => [
                         [
-                            "type" => "web_search_preview",
-                            "search_context_size" => "low"
+                            'type' => 'web_search_preview',
+                            'search_context_size' => 'low'
                         ]
                     ],
                     'input' => $arrMessages,
@@ -186,64 +192,72 @@ class AIOpenAI {
                 ]);
 
                 $answer = '';
-                
+
                 foreach ($stream as $response) {
                     // Handle text delta events - stream the difference
                     if ($response->event === 'response.output_text.delta') {
                         // Try to access delta text directly from the response object
                         $textChunk = '';
-                        
+
                         $repArr = $response->toArray();
 
                         // Try different ways to access delta text
-                        if(isset($repArr['data']['delta'])) {
+                        if (isset($repArr['data']['delta'])) {
                             $textChunk = $repArr['data']['delta'];
                             // Debug: log the response structure on localhost
-                            if (isset($_SERVER['HTTP_HOST']) && in_array($_SERVER['HTTP_HOST'], ['localhost', '127.0.0.1']) && 1==2) {
-                                if($GLOBALS["debug"]) error_log("DEBUG: Response structure: " . print_r($response->toArray(), true));
+                            if (isset($_SERVER['HTTP_HOST']) && in_array($_SERVER['HTTP_HOST'], ['localhost', '127.0.0.1']) && 1 == 2) {
+                                if ($GLOBALS['debug']) {
+                                    error_log('DEBUG: Response structure: ' . print_r($response->toArray(), true));
+                                }
                             }
                         }
-                        
+
                         // Only stream non-empty chunks
                         if (!empty($textChunk)) {
-                            if($GLOBALS["debug"]) error_log("DEBUG: Streaming chunk: " . $textChunk);
+                            if ($GLOBALS['debug']) {
+                                error_log('DEBUG: Streaming chunk: ' . $textChunk);
+                            }
                             $answer .= $textChunk;
                             // Stream the chunk to frontend
-                            Frontend::statusToStream($msgArr["BID"], 'ai', $textChunk);
+                            Frontend::statusToStream($msgArr['BID'], 'ai', $textChunk);
                         }
                     }
-                    
+
                     // Handle text done events - might contain final text
                     if ($response->event === 'response.output_text.done') {
                         // Debug: log the response structure on localhost
-                        if (isset($_SERVER['HTTP_HOST']) && in_array($_SERVER['HTTP_HOST'], ['localhost', '127.0.0.1']) && 1==2) {
-                            if($GLOBALS["debug"]) error_log("DEBUG: Response event: " . $response->event);
-                            if($GLOBALS["debug"]) error_log("DEBUG: Response structure: " . print_r($response->toArray(), true));
+                        if (isset($_SERVER['HTTP_HOST']) && in_array($_SERVER['HTTP_HOST'], ['localhost', '127.0.0.1']) && 1 == 2) {
+                            if ($GLOBALS['debug']) {
+                                error_log('DEBUG: Response event: ' . $response->event);
+                            }
+                            if ($GLOBALS['debug']) {
+                                error_log('DEBUG: Response structure: ' . print_r($response->toArray(), true));
+                            }
                         }
                         // Try to access final text
                         if (isset($response->text)) {
                             $finalText = $response->text;
                             // If we don't have accumulated text, use the final text
-                            if(empty($answer)) {
+                            if (empty($answer)) {
                                 $answer = $finalText;
                             }
                         }
                     }
-                    
+
                     // Handle errors
                     if ($response->event === 'error') {
-                        return "*API topic Error - Streaming failed: " . $response->message;
+                        return '*API topic Error - Streaming failed: ' . $response->message;
                     }
                 }
                 // error_log("***************** DEBUG: Streaming done - answer: ".$answer);
-                // **************************************************************************************************                
+                // **************************************************************************************************
                 // ** return a different way to the rest of the process
                 $arrAnswer = $msgArr;
                 $arrAnswer['BTEXT'] = $answer;
                 $arrAnswer['BDIRECT'] = 'OUT';
                 $arrAnswer['BDATETIME'] = date('Y-m-d H:i:s');
                 $arrAnswer['BUNIXTIMES'] = time();
-                
+
                 // Clear file-related fields since there's no valid JSON
                 $arrAnswer['BFILE'] = 0;
                 $arrAnswer['BFILEPATH'] = '';
@@ -253,20 +267,20 @@ class AIOpenAI {
                 // Add model information to the response
                 $arrAnswer['_USED_MODEL'] = $myModel;
                 $arrAnswer['_AI_SERVICE'] = 'AIOpenAI';
-                
+
                 // avoid double output to the chat window
                 $arrAnswer['ALREADYSHOWN'] = true;
 
                 return $arrAnswer;
-                
+
             } else {
                 // Use non-streaming mode (existing logic)
                 $chat = $client->responses()->create([
                     'model' => $myModel,
                     'tools' => [
                         [
-                            "type" => "web_search_preview",
-                            "search_context_size" => "low"
+                            'type' => 'web_search_preview',
+                            'search_context_size' => 'low'
                         ]
                     ],
                     'input' => $arrMessages,
@@ -284,11 +298,10 @@ class AIOpenAI {
                 foreach ($chat->output as $output) {
                     if ($output->type === 'message'          // nur Messages …
                         && $output->role === 'assistant'     // … vom Assistenten
-                        && $output->status === 'completed')  // … die fertig sind
-                    {
+                        && $output->status === 'completed') {  // … die fertig sind
                         foreach ($output->content as $content) {
                             if ($content->type === 'output_text') {
-                                if($stream) {
+                                if ($stream) {
                                     // Already streamed above, just accumulate for final processing
                                     $answer .= $content->text . PHP_EOL;
                                 } else {
@@ -298,29 +311,29 @@ class AIOpenAI {
                         }
                     }
                 }
-                
+
                 // Clean JSON response - only if it starts with JSON markers
                 if (strpos($answer, "```json\n") === 0) {
                     $answer = substr($answer, 8); // Remove "```json\n" from start
                     if (strpos($answer, "\n```") !== false) {
-                        $answer = str_replace("\n```", "", $answer);
+                        $answer = str_replace("\n```", '', $answer);
                     }
-                } elseif (strpos($answer, "```json") === 0) {
+                } elseif (strpos($answer, '```json') === 0) {
                     $answer = substr($answer, 7); // Remove "```json" from start
-                    if (strpos($answer, "```") !== false) {
-                        $answer = str_replace("```", "", $answer);
+                    if (strpos($answer, '```') !== false) {
+                        $answer = str_replace('```', '', $answer);
                     }
-                } elseif (strpos($answer, "```") === 0) {
+                } elseif (strpos($answer, '```') === 0) {
                     $answer = substr($answer, 3); // Remove "```" from start
-                    if (strpos($answer, "```") !== false) {
-                        $answer = str_replace("```", "", $answer);
+                    if (strpos($answer, '```') !== false) {
+                        $answer = str_replace('```', '', $answer);
                     }
                 }
                 $answer = trim($answer);
 
                 //error_log(" __________________________ OPENAI ANSWER: ".$answer);
 
-                if(Tools::isValidJson($answer) == false) {
+                if (Tools::isValidJson($answer) == false) {
                     //error_log(" __________________________ OPENAI ANSWER: ".$answer);
                     // Fill $arrAnswer with values from $msgArr when JSON is not valid
                     $arrAnswer = $msgArr;
@@ -328,7 +341,7 @@ class AIOpenAI {
                     $arrAnswer['BDIRECT'] = 'OUT';
                     $arrAnswer['BDATETIME'] = date('Y-m-d H:i:s');
                     $arrAnswer['BUNIXTIMES'] = time();
-                    
+
                     // Clear file-related fields since there's no valid JSON
                     $arrAnswer['BFILE'] = 0;
                     $arrAnswer['BFILEPATH'] = '';
@@ -339,90 +352,92 @@ class AIOpenAI {
                     try {
                         $arrAnswer = json_decode($answer, true);
                     } catch (Exception $err) {
-                        return "*API topic Error - Ralf made a bubu - please mail that to him: * " . $err->getMessage();
-                    }    
+                        return '*API topic Error - Ralf made a bubu - please mail that to him: * ' . $err->getMessage();
+                    }
                 }
-                
+
                 // Add model information to the response
                 $arrAnswer['_USED_MODEL'] = $myModel;
                 $arrAnswer['_AI_SERVICE'] = 'AIOpenAI';
-                
-                //file_put_contents('up/openai_log_'.(date("His")).'.txt', print_r($chat, true));            
+
+                //file_put_contents('up/openai_log_'.(date("His")).'.txt', print_r($chat, true));
                 return $arrAnswer;
             }
-            
+
         } catch (Exception $err) {
-            return "*APItopic Error - Ralf made a bubu - please mail that to him: * " . $err->getMessage();
+            return '*APItopic Error - Ralf made a bubu - please mail that to him: * ' . $err->getMessage();
         }
     }
 
     /**
      * Welcome message generator
-     * 
+     *
      * Creates a personalized welcome message for new users.
      * Includes information about available commands and features.
-     * 
+     *
      * @param array $msgArr Message array containing user information
      * @return array|string|bool Welcome message or error message
      */
-    public static function welcomePrompt($msgArr): array|string|bool {
+    public static function welcomePrompt($msgArr): array|string|bool
+    {
         $arrPrompt = BasicAI::getAprompt('tools:help');
         $systemPrompt = $arrPrompt['BPROMPT'];
-        
+
         $client = self::$client;
 
         $arrMessages = [
             ['role' => 'system', 'content' => $systemPrompt],
         ];
-        
+
         $msgText = '{"BCOMMAND":"/list","BLANG":"'.$msgArr['BLANG'].'"}';
         $arrMessages[] = ['role' => 'user', 'content' => $msgText];
-        $myModel = $GLOBALS["AI_CHAT"]["MODEL"];
+        $myModel = $GLOBALS['AI_CHAT']['MODEL'];
         try {
             $chat = $client->chat()->create([
                 'model' => $myModel,
                 'messages' => $arrMessages
             ]);
         } catch (Exception $err) {
-            return "*APIwelcome Error - Ralf made a bubu - please mail that to him: * " . $err->getMessage();
+            return '*APIwelcome Error - Ralf made a bubu - please mail that to him: * ' . $err->getMessage();
         }
         return $chat['choices'][0]['message']['content'];
-    }    
+    }
     /**
      * Text to speech converter
-     * 
+     *
      * Converts text content to speech using OpenAI's text-to-speech API.
      * Saves the generated audio file and returns the file information.
-     * 
+     *
      * @param array $msgArr Message array containing text to convert
      * @param array $usrArr User array containing user information
      * @return array|bool Message array with file information or false on error
      */
-    public static function textToSpeech($msgArr, $usrArr): array | bool {
+    public static function textToSpeech($msgArr, $usrArr): array | bool
+    {
         // https://github.com/openai-php/client/issues/30
         $client = OpenAI::client(self::$key);
 
         $response = $client->audio()->speech([
-            'model' => $GLOBALS["AI_TEXT2SOUND"]["MODEL"],
+            'model' => $GLOBALS['AI_TEXT2SOUND']['MODEL'],
             'input' => $msgArr['BTEXT'],
             'voice' => 'nova',
         ]);
-        
+
         // --- save the output
-        if(strlen($response) > 1000) {
+        if (strlen($response) > 1000) {
             $userPhoneNo = $usrArr['BPROVIDERID'];
-            $savePath = substr($userPhoneNo, -5, 3) . '/' . substr($userPhoneNo, -2, 2) . '/' . date("Ym");        
+            $savePath = substr($userPhoneNo, -5, 3) . '/' . substr($userPhoneNo, -2, 2) . '/' . date('Ym');
             $absSavePath = rtrim(UPLOAD_DIR, '/').'/'.$savePath;
-            if(!is_dir($absSavePath)) {
+            if (!is_dir($absSavePath)) {
                 mkdir($absSavePath, 0777, true);
             }
             $saveTo = $savePath . '/' . 'wa_'.(time()).'.mp3';
             file_put_contents(rtrim(UPLOAD_DIR, '/').'/'.$saveTo, $response);
-            $msgArr['BFILE']= 1;
+            $msgArr['BFILE'] = 1;
             $msgArr['BFILEPATH'] = $saveTo;
             $msgArr['BFILETYPE'] = 'mp3';
 
-            if(file_exists(rtrim(UPLOAD_DIR, '/').'/'.$saveTo)) {
+            if (file_exists(rtrim(UPLOAD_DIR, '/').'/'.$saveTo)) {
                 return $msgArr;
             }
         }
@@ -430,25 +445,26 @@ class AIOpenAI {
     }
     /**
      * Image prompt handler
-     * 
+     *
      * Generates images based on text prompts using OpenAI's image generation API.
      * Saves the generated image and returns the file information.
-     * 
+     *
      * @param array $msgArr Message array containing image prompt
      * @param bool $stream Whether to stream the response
      * @return array Message array with image file information
      */
-    public static function picPrompt($msgArr, $stream = false): array {
-        
+    public static function picPrompt($msgArr, $stream = false): array
+    {
+
         if (!empty($GLOBALS['debug'])) {
-            error_log("AIOpenAI::picPrompt: Starting image generation for msgId=" . $msgArr['BID']);
-            error_log("AIOpenAI::picPrompt: Original text: " . substr($msgArr['BTEXT'], 0, 100));
+            error_log('AIOpenAI::picPrompt: Starting image generation for msgId=' . $msgArr['BID']);
+            error_log('AIOpenAI::picPrompt: Original text: ' . substr($msgArr['BTEXT'], 0, 100));
         }
-        
+
         $usrArr = Central::getUsrById($msgArr['BUSERID']);
 
-        if(substr($msgArr['BTEXT'], 0, 1) == '/') {
-            $picPrompt = substr($msgArr['BTEXT'], strpos($msgArr['BTEXT'], " "));
+        if (substr($msgArr['BTEXT'], 0, 1) == '/') {
+            $picPrompt = substr($msgArr['BTEXT'], strpos($msgArr['BTEXT'], ' '));
         } else {
             $picPrompt = $msgArr['BTEXT'];
         }
@@ -456,21 +472,21 @@ class AIOpenAI {
         $picPrompt = trim($picPrompt);
 
         if (!empty($GLOBALS['debug'])) {
-            error_log("AIOpenAI::picPrompt: Cleaned prompt: " . $picPrompt);
-            error_log("AIOpenAI::picPrompt: API key available: " . (self::$key ? 'YES' : 'NO'));
+            error_log('AIOpenAI::picPrompt: Cleaned prompt: ' . $picPrompt);
+            error_log('AIOpenAI::picPrompt: API key available: ' . (self::$key ? 'YES' : 'NO'));
         }
 
         $client = OpenAI::client(self::$key);
 
-        $myModel = $GLOBALS["AI_TEXT2PIC"]["MODEL"];
-        
+        $myModel = $GLOBALS['AI_TEXT2PIC']['MODEL'];
+
         if (!empty($GLOBALS['debug'])) {
-            error_log("AIOpenAI::picPrompt: Using model: " . $myModel);
+            error_log('AIOpenAI::picPrompt: Using model: ' . $myModel);
         }
 
-        if($stream) { 
+        if ($stream) {
             $update = [
-                'msgId' => $msgArr["BID"],
+                'msgId' => $msgArr['BID'],
                 'status' => 'pre_processing',
                 'message' => 'Generation started... '
             ];
@@ -478,8 +494,8 @@ class AIOpenAI {
         }
 
         if (!empty($GLOBALS['debug'])) {
-            error_log("AIOpenAI::picPrompt: About to call OpenAI images()->create() API");
-            error_log("AIOpenAI::picPrompt: Request params - model: $myModel, prompt length: " . $picPrompt . ", size: 1024x1024");
+            error_log('AIOpenAI::picPrompt: About to call OpenAI images()->create() API');
+            error_log("AIOpenAI::picPrompt: Request params - model: $myModel, prompt length: " . $picPrompt . ', size: 1024x1024');
         }
 
         try {
@@ -489,24 +505,24 @@ class AIOpenAI {
                 'n' => 1,
                 'size' => '1024x1024'
             ]);
-            
+
             if (!empty($GLOBALS['debug'])) {
-                error_log("AIOpenAI::picPrompt: API call done");
-                error_log("AIOpenAI::picPrompt: Response type: " . gettype($response));
+                error_log('AIOpenAI::picPrompt: API call done');
+                error_log('AIOpenAI::picPrompt: Response type: ' . gettype($response));
                 if (method_exists($response, 'toArray')) {
                     $responseArray = $response->toArray();
-                    error_log("AIOpenAI::picPrompt: Response data count: " . (isset($responseArray['data']) ? count($responseArray['data']) : 0));
+                    error_log('AIOpenAI::picPrompt: Response data count: ' . (isset($responseArray['data']) ? count($responseArray['data']) : 0));
                 }
             }
         } catch (Exception $err) {
             if (!empty($GLOBALS['debug'])) {
-                error_log("AIOpenAI::picPrompt: EXCEPTION in images()->create() - " . $err->getMessage());
-                error_log("AIOpenAI::picPrompt: Exception file: " . $err->getFile() . " | Line: " . $err->getLine());
-                error_log("AIOpenAI::picPrompt: Stack trace: " . $err->getTraceAsString());
+                error_log('AIOpenAI::picPrompt: EXCEPTION in images()->create() - ' . $err->getMessage());
+                error_log('AIOpenAI::picPrompt: Exception file: ' . $err->getFile() . ' | Line: ' . $err->getLine());
+                error_log('AIOpenAI::picPrompt: Stack trace: ' . $err->getTraceAsString());
             }
             if ($stream) {
                 $update = [
-                    'msgId' => $msgArr["BID"],
+                    'msgId' => $msgArr['BID'],
                     'status' => 'pre_processing',
                     'message' => 'Image generation failed: ' . $err->getMessage() . ' '
                 ];
@@ -515,109 +531,110 @@ class AIOpenAI {
             // Return error in msgArr format
             $msgArr['BFILE'] = 0;
             $msgArr['BFILEPATH'] = '';
-            $msgArr['BFILETEXT'] = "API Error: " . $err->getMessage();
+            $msgArr['BFILETEXT'] = 'API Error: ' . $err->getMessage();
             return $msgArr;
         }
 
         //error_log(print_r($response->toArray(), true));
 
         if (!empty($GLOBALS['debug'])) {
-            error_log("AIOpenAI::picPrompt: Processing response data");
+            error_log('AIOpenAI::picPrompt: Processing response data');
         }
 
         foreach ($response->data as $data) {
             $imgBuffer = $data->b64_json; // 'https://oaidalleapiprodscus.blob.core.windows.net/private/...'
         }
-        
+
         if (!empty($GLOBALS['debug'])) {
-            error_log("AIOpenAI::picPrompt: Image buffer length: " . strlen($imgBuffer ?? ''));
-            error_log("AIOpenAI::picPrompt: Buffer starts with data URI: " . (strpos($imgBuffer ?? '', 'data:image') === 0 ? 'YES' : 'NO'));
+            error_log('AIOpenAI::picPrompt: Image buffer length: ' . strlen($imgBuffer ?? ''));
+            error_log('AIOpenAI::picPrompt: Buffer starts with data URI: ' . (strpos($imgBuffer ?? '', 'data:image') === 0 ? 'YES' : 'NO'));
         }
-        
+
         // decode the base64 image
         // Remove the data URI scheme if present
         if (strpos($imgBuffer, 'data:image') === 0) {
             $imgBuffer = preg_replace('/^data:image\/\w+;base64,/', '', $imgBuffer);
             if (!empty($GLOBALS['debug'])) {
-                error_log("AIOpenAI::picPrompt: Removed data URI prefix, new length: " . strlen($imgBuffer));
+                error_log('AIOpenAI::picPrompt: Removed data URI prefix, new length: ' . strlen($imgBuffer));
             }
         }
 
         // Decode base64 to binary
         $imageData = base64_decode($imgBuffer);
         if (!empty($GLOBALS['debug'])) {
-            error_log("AIOpenAI::picPrompt: Decoded image data size: " . strlen($imageData) . " bytes");
+            error_log('AIOpenAI::picPrompt: Decoded image data size: ' . strlen($imageData) . ' bytes');
         }
-        
+
         // should be dynamic!
         $fileType = 'png';
 
         // save file to
         // hive: $fileUrl = $arrRes['output'][0]['url'];
-        $fileOutput = substr($usrArr["BID"], -5, 3) . '/' . substr($usrArr["BID"], -2, 2) . '/' . date("Ym");
+        $fileOutput = substr($usrArr['BID'], -5, 3) . '/' . substr($usrArr['BID'], -2, 2) . '/' . date('Ym');
         $filePath = $fileOutput . '/oai_' . time() . '_' . $msgArr['BID'] . '.' . $fileType;
-        
+
         if (!empty($GLOBALS['debug'])) {
-            error_log("AIOpenAI::picPrompt: File save path: up/" . $filePath);
-            error_log("AIOpenAI::picPrompt: Directory path: up/" . $fileOutput);
+            error_log('AIOpenAI::picPrompt: File save path: up/' . $filePath);
+            error_log('AIOpenAI::picPrompt: Directory path: up/' . $fileOutput);
         }
-        
+
         // create the directory if it doesn't exist
-        if(!is_dir('up/'.$fileOutput)) {
+        if (!is_dir('up/'.$fileOutput)) {
             if (!empty($GLOBALS['debug'])) {
-                error_log("AIOpenAI::picPrompt: Creating directory: up/" . $fileOutput);
+                error_log('AIOpenAI::picPrompt: Creating directory: up/' . $fileOutput);
             }
             mkdir('up/'.$fileOutput, 0777, true);
         }
-        
+
         $msgArr['BFILE'] = 1;
         $msgArr['BFILETEXT'] = 'OK: OpenAI Image'; //json_encode($msgArr['input']);
         $msgArr['BFILEPATH'] = $filePath;
-        $msgArr['BFILETYPE'] = $fileType;    
+        $msgArr['BFILETYPE'] = $fileType;
 
         try {
             $bytesWritten = file_put_contents('up/'.$filePath, $imageData);
             if (!empty($GLOBALS['debug'])) {
-                error_log("AIOpenAI::picPrompt: File saved successfully - bytes written: " . $bytesWritten);
-                error_log("AIOpenAI::picPrompt: File exists check: " . (file_exists('up/'.$filePath) ? 'YES' : 'NO'));
+                error_log('AIOpenAI::picPrompt: File saved successfully - bytes written: ' . $bytesWritten);
+                error_log('AIOpenAI::picPrompt: File exists check: ' . (file_exists('up/'.$filePath) ? 'YES' : 'NO'));
                 if (file_exists('up/'.$filePath)) {
-                    error_log("AIOpenAI::picPrompt: Final file size: " . filesize('up/'.$filePath) . " bytes");
+                    error_log('AIOpenAI::picPrompt: Final file size: ' . filesize('up/'.$filePath) . ' bytes');
                 }
             }
             // when URL is available, copy($fileUrl, 'up/'.$filePath);
         } catch (Exception $e) {
             if (!empty($GLOBALS['debug'])) {
-                error_log("AIOpenAI::picPrompt: EXCEPTION during file save - " . $e->getMessage());
-                error_log("AIOpenAI::picPrompt: Exception file: " . $e->getFile() . " | Line: " . $e->getLine());
+                error_log('AIOpenAI::picPrompt: EXCEPTION during file save - ' . $e->getMessage());
+                error_log('AIOpenAI::picPrompt: Exception file: ' . $e->getFile() . ' | Line: ' . $e->getLine());
             }
             $msgArr['BFILE'] = 0;
             $msgArr['BFILEPATH'] = '';
-            $msgArr['BFILETEXT'] = "File Save Error: " . $e->getMessage();
+            $msgArr['BFILETEXT'] = 'File Save Error: ' . $e->getMessage();
         }
-        
+
         if (!empty($GLOBALS['debug'])) {
-            error_log("AIOpenAI::picPrompt: Completed - BFILE=" . $msgArr['BFILE'] . " | BFILEPATH=" . ($msgArr['BFILEPATH'] ?? 'empty') . " | BFILETEXT=" . substr($msgArr['BFILETEXT'] ?? '', 0, 50));
+            error_log('AIOpenAI::picPrompt: Completed - BFILE=' . $msgArr['BFILE'] . ' | BFILEPATH=' . ($msgArr['BFILEPATH'] ?? 'empty') . ' | BFILETEXT=' . substr($msgArr['BFILETEXT'] ?? '', 0, 50));
         }
-        
+
         // return the message array
         return $msgArr;
     }
 
     /**
      * Image content analyzer
-     * 
+     *
      * Analyzes image content and generates a description using OpenAI's vision API.
      * Handles image resizing for large files and returns the analysis results.
-     * 
+     *
      * @param array $arrMessage Message array containing image information
      * @return array|string|bool Image description or error message
      */
-    public static function explainImage($arrMessage): array|string|bool {
+    public static function explainImage($arrMessage): array|string|bool
+    {
         // Resize image if too large
         $absFile = rtrim(UPLOAD_DIR, '/').'/'.$arrMessage['BFILEPATH'];
-        if(filesize($absFile) > intval(1024*1024*3.5)) {
+        if (filesize($absFile) > intval(1024 * 1024 * 3.5)) {
             $imageFile = Tools::giveSmallImage($arrMessage['BFILEPATH'], false, 1200);
-            $tmpAbs = rtrim(UPLOAD_DIR, '/').'/'."tmp_del_".$arrMessage['BID'].".png";
+            $tmpAbs = rtrim(UPLOAD_DIR, '/').'/'.'tmp_del_'.$arrMessage['BID'].'.png';
             $savedFile = imagepng($imageFile, $tmpAbs);
             chmod($tmpAbs, 0755);
             $imagePath = 'up/tmp_del_'.$arrMessage['BID'].'.png';
@@ -628,69 +645,71 @@ class AIOpenAI {
         $client = self::$client;
 
         // Use the global prompt if available, otherwise use default
-        $imgPrompt = isset($GLOBALS["AI_PIC2TEXT"]["PROMPT"]) 
-        ? $GLOBALS["AI_PIC2TEXT"]["PROMPT"] 
+        $imgPrompt = isset($GLOBALS['AI_PIC2TEXT']['PROMPT'])
+        ? $GLOBALS['AI_PIC2TEXT']['PROMPT']
         : 'Describe this image in detail. Be comprehensive and accurate.';
-    
+
         try {
             $response = $client->images()->analyze([
-                'model' => $GLOBALS["AI_PIC2TEXT"]["MODEL"],
+                'model' => $GLOBALS['AI_PIC2TEXT']['MODEL'],
                 'image' => fopen($imagePath, 'r'),
                 'prompt' => $imgPrompt
             ]);
             $arrMessage['BFILETEXT'] = $response['choices'][0]['message']['content'];
         } catch (Exception $err) {
-            $arrMessage['BFILETEXT'] = "*API Image Error - Ralf made a bubu - please mail that to him: * " . $err->getMessage();
+            $arrMessage['BFILETEXT'] = '*API Image Error - Ralf made a bubu - please mail that to him: * ' . $err->getMessage();
         }
         return $arrMessage;
     }
     /**
      * Audio to text converter
-     * 
+     *
      * Transcribes MP3 audio files to text using OpenAI's Whisper API.
      * Handles audio file processing and returns the transcription.
-     * 
+     *
      * @param array $arrMessage Message array containing audio file information
      * @return array|string|bool Transcription text or error message
      */
-    public static function mp3ToText($arrMessage): array|string|bool {
+    public static function mp3ToText($arrMessage): array|string|bool
+    {
         $client = self::$client;
         try {
             $transcription = $client->audio()->transcriptions()->create([
                 'file' => rtrim(UPLOAD_DIR, '/').'/'.$arrMessage['BFILEPATH'],
-                'model' => $GLOBALS["AI_SOUND2TEXT"]["MODEL"],
+                'model' => $GLOBALS['AI_SOUND2TEXT']['MODEL'],
                 'response_format' => 'text'
             ]);
-        
+
             $fullText = $transcription;
 
         } catch (Exception $e) {
-            $fullText = "Error: " . $e->getMessage();
+            $fullText = 'Error: ' . $e->getMessage();
         }
         return $fullText;
     }
     /**
      * Text translator
-     * 
+     *
      * Translates text content to a specified language using OpenAI's translation capabilities.
      * Supports multiple languages and handles translation errors gracefully.
-     * 
+     *
      * @param array $msgArr Message array containing text to translate
      * @param string $lang Target language code (optional)
      * @param string $sourceText Field containing text to translate (optional)
      * @return array Translated message array
      */
-    public static function translateTo($msgArr, $lang='', $sourceText='BTEXT'): array {    
+    public static function translateTo($msgArr, $lang = '', $sourceText = 'BTEXT'): array
+    {
         $targetLang = $msgArr['BLANG'];
-        
-        if(strlen($lang) == 2) {
+
+        if (strlen($lang) == 2) {
             $targetLang = $lang;
         }
 
         $qTerm = $msgArr[$sourceText];
-        
-        if(substr($qTerm, 0, 1) != '/') {
-            $qTerm = "/translate ".$lang." ".$qTerm;
+
+        if (substr($qTerm, 0, 1) != '/') {
+            $qTerm = '/translate '.$lang.' '.$qTerm;
         }
 
         $client = self::$client;
@@ -698,14 +717,21 @@ class AIOpenAI {
         $tPrompt = BasicAI::getAprompt('tools:lang');
         $systemPrompt = is_array($tPrompt) ? ($tPrompt['BPROMPT'] ?? '') : (string)$tPrompt;
         // Normalize content like in AIGroq
-        $normalizeContent = function($content) {
-            if (is_string($content)) { return $content; }
+        $normalizeContent = function ($content) {
+            if (is_string($content)) {
+                return $content;
+            }
             if (is_array($content)) {
                 $looksLikeParts = true;
                 foreach ($content as $part) {
-                    if (!is_array($part) || !isset($part['type'])) { $looksLikeParts = false; break; }
+                    if (!is_array($part) || !isset($part['type'])) {
+                        $looksLikeParts = false;
+                        break;
+                    }
                 }
-                if ($looksLikeParts) { return $content; }
+                if ($looksLikeParts) {
+                    return $content;
+                }
                 return json_encode($content, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
             }
             return json_encode($content, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
@@ -717,7 +743,7 @@ class AIOpenAI {
 
         $arrMessages[] = ['role' => 'user', 'content' => $normalizeContent($qTerm)];
 
-        $myModel = $GLOBALS["AI_CHAT"]["MODEL"];
+        $myModel = $GLOBALS['AI_CHAT']['MODEL'];
         try {
             $chat = $client->chat()->create([
                 'model' => $myModel,
@@ -725,11 +751,15 @@ class AIOpenAI {
             ]);
         } catch (Exception $err) {
             // Return structured debug similar to AIGroq
-            $toText = function($value) {
-                if (is_string($value)) { return $value; }
+            $toText = function ($value) {
+                if (is_string($value)) {
+                    return $value;
+                }
                 if (is_array($value) || is_object($value)) {
                     $json = json_encode($value, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-                    if ($json !== false && $json !== null) { return $json; }
+                    if ($json !== false && $json !== null) {
+                        return $json;
+                    }
                     return print_r($value, true);
                 }
                 return (string)$value;
@@ -738,17 +768,23 @@ class AIOpenAI {
             $usrContent = $arrMessages[1]['content'] ?? '';
             $sysType = gettype($sysContent);
             $usrType = gettype($usrContent);
-            if ($sysType === 'object' && function_exists('get_class')) { $sysType .= ':' . get_class($sysContent); }
-            if ($usrType === 'object' && function_exists('get_class')) { $usrType .= ':' . get_class($usrContent); }
+            if ($sysType === 'object' && function_exists('get_class')) {
+                $sysType .= ':' . get_class($sysContent);
+            }
+            if ($usrType === 'object' && function_exists('get_class')) {
+                $usrType .= ':' . get_class($usrContent);
+            }
             $debug = "DEBUG translate failure OpenAI\n"
-                . "error: " . $err->getMessage() . "\n"
-                . "model: " . ($myModel ?? '') . "\n"
-                . "systemPrompt.type: " . $sysType . "\n"
-                . "systemPrompt.text: " . $toText($sysContent) . "\n"
-                . "userCommand.type: " . $usrType . "\n"
-                . "userCommand.text: " . $toText($usrContent) . "\n"
-                . "messages.json: " . $toText($arrMessages) . "\n";
-            if (strlen($debug) > 8000) { $debug = substr($debug, 0, 8000) . "..."; }
+                . 'error: ' . $err->getMessage() . "\n"
+                . 'model: ' . ($myModel ?? '') . "\n"
+                . 'systemPrompt.type: ' . $sysType . "\n"
+                . 'systemPrompt.text: ' . $toText($sysContent) . "\n"
+                . 'userCommand.type: ' . $usrType . "\n"
+                . 'userCommand.text: ' . $toText($usrContent) . "\n"
+                . 'messages.json: ' . $toText($arrMessages) . "\n";
+            if (strlen($debug) > 8000) {
+                $debug = substr($debug, 0, 8000) . '...';
+            }
             $msgArr['BTEXT'] = $debug;
             return $msgArr;
         }
@@ -756,43 +792,45 @@ class AIOpenAI {
         $msgArr[$sourceText] = $chat['choices'][0]['message']['content'];
         return $msgArr;
     }
-        /**
+    /**
      * Summarize text using Groq's summarization API
-     * 
+     *
      * Summarizes a given text using Groq's summarization capabilities.
-     * 
+     *
     */
-    public static function summarizePrompt($text): string {
+    public static function summarizePrompt($text): string
+    {
         $client = self::$client;
         $arrMessages = [
             ['role' => 'system', 'content' => 'You summarize the text of the user to a short 2-3 sentence summary. Do not add any other text, just the essence of the text. Stay under 128 characters. Answer in the language of the text.'],
         ];
         $arrMessages[] = ['role' => 'user', 'content' => $text];
-        
-        $myModel = $GLOBALS["AI_CHAT"]["MODEL"];
+
+        $myModel = $GLOBALS['AI_CHAT']['MODEL'];
         try {
             $chat = $client->chat()->create([
                 'model' => $myModel,
                 'messages' => $arrMessages
             ]);
         } catch (Exception $err) {
-            return "*APIwelcome Error - Ralf made a bubu - please mail that to him: * " . $err->getMessage();
+            return '*APIwelcome Error - Ralf made a bubu - please mail that to him: * ' . $err->getMessage();
         }
         return $chat['choices'][0]['message']['content'];
     }
 
     /**
      * Create Office file using OpenAI Responses API
-     * 
+     *
      * Creates PowerPoint, Word, or Excel files using OpenAI's Responses API with code interpreter.
      * Follows the same logic as the openai-ppt.sh script but implemented in PHP.
-     * 
+     *
      * @param string $creatorPrompt The prompt describing what file to create
      * @param array $usrArr User array containing user information
      * @param bool $stream Whether to stream progress updates
      * @return array Result array with file information or error message
      */
-    public static function createOfficeFile($msgArr, $usrArr, $stream = false): array {
+    public static function createOfficeFile($msgArr, $usrArr, $stream = false): array
+    {
         $creatorPrompt = $msgArr['BTEXT'];
         $result = [
             'success' => false,
@@ -803,18 +841,22 @@ class AIOpenAI {
         ];
 
         // Check if we're on localhost for debug logging
-        $isLocalhost = in_array($_SERVER['HTTP_HOST'] ?? '', ['localhost', '127.0.0.1', '::1']) || 
+        $isLocalhost = in_array($_SERVER['HTTP_HOST'] ?? '', ['localhost', '127.0.0.1', '::1']) ||
                       (isset($_SERVER['SERVER_NAME']) && in_array($_SERVER['SERVER_NAME'], ['localhost', '127.0.0.1', '::1']));
 
         if ($isLocalhost) {
-            if($GLOBALS["debug"]) error_log("DEBUG createOfficeFile: Starting with prompt: " . substr($creatorPrompt, 0, 100) . "...");
+            if ($GLOBALS['debug']) {
+                error_log('DEBUG createOfficeFile: Starting with prompt: ' . substr($creatorPrompt, 0, 100) . '...');
+            }
         }
 
         // Initialize OpenAI client
         if (!self::init()) {
             $result['error'] = 'Failed to initialize OpenAI client';
             if ($isLocalhost) {
-                if($GLOBALS["debug"]) error_log("DEBUG createOfficeFile: Failed to initialize OpenAI client");
+                if ($GLOBALS['debug']) {
+                    error_log('DEBUG createOfficeFile: Failed to initialize OpenAI client');
+                }
             }
             return $result;
         }
@@ -823,13 +865,17 @@ class AIOpenAI {
         if (!$apiKey) {
             $result['error'] = 'OpenAI API key not found';
             if ($isLocalhost) {
-                if($GLOBALS["debug"]) error_log("DEBUG createOfficeFile: OpenAI API key not found");
+                if ($GLOBALS['debug']) {
+                    error_log('DEBUG createOfficeFile: OpenAI API key not found');
+                }
             }
             return $result;
         }
 
         if ($isLocalhost) {
-            if($GLOBALS["debug"]) error_log("DEBUG createOfficeFile: API key found, length: " . strlen($apiKey));
+            if ($GLOBALS['debug']) {
+                error_log('DEBUG createOfficeFile: API key found, length: ' . strlen($apiKey));
+            }
         }
 
         if ($stream) {
@@ -844,7 +890,7 @@ class AIOpenAI {
         try {
             // Step 1: Create the response request
             $responseData = [
-                'model' => $GLOBALS["AI_CHAT"]["MODEL"],
+                'model' => $GLOBALS['AI_CHAT']['MODEL'],
                 'tools' => [
                     [
                         'type' => 'code_interpreter',
@@ -863,7 +909,9 @@ class AIOpenAI {
             ];
 
             if ($isLocalhost) {
-                if($GLOBALS["debug"]) error_log("DEBUG createOfficeFile: Request data prepared: " . json_encode($responseData,JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
+                if ($GLOBALS['debug']) {
+                    error_log('DEBUG createOfficeFile: Request data prepared: ' . json_encode($responseData, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
+                }
             }
 
             $headers = [
@@ -881,7 +929,9 @@ class AIOpenAI {
             }
 
             if ($isLocalhost) {
-                if($GLOBALS["debug"]) error_log("DEBUG createOfficeFile: Making initial request to OpenAI API...");
+                if ($GLOBALS['debug']) {
+                    error_log('DEBUG createOfficeFile: Making initial request to OpenAI API...');
+                }
             }
 
             // Make the initial request using Curler
@@ -892,13 +942,17 @@ class AIOpenAI {
             );
 
             if ($isLocalhost) {
-                if($GLOBALS["debug"]) error_log("DEBUG createOfficeFile: Initial response received: " . json_encode($responseJson));
+                if ($GLOBALS['debug']) {
+                    error_log('DEBUG createOfficeFile: Initial response received: ' . json_encode($responseJson));
+                }
             }
 
             if (!isset($responseJson['id'])) {
                 $result['error'] = 'Failed to create response: ' . json_encode($responseJson);
                 if ($isLocalhost) {
-                    if($GLOBALS["debug"]) error_log("DEBUG createOfficeFile: No response ID in response: " . json_encode($responseJson));
+                    if ($GLOBALS['debug']) {
+                        error_log('DEBUG createOfficeFile: No response ID in response: ' . json_encode($responseJson));
+                    }
                 }
                 return $result;
             }
@@ -906,7 +960,9 @@ class AIOpenAI {
             $responseId = $responseJson['id'];
 
             if ($isLocalhost) {
-                if($GLOBALS["debug"]) error_log("DEBUG createOfficeFile: Response ID obtained: " . $responseId);
+                if ($GLOBALS['debug']) {
+                    error_log('DEBUG createOfficeFile: Response ID obtained: ' . $responseId);
+                }
             }
 
             if ($stream) {
@@ -921,10 +977,12 @@ class AIOpenAI {
             // Step 2: Poll until the response is completed
             $maxAttempts = 60; // 5 minutes with 5-second intervals
             $attempts = 0;
-            
+
             while ($attempts < $maxAttempts) {
                 if ($isLocalhost) {
-                    if($GLOBALS["debug"]) error_log("DEBUG createOfficeFile: Polling attempt " . ($attempts + 1) . " for response ID: " . $responseId);
+                    if ($GLOBALS['debug']) {
+                        error_log('DEBUG createOfficeFile: Polling attempt ' . ($attempts + 1) . ' for response ID: ' . $responseId);
+                    }
                 }
 
                 $statusResponse = Curler::callJson(
@@ -933,13 +991,17 @@ class AIOpenAI {
                 );
 
                 if ($isLocalhost) {
-                    if($GLOBALS["debug"]) error_log("DEBUG createOfficeFile: Status response: " . json_encode($statusResponse));
+                    if ($GLOBALS['debug']) {
+                        error_log('DEBUG createOfficeFile: Status response: ' . json_encode($statusResponse));
+                    }
                 }
 
                 if (!isset($statusResponse['status'])) {
                     $result['error'] = 'Failed to get response status';
                     if ($isLocalhost) {
-                        if($GLOBALS["debug"]) error_log("DEBUG createOfficeFile: No status in response: " . json_encode($statusResponse));
+                        if ($GLOBALS['debug']) {
+                            error_log('DEBUG createOfficeFile: No status in response: ' . json_encode($statusResponse));
+                        }
                     }
                     return $result;
                 }
@@ -947,21 +1009,25 @@ class AIOpenAI {
                 $status = $statusResponse['status'];
 
                 if ($isLocalhost) {
-                    if($GLOBALS["debug"]) error_log("DEBUG createOfficeFile: Current status: " . $status);
+                    if ($GLOBALS['debug']) {
+                        error_log('DEBUG createOfficeFile: Current status: ' . $status);
+                    }
                 }
 
                 if ($stream) {
                     $update = [
                         'msgId' => $msgArr['BID'],
                         'status' => 'pre_processing',
-                        'message' => ($attempts+1) .' '
+                        'message' => ($attempts + 1) .' '
                     ];
                     Frontend::printToStream($update);
                 }
 
                 if ($status === 'completed') {
                     if ($isLocalhost) {
-                        if($GLOBALS["debug"]) error_log("DEBUG createOfficeFile: Response completed successfully");
+                        if ($GLOBALS['debug']) {
+                            error_log('DEBUG createOfficeFile: Response completed successfully');
+                        }
                     }
                     break;
                 }
@@ -969,7 +1035,9 @@ class AIOpenAI {
                 if ($status === 'failed' || $status === 'cancelled') {
                     $result['error'] = 'Generation failed with status: ' . $status . ' ';
                     if ($isLocalhost) {
-                        if($GLOBALS["debug"]) error_log("DEBUG createOfficeFile: Generation failed with status: " . $status);
+                        if ($GLOBALS['debug']) {
+                            error_log('DEBUG createOfficeFile: Generation failed with status: ' . $status);
+                        }
                     }
                     return $result;
                 }
@@ -981,7 +1049,9 @@ class AIOpenAI {
             if ($attempts >= $maxAttempts) {
                 $result['error'] = 'Generation timed out after 5 minutes ';
                 if ($isLocalhost) {
-                    if($GLOBALS["debug"]) error_log("DEBUG createOfficeFile: Generation timed out after " . $maxAttempts . " attempts");
+                    if ($GLOBALS['debug']) {
+                        error_log('DEBUG createOfficeFile: Generation timed out after ' . $maxAttempts . ' attempts');
+                    }
                 }
                 return $result;
             }
@@ -1001,45 +1071,57 @@ class AIOpenAI {
             $textContent = null;
 
             if ($isLocalhost) {
-                if($GLOBALS["debug"]) error_log("DEBUG createOfficeFile: Extracting file IDs from completed response");
+                if ($GLOBALS['debug']) {
+                    error_log('DEBUG createOfficeFile: Extracting file IDs from completed response');
+                }
             }
 
             // Search for container_file_citation in the response
             self::extractFileIds($statusResponse, $containerId, $fileId);
 
             if ($isLocalhost) {
-                if($GLOBALS["debug"]) error_log("DEBUG createOfficeFile: Extracted containerId: " . ($containerId ?? 'null') . ", fileId: " . ($fileId ?? 'null'));
+                if ($GLOBALS['debug']) {
+                    error_log('DEBUG createOfficeFile: Extracted containerId: ' . ($containerId ?? 'null') . ', fileId: ' . ($fileId ?? 'null'));
+                }
             }
 
             // If no file found, try to extract text content
             if (!$containerId || !$fileId) {
                 if ($isLocalhost) {
-                    if($GLOBALS["debug"]) error_log("DEBUG createOfficeFile: No file found, checking for text content");
+                    if ($GLOBALS['debug']) {
+                        error_log('DEBUG createOfficeFile: No file found, checking for text content');
+                    }
                 }
-                
+
                 $textContent = self::extractTextContent($statusResponse);
-                
+
                 if ($textContent) {
                     if ($isLocalhost) {
-                        if($GLOBALS["debug"]) error_log("DEBUG createOfficeFile: Found text content, length: " . strlen($textContent));
+                        if ($GLOBALS['debug']) {
+                            error_log('DEBUG createOfficeFile: Found text content, length: ' . strlen($textContent));
+                        }
                     }
-                    
+
                     // Return the text content instead of a file
                     $result['success'] = true;
                     $result['textContent'] = $textContent;
                     $result['filePath'] = '';
                     $result['fileName'] = '';
                     $result['fileType'] = 'text';
-                    
+
                     if ($isLocalhost) {
-                        if($GLOBALS["debug"]) error_log("DEBUG createOfficeFile: Returning text content instead of file");
+                        if ($GLOBALS['debug']) {
+                            error_log('DEBUG createOfficeFile: Returning text content instead of file');
+                        }
                     }
-                    
+
                     return $result;
                 } else {
                     $result['error'] = 'No file or text content found in the response';
                     if ($isLocalhost) {
-                        if($GLOBALS["debug"]) error_log("DEBUG createOfficeFile: No file or text content found in response");
+                        if ($GLOBALS['debug']) {
+                            error_log('DEBUG createOfficeFile: No file or text content found in response');
+                        }
                     }
                     return $result;
                 }
@@ -1056,9 +1138,11 @@ class AIOpenAI {
 
             // Step 4: Download the file
             $downloadUrl = 'https://api.openai.com/v1/containers/' . $containerId . '/files/' . $fileId . '/content';
-            
+
             if ($isLocalhost) {
-                if($GLOBALS["debug"]) error_log("DEBUG createOfficeFile: Downloading file from URL: " . $downloadUrl);
+                if ($GLOBALS['debug']) {
+                    error_log('DEBUG createOfficeFile: Downloading file from URL: ' . $downloadUrl);
+                }
             }
 
             $downloadHeaders = [
@@ -1067,39 +1151,49 @@ class AIOpenAI {
 
             // Use Curler to download the file
             $fileContent = self::downloadFile($downloadUrl, $downloadHeaders);
-            
+
             if ($fileContent === false) {
                 $result['error'] = 'Failed to download file ';
                 if ($isLocalhost) {
-                    if($GLOBALS["debug"]) error_log("DEBUG createOfficeFile: Failed to download file from URL: " . $downloadUrl);
+                    if ($GLOBALS['debug']) {
+                        error_log('DEBUG createOfficeFile: Failed to download file from URL: ' . $downloadUrl);
+                    }
                 }
                 return $result;
             }
 
             if ($isLocalhost) {
-                if($GLOBALS["debug"]) error_log("DEBUG createOfficeFile: File downloaded successfully, size: " . strlen($fileContent) . " bytes");
+                if ($GLOBALS['debug']) {
+                    error_log('DEBUG createOfficeFile: File downloaded successfully, size: ' . strlen($fileContent) . ' bytes');
+                }
             }
 
             // Step 5: Save the file with dynamic path structure
             $fileExtension = self::determineFileExtension($creatorPrompt);
-            
+
             if ($isLocalhost) {
-                if($GLOBALS["debug"]) error_log("DEBUG createOfficeFile: Determined file extension: " . $fileExtension);
+                if ($GLOBALS['debug']) {
+                    error_log('DEBUG createOfficeFile: Determined file extension: ' . $fileExtension);
+                }
             }
 
             // Create dynamic file path similar to picPrompt method
-                    $fileOutput = substr($usrArr["BID"], -5, 3) . '/' . substr($usrArr["BID"], -2, 2) . '/' . date("Ym");
-        $fileName = 'oai_' . time() . '.' . $fileExtension;
+            $fileOutput = substr($usrArr['BID'], -5, 3) . '/' . substr($usrArr['BID'], -2, 2) . '/' . date('Ym');
+            $fileName = 'oai_' . time() . '.' . $fileExtension;
             $filePath = $fileOutput . '/' . $fileName;
-            
+
             if ($isLocalhost) {
-                if($GLOBALS["debug"]) error_log("DEBUG createOfficeFile: File path: up/" . $filePath);
+                if ($GLOBALS['debug']) {
+                    error_log('DEBUG createOfficeFile: File path: up/' . $filePath);
+                }
             }
 
             // Create the directory if it doesn't exist
-            if(!is_dir('up/'.$fileOutput)) {
+            if (!is_dir('up/'.$fileOutput)) {
                 if ($isLocalhost) {
-                    if($GLOBALS["debug"]) error_log("DEBUG createOfficeFile: Creating directory: up/" . $fileOutput);
+                    if ($GLOBALS['debug']) {
+                        error_log('DEBUG createOfficeFile: Creating directory: up/' . $fileOutput);
+                    }
                 }
                 mkdir('up/'.$fileOutput, 0777, true);
             }
@@ -1107,13 +1201,17 @@ class AIOpenAI {
             if (file_put_contents('up/'.$filePath, $fileContent) === false) {
                 $result['error'] = 'Failed to save file ';
                 if ($isLocalhost) {
-                    if($GLOBALS["debug"]) error_log("DEBUG createOfficeFile: Failed to save file to: up/" . $filePath);
+                    if ($GLOBALS['debug']) {
+                        error_log('DEBUG createOfficeFile: Failed to save file to: up/' . $filePath);
+                    }
                 }
                 return $result;
             }
 
             if ($isLocalhost) {
-                if($GLOBALS["debug"]) error_log("DEBUG createOfficeFile: File saved successfully to: up/" . $filePath);
+                if ($GLOBALS['debug']) {
+                    error_log('DEBUG createOfficeFile: File saved successfully to: up/' . $filePath);
+                }
             }
 
             if ($stream) {
@@ -1131,7 +1229,9 @@ class AIOpenAI {
             $result['fileType'] = $fileExtension;
 
             if ($isLocalhost) {
-                if($GLOBALS["debug"]) error_log("DEBUG createOfficeFile: Method completed successfully");
+                if ($GLOBALS['debug']) {
+                    error_log('DEBUG createOfficeFile: Method completed successfully');
+                }
             }
 
             return $result;
@@ -1139,8 +1239,12 @@ class AIOpenAI {
         } catch (Exception $e) {
             $result['error'] = 'Exception: ' . $e->getMessage();
             if ($isLocalhost) {
-                if($GLOBALS["debug"]) error_log("DEBUG createOfficeFile: Exception caught: " . $e->getMessage());
-                if($GLOBALS["debug"]) error_log("DEBUG createOfficeFile: Exception trace: " . $e->getTraceAsString());
+                if ($GLOBALS['debug']) {
+                    error_log('DEBUG createOfficeFile: Exception caught: ' . $e->getMessage());
+                }
+                if ($GLOBALS['debug']) {
+                    error_log('DEBUG createOfficeFile: Exception trace: ' . $e->getTraceAsString());
+                }
             }
             return $result;
         }
@@ -1148,24 +1252,26 @@ class AIOpenAI {
 
     /**
      * Extract container and file IDs from response
-     * 
+     *
      * @param array $response The response array
      * @param string &$containerId Reference to store container ID
      * @param string &$fileId Reference to store file ID
      */
-    private static function extractFileIds($response, &$containerId, &$fileId) {
+    private static function extractFileIds($response, &$containerId, &$fileId)
+    {
         // Recursively search for container_file_citation objects
         self::searchForFileCitation($response, $containerId, $fileId);
     }
 
     /**
      * Recursively search for file citation in response
-     * 
+     *
      * @param mixed $data The data to search
      * @param string &$containerId Reference to store container ID
      * @param string &$fileId Reference to store file ID
      */
-    private static function searchForFileCitation($data, &$containerId, &$fileId) {
+    private static function searchForFileCitation($data, &$containerId, &$fileId)
+    {
         if (is_array($data)) {
             foreach ($data as $key => $value) {
                 if ($key === 'type' && $value === 'container_file_citation') {
@@ -1189,18 +1295,19 @@ class AIOpenAI {
 
     /**
      * Download file content
-     * 
+     *
      * @param string $url The download URL
      * @param array $headers The headers to use
      * @return string|false The file content or false on failure
      */
-    private static function downloadFile($url, $headers) {
+    private static function downloadFile($url, $headers)
+    {
         $ch = curl_init();
         curl_setopt($ch, CURLOPT_URL, $url);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
         curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
-        
+
         $content = curl_exec($ch);
         $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         curl_close($ch);
@@ -1214,13 +1321,14 @@ class AIOpenAI {
 
     /**
      * Determine file extension based on prompt
-     * 
+     *
      * @param string $prompt The creation prompt
      * @return string The file extension
      */
-    private static function determineFileExtension($prompt) {
+    private static function determineFileExtension($prompt)
+    {
         $prompt = strtolower($prompt);
-        
+
         if (strpos($prompt, 'powerpoint') !== false || strpos($prompt, 'ppt') !== false) {
             return 'pptx';
         }
@@ -1230,40 +1338,45 @@ class AIOpenAI {
         if (strpos($prompt, 'word') !== false || strpos($prompt, 'document') !== false) {
             return 'docx';
         }
-        
+
         // Default to pptx for office files
         return 'pptx';
     }
 
     /**
      * Extract text content from response
-     * 
+     *
      * @param array $response The response array
      * @return string|false The extracted text content or false on failure
      */
-    private static function extractTextContent($response) {
+    private static function extractTextContent($response)
+    {
         // Check if we're on localhost for debug logging
-        $isLocalhost = in_array($_SERVER['HTTP_HOST'] ?? '', ['localhost', '127.0.0.1', '::1']) || 
+        $isLocalhost = in_array($_SERVER['HTTP_HOST'] ?? '', ['localhost', '127.0.0.1', '::1']) ||
                       (isset($_SERVER['SERVER_NAME']) && in_array($_SERVER['SERVER_NAME'], ['localhost', '127.0.0.1', '::1']));
 
         if ($isLocalhost) {
-            if($GLOBALS["debug"]) error_log("DEBUG extractTextContent: Starting extraction from response");
+            if ($GLOBALS['debug']) {
+                error_log('DEBUG extractTextContent: Starting extraction from response');
+            }
         }
 
         // Try to extract from the output array structure
         if (isset($response['output']) && is_array($response['output'])) {
             foreach ($response['output'] as $output) {
-                if (isset($output['type']) && $output['type'] === 'message' && 
+                if (isset($output['type']) && $output['type'] === 'message' &&
                     isset($output['content']) && is_array($output['content'])) {
-                    
+
                     foreach ($output['content'] as $content) {
-                        if (isset($content['type']) && $content['type'] === 'output_text' && 
+                        if (isset($content['type']) && $content['type'] === 'output_text' &&
                             isset($content['text'])) {
-                            
+
                             if ($isLocalhost) {
-                                if($GLOBALS["debug"]) error_log("DEBUG extractTextContent: Found text content in output_text");
+                                if ($GLOBALS['debug']) {
+                                    error_log('DEBUG extractTextContent: Found text content in output_text');
+                                }
                             }
-                            
+
                             return $content['text'];
                         }
                     }
@@ -1274,15 +1387,19 @@ class AIOpenAI {
         // Fallback: try to extract from choices structure (older API format)
         if (isset($response['choices'][0]['message']['content'])) {
             if ($isLocalhost) {
-                if($GLOBALS["debug"]) error_log("DEBUG extractTextContent: Found text content in choices structure");
+                if ($GLOBALS['debug']) {
+                    error_log('DEBUG extractTextContent: Found text content in choices structure');
+                }
             }
             return $response['choices'][0]['message']['content'];
         }
 
         if ($isLocalhost) {
-            if($GLOBALS["debug"]) error_log("DEBUG extractTextContent: No text content found in response");
+            if ($GLOBALS['debug']) {
+                error_log('DEBUG extractTextContent: No text content found in response');
+            }
         }
-        
+
         return false;
     }
 
@@ -1296,27 +1413,30 @@ class AIOpenAI {
 
     /**
      * Analyze uploaded file using OpenAI
-     * 
+     *
      * Uploads a file to OpenAI and analyzes it using the Responses API.
      * Supports office documents, PDFs, code files, and other document types.
-     * 
+     *
      * @param array $msgArr Message array containing file information
      * @param bool $stream Whether to stream progress updates
      * @return array|string|bool Analysis result or error message
      */
-    public static function analyzeFile($msgArr, $stream = false): array|string|bool {
+    public static function analyzeFile($msgArr, $stream = false): array|string|bool
+    {
         // Check if file exists and is actually a file
         $filePath = __DIR__ . '/../up/' . $msgArr['BFILEPATH'];
 
-        $errorStop = '';       
+        $errorStop = '';
         // Get absolute path to avoid any path issues
         $absolutePath = realpath($filePath);
         if (!$absolutePath) {
-            $errorStop .= "*API File Error - Cannot resolve file path: " . $msgArr['BFILEPATH'];
+            $errorStop .= '*API File Error - Cannot resolve file path: ' . $msgArr['BFILEPATH'];
         }
 
         if ($errorStop != '') {
-            if($GLOBALS["debug"]) error_log($errorStop);
+            if ($GLOBALS['debug']) {
+                error_log($errorStop);
+            }
             if ($stream) {
                 $update = [
                     'msgId' => $msgArr['BID'],
@@ -1327,50 +1447,53 @@ class AIOpenAI {
             }
             return $errorStop;
         }
-        if($GLOBALS["debug"]) error_log($absolutePath);
+        if ($GLOBALS['debug']) {
+            error_log($absolutePath);
+        }
 
         $client = self::$client;
 
-    }    
+    }
 
     /**
      * Simple prompt execution
-     * 
+     *
      * Executes a simple prompt with system and user messages, returning a structured response.
      * This provides a clean interface for basic AI interactions.
-     * 
+     *
      * @param string $systemPrompt The system prompt/instruction
      * @param string $userPrompt The user's input/prompt
      * @return array Response array with success status and result/error
      */
-    public static function simplePrompt($systemPrompt, $userPrompt): array {
+    public static function simplePrompt($systemPrompt, $userPrompt): array
+    {
         $client = self::$client;
-        
+
         $arrMessages = [
             ['role' => 'system', 'content' => $systemPrompt],
             ['role' => 'user', 'content' => $userPrompt]
         ];
 
         // which model on OpenAI?
-        $myModel = $GLOBALS["AI_CHAT"]["MODEL"];
-        
+        $myModel = $GLOBALS['AI_CHAT']['MODEL'];
+
         try {
             $chat = $client->chat()->create([
                 'model' => $myModel,
                 'messages' => $arrMessages
             ]);
-            
+
             $result = $chat['choices'][0]['message']['content'];
-            
+
             return [
                 'success' => true,
                 'summary' => $result
             ];
-            
+
         } catch (Exception $err) {
             return [
                 'success' => false,
-                'summary' => "*API Simple Prompt Error - OpenAI error: * " . $err->getMessage()
+                'summary' => '*API Simple Prompt Error - OpenAI error: * ' . $err->getMessage()
             ];
         }
     }

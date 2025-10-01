@@ -2,13 +2,14 @@
 
 /**
  * OAuthConfig Class
- * 
+ *
  * Handles OAuth credentials and tokens for various services including Google OAuth
  * and Gmail OAuth. Uses environment variables for secure credential management.
- * 
+ *
  * @package OAuthConfig
  */
-class OAuthConfig {
+class OAuthConfig
+{
     private static $initialized = false;
     private static $googleCredentials = null;
     private static $gmailToken = null;
@@ -17,7 +18,8 @@ class OAuthConfig {
      * Initialize the OAuth configuration
      * Loads credentials from environment variables or falls back to legacy files
      */
-    public static function init() {
+    public static function init()
+    {
         if (self::$initialized) {
             return;
         }
@@ -57,31 +59,34 @@ class OAuthConfig {
 
     /**
      * Get Google OAuth credentials
-     * 
+     *
      * @return array|null Google OAuth credentials or null if not configured
      */
-    public static function getGoogleCredentials() {
+    public static function getGoogleCredentials()
+    {
         self::init();
         return self::$googleCredentials;
     }
 
     /**
      * Get Gmail OAuth token
-     * 
+     *
      * @return array|null Gmail OAuth token or null if not configured
      */
-    public static function getGmailToken() {
+    public static function getGmailToken()
+    {
         self::init();
         return self::$gmailToken;
     }
 
     /**
      * Save Gmail OAuth token
-     * 
+     *
      * @param array $token Gmail OAuth token to save
      * @return bool True if successful
      */
-    public static function saveGmailToken($token) {
+    public static function saveGmailToken($token)
+    {
         self::init();
         self::$gmailToken = $token;
 
@@ -98,15 +103,16 @@ class OAuthConfig {
 
     /**
      * Create a configured Google Client instance
-     * 
+     *
      * @param string $redirectUri OAuth redirect URI
      * @param array $scopes Array of OAuth scopes
      * @return Google_Client Configured Google Client instance
      * @throws Exception If credentials are not configured
      */
-    public static function createGoogleClient($redirectUri, $scopes = ['https://www.googleapis.com/auth/gmail.modify']) {
+    public static function createGoogleClient($redirectUri, $scopes = ['https://www.googleapis.com/auth/gmail.modify'])
+    {
         self::init();
-        
+
         if (!self::$googleCredentials) {
             throw new Exception('Google OAuth credentials not configured');
         }
@@ -114,18 +120,18 @@ class OAuthConfig {
         $client = new Google_Client();
         $client->setAuthConfig(self::$googleCredentials);
         $client->setRedirectUri($redirectUri);
-        
+
         foreach ($scopes as $scope) {
             $client->addScope($scope);
         }
-        
+
         $client->setAccessType('offline');
         $client->setPrompt('consent');
 
         // Set existing token if available
         if (self::$gmailToken) {
             $client->setAccessToken(self::$gmailToken);
-            
+
             // Refresh token if expired
             if ($client->isAccessTokenExpired()) {
                 if ($client->getRefreshToken()) {
@@ -140,10 +146,11 @@ class OAuthConfig {
 
     /**
      * Validate OAuth configuration
-     * 
+     *
      * @return array Array of missing or invalid configurations
      */
-    public static function validateConfig() {
+    public static function validateConfig()
+    {
         self::init();
         $issues = [];
 
@@ -153,12 +160,12 @@ class OAuthConfig {
 
         if (!self::$gmailToken) {
             $issues[] = 'Gmail OAuth token not configured';
-        } elseif (isset(self::$gmailToken['expires_in']) && 
-                 isset(self::$gmailToken['created']) && 
+        } elseif (isset(self::$gmailToken['expires_in']) &&
+                 isset(self::$gmailToken['created']) &&
                  (time() - self::$gmailToken['created'] > self::$gmailToken['expires_in'])) {
             $issues[] = 'Gmail OAuth token expired';
         }
 
         return $issues;
     }
-} 
+}

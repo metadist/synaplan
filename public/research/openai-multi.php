@@ -1,4 +1,5 @@
 <?php
+
 $root = '../';
 require_once($root . 'inc/_coreincludes.php');
 
@@ -14,7 +15,7 @@ $client = OpenAI::client($apiKey);
 $response = $client->responses()->create([
     'model' => 'gpt-4.1',
     'tools' => [],
-    'input' => "Please create a Powerpoint file with a cover and a simple slide with headline! Title: It is fun to be AI, headline: Downfall of the humans. Provide a download file in PPT or PPTX.",
+    'input' => 'Please create a Powerpoint file with a cover and a simple slide with headline! Title: It is fun to be AI, headline: Downfall of the humans. Provide a download file in PPT or PPTX.',
     'temperature' => 0.7,
     'max_output_tokens' => 50000,
     'tool_choice' => 'auto',
@@ -37,7 +38,7 @@ foreach ($response->output as $output) {
     $output->id; // 'msg_67ccd2bf17f0819081ff3bb2cf6508e6'
     $output->status; // 'completed'
     $output->role; // 'assistant'
-    
+
     foreach ($output->content as $content) {
         $content->type; // 'output_text'
         $content->text; // The response text

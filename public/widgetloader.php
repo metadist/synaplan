@@ -29,45 +29,45 @@ $widgetId = isset($_REQUEST['widgetid']) ? intval($_REQUEST['widgetid']) : 1;
 
 // Validate parameters
 if ($uid <= 0 || $widgetId < 1 || $widgetId > 9) {
-    echo "<h1>Invalid widget parameters!</h1>";
+    echo '<h1>Invalid widget parameters!</h1>';
     exit;
 }
 
 // Set anonymous widget session variables
-$_SESSION["is_widget"] = true;
-$_SESSION["widget_owner_id"] = $uid;
-$_SESSION["widget_id"] = $widgetId;
-$_SESSION["anonymous_session_id"] = uniqid('widget_', true); // Generate unique session ID
-$_SESSION["anonymous_session_created"] = time(); // Add creation timestamp for timeout validation
+$_SESSION['is_widget'] = true;
+$_SESSION['widget_owner_id'] = $uid;
+$_SESSION['widget_id'] = $widgetId;
+$_SESSION['anonymous_session_id'] = uniqid('widget_', true); // Generate unique session ID
+$_SESSION['anonymous_session_created'] = time(); // Add creation timestamp for timeout validation
 
 // Note: Rate limiting is now handled in the chat submission API calls, not here
 // This allows the widget interface to load but limits actual message sending
 
 // Validate session timeout for existing sessions
-if (isset($_SESSION["is_widget"]) && $_SESSION["is_widget"] === true) {
+if (isset($_SESSION['is_widget']) && $_SESSION['is_widget'] === true) {
     $sessionTimeout = 86400; // 24 hours
-    $sessionCreated = $_SESSION["anonymous_session_created"] ?? 0;
-    
+    $sessionCreated = $_SESSION['anonymous_session_created'] ?? 0;
+
     if ((time() - $sessionCreated) > $sessionTimeout) {
         // Session expired, clear and recreate
-        unset($_SESSION["is_widget"]);
-        unset($_SESSION["widget_owner_id"]);
-        unset($_SESSION["widget_id"]);
-        unset($_SESSION["anonymous_session_id"]);
-        unset($_SESSION["anonymous_session_created"]);
-        
+        unset($_SESSION['is_widget']);
+        unset($_SESSION['widget_owner_id']);
+        unset($_SESSION['widget_id']);
+        unset($_SESSION['anonymous_session_id']);
+        unset($_SESSION['anonymous_session_created']);
+
         // Recreate session
-        $_SESSION["is_widget"] = true;
-        $_SESSION["widget_owner_id"] = $uid;
-        $_SESSION["widget_id"] = $widgetId;
-        $_SESSION["anonymous_session_id"] = uniqid('widget_', true); // Generate new unique session ID
-        $_SESSION["anonymous_session_created"] = time();
+        $_SESSION['is_widget'] = true;
+        $_SESSION['widget_owner_id'] = $uid;
+        $_SESSION['widget_id'] = $widgetId;
+        $_SESSION['anonymous_session_id'] = uniqid('widget_', true); // Generate new unique session ID
+        $_SESSION['anonymous_session_created'] = time();
     }
 }
 
 // Get widget configuration from database
-$group = "widget_" . $widgetId;
-$sql = "SELECT BSETTING, BVALUE FROM BCONFIG WHERE BOWNERID = " . $uid . " AND BGROUP = '" . db::EscString($group) . "'";
+$group = 'widget_' . $widgetId;
+$sql = 'SELECT BSETTING, BVALUE FROM BCONFIG WHERE BOWNERID = ' . $uid . " AND BGROUP = '" . db::EscString($group) . "'";
 $res = db::Query($sql);
 
 $config = [

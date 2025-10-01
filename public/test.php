@@ -1,4 +1,5 @@
 <?php
+
 set_time_limit(0);
 
 // OpenAI-compatibility test for Synaplan public/api.php
@@ -6,7 +7,8 @@ set_time_limit(0);
 //   SYNAPLAN_API_BASE="https://your.host" SYNAPLAN_API_KEY="<paste-key>" php test.php
 // or: php test.php https://your.host <api_key>
 
-function env(string $key, string $default = ''): string {
+function env(string $key, string $default = ''): string
+{
     $val = getenv($key);
     return ($val === false || $val === null) ? $default : $val;
 }
@@ -19,7 +21,8 @@ if ($apiKey === '') {
     exit(1);
 }
 
-function http_get(string $url, array $headers): array {
+function http_get(string $url, array $headers): array
+{
     $ch = curl_init();
     curl_setopt($ch, CURLOPT_URL, $url);
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
@@ -30,7 +33,8 @@ function http_get(string $url, array $headers): array {
     return [$status, $body];
 }
 
-function http_post_json(string $url, array $headers, array $payload): array {
+function http_post_json(string $url, array $headers, array $payload): array
+{
     $ch = curl_init();
     curl_setopt($ch, CURLOPT_URL, $url);
     curl_setopt($ch, CURLOPT_POST, true);
@@ -44,7 +48,8 @@ function http_post_json(string $url, array $headers, array $payload): array {
     return [$status, $body];
 }
 
-function print_section(string $title): void {
+function print_section(string $title): void
+{
     echo "\n=== $title ===\n";
 }
 
@@ -106,4 +111,3 @@ foreach ($imageModels as $model) {
 }
 
 echo "\nDone.\n";
-

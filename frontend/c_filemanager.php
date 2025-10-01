@@ -21,22 +21,22 @@
         $errors = [];
         foreach ($idsToDelete as $fileId) {
             // Get file path before deleting DB entry
-            $sql = "SELECT BFILEPATH FROM BMESSAGES WHERE BID = $fileId AND BUSERID = " . intval($_SESSION["USERPROFILE"]["BID"]);
+            $sql = "SELECT BFILEPATH FROM BMESSAGES WHERE BID = $fileId AND BUSERID = " . intval($_SESSION['USERPROFILE']['BID']);
             $res = db::Query($sql);
             $row = db::FetchArr($res);
             if ($row && !empty($row['BFILEPATH'])) {
                 $filePath = rtrim(UPLOAD_DIR, '/').'/' . $row['BFILEPATH'];
                 if (file_exists($filePath) && is_file($filePath)) {
                     if (!unlink($filePath)) {
-                        $errors[] = "Could not delete file: " . htmlspecialchars($row['BFILEPATH']);
+                        $errors[] = 'Could not delete file: ' . htmlspecialchars($row['BFILEPATH']);
                     }
                 }
             }
             // Delete from BRAG with user ID check for extra security
-            $sqlBrag = "DELETE FROM BRAG WHERE BMID = $fileId AND BUID = " . intval($_SESSION["USERPROFILE"]["BID"]);
+            $sqlBrag = "DELETE FROM BRAG WHERE BMID = $fileId AND BUID = " . intval($_SESSION['USERPROFILE']['BID']);
             db::Query($sqlBrag);
             // Delete from BMESSAGES
-            $sqlMsg = "DELETE FROM BMESSAGES WHERE BID = $fileId AND BUSERID = " . intval($_SESSION["USERPROFILE"]["BID"]);
+            $sqlMsg = "DELETE FROM BMESSAGES WHERE BID = $fileId AND BUSERID = " . intval($_SESSION['USERPROFILE']['BID']);
             db::Query($sqlMsg);
             $deletedCount++;
         }
@@ -45,7 +45,7 @@
         }
         if (!empty($errors)) {
             $deleteNotification .= '<div class="alert alert-warning my-2">' . implode('<br>', $errors) . '</div>';
-        }       
+        }
     }
     if (!empty($deleteNotification)) {
         echo $deleteNotification;
@@ -71,21 +71,21 @@
                                 <option value="">Or select existing...</option>
                                 <?php
                                     // Get existing group keys
-                                    $sql = "SELECT DISTINCT BRAG.BGROUPKEY
+                                    $sql = 'SELECT DISTINCT BRAG.BGROUPKEY
                                             FROM BMESSAGES
                                             INNER JOIN BRAG ON BRAG.BMID = BMESSAGES.BID
-                                            WHERE BMESSAGES.BUSERID = " . $_SESSION["USERPROFILE"]["BID"] . "
+                                            WHERE BMESSAGES.BUSERID = ' . $_SESSION['USERPROFILE']['BID'] . "
                                               AND BMESSAGES.BDIRECT = 'IN'
                                               AND BMESSAGES.BFILE > 0
                                               AND BMESSAGES.BFILEPATH != ''
                                               AND BRAG.BGROUPKEY != ''
                                               ORDER BY BRAG.BGROUPKEY";
-                                    $res = db::Query($sql);
-                                    while ($row = db::FetchArr($res)) {
-                                        echo "<option value='" . htmlspecialchars($row['BGROUPKEY']) . "'>" . 
-                                             htmlspecialchars($row['BGROUPKEY']) . "</option>";
-                                    }
-                                ?>
+    $res = db::Query($sql);
+    while ($row = db::FetchArr($res)) {
+        echo "<option value='" . htmlspecialchars($row['BGROUPKEY']) . "'>" .
+             htmlspecialchars($row['BGROUPKEY']) . '</option>';
+    }
+    ?>
                             </select>
                         </div>
                         <div class="form-text">Enter a keyword to group related files together for RAG search</div>
@@ -133,29 +133,29 @@
                             <div class="input-group">
                                 <select class="form-select" name="fileGroupSelect" id="fileGroupSelect" onchange="$('#fileFilterForm').submit()">
                                     <?php
-                                        // Query: Get unique BGROUPKEYs for files with BDIRECT='IN', BFILE>0, BFILEPATH not empty, joined with BRAG
-                                        $groupKeys = [];
-                                        $selectedGroup = isset($_POST['fileGroupSelect']) ? $_POST['fileGroupSelect'] : '';
-                                        
-                                        $sql = "SELECT DISTINCT BRAG.BGROUPKEY, COUNT(*) as file_count
+            // Query: Get unique BGROUPKEYs for files with BDIRECT='IN', BFILE>0, BFILEPATH not empty, joined with BRAG
+            $groupKeys = [];
+    $selectedGroup = isset($_POST['fileGroupSelect']) ? $_POST['fileGroupSelect'] : '';
+
+    $sql = 'SELECT DISTINCT BRAG.BGROUPKEY, COUNT(*) as file_count
                                                 FROM BMESSAGES
                                                 INNER JOIN BRAG ON BRAG.BMID = BMESSAGES.BID
-                                                WHERE BMESSAGES.BUSERID = " . $_SESSION["USERPROFILE"]["BID"] . "
+                                                WHERE BMESSAGES.BUSERID = ' . $_SESSION['USERPROFILE']['BID'] . "
                                                   AND BMESSAGES.BDIRECT = 'IN'
                                                   AND BMESSAGES.BFILE > 0
                                                   AND BMESSAGES.BFILEPATH != ''
                                                   AND BRAG.BGROUPKEY != ''
                                                 GROUP BY BRAG.BGROUPKEY
                                                 ORDER BY BRAG.BGROUPKEY";
-                                        $res = db::Query($sql);
-                                        
-                                        echo "<option value=''>All files...</option>";
-                                        while ($row = db::FetchArr($res)) {
-                                            $isSelected = ($selectedGroup == $row['BGROUPKEY']) ? 'selected' : '';
-                                            echo "<option value='" . htmlspecialchars($row['BGROUPKEY']) . "' $isSelected>" . 
-                                                 htmlspecialchars($row['BGROUPKEY']) . " (" . $row['file_count'] . " entries)</option>";
-                                        }
-                                    ?>
+    $res = db::Query($sql);
+
+    echo "<option value=''>All files...</option>";
+    while ($row = db::FetchArr($res)) {
+        $isSelected = ($selectedGroup == $row['BGROUPKEY']) ? 'selected' : '';
+        echo "<option value='" . htmlspecialchars($row['BGROUPKEY']) . "' $isSelected>" .
+             htmlspecialchars($row['BGROUPKEY']) . ' (' . $row['file_count'] . ' entries)</option>';
+    }
+    ?>
                                 </select>
                                 <button type="submit" class="btn btn-primary">Filter</button>
                                 <?php if (!empty($selectedGroup)): ?>
@@ -201,34 +201,34 @@
                         </thead>
                         <tbody style="font-size: 0.9rem;">
                             <?php
-                            
+
                                 // TODO: Add your PHP loop here to populate the table
                                 // Logic to populate the files table based on selected group
                                 // Include DB tools if not already included
                                 // require_once("../inc/_confdb.php"); // Uncomment if needed
 
-                                $userId = $_SESSION["USERPROFILE"]["BID"];
-                                $where = "BMESSAGES.BUSERID = " . intval($userId) . " 
+                                $userId = $_SESSION['USERPROFILE']['BID'];
+    $where = 'BMESSAGES.BUSERID = ' . intval($userId) . " 
                                     AND BMESSAGES.BFILE = 1 
                                     AND BMESSAGES.BFILEPATH != ''";
 
-                                // Check if a group is selected (from POST or GET)
-                                $selectedGroup = '';
-                                if (isset($_POST['fileGroupSelect']) && !empty($_POST['fileGroupSelect'])) {
-                                    $selectedGroup = db::EscString($_POST['fileGroupSelect']);
-                                } elseif (isset($_GET['fileGroupSelect']) && !empty($_GET['fileGroupSelect'])) {
-                                    $selectedGroup = db::EscString($_GET['fileGroupSelect']);
-                                }
+    // Check if a group is selected (from POST or GET)
+    $selectedGroup = '';
+    if (isset($_POST['fileGroupSelect']) && !empty($_POST['fileGroupSelect'])) {
+        $selectedGroup = db::EscString($_POST['fileGroupSelect']);
+    } elseif (isset($_GET['fileGroupSelect']) && !empty($_GET['fileGroupSelect'])) {
+        $selectedGroup = db::EscString($_GET['fileGroupSelect']);
+    }
 
-                                // Pagination setup
-                                $page = isset($_GET['page']) ? max(1, intval($_GET['page'])) : 1;
-                                $perPage = 30;
-                                $offset = ($page - 1) * $perPage;
-                                $limit = $perPage + 1; // Get one extra to check if there are more pages
+    // Pagination setup
+    $page = isset($_GET['page']) ? max(1, intval($_GET['page'])) : 1;
+    $perPage = 30;
+    $offset = ($page - 1) * $perPage;
+    $limit = $perPage + 1; // Get one extra to check if there are more pages
 
-                                if (!empty($selectedGroup)) {
-                                    // Only show files in the selected group
-                                    $sql = "SELECT BMESSAGES.*, BRAG.BGROUPKEY, 
+    if (!empty($selectedGroup)) {
+        // Only show files in the selected group
+        $sql = "SELECT BMESSAGES.*, BRAG.BGROUPKEY, 
                                             CASE WHEN BRAG.BMID IS NOT NULL THEN 1 ELSE 0 END as hasRAGContent
                                             FROM BMESSAGES
                                             INNER JOIN BRAG ON BRAG.BMID = BMESSAGES.BID
@@ -236,82 +236,82 @@
                                               AND BRAG.BGROUPKEY = '" . $selectedGroup . "'
                                               GROUP by BRAG.BMID
                                             LIMIT $offset, $limit";
-                                } else {
-                                    // Show all files for the user with group info
-                                    $sql = "SELECT BMESSAGES.*, BRAG.BGROUPKEY,
+    } else {
+        // Show all files for the user with group info
+        $sql = "SELECT BMESSAGES.*, BRAG.BGROUPKEY,
                                             CASE WHEN BRAG.BMID IS NOT NULL THEN 1 ELSE 0 END as hasRAGContent
                                             FROM BMESSAGES
                                             LEFT JOIN BRAG ON BRAG.BMID = BMESSAGES.BID
                                             WHERE $where
                                             GROUP BY BMESSAGES.BID
                                             LIMIT $offset, $limit";
-                                }
+    }
 
-                                $res = db::Query($sql);
-                                $hasRows = false;
-                                $rowCount = 0;
-                                $hasMorePages = false;
-                                
-                                while ($row = db::FetchArr($res)) {
-                                    $rowCount++;
-                                    
-                                    // Check if we have more than perPage rows (indicating there are more pages)
-                                    if ($rowCount > $perPage) {
-                                        $hasMorePages = true;
-                                        break;
-                                    }
-                                    
-                                    $hasRows = true;
-                                    echo "<tr>";
-                                    // Checkbox column
-                                    echo "<td><input type='checkbox' name='selectedFiles[]' value='" . (int)$row['BID'] . "'></td>";
-                                    echo "<td>" . htmlspecialchars($row['BID']) . "</td>";
-                                    echo "<td>";
-                                    echo htmlspecialchars(substr(basename($row['BFILEPATH']),0,36));
-                                    if(strlen(basename($row['BFILEPATH'])) > 36) {
-                                        echo "...";
-                                    }
-                                    echo "</td>";
-                                    echo "<td>" . htmlspecialchars($row['BDIRECT']) . "</td>";
-                                    // Group column
-                                    echo "<td>";
-                                    if (isset($row['BGROUPKEY']) && $row['BGROUPKEY'] != '') {
-                                        if ($row['hasRAGContent']) {
-                                            echo '<span class="badge bg-primary" style="cursor: pointer;" onclick="changeFileGroup(' . (int)$row['BID'] . ', \'' . htmlspecialchars($row['BGROUPKEY']) . '\')" title="Click to change group">' . htmlspecialchars($row['BGROUPKEY']) . '</span>';
-                                        } else {
-                                            echo '<span class="badge bg-primary" style="cursor: default;" title="File not yet processed for RAG">' . htmlspecialchars($row['BGROUPKEY']) . '</span>';
-                                        }
-                                    } else {
-                                        if ($row['hasRAGContent']) {
-                                            echo '<span class="badge bg-secondary" style="cursor: pointer;" onclick="changeFileGroup(' . (int)$row['BID'] . ', \'\')" title="Click to assign group">No Group</span>';
-                                        }
-                                    }
-                                    echo "</td>";
-                                    echo "<td>";
-                                    echo "<small>";
-                                    echo htmlspecialchars(substr($row['BFILETEXT'],0,50));
-                                    echo "</small>";
-                                    echo "</td>";
-                                    echo "<td>" . htmlspecialchars($row['BDATETIME']) . "</td>";
-                                    echo "<td>";
-                                    // Action buttons container with nowrap
-                                    echo "<div class='d-flex gap-1 flex-nowrap'>";
-                                    // DELETE BUTTON
-                                    echo "<button type='button' class='btn btn-sm btn-danger' onclick='deleteFile(" . (int)$row['BID'] . ")' title='Delete file'>";
-                                    echo "<i class='fas fa-trash'></i>";
-                                    echo "</button>";
-                                    // DOWNLOAD BUTTON
-                                    echo "<button type='button' class='btn btn-sm btn-secondary' onclick='downloadFile(\"" . htmlspecialchars($row['BFILEPATH']) . "\")' title='Download file'>";
-                                    echo "<i class='fas fa-download'></i>";
-                                    echo "</button>";
-                                    echo "</div>";
-                                    echo "</td>";
-                                    echo "</tr>";
-                                }
-                                if (!$hasRows) {
-                                    echo "<tr><td colspan='8' class='text-center'>No files found</td></tr>";
-                                }
-                            ?>
+    $res = db::Query($sql);
+    $hasRows = false;
+    $rowCount = 0;
+    $hasMorePages = false;
+
+    while ($row = db::FetchArr($res)) {
+        $rowCount++;
+
+        // Check if we have more than perPage rows (indicating there are more pages)
+        if ($rowCount > $perPage) {
+            $hasMorePages = true;
+            break;
+        }
+
+        $hasRows = true;
+        echo '<tr>';
+        // Checkbox column
+        echo "<td><input type='checkbox' name='selectedFiles[]' value='" . (int)$row['BID'] . "'></td>";
+        echo '<td>' . htmlspecialchars($row['BID']) . '</td>';
+        echo '<td>';
+        echo htmlspecialchars(substr(basename($row['BFILEPATH']), 0, 36));
+        if (strlen(basename($row['BFILEPATH'])) > 36) {
+            echo '...';
+        }
+        echo '</td>';
+        echo '<td>' . htmlspecialchars($row['BDIRECT']) . '</td>';
+        // Group column
+        echo '<td>';
+        if (isset($row['BGROUPKEY']) && $row['BGROUPKEY'] != '') {
+            if ($row['hasRAGContent']) {
+                echo '<span class="badge bg-primary" style="cursor: pointer;" onclick="changeFileGroup(' . (int)$row['BID'] . ', \'' . htmlspecialchars($row['BGROUPKEY']) . '\')" title="Click to change group">' . htmlspecialchars($row['BGROUPKEY']) . '</span>';
+            } else {
+                echo '<span class="badge bg-primary" style="cursor: default;" title="File not yet processed for RAG">' . htmlspecialchars($row['BGROUPKEY']) . '</span>';
+            }
+        } else {
+            if ($row['hasRAGContent']) {
+                echo '<span class="badge bg-secondary" style="cursor: pointer;" onclick="changeFileGroup(' . (int)$row['BID'] . ', \'\')" title="Click to assign group">No Group</span>';
+            }
+        }
+        echo '</td>';
+        echo '<td>';
+        echo '<small>';
+        echo htmlspecialchars(substr($row['BFILETEXT'], 0, 50));
+        echo '</small>';
+        echo '</td>';
+        echo '<td>' . htmlspecialchars($row['BDATETIME']) . '</td>';
+        echo '<td>';
+        // Action buttons container with nowrap
+        echo "<div class='d-flex gap-1 flex-nowrap'>";
+        // DELETE BUTTON
+        echo "<button type='button' class='btn btn-sm btn-danger' onclick='deleteFile(" . (int)$row['BID'] . ")' title='Delete file'>";
+        echo "<i class='fas fa-trash'></i>";
+        echo '</button>';
+        // DOWNLOAD BUTTON
+        echo "<button type='button' class='btn btn-sm btn-secondary' onclick='downloadFile(\"" . htmlspecialchars($row['BFILEPATH']) . "\")' title='Download file'>";
+        echo "<i class='fas fa-download'></i>";
+        echo '</button>';
+        echo '</div>';
+        echo '</td>';
+        echo '</tr>';
+    }
+    if (!$hasRows) {
+        echo "<tr><td colspan='8' class='text-center'>No files found</td></tr>";
+    }
+    ?>
                         </tbody>
                     </table>
                 </div>
@@ -333,14 +333,14 @@
                     </div>
                     <div class="btn-group" role="group">
                         <?php if ($page > 1): ?>
-                            <a href="index.php/filemanager?page=<?php echo ($page - 1); ?><?php echo !empty($selectedGroup) ? '&fileGroupSelect=' . urlencode($selectedGroup) : ''; ?>" 
+                            <a href="index.php/filemanager?page=<?php echo($page - 1); ?><?php echo !empty($selectedGroup) ? '&fileGroupSelect=' . urlencode($selectedGroup) : ''; ?>" 
                                class="btn btn-outline-primary btn-sm">
                                 <i class="fas fa-chevron-left"></i> Previous
                             </a>
                         <?php endif; ?>
                         
                         <?php if ($hasMorePages): ?>
-                            <a href="index.php/filemanager?page=<?php echo ($page + 1); ?><?php echo !empty($selectedGroup) ? '&fileGroupSelect=' . urlencode($selectedGroup) : ''; ?>" 
+                            <a href="index.php/filemanager?page=<?php echo($page + 1); ?><?php echo !empty($selectedGroup) ? '&fileGroupSelect=' . urlencode($selectedGroup) : ''; ?>" 
                                class="btn btn-outline-primary btn-sm">
                                 Next <i class="fas fa-chevron-right"></i>
                             </a>

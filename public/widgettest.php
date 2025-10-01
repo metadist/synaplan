@@ -3,7 +3,7 @@
 session_start();
 
 // Log out the user to test widget anonymously
-if(isset($_SESSION['USERPROFILE'])) {
+if (isset($_SESSION['USERPROFILE'])) {
     // Store user info for later login reminder
     $loggedOutUser = $_SESSION['USERPROFILE'];
     // Clear the session to simulate anonymous access
@@ -89,7 +89,7 @@ $mode = isset($_REQUEST['mode']) ? trim((string)$_REQUEST['mode']) : '';
         <div class="container">
             <h1>Widget Test Page</h1>
             
-            <?php if(isset($loggedOutUser)): ?>
+            <?php if (isset($loggedOutUser)): ?>
             <div class="alert alert-warning" role="alert">
                 <h4 class="alert-heading"><i class="fas fa-exclamation-triangle"></i> You have been logged out!</h4>
                 <p><strong>Important:</strong> You have been automatically logged out of your Synaplan session to test the widget anonymously.</p>

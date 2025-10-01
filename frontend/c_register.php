@@ -1,58 +1,58 @@
-<?php // User registration form ?>
+<?php // User registration form?>
 <script
   src="https://challenges.cloudflare.com/turnstile/v0/api.js"
   async
   defer
 ></script>
 <main class="col-md-12 ms-sm-auto col-lg-12 px-md-4" id="contentMain">
-    <H1><?php _s("Create Account", __FILE__, $_SESSION["LANG"]); ?></H1>
+    <H1><?php _s('Create Account', __FILE__, $_SESSION['LANG']); ?></H1>
     <p>
-        <?php _s("Please fill in the form below to create your account.", __FILE__, $_SESSION["LANG"]); ?><BR>
-        <?php _s("Already have an account?", __FILE__, $_SESSION["LANG"]); ?> <B><a href="index.php"><?php _s("Login here", __FILE__, $_SESSION["LANG"]); ?></a></B>
+        <?php _s('Please fill in the form below to create your account.', __FILE__, $_SESSION['LANG']); ?><BR>
+        <?php _s('Already have an account?', __FILE__, $_SESSION['LANG']); ?> <B><a href="index.php"><?php _s('Login here', __FILE__, $_SESSION['LANG']); ?></a></B>
     </p>
     
     <!-- Success Alert -->
     <div class="alert alert-success d-none" id="successAlert" role="alert">
         <i class="fas fa-check-circle me-2"></i>
-        <strong><?php _s("Registration Successful!", __FILE__, $_SESSION["LANG"]); ?></strong><br>
-        <?php _s("We've sent a confirmation email to your email address. Please check your inbox and click the confirmation link to activate your account.", __FILE__, $_SESSION["LANG"]); ?>
+        <strong><?php _s('Registration Successful!', __FILE__, $_SESSION['LANG']); ?></strong><br>
+        <?php _s("We've sent a confirmation email to your email address. Please check your inbox and click the confirmation link to activate your account.", __FILE__, $_SESSION['LANG']); ?>
     </div>
     
     <!-- Error Alert -->
     <div class="alert alert-danger d-none" id="errorAlert" role="alert">
         <i class="fas fa-exclamation-triangle me-2"></i>
-        <strong><?php _s("Registration Failed!", __FILE__, $_SESSION["LANG"]); ?></strong><br>
+        <strong><?php _s('Registration Failed!', __FILE__, $_SESSION['LANG']); ?></strong><br>
         <span id="errorMessage"></span>
     </div>
     
     <form id="registrationForm" target="_top">
         <div class="form-group mt-2">
-            <label for="email"><?php _s("Email", __FILE__, $_SESSION["LANG"]); ?></label>
-            <input type="email" class="form-control mt-2" id="email" name="email" placeholder="<?php _s("Enter your email address", __FILE__, $_SESSION["LANG"]); ?>" required>
+            <label for="email"><?php _s('Email', __FILE__, $_SESSION['LANG']); ?></label>
+            <input type="email" class="form-control mt-2" id="email" name="email" placeholder="<?php _s('Enter your email address', __FILE__, $_SESSION['LANG']); ?>" required>
         </div>
         <div class="form-group mt-2">
-            <label for="password"><?php _s("Password", __FILE__, $_SESSION["LANG"]); ?></label>
-            <input type="password" class="form-control mt-2" id="password" name="password" placeholder="<?php _s("Enter password (min. 6 characters)", __FILE__, $_SESSION["LANG"]); ?>" minlength="6" required>
+            <label for="password"><?php _s('Password', __FILE__, $_SESSION['LANG']); ?></label>
+            <input type="password" class="form-control mt-2" id="password" name="password" placeholder="<?php _s('Enter password (min. 6 characters)', __FILE__, $_SESSION['LANG']); ?>" minlength="6" required>
         </div>
         <div class="form-group mt-2">
-            <label for="confirmPassword"><?php _s("Confirm Password", __FILE__, $_SESSION["LANG"]); ?></label>
-            <input type="password" class="form-control mt-2" id="confirmPassword" name="confirmPassword" placeholder="<?php _s("Confirm your password", __FILE__, $_SESSION["LANG"]); ?>" minlength="6" required>
+            <label for="confirmPassword"><?php _s('Confirm Password', __FILE__, $_SESSION['LANG']); ?></label>
+            <input type="password" class="form-control mt-2" id="confirmPassword" name="confirmPassword" placeholder="<?php _s('Confirm your password', __FILE__, $_SESSION['LANG']); ?>" minlength="6" required>
         </div>
         <button type="submit" class="btn btn-primary mt-2" id="submitBtn">
             <span class="spinner-border spinner-border-sm d-none me-2" id="submitSpinner" role="status" aria-hidden="true"></span>
-            <?php _s("Create Account", __FILE__, $_SESSION["LANG"]); ?>
+            <?php _s('Create Account', __FILE__, $_SESSION['LANG']); ?>
         </button>
         <BR><BR>
         <div class="cf-turnstile" data-sitekey="0x4AAAAAAB1d8VjDhX7_hJRg" data-theme="light" data-size="normal"></div>
     </form>
     
     <BR>
-    <p><?php _s("By creating an account, you agree to our terms of service.", __FILE__, $_SESSION["LANG"]); ?></p>
+    <p><?php _s('By creating an account, you agree to our terms of service.', __FILE__, $_SESSION['LANG']); ?></p>
     <BR>
-    <p><?php 
+    <p><?php
     $homeUrl = ApiKeys::getBaseUrl();
-    _s("Go to our homepage for more information: <a href=\"$homeUrl\">$homeUrl</a>", __FILE__, $_SESSION["LANG"]); 
-    ?></p>
+_s("Go to our homepage for more information: <a href=\"$homeUrl\">$homeUrl</a>", __FILE__, $_SESSION['LANG']);
+?></p>
 </main>
 
 <script>
@@ -69,12 +69,12 @@ document.getElementById('registrationForm').addEventListener('submit', function(
     
     // Basic validation
     if (password !== confirmPassword) {
-        showError('<?php _s("Passwords do not match!", __FILE__, $_SESSION["LANG"]); ?>');
+        showError('<?php _s('Passwords do not match!', __FILE__, $_SESSION['LANG']); ?>');
         return;
     }
     
     if (password.length < 6) {
-        showError('<?php _s("Password must be at least 6 characters long!", __FILE__, $_SESSION["LANG"]); ?>');
+        showError('<?php _s('Password must be at least 6 characters long!', __FILE__, $_SESSION['LANG']); ?>');
         return;
     }
     
@@ -107,12 +107,12 @@ document.getElementById('registrationForm').addEventListener('submit', function(
             // Clear the form
             document.getElementById('registrationForm').reset();
         } else {
-            showError(data.error || '<?php _s("Registration failed. Please try again.", __FILE__, $_SESSION["LANG"]); ?>');
+            showError(data.error || '<?php _s('Registration failed. Please try again.', __FILE__, $_SESSION['LANG']); ?>');
         }
     })
     .catch(error => {
         console.error('Error:', error);
-        showError('<?php _s("An error occurred. Please try again.", __FILE__, $_SESSION["LANG"]); ?>');
+        showError('<?php _s('An error occurred. Please try again.', __FILE__, $_SESSION['LANG']); ?>');
     })
     .finally(() => {
         // Reset button state

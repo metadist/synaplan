@@ -1,3 +1,3 @@
 <?php
-$GLOBALS["debug"] = true;
-?>
+
+$GLOBALS['debug'] = true;

@@ -1,7 +1,8 @@
 <?php
+
 /**
  * OIDC Callback Handler
- * 
+ *
  * This file handles the OAuth/OIDC callback from the provider.
  * It should be set as the redirect URI in your OIDC provider configuration.
  */
@@ -20,7 +21,7 @@ if (isset($_REQUEST['code']) || isset($_REQUEST['error'])) {
         $errorDescription = isset($_REQUEST['error_description']) ? $_REQUEST['error_description'] : '';
 
         error_log('OIDC callback error: ' . $error . ' - ' . $errorDescription);
-        $_SESSION['oidc_error'] = 'Authentication failed: ' . htmlspecialchars($error) . 
+        $_SESSION['oidc_error'] = 'Authentication failed: ' . htmlspecialchars($error) .
                                   ($errorDescription ? ' - ' . htmlspecialchars($errorDescription) : '');
 
         // Redirect to login page
