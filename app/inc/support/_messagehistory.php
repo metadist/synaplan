@@ -160,13 +160,17 @@ class MessageHistory {
         $promptTime = $verifyArr['BUNIXTIMES'];
         
         // Get all OUT messages in the same track that came after this prompt
+        // Include file fields for inline media display
         $sql = "SELECT 
                     BID,
                     BTEXT,
                     BDATETIME,
                     BUNIXTIMES,
                     BTOPIC,
-                    BSTATUS
+                    BSTATUS,
+                    BFILE,
+                    BFILEPATH,
+                    BFILETYPE
                 FROM BMESSAGES
                 WHERE BUSERID = " . $userId . "
                 AND BTRACKID = " . $trackId . "
@@ -179,9 +183,12 @@ class MessageHistory {
         $answers = [];
         
         while ($row = db::FetchArr($res)) {
+            // Apply Tools::addMediaToText() to format inline media (images, videos, audio)
+            $formattedText = Tools::addMediaToText($row);
+            
             $answers[] = [
                 'id' => $row['BID'],
-                'text' => $row['BTEXT'],
+                'text' => $formattedText,
                 'datetime' => $row['BDATETIME'],
                 'timestamp' => $row['BUNIXTIMES'],
                 'topic' => $row['BTOPIC'],
