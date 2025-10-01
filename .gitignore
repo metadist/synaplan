@@ -26,3 +26,5 @@ testing/reports/
 .php-cs-fixer.cache
 app/inc/ai/grpc-triton/
 dev/ai_readme.md
+
+.claude/
