@@ -52,7 +52,7 @@ INSERT INTO `BMODELS` (`BID`, `BSERVICE`, `BNAME`, `BTAG`, `BSELECTABLE`, `BPROV
 (1, 'Ollama', 'deepseek-r1:14b', 'chat', 1, 'deepseek-r1:14b', 0.092, 'per1M', 0.46, 'per1M', 6, 0.5, '{\"description\":\"Local model on synaplans company server in Germany. DeepSeek R1 is a Chinese Open Source LLM.\"}'),
 (2, 'Ollama', 'Llama 3.3 70b', 'chat', 1, 'llama3.3:70b', 0.54, 'per1M', 0.73, 'per1M', 9, 1, '{\"description\":\"Local model on synaplans company server in Germany. Metas Llama Model Version 3.3 with 70b parameters. Heavy load model and relatively slow, even on a dedicated NVIDIA card. Yet good quality!\"}'),
 (3, 'Ollama', 'deepseek-r1:32b', 'chat', 1, 'deepseek-r1:32b', 0.69, 'per1M', 0.91, '-', 8, 1, '{\"description\":\"Local model on synaplans company server in Germany. DeepSeek R1 is a Chinese Open Source LLM. This is the bigger version with 32b parameters. A bit slower, but more accurate!\"}'),
-(6, 'Ollama', 'mistral', 'chat', 1, 'mistral', 0.095, 'per1M', 0.475, '-', 5, 0, '{\"description\":\"Local model on synaplans company server in Germany. Mistral 8b model - internally used for RAG retrieval.\"}'),
+(6, 'Ollama', 'mistral', 'chat', 1, 'mistral:7b', 0.095, 'per1M', 0.475, '-', 5, 0, '{\"description\":\"Local model on synaplans company server in Germany. Mistral 8b model - internally used for RAG retrieval.\"}'),
 (9, 'Groq', 'Llama 3.3 70b versatile', 'chat', 1, 'llama-3.3-70b-versatile', 0.59, 'per1M', 0.79, 'per1M', 9, 1, '{\"description\":\"Fast API service via groq\",\"params\":{\"model\":\"llama-3.3-70b-versatile\",\"reasoning_format\":\"hidden\",\"messages\":[]}}'),
 (13, 'Ollama', 'bge-m3', 'vectorize', 0, 'bge-m3', 0.19, 'per1M', 0, '-', 6, 1, '{\"description\":\"Vectorize text into synaplans MariaDB vector DB (local) for RAG\",\"params\":{\"model\":\"bge-m3\",\"input\":[]}}'),
 (17, 'Groq', 'llama-4-scout-17b-16e-instruct', 'pic2text', 1, 'meta-llama/llama-4-scout-17b-16e-instruct', 0.11, 'per1M', 0.34, 'per1M', 8, 0, '{\"description\":\"Groq image processing and text extraction\",\"prompt\":\"Describe image! List the texts in the image, if possible. If not, describe the image in short.\",\"params\":{\"model\":\"llama-3.2-90b-vision-preview\"}}'),
@@ -75,9 +75,11 @@ INSERT INTO `BMODELS` (`BID`, `BSERVICE`, `BNAME`, `BTAG`, `BSELECTABLE`, `BPROV
 (72, 'OpenAI', 'o3-pro', 'chat', 1, 'o3-pro', 20, 'per1M', 80, 'per1M', 10, 1, '{\"description\":\"OpenAI premium reasoning model. More compute than o3 with higher reliability. API id: o3-pro. Pricing: $20 per 1M input tokens, $80 per 1M output tokens.\",\"params\":{\"model\":\"o3-pro\"}}'),
 (73, 'OpenAI', 'gpt-4o-mini', 'chat', 1, 'gpt-4o-mini', 0.15, 'per1M', 0.6, 'per1M', 8, 1, '{\"description\":\"OpenAI lightweight GPT-4o-mini model for fast and cost-efficient chat and reasoning tasks. Optimized for lower latency and cheaper throughput.\",\"params\":{\"model\":\"gpt-4o-mini\"}}'),
 (74, 'Anthropic', 'Claude Sonnet 4', 'chat', 1, 'claude-sonnet-4-20250514', 3, 'per1M', 15, 'per1M', 9, 1, '{\"description\":\"Anthropic Claude Sonnet 4 model. Mid-tier reasoning and coding performance with large context window. Balanced between quality and cost.\",\"params\":{\"model\":\"claude-sonnet-4-20250514\"}}'),
-(75, 'Ollama', 'gpt-oss-20b', 'chat', 1, 'gpt-oss-20b', 0.08, 'per1M', 0.4, 'per1M', 9, 1, '{\"description\":\"Local GPT Open Source 20b model on SynaPlan server in Germany. High-quality open source alternative to commercial GPT models.\",\"params\":{\"model\":\"gpt-oss-20b\"}}'),
-(76, 'Triton', 'mistral-streaming', 'chat', 1, 'mistral-streaming', 0.01, 'per1M', 0.01, 'per1M', 9, 0, '{\"description\":\"Triton Mistral Streaming\",\"prompt\":\"\",\"params\":{\"model\":\"mistral-streaming\"}}');
-(77, 'Ollama', 'gpt-oss:20b', 'chat', 1, 'gpt-oss:20b', 0.12, 'per1M', 0.60, 'per1M', 9, 1, '{\"description\":\"Local model on synaplans company server in Germany. OpenAIs open-weight GPT-OSS (20B). 128K context, Apache-2.0 license, MXFP4 quantization; supports tools/agentic use cases.\",\"params\":{\"model\":\"gpt-oss:20b\"},\"meta\":{\"context_window\":\"128k\",\"license\":\"Apache-2.0\",\"quantization\":\"MXFP4\"}}')
+(75, 'Groq', 'gpt-oss-20b', 'chat', 1, 'gpt-oss-20b', 0.10, 'per1M', 0.50, 'per1M', 9, 1, '{\"description\":\"OpenAIs gpt-oss-20b Modell, bereitgestellt von Groq. Ein 21-Milliarden-Parameter-Modell mit Mixture-of-Experts-Architektur, optimiert für niedrige Latenz und Einsatz auf Consumer-Hardware.\",\"params\":{\"model\":\"gpt-oss-20b\"},\"meta\":{\"context_window\":\"131072\",\"license\":\"Apache-2.0\",\"quantization\":\"TruePoint Numerics\"}}'),
+(76, 'Groq', 'gpt-oss-120b', 'chat', 1, 'gpt-oss-120b', 0.15, 'per1M', 0.75, 'per1M', 9, 1, '{\"description\":\"OpenAIs gpt-oss-120b Modell, bereitgestellt von Groq. Ein 120-Milliarden-Parameter-Modell mit Mixture-of-Experts-Architektur, geeignet für anspruchsvolle agentische Anwendungen.\",\"params\":{\"model\":\"gpt-oss-120b\"},\"meta\":{\"context_window\":\"131072\",\"license\":\"Apache-2.0\",\"quantization\":\"TruePoint Numerics\"}}'),
+(77, 'Triton', 'mistral-streaming', 'chat', 1, 'mistral-streaming', 0.01, 'per1M', 0.01, 'per1M', 9, 0, '{\"description\":\"Triton Mistral Streaming\",\"prompt\":\"\",\"params\":{\"model\":\"mistral-streaming\"}}'),
+(78, 'Ollama', 'gpt-oss:20b', 'chat', 1, 'gpt-oss:20b', 0.12, 'per1M', 0.60, 'per1M', 9, 1, '{\"description\":\"Local model on synaplans company server in Germany. OpenAIs open-weight GPT-OSS (20B). 128K context, Apache-2.0 license, MXFP4 quantization; supports tools/agentic use cases.\",\"params\":{\"model\":\"gpt-oss:20b\"},\"meta\":{\"context_window\":\"128k\",\"license\":\"Apache-2.0\",\"quantization\":\"MXFP4\"}}'),
+(79, 'Ollama', 'gpt-oss:120b', 'chat', 1, 'gpt-oss:120b', 0.05, 'per1M', 0.25, 'per1M', 9, 1, '{\"description\":\"Local model on synaplans company server in Germany. OpenAIs open-weight GPT-OSS (120B). 128K context, Apache-2.0 license, MXFP4 quantization; supports tools/agentic use cases.\",\"params\":{\"model\":\"gpt-oss:120b\"},\"meta\":{\"context_window\":\"128k\",\"license\":\"Apache-2.0\",\"quantization\":\"MXFP4\"}}');
 --
 -- Indexes for dumped tables
 --
@@ -97,7 +99,7 @@ ALTER TABLE `BMODELS`
 -- AUTO_INCREMENT for table `BMODELS`
 --
 ALTER TABLE `BMODELS`
-  MODIFY `BID` bigint(20) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=77;
+  MODIFY `BID` bigint(20) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=80;
 COMMIT;
 
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
