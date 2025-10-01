@@ -218,6 +218,15 @@ Configuration-driven AI selection via `$GLOBALS` and centralized key management 
 ### Contributing
 PRs welcome for providers, channels, docs, and performance. Start from `app/Director.php` and `frontend/` components, and follow existing patterns.
 
+#### Git Blame Configuration
+This repository includes a `.git-blame-ignore-revs` file to ignore formatting commits in git blame. To configure your local git to use this file:
+
+```bash
+git config blame.ignoreRevsFile .git-blame-ignore-revs
+```
+
+This will help you see the actual code changes instead of formatting commits when using `git blame`.
+
 ### License
 See "LICENSE": Apache 2.0 real open core, because we love it!
 
