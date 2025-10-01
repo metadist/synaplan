@@ -20,23 +20,23 @@
         <hr style="border: 0; border-top: 1px solid #d1d5db; margin: 5px 10px 12px 10px;">
         <ul class="nav flex-column">
             <li class="nav-item">
-            <a class="nav-link<?php ($contentInc=="chat" || $contentInc=="chat-history") ? print " active" : ""; ?>" href="index.php/chat">
+            <a class="nav-link<?php ($contentInc == 'chat' || $contentInc == 'chat-history') ? print ' active' : ''; ?>" href="index.php/chat">
                 <span data-feather="message-square"></span>
                 Chat
             </a>
-            <?php if($contentInc == "chat" || $contentInc == "chat-history") { ?>
+            <?php if ($contentInc == 'chat' || $contentInc == 'chat-history') { ?>
                 <ul class="nav flex-column" style="margin-left: 18px;">
                     <li class="subitem"><a href="index.php/chat-history" id="chatHistoryMenu">History Log</a></li>
                 </ul>
             <?php } ?>
             </li>
             <li class="nav-item">
-            <a class="nav-link<?php ($contentInc=="tools") ? print " active" : ""; ?>" href="index.php/tools">
+            <a class="nav-link<?php ($contentInc == 'tools') ? print ' active' : ''; ?>" href="index.php/tools">
                 <span data-feather="tool"></span>
                 Tools
             </a>
-            <?php if($contentInc == "tools" || $contentInc == "webwidget" || $contentInc == "docsummary" 
-                || $contentInc == "soundstream" || $contentInc == "mailhandler") { ?>
+            <?php if ($contentInc == 'tools' || $contentInc == 'webwidget' || $contentInc == 'docsummary'
+                || $contentInc == 'soundstream' || $contentInc == 'mailhandler') { ?>
                 <ul class="nav flex-column" style="margin-left: 18px;">
                     <li class="subitem"><a href="index.php/webwidget" id="toolMenu1">Chat Widget</a></li>
                     <li class="subitem"><a href="index.php/docsummary" id="toolMenu2">Doc Summary</a></li>
@@ -46,18 +46,18 @@
             <?php } ?>
             </li>
             <li class="nav-item">
-            <a class="nav-link<?php ($contentInc=="filemanager") ? print " active" : ""; ?>" href="index.php/filemanager">
+            <a class="nav-link<?php ($contentInc == 'filemanager') ? print ' active' : ''; ?>" href="index.php/filemanager">
                 <span data-feather="image"></span>
                 Files &amp; RAG
             </a>
             </li>
             <li class="nav-item">
-            <a class="nav-link<?php ($contentInc=="ais") ? print " active" : ""; ?>" href="index.php/ais">
+            <a class="nav-link<?php ($contentInc == 'ais') ? print ' active' : ''; ?>" href="index.php/ais">
                 <span data-feather="cpu"></span>
                 AI Config
             </a>
-            <?php if($contentInc == "ais" || $contentInc == "inbound" || $contentInc == "preprocessor" 
-                || $contentInc == "prompts" || $contentInc == "aimodels" || $contentInc == "outprocessor" || $contentInc == "apikeys") { ?>
+            <?php if ($contentInc == 'ais' || $contentInc == 'inbound' || $contentInc == 'preprocessor'
+                || $contentInc == 'prompts' || $contentInc == 'aimodels' || $contentInc == 'outprocessor' || $contentInc == 'apikeys') { ?>
                 <ul class="nav flex-column" style="margin-left: 18px;">
                     <li class="subitem"><a href="index.php/inbound" id="menuPoint1">Inbound</a></li>
                     <li class="subitem"><a href="index.php/aimodels" id="menuPoint4">AI Models</a></li>
@@ -69,7 +69,7 @@
             <?php } ?>
             </li>
             <li class="nav-item">
-            <a class="nav-link<?php ($contentInc=="statistics") ? print " active" : ""; ?>" aria-current="page" href="index.php/statistics">
+            <a class="nav-link<?php ($contentInc == 'statistics') ? print ' active' : ''; ?>" aria-current="page" href="index.php/statistics">
                 <span data-feather="bar-chart-2"></span>
                 Statistics
             </a>
@@ -82,12 +82,12 @@
             <div class="user-info" onclick="window.location.href='index.php/settings'" style="cursor: pointer;">
                 <div class="user-avatar">
                     <div class="avatar-circle">
-                        <?php echo isset($_SESSION["USERPROFILE"]["BMAIL"]) ? strtoupper(substr($_SESSION["USERPROFILE"]["BMAIL"], 0, 1)) : 'S'; ?>
+                        <?php echo isset($_SESSION['USERPROFILE']['BMAIL']) ? strtoupper(substr($_SESSION['USERPROFILE']['BMAIL'], 0, 1)) : 'S'; ?>
                     </div>
                 </div>
                 <div class="user-details">
                     <div class="user-email">
-                        <?php echo isset($_SESSION["USERPROFILE"]["BMAIL"]) ? $_SESSION["USERPROFILE"]["BMAIL"] : 'user@example.com'; ?>
+                        <?php echo isset($_SESSION['USERPROFILE']['BMAIL']) ? $_SESSION['USERPROFILE']['BMAIL'] : 'user@example.com'; ?>
                     </div>
                 </div>
                 <button class="logout-btn" onclick="event.stopPropagation(); showLogoutModal()" title="Logout">

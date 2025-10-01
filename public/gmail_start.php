@@ -1,4 +1,5 @@
 <?php
+
 require_once(__DIR__ . '/../vendor/autoload.php');
 require_once(__DIR__ . '/inc/_oauth.php');
 
@@ -15,6 +16,6 @@ try {
     header('Location: ' . filter_var($authUrl, FILTER_SANITIZE_URL));
     exit;
 } catch (Exception $e) {
-    echo "Error: " . $e->getMessage();
+    echo 'Error: ' . $e->getMessage();
     exit;
 }

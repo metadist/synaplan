@@ -1,10 +1,11 @@
 <?php
+
 // Legacy REST action switch moved from api.php
 
 header('Content-Type: application/json; charset=UTF-8');
 $apiAction = $_REQUEST['action'];
 
-switch($apiAction) {
+switch ($apiAction) {
     case 'snippetTranslate':
         $sourceText = isset($_REQUEST['source_text']) ? trim($_REQUEST['source_text']) : '';
         $sourceLang = isset($_REQUEST['source_lang']) ? trim($_REQUEST['source_lang']) : 'en';
@@ -18,31 +19,31 @@ switch($apiAction) {
     case 'messageAgain':
         // Determine user ID for rate limiting (Widget owner or regular user)
         $userId = 0;
-        if (isset($_SESSION["is_widget"]) && $_SESSION["is_widget"] === true) {
-            $userId = intval($_SESSION["widget_owner_id"] ?? 0);
+        if (isset($_SESSION['is_widget']) && $_SESSION['is_widget'] === true) {
+            $userId = intval($_SESSION['widget_owner_id'] ?? 0);
         } elseif (isset($_SESSION['USERPROFILE']['BID'])) {
             $userId = intval($_SESSION['USERPROFILE']['BID']);
         }
-        
+
         // Smart rate limiting for Again requests - only check relevant operation limits
         // Skip rate limiting for widgets to avoid errors - they use owner limits anyway
-        if (XSControl::isRateLimitingEnabled() && $userId > 0 && !isset($_SESSION["is_widget"])) {
+        if (XSControl::isRateLimitingEnabled() && $userId > 0 && !isset($_SESSION['is_widget'])) {
             $inId = intval($_REQUEST['in_id'] ?? 0);
-            
+
             // Get the original message to determine what operation to limit
             if ($inId > 0) {
-                $originalSQL = "SELECT BTOPIC FROM BMESSAGES WHERE BID = " . $inId . " LIMIT 1";
+                $originalSQL = 'SELECT BTOPIC FROM BMESSAGES WHERE BID = ' . $inId . ' LIMIT 1';
                 $originalRes = db::Query($originalSQL);
                 $originalArr = db::FetchArr($originalRes);
-                
+
                 if ($originalArr && !empty($originalArr['BTOPIC'])) {
                     $originalTopic = $originalArr['BTOPIC'];
-                    
+
                     // Only check limits relevant to the original operation
                     $testMsg = ['BUSERID' => $userId, 'BTOPIC' => $originalTopic];
                     $againLimitCheck = XSControl::checkTopicLimit($testMsg);
-                    
-                    if($againLimitCheck['limited']) {
+
+                    if ($againLimitCheck['limited']) {
                         $resArr = [
                             'error' => 'rate_limit_exceeded',
                             'message' => $againLimitCheck['reason'],
@@ -53,7 +54,7 @@ switch($apiAction) {
                 }
             }
         }
-        
+
         // Log Again request to BUSELOG using original message ID (tracks operation type)
         if ($userId > 0) {
             $inId = intval($_REQUEST['in_id'] ?? 0);
@@ -61,7 +62,7 @@ switch($apiAction) {
                 XSControl::countThis($userId, $inId);
             }
         }
-        
+
         $resArr = AgainLogic::prepareAgain($_REQUEST);
         break;
     case 'againOptions':
@@ -100,9 +101,13 @@ switch($apiAction) {
     case 'changeGroupOfFile':
         $fileId = intval($_REQUEST['fileId']);
         $newGroup = isset($_REQUEST['newGroup']) ? trim($_REQUEST['newGroup']) : '';
-        if($GLOBALS["debug"]) error_log("API changeGroupOfFile called with fileId: $fileId, newGroup: '$newGroup'");
+        if ($GLOBALS['debug']) {
+            error_log("API changeGroupOfFile called with fileId: $fileId, newGroup: '$newGroup'");
+        }
         $resArr = BasicAI::changeGroupOfFile($fileId, $newGroup);
-        if($GLOBALS["debug"]) error_log("API changeGroupOfFile result: " . json_encode($resArr));
+        if ($GLOBALS['debug']) {
+            error_log('API changeGroupOfFile result: ' . json_encode($resArr));
+        }
         break;
     case 'getProfile':
         $resArr = Frontend::getProfile();
@@ -151,8 +156,11 @@ switch($apiAction) {
         $result = Frontend::mailOAuthCallback();
         if (!isset($_REQUEST['ui']) || $_REQUEST['ui'] !== 'json') {
             $target = $GLOBALS['baseUrl'] . 'index.php/mailhandler';
-            if (!empty($result['success'])) { $target .= '?oauth=ok'; }
-            else { $target .= '?oauth=error'; }
+            if (!empty($result['success'])) {
+                $target .= '?oauth=ok';
+            } else {
+                $target .= '?oauth=error';
+            }
             header('Content-Type: text/html; charset=UTF-8');
             header('Location: ' . $target);
             echo '<html><head><meta http-equiv="refresh" content="0;url='.$target.'"></head><body>Redirecting...</body></html>';
@@ -201,4 +209,3 @@ switch($apiAction) {
 
 echo json_encode($resArr);
 exit;
-

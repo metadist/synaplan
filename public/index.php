@@ -5,11 +5,11 @@ session_start();
 // ------------------------------------------------------ lang config
 // Use session fallback handler for robust session management
 
-if(!isset($_SESSION["LANG"])) {
-    $_SESSION["LANG"] = "en";
+if (!isset($_SESSION['LANG'])) {
+    $_SESSION['LANG'] = 'en';
 }
-if(isset($_REQUEST["lang"])) {
-  $_SESSION["LANG"] = $_REQUEST["lang"];
+if (isset($_REQUEST['lang'])) {
+    $_SESSION['LANG'] = $_REQUEST['lang'];
 }
 
 // ------------------------------------------------------ include files
@@ -19,14 +19,14 @@ require_once __DIR__ . '/../app/inc/_coreincludes.php';
 
 // ------------------------------------------------------ handle authentication actions that need redirects
 // Only handle actions that require redirects BEFORE HTML output
-if(isset($_REQUEST['action'])) {
-    switch($_REQUEST['action']) {
+if (isset($_REQUEST['action'])) {
+    switch ($_REQUEST['action']) {
         case 'oidc_login':
             OidcAuth::initiateAuth();
             exit; // Should redirect, but exit as backup
             break;
         case 'login':
-            if(Frontend::myCFcaptcha()) {
+            if (Frontend::myCFcaptcha()) {
                 $success = Frontend::setUserFromWebLogin();
             } else {
                 $success = false;
@@ -34,7 +34,7 @@ if(isset($_REQUEST['action'])) {
             }
             break;
         case 'register':
-            if(Frontend::myCFcaptcha()) {
+            if (Frontend::myCFcaptcha()) {
                 $result = UserRegistration::registerNewUser();
                 $_SESSION['registration_result'] = $result;
             } else {
@@ -51,12 +51,12 @@ if(isset($_REQUEST['action'])) {
 
 // ------------------------------------------------------ handle auto-redirect to OIDC
 // Check if user needs to be auto-redirected to OIDC provider
-if (!isset($_SESSION['USERPROFILE']) && 
-    OidcAuth::isConfigured() && 
+if (!isset($_SESSION['USERPROFILE']) &&
+    OidcAuth::isConfigured() &&
     OidcAuth::isAutoRedirectEnabled() &&
     !isset($_SESSION['oidc_error']) &&
     !isset($_REQUEST['action'])) {
-    
+
     OidcAuth::initiateAuth();
     exit;
 }
@@ -65,7 +65,7 @@ if (!isset($_SESSION['USERPROFILE']) &&
 <!doctype html>
 <html lang="en">
   <head>
-    <base href="<?php echo $GLOBALS["baseUrl"]; ?>">
+    <base href="<?php echo $GLOBALS['baseUrl']; ?>">
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="description" content="Ralfs.AI Dashboard">
@@ -75,7 +75,7 @@ if (!isset($_SESSION['USERPROFILE']) &&
     <link href="node_modules/bootstrap/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="assets/statics/fa/css/all.min.css" rel="stylesheet">
     <!-- Custom styles for this template -->
-    <link href="assets/statics/css/dashboard.css?v=<?php echo date("Ymd"); ?>-1" rel="stylesheet">
+    <link href="assets/statics/css/dashboard.css?v=<?php echo date('Ymd'); ?>-1" rel="stylesheet">
     <!-- JQuery we need quickly, sorry SEO -->
     <script src="node_modules/jquery/dist/jquery.min.js"></script>
   </head>

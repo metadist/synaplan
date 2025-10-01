@@ -1,8 +1,10 @@
 <?php
+
 use Google\Client as Google_Client;
 use Google\Service\Gmail as Google_Service_Gmail;
 
-class myGMail {
+class myGMail
+{
     private static $allowedAttachmentTypes = ['pdf', 'docx', 'pptx', 'jpg', 'jpeg', 'png', 'mp3'];
     private static $excludedFilenames = ['logo', 'footer', 'signature', 'banner'];
 
@@ -10,20 +12,22 @@ class myGMail {
      * Called by getMail() to refresh the OAuth token if expired
      * Returns a configured Google client with valid access token
      */
-    public static function refreshToken() {
+    public static function refreshToken()
+    {
         try {
-            $client = OAuthConfig::createGoogleClient($GLOBALS["baseUrl"].'gmail_callback2oauth.php');
+            $client = OAuthConfig::createGoogleClient($GLOBALS['baseUrl'].'gmail_callback2oauth.php');
             return $client;
         } catch (Exception $e) {
             throw new Exception('OAuth configuration error: ' . $e->getMessage());
         }
     }
 
-    public static function getMail() {
+    public static function getMail()
+    {
         try {
             $client = self::refreshToken();
             $service = new Google_Service_Gmail($client);
-            
+
             $messagesResponse = $service->users_messages->listUsersMessages('me', [
                 'labelIds' => ['INBOX'],
                 'maxResults' => 20
@@ -48,8 +52,9 @@ class myGMail {
     // function to extract the phone number from the to string
     // eg.: "Some Guy <smart+49175407011@gmail.com>"
     // returns: 49175407011
-    private static function extractPhoneNumberOrTag($toString) {
-        if(substr_count($toString, "+") > 0) {
+    private static function extractPhoneNumberOrTag($toString)
+    {
+        if (substr_count($toString, '+') > 0) {
             $mailParts = explode('+', $toString);
             $phoneParts = explode('@', $mailParts[1]);
             return db::EscString($phoneParts[0]);
@@ -69,13 +74,14 @@ class myGMail {
      * @param $messageId ID of the message to process
      * @return array Processed mail data including headers and attachments
      */
-    private static function processMessage($service, $messageId) {
+    private static function processMessage($service, $messageId)
+    {
         $message = $service->users_messages->get('me', $messageId, ['format' => 'full']);
 
         $payload = $message->getPayload();
         $mimeType = $payload->getMimeType();
         $headers = $payload->getHeaders();
-        
+
         $usrArr = [];
 
         $mailData = [
@@ -113,20 +119,20 @@ class myGMail {
         // print_r($mailData);
         $mailData['plainmail'] = Tools::cleanGMail($mailData['from']);
 
-        if($mailData['usrPhoneOrTag'] > 0) { // OR strlen($mailData['usrPhoneOrTag'] > 0)) {
+        if ($mailData['usrPhoneOrTag'] > 0) { // OR strlen($mailData['usrPhoneOrTag'] > 0)) {
             // $usrArr = Central::getUserByPhoneNumber($mailData['usrPhoneOrTag'], false);
             // new User matching logic:
             $usrArr = Central::getUserByMail($mailData['plainmail'], $mailData['usrPhoneOrTag']);
         } else {
             // get the user by the mail
-            $usrArr = Central::getUserByMail($mailData['plainmail'], "");
+            $usrArr = Central::getUserByMail($mailData['plainmail'], '');
         }
 
         // ------------------------------------------------------------
-        if(is_array($usrArr) AND count($usrArr) > 0 AND $usrArr["DETAILS"]["MAILCHECKED"] == 1) {
+        if (is_array($usrArr) and count($usrArr) > 0 and $usrArr['DETAILS']['MAILCHECKED'] == 1) {
             $mailData['usrArr'] = $usrArr;
             // Process body and attachments
-            if($usrArr["BID"] > 0) {
+            if ($usrArr['BID'] > 0) {
                 // print "USER FOUND\n";
                 // If the top-level is plain or html (non-multipart), decode directly
                 if (in_array($mimeType, ['text/plain','text/html'])) {
@@ -139,7 +145,7 @@ class myGMail {
                         self::processPayloadParts($payload->getParts(), $mailData, $service, $messageId);
                         self::deleteMessage($messageId);
                     } catch (Exception $e) {
-                        $mailData['body'] = "Error processing payload parts: " . $e->getMessage();
+                        $mailData['body'] = 'Error processing payload parts: ' . $e->getMessage();
                         self::deleteMessage($messageId);
                     }
                 }
@@ -150,18 +156,18 @@ class myGMail {
                 $mailData = false;
             }
         } else {
-            if(is_array($usrArr) AND isset($usrArr["DETAILS"]["MAIL"]) AND 
-                (!isset($usrArr["DETAILS"]["MAILCHECKED"]) 
-                OR $usrArr["DETAILS"]["MAILCHECKED"] !== 1)) {
-                    // legacy user update
-                    if(!isset($usrArr["DETAILS"]["MAILCHECKED"])) {
-                        $usrArr["DETAILS"]["MAILCHECKED"] = dechex(rand(100000, 999999));
-                        $userDetailsJson = json_encode($usrArr["DETAILS"],JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-                        $updateSQL = "UPDATE BUSER SET BUSERDETAILS = '".db::EscString($userDetailsJson)."' WHERE BID = ".$usrArr["BID"];
-                        db::Query($updateSQL);
-                    }
-                    // create the confirmation link
-                    XSControl::createConfirmationLink($usrArr);
+            if (is_array($usrArr) and isset($usrArr['DETAILS']['MAIL']) and
+                (!isset($usrArr['DETAILS']['MAILCHECKED'])
+                or $usrArr['DETAILS']['MAILCHECKED'] !== 1)) {
+                // legacy user update
+                if (!isset($usrArr['DETAILS']['MAILCHECKED'])) {
+                    $usrArr['DETAILS']['MAILCHECKED'] = dechex(rand(100000, 999999));
+                    $userDetailsJson = json_encode($usrArr['DETAILS'], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+                    $updateSQL = "UPDATE BUSER SET BUSERDETAILS = '".db::EscString($userDetailsJson)."' WHERE BID = ".$usrArr['BID'];
+                    db::Query($updateSQL);
+                }
+                // create the confirmation link
+                XSControl::createConfirmationLink($usrArr);
             }
             // delete
             self::deleteMessage($messageId);
@@ -180,19 +186,20 @@ class myGMail {
      * @param $messageId Current message ID
      * @param $prefix Used for nested parts (optional)
      */
-    private static function processPayloadParts($parts, &$mailData, $service, $messageId) {
+    private static function processPayloadParts($parts, &$mailData, $service, $messageId)
+    {
         if (empty($parts)) {
             return;
         }
-    
+
         foreach ($parts as $part) {
             // Check MIME type
             $mimeType = $part->getMimeType();
             $filename = $part->getFilename();
-    
+
             if ($mimeType === 'text/plain' && !$part->getFilename()) {
                 $mailData['body'] = self::decodeBody($part, $part->getBody()->getData());
-            } elseif($mimeType === 'text/html' && !$part->getFilename()) {
+            } elseif ($mimeType === 'text/html' && !$part->getFilename()) {
                 $mailData['body'] = strip_tags(self::decodeBody($part, $part->getBody()->getData()));
             } elseif (!empty($filename)) {
                 $attachment = self::processAttachment($part, $service, $messageId);
@@ -200,7 +207,7 @@ class myGMail {
                     $mailData['attachments'][] = $attachment;
                 }
             }
-    
+
             // If there's another level of parts, recurse
             $subParts = $part->getParts();
             if (!empty($subParts)) {
@@ -217,10 +224,11 @@ class myGMail {
      * @param $messageId ID of message containing attachment
      * @return array|null Attachment data if valid, null if filtered out
      */
-    private static function processAttachment($part, $service, $messageId) {
+    private static function processAttachment($part, $service, $messageId)
+    {
         $filename = $part->getFilename();
         $attachmentId = $part->getBody()->getAttachmentId();
-        
+
         if (!$attachmentId) {
             return null;
         }
@@ -243,11 +251,11 @@ class myGMail {
         // Get attachment content
         $attachment = $service->users_messages_attachments->get('me', $messageId, $attachmentId);
         $data = $attachment->getData();
-        
+
         // Properly handle the base64url encoded data
         $data = str_replace(['-', '_'], ['+', '/'], $data);
         $data = base64_decode($data);
-        
+
         return [
             'filename' => $filename,
             'mimeType' => $part->getMimeType(),
@@ -258,11 +266,12 @@ class myGMail {
     /**
      * Called by processPayloadParts() to decode base64 encoded message bodies
      */
-    private static function decodeBody($part, $partBodyData): string {
+    private static function decodeBody($part, $partBodyData): string
+    {
         // First do the normal base64url decoding that the Gmail API expects
         $base64Decoded = strtr($partBodyData, '-_', '+/');
         $rawContent    = base64_decode($base64Decoded);
-    
+
         // If this part is quoted-printable, do that decoding too
         // You can check $part->getHeaders() or $part->getMimeType(), etc.
         // In your raw example, it was "Content-Transfer-Encoding: quoted-printable"
@@ -275,28 +284,29 @@ class myGMail {
                 }
             }
         }
-    
+
         // If the charset is iso-8859-1 and you want UTF-8, you can convert:
         // (you could also sniff the header "Content-Type: text/plain; charset=iso-8859-1")
         if (strpos(strtolower($part->getMimeType()), 'iso-8859-1') !== false
             || strpos(strtolower($rawContent), 'charset=iso-8859-1') !== false) {
             $rawContent = mb_convert_encoding($rawContent, 'UTF-8', 'ISO-8859-1');
         }
-    
+
         return $rawContent;
     }
     // whole mail is simple text
-    private static function decodeBodyTopLevel($payload) {
+    private static function decodeBodyTopLevel($payload)
+    {
         // This is the raw base64url string for the body
         $rawData = $payload->getBody() ? $payload->getBody()->getData() : '';
         if (!$rawData) {
             return '';
         }
-    
+
         // Step 1: Base64URL decode
         $base64Decoded = strtr($rawData, '-_', '+/');
         $decoded       = base64_decode($base64Decoded);
-    
+
         // Step 2: Check Content-Transfer-Encoding
         // You can look at $payload->getHeaders() for a "Content-Transfer-Encoding: quoted-printable"
         $headers = $payload->getHeaders();
@@ -306,19 +316,20 @@ class myGMail {
                 $decoded = quoted_printable_decode($decoded);
             }
         }
-    
+
         // Step 3: Convert character set if iso-8859-1
         // (Your raw data says: charset="iso-8859-1")
         if (strpos(strtolower($payload->getMimeType()), 'iso-8859-1') !== false) {
             $decoded = mb_convert_encoding($decoded, 'UTF-8', 'ISO-8859-1');
         }
-    
+
         // If it was "text/html" top-level, you could do `strip_tags` or
         // store it in a separate $mailData['body_html']. Up to you.
         return $decoded;
     }
     // ------------------------------------------------------------
-    public static function saveToDatabase($processedMails) {
+    public static function saveToDatabase($processedMails)
+    {
         $myTrackingId = (int) (microtime(true) * 1000000);
 
         foreach ($processedMails as $mail) {
@@ -330,17 +341,17 @@ class myGMail {
                 $inMessageArr['BUSERID'] = $mail['usrArr']['BID'];
                 $inMessageArr['BTEXT'] = trim(strip_tags($mail['body']));
                 $inMessageArr['BUNIXTIMES'] = time();
-                $inMessageArr['BDATETIME'] = (string) date("YmdHis");
+                $inMessageArr['BDATETIME'] = (string) date('YmdHis');
                 // --
                 $convArr = Central::searchConversation($inMessageArr);
-                if(is_array($convArr) AND $convArr['BID'] > 0) {
+                if (is_array($convArr) and $convArr['BID'] > 0) {
                     $inMessageArr['BTRACKID'] = $convArr['BTRACKID'];
                     $inMessageArr['BTOPIC'] = $convArr['BTOPIC'];
                     $inMessageArr['BLANG'] = $convArr['BLANG'];
                 } else {
                     $inMessageArr['BTRACKID'] = $myTrackingId;
                     $inMessageArr['BLANG'] = Central::getLanguageByCountryCode($mail['usrArr']['BPROVIDERID']);
-                    $inMessageArr['BTOPIC'] = ''; 
+                    $inMessageArr['BTOPIC'] = '';
                 }
 
                 //$inMessageArr['BTOPIC'] = "other";
@@ -367,12 +378,12 @@ class myGMail {
                     if (is_array($limitCheck) && $limitCheck['limited']) {
                         // Send rate limit notification via email
                         $limitMessage = "⏳ Usage Limit Reached\n" . $limitCheck['message'] . "\nNext available in: " . $limitCheck['reset_time_formatted'] . "\nNeed higher limits? 🚀 Upgrade your plan";
-                        
+
                         // Send auto-reply email
-                        $replySubject = "Re: " . $mail['subject'];
+                        $replySubject = 'Re: ' . $mail['subject'];
                         $replyBody = $limitMessage;
                         _mymail('info@metadist.de', $mail['plainmail'], $replySubject, $replyBody, $replyBody);
-                        
+
                         $mail['attachments'] = [];
                         $saveToDB = 1;
                     }
@@ -381,25 +392,25 @@ class myGMail {
                 // Save attachments
                 $fileCount = 0;
                 foreach ($mail['attachments'] as $attachment) {
-                    if(strlen($mail['usrArr']['BPROVIDERID']) > 5) {                        
-                        $userRelPath = substr($mail['usrArr']['BPROVIDERID'], -5, 3) . '/' . 
-                                     substr($mail['usrArr']['BPROVIDERID'], -2, 2) . '/' . 
-                                     date("Ym") . "/";
-                        
+                    if (strlen($mail['usrArr']['BPROVIDERID']) > 5) {
+                        $userRelPath = substr($mail['usrArr']['BPROVIDERID'], -5, 3) . '/' .
+                                     substr($mail['usrArr']['BPROVIDERID'], -2, 2) . '/' .
+                                     date('Ym') . '/';
+
                         // Fix directory creation
                         $fullUploadDir = rtrim(UPLOAD_DIR, '/').'/' . $userRelPath;
                         if (!is_dir($fullUploadDir)) {
                             mkdir($fullUploadDir, 0755, true);  // Use recursive directory creation
                         }
-                        
+
                         // save file
                         $fileType = Tools::getFileExtension($attachment['mimeType']);
-                        $fileRelPath = $userRelPath . 'gm-' . date("YmdHis") . '-' . ($fileCount++) . '.' . $fileType;
+                        $fileRelPath = $userRelPath . 'gm-' . date('YmdHis') . '-' . ($fileCount++) . '.' . $fileType;
                         $filePath = $fullUploadDir . basename($fileRelPath);
-                        
+
                         // Write the raw binary data directly to file
                         file_put_contents($filePath, $attachment['data']);
-                        
+
                         $inMessageArr['BFILEPATH'] = $fileRelPath;
                         $inMessageArr['BFILETYPE'] = $fileType;
                         $inMessageArr['BFILE'] = 1;
@@ -411,7 +422,7 @@ class myGMail {
                     }
                 }
 
-                if($saveToDB == 0) {
+                if ($saveToDB == 0) {
                     $resArr = Central::handleInMessage($inMessageArr);
                     $lastInsertsId[] = $resArr['lastId'];
                     // log the message to the DB
@@ -421,21 +432,21 @@ class myGMail {
                 // Delete the message after processing: old place, was moved to mail process
                 // self::deleteMessage($mail['message_id']);
                 // -------------------- Message Array saved to DB -------------------
-                if(count($lastInsertsId) > 0) {
-                    foreach($lastInsertsId as $lastInsertId) {
-                        if(intval($lastInsertId) > 0) {
+                if (count($lastInsertsId) > 0) {
+                    foreach ($lastInsertsId as $lastInsertId) {
+                        if (intval($lastInsertId) > 0) {
                             // log the message to the DB
                             XSControl::countThis($inMessageArr['BUSERID'], $lastInsertId);
 
-                            $metaSQL = "insert into BMESSAGEMETA (BID, BMESSID, BTOKEN, BVALUE) values (DEFAULT, ".(0 + $lastInsertId).", 'FILECOUNT', '".($fileCount)."');";
+                            $metaSQL = 'insert into BMESSAGEMETA (BID, BMESSID, BTOKEN, BVALUE) values (DEFAULT, '.(0 + $lastInsertId).", 'FILECOUNT', '".($fileCount)."');";
                             $metaRes = db::Query($metaSQL);
                             // count bytes
                             XSControl::countBytes($inMessageArr, 'BOTH', false);
-                                
+
                             // (2) start the preprocessor and monitor the pid in the pids folder
-                            $cmd = "nohup php preprocessor.php ".($lastInsertId)." > /dev/null 2>&1 &";
-                            $pidfile = "pids/m".($lastInsertId).".pid";
-                            exec(sprintf("%s echo $! >> %s", $cmd, $pidfile));
+                            $cmd = 'nohup php preprocessor.php '.($lastInsertId).' > /dev/null 2>&1 &';
+                            $pidfile = 'pids/m'.($lastInsertId).'.pid';
+                            exec(sprintf('%s echo $! >> %s', $cmd, $pidfile));
                         }
                     }
                 }
@@ -452,11 +463,12 @@ class myGMail {
      * @param $messageId ID of message to delete
      * @return bool True if successful
      */
-    public static function deleteMessage($messageId) {
+    public static function deleteMessage($messageId)
+    {
         try {
             $client = self::refreshToken();
             $service = new Google_Service_Gmail($client);
-            
+
             // Move the message to trash
             $service->users_messages->trash('me', $messageId);
             return true;
@@ -464,4 +476,4 @@ class myGMail {
             throw new Exception('Error deleting message: ' . $e->getMessage());
         }
     }
-} 
+}

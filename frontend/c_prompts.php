@@ -23,26 +23,26 @@
                         <select class="form-select form-select-lg" aria-label="Select your prompt" name="editKey" id="editKey" onchange="onPromptChange()">
                         <?php
                             $prompts = BasicAI::getAllPrompts();
-                            $selectedAIModel = -1;
-                            $loopCount = 0;
-                            foreach($prompts as $prompt) {
-                                $ownerHint = "(default)";
-                                if($prompt['BOWNERID'] != 0) {
-                                    $ownerHint = "(custom)";
-                                }
-                                echo "<option value='".$prompt['BTOPIC']."'>".$ownerHint." ".$prompt['BTOPIC']. " - ".substr($prompt['BSHORTDESC'],0,32)."...</option>";
-                                if($promptDesc == '') {
-                                    $promptDesc = $prompt['BSHORTDESC'];
-                                }
-                                if($loopCount == 0) {
-                                    foreach($prompt['SETTINGS'] as $setting) {
-                                        if($setting['BTOKEN'] == 'aiModel') {
-                                            $selectedAIModel = $setting['BVALUE'];
-                                        }
+                        $selectedAIModel = -1;
+                        $loopCount = 0;
+                        foreach ($prompts as $prompt) {
+                            $ownerHint = '(default)';
+                            if ($prompt['BOWNERID'] != 0) {
+                                $ownerHint = '(custom)';
+                            }
+                            echo "<option value='".$prompt['BTOPIC']."'>".$ownerHint.' '.$prompt['BTOPIC']. ' - '.substr($prompt['BSHORTDESC'], 0, 32).'...</option>';
+                            if ($promptDesc == '') {
+                                $promptDesc = $prompt['BSHORTDESC'];
+                            }
+                            if ($loopCount == 0) {
+                                foreach ($prompt['SETTINGS'] as $setting) {
+                                    if ($setting['BTOKEN'] == 'aiModel') {
+                                        $selectedAIModel = $setting['BVALUE'];
                                     }
                                 }
-                                $loopCount++;
                             }
+                            $loopCount++;
+                        }
                         ?>
                         </select>
                         <div class="form-text">Choose an existing prompt to edit</div>
@@ -100,25 +100,25 @@
                     <div class="col-sm-10">
                         <?php
                             $AImodels = BasicAI::getAllModels();
-                            $modCount = 0;
-                            array_unshift($AImodels, [
-                                "BID" => "-1",
-                                "BTAG" => "AUTOMATED",
-                                "BNAME" => "Tries to define the best model for the task",
-                                "BSHORTDESC" => "Tries to define the best model for the task",
-                                "BSERVICE" => "SYNAPLAN"
-                            ]);
+                        $modCount = 0;
+                        array_unshift($AImodels, [
+                            'BID' => '-1',
+                            'BTAG' => 'AUTOMATED',
+                            'BNAME' => 'Tries to define the best model for the task',
+                            'BSHORTDESC' => 'Tries to define the best model for the task',
+                            'BSERVICE' => 'SYNAPLAN'
+                        ]);
                         ?>
                         <select class="form-select" name="aiModelSelect" id="aiModelSelect">
-                            <?php 
-                            foreach($AImodels as $model): 
+                            <?php
+                            foreach ($AImodels as $model):
                                 // Only disable if it's a system model AND not the currently selected value
                                 $disabled = ($model['BSELECTABLE'] == 0 && $selectedAIModel != $model['BID']) ? 'disabled' : '';
-                                $modelLabel = htmlspecialchars($model["BTAG"]." - ".$model['BNAME']." on ".$model['BSERVICE']);
+                                $modelLabel = htmlspecialchars($model['BTAG'].' - '.$model['BNAME'].' on '.$model['BSERVICE']);
                                 if ($model['BSELECTABLE'] == 0) {
                                     $modelLabel .= ' [System Model]';
                                 }
-                            ?>
+                                ?>
                                 <option value="<?= htmlspecialchars($model['BID']) ?>" <?= $disabled ?>><?= $modelLabel ?></option>
                             <?php endforeach; ?>
                         </select>
@@ -172,25 +172,25 @@
                             <select class="form-select" id="toolFilesKeyword" name="toolFilesKeyword">
                                 <option value="">All file groups...</option>
                                 <?php
-                                    // Reuse the groupKeys logic from c_filemanager.php
-                                    $groupKeys = [];
-                                    $sql = "SELECT DISTINCT BRAG.BGROUPKEY
+                                        // Reuse the groupKeys logic from c_filemanager.php
+                                        $groupKeys = [];
+                        $sql = 'SELECT DISTINCT BRAG.BGROUPKEY
                                             FROM BMESSAGES
                                             INNER JOIN BRAG ON BRAG.BMID = BMESSAGES.BID
-                                            WHERE BMESSAGES.BUSERID = " . $_SESSION["USERPROFILE"]["BID"] . "
+                                            WHERE BMESSAGES.BUSERID = ' . $_SESSION['USERPROFILE']['BID'] . "
                                             AND BMESSAGES.BDIRECT = 'IN'
                                             AND BMESSAGES.BFILE > 0
                                             AND BMESSAGES.BFILEPATH != ''";
-                                    $res = db::Query($sql);
-                                    while ($row = db::FetchArr($res)) {
-                                        if (!empty($row['BGROUPKEY'])) {
-                                            $groupKeys[] = $row['BGROUPKEY'];
-                                        }
-                                    }
-                                    foreach ($groupKeys as $groupKey) {
-                                        echo "<option value='" . htmlspecialchars($groupKey) . "'>" . htmlspecialchars($groupKey) . "</option>";
-                                    }
-                                ?>
+                        $res = db::Query($sql);
+                        while ($row = db::FetchArr($res)) {
+                            if (!empty($row['BGROUPKEY'])) {
+                                $groupKeys[] = $row['BGROUPKEY'];
+                            }
+                        }
+                        foreach ($groupKeys as $groupKey) {
+                            echo "<option value='" . htmlspecialchars($groupKey) . "'>" . htmlspecialchars($groupKey) . '</option>';
+                        }
+                        ?>
                             </select>
                             <div class="form-text">Choose a file group to restrict RAG search.</div>
                         </div>
@@ -222,16 +222,16 @@
             </div>
             <div class="card-body p-0">
                 <?php
-                    if($selectedAIModel == -1) {
-                        $promptText = BasicAI::getAprompt("general", $_SESSION["LANG"], [], false)["BPROMPT"];
+                    if ($selectedAIModel == -1) {
+                        $promptText = BasicAI::getAprompt('general', $_SESSION['LANG'], [], false)['BPROMPT'];
                     } else {
-                        $promptText = BasicAI::getApromptById($selectedAIModel)["BPROMPT"];
+                        $promptText = BasicAI::getApromptById($selectedAIModel)['BPROMPT'];
                     }
-                ?>
+                        ?>
                 <textarea id="mdEditor" class="form-control border-0" name="promptContent"
-                    style="min-height: 500px; font-family: 'Courier New', monospace; font-size: 14px; line-height: 1.5;"><?php 
-                    echo $promptText; 
-                ?></textarea>
+                    style="min-height: 500px; font-family: 'Courier New', monospace; font-size: 14px; line-height: 1.5;"><?php
+                            echo $promptText;
+                        ?></textarea>
             </div>
         </div>
 

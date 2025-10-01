@@ -1,5 +1,6 @@
-<?php 
-/* 
+<?php
+
+/*
     API for synaplan.com. Serving as a bridge between the frontend and the backend.
     Design with a bearer token authentication. Bearer token is the session id.
     The bearer Auth token is saved in the database for each user.
@@ -42,11 +43,11 @@ ApiAuthenticator::handleBearerAuth();
 // ----------------------------- Rate Limiting: Block only if MESSAGES limit reached
 // Specific operation limits (images/videos) are checked after sorting
 $action = $_REQUEST['action'] ?? '';
-if (XSControl::isRateLimitingEnabled() && 
-    isset($_SESSION['USERPROFILE']) && 
+if (XSControl::isRateLimitingEnabled() &&
+    isset($_SESSION['USERPROFILE']) &&
     !empty($_SESSION['USERPROFILE']['BID']) &&
     $action === 'messageNew') {
-    
+
     // Only check general MESSAGES limits - specific operations checked after sorting
     $limitResult = XSControl::checkMessagesLimit($_SESSION['USERPROFILE']['BID']);
     if ($limitResult !== true) {
@@ -104,8 +105,8 @@ try {
 
     // Debug logging
     ApiAuthenticator::logSessionDebugInfo();
-    if ($GLOBALS["debug"]) {
-        error_log("API Action: " . $apiAction);
+    if ($GLOBALS['debug']) {
+        error_log('API Action: ' . $apiAction);
     }
 
     // Check if action is allowed for current session
@@ -117,5 +118,5 @@ try {
     require_once __DIR__ . '/../app/inc/api/_api-restcalls.php';
 } catch (\Throwable $e) {
     http_response_code(500);
-    echo json_encode(["error" => "Server error", "message" => ($GLOBALS["debug"] ?? false) ? $e->getMessage() : null]);
+    echo json_encode(['error' => 'Server error', 'message' => ($GLOBALS['debug'] ?? false) ? $e->getMessage() : null]);
 }

@@ -1,6 +1,7 @@
 <?php
 
-class Curler {
+class Curler
+{
     /**
      * Makes a cURL request and returns the response as an array.
      *
@@ -42,4 +43,4 @@ class Curler {
     }
 
 
-} 
+}

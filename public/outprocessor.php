@@ -1,10 +1,11 @@
 <?php
+
 //==================================================================================
 /*
  AOutprocessorf for Ralfs.AI messages
  written by puzzler - Ralf Schwoebel, rs(at)metadist.de
 
- Tasks of this file: 
+ Tasks of this file:
  . take the message ID handed over and decide how to send it out
 */
 //==================================================================================
@@ -30,7 +31,7 @@ $msgId = intval($argv[2]);
 $aiAnswer = Central::getMsgById($aiLastId);
 
 $usrArr = Central::getUsrById($aiAnswer['BUSERID']);
-$usrArr["DETAILS"] = json_decode($usrArr["BUSERDETAILS"], true);
+$usrArr['DETAILS'] = json_decode($usrArr['BUSERDETAILS'], true);
 
 
 // set the answer method
@@ -41,28 +42,28 @@ $answerMethod = $aiAnswer['BMESSTYPE'];
 // ------------------------------------------------------
 // WHATSAPP
 // ------------------------------------------------------
-if($answerMethod == 'WA') {
+if ($answerMethod == 'WA') {
     // SENDING BACK: check the way in and choose the right out.
     // get the phone number from the database, that was receiving the message
     // use it to send the answer back
-    $detRes = db::Query("select BWAPHONENO, BWAPHONEID from BWAIDS where BMID = ".$msgId);
+    $detRes = db::Query('select BWAPHONENO, BWAPHONEID from BWAIDS where BMID = '.$msgId);
     $waDetailsArr = db::FetchArr($detRes);
 
     // ******************************************************
     // SEND WA
     $waSender = new waSender($waDetailsArr);
 
-    if(file_exists(__DIR__ . '/.keys/.live.txt')) {
-        if($aiAnswer['BFILE']>0 AND $aiAnswer['BFILETYPE'] != '' AND str_contains($aiAnswer['BFILEPATH'], '/')) {
-            if($aiAnswer['BFILETYPE'] == 'png' OR $aiAnswer['BFILETYPE'] == 'jpg' OR $aiAnswer['BFILETYPE'] == 'jpeg') {
-                $waSender->sendImage($usrArr["BPROVIDERID"], $aiAnswer);
-            } elseif($aiAnswer['BFILETYPE'] == 'mp3') {
-                $waSender->sendAudio($usrArr["BPROVIDERID"], $aiAnswer);
+    if (file_exists(__DIR__ . '/.keys/.live.txt')) {
+        if ($aiAnswer['BFILE'] > 0 and $aiAnswer['BFILETYPE'] != '' and str_contains($aiAnswer['BFILEPATH'], '/')) {
+            if ($aiAnswer['BFILETYPE'] == 'png' or $aiAnswer['BFILETYPE'] == 'jpg' or $aiAnswer['BFILETYPE'] == 'jpeg') {
+                $waSender->sendImage($usrArr['BPROVIDERID'], $aiAnswer);
+            } elseif ($aiAnswer['BFILETYPE'] == 'mp3') {
+                $waSender->sendAudio($usrArr['BPROVIDERID'], $aiAnswer);
             } else {
-                $waSender->sendDoc($usrArr["BPROVIDERID"], $aiAnswer);
+                $waSender->sendDoc($usrArr['BPROVIDERID'], $aiAnswer);
             }
         } else {
-            $myRes = $waSender->sendText($usrArr["BPROVIDERID"], $aiAnswer['BTEXT']);
+            $myRes = $waSender->sendText($usrArr['BPROVIDERID'], $aiAnswer['BTEXT']);
         }
 
     } else {
@@ -74,7 +75,7 @@ if($answerMethod == 'WA') {
 // ------------------------------------------------------
 // GMAIL
 // ------------------------------------------------------
-if($answerMethod == 'MAIL') {
+if ($answerMethod == 'MAIL') {
     // send the answer to the user via metadist account, but reply-to is correct
     // $mailSender = new mailSender($usrArr["BPROVIDERID"]);
     // $mailSender->sendMail($aiAnswer);
@@ -85,12 +86,12 @@ if($answerMethod == 'MAIL') {
     // print $fileAttachment."\n";
 
     $sentRes = EmailService::sendEmail(
-        $usrArr["DETAILS"]["MAIL"], 
-        "Ralfs.AI - ".$aiAnswer['BTOPIC'], 
-        $htmlText, 
-        $htmlText, 
-        "smart@ralfs.ai"
+        $usrArr['DETAILS']['MAIL'],
+        'Ralfs.AI - '.$aiAnswer['BTOPIC'],
+        $htmlText,
+        $htmlText,
+        'smart@ralfs.ai'
     );
 }
-//----- 
+//-----
 exit;

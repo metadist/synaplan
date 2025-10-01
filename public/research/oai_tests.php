@@ -1,10 +1,11 @@
 <?php
+
 //==================================================================================
 /*
  AIprocessor for Ralfs.AI messages
  written by puzzler - Ralf Schwoebel, rs(at)metadist.de
 
- Tasks of this file: 
+ Tasks of this file:
  . take the message ID handed over and process it
 */
 //==================================================================================
@@ -46,10 +47,10 @@ $GLOBALS['openaiKey'] = file_get_contents(__DIR__ . '/.keys/.openaikey.txt');
 $client = OpenAI::client($GLOBALS['openaiKey']);
 
 $arrMessages = [
-    ['role' => 'system', 'content' => "Du bist ein Assistent, der sich erstmal vorstellt und sagt auf welchem LLM basiert."],
+    ['role' => 'system', 'content' => 'Du bist ein Assistent, der sich erstmal vorstellt und sagt auf welchem LLM basiert.'],
 ];
 
-$arrMessages[] = ['role' => 'user', 'content' => "Kannst Du eine Datei erzeugen, zum Beispiel ein Word Dokument mit einem Text darin und hier anhängen?"];
+$arrMessages[] = ['role' => 'user', 'content' => 'Kannst Du eine Datei erzeugen, zum Beispiel ein Word Dokument mit einem Text darin und hier anhängen?'];
 
 try {
     $chat = $client->chat()->create([
@@ -57,7 +58,7 @@ try {
         'messages' => $arrMessages
     ]);
 } catch (OpenAIException $err) {
-    return "*APItopic Error - Ralf made a bubu - please mail that to him: * " . $err->getMessage();
+    return '*APItopic Error - Ralf made a bubu - please mail that to him: * ' . $err->getMessage();
 }
 //return $chat->message->content;
 // the prompt asks for a JSON object, so we need to decode it

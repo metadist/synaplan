@@ -34,8 +34,8 @@ $mode = isset($_REQUEST['mode']) ? trim($_REQUEST['mode']) : '';
 // Validate parameters
 if ($uid <= 0 || $widgetId < 1 || $widgetId > 9) {
     echo "console.error('Invalid widget parameters: uid=$uid, widgetid=$widgetId');";
-// Load widget notifications script
-echo "
+    // Load widget notifications script
+    echo "
 document.addEventListener('DOMContentLoaded', function() {
     var script = document.createElement('script');
     script.src = '{$GLOBALS['baseUrl']}assets/statics/js/system-notifications.js';
@@ -47,8 +47,8 @@ document.addEventListener('DOMContentLoaded', function() {
 }
 
 // Get widget configuration from database
-$group = "widget_" . $widgetId;
-$sql = "SELECT BSETTING, BVALUE FROM BCONFIG WHERE BOWNERID = " . $uid . " AND BGROUP = '" . db::EscString($group) . "'";
+$group = 'widget_' . $widgetId;
+$sql = 'SELECT BSETTING, BVALUE FROM BCONFIG WHERE BOWNERID = ' . $uid . " AND BGROUP = '" . db::EscString($group) . "'";
 $res = db::Query($sql);
 
 $config = [
@@ -72,8 +72,8 @@ while ($row = db::FetchArr($res)) {
 }
 
 // Get the base URL for the widget (ensure trailing slash)
-$baseUrl = rtrim($GLOBALS["baseUrl"], '/') . '/';
-$widgetUrl = $baseUrl . "widgetloader.php?uid=" . $uid . "&widgetid=" . $widgetId;
+$baseUrl = rtrim($GLOBALS['baseUrl'], '/') . '/';
+$widgetUrl = $baseUrl . 'widgetloader.php?uid=' . $uid . '&widgetid=' . $widgetId;
 
 // Determine position CSS
 $positionCSS = '';

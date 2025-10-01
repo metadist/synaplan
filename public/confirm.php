@@ -5,14 +5,14 @@ require_once __DIR__ . '/../app/inc/_coreincludes.php';
 $id = intval($_GET['id']);
 $c = db::EscString($_GET['c']);
 
-$getSQL = "SELECT * FROM BUSER WHERE BID = ".$id." AND BUSERDETAILS LIKE '%".$c."%'";
+$getSQL = 'SELECT * FROM BUSER WHERE BID = '.$id." AND BUSERDETAILS LIKE '%".$c."%'";
 $getRes = db::Query($getSQL);
 $getArr = db::FetchArr($getRes);
 
 $confirmed = false;
-if($getArr) {
+if ($getArr) {
     $getArr['DETAILS'] = json_decode($getArr['BUSERDETAILS'], true);
-    if(isset($getArr['DETAILS']['MAILCHECKED']) AND $getArr['DETAILS']['MAILCHECKED'] == $c) {
+    if (isset($getArr['DETAILS']['MAILCHECKED']) and $getArr['DETAILS']['MAILCHECKED'] == $c) {
         $getArr['DETAILS']['MAILCHECKED'] = 1;
         $userDetailsJson = json_encode($getArr['DETAILS'], JSON_UNESCAPED_UNICODE);
         $updateSQL = "UPDATE BUSER SET BUSERDETAILS = '".db::EscString($userDetailsJson)."' WHERE BID = ".$id;
@@ -26,7 +26,7 @@ if($getArr) {
         <title>Confirmation</title>
     </head>
     <body>
-        <?php if($confirmed) { ?>
+        <?php if ($confirmed) { ?>
             <h1>Email confirmed</h1>
             You can now mail to <a href="mailto:smart@ralfs.ai">smart@ralfs.ai</a>.
         

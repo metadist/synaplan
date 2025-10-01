@@ -1,10 +1,11 @@
 <?php
+
 //==================================================================================
 /*
  AIprocessor for Ralfs.AI messages
  written by puzzler - Ralf Schwoebel, rs(at)metadist.de
 
- Tasks of this file: 
+ Tasks of this file:
  . take the message ID handed over and process it
 */
 //==================================================================================
@@ -50,7 +51,7 @@ $groqkey = file_get_contents('./.keys/.groqkey.txt');
 $client = new Groq($groqkey);
 
 $arrMessages = [
-    ['role' => 'system', 'content' => "You answer questions. You get one JSON object and the user question in the BTEXT field. Replace that text in the BTEXT field with your answer. The other fields are not relevant for you."],
+    ['role' => 'system', 'content' => 'You answer questions. You get one JSON object and the user question in the BTEXT field. Replace that text in the BTEXT field with your answer. The other fields are not relevant for you.'],
 ];
 
 // tell AI the whole thread
@@ -75,5 +76,5 @@ try {
     ]);
     print_r($chat['choices'][0]['message']);
 } catch (GroqException $err) {
-    print "*APItopic Error - Ralf made a bubu - please mail that to him: * " . $err->getMessage();
+    print '*APItopic Error - Ralf made a bubu - please mail that to him: * ' . $err->getMessage();
 }

@@ -1,4 +1,5 @@
 <?php
+
 require_once(__DIR__ . '/../../vendor/autoload.php');
 require_once(__DIR__ . '/config/_confsys.php');
 require_once(__DIR__ . '/config/_confdb.php');
@@ -10,7 +11,7 @@ require_once(__DIR__ . '/support/_tools.php');
 require_once(__DIR__ . '/ai/providers/_aiollama.php');
 require_once(__DIR__ . '/ai/providers/_aigroq.php');
 require_once(__DIR__ . '/ai/providers/_aianthropic.php');
-require_once(__DIR__ . '/ai/providers/_aithehive.php');  
+require_once(__DIR__ . '/ai/providers/_aithehive.php');
 require_once(__DIR__ . '/ai/providers/_aiopenai.php');
 require_once(__DIR__ . '/ai/providers/_aigoogle.php');
 // Triton works on systems with php/grpc installed and with
@@ -61,7 +62,7 @@ $rootPath = $publicRoot . 'up/';
 // error_log("rootPath: " . $rootPath);
 
 $adapter = new League\Flysystem\Local\LocalFilesystemAdapter($rootPath);
-$GLOBALS["filesystem"] = new League\Flysystem\Filesystem($adapter, [
+$GLOBALS['filesystem'] = new League\Flysystem\Filesystem($adapter, [
     'visibility' => 'public',
     'directory_visibility' => 'public'
 ]);

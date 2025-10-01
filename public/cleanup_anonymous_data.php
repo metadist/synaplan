@@ -1,10 +1,10 @@
 <?php
 /**
  * Anonymous Widget Data Cleanup Script
- * 
+ *
  * This script cleans up old anonymous widget data to comply with GDPR requirements.
  * It deletes anonymous messages and RAG entries older than 4 weeks (28 days).
- * 
+ *
  * Usage: php cleanup_anonymous_data.php
  * Recommended: Run daily via cron job
  */
@@ -74,7 +74,7 @@ echo "Total items deleted: $totalDeleted\n";
 echo "Anonymous RAG entries: $deletedRagEntries\n";
 echo "Anonymous messages: $deletedMessages\n";
 echo "Orphaned RAG entries: $deletedOrphanedRag\n";
-echo "Cleanup completed at: " . date('Y-m-d H:i:s') . "\n";
+echo 'Cleanup completed at: ' . date('Y-m-d H:i:s') . "\n";
 
 // Log the cleanup for audit purposes
 $logMessage = date('Y-m-d H:i:s') . " - Anonymous data cleanup: $deletedMessages messages, $deletedRagEntries RAG entries, $deletedOrphanedRag orphaned entries deleted\n";

@@ -1,4 +1,5 @@
 <?php
+
 $root = '../';
 require_once($root . 'inc/_coreincludes.php');
 

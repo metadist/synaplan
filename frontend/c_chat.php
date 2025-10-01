@@ -20,7 +20,7 @@ $widgetPrompt = $_SESSION['WIDGET_PROMPT'] ?? 'general';
 $widgetAutoMessage = $_SESSION['WIDGET_AUTO_MESSAGE'] ?? '';
 
 // Check if this is anonymous widget mode
-$isAnonymousWidget = isset($_SESSION["is_widget"]) && $_SESSION["is_widget"] === true;
+$isAnonymousWidget = isset($_SESSION['is_widget']) && $_SESSION['is_widget'] === true;
 ?>
 <link rel="stylesheet" href="assets/statics/fa/css/all.min.css">
 <!-- Add highlight.js CSS -->
@@ -71,17 +71,17 @@ window.isWidgetMode = <?php echo $isWidgetMode ? 'true' : 'false'; ?>;
                     </li>
                     <?php
                         $prompts = BasicAI::getAllPrompts();
-                        foreach($prompts as $prompt) {
-                            $ownerHint = $prompt['BOWNERID'] != 0 ? "👤" : "🏢";
-                            $desc = htmlspecialchars(substr($prompt['BSHORTDESC'],0,84));
-                            echo "<li>
+        foreach ($prompts as $prompt) {
+            $ownerHint = $prompt['BOWNERID'] != 0 ? '👤' : '🏢';
+            $desc = htmlspecialchars(substr($prompt['BSHORTDESC'], 0, 84));
+            echo "<li>
                                 <a class='dropdown-item' href='#' data-value='".htmlspecialchars($prompt['BTOPIC'])."'>
                                     <span class='dropdown-main'>{$ownerHint} {$prompt['BTOPIC']}</span>
                                     <span class='dropdown-desc'>{$desc}</span>
                                 </a>
                             </li>";
-                        }
-                    ?>
+        }
+        ?>
                 </ul>
                 <input type="hidden" name="promptConfigSelect" id="promptConfigSelect" value="tools:sort">
             </div>

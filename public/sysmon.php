@@ -56,22 +56,22 @@ foreach ($sites as $site) {
 }
 */
 // now count incoming messages to BMESSAGES in database
-$sql = "SELECT COUNT(*) ANZ FROM BMESSAGES WHERE BUNIXTIMES > ".(time()-180);
+$sql = 'SELECT COUNT(*) ANZ FROM BMESSAGES WHERE BUNIXTIMES > '.(time() - 180);
 $res = db::query($sql);
 $countArr = db::FetchArr($res);
-$count = $countArr["ANZ"];
-if($count > 50) {
-    $errors[] = "Incoming messages: ERROR - ".($count)." messages in the last 3 minutes\n";
+$count = $countArr['ANZ'];
+if ($count > 50) {
+    $errors[] = 'Incoming messages: ERROR - '.($count)." messages in the last 3 minutes\n";
 } else {
-    $errors[] = "Incoming messages: OK - ".($count)." messages in the last 3 minutes\n";
+    $errors[] = 'Incoming messages: OK - '.($count)." messages in the last 3 minutes\n";
 }
-$myServer = ApiKeys::get("OLLAMA_SERVER");
+$myServer = ApiKeys::get('OLLAMA_SERVER');
 $host = 'http://'.$myServer;
 $ollama = file_get_contents($host);
-if(strpos($ollama, 'running') >0 ) {
-    $errors[] = "Ollama: OK - ".$ollama."\n";
+if (strpos($ollama, 'running') > 0) {
+    $errors[] = 'Ollama: OK - '.$ollama."\n";
 } else {
-    $errors[] = "Ollama: ERROR - ".$ollama."\n";
+    $errors[] = 'Ollama: ERROR - '.$ollama."\n";
 }
 ?>
 <html>

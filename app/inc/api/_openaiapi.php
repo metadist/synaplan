@@ -1,8 +1,10 @@
 <?php
 
-class OpenAICompatController {
+class OpenAICompatController
+{
     // ---------------------------- Public entrypoints
-    public static function chatCompletions(array $req, bool $stream = false) {
+    public static function chatCompletions(array $req, bool $stream = false)
+    {
         $resolution = self::resolveModel($req['model'] ?? '');
         if (!$resolution['ok']) {
             self::sendError(400, $resolution['error'] ?? 'Invalid model');
@@ -54,7 +56,8 @@ class OpenAICompatController {
         echo json_encode($resp);
     }
 
-    public static function imageGenerations(array $req) {
+    public static function imageGenerations(array $req)
+    {
         $resolution = self::resolveModel($req['model'] ?? '');
         if (!$resolution['ok']) {
             self::sendError(400, $resolution['error'] ?? 'Invalid model');
@@ -103,12 +106,15 @@ class OpenAICompatController {
         echo json_encode($resp);
     }
 
-    public static function listModels() {
+    public static function listModels()
+    {
         $rows = BasicAI::getAllModels();
         $data = [];
         foreach ($rows as $row) {
             $id = $row['BPROVID'] ?? '';
-            if ($id === '') { $id = $row['BNAME'] ?? ('model-' . ($row['BID'] ?? '')); }
+            if ($id === '') {
+                $id = $row['BNAME'] ?? ('model-' . ($row['BID'] ?? ''));
+            }
             $data[] = [
                 'id' => $id,
                 'object' => 'model',
@@ -121,7 +127,8 @@ class OpenAICompatController {
         echo json_encode(['data' => $data]);
     }
 
-    public static function audioTranscriptions() {
+    public static function audioTranscriptions()
+    {
         $model = $_REQUEST['model'] ?? '';
         $resolution = self::resolveModel($model);
         if (!$resolution['ok']) {
@@ -155,12 +162,15 @@ class OpenAICompatController {
 
         $serviceClass = $resolution['serviceClass'];
         $text = $serviceClass::mp3ToText($msgArr);
-        if (!is_string($text)) { $text = (string)$text; }
+        if (!is_string($text)) {
+            $text = (string)$text;
+        }
         header('Content-Type: text/plain; charset=UTF-8');
         echo $text;
     }
 
-    public static function imageAnalysis() {
+    public static function imageAnalysis()
+    {
         $model = $_REQUEST['model'] ?? '';
         $resolution = self::resolveModel($model);
         if (!$resolution['ok']) {
@@ -194,14 +204,18 @@ class OpenAICompatController {
         $serviceClass = $resolution['serviceClass'];
         $outArr = $serviceClass::explainImage($msgArr);
         $desc = '';
-        if (is_array($outArr) && isset($outArr['BFILETEXT'])) { $desc = $outArr['BFILETEXT']; }
-        elseif (is_string($outArr)) { $desc = $outArr; }
+        if (is_array($outArr) && isset($outArr['BFILETEXT'])) {
+            $desc = $outArr['BFILETEXT'];
+        } elseif (is_string($outArr)) {
+            $desc = $outArr;
+        }
         header('Content-Type: application/json; charset=UTF-8');
         echo json_encode(['text' => $desc]);
     }
 
     // ---------------------------- Helpers
-    private static function buildMsgAndThread(array $messages, string $lang, int $userId, int $trackId): array {
+    private static function buildMsgAndThread(array $messages, string $lang, int $userId, int $trackId): array
+    {
         $threadArr = [];
         $lastUser = '';
         foreach ($messages as $m) {
@@ -211,18 +225,24 @@ class OpenAICompatController {
                 // If OpenAI array content, concatenate text parts; ignore images for v1
                 $parts = [];
                 foreach ($content as $part) {
-                    if (($part['type'] ?? '') === 'text' && isset($part['text'])) { $parts[] = $part['text']; }
+                    if (($part['type'] ?? '') === 'text' && isset($part['text'])) {
+                        $parts[] = $part['text'];
+                    }
                 }
                 $content = implode("\n", $parts);
             }
             $content = (string)$content;
-            if ($role === 'system') { continue; }
+            if ($role === 'system') {
+                continue;
+            }
             $threadArr[] = [
                 'BDIRECT' => ($role === 'assistant') ? 'OUT' : 'IN',
                 'BTEXT' => $content,
                 'BDATETIME' => date('YmdHis')
             ];
-            if ($role === 'user') { $lastUser = $content; }
+            if ($role === 'user') {
+                $lastUser = $content;
+            }
         }
 
         $msgArr = [
@@ -241,13 +261,19 @@ class OpenAICompatController {
         return [$msgArr, $threadArr];
     }
 
-    private static function normalizeText($result, $fallbackMsgArr): string {
-        if (is_string($result)) { return $result; }
-        if (is_array($result) && isset($result['BTEXT'])) { return (string)$result['BTEXT']; }
+    private static function normalizeText($result, $fallbackMsgArr): string
+    {
+        if (is_string($result)) {
+            return $result;
+        }
+        if (is_array($result) && isset($result['BTEXT'])) {
+            return (string)$result['BTEXT'];
+        }
         return '';
     }
 
-    private static function streamChatChunks(string $text, string $model) {
+    private static function streamChatChunks(string $text, string $model)
+    {
         header('Content-Type: text/event-stream');
         header('Cache-Control: no-cache');
         header('Connection: keep-alive');
@@ -283,7 +309,8 @@ class OpenAICompatController {
         flush();
     }
 
-    private static function sendError(int $status, string $message, string $type = 'invalid_request_error', string $code = ''): void {
+    private static function sendError(int $status, string $message, string $type = 'invalid_request_error', string $code = ''): void
+    {
         http_response_code($status);
         header('Content-Type: application/json; charset=UTF-8');
         echo json_encode(['error' => [
@@ -293,7 +320,8 @@ class OpenAICompatController {
         ]]);
     }
 
-    private static function resolveModel(string $model): array {
+    private static function resolveModel(string $model): array
+    {
         $model = trim($model);
         if ($model === '') {
             // Fallback to existing globals
@@ -331,10 +359,18 @@ class OpenAICompatController {
         foreach ($models as $row) {
             $matches = false;
             $m = strtolower($model);
-            if (strtolower($row['BPROVID'] ?? '') === $m) { $matches = true; }
-            if (!$matches && strtolower($row['BNAME'] ?? '') === $m) { $matches = true; }
-            if (!$matches && strtolower($row['BTAG'] ?? '') === $m) { $matches = true; }
-            if (!$matches && (string)($row['BID'] ?? '') === $model) { $matches = true; }
+            if (strtolower($row['BPROVID'] ?? '') === $m) {
+                $matches = true;
+            }
+            if (!$matches && strtolower($row['BNAME'] ?? '') === $m) {
+                $matches = true;
+            }
+            if (!$matches && strtolower($row['BTAG'] ?? '') === $m) {
+                $matches = true;
+            }
+            if (!$matches && (string)($row['BID'] ?? '') === $model) {
+                $matches = true;
+            }
             if ($matches) {
                 $service = 'AI' . ($row['BSERVICE'] ?? 'OpenAI');
                 $name = $row['BPROVID'] ?: ($row['BNAME'] ?? '');
@@ -349,43 +385,50 @@ class OpenAICompatController {
         return ['ok' => false, 'error' => 'Model not found'];
     }
 
-    private static function applyChatGlobals(array $r): void {
+    private static function applyChatGlobals(array $r): void
+    {
         $GLOBALS['AI_CHAT']['SERVICE'] = $r['serviceClass'];
         $GLOBALS['AI_CHAT']['MODEL'] = $r['modelName'];
         $GLOBALS['AI_CHAT']['MODELID'] = $r['modelId'];
     }
 
-    private static function applyPicGlobals(array $r): void {
+    private static function applyPicGlobals(array $r): void
+    {
         $GLOBALS['AI_TEXT2PIC']['SERVICE'] = $r['serviceClass'];
         $GLOBALS['AI_TEXT2PIC']['MODEL'] = $r['modelName'];
         $GLOBALS['AI_TEXT2PIC']['MODELID'] = $r['modelId'];
     }
 
-    private static function applyAudioGlobals(array $r): void {
+    private static function applyAudioGlobals(array $r): void
+    {
         $GLOBALS['AI_SOUND2TEXT']['SERVICE'] = $r['serviceClass'];
         $GLOBALS['AI_SOUND2TEXT']['MODEL'] = $r['modelName'];
         $GLOBALS['AI_SOUND2TEXT']['MODELID'] = $r['modelId'];
     }
 
-    private static function applyVisionGlobals(array $r): void {
+    private static function applyVisionGlobals(array $r): void
+    {
         $GLOBALS['AI_PIC2TEXT']['SERVICE'] = $r['serviceClass'];
         $GLOBALS['AI_PIC2TEXT']['MODEL'] = $r['modelName'];
         $GLOBALS['AI_PIC2TEXT']['MODELID'] = $r['modelId'];
     }
 
-    private static function saveUploadedFile(array $file): string {
+    private static function saveUploadedFile(array $file): string
+    {
         $userId = $_SESSION['USERPROFILE']['BID'] ?? 0;
         $base = rtrim(UPLOAD_DIR, '/') . '/';
         $sub = substr(strval($userId), -5, 3) . '/' . substr(strval($userId), -2, 2) . '/' . date('Ym');
         $name = 'upload_' . time() . '_' . bin2hex(random_bytes(3));
         $ext = strtolower(pathinfo($file['name'] ?? '', PATHINFO_EXTENSION));
-        if ($ext === '') { $ext = 'bin'; }
+        if ($ext === '') {
+            $ext = 'bin';
+        }
         $rel = $sub . '/' . $name . '.' . $ext;
         $dir = $base . $sub;
-        if (!is_dir($dir)) { @mkdir($dir, 0777, true); }
+        if (!is_dir($dir)) {
+            @mkdir($dir, 0777, true);
+        }
         $ok = @move_uploaded_file($file['tmp_name'], $base . $rel);
         return $ok ? $rel : '';
     }
 }
-
-
