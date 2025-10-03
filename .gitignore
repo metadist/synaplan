@@ -1,5 +1,6 @@
 .env
 !.env.example
+!.env.docker
 
 public/node_modules/
 public/up/*

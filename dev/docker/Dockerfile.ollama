@@ -3,14 +3,21 @@ FROM ollama/ollama:latest
 # Install curl for healthcheck
 RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
 
-# Set the entrypoint to start Ollama, wait for ready, pull models, and exec serve
-# Now includes gpt-oss-20b for local GPT Open Source model
-ENTRYPOINT ["sh", "-c", "ollama serve & until curl -sf localhost:11434/api/tags; do sleep 2; done && \
-    echo 'Pulling base models...' && \
-    ollama pull llama3.2:3b && \
-    ollama pull mistral:7b && \
-    ollama pull codellama:7b && \
-    echo 'Pulling GPT-OSS:20b (this may take a while)...' && \
-    ollama pull gpt-oss:20b && \
+# Set the entrypoint to start Ollama, wait for ready, pull models from env var, and exec serve
+# Models are configured via OLLAMA_PULL_MODELS environment variable in docker-compose.yml
+ENTRYPOINT ["sh", "-c", "\
+    ollama serve & \
+    until curl -sf localhost:11434/api/tags; do sleep 2; done && \
+    echo 'Pulling models from OLLAMA_PULL_MODELS...' && \
+    if [ -n \"$OLLAMA_PULL_MODELS\" ]; then \
+        echo \"$OLLAMA_PULL_MODELS\" | tr ',' '\\n' | while read -r model; do \
+            if [ -n \"$model\" ]; then \
+                echo \"Pulling model: $model\" && \
+                ollama pull \"$model\" || echo \"Warning: Failed to pull $model\"; \
+            fi; \
+        done; \
+    else \
+        echo 'No models configured in OLLAMA_PULL_MODELS'; \
+    fi && \
     echo 'All models ready!' && \
     pkill ollama && sleep 2 && exec ollama serve"] 

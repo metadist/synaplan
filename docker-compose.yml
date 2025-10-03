@@ -1,4 +1,27 @@
 services:
+  # Configuration Check (prints which env config is active)
+  env-check:
+    image: alpine:3.20
+    container_name: synaplan-env-check
+    command: >
+      sh -c '
+        if [ -f /workspace/.env ]; then
+          echo "✓ Using custom .env file (values may be overridden by docker-compose.yml)";
+        else
+          echo "✓ Using .env.docker defaults (create .env to customize)";
+        fi;
+        echo "Docker Base URL: $${APP_URL:-http://localhost:8080/}";
+      '
+    volumes:
+      - ./:/workspace:ro
+    env_file:
+      - .env.docker
+    environment:
+      - APP_URL=${APP_URL:-http://localhost:8080/}
+    restart: "no"
+    networks:
+      - synaplan-network
+
   # PHP Application
   app:
     build:
@@ -12,26 +35,65 @@ services:
     volumes:
       - ./:/var/www/html
       - whisper_models:/var/www/html/inc/whispermodels:ro
+    env_file:
+      - .env.docker
     environment:
-      - APP_ENV=development
-      - APP_DEBUG=true
-      - DB_HOST=db
-      - DB_NAME=synaplan
-      - DB_USER=synaplan_user
-      - DB_PASSWORD=synaplan_password
-      - OLLAMA_SERVER=ollama:11434
+      # Application
+      - APP_ENV=${APP_ENV:-development}
+      - APP_DEBUG=${APP_DEBUG:-true}
+      - APP_URL=${APP_URL:-http://localhost:8080/}
+      # Database
+      - DB_HOST=${DB_HOST:-db}
+      - DB_NAME=${DB_NAME:-synaplan}
+      - DB_USER=${DB_USER:-synaplan_user}
+      - DB_PASSWORD=${DB_PASSWORD:-synaplan_password}
+      # Services
+      - OLLAMA_SERVER=${OLLAMA_SERVER:-ollama:11434}
       - TIKA_URL=${TIKA_URL:-http://tika:9998}
+      - TIKA_ENABLED=${TIKA_ENABLED:-true}
       - TIKA_HTTP_USER=${TIKA_HTTP_USER:-}
       - TIKA_HTTP_PASS=${TIKA_HTTP_PASS:-}
+      # Debug
       - XDEBUG_MODE=debug
       - XDEBUG_CONFIG=client_host=host.docker.internal client_port=9003
+      # OIDC
       - OIDC_PROVIDER_URL=${OIDC_PROVIDER_URL:-}
       - OIDC_CLIENT_ID=${OIDC_CLIENT_ID:-}
       - OIDC_CLIENT_SECRET=${OIDC_CLIENT_SECRET:-}
       - OIDC_REDIRECT_URI=${OIDC_REDIRECT_URI:-}
       - OIDC_SCOPES=${OIDC_SCOPES:-openid profile email}
+      # Features
       - RATE_LIMITING_ENABLED=${RATE_LIMITING_ENABLED:-false}
+      # API Keys (pass through from .env if set)
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - GROQ_API_KEY=${GROQ_API_KEY:-}
+      - GOOGLE_GEMINI_API_KEY=${GOOGLE_GEMINI_API_KEY:-}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - THEHIVE_API_KEY=${THEHIVE_API_KEY:-}
+      - ELEVENLABS_API_KEY=${ELEVENLABS_API_KEY:-}
+      - BRAVE_SEARCH_API_KEY=${BRAVE_SEARCH_API_KEY:-}
+      - WHATSAPP_TOKEN=${WHATSAPP_TOKEN:-}
+      - AWS_CREDENTIALS=${AWS_CREDENTIALS:-}
+      - GOOGLE_OAUTH_CREDENTIALS=${GOOGLE_OAUTH_CREDENTIALS:-}
+      - GMAIL_OAUTH_TOKEN=${GMAIL_OAUTH_TOKEN:-}
+      # Tika tuning
+      - TIKA_TIMEOUT_MS=${TIKA_TIMEOUT_MS:-20000}
+      - TIKA_RETRIES=${TIKA_RETRIES:-2}
+      - TIKA_RETRY_BACKOFF_MS=${TIKA_RETRY_BACKOFF_MS:-500}
+      - TIKA_MIN_LENGTH=${TIKA_MIN_LENGTH:-200}
+      - TIKA_MIN_ENTROPY=${TIKA_MIN_ENTROPY:-2.5}
+      - TIKA_OCR_SIGNAL_MIN=${TIKA_OCR_SIGNAL_MIN:-1}
+      - RASTERIZE_DPI=${RASTERIZE_DPI:-150}
+      - RASTERIZE_PAGE_CAP=${RASTERIZE_PAGE_CAP:-5}
+      - RASTERIZE_TIMEOUT_MS=${RASTERIZE_TIMEOUT_MS:-60000}
+      - TIKA_MIN_CHAR_PER_KB=${TIKA_MIN_CHAR_PER_KB:-10}
+      # System URLs
+      - SYSTEM_PRICING_URL=${SYSTEM_PRICING_URL:-https://www.synaplan.com/pricing}
+      - SYSTEM_ACCOUNT_URL=${SYSTEM_ACCOUNT_URL:-https://www.synaplan.com/account}
+      - SYSTEM_UPGRADE_URL=${SYSTEM_UPGRADE_URL:-https://www.synaplan.com/upgrade}
     depends_on:
+      env-check:
+        condition: service_completed_successfully
       db:
         condition: service_healthy
       ollama:
@@ -63,9 +125,11 @@ services:
       dockerfile: dev/docker/Dockerfile
     container_name: synaplan-composer-install
     working_dir: /var/www/html
+    env_file:
+      - .env.docker
     environment:
       - COMPOSER_ALLOW_SUPERUSER=1
-      - COMPOSER_PROCESS_TIMEOUT=1600
+      - COMPOSER_PROCESS_TIMEOUT=${COMPOSER_PROCESS_TIMEOUT:-1600}
     volumes:
       - ./:/var/www/html
     command: composer install --prefer-dist --no-interaction
@@ -133,7 +197,7 @@ services:
       - ollama_data:/root/.ollama
     environment:
       - OLLAMA_HOST=0.0.0.0
-      - OLLAMA_PULL_MODELS=llava:13b,llama3.2:3b,mistral:7b,codellama:7b,deepseek-r1:14b,deepseek-r1:32b,bge-m3,gpt-oss:20b
+      - OLLAMA_PULL_MODELS=mistral:7b,deepseek-r1:14b,bge-m3
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:11434/api/tags"]
@@ -170,8 +234,6 @@ services:
             echo "Successfully downloaded $1.bin"
           fi
         } &&
-        f medium    https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-medium.bin &&
-        f medium.en https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-medium.en.bin &&
         f base      https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.bin &&
         echo "Setting permissions..." &&
         ls /models/*.bin >/dev/null 2>&1 && chmod 644 /models/*.bin &&
