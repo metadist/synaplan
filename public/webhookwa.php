@@ -373,6 +373,20 @@ function downloadMediaFile(array $mediaInfo, string $accessToken): array
             $saveTo = $saveToNew;
             $mediaInfo['mime_type'] = 'audio/mpeg';
         }
+
+        // Security: Sanitize HTML files to prevent malicious landing pages
+        $fileExt = Tools::getFileExtension($mediaInfo['mime_type']);
+        if (in_array(strtolower($fileExt), ['html', 'htm']) && file_exists('./up/' . $saveTo)) {
+            $sanitizeResult = Central::sanitizeHtmlUpload('./up/' . $saveTo, $fileExt);
+            if ($sanitizeResult['converted']) {
+                // Replace HTML file with sanitized text version
+                $saveToNew = preg_replace('/\.(html?|htm)$/i', '.txt', $saveTo);
+                file_put_contents('./up/' . $saveToNew, $sanitizeResult['content']);
+                @unlink('./up/' . $saveTo); // Remove original HTML file
+                $saveTo = $saveToNew;
+                $mediaInfo['mime_type'] = 'text/plain';
+            }
+        }
     } else {
         $dlError .= ' - not executed -';
     }

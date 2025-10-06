@@ -128,6 +128,13 @@ class FileManager
                 }
 
                 if ($mimeTypeAllowed) {
+                    // Security: Sanitize HTML files to prevent malicious landing pages
+                    $sanitizeResult = Central::sanitizeHtmlUpload($tmpName, $fileExtension);
+                    if ($sanitizeResult['converted']) {
+                        $fileExtension = $sanitizeResult['newExtension'];
+                        $originalName = preg_replace('/\.(html?|htm)$/i', '.txt', $originalName);
+                    }
+
                     // Create file path
                     $userRelPath = substr($userId, -5, 3) . '/' . substr($userId, -2, 2) . '/' . date('Ym') . '/';
                     $fullUploadDir = rtrim(UPLOAD_DIR, '/').'/' . $userRelPath;
@@ -138,8 +145,17 @@ class FileManager
                     $newFileName = Tools::sysStr($originalName);
                     $targetPath = $fullUploadDir . $newFileName;
 
+                    // Save file - write sanitized content for HTML, or move file for others
+                    $uploadSuccess = false;
+                    if ($sanitizeResult['converted']) {
+                        $uploadSuccess = file_put_contents($targetPath, $sanitizeResult['content']) !== false;
+                        @unlink($tmpName); // Clean up temp file
+                    } else {
+                        $uploadSuccess = move_uploaded_file($tmpName, $targetPath);
+                    }
+
                     // Move uploaded file
-                    if (move_uploaded_file($tmpName, $targetPath)) {
+                    if ($uploadSuccess) {
                         // Create message entry first
                         $inMessageArr = [];
                         $inMessageArr['BUSERID'] = $userId;

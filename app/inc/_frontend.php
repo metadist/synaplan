@@ -287,6 +287,13 @@ class Frontend
                 }
 
                 if ($mimeTypeAllowed) {
+                    // Security: Sanitize HTML files to prevent malicious landing pages
+                    $sanitizeResult = Central::sanitizeHtmlUpload($tmpName, $fileExtension);
+                    if ($sanitizeResult['converted']) {
+                        $fileExtension = $sanitizeResult['newExtension'];
+                        $originalName = preg_replace('/\.(html?|htm)$/i', '.txt', $originalName);
+                    }
+
                     // Zielpfad
                     $userRelPath = substr($userId, -5, 3) . '/' . substr($userId, -2, 2) . '/' . date('Ym') . '/';
                     $fullUploadDir = rtrim(UPLOAD_DIR, '/').'/' . $userRelPath;
@@ -298,8 +305,14 @@ class Frontend
                     $newFileName = Tools::sysStr($originalName);
                     $targetPath = $fullUploadDir . $newFileName;
 
-                    // Speichern
-                    move_uploaded_file($tmpName, $targetPath);
+                    // Speichern - write sanitized content for HTML, or move file for others
+                    if ($sanitizeResult['converted']) {
+                        file_put_contents($targetPath, $sanitizeResult['content']);
+                        @unlink($tmpName); // Clean up temp file
+                    } else {
+                        move_uploaded_file($tmpName, $targetPath);
+                    }
+
                     $filesArr[] = [
                         'BFILEPATH' => $userRelPath.$newFileName,
                         'BFILETYPE' => $fileExtension,

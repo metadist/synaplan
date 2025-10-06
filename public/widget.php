@@ -408,6 +408,8 @@ window.SYNAPLAN_SYSTEM_URLS = {
             // EXPOSE GLOBAL API FOR EXTERNAL JAVASCRIPT
             // =============================
             // This allows the website owner to interact with and animate the widget input
+            var currentTypeInterval = null; // Track current typing animation
+            
             window.SynaplanInlineWidget = window.SynaplanInlineWidget || {};
             window.SynaplanInlineWidget[_spWid] = {
                 // Get the input element
@@ -424,6 +426,11 @@ window.SYNAPLAN_SYSTEM_URLS = {
                 },
                 // Set the input text
                 setText: function(text) {
+                    // Clear any ongoing typing animation
+                    if (currentTypeInterval) {
+                        clearInterval(currentTypeInterval);
+                        currentTypeInterval = null;
+                    }
                     if (inputEl) inputEl.value = text;
                 },
                 // Get the current input text
@@ -434,20 +441,33 @@ window.SYNAPLAN_SYSTEM_URLS = {
                 typeText: function(text, speed) {
                     speed = speed || 80; // ms per character
                     if (!inputEl) return;
+                    
+                    // Clear any previous typing animation to prevent overlap
+                    if (currentTypeInterval) {
+                        clearInterval(currentTypeInterval);
+                        currentTypeInterval = null;
+                    }
+                    
                     inputEl.value = '';
                     var i = 0;
-                    var interval = setInterval(function() {
+                    currentTypeInterval = setInterval(function() {
                         if (i < text.length) {
                             inputEl.value += text.charAt(i);
                             i++;
                         } else {
-                            clearInterval(interval);
+                            clearInterval(currentTypeInterval);
+                            currentTypeInterval = null;
                         }
                     }, speed);
-                    return interval; // return so caller can clear if needed
+                    return currentTypeInterval; // return so caller can clear if needed
                 },
                 // Clear the input
                 clear: function() {
+                    // Stop any ongoing typing animation
+                    if (currentTypeInterval) {
+                        clearInterval(currentTypeInterval);
+                        currentTypeInterval = null;
+                    }
                     if (inputEl) inputEl.value = '';
                 },
                 // Focus the input
@@ -486,6 +506,13 @@ window.SYNAPLAN_SYSTEM_URLS = {
                     if (!container) return;
                     for (var prop in cssProperties) {
                         container.style[prop] = cssProperties[prop];
+                    }
+                },
+                // Stop any ongoing typing animation
+                stopTyping: function() {
+                    if (currentTypeInterval) {
+                        clearInterval(currentTypeInterval);
+                        currentTypeInterval = null;
                     }
                 }
             };
