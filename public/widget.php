@@ -127,6 +127,37 @@ window.SYNAPLAN_SYSTEM_URLS = {
     // Public no-op close callback hook (integrators can override)
     try { window.synaplanWidgetOnClose = window.synaplanWidgetOnClose || function(){}; } catch (e) {}
 
+    // Mobile detection helper
+    function isMobileDevice() {
+        try {
+            return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
+                   (navigator.maxTouchPoints && navigator.maxTouchPoints > 2 && /MacIntel/.test(navigator.platform));
+        } catch(e) {
+            return false;
+        }
+    }
+
+    // Helper to open chat in new window (mobile-optimized)
+    function openChatInNewWindow(url) {
+        try {
+            // Store current URL as referrer for back button
+            var referrerUrl = window.location.href;
+            var separator = url.indexOf('?') > -1 ? '&' : '?';
+            var fullUrl = url + separator + 'referrer=' + encodeURIComponent(referrerUrl) + '&mobile=1';
+            
+            // Open in new window/tab
+            var chatWindow = window.open(fullUrl, '_blank');
+            
+            // Fallback if popup blocked - create a visible link
+            if (!chatWindow || chatWindow.closed || typeof chatWindow.closed === 'undefined') {
+                window.location.href = fullUrl;
+            }
+        } catch(e) {
+            // Final fallback - direct navigation
+            window.location.href = url + (url.indexOf('?') > -1 ? '&' : '?') + 'mobile=1';
+        }
+    }
+
     <?php if ($mode === 'inline-box' || $config['integrationType'] === 'inline-box'): ?>
     // =============================
     // Inline Box Integration Mode
@@ -343,6 +374,13 @@ window.SYNAPLAN_SYSTEM_URLS = {
             }
 
             function openOverlay(){
+                // Mobile devices: open in new window instead of overlay
+                if (isMobileDevice()) {
+                    openChatInNewWindow(<?php echo json_encode($widgetUrl); ?>);
+                    return;
+                }
+                
+                // Desktop: use overlay as before
                 if (!overlay) return;
                 overlay.style.display = 'block';
                 // Force reflow for transition
@@ -821,6 +859,13 @@ window.SYNAPLAN_SYSTEM_URLS = {
 
     // Handle button click
     chatButton.addEventListener('click', () => {
+        // Mobile devices: open in new window instead of overlay
+        if (isMobileDevice()) {
+            openChatInNewWindow('<?php echo $widgetUrl; ?>');
+            return;
+        }
+        
+        // Desktop: use overlay as before
         overlay.style.display = 'block';
         chatContainer.style.display = 'block';
         setTimeout(() => {

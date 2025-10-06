@@ -1,5 +1,7 @@
 <?php
-// Ensure session cookies work inside third-party iframes by setting SameSite=None; Secure
+// Get parameters early to detect mobile mode
+$isMobile = isset($_REQUEST['mobile']) && $_REQUEST['mobile'] == '1';
+
 // Robust HTTPS detection: X-Forwarded-Proto or baseUrl prefix
 $forwardedProto = isset($_SERVER['HTTP_X_FORWARDED_PROTO']) ? strtolower($_SERVER['HTTP_X_FORWARDED_PROTO']) : '';
 $baseHttps = isset($GLOBALS['baseUrl']) && strpos($GLOBALS['baseUrl'], 'https://') === 0;
@@ -7,25 +9,44 @@ $isHttps = ($forwardedProto === 'https') ||
            (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ||
            (isset($_SERVER['SERVER_PORT']) && $_SERVER['SERVER_PORT'] == 443) ||
            $baseHttps;
+
+// Set session cookie parameters based on mode
 if (function_exists('session_set_cookie_params')) {
-    $cookieParams = [
-        'lifetime' => 0,
-        'path' => '/',
-        'domain' => '',
-        'secure' => $isHttps ? true : false,
-        'httponly' => true,
-        'samesite' => 'None'
-    ];
+    if ($isMobile) {
+        // Mobile mode: Use standard session cookies (no SameSite=None needed)
+        // Since we're opening in a new tab on the same domain, we don't have third-party cookie issues
+        $cookieParams = [
+            'lifetime' => 0,
+            'path' => '/',
+            'domain' => '',
+            'secure' => $isHttps ? true : false,
+            'httponly' => true,
+            'samesite' => 'Lax'  // Standard same-site for better security
+        ];
+    } else {
+        // Desktop iframe mode: Ensure session cookies work inside third-party iframes
+        $cookieParams = [
+            'lifetime' => 0,
+            'path' => '/',
+            'domain' => '',
+            'secure' => $isHttps ? true : false,
+            'httponly' => true,
+            'samesite' => 'None'
+        ];
+    }
     @session_set_cookie_params($cookieParams);
 }
+
 session_start();
+
 // Core app files via Composer autoload and centralized includes
 require_once __DIR__ . '/../vendor/autoload.php';
 require_once __DIR__ . '/../app/inc/_coreincludes.php';
 
-// Get parameters
+// Get remaining parameters
 $uid = isset($_REQUEST['uid']) ? intval($_REQUEST['uid']) : 0;
 $widgetId = isset($_REQUEST['widgetid']) ? intval($_REQUEST['widgetid']) : 1;
+$referrerUrl = isset($_REQUEST['referrer']) ? trim($_REQUEST['referrer']) : '';
 
 // Validate parameters
 if ($uid <= 0 || $widgetId < 1 || $widgetId > 9) {
@@ -126,6 +147,41 @@ header('Pragma: no-cache');
             padding: 15px;
             text-align: center;
             font-weight: bold;
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .widget-back-button {
+            position: absolute;
+            left: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: rgba(255, 255, 255, 0.2);
+            border: none;
+            color: white;
+            width: 36px;
+            height: 36px;
+            border-radius: 8px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            transition: background 0.2s ease;
+            z-index: 10;
+        }
+        
+        .widget-back-button:hover,
+        .widget-back-button:active {
+            background: rgba(255, 255, 255, 0.3);
+        }
+        
+        .widget-back-button svg {
+            width: 20px;
+            height: 20px;
+            fill: currentColor;
         }
         
         .widget-content {
@@ -135,6 +191,25 @@ header('Pragma: no-cache');
             overflow: hidden; /* avoid double scrollbars; let .chat-messages scroll */
             position: relative; /* positioning context for cookie banner */
         }
+        
+        <?php if ($isMobile): ?>
+        /* Mobile full-screen optimizations */
+        .widget-content {
+            height: calc(var(--sp-dvh, 100vh) - 60px);
+        }
+        
+        .widget-header {
+            padding: 12px 15px;
+            font-size: 18px;
+        }
+        
+        /* Ensure full screen on mobile */
+        html, body {
+            overflow: hidden;
+            position: fixed;
+            width: 100%;
+        }
+        <?php endif; ?>
 
         /* Remove default padding/margins from embedded main container */
         #contentMain {
@@ -244,7 +319,14 @@ header('Pragma: no-cache');
 <body>
     
     <div class="widget-header">
-        Chat Support
+        <?php if ($isMobile && !empty($referrerUrl)): ?>
+        <button class="widget-back-button" id="widgetBackButton" type="button" aria-label="Go back">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="15 18 9 12 15 6"></polyline>
+            </svg>
+        </button>
+        <?php endif; ?>
+        <span>Chat Support</span>
     </div>
     <div class="widget-content" id="spWidgetContent">
         <?php include __DIR__ . '/../frontend/c_chat.php'; ?>
@@ -253,6 +335,36 @@ header('Pragma: no-cache');
     <script src="node_modules/bootstrap/dist/js/bootstrap.bundle.min.js?v=<?php echo @filemtime('node_modules/bootstrap/dist/js/bootstrap.bundle.min.js'); ?>"></script>
     <script>
     (function() {
+        // Mobile mode: Setup history and back button for proper navigation
+        <?php if ($isMobile && !empty($referrerUrl)): ?>
+        var referrerUrl = <?php echo json_encode($referrerUrl); ?>;
+        
+        // Push a history state so the back button works
+        if (window.history && window.history.pushState) {
+            // Replace current state with referrer info
+            window.history.replaceState({ fromWidget: true, referrer: referrerUrl }, '', window.location.href);
+            
+            // Handle back button
+            var backButton = document.getElementById('widgetBackButton');
+            if (backButton) {
+                backButton.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    // Navigate back to referrer
+                    window.location.href = referrerUrl;
+                }, { passive: false });
+            }
+            
+            // Also handle browser back button
+            window.addEventListener('popstate', function(event) {
+                if (event.state && event.state.fromWidget && event.state.referrer) {
+                    window.location.href = event.state.referrer;
+                } else if (referrerUrl) {
+                    window.location.href = referrerUrl;
+                }
+            });
+        }
+        <?php endif; ?>
+        
         // Dynamic viewport height for iOS Safari and mobile browsers
         const updateSPDVH = () => {
             const vh = (window.visualViewport && window.visualViewport.height) ? window.visualViewport.height : window.innerHeight;
@@ -288,35 +400,37 @@ header('Pragma: no-cache');
         document.addEventListener('DOMContentLoaded', function(){ setTimeout(focusMessageInput, 50); });
         window.addEventListener('load', function(){ setTimeout(focusMessageInput, 150); });
 
-        // iOS/Safari third-party cookie mitigation using Storage Access API
+        <?php if (!$isMobile): ?>
+        // iOS/Safari third-party cookie mitigation using Storage Access API (Desktop iframe mode only)
         const canRequest = document.hasStorageAccess && document.requestStorageAccess;
-        if (!canRequest) return; // Not Safari or unsupported
-
-        // Only try when we appear to be in a third-party context
-        try {
-            document.hasStorageAccess().then((hasAccess) => {
-                if (hasAccess) return;
-                // Add a small banner prompting user to enable access
-                const parent = document.getElementById('spWidgetContent') || document.body;
-                const bar = document.createElement('div');
-                bar.style.cssText = 'position:absolute;left:0;right:0;bottom:0;background:#fff3cd;color:#856404;padding:10px 12px;border-top:1px solid #ffeeba;font-size:14px;z-index:2147483647;display:flex;align-items:center;justify-content:space-between;gap:12px;pointer-events:auto;touch-action:manipulation;transform:translateZ(0);';
-                bar.innerHTML = '<span>To enable chat on this site, please allow cookie access.</span>';
-                const btn = document.createElement('button');
-                btn.className = 'btn btn-sm btn-primary';
-                btn.textContent = 'Allow';
-                btn.style.cssText = 'pointer-events:auto;';
-                btn.addEventListener('click', function() {
-                    document.requestStorageAccess().then(() => {
-                        // Reload to use the session cookie
-                        location.reload();
-                    }).catch(() => {
-                        // If denied, keep the bar visible
+        if (canRequest) {
+            // Only try when we appear to be in a third-party context
+            try {
+                document.hasStorageAccess().then((hasAccess) => {
+                    if (hasAccess) return;
+                    // Add a small banner prompting user to enable access
+                    const parent = document.getElementById('spWidgetContent') || document.body;
+                    const bar = document.createElement('div');
+                    bar.style.cssText = 'position:absolute;left:0;right:0;bottom:0;background:#fff3cd;color:#856404;padding:10px 12px;border-top:1px solid #ffeeba;font-size:14px;z-index:2147483647;display:flex;align-items:center;justify-content:space-between;gap:12px;pointer-events:auto;touch-action:manipulation;transform:translateZ(0);';
+                    bar.innerHTML = '<span>To enable chat on this site, please allow cookie access.</span>';
+                    const btn = document.createElement('button');
+                    btn.className = 'btn btn-sm btn-primary';
+                    btn.textContent = 'Allow';
+                    btn.style.cssText = 'pointer-events:auto;';
+                    btn.addEventListener('click', function() {
+                        document.requestStorageAccess().then(() => {
+                            // Reload to use the session cookie
+                            location.reload();
+                        }).catch(() => {
+                            // If denied, keep the bar visible
+                        });
                     });
+                    bar.appendChild(btn);
+                    parent.appendChild(bar);
                 });
-                bar.appendChild(btn);
-                parent.appendChild(bar);
-            });
-        } catch (e) { /* ignore */ }
+            } catch (e) { /* ignore */ }
+        }
+        <?php endif; ?>
     })();
     </script>
 </body>
