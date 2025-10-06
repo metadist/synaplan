@@ -142,7 +142,7 @@ window.SYNAPLAN_SYSTEM_URLS = {
         var _primary = <?php echo json_encode($config['color']); ?>;
         var _radius = <?php echo json_encode((string)$config['inlineBorderRadius']); ?>; // in px
 
-        // Write inline container and overlay markup directly at script position
+        // Write inline container directly at script position
         document.write('\n<div id="' + _spIdBase + '-container" style="display:block;max-width:900px;margin:0 auto;padding:30px 20px;">\n' +
             '  <div id="' + _spIdBase + '-box" style="display:flex;align-items:stretch;gap:12px;width:100%;box-sizing:border-box;' +
             '       background:rgba(255,255,255,0.98);padding:10px;border-radius:' + Math.max(12, parseInt(_radius) + 4) + 'px;' +
@@ -170,20 +170,42 @@ window.SYNAPLAN_SYSTEM_URLS = {
             '  </div>\n' +
             '</div>\n');
 
-        // Overlay covers page with slight transparency; chat container at 95% viewport
-        document.write('\n<div id="' + _spIdBase + '-overlay" style="position:fixed !important;inset:0 !important;background:rgba(0,0,0,0.45);' +
-            'z-index:2147483647 !important;display:none;opacity:0;transition:opacity .25s ease;' +
-            'top:0 !important;left:0 !important;right:0 !important;bottom:0 !important;' +
-            'width:100vw !important;height:100vh !important;margin:0 !important;padding:0 !important;">\n' +
-            '  <div id="' + _spIdBase + '-panel" style="position:fixed !important;left:2.5vw;top:2.5vh;width:95vw;height:95vh;' +
-            '       background:#fff;border-radius:12px;box-shadow:0 12px 32px rgba(0,0,0,0.2);' +
-            '       z-index:2147483647 !important;display:flex;flex-direction:column;overflow:hidden;">\n' +
-            '    <button id="' + _spIdBase + '-close" type="button" aria-label="Close" title="Close" ' +
-            '      style="position:absolute !important;top:12px !important;right:12px !important;width:36px;height:36px;border:none;border-radius:18px;' +
-            '             background:transparent;color:#6c757d;font-size:22px;cursor:pointer;z-index:2147483647 !important;">×</button>\n' +
-            '    <div id="' + _spIdBase + '-framewrap" style="flex:1 1 auto;width:100%;height:100%;background:#fff;"></div>\n' +
-            '  </div>\n' +
-            '</div>\n');
+        // Create overlay and append to body (not document.write) to avoid stacking context issues
+        (function() {
+            // Wait for DOM to be ready
+            function appendOverlay() {
+                if (!document.body) {
+                    setTimeout(appendOverlay, 10);
+                    return;
+                }
+                
+                var overlayHtml = 
+                    '<div id="' + _spIdBase + '-overlay" style="position:fixed !important;inset:0 !important;background:rgba(0,0,0,0.45);' +
+                    'z-index:2147483647 !important;display:none;opacity:0;transition:opacity .25s ease;' +
+                    'top:0 !important;left:0 !important;right:0 !important;bottom:0 !important;' +
+                    'width:100vw !important;height:100vh !important;margin:0 !important;padding:0 !important;">' +
+                    '  <div id="' + _spIdBase + '-panel" style="position:fixed !important;left:2.5vw;top:2.5vh;width:95vw;height:95vh;' +
+                    '       background:#fff;border-radius:12px;box-shadow:0 12px 32px rgba(0,0,0,0.2);' +
+                    '       z-index:2147483647 !important;display:flex;flex-direction:column;overflow:hidden;">' +
+                    '    <button id="' + _spIdBase + '-close" type="button" aria-label="Close" title="Close" ' +
+                    '      style="position:absolute !important;top:12px !important;right:12px !important;width:36px;height:36px;border:none;border-radius:18px;' +
+                    '             background:transparent;color:#6c757d;font-size:22px;cursor:pointer;z-index:2147483647 !important;">×</button>' +
+                    '    <div id="' + _spIdBase + '-framewrap" style="flex:1 1 auto;width:100%;height:100%;background:#fff;"></div>' +
+                    '  </div>' +
+                    '</div>';
+                
+                var tempDiv = document.createElement('div');
+                tempDiv.innerHTML = overlayHtml;
+                document.body.appendChild(tempDiv.firstChild);
+            }
+            
+            // Execute immediately or wait for DOM
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', appendOverlay);
+            } else {
+                appendOverlay();
+            }
+        })();
 
         // Inject enforced z-index CSS to ensure widget is always on top
         var enforceZIndexStyle = document.createElement('style');
@@ -211,18 +233,32 @@ window.SYNAPLAN_SYSTEM_URLS = {
             '}';
         document.head.appendChild(enforceZIndexStyle);
 
-        // Attach behavior after current script executes
+        // Attach behavior after overlay is added to DOM
         (function(){
-            var overlay = document.getElementById(_spIdBase + '-overlay');
-            var frameWrap = document.getElementById(_spIdBase + '-framewrap');
             var inputEl = document.getElementById(_spIdBase + '-input');
             var btnEl = document.getElementById(_spIdBase + '-btn');
             var uploadEl = document.getElementById(_spIdBase + '-upload');
-            var closeEl = document.getElementById(_spIdBase + '-close');
-            var panelEl = document.getElementById(_spIdBase + '-panel');
+            var overlay, frameWrap, closeEl, panelEl;
             var isOpen = false;
-
-            function applyInlineMobileLayout(){
+            
+            // Wait for overlay to be appended to body
+            function initializeOverlay() {
+                overlay = document.getElementById(_spIdBase + '-overlay');
+                frameWrap = document.getElementById(_spIdBase + '-framewrap');
+                closeEl = document.getElementById(_spIdBase + '-close');
+                panelEl = document.getElementById(_spIdBase + '-panel');
+                
+                if (!overlay || !frameWrap || !closeEl || !panelEl) {
+                    setTimeout(initializeOverlay, 50);
+                    return;
+                }
+                
+                // Now attach all event listeners
+                attachEventListeners();
+            }
+            
+            function attachEventListeners() {
+                function applyInlineMobileLayout(){
                 try {
                     if (!panelEl) return;
                     var isMobile = (window.matchMedia && window.matchMedia('(max-width: 500px)').matches);
@@ -462,6 +498,10 @@ window.SYNAPLAN_SYSTEM_URLS = {
                     uploadEl.style.color = '#6c757d';
                 });
             }
+            } // End attachEventListeners
+            
+            // Start initialization
+            initializeOverlay();
         })();
     } catch(e) {
         console.error('Synaplan inline widget init error:', e);
