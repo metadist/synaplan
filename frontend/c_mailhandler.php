@@ -231,7 +231,7 @@
                     <input type="email" class="form-control" name="departmentEmail[]" value="${email || ''}" placeholder="department@example.com" required>
                 </div>
                 <div class="col-sm-5">
-                    <label class="form-label"><strong>Description:</strong></label>
+                    <label class="form-label"><strong>Rules for forwarding:</strong></label>
                     <input type="text" class="form-control" name="departmentDescription[]" value="${description || ''}" placeholder="e.g., Customer Support, Sales, Technical" required>
                 </div>
                 <div class="col-sm-2">

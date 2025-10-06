@@ -383,7 +383,14 @@ header('Pragma: no-cache');
             try {
                 var el = document.getElementById('messageInput');
                 if (el && typeof el.focus === 'function') {
+                    // Scroll into view first (helps on mobile)
+                    if (el.scrollIntoView) {
+                        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    }
+                    
+                    // Focus the element
                     el.focus();
+                    
                     // Place caret at end for contenteditable
                     if (window.getSelection && document.createRange && el.isContentEditable) {
                         var range = document.createRange();
@@ -393,12 +400,58 @@ header('Pragma: no-cache');
                         sel.removeAllRanges();
                         sel.addRange(range);
                     }
+                    
+                    // For mobile devices, try to trigger the keyboard
+                    <?php if ($isMobile): ?>
+                    // Trigger click event to ensure keyboard shows on mobile
+                    if (el.click) {
+                        setTimeout(function() { el.click(); }, 50);
+                    }
+                    <?php endif; ?>
+                    
+                    return true;
                 }
-            } catch (e) { /* ignore */ }
+                return false;
+            } catch (e) { 
+                return false;
+            }
         }
-        // Try on DOM load and shortly after
-        document.addEventListener('DOMContentLoaded', function(){ setTimeout(focusMessageInput, 50); });
-        window.addEventListener('load', function(){ setTimeout(focusMessageInput, 150); });
+        
+        // Try multiple times to ensure focus works (especially on mobile)
+        var focusAttempts = 0;
+        var maxFocusAttempts = <?php echo $isMobile ? '8' : '3'; ?>;
+        
+        function tryFocus() {
+            if (focusMessageInput()) {
+                return; // Success, stop trying
+            }
+            focusAttempts++;
+            if (focusAttempts < maxFocusAttempts) {
+                setTimeout(tryFocus, <?php echo $isMobile ? '100' : '200'; ?>);
+            }
+        }
+        
+        // Start trying to focus as soon as possible
+        document.addEventListener('DOMContentLoaded', function() { 
+            setTimeout(tryFocus, 50);
+        });
+        window.addEventListener('load', function() { 
+            setTimeout(tryFocus, 100);
+        });
+        
+        <?php if ($isMobile): ?>
+        // Additional mobile-specific focus attempts
+        // Try again after a short delay (helps with mobile browsers)
+        setTimeout(tryFocus, 300);
+        setTimeout(tryFocus, 600);
+        
+        // Also try when page becomes visible (mobile tab switching)
+        document.addEventListener('visibilitychange', function() {
+            if (!document.hidden) {
+                setTimeout(focusMessageInput, 100);
+            }
+        });
+        <?php endif; ?>
 
         <?php if (!$isMobile): ?>
         // iOS/Safari third-party cookie mitigation using Storage Access API (Desktop iframe mode only)

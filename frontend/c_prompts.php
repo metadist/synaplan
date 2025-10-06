@@ -51,10 +51,10 @@
 
                 <!-- Description -->
                 <div class="row mb-3">
-                    <label for="promptDescription" class="col-sm-2 col-form-label"><strong>Description:</strong></label>
+                    <label for="promptDescription" class="col-sm-2 col-form-label"><strong>Rules for selection:</strong></label>
                     <div class="col-sm-10">
                         <textarea class="form-control" name="promptDescription" id="promptDescription" rows="2" placeholder="Enter a description for the preprocessor..."><?php echo $promptDesc; ?></textarea>
-                        <div class="form-text">Brief description of what this prompt does</div>
+                        <div class="form-text">Rules to direct to this prompt. When shall this prompt be used?</div>
                     </div>
                 </div>
 
@@ -208,9 +208,9 @@
                             <div class="form-text">Set the screenshot size in pixels (default: 1200x2000).</div>
                         </div>
                         <!-- Transfer Info -->
-                        <div id="toolTransferSettings" class="tool-settings-box alert alert-info" style="display:none;">
+                        <!-- div id="toolTransferSettings" class="tool-settings-box alert alert-info" style="display:none;">
                             <strong>📤 MCP calls...</strong> Configure your MCP calls before and after prompt execution.
-                        </div>
+                        </div -->
                     </div>
                 </div>
             </div>
