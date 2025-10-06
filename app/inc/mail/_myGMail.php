@@ -5,7 +5,7 @@ use Google\Service\Gmail as Google_Service_Gmail;
 
 class myGMail
 {
-    private static $allowedAttachmentTypes = ['pdf', 'docx', 'pptx', 'jpg', 'jpeg', 'png', 'mp3'];
+    private static $allowedAttachmentTypes = ['pdf', 'docx', 'pptx', 'jpg', 'jpeg', 'png', 'mp3', 'md', 'html', 'htm'];
     private static $excludedFilenames = ['logo', 'footer', 'signature', 'banner'];
 
     /**

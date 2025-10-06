@@ -70,7 +70,7 @@ class UniversalFileHandler
 
     private static function isPlainTextMime(string $mime): bool
     {
-        return $mime === 'text/plain' || $mime === 'text/markdown' || $mime === 'text/csv';
+        return $mime === 'text/plain' || $mime === 'text/markdown' || $mime === 'text/x-markdown' || $mime === 'text/csv' || $mime === 'text/html';
     }
 
     private static function isPdfMime(string $mime): bool
@@ -193,7 +193,10 @@ class UniversalFileHandler
             'docx' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
             'ppt'  => 'application/vnd.ms-powerpoint',
             'pptx' => 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-            'csv'  => 'text/csv'
+            'csv'  => 'text/csv',
+            'md'   => 'text/markdown',
+            'html' => 'text/html',
+            'htm'  => 'text/html'
         ];
         if (isset($map[$ext])) {
             if ($mime === '' || $mime === 'application/zip' || $mime === 'application/octet-stream') {

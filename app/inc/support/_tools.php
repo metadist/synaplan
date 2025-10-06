@@ -187,6 +187,9 @@ class Tools
             'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' => 'xlsx',
             'application/vnd.ms-excel' => 'xls',
             'application/vnd.ms-powerpoint' => 'ppt',
+            'text/html' => 'html',
+            'text/markdown' => 'md',
+            'text/x-markdown' => 'md',
         ];
 
         return $mimeMap[$mimeType] ?? 'unknown';

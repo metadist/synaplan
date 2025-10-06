@@ -207,7 +207,7 @@ window.SYNAPLAN_SYSTEM_URLS = {
             }
         })();
 
-        // Inject enforced z-index CSS to ensure widget is always on top
+        // Inject enforced z-index CSS and mobile responsiveness
         var enforceZIndexStyle = document.createElement('style');
         enforceZIndexStyle.id = _spIdBase + '-enforce-z';
         enforceZIndexStyle.textContent = 
@@ -230,6 +230,41 @@ window.SYNAPLAN_SYSTEM_URLS = {
             '#' + _spIdBase + '-close { ' +
             '  position: absolute !important; ' +
             '  z-index: 2147483647 !important; ' +
+            '} ' +
+            /* Desktop default: button auto-width, keep original styling */ +
+            '#' + _spIdBase + '-btn { ' +
+            '  width: auto !important; ' +
+            '  flex: 0 0 auto !important; ' +
+            '} ' +
+            /* Mobile responsive styles (below 768px) */ +
+            '@media (max-width: 767px) { ' +
+            '  #' + _spIdBase + '-container { ' +
+            '    padding: 12px 10px !important; ' +
+            '    max-width: 100% !important; ' +
+            '  } ' +
+            '  #' + _spIdBase + '-box { ' +
+            '    flex-direction: column !important; ' +
+            '    gap: 8px !important; ' +
+            '    padding: 6px !important; ' +
+            '  } ' +
+            '  #' + _spIdBase + '-input { ' +
+            '    padding: 14px 50px 14px 16px !important; ' +
+            '    font-size: 15px !important; ' +
+            '  } ' +
+            '  #' + _spIdBase + '-upload { ' +
+            '    right: 8px !important; ' +
+            '    width: 34px !important; ' +
+            '    height: 34px !important; ' +
+            '  } ' +
+            '  #' + _spIdBase + '-upload svg { ' +
+            '    width: 18px !important; ' +
+            '    height: 18px !important; ' +
+            '  } ' +
+            '  #' + _spIdBase + '-btn { ' +
+            '    padding: 14px 24px !important; ' +
+            '    font-size: 15px !important; ' +
+            '    width: 100% !important; ' +
+            '  } ' +
             '}';
         document.head.appendChild(enforceZIndexStyle);
 
