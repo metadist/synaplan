@@ -143,29 +143,73 @@ window.SYNAPLAN_SYSTEM_URLS = {
         var _radius = <?php echo json_encode((string)$config['inlineBorderRadius']); ?>; // in px
 
         // Write inline container and overlay markup directly at script position
-        document.write('\n<div id="' + _spIdBase + '-container" style="display:block;max-width:100%;">\n' +
-            '  <div id="' + _spIdBase + '-box" style="display:flex;align-items:center;gap:8px;width:100%;box-sizing:border-box;">\n' +
-            '    <input id="' + _spIdBase + '-input" type="text" placeholder="' + _placeholder.replace(/"/g, '&quot;') + '" ' +
-            '      style="flex:1;min-width:0;padding:10px 12px;font-size:' + _fontSize + 'px;color:' + _textColor + ';' +
-            '             border:1px solid rgba(0,0,0,0.15);border-radius:' + _radius + 'px;outline:none;">\n' +
+        document.write('\n<div id="' + _spIdBase + '-container" style="display:block;max-width:900px;margin:0 auto;padding:30px 20px;">\n' +
+            '  <div id="' + _spIdBase + '-box" style="display:flex;align-items:stretch;gap:12px;width:100%;box-sizing:border-box;' +
+            '       background:rgba(255,255,255,0.98);padding:10px;border-radius:' + Math.max(12, parseInt(_radius) + 4) + 'px;' +
+            '       box-shadow:0 8px 30px rgba(0,0,0,0.15);backdrop-filter:blur(12px);transition:all 0.3s ease;">\n' +
+            '    <div style="position:relative;flex:1;min-width:0;display:flex;align-items:center;">\n' +
+            '      <input id="' + _spIdBase + '-input" type="text" placeholder="' + _placeholder.replace(/"/g, '&quot;') + '" ' +
+            '        style="flex:1;width:100%;padding:20px 60px 20px 28px;font-size:' + _fontSize + 'px;color:#061c3e;' +
+            '               background:white;border:2px solid rgba(6,28,62,0.08);border-radius:' + _radius + 'px;outline:none;' +
+            '               font-weight:500;transition:all 0.3s ease;">\n' +
+            '      <button id="' + _spIdBase + '-upload" type="button" title="Upload file" aria-label="Upload file" ' +
+            '        style="position:absolute;right:12px;width:38px;height:38px;background:transparent;border:none;' +
+            '               border-radius:6px;cursor:pointer;display:flex;align-items:center;justify-content:center;' +
+            '               transition:all 0.2s ease;color:#6c757d;">\n' +
+            '        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="pointer-events:none;">\n' +
+            '          <path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48" ' +
+            '                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>\n' +
+            '        </svg>\n' +
+            '      </button>\n' +
+            '    </div>\n' +
             '    <button id="' + _spIdBase + '-btn" type="button" ' +
-            '      style="padding:10px 14px;font-size:' + Math.max(12, Math.min(22, parseInt(_fontSize))) + 'px;color:#fff;background:' + _primary + ';' +
-            '             border:none;border-radius:' + _radius + 'px;cursor:pointer;">' + _btnText.replace(/</g,'&lt;') + '</button>\n' +
+            '      style="padding:20px 40px;font-size:' + Math.max(14, Math.min(20, parseInt(_fontSize))) + 'px;' +
+            '             color:#061c3e;background:linear-gradient(135deg, #00E5FF 0%, #00FF9D 100%);' +
+            '             border:none;border-radius:' + _radius + 'px;cursor:pointer;white-space:nowrap;font-weight:600;' +
+            '             transition:all 0.3s ease;box-shadow:0 4px 16px rgba(0,229,255,0.25);">' + _btnText.replace(/</g,'&lt;') + '</button>\n' +
             '  </div>\n' +
             '</div>\n');
 
         // Overlay covers page with slight transparency; chat container at 95% viewport
-        document.write('\n<div id="' + _spIdBase + '-overlay" style="position:fixed;inset:0;background:rgba(0,0,0,0.45);' +
-                       'z-index:2147483646;display:none;opacity:0;transition:opacity .25s ease;">\n' +
-            '  <div id="' + _spIdBase + '-panel" style="position:fixed;left:2.5vw;top:2.5vh;width:95vw;height:95vh;' +
+        document.write('\n<div id="' + _spIdBase + '-overlay" style="position:fixed !important;inset:0 !important;background:rgba(0,0,0,0.45);' +
+            'z-index:2147483647 !important;display:none;opacity:0;transition:opacity .25s ease;' +
+            'top:0 !important;left:0 !important;right:0 !important;bottom:0 !important;' +
+            'width:100vw !important;height:100vh !important;margin:0 !important;padding:0 !important;">\n' +
+            '  <div id="' + _spIdBase + '-panel" style="position:fixed !important;left:2.5vw;top:2.5vh;width:95vw;height:95vh;' +
             '       background:#fff;border-radius:12px;box-shadow:0 12px 32px rgba(0,0,0,0.2);' +
-            '       z-index:2147483647;display:flex;flex-direction:column;overflow:hidden;">\n' +
+            '       z-index:2147483647 !important;display:flex;flex-direction:column;overflow:hidden;">\n' +
             '    <button id="' + _spIdBase + '-close" type="button" aria-label="Close" title="Close" ' +
-            '      style="position:absolute;top:12px;right:12px;width:36px;height:36px;border:none;border-radius:18px;' +
-            '             background:transparent;color:#6c757d;font-size:22px;cursor:pointer;">×</button>\n' +
+            '      style="position:absolute !important;top:12px !important;right:12px !important;width:36px;height:36px;border:none;border-radius:18px;' +
+            '             background:transparent;color:#6c757d;font-size:22px;cursor:pointer;z-index:2147483647 !important;">×</button>\n' +
             '    <div id="' + _spIdBase + '-framewrap" style="flex:1 1 auto;width:100%;height:100%;background:#fff;"></div>\n' +
             '  </div>\n' +
             '</div>\n');
+
+        // Inject enforced z-index CSS to ensure widget is always on top
+        var enforceZIndexStyle = document.createElement('style');
+        enforceZIndexStyle.id = _spIdBase + '-enforce-z';
+        enforceZIndexStyle.textContent = 
+            '#' + _spIdBase + '-overlay { ' +
+            '  position: fixed !important; ' +
+            '  z-index: 2147483647 !important; ' +
+            '  top: 0 !important; ' +
+            '  left: 0 !important; ' +
+            '  right: 0 !important; ' +
+            '  bottom: 0 !important; ' +
+            '  width: 100vw !important; ' +
+            '  height: 100vh !important; ' +
+            '  margin: 0 !important; ' +
+            '  padding: 0 !important; ' +
+            '} ' +
+            '#' + _spIdBase + '-panel { ' +
+            '  position: fixed !important; ' +
+            '  z-index: 2147483647 !important; ' +
+            '} ' +
+            '#' + _spIdBase + '-close { ' +
+            '  position: absolute !important; ' +
+            '  z-index: 2147483647 !important; ' +
+            '}';
+        document.head.appendChild(enforceZIndexStyle);
 
         // Attach behavior after current script executes
         (function(){
@@ -173,6 +217,7 @@ window.SYNAPLAN_SYSTEM_URLS = {
             var frameWrap = document.getElementById(_spIdBase + '-framewrap');
             var inputEl = document.getElementById(_spIdBase + '-input');
             var btnEl = document.getElementById(_spIdBase + '-btn');
+            var uploadEl = document.getElementById(_spIdBase + '-upload');
             var closeEl = document.getElementById(_spIdBase + '-close');
             var panelEl = document.getElementById(_spIdBase + '-panel');
             var isOpen = false;
@@ -278,11 +323,144 @@ window.SYNAPLAN_SYSTEM_URLS = {
             if (btnEl) {
                 btnEl.addEventListener('click', openOverlay, { passive: true });
             }
+            if (uploadEl) {
+                uploadEl.addEventListener('click', openOverlay, { passive: true });
+            }
             if (closeEl) {
                 closeEl.addEventListener('click', closeOverlay, { passive: true });
             }
             if (overlay) {
                 overlay.addEventListener('click', function(e){ if (e.target === overlay) closeOverlay(); });
+            }
+
+            // =============================
+            // EXPOSE GLOBAL API FOR EXTERNAL JAVASCRIPT
+            // =============================
+            // This allows the website owner to interact with and animate the widget input
+            window.SynaplanInlineWidget = window.SynaplanInlineWidget || {};
+            window.SynaplanInlineWidget[_spWid] = {
+                // Get the input element
+                getInput: function() {
+                    return inputEl;
+                },
+                // Get the button element
+                getButton: function() {
+                    return btnEl;
+                },
+                // Get the upload button element
+                getUploadButton: function() {
+                    return uploadEl;
+                },
+                // Set the input text
+                setText: function(text) {
+                    if (inputEl) inputEl.value = text;
+                },
+                // Get the current input text
+                getText: function() {
+                    return inputEl ? inputEl.value : '';
+                },
+                // Animate typing effect
+                typeText: function(text, speed) {
+                    speed = speed || 80; // ms per character
+                    if (!inputEl) return;
+                    inputEl.value = '';
+                    var i = 0;
+                    var interval = setInterval(function() {
+                        if (i < text.length) {
+                            inputEl.value += text.charAt(i);
+                            i++;
+                        } else {
+                            clearInterval(interval);
+                        }
+                    }, speed);
+                    return interval; // return so caller can clear if needed
+                },
+                // Clear the input
+                clear: function() {
+                    if (inputEl) inputEl.value = '';
+                },
+                // Focus the input
+                focus: function() {
+                    if (inputEl) inputEl.focus();
+                },
+                // Trigger the button click (open overlay)
+                open: function() {
+                    openOverlay();
+                },
+                // Close the overlay
+                close: function() {
+                    closeOverlay();
+                },
+                // Check if overlay is open
+                isOpen: function() {
+                    return isOpen;
+                },
+                // Add custom style to the input
+                styleInput: function(cssProperties) {
+                    if (!inputEl) return;
+                    for (var prop in cssProperties) {
+                        inputEl.style[prop] = cssProperties[prop];
+                    }
+                },
+                // Add custom style to the button
+                styleButton: function(cssProperties) {
+                    if (!btnEl) return;
+                    for (var prop in cssProperties) {
+                        btnEl.style[prop] = cssProperties[prop];
+                    }
+                },
+                // Add custom style to the container
+                styleContainer: function(cssProperties) {
+                    var container = document.getElementById(_spIdBase + '-box');
+                    if (!container) return;
+                    for (var prop in cssProperties) {
+                        container.style[prop] = cssProperties[prop];
+                    }
+                }
+            };
+
+            // Also expose a shorthand if only one widget exists
+            if (!window.SynaplanWidget) {
+                window.SynaplanWidget = window.SynaplanInlineWidget[_spWid];
+            }
+
+            // Add hover effects with brand colors
+            if (inputEl) {
+                inputEl.addEventListener('focus', function() {
+                    var box = document.getElementById(_spIdBase + '-box');
+                    if (box) box.style.boxShadow = '0 12px 40px rgba(0,0,0,0.2)';
+                    inputEl.style.borderColor = 'rgba(0,229,255,0.4)';
+                    inputEl.style.background = '#ffffff';
+                });
+                inputEl.addEventListener('blur', function() {
+                    var box = document.getElementById(_spIdBase + '-box');
+                    if (box) box.style.boxShadow = '0 8px 30px rgba(0,0,0,0.15)';
+                    inputEl.style.borderColor = 'rgba(6,28,62,0.08)';
+                });
+            }
+            if (btnEl) {
+                btnEl.addEventListener('mouseenter', function() {
+                    btnEl.style.background = 'linear-gradient(135deg, #00c4a7 0%, #00b49a 100%)';
+                    btnEl.style.color = 'white';
+                    btnEl.style.transform = 'translateY(-2px)';
+                    btnEl.style.boxShadow = '0 8px 24px rgba(0,212,170,0.4)';
+                });
+                btnEl.addEventListener('mouseleave', function() {
+                    btnEl.style.background = 'linear-gradient(135deg, #00E5FF 0%, #00FF9D 100%)';
+                    btnEl.style.color = '#061c3e';
+                    btnEl.style.transform = 'translateY(0)';
+                    btnEl.style.boxShadow = '0 4px 16px rgba(0,229,255,0.25)';
+                });
+            }
+            if (uploadEl) {
+                uploadEl.addEventListener('mouseenter', function() {
+                    uploadEl.style.background = 'rgba(0,229,255,0.1)';
+                    uploadEl.style.color = '#00E5FF';
+                });
+                uploadEl.addEventListener('mouseleave', function() {
+                    uploadEl.style.background = 'transparent';
+                    uploadEl.style.color = '#6c757d';
+                });
             }
         })();
     } catch(e) {
@@ -345,13 +523,13 @@ window.SYNAPLAN_SYSTEM_URLS = {
     const overlay = document.createElement('div');
     overlay.id = 'synaplan-chat-overlay';
     overlay.style.cssText = `
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
+        position: fixed !important;
+        top: 0 !important;
+        left: 0 !important;
+        width: 100% !important;
+        height: 100% !important;
         background: rgba(0, 0, 0, 0.5);
-        z-index: 2147483646;
+        z-index: 2147483647 !important;
         display: none;
         opacity: 0;
         transition: opacity 0.3s ease;
@@ -440,6 +618,7 @@ window.SYNAPLAN_SYSTEM_URLS = {
           /* centered modal with reduced height on mobile */
           height: min(70vh, calc(var(--sp-dvh, 100vh) - 140px)) !important;
           max-height: 90vh !important;
+          z-index: 2147483647 !important;
         }
         @supports (height: 100dvh) {
           #synaplan-chat-container {
@@ -457,13 +636,13 @@ window.SYNAPLAN_SYSTEM_URLS = {
       #synaplan-chat-widget { 
         position: fixed !important; 
         bottom: 20px !important; 
-        z-index: 2147483645 !important; 
+        z-index: 2147483646 !important; 
       }
       #synaplan-chat-overlay { 
         position: fixed !important; 
         top: 0 !important; 
         left: 0 !important; 
-        z-index: 2147483646 !important; 
+        z-index: 2147483647 !important; 
         width: 100% !important;
         height: 100% !important;
         margin: 0 !important;
@@ -495,6 +674,7 @@ window.SYNAPLAN_SYSTEM_URLS = {
           width: min(92vw, 420px) !important;
           height: min(70vh, calc(var(--sp-dvh, 100vh) - 140px)) !important;
           max-height: 90vh !important;
+          z-index: 2147483647 !important;
         }
         @supports (height: 100dvh) {
           #synaplan-chat-container {
