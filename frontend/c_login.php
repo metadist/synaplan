@@ -17,10 +17,8 @@
     <!-- Header with Logo -->
     <header class="auth-header">
         <a href="<?php echo ApiKeys::getBaseUrl(); ?>" class="auth-logo">
-            <img src="assets/statics/img/synaplan_logo_onwhite.svg" alt="Synaplan">
-            <span>synaplan</span>
+            <img src="assets/statics/img/synaplan_logo_ondark.svg" alt="Synaplan">
         </a>
-        <div class="auth-welcome"><?php _s('Welcome', __FILE__, $_SESSION['LANG']); ?></div>
     </header>
 
     <!-- Main Content -->
@@ -80,10 +78,7 @@
 
     <!-- Footer -->
     <footer class="auth-footer">
-        <?php
-        $homeUrl = ApiKeys::getBaseUrl();
-_s("Go to our homepage for more information: <a href=\"$homeUrl\">$homeUrl</a>", __FILE__, $_SESSION['LANG']);
-?>
+        <?php _s('Go to our homepage for more information: <a href="https://www.synaplan.com/">https://www.synaplan.com/</a>', __FILE__, $_SESSION['LANG']); ?>
     </footer>
 </body>
 </html>

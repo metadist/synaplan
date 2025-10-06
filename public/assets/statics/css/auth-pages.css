@@ -50,7 +50,7 @@ body::before {
 .auth-header {
     position: relative;
     z-index: 2;
-    padding: 40px 0 20px;
+    padding: 20px 0 10px;
     text-align: center;
 }
 
@@ -202,14 +202,14 @@ body::before {
 
 /* Links */
 .auth-link {
-    color: var(--synaplan-accent);
+    color: #007bff;
     text-decoration: none;
     font-weight: 500;
     transition: color 0.3s ease;
 }
 
 .auth-link:hover {
-    color: var(--synaplan-accent-secondary);
+    color: #0056b3;
     text-decoration: none;
 }
 
@@ -258,13 +258,13 @@ body::before {
 }
 
 .auth-footer a {
-    color: var(--synaplan-accent);
+    color: #6c757d;
     text-decoration: none;
     font-weight: 500;
 }
 
 .auth-footer a:hover {
-    color: var(--synaplan-accent-secondary);
+    color: #495057;
     text-decoration: none;
 }
 
@@ -291,7 +291,7 @@ body::before {
 /* Responsive Design */
 @media (max-width: 768px) {
     .auth-header {
-        padding: 20px 0 10px;
+        padding: 15px 0 5px;
     }
     
     .auth-logo {
