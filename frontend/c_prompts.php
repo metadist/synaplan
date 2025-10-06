@@ -149,7 +149,7 @@
                                     <label class="form-check-label" for="toolScreenshot">📸 URL Screenshot</label>
                                 </div>
                             </div>
-                            <div class="col-md-3 col-sm-6 mb-2">
+                            <div class="col-md-3 col-sm-6 mb-2" style="display:none;">
                                 <div class="form-check form-switch">
                                     <input class="form-check-input" type="checkbox" role="switch" id="toolTransfer" title="Enable File Transfer">
                                     <label class="form-check-label" for="toolTransfer">📤 MCP calls...</label>
@@ -208,9 +208,9 @@
                             <div class="form-text">Set the screenshot size in pixels (default: 1200x2000).</div>
                         </div>
                         <!-- Transfer Info -->
-                        <!-- div id="toolTransferSettings" class="tool-settings-box alert alert-info" style="display:none;">
+                        <div id="toolTransferSettings" class="tool-settings-box alert alert-info" style="display:none;">
                             <strong>📤 MCP calls...</strong> Configure your MCP calls before and after prompt execution.
-                        </div -->
+                        </div>
                     </div>
                 </div>
             </div>
