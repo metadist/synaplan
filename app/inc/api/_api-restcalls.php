@@ -62,11 +62,30 @@ switch ($apiAction) {
         // Create user account (simplified for now)
         $user_id = 'wp_user_' . time() . '_' . substr(md5($email), 0, 8);
 
+        // Create API key for the new user
+        $api_key = 'sk_' . bin2hex(random_bytes(24));
+
+        // Create widget configuration
+        $widget_config = [
+            'integration_type' => 'floating-button',
+            'color' => '#007bff',
+            'icon_color' => '#ffffff',
+            'position' => 'bottom-right',
+            'auto_message' => 'Hello! How can I help you today?',
+            'auto_open' => false,
+            'prompt' => 'general'
+        ];
+
+        $widget_id = 'widget_' . time() . '_' . substr(md5(json_encode($widget_config)), 0, 8);
+
         $resArr = [
             'success' => true,
             'data' => [
                 'user_id' => $user_id,
                 'email' => $email,
+                'api_key' => $api_key,
+                'widget_id' => $widget_id,
+                'widget_config' => $widget_config,
                 'site_info' => $verification_data['site_info'],
                 'message' => 'User registered successfully with WordPress site verification'
             ]
