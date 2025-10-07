@@ -20,6 +20,7 @@ require_once(__DIR__ . '/ai/providers/_aigoogle.php');
 
 // incoming tools
 require_once(__DIR__ . '/integrations/_wasender.php');
+require_once(__DIR__ . '/integrations/wordpresswizard.php');
 require_once(__DIR__ . '/mail/_myGMail.php');
 require_once(__DIR__ . '/_xscontrol.php');
 // oidc authentication

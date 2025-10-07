@@ -234,6 +234,9 @@ switch ($apiAction) {
         $userId = isset($_SESSION['USERPROFILE']['BID']) ? $_SESSION['USERPROFILE']['BID'] : 0;
         $resArr = MessageHistory::getUserStats($userId);
         break;
+    case 'wpWizardComplete':
+        $resArr = WordPressWizard::completeWizardSetup();
+        break;
     default:
         $resArr = ['error' => 'Invalid action'];
         break;
