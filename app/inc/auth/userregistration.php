@@ -22,17 +22,27 @@ class UserRegistration
     {
         $retArr = ['success' => false, 'error' => ''];
 
-        // Validate Turnstile captcha first
-        $captchaOk = Frontend::myCFcaptcha();
-        if (!$captchaOk) {
-            $retArr['error'] = 'Captcha verification failed. Please try again.';
-            return $retArr;
+        // Check if this is a WordPress plugin registration
+        $isWordPressRegistration = isset($_REQUEST['source']) && $_REQUEST['source'] === 'wordpress_plugin';
+
+        if (!$isWordPressRegistration) {
+            // Validate Turnstile captcha for regular web registrations
+            $captchaOk = Frontend::myCFcaptcha();
+            if (!$captchaOk) {
+                $retArr['error'] = 'Captcha verification failed. Please try again.';
+                return $retArr;
+            }
         }
 
         // Get email and password from request
         $email = isset($_REQUEST['email']) ? db::EscString($_REQUEST['email']) : '';
         $password = isset($_REQUEST['password']) ? $_REQUEST['password'] : '';
         $confirmPassword = isset($_REQUEST['confirmPassword']) ? $_REQUEST['confirmPassword'] : '';
+
+        // For WordPress registrations, use password as confirmPassword
+        if ($isWordPressRegistration) {
+            $confirmPassword = $password;
+        }
 
         // Validate input
         if (strlen($email) > 0 && strlen($password) > 0 && $password === $confirmPassword && strlen($password) >= 6) {
@@ -79,15 +89,57 @@ class UserRegistration
             $newUserId = db::LastId();
 
             if ($newUserId > 0) {
-                // Send confirmation email
-                $emailSent = EmailService::sendRegistrationConfirmation($email, $pin, $newUserId);
-                if ($emailSent) {
+                if ($isWordPressRegistration) {
+                    // WordPress plugin registration - create API key in database (same process as web)
+                    $random = bin2hex(random_bytes(24));
+                    $api_key = 'sk_live_' . $random;
+                    $now = time();
+
+                    // Insert API key into database (same as ApiKeyManager::createApiKey)
+                    $ins = 'INSERT INTO BAPIKEYS (BOWNERID, BNAME, BKEY, BSTATUS, BCREATED, BLASTUSED) 
+                            VALUES (' . $newUserId . ", 'WordPress Plugin', '" . db::EscString($api_key) . "', 'active', " . $now . ', 0)';
+                    db::Query($ins);
+
+                    $widget_config = [
+                        'integration_type' => 'floating-button',
+                        'color' => '#007bff',
+                        'icon_color' => '#ffffff',
+                        'position' => 'bottom-right',
+                        'auto_message' => 'Hello! How can I help you today?',
+                        'auto_open' => false,
+                        'prompt' => 'general'
+                    ];
+                    $widget_id = 'widget_' . time() . '_' . substr(md5(json_encode($widget_config)), 0, 8);
+
                     $retArr['success'] = true;
-                    $retArr['message'] = 'Registration successful! Please check your email for confirmation.';
+                    $retArr['data'] = [
+                        'user_id' => 'wp_user_' . $newUserId,
+                        'email' => $email,
+                        'api_key' => $api_key,
+                        'widget_id' => $widget_id,
+                        'widget_config' => $widget_config,
+                        'message' => 'User registered successfully with WordPress site verification'
+                    ];
                 } else {
-                    // User was created but email failed - still return success but with warning
-                    $retArr['success'] = true;
-                    $retArr['message'] = 'Account created successfully, but confirmation email could not be sent. Please contact support.';
+                    // Regular web registration - send confirmation email
+                    $emailSent = EmailService::sendRegistrationConfirmation($email, $pin, $newUserId);
+                    if ($emailSent) {
+                        $retArr['success'] = true;
+                        $retArr['message'] = 'Registration successful! Please check your email for confirmation.';
+                    } else {
+                        // User was created but email failed - still return success but with warning
+                        $retArr['success'] = true;
+                        $retArr['message'] = 'Account created successfully, but confirmation email could not be sent. Please contact support.';
+                    }
+                }
+
+                // For WordPress registrations, also send confirmation email (same process as web)
+                if ($isWordPressRegistration) {
+                    $emailSent = EmailService::sendRegistrationConfirmation($email, $pin, $newUserId);
+                    if (!$emailSent) {
+                        // Log the email failure but don't fail the registration
+                        error_log("WordPress registration: Confirmation email failed for user ID: $newUserId, email: $email");
+                    }
                 }
             } else {
                 $retArr['error'] = 'Failed to create user account. Please try again.';

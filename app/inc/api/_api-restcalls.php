@@ -6,68 +6,6 @@ header('Content-Type: application/json; charset=UTF-8');
 $apiAction = $_REQUEST['action'];
 
 switch ($apiAction) {
-    case 'userRegister':
-        // WordPress plugin user registration with site verification
-        $email = isset($_REQUEST['email']) ? trim($_REQUEST['email']) : '';
-        $password = isset($_REQUEST['password']) ? trim($_REQUEST['password']) : '';
-        $language = isset($_REQUEST['language']) ? trim($_REQUEST['language']) : 'en';
-        $verification_token = isset($_REQUEST['verification_token']) ? trim($_REQUEST['verification_token']) : '';
-        $verification_url = isset($_REQUEST['verification_url']) ? trim($_REQUEST['verification_url']) : '';
-        $site_url = isset($_REQUEST['site_url']) ? trim($_REQUEST['site_url']) : '';
-
-        if (empty($email) || empty($password) || empty($verification_token) || empty($verification_url)) {
-            $resArr = [
-                'success' => false,
-                'error' => 'Missing required fields'
-            ];
-            break;
-        }
-
-        // For now, skip WordPress site verification due to network connectivity issues
-        // TODO: Implement proper verification once network issues are resolved
-        $verification_data = [
-            'success' => true,
-            'verified' => true,
-            'site_info' => [
-                'url' => $site_url,
-                'verified_at' => time(),
-                'bypass_reason' => 'Network connectivity issue - temporary bypass'
-            ]
-        ];
-
-        // Create user account (simplified for now)
-        $user_id = 'wp_user_' . time() . '_' . substr(md5($email), 0, 8);
-
-        // Create API key for the new user
-        $api_key = 'sk_' . bin2hex(random_bytes(24));
-
-        // Create widget configuration
-        $widget_config = [
-            'integration_type' => 'floating-button',
-            'color' => '#007bff',
-            'icon_color' => '#ffffff',
-            'position' => 'bottom-right',
-            'auto_message' => 'Hello! How can I help you today?',
-            'auto_open' => false,
-            'prompt' => 'general'
-        ];
-
-        $widget_id = 'widget_' . time() . '_' . substr(md5(json_encode($widget_config)), 0, 8);
-
-        $resArr = [
-            'success' => true,
-            'data' => [
-                'user_id' => $user_id,
-                'email' => $email,
-                'api_key' => $api_key,
-                'widget_id' => $widget_id,
-                'widget_config' => $widget_config,
-                'site_info' => $verification_data['site_info'],
-                'message' => 'User registered successfully with WordPress site verification'
-            ]
-        ];
-        break;
-
     case 'createApiKey':
         // Create API key for WordPress plugin
         $name = isset($_REQUEST['name']) ? trim($_REQUEST['name']) : 'WordPress Plugin';
