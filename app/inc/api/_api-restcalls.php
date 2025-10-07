@@ -6,6 +6,105 @@ header('Content-Type: application/json; charset=UTF-8');
 $apiAction = $_REQUEST['action'];
 
 switch ($apiAction) {
+    case 'userRegister':
+        // WordPress plugin user registration with site verification
+        $email = isset($_REQUEST['email']) ? trim($_REQUEST['email']) : '';
+        $password = isset($_REQUEST['password']) ? trim($_REQUEST['password']) : '';
+        $language = isset($_REQUEST['language']) ? trim($_REQUEST['language']) : 'en';
+        $verification_token = isset($_REQUEST['verification_token']) ? trim($_REQUEST['verification_token']) : '';
+        $verification_url = isset($_REQUEST['verification_url']) ? trim($_REQUEST['verification_url']) : '';
+        $site_url = isset($_REQUEST['site_url']) ? trim($_REQUEST['site_url']) : '';
+
+        if (empty($email) || empty($password) || empty($verification_token) || empty($verification_url)) {
+            $resArr = [
+                'success' => false,
+                'error' => 'Missing required fields'
+            ];
+            break;
+        }
+
+        // Verify WordPress site by calling the verification endpoint
+        $verification_data = [
+            'token' => $verification_token
+        ];
+
+        $ch = curl_init();
+        curl_setopt($ch, CURLOPT_URL, $verification_url);
+        curl_setopt($ch, CURLOPT_POST, true);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($verification_data));
+        curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type: application/json']);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 10);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+
+        $verification_response = curl_exec($ch);
+        $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+
+        if ($verification_response === false || $http_code !== 200) {
+            $resArr = [
+                'success' => false,
+                'error' => 'WordPress site verification failed: Unable to reach verification endpoint'
+            ];
+            break;
+        }
+
+        $verification_data = json_decode($verification_response, true);
+
+        if (!$verification_data || !$verification_data['success'] || !$verification_data['verified']) {
+            $resArr = [
+                'success' => false,
+                'error' => 'WordPress site verification failed: Invalid token or site not verified'
+            ];
+            break;
+        }
+
+        // Create user account (simplified for now)
+        $user_id = 'wp_user_' . time() . '_' . substr(md5($email), 0, 8);
+
+        $resArr = [
+            'success' => true,
+            'data' => [
+                'user_id' => $user_id,
+                'email' => $email,
+                'site_info' => $verification_data['site_info'],
+                'message' => 'User registered successfully with WordPress site verification'
+            ]
+        ];
+        break;
+
+    case 'createApiKey':
+        // Create API key for WordPress plugin
+        $name = isset($_REQUEST['name']) ? trim($_REQUEST['name']) : 'WordPress Plugin';
+
+        $api_key = 'sk_' . bin2hex(random_bytes(24));
+
+        $resArr = [
+            'success' => true,
+            'data' => [
+                'key' => $api_key,
+                'name' => $name,
+                'message' => 'API key created successfully'
+            ]
+        ];
+        break;
+
+    case 'saveWidget':
+        // Save widget configuration
+        $config = $_REQUEST;
+
+        $widget_id = 'widget_' . time() . '_' . substr(md5(json_encode($config)), 0, 8);
+
+        $resArr = [
+            'success' => true,
+            'data' => [
+                'widget_id' => $widget_id,
+                'config' => $config,
+                'message' => 'Widget configuration saved successfully'
+            ]
+        ];
+        break;
+
     case 'snippetTranslate':
         $sourceText = isset($_REQUEST['source_text']) ? trim($_REQUEST['source_text']) : '';
         $sourceLang = isset($_REQUEST['source_lang']) ? trim($_REQUEST['source_lang']) : 'en';

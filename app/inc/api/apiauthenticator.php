@@ -129,7 +129,7 @@ class ApiAuthenticator
     {
         // Public endpoints that require no authentication nor widget session
         if ($action === 'userRegister') {
-            return true;
+            return self::checkWordPressRegistrationAccess();
         }
         if ($action === 'lostPassword') {
             return true;
@@ -144,6 +144,46 @@ class ApiAuthenticator
         http_response_code(404);
         echo json_encode(['error' => 'Endpoint not found']);
         exit;
+    }
+
+    /**
+     * Check WordPress registration access with rate limiting
+     *
+     * @return bool True if access is allowed
+     */
+    private static function checkWordPressRegistrationAccess(): bool
+    {
+        // Get client IP for rate limiting
+        $clientIp = $_SERVER['HTTP_CF_CONNECTING_IP'] ?? $_SERVER['HTTP_X_FORWARDED_FOR'] ?? $_SERVER['REMOTE_ADDR'] ?? 'unknown';
+
+        // Rate limit: 5 registration attempts per IP per hour
+        $rateLimitKey = 'wp_registration_' . $clientIp;
+        $rateLimitResult = Tools::checkRateLimit($rateLimitKey, 3600, 5); // 5 requests per hour
+
+        if (!$rateLimitResult['allowed']) {
+            http_response_code(429);
+            echo json_encode([
+                'error' => 'Registration rate limit exceeded',
+                'message' => 'Too many registration attempts. Please try again later.',
+                'retry_after' => $rateLimitResult['retry_after']
+            ]);
+            exit;
+        }
+
+        // Additional security: Check for required WordPress verification fields
+        $requiredFields = ['verification_token', 'verification_url', 'site_url'];
+        foreach ($requiredFields as $field) {
+            if (empty($_REQUEST[$field])) {
+                http_response_code(400);
+                echo json_encode([
+                    'error' => 'Missing required WordPress verification fields',
+                    'message' => 'WordPress site verification is required for registration'
+                ]);
+                exit;
+            }
+        }
+
+        return true;
     }
 
     /**
