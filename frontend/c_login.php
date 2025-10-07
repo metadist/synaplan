@@ -6,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?php _s('Please login', __FILE__, $_SESSION['LANG']); ?> | Synaplan</title>
     <link rel="icon" type="image/x-icon" href="assets/statics/img/favicon.ico">
-    <link href="assets/statics/css/auth-pages.css" rel="stylesheet">
+    <link href="assets/statics/css/auth-pages.css?v=2" rel="stylesheet">
     <script
       src="https://challenges.cloudflare.com/turnstile/v0/api.js"
       async
