@@ -928,7 +928,7 @@ class Central
     /**
      * Security: Convert HTML/HTM files to plain text to prevent them from being served as landing pages
      * Strips all HTML tags and converts to .txt file
-     * 
+     *
      * @param string $tmpFilePath Temporary uploaded file path
      * @param string $fileExtension Original file extension
      * @return array ['converted' => bool, 'newExtension' => string, 'content' => string]
@@ -955,7 +955,7 @@ class Central
         // Strip all HTML tags and decode entities
         $plainText = strip_tags($htmlContent);
         $plainText = html_entity_decode($plainText, ENT_QUOTES | ENT_HTML5, 'UTF-8');
-        
+
         // Clean up excessive whitespace
         $plainText = preg_replace('/\s+/', ' ', $plainText);
         $plainText = preg_replace('/\n\s*\n\s*\n/', "\n\n", $plainText);
