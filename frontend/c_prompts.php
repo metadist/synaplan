@@ -51,10 +51,10 @@
 
                 <!-- Description -->
                 <div class="row mb-3">
-                    <label for="promptDescription" class="col-sm-2 col-form-label"><strong>Description:</strong></label>
+                    <label for="promptDescription" class="col-sm-2 col-form-label"><strong>Rules for selection:</strong></label>
                     <div class="col-sm-10">
                         <textarea class="form-control" name="promptDescription" id="promptDescription" rows="2" placeholder="Enter a description for the preprocessor..."><?php echo $promptDesc; ?></textarea>
-                        <div class="form-text">Brief description of what this prompt does</div>
+                        <div class="form-text">Rules to direct to this prompt. When shall this prompt be used?</div>
                     </div>
                 </div>
 
@@ -149,7 +149,7 @@
                                     <label class="form-check-label" for="toolScreenshot">📸 URL Screenshot</label>
                                 </div>
                             </div>
-                            <div class="col-md-3 col-sm-6 mb-2">
+                            <div class="col-md-3 col-sm-6 mb-2" style="display:none;">
                                 <div class="form-check form-switch">
                                     <input class="form-check-input" type="checkbox" role="switch" id="toolTransfer" title="Enable File Transfer">
                                     <label class="form-check-label" for="toolTransfer">📤 MCP calls...</label>
