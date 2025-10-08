@@ -4,6 +4,9 @@
  * WordPress Wizard Integration Handler
  *
  * Handles the complete setup process for WordPress plugin installations including:
+ * - WordPress site verification via callback
+ * - User creation with status 'NEW'
+ * - API key generation
  * - RAG file uploads and vectorization
  * - Widget configuration
  * - Prompt configuration with file search enabled
@@ -14,12 +17,10 @@
 class WordPressWizard
 {
     /**
-     * Complete WordPress wizard setup
+     * Complete WordPress wizard setup - NEW VERSION with verification
      *
-     * This method handles all three missing pieces of the wizard:
-     * 1. Upload files to RAG system
-     * 2. Enable file search on general prompt
-     * 3. Save widget configuration
+     * This is the main entry point for WordPress wizard installations
+     * Handles complete flow: verification → user → API key → files → prompt → widget
      *
      * @return array Result of the setup operation
      */
@@ -27,87 +28,68 @@ class WordPressWizard
     {
         $retArr = ['error' => '', 'success' => false];
 
-        // Verify user is authenticated
-        if (!isset($_SESSION['USERPROFILE']) || !isset($_SESSION['USERPROFILE']['BID'])) {
-            $retArr['error'] = 'User not authenticated';
-            return $retArr;
-        }
-
-        $userId = intval($_SESSION['USERPROFILE']['BID']);
-
         try {
-            // Step 1: Process uploaded files for RAG (if any)
-            $filesProcessed = false;
-            $uploadedFilesCount = 0;
+            // STEP 1: Verify WordPress site
+            $verification = self::verifyWordPressSite();
+            if (!$verification['success']) {
+                $retArr['error'] = $verification['error'] ?? 'WordPress site verification failed';
+                return $retArr;
+            }
 
+            // STEP 2: Create user with status 'NEW' (not PIN)
+            $userResult = self::createWordPressUser();
+            if (!$userResult['success']) {
+                $retArr['error'] = $userResult['error'] ?? 'User creation failed';
+                return $retArr;
+            }
+
+            $userId = $userResult['user_id'];
+
+            // STEP 3: Create API key
+            $apiKeyResult = self::createUserApiKey($userId);
+            if (!$apiKeyResult['success']) {
+                $retArr['error'] = $apiKeyResult['error'] ?? 'API key creation failed';
+                return $retArr;
+            }
+
+            $apiKey = $apiKeyResult['api_key'];
+
+            // STEP 4: Process uploaded files for RAG (if any)
+            $uploadedFilesCount = 0;
             if (!empty($_FILES['files']) && !empty($_FILES['files']['name'][0])) {
                 $ragResult = self::processWizardRAGFiles($userId);
 
-                if (!$ragResult['success']) {
-                    $retArr['error'] = $ragResult['error'] ?? 'Failed to process uploaded files';
-                    return $retArr;
-                }
+                if ($ragResult['success']) {
+                    $uploadedFilesCount = $ragResult['processedCount'] ?? 0;
 
-                $filesProcessed = true;
-                $uploadedFilesCount = $ragResult['processedCount'] ?? 0;
-            }
-
-            // Step 2: Enable file search on general prompt (only if files were uploaded)
-            if ($filesProcessed && $uploadedFilesCount > 0) {
-                $promptResult = self::enableFileSearchOnGeneralPrompt($userId);
-
-                if (!$promptResult['success']) {
-                    // Don't fail the entire process, just log the issue
-                    error_log('WordPress Wizard: Failed to enable file search on prompt: ' . ($promptResult['error'] ?? 'Unknown error'));
+                    // STEP 5: Enable file search on general prompt (if files were uploaded)
+                    if ($uploadedFilesCount > 0) {
+                        $promptResult = self::enableFileSearchOnGeneralPrompt($userId);
+                        if (!$promptResult['success']) {
+                            error_log('WordPress Wizard: Failed to enable file search on prompt: ' . ($promptResult['error'] ?? 'Unknown error'));
+                        }
+                    }
+                } else {
+                    error_log('WordPress Wizard: File processing failed: ' . ($ragResult['error'] ?? 'Unknown error'));
                 }
             }
 
-            // Step 3: Save widget configuration
-            $widgetConfig = [
-                'widgetId' => intval($_REQUEST['widgetId'] ?? 1),
-                'widgetColor' => db::EscString($_REQUEST['widgetColor'] ?? '#007bff'),
-                'widgetIconColor' => db::EscString($_REQUEST['widgetIconColor'] ?? '#ffffff'),
-                'widgetPosition' => db::EscString($_REQUEST['widgetPosition'] ?? 'bottom-right'),
-                'autoMessage' => db::EscString($_REQUEST['autoMessage'] ?? 'Hello! How can I help you today?'),
-                'widgetPrompt' => db::EscString($_REQUEST['widgetPrompt'] ?? 'general'),
-                'autoOpen' => isset($_REQUEST['autoOpen']) && ($_REQUEST['autoOpen'] === '1' || $_REQUEST['autoOpen'] === 'true') ? '1' : '0',
-                'integrationType' => db::EscString($_REQUEST['integrationType'] ?? 'floating-button'),
-                'inlinePlaceholder' => db::EscString($_REQUEST['inlinePlaceholder'] ?? 'Ask me anything...'),
-                'inlineButtonText' => db::EscString($_REQUEST['inlineButtonText'] ?? 'Ask'),
-                'inlineFontSize' => intval($_REQUEST['inlineFontSize'] ?? 18),
-                'inlineTextColor' => db::EscString($_REQUEST['inlineTextColor'] ?? '#212529'),
-                'inlineBorderRadius' => intval($_REQUEST['inlineBorderRadius'] ?? 8)
-            ];
-
-            // Temporarily set request variables for Frontend::saveWidget()
-            $_REQUEST['widgetId'] = $widgetConfig['widgetId'];
-            $_REQUEST['widgetColor'] = $widgetConfig['widgetColor'];
-            $_REQUEST['widgetIconColor'] = $widgetConfig['widgetIconColor'];
-            $_REQUEST['widgetPosition'] = $widgetConfig['widgetPosition'];
-            $_REQUEST['autoMessage'] = $widgetConfig['autoMessage'];
-            $_REQUEST['widgetPrompt'] = $widgetConfig['widgetPrompt'];
-            $_REQUEST['autoOpen'] = $widgetConfig['autoOpen'];
-            $_REQUEST['integrationType'] = $widgetConfig['integrationType'];
-            $_REQUEST['inlinePlaceholder'] = $widgetConfig['inlinePlaceholder'];
-            $_REQUEST['inlineButtonText'] = $widgetConfig['inlineButtonText'];
-            $_REQUEST['inlineFontSize'] = $widgetConfig['inlineFontSize'];
-            $_REQUEST['inlineTextColor'] = $widgetConfig['inlineTextColor'];
-            $_REQUEST['inlineBorderRadius'] = $widgetConfig['inlineBorderRadius'];
-
-            $widgetResult = Frontend::saveWidget();
-
+            // STEP 6: Save widget configuration to BCONFIG
+            $widgetResult = self::saveWidgetConfiguration($userId);
             if (!$widgetResult['success']) {
-                $retArr['error'] = $widgetResult['error'] ?? 'Failed to save widget configuration';
-                return $retArr;
+                error_log('WordPress Wizard: Widget configuration failed: ' . ($widgetResult['error'] ?? 'Unknown error'));
             }
 
             // Success!
             $retArr['success'] = true;
             $retArr['message'] = 'WordPress wizard setup completed successfully';
-            $retArr['filesProcessed'] = $uploadedFilesCount;
-            $retArr['widget'] = [
-                'widgetId' => $widgetConfig['widgetId'],
-                'saved' => true
+            $retArr['data'] = [
+                'user_id' => $userId,
+                'email' => db::EscString($_REQUEST['email'] ?? ''),
+                'api_key' => $apiKey,
+                'filesProcessed' => $uploadedFilesCount,
+                'widget_configured' => $widgetResult['success'] ?? false,
+                'site_verified' => true
             ];
 
             return $retArr;
@@ -117,6 +99,221 @@ class WordPressWizard
             $retArr['error'] = 'An error occurred during setup: ' . $e->getMessage();
             return $retArr;
         }
+    }
+
+    /**
+     * Verify WordPress site by calling back to the verification endpoint
+     *
+     * @return array Verification result
+     */
+    private static function verifyWordPressSite(): array
+    {
+        $retArr = ['success' => false, 'error' => ''];
+
+        // Get verification data from request
+        $verificationToken = isset($_REQUEST['verification_token']) ? db::EscString($_REQUEST['verification_token']) : '';
+        $verificationUrl = isset($_REQUEST['verification_url']) ? db::EscString($_REQUEST['verification_url']) : '';
+        $siteUrl = isset($_REQUEST['site_url']) ? db::EscString($_REQUEST['site_url']) : '';
+
+        if (empty($verificationToken) || empty($verificationUrl)) {
+            $retArr['error'] = 'Missing verification token or URL';
+            return $retArr;
+        }
+
+        // Call back to WordPress site to verify the token
+        $postData = ['token' => $verificationToken];
+
+        $ch = curl_init();
+        curl_setopt($ch, CURLOPT_URL, $verificationUrl);
+        curl_setopt($ch, CURLOPT_POST, true);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query($postData));
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 10);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
+
+        $response = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $curlError = curl_error($ch);
+        curl_close($ch);
+
+        if ($curlError) {
+            $retArr['error'] = 'Verification request failed: ' . $curlError;
+            return $retArr;
+        }
+
+        if ($httpCode !== 200) {
+            $retArr['error'] = 'WordPress site verification failed (HTTP ' . $httpCode . ')';
+            return $retArr;
+        }
+
+        $decoded = json_decode($response, true);
+        if (!$decoded || !isset($decoded['verified']) || $decoded['verified'] !== true) {
+            $retArr['error'] = 'Invalid verification response from WordPress site';
+            return $retArr;
+        }
+
+        $retArr['success'] = true;
+        $retArr['site_info'] = $decoded['site_info'] ?? [];
+
+        return $retArr;
+    }
+
+    /**
+     * Create WordPress user with status 'NEW' (auto-activated)
+     *
+     * @return array User creation result with user ID
+     */
+    private static function createWordPressUser(): array
+    {
+        $retArr = ['success' => false, 'error' => '', 'user_id' => 0];
+
+        // Get and sanitize email and password
+        $email = isset($_REQUEST['email']) ? db::EscString($_REQUEST['email']) : '';
+        $password = isset($_REQUEST['password']) ? $_REQUEST['password'] : '';
+        $language = isset($_REQUEST['language']) ? db::EscString($_REQUEST['language']) : 'en';
+
+        // Validate input
+        if (empty($email) || empty($password)) {
+            $retArr['error'] = 'Email and password are required';
+            return $retArr;
+        }
+
+        if (strlen($password) < 6) {
+            $retArr['error'] = 'Password must be at least 6 characters';
+            return $retArr;
+        }
+
+        // Check if email already exists
+        $checkSQL = "SELECT BID FROM BUSER WHERE BMAIL = '" . $email . "'";
+        $checkRes = db::Query($checkSQL);
+        $existingUser = db::FetchArr($checkRes);
+
+        if ($existingUser) {
+            $retArr['error'] = 'An account with this email address already exists';
+            return $retArr;
+        }
+
+        // MD5 encrypt the password
+        $passwordMd5 = md5($password);
+
+        // Create user details JSON
+        $userDetails = [
+            'firstName' => '',
+            'lastName' => '',
+            'phone' => '',
+            'companyName' => '',
+            'vatId' => '',
+            'street' => '',
+            'zipCode' => '',
+            'city' => '',
+            'country' => '',
+            'language' => $language,
+            'timezone' => '',
+            'invoiceEmail' => '',
+            'emailConfirmed' => true,
+            'wordpressVerified' => true
+        ];
+
+        // Insert new user with BUSERLEVEL = 'NEW' (auto-activated, no email confirmation needed)
+        $insertSQL = "INSERT INTO BUSER (BCREATED, BINTYPE, BMAIL, BPW, BPROVIDERID, BUSERLEVEL, BUSERDETAILS) 
+                     VALUES ('" . date('YmdHis') . "', 'MAIL', '" . $email . "', '" . $passwordMd5 . "', '" . $email . "', 'NEW', '" . db::EscString(json_encode($userDetails, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)) . "')";
+
+        db::Query($insertSQL);
+        $newUserId = db::LastId();
+
+        if ($newUserId > 0) {
+            $retArr['success'] = true;
+            $retArr['user_id'] = $newUserId;
+            $retArr['email'] = $email;
+        } else {
+            $retArr['error'] = 'Failed to create user account';
+        }
+
+        return $retArr;
+    }
+
+    /**
+     * Create API key for the WordPress user
+     *
+     * @param int $userId User ID
+     * @return array API key creation result
+     */
+    private static function createUserApiKey(int $userId): array
+    {
+        $retArr = ['success' => false, 'error' => '', 'api_key' => ''];
+
+        // Generate API key (same format as ApiKeyManager)
+        $random = bin2hex(random_bytes(24));
+        $apiKey = 'sk_live_' . $random;
+        $now = time();
+
+        // Insert API key into database
+        $insertSQL = 'INSERT INTO BAPIKEYS (BOWNERID, BNAME, BKEY, BSTATUS, BCREATED, BLASTUSED) 
+                     VALUES (' . $userId . ", 'WordPress Plugin', '" . db::EscString($apiKey) . "', 'active', " . $now . ', 0)';
+
+        db::Query($insertSQL);
+        $apiKeyId = db::LastId();
+
+        if ($apiKeyId > 0) {
+            $retArr['success'] = true;
+            $retArr['api_key'] = $apiKey;
+        } else {
+            $retArr['error'] = 'Failed to create API key';
+        }
+
+        return $retArr;
+    }
+
+    /**
+     * Save widget configuration to BCONFIG table
+     *
+     * @param int $userId User ID
+     * @return array Save result
+     */
+    private static function saveWidgetConfiguration(int $userId): array
+    {
+        $retArr = ['success' => false, 'error' => ''];
+
+        try {
+            // Get widget configuration from request with defaults
+            $widgetId = intval($_REQUEST['widgetId'] ?? 1);
+            $group = 'widget_' . $widgetId;
+
+            $widgetSettings = [
+                'color' => db::EscString($_REQUEST['widgetColor'] ?? '#007bff'),
+                'iconColor' => db::EscString($_REQUEST['widgetIconColor'] ?? '#ffffff'),
+                'position' => db::EscString($_REQUEST['widgetPosition'] ?? 'bottom-right'),
+                'autoMessage' => db::EscString($_REQUEST['autoMessage'] ?? 'Hello! How can I help you today?'),
+                'prompt' => db::EscString($_REQUEST['widgetPrompt'] ?? 'general'),
+                'autoOpen' => isset($_REQUEST['autoOpen']) && ($_REQUEST['autoOpen'] === '1' || $_REQUEST['autoOpen'] === 'true') ? '1' : '0',
+                'integrationType' => db::EscString($_REQUEST['integrationType'] ?? 'floating-button'),
+                'inlinePlaceholder' => db::EscString($_REQUEST['inlinePlaceholder'] ?? 'Ask me anything...'),
+                'inlineButtonText' => db::EscString($_REQUEST['inlineButtonText'] ?? 'Ask'),
+                'inlineFontSize' => intval($_REQUEST['inlineFontSize'] ?? 18),
+                'inlineTextColor' => db::EscString($_REQUEST['inlineTextColor'] ?? '#212529'),
+                'inlineBorderRadius' => intval($_REQUEST['inlineBorderRadius'] ?? 8)
+            ];
+
+            // Delete existing widget configuration for this user and widget ID
+            $deleteSQL = 'DELETE FROM BCONFIG WHERE BOWNERID = ' . $userId . " AND BGROUP = '" . db::EscString($group) . "'";
+            db::Query($deleteSQL);
+
+            // Insert new widget configuration
+            foreach ($widgetSettings as $setting => $value) {
+                $insertSQL = 'INSERT INTO BCONFIG (BOWNERID, BGROUP, BSETTING, BVALUE) 
+                             VALUES (' . $userId . ", '" . db::EscString($group) . "', '" . db::EscString($setting) . "', '" . db::EscString((string)$value) . "')";
+                db::Query($insertSQL);
+            }
+
+            $retArr['success'] = true;
+            $retArr['message'] = 'Widget configuration saved successfully';
+
+        } catch (\Throwable $e) {
+            error_log('Widget configuration error: ' . $e->getMessage());
+            $retArr['error'] = 'Failed to save widget configuration: ' . $e->getMessage();
+        }
+
+        return $retArr;
     }
 
     /**

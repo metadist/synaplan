@@ -172,6 +172,10 @@ switch ($apiAction) {
     case 'userRegister':
         $resArr = UserRegistration::registerNewUser();
         break;
+    case 'wpWizardComplete':
+        // Complete WordPress wizard setup with verification, user creation, API key, files, prompt, and widget
+        $resArr = WordPressWizard::completeWizardSetup();
+        break;
     case 'lostPassword':
         $resArr = UserRegistration::lostPassword();
         break;
