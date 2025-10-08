@@ -132,6 +132,10 @@ class ApiAuthenticator
         if ($action === 'userRegister') {
             return self::checkWordPressRegistrationAccess();
         }
+        if ($action === 'wpWizardComplete') {
+            // WordPress wizard uses same verification as userRegister
+            return self::checkWordPressRegistrationAccess();
+        }
         if ($action === 'lostPassword') {
             return true;
         }

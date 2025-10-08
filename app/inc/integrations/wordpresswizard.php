@@ -445,6 +445,9 @@ class WordPressWizard
     /**
      * Enable file search tool on general prompt with WORDPRESS_WIZARD group filter
      *
+     * Creates a user-specific copy of the "general" prompt with file search enabled
+     * This mimics what happens when a user enables file search in the UI
+     *
      * @param int $userId User ID
      * @return array Result of the operation
      */
@@ -456,57 +459,66 @@ class WordPressWizard
             $promptKey = 'general';
             $groupKey = 'WORDPRESS_WIZARD';
 
-            // Get the current general prompt details
-            $promptDetails = BasicAI::getPromptDetails($promptKey);
+            // Get the default general prompt (BOWNERID = 0)
+            $sql = "SELECT BID, BPROMPT, BSHORTDESC, BLANG FROM BPROMPTS 
+                    WHERE BTOPIC = '" . db::EscString($promptKey) . "' AND BOWNERID = 0 LIMIT 1";
+            $res = db::Query($sql);
+            $defaultPrompt = db::FetchArr($res);
 
-            if (!isset($promptDetails['BID']) || !isset($promptDetails['BPROMPT'])) {
-                $retArr['error'] = 'General prompt not found';
+            if (!$defaultPrompt) {
+                $retArr['error'] = 'Default general prompt not found';
                 return $retArr;
             }
 
-            // Get current settings
-            $currentSettings = [];
-            if (isset($promptDetails['SETTINGS']) && is_array($promptDetails['SETTINGS'])) {
-                foreach ($promptDetails['SETTINGS'] as $setting) {
-                    if (is_array($setting) && isset($setting['BTOKEN'])) {
-                        $currentSettings[$setting['BTOKEN']] = $setting['BVALUE'] ?? '';
-                    }
-                }
+            // Check if user already has a custom prompt
+            $checkSql = "SELECT BID FROM BPROMPTS 
+                         WHERE BTOPIC = '" . db::EscString($promptKey) . "' AND BOWNERID = " . $userId . ' LIMIT 1';
+            $checkRes = db::Query($checkSql);
+            $existingPrompt = db::FetchArr($checkRes);
+
+            if ($existingPrompt) {
+                // User already has a custom prompt, delete it and its settings
+                $existingPromptId = $existingPrompt['BID'];
+                db::Query('DELETE FROM BPROMPTMETA WHERE BPROMPTID = ' . $existingPromptId);
+                db::Query('DELETE FROM BPROMPTS WHERE BID = ' . $existingPromptId);
             }
 
-            // Prepare the update request
-            $_REQUEST['promptKey'] = $promptKey;
-            $_REQUEST['promptContent'] = $promptDetails['BPROMPT'];
-            $_REQUEST['promptDescription'] = $promptDetails['BSHORTDESC'] ?? '';
-            $_REQUEST['saveFlag'] = 'save';
-            $_REQUEST['aiModel'] = $currentSettings['aiModel'] ?? '-1';
+            // Create user-specific copy of the prompt
+            $insertPromptSql = 'INSERT INTO BPROMPTS (BOWNERID, BLANG, BTOPIC, BPROMPT, BSHORTDESC) 
+                                VALUES (' . $userId . ", 
+                                        '" . db::EscString($defaultPrompt['BLANG']) . "', 
+                                        '" . db::EscString($promptKey) . "', 
+                                        '" . db::EscString($defaultPrompt['BPROMPT']) . "', 
+                                        '" . db::EscString($defaultPrompt['BSHORTDESC']) . "')";
+            db::Query($insertPromptSql);
+            $newPromptId = db::LastId();
 
-            // Enable file search tool
-            $_REQUEST['tool_internet'] = $currentSettings['tool_internet'] ?? '0';
-            $_REQUEST['tool_files'] = '1'; // Enable file search
-            $_REQUEST['tool_screenshot'] = $currentSettings['tool_screenshot'] ?? '0';
-            $_REQUEST['tool_transfer'] = $currentSettings['tool_transfer'] ?? '0';
-
-            // Set the group filter for file search
-            $_REQUEST['tool_files_keyword'] = $groupKey;
-
-            // Preserve screenshot settings if they exist
-            if (!empty($currentSettings['tool_screenshot_x'])) {
-                $_REQUEST['tool_screenshot_x'] = $currentSettings['tool_screenshot_x'];
-            }
-            if (!empty($currentSettings['tool_screenshot_y'])) {
-                $_REQUEST['tool_screenshot_y'] = $currentSettings['tool_screenshot_y'];
+            if ($newPromptId <= 0) {
+                $retArr['error'] = 'Failed to create user-specific prompt';
+                return $retArr;
             }
 
-            // Update the prompt
-            $updateResult = BasicAI::updatePrompt($promptKey);
+            // Insert settings into BPROMPTMETA
+            $settings = [
+                'aiModel' => '-1',          // Automatic model selection
+                'tool_internet' => '0',     // Internet search off
+                'tool_files' => '1',        // File search ON
+                'tool_screenshot' => '0',   // Screenshot off
+                'tool_transfer' => '0',     // Transfer off
+                'tool_files_keyword' => $groupKey  // Filter by WORDPRESS_WIZARD group
+            ];
 
-            if ($updateResult['success']) {
-                $retArr['success'] = true;
-                $retArr['message'] = 'File search enabled on general prompt with WORDPRESS_WIZARD filter';
-            } else {
-                $retArr['error'] = $updateResult['error'] ?? 'Failed to update prompt';
+            foreach ($settings as $token => $value) {
+                $insertSettingSql = 'INSERT INTO BPROMPTMETA (BPROMPTID, BTOKEN, BVALUE) 
+                                     VALUES (' . $newPromptId . ", 
+                                             '" . db::EscString($token) . "', 
+                                             '" . db::EscString($value) . "')";
+                db::Query($insertSettingSql);
             }
+
+            $retArr['success'] = true;
+            $retArr['message'] = 'File search enabled on general prompt with WORDPRESS_WIZARD filter';
+            $retArr['promptId'] = $newPromptId;
 
             return $retArr;
 
