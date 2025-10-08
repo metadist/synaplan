@@ -18,7 +18,8 @@ class ApiAuthenticator
         'chatStream',
         'getMessageFiles',
         'userRegister',
-        'lostPassword'
+        'lostPassword',
+        'wpWizardComplete'
     ];
 
     /** @var array Endpoints that require authenticated user sessions */
@@ -52,8 +53,7 @@ class ApiAuthenticator
         'mailOAuthStart',
         'mailOAuthCallback',
         'mailOAuthStatus',
-        'mailOAuthDisconnect',
-        'wpWizardComplete'
+        'mailOAuthDisconnect'
     ];
 
     /**
