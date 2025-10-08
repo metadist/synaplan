@@ -89,6 +89,9 @@
                     <div class="user-email">
                         <?php echo isset($_SESSION['USERPROFILE']['BMAIL']) ? $_SESSION['USERPROFILE']['BMAIL'] : 'user@example.com'; ?>
                     </div>
+                    <div class="user-level" style="font-size: 0.7em; color: rgba(255, 255, 255, 0.6); margin-top: 2px;">
+                        <?php echo isset($_SESSION['USERPROFILE']['BUSERLEVEL']) ? $_SESSION['USERPROFILE']['BUSERLEVEL'] : 'NEW'; ?>
+                    </div>
                 </div>
                 <button class="logout-btn" onclick="event.stopPropagation(); showLogoutModal()" title="Logout">
                     <span data-feather="log-out"></span>
