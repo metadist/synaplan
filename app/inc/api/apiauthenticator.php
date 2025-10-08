@@ -130,11 +130,12 @@ class ApiAuthenticator
     {
         // Public endpoints that require no authentication nor widget session
         if ($action === 'userRegister') {
-            return self::checkWordPressRegistrationAccess();
+            // Allow both WordPress plugin registrations AND regular web registrations
+            return self::checkRegistrationAccess();
         }
         if ($action === 'wpWizardComplete') {
-            // WordPress wizard uses same verification as userRegister
-            return self::checkWordPressRegistrationAccess();
+            // WordPress wizard requires WordPress-specific verification
+            return self::checkWordPressWizardAccess();
         }
         if ($action === 'lostPassword') {
             return true;
@@ -152,37 +153,88 @@ class ApiAuthenticator
     }
 
     /**
-     * Check WordPress registration access with rate limiting
+     * Check registration access - supports both WordPress and regular web registrations
      *
      * @return bool True if access is allowed
      */
-    private static function checkWordPressRegistrationAccess(): bool
+    private static function checkRegistrationAccess(): bool
     {
         // Get client IP for rate limiting
         $clientIp = $_SERVER['HTTP_CF_CONNECTING_IP'] ?? $_SERVER['HTTP_X_FORWARDED_FOR'] ?? $_SERVER['REMOTE_ADDR'] ?? 'unknown';
 
-        // Rate limit: 5 registration attempts per IP per hour
-        $rateLimitKey = 'wp_registration_' . $clientIp;
-        $rateLimitResult = Tools::checkRateLimit($rateLimitKey, 3600, 5); // 5 requests per hour
+        // Detect if this is a WordPress plugin registration
+        $isWordPressRegistration = isset($_REQUEST['source']) && $_REQUEST['source'] === 'wordpress_plugin';
+
+        // For WordPress registrations, use stricter rate limit
+        if ($isWordPressRegistration) {
+            // Rate limit: 5 WordPress registration attempts per IP per hour
+            $rateLimitKey = 'wp_registration_' . $clientIp;
+            $rateLimitResult = Tools::checkRateLimit($rateLimitKey, 3600, 5);
+
+            if (!$rateLimitResult['allowed']) {
+                http_response_code(429);
+                echo json_encode([
+                    'error' => 'Registration rate limit exceeded',
+                    'message' => 'Too many registration attempts. Please try again later.',
+                    'retry_after' => $rateLimitResult['retry_after']
+                ]);
+                exit;
+            }
+
+            // WordPress registrations require verification fields (handled in UserRegistration::registerNewUser)
+        } else {
+            // Regular web registrations - rate limit: 10 per IP per hour
+            $rateLimitKey = 'registration_' . $clientIp;
+            $rateLimitResult = Tools::checkRateLimit($rateLimitKey, 3600, 10);
+
+            if (!$rateLimitResult['allowed']) {
+                http_response_code(429);
+                echo json_encode([
+                    'error' => 'Registration rate limit exceeded',
+                    'message' => 'Too many registration attempts. Please try again later.',
+                    'retry_after' => $rateLimitResult['retry_after']
+                ]);
+                exit;
+            }
+
+            // Regular registrations use Turnstile validation (handled in UserRegistration::registerNewUser)
+        }
+
+        return true;
+    }
+
+    /**
+     * Check WordPress wizard access with verification requirements
+     *
+     * @return bool True if access is allowed
+     */
+    private static function checkWordPressWizardAccess(): bool
+    {
+        // Get client IP for rate limiting
+        $clientIp = $_SERVER['HTTP_CF_CONNECTING_IP'] ?? $_SERVER['HTTP_X_FORWARDED_FOR'] ?? $_SERVER['REMOTE_ADDR'] ?? 'unknown';
+
+        // Rate limit: 5 wizard completion attempts per IP per hour
+        $rateLimitKey = 'wp_wizard_' . $clientIp;
+        $rateLimitResult = Tools::checkRateLimit($rateLimitKey, 3600, 5);
 
         if (!$rateLimitResult['allowed']) {
             http_response_code(429);
             echo json_encode([
-                'error' => 'Registration rate limit exceeded',
-                'message' => 'Too many registration attempts. Please try again later.',
+                'error' => 'Wizard rate limit exceeded',
+                'message' => 'Too many wizard attempts. Please try again later.',
                 'retry_after' => $rateLimitResult['retry_after']
             ]);
             exit;
         }
 
-        // Additional security: Check for required WordPress verification fields
+        // WordPress wizard REQUIRES verification fields
         $requiredFields = ['verification_token', 'verification_url', 'site_url'];
         foreach ($requiredFields as $field) {
             if (empty($_REQUEST[$field])) {
                 http_response_code(400);
                 echo json_encode([
                     'error' => 'Missing required WordPress verification fields',
-                    'message' => 'WordPress site verification is required for registration'
+                    'message' => 'WordPress site verification is required for wizard completion'
                 ]);
                 exit;
             }
