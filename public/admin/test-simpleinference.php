@@ -52,12 +52,12 @@ try {
     $testResult['api_key'] = substr($apiKey, 0, 20) . '...';
 
     // Step 2: Make API call
-    $apiUrl = $GLOBALS['baseUrl'] . '/api.php';
+    $apiUrl = $GLOBALS['baseUrl'] . 'api.php';
     $prompt = 'what is the weather in uzbekistan?';
 
     $postData = [
         'action' => 'messageNew',
-        'text' => $prompt
+        'message' => $prompt
     ];
 
     $ch = curl_init();
