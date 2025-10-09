@@ -24,9 +24,12 @@ $testResult = [
     'prompt' => 'what is the weather in uzbekistan?',
     'api_key' => '',
     'response' => '',
+    'ai_response' => '',
+    'message_id' => 0,
     'error' => '',
     'timestamp' => date('Y-m-d H:i:s'),
-    'response_time_ms' => 0
+    'response_time_ms' => 0,
+    'processing_time_ms' => 0
 ];
 
 // Initialize HTML report
@@ -35,7 +38,8 @@ $testStartTime = microtime(true);
 
 try {
     // Step 1: Get API key for user ID 3
-    $apiKeySQL = "SELECT BKEY FROM BAPIKEYS WHERE BOWNERID = 3 AND BSTATUS = 'active' ORDER BY BID DESC LIMIT 1";
+    $userId = 3;
+    $apiKeySQL = 'SELECT BKEY FROM BAPIKEYS WHERE BOWNERID = ' . $userId . " AND BSTATUS = 'active' ORDER BY BID DESC LIMIT 1";
     $apiKeyRes = db::Query($apiKeySQL);
     $apiKeyArr = db::FetchArr($apiKeyRes);
 
@@ -110,13 +114,37 @@ try {
     }
 
     // Check if we have a successful response
-    if (isset($decoded['error'])) {
+    if (isset($decoded['success']) && $decoded['success'] === true) {
+        $testResult['message'] = 'Message saved successfully';
+
+        // Include message ID if available
+        if (!empty($decoded['lastIds'])) {
+            $messageId = $decoded['lastIds'][0];
+            $testResult['message_id'] = $messageId;
+
+            // Step 3: Trigger AI processing with messageAgain
+            $processResult = processMessage($messageId, $apiKey, $apiUrl);
+
+            if ($processResult['success']) {
+                $testResult['result'] = true;
+                $testResult['ai_response'] = $processResult['response_text'];
+                $testResult['response_complete'] = true;
+                $testResult['message'] = 'API inference completed successfully';
+                $testResult['processing_time_ms'] = $processResult['processing_time_ms'];
+            } else {
+                $testResult['result'] = false;
+                $testResult['error'] = 'Failed to process message: ' . $processResult['error'];
+                $testResult['message'] = 'Message saved but AI processing failed';
+            }
+        }
+
+        $testResult['response'] = json_encode($decoded, JSON_PRETTY_PRINT);
+    } elseif (isset($decoded['error']) && !empty($decoded['error'])) {
         $testResult['error'] = 'API error: ' . $decoded['error'];
         $testResult['response'] = json_encode($decoded, JSON_PRETTY_PRINT);
     } else {
-        $testResult['result'] = true;
+        $testResult['error'] = 'Unexpected API response format';
         $testResult['response'] = json_encode($decoded, JSON_PRETTY_PRINT);
-        $testResult['message'] = 'API inference completed successfully';
     }
 
 } catch (\Throwable $e) {
@@ -160,6 +188,10 @@ function appendToReport($reportFile, $testResult, $testDuration)
                 <div class="detail-value">' . $testResult['response_time_ms'] . ' ms</div>
             </div>
             <div class="detail-row">
+                <div class="detail-label">AI Processing Time:</div>
+                <div class="detail-value">' . ($testResult['processing_time_ms'] ?? 0) . ' ms</div>
+            </div>
+            <div class="detail-row">
                 <div class="detail-label">User ID:</div>
                 <div class="detail-value"><code>' . htmlspecialchars($testResult['user_id']) . '</code></div>
             </div>
@@ -173,11 +205,20 @@ function appendToReport($reportFile, $testResult, $testDuration)
             </div>
 ';
 
+    if (!empty($testResult['ai_response'])) {
+        $reportHtml .= '
+            <div class="detail-row">
+                <div class="detail-label">AI Answer:</div>
+                <div class="detail-value"><pre style="background: #e8f5e9; padding: 10px; border-radius: 4px; overflow-x: auto; border-left: 4px solid #4caf50;">' . htmlspecialchars($testResult['ai_response']) . '</pre></div>
+            </div>
+';
+    }
+
     if (!empty($testResult['response'])) {
         $reportHtml .= '
             <div class="detail-row">
-                <div class="detail-label">API Response:</div>
-                <div class="detail-value"><pre style="background: #f4f4f4; padding: 10px; border-radius: 4px; overflow-x: auto;">' . htmlspecialchars(substr($testResult['response'], 0, 500)) . (strlen($testResult['response']) > 500 ? '...' : '') . '</pre></div>
+                <div class="detail-label">Raw API Response:</div>
+                <div class="detail-value"><pre style="background: #f4f4f4; padding: 10px; border-radius: 4px; overflow-x: auto; font-size: 11px;">' . htmlspecialchars(substr($testResult['response'], 0, 300)) . (strlen($testResult['response']) > 300 ? '...' : '') . '</pre></div>
             </div>
 ';
     }
@@ -198,4 +239,88 @@ function appendToReport($reportFile, $testResult, $testDuration)
 
     // Write to report file (append mode)
     file_put_contents($reportFile, $reportHtml, FILE_APPEND);
+}
+
+/**
+ * Trigger AI processing for a message using messageAgain API
+ *
+ * @param int $messageId The input message ID
+ * @param string $apiKey API authentication key
+ * @param string $apiUrl API endpoint URL
+ * @return array Processing result
+ */
+function processMessage(int $messageId, string $apiKey, string $apiUrl): array
+{
+    $retArr = ['success' => false, 'error' => '', 'response_text' => '', 'processing_time_ms' => 0];
+
+    try {
+        // Call messageAgain API to trigger AI processing
+        $postData = [
+            'action' => 'messageAgain',
+            'in_id' => $messageId
+        ];
+
+        $ch = curl_init();
+        curl_setopt($ch, CURLOPT_URL, $apiUrl);
+        curl_setopt($ch, CURLOPT_POST, true);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($postData));
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 120); // 2 minutes for AI processing
+        curl_setopt($ch, CURLOPT_HTTPHEADER, [
+            'Content-Type: application/json',
+            'Authorization: Bearer ' . $apiKey
+        ]);
+
+        $startTime = microtime(true);
+        $response = curl_exec($ch);
+        $processingTime = round((microtime(true) - $startTime) * 1000, 2);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $curlError = curl_error($ch);
+        curl_close($ch);
+
+        $retArr['processing_time_ms'] = $processingTime;
+
+        if ($curlError) {
+            $retArr['error'] = 'cURL error: ' . $curlError;
+            return $retArr;
+        }
+
+        if ($httpCode !== 200) {
+            $retArr['error'] = 'API returned HTTP ' . $httpCode . ': ' . substr($response, 0, 200);
+            return $retArr;
+        }
+
+        $decoded = json_decode($response, true);
+
+        if (!$decoded) {
+            $retArr['error'] = 'Invalid JSON response from messageAgain';
+            return $retArr;
+        }
+
+        // Check for error in response
+        if (isset($decoded['error']) && !empty($decoded['error'])) {
+            $retArr['error'] = $decoded['error'];
+            return $retArr;
+        }
+
+        // Extract response text from various possible locations
+        if (isset($decoded['data']['BTEXT'])) {
+            $retArr['response_text'] = $decoded['data']['BTEXT'];
+            $retArr['success'] = true;
+        } elseif (isset($decoded['BTEXT'])) {
+            $retArr['response_text'] = $decoded['BTEXT'];
+            $retArr['success'] = true;
+        } elseif (isset($decoded['text'])) {
+            $retArr['response_text'] = $decoded['text'];
+            $retArr['success'] = true;
+        } else {
+            $retArr['error'] = 'No response text found in API response';
+            $retArr['raw_response'] = json_encode($decoded);
+        }
+
+    } catch (\Throwable $e) {
+        $retArr['error'] = 'Exception: ' . $e->getMessage();
+    }
+
+    return $retArr;
 }
