@@ -54,6 +54,27 @@ $isAnonymousWidget = isset($_SESSION['is_widget']) && $_SESSION['is_widget'] ===
     background: <?php echo $widgetUserBubbleColor; ?> !important;
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2) !important;
   }
+  
+  /* Widget mode: Style input field border with brand color */
+  .message-input {
+    border: 2px solid <?php echo $widgetUserBubbleColor; ?> !important;
+  }
+  
+  .message-input:focus {
+    border-color: <?php echo $widgetUserBubbleColor; ?> !important;
+    box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.1) !important;
+  }
+  
+  /* Widget mode: Style send button with brand color */
+  .send-btn {
+    background: <?php echo $widgetUserBubbleColor; ?> !important;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2) !important;
+  }
+  
+  .send-btn:hover {
+    opacity: 0.9;
+    box-shadow: 0 3px 6px rgba(0, 0, 0, 0.3) !important;
+  }
   <?php endif; ?>
 </style>
 <script>
