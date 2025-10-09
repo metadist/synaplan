@@ -116,29 +116,28 @@ try {
     // Check if we have a successful response
     if (isset($decoded['success']) && $decoded['success'] === true) {
         $testResult['message'] = 'Message saved successfully';
+        $testResult['response'] = json_encode($decoded, JSON_PRETTY_PRINT);
 
         // Include message ID if available
         if (!empty($decoded['lastIds'])) {
             $messageId = $decoded['lastIds'][0];
             $testResult['message_id'] = $messageId;
-
-            // Step 3: Trigger AI processing with messageAgain
-            $processResult = processMessage($messageId, $apiKey, $apiUrl);
-
-            if ($processResult['success']) {
-                $testResult['result'] = true;
-                $testResult['ai_response'] = $processResult['response_text'];
-                $testResult['response_complete'] = true;
-                $testResult['message'] = 'API inference completed successfully';
-                $testResult['processing_time_ms'] = $processResult['processing_time_ms'];
-            } else {
-                $testResult['result'] = false;
-                $testResult['error'] = 'Failed to process message: ' . $processResult['error'];
-                $testResult['message'] = 'Message saved but AI processing failed';
-            }
         }
 
-        $testResult['response'] = json_encode($decoded, JSON_PRETTY_PRINT);
+        // Step 3: Use OpenAI-compatible API to get AI response
+        $aiResult = getAIResponseSimple($prompt, $apiKey, $apiUrl);
+
+        if ($aiResult['success']) {
+            $testResult['result'] = true;
+            $testResult['ai_response'] = $aiResult['response_text'];
+            $testResult['response_complete'] = true;
+            $testResult['message'] = 'API inference completed successfully';
+            $testResult['processing_time_ms'] = $aiResult['processing_time_ms'];
+        } else {
+            $testResult['result'] = false;
+            $testResult['error'] = 'Failed to get AI response: ' . $aiResult['error'];
+            $testResult['message'] = 'Message saved but AI processing failed';
+        }
     } elseif (isset($decoded['error']) && !empty($decoded['error'])) {
         $testResult['error'] = 'API error: ' . $decoded['error'];
         $testResult['response'] = json_encode($decoded, JSON_PRETTY_PRINT);
@@ -242,28 +241,38 @@ function appendToReport($reportFile, $testResult, $testDuration)
 }
 
 /**
- * Trigger AI processing for a message using messageAgain API
+ * Get AI response using OpenAI-compatible API endpoint
+ * Simple non-streaming request/response
  *
- * @param int $messageId The input message ID
+ * @param string $prompt The user prompt
  * @param string $apiKey API authentication key
- * @param string $apiUrl API endpoint URL
+ * @param string $baseUrl Base API URL (e.g., http://example.com/api.php)
  * @return array Processing result
  */
-function processMessage(int $messageId, string $apiKey, string $apiUrl): array
+function getAIResponseSimple(string $prompt, string $apiKey, string $baseUrl): array
 {
     $retArr = ['success' => false, 'error' => '', 'response_text' => '', 'processing_time_ms' => 0];
 
     try {
-        // Call messageAgain API to trigger AI processing
-        $postData = [
-            'action' => 'messageAgain',
-            'in_id' => $messageId
+        // Use OpenAI-compatible endpoint through api.php/v1/chat/completions
+        // The router in api.php will extract /v1/chat/completions from the path
+        $openAIUrl = $baseUrl . '/v1/chat/completions';
+
+        $payload = [
+            'model' => 'llama-3.3-70b-versatile', // Use Groq fast API service (BID 9) - Fast and high quality
+            'messages' => [
+                [
+                    'role' => 'user',
+                    'content' => $prompt
+                ]
+            ],
+            'stream' => false
         ];
 
         $ch = curl_init();
-        curl_setopt($ch, CURLOPT_URL, $apiUrl);
+        curl_setopt($ch, CURLOPT_URL, $openAIUrl);
         curl_setopt($ch, CURLOPT_POST, true);
-        curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($postData));
+        curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($payload));
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($ch, CURLOPT_TIMEOUT, 120); // 2 minutes for AI processing
         curl_setopt($ch, CURLOPT_HTTPHEADER, [
@@ -293,28 +302,22 @@ function processMessage(int $messageId, string $apiKey, string $apiUrl): array
         $decoded = json_decode($response, true);
 
         if (!$decoded) {
-            $retArr['error'] = 'Invalid JSON response from messageAgain';
+            $retArr['error'] = 'Invalid JSON response';
             return $retArr;
         }
 
         // Check for error in response
-        if (isset($decoded['error']) && !empty($decoded['error'])) {
-            $retArr['error'] = $decoded['error'];
+        if (isset($decoded['error'])) {
+            $retArr['error'] = is_string($decoded['error']) ? $decoded['error'] : json_encode($decoded['error']);
             return $retArr;
         }
 
-        // Extract response text from various possible locations
-        if (isset($decoded['data']['BTEXT'])) {
-            $retArr['response_text'] = $decoded['data']['BTEXT'];
+        // Extract response text from OpenAI format
+        if (isset($decoded['choices'][0]['message']['content'])) {
             $retArr['success'] = true;
-        } elseif (isset($decoded['BTEXT'])) {
-            $retArr['response_text'] = $decoded['BTEXT'];
-            $retArr['success'] = true;
-        } elseif (isset($decoded['text'])) {
-            $retArr['response_text'] = $decoded['text'];
-            $retArr['success'] = true;
+            $retArr['response_text'] = $decoded['choices'][0]['message']['content'];
         } else {
-            $retArr['error'] = 'No response text found in API response';
+            $retArr['error'] = 'No content in API response';
             $retArr['raw_response'] = json_encode($decoded);
         }
 

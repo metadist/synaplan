@@ -44,6 +44,25 @@ try {
         $testResult['message'] = 'User deleted successfully';
     }
 
+    // Step 2: Reset BUSELOG counts for user ID 3
+    try {
+        // Count BUSELOG entries
+        $countSQL = 'SELECT COUNT(*) as cnt FROM BUSELOG WHERE BUSERID = 3';
+        $countRes = db::Query($countSQL);
+        $countArr = db::FetchArr($countRes);
+        $deletedBuselogCount = $countArr['cnt'] ?? 0;
+
+        // Delete BUSELOG entries
+        $deleteSQL = 'DELETE FROM BUSELOG WHERE BUSERID = 3';
+        db::Query($deleteSQL);
+
+        $testResult['deletion_log'][] = "Deleted {$deletedBuselogCount} BUSELOG entries for user ID 3";
+        $testResult['buselog_deleted'] = $deletedBuselogCount;
+    } catch (\Throwable $e) {
+        $testResult['deletion_log'][] = 'BUSELOG deletion error: ' . $e->getMessage();
+        $testResult['buselog_error'] = $e->getMessage();
+    }
+
 } catch (\Throwable $e) {
     $testResult['error'] = 'Exception: ' . $e->getMessage();
 }
