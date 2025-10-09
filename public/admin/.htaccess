@@ -1,0 +1,9 @@
+AuthUserFile /wwwroot/synaplan.com/public/admin/.htpasswd
+AuthBasicProvider file
+AuthName "Synaplan App Server"
+AuthType Basic
+Require valid-user
+#-------------------------------
+<IfModule mod_rewrite.c>
+RewriteEngine On
+</IfModule>
