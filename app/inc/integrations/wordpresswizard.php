@@ -286,6 +286,7 @@ class WordPressWizard
                 'autoMessage' => db::EscString($_REQUEST['autoMessage'] ?? 'Hello! How can I help you today?'),
                 'prompt' => db::EscString($_REQUEST['widgetPrompt'] ?? 'general'),
                 'autoOpen' => isset($_REQUEST['autoOpen']) && ($_REQUEST['autoOpen'] === '1' || $_REQUEST['autoOpen'] === 'true') ? '1' : '0',
+                'widgetLogo' => db::EscString($_REQUEST['widgetLogo'] ?? ''),
                 'integrationType' => db::EscString($_REQUEST['integrationType'] ?? 'floating-button'),
                 'inlinePlaceholder' => db::EscString($_REQUEST['inlinePlaceholder'] ?? 'Ask me anything...'),
                 'inlineButtonText' => db::EscString($_REQUEST['inlineButtonText'] ?? 'Ask'),

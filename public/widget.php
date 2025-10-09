@@ -58,6 +58,7 @@ $config = [
     'autoMessage' => '',
     'prompt' => 'general',
     'autoOpen' => '0',
+    'widgetLogo' => '', // Widget logo file path
     // Inline-box defaults
     'integrationType' => 'floating-button',
     'inlinePlaceholder' => 'Ask me anything...',
@@ -69,6 +70,42 @@ $config = [
 
 while ($row = db::FetchArr($res)) {
     $config[$row['BSETTING']] = $row['BVALUE'];
+}
+
+// Function to darken color for better contrast with white text
+// Multiplies each RGB component by 0.4 as requested
+function darkenWidgetColor($hexColor, $factor = 0.4)
+{
+    // Remove # if present
+    $hexColor = ltrim($hexColor, '#');
+
+    // Convert to RGB
+    if (strlen($hexColor) == 3) {
+        // Short form (e.g., #F00)
+        $r = hexdec(str_repeat(substr($hexColor, 0, 1), 2));
+        $g = hexdec(str_repeat(substr($hexColor, 1, 1), 2));
+        $b = hexdec(str_repeat(substr($hexColor, 2, 1), 2));
+    } else {
+        // Long form (e.g., #FF0000)
+        $r = hexdec(substr($hexColor, 0, 2));
+        $g = hexdec(substr($hexColor, 2, 2));
+        $b = hexdec(substr($hexColor, 4, 2));
+    }
+
+    // Multiply by factor (0.4 for 40% brightness)
+    $r = round($r * $factor);
+    $g = round($g * $factor);
+    $b = round($b * $factor);
+
+    // Ensure values stay in range 0-255
+    $r = max(0, min(255, $r));
+    $g = max(0, min(255, $g));
+    $b = max(0, min(255, $b));
+
+    // Convert back to hex
+    return '#' . str_pad(dechex($r), 2, '0', STR_PAD_LEFT)
+               . str_pad(dechex($g), 2, '0', STR_PAD_LEFT)
+               . str_pad(dechex($b), 2, '0', STR_PAD_LEFT);
 }
 
 // Get the base URL for the widget (ensure trailing slash)
@@ -648,13 +685,24 @@ window.SYNAPLAN_SYSTEM_URLS = {
         -webkit-appearance: none !important;
         appearance: none !important;
         position: relative !important;
+        overflow: hidden !important;
     `;
+    <?php if (!empty($config['widgetLogo'])): ?>
+    // Use logo if configured
+    chatButton.innerHTML = `
+      <img src="<?php echo addslashes($GLOBALS['baseUrl'] . 'up/' . $config['widgetLogo']); ?>" 
+           alt="Chat" 
+           style="width: 36px; height: 36px; object-fit: contain; display:block; pointer-events:none;"
+           onerror="this.outerHTML='<svg width=\\'28\\' height=\\'28\\' viewBox=\\'0 0 24 24\\' fill=\\'none\\' xmlns=\\'http://www.w3.org/2000/svg\\' aria-hidden=\\'true\\' focusable=\\'false\\' style=\\'display:block; pointer-events:none;\\'><path d=\\'M4 4.75C4 3.7835 4.7835 3 5.75 3H18.25C19.2165 3 20 3.7835 20 4.75V14.25C20 15.2165 19.2165 16 18.25 16H8.41421L5.70711 18.7071C5.07714 19.3371 4 18.8898 4 17.9929V4.75Z\\' fill=\\'<?php echo $config['iconColor']; ?>\\'/></svg>'">
+    `;
+    <?php else: ?>
     // Inline SVG icon to ensure consistent rendering on iOS/Android and other platforms
     chatButton.innerHTML = `
       <svg width="28" height="28" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false" style="display:block; pointer-events:none;">
         <path d="M4 4.75C4 3.7835 4.7835 3 5.75 3H18.25C19.2165 3 20 3.7835 20 4.75V14.25C20 15.2165 19.2165 16 18.25 16H8.41421L5.70711 18.7071C5.07714 19.3371 4 18.8898 4 17.9929V4.75Z" fill="<?php echo $config['iconColor']; ?>"/>
       </svg>
     `;
+    <?php endif; ?>
     chatButton.setAttribute('aria-label', 'Open chat');
     chatButton.setAttribute('title', 'Chat');
     chatButton.setAttribute('type', 'button');

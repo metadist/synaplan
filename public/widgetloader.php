@@ -54,37 +54,44 @@ if ($uid <= 0 || $widgetId < 1 || $widgetId > 9) {
     exit;
 }
 
-// Set anonymous widget session variables
-$_SESSION['is_widget'] = true;
-$_SESSION['widget_owner_id'] = $uid;
-$_SESSION['widget_id'] = $widgetId;
-$_SESSION['anonymous_session_id'] = uniqid('widget_', true); // Generate unique session ID
-$_SESSION['anonymous_session_created'] = time(); // Add creation timestamp for timeout validation
-
-// Note: Rate limiting is now handled in the chat submission API calls, not here
-// This allows the widget interface to load but limits actual message sending
-
-// Validate session timeout for existing sessions
-if (isset($_SESSION['is_widget']) && $_SESSION['is_widget'] === true) {
+// SECURITY FIX: Only create new anonymous session if one doesn't exist
+// This ensures each visitor gets a unique, persistent session for file isolation
+if (!isset($_SESSION['anonymous_session_id']) || !isset($_SESSION['is_widget'])) {
+    // First time visitor or session expired - create new session
+    $_SESSION['is_widget'] = true;
+    $_SESSION['widget_owner_id'] = $uid;
+    $_SESSION['widget_id'] = $widgetId;
+    $_SESSION['anonymous_session_id'] = uniqid('widget_', true) . '_' . bin2hex(random_bytes(8)); // Generate unique session ID
+    $_SESSION['anonymous_session_created'] = time(); // Add creation timestamp for timeout validation
+} else {
+    // Existing session - validate timeout
     $sessionTimeout = 86400; // 24 hours
     $sessionCreated = $_SESSION['anonymous_session_created'] ?? 0;
 
     if ((time() - $sessionCreated) > $sessionTimeout) {
-        // Session expired, clear and recreate
+        // Session expired, clear and recreate with NEW anonymous_session_id
         unset($_SESSION['is_widget']);
         unset($_SESSION['widget_owner_id']);
         unset($_SESSION['widget_id']);
         unset($_SESSION['anonymous_session_id']);
         unset($_SESSION['anonymous_session_created']);
 
-        // Recreate session
+        // Recreate session with new ID
         $_SESSION['is_widget'] = true;
         $_SESSION['widget_owner_id'] = $uid;
         $_SESSION['widget_id'] = $widgetId;
-        $_SESSION['anonymous_session_id'] = uniqid('widget_', true); // Generate new unique session ID
+        $_SESSION['anonymous_session_id'] = uniqid('widget_', true) . '_' . bin2hex(random_bytes(8)); // Generate new unique session ID
         $_SESSION['anonymous_session_created'] = time();
+    } else {
+        // Session still valid - update widget context but keep anonymous_session_id
+        $_SESSION['is_widget'] = true;
+        $_SESSION['widget_owner_id'] = $uid;
+        $_SESSION['widget_id'] = $widgetId;
     }
 }
+
+// Note: Rate limiting is now handled in the chat submission API calls, not here
+// This allows the widget interface to load but limits actual message sending
 
 // Get widget configuration from database
 $group = 'widget_' . $widgetId;
@@ -95,16 +102,57 @@ $config = [
     'color' => '#007bff',
     'position' => 'bottom-right',
     'autoMessage' => '',
-    'prompt' => 'general'
+    'prompt' => 'general',
+    'widgetLogo' => '' // Logo file path if configured
 ];
 
 while ($row = db::FetchArr($res)) {
     $config[$row['BSETTING']] = $row['BVALUE'];
 }
 
+// Function to darken color for better contrast with white text
+// Multiplies each RGB component by 0.4 as requested
+function darkenColor($hexColor, $factor = 0.4)
+{
+    // Remove # if present
+    $hexColor = ltrim($hexColor, '#');
+
+    // Convert to RGB
+    if (strlen($hexColor) == 3) {
+        // Short form (e.g., #F00)
+        $r = hexdec(str_repeat(substr($hexColor, 0, 1), 2));
+        $g = hexdec(str_repeat(substr($hexColor, 1, 1), 2));
+        $b = hexdec(str_repeat(substr($hexColor, 2, 1), 2));
+    } else {
+        // Long form (e.g., #FF0000)
+        $r = hexdec(substr($hexColor, 0, 2));
+        $g = hexdec(substr($hexColor, 2, 2));
+        $b = hexdec(substr($hexColor, 4, 2));
+    }
+
+    // Multiply by factor (0.4 for 40% brightness)
+    $r = round($r * $factor);
+    $g = round($g * $factor);
+    $b = round($b * $factor);
+
+    // Ensure values stay in range 0-255
+    $r = max(0, min(255, $r));
+    $g = max(0, min(255, $g));
+    $b = max(0, min(255, $b));
+
+    // Convert back to hex
+    return '#' . str_pad(dechex($r), 2, '0', STR_PAD_LEFT)
+               . str_pad(dechex($g), 2, '0', STR_PAD_LEFT)
+               . str_pad(dechex($b), 2, '0', STR_PAD_LEFT);
+}
+
+// Calculate darkened color for user message bubbles (40% brightness for good contrast)
+$darkenedUserColor = darkenColor($config['color'], 0.4);
+
 // Set the prompt topic for the chat
 $_SESSION['WIDGET_PROMPT'] = $config['prompt'];
 $_SESSION['WIDGET_AUTO_MESSAGE'] = $config['autoMessage'];
+$_SESSION['WIDGET_USER_BUBBLE_COLOR'] = $darkenedUserColor; // For user message bubbles in chat
 
 // Set headers to prevent caching and allow iframe embedding
 header('Content-Type: text/html; charset=utf-8');
@@ -151,6 +199,14 @@ header('Pragma: no-cache');
             display: flex;
             align-items: center;
             justify-content: center;
+            gap: 10px;
+        }
+        
+        .widget-logo {
+            height: 32px;
+            width: auto;
+            max-width: 48px;
+            object-fit: contain;
         }
         
         .widget-back-button {
@@ -325,6 +381,9 @@ header('Pragma: no-cache');
                 <polyline points="15 18 9 12 15 6"></polyline>
             </svg>
         </button>
+        <?php endif; ?>
+        <?php if (!empty($config['widgetLogo'])): ?>
+        <img src="<?php echo htmlspecialchars($GLOBALS['baseUrl'] . 'up/' . $config['widgetLogo']); ?>" alt="Logo" class="widget-logo" onerror="this.style.display='none'">
         <?php endif; ?>
         <span>Chat Support</span>
     </div>

@@ -1650,6 +1650,7 @@ class Frontend
                         'autoMessage' => '',
                         'prompt' => 'general',
                         'autoOpen' => '0',
+                        'widgetLogo' => '', // Widget logo file path
                         // New: integration type and inline-box defaults
                         'integrationType' => 'floating-button',
                         'inlinePlaceholder' => 'Ask me anything...',
@@ -1679,6 +1680,9 @@ class Frontend
                         break;
                     case 'autoOpen':
                         $widgets[$widgetId]['autoOpen'] = $value;
+                        break;
+                    case 'widgetLogo':
+                        $widgets[$widgetId]['widgetLogo'] = $value;
                         break;
                         // New inline-box and integration settings mapping
                     case 'integrationType':
@@ -1785,6 +1789,9 @@ class Frontend
 
         $group = 'widget_' . $widgetId;
 
+        // Get widget logo (optional)
+        $widgetLogo = db::EscString($_REQUEST['widgetLogo'] ?? '');
+
         // Save widget settings
         $settings = [
             'color' => $color,
@@ -1794,6 +1801,7 @@ class Frontend
             'prompt' => $prompt,
             // autoOpen is optional; default is '0' (disabled)
             'autoOpen' => isset($_REQUEST['autoOpen']) && ($_REQUEST['autoOpen'] === '1' || $_REQUEST['autoOpen'] === 'true' || $_REQUEST['autoOpen'] === 'on') ? '1' : '0',
+            'widgetLogo' => $widgetLogo, // Logo file path from WIDGET_LOGO group
             // New inline/integration settings persisted to BCONFIG
             'integrationType' => $integrationType,
             'inlinePlaceholder' => $inlinePlaceholder,

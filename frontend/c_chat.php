@@ -18,6 +18,7 @@
 $isWidgetMode = isset($_SESSION['WIDGET_PROMPT']);
 $widgetPrompt = $_SESSION['WIDGET_PROMPT'] ?? 'general';
 $widgetAutoMessage = $_SESSION['WIDGET_AUTO_MESSAGE'] ?? '';
+$widgetUserBubbleColor = $_SESSION['WIDGET_USER_BUBBLE_COLOR'] ?? null; // Darkened color for user bubbles
 
 // Check if this is anonymous widget mode
 $isAnonymousWidget = isset($_SESSION['is_widget']) && $_SESSION['is_widget'] === true;
@@ -46,6 +47,14 @@ $isAnonymousWidget = isset($_SESSION['is_widget']) && $_SESSION['is_widget'] ===
     word-wrap: break-word !important;
     overflow-wrap: break-word !important;
   }
+  
+  <?php if ($isWidgetMode && !empty($widgetUserBubbleColor)): ?>
+  /* Widget mode: Override user message bubble color with darkened brand color */
+  .message-bubble.user-bubble {
+    background: <?php echo $widgetUserBubbleColor; ?> !important;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2) !important;
+  }
+  <?php endif; ?>
 </style>
 <script>
 // Initialize widget flags early so downstream scripts (chat.js) can read them
