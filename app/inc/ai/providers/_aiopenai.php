@@ -793,9 +793,9 @@ class AIOpenAI
         return $msgArr;
     }
     /**
-     * Summarize text using Groq's summarization API
+     * Summarize text using OpenAI's summarization API
      *
-     * Summarizes a given text using Groq's summarization capabilities.
+     * Summarizes a given text using OpenAI's summarization capabilities.
      *
     */
     public static function summarizePrompt($text): string
@@ -806,14 +806,14 @@ class AIOpenAI
         ];
         $arrMessages[] = ['role' => 'user', 'content' => $text];
 
-        $myModel = $GLOBALS['AI_CHAT']['MODEL'];
+        $myModel = $GLOBALS['AI_SUMMARIZE']['MODEL'];
         try {
             $chat = $client->chat()->create([
                 'model' => $myModel,
                 'messages' => $arrMessages
             ]);
         } catch (Exception $err) {
-            return '*APIwelcome Error - Ralf made a bubu - please mail that to him: * ' . $err->getMessage();
+            return '*API summarize Error - OpenAI error: * ' . $err->getMessage();
         }
         return $chat['choices'][0]['message']['content'];
     }
@@ -1475,7 +1475,7 @@ class AIOpenAI
         ];
 
         // which model on OpenAI?
-        $myModel = $GLOBALS['AI_CHAT']['MODEL'];
+        $myModel = $GLOBALS['AI_SUMMARIZE']['MODEL'];
 
         try {
             $chat = $client->chat()->create([

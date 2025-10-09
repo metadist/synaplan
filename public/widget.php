@@ -58,6 +58,7 @@ $config = [
     'autoMessage' => '',
     'prompt' => 'general',
     'autoOpen' => '0',
+    'widgetLogo' => '', // Widget logo file path
     // Inline-box defaults
     'integrationType' => 'floating-button',
     'inlinePlaceholder' => 'Ask me anything...',
@@ -69,6 +70,42 @@ $config = [
 
 while ($row = db::FetchArr($res)) {
     $config[$row['BSETTING']] = $row['BVALUE'];
+}
+
+// Function to darken color for better contrast with white text
+// Multiplies each RGB component by 0.4 as requested
+function darkenWidgetColor($hexColor, $factor = 0.4)
+{
+    // Remove # if present
+    $hexColor = ltrim($hexColor, '#');
+
+    // Convert to RGB
+    if (strlen($hexColor) == 3) {
+        // Short form (e.g., #F00)
+        $r = hexdec(str_repeat(substr($hexColor, 0, 1), 2));
+        $g = hexdec(str_repeat(substr($hexColor, 1, 1), 2));
+        $b = hexdec(str_repeat(substr($hexColor, 2, 1), 2));
+    } else {
+        // Long form (e.g., #FF0000)
+        $r = hexdec(substr($hexColor, 0, 2));
+        $g = hexdec(substr($hexColor, 2, 2));
+        $b = hexdec(substr($hexColor, 4, 2));
+    }
+
+    // Multiply by factor (0.4 for 40% brightness)
+    $r = round($r * $factor);
+    $g = round($g * $factor);
+    $b = round($b * $factor);
+
+    // Ensure values stay in range 0-255
+    $r = max(0, min(255, $r));
+    $g = max(0, min(255, $g));
+    $b = max(0, min(255, $b));
+
+    // Convert back to hex
+    return '#' . str_pad(dechex($r), 2, '0', STR_PAD_LEFT)
+               . str_pad(dechex($g), 2, '0', STR_PAD_LEFT)
+               . str_pad(dechex($b), 2, '0', STR_PAD_LEFT);
 }
 
 // Get the base URL for the widget (ensure trailing slash)
@@ -127,6 +164,37 @@ window.SYNAPLAN_SYSTEM_URLS = {
     // Public no-op close callback hook (integrators can override)
     try { window.synaplanWidgetOnClose = window.synaplanWidgetOnClose || function(){}; } catch (e) {}
 
+    // Mobile detection helper
+    function isMobileDevice() {
+        try {
+            return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
+                   (navigator.maxTouchPoints && navigator.maxTouchPoints > 2 && /MacIntel/.test(navigator.platform));
+        } catch(e) {
+            return false;
+        }
+    }
+
+    // Helper to open chat in new window (mobile-optimized)
+    function openChatInNewWindow(url) {
+        try {
+            // Store current URL as referrer for back button
+            var referrerUrl = window.location.href;
+            var separator = url.indexOf('?') > -1 ? '&' : '?';
+            var fullUrl = url + separator + 'referrer=' + encodeURIComponent(referrerUrl) + '&mobile=1';
+            
+            // Open in new window/tab
+            var chatWindow = window.open(fullUrl, '_blank');
+            
+            // Fallback if popup blocked - create a visible link
+            if (!chatWindow || chatWindow.closed || typeof chatWindow.closed === 'undefined') {
+                window.location.href = fullUrl;
+            }
+        } catch(e) {
+            // Final fallback - direct navigation
+            window.location.href = url + (url.indexOf('?') > -1 ? '&' : '?') + 'mobile=1';
+        }
+    }
+
     <?php if ($mode === 'inline-box' || $config['integrationType'] === 'inline-box'): ?>
     // =============================
     // Inline Box Integration Mode
@@ -142,42 +210,158 @@ window.SYNAPLAN_SYSTEM_URLS = {
         var _primary = <?php echo json_encode($config['color']); ?>;
         var _radius = <?php echo json_encode((string)$config['inlineBorderRadius']); ?>; // in px
 
-        // Write inline container and overlay markup directly at script position
-        document.write('\n<div id="' + _spIdBase + '-container" style="display:block;max-width:100%;">\n' +
-            '  <div id="' + _spIdBase + '-box" style="display:flex;align-items:center;gap:8px;width:100%;box-sizing:border-box;">\n' +
-            '    <input id="' + _spIdBase + '-input" type="text" placeholder="' + _placeholder.replace(/"/g, '&quot;') + '" ' +
-            '      style="flex:1;min-width:0;padding:10px 12px;font-size:' + _fontSize + 'px;color:' + _textColor + ';' +
-            '             border:1px solid rgba(0,0,0,0.15);border-radius:' + _radius + 'px;outline:none;">\n' +
+        // Write inline container directly at script position
+        document.write('\n<div id="' + _spIdBase + '-container" style="display:block;max-width:900px;margin:0 auto;padding:30px 20px;">\n' +
+            '  <div id="' + _spIdBase + '-box" style="display:flex;align-items:stretch;gap:12px;width:100%;box-sizing:border-box;' +
+            '       background:rgba(255,255,255,0.98);padding:10px;border-radius:' + Math.max(12, parseInt(_radius) + 4) + 'px;' +
+            '       box-shadow:0 8px 30px rgba(0,0,0,0.15);backdrop-filter:blur(12px);transition:all 0.3s ease;">\n' +
+            '    <div style="position:relative;flex:1;min-width:0;display:flex;align-items:center;">\n' +
+            '      <input id="' + _spIdBase + '-input" type="text" placeholder="' + _placeholder.replace(/"/g, '&quot;') + '" ' +
+            '        style="flex:1;width:100%;padding:20px 60px 20px 28px;font-size:' + _fontSize + 'px;color:#061c3e;' +
+            '               background:white;border:2px solid rgba(6,28,62,0.08);border-radius:' + _radius + 'px;outline:none;' +
+            '               font-weight:500;transition:all 0.3s ease;">\n' +
+            '      <button id="' + _spIdBase + '-upload" type="button" title="Upload file" aria-label="Upload file" ' +
+            '        style="position:absolute;right:12px;width:38px;height:38px;background:transparent;border:none;' +
+            '               border-radius:6px;cursor:pointer;display:flex;align-items:center;justify-content:center;' +
+            '               transition:all 0.2s ease;color:#6c757d;">\n' +
+            '        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="pointer-events:none;">\n' +
+            '          <path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48" ' +
+            '                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>\n' +
+            '        </svg>\n' +
+            '      </button>\n' +
+            '    </div>\n' +
             '    <button id="' + _spIdBase + '-btn" type="button" ' +
-            '      style="padding:10px 14px;font-size:' + Math.max(12, Math.min(22, parseInt(_fontSize))) + 'px;color:#fff;background:' + _primary + ';' +
-            '             border:none;border-radius:' + _radius + 'px;cursor:pointer;">' + _btnText.replace(/</g,'&lt;') + '</button>\n' +
+            '      style="padding:20px 40px;font-size:' + Math.max(14, Math.min(20, parseInt(_fontSize))) + 'px;' +
+            '             color:#061c3e;background:linear-gradient(135deg, #00E5FF 0%, #00FF9D 100%);' +
+            '             border:none;border-radius:' + _radius + 'px;cursor:pointer;white-space:nowrap;font-weight:600;' +
+            '             transition:all 0.3s ease;box-shadow:0 4px 16px rgba(0,229,255,0.25);">' + _btnText.replace(/</g,'&lt;') + '</button>\n' +
             '  </div>\n' +
             '</div>\n');
 
-        // Overlay covers page with slight transparency; chat container at 95% viewport
-        document.write('\n<div id="' + _spIdBase + '-overlay" style="position:fixed;inset:0;background:rgba(0,0,0,0.45);' +
-                       'z-index:2147483646;display:none;opacity:0;transition:opacity .25s ease;">\n' +
-            '  <div id="' + _spIdBase + '-panel" style="position:fixed;left:2.5vw;top:2.5vh;width:95vw;height:95vh;' +
-            '       background:#fff;border-radius:12px;box-shadow:0 12px 32px rgba(0,0,0,0.2);' +
-            '       z-index:2147483647;display:flex;flex-direction:column;overflow:hidden;">\n' +
-            '    <button id="' + _spIdBase + '-close" type="button" aria-label="Close" title="Close" ' +
-            '      style="position:absolute;top:12px;right:12px;width:36px;height:36px;border:none;border-radius:18px;' +
-            '             background:transparent;color:#6c757d;font-size:22px;cursor:pointer;">×</button>\n' +
-            '    <div id="' + _spIdBase + '-framewrap" style="flex:1 1 auto;width:100%;height:100%;background:#fff;"></div>\n' +
-            '  </div>\n' +
-            '</div>\n');
+        // Create overlay and append to body (not document.write) to avoid stacking context issues
+        (function() {
+            // Wait for DOM to be ready
+            function appendOverlay() {
+                if (!document.body) {
+                    setTimeout(appendOverlay, 10);
+                    return;
+                }
+                
+                var overlayHtml = 
+                    '<div id="' + _spIdBase + '-overlay" style="position:fixed !important;inset:0 !important;background:rgba(0,0,0,0.45);' +
+                    'z-index:2147483647 !important;display:none;opacity:0;transition:opacity .25s ease;' +
+                    'top:0 !important;left:0 !important;right:0 !important;bottom:0 !important;' +
+                    'width:100vw !important;height:100vh !important;margin:0 !important;padding:0 !important;">' +
+                    '  <div id="' + _spIdBase + '-panel" style="position:fixed !important;left:2.5vw;top:2.5vh;width:95vw;height:95vh;' +
+                    '       background:#fff;border-radius:12px;box-shadow:0 12px 32px rgba(0,0,0,0.2);' +
+                    '       z-index:2147483647 !important;display:flex;flex-direction:column;overflow:hidden;">' +
+                    '    <button id="' + _spIdBase + '-close" type="button" aria-label="Close" title="Close" ' +
+                    '      style="position:absolute !important;top:12px !important;right:12px !important;width:36px;height:36px;border:none;border-radius:18px;' +
+                    '             background:transparent;color:#6c757d;font-size:22px;cursor:pointer;z-index:2147483647 !important;">×</button>' +
+                    '    <div id="' + _spIdBase + '-framewrap" style="flex:1 1 auto;width:100%;height:100%;background:#fff;"></div>' +
+                    '  </div>' +
+                    '</div>';
+                
+                var tempDiv = document.createElement('div');
+                tempDiv.innerHTML = overlayHtml;
+                document.body.appendChild(tempDiv.firstChild);
+            }
+            
+            // Execute immediately or wait for DOM
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', appendOverlay);
+            } else {
+                appendOverlay();
+            }
+        })();
 
-        // Attach behavior after current script executes
+        // Inject enforced z-index CSS and mobile responsiveness
+        var enforceZIndexStyle = document.createElement('style');
+        enforceZIndexStyle.id = _spIdBase + '-enforce-z';
+        enforceZIndexStyle.textContent = 
+            '#' + _spIdBase + '-overlay { ' +
+            '  position: fixed !important; ' +
+            '  z-index: 2147483647 !important; ' +
+            '  top: 0 !important; ' +
+            '  left: 0 !important; ' +
+            '  right: 0 !important; ' +
+            '  bottom: 0 !important; ' +
+            '  width: 100vw !important; ' +
+            '  height: 100vh !important; ' +
+            '  margin: 0 !important; ' +
+            '  padding: 0 !important; ' +
+            '} ' +
+            '#' + _spIdBase + '-panel { ' +
+            '  position: fixed !important; ' +
+            '  z-index: 2147483647 !important; ' +
+            '} ' +
+            '#' + _spIdBase + '-close { ' +
+            '  position: absolute !important; ' +
+            '  z-index: 2147483647 !important; ' +
+            '} ' +
+            /* Desktop default: button auto-width, keep original styling */ +
+            '#' + _spIdBase + '-btn { ' +
+            '  width: auto !important; ' +
+            '  flex: 0 0 auto !important; ' +
+            '} ' +
+            /* Mobile responsive styles (below 768px) */ +
+            '@media (max-width: 767px) { ' +
+            '  #' + _spIdBase + '-container { ' +
+            '    padding: 12px 10px !important; ' +
+            '    max-width: 100% !important; ' +
+            '  } ' +
+            '  #' + _spIdBase + '-box { ' +
+            '    flex-direction: column !important; ' +
+            '    gap: 8px !important; ' +
+            '    padding: 6px !important; ' +
+            '  } ' +
+            '  #' + _spIdBase + '-input { ' +
+            '    padding: 14px 50px 14px 16px !important; ' +
+            '    font-size: 15px !important; ' +
+            '  } ' +
+            '  #' + _spIdBase + '-upload { ' +
+            '    right: 8px !important; ' +
+            '    width: 34px !important; ' +
+            '    height: 34px !important; ' +
+            '  } ' +
+            '  #' + _spIdBase + '-upload svg { ' +
+            '    width: 18px !important; ' +
+            '    height: 18px !important; ' +
+            '  } ' +
+            '  #' + _spIdBase + '-btn { ' +
+            '    padding: 14px 24px !important; ' +
+            '    font-size: 15px !important; ' +
+            '    width: 100% !important; ' +
+            '  } ' +
+            '}';
+        document.head.appendChild(enforceZIndexStyle);
+
+        // Attach behavior after overlay is added to DOM
         (function(){
-            var overlay = document.getElementById(_spIdBase + '-overlay');
-            var frameWrap = document.getElementById(_spIdBase + '-framewrap');
             var inputEl = document.getElementById(_spIdBase + '-input');
             var btnEl = document.getElementById(_spIdBase + '-btn');
-            var closeEl = document.getElementById(_spIdBase + '-close');
-            var panelEl = document.getElementById(_spIdBase + '-panel');
+            var uploadEl = document.getElementById(_spIdBase + '-upload');
+            var overlay, frameWrap, closeEl, panelEl;
             var isOpen = false;
-
-            function applyInlineMobileLayout(){
+            
+            // Wait for overlay to be appended to body
+            function initializeOverlay() {
+                overlay = document.getElementById(_spIdBase + '-overlay');
+                frameWrap = document.getElementById(_spIdBase + '-framewrap');
+                closeEl = document.getElementById(_spIdBase + '-close');
+                panelEl = document.getElementById(_spIdBase + '-panel');
+                
+                if (!overlay || !frameWrap || !closeEl || !panelEl) {
+                    setTimeout(initializeOverlay, 50);
+                    return;
+                }
+                
+                // Now attach all event listeners
+                attachEventListeners();
+            }
+            
+            function attachEventListeners() {
+                function applyInlineMobileLayout(){
                 try {
                     if (!panelEl) return;
                     var isMobile = (window.matchMedia && window.matchMedia('(max-width: 500px)').matches);
@@ -227,6 +411,13 @@ window.SYNAPLAN_SYSTEM_URLS = {
             }
 
             function openOverlay(){
+                // Mobile devices: open in new window instead of overlay
+                if (isMobileDevice()) {
+                    openChatInNewWindow(<?php echo json_encode($widgetUrl); ?>);
+                    return;
+                }
+                
+                // Desktop: use overlay as before
                 if (!overlay) return;
                 overlay.style.display = 'block';
                 // Force reflow for transition
@@ -278,12 +469,176 @@ window.SYNAPLAN_SYSTEM_URLS = {
             if (btnEl) {
                 btnEl.addEventListener('click', openOverlay, { passive: true });
             }
+            if (uploadEl) {
+                uploadEl.addEventListener('click', openOverlay, { passive: true });
+            }
             if (closeEl) {
                 closeEl.addEventListener('click', closeOverlay, { passive: true });
             }
             if (overlay) {
                 overlay.addEventListener('click', function(e){ if (e.target === overlay) closeOverlay(); });
             }
+
+            // =============================
+            // EXPOSE GLOBAL API FOR EXTERNAL JAVASCRIPT
+            // =============================
+            // This allows the website owner to interact with and animate the widget input
+            var currentTypeInterval = null; // Track current typing animation
+            
+            window.SynaplanInlineWidget = window.SynaplanInlineWidget || {};
+            window.SynaplanInlineWidget[_spWid] = {
+                // Get the input element
+                getInput: function() {
+                    return inputEl;
+                },
+                // Get the button element
+                getButton: function() {
+                    return btnEl;
+                },
+                // Get the upload button element
+                getUploadButton: function() {
+                    return uploadEl;
+                },
+                // Set the input text
+                setText: function(text) {
+                    // Clear any ongoing typing animation
+                    if (currentTypeInterval) {
+                        clearInterval(currentTypeInterval);
+                        currentTypeInterval = null;
+                    }
+                    if (inputEl) inputEl.value = text;
+                },
+                // Get the current input text
+                getText: function() {
+                    return inputEl ? inputEl.value : '';
+                },
+                // Animate typing effect
+                typeText: function(text, speed) {
+                    speed = speed || 80; // ms per character
+                    if (!inputEl) return;
+                    
+                    // Clear any previous typing animation to prevent overlap
+                    if (currentTypeInterval) {
+                        clearInterval(currentTypeInterval);
+                        currentTypeInterval = null;
+                    }
+                    
+                    inputEl.value = '';
+                    var i = 0;
+                    currentTypeInterval = setInterval(function() {
+                        if (i < text.length) {
+                            inputEl.value += text.charAt(i);
+                            i++;
+                        } else {
+                            clearInterval(currentTypeInterval);
+                            currentTypeInterval = null;
+                        }
+                    }, speed);
+                    return currentTypeInterval; // return so caller can clear if needed
+                },
+                // Clear the input
+                clear: function() {
+                    // Stop any ongoing typing animation
+                    if (currentTypeInterval) {
+                        clearInterval(currentTypeInterval);
+                        currentTypeInterval = null;
+                    }
+                    if (inputEl) inputEl.value = '';
+                },
+                // Focus the input
+                focus: function() {
+                    if (inputEl) inputEl.focus();
+                },
+                // Trigger the button click (open overlay)
+                open: function() {
+                    openOverlay();
+                },
+                // Close the overlay
+                close: function() {
+                    closeOverlay();
+                },
+                // Check if overlay is open
+                isOpen: function() {
+                    return isOpen;
+                },
+                // Add custom style to the input
+                styleInput: function(cssProperties) {
+                    if (!inputEl) return;
+                    for (var prop in cssProperties) {
+                        inputEl.style[prop] = cssProperties[prop];
+                    }
+                },
+                // Add custom style to the button
+                styleButton: function(cssProperties) {
+                    if (!btnEl) return;
+                    for (var prop in cssProperties) {
+                        btnEl.style[prop] = cssProperties[prop];
+                    }
+                },
+                // Add custom style to the container
+                styleContainer: function(cssProperties) {
+                    var container = document.getElementById(_spIdBase + '-box');
+                    if (!container) return;
+                    for (var prop in cssProperties) {
+                        container.style[prop] = cssProperties[prop];
+                    }
+                },
+                // Stop any ongoing typing animation
+                stopTyping: function() {
+                    if (currentTypeInterval) {
+                        clearInterval(currentTypeInterval);
+                        currentTypeInterval = null;
+                    }
+                }
+            };
+
+            // Also expose a shorthand if only one widget exists
+            if (!window.SynaplanWidget) {
+                window.SynaplanWidget = window.SynaplanInlineWidget[_spWid];
+            }
+
+            // Add hover effects with brand colors
+            if (inputEl) {
+                inputEl.addEventListener('focus', function() {
+                    var box = document.getElementById(_spIdBase + '-box');
+                    if (box) box.style.boxShadow = '0 12px 40px rgba(0,0,0,0.2)';
+                    inputEl.style.borderColor = 'rgba(0,229,255,0.4)';
+                    inputEl.style.background = '#ffffff';
+                });
+                inputEl.addEventListener('blur', function() {
+                    var box = document.getElementById(_spIdBase + '-box');
+                    if (box) box.style.boxShadow = '0 8px 30px rgba(0,0,0,0.15)';
+                    inputEl.style.borderColor = 'rgba(6,28,62,0.08)';
+                });
+            }
+            if (btnEl) {
+                btnEl.addEventListener('mouseenter', function() {
+                    btnEl.style.background = 'linear-gradient(135deg, #00c4a7 0%, #00b49a 100%)';
+                    btnEl.style.color = 'white';
+                    btnEl.style.transform = 'translateY(-2px)';
+                    btnEl.style.boxShadow = '0 8px 24px rgba(0,212,170,0.4)';
+                });
+                btnEl.addEventListener('mouseleave', function() {
+                    btnEl.style.background = 'linear-gradient(135deg, #00E5FF 0%, #00FF9D 100%)';
+                    btnEl.style.color = '#061c3e';
+                    btnEl.style.transform = 'translateY(0)';
+                    btnEl.style.boxShadow = '0 4px 16px rgba(0,229,255,0.25)';
+                });
+            }
+            if (uploadEl) {
+                uploadEl.addEventListener('mouseenter', function() {
+                    uploadEl.style.background = 'rgba(0,229,255,0.1)';
+                    uploadEl.style.color = '#00E5FF';
+                });
+                uploadEl.addEventListener('mouseleave', function() {
+                    uploadEl.style.background = 'transparent';
+                    uploadEl.style.color = '#6c757d';
+                });
+            }
+            } // End attachEventListeners
+            
+            // Start initialization
+            initializeOverlay();
         })();
     } catch(e) {
         console.error('Synaplan inline widget init error:', e);
@@ -330,13 +685,24 @@ window.SYNAPLAN_SYSTEM_URLS = {
         -webkit-appearance: none !important;
         appearance: none !important;
         position: relative !important;
+        overflow: hidden !important;
     `;
+    <?php if (!empty($config['widgetLogo'])): ?>
+    // Use logo if configured
+    chatButton.innerHTML = `
+      <img src="<?php echo addslashes($GLOBALS['baseUrl'] . 'up/' . $config['widgetLogo']); ?>" 
+           alt="Chat" 
+           style="width: 36px; height: 36px; object-fit: contain; display:block; pointer-events:none;"
+           onerror="this.outerHTML='<svg width=\\'28\\' height=\\'28\\' viewBox=\\'0 0 24 24\\' fill=\\'none\\' xmlns=\\'http://www.w3.org/2000/svg\\' aria-hidden=\\'true\\' focusable=\\'false\\' style=\\'display:block; pointer-events:none;\\'><path d=\\'M4 4.75C4 3.7835 4.7835 3 5.75 3H18.25C19.2165 3 20 3.7835 20 4.75V14.25C20 15.2165 19.2165 16 18.25 16H8.41421L5.70711 18.7071C5.07714 19.3371 4 18.8898 4 17.9929V4.75Z\\' fill=\\'<?php echo $config['iconColor']; ?>\\'/></svg>'">
+    `;
+    <?php else: ?>
     // Inline SVG icon to ensure consistent rendering on iOS/Android and other platforms
     chatButton.innerHTML = `
       <svg width="28" height="28" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false" style="display:block; pointer-events:none;">
         <path d="M4 4.75C4 3.7835 4.7835 3 5.75 3H18.25C19.2165 3 20 3.7835 20 4.75V14.25C20 15.2165 19.2165 16 18.25 16H8.41421L5.70711 18.7071C5.07714 19.3371 4 18.8898 4 17.9929V4.75Z" fill="<?php echo $config['iconColor']; ?>"/>
       </svg>
     `;
+    <?php endif; ?>
     chatButton.setAttribute('aria-label', 'Open chat');
     chatButton.setAttribute('title', 'Chat');
     chatButton.setAttribute('type', 'button');
@@ -345,13 +711,13 @@ window.SYNAPLAN_SYSTEM_URLS = {
     const overlay = document.createElement('div');
     overlay.id = 'synaplan-chat-overlay';
     overlay.style.cssText = `
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
+        position: fixed !important;
+        top: 0 !important;
+        left: 0 !important;
+        width: 100% !important;
+        height: 100% !important;
         background: rgba(0, 0, 0, 0.5);
-        z-index: 2147483646;
+        z-index: 2147483647 !important;
         display: none;
         opacity: 0;
         transition: opacity 0.3s ease;
@@ -440,6 +806,7 @@ window.SYNAPLAN_SYSTEM_URLS = {
           /* centered modal with reduced height on mobile */
           height: min(70vh, calc(var(--sp-dvh, 100vh) - 140px)) !important;
           max-height: 90vh !important;
+          z-index: 2147483647 !important;
         }
         @supports (height: 100dvh) {
           #synaplan-chat-container {
@@ -457,13 +824,13 @@ window.SYNAPLAN_SYSTEM_URLS = {
       #synaplan-chat-widget { 
         position: fixed !important; 
         bottom: 20px !important; 
-        z-index: 2147483645 !important; 
+        z-index: 2147483646 !important; 
       }
       #synaplan-chat-overlay { 
         position: fixed !important; 
         top: 0 !important; 
         left: 0 !important; 
-        z-index: 2147483646 !important; 
+        z-index: 2147483647 !important; 
         width: 100% !important;
         height: 100% !important;
         margin: 0 !important;
@@ -495,6 +862,7 @@ window.SYNAPLAN_SYSTEM_URLS = {
           width: min(92vw, 420px) !important;
           height: min(70vh, calc(var(--sp-dvh, 100vh) - 140px)) !important;
           max-height: 90vh !important;
+          z-index: 2147483647 !important;
         }
         @supports (height: 100dvh) {
           #synaplan-chat-container {
@@ -539,6 +907,13 @@ window.SYNAPLAN_SYSTEM_URLS = {
 
     // Handle button click
     chatButton.addEventListener('click', () => {
+        // Mobile devices: open in new window instead of overlay
+        if (isMobileDevice()) {
+            openChatInNewWindow('<?php echo $widgetUrl; ?>');
+            return;
+        }
+        
+        // Desktop: use overlay as before
         overlay.style.display = 'block';
         chatContainer.style.display = 'block';
         setTimeout(() => {

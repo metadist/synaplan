@@ -382,7 +382,7 @@ class AIOllama
     {
         $client = self::$client;
         // which model on ollama?
-        $myModel = $GLOBALS['AI_CHAT']['MODEL'];
+        $myModel = $GLOBALS['AI_SUMMARIZE']['MODEL'];
 
         $prompt = 'You summarize the text of the user to a short 2-3 sentence summary. Do not add any other text, just the essence of the text. Stay under 128 characters. Answer in the language of the text.\n\nText to summarize: ' . $text;
 
@@ -457,7 +457,7 @@ class AIOllama
         $fullPrompt = $systemPrompt . "\n\n" . $userPrompt;
 
         // which model on ollama?
-        $myModel = $GLOBALS['AI_CHAT']['MODEL'];
+        $myModel = $GLOBALS['AI_SUMMARIZE']['MODEL'];
 
         try {
             $completions = $client->completions()->create([

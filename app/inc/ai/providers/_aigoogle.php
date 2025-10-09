@@ -552,17 +552,51 @@ class AIGoogle
      * Text summarizer
      *
      * Summarizes a given text using Google Gemini's summarization capabilities.
-     * Creates concise summaries while preserving key information. Currently not
-     * implemented but prepared for future summarization functionality.
+     * Creates concise summaries while preserving key information.
      *
      * @param string $text The text content to summarize
-     * @return string Summarized text or placeholder message
+     * @return string Summarized text or error message
      */
     public static function summarizePrompt($text): string
     {
-        // TODO: Implement text summarization using Google Gemini
+        // Get the model from configuration
+        $myModel = $GLOBALS['AI_SUMMARIZE']['MODEL'];
 
-        return 'Text summarization not implemented for Google AI yet.';
+        // Prepare the API URL
+        $url = 'https://generativelanguage.googleapis.com/v1beta/models/' . $myModel . ':generateContent?key=' . self::$key;
+        $headers = [
+            'Content-Type: application/json'
+        ];
+
+        // Prepare request data
+        $postData = [
+            'system_instruction' => [
+                'parts' => [
+                    ['text' => 'You summarize the text of the user to a short 2-3 sentence summary. Do not add any other text, just the essence of the text. Stay under 128 characters. Answer in the language of the text.']
+                ]
+            ],
+            'contents' => [
+                [
+                    'role' => 'user',
+                    'parts' => [
+                        ['text' => $text]
+                    ]
+                ]
+            ]
+        ];
+
+        try {
+            $arrRes = Curler::callJson($url, $headers, $postData);
+
+            // Extract response text
+            if (isset($arrRes['candidates'][0]['content']['parts'][0]['text'])) {
+                return $arrRes['candidates'][0]['content']['parts'][0]['text'];
+            } else {
+                return '*API summarize Error - Google AI response format error*';
+            }
+        } catch (Exception $err) {
+            return '*API summarize Error - Google Gemini error: * ' . $err->getMessage();
+        }
     }
 
     // ******************************************************************************************************
@@ -1270,7 +1304,7 @@ class AIGoogle
     public static function simplePrompt($systemPrompt, $userPrompt): array
     {
         // Get the model from configuration
-        $myModel = $GLOBALS['AI_CHAT']['MODEL'];
+        $myModel = $GLOBALS['AI_SUMMARIZE']['MODEL'];
 
         // Prepare the API URL
         $url = 'https://generativelanguage.googleapis.com/v1beta/models/' . $myModel . ':generateContent?key=' . self::$key;

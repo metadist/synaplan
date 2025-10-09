@@ -38,7 +38,7 @@
             <?php if ($contentInc == 'tools' || $contentInc == 'webwidget' || $contentInc == 'docsummary'
                 || $contentInc == 'soundstream' || $contentInc == 'mailhandler') { ?>
                 <ul class="nav flex-column" style="margin-left: 18px;">
-                    <li class="subitem"><a href="index.php/webwidget" id="toolMenu1">Chat Widget</a></li>
+                    <li class="subitem"><a href="index.php/webwidget" id="toolMenu1">Support Chat</a></li>
                     <li class="subitem"><a href="index.php/docsummary" id="toolMenu2">Doc Summary</a></li>
                     <!-- li class="subitem"><a href="index.php/soundstream" id="toolMenu3">Sound2Text</a></li -->
                     <li class="subitem"><a href="index.php/mailhandler" id="toolMenu4">Mail Handler</a></li>
@@ -88,6 +88,9 @@
                 <div class="user-details">
                     <div class="user-email">
                         <?php echo isset($_SESSION['USERPROFILE']['BMAIL']) ? $_SESSION['USERPROFILE']['BMAIL'] : 'user@example.com'; ?>
+                    </div>
+                    <div class="user-level" style="font-size: 0.7em; color: rgba(255, 255, 255, 0.6); margin-top: 2px;">
+                        <?php echo isset($_SESSION['USERPROFILE']['BUSERLEVEL']) ? $_SESSION['USERPROFILE']['BUSERLEVEL'] : 'NEW'; ?>
                     </div>
                 </div>
                 <button class="logout-btn" onclick="event.stopPropagation(); showLogoutModal()" title="Logout">

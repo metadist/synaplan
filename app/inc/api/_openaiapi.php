@@ -423,12 +423,27 @@ class OpenAICompatController
         if ($ext === '') {
             $ext = 'bin';
         }
+
+        // Security: Sanitize HTML files to prevent malicious landing pages
+        $sanitizeResult = Central::sanitizeHtmlUpload($file['tmp_name'], $ext);
+        if ($sanitizeResult['converted']) {
+            $ext = 'txt';
+        }
+
         $rel = $sub . '/' . $name . '.' . $ext;
         $dir = $base . $sub;
         if (!is_dir($dir)) {
             @mkdir($dir, 0777, true);
         }
-        $ok = @move_uploaded_file($file['tmp_name'], $base . $rel);
+
+        // Save file - write sanitized content for HTML, or move file for others
+        if ($sanitizeResult['converted']) {
+            $ok = @file_put_contents($base . $rel, $sanitizeResult['content']) !== false;
+            @unlink($file['tmp_name']); // Clean up temp file
+        } else {
+            $ok = @move_uploaded_file($file['tmp_name'], $base . $rel);
+        }
+
         return $ok ? $rel : '';
     }
 }

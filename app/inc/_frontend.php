@@ -287,6 +287,13 @@ class Frontend
                 }
 
                 if ($mimeTypeAllowed) {
+                    // Security: Sanitize HTML files to prevent malicious landing pages
+                    $sanitizeResult = Central::sanitizeHtmlUpload($tmpName, $fileExtension);
+                    if ($sanitizeResult['converted']) {
+                        $fileExtension = $sanitizeResult['newExtension'];
+                        $originalName = preg_replace('/\.(html?|htm)$/i', '.txt', $originalName);
+                    }
+
                     // Zielpfad
                     $userRelPath = substr($userId, -5, 3) . '/' . substr($userId, -2, 2) . '/' . date('Ym') . '/';
                     $fullUploadDir = rtrim(UPLOAD_DIR, '/').'/' . $userRelPath;
@@ -298,8 +305,14 @@ class Frontend
                     $newFileName = Tools::sysStr($originalName);
                     $targetPath = $fullUploadDir . $newFileName;
 
-                    // Speichern
-                    move_uploaded_file($tmpName, $targetPath);
+                    // Speichern - write sanitized content for HTML, or move file for others
+                    if ($sanitizeResult['converted']) {
+                        file_put_contents($targetPath, $sanitizeResult['content']);
+                        @unlink($tmpName); // Clean up temp file
+                    } else {
+                        move_uploaded_file($tmpName, $targetPath);
+                    }
+
                     $filesArr[] = [
                         'BFILEPATH' => $userRelPath.$newFileName,
                         'BFILETYPE' => $fileExtension,
@@ -1637,6 +1650,7 @@ class Frontend
                         'autoMessage' => '',
                         'prompt' => 'general',
                         'autoOpen' => '0',
+                        'widgetLogo' => '', // Widget logo file path
                         // New: integration type and inline-box defaults
                         'integrationType' => 'floating-button',
                         'inlinePlaceholder' => 'Ask me anything...',
@@ -1666,6 +1680,9 @@ class Frontend
                         break;
                     case 'autoOpen':
                         $widgets[$widgetId]['autoOpen'] = $value;
+                        break;
+                    case 'widgetLogo':
+                        $widgets[$widgetId]['widgetLogo'] = $value;
                         break;
                         // New inline-box and integration settings mapping
                     case 'integrationType':
@@ -1772,6 +1789,9 @@ class Frontend
 
         $group = 'widget_' . $widgetId;
 
+        // Get widget logo (optional)
+        $widgetLogo = db::EscString($_REQUEST['widgetLogo'] ?? '');
+
         // Save widget settings
         $settings = [
             'color' => $color,
@@ -1781,6 +1801,7 @@ class Frontend
             'prompt' => $prompt,
             // autoOpen is optional; default is '0' (disabled)
             'autoOpen' => isset($_REQUEST['autoOpen']) && ($_REQUEST['autoOpen'] === '1' || $_REQUEST['autoOpen'] === 'true' || $_REQUEST['autoOpen'] === 'on') ? '1' : '0',
+            'widgetLogo' => $widgetLogo, // Logo file path from WIDGET_LOGO group
             // New inline/integration settings persisted to BCONFIG
             'integrationType' => $integrationType,
             'inlinePlaceholder' => $inlinePlaceholder,

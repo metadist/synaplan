@@ -5,7 +5,7 @@ use Google\Service\Gmail as Google_Service_Gmail;
 
 class myGMail
 {
-    private static $allowedAttachmentTypes = ['pdf', 'docx', 'pptx', 'jpg', 'jpeg', 'png', 'mp3'];
+    private static $allowedAttachmentTypes = ['pdf', 'docx', 'pptx', 'jpg', 'jpeg', 'png', 'mp3', 'md', 'html', 'htm'];
     private static $excludedFilenames = ['logo', 'footer', 'signature', 'banner'];
 
     /**
@@ -405,11 +405,27 @@ class myGMail
 
                         // save file
                         $fileType = Tools::getFileExtension($attachment['mimeType']);
+
+                        // Security: Sanitize HTML attachments
+                        $fileData = $attachment['data'];
+                        if (in_array(strtolower($fileType), ['html', 'htm'])) {
+                            // Create temp file for sanitization
+                            $tempPath = sys_get_temp_dir() . '/html_' . uniqid() . '.' . $fileType;
+                            file_put_contents($tempPath, $fileData);
+
+                            $sanitizeResult = Central::sanitizeHtmlUpload($tempPath, $fileType);
+                            if ($sanitizeResult['converted']) {
+                                $fileType = 'txt';
+                                $fileData = $sanitizeResult['content'];
+                            }
+                            @unlink($tempPath);
+                        }
+
                         $fileRelPath = $userRelPath . 'gm-' . date('YmdHis') . '-' . ($fileCount++) . '.' . $fileType;
                         $filePath = $fullUploadDir . basename($fileRelPath);
 
-                        // Write the raw binary data directly to file
-                        file_put_contents($filePath, $attachment['data']);
+                        // Write the file data (sanitized if HTML)
+                        file_put_contents($filePath, $fileData);
 
                         $inMessageArr['BFILEPATH'] = $fileRelPath;
                         $inMessageArr['BFILETYPE'] = $fileType;

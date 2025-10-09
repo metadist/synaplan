@@ -281,7 +281,7 @@ class Central
     // mime types allowed
     public static function checkMimeTypes($extension, $mimeType): bool
     {
-        $allowedExtensions = ['pdf', 'jpg', 'jpeg', 'png', 'gif', 'doc', 'docx', 'xls', 'xlsx', 'mp3', 'mp4','svg','ppt','pptx','csv','txt'];
+        $allowedExtensions = ['pdf', 'jpg', 'jpeg', 'png', 'gif', 'doc', 'docx', 'xls', 'xlsx', 'mp3', 'mp4','svg','ppt','pptx','csv','txt','md','html','htm'];
         $allowedMimeTypes = [
             'application/pdf',
             'image/jpeg',
@@ -297,6 +297,9 @@ class Central
             'application/vnd.ms-powerpoint',
             'application/vnd.openxmlformats-officedocument.presentationml.presentation',
             'text/csv',
+            'text/html',
+            'text/markdown',
+            'text/x-markdown',
             'text/plain'
         ];
         if (in_array($extension, $allowedExtensions) or in_array($mimeType, $allowedMimeTypes)) {
@@ -589,8 +592,8 @@ class Central
         }
 
         // documents (tika-first, with pdf rasterize→vision fallback via UniversalFileHandler)
-        if ($arrMessage['BFILETYPE'] == 'pdf' || $arrMessage['BFILETYPE'] == 'doc' || $arrMessage['BFILETYPE'] == 'docx' || $arrMessage['BFILETYPE'] == 'xls' || $arrMessage['BFILETYPE'] == 'xlsx' || $arrMessage['BFILETYPE'] == 'ppt' || $arrMessage['BFILETYPE'] == 'pptx' || $arrMessage['BFILETYPE'] == 'csv' || $arrMessage['BFILETYPE'] == 'html' || $arrMessage['BFILETYPE'] == 'htm' || $arrMessage['BFILETYPE'] == 'txt') {
-            $fileType = ($arrMessage['BFILETYPE'] == 'pdf') ? 3 : (($arrMessage['BFILETYPE'] == 'doc' || $arrMessage['BFILETYPE'] == 'docx') ? 4 : (($arrMessage['BFILETYPE'] == 'txt') ? 5 : 0));
+        if ($arrMessage['BFILETYPE'] == 'pdf' || $arrMessage['BFILETYPE'] == 'doc' || $arrMessage['BFILETYPE'] == 'docx' || $arrMessage['BFILETYPE'] == 'xls' || $arrMessage['BFILETYPE'] == 'xlsx' || $arrMessage['BFILETYPE'] == 'ppt' || $arrMessage['BFILETYPE'] == 'pptx' || $arrMessage['BFILETYPE'] == 'csv' || $arrMessage['BFILETYPE'] == 'html' || $arrMessage['BFILETYPE'] == 'htm' || $arrMessage['BFILETYPE'] == 'txt' || $arrMessage['BFILETYPE'] == 'md') {
+            $fileType = ($arrMessage['BFILETYPE'] == 'pdf') ? 3 : (($arrMessage['BFILETYPE'] == 'doc' || $arrMessage['BFILETYPE'] == 'docx') ? 4 : (($arrMessage['BFILETYPE'] == 'txt') ? 5 : (($arrMessage['BFILETYPE'] == 'html' || $arrMessage['BFILETYPE'] == 'htm') ? 6 : (($arrMessage['BFILETYPE'] == 'md') ? 7 : 0))));
             list($extractedText, $meta) = \UniversalFileHandler::extract($arrMessage['BFILEPATH'], $arrMessage['BFILETYPE']);
             if (!empty($GLOBALS['debug']) && !empty($meta['strategy'])) {
                 @error_log('DocExtract strategy=' . $meta['strategy'] . ' type=' . $arrMessage['BFILETYPE'] . ' file=' . basename($arrMessage['BFILEPATH']));
@@ -889,8 +892,8 @@ class Central
         }
 
         // documents (tika-first, with pdf rasterize→vision fallback via UniversalFileHandler)
-        elseif ($arrMessage['BFILETYPE'] == 'pdf' || $arrMessage['BFILETYPE'] == 'doc' || $arrMessage['BFILETYPE'] == 'docx' || $arrMessage['BFILETYPE'] == 'xls' || $arrMessage['BFILETYPE'] == 'xlsx' || $arrMessage['BFILETYPE'] == 'ppt' || $arrMessage['BFILETYPE'] == 'pptx' || $arrMessage['BFILETYPE'] == 'csv' || $arrMessage['BFILETYPE'] == 'html' || $arrMessage['BFILETYPE'] == 'htm' || $arrMessage['BFILETYPE'] == 'txt') {
-            $fileType = ($arrMessage['BFILETYPE'] == 'pdf') ? 3 : (($arrMessage['BFILETYPE'] == 'doc' || $arrMessage['BFILETYPE'] == 'docx') ? 4 : (($arrMessage['BFILETYPE'] == 'txt') ? 5 : 0));
+        elseif ($arrMessage['BFILETYPE'] == 'pdf' || $arrMessage['BFILETYPE'] == 'doc' || $arrMessage['BFILETYPE'] == 'docx' || $arrMessage['BFILETYPE'] == 'xls' || $arrMessage['BFILETYPE'] == 'xlsx' || $arrMessage['BFILETYPE'] == 'ppt' || $arrMessage['BFILETYPE'] == 'pptx' || $arrMessage['BFILETYPE'] == 'csv' || $arrMessage['BFILETYPE'] == 'html' || $arrMessage['BFILETYPE'] == 'htm' || $arrMessage['BFILETYPE'] == 'txt' || $arrMessage['BFILETYPE'] == 'md') {
+            $fileType = ($arrMessage['BFILETYPE'] == 'pdf') ? 3 : (($arrMessage['BFILETYPE'] == 'doc' || $arrMessage['BFILETYPE'] == 'docx') ? 4 : (($arrMessage['BFILETYPE'] == 'txt') ? 5 : (($arrMessage['BFILETYPE'] == 'html' || $arrMessage['BFILETYPE'] == 'htm') ? 6 : (($arrMessage['BFILETYPE'] == 'md') ? 7 : 0))));
             list($extractedText, $meta) = \UniversalFileHandler::extract($arrMessage['BFILEPATH'], $arrMessage['BFILETYPE']);
             if (!empty($GLOBALS['debug']) && !empty($meta['strategy'])) {
                 @error_log('DocExtract strategy=' . $meta['strategy'] . ' type=' . $arrMessage['BFILETYPE'] . ' file=' . basename($arrMessage['BFILEPATH']));
@@ -914,9 +917,54 @@ class Central
             'mp3' => 2, 'mp4' => 2,
             'pdf' => 3,
             'docx' => 4, 'doc' => 4,
-            'txt' => 5
+            'txt' => 5,
+            'html' => 6, 'htm' => 6,
+            'md' => 7
         ];
 
         return $typeMap[strtolower($fileExtension)] ?? 0;
+    }
+
+    /**
+     * Security: Convert HTML/HTM files to plain text to prevent them from being served as landing pages
+     * Strips all HTML tags and converts to .txt file
+     *
+     * @param string $tmpFilePath Temporary uploaded file path
+     * @param string $fileExtension Original file extension
+     * @return array ['converted' => bool, 'newExtension' => string, 'content' => string]
+     */
+    public static function sanitizeHtmlUpload(string $tmpFilePath, string $fileExtension): array
+    {
+        $result = [
+            'converted' => false,
+            'newExtension' => $fileExtension,
+            'content' => null
+        ];
+
+        // Only process HTML/HTM files
+        if (!in_array(strtolower($fileExtension), ['html', 'htm'])) {
+            return $result;
+        }
+
+        // Read the HTML content
+        $htmlContent = @file_get_contents($tmpFilePath);
+        if ($htmlContent === false) {
+            return $result;
+        }
+
+        // Strip all HTML tags and decode entities
+        $plainText = strip_tags($htmlContent);
+        $plainText = html_entity_decode($plainText, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+
+        // Clean up excessive whitespace
+        $plainText = preg_replace('/\s+/', ' ', $plainText);
+        $plainText = preg_replace('/\n\s*\n\s*\n/', "\n\n", $plainText);
+        $plainText = trim($plainText);
+
+        $result['converted'] = true;
+        $result['newExtension'] = 'txt';
+        $result['content'] = $plainText;
+
+        return $result;
     }
 }

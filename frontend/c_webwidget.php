@@ -106,6 +106,38 @@
                         <div class="form-text">Select the AI prompt to use for this widget</div>
                     </div>
                 </div>
+                
+                <div class="row mb-3">
+                    <label for="widgetLogo" class="col-sm-2 col-form-label"><strong>Widget Logo:</strong></label>
+                    <div class="col-sm-4">
+                        <select class="form-select" name="widgetLogo" id="widgetLogo">
+                            <option value="">No Logo (Default Chat Icon)</option>
+                            <?php
+                                // Get all files from WIDGET_LOGO group for this user
+                                $logoSQL = 'SELECT BMESSAGES.BID, BMESSAGES.BFILEPATH, BMESSAGES.BTEXT 
+                                           FROM BMESSAGES 
+                                           INNER JOIN BRAG ON BRAG.BMID = BMESSAGES.BID 
+                                           WHERE BMESSAGES.BUSERID = ' . $_SESSION['USERPROFILE']['BID'] . " 
+                                           AND BRAG.BGROUPKEY = 'WIDGET_LOGO' 
+                                           AND BMESSAGES.BFILE > 0 
+                                           AND BMESSAGES.BFILEPATH != '' 
+                                           AND (BMESSAGES.BFILETYPE IN ('svg', 'png', 'jpg', 'jpeg'))
+                                           ORDER BY BMESSAGES.BID DESC";
+                            $logoRes = db::Query($logoSQL);
+                            while ($logoRow = db::FetchArr($logoRes)) {
+                                $logoName = basename($logoRow['BFILEPATH']);
+                                echo "<option value='" . htmlspecialchars($logoRow['BFILEPATH']) . "'>" . htmlspecialchars($logoName) . '</option>';
+                            }
+                            ?>
+                        </select>
+                        <div class="form-text">
+                            Upload logo files (SVG, PNG, JPG) via <a href="index.php/filemanager" target="_blank">File Manager</a> with group "WIDGET_LOGO"
+                        </div>
+                        <div id="logoPreview" class="mt-2" style="display: none;">
+                            <img id="logoPreviewImg" src="" alt="Logo Preview" style="max-width: 60px; max-height: 60px; border: 1px solid #dee2e6; border-radius: 8px; padding: 8px; background: #f8f9fa;">
+                        </div>
+                    </div>
+                </div>
 
                 <!-- Inline Box Styling (shown for Inline Box) -->
                 <div id="inlineBoxConfig" style="display:none;">
@@ -293,6 +325,23 @@
                 // Initialize on load
                 toggleIntegrationFields();
             }
+
+            // Widget logo preview
+            const widgetLogoSelect = document.getElementById('widgetLogo');
+            const logoPreview = document.getElementById('logoPreview');
+            const logoPreviewImg = document.getElementById('logoPreviewImg');
+            
+            if (widgetLogoSelect) {
+                widgetLogoSelect.addEventListener('change', function() {
+                    const logoPath = this.value;
+                    if (logoPath) {
+                        logoPreviewImg.src = '<?php echo $GLOBALS['baseUrl']; ?>up/' + logoPath;
+                        logoPreview.style.display = 'block';
+                    } else {
+                        logoPreview.style.display = 'none';
+                    }
+                });
+            }
         });
 
     // Function to load all widgets for the current user
@@ -419,6 +468,9 @@
         if (autoOpenEl) autoOpenEl.checked = false; // default off
         const iconColorEl = document.getElementById('widgetIconColor');
         if (iconColorEl) iconColorEl.value = '#ffffff';
+        const logoEl = document.getElementById('widgetLogo');
+        if (logoEl) logoEl.value = '';
+        document.getElementById('logoPreview').style.display = 'none';
         // Defaults for inline box
         const inlinePh = document.getElementById('inlinePlaceholder');
         const inlineBtn = document.getElementById('inlineButtonText');
@@ -458,6 +510,16 @@
         if (autoOpenEditEl) autoOpenEditEl.checked = (widget.autoOpen == '1');
         const iconColorEditEl = document.getElementById('widgetIconColor');
         if (iconColorEditEl) iconColorEditEl.value = widget.iconColor || '#ffffff';
+        const logoEditEl = document.getElementById('widgetLogo');
+        if (logoEditEl) {
+            logoEditEl.value = widget.widgetLogo || '';
+            if (widget.widgetLogo) {
+                document.getElementById('logoPreviewImg').src = '<?php echo $GLOBALS['baseUrl']; ?>up/' + widget.widgetLogo;
+                document.getElementById('logoPreview').style.display = 'block';
+            } else {
+                document.getElementById('logoPreview').style.display = 'none';
+            }
+        }
         // Inline settings
         const inlinePh = document.getElementById('inlinePlaceholder');
         const inlineBtn = document.getElementById('inlineButtonText');
