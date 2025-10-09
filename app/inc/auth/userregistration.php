@@ -224,4 +224,334 @@ class UserRegistration
 
         return ['success' => true, 'message' => $message];
     }
+
+    /**
+     * Complete user deletion with all associated data
+     *
+     * Deletes user and all related data from all tables
+     *
+     * @param int $userId User ID to delete
+     * @return array Result with success status and detailed log
+     */
+    public static function deleteUserCompletely(int $userId): array
+    {
+        $retArr = ['success' => false, 'error' => '', 'log' => []];
+
+        if ($userId <= 0) {
+            $retArr['error'] = 'Invalid user ID';
+            return $retArr;
+        }
+
+        try {
+            // Step 1: Delete API keys
+            $apiKeyResult = self::deleteUserApiKeys($userId);
+            $retArr['log'][] = 'API Keys: ' . ($apiKeyResult['success'] ? 'Deleted ' . $apiKeyResult['count'] . ' key(s)' : 'Failed - ' . $apiKeyResult['error']);
+
+            // Step 2: Delete user files directory
+            $filesResult = self::deleteUserFiles($userId);
+            $retArr['log'][] = 'Files: ' . ($filesResult['success'] ? $filesResult['message'] : 'Failed - ' . $filesResult['error']);
+
+            // Step 3: Delete BCONFIG entries
+            $configResult = self::deleteUserConfig($userId);
+            $retArr['log'][] = 'Config: ' . ($configResult['success'] ? 'Deleted ' . $configResult['count'] . ' record(s)' : 'Failed - ' . $configResult['error']);
+
+            // Step 4: Delete BPROMPTS and BPROMPTMETA entries
+            $promptsResult = self::deleteUserPrompts($userId);
+            $retArr['log'][] = 'Prompts: ' . ($promptsResult['success'] ? 'Deleted ' . $promptsResult['count'] . ' prompt(s) and ' . $promptsResult['metaCount'] . ' meta record(s)' : 'Failed - ' . $promptsResult['error']);
+
+            // Step 5: Delete BRAG entries
+            $ragResult = self::deleteUserRAG($userId);
+            $retArr['log'][] = 'RAG: ' . ($ragResult['success'] ? 'Deleted ' . $ragResult['count'] . ' record(s)' : 'Failed - ' . $ragResult['error']);
+
+            // Step 6: Delete BMESSAGES and BMESSAGEMETA entries
+            $messagesResult = self::deleteUserMessages($userId);
+            $retArr['log'][] = 'Messages: ' . ($messagesResult['success'] ? 'Deleted ' . $messagesResult['count'] . ' message(s) and ' . $messagesResult['metaCount'] . ' meta record(s)' : 'Failed - ' . $messagesResult['error']);
+
+            // Step 7: Delete user from BUSER
+            $userResult = self::deleteUserRecord($userId);
+            $retArr['log'][] = 'User Record: ' . ($userResult['success'] ? 'Deleted' : 'Failed - ' . $userResult['error']);
+
+            // Success if user record was deleted
+            $retArr['success'] = $userResult['success'];
+
+        } catch (\Throwable $e) {
+            $retArr['error'] = 'Exception during deletion: ' . $e->getMessage();
+            $retArr['log'][] = 'ERROR: ' . $e->getMessage();
+        }
+
+        return $retArr;
+    }
+
+    /**
+     * Delete all API keys for a user
+     *
+     * @param int $userId User ID
+     * @return array Result with count
+     */
+    private static function deleteUserApiKeys(int $userId): array
+    {
+        $retArr = ['success' => false, 'error' => '', 'count' => 0];
+
+        try {
+            // Count API keys
+            $countSQL = 'SELECT COUNT(*) as cnt FROM BAPIKEYS WHERE BOWNERID = ' . $userId;
+            $countRes = db::Query($countSQL);
+            $countArr = db::FetchArr($countRes);
+            $retArr['count'] = $countArr['cnt'] ?? 0;
+
+            // Delete API keys
+            $deleteSQL = 'DELETE FROM BAPIKEYS WHERE BOWNERID = ' . $userId;
+            db::Query($deleteSQL);
+
+            $retArr['success'] = true;
+        } catch (\Throwable $e) {
+            $retArr['error'] = $e->getMessage();
+        }
+
+        return $retArr;
+    }
+
+    /**
+     * Delete user files directory
+     *
+     * @param int $userId User ID
+     * @return array Result with message
+     */
+    private static function deleteUserFiles(int $userId): array
+    {
+        $retArr = ['success' => false, 'error' => '', 'message' => ''];
+
+        try {
+            $userSubDir = 'uid_' . $userId;
+            $userDir = rtrim(UPLOAD_DIR ?? '/tmp', '/') . '/' . $userSubDir;
+
+            if (!file_exists($userDir)) {
+                $retArr['success'] = true;
+                $retArr['message'] = 'No files directory found';
+                return $retArr;
+            }
+
+            // Recursively delete directory
+            $deleted = self::recursiveDelete($userDir);
+
+            if ($deleted) {
+                $retArr['success'] = true;
+                $retArr['message'] = 'Files directory deleted';
+            } else {
+                $retArr['error'] = 'Failed to delete files directory';
+            }
+        } catch (\Throwable $e) {
+            $retArr['error'] = $e->getMessage();
+        }
+
+        return $retArr;
+    }
+
+    /**
+     * Recursively delete directory
+     *
+     * @param string $dir Directory path
+     * @return bool Success status
+     */
+    private static function recursiveDelete(string $dir): bool
+    {
+        if (!file_exists($dir)) {
+            return true;
+        }
+
+        if (!is_dir($dir)) {
+            return unlink($dir);
+        }
+
+        foreach (scandir($dir) as $item) {
+            if ($item == '.' || $item == '..') {
+                continue;
+            }
+
+            if (!self::recursiveDelete($dir . DIRECTORY_SEPARATOR . $item)) {
+                return false;
+            }
+        }
+
+        return rmdir($dir);
+    }
+
+    /**
+     * Delete user configuration entries
+     *
+     * @param int $userId User ID
+     * @return array Result with count
+     */
+    private static function deleteUserConfig(int $userId): array
+    {
+        $retArr = ['success' => false, 'error' => '', 'count' => 0];
+
+        try {
+            // Count config entries
+            $countSQL = 'SELECT COUNT(*) as cnt FROM BCONFIG WHERE BOWNERID = ' . $userId;
+            $countRes = db::Query($countSQL);
+            $countArr = db::FetchArr($countRes);
+            $retArr['count'] = $countArr['cnt'] ?? 0;
+
+            // Delete config entries
+            $deleteSQL = 'DELETE FROM BCONFIG WHERE BOWNERID = ' . $userId;
+            db::Query($deleteSQL);
+
+            $retArr['success'] = true;
+        } catch (\Throwable $e) {
+            $retArr['error'] = $e->getMessage();
+        }
+
+        return $retArr;
+    }
+
+    /**
+     * Delete user prompts and prompt meta entries
+     *
+     * @param int $userId User ID
+     * @return array Result with counts
+     */
+    private static function deleteUserPrompts(int $userId): array
+    {
+        $retArr = ['success' => false, 'error' => '', 'count' => 0, 'metaCount' => 0];
+
+        try {
+            // Get all prompt IDs for this user
+            $promptSQL = 'SELECT BID FROM BPROMPTS WHERE BOWNERID = ' . $userId;
+            $promptRes = db::Query($promptSQL);
+            $promptIds = [];
+
+            while ($row = db::FetchArr($promptRes)) {
+                $promptIds[] = $row['BID'];
+            }
+
+            $retArr['count'] = count($promptIds);
+
+            // Delete prompt meta entries for these prompts
+            if (count($promptIds) > 0) {
+                $promptIdList = implode(',', $promptIds);
+
+                // Count meta entries
+                $countMetaSQL = 'SELECT COUNT(*) as cnt FROM BPROMPTMETA WHERE BPROMPTID IN (' . $promptIdList . ')';
+                $countMetaRes = db::Query($countMetaSQL);
+                $countMetaArr = db::FetchArr($countMetaRes);
+                $retArr['metaCount'] = $countMetaArr['cnt'] ?? 0;
+
+                // Delete meta entries
+                $deleteMetaSQL = 'DELETE FROM BPROMPTMETA WHERE BPROMPTID IN (' . $promptIdList . ')';
+                db::Query($deleteMetaSQL);
+            }
+
+            // Delete prompts
+            $deletePromptsSQL = 'DELETE FROM BPROMPTS WHERE BOWNERID = ' . $userId;
+            db::Query($deletePromptsSQL);
+
+            $retArr['success'] = true;
+        } catch (\Throwable $e) {
+            $retArr['error'] = $e->getMessage();
+        }
+
+        return $retArr;
+    }
+
+    /**
+     * Delete user RAG entries
+     *
+     * @param int $userId User ID
+     * @return array Result with count
+     */
+    private static function deleteUserRAG(int $userId): array
+    {
+        $retArr = ['success' => false, 'error' => '', 'count' => 0];
+
+        try {
+            // Count RAG entries
+            $countSQL = 'SELECT COUNT(*) as cnt FROM BRAG WHERE BUID = ' . $userId;
+            $countRes = db::Query($countSQL);
+            $countArr = db::FetchArr($countRes);
+            $retArr['count'] = $countArr['cnt'] ?? 0;
+
+            // Delete RAG entries
+            $deleteSQL = 'DELETE FROM BRAG WHERE BUID = ' . $userId;
+            db::Query($deleteSQL);
+
+            $retArr['success'] = true;
+        } catch (\Throwable $e) {
+            $retArr['error'] = $e->getMessage();
+        }
+
+        return $retArr;
+    }
+
+    /**
+     * Delete user messages and message meta entries
+     *
+     * @param int $userId User ID
+     * @return array Result with counts
+     */
+    private static function deleteUserMessages(int $userId): array
+    {
+        $retArr = ['success' => false, 'error' => '', 'count' => 0, 'metaCount' => 0];
+
+        try {
+            // Get all message IDs for this user
+            $messageSQL = 'SELECT BID FROM BMESSAGES WHERE BUSERID = ' . $userId;
+            $messageRes = db::Query($messageSQL);
+            $messageIds = [];
+
+            while ($row = db::FetchArr($messageRes)) {
+                $messageIds[] = $row['BID'];
+            }
+
+            $retArr['count'] = count($messageIds);
+
+            // Delete message meta entries for these messages
+            if (count($messageIds) > 0) {
+                $messageIdList = implode(',', $messageIds);
+
+                // Count meta entries
+                $countMetaSQL = 'SELECT COUNT(*) as cnt FROM BMESSAGEMETA WHERE BMESSID IN (' . $messageIdList . ')';
+                $countMetaRes = db::Query($countMetaSQL);
+                $countMetaArr = db::FetchArr($countMetaRes);
+                $retArr['metaCount'] = $countMetaArr['cnt'] ?? 0;
+
+                // Delete meta entries
+                $deleteMetaSQL = 'DELETE FROM BMESSAGEMETA WHERE BMESSID IN (' . $messageIdList . ')';
+                db::Query($deleteMetaSQL);
+            }
+
+            // Delete messages
+            $deleteMessagesSQL = 'DELETE FROM BMESSAGES WHERE BUSERID = ' . $userId;
+            db::Query($deleteMessagesSQL);
+
+            $retArr['success'] = true;
+        } catch (\Throwable $e) {
+            $retArr['error'] = $e->getMessage();
+        }
+
+        return $retArr;
+    }
+
+    /**
+     * Delete user record from BUSER
+     *
+     * @param int $userId User ID
+     * @return array Result
+     */
+    private static function deleteUserRecord(int $userId): array
+    {
+        $retArr = ['success' => false, 'error' => ''];
+
+        try {
+            // Delete user
+            $deleteSQL = 'DELETE FROM BUSER WHERE BID = ' . $userId;
+            db::Query($deleteSQL);
+
+            $retArr['success'] = true;
+        } catch (\Throwable $e) {
+            $retArr['error'] = $e->getMessage();
+        }
+
+        return $retArr;
+    }
 }
