@@ -6,38 +6,6 @@ header('Content-Type: application/json; charset=UTF-8');
 $apiAction = $_REQUEST['action'];
 
 switch ($apiAction) {
-    case 'createApiKey':
-        // Create API key for WordPress plugin
-        $name = isset($_REQUEST['name']) ? trim($_REQUEST['name']) : 'WordPress Plugin';
-
-        $api_key = 'sk_' . bin2hex(random_bytes(24));
-
-        $resArr = [
-            'success' => true,
-            'data' => [
-                'key' => $api_key,
-                'name' => $name,
-                'message' => 'API key created successfully'
-            ]
-        ];
-        break;
-
-    case 'saveWidget':
-        // Save widget configuration
-        $config = $_REQUEST;
-
-        $widget_id = 'widget_' . time() . '_' . substr(md5(json_encode($config)), 0, 8);
-
-        $resArr = [
-            'success' => true,
-            'data' => [
-                'widget_id' => $widget_id,
-                'config' => $config,
-                'message' => 'Widget configuration saved successfully'
-            ]
-        ];
-        break;
-
     case 'snippetTranslate':
         $sourceText = isset($_REQUEST['source_text']) ? trim($_REQUEST['source_text']) : '';
         $sourceLang = isset($_REQUEST['source_lang']) ? trim($_REQUEST['source_lang']) : 'en';
