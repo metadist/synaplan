@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <style>
+        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+        .button { display: inline-block; padding: 12px 24px; background: #4F46E5; color: white; text-decoration: none; border-radius: 6px; margin: 20px 0; }
+        .footer { margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee; font-size: 12px; color: #666; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>Welcome to Synaplan!</h2>
+        <p>Hi {{ name }},</p>
+        <p>Your email has been successfully verified and your account is now active.</p>
+        <p>You can now start using all features of Synaplan:</p>
+        <ul>
+            <li>AI-powered chat assistant</li>
+            <li>Document analysis</li>
+            <li>Multi-channel communication</li>
+            <li>And much more!</li>
+        </ul>
+        <a href="{{ app_url ?? 'http://localhost:3000' }}" class="button">Get Started</a>
+        <div class="footer">
+            <p>Need help? Check out our documentation or contact support.</p>
+            <p>&copy; {{ "now"|date("Y") }} Synaplan. All rights reserved.</p>
+        </div>
+    </div>
+</body>
+</html>
+

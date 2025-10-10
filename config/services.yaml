@@ -1,0 +1,114 @@
+parameters:
+
+services:
+    _defaults:
+        autowire: true
+        autoconfigure: true
+
+    App\:
+        resource: '../src/'
+        exclude:
+            - '../src/DependencyInjection/'
+            - '../src/Entity/'
+            - '../src/Kernel.php'
+
+    # AI Providers - TestProvider supports all capabilities
+    App\AI\Provider\TestProvider:
+        tags:
+            - { name: 'app.ai.chat' }
+            - { name: 'app.ai.embedding' }
+            - { name: 'app.ai.vision' }
+            - { name: 'app.ai.image_generation' }
+            - { name: 'app.ai.speech_to_text' }
+            - { name: 'app.ai.text_to_speech' }
+            - { name: 'app.ai.file_analysis' }
+
+    App\AI\Provider\AnthropicProvider:
+        arguments:
+            $apiKey: '%env(ANTHROPIC_API_KEY)%'
+        tags:
+            - { name: 'app.ai.chat' }
+
+    App\AI\Provider\OpenAIProvider:
+        arguments:
+            $apiKey: '%env(OPENAI_API_KEY)%'
+        tags:
+            - { name: 'app.ai.chat' }
+            - { name: 'app.ai.embedding' }
+
+    App\AI\Provider\OllamaProvider:
+        arguments:
+            $baseUrl: '%env(OLLAMA_BASE_URL)%'
+        tags:
+            - { name: 'app.ai.chat' }
+            - { name: 'app.ai.embedding' }
+
+    # AI Facade
+    App\AI\Service\AiFacade: ~
+
+    # Message Processing Services
+    App\Service\Message\MessagePreProcessor:
+        arguments:
+            $tikaBaseUrl: '%env(TIKA_URL)%'
+            $uploadsDir: '%kernel.project_dir%/public/up'
+    App\Service\Message\MessageSorter: ~
+    App\Service\Message\MessageClassifier: ~
+    App\Service\Message\InferenceRouter: ~
+    App\Service\Message\MessageProcessor: ~
+    
+    # Message Handlers
+    App\Service\Message\Handler\ChatHandler: ~
+
+    # Circuit Breaker
+    App\Service\CircuitBreaker: ~
+
+    # Model Configuration Service
+    App\Service\ModelConfigService: ~
+
+    # Rate Limiter Service
+    App\Service\RateLimiterService: ~
+
+    # Mailer Service
+    App\Service\MailerService: ~
+
+    # Again Service (for model suggestions)
+    App\Service\AgainService: ~
+    App\Service\Message\AgainHandler: ~
+
+    # CORS Listener (fallback if NelmioCorsBundle not working)
+    App\EventListener\CorsListener:
+        tags:
+            - { name: kernel.event_subscriber }
+
+    # File Processing Services
+    App\Service\File\TikaClient:
+        arguments:
+            $tikaUrl: '%env(TIKA_URL)%'
+            $tikaTimeoutMs: '%env(int:TIKA_TIMEOUT_MS)%'
+            $tikaRetries: '%env(int:TIKA_RETRIES)%'
+            $tikaRetryBackoffMs: '%env(int:TIKA_RETRY_BACKOFF_MS)%'
+            $tikaHttpUser: '%env(default::TIKA_HTTP_USER)%'
+            $tikaHttpPass: '%env(default::TIKA_HTTP_PASS)%'
+
+    App\Service\File\PdfRasterizer:
+        arguments:
+            $uploadDir: '%kernel.project_dir%/public/up'
+            $rasterizeDpi: '%env(int:RASTERIZE_DPI)%'
+            $rasterizePageCap: '%env(int:RASTERIZE_PAGE_CAP)%'
+            $rasterizeTimeoutMs: '%env(int:RASTERIZE_TIMEOUT_MS)%'
+
+    App\Service\File\TextCleaner: ~
+
+    App\Service\File\FileProcessor:
+        arguments:
+            $uploadDir: '%kernel.project_dir%/public/up'
+            $tikaMinLength: '%env(int:TIKA_MIN_LENGTH)%'
+            $tikaMinEntropy: '%env(float:TIKA_MIN_ENTROPY)%'
+
+    App\Service\File\TextChunker:
+        arguments:
+            $maxChunkSize: 500
+            $overlapSize: 50
+            $minChunkSize: 100
+
+    App\Service\File\VectorizationService: ~

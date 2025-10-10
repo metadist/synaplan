@@ -1,0 +1,23 @@
+framework:
+    cache:
+        prefix_seed: synaplan_sf
+        
+        # Redis as default cache adapter
+        app: cache.adapter.redis
+        default_redis_provider: '%env(REDIS_URL)%'
+        
+        pools:
+            # Provider status cache (short TTL)
+            cache.provider_status:
+                adapter: cache.adapter.redis
+                default_lifetime: 60
+                
+            # Model configuration cache
+            cache.model_config:
+                adapter: cache.adapter.redis
+                default_lifetime: 3600
+                
+            # User config cache
+            cache.user_config:
+                adapter: cache.adapter.redis
+                default_lifetime: 1800

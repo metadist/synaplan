@@ -1,0 +1,81 @@
+doctrine:
+    dbal:
+        default_connection: default
+        types:
+            vector: App\Doctrine\VectorType
+        connections:
+            default:
+                url: '%env(resolve:DATABASE_WRITE_URL)%'
+                driver: 'pdo_mysql'
+                server_version: '11.8'
+                charset: utf8mb4
+                profiling_collect_backtrace: '%kernel.debug%'
+                use_savepoints: true
+                mapping_types:
+                    vector: vector
+                
+            read:
+                url: '%env(resolve:DATABASE_READ_URL)%'
+                driver: 'pdo_mysql'
+                server_version: '11.8'
+                charset: utf8mb4
+                profiling_collect_backtrace: '%kernel.debug%'
+                mapping_types:
+                    vector: vector
+
+    orm:
+        default_entity_manager: default
+        auto_generate_proxy_classes: true
+        enable_lazy_ghost_objects: true
+        
+        entity_managers:
+            default:
+                connection: default
+                naming_strategy: App\Doctrine\CustomNamingStrategy
+                mappings:
+                    App:
+                        type: attribute
+                        is_bundle: false
+                        dir: '%kernel.project_dir%/src/Entity'
+                        prefix: 'App\Entity'
+                        alias: App
+                        
+            read:
+                connection: read
+                naming_strategy: App\Doctrine\CustomNamingStrategy
+                mappings:
+                    App:
+                        type: attribute
+                        is_bundle: false
+                        dir: '%kernel.project_dir%/src/Entity'
+                        prefix: 'App\Entity'
+                        alias: App
+        
+        controller_resolver:
+            auto_mapping: false
+
+when@test:
+    doctrine:
+        dbal:
+            # "TEST_TOKEN" is typically set by ParaTest
+            dbname_suffix: '_test%env(default::TEST_TOKEN)%'
+
+when@prod:
+    doctrine:
+        orm:
+            auto_generate_proxy_classes: false
+            proxy_dir: '%kernel.build_dir%/doctrine/orm/Proxies'
+            query_cache_driver:
+                type: pool
+                pool: doctrine.system_cache_pool
+            result_cache_driver:
+                type: pool
+                pool: doctrine.result_cache_pool
+
+    framework:
+        cache:
+            pools:
+                doctrine.result_cache_pool:
+                    adapter: cache.app
+                doctrine.system_cache_pool:
+                    adapter: cache.system

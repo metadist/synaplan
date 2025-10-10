@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<phpunit xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:noNamespaceSchemaLocation="vendor/phpunit/phpunit/phpunit.xsd"
+         backupGlobals="false"
+         colors="true"
+         bootstrap="tests/bootstrap.php"
+         convertDeprecationsToExceptions="false"
+>
+    <php>
+        <ini name="display_errors" value="1" />
+        <ini name="error_reporting" value="-1" />
+        <server name="APP_ENV" value="test" force="true" />
+        <server name="SHELL_VERBOSITY" value="-1" />
+        <server name="SYMFONY_PHPUNIT_REMOVE" value="" />
+        <server name="SYMFONY_PHPUNIT_VERSION" value="9.5" />
+        <server name="KERNEL_CLASS" value="App\Kernel" force="true" />
+        
+        <!-- Use .env.test for configuration -->
+        <env name="SYMFONY_DEPRECATIONS_HELPER" value="weak" />
+        
+        <!-- Mailer: No emails in tests -->
+        <env name="MAILER_DSN" value="null://null" />
+        
+        <!-- AI: Use TestProvider -->
+        <env name="AI_DEFAULT_PROVIDER" value="test" />
+    </php>
+
+    <testsuites>
+        <testsuite name="Project Test Suite">
+            <directory>tests</directory>
+        </testsuite>
+    </testsuites>
+
+    <coverage processUncoveredFiles="true">
+        <include>
+            <directory suffix=".php">src</directory>
+        </include>
+        <exclude>
+            <directory>src/DataFixtures</directory>
+            <file>src/Kernel.php</file>
+        </exclude>
+    </coverage>
+
+    <listeners>
+        <listener class="Symfony\Bridge\PhpUnit\SymfonyTestsListener" />
+    </listeners>
+
+    <extensions>
+    </extensions>
+</phpunit>
+

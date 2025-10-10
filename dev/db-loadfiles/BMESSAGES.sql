@@ -1,0 +1,73 @@
+/*M!999999\- enable the sandbox mode */ 
+-- MariaDB dump 10.19-11.7.2-MariaDB, for debian-linux-gnu (x86_64)
+--
+-- Host: localhost    Database: synadb
+-- ------------------------------------------------------
+-- Server version	11.7.2-MariaDB-ubu2404
+
+/*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;
+/*!40101 SET @OLD_CHARACTER_SET_RESULTS=@@CHARACTER_SET_RESULTS */;
+/*!40101 SET @OLD_COLLATION_CONNECTION=@@COLLATION_CONNECTION */;
+/*!40101 SET NAMES utf8mb4 */;
+/*!40103 SET @OLD_TIME_ZONE=@@TIME_ZONE */;
+/*!40103 SET TIME_ZONE='+00:00' */;
+/*!40014 SET @OLD_UNIQUE_CHECKS=@@UNIQUE_CHECKS, UNIQUE_CHECKS=0 */;
+/*!40014 SET @OLD_FOREIGN_KEY_CHECKS=@@FOREIGN_KEY_CHECKS, FOREIGN_KEY_CHECKS=0 */;
+/*!40101 SET @OLD_SQL_MODE=@@SQL_MODE, SQL_MODE='NO_AUTO_VALUE_ON_ZERO' */;
+/*M!100616 SET @OLD_NOTE_VERBOSITY=@@NOTE_VERBOSITY, NOTE_VERBOSITY=0 */;
+
+--
+-- Table structure for table `BMESSAGES`
+--
+
+DROP TABLE IF EXISTS `BMESSAGES`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8mb4 */;
+CREATE TABLE `BMESSAGES` (
+  `BID` bigint(20) NOT NULL AUTO_INCREMENT COMMENT 'primary index',
+  `BUSERID` bigint(20) NOT NULL COMMENT 'User id in the DB. can be the phone number or Telegram user name',
+  `BTRACKID` bigint(20) NOT NULL COMMENT 'Group the messages along a session, if possible',
+  `BPROVIDX` varchar(96) NOT NULL DEFAULT '',
+  `BUNIXTIMES` bigint(20) NOT NULL DEFAULT 0,
+  `BDATETIME` varchar(20) NOT NULL DEFAULT '',
+  `BMESSTYPE` varchar(4) NOT NULL DEFAULT 'WA' COMMENT 'From WA for WhatsApp to TGRM for Telegram or WEB...',
+  `BFILE` tinyint(1) NOT NULL DEFAULT 0 COMMENT 'Is file (>0) or not ==0',
+  `BFILEPATH` varchar(255) NOT NULL DEFAULT '' COMMENT 'Path to the file',
+  `BFILETYPE` varchar(8) NOT NULL DEFAULT '' COMMENT 'Ending of file - like OGG or DOCX - maximum of 4 letters',
+  `BTOPIC` varchar(16) NOT NULL DEFAULT 'UNKNOWN',
+  `BLANG` varchar(2) NOT NULL DEFAULT 'NN',
+  `BTEXT` text NOT NULL DEFAULT '' COMMENT 'Message of the user',
+  `BDIRECT` varchar(3) NOT NULL DEFAULT 'OUT' COMMENT 'Incoming or outgoing?',
+  `BSTATUS` varchar(24) NOT NULL DEFAULT '',
+  `BFILETEXT` longtext NOT NULL DEFAULT '',
+  PRIMARY KEY (`BID`),
+  KEY `BUSERID` (`BUSERID`),
+  KEY `BMESSTYPE` (`BMESSTYPE`),
+  KEY `BTRACKID` (`BTRACKID`),
+  KEY `BFILE` (`BFILE`),
+  KEY `BDIRECT` (`BDIRECT`),
+  KEY `BLANG` (`BLANG`),
+  KEY `BTOPIC` (`BTOPIC`),
+  FULLTEXT KEY `BFILETEXT` (`BFILETEXT`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `BMESSAGES`
+--
+
+LOCK TABLES `BMESSAGES` WRITE;
+/*!40000 ALTER TABLE `BMESSAGES` DISABLE KEYS */;
+/*!40000 ALTER TABLE `BMESSAGES` ENABLE KEYS */;
+UNLOCK TABLES;
+/*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
+
+/*!40101 SET SQL_MODE=@OLD_SQL_MODE */;
+/*!40014 SET FOREIGN_KEY_CHECKS=@OLD_FOREIGN_KEY_CHECKS */;
+/*!40014 SET UNIQUE_CHECKS=@OLD_UNIQUE_CHECKS */;
+/*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
+/*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;
+/*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
+/*M!100616 SET NOTE_VERBOSITY=@OLD_NOTE_VERBOSITY */;
+
+-- Dump completed on 2025-08-05 15:19:30

@@ -1,0 +1,178 @@
+services:
+  # Symfony PHP Application
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: synaplan-sf-app
+    ports:
+      - "8000:80"
+    volumes:
+      - ./:/var/www/html
+      - whisper_models:/var/www/html/var/whisper:ro
+    environment:
+      APP_ENV: ${APP_ENV:-dev}
+      APP_SECRET: ${APP_SECRET:-change_me_in_production}
+      DATABASE_WRITE_URL: mysql://synaplan_user:synaplan_password@db:3306/synaplan?serverVersion=11.8&charset=utf8mb4
+      DATABASE_READ_URL: mysql://synaplan_user:synaplan_password@db:3306/synaplan?serverVersion=11.8&charset=utf8mb4
+      REDIS_URL: redis://redis:6379
+      MESSENGER_TRANSPORT_DSN: redis://redis:6379/messages
+      # AI Provider URLs
+      OLLAMA_BASE_URL: http://synaplan-ollama:11434
+      TIKA_BASE_URL: http://tika:9998
+      # API Keys (from .env or host environment)
+      AI_DEFAULT_PROVIDER: ${AI_DEFAULT_PROVIDER:-test}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      GROQ_API_KEY: ${GROQ_API_KEY:-}
+      GOOGLE_GEMINI_API_KEY: ${GOOGLE_GEMINI_API_KEY:-}
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - synaplan-network
+
+  # MariaDB 11.8 Database
+  db:
+    image: mariadb:11.8.2
+    container_name: synaplan-sf-db
+    command: --max-allowed-packet=256M --innodb-buffer-pool-size=512M
+    environment:
+      MYSQL_DATABASE: synaplan
+      MYSQL_USER: synaplan_user
+      MYSQL_PASSWORD: synaplan_password
+      MYSQL_ROOT_PASSWORD: root_password
+    ports:
+      - "3307:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./dev/db-loadfiles:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD", "mariadb", "-h", "localhost", "-u", "root", "-proot_password", "-e", "SELECT 1;"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    restart: unless-stopped
+    networks:
+      - synaplan-network
+
+  # Redis Cache & Queue
+  redis:
+    image: redis:7-alpine
+    container_name: synaplan-sf-redis
+    command: redis-server --appendonly yes --maxmemory 512mb --maxmemory-policy allkeys-lru
+    ports:
+      - "6380:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - synaplan-network
+
+  # Ollama - Local AI Models
+  ollama:
+    image: ollama/ollama:latest
+    container_name: synaplan-sf-ollama
+    ports:
+      - "11435:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    environment:
+      OLLAMA_HOST: 0.0.0.0
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:11434/api/tags"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    restart: unless-stopped
+    networks:
+      - synaplan-network
+
+  # Apache Tika - Document Text Extraction
+  tika:
+    image: apache/tika:2.9.2.0
+    container_name: synaplan-sf-tika
+    command: -h 0.0.0.0 -p 9998
+    ports:
+      - "9999:9998"
+    healthcheck:
+      test: ["CMD", "sh", "-c", "wget -qO- http://localhost:9998/version >/dev/null 2>&1 || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 20s
+    restart: unless-stopped
+    networks:
+      - synaplan-network
+
+  # Whisper Models Download (runs once)
+  whisper-models:
+    image: alpine:3.20
+    container_name: synaplan-sf-whisper-models
+    command: >
+      sh -c '
+        apk add --no-cache curl ca-certificates &&
+        mkdir -p /models &&
+        if [ ! -f "/models/ggml-base.bin" ]; then
+          echo "Downloading Whisper base model..." &&
+          curl -fL --retry 3 --retry-delay 5 --max-time 600 \
+            -o "/models/ggml-base.bin" \
+            "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.bin" &&
+          chmod 644 /models/*.bin &&
+          echo "Whisper model downloaded successfully"
+        else
+          echo "Whisper model already exists, skipping download"
+        fi
+      '
+    volumes:
+      - whisper_models:/models
+    restart: "no"
+    networks:
+      - synaplan-network
+
+  # phpMyAdmin (optional - for DB management)
+  phpmyadmin:
+    image: phpmyadmin/phpmyadmin:latest
+    container_name: synaplan-sf-phpmyadmin
+    environment:
+      PMA_HOST: db
+      PMA_PORT: 3306
+      PMA_USER: synaplan_user
+      PMA_PASSWORD: synaplan_password
+    ports:
+      - "8082:80"
+    depends_on:
+      - db
+    restart: unless-stopped
+    networks:
+      - synaplan-network
+
+  # MailHog (SMTP testing)
+  mailhog:
+    image: mailhog/mailhog:latest
+    container_name: synaplan-sf-mailhog
+    ports:
+      - "1025:1025"  # SMTP
+      - "8025:8025"  # Web UI
+    networks:
+      - synaplan-network
+
+volumes:
+  mysql_data:
+  redis_data:
+  ollama_data:
+  whisper_models:
+
+networks:
+  synaplan-network:
+    driver: bridge
