@@ -1,0 +1,101 @@
+{
+  "welcome": "Willkommen bei Synaplan",
+  "chat": {
+    "title": "Chat",
+    "newChat": "Neuer Chat"
+  },
+  "chatInput": {
+    "placeholder": "Schreibe deine Nachricht hier...",
+    "send": "Senden",
+    "stop": "Stoppen",
+    "enhance": "Verbessern",
+    "thinking": "Denken"
+  },
+  "login": {
+    "title": "Anmelden",
+    "email": "E-Mail",
+    "password": "Passwort",
+    "submit": "Anmelden",
+    "noAccount": "Noch kein Konto?",
+    "register": "Registrieren",
+    "forgotPassword": "Passwort vergessen?"
+  },
+  "register": {
+    "title": "Registrieren",
+    "firstName": "Vorname",
+    "lastName": "Nachname",
+    "email": "E-Mail",
+    "password": "Passwort",
+    "confirmPassword": "Passwort bestätigen",
+    "submit": "Registrieren",
+    "hasAccount": "Bereits ein Konto?",
+    "login": "Anmelden"
+  },
+  "forgotPassword": {
+    "title": "Passwort vergessen",
+    "email": "E-Mail",
+    "submit": "Zurücksetzen-Link senden",
+    "backToLogin": "Zurück zur Anmeldung"
+  },
+  "verifyEmail": {
+    "title": "E-Mail verifizieren",
+    "verifying": "Verifiziere...",
+    "success": "E-Mail erfolgreich verifiziert!",
+    "error": "Verifizierung fehlgeschlagen",
+    "goToLogin": "Zur Anmeldung"
+  },
+  "emailVerified": {
+    "title": "E-Mail verifiziert",
+    "message": "Ihre E-Mail wurde erfolgreich verifiziert!",
+    "goToLogin": "Zur Anmeldung"
+  },
+  "profile": {
+    "title": "Profil-Einstellungen",
+    "personalInfo": "Persönliche Informationen",
+    "firstName": "Vorname",
+    "lastName": "Nachname",
+    "email": "E-Mail",
+    "phone": "Telefon",
+    "companyInfo": "Firmeninformationen",
+    "companyName": "Firmenname",
+    "vatId": "USt-IdNr.",
+    "address": "Adresse",
+    "street": "Straße",
+    "zipCode": "PLZ",
+    "city": "Stadt",
+    "country": "Land",
+    "preferences": "Einstellungen",
+    "language": "Sprache",
+    "timezone": "Zeitzone",
+    "invoiceEmail": "Rechnungs-E-Mail",
+    "saveChanges": "Änderungen speichern",
+    "cancel": "Abbrechen"
+  },
+  "processing": {
+    "started": "Starte Verarbeitung...",
+    "startedTitle": "Verarbeite deine Nachricht",
+    "startedDesc": "Bereite Analyse deiner Anfrage vor",
+    "preprocessing": "Verarbeite Dateien...",
+    "preprocessingTitle": "Verarbeite Anhänge",
+    "preprocessingDesc": "Extrahiere und analysiere Dateiinhalte",
+    "classifying": "Analysiere Nachricht...",
+    "classifyingTitle": "Verstehe deine Anfrage",
+    "classifyingDesc": "KI analysiert Absicht und Inhalt",
+    "classified": "Erkannt",
+    "classifiedTitle": "Analyse abgeschlossen",
+    "routing": "Leite zu Handler",
+    "routingTitle": "Leite Anfrage weiter",
+    "routingDesc": "Leite zum passenden Handler:",
+    "generating": "Generiere Antwort...",
+    "generatingTitle": "Generiere Antwort",
+    "generatingDesc": "KI erstellt deine Antwort mit",
+    "topic": "Thema",
+    "language": "Sprache",
+    "modelId": "Model ID"
+  },
+  "message": {
+    "thinking": "Denkprozess",
+    "reasoning": "KI-Überlegung"
+  }
+}
+
