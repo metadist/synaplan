@@ -50,12 +50,42 @@
             </p>
           </div>
 
+          <!-- Success Message -->
+          <div v-if="successMessage" class="p-4 bg-green-500/10 border border-green-500/20 rounded-lg">
+            <p class="text-sm text-green-600 dark:text-green-400 flex items-start gap-2">
+              <svg class="w-5 h-5 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+              </svg>
+              <span>{{ successMessage }}</span>
+            </p>
+          </div>
+
+          <!-- Error Message -->
+          <div v-if="error" class="p-4 bg-red-500/10 border border-red-500/20 rounded-lg">
+            <p class="text-sm text-red-600 dark:text-red-400 flex items-start gap-2">
+              <svg class="w-5 h-5 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+              </svg>
+              <span>{{ error }}</span>
+            </p>
+          </div>
+
+          <!-- Remaining Attempts Info -->
+          <div v-if="remainingAttempts < 5" class="p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-lg">
+            <p class="text-xs txt-secondary text-center">
+              {{ remainingAttempts }} attempt{{ remainingAttempts !== 1 ? 's' : '' }} remaining
+            </p>
+          </div>
+
           <Button
             @click="handleResendEmail"
-            :disabled="isResending || countdown > 0"
+            :disabled="isResending || countdown > 0 || remainingAttempts <= 0"
             class="w-full btn-secondary py-3 rounded-lg font-medium"
           >
-            <span v-if="!isResending && countdown === 0">
+            <span v-if="remainingAttempts <= 0">
+              Maximum attempts reached
+            </span>
+            <span v-else-if="!isResending && countdown === 0">
               {{ $t('auth.resendEmail') }}
             </span>
             <span v-else-if="isResending" class="flex items-center justify-center gap-2">
@@ -66,7 +96,7 @@
               {{ $t('auth.sending') }}
             </span>
             <span v-else>
-              {{ $t('auth.resendIn', { seconds: countdown }) }}
+              Wait {{ Math.floor(countdown / 60) }}:{{ String(countdown % 60).padStart(2, '0') }}
             </span>
           </Button>
 
@@ -119,7 +149,11 @@ const logoSrc = computed(() => isDark.value ? '/synaplan-light.svg' : '/synaplan
 
 const userEmail = ref(route.query.email as string || 'your@email.com')
 const isResending = ref(false)
-const countdown = ref(60)
+const countdown = ref(0)
+const remainingAttempts = ref(5)
+const cooldownMinutes = ref(2)
+const error = ref('')
+const successMessage = ref('')
 let countdownInterval: number | null = null
 
 const currentLanguage = computed(() => locale.value)
@@ -139,8 +173,11 @@ const toggleTheme = () => {
   themeStore.setTheme(nextTheme)
 }
 
-const startCountdown = () => {
-  countdown.value = 60
+const startCountdown = (seconds: number) => {
+  countdown.value = seconds
+  if (countdownInterval) {
+    clearInterval(countdownInterval)
+  }
   countdownInterval = window.setInterval(() => {
     countdown.value--
     if (countdown.value <= 0 && countdownInterval) {
@@ -151,12 +188,53 @@ const startCountdown = () => {
 }
 
 const handleResendEmail = async () => {
+  error.value = ''
+  successMessage.value = ''
   isResending.value = true
+  
   try {
-    await apiService.post('/auth/resend-verification', { email: userEmail.value })
-    startCountdown()
-  } catch (error) {
-    console.error('Failed to resend email:', error)
+    const response = await authApi.resendVerification(userEmail.value)
+    
+    successMessage.value = response.message || 'Verification email sent!'
+    
+    if (response.remainingAttempts !== undefined) {
+      remainingAttempts.value = response.remainingAttempts
+    }
+    
+    if (response.cooldownMinutes !== undefined) {
+      cooldownMinutes.value = response.cooldownMinutes
+      startCountdown(response.cooldownMinutes * 60)
+    }
+  } catch (err: any) {
+    console.error('Failed to resend email:', err)
+    
+    if (err.response?.status === 429) {
+      // Rate limit error
+      const data = err.response.data
+      error.value = data.message || data.error || 'Please wait before requesting another email'
+      
+      if (data.waitSeconds) {
+        startCountdown(data.waitSeconds)
+      }
+      
+      if (data.remainingAttempts !== undefined) {
+        remainingAttempts.value = data.remainingAttempts
+      }
+      
+      if (data.maxAttemptsReached) {
+        error.value = 'Maximum attempts reached. Please contact support.'
+        remainingAttempts.value = 0
+      }
+    } else if (err.response?.status === 500) {
+      // Technical error (e.g., mail server issues)
+      error.value = err.response?.data?.message || 'A technical error occurred. Please try again later.'
+    } else if (err.response?.status === 400) {
+      // Validation error
+      error.value = err.response?.data?.error || err.response?.data?.message || 'Invalid request'
+    } else {
+      // Generic error
+      error.value = err.response?.data?.message || err.response?.data?.error || 'Failed to send email. Please try again.'
+    }
   } finally {
     isResending.value = false
   }
@@ -167,7 +245,7 @@ const handleChangeEmail = () => {
 }
 
 onMounted(() => {
-  startCountdown()
+  // Don't auto-start countdown, user must click resend first
 })
 
 onUnmounted(() => {

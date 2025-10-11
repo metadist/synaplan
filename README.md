@@ -58,11 +58,14 @@ src/
 ## ✨ Features
 
 ### 1. AI Chat Interface
-- Real-time streaming responses
-- Multiple AI model support (OpenAI, Anthropic, Google)
-- Rich message types: text, images, code, links, videos
-- Command system (`/pic`, `/vid`, `/search`, etc.)
-- Chat history management
+- Real-time SSE streaming with live responses
+- Multiple AI model support (Ollama, OpenAI, Anthropic, Groq, Google)
+- Rich message rendering: text, code blocks, links, images, videos
+- Thinking/reasoning blocks display (collapsible)
+- Chat sessions with history and lazy loading
+- Model selection and "Again" functionality
+- Processing status indicators during classification and generation
+- Custom dialogs replacing native browser alerts
 
 ### 2. Widget Management
 - Create and manage embeddable chat widgets
@@ -262,10 +265,12 @@ The app supports special commands in chat:
 
 ## 🚧 Future Enhancements
 
-- [ ] Replace mock data with real API calls
-- [ ] Add user authentication flow
-- [ ] Implement WebSocket for real-time chat
-- [ ] Add more AI providers
+- [x] Real API integration (authentication, chat, sessions)
+- [x] SSE streaming for real-time responses
+- [x] Multi-provider AI support
+- [ ] File upload and analysis
+- [ ] Web search tool integration
+- [ ] Media generation (images, videos, audio)
 - [ ] Advanced widget analytics
 - [ ] Multi-language support
 

@@ -5,8 +5,6 @@
 import { httpClient, API_BASE_URL } from './httpClient'
 import type { MessageResponse } from '@/types/ai-models'
 
-const useMockData = false
-
 export const chatApi = {
   async sendMessage(userId: number, message: string, trackId?: number): Promise<any> {
     // Mock data temporarily disabled - direct backend communication
@@ -34,14 +32,18 @@ export const chatApi = {
     userId: number,
     message: string,
     trackId: number | undefined,
+    chatId: number,
     onUpdate: (data: any) => void,
-    includeReasoning: boolean = false
+    includeReasoning: boolean = false,
+    webSearch: boolean = false
   ): () => void {
     const token = localStorage.getItem('auth_token')
     const params = new URLSearchParams({
       message,
+      chatId: chatId.toString(),
       ...(trackId && { trackId: trackId.toString() }),
-      ...(includeReasoning && { reasoning: '1' })
+      ...(includeReasoning && { reasoning: '1' }),
+      ...(webSearch && { webSearch: '1' })
     })
 
     // Build URL with token for authentication
@@ -88,18 +90,13 @@ export const chatApi = {
         return
       }
       
-      // SSE CLOSED (2) - Connection is closed
-      if (eventSource.readyState === EventSource.CLOSED) {
-        console.log('✅ Stream ended (connection closed)')
+      // SSE CLOSED (2) or CONNECTING (0) - Connection closed by server
+      // Usually means all data sent, treat as completion if we haven't received it
+      if (eventSource.readyState === EventSource.CLOSED || eventSource.readyState === EventSource.CONNECTING) {
+        console.log('⚠️ SSE connection closed by server (treating as completion)')
         eventSource.close()
-        return
-      }
-      
-      // SSE CONNECTING (0) - Usually means server closed after sending all data
-      // This is normal behavior after complete event, not an actual error
-      if (eventSource.readyState === EventSource.CONNECTING) {
-        console.log('⚠️ SSE connection closed by server (normal after data sent)')
-        eventSource.close()
+        // Send a synthetic complete event to clean up UI
+        onUpdate({ status: 'complete', message: 'Response complete', metadata: {} })
         return
       }
       
@@ -137,6 +134,12 @@ export const chatApi = {
     return httpClient<{ original: string; enhanced: string }>('/api/v1/messages/enhance', {
       method: 'POST',
       body: JSON.stringify({ text })
+    })
+  },
+
+  async getChatMessages(chatId: number, offset = 0, limit = 50): Promise<any> {
+    return httpClient<any>(`/api/v1/chats/${chatId}/messages?offset=${offset}&limit=${limit}`, {
+      method: 'GET'
     })
   }
 }

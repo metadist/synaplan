@@ -1,7 +1,7 @@
-import type { Part } from '../stores/history'
-import { commandsData } from '../stores/commands'
+import type { Part } from '@/stores/history'
+import { commandsData } from '@/stores/commands'
 import { parseCommand, normalizeUrl } from './parse'
-import { mockImages, mockVideo, mockLinks, mockDocs, mockCodeSamples, mockTranslations } from '../mocks/data'
+import { mockImages, mockVideo, mockLinks, mockDocs, mockCodeSamples, mockTranslations } from '@/mocks/data'
 
 function delay(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms))

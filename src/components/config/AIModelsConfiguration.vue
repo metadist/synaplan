@@ -189,6 +189,7 @@ import { Icon } from '@iconify/vue'
 import { getModels, getDefaultModels, saveDefaultModels, type ModelInfo } from '@/services/api/configApi'
 import { serviceColors } from '@/mocks/aiModels'
 import { getProviderIcon } from '@/utils/providerIcons'
+import { useNotification } from '@/composables/useNotification'
 
 type Capability = 'SORT' | 'CHAT' | 'VECTORIZE' | 'PIC2TEXT' | 'TEXT2PIC' | 'SOUND2TEXT' | 'TEXT2SOUND' | 'ANALYZE'
 
@@ -222,6 +223,8 @@ const defaultConfig = ref<Record<Capability, number | null>>({
 })
 const originalConfig = ref<Record<Capability, number | null>>({ ...defaultConfig.value })
 const selectedPurpose = ref<Capability | null>(null)
+
+const { success, error: showError } = useNotification()
 
 onMounted(async () => {
   await loadData()
@@ -300,11 +303,11 @@ const saveConfiguration = async () => {
     
     if (response.success) {
       originalConfig.value = { ...defaultConfig.value }
-      alert('Configuration saved successfully!')
+      success('Configuration saved successfully!')
     }
   } catch (error: any) {
     console.error('Failed to save configuration:', error)
-    alert(error.response?.data?.error || 'Failed to save configuration')
+    showError(error.response?.data?.error || 'Failed to save configuration')
   } finally {
     saving.value = false
   }

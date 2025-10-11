@@ -19,13 +19,13 @@ async function httpClient<T>(endpoint: string, options: HttpClientOptions = {}):
   }
 
   const token = localStorage.getItem('auth_token')
-  const headers: HeadersInit = {
+  const headers: Record<string, string> = {
     'Content-Type': 'application/json',
-    ...options.headers,
+    ...(options.headers as Record<string, string>),
   }
 
   if (token) {
-    headers.Authorization = `Bearer ${token}`
+    headers['Authorization'] = `Bearer ${token}`
   }
 
   const response = await fetch(url, {
@@ -35,10 +35,32 @@ async function httpClient<T>(endpoint: string, options: HttpClientOptions = {}):
 
   if (!response.ok) {
     if (response.status === 401) {
-      // Token invalid, trigger logout
+      // Token invalid or expired - trigger complete logout
+      console.warn('🔒 Authentication failed - logging out user')
+      
+      // Clear localStorage
       localStorage.removeItem('auth_token')
       localStorage.removeItem('auth_user')
-      window.location.href = '/login'
+      
+      // Clear all stores via router navigation (triggers store resets)
+      // Use router.push instead of window.location to maintain SPA state
+      const { useAuthStore } = await import('@/stores/auth')
+      const { useHistoryStore } = await import('@/stores/history')
+      const { useChatsStore } = await import('@/stores/chats')
+      
+      const authStore = useAuthStore()
+      const historyStore = useHistoryStore()
+      const chatsStore = useChatsStore()
+      
+      // Clear stores
+      authStore.$reset()
+      historyStore.clear()
+      chatsStore.$reset()
+      
+      // Redirect to login
+      window.location.href = '/login?reason=session_expired'
+      
+      throw new Error('Session expired. Please login again.')
     }
     
     let errorMessage = `HTTP ${response.status}: ${response.statusText}`

@@ -6,7 +6,16 @@
     <div class="flex flex-col h-full">
       <div ref="chatContainer" class="flex-1 overflow-y-auto bg-chat" @scroll="handleScroll">
         <div class="max-w-4xl mx-auto py-6">
-          <div v-if="historyStore.messages.length === 0" class="flex items-center justify-center h-full px-6">
+          <!-- Loading indicator for infinite scroll -->
+          <div v-if="historyStore.isLoadingMessages" class="flex items-center justify-center py-4">
+            <svg class="w-4 h-4 animate-spin txt-brand" fill="none" viewBox="0 0 24 24">
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/>
+            </svg>
+            <span class="ml-2 txt-secondary text-sm">Loading messages...</span>
+          </div>
+          
+          <div v-if="historyStore.messages.length === 0 && !historyStore.isLoadingMessages" class="flex items-center justify-center h-full px-6">
             <div class="text-center">
               <h2 class="text-2xl font-semibold txt-primary mb-2">
                 {{ $t('welcome') }}
@@ -54,20 +63,23 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, nextTick, watch } from 'vue'
-import MainLayout from '../components/MainLayout.vue'
-import ChatInput from '../components/ChatInput.vue'
-import ChatMessage from '../components/ChatMessage.vue'
-import { useHistoryStore, type Message } from '../stores/history'
-import { executeCommand } from '../commands/execute'
-import { useModelsStore } from '../stores/models'
-import { useAuthStore } from '../stores/auth'
+import { ref, computed, nextTick, watch, onMounted } from 'vue'
+import MainLayout from '@/components/MainLayout.vue'
+import ChatInput from '@/components/ChatInput.vue'
+import ChatMessage from '@/components/ChatMessage.vue'
+import { useHistoryStore, type Message } from '@/stores/history'
+import { useChatsStore } from '@/stores/chats'
+import { executeCommand } from '@/commands/execute'
+import { useModelsStore } from '@/stores/models'
+import { useAuthStore } from '@/stores/auth'
 import { chatApi } from '@/services/api'
 import { mockModelOptions, type ModelOption } from '@/mocks/aiModels'
+import { parseAIResponse } from '@/utils/responseParser'
 
 const chatContainer = ref<HTMLElement | null>(null)
 const autoScroll = ref(true)
 const historyStore = useHistoryStore()
+const chatsStore = useChatsStore()
 const modelsStore = useModelsStore()
 const authStore = useAuthStore()
 let streamingAbortController: AbortController | null = null
@@ -88,20 +100,50 @@ const isStreaming = computed(() => {
   return historyStore.messages.some(m => m.isStreaming === true)
 })
 
-// Welcome-Message with streaming
-const initWelcomeMessage = async () => {
-  const messageId = historyStore.addStreamingMessage('assistant', 'OpenAI', 'GPT-4')
-  const welcomeText = 'Hello! How can I help you today? Try typing "/" to see available commands.'
-  
-  const { streamText } = await import('../commands/execute')
-  for await (const chunk of streamText(welcomeText, 2)) {
-    historyStore.updateStreamingMessage(messageId, chunk)
-  }
-  historyStore.finishStreamingMessage(messageId)
-}
-
 // Init on mount
-initWelcomeMessage()
+onMounted(async () => {
+  // Load chats first
+  await chatsStore.loadChats()
+  
+  // If no active chat, create one
+  if (!chatsStore.activeChatId) {
+    await chatsStore.createChat('New Chat')
+  } else {
+    // Load messages for active chat
+    await historyStore.loadMessages(chatsStore.activeChatId)
+  }
+})
+
+// Watch for active chat changes and load messages
+watch(() => chatsStore.activeChatId, async (newChatId) => {
+  if (newChatId) {
+    historyStore.clear()
+    await historyStore.loadMessages(newChatId)
+    await nextTick()
+    scrollToBottom()
+  }
+})
+
+async function generateChatTitleFromFirstMessage(firstMessage: string) {
+  const chat = chatsStore.activeChat
+  if (!chat) return
+  
+  // Only generate if chat has default title
+  if (chat.title && chat.title !== 'New Chat') return
+  
+  // Only generate for user messages from this chat
+  const userMessages = historyStore.messages.filter(m => m.role === 'user')
+  if (userMessages.length !== 1) return
+  
+  // Generate title from first message (take first 50 chars)
+  let title = firstMessage.trim()
+  if (title.length > 50) {
+    title = title.substring(0, 47) + '...'
+  }
+  
+  // Update chat title
+  await chatsStore.updateChatTitle(chat.id, title)
+}
 
 const getDateLabel = (date: Date): string => {
   const today = new Date()
@@ -152,20 +194,34 @@ const scrollToBottom = () => {
   }
 }
 
-const handleScroll = () => {
+const handleScroll = async () => {
   if (!chatContainer.value) return
 
   const { scrollTop, scrollHeight, clientHeight } = chatContainer.value
+  
+  // Check if at bottom for auto-scroll
   const isAtBottom = Math.abs(scrollHeight - clientHeight - scrollTop) < 50
-
   autoScroll.value = isAtBottom
+  
+  // Check if at top for loading more messages (Infinite Scroll)
+  const isAtTop = scrollTop < 100
+  if (isAtTop && historyStore.hasMoreMessages && !historyStore.isLoadingMessages && chatsStore.activeChatId) {
+    const currentScrollHeight = scrollHeight
+    await historyStore.loadMoreMessages(chatsStore.activeChatId)
+    // Restore scroll position after loading
+    await nextTick()
+    if (chatContainer.value) {
+      const newScrollHeight = chatContainer.value.scrollHeight
+      chatContainer.value.scrollTop = newScrollHeight - currentScrollHeight + scrollTop
+    }
+  }
 }
 
 watch(() => historyStore.messages, () => {
   scrollToBottom()
 }, { deep: true })
 
-const handleSendMessage = async (content: string, isCommand: boolean, options?: { includeReasoning?: boolean }) => {
+const handleSendMessage = async (content: string, options?: { includeReasoning?: boolean }) => {
   autoScroll.value = true
 
   // Add user message
@@ -185,7 +241,7 @@ const handleSendMessage = async (content: string, isCommand: boolean, options?: 
   }
 }
 
-const streamAIResponse = async (userMessage: string, options?: { includeReasoning?: boolean }) => {
+const streamAIResponse = async (userMessage: string, options?: { includeReasoning?: boolean; webSearch?: boolean }) => {
   streamingAbortController = new AbortController()
   
   // Get current selected model from store
@@ -219,15 +275,24 @@ const streamAIResponse = async (userMessage: string, options?: { includeReasonin
     } else {
       // Use real Backend API with SSE streaming
       const userId = authStore.user?.id || 1
-      let fullContent = ''
+      const chatId = chatsStore.activeChatId
+      
+      if (!chatId) {
+        console.error('No active chat selected')
+        return
+      }
+      
       const trackId = Date.now()
+      let fullContent = ''
       
       const includeReasoning = options?.includeReasoning ?? false
+      const webSearch = options?.webSearch ?? false
       
       const stopStreaming = chatApi.streamMessage(
         userId,
         userMessage,
         trackId,
+        chatId,
         (data) => {
           if (streamingAbortController?.signal.aborted) {
             return
@@ -281,19 +346,111 @@ const streamAIResponse = async (userMessage: string, options?: { includeReasonin
           } else if (data.status === 'data' && data.chunk) {
             console.log('📦 Received chunk:', data.chunk.substring(0, 20) + '...')
             
-            // Hide processing status once first chunk arrives
             if (processingStatus.value) {
               processingStatus.value = ''
               processingMetadata.value = {}
             }
             
-            // Accumulate full content (including <think> tags)
+            // AI gibt nur TEXT zurück (keine JSON!)
             fullContent += data.chunk
             
-            // But display content WITHOUT <think> blocks during streaming
-            // Remove all <think>...</think> content temporarily for display
-            const displayContent = fullContent.replace(/<think>[\s\S]*?<\/think>/g, '')
-            historyStore.updateStreamingMessage(messageId, displayContent)
+            // Extrahiere thinking blocks und content separat
+            const thinkingMatches = fullContent.match(/<think>([\s\S]*?)(<\/think>|$)/g)
+            const thinkingParts: any[] = []
+            
+            if (thinkingMatches) {
+              thinkingMatches.forEach(match => {
+                const content = match.replace(/<think>|<\/think>/g, '').trim()
+                if (content) {
+                  thinkingParts.push({ type: 'thinking', content })
+                }
+              })
+            }
+            
+            // Display content OHNE <think> blocks
+            const displayContent = fullContent.replace(/<think>[\s\S]*?<\/think>/g, '').trim()
+            
+            // Parse für code blocks, etc.
+            const parsed = parseAIResponse(displayContent)
+            
+            // Update message
+            const message = historyStore.messages.find(m => m.id === messageId)
+            if (message) {
+              const newParts = [...thinkingParts]
+              
+              parsed.parts.forEach(part => {
+                if (part.type === 'text') {
+                  newParts.push({ type: 'text', content: part.content })
+                } else if (part.type === 'code' || part.type === 'json') {
+                  newParts.push({
+                    type: 'code',
+                    content: part.content,
+                    language: part.language
+                  })
+                } else if (part.type === 'links' && part.links) {
+                  newParts.push({
+                    type: 'links',
+                    items: part.links.map(l => {
+                      try {
+                        return {
+                          title: l.title,
+                          url: l.url,
+                          desc: l.description,
+                          host: new URL(l.url).hostname
+                        }
+                      } catch {
+                        return {
+                          title: l.title,
+                          url: l.url,
+                          desc: l.description,
+                          host: l.url
+                        }
+                      }
+                    })
+                  })
+                }
+              })
+              
+              message.parts = newParts
+            }
+          } else if (data.status === 'file') {
+            // Handle file attachments (images, videos, etc.)
+            console.log('📎 File received:', data.type, data.url)
+            const message = historyStore.messages.find(m => m.id === messageId)
+            if (message) {
+              // Add file part based on type
+              if (data.type === 'image') {
+                message.parts.push({ type: 'image', url: data.url })
+              } else if (data.type === 'video') {
+                message.parts.push({ type: 'video', url: data.url })
+              }
+            }
+          } else if (data.status === 'links') {
+            // Handle web search results
+            console.log('🔗 Links received:', data.links)
+            const message = historyStore.messages.find(m => m.id === messageId)
+            if (message && data.links) {
+              message.parts.push({
+                type: 'links',
+                items: data.links.map((l: any) => {
+                  try {
+                    return {
+                      title: l.title || l.url,
+                      url: l.url,
+                      desc: l.description,
+                      host: new URL(l.url).hostname
+                    }
+                  } catch {
+                    return {
+                      title: l.title || l.url,
+                      url: l.url,
+                      desc: l.description,
+                      host: l.url
+                    }
+                  }
+                })
+              })
+            }
           } else if (data.status === 'complete') {
             console.log('Complete:', data)
             
@@ -307,27 +464,30 @@ const streamAIResponse = async (userMessage: string, options?: { includeReasonin
               if (data.again) {
                 message.againData = data.again
               }
-              if (data.messageId) {
-                message.backendMessageId = data.messageId
-              }
-              // Update provider and model from backend metadata
-              if (data.metadata?.provider) {
-                message.provider = data.metadata.provider
-              }
-              if (data.metadata?.model) {
-                message.modelLabel = data.metadata.model
-              }
-            }
-            
-            historyStore.finishStreamingMessage(messageId)
+                  if (data.messageId) {
+                    message.backendMessageId = data.messageId
+                  }
+                  // Update provider and model from backend metadata
+                  if (data.metadata?.provider) {
+                    message.provider = data.metadata.provider
+                  }
+                  if (data.metadata?.model) {
+                    message.modelLabel = data.metadata.model
+                  }
+                }
+                
+                // Generate chat title from first message
+                generateChatTitleFromFirstMessage(userMessage)
+                
+                historyStore.finishStreamingMessage(messageId)
           } else if (data.status === 'error') {
             const errorMsg = data.error || data.message || 'Unknown error'
             console.error('Error:', errorMsg, data)
             processingStatus.value = ''
             processingMetadata.value = {}
             
-            // Keep existing content if any was received
-            if (fullContent) {
+            const message = historyStore.messages.find(m => m.id === messageId)
+            if (message && message.parts.length > 0) {
               historyStore.finishStreamingMessage(messageId)
             } else {
               historyStore.updateStreamingMessage(messageId, 'Error: ' + errorMsg)
@@ -337,7 +497,8 @@ const streamAIResponse = async (userMessage: string, options?: { includeReasonin
             console.log('⚠️ Unknown status:', data.status, data)
           }
         },
-        includeReasoning
+        includeReasoning,
+        webSearch
       )
       
       // Store cleanup function
@@ -456,87 +617,3 @@ const handleRegenerate = async (message: Message, modelOption: ModelOption) => {
 }
 </script>
 
-<style scoped>
-/* Processing Status Styles */
-.processing-status-container {
-  padding: 0 16px;
-  margin-bottom: 16px;
-}
-
-.processing-status {
-  padding: 12px 16px;
-  background: linear-gradient(135deg, rgba(139, 92, 246, 0.05) 0%, rgba(167, 139, 250, 0.05) 100%);
-  border: 1px solid rgba(139, 92, 246, 0.2);
-  border-radius: 12px;
-  animation: fadeIn 0.3s ease-in;
-}
-
-.status-badge {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 8px;
-}
-
-.status-text {
-  font-size: 14px;
-  color: #8b5cf6;
-  font-weight: 500;
-  flex: 1;
-}
-
-.status-spinner {
-  width: 16px;
-  height: 16px;
-  border: 2px solid rgba(139, 92, 246, 0.3);
-  border-top-color: #8b5cf6;
-  border-radius: 50%;
-  animation: spin 0.8s linear infinite;
-  flex-shrink: 0;
-}
-
-.status-metadata {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  font-size: 12px;
-  padding-top: 8px;
-  border-top: 1px solid rgba(139, 92, 246, 0.1);
-}
-
-.metadata-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.metadata-label {
-  color: #9ca3af;
-  font-weight: 500;
-}
-
-.metadata-value {
-  color: #6b7280;
-  background: rgba(139, 92, 246, 0.1);
-  padding: 2px 8px;
-  border-radius: 4px;
-  font-weight: 600;
-}
-
-@keyframes spin {
-  to { 
-    transform: rotate(360deg); 
-  }
-}
-
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(-10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-</style>

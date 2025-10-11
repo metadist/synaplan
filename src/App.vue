@@ -11,12 +11,14 @@
       </Suspense>
     </ErrorBoundary>
     <NotificationContainer />
+    <Dialog />
   </div>
 </template>
 
 <script setup lang="ts">
 import { useTheme } from './composables/useTheme'
 import NotificationContainer from '@/components/NotificationContainer.vue'
+import Dialog from '@/components/Dialog.vue'
 import ErrorBoundary from '@/components/ErrorBoundary.vue'
 import LoadingView from '@/views/LoadingView.vue'
 

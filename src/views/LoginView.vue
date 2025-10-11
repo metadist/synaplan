@@ -150,8 +150,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, computed, onMounted } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { SunIcon, MoonIcon } from '@heroicons/vue/24/outline'
 import { useTheme } from '../composables/useTheme'
@@ -160,6 +160,7 @@ import { validateEmail } from '../composables/usePasswordValidation'
 import Button from '../components/Button.vue'
 
 const router = useRouter()
+const route = useRoute()
 const { locale } = useI18n()
 const themeStore = useTheme()
 
@@ -191,12 +192,27 @@ const toggleTheme = () => {
   themeStore.setTheme(nextTheme)
 }
 
-const { login, error, loading, clearError } = useAuth()
+const { login, error: authError, loading, clearError } = useAuth()
 const emailError = ref('')
+const sessionExpiredMessage = ref('')
+
+// Computed error to show either auth error or session expired message
+const error = computed(() => sessionExpiredMessage.value || authError.value)
+
+// Check for session expiration on mount
+onMounted(() => {
+  const reason = route.query.reason as string
+  if (reason === 'session_expired') {
+    sessionExpiredMessage.value = 'Your session has expired. Please login again.'
+    // Remove query parameter from URL without reloading
+    router.replace({ query: {} })
+  }
+})
 
 const handleLogin = async () => {
   clearError()
   emailError.value = ''
+  sessionExpiredMessage.value = ''
 
   // Validate email
   if (!validateEmail(email.value)) {

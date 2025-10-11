@@ -84,6 +84,9 @@ function parseContentWithThinking(content: string): Part[] {
 
 export const useHistoryStore = defineStore('history', () => {
   const messages = ref<Message[]>([])
+  const isLoadingMessages = ref(false)
+  const hasMoreMessages = ref(false)
+  const currentOffset = ref(0)
 
   const addMessage = (
     role: 'user' | 'assistant', 
@@ -144,10 +147,12 @@ export const useHistoryStore = defineStore('history', () => {
       message.isStreaming = false
       if (parts) {
         message.parts = parts
-      } else {
-        // Parse the current content for thinking blocks
+      }
+      // If parts are already set correctly (e.g., during streaming), don't re-parse
+      // Only parse if we have a single text part that might contain thinking blocks
+      else if (message.parts.length === 1 && message.parts[0].type === 'text') {
         const currentContent = message.parts[0]?.content || ''
-        if (currentContent) {
+        if (currentContent && currentContent.includes('<think>')) {
           message.parts = parseContentWithThinking(currentContent)
         }
       }
@@ -163,15 +168,68 @@ export const useHistoryStore = defineStore('history', () => {
 
   const clear = () => {
     messages.value = []
+    currentOffset.value = 0
+    hasMoreMessages.value = false
+  }
+
+  const loadMessages = async (chatId: number, offset = 0, limit = 50) => {
+    isLoadingMessages.value = true
+    try {
+      const { chatApi } = await import('@/services/api')
+      const response = await chatApi.getChatMessages(chatId, offset, limit)
+      
+      if (response.success && response.messages) {
+        const loadedMessages: Message[] = response.messages.map((m: any) => {
+          const role = m.direction === 'IN' ? 'user' : 'assistant'
+          const parts = parseContentWithThinking(m.text || '')
+          
+          return {
+            id: `backend-${m.id}`,
+            role,
+            parts,
+            timestamp: new Date(m.timestamp * 1000),
+            provider: m.provider,
+            modelLabel: m.provider || 'AI',
+            backendMessageId: m.id
+          }
+        })
+        
+        // If offset is 0, replace messages; otherwise, prepend (for infinite scroll)
+        if (offset === 0) {
+          messages.value = loadedMessages
+        } else {
+          messages.value = [...loadedMessages, ...messages.value]
+        }
+        
+        currentOffset.value = offset + loadedMessages.length
+        hasMoreMessages.value = response.pagination?.hasMore || false
+      }
+    } catch (error) {
+      console.error('Failed to load messages:', error)
+    } finally {
+      isLoadingMessages.value = false
+    }
+  }
+
+  const loadMoreMessages = async (chatId: number) => {
+    if (isLoadingMessages.value || !hasMoreMessages.value) {
+      return
+    }
+    await loadMessages(chatId, currentOffset.value, 50)
   }
 
   return {
     messages,
+    isLoadingMessages,
+    hasMoreMessages,
     addMessage,
     addStreamingMessage,
     updateStreamingMessage,
     finishStreamingMessage,
     markSuperseded,
     clear,
+    clearHistory: clear,
+    loadMessages,
+    loadMoreMessages
   }
 })

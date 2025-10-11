@@ -242,6 +242,7 @@ import {
   outputLanguages, 
   focusAreaOptions 
 } from '@/mocks/summaries'
+import { useNotification } from '@/composables/useNotification'
 
 const emit = defineEmits<{
   generate: [text: string, config: SummaryConfig]
@@ -264,6 +265,8 @@ const config = ref<SummaryConfig>({
 const documentText = ref('')
 const isDragging = ref(false)
 const fileInput = ref<HTMLInputElement | null>(null)
+
+const { warning } = useNotification()
 
 const characterCount = computed(() => documentText.value.length)
 const wordCount = computed(() => {
@@ -314,7 +317,7 @@ const handleDrop = (event: DragEvent) => {
 const handleFile = (file: File) => {
   // Check file size (10MB max)
   if (file.size > 10 * 1024 * 1024) {
-    alert('File size exceeds 10MB limit')
+    warning('File size exceeds 10MB limit')
     return
   }
 

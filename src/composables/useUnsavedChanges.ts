@@ -1,6 +1,7 @@
 import { ref, watch, type Ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useNotification } from './useNotification'
+import { useDialog } from './useDialog'
 import { useI18n } from 'vue-i18n'
 
 export function useUnsavedChanges<T>(
@@ -9,6 +10,7 @@ export function useUnsavedChanges<T>(
 ) {
   const router = useRouter()
   const { success } = useNotification()
+  const dialog = useDialog()
   const { t } = useI18n()
   
   const hasUnsavedChanges = ref(false)
@@ -51,16 +53,22 @@ export function useUnsavedChanges<T>(
   }
 
   // Prevent navigation if there are unsaved changes
-  const confirmNavigation = () => {
+  const confirmNavigation = async () => {
     if (hasUnsavedChanges.value) {
-      return window.confirm(t('unsavedChanges.confirmLeave'))
+      return await dialog.confirm({
+        title: t('unsavedChanges.title'),
+        message: t('unsavedChanges.confirmLeave'),
+        confirmText: t('common.leave'),
+        cancelText: t('common.stay'),
+        danger: true
+      })
     }
     return true
   }
 
   // Setup navigation guard
   const setupNavigationGuard = () => {
-    // Browser navigation (back/forward/close)
+    // Browser navigation (back/forward/close) - must use window.confirm
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
       if (hasUnsavedChanges.value) {
         e.preventDefault()
@@ -69,10 +77,11 @@ export function useUnsavedChanges<T>(
     }
     window.addEventListener('beforeunload', handleBeforeUnload)
 
-    // Vue Router navigation
-    const removeGuard = router.beforeEach((_to, _from, next) => {
-      if (hasUnsavedChanges.value && !confirmNavigation()) {
-        next(false)
+    // Vue Router navigation - can use async dialog
+    const removeGuard = router.beforeEach(async (_to, _from, next) => {
+      if (hasUnsavedChanges.value) {
+        const confirmed = await confirmNavigation()
+        next(confirmed)
       } else {
         next()
       }

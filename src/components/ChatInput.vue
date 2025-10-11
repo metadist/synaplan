@@ -220,13 +220,9 @@ const aiConfigStore = useAiConfigStore()
 const { warning, error: showError } = useNotification()
 
 const emit = defineEmits<{
-  send: [message: string, isCommand: boolean, options?: { includeReasoning?: boolean }]
+  send: [message: string, options?: { includeReasoning?: boolean; webSearch?: boolean }]
   stop: []
 }>()
-
-const isCommand = computed(() => {
-  return message.value.trim().startsWith('/')
-})
 
 const commandsStore = useCommandsStore()
 
@@ -258,10 +254,13 @@ watch(message, (newValue) => {
 
 const sendMessage = () => {
   if (message.value.trim()) {
+    const hasWebSearch = activeTools.value.some(t => t.id === 'web-search')
+    
     const options = {
-      includeReasoning: thinkingEnabled.value
+      includeReasoning: thinkingEnabled.value,
+      webSearch: hasWebSearch
     }
-    emit('send', message.value, isCommand.value, options)
+    emit('send', message.value, options)
     message.value = ''
     paletteVisible.value = false
     activeCommand.value = null
