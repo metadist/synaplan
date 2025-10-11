@@ -45,7 +45,7 @@ framework:
 
         routing:
             # Route your messages to the transports
-            # 'App\Message\ProcessMessageCommand': async_ai_high
+            'App\Message\ProcessMessageCommand': async_ai_high
 
 when@test:
     framework:

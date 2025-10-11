@@ -14,6 +14,7 @@ use App\Repository\MessageRepository;
 #[ORM\Index(columns: ['BDIRECT'], name: 'BDIRECT')]
 #[ORM\Index(columns: ['BLANG'], name: 'BLANG')]
 #[ORM\Index(columns: ['BTOPIC'], name: 'BTOPIC')]
+#[ORM\Index(columns: ['BCHATID'], name: 'idx_message_chat')]
 class Message
 {
     #[ORM\Id]
@@ -23,6 +24,13 @@ class Message
 
     #[ORM\Column(name: 'BUSERID', type: 'bigint')]
     private int $userId;
+
+    #[ORM\Column(name: 'BCHATID', type: 'integer', nullable: true)]
+    private ?int $chatId = null;
+
+    #[ORM\ManyToOne(targetEntity: Chat::class, inversedBy: 'messages')]
+    #[ORM\JoinColumn(name: 'BCHATID', referencedColumnName: 'BID', onDelete: 'SET NULL')]
+    private ?Chat $chat = null;
 
     #[ORM\Column(name: 'BTRACKID', type: 'bigint')]
     private int $trackingId;
@@ -239,6 +247,29 @@ class Message
     public function setFileType(string $fileType): self
     {
         $this->fileType = $fileType;
+        return $this;
+    }
+
+    public function getChatId(): ?int
+    {
+        return $this->chatId;
+    }
+
+    public function setChatId(?int $chatId): self
+    {
+        $this->chatId = $chatId;
+        return $this;
+    }
+
+    public function getChat(): ?Chat
+    {
+        return $this->chat;
+    }
+
+    public function setChat(?Chat $chat): self
+    {
+        $this->chat = $chat;
+        $this->chatId = $chat?->getId();
         return $this;
     }
 }

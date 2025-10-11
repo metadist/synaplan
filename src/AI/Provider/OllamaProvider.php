@@ -74,29 +74,34 @@ class OllamaProvider implements ChatProviderInterface, EmbeddingProviderInterfac
 
         try {
             $model = $options['model'];
-            $reasoning = $options['reasoning'] ?? false;
             
             $this->logger->info('Ollama chat request', [
                 'model' => $model,
-                'message_count' => count($messages),
-                'reasoning_requested' => $reasoning
+                'message_count' => count($messages)
             ]);
 
-            $requestOptions = [
-                'model' => $model,
-                'messages' => $messages,
-                'stream' => false,
-            ];
-
-            if ($reasoning) {
-                $requestOptions['options'] = [
-                    'enable_reasoning' => true
-                ];
+            // Build prompt from messages (Ollama Completions API style)
+            $prompt = '';
+            foreach ($messages as $message) {
+                $role = $message['role'] ?? 'user';
+                $content = $message['content'] ?? '';
+                
+                if ($role === 'system') {
+                    $prompt .= $content . "\n\n";
+                } elseif ($role === 'user') {
+                    $prompt .= "User: " . $content . "\n";
+                } elseif ($role === 'assistant') {
+                    $prompt .= "Assistant: " . $content . "\n";
+                }
             }
 
-            $response = $this->client->chat()->create($requestOptions);
+            // Use completions API (non-streaming)
+            $response = $this->client->completions()->create([
+                'model' => $model,
+                'prompt' => $prompt,
+            ]);
 
-            return $response->message->content ?? '';
+            return $response->response ?? '';
         } catch (\Exception $e) {
             $this->logger->error('Ollama chat error', [
                 'error' => $e->getMessage(),
@@ -117,42 +122,72 @@ class OllamaProvider implements ChatProviderInterface, EmbeddingProviderInterfac
 
         try {
             $model = $options['model'];
-            $reasoning = $options['reasoning'] ?? false;
             
-            $this->logger->info('Ollama streaming chat request', [
+            $this->logger->info('🔵 Ollama streaming chat START', [
                 'model' => $model,
-                'message_count' => count($messages),
-                'reasoning_requested' => $reasoning
+                'message_count' => count($messages)
             ]);
 
-            $requestOptions = [
-                'model' => $model,
-                'messages' => $messages,
-                'stream' => true,
-            ];
-
-            if ($reasoning) {
-                $requestOptions['options'] = [
-                    'enable_reasoning' => true
-                ];
+            // Build prompt from messages (Ollama Completions API style)
+            $prompt = '';
+            foreach ($messages as $message) {
+                $role = $message['role'] ?? 'user';
+                $content = $message['content'] ?? '';
+                
+                if ($role === 'system') {
+                    $prompt .= $content . "\n\n";
+                } elseif ($role === 'user') {
+                    $prompt .= "User: " . $content . "\n";
+                } elseif ($role === 'assistant') {
+                    $prompt .= "Assistant: " . $content . "\n";
+                }
             }
+            
+            $this->logger->info('🟡 Ollama: Prompt built', ['length' => strlen($prompt)]);
 
-            $stream = $this->client->chat()->create($requestOptions);
-
-            foreach ($stream as $response) {
-                $content = $response->message->content ?? '';
-                if ($content) {
-                    $callback($content);
+            // Use completions API with streaming (like old code)
+            $stream = $this->client->completions()->createStreamed([
+                'model' => $model,
+                'prompt' => $prompt,
+            ]);
+            
+            $this->logger->info('🟡 Ollama: Stream created, iterating...');
+            
+            $chunkCount = 0;
+            $fullResponse = '';
+            
+            foreach ($stream as $completion) {
+                // Extract response content (like old code: $completion->response)
+                $textChunk = $completion->response ?? '';
+                
+                if (!empty($textChunk)) {
+                    $fullResponse .= $textChunk;
+                    $callback($textChunk);
+                    $chunkCount++;
+                    
+                    if ($chunkCount === 1) {
+                        $this->logger->info('🟢 Ollama: First chunk sent!', [
+                            'length' => strlen($textChunk),
+                            'preview' => substr($textChunk, 0, 50)
+                        ]);
+                    }
                 }
                 
-                // Check if stream is done
-                if (isset($response->done) && $response->done) {
+                // Check if done
+                if (isset($completion->done) && $completion->done) {
+                    $this->logger->info('🔵 Ollama: Stream done signal received');
                     break;
                 }
             }
+            
+            $this->logger->info('🔵 Ollama: Streaming complete', [
+                'chunks_sent' => $chunkCount,
+                'total_length' => strlen($fullResponse)
+            ]);
         } catch (\Exception $e) {
-            $this->logger->error('Ollama streaming error', [
-                'error' => $e->getMessage()
+            $this->logger->error('🔴 Ollama streaming error', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
             ]);
             throw new ProviderException(
                 'Ollama streaming error: ' . $e->getMessage(),

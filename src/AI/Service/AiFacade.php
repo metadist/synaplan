@@ -98,26 +98,34 @@ class AiFacade
             $messages = [['role' => 'user', 'content' => $messages]];
         }
         
-        $this->logger->info('AI chat stream request', [
+        $this->logger->info('🔵 AiFacade: Starting chat stream', [
             'provider' => $provider->getName(),
             'user_id' => $userId,
             'messages_count' => count($messages),
+            'model' => $options['model'] ?? 'default'
         ]);
         
         // Execute streaming with Circuit Breaker protection
         try {
             $this->circuitBreaker->execute(
-                callback: fn() => $provider->chatStream($messages, $streamCallback, $options),
+                callback: function() use ($provider, $messages, $streamCallback, $options) {
+                    $this->logger->info('🟢 AiFacade: Calling provider chatStream');
+                    $provider->chatStream($messages, $streamCallback, $options);
+                    $this->logger->info('🔵 AiFacade: Provider chatStream completed');
+                    return null; // void return
+                },
                 serviceName: 'ai_provider_' . $provider->getName(),
                 fallback: function() use ($messages, $streamCallback, $options) {
-                    $this->logger->warning('Using fallback provider for streaming');
+                    $this->logger->warning('⚠️  AiFacade: Using fallback provider for streaming');
                     $fallbackProvider = $this->registry->getChatProvider('test');
-                    return $fallbackProvider->chatStream($messages, $streamCallback, $options);
+                    $fallbackProvider->chatStream($messages, $streamCallback, $options);
+                    return null;
                 }
             );
         } catch (\Exception $e) {
-            $this->logger->error('AI chat stream failed with all providers', [
-                'error' => $e->getMessage()
+            $this->logger->error('🔴 AiFacade: Chat stream failed with all providers', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
             ]);
             throw new ProviderException('All AI providers failed for streaming', $e);
         }

@@ -99,13 +99,50 @@ class ChatHandler implements MessageHandlerInterface
 
         $this->notify($progressCallback, 'generating', 'Response generated.');
 
+        // Extract structured data from JSON response if present
+        $content = $response['content'];
+        $metadata = [
+            'provider' => $response['provider'] ?? 'unknown',
+            'model' => $response['model'] ?? 'unknown',
+            'tokens' => $response['usage'] ?? [],
+        ];
+        
+        if (is_string($content) && str_starts_with(trim($content), '{')) {
+            try {
+                $jsonData = json_decode($content, true, 512, JSON_THROW_ON_ERROR);
+                
+                // Extract BTEXT as main content
+                if (isset($jsonData['BTEXT'])) {
+                    $content = $jsonData['BTEXT'];
+                    $this->logger->info('ChatHandler: Extracted BTEXT from JSON response');
+                }
+                
+                // Extract file information
+                if (!empty($jsonData['BFILE']) && !empty($jsonData['BFILETEXT'])) {
+                    $metadata['file'] = [
+                        'path' => $jsonData['BFILETEXT'],
+                        'type' => $this->detectFileType($jsonData['BFILETEXT']),
+                    ];
+                    $this->logger->info('ChatHandler: Extracted file data', $metadata['file']);
+                }
+                
+                // Extract web search results/links
+                if (!empty($jsonData['BLINKS'])) {
+                    $metadata['links'] = $jsonData['BLINKS'];
+                    $this->logger->info('ChatHandler: Extracted links');
+                }
+                
+            } catch (\JsonException $e) {
+                // Not valid JSON, use content as-is
+                $this->logger->debug('ChatHandler: Response not JSON', [
+                    'error' => $e->getMessage()
+                ]);
+            }
+        }
+
         return [
-            'content' => $response['content'],
-            'metadata' => [
-                'provider' => $response['provider'] ?? 'unknown',
-                'model' => $response['model'] ?? 'unknown',
-                'tokens' => $response['usage'] ?? [],
-            ],
+            'content' => $content,
+            'metadata' => $metadata,
         ];
     }
 
@@ -122,11 +159,11 @@ class ChatHandler implements MessageHandlerInterface
     ): array {
         $this->notify($progressCallback, 'generating', 'Generating response...');
 
-        // System Prompt laden
-        $systemPrompt = $this->getSystemPrompt($message->getUserId(), $classification['language']);
+        // Simple system prompt for streaming (like old system)
+        $systemPrompt = 'You are the Synaplan.com AI assistant. Please answer in the language of the user.';
 
-        // Conversation History bauen
-        $messages = $this->buildMessages($systemPrompt, $thread, $message);
+        // Conversation History bauen (TEXT only for streaming)
+        $messages = $this->buildStreamingMessages($systemPrompt, $thread, $message);
 
         // Get model - Priority: User-selected (Again) > Classification override > DB default
         $modelId = null;
@@ -177,12 +214,20 @@ class ChatHandler implements MessageHandlerInterface
             'temperature' => 0.7,
         ], $options); // Options from frontend (e.g., reasoning: true/false)
         
+        $this->logger->info('🔵 ChatHandler: Calling AiFacade chatStream', [
+            'provider' => $provider,
+            'model' => $modelName,
+            'user_id' => $message->getUserId()
+        ]);
+        
         $metadata = $this->aiFacade->chatStream(
             $messages,
             $streamCallback,
             $message->getUserId(),
             $aiOptions
         );
+        
+        $this->logger->info('🔵 ChatHandler: AiFacade chatStream returned');
 
         $this->notify($progressCallback, 'generating', 'Response generated.');
 
@@ -197,7 +242,7 @@ class ChatHandler implements MessageHandlerInterface
 
     private function getSystemPrompt(int $userId, string $language): string
     {
-        // User-spezifischen System Prompt laden (aus BPROMPTS)
+
         $prompt = $this->promptRepository->findOneBy([
             'ownerId' => $userId,
             'language' => $language,
@@ -221,7 +266,11 @@ class ChatHandler implements MessageHandlerInterface
         return "You are a helpful AI assistant. Respond in a friendly and professional manner.";
     }
 
-    private function buildMessages(string $systemPrompt, array $thread, Message $currentMessage): array
+    /**
+     * Build messages for streaming (TEXT only, no JSON)
+     * Like old system: topicPrompt with $stream = true
+     */
+    private function buildStreamingMessages(string $systemPrompt, array $thread, Message $currentMessage): array
     {
         $messages = [
             ['role' => 'system', 'content' => $systemPrompt]
@@ -232,9 +281,13 @@ class ChatHandler implements MessageHandlerInterface
             $role = $msg->getDirection() === 'IN' ? 'user' : 'assistant';
             $content = $msg->getText();
             
-            // File Text inkludieren wenn vorhanden
+            // File Text inkludieren wenn vorhanden (wie altes System)
             if ($msg->getFileText()) {
-                $content .= "\n\n[File: " . $msg->getFilePath() . "]\n" . substr($msg->getFileText(), 0, 3000);
+                $content .= "\n\n\n---\n\n\nUser provided a file: " . 
+                           $msg->getFileType() . 
+                           ", saying: '" . 
+                           substr($msg->getFileText(), 0, 3000) . 
+                           "'\n\n";
             }
 
             $messages[] = [
@@ -246,12 +299,57 @@ class ChatHandler implements MessageHandlerInterface
         // Aktuelle Message
         $content = $currentMessage->getText();
         if ($currentMessage->getFileText()) {
-            $content .= "\n\n[File: " . $currentMessage->getFilePath() . "]\n" . substr($currentMessage->getFileText(), 0, 3000);
+            $content .= "\n\n\n---\n\n\nUser provided a file: " . 
+                       $currentMessage->getFileType() . 
+                       ", saying: '" . 
+                       substr($currentMessage->getFileText(), 0, 3000) . 
+                       "'\n\n";
         }
 
         $messages[] = [
             'role' => 'user',
             'content' => $content,
+        ];
+
+        return $messages;
+    }
+    
+    /**
+     * Build messages for non-streaming (JSON format)
+     * Like old system: topicPrompt with $stream = false
+     */
+    private function buildMessages(string $systemPrompt, array $thread, Message $currentMessage): array
+    {
+        $messages = [
+            ['role' => 'system', 'content' => $systemPrompt]
+        ];
+
+        // Thread Messages (JSON encoded wie im alten System)
+        foreach ($thread as $msg) {
+            $role = $msg->getDirection() === 'IN' ? 'user' : 'assistant';
+            $content = $msg->getText();
+
+            $messages[] = [
+                'role' => $role,
+                'content' => '[' . $msg->getDateTime() . ']: ' . $content,
+            ];
+        }
+
+        // Aktuelle Message als JSON
+        $msgArr = [
+            'BUNIXTIMES' => $currentMessage->getUnixTimestamp(),
+            'BDATETIME' => $currentMessage->getDateTime(),
+            'BFILEPATH' => $currentMessage->getFilePath() ?: '',
+            'BFILETYPE' => $currentMessage->getFileType() ?: '',
+            'BTOPIC' => $currentMessage->getTopic(),
+            'BLANG' => $currentMessage->getLanguage(),
+            'BTEXT' => $currentMessage->getText(),
+            'BFILETEXT' => $currentMessage->getFileText() ?: '',
+        ];
+        
+        $messages[] = [
+            'role' => 'user',
+            'content' => json_encode($msgArr, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
         ];
 
         return $messages;
@@ -266,6 +364,31 @@ class ChatHandler implements MessageHandlerInterface
                 'timestamp' => time(),
             ]);
         }
+    }
+    
+    private function detectFileType(string $path): string
+    {
+        $extension = strtolower(pathinfo($path, PATHINFO_EXTENSION));
+        
+        $imageExtensions = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'];
+        $videoExtensions = ['mp4', 'webm', 'ogg', 'mov', 'avi'];
+        $audioExtensions = ['mp3', 'wav', 'ogg', 'flac'];
+        $docExtensions = ['pdf', 'doc', 'docx', 'txt', 'xlsx', 'pptx'];
+        
+        if (in_array($extension, $imageExtensions)) {
+            return 'image';
+        }
+        if (in_array($extension, $videoExtensions)) {
+            return 'video';
+        }
+        if (in_array($extension, $audioExtensions)) {
+            return 'audio';
+        }
+        if (in_array($extension, $docExtensions)) {
+            return 'document';
+        }
+        
+        return 'file';
     }
 }
 

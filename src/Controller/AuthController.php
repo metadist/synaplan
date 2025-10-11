@@ -3,7 +3,9 @@
 namespace App\Controller;
 
 use App\DTO\RegisterRequest;
+use App\Entity\EmailVerificationAttempt;
 use App\Entity\User;
+use App\Repository\EmailVerificationAttemptRepository;
 use App\Repository\UserRepository;
 use App\Repository\VerificationTokenRepository;
 use App\Service\MailerService;
@@ -23,16 +25,23 @@ use Symfony\Component\Validator\Validator\ValidatorInterface;
 #[Route('/api/v1/auth', name: 'api_auth_')]
 class AuthController extends AbstractController
 {
+    private int $resendCooldownMinutes;
+    private int $maxResendAttempts;
+
     public function __construct(
         private UserRepository $userRepository,
         private VerificationTokenRepository $tokenRepository,
+        private EmailVerificationAttemptRepository $attemptRepository,
         private EntityManagerInterface $em,
         private UserPasswordHasherInterface $passwordHasher,
         private JWTTokenManagerInterface $jwtManager,
         private MailerService $mailerService,
         private ValidatorInterface $validator,
         private LoggerInterface $logger
-    ) {}
+    ) {
+        $this->resendCooldownMinutes = (int) ($_ENV['EMAIL_VERIFICATION_COOLDOWN_MINUTES'] ?? 2);
+        $this->maxResendAttempts = (int) ($_ENV['EMAIL_VERIFICATION_MAX_ATTEMPTS'] ?? 5);
+    }
 
     #[Route('/register', name: 'register', methods: ['POST'])]
     public function register(
@@ -240,27 +249,103 @@ class AuthController extends AbstractController
             return $this->json(['error' => 'Email required'], Response::HTTP_BAD_REQUEST);
         }
 
+        // ALWAYS check rate limiting first (prevent spam with any email)
+        $attempt = $this->attemptRepository->findByEmail($email);
+        
+        if (!$attempt) {
+            // First attempt - create tracking
+            $attempt = new EmailVerificationAttempt();
+            $attempt->setEmail($email);
+            $attempt->setIpAddress($request->getClientIp());
+            $this->em->persist($attempt);
+        } else {
+            // Check if can resend (applies to ALL requests, not just valid users)
+            if (!$attempt->canResend($this->resendCooldownMinutes, $this->maxResendAttempts)) {
+                $remainingAttempts = $attempt->getRemainingAttempts($this->maxResendAttempts);
+                
+                if ($remainingAttempts <= 0) {
+                    $this->logger->warning('Max resend attempts reached', [
+                        'email' => $email,
+                        'ip' => $request->getClientIp()
+                    ]);
+                    
+                    return $this->json([
+                        'error' => 'Maximum verification attempts reached',
+                        'message' => 'You have reached the maximum number of verification email requests. Please contact support if you need assistance.',
+                        'maxAttemptsReached' => true
+                    ], Response::HTTP_TOO_MANY_REQUESTS);
+                }
+                
+                $nextAvailable = $attempt->getNextAvailableAt($this->resendCooldownMinutes);
+                $waitSeconds = $nextAvailable->getTimestamp() - (new \DateTime())->getTimestamp();
+                
+                return $this->json([
+                    'error' => 'Please wait before requesting another verification email',
+                    'waitSeconds' => max(0, $waitSeconds),
+                    'remainingAttempts' => $remainingAttempts,
+                    'nextAvailableAt' => $nextAvailable->format('c')
+                ], Response::HTTP_TOO_MANY_REQUESTS);
+            }
+            
+            // Increment attempts
+            $attempt->incrementAttempts();
+        }
+
+        // NOW check if user exists and is unverified
         $user = $this->userRepository->findOneBy(['mail' => $email]);
 
+        // User doesn't exist or is already verified - increment attempt but return generic message
         if (!$user || $user->isEmailVerified()) {
+            // Save attempt tracking even for invalid requests
+            try {
+                $this->em->flush();
+            } catch (\Exception $e) {
+                $this->logger->error('Failed to save rate limit attempt', ['error' => $e->getMessage()]);
+            }
+            
+            $this->logger->info('Resend verification requested for non-existent or verified user', [
+                'email' => $email,
+                'ip' => $request->getClientIp()
+            ]);
+            
+            // Security: Don't reveal if user exists or is verified
             return $this->json([
                 'success' => true,
-                'message' => 'Verification email sent if account exists'
+                'message' => 'If your email is registered and unverified, you will receive a verification email.'
             ]);
         }
 
-        $token = $this->tokenRepository->createToken($user, 'email_verification', 86400);
-
+        // User exists and is unverified - create token and send email
         try {
+            $token = $this->tokenRepository->createToken($user, 'email_verification', 86400);
             $this->mailerService->sendVerificationEmail($user->getMail(), $token->getToken());
+            
+            // Only flush after successful email send
+            $this->em->flush();
+            
+            $this->logger->info('Verification email sent successfully', [
+                'user_id' => $user->getId(),
+                'attempt' => $attempt->getAttempts()
+            ]);
+            
+            return $this->json([
+                'success' => true,
+                'message' => 'Verification email sent successfully',
+                'remainingAttempts' => $attempt->getRemainingAttempts($this->maxResendAttempts),
+                'cooldownMinutes' => $this->resendCooldownMinutes
+            ]);
         } catch (\Exception $e) {
-            $this->logger->error('Failed to resend verification', ['user_id' => $user->getId()]);
+            $this->logger->error('Failed to send verification email', [
+                'user_id' => $user->getId(),
+                'email' => $email,
+                'error' => $e->getMessage()
+            ]);
+            
+            return $this->json([
+                'error' => 'Technical error',
+                'message' => 'An error occurred while sending the verification email. Please try again later.'
+            ], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
-
-        return $this->json([
-            'success' => true,
-            'message' => 'Verification email sent if account exists'
-        ]);
     }
 
     #[Route('/me', name: 'me', methods: ['GET'])]

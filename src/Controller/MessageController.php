@@ -9,6 +9,7 @@ use App\Service\AgainService;
 use App\Service\Message\AgainHandler;
 use App\Service\PromptService;
 use App\Service\ModelConfigService;
+use App\Service\MessageEnqueueService;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -28,6 +29,7 @@ class MessageController extends AbstractController
         private AgainHandler $againHandler,
         private PromptService $promptService,
         private ModelConfigService $modelConfigService,
+        private MessageEnqueueService $enqueueService,
         private LoggerInterface $logger
     ) {}
 
@@ -326,6 +328,59 @@ class MessageController extends AbstractController
                 'error' => 'Again request failed: ' . $e->getMessage()
             ], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
+    }
+
+    /**
+     * Enqueue message for async processing (Fast-Ack < 300ms)
+     */
+    #[Route('/enqueue', name: 'enqueue', methods: ['POST'])]
+    public function enqueueMessage(
+        Request $request,
+        #[CurrentUser] ?User $user
+    ): JsonResponse {
+        if (!$user) {
+            return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
+        }
+
+        $data = json_decode($request->getContent(), true);
+        $messageText = $data['message'] ?? '';
+
+        if (empty($messageText)) {
+            return $this->json(['error' => 'Message is required'], Response::HTTP_BAD_REQUEST);
+        }
+
+        // Enqueue message (Fast-Ack)
+        $result = $this->enqueueService->enqueueMessage(
+            $user,
+            $messageText,
+            [
+                'tracking_id' => $data['trackId'] ?? time(),
+                'reasoning' => $data['reasoning'] ?? false,
+            ]
+        );
+
+        return $this->json($result, Response::HTTP_ACCEPTED);
+    }
+
+    /**
+     * Check message status (Polling)
+     */
+    #[Route('/{messageId}/status', name: 'status', methods: ['GET'])]
+    public function getMessageStatus(
+        int $messageId,
+        #[CurrentUser] ?User $user
+    ): JsonResponse {
+        if (!$user) {
+            return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
+        }
+
+        $status = $this->enqueueService->getMessageStatus($messageId);
+
+        if (!$status) {
+            return $this->json(['error' => 'Message not found'], Response::HTTP_NOT_FOUND);
+        }
+
+        return $this->json($status);
     }
 
     /**

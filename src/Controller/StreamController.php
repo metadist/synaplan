@@ -38,32 +38,46 @@ class StreamController extends AbstractController
 
         $messageText = $request->query->get('message', '');
         $trackId = $request->query->get('trackId', time());
+        $chatId = $request->query->get('chatId', null);
         $includeReasoning = $request->query->get('reasoning', '0') === '1';
+        $webSearch = $request->query->get('webSearch', '0') === '1';
 
         if (empty($messageText)) {
             return $this->json(['error' => 'Message is required'], Response::HTTP_BAD_REQUEST);
         }
+        
+        if (!$chatId) {
+            return $this->json(['error' => 'Chat ID is required'], Response::HTTP_BAD_REQUEST);
+        }
 
-        // Create StreamedResponse for SSE
+        // StreamedResponse für SSE
         $response = new StreamedResponse();
         $response->headers->set('Content-Type', 'text/event-stream');
         $response->headers->set('Cache-Control', 'no-cache');
-        $response->headers->set('X-Accel-Buffering', 'no'); // Disable nginx buffering
+        $response->headers->set('X-Accel-Buffering', 'no');
         $response->headers->set('Connection', 'keep-alive');
 
-        $response->setCallback(function () use ($user, $messageText, $trackId, $includeReasoning) {
-            // Disable output buffering completely
+        $response->setCallback(function () use ($user, $messageText, $trackId, $chatId, $includeReasoning, $webSearch) {
+            // Disable output buffering
             while (ob_get_level()) {
                 ob_end_clean();
             }
             ob_implicit_flush(1);
             set_time_limit(0);
-            ignore_user_abort(false); // Stop if connection is lost
+            ignore_user_abort(false);
 
             try {
+                // Load chat
+                $chat = $this->em->getRepository(\App\Entity\Chat::class)->find((int)$chatId);
+                if (!$chat || $chat->getUserId() !== $user->getId()) {
+                    $this->sendSSE('error', ['error' => 'Chat not found or access denied']);
+                    return;
+                }
+                
                 // Create incoming message
                 $incomingMessage = new Message();
                 $incomingMessage->setUserId($user->getId());
+                $incomingMessage->setChat($chat);
                 $incomingMessage->setTrackingId($trackId);
                 $incomingMessage->setProviderIndex('WEB');
                 $incomingMessage->setUnixTimestamp(time());
@@ -79,45 +93,42 @@ class StreamController extends AbstractController
                 $this->em->persist($incomingMessage);
                 $this->em->flush();
 
-                // Process with REAL streaming support
+                // Process with REAL streaming (TEXT only, NO JSON!)
                 $responseText = '';
                 $chunkCount = 0;
                 
-                // Processing options to pass through the chain
                 $processingOptions = [
-                    'reasoning' => $includeReasoning, // Let model/provider decide if it supports reasoning
+                    'reasoning' => $includeReasoning,
+                    'webSearch' => $webSearch,
                 ];
                 
                 $result = $this->messageProcessor->processStream(
                     $incomingMessage,
-                    // Stream callback - called for each AI chunk
+                    // Stream callback - AI streams TEXT directly
                     function($chunk) use (&$responseText, &$chunkCount) {
                         if (connection_aborted()) {
-                            error_log('🔴 StreamController: Connection aborted during streaming');
+                            error_log('🔴 StreamController: Connection aborted');
                             return;
                         }
                         
-                        // Accumulate full response for DB storage
                         $responseText .= $chunk;
                         
-                        // Send chunk immediately to frontend
+                        // Stream immediately to frontend
                         if (!empty($chunk)) {
                             $this->sendSSE('data', ['chunk' => $chunk]);
                             
                             if ($chunkCount === 0) {
-                                error_log('🔵 StreamController: Started REAL-TIME streaming');
+                                error_log('🔵 StreamController: Started streaming');
                             }
                             $chunkCount++;
                         }
                     },
-                    // Status callback - called for processing updates
+                    // Status callback
                     function($statusUpdate) {
-                        // Skip 'complete' event - we'll send it after streaming
                         if ($statusUpdate['status'] === 'complete') {
                             return;
                         }
                         
-                        // Send status update as SSE
                         $this->sendSSE($statusUpdate['status'], [
                             'message' => $statusUpdate['message'],
                             'metadata' => $statusUpdate['metadata'] ?? [],
@@ -134,44 +145,44 @@ class StreamController extends AbstractController
                 $classification = $result['classification'];
                 $response = $result['response'];
                 
-                error_log('🔵 StreamController: REAL-TIME streaming complete, ' . $chunkCount . ' chunks sent');
-                $this->logger->info('StreamController: Real-time streaming complete', [
+                error_log('🔵 StreamController: Streaming complete, ' . $chunkCount . ' chunks');
+                $this->logger->info('StreamController: Streaming complete', [
                     'chunks' => $chunkCount,
-                    'total_length' => strlen($responseText),
-                    'reasoning_included' => $includeReasoning
+                    'length' => strlen($responseText),
                 ]);
 
-                // Parse for media markers
+                // Get file/links from handler metadata (Handler sets these, not AI!)
                 $hasFile = 0;
                 $filePath = '';
                 $fileType = '';
-                $fullResponse = $responseText;
-
-                if (preg_match('/\[IMAGE:(.+?)\]/', $fullResponse, $matches)) {
+                
+                if (isset($response['metadata']['file'])) {
                     $hasFile = 1;
-                    $filePath = $matches[1];
-                    $fileType = 'png';
-                    $fullResponse = trim(preg_replace('/\[IMAGE:.+?\]/', '', $fullResponse));
+                    $filePath = $response['metadata']['file']['path'];
+                    $fileType = $response['metadata']['file']['type'];
                     
                     $this->sendSSE('file', [
-                        'type' => 'image',
+                        'type' => $fileType,
                         'url' => $filePath,
                     ]);
-                } elseif (preg_match('/\[VIDEO:(.+?)\]/', $fullResponse, $matches)) {
-                    $hasFile = 1;
-                    $filePath = $matches[1];
-                    $fileType = 'mp4';
-                    $fullResponse = trim(preg_replace('/\[VIDEO:.+?\]/', '', $fullResponse));
                     
-                    $this->sendSSE('file', [
-                        'type' => 'video',
-                        'url' => $filePath,
+                    $this->logger->info('StreamController: Handler provided file', [
+                        'path' => $filePath,
+                        'type' => $fileType
                     ]);
+                }
+                
+                if (isset($response['metadata']['links'])) {
+                    $this->sendSSE('links', [
+                        'links' => $response['metadata']['links']
+                    ]);
+                    $this->logger->info('StreamController: Handler provided links');
                 }
 
                 // Create outgoing message
                 $outgoingMessage = new Message();
                 $outgoingMessage->setUserId($user->getId());
+                $outgoingMessage->setChat($chat);
                 $outgoingMessage->setTrackingId($trackId);
                 $outgoingMessage->setProviderIndex($response['metadata']['provider'] ?? 'test');
                 $outgoingMessage->setUnixTimestamp(time());
@@ -182,7 +193,7 @@ class StreamController extends AbstractController
                 $outgoingMessage->setFileType($fileType);
                 $outgoingMessage->setTopic($classification['topic']);
                 $outgoingMessage->setLanguage($classification['language']);
-                $outgoingMessage->setText($fullResponse);
+                $outgoingMessage->setText($responseText); // Pure TEXT, not JSON
                 $outgoingMessage->setDirection('OUT');
                 $outgoingMessage->setStatus('complete');
 
@@ -193,12 +204,14 @@ class StreamController extends AbstractController
                 $incomingMessage->setLanguage($classification['language']);
                 $incomingMessage->setStatus('complete');
                 
+                $chat->updateTimestamp();
+                
                 $this->em->flush();
 
-                // Get Again data for frontend
+                // Get Again data
                 $againData = $this->getAgainData($classification['topic'], null);
 
-                // Send complete event with full metadata
+                // Send complete event
                 $this->sendSSE('complete', [
                     'messageId' => $outgoingMessage->getId(),
                     'trackId' => $trackId,
@@ -209,14 +222,12 @@ class StreamController extends AbstractController
                     'again' => $againData,
                 ]);
                 
-                // Give frontend 100ms to process complete event before connection closes
                 usleep(100000);
 
                 $this->logger->info('Streamed message processed', [
                     'user_id' => $user->getId(),
                     'message_id' => $outgoingMessage->getId(),
                     'topic' => $classification['topic'],
-                    'model' => $response['metadata']['model'] ?? 'unknown',
                 ]);
 
             } catch (\Exception $e) {
@@ -234,12 +245,8 @@ class StreamController extends AbstractController
         return $response;
     }
 
-    /**
-     * Send Server-Sent Event
-     */
     private function sendSSE(string $status, array $data): void
     {
-        // Check if connection is still alive
         if (connection_aborted()) {
             error_log('🔴 StreamController: Connection aborted');
             return;
@@ -252,25 +259,16 @@ class StreamController extends AbstractController
 
         echo "data: " . json_encode($event) . "\n\n";
         
-        // Ensure data is flushed
         if (ob_get_level() > 0) {
             ob_flush();
         }
         flush();
     }
 
-    /**
-     * Get Again data (eligible models and predicted next)
-     */
     private function getAgainData(string $topic, ?int $currentModelId): array
     {
-        // Resolve tag from topic
         $tag = $this->againService->resolveTagFromTopic($topic);
-        
-        // Get eligible models
         $eligibleModels = $this->againService->getEligibleModels($tag);
-        
-        // Get predicted next
         $predictedNext = $this->againService->getPredictedNext($eligibleModels, $currentModelId);
 
         return [
@@ -280,4 +278,3 @@ class StreamController extends AbstractController
         ];
     }
 }
-
