@@ -122,6 +122,8 @@ class OidcAuth
             if ($user) {
                 // Set session
                 $_SESSION['USERPROFILE'] = $user;
+                // Clear any leftover anonymous widget session variables on login
+                Frontend::clearWidgetSession();
                 Frontend::$AIdetailArr['GMAIL'] = substr($user['BMAIL'], 0, strpos($user['BMAIL'], '@'));
                 error_log('OIDC: Successfully authenticated user: ' . $user['BMAIL']);
                 return true;
