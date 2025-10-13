@@ -378,16 +378,15 @@ class WordPressWizard
             // Generate unique filename
             $newFileName = time() . '_' . $userId . '_' . uniqid() . '.' . $fileExtension;
 
-            // Create user-specific directory
-            $userSubDir = 'uid_' . $userId;
-            $userDir = rtrim(UPLOAD_DIR, '/') . '/' . $userSubDir;
+            // Create user-specific directory using standard pattern
+            $userRelPath = substr($userId, -5, 3) . '/' . substr($userId, -2, 2) . '/' . date('Ym') . '/';
+            $fullUploadDir = rtrim(UPLOAD_DIR, '/').'/' . $userRelPath;
 
-            if (!file_exists($userDir)) {
-                mkdir($userDir, 0755, true);
+            if (!is_dir($fullUploadDir)) {
+                mkdir($fullUploadDir, 0755, true);
             }
 
-            $targetPath = $userDir . '/' . $newFileName;
-            $userRelPath = $userSubDir . '/';
+            $targetPath = $fullUploadDir . $newFileName;
 
             // Move uploaded file
             if (move_uploaded_file($tmpName, $targetPath)) {
