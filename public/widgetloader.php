@@ -315,18 +315,6 @@ header('Pragma: no-cache');
             display: none !important; 
         }
         
-        /* Hide file preview by default in widget mode */
-        #filesDiv {
-            display: none !important;
-        }
-        
-        .file-preview-container {
-            display: none !important;
-        }
-        
-        .file-preview-container.active {
-            display: block !important;
-        }
         
         /* Widget-specific input layout */
         .input-controls-wrapper {

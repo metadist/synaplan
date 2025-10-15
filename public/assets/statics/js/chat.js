@@ -525,6 +525,15 @@ function placeCaretAtEnd(el) {
 function handleSendMessage() {
     // Grab the user's text - use textContent instead of innerText to preserve actual newlines
     if (!messageInput) return;
+    
+    // Clear placeholder if it still exists
+    if (messageInput.dataset.isPlaceholder === 'true') {
+        messageInput.textContent = '';
+        messageInput.style.color = '';
+        delete messageInput.dataset.isPlaceholder;
+        return; // Don't send placeholder text
+    }
+    
     const userMessage = messageInput.textContent.trim();
     
     // Validate that message is not empty (unless files are attached)
@@ -550,6 +559,15 @@ function handleSendMessage() {
         if (messageHistory.length > 10) messageHistory.shift(); // Keep last 10
     }
     historyIndex = -1;
+
+    // Show upload spinner if files are attached (widget mode)
+    const hasFiles = attachedFiles.length > 0;
+    const uploadSpinner = document.getElementById('widgetUploadSpinner');
+    const filesHeader = document.getElementById('filesHeader');
+    if (hasFiles && uploadSpinner && filesHeader && isWidgetMode) {
+        uploadSpinner.classList.add('active');
+        filesHeader.classList.add('uploading');
+    }
 
     // Real-world usage: create FormData, append files, send via fetch/AJAX
     let formData = new FormData();
@@ -591,8 +609,24 @@ function handleSendMessage() {
             });
             return { error: 'rate_limit_handled' };
           });
+        } else if (res.status === 500) {
+          // Try to get server error details for better debugging
+          return res.text().then(text => {
+            console.error('Server error (500):', text);
+            // Try to parse as JSON first
+            try {
+              const data = JSON.parse(text);
+              throw new Error(data.error || data.message || 'Server error (500). Please try again.');
+            } catch (e) {
+              // Not JSON, show generic message but log details
+              throw new Error('Server error (500). Please check console for details.');
+            }
+          }).catch(err => {
+            throw new Error(err.message || 'Server error (500). Please try again.');
+          });
         } else {
-          throw new Error('Network response was not ok');
+          // Other errors (400, 404, etc.)
+          throw new Error(`Server error (${res.status}). Please try again.`);
         }
       }
       return res.json();
@@ -764,12 +798,25 @@ function handleSendMessage() {
           $("#chatModalBody").scrollTop( $("#chatModalBody").prop("scrollHeight") );
         }
         
+        // Hide upload spinner on success (widget mode)
+        if (hasFiles && uploadSpinner && filesHeader && isWidgetMode) {
+            uploadSpinner.classList.remove('active');
+            filesHeader.classList.remove('uploading');
+        }
+        
         // Reset the file upload section only on successful upload
         resetFileUploadSection();
       }
     })
     .catch(err => {
       console.error(err);
+      
+      // Hide upload spinner on error (widget mode)
+      if (hasFiles && uploadSpinner && filesHeader && isWidgetMode) {
+          uploadSpinner.classList.remove('active');
+          filesHeader.classList.remove('uploading');
+      }
+      
       // Handle specific error messages for anonymous users with unified notifications
       if (isAnonymousWidget) {
         if (err.message.includes('Authentication required')) {
