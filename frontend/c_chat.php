@@ -126,7 +126,7 @@ window.isWidgetMode = <?php echo $isWidgetMode ? 'true' : 'false'; ?>;
                 <div class="messages-container">
                     <!-- Chat History Loading Buttons -->
                     <?php if (!$isAnonymousWidget): ?>
-                    <div id="chatHistoryButtons" class="py-4">
+                    <div id="chatHistoryButtons" class="py-4" style="display: none;">
                         <div class="d-flex justify-content-between">
                             <div class="d-flex gap-3">
                                 <button type="button" class="btn btn-outline-primary btn-sm load-history-btn m-2" data-amount="10">
@@ -206,7 +206,7 @@ window.isWidgetMode = <?php echo $isWidgetMode ? 'true' : 'false'; ?>;
                                     <div id="messageInput" 
                                         class="message-input" 
                                         contenteditable="true" 
-                                        placeholder="Type your message...">
+                                        placeholder="<?php echo $isWidgetMode ? 'Enter your question' : 'Ctrl+Enter for new line'; ?>">
                                     </div>
                                 </div>
 
@@ -237,7 +237,7 @@ window.isWidgetMode = <?php echo $isWidgetMode ? 'true' : 'false'; ?>;
 <script src="node_modules/@highlightjs/cdn-assets/languages/sql.min.js"></script>
 <script src="node_modules/@highlightjs/cdn-assets/languages/go.min.js"></script>
 <script src="assets/statics/js/speech.js?v=2"></script>
-<script src="assets/statics/js/chat.js?v=2"></script>
+<script src="assets/statics/js/chat.js?v=251015"></script>
 <script src="assets/statics/js/chathistory.js?v=2"></script>
 
 <script>

@@ -352,16 +352,18 @@ function initializeEventListeners() {
         });
         
         messageInput.addEventListener('keydown', function(e) {
-            // In anonymous widget mode: Enter sends, Shift+Enter makes newline
-            if (isAnonymousWidget && e.key === 'Enter' && !e.shiftKey && !e.ctrlKey && !e.altKey) {
-                e.preventDefault();
-                handleSendMessage();
-                return;
-            }
-            // Default (full app): Ctrl+Enter or Alt+Enter sends
-            if (e.key === 'Enter' && (e.ctrlKey || e.altKey)) {
-                e.preventDefault();
-                handleSendMessage();
+            // Universal behavior: Enter sends, Ctrl+Enter makes newline
+            if (e.key === 'Enter') {
+                if (e.ctrlKey) {
+                    // Ctrl+Enter: insert newline
+                    // Allow default behavior (contenteditable will insert newline)
+                    return;
+                } else if (!e.shiftKey && !e.altKey) {
+                    // Plain Enter: send message
+                    e.preventDefault();
+                    handleSendMessage();
+                    return;
+                }
             }
         });
         

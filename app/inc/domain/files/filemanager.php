@@ -92,8 +92,11 @@ class FileManager
             $groupKey = isset($_REQUEST['groupKey']) ? trim(db::EscString($_REQUEST['groupKey'])) : 'DEFAULT';
         }
 
+        error_log('[RAG] saveRAGFiles: userId=' . $userId . ', groupKey="' . $groupKey . '", is_widget=' . (isset($_SESSION['is_widget']) ? 'yes' : 'no'));
+
         if (empty($groupKey) || $groupKey === '') {
             $retArr['error'] = 'Group key is required';
+            error_log('[RAG] saveRAGFiles: ERROR - Group key is empty');
             return $retArr;
         }
 
@@ -201,10 +204,12 @@ class FileManager
         }
 
         // Process files through RAG system
+        error_log('[RAG] saveRAGFiles: Calling Central::processRAGFiles with ' . count($filesArr) . ' files, groupKey="' . $groupKey . '"');
         if ($GLOBALS['debug']) {
             error_log('* * * * * * ************** _________ PROCESSING RAG FILES: '.print_r($filesArr, true));
         }
         $ragResult = Central::processRAGFiles($filesArr, $userId, $groupKey, false);
+        error_log('[RAG] saveRAGFiles: processRAGFiles returned - success=' . ($ragResult['success'] ? 'true' : 'false') . ', processedCount=' . ($ragResult['processedCount'] ?? 0) . ', groupKey in result=' . ($ragResult['groupKey'] ?? 'N/A'));
 
         $retArr['success'] = $ragResult['success'];
         $retArr['processedFiles'] = $ragResult['results'];

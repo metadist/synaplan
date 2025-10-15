@@ -26,6 +26,9 @@
                 <button type="button" class="btn btn-primary" id="createNewWidgetBtn">
                     <i class="fas fa-plus"></i> Create New Widget
                 </button>
+                <button type="button" class="btn btn-success ms-2" id="launchWizardBtn">
+                    <i class="fas fa-magic"></i> Setup Wizard
+                </button>
             </div>
         </div>
     </div>
@@ -239,6 +242,220 @@
     </form>
 </main>
 
+<!-- Widget Setup Wizard Modal -->
+<div class="modal fade" id="widgetWizardModal" tabindex="-1" aria-labelledby="widgetWizardModalLabel" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title" id="widgetWizardModalLabel">
+                    <i class="fas fa-magic"></i> Widget Setup Wizard
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <!-- Progress Bar -->
+                <div class="mb-4">
+                    <div class="d-flex justify-content-between mb-2">
+                        <span class="wizard-step-label" data-step="1"><i class="fas fa-cog"></i> Configure</span>
+                        <span class="wizard-step-label" data-step="2"><i class="fas fa-upload"></i> Upload Files</span>
+                        <span class="wizard-step-label" data-step="3"><i class="fas fa-code"></i> Integration</span>
+                    </div>
+                    <div class="progress" style="height: 8px;">
+                        <div class="progress-bar bg-success" id="wizardProgressBar" role="progressbar" style="width: 33%;" aria-valuenow="33" aria-valuemin="0" aria-valuemax="100"></div>
+                    </div>
+                </div>
+
+                <!-- Wizard Steps Container -->
+                <div id="wizardStepsContainer">
+                    <!-- Step 1: Widget Configuration -->
+                    <div class="wizard-step" id="wizardStep1" style="display: block;">
+                        <h4 class="mb-3"><i class="fas fa-palette"></i> Step 1: Configure Your Widget</h4>
+                        <p class="text-muted mb-4">Customize the appearance and behavior of your chat widget</p>
+                        
+                        <div class="row mb-3">
+                            <label class="col-sm-3 col-form-label"><strong>Integration Type:</strong></label>
+                            <div class="col-sm-9">
+                                <select class="form-select" id="wizard_integrationType">
+                                    <option value="floating-button">Floating Button</option>
+                                    <option value="inline-box">Inline Box</option>
+                                </select>
+                                <div class="form-text">Choose how the widget appears on your website</div>
+                            </div>
+                        </div>
+
+                        <div class="row mb-3">
+                            <label class="col-sm-3 col-form-label"><strong>Primary Color:</strong></label>
+                            <div class="col-sm-4">
+                                <input type="color" class="form-control form-control-color" id="wizard_widgetColor" value="#007bff">
+                            </div>
+                            <label class="col-sm-2 col-form-label"><strong>Icon Color:</strong></label>
+                            <div class="col-sm-3">
+                                <input type="color" class="form-control form-control-color" id="wizard_widgetIconColor" value="#ffffff">
+                            </div>
+                        </div>
+
+                        <div class="row mb-3">
+                            <label class="col-sm-3 col-form-label"><strong>Position:</strong></label>
+                            <div class="col-sm-9">
+                                <select class="form-select" id="wizard_widgetPosition">
+                                    <option value="bottom-right">Bottom Right</option>
+                                    <option value="bottom-left">Bottom Left</option>
+                                    <option value="bottom-center">Bottom Center</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="row mb-3">
+                            <label class="col-sm-3 col-form-label"><strong>Welcome Message:</strong></label>
+                            <div class="col-sm-9">
+                                <input type="text" class="form-control" id="wizard_autoMessage" placeholder="Hello! How can I help you today?" value="Hello! How can I help you today?">
+                                <div class="form-text">First message visitors will see</div>
+                            </div>
+                        </div>
+
+                        <div class="row mb-3">
+                            <label class="col-sm-3 col-form-label"><strong>AI Prompt:</strong></label>
+                            <div class="col-sm-9">
+                                <select class="form-select" id="wizard_widgetPrompt">
+                                    <?php
+                                        $prompts = BasicAI::getAllPrompts();
+                            foreach ($prompts as $prompt) {
+                                $ownerHint = $prompt['BOWNERID'] != 0 ? '(custom)' : '(default)';
+                                echo "<option value='".$prompt['BTOPIC']."'>".$ownerHint.' '.$prompt['BTOPIC'].'</option>';
+                            }
+                            ?>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="row mb-3">
+                            <div class="col-sm-9 offset-sm-3">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="wizard_autoOpen">
+                                    <label class="form-check-label" for="wizard_autoOpen">
+                                        Auto-open widget after a few seconds
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Inline Box Options (conditional) -->
+                        <div id="wizard_inlineBoxConfig" style="display:none;">
+                            <hr class="my-4">
+                            <h5 class="mb-3">Inline Box Settings</h5>
+                            <div class="row mb-3">
+                                <label class="col-sm-3 col-form-label"><strong>Placeholder Text:</strong></label>
+                                <div class="col-sm-9">
+                                    <input type="text" class="form-control" id="wizard_inlinePlaceholder" value="Ask me anything...">
+                                </div>
+                            </div>
+                            <div class="row mb-3">
+                                <label class="col-sm-3 col-form-label"><strong>Button Text:</strong></label>
+                                <div class="col-sm-9">
+                                    <input type="text" class="form-control" id="wizard_inlineButtonText" value="Ask">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Step 2: RAG File Upload -->
+                    <div class="wizard-step" id="wizardStep2" style="display: none;">
+                        <h4 class="mb-3"><i class="fas fa-upload"></i> Step 2: Upload Knowledge Base Files (Optional)</h4>
+                        <p class="text-muted mb-4">Upload documents to enhance your AI assistant's knowledge</p>
+
+                        <div class="alert alert-info">
+                            <i class="fas fa-info-circle"></i> Upload PDF, DOCX, TXT, or image files that contain information your chatbot should know about. 
+                            These files will be processed and made available to your AI assistant.
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="wizard_groupKey" class="form-label"><strong>Group Name:</strong></label>
+                            <input type="text" class="form-control" id="wizard_groupKey" placeholder="e.g., PRODUCT_DOCS, FAQ, SUPPORT" value="WIDGET_KB">
+                            <div class="form-text">A keyword to organize your files (min 3 characters)</div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="wizard_ragFiles" class="form-label"><strong>Select Files:</strong></label>
+                            <input type="file" class="form-control" id="wizard_ragFiles" multiple accept=".pdf,.docx,.txt,.jpg,.jpeg,.png">
+                            <div class="form-text">Maximum 5 files, 10MB each</div>
+                        </div>
+
+                        <!-- File Preview -->
+                        <div id="wizard_filePreview" style="display: none;">
+                            <h6 class="mt-3">Selected Files:</h6>
+                            <div id="wizard_fileList" class="border rounded p-2" style="background-color: #f8f9fa; max-height: 200px; overflow-y: auto;"></div>
+                        </div>
+
+                        <div class="alert alert-warning mt-3">
+                            <i class="fas fa-exclamation-triangle"></i> <strong>Note:</strong> You can skip this step and upload files later via the File Manager.
+                        </div>
+                    </div>
+
+                    <!-- Step 3: Integration Instructions -->
+                    <div class="wizard-step" id="wizardStep3" style="display: none;">
+                        <h4 class="mb-3"><i class="fas fa-check-circle text-success"></i> Step 3: Integration Complete!</h4>
+                        <p class="text-muted mb-4">Your widget has been created. Follow these steps to add it to your website:</p>
+
+                        <div class="alert alert-success">
+                            <h5><i class="fas fa-clipboard-check"></i> Widget Created Successfully!</h5>
+                            <p class="mb-0">Widget ID: <strong><span id="wizard_createdWidgetId"></span></strong></p>
+                            <p class="mb-0" id="wizard_filesProcessedInfo" style="display: none;">Files Processed: <strong><span id="wizard_filesProcessedCount"></span></strong></p>
+                        </div>
+
+                        <div class="card mb-3">
+                            <div class="card-header bg-light">
+                                <h5 class="mb-0"><i class="fas fa-code"></i> Integration Code</h5>
+                            </div>
+                            <div class="card-body">
+                                <p><strong>Copy this code and paste it into your website's HTML, preferably before the closing &lt;/body&gt; tag:</strong></p>
+                                <div class="position-relative">
+                                    <textarea class="form-control font-monospace" id="wizard_integrationCode" rows="8" readonly></textarea>
+                                    <button type="button" class="btn btn-sm btn-primary position-absolute top-0 end-0 m-2" id="wizard_copyCodeBtn">
+                                        <i class="fas fa-copy"></i> Copy
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="card">
+                            <div class="card-header bg-light">
+                                <h5 class="mb-0"><i class="fas fa-list-ol"></i> Installation Steps</h5>
+                            </div>
+                            <div class="card-body">
+                                <ol class="mb-0">
+                                    <li class="mb-2"><strong>Copy the integration code</strong> above using the copy button</li>
+                                    <li class="mb-2"><strong>Access your website's HTML</strong> (via your CMS, theme editor, or HTML files)</li>
+                                    <li class="mb-2"><strong>Paste the code before the closing &lt;/body&gt; tag</strong> or in your footer section</li>
+                                    <li class="mb-2"><strong>Save and publish</strong> your changes</li>
+                                    <li class="mb-2"><strong>Visit your website</strong> to see the chat widget in action!</li>
+                                </ol>
+                            </div>
+                        </div>
+
+                        <div class="alert alert-info mt-3">
+                            <i class="fas fa-info-circle"></i> <strong>Need help?</strong> You can always access this code and modify your widget settings from the main Widget Configuration page.
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" id="wizardPrevBtn" style="display: none;">
+                    <i class="fas fa-arrow-left"></i> Previous
+                </button>
+                <button type="button" class="btn btn-success" id="wizardNextBtn">
+                    Next <i class="fas fa-arrow-right"></i>
+                </button>
+                <button type="button" class="btn btn-primary" id="wizardFinishBtn" style="display: none;">
+                    <i class="fas fa-check"></i> Finish
+                </button>
+                <div id="wizardSavingIndicator" style="display: none;">
+                    <span class="text-muted"><i class="fas fa-spinner fa-spin"></i> Creating widget...</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script>
     try {
         console.log('WebWidget script loading...');
@@ -342,6 +559,9 @@
                     }
                 });
             }
+
+            // Setup Wizard functionality
+            initializeWizard();
         });
 
     // Function to load all widgets for the current user
@@ -669,6 +889,487 @@
         }, 5000);
     }
 
+    // ===========================================
+    // WIZARD FUNCTIONALITY
+    // ===========================================
+    let wizardCurrentStep = 1;
+    let wizardSelectedFiles = [];
+    let wizardCreatedWidgetId = null;
+
+    function initializeWizard() {
+        // Launch wizard button
+        const launchBtn = document.getElementById('launchWizardBtn');
+        if (launchBtn) {
+            launchBtn.addEventListener('click', launchWizard);
+        }
+
+        // Wizard navigation buttons
+        const nextBtn = document.getElementById('wizardNextBtn');
+        const prevBtn = document.getElementById('wizardPrevBtn');
+        const finishBtn = document.getElementById('wizardFinishBtn');
+
+        if (nextBtn) nextBtn.addEventListener('click', wizardNext);
+        if (prevBtn) prevBtn.addEventListener('click', wizardPrev);
+        if (finishBtn) finishBtn.addEventListener('click', wizardFinish);
+
+        // Integration type toggle in wizard
+        const wizardIntegrationType = document.getElementById('wizard_integrationType');
+        if (wizardIntegrationType) {
+            wizardIntegrationType.addEventListener('change', function() {
+                const inlineConfig = document.getElementById('wizard_inlineBoxConfig');
+                if (inlineConfig) {
+                    inlineConfig.style.display = this.value === 'inline-box' ? 'block' : 'none';
+                }
+            });
+        }
+
+        // File selection in wizard
+        const wizardFiles = document.getElementById('wizard_ragFiles');
+        if (wizardFiles) {
+            wizardFiles.addEventListener('change', function() {
+                wizardSelectedFiles = Array.from(this.files);
+                updateWizardFilePreview();
+            });
+        }
+
+        // Copy code button in wizard
+        const copyCodeBtn = document.getElementById('wizard_copyCodeBtn');
+        if (copyCodeBtn) {
+            copyCodeBtn.addEventListener('click', copyWizardIntegrationCode);
+        }
+    }
+
+    function launchWizard() {
+        // Reset wizard state
+        wizardCurrentStep = 1;
+        wizardSelectedFiles = [];
+        wizardCreatedWidgetId = null;
+
+        // Reset form values
+        document.getElementById('wizard_integrationType').value = 'floating-button';
+        document.getElementById('wizard_widgetColor').value = '#007bff';
+        document.getElementById('wizard_widgetIconColor').value = '#ffffff';
+        document.getElementById('wizard_widgetPosition').value = 'bottom-right';
+        document.getElementById('wizard_autoMessage').value = 'Hello! How can I help you today?';
+        document.getElementById('wizard_widgetPrompt').value = 'general';
+        document.getElementById('wizard_autoOpen').checked = false;
+        document.getElementById('wizard_inlinePlaceholder').value = 'Ask me anything...';
+        document.getElementById('wizard_inlineButtonText').value = 'Ask';
+        document.getElementById('wizard_groupKey').value = 'WIDGET_KB';
+        document.getElementById('wizard_ragFiles').value = '';
+        document.getElementById('wizard_filePreview').style.display = 'none';
+        document.getElementById('wizard_inlineBoxConfig').style.display = 'none';
+
+        // Show wizard modal
+        const wizardModal = new bootstrap.Modal(document.getElementById('widgetWizardModal'));
+        wizardModal.show();
+
+        // Show first step
+        showWizardStep(1);
+    }
+
+    function showWizardStep(step) {
+        wizardCurrentStep = step;
+
+        // Hide all steps
+        document.querySelectorAll('.wizard-step').forEach(el => el.style.display = 'none');
+
+        // Show current step
+        const currentStepEl = document.getElementById('wizardStep' + step);
+        if (currentStepEl) currentStepEl.style.display = 'block';
+
+        // Update progress bar
+        const progress = (step / 3) * 100;
+        const progressBar = document.getElementById('wizardProgressBar');
+        if (progressBar) {
+            progressBar.style.width = progress + '%';
+            progressBar.setAttribute('aria-valuenow', progress);
+        }
+
+        // Update step labels
+        document.querySelectorAll('.wizard-step-label').forEach(label => {
+            const labelStep = parseInt(label.getAttribute('data-step'));
+            if (labelStep === step) {
+                label.style.fontWeight = 'bold';
+                label.style.color = '#198754';
+            } else if (labelStep < step) {
+                label.style.fontWeight = 'normal';
+                label.style.color = '#6c757d';
+            } else {
+                label.style.fontWeight = 'normal';
+                label.style.color = '#adb5bd';
+            }
+        });
+
+        // Update navigation buttons
+        const prevBtn = document.getElementById('wizardPrevBtn');
+        const nextBtn = document.getElementById('wizardNextBtn');
+        const finishBtn = document.getElementById('wizardFinishBtn');
+
+        if (prevBtn) prevBtn.style.display = step === 1 ? 'none' : 'inline-block';
+        if (nextBtn) nextBtn.style.display = step === 3 ? 'none' : 'inline-block';
+        if (finishBtn) finishBtn.style.display = step === 3 ? 'inline-block' : 'none';
+    }
+
+    function wizardNext() {
+        if (wizardCurrentStep === 1) {
+            // Moving from step 1 to step 2
+            showWizardStep(2);
+        } else if (wizardCurrentStep === 2) {
+            // Moving from step 2 to step 3 - need to save widget and upload files
+            saveWizardWidget();
+        }
+    }
+
+    function wizardPrev() {
+        if (wizardCurrentStep > 1) {
+            showWizardStep(wizardCurrentStep - 1);
+        }
+    }
+
+    function saveWizardWidget() {
+        // Show saving indicator
+        document.getElementById('wizardSavingIndicator').style.display = 'block';
+        document.getElementById('wizardNextBtn').disabled = true;
+
+        // Find next available widget ID
+        const usedIds = widgets.map(w => w.widgetId);
+        let newId = 1;
+        while (usedIds.includes(newId)) {
+            newId++;
+        }
+
+        if (newId > 9) {
+            showAlert('Maximum of 9 widgets allowed', 'warning');
+            document.getElementById('wizardSavingIndicator').style.display = 'none';
+            document.getElementById('wizardNextBtn').disabled = false;
+            return;
+        }
+
+        wizardCreatedWidgetId = newId;
+
+        // Prepare widget data
+        const formData = new FormData();
+        formData.append('action', 'saveWidget');
+        formData.append('widgetId', newId);
+        formData.append('integrationType', document.getElementById('wizard_integrationType').value);
+        formData.append('widgetColor', document.getElementById('wizard_widgetColor').value);
+        formData.append('widgetIconColor', document.getElementById('wizard_widgetIconColor').value);
+        formData.append('widgetPosition', document.getElementById('wizard_widgetPosition').value);
+        formData.append('autoMessage', document.getElementById('wizard_autoMessage').value);
+        formData.append('widgetPrompt', document.getElementById('wizard_widgetPrompt').value);
+        formData.append('autoOpen', document.getElementById('wizard_autoOpen').checked ? '1' : '0');
+        formData.append('inlinePlaceholder', document.getElementById('wizard_inlinePlaceholder').value);
+        formData.append('inlineButtonText', document.getElementById('wizard_inlineButtonText').value);
+        formData.append('inlineFontSize', '18');
+        formData.append('inlineTextColor', '#212529');
+        formData.append('inlineBorderRadius', '8');
+        formData.append('widgetLogo', '');
+
+        // Save widget configuration first
+        fetch('api.php', {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.error) {
+                showAlert('Error saving widget: ' + data.error, 'danger');
+                document.getElementById('wizardSavingIndicator').style.display = 'none';
+                document.getElementById('wizardNextBtn').disabled = false;
+            } else {
+                // Widget saved, now check if we need to enable file search on prompt
+                if (wizardSelectedFiles.length > 0) {
+                    // Files are being uploaded, check if prompt has file search enabled
+                    const selectedPrompt = document.getElementById('wizard_widgetPrompt').value;
+                    checkAndEnableFileSearch(selectedPrompt, newId);
+                } else {
+                    // No files to upload, go to final step
+                    completWizardSetup(newId, 0);
+                }
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            showAlert('An error occurred while saving the widget', 'danger');
+            document.getElementById('wizardSavingIndicator').style.display = 'none';
+            document.getElementById('wizardNextBtn').disabled = false;
+        });
+    }
+
+    function checkAndEnableFileSearch(promptKey, widgetId) {
+        console.log('[WIZARD] checkAndEnableFileSearch called: promptKey=' + promptKey + ', widgetId=' + widgetId);
+        
+        // Fetch prompt details to check if file search is enabled
+        const formData = new FormData();
+        formData.append('action', 'getPromptDetails');
+        formData.append('promptKey', promptKey);
+
+        fetch('api.php', {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            console.log('[WIZARD] getPromptDetails response:', data);
+            
+            if (data.error) {
+                console.error('[WIZARD] Error fetching prompt details:', data.error);
+                // Continue with file upload anyway
+                uploadWizardFiles(widgetId);
+                return;
+            }
+
+            // Check if tool_files is enabled
+            const fileSearchSetting = data.SETTINGS.find(s => s.BTOKEN === 'tool_files');
+            const fileSearchEnabled = fileSearchSetting && fileSearchSetting.BVALUE === '1';
+            
+            console.log('[WIZARD] File search enabled:', fileSearchEnabled, 'Settings:', data.SETTINGS);
+
+            if (!fileSearchEnabled) {
+                // File search is not enabled, ask user
+                if (confirm('The selected AI prompt "' + promptKey + '" does not have File Search enabled.\n\n' +
+                           'Would you like to enable File Search on this prompt so it can use the uploaded files?\n\n' +
+                           'This will create a custom copy of the prompt for your account.')) {
+                    // User wants to enable file search
+                    enableFileSearchOnPrompt(promptKey, widgetId);
+                } else {
+                    // User declined, just upload files without modifying prompt
+                    uploadWizardFiles(widgetId);
+                }
+            } else {
+                // File search already enabled, check if we should update the group filter
+                const groupKey = document.getElementById('wizard_groupKey').value.trim();
+                const currentFilter = data.SETTINGS.find(s => s.BTOKEN === 'tool_files_keyword');
+                
+                if (currentFilter && currentFilter.BVALUE && currentFilter.BVALUE !== groupKey) {
+                    // There's already a different filter set
+                    if (confirm('The prompt "' + promptKey + '" is currently filtered to group "' + currentFilter.BVALUE + '".\n\n' +
+                               'Would you like to change it to "' + groupKey + '" to use your newly uploaded files?')) {
+                        // Update the filter
+                        updatePromptFileSearchFilter(promptKey, groupKey, widgetId);
+                    } else {
+                        // Keep existing filter, just upload files
+                        uploadWizardFiles(widgetId);
+                    }
+                } else {
+                    // No filter or same filter, proceed normally
+                    uploadWizardFiles(widgetId);
+                }
+            }
+        })
+        .catch(error => {
+            console.error('Error checking prompt:', error);
+            // Continue anyway
+            uploadWizardFiles(widgetId);
+        });
+    }
+
+    function enableFileSearchOnPrompt(promptKey, widgetId) {
+        const groupKey = document.getElementById('wizard_groupKey').value.trim();
+        
+        console.log('[WIZARD] enableFileSearchOnPrompt called: promptKey=' + promptKey + ', groupKey=' + groupKey);
+        
+        const formData = new FormData();
+        formData.append('action', 'enablePromptFileSearch');
+        formData.append('promptKey', promptKey);
+        formData.append('groupKey', groupKey);
+
+        fetch('api.php', {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            console.log('[WIZARD] enablePromptFileSearch response:', data);
+            
+            if (data.success) {
+                console.log('[WIZARD] SUCCESS: File search enabled on prompt:', promptKey);
+                showAlert('File search has been enabled on prompt "' + promptKey + '"', 'success');
+            } else {
+                console.error('[WIZARD] FAILED to enable file search:', data.error);
+                showAlert('Warning: Could not enable file search on prompt: ' + (data.error || 'Unknown error'), 'warning');
+            }
+            // Continue with file upload regardless
+            uploadWizardFiles(widgetId);
+        })
+        .catch(error => {
+            console.error('[WIZARD] ERROR enabling file search:', error);
+            // Continue anyway
+            uploadWizardFiles(widgetId);
+        });
+    }
+
+    function updatePromptFileSearchFilter(promptKey, groupKey, widgetId) {
+        const formData = new FormData();
+        formData.append('action', 'updatePromptFileSearchFilter');
+        formData.append('promptKey', promptKey);
+        formData.append('groupKey', groupKey);
+
+        fetch('api.php', {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                console.log('File search filter updated on prompt:', promptKey);
+                showAlert('Prompt "' + promptKey + '" now uses file group "' + groupKey + '"', 'success');
+            } else {
+                console.error('Failed to update filter:', data.error);
+            }
+            // Continue with file upload
+            uploadWizardFiles(widgetId);
+        })
+        .catch(error => {
+            console.error('Error updating filter:', error);
+            uploadWizardFiles(widgetId);
+        });
+    }
+
+    function uploadWizardFiles(widgetId) {
+        const groupKey = document.getElementById('wizard_groupKey').value.trim();
+
+        console.log('[WIZARD] uploadWizardFiles called: groupKey="' + groupKey + '", files=' + wizardSelectedFiles.length);
+
+        if (!groupKey || groupKey.length < 3) {
+            console.warn('[WIZARD] Group key invalid or too short, skipping file upload');
+            // Skip file upload if group key is invalid
+            completWizardSetup(widgetId, 0);
+            return;
+        }
+
+        const formData = new FormData();
+        formData.append('action', 'ragUpload');
+        formData.append('groupKey', groupKey);
+
+        wizardSelectedFiles.forEach(file => {
+            formData.append('files[]', file);
+            console.log('[WIZARD] Adding file to upload:', file.name);
+        });
+
+        console.log('[WIZARD] Sending ragUpload request with groupKey:', groupKey);
+
+        fetch('api.php', {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            console.log('[WIZARD] ragUpload response:', data);
+            const filesProcessed = data.success ? (data.processedCount || 0) : 0;
+            console.log('[WIZARD] Files processed:', filesProcessed);
+            completWizardSetup(widgetId, filesProcessed);
+        })
+        .catch(error => {
+            console.error('[WIZARD] File upload error:', error);
+            // Continue anyway
+            completWizardSetup(widgetId, 0);
+        });
+    }
+
+    function completWizardSetup(widgetId, filesProcessed) {
+        // Hide saving indicator
+        document.getElementById('wizardSavingIndicator').style.display = 'none';
+        document.getElementById('wizardNextBtn').disabled = false;
+
+        // Update final step with widget details
+        document.getElementById('wizard_createdWidgetId').textContent = widgetId;
+
+        if (filesProcessed > 0) {
+            document.getElementById('wizard_filesProcessedCount').textContent = filesProcessed;
+            document.getElementById('wizard_filesProcessedInfo').style.display = 'block';
+        } else {
+            document.getElementById('wizard_filesProcessedInfo').style.display = 'none';
+        }
+
+        // Generate integration code
+        const userId = <?php echo $_SESSION['USERPROFILE']['BID']; ?>;
+        const integrationType = document.getElementById('wizard_integrationType').value;
+        let code;
+
+        if (integrationType === 'inline-box') {
+            code = '<!-- Synaplan Chat Inline Box -->\n' +
+                   '<script src="<?php echo $GLOBALS['baseUrl']; ?>widget.php?uid=' + userId + '&widgetid=' + widgetId + '&mode=inline-box"><\/script>';
+        } else {
+            code = '<!-- Synaplan Chat Widget -->\n' +
+                   '<script>\n' +
+                   '(function() {\n' +
+                   '    var script = document.createElement(\'script\');\n' +
+                   '    script.src = \'<?php echo $GLOBALS['baseUrl']; ?>widget.php?uid=' + userId + '&widgetid=' + widgetId + '\';\n' +
+                   '    script.async = true;\n' +
+                   '    document.head.appendChild(script);\n' +
+                   '})();\n' +
+                   '<\/script>';
+        }
+
+        document.getElementById('wizard_integrationCode').value = code;
+
+        // Reload widgets list
+        loadWidgets();
+
+        // Show final step
+        showWizardStep(3);
+    }
+
+    function updateWizardFilePreview() {
+        const preview = document.getElementById('wizard_filePreview');
+        const fileList = document.getElementById('wizard_fileList');
+
+        if (wizardSelectedFiles.length === 0) {
+            preview.style.display = 'none';
+            return;
+        }
+
+        fileList.innerHTML = '';
+        wizardSelectedFiles.forEach((file, index) => {
+            const fileItem = document.createElement('div');
+            fileItem.className = 'd-flex justify-content-between align-items-center mb-1 p-1';
+            fileItem.innerHTML = `
+                <span><i class="fas fa-file"></i> ${file.name} (${(file.size / 1024).toFixed(1)} KB)</span>
+                <button type="button" class="btn btn-sm btn-outline-danger" onclick="removeWizardFile(${index})">
+                    <i class="fas fa-times"></i>
+                </button>
+            `;
+            fileList.appendChild(fileItem);
+        });
+
+        preview.style.display = 'block';
+    }
+
+    window.removeWizardFile = function(index) {
+        wizardSelectedFiles.splice(index, 1);
+        updateWizardFilePreview();
+
+        // Update file input
+        const wizardFilesInput = document.getElementById('wizard_ragFiles');
+        const dt = new DataTransfer();
+        wizardSelectedFiles.forEach(file => dt.items.add(file));
+        wizardFilesInput.files = dt.files;
+    };
+
+    function copyWizardIntegrationCode() {
+        const codeTextarea = document.getElementById('wizard_integrationCode');
+        codeTextarea.select();
+        document.execCommand('copy');
+
+        const btn = document.getElementById('wizard_copyCodeBtn');
+        const originalHtml = btn.innerHTML;
+        btn.innerHTML = '<i class="fas fa-check"></i> Copied!';
+        setTimeout(() => {
+            btn.innerHTML = originalHtml;
+        }, 2000);
+    }
+
+    function wizardFinish() {
+        // Close modal
+        const wizardModal = bootstrap.Modal.getInstance(document.getElementById('widgetWizardModal'));
+        if (wizardModal) wizardModal.hide();
+
+        // Show success message
+        showAlert('Widget created successfully! You can now integrate it into your website.', 'success');
+    }
+
     console.log('WebWidget script loaded successfully');
     console.log('createNewWidget function available:', typeof createNewWidget);
     } catch (error) {
@@ -706,5 +1407,36 @@
     .card-footer {
         background-color: #f8f9fa;
         border-top: 1px solid #dee2e6;
+    }
+    
+    /* Wizard Styles */
+    .wizard-step-label {
+        font-size: 0.9rem;
+        transition: all 0.3s ease;
+    }
+    
+    .wizard-step {
+        animation: fadeIn 0.3s ease-in;
+    }
+    
+    @keyframes fadeIn {
+        from {
+            opacity: 0;
+            transform: translateY(10px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+    
+    #widgetWizardModal .modal-body {
+        min-height: 400px;
+    }
+    
+    #wizard_integrationCode {
+        font-size: 0.85rem;
+        background-color: #f8f9fa;
+        border: 1px solid #dee2e6;
     }
 </style> 

@@ -37,7 +37,7 @@
                 <?php _s('Registration is free', __FILE__, $_SESSION['LANG']); ?>: <a href="index.php/register" class="auth-link"><?php _s('Register', __FILE__, $_SESSION['LANG']); ?></a>
             </div>
             
-            <form action="index.php" method="post" target="_top">
+            <form action="index.php" method="post" target="_top" id="loginForm">
                 <input type="hidden" name="action" value="login">
                 <div class="form-group">
                     <label for="email"><?php _s('Email', __FILE__, $_SESSION['LANG']); ?></label>
@@ -47,8 +47,8 @@
                     <label for="password"><?php _s('Password', __FILE__, $_SESSION['LANG']); ?></label>
                     <input type="password" class="form-control" id="password" name="password" placeholder="<?php _s('Enter password', __FILE__, $_SESSION['LANG']); ?>" required>
                 </div>
-                <button type="submit" class="btn btn-primary"><?php _s('Login', __FILE__, $_SESSION['LANG']); ?></button>
-                <div class="cf-turnstile" data-sitekey="0x4AAAAAAB1d8VjDhX7_hJRg" data-theme="light" data-size="normal"></div>
+                <button type="submit" class="btn btn-primary" id="loginBtn" disabled title="<?php _s('Please complete the security check below', __FILE__, $_SESSION['LANG']); ?>"><?php _s('Login', __FILE__, $_SESSION['LANG']); ?></button>
+                <div class="cf-turnstile" data-sitekey="0x4AAAAAAB1d8VjDhX7_hJRg" data-theme="light" data-size="normal" data-callback="onTurnstileSuccess" data-error-callback="onTurnstileError" data-expired-callback="onTurnstileExpired"></div>
             </form>
             
             <?php if (OidcAuth::isConfigured()): ?>
@@ -80,5 +80,44 @@
     <footer class="auth-footer">
         <?php _s('Go to our homepage for more information: <a href="https://www.synaplan.com/">https://www.synaplan.com/</a>', __FILE__, $_SESSION['LANG']); ?>
     </footer>
+
+    <script>
+    let turnstileCompleted = false;
+
+    // Callback when Turnstile is successfully completed
+    function onTurnstileSuccess(token) {
+        turnstileCompleted = true;
+        const loginBtn = document.getElementById('loginBtn');
+        loginBtn.disabled = false;
+        loginBtn.removeAttribute('title');
+    }
+
+    // Callback when Turnstile encounters an error
+    function onTurnstileError() {
+        turnstileCompleted = false;
+        const loginBtn = document.getElementById('loginBtn');
+        loginBtn.disabled = true;
+        loginBtn.setAttribute('title', '<?php _s('Security check failed. Please refresh the page.', __FILE__, $_SESSION['LANG']); ?>');
+    }
+
+    // Callback when Turnstile token expires
+    function onTurnstileExpired() {
+        turnstileCompleted = false;
+        const loginBtn = document.getElementById('loginBtn');
+        loginBtn.disabled = true;
+        loginBtn.setAttribute('title', '<?php _s('Security check expired. Please complete it again.', __FILE__, $_SESSION['LANG']); ?>');
+    }
+
+    // Add form submission validation
+    document.getElementById('loginForm').addEventListener('submit', function(e) {
+        const turnstileResponse = document.querySelector('[name="cf-turnstile-response"]')?.value;
+        
+        if (!turnstileCompleted || !turnstileResponse) {
+            e.preventDefault();
+            alert('<?php _s('Please complete the security check before logging in.', __FILE__, $_SESSION['LANG']); ?>');
+            return false;
+        }
+    });
+    </script>
 </body>
 </html>

@@ -58,11 +58,10 @@
                     <label for="confirmPassword"><?php _s('Confirm Password', __FILE__, $_SESSION['LANG']); ?></label>
                     <input type="password" class="form-control" id="confirmPassword" name="confirmPassword" placeholder="<?php _s('Confirm your password', __FILE__, $_SESSION['LANG']); ?>" minlength="6" required>
                 </div>
-                <button type="submit" class="btn btn-primary" id="submitBtn">
-                    <span class="spinner-border spinner-border-sm d-none me-2" id="submitSpinner" role="status" aria-hidden="true"></span>
+                <button type="submit" class="btn btn-primary" id="submitBtn" disabled title="<?php _s('Please complete the security check below', __FILE__, $_SESSION['LANG']); ?>">
                     <?php _s('Create Account', __FILE__, $_SESSION['LANG']); ?>
                 </button>
-                <div class="cf-turnstile" data-sitekey="0x4AAAAAAB1d8VjDhX7_hJRg" data-theme="light" data-size="normal"></div>
+                <div class="cf-turnstile" data-sitekey="0x4AAAAAAB1d8VjDhX7_hJRg" data-theme="light" data-size="normal" data-callback="onTurnstileSuccess" data-error-callback="onTurnstileError" data-expired-callback="onTurnstileExpired"></div>
             </form>
             
             <div class="text-center mt-3">
@@ -77,12 +76,45 @@
     </footer>
 
     <script>
+    let turnstileCompleted = false;
+
+    // Callback when Turnstile is successfully completed
+    function onTurnstileSuccess(token) {
+        turnstileCompleted = true;
+        const submitBtn = document.getElementById('submitBtn');
+        submitBtn.disabled = false;
+        submitBtn.removeAttribute('title');
+    }
+
+    // Callback when Turnstile encounters an error
+    function onTurnstileError() {
+        turnstileCompleted = false;
+        const submitBtn = document.getElementById('submitBtn');
+        submitBtn.disabled = true;
+        submitBtn.setAttribute('title', '<?php _s('Security check failed. Please refresh the page.', __FILE__, $_SESSION['LANG']); ?>');
+    }
+
+    // Callback when Turnstile token expires
+    function onTurnstileExpired() {
+        turnstileCompleted = false;
+        const submitBtn = document.getElementById('submitBtn');
+        submitBtn.disabled = true;
+        submitBtn.setAttribute('title', '<?php _s('Security check expired. Please complete it again.', __FILE__, $_SESSION['LANG']); ?>');
+    }
+
     document.getElementById('registrationForm').addEventListener('submit', function(e) {
         e.preventDefault();
         
         const email = document.getElementById('email').value;
         const password = document.getElementById('password').value;
         const confirmPassword = document.getElementById('confirmPassword').value;
+        
+        // Validate Turnstile
+        const turnstileResponse = document.querySelector('[name="cf-turnstile-response"]')?.value;
+        if (!turnstileCompleted || !turnstileResponse) {
+            showError('<?php _s('Please complete the security check before registering.', __FILE__, $_SESSION['LANG']); ?>');
+            return;
+        }
         
         // Hide any existing alerts
         document.getElementById('successAlert').classList.add('d-none');
@@ -101,12 +133,7 @@
         
         // Show loading state
         const submitBtn = document.getElementById('submitBtn');
-        const submitSpinner = document.getElementById('submitSpinner');
         submitBtn.disabled = true;
-        submitSpinner.classList.remove('d-none');
-        
-        // Get Turnstile response
-        const turnstileResponse = document.querySelector('[name="cf-turnstile-response"]')?.value || '';
         
         // Prepare form data
         const formData = new FormData();
@@ -127,6 +154,8 @@
                 showSuccess();
                 // Clear the form
                 document.getElementById('registrationForm').reset();
+                // Reset turnstile state after successful registration
+                turnstileCompleted = false;
             } else {
                 showError(data.error || '<?php _s('Registration failed. Please try again.', __FILE__, $_SESSION['LANG']); ?>');
             }
@@ -136,9 +165,10 @@
             showError('<?php _s('An error occurred. Please try again.', __FILE__, $_SESSION['LANG']); ?>');
         })
         .finally(() => {
-            // Reset button state
-            submitBtn.disabled = false;
-            submitSpinner.classList.add('d-none');
+            // Reset button state only if turnstile is still valid
+            if (turnstileCompleted) {
+                submitBtn.disabled = false;
+            }
         });
     });
 

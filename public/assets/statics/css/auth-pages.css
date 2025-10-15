@@ -178,9 +178,19 @@ body::before {
 }
 
 .btn-primary:disabled {
-    opacity: 0.6;
+    background: #4a5568 !important;
+    color: #9ca3af !important;
     cursor: not-allowed;
     transform: none;
+    box-shadow: none;
+    border: 2px solid #2d3748;
+}
+
+.btn-primary:disabled:hover {
+    background: #4a5568 !important;
+    color: #9ca3af !important;
+    transform: none;
+    box-shadow: none;
 }
 
 .btn-outline-primary {

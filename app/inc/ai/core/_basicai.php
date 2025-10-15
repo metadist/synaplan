@@ -565,6 +565,221 @@ class BasicAI
         return $arrPrompt;
     }
     // ******************************************************************************************************
+    // enable file search on a prompt with group filter
+    // Creates user-specific copy if it's a default prompt (BOWNERID = 0)
+    // ******************************************************************************************************
+    public static function enablePromptFileSearch($promptKey, $groupKey): array
+    {
+        $retArr = ['error' => '', 'success' => false];
+
+        try {
+            $userId = $_SESSION['USERPROFILE']['BID'];
+            $promptKey = db::EscString($promptKey);
+            $groupKey = db::EscString($groupKey);
+
+            if (empty($promptKey)) {
+                $retArr['error'] = 'Prompt key is required';
+                return $retArr;
+            }
+
+            // Get the current prompt (default or user-specific)
+            $sql = "SELECT BID, BPROMPT, BSHORTDESC, BLANG, BOWNERID FROM BPROMPTS 
+                    WHERE BTOPIC = '" . $promptKey . "' 
+                    AND (BOWNERID = 0 OR BOWNERID = " . $userId . ')
+                    ORDER BY BOWNERID DESC
+                    LIMIT 1';
+            $res = db::Query($sql);
+            $currentPrompt = db::FetchArr($res);
+
+            if (!$currentPrompt) {
+                $retArr['error'] = 'Prompt not found';
+                error_log("enablePromptFileSearch: Prompt '$promptKey' not found for user $userId");
+                return $retArr;
+            }
+
+            $targetPromptId = $currentPrompt['BID'];
+            $needsNewPrompt = false;
+
+            error_log("enablePromptFileSearch: Found prompt BID={$targetPromptId}, BOWNERID={$currentPrompt['BOWNERID']}, BTOPIC='$promptKey' for user $userId");
+
+            // If this is a default prompt (BOWNERID = 0), create a user-specific copy
+            if ($currentPrompt['BOWNERID'] == 0) {
+                // Check if user already has a custom copy
+                $checkSql = "SELECT BID FROM BPROMPTS 
+                             WHERE BTOPIC = '" . $promptKey . "' AND BOWNERID = " . $userId . ' LIMIT 1';
+                $checkRes = db::Query($checkSql);
+                $existingPrompt = db::FetchArr($checkRes);
+
+                if ($existingPrompt) {
+                    // User already has a custom prompt, use it
+                    $targetPromptId = $existingPrompt['BID'];
+                } else {
+                    // Create user-specific copy of the prompt
+                    $insertPromptSql = 'INSERT INTO BPROMPTS (BOWNERID, BLANG, BTOPIC, BPROMPT, BSHORTDESC) 
+                                        VALUES (' . $userId . ", 
+                                                '" . db::EscString($currentPrompt['BLANG']) . "', 
+                                                '" . $promptKey . "', 
+                                                '" . db::EscString($currentPrompt['BPROMPT']) . "', 
+                                                '" . db::EscString($currentPrompt['BSHORTDESC']) . "')";
+                    db::Query($insertPromptSql);
+                    $targetPromptId = db::LastId();
+
+                    if ($targetPromptId <= 0) {
+                        $retArr['error'] = 'Failed to create user-specific prompt';
+                        return $retArr;
+                    }
+                    $needsNewPrompt = true;
+                }
+            }
+
+            // Get existing settings BEFORE deleting (to preserve values we don't change)
+            $existingSettings = [];
+            $settingsSql = 'SELECT BTOKEN, BVALUE FROM BPROMPTMETA WHERE BPROMPTID = ' . $targetPromptId;
+            $settingsRes = db::Query($settingsSql);
+            while ($settingRow = db::FetchArr($settingsRes)) {
+                $existingSettings[$settingRow['BTOKEN']] = $settingRow['BVALUE'];
+            }
+
+            // If we just created a new prompt and it has no settings, copy from default
+            if ($needsNewPrompt && empty($existingSettings)) {
+                $defaultSettingsSql = 'SELECT BTOKEN, BVALUE FROM BPROMPTMETA WHERE BPROMPTID = ' . $currentPrompt['BID'];
+                $defaultSettingsRes = db::Query($defaultSettingsSql);
+                while ($settingRow = db::FetchArr($defaultSettingsRes)) {
+                    $existingSettings[$settingRow['BTOKEN']] = $settingRow['BVALUE'];
+                }
+            }
+
+            // DELETE old prompt settings (matching c_prompts.php pattern)
+            // SECURITY: Only delete if prompt belongs to user AND is not a default prompt
+            $deleteSql = 'DELETE FROM BPROMPTMETA 
+                         WHERE BPROMPTID = ' . $targetPromptId . '
+                         AND BPROMPTID IN (
+                             SELECT BID FROM BPROMPTS 
+                             WHERE BID = ' . $targetPromptId . '
+                             AND BOWNERID = ' . $userId . '
+                             AND BOWNERID > 0
+                         )';
+            db::Query($deleteSql);
+            error_log("enablePromptFileSearch: Deleted old settings for prompt ID $targetPromptId (user $userId)");
+
+            // Prepare all settings (matching c_prompts.php structure)
+            // Use existing values or defaults
+            $aiModel = $existingSettings['aiModel'] ?? '-1';
+            $toolInternet = $existingSettings['tool_internet'] ?? '0';
+            $toolFiles = '1';  // ENABLE file search
+            $toolScreenshot = $existingSettings['tool_screenshot'] ?? '0';
+            $toolTransfer = $existingSettings['tool_transfer'] ?? '0';
+            $toolFilesKeyword = $groupKey;  // Set group filter
+            $toolScreenshotX = $existingSettings['tool_screenshot_x'] ?? '';
+            $toolScreenshotY = $existingSettings['tool_screenshot_y'] ?? '';
+
+            // INSERT all settings fresh (matching c_prompts.php pattern)
+            $sql = "INSERT INTO BPROMPTMETA (BPROMPTID, BTOKEN, BVALUE) VALUES ({$targetPromptId}, 'aiModel', '" . db::EscString($aiModel) . "')";
+            db::Query($sql);
+
+            $sql = "INSERT INTO BPROMPTMETA (BPROMPTID, BTOKEN, BVALUE) VALUES ({$targetPromptId}, 'tool_internet', '" . db::EscString($toolInternet) . "')";
+            db::Query($sql);
+
+            $sql = "INSERT INTO BPROMPTMETA (BPROMPTID, BTOKEN, BVALUE) VALUES ({$targetPromptId}, 'tool_files', '" . db::EscString($toolFiles) . "')";
+            db::Query($sql);
+
+            $sql = "INSERT INTO BPROMPTMETA (BPROMPTID, BTOKEN, BVALUE) VALUES ({$targetPromptId}, 'tool_screenshot', '" . db::EscString($toolScreenshot) . "')";
+            db::Query($sql);
+
+            $sql = "INSERT INTO BPROMPTMETA (BPROMPTID, BTOKEN, BVALUE) VALUES ({$targetPromptId}, 'tool_transfer', '" . db::EscString($toolTransfer) . "')";
+            db::Query($sql);
+
+            // Insert tool_files_keyword (group filter)
+            if (!empty($toolFilesKeyword)) {
+                $sql = "INSERT INTO BPROMPTMETA (BPROMPTID, BTOKEN, BVALUE) VALUES ({$targetPromptId}, 'tool_files_keyword', '" . db::EscString($toolFilesKeyword) . "')";
+                db::Query($sql);
+            }
+
+            // Insert screenshot settings if they exist
+            if (!empty($toolScreenshotX)) {
+                $sql = "INSERT INTO BPROMPTMETA (BPROMPTID, BTOKEN, BVALUE) VALUES ({$targetPromptId}, 'tool_screenshot_x', '" . db::EscString($toolScreenshotX) . "')";
+                db::Query($sql);
+            }
+            if (!empty($toolScreenshotY)) {
+                $sql = "INSERT INTO BPROMPTMETA (BPROMPTID, BTOKEN, BVALUE) VALUES ({$targetPromptId}, 'tool_screenshot_y', '" . db::EscString($toolScreenshotY) . "')";
+                db::Query($sql);
+            }
+
+            $retArr['success'] = true;
+            $retArr['message'] = 'File search enabled on prompt with filter: ' . $groupKey;
+            $retArr['promptId'] = $targetPromptId;
+
+            error_log("enablePromptFileSearch: SUCCESS - Prompt ID $targetPromptId updated with tool_files=1, tool_files_keyword=$groupKey");
+
+            return $retArr;
+
+        } catch (\Throwable $e) {
+            error_log('Enable File Search Error: ' . $e->getMessage());
+            $retArr['error'] = 'Failed to enable file search: ' . $e->getMessage();
+            return $retArr;
+        }
+    }
+    // ******************************************************************************************************
+    // update file search filter on existing prompt
+    // ******************************************************************************************************
+    public static function updatePromptFileSearchFilter($promptKey, $groupKey): array
+    {
+        $retArr = ['error' => '', 'success' => false];
+
+        try {
+            $userId = $_SESSION['USERPROFILE']['BID'];
+            $promptKey = db::EscString($promptKey);
+            $groupKey = db::EscString($groupKey);
+
+            if (empty($promptKey)) {
+                $retArr['error'] = 'Prompt key is required';
+                return $retArr;
+            }
+
+            // Get the user's prompt (only user-owned, not default)
+            $sql = "SELECT BID FROM BPROMPTS 
+                    WHERE BTOPIC = '" . $promptKey . "' 
+                    AND BOWNERID = " . $userId . '
+                    LIMIT 1';
+            $res = db::Query($sql);
+            $userPrompt = db::FetchArr($res);
+
+            if (!$userPrompt) {
+                $retArr['error'] = 'User-specific prompt not found. Cannot update default prompts.';
+                return $retArr;
+            }
+
+            $promptId = $userPrompt['BID'];
+
+            // Update the filter setting (use DELETE→INSERT pattern for consistency)
+            // SECURITY: Only delete if prompt belongs to user AND is not a default prompt
+            $deleteSql = 'DELETE FROM BPROMPTMETA 
+                         WHERE BPROMPTID = ' . $promptId . "
+                         AND BTOKEN = 'tool_files_keyword'
+                         AND BPROMPTID IN (
+                             SELECT BID FROM BPROMPTS 
+                             WHERE BID = " . $promptId . '
+                             AND BOWNERID = ' . $userId . '
+                             AND BOWNERID > 0
+                         )';
+            db::Query($deleteSql);
+
+            $insertSql = 'INSERT INTO BPROMPTMETA (BPROMPTID, BTOKEN, BVALUE) 
+                         VALUES (' . $promptId . ", 'tool_files_keyword', '" . db::EscString($groupKey) . "')";
+            db::Query($insertSql);
+
+            $retArr['success'] = true;
+            $retArr['message'] = 'File search filter updated to: ' . $groupKey;
+
+            return $retArr;
+
+        } catch (\Throwable $e) {
+            error_log('Update File Search Filter Error: ' . $e->getMessage());
+            $retArr['error'] = 'Failed to update filter: ' . $e->getMessage();
+            return $retArr;
+        }
+    }
+    // ******************************************************************************************************
     // get the file sorting topics
     // ******************************************************************************************************
     public static function getFileSortTopics(): array
