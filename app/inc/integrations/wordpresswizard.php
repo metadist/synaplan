@@ -17,172 +17,6 @@
 class WordPressWizard
 {
     /**
-     * Get client IP address with Cloudflare support
-     *
-     * @return string Client IP address
-     */
-    private static function getClientIP(): string
-    {
-        // Priority: CF-Connecting-IP > X-Forwarded-For > REMOTE_ADDR
-        return $_SERVER['HTTP_CF_CONNECTING_IP'] ?? $_SERVER['HTTP_X_FORWARDED_FOR'] ?? $_SERVER['REMOTE_ADDR'] ?? 'unknown';
-    }
-
-    /**
-     * Get browser and system details from User-Agent
-     *
-     * @return array Browser details (browser, os, language)
-     */
-    private static function getBrowserDetails(): array
-    {
-        $userAgent = $_SERVER['HTTP_USER_AGENT'] ?? 'Unknown';
-        $language = $_SERVER['HTTP_ACCEPT_LANGUAGE'] ?? 'Unknown';
-
-        // Parse browser
-        $browser = 'Unknown Browser';
-        if (preg_match('/Firefox\/([0-9.]+)/i', $userAgent, $matches)) {
-            $browser = 'Firefox ' . $matches[1];
-        } elseif (preg_match('/Edg\/([0-9.]+)/i', $userAgent, $matches)) {
-            $browser = 'Edge ' . $matches[1];
-        } elseif (preg_match('/Chrome\/([0-9.]+)/i', $userAgent, $matches)) {
-            $browser = 'Chrome ' . $matches[1];
-        } elseif (preg_match('/Safari\/([0-9.]+)/i', $userAgent, $matches)) {
-            // Check if it's actually Safari (not Chrome-based)
-            if (!preg_match('/Chrome/i', $userAgent)) {
-                $browser = 'Safari ' . $matches[1];
-            }
-        } elseif (preg_match('/Opera|OPR\/([0-9.]+)/i', $userAgent, $matches)) {
-            $browser = 'Opera ' . ($matches[1] ?? '');
-        }
-
-        // Parse OS
-        $os = 'Unknown OS';
-        if (preg_match('/Windows NT ([0-9.]+)/i', $userAgent, $matches)) {
-            $os = 'Windows ' . $matches[1];
-        } elseif (preg_match('/Mac OS X ([0-9_]+)/i', $userAgent, $matches)) {
-            $os = 'macOS ' . str_replace('_', '.', $matches[1]);
-        } elseif (preg_match('/Linux/i', $userAgent)) {
-            $os = 'Linux';
-        } elseif (preg_match('/Android ([0-9.]+)/i', $userAgent, $matches)) {
-            $os = 'Android ' . $matches[1];
-        } elseif (preg_match('/iOS|iPhone OS ([0-9_]+)/i', $userAgent, $matches)) {
-            $os = 'iOS ' . str_replace('_', '.', $matches[1] ?? '');
-        }
-
-        return [
-            'browser' => $browser,
-            'os' => $os,
-            'language' => $language,
-            'user_agent' => $userAgent
-        ];
-    }
-
-    /**
-     * Send admin notification about new WordPress signup
-     *
-     * @param int $userId New user ID
-     * @param string $email User email
-     * @param string $siteUrl WordPress site URL
-     * @param int $filesCount Number of files uploaded
-     * @return bool True if email sent successfully
-     */
-    private static function sendAdminNotification(int $userId, string $email, string $siteUrl, int $filesCount): bool
-    {
-        $ip = self::getClientIP();
-        $browserDetails = self::getBrowserDetails();
-
-        // Build IP lookup link
-        $ipLookupLink = 'https://whatismyipaddress.com/ip/' . urlencode($ip);
-
-        $htmlBody = "
-        <h2>🎉 New WordPress Plugin Signup</h2>
-        
-        <h3>User Information</h3>
-        <table style='border-collapse: collapse; width: 100%;'>
-            <tr style='background: #f8f9fa;'>
-                <td style='padding: 8px; border: 1px solid #dee2e6; font-weight: bold;'>User ID</td>
-                <td style='padding: 8px; border: 1px solid #dee2e6;'>{$userId}</td>
-            </tr>
-            <tr>
-                <td style='padding: 8px; border: 1px solid #dee2e6; font-weight: bold;'>Email</td>
-                <td style='padding: 8px; border: 1px solid #dee2e6;'>{$email}</td>
-            </tr>
-            <tr style='background: #f8f9fa;'>
-                <td style='padding: 8px; border: 1px solid #dee2e6; font-weight: bold;'>WordPress Site</td>
-                <td style='padding: 8px; border: 1px solid #dee2e6;'><a href='{$siteUrl}'>{$siteUrl}</a></td>
-            </tr>
-            <tr>
-                <td style='padding: 8px; border: 1px solid #dee2e6; font-weight: bold;'>Files Uploaded</td>
-                <td style='padding: 8px; border: 1px solid #dee2e6;'>{$filesCount}</td>
-            </tr>
-        </table>
-        
-        <h3>Client Information</h3>
-        <table style='border-collapse: collapse; width: 100%;'>
-            <tr style='background: #f8f9fa;'>
-                <td style='padding: 8px; border: 1px solid #dee2e6; font-weight: bold;'>IP Address</td>
-                <td style='padding: 8px; border: 1px solid #dee2e6;'>
-                    <a href='{$ipLookupLink}' target='_blank'>{$ip}</a>
-                </td>
-            </tr>
-            <tr>
-                <td style='padding: 8px; border: 1px solid #dee2e6; font-weight: bold;'>Browser</td>
-                <td style='padding: 8px; border: 1px solid #dee2e6;'>{$browserDetails['browser']}</td>
-            </tr>
-            <tr style='background: #f8f9fa;'>
-                <td style='padding: 8px; border: 1px solid #dee2e6; font-weight: bold;'>Operating System</td>
-                <td style='padding: 8px; border: 1px solid #dee2e6;'>{$browserDetails['os']}</td>
-            </tr>
-            <tr>
-                <td style='padding: 8px; border: 1px solid #dee2e6; font-weight: bold;'>Language</td>
-                <td style='padding: 8px; border: 1px solid #dee2e6;'>{$browserDetails['language']}</td>
-            </tr>
-        </table>
-        
-        <h3>Technical Details</h3>
-        <p style='font-family: monospace; font-size: 12px; background: #f8f9fa; padding: 10px; border-radius: 4px;'>
-            User-Agent: {$browserDetails['user_agent']}
-        </p>
-        
-        <p style='color: #6c757d; font-size: 12px; margin-top: 20px;'>
-            Timestamp: " . date('Y-m-d H:i:s') . ' UTC
-        </p>
-        ';
-
-        $plainBody = "
-🎉 NEW WORDPRESS PLUGIN SIGNUP
-
-USER INFORMATION
-================
-User ID: {$userId}
-Email: {$email}
-WordPress Site: {$siteUrl}
-Files Uploaded: {$filesCount}
-
-CLIENT INFORMATION
-==================
-IP Address: {$ip}
-IP Lookup: {$ipLookupLink}
-Browser: {$browserDetails['browser']}
-Operating System: {$browserDetails['os']}
-Language: {$browserDetails['language']}
-
-TECHNICAL DETAILS
-=================
-User-Agent: {$browserDetails['user_agent']}
-
-Timestamp: " . date('Y-m-d H:i:s') . ' UTC
-        ';
-
-        return EmailService::sendEmail(
-            'team@metadist.de',
-            'New WordPress Plugin Signup - ' . $email,
-            $htmlBody,
-            $plainBody,
-            'noreply@synaplan.com'
-        );
-    }
-
-    /**
      * Complete WordPress wizard setup - NEW VERSION with verification
      *
      * This is the main entry point for WordPress wizard installations
@@ -246,26 +80,16 @@ Timestamp: " . date('Y-m-d H:i:s') . ' UTC
                 error_log('WordPress Wizard: Widget configuration failed: ' . ($widgetResult['error'] ?? 'Unknown error'));
             }
 
-            // STEP 7: Send admin notification email
-            $email = db::EscString($_REQUEST['email'] ?? '');
-            $siteUrl = db::EscString($_REQUEST['site_url'] ?? 'Unknown');
-            $notificationSent = self::sendAdminNotification($userId, $email, $siteUrl, $uploadedFilesCount);
-
-            if (!$notificationSent) {
-                error_log('WordPress Wizard: Failed to send admin notification email');
-            }
-
             // Success!
             $retArr['success'] = true;
             $retArr['message'] = 'WordPress wizard setup completed successfully';
             $retArr['data'] = [
                 'user_id' => $userId,
-                'email' => $email,
+                'email' => db::EscString($_REQUEST['email'] ?? ''),
                 'api_key' => $apiKey,
                 'filesProcessed' => $uploadedFilesCount,
                 'widget_configured' => $widgetResult['success'] ?? false,
-                'site_verified' => true,
-                'admin_notified' => $notificationSent
+                'site_verified' => true
             ];
 
             return $retArr;
@@ -347,7 +171,6 @@ Timestamp: " . date('Y-m-d H:i:s') . ' UTC
         $email = isset($_REQUEST['email']) ? db::EscString($_REQUEST['email']) : '';
         $password = isset($_REQUEST['password']) ? $_REQUEST['password'] : '';
         $language = isset($_REQUEST['language']) ? db::EscString($_REQUEST['language']) : 'en';
-        $siteUrl = isset($_REQUEST['site_url']) ? db::EscString($_REQUEST['site_url']) : '';
 
         // Validate input
         if (empty($email) || empty($password)) {
@@ -373,7 +196,7 @@ Timestamp: " . date('Y-m-d H:i:s') . ' UTC
         // MD5 encrypt the password
         $passwordMd5 = md5($password);
 
-        // Create user details JSON with WordPress site URL
+        // Create user details JSON
         $userDetails = [
             'firstName' => '',
             'lastName' => '',
@@ -388,8 +211,7 @@ Timestamp: " . date('Y-m-d H:i:s') . ' UTC
             'timezone' => '',
             'invoiceEmail' => '',
             'emailConfirmed' => true,
-            'wordpressVerified' => true,
-            'wordpressSiteUrl' => $siteUrl
+            'wordpressVerified' => true
         ];
 
         // Insert new user with BUSERLEVEL = 'NEW' (auto-activated, no email confirmation needed)
@@ -556,15 +378,16 @@ Timestamp: " . date('Y-m-d H:i:s') . ' UTC
             // Generate unique filename
             $newFileName = time() . '_' . $userId . '_' . uniqid() . '.' . $fileExtension;
 
-            // Create user-specific directory using standard pattern
-            $userRelPath = substr($userId, -5, 3) . '/' . substr($userId, -2, 2) . '/' . date('Ym') . '/';
-            $fullUploadDir = rtrim(UPLOAD_DIR, '/').'/' . $userRelPath;
+            // Create user-specific directory
+            $userSubDir = 'uid_' . $userId;
+            $userDir = rtrim(UPLOAD_DIR, '/') . '/' . $userSubDir;
 
-            if (!is_dir($fullUploadDir)) {
-                mkdir($fullUploadDir, 0755, true);
+            if (!file_exists($userDir)) {
+                mkdir($userDir, 0755, true);
             }
 
-            $targetPath = $fullUploadDir . $newFileName;
+            $targetPath = $userDir . '/' . $newFileName;
+            $userRelPath = $userSubDir . '/';
 
             // Move uploaded file
             if (move_uploaded_file($tmpName, $targetPath)) {
