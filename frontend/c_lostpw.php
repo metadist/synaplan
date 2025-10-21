@@ -48,11 +48,10 @@
                     <label for="email"><?php _s('Email', __FILE__, $_SESSION['LANG']); ?></label>
                     <input type="email" class="form-control" id="email" name="email" placeholder="<?php _s('Enter your registered email', __FILE__, $_SESSION['LANG']); ?>" required>
                 </div>
-                <button type="submit" class="btn btn-primary" id="submitBtn">
-                    <span class="spinner-border spinner-border-sm d-none me-2" id="submitSpinner" role="status" aria-hidden="true"></span>
+                <button type="submit" class="btn btn-primary" id="submitBtn" disabled title="<?php _s('Please complete the security check below', __FILE__, $_SESSION['LANG']); ?>">
                     <?php _s('Send new password', __FILE__, $_SESSION['LANG']); ?>
                 </button>
-                <div class="cf-turnstile" data-sitekey="0x4AAAAAAB1d8VjDhX7_hJRg" data-theme="light" data-size="normal"></div>
+                <div class="cf-turnstile" data-sitekey="0x4AAAAAAB1d8VjDhX7_hJRg" data-theme="light" data-size="normal" data-callback="onTurnstileSuccess" data-error-callback="onTurnstileError" data-expired-callback="onTurnstileExpired"></div>
             </form>
         </div>
     </main>
@@ -63,10 +62,43 @@
     </footer>
 
     <script>
+    let turnstileCompleted = false;
+
+    // Callback when Turnstile is successfully completed
+    function onTurnstileSuccess(token) {
+        turnstileCompleted = true;
+        const submitBtn = document.getElementById('submitBtn');
+        submitBtn.disabled = false;
+        submitBtn.removeAttribute('title');
+    }
+
+    // Callback when Turnstile encounters an error
+    function onTurnstileError() {
+        turnstileCompleted = false;
+        const submitBtn = document.getElementById('submitBtn');
+        submitBtn.disabled = true;
+        submitBtn.setAttribute('title', '<?php _s('Security check failed. Please refresh the page.', __FILE__, $_SESSION['LANG']); ?>');
+    }
+
+    // Callback when Turnstile token expires
+    function onTurnstileExpired() {
+        turnstileCompleted = false;
+        const submitBtn = document.getElementById('submitBtn');
+        submitBtn.disabled = true;
+        submitBtn.setAttribute('title', '<?php _s('Security check expired. Please complete it again.', __FILE__, $_SESSION['LANG']); ?>');
+    }
+
     document.getElementById('lostpwForm').addEventListener('submit', function(e) {
         e.preventDefault();
 
         const email = document.getElementById('email').value;
+
+        // Validate Turnstile
+        const turnstileResponse = document.querySelector('[name="cf-turnstile-response"]')?.value;
+        if (!turnstileCompleted || !turnstileResponse) {
+            showError('<?php _s('Please complete the security check before submitting.', __FILE__, $_SESSION['LANG']); ?>');
+            return;
+        }
 
         document.getElementById('successAlert').classList.add('d-none');
         document.getElementById('errorAlert').classList.add('d-none');
@@ -77,9 +109,7 @@
         }
 
         const submitBtn = document.getElementById('submitBtn');
-        const submitSpinner = document.getElementById('submitSpinner');
         submitBtn.disabled = true;
-        submitSpinner.classList.remove('d-none');
 
         // build FormData from the form to include Turnstile token automatically
         const formEl = document.getElementById('lostpwForm');
@@ -95,6 +125,8 @@
             if (data.success) {
                 showSuccess(data.message || '<?php _s('If the email exists, we sent a new password.', __FILE__, $_SESSION['LANG']); ?>');
                 document.getElementById('lostpwForm').reset();
+                // Reset turnstile state after successful submission
+                turnstileCompleted = false;
             } else {
                 showError(data.error || '<?php _s('Password reset failed. Please try again.', __FILE__, $_SESSION['LANG']); ?>');
             }
@@ -104,8 +136,10 @@
             showError('<?php _s('An error occurred. Please try again.', __FILE__, $_SESSION['LANG']); ?>');
         })
         .finally(() => {
-            submitBtn.disabled = false;
-            submitSpinner.classList.add('d-none');
+            // Reset button state only if turnstile is still valid
+            if (turnstileCompleted) {
+                submitBtn.disabled = false;
+            }
         });
     });
 

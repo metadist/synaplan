@@ -322,17 +322,20 @@ class UserRegistration
         $retArr = ['success' => false, 'error' => '', 'message' => ''];
 
         try {
-            $userSubDir = 'uid_' . $userId;
-            $userDir = rtrim(UPLOAD_DIR ?? '/tmp', '/') . '/' . $userSubDir;
+            // Use standard directory pattern - need to find all matching directories
+            // Pattern: XXX/YY/YYYYMM/ where XXX = last 3 chars, YY = last 2 chars of userId
+            $userDirPattern = substr($userId, -5, 3) . '/' . substr($userId, -2, 2) . '/';
+            $baseDir = rtrim(UPLOAD_DIR ?? '/tmp', '/');
+            $userDirBase = $baseDir . '/' . $userDirPattern;
 
-            if (!file_exists($userDir)) {
+            if (!file_exists($userDirBase)) {
                 $retArr['success'] = true;
                 $retArr['message'] = 'No files directory found';
                 return $retArr;
             }
 
-            // Recursively delete directory
-            $deleted = self::recursiveDelete($userDir);
+            // Recursively delete all month directories for this user
+            $deleted = self::recursiveDelete($userDirBase);
 
             if ($deleted) {
                 $retArr['success'] = true;

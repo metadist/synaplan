@@ -126,7 +126,7 @@ window.isWidgetMode = <?php echo $isWidgetMode ? 'true' : 'false'; ?>;
                 <div class="messages-container">
                     <!-- Chat History Loading Buttons -->
                     <?php if (!$isAnonymousWidget): ?>
-                    <div id="chatHistoryButtons" class="py-4">
+                    <div id="chatHistoryButtons" class="py-4" style="display: none;">
                         <div class="d-flex justify-content-between">
                             <div class="d-flex gap-3">
                                 <button type="button" class="btn btn-outline-primary btn-sm load-history-btn m-2" data-amount="10">
@@ -162,7 +162,8 @@ window.isWidgetMode = <?php echo $isWidgetMode ? 'true' : 'false'; ?>;
                             <div class="d-flex justify-content-between align-items-start mb-3">
                                 <div class="d-flex align-items-center">
                                     <i class="fas fa-paperclip text-primary me-2"></i>
-                                    <h6 class="mb-0 text-primary fw-bold">Attached Files</h6>
+                                    <h6 class="mb-0 text-primary fw-bold" id="filesHeader">Attached Files</h6>
+                                    <div class="widget-upload-spinner" id="widgetUploadSpinner"></div>
                                 </div>
                                 <button type="button" id="closeFilesDiv" class="btn btn-sm btn-outline-danger close-files-btn">
                                     <i class="fas fa-times"></i>
@@ -206,7 +207,7 @@ window.isWidgetMode = <?php echo $isWidgetMode ? 'true' : 'false'; ?>;
                                     <div id="messageInput" 
                                         class="message-input" 
                                         contenteditable="true" 
-                                        placeholder="Type your message...">
+                                        placeholder="<?php echo $isWidgetMode ? 'Enter your question' : 'Ctrl+Enter for new line'; ?>">
                                     </div>
                                 </div>
 
@@ -237,7 +238,7 @@ window.isWidgetMode = <?php echo $isWidgetMode ? 'true' : 'false'; ?>;
 <script src="node_modules/@highlightjs/cdn-assets/languages/sql.min.js"></script>
 <script src="node_modules/@highlightjs/cdn-assets/languages/go.min.js"></script>
 <script src="assets/statics/js/speech.js?v=2"></script>
-<script src="assets/statics/js/chat.js?v=2"></script>
+<script src="assets/statics/js/chat.js?v=251015f"></script>
 <script src="assets/statics/js/chathistory.js?v=2"></script>
 
 <script>
@@ -360,6 +361,161 @@ window.isWidgetMode = <?php echo $isWidgetMode ? 'true' : 'false'; ?>;
         height: auto !important;
         object-fit: contain !important;
       }
+      
+      /* Compact file preview for widget mode - position at bottom above input */
+      #filesDiv {
+        position: absolute !important;
+        bottom: 100% !important;
+        left: 0 !important;
+        right: 0 !important;
+        background: rgba(255, 255, 255, 0.98) !important;
+        border: 1px solid #e0e0e0 !important;
+        border-radius: 8px !important;
+        padding: 8px !important;
+        margin-bottom: 4px !important;
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08) !important;
+        z-index: 100 !important;
+      }
+      
+      /* Make chat input container relative so filesDiv positions relative to it */
+      .chat-input-container {
+        position: relative !important;
+      }
+      
+      .file-preview-container {
+        padding: 8px !important;
+      }
+      
+      .file-preview-container .d-flex.justify-content-between {
+        margin-bottom: 6px !important;
+      }
+      
+      .file-preview-container h6 {
+        font-size: 0.8rem !important;
+        margin-bottom: 0 !important;
+      }
+      
+      .file-actions {
+        display: none !important; /* Hide "Add More Files" in widget mode */
+      }
+      
+      .file-preview-grid {
+        display: flex !important;
+        flex-direction: column !important;
+        gap: 6px !important;
+        max-height: 120px !important;
+        overflow-y: auto !important;
+      }
+      
+      .file-preview-card {
+        display: flex !important;
+        align-items: center !important;
+        gap: 8px !important;
+        padding: 8px 12px !important;
+        background: #f8f9fa !important;
+        border-radius: 6px !important;
+        border: 1px solid #e9ecef !important;
+      }
+      
+      .file-preview-section {
+        display: none !important; /* Hide image/icon preview section in widget mode to save space */
+      }
+      
+      .file-preview-image {
+        display: none !important; /* Hide image previews in widget mode */
+      }
+      
+      .file-preview-icon {
+        display: none !important; /* Hide file type icons in widget mode */
+      }
+      
+      .file-info {
+        flex: 1 !important;
+        min-width: 0 !important;
+        display: flex !important;
+        flex-direction: column !important;
+        gap: 2px !important;
+      }
+      
+      .file-name {
+        font-size: 0.75rem !important;
+        font-weight: 500 !important;
+        color: #212529 !important;
+        white-space: nowrap !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+        line-height: 1.2 !important;
+      }
+      
+      .file-size {
+        display: none !important; /* Hide file size in widget mode to save space */
+      }
+      
+      .file-remove-btn {
+        width: 24px !important;
+        height: 24px !important;
+        min-width: 24px !important;
+        padding: 0 !important;
+        background: transparent !important;
+        border: none !important;
+        color: #dc3545 !important;
+        cursor: pointer !important;
+        border-radius: 50% !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        font-size: 16px !important;
+        transition: background-color 0.2s ease !important;
+        flex-shrink: 0 !important;
+      }
+      
+      .file-remove-btn:hover {
+        background: rgba(220, 53, 69, 0.1) !important;
+      }
+      
+      .close-files-btn {
+        width: 24px !important;
+        height: 24px !important;
+        padding: 0 !important;
+        font-size: 14px !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+      }
+      
+      /* Upload spinner animation for widget mode */
+      .widget-upload-spinner {
+        display: none;
+        width: 20px !important;
+        height: 20px !important;
+        border: 3px solid rgba(0, 0, 0, 0.1) !important;
+        border-top-color: #00d084 !important;
+        border-radius: 50% !important;
+        animation: widget-spin 0.8s linear infinite !important;
+        margin-left: 8px !important;
+      }
+      
+      .widget-upload-spinner.active {
+        display: inline-block !important;
+      }
+      
+      @keyframes widget-spin {
+        to { transform: rotate(360deg); }
+      }
+      
+      /* Show uploading status */
+      .file-preview-container h6.uploading::after {
+        content: " - Uploading..." !important;
+        color: #00d084 !important;
+        font-weight: normal !important;
+        font-size: 0.75rem !important;
+        animation: pulse 1.5s ease-in-out infinite !important;
+      }
+      
+      @keyframes pulse {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.5; }
+      }
     `;
     document.head.appendChild(style);
 
@@ -406,6 +562,26 @@ window.isWidgetMode = <?php echo $isWidgetMode ? 'true' : 'false'; ?>;
             onPromptConfigChange();
         }
         // No need to scroll to bottom since chat history is loaded via buttons now
+        
+        // Initialize placeholder text for contenteditable
+        const messageInput = document.getElementById('messageInput');
+        if (messageInput) {
+            const placeholderText = messageInput.getAttribute('placeholder');
+            if (placeholderText && messageInput.textContent.trim() === '') {
+                messageInput.textContent = placeholderText;
+                messageInput.style.color = '#999';
+                messageInput.dataset.isPlaceholder = 'true';
+                
+                // Remove placeholder on focus
+                messageInput.addEventListener('focus', function() {
+                    if (this.dataset.isPlaceholder === 'true') {
+                        this.textContent = '';
+                        this.style.color = '';
+                        delete this.dataset.isPlaceholder;
+                    }
+                }, { once: true }); // Only run once
+            }
+        }
     });
 </script>
 

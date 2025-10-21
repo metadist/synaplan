@@ -15,6 +15,25 @@ class Frontend
     public static $AIdetailArr = [];
 
     /**
+     * Clear widget session variables
+     *
+     * Centralized method to clear all widget-related session variables
+     * Should be called whenever a user logs in to prevent session pollution
+     *
+     * @return void
+     */
+    public static function clearWidgetSession(): void
+    {
+        unset($_SESSION['is_widget']);
+        unset($_SESSION['widget_owner_id']);
+        unset($_SESSION['widget_id']);
+        unset($_SESSION['anonymous_session_id']);
+        unset($_SESSION['anonymous_session_created']);
+        unset($_SESSION['WIDGET_PROMPT']);
+        unset($_SESSION['WIDGET_AUTO_MESSAGE']);
+    }
+
+    /**
      * Set user from web login
      *
      * Authenticates a user based on their web login and sets up their session
@@ -52,13 +71,7 @@ class Frontend
                 // User found and allowed - set session
                 $_SESSION['USERPROFILE'] = $uArr;
                 // Clear any leftover anonymous widget session variables on login
-                unset($_SESSION['is_widget']);
-                unset($_SESSION['widget_owner_id']);
-                unset($_SESSION['widget_id']);
-                unset($_SESSION['anonymous_session_id']);
-                unset($_SESSION['anonymous_session_created']);
-                unset($_SESSION['WIDGET_PROMPT']);
-                unset($_SESSION['WIDGET_AUTO_MESSAGE']);
+                self::clearWidgetSession();
                 $success = true;
                 self::$AIdetailArr['GMAIL'] = substr($email, 0, strpos($email, '@'));
             } else {
@@ -88,6 +101,8 @@ class Frontend
             $uArr = db::FetchArr($uRes);
             if ($uArr) {
                 $_SESSION['USERPROFILE'] = $uArr;
+                // Clear any leftover anonymous widget session variables on login
+                self::clearWidgetSession();
                 return true;
             } else {
                 unset($_SESSION['USERPROFILE']);

@@ -114,7 +114,7 @@ $mode = isset($_REQUEST['mode']) ? trim((string)$_REQUEST['mode']) : '';
             
             <div class="code">
                 <strong>Integration Code Used:</strong><br>
-                &lt;script src="widget.php?uid=<?php echo htmlspecialchars($uid); ?>&amp;widgetid=<?php echo htmlspecialchars($widgetId); ?><?php echo $mode !== '' ? '&amp;mode=' . htmlspecialchars($mode) : ''; ?>"&gt;&lt;/script&gt;
+                &lt;script src="<?php echo htmlspecialchars(rtrim($GLOBALS['baseUrl'], '/')); ?>/widget.php?uid=<?php echo htmlspecialchars($uid); ?>&amp;widgetid=<?php echo htmlspecialchars($widgetId); ?><?php echo $mode !== '' ? '&amp;mode=' . htmlspecialchars($mode) : ''; ?>"&gt;&lt;/script&gt;
             </div>
             
             <p>If you don't see the widget, please check:</p>
@@ -137,7 +137,7 @@ $mode = isset($_REQUEST['mode']) ? trim((string)$_REQUEST['mode']) : '';
             
             <!-- Place inline-box immediately below the code block to render inline with text -->
             <?php if ($mode === 'inline-box'): ?>
-            <script src="widget.php?uid=<?php echo htmlspecialchars($uid); ?>&widgetid=<?php echo htmlspecialchars($widgetId); ?>&mode=inline-box"></script>
+            <script src="<?php echo rtrim($GLOBALS['baseUrl'], '/'); ?>/widget.php?uid=<?php echo htmlspecialchars($uid); ?>&widgetid=<?php echo htmlspecialchars($widgetId); ?>&mode=inline-box"></script>
             <?php endif; ?>
         </div>
         
@@ -146,7 +146,7 @@ $mode = isset($_REQUEST['mode']) ? trim((string)$_REQUEST['mode']) : '';
         <script>
         (function() {
             var script = document.createElement('script');
-            script.src = 'widget.php?uid=<?php echo htmlspecialchars($uid); ?>&widgetid=<?php echo htmlspecialchars($widgetId); ?>';
+            script.src = '<?php echo rtrim($GLOBALS['baseUrl'], '/'); ?>/widget.php?uid=<?php echo htmlspecialchars($uid); ?>&widgetid=<?php echo htmlspecialchars($widgetId); ?>';
             script.async = true;
             document.head.appendChild(script);
         })();

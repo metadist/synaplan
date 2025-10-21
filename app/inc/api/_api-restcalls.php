@@ -89,6 +89,43 @@ switch ($apiAction) {
     case 'getPromptDetails':
         $resArr = BasicAI::getPromptDetails($_REQUEST['promptKey']);
         break;
+    case 'enablePromptFileSearch':
+        $promptKey = isset($_REQUEST['promptKey']) ? trim($_REQUEST['promptKey']) : '';
+        $groupKey = isset($_REQUEST['groupKey']) ? trim($_REQUEST['groupKey']) : '';
+        $resArr = BasicAI::enablePromptFileSearch($promptKey, $groupKey);
+        break;
+    case 'updatePromptFileSearchFilter':
+        $promptKey = isset($_REQUEST['promptKey']) ? trim($_REQUEST['promptKey']) : '';
+        $groupKey = isset($_REQUEST['groupKey']) ? trim($_REQUEST['groupKey']) : '';
+        $resArr = BasicAI::updatePromptFileSearchFilter($promptKey, $groupKey);
+        break;
+    case 'debugPromptSettings':
+        // Debug endpoint to check actual database state
+        $promptKey = isset($_REQUEST['promptKey']) ? trim($_REQUEST['promptKey']) : 'general';
+        $userId = $_SESSION['USERPROFILE']['BID'];
+
+        // Get prompt
+        $sql = "SELECT BID, BOWNERID, BTOPIC FROM BPROMPTS WHERE BTOPIC = '" . db::EscString($promptKey) . "' AND BOWNERID = " . $userId . ' LIMIT 1';
+        $res = db::Query($sql);
+        $prompt = db::FetchArr($res);
+
+        // Get settings
+        $settings = [];
+        if ($prompt) {
+            $sql = 'SELECT BTOKEN, BVALUE FROM BPROMPTMETA WHERE BPROMPTID = ' . $prompt['BID'] . ' ORDER BY BTOKEN';
+            $res = db::Query($sql);
+            while ($row = db::FetchArr($res)) {
+                $settings[] = $row;
+            }
+        }
+
+        $resArr = [
+            'success' => true,
+            'prompt' => $prompt,
+            'settings' => $settings,
+            'userId' => $userId
+        ];
+        break;
     case 'getMessageFiles':
         $messageId = intval($_REQUEST['messageId']);
         $files = FileManager::getMessageFiles($messageId);

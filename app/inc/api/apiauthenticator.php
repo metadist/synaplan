@@ -31,6 +31,9 @@ class ApiAuthenticator
         'promptUpdate',
         'deletePrompt',
         'getPromptDetails',
+        'enablePromptFileSearch',
+        'updatePromptFileSearchFilter',
+        'debugPromptSettings',
         'getFileGroups',
         'changeGroupOfFile',
         'getProfile',
@@ -105,6 +108,8 @@ class ApiAuthenticator
         // Set session
         $_SESSION['USERPROFILE'] = $userArr;
         $_SESSION['AUTH_MODE'] = 'api_key';
+        // Clear any leftover anonymous widget session variables on API key login
+        Frontend::clearWidgetSession();
 
         // Update last used timestamp
         db::Query('UPDATE BAPIKEYS SET BLASTUSED = '.time().' WHERE BID = '.intval($row['BID']));

@@ -20,7 +20,7 @@ require_once __DIR__ . '/../vendor/autoload.php';
 require_once __DIR__ . '/../app/inc/_coreincludes.php';
 
 // Initialize the API
-$GLOBALS['WAtoken'] = file_get_contents(__DIR__ . '/.keys/.watoken.txt');
+$GLOBALS['WAtoken'] = ApiKeys::getWhatsApp();
 
 // verification call - only needed once in a while
 // Check if the request is a verification request
@@ -38,8 +38,6 @@ $request = json_decode(file_get_contents('php://input'), true);
 
 if ($request) {
     // can be more than one message in the request
-    // set unique tracking ID for this
-    $myTrackingId = (int) (microtime(true) * 1000000);
     foreach ($request['entry'] as $entry) {
         foreach ($entry['changes'] as $change) {
             // preformat the message
@@ -73,17 +71,17 @@ if ($request) {
                     $inMessageArr['BTEXT'] = $message['content']['text'];
                     $inMessageArr['BUNIXTIMES'] = $message['timestamp'];
                     $inMessageArr['BDATETIME'] = (string) date('YmdHis');
-                    $inMessageArr['BTOPIC'] = '';
+                    $inMessageArr['BTOPIC'] = 'general';
 
                     $convArr = Central::searchConversation($inMessageArr);
-                    if ($convArr['BID'] > 0) {
+                    if (is_array($convArr) && isset($convArr['BID']) && $convArr['BID'] > 0) {
                         $inMessageArr['BTRACKID'] = $convArr['BTRACKID'];
                         $inMessageArr['BTOPIC'] = $convArr['BTOPIC'];
                         $inMessageArr['BLANG'] = $convArr['BLANG'];
                     } else {
-                        $inMessageArr['BTRACKID'] = $myTrackingId;
+                        $inMessageArr['BTRACKID'] = (int) (microtime(true) * 1000000);
                         $inMessageArr['BLANG'] = Central::getLanguageByCountryCode($message['from']);
-                        $inMessageArr['BTOPIC'] = '';
+                        $inMessageArr['BTOPIC'] = 'general';
                     }
 
                     // now the rest of the message
@@ -103,13 +101,15 @@ if ($request) {
                         if (is_array($limitCheck) && $limitCheck['limited']) {
                             // Send rate limit notification via WhatsApp
                             $limitMessage = "⏳ Usage Limit Reached\n" . $limitCheck['message'] . "\nNext available in: " . $limitCheck['reset_time_formatted'] . "\nNeed higher limits? 🚀 Upgrade your plan";
-                            $responseMessage = [
-                                'messaging_product' => 'whatsapp',
-                                'to' => $from,
-                                'type' => 'text',
-                                'text' => ['body' => $limitMessage]
-                            ];
-                            SendMessage($responseMessage);
+
+                            // Get WhatsApp details to send reply
+                            if (isset($message['metadata']['phone_number_id'])) {
+                                $waDetailsArr = [
+                                    'BWAPHONEID' => $message['metadata']['phone_number_id']
+                                ];
+                                $waSender = new waSender($waDetailsArr);
+                                $waSender->sendText($message['from'], $limitMessage);
+                            }
                             exit;
                         }
                     }
@@ -143,6 +143,10 @@ if ($request) {
                         // count bytes
                         XSControl::countBytes($inMessageArr, 'BOTH', false);
                         // (2) start the preprocessor and monitor the pid in the pids folder
+                        // Ensure pids directory exists
+                        if (!is_dir('pids')) {
+                            mkdir('pids', 0755, true);
+                        }
                         $cmd = 'nohup php preprocessor.php '.$inMessageArr['BID'].' > /dev/null 2>&1 &';
                         $pidfile = 'pids/m'.($inMessageArr['BID']).'.pid';
                         //error_log(__FILE__.": execute : ".$cmd);
@@ -171,11 +175,20 @@ if ($request) {
 
 function logMessage($arrMessage)
 {
-    $logContent = file_get_contents('debug.log');
+    $logFile = 'debug.log';
+    $logContent = '';
+
+    // Read existing log if it exists
+    if (file_exists($logFile)) {
+        $logContent = file_get_contents($logFile);
+    }
+
     $logContent = '<pre>'.json_encode($arrMessage, JSON_PRETTY_PRINT). "</pre>\n****\n" . substr($logContent, 0, 16384) . "...\n****\n";
-    $fhd = fopen('debug.log', 'w');
-    fwrite($fhd, $logContent);
-    fclose($fhd);
+    $fhd = fopen($logFile, 'w');
+    if ($fhd) {
+        fwrite($fhd, $logContent);
+        fclose($fhd);
+    }
 }
 
 // --------------------------------------------------------------------------------
@@ -190,7 +203,10 @@ function processWAMessage($messageBlock): array
 {
     // https://graph.facebook.com/v21.0/
     $mediaDownloadUrl = 'https://graph.facebook.com/v21.0/';
-    $processedData = [];
+    $processedData = [
+        'messages' => [],
+        'status' => []
+    ];
 
     // now handle the message
     $value = $messageBlock['value'];

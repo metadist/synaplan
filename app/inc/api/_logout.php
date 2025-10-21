@@ -15,13 +15,7 @@ function handleLogout()
     // Clear local session first
     unset($_SESSION['USERPROFILE']);
     // Clear any widget/anonymous session flags to avoid UI leaks after login
-    unset($_SESSION['is_widget']);
-    unset($_SESSION['widget_owner_id']);
-    unset($_SESSION['widget_id']);
-    unset($_SESSION['anonymous_session_id']);
-    unset($_SESSION['anonymous_session_created']);
-    unset($_SESSION['WIDGET_PROMPT']);
-    unset($_SESSION['WIDGET_AUTO_MESSAGE']);
+    Frontend::clearWidgetSession();
 
     // If OIDC is configured, redirect to IDP logout
     if (OidcAuth::isConfigured()) {
