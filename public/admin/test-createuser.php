@@ -50,7 +50,7 @@ try {
     // Step 2: Create user with specific ID 3
     $email = 'team@synaplan.com';
     $password = 'testing';
-    $passwordMd5 = md5($password);
+    $passwordHash = PasswordHelper::hash($password);
 
     // Create user details JSON
     $userDetails = [
@@ -73,7 +73,7 @@ try {
     // Insert user with specific ID 3
     // First, we need to check if we can insert with specific ID
     $insertSQL = "INSERT INTO BUSER (BID, BCREATED, BINTYPE, BMAIL, BPW, BPROVIDERID, BUSERLEVEL, BUSERDETAILS) 
-                 VALUES (3, '" . date('YmdHis') . "', 'MAIL', '" . db::EscString($email) . "', '" . $passwordMd5 . "', '" . db::EscString($email) . "', 'NEW', '" . db::EscString(json_encode($userDetails, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)) . "')";
+                 VALUES (3, '" . date('YmdHis') . "', 'MAIL', '" . db::EscString($email) . "', '" . db::EscString($passwordHash) . "', '" . db::EscString($email) . "', 'NEW', '" . db::EscString(json_encode($userDetails, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)) . "')";
 
     db::Query($insertSQL);
     $newUserId = db::LastId();

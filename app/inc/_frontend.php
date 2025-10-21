@@ -50,32 +50,46 @@ class Frontend
 
         // Validate input
         if (strlen($email) > 0 && strlen($password) > 0) {
-            // MD5 encrypt the password
-            $passwordMd5 = md5($password);
-
-            // Query the database for matching user
-            $uSQL = "SELECT * FROM BUSER WHERE BMAIL = '".$email."' AND BPW = '".$passwordMd5."'";
+            // Query the database for user by email only
+            $uSQL = "SELECT * FROM BUSER WHERE BMAIL = '".$email."'";
             $uRes = db::Query($uSQL);
             $uArr = db::FetchArr($uRes);
 
-            if ($uArr) {
-                // Only allow login for specific user levels
-                $allowedLevels = ['NEW','PRO','TEAM','BUSINESS'];
-                if (!in_array($uArr['BUSERLEVEL'], $allowedLevels, true)) {
-                    // Not allowed (e.g., PIN:xxxx or unsupported level)
+            if ($uArr && isset($uArr['BPW'])) {
+                // Verify password using PasswordHelper (supports both MD5 and bcrypt)
+                if (PasswordHelper::verify($password, $uArr['BPW'])) {
+                    // Only allow login for specific user levels
+                    $allowedLevels = ['NEW','PRO','TEAM','BUSINESS'];
+                    if (!in_array($uArr['BUSERLEVEL'], $allowedLevels, true)) {
+                        // Not allowed (e.g., PIN:xxxx or unsupported level)
+                        unset($_SESSION['USERPROFILE']);
+                        $success = false;
+                        return $success;
+                    }
+
+                    // Password verified - check if we need to upgrade the hash
+                    if (PasswordHelper::needsRehash($uArr['BPW'])) {
+                        // Upgrade from MD5 to bcrypt
+                        PasswordHelper::upgradeUserPassword($uArr['BID'], $password);
+
+                        // Reload user data with new hash
+                        $uRes2 = db::Query($uSQL);
+                        $uArr = db::FetchArr($uRes2);
+                    }
+
+                    // User found and allowed - set session
+                    $_SESSION['USERPROFILE'] = $uArr;
+                    // Clear any leftover anonymous widget session variables on login
+                    self::clearWidgetSession();
+                    $success = true;
+                    self::$AIdetailArr['GMAIL'] = substr($email, 0, strpos($email, '@'));
+                } else {
+                    // Wrong password - clear session
                     unset($_SESSION['USERPROFILE']);
                     $success = false;
-                    return $success;
                 }
-
-                // User found and allowed - set session
-                $_SESSION['USERPROFILE'] = $uArr;
-                // Clear any leftover anonymous widget session variables on login
-                self::clearWidgetSession();
-                $success = true;
-                self::$AIdetailArr['GMAIL'] = substr($email, 0, strpos($email, '@'));
             } else {
-                // User not found or wrong password - clear session
+                // User not found - clear session
                 unset($_SESSION['USERPROFILE']);
                 $success = false;
             }
