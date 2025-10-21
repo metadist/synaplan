@@ -101,7 +101,7 @@ if ($request) {
                         if (is_array($limitCheck) && $limitCheck['limited']) {
                             // Send rate limit notification via WhatsApp
                             $limitMessage = "⏳ Usage Limit Reached\n" . $limitCheck['message'] . "\nNext available in: " . $limitCheck['reset_time_formatted'] . "\nNeed higher limits? 🚀 Upgrade your plan";
-                            
+
                             // Get WhatsApp details to send reply
                             if (isset($message['metadata']['phone_number_id'])) {
                                 $waDetailsArr = [
@@ -177,12 +177,12 @@ function logMessage($arrMessage)
 {
     $logFile = 'debug.log';
     $logContent = '';
-    
+
     // Read existing log if it exists
     if (file_exists($logFile)) {
         $logContent = file_get_contents($logFile);
     }
-    
+
     $logContent = '<pre>'.json_encode($arrMessage, JSON_PRETTY_PRINT). "</pre>\n****\n" . substr($logContent, 0, 16384) . "...\n****\n";
     $fhd = fopen($logFile, 'w');
     if ($fhd) {
