@@ -338,7 +338,6 @@ class myGMail
     public static function saveToDatabase($processedMails)
     {
         $myTrackingId = (int) (microtime(true) * 1000000);
-        error_log("=== Gmail saveToDatabase: Processing " . count($processedMails) . " emails ===");
 
         foreach ($processedMails as $mail) {
             try {
@@ -351,21 +350,16 @@ class myGMail
                 $inMessageArr['BUNIXTIMES'] = time();
                 $inMessageArr['BDATETIME'] = (string) date('YmdHis');
 
-                error_log("Gmail: Processing email for user ID: " . $inMessageArr['BUSERID']);
-                error_log("Gmail: Email body length: " . strlen($inMessageArr['BTEXT']) . " chars");
-
                 // --
                 $convArr = Central::searchConversation($inMessageArr);
                 if (is_array($convArr) and $convArr['BID'] > 0) {
                     $inMessageArr['BTRACKID'] = $convArr['BTRACKID'];
                     $inMessageArr['BTOPIC'] = $convArr['BTOPIC'];
                     $inMessageArr['BLANG'] = $convArr['BLANG'];
-                    error_log("Gmail: Found existing conversation, TrackID: " . $inMessageArr['BTRACKID']);
                 } else {
                     $inMessageArr['BTRACKID'] = $myTrackingId;
                     $inMessageArr['BLANG'] = Central::getLanguageByCountryCode($mail['usrArr']['BPROVIDERID']);
                     $inMessageArr['BTOPIC'] = '';
-                    error_log("Gmail: New conversation, TrackID: " . $inMessageArr['BTRACKID']);
                 }
 
                 //$inMessageArr['BTOPIC'] = "other";
@@ -381,8 +375,6 @@ class myGMail
                 $inMessageArr['BDIRECT'] = 'IN';
                 $inMessageArr['BSTATUS'] = 'NEW';
                 $inMessageArr['BFILETEXT'] = '';
-
-                error_log("Gmail: Set BMESSTYPE='MAIL' for incoming message");
 
                 // counter, if it was saved to DB,
                 // is also used to jump over mail when limit is reached
@@ -457,7 +449,6 @@ class myGMail
                 if ($saveToDB == 0) {
                     $resArr = Central::handleInMessage($inMessageArr);
                     $lastInsertsId[] = $resArr['lastId'];
-                    error_log("Gmail: Saved message to DB with ID: " . $resArr['lastId']);
                     // log the message to the DB
                     XSControl::countThis($inMessageArr['BUSERID'], $resArr['lastId']);
                 }
@@ -480,7 +471,6 @@ class myGMail
                             $cmd = 'nohup php preprocessor.php '.($lastInsertId).' > /dev/null 2>&1 &';
                             $pidfile = 'pids/m'.($lastInsertId).'.pid';
                             exec(sprintf('%s echo $! >> %s', $cmd, $pidfile));
-                            error_log("Gmail: Launched preprocessor for message ID: " . $lastInsertId);
                         }
                     }
                 }

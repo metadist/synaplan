@@ -29,18 +29,13 @@ $GLOBALS['WAtoken'] = ApiKeys::getWhatsApp();
 $aiLastId = intval($argv[1]);
 $msgId = intval($argv[2]);
 
-// Log outprocessor start
-error_log("Outprocessor: Started for AI message {$aiLastId}, original message {$msgId}");
-
 $aiAnswer = Central::getMsgById($aiLastId);
 if (!$aiAnswer || !isset($aiAnswer['BUSERID'])) {
-    error_log("Outprocessor: Failed to get AI answer for ID {$aiLastId}");
     exit(1);
 }
 
 $usrArr = Central::getUsrById($aiAnswer['BUSERID']);
 if (!$usrArr) {
-    error_log("Outprocessor: Failed to get user for ID {$aiAnswer['BUSERID']}");
     exit(1);
 }
 $usrArr['DETAILS'] = json_decode($usrArr['BUSERDETAILS'], true);
@@ -62,14 +57,12 @@ if ($answerMethod == 'WA') {
     $waDetailsArr = db::FetchArr($detRes);
 
     if (!$waDetailsArr || !isset($waDetailsArr['BWAPHONEID'])) {
-        error_log("Outprocessor: Failed to get WhatsApp details for message {$msgId}");
         exit(1);
     }
 
     // ******************************************************
     // SEND WA
     $waSender = new waSender($waDetailsArr);
-    error_log("Outprocessor: Sending WhatsApp message to user {$usrArr['BPROVIDERID']}");
 
     if (!empty($GLOBALS['WAtoken'])) {
         try {
@@ -80,15 +73,11 @@ if ($answerMethod == 'WA') {
                     $waSender->sendAudio($usrArr['BPROVIDERID'], $aiAnswer);
                 } else {
                     $myRes = $waSender->sendText($usrArr['BPROVIDERID'], $aiAnswer['BTEXT']);
-                    error_log("Outprocessor: Sent WhatsApp text to {$usrArr['BPROVIDERID']}");
                 }
             }
         } catch (Exception $e) {
-            error_log('Outprocessor: WhatsApp send failed: ' . $e->getMessage());
+            // Silent fail
         }
-    } else {
-        error_log('Outprocessor: Local dev mode - not sending WhatsApp message');
-        error_log('Outprocessor: Would send: ' . json_encode($aiAnswer));
     }
 }
 
@@ -96,11 +85,6 @@ if ($answerMethod == 'WA') {
 // GMAIL
 // ------------------------------------------------------
 if ($answerMethod == 'MAIL') {
-    error_log("Outprocessor: MAIL mode detected");
-    error_log("Outprocessor: Sending to: " . $usrArr['DETAILS']['MAIL']);
-    error_log("Outprocessor: Subject: Ralfs.AI - " . $aiAnswer['BTOPIC']);
-    error_log("Outprocessor: Body length: " . strlen($aiAnswer['BTEXT']) . " chars");
-
     // send the answer to the user via metadist account, but reply-to is correct
     // $mailSender = new mailSender($usrArr["BPROVIDERID"]);
     // $mailSender->sendMail($aiAnswer);
@@ -117,12 +101,6 @@ if ($answerMethod == 'MAIL') {
         $htmlText,
         'smart@ralfs.ai'
     );
-
-    if ($sentRes) {
-        error_log("Outprocessor: ✓ Email sent successfully");
-    } else {
-        error_log("Outprocessor: ✗ Email sending FAILED");
-    }
 }
 //-----
 exit;
