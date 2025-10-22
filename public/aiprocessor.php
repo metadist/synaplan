@@ -35,8 +35,8 @@ ProcessMethods::sortMessage();
 // Prepare AI answer for database storage
 $aiLastId = ProcessMethods::saveAnswerToDB();
 
-// Clean up process ID file
-$pidfile = 'pids/m'.($msgId).'.pid';
+// Clean up aiprocessor PID file
+$pidfile = __DIR__ . '/pids/p' . intval($msgId) . '.pid';
 if (file_exists($pidfile)) {
     unlink($pidfile);
 }

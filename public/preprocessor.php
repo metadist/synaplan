@@ -32,18 +32,25 @@ if ($msgArr['BFILE'] > 0) {
     //print_r($msgArr);
 }
 
-//error_log(__FILE__.": msgArr: ".json_encode($msgArr), 3, "/wwwroot/bridgeAI/customphp.log");
 // -----------------------------------------------------
-// delete the pid file
-$pidfile = 'pids/m'.($msgId).'.pid';
+// Clean up preprocessor PID file
+$pidfile = __DIR__ . '/pids/m' . intval($msgId) . '.pid';
 if (file_exists($pidfile)) {
     unlink($pidfile);
 }
-// -----------------------------------------------------
-// -----------------------------------------------------
-// hand over to the ai processor
 
-// Note: countThis() is now called directly in _frontend.php after successful message insert
+// -----------------------------------------------------
+// Hand over to the AI processor
+// -----------------------------------------------------
+
+$messageId = intval($msgArr['BID']);
+$logfile = __DIR__ . '/logs/aiprocessor_' . $messageId . '.log';
+$pidfile = __DIR__ . '/pids/p' . $messageId . '.pid';
+
+// Build command with proper paths and logging
+$cmd = 'cd ' . escapeshellarg(__DIR__) . ' && ' .
+       PHP_BINARY . ' aiprocessor.php ' . escapeshellarg($messageId) .
+       ' >> ' . escapeshellarg($logfile) . ' 2>&1 & echo $!';
 
 $cmd = 'php aiprocessor.php '.$msgArr['BID'].' > /dev/null 2>&1 &';
 $pidfile = 'pids/p'.($msgArr['BID']).'.pid';
