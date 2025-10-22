@@ -24,12 +24,19 @@ require_once __DIR__ . '/../app/inc/_coreincludes.php';
 // process the message, download files and parse them
 // ****************************************************************
 $msgId = intval($argv[1]);
+error_log("Preprocessor: Started for message ID: $msgId");
+
 $msgArr = Central::getMsgById($msgId);
+error_log("Preprocessor: Got message - BMESSTYPE=" . ($msgArr['BMESSTYPE'] ?? 'N/A') . ", User=" . ($msgArr['BUSERID'] ?? 'N/A'));
 
 // print_r($msgArr);
 if ($msgArr['BFILE'] > 0) {
+    error_log("Preprocessor: Processing file: " . $msgArr['BFILEPATH']);
     $msgArr = Central::parseFile($msgArr);
+    error_log("Preprocessor: File parsed, extracted text length: " . strlen($msgArr['BFILETEXT'] ?? '') . " chars");
     //print_r($msgArr);
+} else {
+    error_log("Preprocessor: No file to process");
 }
 
 // -----------------------------------------------------
@@ -55,5 +62,6 @@ $cmd = 'cd ' . escapeshellarg(__DIR__) . ' && ' .
 $cmd = 'php aiprocessor.php '.$msgArr['BID'].' > /dev/null 2>&1 &';
 $pidfile = 'pids/p'.($msgArr['BID']).'.pid';
 exec(sprintf('%s echo $! >> %s', $cmd, $pidfile));
+error_log("Preprocessor: Launched aiprocessor for message ID: $msgId");
 
 exit;

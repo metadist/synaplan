@@ -129,47 +129,54 @@ class myGMail
         }
 
         // ------------------------------------------------------------
-        if (is_array($usrArr) and count($usrArr) > 0 and $usrArr['DETAILS']['MAILCHECKED'] == 1) {
-            $mailData['usrArr'] = $usrArr;
-            // Process body and attachments
-            if ($usrArr['BID'] > 0) {
-                // print "USER FOUND\n";
+        // Check if user exists and is confirmed (BUSERLEVEL should be 'NEW', 'ADM', or similar - NOT 'PIN:*')
+        if (is_array($usrArr) and count($usrArr) > 0 and $usrArr['BID'] > 0) {
+            // Check if user is confirmed (not waiting for PIN confirmation)
+            $isConfirmed = !str_starts_with($usrArr['BUSERLEVEL'], 'PIN:');
+
+            if ($isConfirmed) {
+                // User is confirmed - process the message like they're logged into chat
+                $mailData['usrArr'] = $usrArr;
+
                 // If the top-level is plain or html (non-multipart), decode directly
                 if (in_array($mimeType, ['text/plain','text/html'])) {
                     // This is not multipart, so the body is directly in $payload->getBody()
                     $mailData['body'] = self::decodeBodyTopLevel($payload);
-                    self::deleteMessage($messageId);
                 } else {
                     // Otherwise, it might be multipart (or something else), so process parts
                     try {
                         self::processPayloadParts($payload->getParts(), $mailData, $service, $messageId);
-                        self::deleteMessage($messageId);
                     } catch (Exception $e) {
                         $mailData['body'] = 'Error processing payload parts: ' . $e->getMessage();
-                        self::deleteMessage($messageId);
                     }
                 }
+                // Delete message AFTER successful processing
+                self::deleteMessage($messageId);
             } else {
-                // print "USER NOT FOUND\n";
-                // Just delete the message
+                // User exists but not confirmed yet - send reminder
+                $replySubject = 'Re: ' . $mailData['subject'];
+                $replyBody = "Hello!\n\nYour Synaplan account is not yet confirmed. Please check your email for the confirmation link.\n\nIf you need a new confirmation link, please contact support at info@metadist.de\n\nBest regards,\nSynaplan Team";
+                _mymail('info@metadist.de', $mailData['plainmail'], $replySubject, $replyBody, $replyBody);
+
                 self::deleteMessage($messageId);
                 $mailData = false;
             }
         } else {
-            if (is_array($usrArr) and isset($usrArr['DETAILS']['MAIL']) and
-                (!isset($usrArr['DETAILS']['MAILCHECKED'])
-                or $usrArr['DETAILS']['MAILCHECKED'] !== 1)) {
-                // legacy user update
-                if (!isset($usrArr['DETAILS']['MAILCHECKED'])) {
-                    $usrArr['DETAILS']['MAILCHECKED'] = dechex(rand(100000, 999999));
-                    $userDetailsJson = json_encode($usrArr['DETAILS'], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-                    $updateSQL = "UPDATE BUSER SET BUSERDETAILS = '".db::EscString($userDetailsJson)."' WHERE BID = ".$usrArr['BID'];
-                    db::Query($updateSQL);
-                }
-                // create the confirmation link
-                XSControl::createConfirmationLink($usrArr);
-            }
-            // delete
+            // Unknown sender - send auto-reply with signup info
+            $replySubject = 'Re: ' . $mailData['subject'];
+            $replyBody = "Hello!\n\n";
+            $replyBody .= "We received your email from: " . $mailData['plainmail'] . "\n\n";
+            $replyBody .= "However, this sender address is not registered in our system.\n\n";
+            $replyBody .= "To use our AI assistant via email, please create a free account at:\n";
+            $replyBody .= $GLOBALS['baseUrl'] . "\n\n";
+            $replyBody .= "Once registered and confirmed, you can simply email us and our AI will respond!\n\n";
+            $replyBody .= "Best regards,\nSynaplan Team\n\n";
+            $replyBody .= "---\n";
+            $replyBody .= "If you believe this is an error, please contact: info@metadist.de";
+
+            _mymail('info@metadist.de', $mailData['plainmail'], $replySubject, $replyBody, $replyBody);
+
+            // Delete the message
             self::deleteMessage($messageId);
             $mailData = false;
         }
@@ -331,6 +338,7 @@ class myGMail
     public static function saveToDatabase($processedMails)
     {
         $myTrackingId = (int) (microtime(true) * 1000000);
+        error_log("=== Gmail saveToDatabase: Processing " . count($processedMails) . " emails ===");
 
         foreach ($processedMails as $mail) {
             try {
@@ -342,16 +350,22 @@ class myGMail
                 $inMessageArr['BTEXT'] = trim(strip_tags($mail['body']));
                 $inMessageArr['BUNIXTIMES'] = time();
                 $inMessageArr['BDATETIME'] = (string) date('YmdHis');
+
+                error_log("Gmail: Processing email for user ID: " . $inMessageArr['BUSERID']);
+                error_log("Gmail: Email body length: " . strlen($inMessageArr['BTEXT']) . " chars");
+
                 // --
                 $convArr = Central::searchConversation($inMessageArr);
                 if (is_array($convArr) and $convArr['BID'] > 0) {
                     $inMessageArr['BTRACKID'] = $convArr['BTRACKID'];
                     $inMessageArr['BTOPIC'] = $convArr['BTOPIC'];
                     $inMessageArr['BLANG'] = $convArr['BLANG'];
+                    error_log("Gmail: Found existing conversation, TrackID: " . $inMessageArr['BTRACKID']);
                 } else {
                     $inMessageArr['BTRACKID'] = $myTrackingId;
                     $inMessageArr['BLANG'] = Central::getLanguageByCountryCode($mail['usrArr']['BPROVIDERID']);
                     $inMessageArr['BTOPIC'] = '';
+                    error_log("Gmail: New conversation, TrackID: " . $inMessageArr['BTRACKID']);
                 }
 
                 //$inMessageArr['BTOPIC'] = "other";
@@ -367,6 +381,8 @@ class myGMail
                 $inMessageArr['BDIRECT'] = 'IN';
                 $inMessageArr['BSTATUS'] = 'NEW';
                 $inMessageArr['BFILETEXT'] = '';
+
+                error_log("Gmail: Set BMESSTYPE='MAIL' for incoming message");
 
                 // counter, if it was saved to DB,
                 // is also used to jump over mail when limit is reached
@@ -441,6 +457,7 @@ class myGMail
                 if ($saveToDB == 0) {
                     $resArr = Central::handleInMessage($inMessageArr);
                     $lastInsertsId[] = $resArr['lastId'];
+                    error_log("Gmail: Saved message to DB with ID: " . $resArr['lastId']);
                     // log the message to the DB
                     XSControl::countThis($inMessageArr['BUSERID'], $resArr['lastId']);
                 }
@@ -463,6 +480,7 @@ class myGMail
                             $cmd = 'nohup php preprocessor.php '.($lastInsertId).' > /dev/null 2>&1 &';
                             $pidfile = 'pids/m'.($lastInsertId).'.pid';
                             exec(sprintf('%s echo $! >> %s', $cmd, $pidfile));
+                            error_log("Gmail: Launched preprocessor for message ID: " . $lastInsertId);
                         }
                     }
                 }
