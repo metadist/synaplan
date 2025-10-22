@@ -28,9 +28,20 @@ $GLOBALS['WAtoken'] = ApiKeys::getWhatsApp();
 $aiLastId = intval($argv[1]);
 $msgId = intval($argv[2]);
 
+// Log outprocessor start
+error_log("Outprocessor: Started for AI message {$aiLastId}, original message {$msgId}");
+
 $aiAnswer = Central::getMsgById($aiLastId);
+if (!$aiAnswer || !isset($aiAnswer['BUSERID'])) {
+    error_log("Outprocessor: Failed to get AI answer for ID {$aiLastId}");
+    exit(1);
+}
 
 $usrArr = Central::getUsrById($aiAnswer['BUSERID']);
+if (!$usrArr) {
+    error_log("Outprocessor: Failed to get user for ID {$aiAnswer['BUSERID']}");
+    exit(1);
+}
 $usrArr['DETAILS'] = json_decode($usrArr['BUSERDETAILS'], true);
 
 
@@ -49,26 +60,40 @@ if ($answerMethod == 'WA') {
     $detRes = db::Query('select BWAPHONENO, BWAPHONEID from BWAIDS where BMID = '.$msgId);
     $waDetailsArr = db::FetchArr($detRes);
 
+    if (!$waDetailsArr || !isset($waDetailsArr['BWAPHONEID'])) {
+        error_log("Outprocessor: Failed to get WhatsApp details for message {$msgId}");
+        exit(1);
+    }
+
     // ******************************************************
     // SEND WA
     $waSender = new waSender($waDetailsArr);
+    error_log("Outprocessor: Sending WhatsApp message to user {$usrArr['BPROVIDERID']}");
 
     if (file_exists(__DIR__ . '/.keys/.live.txt')) {
-        if ($aiAnswer['BFILE'] > 0 and $aiAnswer['BFILETYPE'] != '' and str_contains($aiAnswer['BFILEPATH'], '/')) {
-            if ($aiAnswer['BFILETYPE'] == 'png' or $aiAnswer['BFILETYPE'] == 'jpg' or $aiAnswer['BFILETYPE'] == 'jpeg') {
-                $waSender->sendImage($usrArr['BPROVIDERID'], $aiAnswer);
-            } elseif ($aiAnswer['BFILETYPE'] == 'mp3') {
-                $waSender->sendAudio($usrArr['BPROVIDERID'], $aiAnswer);
+        // Send message based on type
+        try {
+            if ($aiAnswer['BFILE'] > 0 and $aiAnswer['BFILETYPE'] != '' and str_contains($aiAnswer['BFILEPATH'], '/')) {
+                if ($aiAnswer['BFILETYPE'] == 'png' or $aiAnswer['BFILETYPE'] == 'jpg' or $aiAnswer['BFILETYPE'] == 'jpeg') {
+                    $myRes = $waSender->sendImage($usrArr['BPROVIDERID'], $aiAnswer);
+                    error_log("Outprocessor: Sent WhatsApp image to {$usrArr['BPROVIDERID']}");
+                } elseif ($aiAnswer['BFILETYPE'] == 'mp3') {
+                    $myRes = $waSender->sendAudio($usrArr['BPROVIDERID'], $aiAnswer);
+                    error_log("Outprocessor: Sent WhatsApp audio to {$usrArr['BPROVIDERID']}");
+                } else {
+                    $myRes = $waSender->sendDoc($usrArr['BPROVIDERID'], $aiAnswer);
+                    error_log("Outprocessor: Sent WhatsApp document to {$usrArr['BPROVIDERID']}");
+                }
             } else {
-                $waSender->sendDoc($usrArr['BPROVIDERID'], $aiAnswer);
+                $myRes = $waSender->sendText($usrArr['BPROVIDERID'], $aiAnswer['BTEXT']);
+                error_log("Outprocessor: Sent WhatsApp text to {$usrArr['BPROVIDERID']}");
             }
-        } else {
-            $myRes = $waSender->sendText($usrArr['BPROVIDERID'], $aiAnswer['BTEXT']);
+        } catch (Exception $e) {
+            error_log('Outprocessor: WhatsApp send failed: ' . $e->getMessage());
         }
-
     } else {
-        print "not sent, local dev\n";
-        print_r($aiAnswer);
+        error_log('Outprocessor: Local dev mode - not sending WhatsApp message');
+        error_log('Outprocessor: Would send: ' . json_encode($aiAnswer));
     }
 }
 

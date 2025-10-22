@@ -110,7 +110,8 @@ if ($request) {
                                 $waSender = new waSender($waDetailsArr);
                                 $waSender->sendText($message['from'], $limitMessage);
                             }
-                            exit;
+                            // Don't exit - continue processing other messages in the batch
+                            continue;
                         }
                     }
 
@@ -143,14 +144,36 @@ if ($request) {
                         // count bytes
                         XSControl::countBytes($inMessageArr, 'BOTH', false);
                         // (2) start the preprocessor and monitor the pid in the pids folder
-                        // Ensure pids directory exists
+                        // Ensure pids and logs directories exist
                         if (!is_dir('pids')) {
                             mkdir('pids', 0755, true);
                         }
-                        $cmd = 'nohup php preprocessor.php '.$inMessageArr['BID'].' > /dev/null 2>&1 &';
-                        $pidfile = 'pids/m'.($inMessageArr['BID']).'.pid';
-                        //error_log(__FILE__.": execute : ".$cmd);
-                        exec(sprintf('%s echo $! >> %s', $cmd, $pidfile));
+                        if (!is_dir('logs')) {
+                            mkdir('logs', 0755, true);
+                        }
+
+                        // Build command with proper paths and logging
+                        $messageId = intval($inMessageArr['BID']);
+                        $logfile = __DIR__ . '/logs/preprocessor_' . $messageId . '.log';
+                        $pidfile = __DIR__ . '/pids/m' . $messageId . '.pid';
+
+                        // Use PHP_BINARY for guaranteed correct PHP path, set working directory
+                        $cmd = 'cd ' . escapeshellarg(__DIR__) . ' && ' .
+                               PHP_BINARY . ' preprocessor.php ' . escapeshellarg($messageId) .
+                               ' >> ' . escapeshellarg($logfile) . ' 2>&1 & echo $!';
+
+                        // Execute and capture PID
+                        $output = [];
+                        exec($cmd, $output);
+                        $pid = isset($output[0]) ? trim($output[0]) : 0;
+
+                        // Save PID to file
+                        if ($pid > 0) {
+                            file_put_contents($pidfile, $pid);
+                            error_log("WhatsApp webhook: Started preprocessor for message {$messageId}, PID: {$pid}");
+                        } else {
+                            error_log("WhatsApp webhook: Failed to start preprocessor for message {$messageId}, cmd: {$cmd}");
+                        }
                     }
                     // ****************************************************************
                 }
@@ -283,13 +306,23 @@ function processWAMessage($messageBlock): array
                     }
                     //
                     if (strlen($savePath) > 0) {
+                        // Create directory via Flysystem
                         $GLOBALS['filesystem']->createDirectory($savePath);
-                        // log the media array to the apache error log on demand
-                        // error_log("savePath: " . print_r($mediaInfo, true));
+
+                        // Also ensure physical directory exists
+                        $physicalDir = __DIR__ . '/up/' . $savePath;
+                        if (!is_dir($physicalDir)) {
+                            mkdir($physicalDir, 0755, true);
+                        }
+
+                        // Save contacts JSON
                         $fileName = 'wa_contacts' . date('YmdHis') . '.json';
                         $saveTo = $savePath . '/' . $fileName;
-                        $GLOBALS['filesystem']->createDirectory($savePath);
-                        file_put_contents('./up/'.$saveTo, $messageDetails['contactsJson']);
+                        $fullPath = __DIR__ . '/up/' . $saveTo;
+
+                        if (file_put_contents($fullPath, $messageDetails['contactsJson']) === false) {
+                            error_log("WhatsApp contacts JSON save failed: {$fullPath}");
+                        }
                         $mimeType = 'json';
                     }
                 }
@@ -368,37 +401,65 @@ function downloadMediaFile(array $mediaInfo, string $accessToken): array
         $dlError = 'User phone number is not valid.';
     }
     //
-    $GLOBALS['filesystem']->createDirectory($savePath);
-    // log the media array to the apache error log on demand
-    // error_log("savePath: " . print_r($mediaInfo, true));
-    $fileName = 'wa_'.$mediaInfo['id'] . '.' . Tools::getFileExtension($mediaInfo['mime_type']);
-    $saveTo = $savePath . '/' . $fileName;
+    // Create directory structure via Flysystem
     $GLOBALS['filesystem']->createDirectory($savePath);
 
-    // execute CURL
+    // Also ensure physical directory exists for curl to write to
+    $physicalDir = __DIR__ . '/up/' . $savePath;
+    if (!is_dir($physicalDir)) {
+        mkdir($physicalDir, 0755, true);
+    }
+
+    // Build file path
+    $fileName = 'wa_'.$mediaInfo['id'] . '.' . Tools::getFileExtension($mediaInfo['mime_type']);
+    $saveTo = $savePath . '/' . $fileName;
+    $fullPath = __DIR__ . '/up/' . $saveTo;
+
+    // execute CURL with verification
     if ($savePath != '') {
-        $exRes = exec("curl -X GET \"$url\" -H \"Authorization: Bearer $token\" -o \"./up/$saveTo\"");
-        if (substr($saveTo, -3) == 'ogg' && file_exists('./up/' . $saveTo)) {
+        // Download file and capture HTTP status code
+        $exRes = exec("curl -X GET \"$url\" -H \"Authorization: Bearer $token\" -o \"$fullPath\" -w '%{http_code}' -s");
+
+        // Verify download succeeded
+        if (!file_exists($fullPath) || filesize($fullPath) == 0) {
+            $dlError .= ' - File download failed (HTTP: ' . $exRes . ') - ';
+            error_log("WhatsApp file download failed: {$fullPath}, HTTP: {$exRes}, URL: {$url}");
+        }
+
+        if (substr($saveTo, -3) == 'ogg' && file_exists($fullPath)) {
             // convert to mp3
             set_time_limit(360);
             $saveToNew = substr($saveTo, 0, -3) . 'mp3';
-            unlink('./up/'.$saveToNew);
+            $fullPathNew = __DIR__ . '/up/' . $saveToNew;
 
-            $exRes = exec("ffmpeg -loglevel panic -hide_banner -i \"./up/$saveTo\" -acodec libmp3lame -ab 128k \"./up/$saveToNew\"");
-            unlink("./up/$saveTo");
-            $saveTo = $saveToNew;
-            $mediaInfo['mime_type'] = 'audio/mpeg';
+            // Remove old mp3 if exists
+            if (file_exists($fullPathNew)) {
+                unlink($fullPathNew);
+            }
+
+            $exRes = exec("ffmpeg -loglevel panic -hide_banner -i \"$fullPath\" -acodec libmp3lame -ab 128k \"$fullPathNew\"");
+
+            // Verify conversion succeeded before deleting original
+            if (file_exists($fullPathNew) && filesize($fullPathNew) > 0) {
+                unlink($fullPath);
+                $saveTo = $saveToNew;
+                $mediaInfo['mime_type'] = 'audio/mpeg';
+            } else {
+                error_log("WhatsApp ffmpeg conversion failed for: {$fullPath}");
+            }
         }
 
         // Security: Sanitize HTML files to prevent malicious landing pages
         $fileExt = Tools::getFileExtension($mediaInfo['mime_type']);
-        if (in_array(strtolower($fileExt), ['html', 'htm']) && file_exists('./up/' . $saveTo)) {
-            $sanitizeResult = Central::sanitizeHtmlUpload('./up/' . $saveTo, $fileExt);
+        $currentFullPath = __DIR__ . '/up/' . $saveTo;
+        if (in_array(strtolower($fileExt), ['html', 'htm']) && file_exists($currentFullPath)) {
+            $sanitizeResult = Central::sanitizeHtmlUpload($currentFullPath, $fileExt);
             if ($sanitizeResult['converted']) {
                 // Replace HTML file with sanitized text version
                 $saveToNew = preg_replace('/\.(html?|htm)$/i', '.txt', $saveTo);
-                file_put_contents('./up/' . $saveToNew, $sanitizeResult['content']);
-                @unlink('./up/' . $saveTo); // Remove original HTML file
+                $fullPathNew = __DIR__ . '/up/' . $saveToNew;
+                file_put_contents($fullPathNew, $sanitizeResult['content']);
+                @unlink($currentFullPath); // Remove original HTML file
                 $saveTo = $saveToNew;
                 $mediaInfo['mime_type'] = 'text/plain';
             }
