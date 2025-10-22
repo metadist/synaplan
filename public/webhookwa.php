@@ -148,32 +148,11 @@ if ($request) {
                         if (!is_dir('pids')) {
                             mkdir('pids', 0755, true);
                         }
-                        if (!is_dir('logs')) {
-                            mkdir('logs', 0755, true);
-                        }
-
-                        // Build command with proper paths and logging
-                        $messageId = intval($inMessageArr['BID']);
-                        $logfile = __DIR__ . '/logs/preprocessor_' . $messageId . '.log';
-                        $pidfile = __DIR__ . '/pids/m' . $messageId . '.pid';
-
-                        // Use PHP_BINARY for guaranteed correct PHP path, set working directory
-                        $cmd = 'cd ' . escapeshellarg(__DIR__) . ' && ' .
-                               PHP_BINARY . ' preprocessor.php ' . escapeshellarg($messageId) .
-                               ' >> ' . escapeshellarg($logfile) . ' 2>&1 & echo $!';
-
-                        // Execute and capture PID
-                        $output = [];
-                        exec($cmd, $output);
-                        $pid = isset($output[0]) ? trim($output[0]) : 0;
-
-                        // Save PID to file
-                        if ($pid > 0) {
-                            file_put_contents($pidfile, $pid);
-                            error_log("WhatsApp webhook: Started preprocessor for message {$messageId}, PID: {$pid}");
-                        } else {
-                            error_log("WhatsApp webhook: Failed to start preprocessor for message {$messageId}, cmd: {$cmd}");
-                        }
+                        
+                        $preprocessorPath = __DIR__ . '/preprocessor.php';
+                        $pidfile = __DIR__ . '/pids/m'.$inMessageArr['BID'].'.pid';
+                        $cmd = sprintf("php '%s' '%s' > /dev/null 2>&1 & echo $! > '%s'", $preprocessorPath, $inMessageArr['BID'], $pidfile);
+                        exec($cmd);
                     }
                     // ****************************************************************
                 }

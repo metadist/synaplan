@@ -17,7 +17,8 @@
 //==================================================================================
 // core app files with relative paths
 $root = __DIR__ . '/';
-require_once($root . '/inc/_coreincludes.php');
+require_once __DIR__ . '/../vendor/autoload.php';
+require_once __DIR__ . '/../app/inc/_coreincludes.php';
 
 // ****************************************************************
 // process the message, download files and parse them
@@ -51,17 +52,8 @@ $cmd = 'cd ' . escapeshellarg(__DIR__) . ' && ' .
        PHP_BINARY . ' aiprocessor.php ' . escapeshellarg($messageId) .
        ' >> ' . escapeshellarg($logfile) . ' 2>&1 & echo $!';
 
-// Execute and capture PID
-$output = [];
-exec($cmd, $output);
-$pid = isset($output[0]) ? trim($output[0]) : 0;
-
-// Save PID to file
-if ($pid > 0) {
-    file_put_contents($pidfile, $pid);
-    error_log("Preprocessor: Started aiprocessor for message {$messageId}, PID: {$pid}");
-} else {
-    error_log("Preprocessor: Failed to start aiprocessor for message {$messageId}, cmd: {$cmd}");
-}
+$cmd = 'php aiprocessor.php '.$msgArr['BID'].' > /dev/null 2>&1 &';
+$pidfile = 'pids/p'.($msgArr['BID']).'.pid';
+exec(sprintf('%s echo $! >> %s', $cmd, $pidfile));
 
 exit;

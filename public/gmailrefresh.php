@@ -1,21 +1,7 @@
 <?php
 
-require_once(__DIR__ . '/../vendor/autoload.php');
-
-// ------------------------------------------------------ base config
-require_once(__DIR__ . '/inc/_confsys.php');
-require_once(__DIR__ . '/inc/_confdb.php');
-require_once(__DIR__ . '/inc/_confdefaults.php');
-require_once(__DIR__ . '/inc/_mail.php');
-require_once(__DIR__ . '/inc/_tools.php');
-require_once(__DIR__ . '/inc/_xscontrol.php');
-
-// central tool
-require_once(__DIR__ . '/inc/_central.php');
-// basic ai tools
-require_once(__DIR__ . '/inc/_basicai.php');
-// myGMail
-require_once(__DIR__ . '/inc/_myGMail.php');
+require_once __DIR__ . '/../vendor/autoload.php';
+require_once __DIR__ . '/../app/inc/_coreincludes.php';
 
 // ------------------------------------------------------
 

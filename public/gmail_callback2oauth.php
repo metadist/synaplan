@@ -1,7 +1,7 @@
 <?php
 
-require_once(__DIR__ . '/../vendor/autoload.php');
-require_once(__DIR__ . '/inc/_oauth.php');
+require_once __DIR__ . '/../vendor/autoload.php';
+require_once __DIR__ . '/../app/inc/_coreincludes.php';
 
 session_start();
 

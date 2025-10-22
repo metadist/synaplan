@@ -13,7 +13,8 @@ set_time_limit(360);
 
 // core app files with relative paths
 $root = __DIR__ . '/';
-require_once($root . '/inc/_coreincludes.php');
+require_once __DIR__ . '/../vendor/autoload.php';
+require_once __DIR__ . '/../app/inc/_coreincludes.php';
 
 // ------------------------------------------------------
 // Called by the AI processor, when the answer is ready
@@ -70,20 +71,12 @@ if ($answerMethod == 'WA') {
     $waSender = new waSender($waDetailsArr);
     error_log("Outprocessor: Sending WhatsApp message to user {$usrArr['BPROVIDERID']}");
 
-    if (file_exists(__DIR__ . '/.keys/.live.txt')) {
-        // Send message based on type
-        try {
-            if ($aiAnswer['BFILE'] > 0 and $aiAnswer['BFILETYPE'] != '' and str_contains($aiAnswer['BFILEPATH'], '/')) {
-                if ($aiAnswer['BFILETYPE'] == 'png' or $aiAnswer['BFILETYPE'] == 'jpg' or $aiAnswer['BFILETYPE'] == 'jpeg') {
-                    $myRes = $waSender->sendImage($usrArr['BPROVIDERID'], $aiAnswer);
-                    error_log("Outprocessor: Sent WhatsApp image to {$usrArr['BPROVIDERID']}");
-                } elseif ($aiAnswer['BFILETYPE'] == 'mp3') {
-                    $myRes = $waSender->sendAudio($usrArr['BPROVIDERID'], $aiAnswer);
-                    error_log("Outprocessor: Sent WhatsApp audio to {$usrArr['BPROVIDERID']}");
-                } else {
-                    $myRes = $waSender->sendDoc($usrArr['BPROVIDERID'], $aiAnswer);
-                    error_log("Outprocessor: Sent WhatsApp document to {$usrArr['BPROVIDERID']}");
-                }
+    if (!empty($GLOBALS['WAtoken'])) {
+        if ($aiAnswer['BFILE'] > 0 and $aiAnswer['BFILETYPE'] != '' and str_contains($aiAnswer['BFILEPATH'], '/')) {
+            if ($aiAnswer['BFILETYPE'] == 'png' or $aiAnswer['BFILETYPE'] == 'jpg' or $aiAnswer['BFILETYPE'] == 'jpeg') {
+                $waSender->sendImage($usrArr['BPROVIDERID'], $aiAnswer);
+            } elseif ($aiAnswer['BFILETYPE'] == 'mp3') {
+                $waSender->sendAudio($usrArr['BPROVIDERID'], $aiAnswer);
             } else {
                 $myRes = $waSender->sendText($usrArr['BPROVIDERID'], $aiAnswer['BTEXT']);
                 error_log("Outprocessor: Sent WhatsApp text to {$usrArr['BPROVIDERID']}");
