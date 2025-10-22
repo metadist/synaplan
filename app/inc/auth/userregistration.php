@@ -60,8 +60,8 @@ class UserRegistration
             // Generate 6-character alphanumeric PIN
             $pin = self::generatePin();
 
-            // MD5 encrypt the password
-            $passwordMd5 = md5($password);
+            // Hash password using bcrypt (secure modern hashing)
+            $passwordHash = PasswordHelper::hash($password);
 
             // Create user details JSON
             $userDetails = [
@@ -83,7 +83,7 @@ class UserRegistration
 
             // Insert new user
             $insertSQL = "INSERT INTO BUSER (BCREATED, BINTYPE, BMAIL, BPW, BPROVIDERID, BUSERLEVEL, BUSERDETAILS) 
-                         VALUES ('".date('YmdHis')."', 'MAIL', '".$email."', '".$passwordMd5."', '".db::EscString($email)."', 'PIN:".$pin."', '".db::EscString(json_encode($userDetails, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES))."')";
+                         VALUES ('".date('YmdHis')."', 'MAIL', '".$email."', '".db::EscString($passwordHash)."', '".db::EscString($email)."', 'PIN:".$pin."', '".db::EscString(json_encode($userDetails, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES))."')";
 
             db::Query($insertSQL);
             $newUserId = db::LastId();
@@ -206,10 +206,10 @@ class UserRegistration
         if ($uArr && isset($uArr['BID'])) {
             // Generate new password
             $newPassword = Tools::createRandomString(10, 14);
-            $newPasswordMd5 = md5($newPassword);
+            $newPasswordHash = PasswordHelper::hash($newPassword);
 
-            // Update DB
-            $upd = "UPDATE BUSER SET BPW='".$newPasswordMd5."' WHERE BID=".(int)$uArr['BID'];
+            // Update DB with bcrypt hash
+            $upd = "UPDATE BUSER SET BPW='".db::EscString($newPasswordHash)."' WHERE BID=".(int)$uArr['BID'];
             db::Query($upd);
 
             // Send mail (English)

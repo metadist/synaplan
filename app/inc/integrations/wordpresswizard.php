@@ -193,8 +193,8 @@ class WordPressWizard
             return $retArr;
         }
 
-        // MD5 encrypt the password
-        $passwordMd5 = md5($password);
+        // Hash password using bcrypt (secure modern hashing)
+        $passwordHash = PasswordHelper::hash($password);
 
         // Create user details JSON
         $userDetails = [
@@ -216,7 +216,7 @@ class WordPressWizard
 
         // Insert new user with BUSERLEVEL = 'NEW' (auto-activated, no email confirmation needed)
         $insertSQL = "INSERT INTO BUSER (BCREATED, BINTYPE, BMAIL, BPW, BPROVIDERID, BUSERLEVEL, BUSERDETAILS) 
-                     VALUES ('" . date('YmdHis') . "', 'MAIL', '" . $email . "', '" . $passwordMd5 . "', '" . $email . "', 'NEW', '" . db::EscString(json_encode($userDetails, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)) . "')";
+                     VALUES ('" . date('YmdHis') . "', 'MAIL', '" . $email . "', '" . db::EscString($passwordHash) . "', '" . $email . "', 'NEW', '" . db::EscString(json_encode($userDetails, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)) . "')";
 
         db::Query($insertSQL);
         $newUserId = db::LastId();

@@ -27,6 +27,7 @@ require_once(__DIR__ . '/_xscontrol.php');
 require_once(__DIR__ . '/api/_oidc.php');
 require_once(__DIR__ . '/api/_logout.php');
 // auth management classes
+require_once(__DIR__ . '/auth/passwordhelper.php');
 require_once(__DIR__ . '/auth/apikeymanager.php');
 require_once(__DIR__ . '/auth/userregistration.php');
 // file management classes

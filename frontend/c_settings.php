@@ -47,9 +47,10 @@ if (isset($_REQUEST['action']) && $_REQUEST['action'] == 'updateProfile') {
             $checkRes = db::Query($checkSQL);
             $checkArr = db::FetchArr($checkRes);
 
-            if ($checkArr && $checkArr['BPW'] == md5($currentPassword)) {
-                // Update password with MD5 hash
-                $updatePwSQL = "UPDATE BUSER SET BPW = '" . md5($newPassword) . "' WHERE BID = " . $userId;
+            if ($checkArr && PasswordHelper::verify($currentPassword, $checkArr['BPW'])) {
+                // Update password with secure bcrypt hash
+                $newPasswordHash = PasswordHelper::hash($newPassword);
+                $updatePwSQL = "UPDATE BUSER SET BPW = '" . db::EscString($newPasswordHash) . "' WHERE BID = " . $userId;
                 db::Query($updatePwSQL);
             }
         }
