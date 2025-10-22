@@ -15,7 +15,8 @@ set_time_limit(360);
 
 // core app files with relative paths
 $root = __DIR__ . '/';
-require_once($root . '/inc/_coreincludes.php');
+require_once __DIR__ . '/../vendor/autoload.php';
+require_once __DIR__ . '/../app/inc/_coreincludes.php';
 
 // Process the message using the provided message ID
 $msgId = $argv[1];
@@ -34,24 +35,14 @@ ProcessMethods::sortMessage();
 // Prepare AI answer for database storage
 $aiLastId = ProcessMethods::saveAnswerToDB();
 
-// Clean up aiprocessor PID file
-$pidfile = __DIR__ . '/pids/p' . intval($msgId) . '.pid';
+// Clean up process ID file
+$pidfile = 'pids/m'.($msgId).'.pid';
 if (file_exists($pidfile)) {
     unlink($pidfile);
 }
 
 // Hand over to output processor
-$aiId = intval($aiLastId);
-$messageId = intval($msgId);
-$logfile = __DIR__ . '/logs/outprocessor_' . $messageId . '.log';
-
-// Build command with proper paths and logging
-$cmd = 'cd ' . escapeshellarg(__DIR__) . ' && ' .
-       PHP_BINARY . ' outprocessor.php ' . escapeshellarg($aiId) . ' ' . escapeshellarg($messageId) .
-       ' >> ' . escapeshellarg($logfile) . ' 2>&1 &';
-
-// Execute command
+$cmd = 'php outprocessor.php '.($aiLastId).' '.($msgId).' > /dev/null 2>&1 &';
 exec($cmd);
-error_log("AIprocessor: Started outprocessor for AI message {$aiId}, original message {$messageId}");
 
 exit;
