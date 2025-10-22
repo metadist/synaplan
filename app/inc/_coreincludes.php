@@ -26,6 +26,8 @@ require_once(__DIR__ . '/_xscontrol.php');
 // oidc authentication
 require_once(__DIR__ . '/api/_oidc.php');
 require_once(__DIR__ . '/api/_logout.php');
+// oauth (gmail, etc)
+require_once(__DIR__ . '/api/_oauth.php');
 // auth management classes
 require_once(__DIR__ . '/auth/passwordhelper.php');
 require_once(__DIR__ . '/auth/apikeymanager.php');
