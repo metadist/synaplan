@@ -86,20 +86,28 @@ if ($answerMethod == 'WA') {
 // ------------------------------------------------------
 if ($answerMethod == 'MAIL') {
     // send the answer to the user via metadist account, but reply-to is correct
-    // $mailSender = new mailSender($usrArr["BPROVIDERID"]);
-    // $mailSender->sendMail($aiAnswer);
-    // print "MAIL\n";
-    // print_r($aiAnswer);
     $htmlText = nl2br(htmlspecialchars(Tools::ensure_utf8($aiAnswer['BTEXT'])));
-    $fileAttachment = rtrim(UPLOAD_DIR, '/').'/'.$aiAnswer['BFILEPATH'];
-    // print $fileAttachment."\n";
+    $plainText = strip_tags($aiAnswer['BTEXT']);
 
-    $sentRes = EmailService::sendEmail(
-        $usrArr['DETAILS']['MAIL'],
-        'Ralfs.AI - '.$aiAnswer['BTOPIC'],
-        $htmlText,
-        $htmlText,
-        'smart@ralfs.ai'
+    // Build file attachment path if file exists
+    $fileAttachment = '';
+    if ($aiAnswer['BFILE'] > 0 && !empty($aiAnswer['BFILEPATH'])) {
+        $fileAttachment = rtrim(UPLOAD_DIR, '/').'/'.$aiAnswer['BFILEPATH'];
+        // Verify file exists before attaching
+        if (!file_exists($fileAttachment)) {
+            $fileAttachment = '';
+        }
+    }
+
+    // Use _mymail directly to support attachments
+    $sentRes = _mymail(
+        'info@metadist.de',              // From
+        $usrArr['DETAILS']['MAIL'],      // To
+        'Ralfs.AI - '.$aiAnswer['BTOPIC'], // Subject
+        $htmlText,                        // HTML body
+        $plainText,                       // Plain text body
+        'smart@ralfs.ai',                 // Reply-to
+        $fileAttachment                   // File attachment
     );
 }
 //-----
