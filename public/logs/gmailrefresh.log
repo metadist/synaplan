@@ -1,0 +1,19 @@
+[2025-10-22 18:31:33] ===========================================
+[2025-10-22 18:31:33] Gmail Refresh Script Started
+[2025-10-22 18:31:33] ===========================================
+[2025-10-22 18:31:33] [1/3] Refreshing OAuth token...
+[2025-10-22 18:31:33] ✓ Token refreshed successfully
+[2025-10-22 18:31:33] [2/3] Fetching emails from Gmail...
+[2025-10-22 18:31:34] ✓ Found 1 email(s) to process
+[2025-10-22 18:31:34]   Email 1:
+[2025-10-22 18:31:34]     From: Ralf Schwoebel <rs@metadist.de>
+[2025-10-22 18:31:34]     Subject: na?
+[2025-10-22 18:31:34]     User: rs@metadist.de (ID: 249)
+[2025-10-22 18:31:34]     Attachments: 0
+[2025-10-22 18:31:34]     Body length: 265 chars
+[2025-10-22 18:31:34] [3/3] Saving to database and launching processors...
+[2025-10-22 18:31:34] ✓ Successfully saved 1 email(s) to database
+[2025-10-22 18:31:34] ✓ Preprocessor(s) launched in background
+[2025-10-22 18:31:34] ===========================================
+[2025-10-22 18:31:34] ✓ Gmail refresh completed successfully!
+[2025-10-22 18:31:34] ===========================================

@@ -246,6 +246,17 @@ switch ($apiAction) {
     case 'wpWizardComplete':
         $resArr = WordPressWizard::completeWizardSetup();
         break;
+    case 'checkGmailKeyword':
+        // Check if a Gmail keyword is available for use
+        $keyword = isset($_REQUEST['keyword']) ? trim($_REQUEST['keyword']) : '';
+        $resArr = empty($keyword)
+            ? ['available' => false, 'message' => 'Please provide a keyword', 'type' => 'error']
+            : InboundConf::testKeywordAvailability($keyword);
+        break;
+    case 'debugGmailKeywords':
+        // Debug endpoint to see all GMAILKEY entries in BCONFIG
+        $resArr = InboundConf::getAllGmailKeywords();
+        break;
     default:
         $resArr = ['error' => 'Invalid action'];
         break;

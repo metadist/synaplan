@@ -148,7 +148,7 @@ if ($request) {
                         if (!is_dir('pids')) {
                             mkdir('pids', 0755, true);
                         }
-                        
+
                         $preprocessorPath = __DIR__ . '/preprocessor.php';
                         $pidfile = __DIR__ . '/pids/m'.$inMessageArr['BID'].'.pid';
                         $cmd = sprintf("php '%s' '%s' > /dev/null 2>&1 & echo $! > '%s'", $preprocessorPath, $inMessageArr['BID'], $pidfile);

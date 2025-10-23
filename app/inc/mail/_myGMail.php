@@ -49,21 +49,25 @@ class myGMail
         }
     }
 
-    // function to extract the phone number from the to string
-    // eg.: "Some Guy <smart+49175407011@gmail.com>"
-    // returns: 49175407011
-    private static function extractPhoneNumberOrTag($toString)
+    /**
+     * Setup anonymous email session similar to widget loader
+     * Creates a session for anonymous email senders chatting with keyword owner
+     * @param string $senderEmail Email address of the sender
+     * @param int $keywordOwnerId User ID who owns the keyword
+     */
+    private static function setupAnonymousEmailSession($senderEmail, $keywordOwnerId)
     {
-        if (substr_count($toString, '+') > 0) {
-            $mailParts = explode('+', $toString);
-            $phoneParts = explode('@', $mailParts[1]);
-            return db::EscString($phoneParts[0]);
+        // Create or update anonymous session for this email sender
+        if (!isset($_SESSION['is_email_anonymous']) || $_SESSION['email_sender'] !== $senderEmail) {
+            // Create new anonymous email session
+            $_SESSION['is_email_anonymous'] = true;
+            $_SESSION['email_owner_id'] = $keywordOwnerId;
+            $_SESSION['email_sender'] = $senderEmail;
+            $_SESSION['anonymous_email_session_id'] = uniqid('email_', true) . '_' . bin2hex(random_bytes(8));
+            $_SESSION['anonymous_email_session_created'] = time();
         } else {
-            // this can easily lead to double entries,
-            // fix the search by complete mail address!
-            $mailParts = explode('<', $toString);
-            $mailParts = explode('@', $mailParts[1]);
-            return db::EscString($mailParts[0]);
+            // Update existing session
+            $_SESSION['email_owner_id'] = $keywordOwnerId;
         }
     }
 
@@ -96,7 +100,6 @@ class myGMail
 
         // Process headers
         foreach ($headers as $header) {
-            //print "HEADER: " . $header->getName() . " === " . $header->getValue() . "\n";
             switch ($header->getName()) {
                 case 'Subject':
                     $mailData['subject'] = $header->getValue();
@@ -106,7 +109,6 @@ class myGMail
                     break;
                 case 'To':
                     $mailData['to'] = $header->getValue();
-                    $mailData['usrPhoneOrTag'] = self::extractPhoneNumberOrTag($mailData['to']);
                     break;
                 case 'Date':
                     $mailData['date'] = $header->getValue();
@@ -114,65 +116,65 @@ class myGMail
             }
         }
 
-        // check if the mail is to an existing user
-        // get the assigned email
-        // print_r($mailData);
+        // Extract sender email (clean format without name)
         $mailData['plainmail'] = Tools::cleanGMail($mailData['from']);
 
-        if ($mailData['usrPhoneOrTag'] > 0) { // OR strlen($mailData['usrPhoneOrTag'] > 0)) {
-            // $usrArr = Central::getUserByPhoneNumber($mailData['usrPhoneOrTag'], false);
-            // new User matching logic:
-            $usrArr = Central::getUserByMail($mailData['plainmail'], $mailData['usrPhoneOrTag']);
-        } else {
-            // get the user by the mail
-            $usrArr = Central::getUserByMail($mailData['plainmail'], '');
+        // ============================================================
+        // NEW KEYWORD-BASED ROUTING (like widget loader)
+        // ============================================================
+
+        // Extract keyword from the To: field (e.g., smart+support@synaplan.com)
+        $keyword = InboundConf::extractKeywordFromEmail($mailData['to']);
+
+        // Get the owner user ID based on keyword
+        // Returns system user ID 2 if keyword is invalid/not found
+        $keywordOwnerId = InboundConf::getUserIdByKeyword($keyword);
+
+        // Load the keyword owner's user profile (this is who will "receive" the message)
+        $ownerSQL = 'SELECT * FROM BUSER WHERE BID = ' . intval($keywordOwnerId) . ' LIMIT 1';
+        $ownerRes = db::Query($ownerSQL);
+        $usrArr = db::FetchArr($ownerRes);
+
+        if (!$usrArr || !isset($usrArr['BID']) || $usrArr['BID'] <= 0) {
+            // Failed to load keyword owner - skip this message
+            self::deleteMessage($messageId);
+            return false;
         }
 
-        // ------------------------------------------------------------
-        if (is_array($usrArr) and count($usrArr) > 0 and $usrArr['DETAILS']['MAILCHECKED'] == 1) {
-            $mailData['usrArr'] = $usrArr;
-            // Process body and attachments
-            if ($usrArr['BID'] > 0) {
-                // print "USER FOUND\n";
-                // If the top-level is plain or html (non-multipart), decode directly
-                if (in_array($mimeType, ['text/plain','text/html'])) {
-                    // This is not multipart, so the body is directly in $payload->getBody()
-                    $mailData['body'] = self::decodeBodyTopLevel($payload);
-                    self::deleteMessage($messageId);
-                } else {
-                    // Otherwise, it might be multipart (or something else), so process parts
-                    try {
-                        self::processPayloadParts($payload->getParts(), $mailData, $service, $messageId);
-                        self::deleteMessage($messageId);
-                    } catch (Exception $e) {
-                        $mailData['body'] = 'Error processing payload parts: ' . $e->getMessage();
-                        self::deleteMessage($messageId);
-                    }
-                }
-            } else {
-                // print "USER NOT FOUND\n";
-                // Just delete the message
-                self::deleteMessage($messageId);
-                $mailData = false;
-            }
+        // Set up anonymous email session (sender is anonymous, chatting with keyword owner)
+        self::setupAnonymousEmailSession($mailData['plainmail'], $keywordOwnerId);
+
+        // Store user array for processing (this is the keyword owner, NOT the sender)
+        $mailData['usrArr'] = $usrArr;
+        $mailData['keyword'] = $keyword;
+        $mailData['keywordOwnerId'] = $keywordOwnerId;
+
+        // Process email body and attachments
+        // If the top-level is plain or html (non-multipart), decode directly
+        if (in_array($mimeType, ['text/plain','text/html'])) {
+            // This is not multipart, so the body is directly in $payload->getBody()
+            $mailData['body'] = self::decodeBodyTopLevel($payload);
         } else {
-            if (is_array($usrArr) and isset($usrArr['DETAILS']['MAIL']) and
-                (!isset($usrArr['DETAILS']['MAILCHECKED'])
-                or $usrArr['DETAILS']['MAILCHECKED'] !== 1)) {
-                // legacy user update
-                if (!isset($usrArr['DETAILS']['MAILCHECKED'])) {
-                    $usrArr['DETAILS']['MAILCHECKED'] = dechex(rand(100000, 999999));
-                    $userDetailsJson = json_encode($usrArr['DETAILS'], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-                    $updateSQL = "UPDATE BUSER SET BUSERDETAILS = '".db::EscString($userDetailsJson)."' WHERE BID = ".$usrArr['BID'];
-                    db::Query($updateSQL);
-                }
-                // create the confirmation link
-                XSControl::createConfirmationLink($usrArr);
+            // Otherwise, it might be multipart (or something else), so process parts
+            try {
+                self::processPayloadParts($payload->getParts(), $mailData, $service, $messageId);
+            } catch (Exception $e) {
+                $mailData['body'] = 'Error processing payload parts: ' . $e->getMessage();
             }
-            // delete
-            self::deleteMessage($messageId);
-            $mailData = false;
         }
+
+        // Sanitize email body text
+        // 1. Strip HTML tags
+        $mailData['body'] = strip_tags($mailData['body']);
+        // 2. Decode HTML entities (&nbsp;, &ouml;, etc.)
+        $mailData['body'] = html_entity_decode($mailData['body'], ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        // 3. Ensure UTF-8 encoding
+        $mailData['body'] = mb_convert_encoding($mailData['body'], 'UTF-8', 'UTF-8');
+        // 4. Trim whitespace
+        $mailData['body'] = trim($mailData['body']);
+
+        // Delete message AFTER successful processing
+        self::deleteMessage($messageId);
 
         return $mailData;
     }
@@ -200,7 +202,10 @@ class myGMail
             if ($mimeType === 'text/plain' && !$part->getFilename()) {
                 $mailData['body'] = self::decodeBody($part, $part->getBody()->getData());
             } elseif ($mimeType === 'text/html' && !$part->getFilename()) {
-                $mailData['body'] = strip_tags(self::decodeBody($part, $part->getBody()->getData()));
+                // Decode HTML body, strip tags, and decode HTML entities
+                $htmlBody = self::decodeBody($part, $part->getBody()->getData());
+                $mailData['body'] = strip_tags($htmlBody);
+                $mailData['body'] = html_entity_decode($mailData['body'], ENT_QUOTES | ENT_HTML5, 'UTF-8');
             } elseif (!empty($filename)) {
                 $attachment = self::processAttachment($part, $service, $messageId);
                 if ($attachment) {
@@ -265,6 +270,7 @@ class myGMail
 
     /**
      * Called by processPayloadParts() to decode base64 encoded message bodies
+     * Properly handles character encoding and quoted-printable decoding
      */
     private static function decodeBody($part, $partBodyData): string
     {
@@ -272,29 +278,60 @@ class myGMail
         $base64Decoded = strtr($partBodyData, '-_', '+/');
         $rawContent    = base64_decode($base64Decoded);
 
-        // If this part is quoted-printable, do that decoding too
-        // You can check $part->getHeaders() or $part->getMimeType(), etc.
-        // In your raw example, it was "Content-Transfer-Encoding: quoted-printable"
+        // Detect charset from Content-Type header
+        $detectedCharset = 'UTF-8'; // default
         $headers = $part->getHeaders();
         if (is_array($headers)) {
             foreach ($headers as $header) {
+                // Check for Content-Transfer-Encoding
                 if (strtolower($header->getName()) === 'content-transfer-encoding'
                     && strtolower($header->getValue()) === 'quoted-printable') {
                     $rawContent = quoted_printable_decode($rawContent);
                 }
+
+                // Check for charset in Content-Type
+                if (strtolower($header->getName()) === 'content-type') {
+                    $contentType = $header->getValue();
+                    if (preg_match('/charset=["\']?([^"\';\s]+)/i', $contentType, $matches)) {
+                        $detectedCharset = strtoupper(trim($matches[1]));
+                    }
+                }
             }
         }
 
-        // If the charset is iso-8859-1 and you want UTF-8, you can convert:
-        // (you could also sniff the header "Content-Type: text/plain; charset=iso-8859-1")
-        if (strpos(strtolower($part->getMimeType()), 'iso-8859-1') !== false
-            || strpos(strtolower($rawContent), 'charset=iso-8859-1') !== false) {
-            $rawContent = mb_convert_encoding($rawContent, 'UTF-8', 'ISO-8859-1');
+        // Also check MIME type for charset
+        $mimeType = $part->getMimeType();
+        if (strpos(strtolower($mimeType), 'charset=') !== false) {
+            if (preg_match('/charset=["\']?([^"\';\s]+)/i', $mimeType, $matches)) {
+                $detectedCharset = strtoupper(trim($matches[1]));
+            }
+        }
+
+        // Convert to UTF-8 if needed
+        if ($detectedCharset !== 'UTF-8' && $detectedCharset !== 'UTF8') {
+            // Handle common charset aliases
+            $charsetMap = [
+                'ISO-8859-1' => 'ISO-8859-1',
+                'LATIN1' => 'ISO-8859-1',
+                'WINDOWS-1252' => 'Windows-1252',
+                'ISO-8859-15' => 'ISO-8859-15',
+            ];
+
+            $sourceCharset = $charsetMap[$detectedCharset] ?? $detectedCharset;
+            $rawContent = mb_convert_encoding($rawContent, 'UTF-8', $sourceCharset);
+        }
+
+        // Ensure valid UTF-8
+        if (!mb_check_encoding($rawContent, 'UTF-8')) {
+            $rawContent = mb_convert_encoding($rawContent, 'UTF-8', 'UTF-8');
         }
 
         return $rawContent;
     }
-    // whole mail is simple text
+    /**
+     * Decode top-level email body (when email is simple text, not multipart)
+     * Properly handles character encoding and quoted-printable decoding
+     */
     private static function decodeBodyTopLevel($payload)
     {
         // This is the raw base64url string for the body
@@ -307,24 +344,53 @@ class myGMail
         $base64Decoded = strtr($rawData, '-_', '+/');
         $decoded       = base64_decode($base64Decoded);
 
-        // Step 2: Check Content-Transfer-Encoding
-        // You can look at $payload->getHeaders() for a "Content-Transfer-Encoding: quoted-printable"
+        // Step 2: Detect charset and handle encoding
+        $detectedCharset = 'UTF-8'; // default
         $headers = $payload->getHeaders();
+
         foreach ($headers as $header) {
+            // Check Content-Transfer-Encoding
             if (strtolower($header->getName()) === 'content-transfer-encoding'
                 && strtolower($header->getValue()) === 'quoted-printable') {
                 $decoded = quoted_printable_decode($decoded);
             }
+
+            // Check for charset in Content-Type
+            if (strtolower($header->getName()) === 'content-type') {
+                $contentType = $header->getValue();
+                if (preg_match('/charset=["\']?([^"\';\s]+)/i', $contentType, $matches)) {
+                    $detectedCharset = strtoupper(trim($matches[1]));
+                }
+            }
         }
 
-        // Step 3: Convert character set if iso-8859-1
-        // (Your raw data says: charset="iso-8859-1")
-        if (strpos(strtolower($payload->getMimeType()), 'iso-8859-1') !== false) {
-            $decoded = mb_convert_encoding($decoded, 'UTF-8', 'ISO-8859-1');
+        // Also check MIME type for charset
+        $mimeType = $payload->getMimeType();
+        if (strpos(strtolower($mimeType), 'charset=') !== false) {
+            if (preg_match('/charset=["\']?([^"\';\s]+)/i', $mimeType, $matches)) {
+                $detectedCharset = strtoupper(trim($matches[1]));
+            }
         }
 
-        // If it was "text/html" top-level, you could do `strip_tags` or
-        // store it in a separate $mailData['body_html']. Up to you.
+        // Step 3: Convert to UTF-8 if needed
+        if ($detectedCharset !== 'UTF-8' && $detectedCharset !== 'UTF8') {
+            // Handle common charset aliases
+            $charsetMap = [
+                'ISO-8859-1' => 'ISO-8859-1',
+                'LATIN1' => 'ISO-8859-1',
+                'WINDOWS-1252' => 'Windows-1252',
+                'ISO-8859-15' => 'ISO-8859-15',
+            ];
+
+            $sourceCharset = $charsetMap[$detectedCharset] ?? $detectedCharset;
+            $decoded = mb_convert_encoding($decoded, 'UTF-8', $sourceCharset);
+        }
+
+        // Ensure valid UTF-8
+        if (!mb_check_encoding($decoded, 'UTF-8')) {
+            $decoded = mb_convert_encoding($decoded, 'UTF-8', 'UTF-8');
+        }
+
         return $decoded;
     }
     // ------------------------------------------------------------
@@ -342,6 +408,7 @@ class myGMail
                 $inMessageArr['BTEXT'] = trim(strip_tags($mail['body']));
                 $inMessageArr['BUNIXTIMES'] = time();
                 $inMessageArr['BDATETIME'] = (string) date('YmdHis');
+
                 // --
                 $convArr = Central::searchConversation($inMessageArr);
                 if (is_array($convArr) and $convArr['BID'] > 0) {
@@ -435,6 +502,13 @@ class myGMail
                         // -------------------- Message Array filled --------------------
                         $resArr = Central::handleInMessage($inMessageArr);
                         $lastInsertsId[] = $resArr['lastId'];
+
+                        // Store sender email for anonymous email sessions (with attachment)
+                        if ($resArr['lastId'] > 0 && !empty($mail['plainmail'])) {
+                            $senderEmail = db::EscString($mail['plainmail']);
+                            $metaSQL = 'INSERT INTO BMESSAGEMETA (BID, BMESSID, BTOKEN, BVALUE) VALUES (DEFAULT, ' . intval($resArr['lastId']) . ", 'SENDER_EMAIL', '" . $senderEmail . "')";
+                            db::Query($metaSQL);
+                        }
                     }
                 }
 
@@ -443,6 +517,13 @@ class myGMail
                     $lastInsertsId[] = $resArr['lastId'];
                     // log the message to the DB
                     XSControl::countThis($inMessageArr['BUSERID'], $resArr['lastId']);
+
+                    // Store sender email for anonymous email sessions
+                    if ($resArr['lastId'] > 0 && !empty($mail['plainmail'])) {
+                        $senderEmail = db::EscString($mail['plainmail']);
+                        $metaSQL = 'INSERT INTO BMESSAGEMETA (BID, BMESSID, BTOKEN, BVALUE) VALUES (DEFAULT, ' . intval($resArr['lastId']) . ", 'SENDER_EMAIL', '" . $senderEmail . "')";
+                        db::Query($metaSQL);
+                    }
                 }
 
                 // Delete the message after processing: old place, was moved to mail process
