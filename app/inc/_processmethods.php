@@ -1041,15 +1041,15 @@ class ProcessMethods
                 }
                 $answerSorted        = Tools::searchWeb(self::$msgArr, $answerSorted['BFILETEXT']);
                 $answerSorted['BFILE'] = 0;
-
+                
                 // Append search results to message text for AI analysis
                 if (!empty($answerSorted['BTEXT'])) {
                     self::$msgArr['BTEXT'] .= "\n\n\n---\n\n\n" . $answerSorted['BTEXT'];
                 }
-
+                
                 // Reset previousCall so the fallback AI call can analyze these search results
                 $previousCall = false;
-
+                
                 if (self::$stream) {
                     Frontend::statusToStream(self::$msgId, 'pre', 'Search complete, analyzing results. ');
                 }
