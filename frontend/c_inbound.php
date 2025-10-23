@@ -61,7 +61,7 @@ foreach ($numArr as $num) {
             <h5 class="card-title mb-0"><i class="fas fa-envelope"></i> Email Channel(s)</h5>
         </div>
         <div class="card-body">
-            <a href="mailto:smart@synaplan.com">smart@synaplan.com</a>: default handling<br>
+            <a href="mailto:smart@synaplan.com">smart@synaplan.net</a>: default handling<br>
             
             <?php if (!empty($keywordMessage)): ?>
                 <div class="alert alert-<?php echo $keywordMessageType; ?> alert-dismissible fade show mt-3" role="alert">
@@ -73,7 +73,7 @@ foreach ($numArr as $num) {
             <?php if ($currentKeyword !== null): ?>
                 <div class="alert alert-info mt-3">
                     <strong>Your current keyword:</strong> 
-                    <code>smart+<?php echo htmlspecialchars($currentKeyword); ?>@synaplan.com</code>
+                    <code>smart+<?php echo htmlspecialchars($currentKeyword); ?>@synaplan.net</code>
                     <form action="index.php/inbound" method="post" class="d-inline ms-2">
                         <input type="hidden" name="delete_keyword" value="1">
                         <button type="submit" class="btn btn-sm btn-outline-danger" onclick="return confirm('Are you sure you want to delete your keyword?');">
@@ -100,7 +100,7 @@ foreach ($numArr as $num) {
                         minlength="4"
                         required
                     >
-                    <span class="input-group-text">@synaplan.com</span>
+                    <span class="input-group-text"><B>@synaplan.net</B></span>
                     <button type="button" class="btn btn-outline-secondary" id="checkKeyword">
                         <i class="fas fa-search"></i> Check
                     </button>
