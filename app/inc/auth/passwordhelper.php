@@ -130,5 +130,3 @@ class PasswordHelper
         return ['valid' => true, 'error' => ''];
     }
 }
-
-

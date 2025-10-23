@@ -224,7 +224,7 @@ foreach ($numArr as $num) {
         <div class="card-body">
             Simple API calls with your personal API key:<br>
             https://app.synawork.com/api.php<br><br>
-            Documentation is live: <B><a href="https://docs.synaplan.com/" target="_blank">https://docs.synaplan.com/index.php/openapi</a></B>
+            Documentation is live: <B><a href="https://docs.synaplan.com/" target="_blank">https://docs.synaplan.com/</a></B>
         </div>
     </div>
 
