@@ -270,6 +270,7 @@ class myGMail
 
     /**
      * Called by processPayloadParts() to decode base64 encoded message bodies
+     * Properly handles character encoding and quoted-printable decoding
      */
     private static function decodeBody($part, $partBodyData): string
     {
@@ -277,29 +278,60 @@ class myGMail
         $base64Decoded = strtr($partBodyData, '-_', '+/');
         $rawContent    = base64_decode($base64Decoded);
 
-        // If this part is quoted-printable, do that decoding too
-        // You can check $part->getHeaders() or $part->getMimeType(), etc.
-        // In your raw example, it was "Content-Transfer-Encoding: quoted-printable"
+        // Detect charset from Content-Type header
+        $detectedCharset = 'UTF-8'; // default
         $headers = $part->getHeaders();
         if (is_array($headers)) {
             foreach ($headers as $header) {
+                // Check for Content-Transfer-Encoding
                 if (strtolower($header->getName()) === 'content-transfer-encoding'
                     && strtolower($header->getValue()) === 'quoted-printable') {
                     $rawContent = quoted_printable_decode($rawContent);
                 }
+
+                // Check for charset in Content-Type
+                if (strtolower($header->getName()) === 'content-type') {
+                    $contentType = $header->getValue();
+                    if (preg_match('/charset=["\']?([^"\';\s]+)/i', $contentType, $matches)) {
+                        $detectedCharset = strtoupper(trim($matches[1]));
+                    }
+                }
             }
         }
 
-        // If the charset is iso-8859-1 and you want UTF-8, you can convert:
-        // (you could also sniff the header "Content-Type: text/plain; charset=iso-8859-1")
-        if (strpos(strtolower($part->getMimeType()), 'iso-8859-1') !== false
-            || strpos(strtolower($rawContent), 'charset=iso-8859-1') !== false) {
-            $rawContent = mb_convert_encoding($rawContent, 'UTF-8', 'ISO-8859-1');
+        // Also check MIME type for charset
+        $mimeType = $part->getMimeType();
+        if (strpos(strtolower($mimeType), 'charset=') !== false) {
+            if (preg_match('/charset=["\']?([^"\';\s]+)/i', $mimeType, $matches)) {
+                $detectedCharset = strtoupper(trim($matches[1]));
+            }
+        }
+
+        // Convert to UTF-8 if needed
+        if ($detectedCharset !== 'UTF-8' && $detectedCharset !== 'UTF8') {
+            // Handle common charset aliases
+            $charsetMap = [
+                'ISO-8859-1' => 'ISO-8859-1',
+                'LATIN1' => 'ISO-8859-1',
+                'WINDOWS-1252' => 'Windows-1252',
+                'ISO-8859-15' => 'ISO-8859-15',
+            ];
+
+            $sourceCharset = $charsetMap[$detectedCharset] ?? $detectedCharset;
+            $rawContent = mb_convert_encoding($rawContent, 'UTF-8', $sourceCharset);
+        }
+
+        // Ensure valid UTF-8
+        if (!mb_check_encoding($rawContent, 'UTF-8')) {
+            $rawContent = mb_convert_encoding($rawContent, 'UTF-8', 'UTF-8');
         }
 
         return $rawContent;
     }
-    // whole mail is simple text
+    /**
+     * Decode top-level email body (when email is simple text, not multipart)
+     * Properly handles character encoding and quoted-printable decoding
+     */
     private static function decodeBodyTopLevel($payload)
     {
         // This is the raw base64url string for the body
@@ -312,24 +344,53 @@ class myGMail
         $base64Decoded = strtr($rawData, '-_', '+/');
         $decoded       = base64_decode($base64Decoded);
 
-        // Step 2: Check Content-Transfer-Encoding
-        // You can look at $payload->getHeaders() for a "Content-Transfer-Encoding: quoted-printable"
+        // Step 2: Detect charset and handle encoding
+        $detectedCharset = 'UTF-8'; // default
         $headers = $payload->getHeaders();
+
         foreach ($headers as $header) {
+            // Check Content-Transfer-Encoding
             if (strtolower($header->getName()) === 'content-transfer-encoding'
                 && strtolower($header->getValue()) === 'quoted-printable') {
                 $decoded = quoted_printable_decode($decoded);
             }
+
+            // Check for charset in Content-Type
+            if (strtolower($header->getName()) === 'content-type') {
+                $contentType = $header->getValue();
+                if (preg_match('/charset=["\']?([^"\';\s]+)/i', $contentType, $matches)) {
+                    $detectedCharset = strtoupper(trim($matches[1]));
+                }
+            }
         }
 
-        // Step 3: Convert character set if iso-8859-1
-        // (Your raw data says: charset="iso-8859-1")
-        if (strpos(strtolower($payload->getMimeType()), 'iso-8859-1') !== false) {
-            $decoded = mb_convert_encoding($decoded, 'UTF-8', 'ISO-8859-1');
+        // Also check MIME type for charset
+        $mimeType = $payload->getMimeType();
+        if (strpos(strtolower($mimeType), 'charset=') !== false) {
+            if (preg_match('/charset=["\']?([^"\';\s]+)/i', $mimeType, $matches)) {
+                $detectedCharset = strtoupper(trim($matches[1]));
+            }
         }
 
-        // If it was "text/html" top-level, you could do `strip_tags` or
-        // store it in a separate $mailData['body_html']. Up to you.
+        // Step 3: Convert to UTF-8 if needed
+        if ($detectedCharset !== 'UTF-8' && $detectedCharset !== 'UTF8') {
+            // Handle common charset aliases
+            $charsetMap = [
+                'ISO-8859-1' => 'ISO-8859-1',
+                'LATIN1' => 'ISO-8859-1',
+                'WINDOWS-1252' => 'Windows-1252',
+                'ISO-8859-15' => 'ISO-8859-15',
+            ];
+
+            $sourceCharset = $charsetMap[$detectedCharset] ?? $detectedCharset;
+            $decoded = mb_convert_encoding($decoded, 'UTF-8', $sourceCharset);
+        }
+
+        // Ensure valid UTF-8
+        if (!mb_check_encoding($decoded, 'UTF-8')) {
+            $decoded = mb_convert_encoding($decoded, 'UTF-8', 'UTF-8');
+        }
+
         return $decoded;
     }
     // ------------------------------------------------------------
