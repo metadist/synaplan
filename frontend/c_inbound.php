@@ -30,7 +30,6 @@ $currentKeyword = InboundConf::getGmailKeyword();
 ?>
 <link rel="stylesheet" href="assets/statics/fa/css/all.min.css">
 <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4" id="contentMain">
-    <B>THIS IS NOT YET WORKING, WE ARE BETA</B>
     <h1><?php _s('Inbound', __FILE__, $_SESSION['LANG']); ?></h1>
     <p>
         <?php _s('You can reach this platform via different channels.', __FILE__, $_SESSION['LANG']); ?><br>
@@ -50,6 +49,8 @@ foreach ($numArr as $num) {
     print '+'.$num['BWAOUTNUMBER'].': default handling<br>';
 }
 ?>
+            <BR><BR>
+            Write us a WhatsApp message and test this. We can help you to set up your own number!
             <!-- Add your WhatsApp channel form here if needed -->
         </div>
     </div>
@@ -112,6 +113,8 @@ foreach ($numArr as $num) {
                 <button type="submit" class="btn btn-primary" id="saveKeywordBtn">
                     <i class="fas fa-save"></i> <?php echo $currentKeyword !== null ? 'Update keyword' : 'Save keyword'; ?>
                 </button>
+                <BR><BR>
+                Synaplan polls e-Mails every 60 seconds for new messages.
             </form>
         </div>
     </div>
@@ -220,14 +223,8 @@ foreach ($numArr as $num) {
         </div>
         <div class="card-body">
             Simple API calls with your personal API key:<br>
-            https://synawork.com/api.php<br><br>
-            Example:<br><br>
-            <code>
-                curl -X POST https://synawork.com/api.php \<br>
-                -H "Authorization: Bearer YOUR_API_KEY" \<br>
-                -H "Content-Type: application/json" \<br>
-                -d '{"number": "1234567890", "message": "Hello, world!"}'<br>
-            </code>
+            https://app.synawork.com/api.php<br><br>
+            Documentation is live: <B><a href="https://docs.synaplan.com/" target="_blank">https://docs.synaplan.com/index.php/openapi</a></B>
         </div>
     </div>
 
@@ -236,11 +233,7 @@ foreach ($numArr as $num) {
             <h5 class="card-title mb-0"><i class="fas fa-window-maximize"></i> Web Widget</h5>
         </div>
         <div class="card-body">
-            <strong>To activate the widget, please enter your domain name like "yourdomain.net" in the field below.</strong>
-            <BR>
-             
-            It is hidden by default, until the collapse plugin adds the appropriate classes that we use to style each element. 
-            These classes control the overall appearance, as well as the showing and hiding via CSS transitions. 
+            The web widget support chat can be setup under tools: <a href="index.php/webwidget">Support Web Widget</a>
         </div>
     </div>
 </main>
