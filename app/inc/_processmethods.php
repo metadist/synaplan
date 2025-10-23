@@ -649,6 +649,11 @@ class ProcessMethods
                 }
 
                 $answerSorted = $AIGENERAL::topicPrompt(self::$msgArr, self::$threadArr, self::$stream);
+                
+                // Log first AI call result (especially for MAIL debugging)
+                $firstCallBFILE = is_array($answerSorted) ? ($answerSorted['BFILE'] ?? 'NOT_SET') : 'NOT_ARRAY';
+                $firstCallBTEXT = is_array($answerSorted) ? substr($answerSorted['BTEXT'] ?? '', 0, 100) : (is_string($answerSorted) ? substr($answerSorted, 0, 100) : 'INVALID');
+                error_log("FIRST AI CALL RESULT: BMESSTYPE=" . self::$answerMethod . " | BFILE=" . $firstCallBFILE . " | BTEXT=" . $firstCallBTEXT);
 
                 if (is_string($answerSorted)) {
                     $answerSorted = [
@@ -1049,9 +1054,17 @@ class ProcessMethods
             ) {
                 // Web search was requested - execute search and reset previousCall flag
                 // so the main AI can analyze the search results
+                
+                // Log websearch trigger for debugging
+                error_log("WEBSEARCH TRIGGERED: Query=" . $answerSorted['BFILETEXT'] . " | BMESSTYPE=" . self::$answerMethod);
+                
                 if (self::$stream) {
                     Frontend::statusToStream(self::$msgId, 'pre', 'Web search: ' . $answerSorted['BFILETEXT'] . '. ');
                 }
+                
+                // Store the preliminary message if present (but we'll replace it with final analyzed answer)
+                $preliminaryMessage = $answerSorted['BTEXT'] ?? '';
+                
                 $answerSorted        = Tools::searchWeb(self::$msgArr, $answerSorted['BFILETEXT']);
                 $answerSorted['BFILE'] = 0;
 
@@ -1062,6 +1075,8 @@ class ProcessMethods
 
                 // Reset previousCall so the fallback AI call can analyze these search results
                 $previousCall = false;
+                
+                error_log("WEBSEARCH COMPLETE: Search results length=" . strlen($answerSorted['BTEXT'] ?? '') . " | previousCall reset to false");
 
                 if (self::$stream) {
                     Frontend::statusToStream(self::$msgId, 'pre', 'Search complete, analyzing results. ');
@@ -1071,10 +1086,18 @@ class ProcessMethods
             // --- Fallback Hauptaufruf falls noch nichts lief (außer mediamaker) ---
             if (!$previousCall && self::$msgArr['BTOPIC'] !== 'mediamaker') {
                 self::$msgArr['BTOPIC'] = 'general';
+                
+                // Log fallback AI call (especially important for MAIL to debug websearch analysis)
+                error_log("FALLBACK AI CALL: BMESSTYPE=" . self::$answerMethod . " | BTEXT length=" . strlen(self::$msgArr['BTEXT']) . " | Has search results=" . (strpos(self::$msgArr['BTEXT'], '---') !== false ? 'YES' : 'NO'));
+                
                 if (self::$stream) {
                     Frontend::statusToStream(self::$msgId, 'pre', 'Calling ' . $AIGENERAL . '. ');
                 }
                 $answerSorted = $AIGENERAL::topicPrompt(self::$msgArr, self::$threadArr, self::$stream);
+                
+                // Log the result
+                $resultText = is_array($answerSorted) ? ($answerSorted['BTEXT'] ?? 'NO_BTEXT') : (is_string($answerSorted) ? $answerSorted : 'INVALID');
+                error_log("FALLBACK AI RESULT: Response length=" . strlen($resultText) . " | First 100 chars: " . substr($resultText, 0, 100));
                 if (is_string($answerSorted)) {
                     $answerSorted = [
                         'BTEXT'  => $answerSorted,

@@ -91,7 +91,13 @@ if ($answerMethod == 'MAIL') {
     $serviceSQL = 'SELECT BVALUE FROM BMESSAGEMETA WHERE BMESSID = ' . intval($aiLastId) . " AND BTOKEN = 'AISERVICE' ORDER BY BID DESC LIMIT 1";
     $serviceRes = db::Query($serviceSQL);
     if ($serviceRow = db::FetchArr($serviceRes)) {
-        $aiService = str_replace('AI', '', $serviceRow['BVALUE']); // Remove 'AI' prefix (e.g., 'AIOpenAI' -> 'OpenAI')
+        // Remove 'AI' prefix only (e.g., 'AIOpenAI' -> 'OpenAI', 'AIGroq' -> 'Groq')
+        $fullService = $serviceRow['BVALUE'];
+        if (substr($fullService, 0, 2) === 'AI' && strlen($fullService) > 2) {
+            $aiService = substr($fullService, 2); // Remove first 2 characters ('AI')
+        } else {
+            $aiService = $fullService;
+        }
     }
 
     $modelSQL = 'SELECT BVALUE FROM BMESSAGEMETA WHERE BMESSID = ' . intval($aiLastId) . " AND BTOKEN = 'AIMODEL' ORDER BY BID DESC LIMIT 1";
