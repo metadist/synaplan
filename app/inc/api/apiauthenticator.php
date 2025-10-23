@@ -56,7 +56,9 @@ class ApiAuthenticator
         'mailOAuthStart',
         'mailOAuthCallback',
         'mailOAuthStatus',
-        'mailOAuthDisconnect'
+        'mailOAuthDisconnect',
+        'checkGmailKeyword',
+        'debugGmailKeywords'
     ];
 
     /**

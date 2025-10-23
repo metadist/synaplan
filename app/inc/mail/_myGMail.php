@@ -49,21 +49,25 @@ class myGMail
         }
     }
 
-    // function to extract the phone number from the to string
-    // eg.: "Some Guy <smart+49175407011@gmail.com>"
-    // returns: 49175407011
-    private static function extractPhoneNumberOrTag($toString)
+    /**
+     * Setup anonymous email session similar to widget loader
+     * Creates a session for anonymous email senders chatting with keyword owner
+     * @param string $senderEmail Email address of the sender
+     * @param int $keywordOwnerId User ID who owns the keyword
+     */
+    private static function setupAnonymousEmailSession($senderEmail, $keywordOwnerId)
     {
-        if (substr_count($toString, '+') > 0) {
-            $mailParts = explode('+', $toString);
-            $phoneParts = explode('@', $mailParts[1]);
-            return db::EscString($phoneParts[0]);
+        // Create or update anonymous session for this email sender
+        if (!isset($_SESSION['is_email_anonymous']) || $_SESSION['email_sender'] !== $senderEmail) {
+            // Create new anonymous email session
+            $_SESSION['is_email_anonymous'] = true;
+            $_SESSION['email_owner_id'] = $keywordOwnerId;
+            $_SESSION['email_sender'] = $senderEmail;
+            $_SESSION['anonymous_email_session_id'] = uniqid('email_', true) . '_' . bin2hex(random_bytes(8));
+            $_SESSION['anonymous_email_session_created'] = time();
         } else {
-            // this can easily lead to double entries,
-            // fix the search by complete mail address!
-            $mailParts = explode('<', $toString);
-            $mailParts = explode('@', $mailParts[1]);
-            return db::EscString($mailParts[0]);
+            // Update existing session
+            $_SESSION['email_owner_id'] = $keywordOwnerId;
         }
     }
 
@@ -96,7 +100,6 @@ class myGMail
 
         // Process headers
         foreach ($headers as $header) {
-            //print "HEADER: " . $header->getName() . " === " . $header->getValue() . "\n";
             switch ($header->getName()) {
                 case 'Subject':
                     $mailData['subject'] = $header->getValue();
@@ -106,7 +109,6 @@ class myGMail
                     break;
                 case 'To':
                     $mailData['to'] = $header->getValue();
-                    $mailData['usrPhoneOrTag'] = self::extractPhoneNumberOrTag($mailData['to']);
                     break;
                 case 'Date':
                     $mailData['date'] = $header->getValue();
@@ -114,72 +116,65 @@ class myGMail
             }
         }
 
-        // check if the mail is to an existing user
-        // get the assigned email
-        // print_r($mailData);
+        // Extract sender email (clean format without name)
         $mailData['plainmail'] = Tools::cleanGMail($mailData['from']);
 
-        if ($mailData['usrPhoneOrTag'] > 0) { // OR strlen($mailData['usrPhoneOrTag'] > 0)) {
-            // $usrArr = Central::getUserByPhoneNumber($mailData['usrPhoneOrTag'], false);
-            // new User matching logic:
-            $usrArr = Central::getUserByMail($mailData['plainmail'], $mailData['usrPhoneOrTag']);
-        } else {
-            // get the user by the mail
-            $usrArr = Central::getUserByMail($mailData['plainmail'], '');
-        }
+        // ============================================================
+        // NEW KEYWORD-BASED ROUTING (like widget loader)
+        // ============================================================
 
-        // ------------------------------------------------------------
-        // Check if user exists and is confirmed (BUSERLEVEL should be 'NEW', 'ADM', or similar - NOT 'PIN:*')
-        if (is_array($usrArr) and count($usrArr) > 0 and $usrArr['BID'] > 0) {
-            // Check if user is confirmed (not waiting for PIN confirmation)
-            $isConfirmed = !str_starts_with($usrArr['BUSERLEVEL'], 'PIN:');
+        // Extract keyword from the To: field (e.g., smart+support@synaplan.com)
+        $keyword = InboundConf::extractKeywordFromEmail($mailData['to']);
 
-            if ($isConfirmed) {
-                // User is confirmed - process the message like they're logged into chat
-                $mailData['usrArr'] = $usrArr;
+        // Get the owner user ID based on keyword
+        // Returns system user ID 2 if keyword is invalid/not found
+        $keywordOwnerId = InboundConf::getUserIdByKeyword($keyword);
 
-                // If the top-level is plain or html (non-multipart), decode directly
-                if (in_array($mimeType, ['text/plain','text/html'])) {
-                    // This is not multipart, so the body is directly in $payload->getBody()
-                    $mailData['body'] = self::decodeBodyTopLevel($payload);
-                } else {
-                    // Otherwise, it might be multipart (or something else), so process parts
-                    try {
-                        self::processPayloadParts($payload->getParts(), $mailData, $service, $messageId);
-                    } catch (Exception $e) {
-                        $mailData['body'] = 'Error processing payload parts: ' . $e->getMessage();
-                    }
-                }
-                // Delete message AFTER successful processing
-                self::deleteMessage($messageId);
-            } else {
-                // User exists but not confirmed yet - send reminder
-                $replySubject = 'Re: ' . $mailData['subject'];
-                $replyBody = "Hello!\n\nYour Synaplan account is not yet confirmed. Please check your email for the confirmation link.\n\nIf you need a new confirmation link, please contact support at info@metadist.de\n\nBest regards,\nSynaplan Team";
-                _mymail('info@metadist.de', $mailData['plainmail'], $replySubject, $replyBody, $replyBody);
+        // Load the keyword owner's user profile (this is who will "receive" the message)
+        $ownerSQL = 'SELECT * FROM BUSER WHERE BID = ' . intval($keywordOwnerId) . ' LIMIT 1';
+        $ownerRes = db::Query($ownerSQL);
+        $usrArr = db::FetchArr($ownerRes);
 
-                self::deleteMessage($messageId);
-                $mailData = false;
-            }
-        } else {
-            // Unknown sender - send auto-reply with signup info
-            $replySubject = 'Re: ' . $mailData['subject'];
-            $replyBody = "Hello!\n\n";
-            $replyBody .= "We received your email from: " . $mailData['plainmail'] . "\n\n";
-            $replyBody .= "However, this sender address is not registered in our system.\n\n";
-            $replyBody .= "To use our AI assistant via email, please create a free account at:\n";
-            $replyBody .= $GLOBALS['baseUrl'] . "\n\n";
-            $replyBody .= "Once registered and confirmed, you can simply email us and our AI will respond!\n\n";
-            $replyBody .= "Best regards,\nSynaplan Team\n\n";
-            $replyBody .= "---\n";
-            $replyBody .= "If you believe this is an error, please contact: info@metadist.de";
-
-            _mymail('info@metadist.de', $mailData['plainmail'], $replySubject, $replyBody, $replyBody);
-
-            // Delete the message
+        if (!$usrArr || !isset($usrArr['BID']) || $usrArr['BID'] <= 0) {
+            // Failed to load keyword owner - skip this message
             self::deleteMessage($messageId);
-            $mailData = false;
+            return false;
         }
+
+        // Set up anonymous email session (sender is anonymous, chatting with keyword owner)
+        self::setupAnonymousEmailSession($mailData['plainmail'], $keywordOwnerId);
+
+        // Store user array for processing (this is the keyword owner, NOT the sender)
+        $mailData['usrArr'] = $usrArr;
+        $mailData['keyword'] = $keyword;
+        $mailData['keywordOwnerId'] = $keywordOwnerId;
+
+        // Process email body and attachments
+        // If the top-level is plain or html (non-multipart), decode directly
+        if (in_array($mimeType, ['text/plain','text/html'])) {
+            // This is not multipart, so the body is directly in $payload->getBody()
+            $mailData['body'] = self::decodeBodyTopLevel($payload);
+        } else {
+            // Otherwise, it might be multipart (or something else), so process parts
+            try {
+                self::processPayloadParts($payload->getParts(), $mailData, $service, $messageId);
+            } catch (Exception $e) {
+                $mailData['body'] = 'Error processing payload parts: ' . $e->getMessage();
+            }
+        }
+
+        // Sanitize email body text
+        // 1. Strip HTML tags
+        $mailData['body'] = strip_tags($mailData['body']);
+        // 2. Decode HTML entities (&nbsp;, &ouml;, etc.)
+        $mailData['body'] = html_entity_decode($mailData['body'], ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        // 3. Ensure UTF-8 encoding
+        $mailData['body'] = mb_convert_encoding($mailData['body'], 'UTF-8', 'UTF-8');
+        // 4. Trim whitespace
+        $mailData['body'] = trim($mailData['body']);
+
+        // Delete message AFTER successful processing
+        self::deleteMessage($messageId);
 
         return $mailData;
     }
@@ -207,7 +202,10 @@ class myGMail
             if ($mimeType === 'text/plain' && !$part->getFilename()) {
                 $mailData['body'] = self::decodeBody($part, $part->getBody()->getData());
             } elseif ($mimeType === 'text/html' && !$part->getFilename()) {
-                $mailData['body'] = strip_tags(self::decodeBody($part, $part->getBody()->getData()));
+                // Decode HTML body, strip tags, and decode HTML entities
+                $htmlBody = self::decodeBody($part, $part->getBody()->getData());
+                $mailData['body'] = strip_tags($htmlBody);
+                $mailData['body'] = html_entity_decode($mailData['body'], ENT_QUOTES | ENT_HTML5, 'UTF-8');
             } elseif (!empty($filename)) {
                 $attachment = self::processAttachment($part, $service, $messageId);
                 if ($attachment) {
@@ -443,6 +441,13 @@ class myGMail
                         // -------------------- Message Array filled --------------------
                         $resArr = Central::handleInMessage($inMessageArr);
                         $lastInsertsId[] = $resArr['lastId'];
+
+                        // Store sender email for anonymous email sessions (with attachment)
+                        if ($resArr['lastId'] > 0 && !empty($mail['plainmail'])) {
+                            $senderEmail = db::EscString($mail['plainmail']);
+                            $metaSQL = 'INSERT INTO BMESSAGEMETA (BID, BMESSID, BTOKEN, BVALUE) VALUES (DEFAULT, ' . intval($resArr['lastId']) . ", 'SENDER_EMAIL', '" . $senderEmail . "')";
+                            db::Query($metaSQL);
+                        }
                     }
                 }
 
@@ -451,6 +456,13 @@ class myGMail
                     $lastInsertsId[] = $resArr['lastId'];
                     // log the message to the DB
                     XSControl::countThis($inMessageArr['BUSERID'], $resArr['lastId']);
+
+                    // Store sender email for anonymous email sessions
+                    if ($resArr['lastId'] > 0 && !empty($mail['plainmail'])) {
+                        $senderEmail = db::EscString($mail['plainmail']);
+                        $metaSQL = 'INSERT INTO BMESSAGEMETA (BID, BMESSID, BTOKEN, BVALUE) VALUES (DEFAULT, ' . intval($resArr['lastId']) . ", 'SENDER_EMAIL', '" . $senderEmail . "')";
+                        db::Query($metaSQL);
+                    }
                 }
 
                 // Delete the message after processing: old place, was moved to mail process

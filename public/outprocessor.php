@@ -99,10 +99,27 @@ if ($answerMethod == 'MAIL') {
         }
     }
 
+    // Get the original sender email from BMESSAGEMETA (for keyword-based anonymous emails)
+    // This is stored when processing incoming emails via smart+keyword@synaplan.com
+    $recipientEmail = $usrArr['DETAILS']['MAIL'] ?? ''; // Default to user's email
+
+    $senderMetaSQL = 'SELECT BVALUE FROM BMESSAGEMETA WHERE BMESSID = ' . intval($msgId) . " AND BTOKEN = 'SENDER_EMAIL' LIMIT 1";
+    $senderMetaRes = db::Query($senderMetaSQL);
+    if ($senderMetaRow = db::FetchArr($senderMetaRes)) {
+        // Use the original sender's email (anonymous email sender)
+        $recipientEmail = $senderMetaRow['BVALUE'];
+    }
+
+    // Skip if no valid recipient email
+    if (empty($recipientEmail)) {
+        error_log("outprocessor.php: No recipient email found for msgId $msgId");
+        exit(1);
+    }
+
     // Use _mymail directly to support attachments
     $sentRes = _mymail(
         'info@metadist.de',              // From
-        $usrArr['DETAILS']['MAIL'],      // To
+        $recipientEmail,                  // To (original sender for anonymous emails)
         'Ralfs.AI - '.$aiAnswer['BTOPIC'], // Subject
         $htmlText,                        // HTML body
         $plainText,                       // Plain text body
