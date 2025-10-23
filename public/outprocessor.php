@@ -65,15 +65,14 @@ if ($answerMethod == 'WA') {
     $waSender = new waSender($waDetailsArr);
 
     if (!empty($GLOBALS['WAtoken'])) {
-        try {
-            if ($aiAnswer['BFILE'] > 0 and $aiAnswer['BFILETYPE'] != '' and str_contains($aiAnswer['BFILEPATH'], '/')) {
-                if ($aiAnswer['BFILETYPE'] == 'png' or $aiAnswer['BFILETYPE'] == 'jpg' or $aiAnswer['BFILETYPE'] == 'jpeg') {
-                    $waSender->sendImage($usrArr['BPROVIDERID'], $aiAnswer);
-                } elseif ($aiAnswer['BFILETYPE'] == 'mp3') {
-                    $waSender->sendAudio($usrArr['BPROVIDERID'], $aiAnswer);
-                } else {
-                    $myRes = $waSender->sendText($usrArr['BPROVIDERID'], $aiAnswer['BTEXT']);
-                }
+        if ($aiAnswer['BFILE'] > 0 and $aiAnswer['BFILETYPE'] != '' and str_contains($aiAnswer['BFILEPATH'], '/')) {
+            if ($aiAnswer['BFILETYPE'] == 'png' or $aiAnswer['BFILETYPE'] == 'jpg' or $aiAnswer['BFILETYPE'] == 'jpeg') {
+                $waSender->sendImage($usrArr['BPROVIDERID'], $aiAnswer);
+            } elseif ($aiAnswer['BFILETYPE'] == 'mp3') {
+                $waSender->sendAudio($usrArr['BPROVIDERID'], $aiAnswer);
+            } else {
+                $myRes = $waSender->sendText($usrArr['BPROVIDERID'], $aiAnswer['BTEXT']);
+                error_log("Outprocessor: Sent WhatsApp text to {$usrArr['BPROVIDERID']}");
             }
         } catch (Exception $e) {
             // Silent fail
