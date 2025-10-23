@@ -135,7 +135,7 @@ class AIOpenAI
         $systemPrompt = BasicAI::getAprompt($msgArr['BTOPIC'], $msgArr['BLANG'], $msgArr, true);
 
         $client = self::$client;
-        
+
         // UNIFIED APPROACH: Always prepare for streaming API
         // But use different prompts for stream vs non-stream (web chat vs email)
         if ($stream) {
@@ -149,7 +149,7 @@ class AIOpenAI
                 ['role' => 'system', 'content' => $systemPrompt['BPROMPT']],
             ];
         }
-        
+
         // Build message history
         foreach ($threadArr as $msg) {
             $role = 'user';
@@ -183,23 +183,30 @@ class AIOpenAI
         // ========================================================================
         try {
             // ALWAYS use streaming API (unified approach)
-            $responseStream = $client->responses()->createStreamed([
+            // Build the request parameters
+            $requestParams = [
                 'model' => $myModel,
-                'tools' => [
-                    [
-                        'type' => 'web_search_preview',
-                        'search_context_size' => 'low'
-                    ]
-                ],
                 'input' => $arrMessages,
-                'tool_choice' => 'auto',
-                'parallel_tool_calls' => true,
                 'store' => true,
                 'metadata' => [
                     'user_id' => (string)$msgArr['BUSERID'],
                     'session_id' => (string)$msgArr['BTRACKID']
                 ]
-            ]);
+            ];
+
+            // Only add web search tool for web chat (streaming mode)
+            if ($stream) {
+                $requestParams['tools'] = [
+                    [
+                        'type' => 'web_search_preview',
+                        'search_context_size' => 'high'
+                    ]
+                ];
+                $requestParams['tool_choice'] = 'auto';
+                $requestParams['parallel_tool_calls'] = true;
+            }
+
+            $responseStream = $client->responses()->createStreamed($requestParams);
 
             $answer = '';
 
@@ -218,7 +225,7 @@ class AIOpenAI
                     // Collect chunk (always)
                     if (!empty($textChunk)) {
                         $answer .= $textChunk;
-                        
+
                         // Stream to frontend ONLY if $stream=true (web chat)
                         if ($stream) {
                             Frontend::statusToStream($msgArr['BID'], 'ai', $textChunk);
@@ -243,7 +250,7 @@ class AIOpenAI
             // ========================================================================
             // Process the complete answer based on streaming mode
             // ========================================================================
-            
+
             if ($stream) {
                 // WEB CHAT: Plain text response, simple array
                 $arrAnswer = $msgArr;
@@ -260,11 +267,11 @@ class AIOpenAI
                 $arrAnswer['ALREADYSHOWN'] = true;
 
                 return $arrAnswer;
-                
+
             } else {
                 // EMAIL/BACKGROUND: Process collected answer as JSON
                 // The streaming API already gave us the complete answer in $answer variable
-                
+
                 // Clean JSON response - only if it starts with JSON markers
                 if (strpos($answer, "```json\n") === 0) {
                     $answer = substr($answer, 8); // Remove "```json\n" from start
