@@ -241,6 +241,12 @@ class ProcessMethods
                     if (!empty($GLOBALS['debug'])) {
                         error_log("sortMessage: calling sorter service {$AIGENERAL} model {$AIGENERALmodel} (id {$AIGENERALmodelId})");
                     }
+                    
+                    // Enhanced logging for MAIL messages to debug sorting issues
+                    if (self::$answerMethod == 'MAIL') {
+                        error_log("MAIL SORT DEBUG: BMESSTYPE=" . self::$answerMethod . " | BTEXT=" . substr($sortingArr['BTEXT'], 0, 100) . " | Thread count=" . count(self::$threadArr));
+                    }
+                    
                     if (strlen($sortingArr['BFILETEXT']) > 200) {
                         $sortingArr['BFILETEXT'] = substr($sortingArr['BFILETEXT'], 0, 200) . "\n\n[...content truncated for sorting...]";
                     }
@@ -276,6 +282,13 @@ class ProcessMethods
                     } else {
                         error_log('sortMessage: sorter returned non-JSON; using fallbacks');
                     }
+                }
+                
+                // Enhanced logging for MAIL messages
+                if (self::$answerMethod == 'MAIL') {
+                    $mailTopic = $answerJsonArr['BTOPIC'] ?? 'NOT_SET';
+                    $mailLang = $answerJsonArr['BLANG'] ?? 'NOT_SET';
+                    error_log("MAIL SORT RESULT: BTOPIC=" . $mailTopic . " | BLANG=" . $mailLang . " | Raw response: " . substr($answerJson, 0, 200));
                 }
                 /*** DEBUG ***/
 
