@@ -74,8 +74,6 @@ if ($answerMethod == 'WA') {
                 $myRes = $waSender->sendText($usrArr['BPROVIDERID'], $aiAnswer['BTEXT']);
                 error_log("Outprocessor: Sent WhatsApp text to {$usrArr['BPROVIDERID']}");
             }
-        } catch (Exception $e) {
-            // Silent fail
         }
     }
 }
