@@ -135,15 +135,21 @@ class AIOpenAI
         $systemPrompt = BasicAI::getAprompt($msgArr['BTOPIC'], $msgArr['BLANG'], $msgArr, true);
 
         $client = self::$client;
+        
+        // UNIFIED APPROACH: Always prepare for streaming API
+        // But use different prompts for stream vs non-stream (web chat vs email)
         if ($stream) {
+            // Web chat: Simple prompt, plain text
             $arrMessages = [
                 ['role' => 'system', 'content' => 'You are the Synaplan.com AI assistant. Please answer in the language of the user.'],
             ];
         } else {
+            // Email/background: Full JSON prompt with BFILE instructions
             $arrMessages = [
                 ['role' => 'system', 'content' => $systemPrompt['BPROMPT']],
             ];
         }
+        
         // Build message history
         foreach ($threadArr as $msg) {
             $role = 'user';
@@ -155,12 +161,14 @@ class AIOpenAI
 
         // Add current message
         if ($stream) {
+            // Web chat: Plain text input
             $msgText = $msgArr['BTEXT'];
             if (strlen($msgArr['BFILETEXT']) > 1) {
                 $msgText .= "\n\n\n---\n\n\nUser provided a file: ".$msgArr['BFILETYPE'].", saying: '".$msgArr['BFILETEXT']."'\n\n";
             }
             $arrMessages[] = ['role' => 'user', 'content' => $msgText];
         } else {
+            // Email/background: JSON-encoded input
             $msgText = json_encode($msgArr, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
             $arrMessages[] = ['role' => 'user', 'content' => $msgText];
         }
@@ -168,150 +176,95 @@ class AIOpenAI
         // Respect preselected globals for model (provider already chosen upstream)
         $myModel = $GLOBALS['AI_CHAT']['MODEL'];
 
-        //error_log(" *************** OPENAI call - response object:" . date("Y-m-d H:i:s"));
-        // now ask the AI and give the stream out or the result when done!
+        // ========================================================================
+        // UNIFIED STREAMING APPROACH: Always use streaming API
+        // - If $stream=true: Output chunks to frontend in real-time
+        // - If $stream=false: Collect chunks silently, return complete answer
+        // ========================================================================
         try {
-            if ($stream) {
-                // Use streaming mode - simplified
-                $stream = $client->responses()->createStreamed([
-                    'model' => $myModel,
-                    'tools' => [
-                        [
-                            'type' => 'web_search_preview',
-                            'search_context_size' => 'low'
-                        ]
-                    ],
-                    'input' => $arrMessages,
-                    'tool_choice' => 'auto',
-                    'parallel_tool_calls' => true,
-                    'store' => true,
-                    'metadata' => [
-                        'user_id' => (string)$msgArr['BUSERID'],
-                        'session_id' => (string)$msgArr['BTRACKID']
+            // ALWAYS use streaming API (unified approach)
+            $responseStream = $client->responses()->createStreamed([
+                'model' => $myModel,
+                'tools' => [
+                    [
+                        'type' => 'web_search_preview',
+                        'search_context_size' => 'low'
                     ]
-                ]);
+                ],
+                'input' => $arrMessages,
+                'tool_choice' => 'auto',
+                'parallel_tool_calls' => true,
+                'store' => true,
+                'metadata' => [
+                    'user_id' => (string)$msgArr['BUSERID'],
+                    'session_id' => (string)$msgArr['BTRACKID']
+                ]
+            ]);
 
-                $answer = '';
+            $answer = '';
 
-                foreach ($stream as $response) {
-                    // Handle text delta events - stream the difference
-                    if ($response->event === 'response.output_text.delta') {
-                        // Try to access delta text directly from the response object
-                        $textChunk = '';
+            // Process streaming response
+            foreach ($responseStream as $response) {
+                // Handle text delta events - collect chunks
+                if ($response->event === 'response.output_text.delta') {
+                    $textChunk = '';
+                    $repArr = $response->toArray();
 
-                        $repArr = $response->toArray();
+                    // Extract delta text
+                    if (isset($repArr['data']['delta'])) {
+                        $textChunk = $repArr['data']['delta'];
+                    }
 
-                        // Try different ways to access delta text
-                        if (isset($repArr['data']['delta'])) {
-                            $textChunk = $repArr['data']['delta'];
-                            // Debug: log the response structure on localhost
-                            if (isset($_SERVER['HTTP_HOST']) && in_array($_SERVER['HTTP_HOST'], ['localhost', '127.0.0.1']) && 1 == 2) {
-                                if ($GLOBALS['debug']) {
-                                    error_log('DEBUG: Response structure: ' . print_r($response->toArray(), true));
-                                }
-                            }
-                        }
-
-                        // Only stream non-empty chunks
-                        if (!empty($textChunk)) {
-                            if ($GLOBALS['debug']) {
-                                error_log('DEBUG: Streaming chunk: ' . $textChunk);
-                            }
-                            $answer .= $textChunk;
-                            // Stream the chunk to frontend
+                    // Collect chunk (always)
+                    if (!empty($textChunk)) {
+                        $answer .= $textChunk;
+                        
+                        // Stream to frontend ONLY if $stream=true (web chat)
+                        if ($stream) {
                             Frontend::statusToStream($msgArr['BID'], 'ai', $textChunk);
                         }
                     }
+                }
 
-                    // Handle text done events - might contain final text
-                    if ($response->event === 'response.output_text.done') {
-                        // Debug: log the response structure on localhost
-                        if (isset($_SERVER['HTTP_HOST']) && in_array($_SERVER['HTTP_HOST'], ['localhost', '127.0.0.1']) && 1 == 2) {
-                            if ($GLOBALS['debug']) {
-                                error_log('DEBUG: Response event: ' . $response->event);
-                            }
-                            if ($GLOBALS['debug']) {
-                                error_log('DEBUG: Response structure: ' . print_r($response->toArray(), true));
-                            }
-                        }
-                        // Try to access final text
-                        if (isset($response->text)) {
-                            $finalText = $response->text;
-                            // If we don't have accumulated text, use the final text
-                            if (empty($answer)) {
-                                $answer = $finalText;
-                            }
-                        }
-                    }
-
-                    // Handle errors
-                    if ($response->event === 'error') {
-                        return '*API topic Error - Streaming failed: ' . $response->message;
+                // Handle text done events
+                if ($response->event === 'response.output_text.done') {
+                    // Try to access final text as fallback
+                    if (isset($response->text) && empty($answer)) {
+                        $answer = $response->text;
                     }
                 }
-                // error_log("***************** DEBUG: Streaming done - answer: ".$answer);
-                // **************************************************************************************************
-                // ** return a different way to the rest of the process
+
+                // Handle errors
+                if ($response->event === 'error') {
+                    return '*API topic Error - Streaming failed: ' . $response->message;
+                }
+            }
+
+            // ========================================================================
+            // Process the complete answer based on streaming mode
+            // ========================================================================
+            
+            if ($stream) {
+                // WEB CHAT: Plain text response, simple array
                 $arrAnswer = $msgArr;
                 $arrAnswer['BTEXT'] = $answer;
                 $arrAnswer['BDIRECT'] = 'OUT';
                 $arrAnswer['BDATETIME'] = date('Y-m-d H:i:s');
                 $arrAnswer['BUNIXTIMES'] = time();
-
-                // Clear file-related fields since there's no valid JSON
                 $arrAnswer['BFILE'] = 0;
                 $arrAnswer['BFILEPATH'] = '';
                 $arrAnswer['BFILETYPE'] = '';
                 $arrAnswer['BFILETEXT'] = '';
-
-                // Add model information to the response
                 $arrAnswer['_USED_MODEL'] = $myModel;
                 $arrAnswer['_AI_SERVICE'] = 'AIOpenAI';
-
-                // avoid double output to the chat window
                 $arrAnswer['ALREADYSHOWN'] = true;
 
                 return $arrAnswer;
-
+                
             } else {
-                // Use non-streaming mode (existing logic)
-                $chat = $client->responses()->create([
-                    'model' => $myModel,
-                    'tools' => [
-                        [
-                            'type' => 'web_search_preview',
-                            'search_context_size' => 'low'
-                        ]
-                    ],
-                    'input' => $arrMessages,
-                    'tool_choice' => 'auto',
-                    'parallel_tool_calls' => true,
-                    'store' => true,
-                    'metadata' => [
-                        'user_id' => (string)$msgArr['BUSERID'],
-                        'session_id' => (string)$msgArr['BTRACKID']
-                    ]
-                ]);
-                // JSON response processing
-                // Process the response (same logic for both streaming and non-streaming)
-                $answer = '';
-                foreach ($chat->output as $output) {
-                    if ($output->type === 'message'          // nur Messages …
-                        && $output->role === 'assistant'     // … vom Assistenten
-                        && $output->status === 'completed') {  // … die fertig sind
-                        foreach ($output->content as $content) {
-                            if ($content->type === 'output_text') {
-                                if ($stream) {
-                                    // Already streamed above, just accumulate for final processing
-                                    $answer .= $content->text . PHP_EOL;
-                                } else {
-                                    $answer .= $content->text . PHP_EOL;   // <- text chunks
-                                }
-                            }
-                        }
-                    }
-                }
-
+                // EMAIL/BACKGROUND: Process collected answer as JSON
+                // The streaming API already gave us the complete answer in $answer variable
+                
                 // Clean JSON response - only if it starts with JSON markers
                 if (strpos($answer, "```json\n") === 0) {
                     $answer = substr($answer, 8); // Remove "```json\n" from start
