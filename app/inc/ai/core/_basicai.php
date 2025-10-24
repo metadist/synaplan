@@ -238,7 +238,7 @@ class BasicAI
     public static function getAprompt($keyword, $lang = 'en', $msgArr = [], $addInfos = true)
     {
         $arrPrompt = [];
-        
+
         // CRITICAL FIX: Get user ID from message array first (for email/WhatsApp background processing)
         // Fall back to session only if message doesn't have user ID (for web chat)
         $userId = 0;

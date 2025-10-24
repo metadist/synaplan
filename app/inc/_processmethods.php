@@ -121,13 +121,13 @@ class ProcessMethods
 
         self::$stream = $stream;
         self::$toolProcessed = false;
-        
+
         // CRITICAL FIX: Reload user-specific AI model configuration for background processing
         // When processing via email/background, there's no session, so _confdefaults.php
         // only loads global defaults. We need to reload with the message owner's config.
         if (self::$msgArr['BUSERID'] > 0) {
             $userId = intval(self::$msgArr['BUSERID']);
-            
+
             // Reload AI model configs for this specific user
             $userConfSQL = "SELECT * FROM BCONFIG WHERE BGROUP = 'DEFAULTMODEL' AND BOWNERID = " . $userId;
             $userConfRES = db::Query($userConfSQL);
@@ -139,10 +139,10 @@ class ProcessMethods
                     $GLOBALS['AI_'.$userConfARR['BSETTING']]['SERVICE'] = 'AI'.$detailARR['BSERVICE'];
                     $GLOBALS['AI_'.$userConfARR['BSETTING']]['MODEL'] = $detailARR['BPROVID'];
                     $GLOBALS['AI_'.$userConfARR['BSETTING']]['MODELID'] = $detailARR['BID'];
-                    
+
                     // Log config reload for debugging (only if APP_DEBUG=true)
                     if (!empty($GLOBALS['debug'])) {
-                        error_log("ProcessMethods::init() - Loaded user $userId AI config: " . $userConfARR['BSETTING'] . " = " . $detailARR['BSERVICE'] . "/" . $detailARR['BPROVID']);
+                        error_log("ProcessMethods::init() - Loaded user $userId AI config: " . $userConfARR['BSETTING'] . ' = ' . $detailARR['BSERVICE'] . '/' . $detailARR['BPROVID']);
                     }
                 }
             }
@@ -267,12 +267,12 @@ class ProcessMethods
                     if (!empty($GLOBALS['debug'])) {
                         error_log("sortMessage: calling sorter service {$AIGENERAL} model {$AIGENERALmodel} (id {$AIGENERALmodelId})");
                     }
-                    
+
                     // Enhanced logging for MAIL messages to debug sorting issues (only if APP_DEBUG=true)
                     if (self::$answerMethod == 'MAIL' && !empty($GLOBALS['debug'])) {
-                        error_log("MAIL SORT DEBUG: BMESSTYPE=" . self::$answerMethod . " | BTEXT=" . substr($sortingArr['BTEXT'], 0, 100) . " | Thread count=" . count(self::$threadArr));
+                        error_log('MAIL SORT DEBUG: BMESSTYPE=' . self::$answerMethod . ' | BTEXT=' . substr($sortingArr['BTEXT'], 0, 100) . ' | Thread count=' . count(self::$threadArr));
                     }
-                    
+
                     if (strlen($sortingArr['BFILETEXT']) > 200) {
                         $sortingArr['BFILETEXT'] = substr($sortingArr['BFILETEXT'], 0, 200) . "\n\n[...content truncated for sorting...]";
                     }
@@ -309,12 +309,12 @@ class ProcessMethods
                         error_log('sortMessage: sorter returned non-JSON; using fallbacks');
                     }
                 }
-                
+
                 // Enhanced logging for MAIL messages (only if APP_DEBUG=true)
                 if (self::$answerMethod == 'MAIL' && !empty($GLOBALS['debug'])) {
                     $mailTopic = $answerJsonArr['BTOPIC'] ?? 'NOT_SET';
                     $mailLang = $answerJsonArr['BLANG'] ?? 'NOT_SET';
-                    error_log("MAIL SORT RESULT: BTOPIC=" . $mailTopic . " | BLANG=" . $mailLang . " | Raw response: " . substr($answerJson, 0, 200));
+                    error_log('MAIL SORT RESULT: BTOPIC=' . $mailTopic . ' | BLANG=' . $mailLang . ' | Raw response: ' . substr($answerJson, 0, 200));
                 }
                 /*** DEBUG ***/
 
@@ -637,12 +637,12 @@ class ProcessMethods
                     if ($setting['BTOKEN'] === 'tool_files' && $setting['BVALUE'] == '1') {
                         $searchArr   = self::$msgArr;
                         $ragArr      = Tools::searchRAG($searchArr);
-                        
+
                         // Debug logging (only if APP_DEBUG=true)
                         if (!empty($GLOBALS['debug'])) {
                             $debugFile = __DIR__ . '/../../public/debug_websearch.log';
                             $timestamp = date('Y-m-d H:i:s');
-                            file_put_contents($debugFile, "[$timestamp] RAG SEARCH: Found " . count($ragArr) . " files | BTOPIC=" . self::$msgArr['BTOPIC'] . " | BMESSTYPE=" . self::$answerMethod . "\n", FILE_APPEND);
+                            file_put_contents($debugFile, "[$timestamp] RAG SEARCH: Found " . count($ragArr) . ' files | BTOPIC=' . self::$msgArr['BTOPIC'] . ' | BMESSTYPE=' . self::$answerMethod . "\n", FILE_APPEND);
                             if (count($ragArr) > 0) {
                                 foreach ($ragArr as $idx => $ragItem) {
                                     $preview = isset($ragItem['BTEXT']) ? substr($ragItem['BTEXT'], 0, 100) : 'NO_TEXT';
@@ -650,12 +650,12 @@ class ProcessMethods
                                 }
                             }
                         }
-                        
+
                         if (self::$stream) {
                             Frontend::statusToStream(self::$msgId, 'pre', 'RAG Search: ' . count($ragArr) . ' files... ');
                         }
                         self::$threadArr = array_merge(self::$threadArr, $ragArr);
-                        
+
                         if (!empty($GLOBALS['debug'])) {
                             file_put_contents($debugFile, "[$timestamp] RAG MERGED: Total thread items now: " . count(self::$threadArr) . "\n", FILE_APPEND);
                         }
@@ -693,12 +693,12 @@ class ProcessMethods
                 }
 
                 $answerSorted = $AIGENERAL::topicPrompt(self::$msgArr, self::$threadArr, self::$stream);
-                
+
                 // Log first AI call result (only if APP_DEBUG=true)
                 if (!empty($GLOBALS['debug'])) {
                     $firstCallBFILE = is_array($answerSorted) ? ($answerSorted['BFILE'] ?? 'NOT_SET') : 'NOT_ARRAY';
                     $firstCallBTEXT = is_array($answerSorted) ? substr($answerSorted['BTEXT'] ?? '', 0, 100) : (is_string($answerSorted) ? substr($answerSorted, 0, 100) : 'INVALID');
-                    error_log("FIRST AI CALL RESULT: BMESSTYPE=" . self::$answerMethod . " | BFILE=" . $firstCallBFILE . " | BTEXT=" . $firstCallBTEXT);
+                    error_log('FIRST AI CALL RESULT: BMESSTYPE=' . self::$answerMethod . ' | BFILE=' . $firstCallBFILE . ' | BTEXT=' . $firstCallBTEXT);
                 }
 
                 if (is_string($answerSorted)) {
@@ -1100,24 +1100,24 @@ class ProcessMethods
             ) {
                 // Web search was requested - execute search and reset previousCall flag
                 // so the main AI can analyze the search results
-                
+
                 // Debug to file (only if APP_DEBUG=true)
                 if (!empty($GLOBALS['debug'])) {
                     $debugFile = __DIR__ . '/../../public/debug_websearch.log';
                     $timestamp = date('Y-m-d H:i:s');
-                    file_put_contents($debugFile, "[$timestamp] WEBSEARCH TRIGGERED: Query=" . $answerSorted['BFILETEXT'] . " | BMESSTYPE=" . self::$answerMethod . "\n", FILE_APPEND);
+                    file_put_contents($debugFile, "[$timestamp] WEBSEARCH TRIGGERED: Query=" . $answerSorted['BFILETEXT'] . ' | BMESSTYPE=' . self::$answerMethod . "\n", FILE_APPEND);
                 }
-                
+
                 if (self::$stream) {
                     Frontend::statusToStream(self::$msgId, 'pre', 'Web search: ' . $answerSorted['BFILETEXT'] . '. ');
                 }
-                
+
                 // Store the preliminary message if present (but we'll replace it with final analyzed answer)
                 $preliminaryMessage = $answerSorted['BTEXT'] ?? '';
-                
+
                 // Execute web search - creates NEW message array with search results
                 $searchResultsArr = Tools::searchWeb(self::$msgArr, $answerSorted['BFILETEXT']);
-                
+
                 // Extract ONLY the search results (not the duplicated original question)
                 // Tools::searchWeb() appends to BTEXT, so we need to extract just the new part
                 $originalTextLength = strlen(self::$msgArr['BTEXT']);
@@ -1126,22 +1126,22 @@ class ProcessMethods
                     // Extract only the appended search results
                     $searchOnlyText = substr($searchResultsArr['BTEXT'], $originalTextLength);
                 }
-                
+
                 // Append ONLY search results to message text for AI analysis
                 // Add explicit instruction to prevent the AI from requesting another search
                 if (!empty($searchOnlyText)) {
                     self::$msgArr['BTEXT'] .= "\n\n\n---\n[SYSTEM NOTE: Web search already completed. Results below. Answer the question using these results. Do NOT set BFILE to 10.]\n---\n\n" . $searchOnlyText;
                     if (!empty($GLOBALS['debug'])) {
-                        file_put_contents($debugFile, "[$timestamp] WEBSEARCH APPENDED: Results length=" . strlen($searchOnlyText) . " | New msgArr BTEXT length=" . strlen(self::$msgArr['BTEXT']) . "\n", FILE_APPEND);
+                        file_put_contents($debugFile, "[$timestamp] WEBSEARCH APPENDED: Results length=" . strlen($searchOnlyText) . ' | New msgArr BTEXT length=' . strlen(self::$msgArr['BTEXT']) . "\n", FILE_APPEND);
                     }
                 }
-                
+
                 // Reset BFILE for next iteration
                 $answerSorted['BFILE'] = 0;
 
                 // Reset previousCall so the fallback AI call can analyze these search results
                 $previousCall = false;
-                
+
                 if (!empty($GLOBALS['debug'])) {
                     file_put_contents($debugFile, "[$timestamp] WEBSEARCH COMPLETE: previousCall reset to false | Will trigger fallback AI\n", FILE_APPEND);
                 }
@@ -1154,21 +1154,21 @@ class ProcessMethods
             // --- Fallback Hauptaufruf falls noch nichts lief (außer mediamaker) ---
             if (!$previousCall && self::$msgArr['BTOPIC'] !== 'mediamaker') {
                 self::$msgArr['BTOPIC'] = 'general';
-                
+
                 // Debug to file (only if APP_DEBUG=true)
                 if (!empty($GLOBALS['debug'])) {
                     $debugFile = __DIR__ . '/../../public/debug_websearch.log';
                     $timestamp = date('Y-m-d H:i:s');
                     $hasSearchResults = strpos(self::$msgArr['BTEXT'], '---') !== false ? 'YES' : 'NO';
-                    file_put_contents($debugFile, "[$timestamp] FALLBACK AI CALL: BMESSTYPE=" . self::$answerMethod . " | BTEXT length=" . strlen(self::$msgArr['BTEXT']) . " | Has search results=" . $hasSearchResults . "\n", FILE_APPEND);
+                    file_put_contents($debugFile, "[$timestamp] FALLBACK AI CALL: BMESSTYPE=" . self::$answerMethod . ' | BTEXT length=' . strlen(self::$msgArr['BTEXT']) . ' | Has search results=' . $hasSearchResults . "\n", FILE_APPEND);
                     file_put_contents($debugFile, "[$timestamp] FALLBACK AI INPUT: " . substr(self::$msgArr['BTEXT'], 0, 500) . "...\n", FILE_APPEND);
-                    file_put_contents($debugFile, "[$timestamp] FALLBACK AI: About to call topicPrompt with service=" . $AIGENERAL . " model=" . $GLOBALS['AI_CHAT']['MODEL'] . "\n", FILE_APPEND);
+                    file_put_contents($debugFile, "[$timestamp] FALLBACK AI: About to call topicPrompt with service=" . $AIGENERAL . ' model=' . $GLOBALS['AI_CHAT']['MODEL'] . "\n", FILE_APPEND);
                 }
-                
+
                 if (self::$stream) {
                     Frontend::statusToStream(self::$msgId, 'pre', 'Calling ' . $AIGENERAL . '. ');
                 }
-                
+
                 $startTime = microtime(true);
                 try {
                     $answerSorted = $AIGENERAL::topicPrompt(self::$msgArr, self::$threadArr, self::$stream);
@@ -1195,14 +1195,14 @@ class ProcessMethods
                     }
                     throw $e;
                 }
-                
+
                 // Log the result
                 if (!empty($GLOBALS['debug'])) {
                     $debugFile = __DIR__ . '/../../public/debug_websearch.log';
                     $timestamp = date('Y-m-d H:i:s');
                     $resultText = is_array($answerSorted) ? ($answerSorted['BTEXT'] ?? 'NO_BTEXT') : (is_string($answerSorted) ? $answerSorted : 'INVALID');
                     $resultBFILE = is_array($answerSorted) ? ($answerSorted['BFILE'] ?? 'NOT_SET') : 'N/A';
-                    file_put_contents($debugFile, "[$timestamp] FALLBACK AI RESULT: BTEXT length=" . strlen($resultText) . " | BFILE=" . $resultBFILE . " | First 200 chars: " . substr($resultText, 0, 200) . "\n", FILE_APPEND);
+                    file_put_contents($debugFile, "[$timestamp] FALLBACK AI RESULT: BTEXT length=" . strlen($resultText) . ' | BFILE=' . $resultBFILE . ' | First 200 chars: ' . substr($resultText, 0, 200) . "\n", FILE_APPEND);
                 }
                 if (is_string($answerSorted)) {
                     $answerSorted = [
@@ -1384,9 +1384,9 @@ class ProcessMethods
         if (!empty($GLOBALS['debug'])) {
             $debugFile = __DIR__ . '/../../public/debug_websearch.log';
             $timestamp = date('Y-m-d H:i:s');
-            file_put_contents($debugFile, "[$timestamp] saveAnswerToDB CALLED: BTEXT length=" . strlen(self::$msgArr['BTEXT'] ?? '') . " | BFILE=" . (self::$msgArr['BFILE'] ?? 'NOT_SET') . "\n", FILE_APPEND);
+            file_put_contents($debugFile, "[$timestamp] saveAnswerToDB CALLED: BTEXT length=" . strlen(self::$msgArr['BTEXT'] ?? '') . ' | BFILE=' . (self::$msgArr['BFILE'] ?? 'NOT_SET') . "\n", FILE_APPEND);
         }
-        
+
         // **************************************************************************************************
         // get the incoming id
         $incomingId = self::$msgArr['BID'];
@@ -1461,17 +1461,17 @@ class ProcessMethods
 
         // Insert the processed message into the database
         $newSQL = 'insert into BMESSAGES (' . implode(',', $fields) . ') values (' . implode(',', $values) . ')';
-        
+
         // Debug logging (only if APP_DEBUG=true)
         if (!empty($GLOBALS['debug'])) {
             $debugFile = __DIR__ . '/../../public/debug_websearch.log';
             $timestamp = date('Y-m-d H:i:s');
             file_put_contents($debugFile, "[$timestamp] saveAnswerToDB SQL: " . substr($newSQL, 0, 300) . "...\n", FILE_APPEND);
         }
-        
+
         $newRes = db::Query($newSQL);
         $aiLastId = db::LastId();
-        
+
         if (!empty($GLOBALS['debug'])) {
             $debugFile = __DIR__ . '/../../public/debug_websearch.log';
             $timestamp = date('Y-m-d H:i:s');
