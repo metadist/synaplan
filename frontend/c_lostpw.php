@@ -7,11 +7,7 @@
     <title><?php _s('Reset your password', __FILE__, $_SESSION['LANG']); ?> | Synaplan</title>
     <link rel="icon" type="image/x-icon" href="assets/statics/img/favicon.ico">
     <link href="assets/statics/css/auth-pages.css" rel="stylesheet">
-    <script
-      src="https://challenges.cloudflare.com/turnstile/v0/api.js"
-      async
-      defer
-    ></script>
+    <script src="https://www.google.com/recaptcha/api.js?render=<?php echo htmlspecialchars(ApiKeys::getRecaptchaSiteKey()); ?>"></script>
 </head>
 <body>
     <!-- Header with Logo -->
@@ -44,14 +40,14 @@
             </div>
 
             <form id="lostpwForm" target="_top">
+                <input type="hidden" name="g-recaptcha-response" id="g-recaptcha-response">
                 <div class="form-group">
                     <label for="email"><?php _s('Email', __FILE__, $_SESSION['LANG']); ?></label>
                     <input type="email" class="form-control" id="email" name="email" placeholder="<?php _s('Enter your registered email', __FILE__, $_SESSION['LANG']); ?>" required>
                 </div>
-                <button type="submit" class="btn btn-primary" id="submitBtn" disabled title="<?php _s('Please complete the security check below', __FILE__, $_SESSION['LANG']); ?>">
+                <button type="submit" class="btn btn-primary" id="submitBtn">
                     <?php _s('Send new password', __FILE__, $_SESSION['LANG']); ?>
                 </button>
-                <div class="cf-turnstile" data-sitekey="0x4AAAAAAB1d8VjDhX7_hJRg" data-theme="light" data-size="normal" data-callback="onTurnstileSuccess" data-error-callback="onTurnstileError" data-expired-callback="onTurnstileExpired"></div>
             </form>
         </div>
     </main>
@@ -62,43 +58,12 @@
     </footer>
 
     <script>
-    let turnstileCompleted = false;
-
-    // Callback when Turnstile is successfully completed
-    function onTurnstileSuccess(token) {
-        turnstileCompleted = true;
-        const submitBtn = document.getElementById('submitBtn');
-        submitBtn.disabled = false;
-        submitBtn.removeAttribute('title');
-    }
-
-    // Callback when Turnstile encounters an error
-    function onTurnstileError() {
-        turnstileCompleted = false;
-        const submitBtn = document.getElementById('submitBtn');
-        submitBtn.disabled = true;
-        submitBtn.setAttribute('title', '<?php _s('Security check failed. Please refresh the page.', __FILE__, $_SESSION['LANG']); ?>');
-    }
-
-    // Callback when Turnstile token expires
-    function onTurnstileExpired() {
-        turnstileCompleted = false;
-        const submitBtn = document.getElementById('submitBtn');
-        submitBtn.disabled = true;
-        submitBtn.setAttribute('title', '<?php _s('Security check expired. Please complete it again.', __FILE__, $_SESSION['LANG']); ?>');
-    }
+    const RECAPTCHA_SITE_KEY = '<?php echo htmlspecialchars(ApiKeys::getRecaptchaSiteKey()); ?>';
 
     document.getElementById('lostpwForm').addEventListener('submit', function(e) {
         e.preventDefault();
 
         const email = document.getElementById('email').value;
-
-        // Validate Turnstile
-        const turnstileResponse = document.querySelector('[name="cf-turnstile-response"]')?.value;
-        if (!turnstileCompleted || !turnstileResponse) {
-            showError('<?php _s('Please complete the security check before submitting.', __FILE__, $_SESSION['LANG']); ?>');
-            return;
-        }
 
         document.getElementById('successAlert').classList.add('d-none');
         document.getElementById('errorAlert').classList.add('d-none');
@@ -111,35 +76,36 @@
         const submitBtn = document.getElementById('submitBtn');
         submitBtn.disabled = true;
 
-        // build FormData from the form to include Turnstile token automatically
-        const formEl = document.getElementById('lostpwForm');
-        const formData = new FormData(formEl);
-        formData.append('action', 'lostPassword');
+        // Execute reCAPTCHA v3 before submitting
+        grecaptcha.ready(function() {
+            grecaptcha.execute(RECAPTCHA_SITE_KEY, {action: 'lostpw'}).then(function(token) {
+                // Prepare form data
+                const formData = new FormData();
+                formData.append('action', 'lostPassword');
+                formData.append('email', email);
+                formData.append('g-recaptcha-response', token);
 
-        fetch('api.php', {
-            method: 'POST',
-            body: formData
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                showSuccess(data.message || '<?php _s('If the email exists, we sent a new password.', __FILE__, $_SESSION['LANG']); ?>');
-                document.getElementById('lostpwForm').reset();
-                // Reset turnstile state after successful submission
-                turnstileCompleted = false;
-            } else {
-                showError(data.error || '<?php _s('Password reset failed. Please try again.', __FILE__, $_SESSION['LANG']); ?>');
-            }
-        })
-        .catch(error => {
-            console.error('Error:', error);
-            showError('<?php _s('An error occurred. Please try again.', __FILE__, $_SESSION['LANG']); ?>');
-        })
-        .finally(() => {
-            // Reset button state only if turnstile is still valid
-            if (turnstileCompleted) {
-                submitBtn.disabled = false;
-            }
+                fetch('api.php', {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        showSuccess(data.message || '<?php _s('If the email exists, we sent a new password.', __FILE__, $_SESSION['LANG']); ?>');
+                        document.getElementById('lostpwForm').reset();
+                    } else {
+                        showError(data.error || '<?php _s('Password reset failed. Please try again.', __FILE__, $_SESSION['LANG']); ?>');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    showError('<?php _s('An error occurred. Please try again.', __FILE__, $_SESSION['LANG']); ?>');
+                })
+                .finally(() => {
+                    submitBtn.disabled = false;
+                });
+            });
         });
     });
 

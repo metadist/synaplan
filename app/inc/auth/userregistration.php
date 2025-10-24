@@ -12,6 +12,68 @@
 class UserRegistration
 {
     /**
+     * Verify reCAPTCHA v3 token
+     *
+     * Validates a reCAPTCHA v3 token with Google's API and checks action and score
+     *
+     * @param string $token The reCAPTCHA response token from the client
+     * @param string $expectedAction The expected action name (e.g., 'login', 'register', 'lostpw')
+     * @param float $minScore Minimum score threshold (0.0 to 1.0, default 0.5)
+     * @return array Result array with 'success', 'score', and optional 'reason' or 'error'
+     */
+    public static function verifyRecaptcha(string $token, string $expectedAction = '', float $minScore = 0.5): array
+    {
+        // Skip verification in debug mode
+        if (!empty($GLOBALS['debug'])) {
+            return ['success' => true, 'score' => 1.0];
+        }
+
+        $secret = ApiKeys::getRecaptchaSecretKey();
+        if (empty($secret)) {
+            return ['success' => false, 'error' => 'recaptcha-not-configured'];
+        }
+
+        if (empty($token)) {
+            return ['success' => false, 'error' => 'missing-token'];
+        }
+
+        $url = 'https://www.google.com/recaptcha/api/siteverify';
+        $data = http_build_query(['secret' => $secret, 'response' => $token]);
+
+        $opts = [
+            'http' => [
+                'method'  => 'POST',
+                'header'  => "Content-Type: application/x-www-form-urlencoded\r\n",
+                'content' => $data
+            ]
+        ];
+
+        $context = stream_context_create($opts);
+        $result = @file_get_contents($url, false, $context);
+
+        if ($result === false) {
+            return ['success' => false, 'error' => 'no-response'];
+        }
+
+        $res = json_decode($result, true);
+        if (!isset($res['success']) || !$res['success']) {
+            return $res + ['success' => false];
+        }
+
+        // Check action matches expected value
+        if ($expectedAction && (!isset($res['action']) || $res['action'] !== $expectedAction)) {
+            return ['success' => false, 'reason' => 'wrong-action', 'score' => $res['score'] ?? null];
+        }
+
+        // Check score meets minimum threshold
+        if (($res['score'] ?? 0) < $minScore) {
+            return ['success' => false, 'reason' => 'low-score', 'score' => $res['score']];
+        }
+
+        return ['success' => true, 'score' => $res['score']];
+    }
+
+    /**
      * Register a new user
      *
      * Creates a new user account with email confirmation
@@ -26,10 +88,12 @@ class UserRegistration
         $isWordPressRegistration = isset($_REQUEST['source']) && $_REQUEST['source'] === 'wordpress_plugin';
 
         if (!$isWordPressRegistration) {
-            // Validate Turnstile captcha for regular web registrations
-            $captchaOk = Frontend::myCFcaptcha();
-            if (!$captchaOk) {
-                $retArr['error'] = 'Captcha verification failed. Please try again.';
+            // Validate reCAPTCHA v3 for regular web registrations
+            $recaptchaToken = isset($_REQUEST['g-recaptcha-response']) ? $_REQUEST['g-recaptcha-response'] : '';
+            $captchaResult = self::verifyRecaptcha($recaptchaToken, 'register', 0.5);
+
+            if (!$captchaResult['success']) {
+                $retArr['error'] = 'Security verification failed. Please try again.';
                 return $retArr;
             }
         }
@@ -179,16 +243,18 @@ class UserRegistration
     /**
      * Lost password handler
      *
-     * Validates Turnstile, generates a new password if user exists,
-     * writes it (MD5) to BUSER and sends an email using EmailService.
+     * Validates reCAPTCHA v3, generates a new password if user exists,
+     * writes it (bcrypt) to BUSER and sends an email using EmailService.
      * Always returns a generic success message (no user enumeration).
      */
     public static function lostPassword(): array
     {
-        // Captcha validation (re-using existing helper)
-        $captchaOk = Frontend::myCFcaptcha();
-        if (!$captchaOk) {
-            return ['success' => false, 'error' => 'Captcha verification failed'];
+        // Validate reCAPTCHA v3
+        $recaptchaToken = isset($_REQUEST['g-recaptcha-response']) ? $_REQUEST['g-recaptcha-response'] : '';
+        $captchaResult = self::verifyRecaptcha($recaptchaToken, 'lostpw', 0.5);
+
+        if (!$captchaResult['success']) {
+            return ['success' => false, 'error' => 'Security verification failed'];
         }
 
         $email = isset($_REQUEST['email']) ? db::EscString(trim($_REQUEST['email'])) : '';

@@ -125,6 +125,9 @@ class ApiKeys
             'SYSTEM_PRICING_URL',
             'SYSTEM_ACCOUNT_URL',
             'SYSTEM_UPGRADE_URL',
+            // reCAPTCHA v3
+            'RECAPTCHA3_SITE_KEY',
+            'RECAPTCHA3_SECRET_KEY',
         ];
 
         foreach ($keyConfig as $envKey) {
@@ -424,6 +427,22 @@ class ApiKeys
     public static function getBaseUrl(): string
     {
         return self::get('APP_URL') ?: 'https://www.synaplan.com';
+    }
+
+    /**
+     * Get reCAPTCHA v3 site key (public key for frontend)
+     */
+    public static function getRecaptchaSiteKey()
+    {
+        return self::get('RECAPTCHA3_SITE_KEY');
+    }
+
+    /**
+     * Get reCAPTCHA v3 secret key (private key for backend verification)
+     */
+    public static function getRecaptchaSecretKey()
+    {
+        return self::get('RECAPTCHA3_SECRET_KEY');
     }
 
     /**
