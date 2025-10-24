@@ -47,7 +47,6 @@ if (XSControl::isRateLimitingEnabled() &&
     isset($_SESSION['USERPROFILE']) &&
     !empty($_SESSION['USERPROFILE']['BID']) &&
     $action === 'messageNew') {
-
     // Only check general MESSAGES limits - specific operations checked after sorting
     $limitResult = XSControl::checkMessagesLimit($_SESSION['USERPROFILE']['BID']);
     if ($limitResult !== true) {

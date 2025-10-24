@@ -336,7 +336,6 @@ try {
         echo '✗ WARNING: ' . $stats['unknown'] . ' user(s) have unknown password format!';
         echo '</div>';
     }
-
 } catch (\Throwable $e) {
     echo '<div class="test-result error">';
     echo '✗ EXCEPTION: ' . htmlspecialchars($e->getMessage());

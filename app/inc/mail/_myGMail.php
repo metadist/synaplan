@@ -12,8 +12,7 @@ class myGMail
      * Called by getMail() to refresh the OAuth token if expired
      * Returns a configured Google client with valid access token
      */
-    public static function refreshToken()
-    {
+    public static function refreshToken() {
         try {
             $client = OAuthConfig::createGoogleClient($GLOBALS['baseUrl'].'gmail_callback2oauth.php');
             return $client;
@@ -22,8 +21,7 @@ class myGMail
         }
     }
 
-    public static function getMail()
-    {
+    public static function getMail() {
         try {
             $client = self::refreshToken();
             $service = new Google_Service_Gmail($client);
@@ -55,8 +53,7 @@ class myGMail
      * @param string $senderEmail Email address of the sender
      * @param int $keywordOwnerId User ID who owns the keyword
      */
-    private static function setupAnonymousEmailSession($senderEmail, $keywordOwnerId)
-    {
+    private static function setupAnonymousEmailSession($senderEmail, $keywordOwnerId) {
         // Create or update anonymous session for this email sender
         if (!isset($_SESSION['is_email_anonymous']) || $_SESSION['email_sender'] !== $senderEmail) {
             // Create new anonymous email session
@@ -78,8 +75,7 @@ class myGMail
      * @param $messageId ID of the message to process
      * @return array Processed mail data including headers and attachments
      */
-    private static function processMessage($service, $messageId)
-    {
+    private static function processMessage($service, $messageId) {
         $message = $service->users_messages->get('me', $messageId, ['format' => 'full']);
 
         $payload = $message->getPayload();
@@ -188,8 +184,7 @@ class myGMail
      * @param $messageId Current message ID
      * @param $prefix Used for nested parts (optional)
      */
-    private static function processPayloadParts($parts, &$mailData, $service, $messageId)
-    {
+    private static function processPayloadParts($parts, &$mailData, $service, $messageId) {
         if (empty($parts)) {
             return;
         }
@@ -229,8 +224,7 @@ class myGMail
      * @param $messageId ID of message containing attachment
      * @return array|null Attachment data if valid, null if filtered out
      */
-    private static function processAttachment($part, $service, $messageId)
-    {
+    private static function processAttachment($part, $service, $messageId) {
         $filename = $part->getFilename();
         $attachmentId = $part->getBody()->getAttachmentId();
 
@@ -272,8 +266,7 @@ class myGMail
      * Called by processPayloadParts() to decode base64 encoded message bodies
      * Properly handles character encoding and quoted-printable decoding
      */
-    private static function decodeBody($part, $partBodyData): string
-    {
+    private static function decodeBody($part, $partBodyData): string {
         // First do the normal base64url decoding that the Gmail API expects
         $base64Decoded = strtr($partBodyData, '-_', '+/');
         $rawContent    = base64_decode($base64Decoded);
@@ -332,8 +325,7 @@ class myGMail
      * Decode top-level email body (when email is simple text, not multipart)
      * Properly handles character encoding and quoted-printable decoding
      */
-    private static function decodeBodyTopLevel($payload)
-    {
+    private static function decodeBodyTopLevel($payload) {
         // This is the raw base64url string for the body
         $rawData = $payload->getBody() ? $payload->getBody()->getData() : '';
         if (!$rawData) {
@@ -394,8 +386,7 @@ class myGMail
         return $decoded;
     }
     // ------------------------------------------------------------
-    public static function saveToDatabase($processedMails)
-    {
+    public static function saveToDatabase($processedMails) {
         $myTrackingId = (int) (microtime(true) * 1000000);
 
         foreach ($processedMails as $mail) {
@@ -560,8 +551,7 @@ class myGMail
      * @param $messageId ID of message to delete
      * @return bool True if successful
      */
-    public static function deleteMessage($messageId)
-    {
+    public static function deleteMessage($messageId) {
         try {
             $client = self::refreshToken();
             $service = new Google_Service_Gmail($client);

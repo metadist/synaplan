@@ -145,7 +145,6 @@ try {
         $testResult['error'] = 'Unexpected API response format';
         $testResult['response'] = json_encode($decoded, JSON_PRETTY_PRINT);
     }
-
 } catch (\Throwable $e) {
     $testResult['error'] = 'Exception: ' . $e->getMessage();
 }
@@ -162,8 +161,7 @@ echo json_encode($testResult, JSON_PRETTY_PRINT);
 /**
  * Append test result to HTML report
  */
-function appendToReport($reportFile, $testResult, $testDuration)
-{
+function appendToReport($reportFile, $testResult, $testDuration) {
     $statusClass = $testResult['result'] ? 'status-success' : 'status-failed';
     $statusText = $testResult['result'] ? 'Passed' : 'Failed';
 
@@ -249,8 +247,7 @@ function appendToReport($reportFile, $testResult, $testDuration)
  * @param string $baseUrl Base API URL (e.g., http://example.com/api.php)
  * @return array Processing result
  */
-function getAIResponseSimple(string $prompt, string $apiKey, string $baseUrl): array
-{
+function getAIResponseSimple(string $prompt, string $apiKey, string $baseUrl): array {
     $retArr = ['success' => false, 'error' => '', 'response_text' => '', 'processing_time_ms' => 0];
 
     try {
@@ -320,7 +317,6 @@ function getAIResponseSimple(string $prompt, string $apiKey, string $baseUrl): a
             $retArr['error'] = 'No content in API response';
             $retArr['raw_response'] = json_encode($decoded);
         }
-
     } catch (\Throwable $e) {
         $retArr['error'] = 'Exception: ' . $e->getMessage();
     }

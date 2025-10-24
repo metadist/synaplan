@@ -93,7 +93,6 @@ try {
         $masterResult['email_sent'] = $test3Result['email_sent'];
         $masterResult['email_recipient'] = $test3Result['email_recipient'] ?? '';
     }
-
 } catch (\Throwable $e) {
     $masterResult['error'] = 'Master test runner exception: ' . $e->getMessage();
 }
@@ -120,8 +119,7 @@ echo json_encode($masterResult, JSON_PRETTY_PRINT);
  * @param string $scriptName Test script filename
  * @return array Test result
  */
-function runTest(string $scriptName): array
-{
+function runTest(string $scriptName): array {
     $scriptPath = __DIR__ . '/' . $scriptName;
 
     if (!file_exists($scriptPath)) {

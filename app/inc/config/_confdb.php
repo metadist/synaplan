@@ -60,8 +60,7 @@ mysqli_autocommit($GLOBALS['dbcon'], true);
 
 // global translation tool
 
-function _s($str, $file = '', $t = 'en')
-{
+function _s($str, $file = '', $t = 'en') {
     // -----------------------------------------------------
     if ($t != 'en') {
         $strArr = [];
@@ -92,8 +91,7 @@ function _s($str, $file = '', $t = 'en')
 class db
 {
     // sends a query to the database and returns the result
-    public static function Query($strSQL): mysqli_result|bool
-    {
+    public static function Query($strSQL): mysqli_result|bool {
         // Guard against empty SQL
         if (!is_string($strSQL) || trim($strSQL) === '') {
             error_log('db::Query called with empty SQL');
@@ -119,26 +117,22 @@ class db
     }
 
     // fetches an array from the database result
-    public static function FetchArr($res, $dummy = ''): array|null|bool
-    {
+    public static function FetchArr($res, $dummy = ''): array|null|bool {
         return mysqli_fetch_array($res, MYSQLI_ASSOC);
     }
 
     // counts the rows in the database result
-    public static function CountRows($res): int|null|bool
-    {
+    public static function CountRows($res): int|null|bool {
         return mysqli_num_rows($res);
     }
 
     // counts the rows affected by the last query
-    public static function AffectedRows(): int|null|bool
-    {
+    public static function AffectedRows(): int|null|bool {
         return mysqli_affected_rows($GLOBALS['dbcon']);
     }
 
     // escapes a string for the database
-    public static function EscString($str): string
-    {
+    public static function EscString($str): string {
         // Handle null values
         if (is_null($str)) {
             return '';
@@ -170,23 +164,19 @@ class db
     }
 
     // returns the last inserted id
-    public static function LastId(): int|null|bool
-    {
+    public static function LastId(): int|null|bool {
         return mysqli_insert_id($GLOBALS['dbcon']);
     }
 
     // returns the last error message
-    public static function Error(): string|null|bool
-    {
+    public static function Error(): string|null|bool {
         return mysqli_error($GLOBALS['dbcon']);
     }
 
     // ------------------------------------------------- other base tools
     // removes special characters from a string
-    public static function sysString($inStr): string|null|bool
-    {
+    public static function sysString($inStr): string|null|bool {
         $outStr = preg_replace('([\ \n\r\t\v\f\b\'\"\<\>\*\$\&\;\[\]\{\}\(\)\:\,\!\?\;\.]+)', '', $inStr);
         return $outStr;
     }
-
 }

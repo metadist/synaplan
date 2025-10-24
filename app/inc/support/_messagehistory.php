@@ -20,8 +20,7 @@ class MessageHistory
      * @param array $filters Optional filters (keyword, hasAttachments, dateFrom, dateTo)
      * @return array Result with prompts, pagination info, and status
      */
-    public static function getUserPrompts($userId, $page = 1, $perPage = 15, $filters = [])
-    {
+    public static function getUserPrompts($userId, $page = 1, $perPage = 15, $filters = []) {
         $userId = intval($userId);
         $page = max(1, intval($page));
         $perPage = max(1, min(100, intval($perPage))); // Cap at 100
@@ -142,8 +141,7 @@ class MessageHistory
      * @param int $promptId Message ID of the user prompt
      * @return array Result with answers and status
      */
-    public static function getAnswersForPrompt($userId, $promptId)
-    {
+    public static function getAnswersForPrompt($userId, $promptId) {
         $userId = intval($userId);
         $promptId = intval($promptId);
 
@@ -206,8 +204,7 @@ class MessageHistory
      * @param int $answerId Message ID of the AI answer
      * @return array Result with answer details and status
      */
-    public static function getAnswerDetails($userId, $answerId)
-    {
+    public static function getAnswerDetails($userId, $answerId) {
         $userId = intval($userId);
         $answerId = intval($answerId);
 
@@ -254,8 +251,7 @@ class MessageHistory
      * @param int $userId User ID
      * @return array Statistics about the user's messages
      */
-    public static function getUserStats($userId)
-    {
+    public static function getUserStats($userId) {
         $userId = intval($userId);
 
         $sql = 'SELECT 

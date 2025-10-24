@@ -7,8 +7,7 @@ class BasicAI
     // ******************************************************************************************************
     // tool prompt
     // ******************************************************************************************************
-    public static function toolPrompt($msgArr, $stream = false): array|string|bool
-    {
+    public static function toolPrompt($msgArr, $stream = false): array|string|bool {
         $textArr = explode(' ', $msgArr['BTEXT']);
 
         if ($stream) {
@@ -34,7 +33,6 @@ class BasicAI
         $AIT2SmodelId = $GLOBALS['AI_TEXT2SOUND']['MODELID'];
 
         switch ($textArr[0]) {
-
             case '/aboutai':
                 ProcessMethods::$toolProcessed = false;
                 if ($msgArr['BFILE'] < 1) {
@@ -162,10 +160,7 @@ class BasicAI
     // ******************************************************************************************************
     // create a file from a text
     // ******************************************************************************************************
-    public static function errorAIcheck($msgArr, $errorText, $systemArr): array
-    {
-
-
+    public static function errorAIcheck($msgArr, $errorText, $systemArr): array {
         return $msgArr;
     }
 
@@ -173,8 +168,7 @@ class BasicAI
     // ******************************************************************************************************
     // create chunks of a big text to vectorize it
     // ******************************************************************************************************
-    public static function chunkify($content, $minChars = 80, $maxChars = 4096)
-    {
+    public static function chunkify($content, $minChars = 80, $maxChars = 4096) {
         $lines = explode("\n", $content);
         $chunks = [];
         $chunk = [];
@@ -221,8 +215,7 @@ class BasicAI
     // ******************************************************************************************************
     // get a prompt form the table BPROMPTS by user id or default and keyword
     // ******************************************************************************************************
-    public static function getApromptById($promptId)
-    {
+    public static function getApromptById($promptId) {
         $promptKey = 'general';
         $promptSQL = 'select * from BPROMPTS where BID='.intval($promptId);
         $promptRes = db::Query($promptSQL);
@@ -235,8 +228,7 @@ class BasicAI
     // ******************************************************************************************************
     // get a prompt form the table BPROMPTS by user id or default and keyword
     // ******************************************************************************************************
-    public static function getAprompt($keyword, $lang = 'en', $msgArr = [], $addInfos = true)
-    {
+    public static function getAprompt($keyword, $lang = 'en', $msgArr = [], $addInfos = true) {
         $arrPrompt = [];
 
         // CRITICAL FIX: Get user ID from message array first (for email/WhatsApp background processing)
@@ -340,8 +332,7 @@ class BasicAI
     // ******************************************************************************************************
     // get all prompts
     // ******************************************************************************************************
-    public static function getAllPrompts()
-    {
+    public static function getAllPrompts() {
         $prompts = [];
         $topicArr = [];
         $userId = $_SESSION['USERPROFILE']['BID'];
@@ -383,8 +374,7 @@ class BasicAI
     // ******************************************************************************************************
     // get all models
     // ******************************************************************************************************
-    public static function getAllModels()
-    {
+    public static function getAllModels() {
         $models = [];
         $userId = $_SESSION['USERPROFILE']['BID'];
 
@@ -402,8 +392,7 @@ class BasicAI
     // get the default model for a service (AIGroq, AIOllama, AIOpenAi, etc.) and the task you want to do,
     // like "vision", "soundcreate", "text", "pic2video", "code", "musiccreate", "voice2text", ...
     // ******************************************************************************************************
-    public static function getModel($service, $task): string
-    {
+    public static function getModel($service, $task): string {
         $model = '';
         switch ($service) {
             case 'AIGroq':
@@ -416,8 +405,7 @@ class BasicAI
     // ******************************************************************************************************
     // get the model details
     // ******************************************************************************************************
-    public static function getModelDetails($modelId): array
-    {
+    public static function getModelDetails($modelId): array {
         $mArr = [];
         $mSQL = 'select * from BMODELS where BID='.intval($modelId);
         $mRes = db::Query($mSQL);
@@ -430,8 +418,7 @@ class BasicAI
     // ******************************************************************************************************
     // update a prompt - save new or update existing, add tools config
     // ******************************************************************************************************
-    public static function updatePrompt($promptKey): array
-    {
+    public static function updatePrompt($promptKey): array {
         $userId = $_SESSION['USERPROFILE']['BID'];
 
         // Sanitize input data
@@ -525,8 +512,7 @@ class BasicAI
     // ******************************************************************************************************
     // delete a prompt
     // ******************************************************************************************************
-    public static function deletePrompt($promptKey): bool
-    {
+    public static function deletePrompt($promptKey): bool {
         $userId = $_SESSION['USERPROFILE']['BID'];
 
         // First, check if the prompt exists and get its ID (sanity check)
@@ -549,8 +535,7 @@ class BasicAI
     // ******************************************************************************************************
     // get prompt details
     // ******************************************************************************************************
-    public static function getPromptDetails($promptKey): array
-    {
+    public static function getPromptDetails($promptKey): array {
         $arrPrompt = [];
         $arrPrompt = self::getAprompt($promptKey, '%', [], false);
         $arrPrompt['SETTINGS'] = [];
@@ -576,8 +561,7 @@ class BasicAI
     // enable file search on a prompt with group filter
     // Creates user-specific copy if it's a default prompt (BOWNERID = 0)
     // ******************************************************************************************************
-    public static function enablePromptFileSearch($promptKey, $groupKey): array
-    {
+    public static function enablePromptFileSearch($promptKey, $groupKey): array {
         $retArr = ['error' => '', 'success' => false];
 
         try {
@@ -720,7 +704,6 @@ class BasicAI
             error_log("enablePromptFileSearch: SUCCESS - Prompt ID $targetPromptId updated with tool_files=1, tool_files_keyword=$groupKey");
 
             return $retArr;
-
         } catch (\Throwable $e) {
             error_log('Enable File Search Error: ' . $e->getMessage());
             $retArr['error'] = 'Failed to enable file search: ' . $e->getMessage();
@@ -730,8 +713,7 @@ class BasicAI
     // ******************************************************************************************************
     // update file search filter on existing prompt
     // ******************************************************************************************************
-    public static function updatePromptFileSearchFilter($promptKey, $groupKey): array
-    {
+    public static function updatePromptFileSearchFilter($promptKey, $groupKey): array {
         $retArr = ['error' => '', 'success' => false];
 
         try {
@@ -780,7 +762,6 @@ class BasicAI
             $retArr['message'] = 'File search filter updated to: ' . $groupKey;
 
             return $retArr;
-
         } catch (\Throwable $e) {
             error_log('Update File Search Filter Error: ' . $e->getMessage());
             $retArr['error'] = 'Failed to update filter: ' . $e->getMessage();
@@ -790,8 +771,7 @@ class BasicAI
     // ******************************************************************************************************
     // get the file sorting topics
     // ******************************************************************************************************
-    public static function getFileSortTopics(): array
-    {
+    public static function getFileSortTopics(): array {
         $groupKeys = [];
         $sql = 'SELECT DISTINCT BRAG.BGROUPKEY
                 FROM BMESSAGES
@@ -811,8 +791,7 @@ class BasicAI
     // ******************************************************************************************************
     // get the prompt summarized in short, if too long:
     // ******************************************************************************************************
-    public static function getShortPrompt($prompt): string
-    {
+    public static function getShortPrompt($prompt): string {
         $AISUMMARIZE = $GLOBALS['AI_SUMMARIZE']['SERVICE'];
         $prompt = $AISUMMARIZE::summarizePrompt($prompt);
         return $prompt;
@@ -821,8 +800,7 @@ class BasicAI
     // ******************************************************************************************************
     // get all file groups for the current user
     // ******************************************************************************************************
-    public static function getAllFileGroups(): array
-    {
+    public static function getAllFileGroups(): array {
         $groups = [];
         $userId = $_SESSION['USERPROFILE']['BID'];
 
@@ -850,8 +828,7 @@ class BasicAI
     // ******************************************************************************************************
     // change the group of a specific file
     // ******************************************************************************************************
-    public static function changeGroupOfFile($fileId, $newGroup): array
-    {
+    public static function changeGroupOfFile($fileId, $newGroup): array {
         $resArr = ['success' => false, 'error' => ''];
         $userId = $_SESSION['USERPROFILE']['BID'];
 
@@ -911,8 +888,7 @@ class BasicAI
     // ******************************************************************************************************
     // document summarization functionality
     // ******************************************************************************************************
-    public static function doDocSum(): array
-    {
+    public static function doDocSum(): array {
         $resArr = ['success' => false, 'error' => '', 'summary' => ''];
 
         try {
@@ -976,7 +952,6 @@ class BasicAI
 
             // --- execute the summarize model
             $resArr = $AISUMMARIZE::simplePrompt($systemPrompt, $documentText);
-
         } catch (Exception $e) {
             if ($GLOBALS['debug']) {
                 error_log('BasicAI::doDocSum - Error: ' . $e->getMessage());

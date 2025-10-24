@@ -62,7 +62,6 @@ try {
         $testResult['deletion_log'][] = 'BUSELOG deletion error: ' . $e->getMessage();
         $testResult['buselog_error'] = $e->getMessage();
     }
-
 } catch (\Throwable $e) {
     $testResult['error'] = 'Exception: ' . $e->getMessage();
 }
@@ -121,8 +120,7 @@ echo json_encode($testResult, JSON_PRETTY_PRINT);
 /**
  * Append test result to HTML report
  */
-function appendToReport($reportFile, $testResult, $testDuration)
-{
+function appendToReport($reportFile, $testResult, $testDuration) {
     $statusClass = $testResult['result'] ? 'status-success' : 'status-failed';
     $statusText = $testResult['result'] ? 'Passed' : 'Failed';
 
@@ -185,8 +183,7 @@ function appendToReport($reportFile, $testResult, $testDuration)
 /**
  * Close HTML report with summary section
  */
-function closeReport($reportFile)
-{
+function closeReport($reportFile) {
     $completedTime = date('Y-m-d H:i:s');
 
     // Add summary section

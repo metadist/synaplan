@@ -9,8 +9,7 @@ class Rasterizer
      * Rasterize PDF to PNG images and return absolute paths of generated PNGs.
      * Tries Imagick first, then falls back to pdftoppm.
      */
-    public static function pdfToPng(string $absolutePdfPath): array
-    {
+    public static function pdfToPng(string $absolutePdfPath): array {
         $dpi = ApiKeys::getRasterizeDpi();
         $pageCap = ApiKeys::getRasterizePageCap();
         $timeoutMs = ApiKeys::getRasterizeTimeoutMs();
@@ -75,8 +74,7 @@ class Rasterizer
         return $images;
     }
 
-    private static function ensureTempDir(): string
-    {
+    private static function ensureTempDir(): string {
         $dir = rtrim(UPLOAD_DIR, '/') . '/tmp';
         if (!is_dir($dir)) {
             @mkdir($dir, 0755, true);
@@ -84,8 +82,7 @@ class Rasterizer
         return $dir;
     }
 
-    private static function resolveTargetDir(string $absolutePdfPath): string
-    {
+    private static function resolveTargetDir(string $absolutePdfPath): string {
         $uploadBase = rtrim(UPLOAD_DIR, '/') . '/';
         // If the PDF is already inside the public uploads tree, write PNGs next to it
         if (strpos($absolutePdfPath, $uploadBase) === 0) {
@@ -99,8 +96,7 @@ class Rasterizer
         return self::ensureTempDir();
     }
 
-    private static function execWithTimeout(string $cmd, int $timeoutMs): void
-    {
+    private static function execWithTimeout(string $cmd, int $timeoutMs): void {
         $timeoutSec = max(1, (int)ceil($timeoutMs / 1000));
         $full = 'timeout ' . $timeoutSec . 's ' . $cmd . ' 2>&1';
         @exec($full, $out, $code);

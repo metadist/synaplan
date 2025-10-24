@@ -18,8 +18,7 @@ class OAuthConfig
      * Initialize the OAuth configuration
      * Loads credentials from environment variables or falls back to legacy files
      */
-    public static function init()
-    {
+    public static function init() {
         if (self::$initialized) {
             return;
         }
@@ -62,8 +61,7 @@ class OAuthConfig
      *
      * @return array|null Google OAuth credentials or null if not configured
      */
-    public static function getGoogleCredentials()
-    {
+    public static function getGoogleCredentials() {
         self::init();
         return self::$googleCredentials;
     }
@@ -73,8 +71,7 @@ class OAuthConfig
      *
      * @return array|null Gmail OAuth token or null if not configured
      */
-    public static function getGmailToken()
-    {
+    public static function getGmailToken() {
         self::init();
         return self::$gmailToken;
     }
@@ -85,8 +82,7 @@ class OAuthConfig
      * @param array $token Gmail OAuth token to save
      * @return bool True if successful
      */
-    public static function saveGmailToken($token)
-    {
+    public static function saveGmailToken($token) {
         self::init();
         self::$gmailToken = $token;
 
@@ -109,8 +105,7 @@ class OAuthConfig
      * @return Google_Client Configured Google Client instance
      * @throws Exception If credentials are not configured
      */
-    public static function createGoogleClient($redirectUri, $scopes = ['https://www.googleapis.com/auth/gmail.modify'])
-    {
+    public static function createGoogleClient($redirectUri, $scopes = ['https://www.googleapis.com/auth/gmail.modify']) {
         self::init();
 
         if (!self::$googleCredentials) {
@@ -149,8 +144,7 @@ class OAuthConfig
      *
      * @return array Array of missing or invalid configurations
      */
-    public static function validateConfig()
-    {
+    public static function validateConfig() {
         self::init();
         $issues = [];
 

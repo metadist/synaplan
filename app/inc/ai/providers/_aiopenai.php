@@ -20,8 +20,7 @@ class AIOpenAI
      * Debug logger - writes to local file for troubleshooting
      * Only logs when APP_DEBUG=true in .env
      */
-    private static function debugLog($message)
-    {
+    private static function debugLog($message) {
         if (empty($GLOBALS['debug'])) {
             return; // Skip logging if debug is disabled
         }
@@ -37,8 +36,7 @@ class AIOpenAI
      *
      * @return bool True if initialization is successful
      */
-    public static function init()
-    {
+    public static function init() {
         self::$key = ApiKeys::getOpenAI();
         if (!self::$key) {
             //if($GLOBALS["debug"]) error_log("OpenAI API key not configured");
@@ -59,8 +57,7 @@ class AIOpenAI
      * @param array $threadArr Conversation thread history
      * @return array|string|bool Sorting result or error message
      */
-    public static function sortingPrompt($msgArr, $threadArr): array|string|bool
-    {
+    public static function sortingPrompt($msgArr, $threadArr): array|string|bool {
         // prompt builder
         $systemPrompt = BasicAI::getAprompt('tools:sort');
         // Ensure client is initialized
@@ -143,8 +140,7 @@ class AIOpenAI
      * @param bool $stream Whether to use streaming mode
      * @return array|string|bool Topic-specific response or error message
      */
-    public static function topicPrompt($msgArr, $threadArr, $stream = false): array|string|bool
-    {
+    public static function topicPrompt($msgArr, $threadArr, $stream = false): array|string|bool {
         set_time_limit(3600);
         $systemPrompt = BasicAI::getAprompt($msgArr['BTOPIC'], $msgArr['BLANG'], $msgArr, true);
 
@@ -306,7 +302,6 @@ class AIOpenAI
                 self::debugLog('WEB/WA RESPONSE: BMESSTYPE=' . ($msgArr['BMESSTYPE'] ?? 'NOT_SET') . ' | BTEXT length=' . strlen($answer) . ' | BFILE=0');
 
                 return $arrAnswer;
-
             } else {
                 // EMAIL/BACKGROUND: Process collected answer as JSON
                 // The streaming API already gave us the complete answer in $answer variable
@@ -348,7 +343,6 @@ class AIOpenAI
                     $arrAnswer['BFILEPATH'] = '';
                     $arrAnswer['BFILETYPE'] = '';
                     $arrAnswer['BFILETEXT'] = '';
-
                 } else {
                     try {
                         $arrAnswer = json_decode($answer, true);
@@ -382,7 +376,6 @@ class AIOpenAI
                 self::debugLog('EMAIL FINAL RESPONSE (normalized): BTEXT length=' . strlen($arrAnswer['BTEXT'] ?? '') . ' | BFILE=' . $arrAnswer['BFILE']);
                 return $arrAnswer;
             }
-
         } catch (Exception $err) {
             return '*APItopic Error - Ralf made a bubu - please mail that to him: * ' . $err->getMessage();
         }
@@ -397,8 +390,7 @@ class AIOpenAI
      * @param array $msgArr Message array containing user information
      * @return array|string|bool Welcome message or error message
      */
-    public static function welcomePrompt($msgArr): array|string|bool
-    {
+    public static function welcomePrompt($msgArr): array|string|bool {
         $arrPrompt = BasicAI::getAprompt('tools:help');
         $systemPrompt = $arrPrompt['BPROMPT'];
 
@@ -431,8 +423,7 @@ class AIOpenAI
      * @param array $usrArr User array containing user information
      * @return array|bool Message array with file information or false on error
      */
-    public static function textToSpeech($msgArr, $usrArr): array | bool
-    {
+    public static function textToSpeech($msgArr, $usrArr): array | bool {
         // https://github.com/openai-php/client/issues/30
         $client = OpenAI::client(self::$key);
 
@@ -472,9 +463,7 @@ class AIOpenAI
      * @param bool $stream Whether to stream the response
      * @return array Message array with image file information
      */
-    public static function picPrompt($msgArr, $stream = false): array
-    {
-
+    public static function picPrompt($msgArr, $stream = false): array {
         if (!empty($GLOBALS['debug'])) {
             error_log('AIOpenAI::picPrompt: Starting image generation for msgId=' . $msgArr['BID']);
             error_log('AIOpenAI::picPrompt: Original text: ' . substr($msgArr['BTEXT'], 0, 100));
@@ -647,8 +636,7 @@ class AIOpenAI
      * @param array $arrMessage Message array containing image information
      * @return array|string|bool Image description or error message
      */
-    public static function explainImage($arrMessage): array|string|bool
-    {
+    public static function explainImage($arrMessage): array|string|bool {
         // Resize image if too large
         $absFile = rtrim(UPLOAD_DIR, '/').'/'.$arrMessage['BFILEPATH'];
         if (filesize($absFile) > intval(1024 * 1024 * 3.5)) {
@@ -689,8 +677,7 @@ class AIOpenAI
      * @param array $arrMessage Message array containing audio file information
      * @return array|string|bool Transcription text or error message
      */
-    public static function mp3ToText($arrMessage): array|string|bool
-    {
+    public static function mp3ToText($arrMessage): array|string|bool {
         $client = self::$client;
         try {
             $transcription = $client->audio()->transcriptions()->create([
@@ -700,7 +687,6 @@ class AIOpenAI
             ]);
 
             $fullText = $transcription;
-
         } catch (Exception $e) {
             $fullText = 'Error: ' . $e->getMessage();
         }
@@ -717,8 +703,7 @@ class AIOpenAI
      * @param string $sourceText Field containing text to translate (optional)
      * @return array Translated message array
      */
-    public static function translateTo($msgArr, $lang = '', $sourceText = 'BTEXT'): array
-    {
+    public static function translateTo($msgArr, $lang = '', $sourceText = 'BTEXT'): array {
         $targetLang = $msgArr['BLANG'];
 
         if (strlen($lang) == 2) {
@@ -817,8 +802,7 @@ class AIOpenAI
      * Summarizes a given text using OpenAI's summarization capabilities.
      *
     */
-    public static function summarizePrompt($text): string
-    {
+    public static function summarizePrompt($text): string {
         $client = self::$client;
         $arrMessages = [
             ['role' => 'system', 'content' => 'You summarize the text of the user to a short 2-3 sentence summary. Do not add any other text, just the essence of the text. Stay under 128 characters. Answer in the language of the text.'],
@@ -848,8 +832,7 @@ class AIOpenAI
      * @param bool $stream Whether to stream progress updates
      * @return array Result array with file information or error message
      */
-    public static function createOfficeFile($msgArr, $usrArr, $stream = false): array
-    {
+    public static function createOfficeFile($msgArr, $usrArr, $stream = false): array {
         $creatorPrompt = $msgArr['BTEXT'];
         $result = [
             'success' => false,
@@ -1254,7 +1237,6 @@ class AIOpenAI
             }
 
             return $result;
-
         } catch (Exception $e) {
             $result['error'] = 'Exception: ' . $e->getMessage();
             if ($isLocalhost) {
@@ -1276,8 +1258,7 @@ class AIOpenAI
      * @param string &$containerId Reference to store container ID
      * @param string &$fileId Reference to store file ID
      */
-    private static function extractFileIds($response, &$containerId, &$fileId)
-    {
+    private static function extractFileIds($response, &$containerId, &$fileId) {
         // Recursively search for container_file_citation objects
         self::searchForFileCitation($response, $containerId, $fileId);
     }
@@ -1289,8 +1270,7 @@ class AIOpenAI
      * @param string &$containerId Reference to store container ID
      * @param string &$fileId Reference to store file ID
      */
-    private static function searchForFileCitation($data, &$containerId, &$fileId)
-    {
+    private static function searchForFileCitation($data, &$containerId, &$fileId) {
         if (is_array($data)) {
             foreach ($data as $key => $value) {
                 if ($key === 'type' && $value === 'container_file_citation') {
@@ -1319,8 +1299,7 @@ class AIOpenAI
      * @param array $headers The headers to use
      * @return string|false The file content or false on failure
      */
-    private static function downloadFile($url, $headers)
-    {
+    private static function downloadFile($url, $headers) {
         $ch = curl_init();
         curl_setopt($ch, CURLOPT_URL, $url);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
@@ -1344,8 +1323,7 @@ class AIOpenAI
      * @param string $prompt The creation prompt
      * @return string The file extension
      */
-    private static function determineFileExtension($prompt)
-    {
+    private static function determineFileExtension($prompt) {
         $prompt = strtolower($prompt);
 
         if (strpos($prompt, 'powerpoint') !== false || strpos($prompt, 'ppt') !== false) {
@@ -1368,8 +1346,7 @@ class AIOpenAI
      * @param array $response The response array
      * @return string|false The extracted text content or false on failure
      */
-    private static function extractTextContent($response)
-    {
+    private static function extractTextContent($response) {
         // Check if we're on localhost for debug logging
         $isLocalhost = in_array($_SERVER['HTTP_HOST'] ?? '', ['localhost', '127.0.0.1', '::1']) ||
                       (isset($_SERVER['SERVER_NAME']) && in_array($_SERVER['SERVER_NAME'], ['localhost', '127.0.0.1', '::1']));
@@ -1385,11 +1362,9 @@ class AIOpenAI
             foreach ($response['output'] as $output) {
                 if (isset($output['type']) && $output['type'] === 'message' &&
                     isset($output['content']) && is_array($output['content'])) {
-
                     foreach ($output['content'] as $content) {
                         if (isset($content['type']) && $content['type'] === 'output_text' &&
                             isset($content['text'])) {
-
                             if ($isLocalhost) {
                                 if ($GLOBALS['debug']) {
                                     error_log('DEBUG extractTextContent: Found text content in output_text');
@@ -1440,8 +1415,7 @@ class AIOpenAI
      * @param bool $stream Whether to stream progress updates
      * @return array|string|bool Analysis result or error message
      */
-    public static function analyzeFile($msgArr, $stream = false): array|string|bool
-    {
+    public static function analyzeFile($msgArr, $stream = false): array|string|bool {
         // Check if file exists and is actually a file
         $filePath = __DIR__ . '/../up/' . $msgArr['BFILEPATH'];
 
@@ -1471,7 +1445,6 @@ class AIOpenAI
         }
 
         $client = self::$client;
-
     }
 
     /**
@@ -1484,8 +1457,7 @@ class AIOpenAI
      * @param string $userPrompt The user's input/prompt
      * @return array Response array with success status and result/error
      */
-    public static function simplePrompt($systemPrompt, $userPrompt): array
-    {
+    public static function simplePrompt($systemPrompt, $userPrompt): array {
         $client = self::$client;
 
         $arrMessages = [
@@ -1508,7 +1480,6 @@ class AIOpenAI
                 'success' => true,
                 'summary' => $result
             ];
-
         } catch (Exception $err) {
             return [
                 'success' => false,

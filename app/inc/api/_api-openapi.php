@@ -6,8 +6,7 @@ require_once(__DIR__ . '/_openaiapi.php');
 
 class ApiOpenAPI
 {
-    public static function handle($requestPath, $method, $rawBody)
-    {
+    public static function handle($requestPath, $method, $rawBody) {
         // Match exact /v1/* paths
         if ($requestPath === '/v1/chat/completions' && $method === 'POST') {
             $payload = [];

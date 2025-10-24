@@ -23,8 +23,7 @@ class AIAnthropic
      *
      * @return bool True if initialization is successful
      */
-    public static function init()
-    {
+    public static function init() {
         self::$key = ApiKeys::getAnthropic();
         if (!self::$key) {
             //if($GLOBALS["debug"]) error_log("Anthropic API key not configured");
@@ -42,8 +41,7 @@ class AIAnthropic
      * @param bool $stream Whether this is a streaming request
      * @return array|string Response data or error message
      */
-    private static function makeRequest($endpoint, $data = [], $method = 'POST', $stream = false)
-    {
+    private static function makeRequest($endpoint, $data = [], $method = 'POST', $stream = false) {
         $url = self::$baseUrl . $endpoint;
 
         $headers = [
@@ -106,8 +104,7 @@ class AIAnthropic
      * @param array $threadArr Conversation thread history
      * @return array|string|bool Sorting result or error message
      */
-    public static function sortingPrompt($msgArr, $threadArr): array|string|bool
-    {
+    public static function sortingPrompt($msgArr, $threadArr): array|string|bool {
         $systemPrompt = BasicAI::getAprompt('tools:sort');
 
         $messages = [
@@ -186,8 +183,7 @@ class AIAnthropic
      * @param bool $stream Whether to use streaming mode
      * @return array|string|bool Topic-specific response or error message
      */
-    public static function topicPrompt($msgArr, $threadArr, $stream = false): array|string|bool
-    {
+    public static function topicPrompt($msgArr, $threadArr, $stream = false): array|string|bool {
         set_time_limit(3600);
         $systemPrompt = BasicAI::getAprompt($msgArr['BTOPIC'], $msgArr['BLANG'], $msgArr, true);
 
@@ -302,8 +298,7 @@ class AIAnthropic
      * @param array $msgArr Message array
      * @return array Response array
      */
-    private static function handleStreamingRequest($requestData, $msgArr)
-    {
+    private static function handleStreamingRequest($requestData, $msgArr) {
         $requestData['stream'] = true;
 
         $url = self::$baseUrl . '/messages';
@@ -383,8 +378,7 @@ class AIAnthropic
      * @param array $msgArr Message array containing user information
      * @return array|string|bool Welcome message or error message
      */
-    public static function welcomePrompt($msgArr): array|string|bool
-    {
+    public static function welcomePrompt($msgArr): array|string|bool {
         $arrPrompt = BasicAI::getAprompt('tools:help');
         $systemPrompt = $arrPrompt['BPROMPT'];
 
@@ -423,8 +417,7 @@ class AIAnthropic
      * @param array $usrArr User array containing user information
      * @return array|bool Message array with file information or false on error
      */
-    public static function textToSpeech($msgArr, $usrArr): array | bool
-    {
+    public static function textToSpeech($msgArr, $usrArr): array | bool {
         // Anthropic doesn't have a direct TTS API like OpenAI
         // This would need to be implemented using a different service
         // For now, return false to indicate not supported
@@ -441,8 +434,7 @@ class AIAnthropic
      * @param bool $stream Whether to stream the response
      * @return array Message array with image file information
      */
-    public static function picPrompt($msgArr, $stream = false): array
-    {
+    public static function picPrompt($msgArr, $stream = false): array {
         // Anthropic doesn't have image generation like DALL-E
         // This would need to be implemented using a different service
         // For now, return an error message
@@ -460,8 +452,7 @@ class AIAnthropic
      * @param array $arrMessage Message array containing image information
      * @return array|string|bool Image description or error message
      */
-    public static function explainImage($arrMessage): array|string|bool
-    {
+    public static function explainImage($arrMessage): array|string|bool {
         // Resize image if too large
         if (filesize(rtrim(UPLOAD_DIR, '/').'/'.$arrMessage['BFILEPATH']) > intval(1024 * 1024 * 3.5)) {
             $imageFile = Tools::giveSmallImage($arrMessage['BFILEPATH'], false, 1200);
@@ -535,8 +526,7 @@ class AIAnthropic
      * @param array $arrMessage Message array containing audio file information
      * @return array|string|bool Transcription text or error message
      */
-    public static function mp3ToText($arrMessage): array|string|bool
-    {
+    public static function mp3ToText($arrMessage): array|string|bool {
         // Anthropic doesn't have audio transcription like Whisper
         // This would need to be implemented using a different service
         // For now, return an error message
@@ -554,8 +544,7 @@ class AIAnthropic
      * @param string $sourceText Field containing text to translate (optional)
      * @return array Translated message array
      */
-    public static function translateTo($msgArr, $lang = '', $sourceText = 'BTEXT'): array
-    {
+    public static function translateTo($msgArr, $lang = '', $sourceText = 'BTEXT'): array {
         $targetLang = $msgArr['BLANG'];
 
         if (strlen($lang) == 2) {
@@ -604,8 +593,7 @@ class AIAnthropic
      * @param string $text Text to summarize
      * @return string Summarized text
      */
-    public static function summarizePrompt($text): string
-    {
+    public static function summarizePrompt($text): string {
         $messages = [
             [
                 'role' => 'user',
@@ -644,8 +632,7 @@ class AIAnthropic
      * @param bool $stream Whether to stream progress updates
      * @return array Result array with file information or error message
      */
-    public static function createOfficeFile($msgArr, $usrArr, $stream = false): array
-    {
+    public static function createOfficeFile($msgArr, $usrArr, $stream = false): array {
         // Anthropic doesn't have file generation like OpenAI's code interpreter
         // This would need to be implemented using a different service
         return [
@@ -664,8 +651,7 @@ class AIAnthropic
      * @param string $userPrompt The user's input/prompt
      * @return array Response array with success status and result/error
      */
-    public static function simplePrompt($systemPrompt, $userPrompt): array
-    {
+    public static function simplePrompt($systemPrompt, $userPrompt): array {
         $messages = [
             ['role' => 'user', 'content' => $systemPrompt],
             ['role' => 'user', 'content' => $userPrompt]
@@ -710,8 +696,7 @@ class AIAnthropic
      * @param bool $stream Whether to stream progress updates
      * @return array|string|bool Analysis result or error message
      */
-    public static function analyzeFile($msgArr, $stream = false): array|string|bool
-    {
+    public static function analyzeFile($msgArr, $stream = false): array|string|bool {
         // Check if file exists and is actually a file
         $filePath = __DIR__ . '/../up/' . $msgArr['BFILEPATH'];
 

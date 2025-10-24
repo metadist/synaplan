@@ -21,8 +21,7 @@ class AIGoogle
      *
      * @return bool True on successful initialization
      */
-    public static function init()
-    {
+    public static function init() {
         self::$key = ApiKeys::getGoogleGemini();
         if (!self::$key) {
             //if($GLOBALS["debug"]) error_log("Google Gemini API key not configured");
@@ -45,8 +44,7 @@ class AIGoogle
      * @param array $threadArr Conversation thread history for context
      * @return array|string|bool Sorting result as JSON string or error message
      */
-    public static function sortingPrompt($msgArr, $threadArr): array|string|bool
-    {
+    public static function sortingPrompt($msgArr, $threadArr): array|string|bool {
         // Get prompts from BasicAI
         $systemPrompt = BasicAI::getAprompt('tools:sort');
 
@@ -155,8 +153,7 @@ class AIGoogle
      * @param array $threadArr Thread context for conversation history
      * @return array|string|bool Topic-specific response as array or text, or error message
      */
-    public static function topicPrompt($msgArr, $threadArr, $stream = false): array|string|bool
-    {
+    public static function topicPrompt($msgArr, $threadArr, $stream = false): array|string|bool {
         $systemPrompt = BasicAI::getAprompt($msgArr['BTOPIC'], $msgArr['BLANG'], $msgArr, true);
 
         if (isset($systemPrompt['TOOLS'])) {
@@ -378,8 +375,7 @@ class AIGoogle
      * @param array $msgArr Message array containing user information and language preferences
      * @return array|string|bool Welcome message or placeholder message
      */
-    public static function welcomePrompt($msgArr): array|string|bool
-    {
+    public static function welcomePrompt($msgArr): array|string|bool {
         // TODO: Implement welcome message generation using Google Gemini
         return 'Welcome prompt not implemented for Google AI yet.';
     }
@@ -397,8 +393,7 @@ class AIGoogle
      * @param array $arrMessage Message array containing image information and metadata
      * @return array|string|bool Image description with updated BFILETEXT field or error message
      */
-    public static function explainImage($arrMessage): array|string|bool
-    {
+    public static function explainImage($arrMessage): array|string|bool {
         // Check if we have a file path
         if (empty($arrMessage['BFILEPATH'])) {
             $arrMessage['BFILETEXT'] = 'Error: No image file path provided';
@@ -518,8 +513,7 @@ class AIGoogle
      * @param array $arrMessage Message array containing audio file information and metadata
      * @return array|string|bool Transcription text or placeholder message
      */
-    public static function mp3ToText($arrMessage): array|string|bool
-    {
+    public static function mp3ToText($arrMessage): array|string|bool {
         // TODO: Implement audio transcription using Google Gemini
         return 'Audio transcription not implemented for Google AI yet.';
     }
@@ -539,8 +533,7 @@ class AIGoogle
      * @param string $sourceText Field name containing text to translate (optional, defaults to 'BTEXT')
      * @return array Translated message array with updated content
      */
-    public static function translateTo($msgArr, $lang = '', $sourceText = 'BTEXT'): array
-    {
+    public static function translateTo($msgArr, $lang = '', $sourceText = 'BTEXT'): array {
         // TODO: Implement translation using Google Gemini
         return $msgArr;
     }
@@ -557,8 +550,7 @@ class AIGoogle
      * @param string $text The text content to summarize
      * @return string Summarized text or error message
      */
-    public static function summarizePrompt($text): string
-    {
+    public static function summarizePrompt($text): string {
         // Get the model from configuration
         $myModel = $GLOBALS['AI_SUMMARIZE']['MODEL'];
 
@@ -612,8 +604,7 @@ class AIGoogle
      * @param array $msgArr Message array containing the image generation prompt and user information
      * @return array Updated message array with generated image file information or error details
      */
-    public static function picPrompt($msgArr): array
-    {
+    public static function picPrompt($msgArr): array {
         // Load API key
         $usrArr = Central::getUsrById($msgArr['BUSERID']);
 
@@ -692,8 +683,7 @@ class AIGoogle
      * @param array $msgArr Message array containing text content and user information
      * @return array Result array with audio file information or empty array if not implemented
      */
-    public static function textToSpeech($msgArr): array
-    {
+    public static function textToSpeech($msgArr): array {
         $resArr = [];
         $usrArr = Central::getUsrById($msgArr['BUSERID']);
         return $resArr;
@@ -713,8 +703,7 @@ class AIGoogle
      * @param bool $stream Whether to provide streaming updates during generation (optional, defaults to false)
      * @return array Updated message array with generated video file information or error details
      */
-    public static function createVideo($msgArr, $stream = false): array
-    {
+    public static function createVideo($msgArr, $stream = false): array {
         $debug = !empty($GLOBALS['debug']) ? true : false;
         $startTime = microtime(true);
         // Load user data
@@ -962,7 +951,6 @@ class AIGoogle
                     $extra = $debug ? (' (lastError=' . ($lastError !== '' ? $lastError : 'none') . ')') : '';
                     $msgArr['BFILETEXT'] = 'Error: Video generation timeout after ' . ($maxAttempts * 5) . ' seconds.' . $extra;
                 }
-
             } catch (Exception $err) {
                 $msgArr['BFILEPATH'] = '';
                 $extra = '';
@@ -993,8 +981,7 @@ class AIGoogle
      * @param bool $stream Whether to provide streaming updates during processing (optional, defaults to false)
      * @return array Updated message array with file analysis results or error details
      */
-    public static function analyzeFile($msgArr, $stream = false): array
-    {
+    public static function analyzeFile($msgArr, $stream = false): array {
         // Check if file exists and is actually a file
         $filePath = rtrim(UPLOAD_DIR, '/').'/' . $msgArr['BFILEPATH'];
 
@@ -1264,11 +1251,9 @@ class AIGoogle
                     ];
                     Frontend::printToStream($update);
                 }
-
             } else {
                 throw new Exception('Analysis failed: ' . json_encode($analyzeResponse, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
             }
-
         } catch (Exception $err) {
             $errorMessage = 'File analysis error: ' . $err->getMessage();
             if ($GLOBALS['debug']) {
@@ -1301,8 +1286,7 @@ class AIGoogle
      * @param string $userPrompt The user's input/prompt
      * @return array Response array with success status and result/error
      */
-    public static function simplePrompt($systemPrompt, $userPrompt): array
-    {
+    public static function simplePrompt($systemPrompt, $userPrompt): array {
         // Get the model from configuration
         $myModel = $GLOBALS['AI_SUMMARIZE']['MODEL'];
 
@@ -1339,7 +1323,6 @@ class AIGoogle
             } else {
                 throw new Exception('Invalid response format: ' . json_encode($response));
             }
-
         } catch (Exception $err) {
             return [
                 'success' => false,
