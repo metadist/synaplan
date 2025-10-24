@@ -637,10 +637,28 @@ class ProcessMethods
                     if ($setting['BTOKEN'] === 'tool_files' && $setting['BVALUE'] == '1') {
                         $searchArr   = self::$msgArr;
                         $ragArr      = Tools::searchRAG($searchArr);
+                        
+                        // Debug logging (only if APP_DEBUG=true)
+                        if (!empty($GLOBALS['debug'])) {
+                            $debugFile = __DIR__ . '/../../public/debug_websearch.log';
+                            $timestamp = date('Y-m-d H:i:s');
+                            file_put_contents($debugFile, "[$timestamp] RAG SEARCH: Found " . count($ragArr) . " files | BTOPIC=" . self::$msgArr['BTOPIC'] . " | BMESSTYPE=" . self::$answerMethod . "\n", FILE_APPEND);
+                            if (count($ragArr) > 0) {
+                                foreach ($ragArr as $idx => $ragItem) {
+                                    $preview = isset($ragItem['BTEXT']) ? substr($ragItem['BTEXT'], 0, 100) : 'NO_TEXT';
+                                    file_put_contents($debugFile, "[$timestamp]   RAG[$idx]: " . ($ragItem['BFILEPATH'] ?? 'NO_PATH') . " | Preview: $preview\n", FILE_APPEND);
+                                }
+                            }
+                        }
+                        
                         if (self::$stream) {
                             Frontend::statusToStream(self::$msgId, 'pre', 'RAG Search: ' . count($ragArr) . ' files... ');
                         }
                         self::$threadArr = array_merge(self::$threadArr, $ragArr);
+                        
+                        if (!empty($GLOBALS['debug'])) {
+                            file_put_contents($debugFile, "[$timestamp] RAG MERGED: Total thread items now: " . count(self::$threadArr) . "\n", FILE_APPEND);
+                        }
                     }
 
                     // aiModel-Override pro Prompt
