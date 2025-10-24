@@ -26,22 +26,30 @@ if (isset($_REQUEST['action'])) {
             exit; // Should redirect, but exit as backup
             break;
         case 'login':
-            if (Frontend::myCFcaptcha()) {
+            // Verify reCAPTCHA v3 token
+            $recaptchaToken = isset($_REQUEST['g-recaptcha-response']) ? $_REQUEST['g-recaptcha-response'] : '';
+            $captchaResult = UserRegistration::verifyRecaptcha($recaptchaToken, 'login', 0.5);
+
+            if ($captchaResult['success']) {
                 $success = Frontend::setUserFromWebLogin();
             } else {
                 $success = false;
-                $_SESSION['cf_captcha_error'] = true;
+                $_SESSION['recaptcha_error'] = true;
             }
             break;
         case 'register':
-            if (Frontend::myCFcaptcha()) {
+            // Verify reCAPTCHA v3 token
+            $recaptchaToken = isset($_REQUEST['g-recaptcha-response']) ? $_REQUEST['g-recaptcha-response'] : '';
+            $captchaResult = UserRegistration::verifyRecaptcha($recaptchaToken, 'register', 0.5);
+
+            if ($captchaResult['success']) {
                 $result = UserRegistration::registerNewUser();
                 $_SESSION['registration_result'] = $result;
             } else {
-                $result = false;
-                $_SESSION['cf_captcha_error'] = true;
+                $result = ['success' => false, 'error' => 'Security verification failed'];
+                $_SESSION['recaptcha_error'] = true;
+                $_SESSION['registration_result'] = $result;
             }
-            $_SESSION['registration_result'] = $result;
             break;
         case 'logout':
             handleLogout();

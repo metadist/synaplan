@@ -17,6 +17,20 @@ class AIOpenAI
     private static $client;
 
     /**
+     * Debug logger - writes to local file for troubleshooting
+     * Only logs when APP_DEBUG=true in .env
+     */
+    private static function debugLog($message)
+    {
+        if (empty($GLOBALS['debug'])) {
+            return; // Skip logging if debug is disabled
+        }
+        $logFile = __DIR__ . '/../../../public/debug_openai.log';
+        $timestamp = date('Y-m-d H:i:s');
+        file_put_contents($logFile, "[$timestamp] $message\n", FILE_APPEND);
+    }
+
+    /**
      * Initialize the OpenAI client
      *
      * Loads the API key from the centralized configuration and creates a new OpenAI client instance
@@ -135,32 +149,45 @@ class AIOpenAI
         $systemPrompt = BasicAI::getAprompt($msgArr['BTOPIC'], $msgArr['BLANG'], $msgArr, true);
 
         $client = self::$client;
-        if ($stream) {
+
+        // Determine if this is an email message that needs JSON handling
+        $isEmailMessage = isset($msgArr['BMESSTYPE']) && $msgArr['BMESSTYPE'] === 'MAIL';
+        
+        // UNIFIED API with smart prompt selection:
+        // - Web chat ($stream=true): Simple prompt, plain text
+        // - Email (BMESSTYPE=MAIL): JSON prompt with BFILE instructions
+        // - WhatsApp (BMESSTYPE=WA): Simple prompt, plain text
+        if ($stream || !$isEmailMessage) {
+            // Web chat OR WhatsApp: Simple prompt, plain text
             $arrMessages = [
                 ['role' => 'system', 'content' => 'You are the Synaplan.com AI assistant. Please answer in the language of the user.'],
             ];
         } else {
+            // Email only: Full JSON prompt with BFILE instructions
             $arrMessages = [
                 ['role' => 'system', 'content' => $systemPrompt['BPROMPT']],
             ];
         }
+
         // Build message history
         foreach ($threadArr as $msg) {
             $role = 'user';
             if ($msg['BDIRECT'] == 'OUT') {
                 $role = 'assistant';
             }
-            $arrMessages[] = ['role' => $role, 'content' => '['.$msg['BDATETIME'].']: '.$msg['BTEXT']];
+            $arrMessages[] = ['role' => 'user', 'content' => '['.$msg['BDATETIME'].']: '.$msg['BTEXT']];
         }
 
         // Add current message
-        if ($stream) {
+        if ($stream || !$isEmailMessage) {
+            // Web chat OR WhatsApp: Plain text input
             $msgText = $msgArr['BTEXT'];
             if (strlen($msgArr['BFILETEXT']) > 1) {
                 $msgText .= "\n\n\n---\n\n\nUser provided a file: ".$msgArr['BFILETYPE'].", saying: '".$msgArr['BFILETEXT']."'\n\n";
             }
             $arrMessages[] = ['role' => 'user', 'content' => $msgText];
         } else {
+            // Email only: JSON-encoded input
             $msgText = json_encode($msgArr, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
             $arrMessages[] = ['role' => 'user', 'content' => $msgText];
         }
@@ -168,149 +195,121 @@ class AIOpenAI
         // Respect preselected globals for model (provider already chosen upstream)
         $myModel = $GLOBALS['AI_CHAT']['MODEL'];
 
-        //error_log(" *************** OPENAI call - response object:" . date("Y-m-d H:i:s"));
-        // now ask the AI and give the stream out or the result when done!
+        // ========================================================================
+        // UNIFIED STREAMING APPROACH: Always use streaming API
+        // - Same API, same config, same everything
+        // - ONLY difference: $stream controls if we output to frontend
+        // - NO built-in web search - we use our own BFILE=10 system
+        // ========================================================================
         try {
-            if ($stream) {
-                // Use streaming mode - simplified
-                $stream = $client->responses()->createStreamed([
-                    'model' => $myModel,
-                    'tools' => [
-                        [
-                            'type' => 'web_search_preview',
-                            'search_context_size' => 'low'
-                        ]
-                    ],
-                    'input' => $arrMessages,
-                    'tool_choice' => 'auto',
-                    'parallel_tool_calls' => true,
-                    'store' => true,
-                    'metadata' => [
-                        'user_id' => (string)$msgArr['BUSERID'],
-                        'session_id' => (string)$msgArr['BTRACKID']
-                    ]
-                ]);
+            // ALWAYS use streaming API without built-in web search
+            // Our own web search system (BFILE=10 + Brave API) is more reliable
+            $responseStream = $client->responses()->createStreamed([
+                'model' => $myModel,
+                'input' => $arrMessages,
+                'store' => true,
+                'metadata' => [
+                    'user_id' => (string)$msgArr['BUSERID'],
+                    'session_id' => (string)$msgArr['BTRACKID']
+                ]
+            ]);
 
-                $answer = '';
+            $answer = '';
+            $chunkCount = 0;
+            $eventTypes = [];
 
-                foreach ($stream as $response) {
-                    // Handle text delta events - stream the difference
-                    if ($response->event === 'response.output_text.delta') {
-                        // Try to access delta text directly from the response object
-                        $textChunk = '';
+            // Process streaming response
+            foreach ($responseStream as $response) {
+                // Track event types for debugging
+                if (!in_array($response->event, $eventTypes)) {
+                    $eventTypes[] = $response->event;
+                }
 
-                        $repArr = $response->toArray();
+                // Handle text delta events - collect chunks
+                if ($response->event === 'response.output_text.delta') {
+                    $textChunk = '';
+                    $repArr = $response->toArray();
 
-                        // Try different ways to access delta text
-                        if (isset($repArr['data']['delta'])) {
-                            $textChunk = $repArr['data']['delta'];
-                            // Debug: log the response structure on localhost
-                            if (isset($_SERVER['HTTP_HOST']) && in_array($_SERVER['HTTP_HOST'], ['localhost', '127.0.0.1']) && 1 == 2) {
-                                if ($GLOBALS['debug']) {
-                                    error_log('DEBUG: Response structure: ' . print_r($response->toArray(), true));
-                                }
-                            }
-                        }
+                    // Extract delta text
+                    if (isset($repArr['data']['delta'])) {
+                        $textChunk = $repArr['data']['delta'];
+                    }
 
-                        // Only stream non-empty chunks
-                        if (!empty($textChunk)) {
-                            if ($GLOBALS['debug']) {
-                                error_log('DEBUG: Streaming chunk: ' . $textChunk);
-                            }
-                            $answer .= $textChunk;
-                            // Stream the chunk to frontend
+                    // Collect chunk (always)
+                    if (!empty($textChunk)) {
+                        $answer .= $textChunk;
+                        $chunkCount++;
+
+                        // Stream to frontend ONLY if $stream=true (web chat)
+                        if ($stream) {
                             Frontend::statusToStream($msgArr['BID'], 'ai', $textChunk);
                         }
                     }
+                }
 
-                    // Handle text done events - might contain final text
-                    if ($response->event === 'response.output_text.done') {
-                        // Debug: log the response structure on localhost
-                        if (isset($_SERVER['HTTP_HOST']) && in_array($_SERVER['HTTP_HOST'], ['localhost', '127.0.0.1']) && 1 == 2) {
-                            if ($GLOBALS['debug']) {
-                                error_log('DEBUG: Response event: ' . $response->event);
-                            }
-                            if ($GLOBALS['debug']) {
-                                error_log('DEBUG: Response structure: ' . print_r($response->toArray(), true));
-                            }
-                        }
-                        // Try to access final text
-                        if (isset($response->text)) {
-                            $finalText = $response->text;
-                            // If we don't have accumulated text, use the final text
-                            if (empty($answer)) {
-                                $answer = $finalText;
-                            }
+                // Handle text done events - try to get complete text
+                if ($response->event === 'response.output_text.done') {
+                    $repArr = $response->toArray();
+
+                    // Try multiple ways to get the complete text
+                    if (isset($response->text) && !empty($response->text)) {
+                        // If we haven't collected chunks, use this complete text
+                        if (empty($answer)) {
+                            $answer = $response->text;
+                            self::debugLog('TEXT FROM DONE EVENT: Using response->text, length=' . strlen($answer));
                         }
                     }
 
-                    // Handle errors
-                    if ($response->event === 'error') {
-                        return '*API topic Error - Streaming failed: ' . $response->message;
+                    // Also check in the array structure
+                    if (empty($answer) && isset($repArr['text'])) {
+                        $answer = $repArr['text'];
+                        self::debugLog("TEXT FROM DONE ARRAY: Using repArr['text'], length=" . strlen($answer));
                     }
                 }
-                // error_log("***************** DEBUG: Streaming done - answer: ".$answer);
-                // **************************************************************************************************
-                // ** return a different way to the rest of the process
+
+                // Handle errors
+                if ($response->event === 'error') {
+                    self::debugLog('STREAMING ERROR: ' . $response->message);
+                    return '*API topic Error - Streaming failed: ' . $response->message;
+                }
+            }
+
+            // Log streaming completion
+            self::debugLog('STREAMING COMPLETE: stream=' . ($stream ? 'true' : 'false') . ' | chunks=' . $chunkCount . ' | answer_length=' . strlen($answer) . ' | events=' . implode(',', $eventTypes));
+
+            // If we got no answer at all, log a warning
+            if (empty($answer)) {
+                self::debugLog('WARNING: No answer collected from streaming API! This will result in empty email. Events received: ' . implode(',', $eventTypes));
+            }
+
+            // ========================================================================
+            // Process the complete answer based on message type
+            // ========================================================================
+
+            if ($stream || !$isEmailMessage) {
+                // WEB CHAT or WHATSAPP: Plain text response, simple array
                 $arrAnswer = $msgArr;
                 $arrAnswer['BTEXT'] = $answer;
                 $arrAnswer['BDIRECT'] = 'OUT';
                 $arrAnswer['BDATETIME'] = date('Y-m-d H:i:s');
                 $arrAnswer['BUNIXTIMES'] = time();
-
-                // Clear file-related fields since there's no valid JSON
                 $arrAnswer['BFILE'] = 0;
                 $arrAnswer['BFILEPATH'] = '';
                 $arrAnswer['BFILETYPE'] = '';
                 $arrAnswer['BFILETEXT'] = '';
-
-                // Add model information to the response
                 $arrAnswer['_USED_MODEL'] = $myModel;
                 $arrAnswer['_AI_SERVICE'] = 'AIOpenAI';
-
-                // avoid double output to the chat window
                 $arrAnswer['ALREADYSHOWN'] = true;
+                
+                self::debugLog('WEB/WA RESPONSE: BMESSTYPE=' . ($msgArr['BMESSTYPE'] ?? 'NOT_SET') . ' | BTEXT length=' . strlen($answer) . ' | BFILE=0');
 
                 return $arrAnswer;
 
             } else {
-                // Use non-streaming mode (existing logic)
-                $chat = $client->responses()->create([
-                    'model' => $myModel,
-                    'tools' => [
-                        [
-                            'type' => 'web_search_preview',
-                            'search_context_size' => 'low'
-                        ]
-                    ],
-                    'input' => $arrMessages,
-                    'tool_choice' => 'auto',
-                    'parallel_tool_calls' => true,
-                    'store' => true,
-                    'metadata' => [
-                        'user_id' => (string)$msgArr['BUSERID'],
-                        'session_id' => (string)$msgArr['BTRACKID']
-                    ]
-                ]);
-                // JSON response processing
-                // Process the response (same logic for both streaming and non-streaming)
-                $answer = '';
-                foreach ($chat->output as $output) {
-                    if ($output->type === 'message'          // nur Messages …
-                        && $output->role === 'assistant'     // … vom Assistenten
-                        && $output->status === 'completed') {  // … die fertig sind
-                        foreach ($output->content as $content) {
-                            if ($content->type === 'output_text') {
-                                if ($stream) {
-                                    // Already streamed above, just accumulate for final processing
-                                    $answer .= $content->text . PHP_EOL;
-                                } else {
-                                    $answer .= $content->text . PHP_EOL;   // <- text chunks
-                                }
-                            }
-                        }
-                    }
-                }
+                // EMAIL/BACKGROUND: Process collected answer as JSON
+                // The streaming API already gave us the complete answer in $answer variable
+
+                self::debugLog('EMAIL JSON PROCESSING: Raw answer length=' . strlen($answer) . ' | First 200 chars: ' . substr($answer, 0, 200));
 
                 // Clean JSON response - only if it starts with JSON markers
                 if (strpos($answer, "```json\n") === 0) {
@@ -331,11 +330,11 @@ class AIOpenAI
                 }
                 $answer = trim($answer);
 
-                //error_log(" __________________________ OPENAI ANSWER: ".$answer);
+                self::debugLog('EMAIL JSON CLEANED: Length=' . strlen($answer) . ' | Is valid JSON=' . (Tools::isValidJson($answer) ? 'YES' : 'NO') . ' | Content: ' . substr($answer, 0, 300));
 
                 if (Tools::isValidJson($answer) == false) {
-                    //error_log(" __________________________ OPENAI ANSWER: ".$answer);
                     // Fill $arrAnswer with values from $msgArr when JSON is not valid
+                    self::debugLog('EMAIL NOT JSON: Using answer as plain text BTEXT');
                     $arrAnswer = $msgArr;
                     $arrAnswer['BTEXT'] = $answer;
                     $arrAnswer['BDIRECT'] = 'OUT';
@@ -351,16 +350,26 @@ class AIOpenAI
                 } else {
                     try {
                         $arrAnswer = json_decode($answer, true);
+                        self::debugLog('EMAIL JSON DECODED: BTEXT length=' . strlen($arrAnswer['BTEXT'] ?? '') . ' | BFILE=' . ($arrAnswer['BFILE'] ?? 'NOT_SET'));
                     } catch (Exception $err) {
-                        return '*API topic Error - Ralf made a bubu - please mail that to him: * ' . $err->getMessage();
+                        self::debugLog('EMAIL JSON DECODE ERROR: ' . $err->getMessage());
+                        return '*API topic Error - JSON decode failed: * ' . $err->getMessage();
                     }
+                }
+                
+                // CRITICAL FIX: Normalize BFILE to integer (empty string '' breaks database insert)
+                // BFILE column is tinyint(1) NOT NULL, so '' is invalid
+                if (!isset($arrAnswer['BFILE']) || $arrAnswer['BFILE'] === '' || $arrAnswer['BFILE'] === null) {
+                    $arrAnswer['BFILE'] = 0;
+                } else {
+                    $arrAnswer['BFILE'] = intval($arrAnswer['BFILE']);
                 }
 
                 // Add model information to the response
                 $arrAnswer['_USED_MODEL'] = $myModel;
                 $arrAnswer['_AI_SERVICE'] = 'AIOpenAI';
 
-                //file_put_contents('up/openai_log_'.(date("His")).'.txt', print_r($chat, true));
+                self::debugLog('EMAIL FINAL RESPONSE (normalized): BTEXT length=' . strlen($arrAnswer['BTEXT'] ?? '') . ' | BFILE=' . $arrAnswer['BFILE']);
                 return $arrAnswer;
             }
 

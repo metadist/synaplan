@@ -238,7 +238,15 @@ class BasicAI
     public static function getAprompt($keyword, $lang = 'en', $msgArr = [], $addInfos = true)
     {
         $arrPrompt = [];
-        $userId = $_SESSION['USERPROFILE']['BID'];
+        
+        // CRITICAL FIX: Get user ID from message array first (for email/WhatsApp background processing)
+        // Fall back to session only if message doesn't have user ID (for web chat)
+        $userId = 0;
+        if (isset($msgArr['BUSERID']) && intval($msgArr['BUSERID']) > 0) {
+            $userId = intval($msgArr['BUSERID']);
+        } elseif (isset($_SESSION['USERPROFILE']['BID'])) {
+            $userId = intval($_SESSION['USERPROFILE']['BID']);
+        }
 
         // Validate and sanitize the keyword to prevent SQL issues
         if (empty($keyword) || !is_string($keyword)) {
@@ -249,7 +257,7 @@ class BasicAI
         }
         $keyword = db::EscString($keyword);
 
-        // get prompt from BPROMPTS
+        // get prompt from BPROMPTS - prioritize user's custom prompt (higher BID with ORDER BY BID DESC)
         $pSQL = "select * from BPROMPTS where BTOPIC='".$keyword."' and (BLANG like '".$lang."' OR BLANG='en') AND (BOWNERID='".$userId."' OR BOWNERID=0) ORDER BY BID DESC LIMIT 1";
         $pRes = db::Query($pSQL);
         $pArr = db::FetchArr($pRes);

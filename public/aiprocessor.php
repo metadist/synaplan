@@ -35,6 +35,13 @@ ProcessMethods::sortMessage();
 // Prepare AI answer for database storage
 $aiLastId = ProcessMethods::saveAnswerToDB();
 
+// Debug logging (only if APP_DEBUG=true)
+if (!empty($GLOBALS['debug'])) {
+    $debugFile = __DIR__ . '/debug_websearch.log';
+    $timestamp = date('Y-m-d H:i:s');
+    file_put_contents($debugFile, "[$timestamp] aiprocessor: Calling outprocessor with aiLastId=" . $aiLastId . " msgId=" . $msgId . "\n", FILE_APPEND);
+}
+
 // Clean up aiprocessor PID file
 $pidfile = __DIR__ . '/pids/p' . intval($msgId) . '.pid';
 if (file_exists($pidfile)) {
@@ -44,5 +51,11 @@ if (file_exists($pidfile)) {
 // Hand over to output processor
 $cmd = 'php outprocessor.php '.($aiLastId).' '.($msgId).' > /dev/null 2>&1 &';
 exec($cmd);
+
+if (!empty($GLOBALS['debug'])) {
+    $debugFile = __DIR__ . '/debug_websearch.log';
+    $timestamp = date('Y-m-d H:i:s');
+    file_put_contents($debugFile, "[$timestamp] aiprocessor: outprocessor command executed\n", FILE_APPEND);
+}
 
 exit;

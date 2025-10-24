@@ -7,11 +7,7 @@
     <title><?php _s('Create Account', __FILE__, $_SESSION['LANG']); ?> | Synaplan</title>
     <link rel="icon" type="image/x-icon" href="assets/statics/img/favicon.ico">
     <link href="assets/statics/css/auth-pages.css" rel="stylesheet">
-    <script
-      src="https://challenges.cloudflare.com/turnstile/v0/api.js"
-      async
-      defer
-    ></script>
+    <script src="https://www.google.com/recaptcha/api.js?render=<?php echo htmlspecialchars(ApiKeys::getRecaptchaSiteKey()); ?>"></script>
 </head>
 <body>
     <!-- Header with Logo -->
@@ -46,6 +42,7 @@
             </div>
             
             <form id="registrationForm" target="_top">
+                <input type="hidden" name="g-recaptcha-response" id="g-recaptcha-response">
                 <div class="form-group">
                     <label for="email"><?php _s('Email', __FILE__, $_SESSION['LANG']); ?></label>
                     <input type="email" class="form-control" id="email" name="email" placeholder="<?php _s('Enter your email address', __FILE__, $_SESSION['LANG']); ?>" required>
@@ -58,10 +55,9 @@
                     <label for="confirmPassword"><?php _s('Confirm Password', __FILE__, $_SESSION['LANG']); ?></label>
                     <input type="password" class="form-control" id="confirmPassword" name="confirmPassword" placeholder="<?php _s('Confirm your password', __FILE__, $_SESSION['LANG']); ?>" minlength="6" required>
                 </div>
-                <button type="submit" class="btn btn-primary" id="submitBtn" disabled title="<?php _s('Please complete the security check below', __FILE__, $_SESSION['LANG']); ?>">
+                <button type="submit" class="btn btn-primary" id="submitBtn">
                     <?php _s('Create Account', __FILE__, $_SESSION['LANG']); ?>
                 </button>
-                <div class="cf-turnstile" data-sitekey="0x4AAAAAAB1d8VjDhX7_hJRg" data-theme="light" data-size="normal" data-callback="onTurnstileSuccess" data-error-callback="onTurnstileError" data-expired-callback="onTurnstileExpired"></div>
             </form>
             
             <div class="text-center mt-3">
@@ -76,31 +72,7 @@
     </footer>
 
     <script>
-    let turnstileCompleted = false;
-
-    // Callback when Turnstile is successfully completed
-    function onTurnstileSuccess(token) {
-        turnstileCompleted = true;
-        const submitBtn = document.getElementById('submitBtn');
-        submitBtn.disabled = false;
-        submitBtn.removeAttribute('title');
-    }
-
-    // Callback when Turnstile encounters an error
-    function onTurnstileError() {
-        turnstileCompleted = false;
-        const submitBtn = document.getElementById('submitBtn');
-        submitBtn.disabled = true;
-        submitBtn.setAttribute('title', '<?php _s('Security check failed. Please refresh the page.', __FILE__, $_SESSION['LANG']); ?>');
-    }
-
-    // Callback when Turnstile token expires
-    function onTurnstileExpired() {
-        turnstileCompleted = false;
-        const submitBtn = document.getElementById('submitBtn');
-        submitBtn.disabled = true;
-        submitBtn.setAttribute('title', '<?php _s('Security check expired. Please complete it again.', __FILE__, $_SESSION['LANG']); ?>');
-    }
+    const RECAPTCHA_SITE_KEY = '<?php echo htmlspecialchars(ApiKeys::getRecaptchaSiteKey()); ?>';
 
     document.getElementById('registrationForm').addEventListener('submit', function(e) {
         e.preventDefault();
@@ -108,13 +80,6 @@
         const email = document.getElementById('email').value;
         const password = document.getElementById('password').value;
         const confirmPassword = document.getElementById('confirmPassword').value;
-        
-        // Validate Turnstile
-        const turnstileResponse = document.querySelector('[name="cf-turnstile-response"]')?.value;
-        if (!turnstileCompleted || !turnstileResponse) {
-            showError('<?php _s('Please complete the security check before registering.', __FILE__, $_SESSION['LANG']); ?>');
-            return;
-        }
         
         // Hide any existing alerts
         document.getElementById('successAlert').classList.add('d-none');
@@ -135,40 +100,40 @@
         const submitBtn = document.getElementById('submitBtn');
         submitBtn.disabled = true;
         
-        // Prepare form data
-        const formData = new FormData();
-        formData.append('action', 'userRegister');
-        formData.append('email', email);
-        formData.append('password', password);
-        formData.append('confirmPassword', confirmPassword);
-        formData.append('cf-turnstile-response', turnstileResponse);
-        
-        // Make API call
-        fetch('api.php', {
-            method: 'POST',
-            body: formData
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                showSuccess();
-                // Clear the form
-                document.getElementById('registrationForm').reset();
-                // Reset turnstile state after successful registration
-                turnstileCompleted = false;
-            } else {
-                showError(data.error || '<?php _s('Registration failed. Please try again.', __FILE__, $_SESSION['LANG']); ?>');
-            }
-        })
-        .catch(error => {
-            console.error('Error:', error);
-            showError('<?php _s('An error occurred. Please try again.', __FILE__, $_SESSION['LANG']); ?>');
-        })
-        .finally(() => {
-            // Reset button state only if turnstile is still valid
-            if (turnstileCompleted) {
-                submitBtn.disabled = false;
-            }
+        // Execute reCAPTCHA v3 before submitting
+        grecaptcha.ready(function() {
+            grecaptcha.execute(RECAPTCHA_SITE_KEY, {action: 'register'}).then(function(token) {
+                // Prepare form data
+                const formData = new FormData();
+                formData.append('action', 'userRegister');
+                formData.append('email', email);
+                formData.append('password', password);
+                formData.append('confirmPassword', confirmPassword);
+                formData.append('g-recaptcha-response', token);
+                
+                // Make API call
+                fetch('api.php', {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        showSuccess();
+                        // Clear the form
+                        document.getElementById('registrationForm').reset();
+                    } else {
+                        showError(data.error || '<?php _s('Registration failed. Please try again.', __FILE__, $_SESSION['LANG']); ?>');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    showError('<?php _s('An error occurred. Please try again.', __FILE__, $_SESSION['LANG']); ?>');
+                })
+                .finally(() => {
+                    submitBtn.disabled = false;
+                });
+            });
         });
     });
 

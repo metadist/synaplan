@@ -7,11 +7,7 @@
     <title><?php _s('Please login', __FILE__, $_SESSION['LANG']); ?> | Synaplan</title>
     <link rel="icon" type="image/x-icon" href="assets/statics/img/favicon.ico">
     <link href="assets/statics/css/auth-pages.css?v=2" rel="stylesheet">
-    <script
-      src="https://challenges.cloudflare.com/turnstile/v0/api.js"
-      async
-      defer
-    ></script>
+    <script src="https://www.google.com/recaptcha/api.js?render=<?php echo htmlspecialchars(ApiKeys::getRecaptchaSiteKey()); ?>"></script>
 </head>
 <body>
     <!-- Header with Logo -->
@@ -39,6 +35,7 @@
             
             <form action="index.php" method="post" target="_top" id="loginForm">
                 <input type="hidden" name="action" value="login">
+                <input type="hidden" name="g-recaptcha-response" id="g-recaptcha-response">
                 <div class="form-group">
                     <label for="email"><?php _s('Email', __FILE__, $_SESSION['LANG']); ?></label>
                     <input type="email" class="form-control" id="email" name="email" placeholder="<?php _s('Enter your registered email', __FILE__, $_SESSION['LANG']); ?>" required>
@@ -47,8 +44,7 @@
                     <label for="password"><?php _s('Password', __FILE__, $_SESSION['LANG']); ?></label>
                     <input type="password" class="form-control" id="password" name="password" placeholder="<?php _s('Enter password', __FILE__, $_SESSION['LANG']); ?>" required>
                 </div>
-                <button type="submit" class="btn btn-primary" id="loginBtn" disabled title="<?php _s('Please complete the security check below', __FILE__, $_SESSION['LANG']); ?>"><?php _s('Login', __FILE__, $_SESSION['LANG']); ?></button>
-                <div class="cf-turnstile" data-sitekey="0x4AAAAAAB1d8VjDhX7_hJRg" data-theme="light" data-size="normal" data-callback="onTurnstileSuccess" data-error-callback="onTurnstileError" data-expired-callback="onTurnstileExpired"></div>
+                <button type="submit" class="btn btn-primary" id="loginBtn"><?php _s('Login', __FILE__, $_SESSION['LANG']); ?></button>
             </form>
             
             <?php if (OidcAuth::isConfigured()): ?>
@@ -82,41 +78,21 @@
     </footer>
 
     <script>
-    let turnstileCompleted = false;
+    const RECAPTCHA_SITE_KEY = '<?php echo htmlspecialchars(ApiKeys::getRecaptchaSiteKey()); ?>';
 
-    // Callback when Turnstile is successfully completed
-    function onTurnstileSuccess(token) {
-        turnstileCompleted = true;
-        const loginBtn = document.getElementById('loginBtn');
-        loginBtn.disabled = false;
-        loginBtn.removeAttribute('title');
-    }
-
-    // Callback when Turnstile encounters an error
-    function onTurnstileError() {
-        turnstileCompleted = false;
-        const loginBtn = document.getElementById('loginBtn');
-        loginBtn.disabled = true;
-        loginBtn.setAttribute('title', '<?php _s('Security check failed. Please refresh the page.', __FILE__, $_SESSION['LANG']); ?>');
-    }
-
-    // Callback when Turnstile token expires
-    function onTurnstileExpired() {
-        turnstileCompleted = false;
-        const loginBtn = document.getElementById('loginBtn');
-        loginBtn.disabled = true;
-        loginBtn.setAttribute('title', '<?php _s('Security check expired. Please complete it again.', __FILE__, $_SESSION['LANG']); ?>');
-    }
-
-    // Add form submission validation
+    // Handle form submission with reCAPTCHA v3
     document.getElementById('loginForm').addEventListener('submit', function(e) {
-        const turnstileResponse = document.querySelector('[name="cf-turnstile-response"]')?.value;
+        e.preventDefault();
         
-        if (!turnstileCompleted || !turnstileResponse) {
-            e.preventDefault();
-            alert('<?php _s('Please complete the security check before logging in.', __FILE__, $_SESSION['LANG']); ?>');
-            return false;
-        }
+        // Execute reCAPTCHA v3
+        grecaptcha.ready(function() {
+            grecaptcha.execute(RECAPTCHA_SITE_KEY, {action: 'login'}).then(function(token) {
+                // Set the token in the hidden field
+                document.getElementById('g-recaptcha-response').value = token;
+                // Submit the form
+                e.target.submit();
+            });
+        });
     });
     </script>
 </body>
