@@ -20,8 +20,7 @@ class ApiKeys
     /**
      * Initialize API keys from various sources
      */
-    public static function init()
-    {
+    public static function init() {
         if (self::$initialized) {
             return;
         }
@@ -38,8 +37,7 @@ class ApiKeys
     /**
      * Load .env file if it exists
      */
-    private static function loadDotEnv()
-    {
+    private static function loadDotEnv() {
         // Prefer project root .env, fallback to app/.env
         $projectEnv = dirname(__DIR__, 3) . '/.env'; // /project/.env
         $appEnv     = dirname(__DIR__, 2) . '/.env'; // /project/app/.env
@@ -77,8 +75,7 @@ class ApiKeys
     /**
      * Load all API keys with fallback logic
      */
-    private static function loadKeys()
-    {
+    private static function loadKeys() {
         // Define all API keys
         $keyConfig = [
             'OPENAI_API_KEY',
@@ -138,8 +135,7 @@ class ApiKeys
     /**
      * Get a specific API key
      */
-    private static function getKey($envKey)
-    {
+    private static function getKey($envKey) {
         // 1. Try environment variable
         $value = getenv($envKey) ?: $_ENV[$envKey] ?? null;
         if ($value) {
@@ -159,15 +155,13 @@ class ApiKeys
     /**
      * Get a specific API key
      */
-    public static function get($key)
-    {
+    public static function get($key) {
         self::init();
         return self::$keys[$key] ?? null;
     }
 
     // ------------------------- TIKA CONFIG -------------------------
-    public static function isTikaEnabled(): bool
-    {
+    public static function isTikaEnabled(): bool {
         $val = self::get('TIKA_ENABLED');
         if ($val === null) {
             return true;
@@ -175,61 +169,50 @@ class ApiKeys
         $v = strtolower(trim(strval($val)));
         return !in_array($v, ['0','false','off','no'], true);
     }
-    public static function getTikaUrl(): ?string
-    {
+    public static function getTikaUrl(): ?string {
         return self::get('TIKA_URL') ?: null;
     }
-    public static function getTikaTimeoutMs(): int
-    {
+    public static function getTikaTimeoutMs(): int {
         $v = intval(self::get('TIKA_TIMEOUT_MS'));
         return $v > 0 ? $v : 15000;
     }
-    public static function getTikaRetries(): int
-    {
+    public static function getTikaRetries(): int {
         $v = intval(self::get('TIKA_RETRIES'));
         return $v >= 0 ? $v : 1;
     }
-    public static function getTikaRetryBackoffMs(): int
-    {
+    public static function getTikaRetryBackoffMs(): int {
         $v = intval(self::get('TIKA_RETRY_BACKOFF_MS'));
         return $v >= 0 ? $v : 300;
     }
-    public static function getTikaMinLength(): int
-    {
+    public static function getTikaMinLength(): int {
         $v = intval(self::get('TIKA_MIN_LENGTH'));
         return $v > 0 ? $v : 32;
     }
-    public static function getTikaMinEntropy(): float
-    {
+    public static function getTikaMinEntropy(): float {
         $v = self::get('TIKA_MIN_ENTROPY');
         $f = $v !== null ? floatval($v) : 2.5;
         return $f;
     }
 
-    public static function getTikaHttpUser(): ?string
-    {
+    public static function getTikaHttpUser(): ?string {
         $v = self::get('TIKA_HTTP_USER');
         return ($v !== null && $v !== '') ? $v : null;
     }
-    public static function getTikaHttpPass(): ?string
-    {
+    public static function getTikaHttpPass(): ?string {
         $v = self::get('TIKA_HTTP_PASS');
         return ($v !== null) ? $v : null;
     }
 
     // ------------------------- RASTERIZER CONFIG -------------------------
-    public static function getRasterizeDpi(): int
-    {
+    public static function getRasterizeDpi(): int {
         $v = intval(self::get('RASTERIZE_DPI'));
         return $v > 0 ? $v : 150;
     }
-    public static function getRasterizePageCap(): int
-    {
+    public static function getRasterizePageCap(): int {
         $v = intval(self::get('RASTERIZE_PAGE_CAP'));
         return $v > 0 ? $v : 5;
     }
-    public static function getRasterizeTimeoutMs(): int
-    {
+    public static function getRasterizeTimeoutMs(): int {
         $v = intval(self::get('RASTERIZE_TIMEOUT_MS'));
         return $v > 0 ? $v : 20000;
     }
@@ -237,120 +220,105 @@ class ApiKeys
     /**
      * Get OpenAI API key
      */
-    public static function getOpenAI()
-    {
+    public static function getOpenAI() {
         return self::get('OPENAI_API_KEY');
     }
 
     /**
      * Get Groq API key
      */
-    public static function getGroq()
-    {
+    public static function getGroq() {
         return self::get('GROQ_API_KEY');
     }
 
     /**
      * Get Google Gemini API key
      */
-    public static function getGoogleGemini()
-    {
+    public static function getGoogleGemini() {
         return self::get('GOOGLE_GEMINI_API_KEY');
     }
 
     /**
      * Get Anthropic API key
      */
-    public static function getAnthropic()
-    {
+    public static function getAnthropic() {
         return self::get('ANTHROPIC_API_KEY');
     }
 
     /**
      * Get TheHive API key
      */
-    public static function getTheHive()
-    {
+    public static function getTheHive() {
         return self::get('THEHIVE_API_KEY');
     }
 
     /**
      * Get OIDC Provider URL
      */
-    public static function getOidcProviderUrl()
-    {
+    public static function getOidcProviderUrl() {
         return self::get('OIDC_PROVIDER_URL');
     }
 
     /**
      * Get OIDC Client ID
      */
-    public static function getOidcClientId()
-    {
+    public static function getOidcClientId() {
         return self::get('OIDC_CLIENT_ID');
     }
 
     /**
      * Get OIDC Client Secret
      */
-    public static function getOidcClientSecret()
-    {
+    public static function getOidcClientSecret() {
         return self::get('OIDC_CLIENT_SECRET');
     }
 
     /**
      * Get OIDC Redirect URI
      */
-    public static function getOidcRedirectUri()
-    {
+    public static function getOidcRedirectUri() {
         return self::get('OIDC_REDIRECT_URI');
     }
 
     /**
      * Get OIDC Scopes
      */
-    public static function getOidcScopes()
-    {
+    public static function getOidcScopes() {
         return self::get('OIDC_SCOPES') ?: 'openid profile email';
     }
 
     /**
      * Get ElevenLabs API key
      */
-    public static function getElevenLabs()
-    {
+    public static function getElevenLabs() {
         return self::get('ELEVENLABS_API_KEY');
     }
 
     /**
      * Get Brave Search API key
      */
-    public static function getBraveSearch()
-    {
+    public static function getBraveSearch() {
         return self::get('BRAVE_SEARCH_API_KEY');
     }
 
     /**
      * Get Triton server URL
      */
-    public static function getTritonServer()
-    {
+    public static function getTritonServer() {
         return self::get('TRITON_SERVER');
     }
 
     /**
      * Get WhatsApp token
      */
-    public static function getWhatsApp()
-    {
+    public static function getWhatsApp() {
         return self::get('WHATSAPP_TOKEN');
     }
 
     /**
      * Check if rate limiting is enabled
      */
-    public static function isRateLimitingEnabled(): bool
-    {
+    public static function isRateLimitingEnabled(): bool {
         $value = self::get('RATE_LIMITING_ENABLED');
         if ($value === null) {
             return false;
@@ -364,8 +332,7 @@ class ApiKeys
     /**
      * Normalize URL - supports relative, absolute, and :web format
      */
-    private static function normalizeUrl($url): string
-    {
+    private static function normalizeUrl($url): string {
         if (empty($url)) {
             return '';
         }
@@ -392,8 +359,7 @@ class ApiKeys
      * Supports absolute URLs (https://example.com/pricing) and relative URLs (pricing)
      * Relative URLs are combined with APP_URL as base
      */
-    public static function getPricingUrl(): string
-    {
+    public static function getPricingUrl(): string {
         $url = self::get('SYSTEM_PRICING_URL') ?: 'https://www.synaplan.com/pricing';
         return self::normalizeUrl($url);
     }
@@ -403,8 +369,7 @@ class ApiKeys
      * Supports absolute URLs (https://example.com/account) and relative URLs (account)
      * Relative URLs are combined with APP_URL as base
      */
-    public static function getAccountUrl(): string
-    {
+    public static function getAccountUrl(): string {
         $url = self::get('SYSTEM_ACCOUNT_URL') ?: 'https://www.synaplan.com/account';
         return self::normalizeUrl($url);
     }
@@ -414,8 +379,7 @@ class ApiKeys
      * Supports absolute URLs (https://example.com/upgrade) and relative URLs (upgrade)
      * Relative URLs are combined with APP_URL as base
      */
-    public static function getUpgradeUrl(): string
-    {
+    public static function getUpgradeUrl(): string {
         $url = self::get('SYSTEM_UPGRADE_URL') ?: self::get('SYSTEM_PRICING_URL') ?: 'https://www.synaplan.com/pricing';
         return self::normalizeUrl($url);
     }
@@ -424,32 +388,28 @@ class ApiKeys
      * Get base URL - uses existing APP_URL for homepage links and as base for relative URLs
      * Returns the main application URL (protocol + domain)
      */
-    public static function getBaseUrl(): string
-    {
+    public static function getBaseUrl(): string {
         return self::get('APP_URL') ?: 'https://www.synaplan.com';
     }
 
     /**
      * Get reCAPTCHA v3 site key (public key for frontend)
      */
-    public static function getRecaptchaSiteKey()
-    {
+    public static function getRecaptchaSiteKey() {
         return self::get('RECAPTCHA3_SITE_KEY');
     }
 
     /**
      * Get reCAPTCHA v3 secret key (private key for backend verification)
      */
-    public static function getRecaptchaSecretKey()
-    {
+    public static function getRecaptchaSecretKey() {
         return self::get('RECAPTCHA3_SECRET_KEY');
     }
 
     /**
      * Get AWS credentials as array
      */
-    public static function getAWS()
-    {
+    public static function getAWS() {
         $credentials = self::get('AWS_CREDENTIALS');
         if ($credentials && strpos($credentials, ';') !== false) {
             list($accessKey, $secretKey) = explode(';', $credentials, 2);
@@ -464,8 +424,7 @@ class ApiKeys
     /**
      * Check if all required keys are available
      */
-    public static function validateKeys()
-    {
+    public static function validateKeys() {
         self::init();
         $missing = [];
 

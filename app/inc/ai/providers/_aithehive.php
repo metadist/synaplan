@@ -5,8 +5,7 @@ class AITheHive
     private static $key;
 
     // ******************************************************************************************************
-    public static function init()
-    {
+    public static function init() {
         self::$key = ApiKeys::getTheHive();
         if (!self::$key) {
             //if($GLOBALS["debug"]) error_log("TheHive API key not configured");
@@ -18,8 +17,7 @@ class AITheHive
     // ******************************************************************************************************
     // picture prompt
     // ******************************************************************************************************
-    public static function picPrompt($msgArr): array
-    {
+    public static function picPrompt($msgArr): array {
         $usrArr = Central::getUsrById($msgArr['BUSERID']);
 
         if (substr($msgArr['BTEXT'], 0, 1) == '/') {

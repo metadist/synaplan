@@ -74,8 +74,7 @@ while ($row = db::FetchArr($res)) {
 
 // Function to darken color for better contrast with white text
 // Multiplies each RGB component by 0.4 as requested
-function darkenWidgetColor($hexColor, $factor = 0.4)
-{
+function darkenWidgetColor($hexColor, $factor = 0.4) {
     // Remove # if present
     $hexColor = ltrim($hexColor, '#');
 

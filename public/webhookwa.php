@@ -26,7 +26,6 @@ $GLOBALS['WAtoken'] = ApiKeys::getWhatsApp();
 // Check if the request is a verification request
 if (isset($_REQUEST['hub_mode']) && $_REQUEST['hub_mode'] === 'subscribe' &&
     isset($_REQUEST['hub_verify_token']) && $_REQUEST['hub_verify_token'] === $GLOBALS['WAtoken']) {
-
     // Respond with the hub_challenge parameter
     echo $_REQUEST['hub_challenge'];
     exit;
@@ -59,7 +58,6 @@ if ($request) {
                     }
                     // or json in the content - CONTACTS
                     if (isset($message['content']['media_type']) and $message['content']['media_type'] == 'contacts') {
-
                     }
                     // location info
 
@@ -175,8 +173,7 @@ if ($request) {
 // logging function for now, disable in production
 // **********************************************************************************
 
-function logMessage($arrMessage)
-{
+function logMessage($arrMessage) {
     $logFile = 'debug.log';
     $logContent = '';
 
@@ -200,8 +197,7 @@ function logMessage($arrMessage)
     return message will be formatted as an array.
 */
 
-function processWAMessage($messageBlock): array
-{
+function processWAMessage($messageBlock): array {
     // https://graph.facebook.com/v21.0/
     $mediaDownloadUrl = 'https://graph.facebook.com/v21.0/';
     $processedData = [
@@ -346,8 +342,7 @@ function processWAMessage($messageBlock): array
 }
 
 // media handling
-function downloadMediaInfo(string $mediaId, string $mediaDownloadUrl, string $accessToken): array
-{
+function downloadMediaInfo(string $mediaId, string $mediaDownloadUrl, string $accessToken): array {
     $url = $mediaDownloadUrl . $mediaId;
     $headers = [
         "Authorization: Bearer $accessToken",
@@ -361,8 +356,7 @@ function downloadMediaInfo(string $mediaId, string $mediaDownloadUrl, string $ac
 }
 // create
 // download the media file with a curl request via shell!
-function downloadMediaFile(array $mediaInfo, string $accessToken): array
-{
+function downloadMediaFile(array $mediaInfo, string $accessToken): array {
     if (!isset($mediaInfo['url'])) {
         throw new Exception('Media URL is missing.');
     }
@@ -461,8 +455,7 @@ function downloadMediaFile(array $mediaInfo, string $accessToken): array
 
 // define the file extension for the mime type
 // simple curl request to dump the message info
-function httpRequest(string $method, string $url, array $headers = [], array $data = []): string
-{
+function httpRequest(string $method, string $url, array $headers = [], array $data = []): string {
     $ch = curl_init();
 
     $options = [

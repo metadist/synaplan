@@ -4,8 +4,7 @@ class XSControl
 {
     // Central upgrade and account URLs for easy maintenance
     // count the messages the user sent in the last x seconds
-    public static function countIn($userId, $secondsCount): int
-    {
+    public static function countIn($userId, $secondsCount): int {
         $timeFrame = time() - $secondsCount;
         $countSQL = 'SELECT COUNT(*) XSCOUNT FROM BUSELOG WHERE BUSERID = '.($userId).' AND BTIMESTAMP > '.($timeFrame);
         $countRes = db::Query($countSQL);
@@ -14,8 +13,7 @@ class XSControl
     }
 
     // count specific operation types the user sent in the last x seconds
-    public static function countInByType($userId, $secondsCount, $operationType): int
-    {
+    public static function countInByType($userId, $secondsCount, $operationType): int {
         $timeFrame = time() - $secondsCount;
         $countSQL = 'SELECT COUNT(*) XSCOUNT FROM BUSELOG WHERE BUSERID = '.($userId).' AND BTIMESTAMP > '.($timeFrame)." AND BOPERATIONTYPE = '".db::EscString($operationType)."'";
         $countRes = db::Query($countSQL);
@@ -27,8 +25,7 @@ class XSControl
      * Count operations with STRICT timeframe and subscription logic
      * Always uses operationType and separates paid vs free counting
      */
-    public static function countInCurrentBillingCycle($userId, $timeframe, $operationType = 'general'): int
-    {
+    public static function countInCurrentBillingCycle($userId, $timeframe, $operationType = 'general'): int {
         try {
             $userSQL = 'SELECT BUSERLEVEL, BPAYMENTDETAILS FROM BUSER WHERE BID = ' . intval($userId);
             $userResult = db::Query($userSQL);
@@ -90,7 +87,6 @@ class XSControl
             $countRes = db::Query($countSQL);
             $countArr = db::FetchArr($countRes);
             return intval($countArr['XSCOUNT']);
-
         } catch (Exception $e) {
             error_log('Error counting in billing cycle: ' . $e->getMessage());
             return 0;
@@ -101,8 +97,7 @@ class XSControl
     /**
      * Get intelligent rate limit message for NEW users based on subscription history
      */
-    private static function getIntelligentMessageForNewUser($userId, $limitType, $currentCount, $maxCount): array
-    {
+    private static function getIntelligentMessageForNewUser($userId, $limitType, $currentCount, $maxCount): array {
         try {
             $userSQL = 'SELECT BPAYMENTDETAILS FROM BUSER WHERE BID = ' . intval($userId);
             $userResult = db::Query($userSQL);
@@ -151,7 +146,6 @@ class XSControl
             }
 
             return $result;
-
         } catch (Exception $e) {
             error_log('Error getting intelligent message for NEW user: ' . $e->getMessage());
             // Return default message
@@ -169,8 +163,7 @@ class XSControl
      * Check if user has an active subscription
      * STRICT: Only status==='active' AND now < end_timestamp
      */
-    private static function isActiveSubscription($userId): bool
-    {
+    private static function isActiveSubscription($userId): bool {
         try {
             $userSQL = 'SELECT BUSERLEVEL, BPAYMENTDETAILS FROM BUSER WHERE BID = ' . intval($userId);
             $userResult = db::Query($userSQL);
@@ -195,7 +188,6 @@ class XSControl
 
             // STRICT: Only 'active' status AND current time < end_timestamp
             return ($subscriptionStatus === 'active' && $endTimestamp > 0 && $currentTime < $endTimestamp);
-
         } catch (Exception $e) {
             if ($GLOBALS['debug']) {
                 error_log('Error checking active subscription: ' . $e->getMessage());
@@ -208,8 +200,7 @@ class XSControl
      * Get current user's subscription ID for BUSELOG tracking
      * STRICT: Only returns ID if status==='active' AND now < end_timestamp
      */
-    private static function getCurrentSubscriptionId($userId): ?string
-    {
+    private static function getCurrentSubscriptionId($userId): ?string {
         try {
             $userSQL = 'SELECT BUSERLEVEL, BPAYMENTDETAILS FROM BUSER WHERE BID = ' . intval($userId);
             $userResult = db::Query($userSQL);
@@ -246,8 +237,7 @@ class XSControl
         return null;
     }
 
-    public static function updateOperationType($userId, $msgId, $operationType): bool
-    {
+    public static function updateOperationType($userId, $msgId, $operationType): bool {
         $subscriptionId = self::getCurrentSubscriptionId($userId);
 
         $updateSQL = "UPDATE BUSELOG SET BOPERATIONTYPE = '".db::EscString($operationType)."', BSUBSCRIPTION_ID = " . ($subscriptionId ? "'".db::EscString($subscriptionId)."'" : 'NULL') . ' WHERE BUSERID = '.intval($userId).' AND BMSGID = '.intval($msgId);
@@ -259,8 +249,7 @@ class XSControl
      * Get user's subscription level from BUSER table (primary source)
      * Fast lookup - BUSERLEVEL is the authoritative source for rate limits
      */
-    public static function getUserSubscriptionLevel($userId): string
-    {
+    public static function getUserSubscriptionLevel($userId): string {
         try {
             // Primary: Get BUSERLEVEL from BUSER table (fastest)
             $userSQL = 'SELECT BUSERLEVEL FROM BUSER WHERE BID = ' . intval($userId);
@@ -273,7 +262,6 @@ class XSControl
 
             // Default to NEW if not set
             return 'NEW';
-
         } catch (Exception $e) {
             error_log('Error getting user subscription level: ' . $e->getMessage());
             return 'NEW'; // Safe fallback
@@ -284,8 +272,7 @@ class XSControl
      * Get subscription end timestamp for countdown timer
      * Uses BPAYMENTDETAILS JSON for accurate expiry dates
      */
-    public static function getSubscriptionEndTimestamp($userId): int
-    {
+    public static function getSubscriptionEndTimestamp($userId): int {
         try {
             $paymentSQL = 'SELECT BPAYMENTDETAILS FROM BUSER WHERE BID = ' . intval($userId);
             $paymentResult = db::Query($paymentSQL);
@@ -301,7 +288,6 @@ class XSControl
 
             // Fallback: Return current time + 30 days for NEW users
             return time() + (30 * 24 * 60 * 60);
-
         } catch (Exception $e) {
             error_log('Error getting subscription end timestamp: ' . $e->getMessage());
             return time() + (30 * 24 * 60 * 60); // Safe fallback
@@ -311,8 +297,7 @@ class XSControl
     /**
      * Calculate the correct reset time for rate limits based on subscription billing cycle
      */
-    public static function getCorrectResetTime($userId, $timeframe): int
-    {
+    public static function getCorrectResetTime($userId, $timeframe): int {
         try {
             $paymentSQL = 'SELECT BPAYMENTDETAILS, BUSERLEVEL FROM BUSER WHERE BID = ' . intval($userId);
             $paymentResult = db::Query($paymentSQL);
@@ -366,7 +351,6 @@ class XSControl
                     return time() + $timeframe;
                 }
             }
-
         } catch (Exception $e) {
             error_log('Error calculating reset time: ' . $e->getMessage());
             return 0; // Safe fallback: no reset
@@ -377,8 +361,7 @@ class XSControl
      * Get the timestamp of the oldest message in the current timeframe
      * Used for precise reset time calculation for rolling windows
      */
-    private static function getOldestMessageInTimeframe($userId, $timeframe): int
-    {
+    private static function getOldestMessageInTimeframe($userId, $timeframe): int {
         try {
             // Get current subscription info
             $currentSubscriptionId = self::getCurrentSubscriptionId($userId);
@@ -405,7 +388,6 @@ class XSControl
             $oldestArr = db::FetchArr($oldestRes);
 
             return intval($oldestArr['OLDEST_TIME'] ?? 0);
-
         } catch (Exception $e) {
             error_log('Error getting oldest message time: ' . $e->getMessage());
             return 0;
@@ -415,8 +397,7 @@ class XSControl
     /**
      * Get intelligent rate limit message based on subscription status
      */
-    public static function getIntelligentRateLimitMessage($userId, $operationType, $currentCount, $maxCount, $timeframe): array
-    {
+    public static function getIntelligentRateLimitMessage($userId, $operationType, $currentCount, $maxCount, $timeframe): array {
         try {
             $paymentSQL = 'SELECT BPAYMENTDETAILS, BUSERLEVEL FROM BUSER WHERE BID = ' . intval($userId);
             $paymentResult = db::Query($paymentSQL);
@@ -540,7 +521,6 @@ class XSControl
                     ];
                 }
             }
-
         } catch (Exception $e) {
             error_log('Error getting intelligent rate limit message: ' . $e->getMessage());
             // Safe fallback
@@ -558,8 +538,7 @@ class XSControl
     /**
      * Format time remaining in a human-readable way
      */
-    private static function formatTimeRemaining($seconds): string
-    {
+    private static function formatTimeRemaining($seconds): string {
         if ($seconds <= 0) {
             return 'now';
         }
@@ -580,8 +559,7 @@ class XSControl
     /**
      * Format timeframe in a human-readable way
      */
-    private static function formatTimeframe($seconds): string
-    {
+    private static function formatTimeframe($seconds): string {
         if ($seconds >= 86400) {
             return floor($seconds / 86400) . ' day(s)';
         } elseif ($seconds >= 3600) {
@@ -595,8 +573,7 @@ class XSControl
      * Get operation type mapping from BCAPABILITIES table dynamically
      * Maps rate limit categories to BUSELOG operation types
      */
-    public static function getOperationMappingFromCapabilities(): array
-    {
+    public static function getOperationMappingFromCapabilities(): array {
         static $mapping = null;
 
         if ($mapping === null) {
@@ -673,8 +650,7 @@ class XSControl
 
     // simple count method: puts details into the database into the BUSELOG table
     // call as XSControl::countThis($userId, $msgId)
-    public static function countThis($userId, $msgId, $operationType = 'general'): int
-    {
+    public static function countThis($userId, $msgId, $operationType = 'general'): int {
         $subscriptionId = self::getCurrentSubscriptionId($userId);
 
         $newSQL = 'INSERT INTO BUSELOG (BID, BTIMESTAMP, BUSERID, BMSGID, BOPERATIONTYPE, BSUBSCRIPTION_ID) VALUES (DEFAULT, '.time().', '.($userId).', '.($msgId).", '".db::EscString($operationType)."', " . ($subscriptionId ? "'".db::EscString($subscriptionId)."'" : 'NULL') . ')';
@@ -684,8 +660,7 @@ class XSControl
 
     // create a confirmation link for a fresh user
     // and send it to the user in his/her language
-    public static function createConfirmationLink($usrArr): void
-    {
+    public static function createConfirmationLink($usrArr): void {
         $confirmLink = $GLOBALS['baseUrl'].'da/confirm.php?id='.$usrArr['BID'].'&c='.$usrArr['DETAILS']['MAILCHECKED'];
         $msgTxt = "Welcome to Ralfs.AI BETA!<BR>\n<BR>\n";
         $msgTxt .= "Please confirm your email by clicking the link below:<BR>\n<BR>\n";
@@ -701,8 +676,7 @@ class XSControl
     // the methods above
 
     // basic auth methods
-    public static function getBearerToken(): ?string
-    {
+    public static function getBearerToken(): ?string {
         $headers = null;
 
         // Check different possible locations of the Authorization header.
@@ -738,8 +712,7 @@ class XSControl
     // It could be that messages are worked twice and FILEBYTES or CHATBYTES are already set,
     // therefore: always check if the values are set and ADD to them. Start at 0, if there is no value.
     //
-    public static function countBytes($msgArr, $FILEORTEXT = 'ALL', $stream = false): void
-    {
+    public static function countBytes($msgArr, $FILEORTEXT = 'ALL', $stream = false): void {
         // Safety check: ensure BID exists before proceeding
         if (!isset($msgArr['BID']) || empty($msgArr['BID'])) {
             if ($GLOBALS['debug']) {
@@ -809,8 +782,7 @@ class XSControl
     }
     // store the AI details per message
     // AI models used and how fast they answer! Use the BMESSAGEMETA table
-    public static function storeAIDetails($msgArr, $modelKey, $modelValue, $stream = false): bool
-    {
+    public static function storeAIDetails($msgArr, $modelKey, $modelValue, $stream = false): bool {
         // Safety check: ensure BID exists before proceeding
         if (!isset($msgArr['BID']) || empty($msgArr['BID'])) {
             if ($GLOBALS['debug']) {
@@ -829,8 +801,7 @@ class XSControl
      * Get user-specific rate limits from BCONFIG table
      * Inactive subscription = RATELIMITS_NEW, Active = RATELIMITS_[LEVEL]
      */
-    public static function getUserLimits($userId): array
-    {
+    public static function getUserLimits($userId): array {
         $limits = [];
 
         try {
@@ -882,7 +853,6 @@ class XSControl
                     'FILE_ANALYSIS_TOTAL' => 10
                 ];
             }
-
         } catch (Exception $e) {
             if ($GLOBALS['debug']) {
                 error_log('Error loading user limits: ' . $e->getMessage());
@@ -895,8 +865,7 @@ class XSControl
     /**
      * Check a specific limit type using NEW config keys and unified logic
      */
-    public static function checkSpecificLimit($msgArr, $operation, $limitKey, $maxCount): array
-    {
+    public static function checkSpecificLimit($msgArr, $operation, $limitKey, $maxCount): array {
         $result = ['exceeded' => false, 'reason' => '', 'current_count' => 0];
 
         // Determine timeframe from limit key
@@ -971,8 +940,7 @@ class XSControl
      * Count file bytes uploaded by user in timeframe
      * Uses existing BMESSAGEMETA table FILEBYTES entries
      */
-    private static function countFileBytes($userId, $timeframe): int
-    {
+    private static function countFileBytes($userId, $timeframe): int {
         $bytesSQL = 'SELECT SUM(CAST(m.BVALUE AS UNSIGNED)) as TOTAL_BYTES 
                      FROM BMESSAGEMETA m 
                      JOIN BMESSAGES b ON m.BMESSID = b.BID 
@@ -995,8 +963,7 @@ class XSControl
      * Count API calls by user in timeframe
      * Uses BUSELOG table filtering by message type
      */
-    private static function countApiCalls($userId, $timeframe): int
-    {
+    private static function countApiCalls($userId, $timeframe): int {
         // Count messages that came through API (BMESSTYPE = 'API' or similar)
         $apiSQL = 'SELECT COUNT(*) as API_COUNT 
                    FROM BUSELOG l 
@@ -1020,16 +987,14 @@ class XSControl
     /**
      * Check if rate limiting is enabled via ENV configuration
      */
-    public static function isRateLimitingEnabled(): bool
-    {
+    public static function isRateLimitingEnabled(): bool {
         return ApiKeys::isRateLimitingEnabled();
     }
 
     /**
      * Check general MESSAGES limit for API pre-filtering
      */
-    public static function checkMessagesLimit($userId): bool|array
-    {
+    public static function checkMessagesLimit($userId): bool|array {
         if (!self::isRateLimitingEnabled()) {
             return true; // Always pass if disabled
         }
@@ -1074,7 +1039,6 @@ class XSControl
             }
 
             return true; // All MESSAGES limits OK
-
         } catch (Exception $e) {
             error_log('Rate limit check error: ' . $e->getMessage());
             return true; // Fail open
@@ -1090,8 +1054,7 @@ class XSControl
      *
      * SECURITY: Checks BOTH subscription AND free limits independently
      */
-    public static function checkOperationLimit($msgArr, $operation): array
-    {
+    public static function checkOperationLimit($msgArr, $operation): array {
         $result = ['limited' => false, 'reason' => '', 'reset_time' => 0];
 
         if (!self::isRateLimitingEnabled()) {
@@ -1159,7 +1122,6 @@ class XSControl
                     }
                 }
             }
-
         } catch (Exception $e) {
             if ($GLOBALS['debug']) {
                 error_log('Error checking operation limit: ' . $e->getMessage());
@@ -1173,8 +1135,7 @@ class XSControl
      * Check rate limits for any topic after sorting
      * Maps topics to appropriate limit types
      */
-    public static function checkTopicLimit($msgArr): array
-    {
+    public static function checkTopicLimit($msgArr): array {
         $result = ['limited' => false, 'reason' => '', 'reset_time' => 0];
 
         if (!self::isRateLimitingEnabled()) {
@@ -1236,5 +1197,4 @@ class XSControl
                 return $result;
         }
     }
-
 }

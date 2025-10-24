@@ -52,7 +52,6 @@ if (extension_loaded('memcached')) {
     } else {
         echo '✗ Set operation failed<br>';
     }
-
 } else {
     echo '✗ Memcached extension is NOT loaded<br>';
 }

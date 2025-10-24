@@ -27,7 +27,6 @@ try {
     ]);
 
     echo '✅ Chat API works! Response: ' . $response->choices[0]->message->content . "\n";
-
 } catch (Exception $e) {
     echo '❌ Chat API failed: ' . $e->getMessage() . "\n";
     exit(1);
@@ -58,7 +57,6 @@ try {
 
     echo '✅ Responses API works! Response ID: ' . $response->id . "\n";
     echo 'Status: ' . $response->status . "\n";
-
 } catch (Exception $e) {
     echo '❌ Responses API failed: ' . $e->getMessage() . "\n";
     exit(1);

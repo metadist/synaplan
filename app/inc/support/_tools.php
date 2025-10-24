@@ -5,8 +5,7 @@ class Tools
     // ******************************************************************************************************
     // get config value per user or default
     // ******************************************************************************************************
-    public static function getConfigValue($msgArr, $setting): string
-    {
+    public static function getConfigValue($msgArr, $setting): string {
         $setSQL = 'select * from BCONFIG where (BOWNERID = '.$msgArr['BUSERID']." OR BOWNERID = 0)
                      AND BSETTING = '".$setting."' order by BID desc limit 1";
         $res = db::Query($setSQL);
@@ -16,8 +15,7 @@ class Tools
     // ******************************************************************************************************
     // member link
     // ******************************************************************************************************
-    public static function memberLink($msgArr): array
-    {
+    public static function memberLink($msgArr): array {
         $usrArr = Central::getUsrById($msgArr['BUSERID']);
         $ticketStr = uniqid(dechex(rand(100000, 999999)));
         $userDetailsArr = json_decode($usrArr['BUSERDETAILS'], true);
@@ -35,8 +33,7 @@ class Tools
     // ******************************************************************************************************
     // search web
     // ******************************************************************************************************
-    public static function searchWeb($msgArr, $qTerm): array
-    {
+    public static function searchWeb($msgArr, $qTerm): array {
         // Initialize API credentials
         $braveKey = ApiKeys::getBraveSearch();
 
@@ -82,8 +79,7 @@ class Tools
     // ******************************************************************************************************
     // search RAG
     // ******************************************************************************************************
-    public static function searchRAG($msgArr): array
-    {
+    public static function searchRAG($msgArr): array {
         // get the prompt summarized in short, if too long:
         if (strlen($msgArr['BTEXT']) > 128) {
             $msgArr['BTEXT'] = BasicAI::getShortPrompt($msgArr['BTEXT']);
@@ -125,8 +121,7 @@ class Tools
     // ******************************************************************************************************
     // search docs with, eg: /docs images of picard
     // ******************************************************************************************************
-    public static function searchDocs($msgArr): array
-    {
+    public static function searchDocs($msgArr): array {
         $country = strtoupper($msgArr['BLANG']);
         $usrArr = Central::getUsrById($msgArr['BUSERID']);
 
@@ -158,7 +153,6 @@ class Tools
                     $msgArr['BTEXT'] .= "\n".substr($oneVec['BFILETEXT'], 0, 96).'...';
                     $msgArr['BTEXT'] .= "\n".$GLOBALS['baseUrl'].'up/'.$oneVec['BFILEPATH']."\n";
                     $entryCounter++;
-
                 }
             }
         } else {
@@ -169,8 +163,7 @@ class Tools
         return $msgArr;
     }
     // get file extension from mime type
-    public static function getFileExtension(string $mimeType): string
-    {
+    public static function getFileExtension(string $mimeType): string {
         $mimeMap = [
             'image/jpeg' => 'jpg',
             'image/png' => 'png',
@@ -195,16 +188,14 @@ class Tools
         return $mimeMap[$mimeType] ?? 'unknown';
     }
     // ******************************************************************************************************
-    public static function vectorSearch($msgArr): array
-    {
+    public static function vectorSearch($msgArr): array {
         return $msgArr;
     }
     // ******************************************************************************************************
     // Create a screenshot of a web page from URL
     // ******************************************************************************************************
 
-    public static function webScreenshot($msgArr, $x = 1170, $y = 2400): array
-    {
+    public static function webScreenshot($msgArr, $x = 1170, $y = 2400): array {
         $usrArr = Central::getUsrById($msgArr['BUSERID']);
 
         $commandArr = explode(' ', $msgArr['BTEXT']);
@@ -260,7 +251,6 @@ class Tools
                 $msgArr['BFILEPATH'] = $fileDBPath;
                 $msgArr['BFILETYPE'] = 'png';
                 $msgArr['BTEXT'] = '/screenshot of URL: '.$url;
-
             } else {
                 $msgArr['BTEXT'] = 'Error: Could not create screenshot of the web page.';
             }
@@ -279,8 +269,7 @@ class Tools
     }
 
     // --------------------------------------------------------------------------
-    public static function sysStr($in): string
-    {
+    public static function sysStr($in): string {
         $out = basename(strtolower($in));
         if (substr($out, 0, 1) == '.') {
             $out = substr($out, 1);
@@ -307,8 +296,7 @@ class Tools
         return $out;
     }
     // --------------------------------------------------------------------------
-    public static function idFromMail($in): string
-    {
+    public static function idFromMail($in): string {
         // $strMyId = str_pad($strMyId, 7, "0", STR_PAD_LEFT);
         return md5($in);
         /*
@@ -332,8 +320,7 @@ class Tools
         */
     }
     // --------------------------------------------------------------------------
-    public static function cleanGMail($from)
-    {
+    public static function cleanGMail($from) {
         $mailParts = explode('<', $from);
         $mailParts = explode('>', $mailParts[1]);
         $plainMail = strtolower($mailParts[0]);
@@ -342,13 +329,11 @@ class Tools
         return $plainMail;
     }
     // ---
-    public static function ensure_utf8(string $text): string
-    {
+    public static function ensure_utf8(string $text): string {
         return (mb_detect_encoding($text, 'UTF-8', true) === 'UTF-8') ? $text : mb_convert_encoding($text, 'UTF-8', 'auto');
     }
     // ---
-    public static function cleanTextBlock($text): string
-    {
+    public static function cleanTextBlock($text): string {
         while (substr_count($text, '\\r\\n\\r\\n') > 0) {
             $text = str_replace('\\r\\n', '\\r\\n', $text);
             $text = str_replace('\\r\\n', ' ', $text);
@@ -366,8 +351,7 @@ class Tools
         return $text;
     }
     // --- image loader
-    public static function giveSmallImage($myPath, $giveImage = true, $newWidth = 800)
-    {
+    public static function giveSmallImage($myPath, $giveImage = true, $newWidth = 800) {
         $path = 'up/'.$myPath;
 
         $mimetype = mime_content_type($path);
@@ -445,13 +429,11 @@ class Tools
         return false;
     }
     // datetime string
-    public static function myDateTime($datestr): string
-    {
+    public static function myDateTime($datestr): string {
         return substr($datestr, 6, 2).'.'.substr($datestr, 4, 2).'.'.substr($datestr, 0, 4) . ' - ' . substr($datestr, 8, 2).':'.substr($datestr, 10, 2);
     }
     // is valid json
-    public static function isValidJson($string): bool
-    {
+    public static function isValidJson($string): bool {
         if (!is_string($string)) {
             return false;
         }
@@ -459,8 +441,7 @@ class Tools
         return (json_last_error() === JSON_ERROR_NONE);
     }
     // Rate limiting helper used by API endpoints
-    public static function checkRateLimit($key, $window, $maxRequests)
-    {
+    public static function checkRateLimit($key, $window, $maxRequests) {
         $currentTime = time();
         $rateLimitKey = 'rate_limit_' . $key;
 
@@ -493,8 +474,7 @@ class Tools
         return ['allowed' => false, 'retry_after' => $retryAfter];
     }
     // Get Authorization header value from current request (Bearer ...)
-    public static function getAuthHeaderValue(): string
-    {
+    public static function getAuthHeaderValue(): string {
         $headers = [];
         if (function_exists('getallheaders')) {
             $headers = getallheaders();
@@ -510,8 +490,7 @@ class Tools
         return trim($auth);
     }
     // migrate an half filled array to a full array
-    public static function migrateArray($destinationArr, $sourceArr): array
-    {
+    public static function migrateArray($destinationArr, $sourceArr): array {
         // Create a copy of the destination array to avoid modifying the original
         $result = $destinationArr;
 
@@ -527,8 +506,7 @@ class Tools
     }
     // --------------------------------------------------------------------------
     // change the text to include media to the output
-    public static function addMediaToText($msgArr): string
-    {
+    public static function addMediaToText($msgArr): string {
         // Process complex HTML first
         $outText = self::processComplexHtml($msgArr['BTEXT']);
 
@@ -560,8 +538,7 @@ class Tools
 
     // --------------------------------------------------------------------------
     // Check if text contains complex HTML and convert to markdown source if needed
-    public static function processComplexHtml($text): string
-    {
+    public static function processComplexHtml($text): string {
         // Define simple HTML tags that are allowed (video, image, link elements)
         $simpleTags = ['img', 'video', 'audio', 'a', 'br'];
 
@@ -585,8 +562,7 @@ class Tools
         return $text;
     }
     // converting urlencoded into real utf8
-    public static function turnURLencodedIntoUTF8(string $in): string
-    {
+    public static function turnURLencodedIntoUTF8(string $in): string {
         // 1️⃣ %xx  → byte
         // 1️⃣ %xx & + ➜ byte / space
         $step1 = urldecode($in);
@@ -600,14 +576,12 @@ class Tools
     // CRON coordination helpers (store state in BCONFIG with BOWNERID=0, BGROUP='CRON')
     // --------------------------------------------------------------------------
     // Lightweight debug output helper for cron jobs controlled by $GLOBALS['DEBUG_CRON']
-    public static function debugCronLog(string $message): void
-    {
+    public static function debugCronLog(string $message): void {
         if (!empty($GLOBALS['DEBUG_CRON'])) {
             echo $message;
         }
     }
-    public static function addCron(string $cronId): bool
-    {
+    public static function addCron(string $cronId): bool {
         $id = db::EscString($cronId);
         $ts = date('YmdHis');
         // Try to create the CRON row if it doesn't exist
@@ -625,24 +599,21 @@ class Tools
     }
 
 
-    public static function updateCron(string $cronId): bool
-    {
+    public static function updateCron(string $cronId): bool {
         $id = db::EscString($cronId);
         $ts = date('YmdHis');
         $sql = "UPDATE BCONFIG SET BVALUE='".$ts."' WHERE BOWNERID=0 AND BGROUP='CRON' AND BSETTING='".$id."'";
         return (bool) db::Query($sql);
     }
 
-    public static function deleteCron(string $cronId): bool
-    {
+    public static function deleteCron(string $cronId): bool {
         $id = db::EscString($cronId);
         $sql = "DELETE FROM BCONFIG WHERE BOWNERID=0 AND BGROUP='CRON' AND BSETTING='".$id."'";
         return (bool) db::Query($sql);
     }
 
     // Returns human-friendly runtime string like "123s" or "2m 3s"
-    public static function cronTime(string $cronId): string
-    {
+    public static function cronTime(string $cronId): string {
         $id = db::EscString($cronId);
         $sel = "SELECT BVALUE FROM BCONFIG WHERE BOWNERID=0 AND BGROUP='CRON' AND BSETTING='".$id."' ORDER BY BID DESC LIMIT 1";
         $res = db::Query($sel);
@@ -668,8 +639,7 @@ class Tools
 
     // Check if a cron with given ID is already running anywhere. If not running, register start.
     // Returns true if already running (caller should exit), false if successfully registered this run.
-    public static function cronRunCheck(string $cronId): bool
-    {
+    public static function cronRunCheck(string $cronId): bool {
         $id = db::EscString($cronId);
         $sel = "SELECT BVALUE FROM BCONFIG WHERE BOWNERID=0 AND BGROUP='CRON' AND BSETTING='".$id."' ORDER BY BID DESC LIMIT 1";
         $res = db::Query($sel);
@@ -684,8 +654,7 @@ class Tools
 
     // --------------------------------------------------------------------------
     // Create a secure random string for passwords/tokens
-    public static function createRandomString(int $minLength = 8, int $maxLength = 12): string
-    {
+    public static function createRandomString(int $minLength = 8, int $maxLength = 12): string {
         $min = max(4, $minLength);
         $max = max($min, $maxLength);
         $length = random_int($min, $max);

@@ -116,7 +116,6 @@ if (file_put_contents($envFile, $envContent) !== false) {
     echo "- ✅ Environment variable support\n";
     echo "- ✅ Open source friendly (keys not in repository)\n";
     echo "- ✅ Backward compatibility with existing .keys files\n\n";
-
 } else {
     echo "❌ Failed to create .env file. Check permissions.\n";
     exit(1);

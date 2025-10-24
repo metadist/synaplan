@@ -7,8 +7,7 @@ class AIOllama
     private static $host;
     private static $client;
 
-    public static function init(): void
-    {
+    public static function init(): void {
         $myServer = ApiKeys::get('OLLAMA_SERVER');
         self::$host = 'http://'.$myServer;
         self::$client = Ollama::client(self::$host);
@@ -24,8 +23,7 @@ class AIOllama
      * @param array $threadArr Conversation thread history
      * @return array|string|bool Sorting result or error message
      */
-    public static function sortingPrompt($msgArr, $threadArr): array|string|bool
-    {
+    public static function sortingPrompt($msgArr, $threadArr): array|string|bool {
         // prompt builder
         $systemPrompt = BasicAI::getAprompt('tools:sort');
 
@@ -99,8 +97,7 @@ class AIOllama
      * @param bool $stream Whether to use streaming mode
      * @return array|string|bool Topic-specific response or error message
      */
-    public static function topicPrompt($msgArr, $threadArr, $stream = false): array|string|bool
-    {
+    public static function topicPrompt($msgArr, $threadArr, $stream = false): array|string|bool {
         $systemPrompt = BasicAI::getAprompt($msgArr['BTOPIC'], $msgArr['BLANG'], $msgArr, true);
 
         if (isset($systemPrompt['TOOLS'])) {
@@ -168,7 +165,6 @@ class AIOllama
                 $arrAnswer['ALREADYSHOWN'] = true;
 
                 return $arrAnswer;
-
             } else {
                 // Use non-streaming mode (existing logic)
                 // Build the complete prompt with system context and message history
@@ -236,8 +232,7 @@ class AIOllama
      * @param array $msgArr Message array containing user information
      * @return array|string|bool Welcome message or error message
      */
-    public static function welcomePrompt($msgArr): array|string|bool
-    {
+    public static function welcomePrompt($msgArr): array|string|bool {
         $arrPrompt = BasicAI::getAprompt('tools:help');
         $systemPrompt = $arrPrompt['BPROMPT'];
 
@@ -265,8 +260,7 @@ class AIOllama
     // ****************************************************************
     // local vision AI
     // ****************************************************************
-    public static function explainImage($arrMessage): array|string|bool
-    {
+    public static function explainImage($arrMessage): array|string|bool {
         // Handle large images
         if (filesize(rtrim(UPLOAD_DIR, '/').'/'.$arrMessage['BFILEPATH']) > intval(1024 * 1024 * 3.5)) {
             $imageFile = Tools::giveSmallImage($arrMessage['BFILEPATH'], false, 1200);
@@ -317,8 +311,7 @@ class AIOllama
      * @param array $arrMessage Message array containing audio file information
      * @return array|string|bool Error message indicating unsupported feature
      */
-    public static function mp3ToText($arrMessage): array|string|bool
-    {
+    public static function mp3ToText($arrMessage): array|string|bool {
         // Ollama doesn't support audio transcription natively
         // You would need to use a separate service like OpenAI Whisper or similar
         return 'Audio transcription is not supported by Ollama. Please use external transcription service.';
@@ -334,8 +327,7 @@ class AIOllama
      * @param string $sourceText Field containing text to translate (optional)
      * @return array Translated message array
      */
-    public static function translateTo($msgArr, $lang = '', $sourceText = 'BTEXT'): array
-    {
+    public static function translateTo($msgArr, $lang = '', $sourceText = 'BTEXT'): array {
         $targetLang = $msgArr['BLANG'];
 
         if (strlen($lang) == 2) {
@@ -378,8 +370,7 @@ class AIOllama
      * @param string $text Text to summarize
      * @return string Summarized text
      */
-    public static function summarizePrompt($text): string
-    {
+    public static function summarizePrompt($text): string {
         $client = self::$client;
         // which model on ollama?
         $myModel = $GLOBALS['AI_SUMMARIZE']['MODEL'];
@@ -401,8 +392,7 @@ class AIOllama
     // ******************************************************************************************************
     // transfor the message to vector
     // ******************************************************************************************************
-    public static function embed($text)
-    {
+    public static function embed($text) {
         $vecclient = self::$client;
         try {
             $embeds = $vecclient->embed()->create([
@@ -426,8 +416,7 @@ class AIOllama
     // ******************************************************************************************************
     // nicefy the text with a LLM locally
     // ******************************************************************************************************
-    public static function nicefy($text, $lang)
-    {
+    public static function nicefy($text, $lang) {
         $client = self::$client;
         // which model on ollama?
         $myModel = $GLOBALS['AI_CHAT']['MODEL'];
@@ -449,8 +438,7 @@ class AIOllama
      * @param string $userPrompt The user's input/prompt
      * @return array Response array with success status and result/error
      */
-    public static function simplePrompt($systemPrompt, $userPrompt): array
-    {
+    public static function simplePrompt($systemPrompt, $userPrompt): array {
         $client = self::$client;
 
         // Build the complete prompt with system context and user input
@@ -471,7 +459,6 @@ class AIOllama
                 'success' => true,
                 'summary' => $result
             ];
-
         } catch (Exception $err) {
             return [
                 'success' => false,

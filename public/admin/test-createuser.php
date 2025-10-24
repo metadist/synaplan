@@ -120,7 +120,6 @@ try {
     } else {
         $testResult['error'] = 'User created but API key creation failed';
     }
-
 } catch (\Throwable $e) {
     $testResult['error'] = 'Exception: ' . $e->getMessage();
 }

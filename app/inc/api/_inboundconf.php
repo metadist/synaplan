@@ -6,8 +6,7 @@
 
 class InboundConf
 {
-    public static function getWhatsAppNumbers()
-    {
+    public static function getWhatsAppNumbers() {
         $numArr = [];
         $userId = $_SESSION['USERPROFILE']['BID'];
         $waSQL = 'select * from BWAPHONES where BOWNERID = '.$userId.' OR BOWNERID = 0 ORDER BY BOWNERID DESC';
@@ -19,8 +18,7 @@ class InboundConf
     }
     // *****************************************************
     // set the widget domain(s) in the BCONFIG table
-    public static function setWidgetDomain($domain)
-    {
+    public static function setWidgetDomain($domain) {
         $userId = $_SESSION['USERPROFILE']['BID'];
         $waSQL = '';
         $waRes = db::Query($waSQL);
@@ -34,8 +32,7 @@ class InboundConf
      * Get the current Gmail keyword for the logged-in user
      * @return string|null The keyword or null if not set
      */
-    public static function getGmailKeyword()
-    {
+    public static function getGmailKeyword() {
         $userId = $_SESSION['USERPROFILE']['BID'];
         $sql = 'SELECT BVALUE FROM BCONFIG WHERE BOWNERID = ' . intval($userId) . " AND BGROUP = 'GMAILKEY' AND BSETTING = 'keyword' LIMIT 1";
         $res = db::Query($sql);
@@ -53,8 +50,7 @@ class InboundConf
      * @param string $keyword The keyword to validate
      * @return array ['valid' => bool, 'message' => string]
      */
-    public static function validateKeywordFormat($keyword)
-    {
+    public static function validateKeywordFormat($keyword) {
         // Check if keyword is empty
         if (empty($keyword)) {
             return ['valid' => false, 'message' => 'Keyword cannot be empty'];
@@ -80,8 +76,7 @@ class InboundConf
      * @param int|null $excludeUserId Optional user ID to exclude (for updates)
      * @return bool True if unique, false if already taken
      */
-    public static function isKeywordUnique($keyword, $excludeUserId = null)
-    {
+    public static function isKeywordUnique($keyword, $excludeUserId = null) {
         $keyword = db::EscString($keyword);
         $sql = "SELECT BOWNERID FROM BCONFIG WHERE BGROUP = 'GMAILKEY' AND BSETTING = 'keyword' AND BVALUE = '" . $keyword . "'";
 
@@ -116,8 +111,7 @@ class InboundConf
      * @param string $keyword The keyword to save
      * @return array ['success' => bool, 'message' => string]
      */
-    public static function saveGmailKeyword($keyword)
-    {
+    public static function saveGmailKeyword($keyword) {
         $userId = $_SESSION['USERPROFILE']['BID'];
 
         // Normalize keyword (trim and lowercase for consistency)
@@ -160,8 +154,7 @@ class InboundConf
      * @param string $keyword The keyword to test
      * @return array ['available' => bool, 'message' => string]
      */
-    public static function testKeywordAvailability($keyword)
-    {
+    public static function testKeywordAvailability($keyword) {
         $userId = $_SESSION['USERPROFILE']['BID'];
 
         // Normalize keyword
@@ -185,8 +178,7 @@ class InboundConf
      * Delete Gmail keyword for the current user
      * @return bool True if deleted successfully
      */
-    public static function deleteGmailKeyword()
-    {
+    public static function deleteGmailKeyword() {
         $userId = $_SESSION['USERPROFILE']['BID'];
         $sql = 'DELETE FROM BCONFIG WHERE BOWNERID = ' . intval($userId) . " AND BGROUP = 'GMAILKEY' AND BSETTING = 'keyword'";
         return db::Query($sql);
@@ -196,8 +188,7 @@ class InboundConf
      * Debug method to get all Gmail keywords in the system
      * @return array All GMAILKEY entries from BCONFIG
      */
-    public static function getAllGmailKeywords()
-    {
+    public static function getAllGmailKeywords() {
         $sql = "SELECT BID, BOWNERID, BGROUP, BSETTING, BVALUE FROM BCONFIG WHERE BGROUP = 'GMAILKEY' ORDER BY BOWNERID";
         $res = db::Query($sql);
 
@@ -219,8 +210,7 @@ class InboundConf
      * @param string $keyword The keyword to lookup
      * @return int User ID (owner of keyword, or 2 for system default)
      */
-    public static function getUserIdByKeyword($keyword)
-    {
+    public static function getUserIdByKeyword($keyword) {
         // Default to system user ID 2
         $systemUserId = 2;
 
@@ -254,8 +244,7 @@ class InboundConf
      * @param string $emailAddress Full email address
      * @return string|null Keyword if found, null otherwise
      */
-    public static function extractKeywordFromEmail($emailAddress)
-    {
+    public static function extractKeywordFromEmail($emailAddress) {
         // Remove any name part: "John Doe <smart+support@synaplan.com>" -> "smart+support@synaplan.com"
         if (strpos($emailAddress, '<') !== false) {
             preg_match('/<([^>]+)>/', $emailAddress, $matches);

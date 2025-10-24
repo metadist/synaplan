@@ -25,8 +25,7 @@ class EmailService
      * @param int $userId User ID
      * @return bool True if email sent successfully
      */
-    public static function sendRegistrationConfirmation(string $email, string $pin, int $userId): bool
-    {
+    public static function sendRegistrationConfirmation(string $email, string $pin, int $userId): bool {
         $confirmLink = $GLOBALS['baseUrl'] . 'index.php/confirm/?PIN=' . $pin . '&UID=' . $userId;
 
         $htmlText = "
@@ -66,8 +65,7 @@ class EmailService
      * @param string $email User's email address
      * @return bool True if email sent successfully
      */
-    public static function sendEmailConfirmation(string $email): bool
-    {
+    public static function sendEmailConfirmation(string $email): bool {
         $htmlText = '
         <h2>Email Confirmed!</h2>
         <p>Your email address has been successfully confirmed.</p>
@@ -101,8 +99,7 @@ class EmailService
      * @param string $details Additional details about the limit
      * @return bool True if email sent successfully
      */
-    public static function sendLimitNotification(string $email, string $limitType, string $details = ''): bool
-    {
+    public static function sendLimitNotification(string $email, string $limitType, string $details = ''): bool {
         $htmlText = "
         <h2>Usage Limit Reached</h2>
         <p>Your account has reached the $limitType limit.</p>
@@ -137,8 +134,7 @@ class EmailService
      * @param string $newPassword Newly generated password (already stored hashed)
      * @return bool
      */
-    public static function sendPasswordResetEmail(string $email, string $newPassword): bool
-    {
+    public static function sendPasswordResetEmail(string $email, string $newPassword): bool {
         $loginLink = $GLOBALS['baseUrl'] . 'index.php';
 
         $htmlText = "
@@ -182,8 +178,7 @@ class EmailService
      * @param string $adminEmail Admin email (optional, uses default if not provided)
      * @return bool True if email sent successfully
      */
-    public static function sendAdminNotification(string $subject, string $message, string $adminEmail = ''): bool
-    {
+    public static function sendAdminNotification(string $subject, string $message, string $adminEmail = ''): bool {
         $recipient = !empty($adminEmail) ? $adminEmail : self::$defaultSender;
 
         $htmlText = "
@@ -218,8 +213,7 @@ class EmailService
      * @param string $replyTo Reply-to email address (optional)
      * @return bool True if email sent successfully
      */
-    public static function sendEmail(string $to, string $subject, string $htmlBody, string $plainBody, string $replyTo = ''): bool
-    {
+    public static function sendEmail(string $to, string $subject, string $htmlBody, string $plainBody, string $replyTo = ''): bool {
         try {
             $replyToEmail = !empty($replyTo) ? $replyTo : self::$defaultReplyTo;
 
@@ -244,8 +238,7 @@ class EmailService
      *
      * @param string $email Default sender email
      */
-    public static function setDefaultSender(string $email): void
-    {
+    public static function setDefaultSender(string $email): void {
         self::$defaultSender = $email;
     }
 
@@ -254,8 +247,7 @@ class EmailService
      *
      * @param string $email Default reply-to email
      */
-    public static function setDefaultReplyTo(string $email): void
-    {
+    public static function setDefaultReplyTo(string $email): void {
         self::$defaultReplyTo = $email;
     }
 }

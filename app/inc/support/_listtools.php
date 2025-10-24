@@ -25,8 +25,7 @@ class listTools
     // ******************************************************************************************************
 
     // take the tool call and decide what to do
-    public static function listDirector($jsonArr, $msgArr)
-    {
+    public static function listDirector($jsonArr, $msgArr) {
         $answerArr = $msgArr;
 
         $listAction = $jsonArr['ACTION'];
@@ -97,8 +96,7 @@ class listTools
     // ******************************************************************************************************
     // check if a list exits for the user
     // ******************************************************************************************************
-    public static function listExists($jsonArr, $msgArr): array
-    {
+    public static function listExists($jsonArr, $msgArr): array {
         // set vars first
         $userId = $msgArr['BUSERID'];
         $listName = $jsonArr['LISTNAME'];
@@ -112,8 +110,7 @@ class listTools
     // ******************************************************************************************************
     // get all lists for a user
     // ******************************************************************************************************
-    public static function getLists($jsonArr, $msgArr): array
-    {
+    public static function getLists($jsonArr, $msgArr): array {
         $listArr = [];
         $lSql = 'SELECT DISTINCT BLNAME, BLISTKEY FROM BLISTS WHERE BOWNERID = '.intval($msgArr['BUSERID']).' GROUP BY BLNAME ORDER BY BID desc';
         $lRes = db::Query($lSql);
@@ -126,8 +123,7 @@ class listTools
     // ******************************************************************************************************
     // get all entries for a list
     // ******************************************************************************************************
-    public static function getListEntries($jsonArr, $msgArr): array
-    {
+    public static function getListEntries($jsonArr, $msgArr): array {
         $listName = $jsonArr['LISTNAME'];
         $listArr = [];
         $eSql = 'SELECT * FROM BLISTS WHERE BOWNERID = '.intval($msgArr['BUSERID'])." AND BLNAME like '".(db::EscString($listName))."' ORDER BY BLNAME, BID asc";
@@ -142,8 +138,7 @@ class listTools
     // ******************************************************************************************************
     // create a new list
     // ******************************************************************************************************
-    public static function createList($jsonArr, $msgArr): array
-    {
+    public static function createList($jsonArr, $msgArr): array {
         $listName = $jsonArr['LISTNAME'];
         $userId = $msgArr['BUSERID'];
         $listKey = date('YmdHis');
@@ -167,8 +162,7 @@ class listTools
     // ******************************************************************************************************
     // add a list entry
     // ******************************************************************************************************
-    public static function addListEntry($jsonArr, $msgArr): array
-    {
+    public static function addListEntry($jsonArr, $msgArr): array {
         $listArr = self::listExists($jsonArr, $msgArr);
         if (count($listArr) > 0) {
             $listKey = $listArr['BLISTKEY'];
@@ -185,7 +179,6 @@ class listTools
             $cSql = 'INSERT INTO BLISTS (BID, BOWNERID, BLISTKEY, BLISTFORM, BLNAME, BENTRY) VALUES ';
             $cSql .= '(DEFAULT, '.intval($msgArr['BUSERID']).", '".$listKey."', 'STANDARD', '".(db::EscString($listName))."', '".(db::EscString($listEntry))."')";
             $cRes = db::Query($cSql);
-
         }
         // delete entries with '' as ENTRY
         $dSql = 'DELETE FROM BLISTS WHERE  BOWNERID = '.intval($msgArr['BUSERID'])." AND BLISTKEY = '".$listKey."' AND BENTRY = ''";
@@ -197,8 +190,7 @@ class listTools
     // ******************************************************************************************************
     // show a list
     // ******************************************************************************************************
-    public static function showList($jsonArr, $msgArr): array
-    {
+    public static function showList($jsonArr, $msgArr): array {
         $listArr = self::getListEntries($jsonArr, $msgArr);
         return $listArr;
     }
@@ -206,8 +198,7 @@ class listTools
     // ******************************************************************************************************
     // remove a list entry
     // ******************************************************************************************************
-    public static function removeListEntry($jsonArr, $msgArr): array
-    {
+    public static function removeListEntry($jsonArr, $msgArr): array {
         $listArr = self::getListEntries($jsonArr, $msgArr);
         $listKey = $listArr['BLISTKEY'];
         $listName = $listArr['BLNAME'];
@@ -220,8 +211,7 @@ class listTools
     // ******************************************************************************************************
     // trash a list
     // ******************************************************************************************************
-    public static function trashList($jsonArr, $msgArr): array
-    {
+    public static function trashList($jsonArr, $msgArr): array {
         $listArr = self::getListEntries($jsonArr, $msgArr);
         if (count($listArr) > 0) {
             $listKey = $listArr[0]['BLISTKEY'];
@@ -235,8 +225,7 @@ class listTools
     // ******************************************************************************************************
     // list all lists
     // ******************************************************************************************************
-    public static function listLists($jsonArr, $msgArr): array
-    {
+    public static function listLists($jsonArr, $msgArr): array {
         $listArr = self::getLists($jsonArr, $msgArr);
         return $listArr;
     }

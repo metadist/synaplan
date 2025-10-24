@@ -6,8 +6,7 @@ class TikaClient
     /**
      * Resolve Tika base URL from environment with documented default.
      */
-    public static function resolveBaseUrl(): string
-    {
+    public static function resolveBaseUrl(): string {
         $envUrl = ApiKeys::getTikaUrl();
         $base = $envUrl && strlen(trim($envUrl)) > 0 ? trim($envUrl) : 'http://tika:9998';
         return rtrim($base, '/');
@@ -16,8 +15,7 @@ class TikaClient
     /**
      * Extract plain text via Apache Tika. Returns [text, meta] or [null, meta] on failure.
      */
-    public static function extractText(string $absoluteFilePath, ?string $mimeType = null): array
-    {
+    public static function extractText(string $absoluteFilePath, ?string $mimeType = null): array {
         $baseUrl = self::resolveBaseUrl();
         $endpoint = $baseUrl . '/tika';
         $timeoutMs = ApiKeys::getTikaTimeoutMs();
@@ -69,8 +67,7 @@ class TikaClient
         return [null, ['endpoint' => $baseUrl, 'error' => $lastError]];
     }
 
-    private static function curlPutFile(string $url, array $headers, string $filePath, int $timeoutMs, ?string $authUser = null, ?string $authPass = null): array
-    {
+    private static function curlPutFile(string $url, array $headers, string $filePath, int $timeoutMs, ?string $authUser = null, ?string $authPass = null): array {
         if (!is_file($filePath) || filesize($filePath) === 0) {
             throw new \RuntimeException('Input file missing or empty: ' . $filePath);
         }
@@ -114,8 +111,7 @@ class TikaClient
         return [$response, $httpCode];
     }
 
-    private static function logCall(string $endpoint, int $attempt, bool $success, int $elapsedMs, int $bytes, string $error = '', int $httpCode = 0): void
-    {
+    private static function logCall(string $endpoint, int $attempt, bool $success, int $elapsedMs, int $bytes, string $error = '', int $httpCode = 0): void {
         // Sanitize URL (strip credentials)
         $sanitized = self::sanitizeUrl($endpoint);
         $msg = 'TikaCall endpoint=' . $sanitized . ' attempt=' . $attempt . ' success=' . ($success ? '1' : '0') . ' http=' . $httpCode . ' elapsed_ms=' . $elapsedMs . ' bytes=' . $bytes;
@@ -127,8 +123,7 @@ class TikaClient
         }
     }
 
-    public static function sanitizeUrl(string $url): string
-    {
+    public static function sanitizeUrl(string $url): string {
         $parts = parse_url($url);
         if ($parts === false) {
             return $url;
@@ -140,8 +135,7 @@ class TikaClient
         return $scheme . '://' . $host . $port . $path;
     }
 
-    private static function maybePingHealth(string $baseUrl): void
-    {
+    private static function maybePingHealth(string $baseUrl): void {
         if (self::$didHealthCheck) {
             return;
         }

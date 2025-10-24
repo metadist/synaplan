@@ -6,8 +6,7 @@ namespace App;
 
 class Director
 {
-    public static function dispatch(): void
-    {
+    public static function dispatch(): void {
         $contentInc = 'unknown';
 
         $cleanUriArr = explode('?', $_SERVER['REQUEST_URI']);

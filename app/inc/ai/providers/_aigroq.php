@@ -27,8 +27,7 @@ class AIGroq
      *
      * @return bool True if initialization is successful
      */
-    public static function init()
-    {
+    public static function init() {
         self::$key = ApiKeys::getGroq();
         if (!self::$key) {
             //if($GLOBALS["debug"]) error_log("Groq API key not configured");
@@ -57,8 +56,7 @@ class AIGroq
      * @param array $threadArr Conversation thread history
      * @return array|string|bool Sorting result or error message
      */
-    public static function sortingPrompt($msgArr, $threadArr): array|string|bool
-    {
+    public static function sortingPrompt($msgArr, $threadArr): array|string|bool {
         // Enhanced debug logging for sorting prompt
         if ($GLOBALS['debug']) {
             error_log('=== GROQ SORTING DEBUG: Starting sortingPrompt ===');
@@ -142,7 +140,6 @@ class AIGroq
                 error_log('=== GROQ SORTING DEBUG: API Response Success ===');
                 error_log('Response received successfully');
             }
-
         } catch (GroqException $err) {
             if ($GLOBALS['debug']) {
                 error_log('=== GROQ SORTING DEBUG: API Error Details ===');
@@ -243,8 +240,7 @@ class AIGroq
      * @param array $threadArr Thread context for conversation history
      * @return array|string|bool Topic-specific response or error message
      */
-    public static function topicPrompt($msgArr, $threadArr, $stream = false): array|string|bool
-    {
+    public static function topicPrompt($msgArr, $threadArr, $stream = false): array|string|bool {
         //error_log('topicPrompt: '.print_r($msgArr, true));
 
         $systemPrompt = BasicAI::getAprompt($msgArr['BTOPIC'], $msgArr['BLANG'], $msgArr, true);
@@ -360,7 +356,6 @@ class AIGroq
                     if (!empty($pendingText)) {
                         Frontend::statusToStream($msgArr['BID'], 'ai', $pendingText);
                     }
-
                 } catch (Exception $streamErr) {
                     if ($GLOBALS['debug']) {
                         error_log('=== GROQ TOPIC DEBUG: Streaming Exception ===');
@@ -408,7 +403,6 @@ class AIGroq
                 $arrAnswer['ALREADYSHOWN'] = true;
 
                 return $arrAnswer;
-
             } else {
                 // Use non-streaming mode (existing logic)
                 $chat = $client->chat()->completions()->create([
@@ -423,7 +417,6 @@ class AIGroq
                 error_log('=== GROQ TOPIC DEBUG: Raw response structure ===');
                 error_log('Full response: ' . print_r($chat, true));
             }
-
         } catch (GroqException $err) {
             if ($GLOBALS['debug']) {
                 error_log('=== GROQ TOPIC DEBUG: GroqException Details ===');
@@ -515,8 +508,7 @@ class AIGroq
      * Attempt to extract BTEXT from a JSON string response.
      * Returns null if no valid BTEXT can be found.
      */
-    private static function extractBTEXTFromJsonString(string $content): ?string
-    {
+    private static function extractBTEXTFromJsonString(string $content): ?string {
         $candidate = trim($content);
 
         // Strip BOM and zero-width/invisible characters that break JSON
@@ -570,8 +562,7 @@ class AIGroq
     /**
      * Regex-based fallback to extract BTEXT from malformed JSON-like strings.
      */
-    private static function extractBTEXTViaRegex(string $content): ?string
-    {
+    private static function extractBTEXTViaRegex(string $content): ?string {
         // Try to find BTEXT:"..." or BTEXT:'...' with various quote styles
         $pattern = '/[\"\'\x{201C}\x{201D}\x{201E}]?BTEXT[\"\'\x{201C}\x{201D}\x{201E}]?\s*:\s*([\"\'\x{201C}\x{201D}\x{201E}])(.*?)\1/su';
         if (preg_match($pattern, $content, $m)) {
@@ -592,8 +583,7 @@ class AIGroq
      * @param array $msgArr Message array containing user information
      * @return array|string|bool Welcome message or error message
      */
-    public static function welcomePrompt($msgArr): array|string|bool
-    {
+    public static function welcomePrompt($msgArr): array|string|bool {
         $arrPrompt = BasicAI::getAprompt('tools:help');
         $systemPrompt = $arrPrompt['BPROMPT'];
 
@@ -625,8 +615,7 @@ class AIGroq
      * @param array $arrMessage Message array containing image information
      * @return array|string|bool Image description or error message
      */
-    public static function explainImage($arrMessage): array|string|bool
-    {
+    public static function explainImage($arrMessage): array|string|bool {
         // Resize image if too large
         if (filesize('./up/'.$arrMessage['BFILEPATH']) > intval(1024 * 1024 * 3.5)) {
             $imageFile = Tools::giveSmallImage($arrMessage['BFILEPATH'], false, 1200);
@@ -666,8 +655,7 @@ class AIGroq
      * @param array $arrMessage Message array containing audio file information
      * @return array|string|bool Transcription text or error message
      */
-    public static function mp3ToText($arrMessage): array|string|bool
-    {
+    public static function mp3ToText($arrMessage): array|string|bool {
         $client = self::$client;
         try {
             $transcription = $client->audio()->transcriptions()->create([
@@ -679,7 +667,6 @@ class AIGroq
             ]);
 
             $fullText = $transcription;
-
         } catch (\LucianoTonet\GroqPHP\GroqException $e) {
             $fullText = 'Error: ' . $e->getMessage();
         }
@@ -696,8 +683,7 @@ class AIGroq
      * @param string $sourceText Field containing text to translate (optional)
      * @return array Translated message array
      */
-    public static function translateTo($msgArr, $lang = 'en', $sourceText = 'BTEXT'): array
-    {
+    public static function translateTo($msgArr, $lang = 'en', $sourceText = 'BTEXT'): array {
         $targetLang = $msgArr['BLANG'];
 
         if (strlen($lang) == 2) {
@@ -803,8 +789,7 @@ class AIGroq
      * Summarizes a given text using Groq's summarization capabilities.
      *
     */
-    public static function summarizePrompt($text): string
-    {
+    public static function summarizePrompt($text): string {
         $client = self::$client;
         $arrMessages = [
             ['role' => 'system', 'content' => 'You summarize the text of the user to a short 2-3 sentence summary. Do not add any other text, just the essence of the text. Stay under 128 characters. Answer in the language of the text.'],
@@ -828,8 +813,7 @@ class AIGroq
      * @param string $userPrompt The user's input/prompt
      * @return array Response array with success status and result/error
      */
-    public static function simplePrompt($systemPrompt, $userPrompt): array
-    {
+    public static function simplePrompt($systemPrompt, $userPrompt): array {
         $client = self::$client;
 
         $arrMessages = [
@@ -850,7 +834,6 @@ class AIGroq
                 'success' => true,
                 'summary' => $result
             ];
-
         } catch (GroqException $err) {
             return [
                 'success' => false,
