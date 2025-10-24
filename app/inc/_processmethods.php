@@ -701,6 +701,13 @@ class ProcessMethods
                     error_log("FIRST AI CALL RESULT: BMESSTYPE=" . self::$answerMethod . " | BFILE=" . $firstCallBFILE . " | BTEXT=" . $firstCallBTEXT);
                 }
 
+                // Log first AI call result (only if APP_DEBUG=true)
+                if (!empty($GLOBALS['debug'])) {
+                    $firstCallBFILE = is_array($answerSorted) ? ($answerSorted['BFILE'] ?? 'NOT_SET') : 'NOT_ARRAY';
+                    $firstCallBTEXT = is_array($answerSorted) ? substr($answerSorted['BTEXT'] ?? '', 0, 100) : (is_string($answerSorted) ? substr($answerSorted, 0, 100) : 'INVALID');
+                    error_log('FIRST AI CALL RESULT: BMESSTYPE=' . self::$answerMethod . ' | BFILE=' . $firstCallBFILE . ' | BTEXT=' . $firstCallBTEXT);
+                }
+
                 if (is_string($answerSorted)) {
                     $answerSorted = [
                         'BTEXT'  => $answerSorted,
@@ -1472,6 +1479,12 @@ class ProcessMethods
         $newRes = db::Query($newSQL);
         $aiLastId = db::LastId();
         
+        if (!empty($GLOBALS['debug'])) {
+            $debugFile = __DIR__ . '/../../public/debug_websearch.log';
+            $timestamp = date('Y-m-d H:i:s');
+            file_put_contents($debugFile, "[$timestamp] saveAnswerToDB SAVED: aiLastId=" . $aiLastId . " | Will call outprocessor\n", FILE_APPEND);
+        }
+
         if (!empty($GLOBALS['debug'])) {
             $debugFile = __DIR__ . '/../../public/debug_websearch.log';
             $timestamp = date('Y-m-d H:i:s');

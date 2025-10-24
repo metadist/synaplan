@@ -303,6 +303,8 @@ class AIOpenAI
                 
                 self::debugLog('WEB/WA RESPONSE: BMESSTYPE=' . ($msgArr['BMESSTYPE'] ?? 'NOT_SET') . ' | BTEXT length=' . strlen($answer) . ' | BFILE=0');
 
+                self::debugLog('WEB/WA RESPONSE: BMESSTYPE=' . ($msgArr['BMESSTYPE'] ?? 'NOT_SET') . ' | BTEXT length=' . strlen($answer) . ' | BFILE=0');
+
                 return $arrAnswer;
 
             } else {
@@ -357,6 +359,14 @@ class AIOpenAI
                     }
                 }
                 
+                // CRITICAL FIX: Normalize BFILE to integer (empty string '' breaks database insert)
+                // BFILE column is tinyint(1) NOT NULL, so '' is invalid
+                if (!isset($arrAnswer['BFILE']) || $arrAnswer['BFILE'] === '' || $arrAnswer['BFILE'] === null) {
+                    $arrAnswer['BFILE'] = 0;
+                } else {
+                    $arrAnswer['BFILE'] = intval($arrAnswer['BFILE']);
+                }
+
                 // CRITICAL FIX: Normalize BFILE to integer (empty string '' breaks database insert)
                 // BFILE column is tinyint(1) NOT NULL, so '' is invalid
                 if (!isset($arrAnswer['BFILE']) || $arrAnswer['BFILE'] === '' || $arrAnswer['BFILE'] === null) {
