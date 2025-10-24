@@ -121,6 +121,30 @@ class ProcessMethods
 
         self::$stream = $stream;
         self::$toolProcessed = false;
+        
+        // CRITICAL FIX: Reload user-specific AI model configuration for background processing
+        // When processing via email/background, there's no session, so _confdefaults.php
+        // only loads global defaults. We need to reload with the message owner's config.
+        if (self::$msgArr['BUSERID'] > 0) {
+            $userId = intval(self::$msgArr['BUSERID']);
+            
+            // Reload AI model configs for this specific user
+            $userConfSQL = "SELECT * FROM BCONFIG WHERE BGROUP = 'DEFAULTMODEL' AND BOWNERID = " . $userId;
+            $userConfRES = db::Query($userConfSQL);
+            while ($userConfARR = db::FetchArr($userConfRES)) {
+                $detailSQL = 'SELECT * FROM BMODELS WHERE BID = '.intval($userConfARR['BVALUE']);
+                $detailRES = db::Query($detailSQL);
+                if ($detailRES && db::CountRows($detailRES) > 0) {
+                    $detailARR = db::FetchArr($detailRES);
+                    $GLOBALS['AI_'.$userConfARR['BSETTING']]['SERVICE'] = 'AI'.$detailARR['BSERVICE'];
+                    $GLOBALS['AI_'.$userConfARR['BSETTING']]['MODEL'] = $detailARR['BPROVID'];
+                    $GLOBALS['AI_'.$userConfARR['BSETTING']]['MODELID'] = $detailARR['BID'];
+                    
+                    // Log config reload for debugging
+                    error_log("ProcessMethods::init() - Loaded user $userId AI config: " . $userConfARR['BSETTING'] . " = " . $detailARR['BSERVICE'] . "/" . $detailARR['BPROVID']);
+                }
+            }
+        }
     }
 
     /**
