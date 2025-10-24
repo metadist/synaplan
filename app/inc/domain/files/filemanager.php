@@ -20,8 +20,7 @@ class FileManager
      * @param int $messageId The message ID to get files for
      * @return array Array of files associated with the message
      */
-    public static function getMessageFiles($messageId)
-    {
+    public static function getMessageFiles($messageId) {
         $files = [];
 
         // Handle anonymous widget sessions
@@ -69,8 +68,7 @@ class FileManager
      *
      * @return array Array containing status and processing information
      */
-    public static function saveRAGFiles(): array
-    {
+    public static function saveRAGFiles(): array {
         $retArr = ['error' => '', 'success' => false, 'processedFiles' => []];
 
         // Handle anonymous widget sessions
@@ -229,8 +227,7 @@ class FileManager
      * @param int $limit Maximum number of files to return
      * @return array Array of latest files
      */
-    public static function getLatestFiles($limit = 10): array
-    {
+    public static function getLatestFiles($limit = 10): array {
         $userId = $_SESSION['USERPROFILE']['BID'];
         $files = [];
 

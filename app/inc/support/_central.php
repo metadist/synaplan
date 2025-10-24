@@ -30,8 +30,7 @@ class Central
 {
     // enrich the message with user information and other data
     // save it to the DB
-    public static function handleInMessage($arrMessage): array|string|bool
-    {
+    public static function handleInMessage($arrMessage): array|string|bool {
         // check, if there is a conversation open with this trackid
         // set conversion group ID, if so
         //error_log('Central::handleInMessage '.print_r($arrMessage, true));
@@ -74,16 +73,13 @@ class Central
     }
 
     // Status updates
-    public static function handleStatus($arrStatus): array|string|bool
-    {
-
+    public static function handleStatus($arrStatus): array|string|bool {
         return $arrStatus;
     }
     // ******************************************************************************************************
     // handle the prompt id for the message
     // ******************************************************************************************************
-    public static function handlePromptIdForMessage($arrMessage): string
-    {
+    public static function handlePromptIdForMessage($arrMessage): string {
         $messPromptId = 'tools:sort';
         if (isset($_REQUEST['promptId'])) {
             $messPromptId = db::EscString($_REQUEST['promptId']);
@@ -104,8 +100,7 @@ class Central
     // complete the message set with user information
     // get user by phone number
     // return user arr
-    public static function getUserByPhoneNumber($phoneNumber, $createNew = true): array|null|bool
-    {
+    public static function getUserByPhoneNumber($phoneNumber, $createNew = true): array|null|bool {
         $arrUser = [];
         $getSQL = "select * from BUSER where BPROVIDERID = '".(db::EscString($phoneNumber))."' AND BINTYPE = 'WA'";
         $res = db::Query($getSQL);
@@ -131,8 +126,7 @@ class Central
         return $arrUser;
     }
     // get user by mail
-    public static function getUserByMail($mail, $phoneNumberOrTag, $createNew = true): array|null|bool
-    {
+    public static function getUserByMail($mail, $phoneNumberOrTag, $createNew = true): array|null|bool {
         $arrUser = [];
         // first look in the user kinds
         $escapedProvId = db::EscString(Tools::idFromMail($mail));
@@ -173,8 +167,7 @@ class Central
 
     // get the user by phone or tag, that means that the BINTYPE CAN VARY
     // NOT READY YET!
-    public static function getUserByPhoneNumberOrTag($phoneNumberOrTag, $createMail = true): array|null|bool
-    {
+    public static function getUserByPhoneNumberOrTag($phoneNumberOrTag, $createMail = true): array|null|bool {
         $arrUser = [];
 
         if (intval($phoneNumberOrTag) > 0) {
@@ -206,8 +199,7 @@ class Central
         return $arrUser;
     }
     // get the seconds since the last message of the user
-    public static function getSecondsSinceLastMessage($arrMessage): int
-    {
+    public static function getSecondsSinceLastMessage($arrMessage): int {
         $searchSQL = 'select * from BMESSAGES where BUSERID = '.$arrMessage['BUSERID'].' and BUNIXTIMES < '.$arrMessage['BUNIXTIMES'].' 
             order by BID desc limit 1';
         $res = db::Query($searchSQL);
@@ -221,8 +213,7 @@ class Central
         return $lastTime;
     }
     // search for a conversation with the user and message details
-    public static function searchConversation($arrMessage): array|string|bool
-    {
+    public static function searchConversation($arrMessage): array|string|bool {
         $arrConv = [];
         $arrConv['BID'] = 0;
         // search for the last message of the user
@@ -250,8 +241,7 @@ class Central
         return false;
     }
     // language by country code
-    public static function getLanguageByCountryCode($phoneNumber): string
-    {
+    public static function getLanguageByCountryCode($phoneNumber): string {
         $arrLang = [
             '1' => 'en',
             '49' => 'de',
@@ -279,8 +269,7 @@ class Central
         return 'en';
     }
     // mime types allowed
-    public static function checkMimeTypes($extension, $mimeType): bool
-    {
+    public static function checkMimeTypes($extension, $mimeType): bool {
         $allowedExtensions = ['pdf', 'jpg', 'jpeg', 'png', 'gif', 'doc', 'docx', 'xls', 'xlsx', 'mp3', 'mp4','svg','ppt','pptx','csv','txt','md','html','htm'];
         $allowedMimeTypes = [
             'application/pdf',
@@ -315,8 +304,7 @@ class Central
      * @param string $mimeType MIME type
      * @return bool True if file type is allowed for anonymous users
      */
-    public static function checkMimeTypesForAnonymous($extension, $mimeType): bool
-    {
+    public static function checkMimeTypesForAnonymous($extension, $mimeType): bool {
         $allowedExtensions = ['pdf', 'jpg', 'jpeg', 'png', 'gif'];
         $allowedMimeTypes = [
             'application/pdf',
@@ -330,8 +318,7 @@ class Central
         return false;
     }
     // language by the browser settings
-    public static function getLanguageByBrowser(): string
-    {
+    public static function getLanguageByBrowser(): string {
         if (!isset($_SERVER['HTTP_ACCEPT_LANGUAGE'])) {
             return 'en'; // fallback
         }
@@ -362,8 +349,7 @@ class Central
     }
 
     // parse the file
-    public static function parseFile($arrMessage, $streamOutput = false): array|string|bool
-    {
+    public static function parseFile($arrMessage, $streamOutput = false): array|string|bool {
         $fileType = 0;
         if ($streamOutput) {
             $update = [
@@ -680,8 +666,7 @@ class Central
     }
 
     // get the message thread up to 15 messages back
-    public static function getThread($arrMsg, $timeSeconds = 86400): array|string|bool
-    {
+    public static function getThread($arrMsg, $timeSeconds = 86400): array|string|bool {
         $arrThread = [];
 
         // Handle anonymous widget sessions
@@ -714,8 +699,7 @@ class Central
     }
 
     // get topic filtered thread
-    public static function getTopicThread($arrMsg, $timeSeconds = 86400): array|string|bool
-    {
+    public static function getTopicThread($arrMsg, $timeSeconds = 86400): array|string|bool {
         $arrThread = [];
         $getSQL = 'select * from BMESSAGES where BUSERID = '.$arrMsg['BUSERID'].' and BUNIXTIMES < '.$arrMsg['BUNIXTIMES'].' and BUNIXTIMES > '.($arrMsg['BUNIXTIMES'] - $timeSeconds)." and BTOPIC = '".$arrMsg['BTOPIC']."' order by BID desc limit 5";
         $res = db::Query($getSQL);
@@ -731,8 +715,7 @@ class Central
     }
 
     // get message by ID
-    public static function getMsgById($msgId): array|string|bool
-    {
+    public static function getMsgById($msgId): array|string|bool {
         $getSQL = 'select * from BMESSAGES where BID = '.$msgId;
         $res = db::Query($getSQL);
         $msgArr = db::FetchArr($res);
@@ -740,8 +723,7 @@ class Central
     }
 
     // get user by ID
-    public static function getUsrById($usrId): array|string|bool
-    {
+    public static function getUsrById($usrId): array|string|bool {
         $getSQL = 'select * from BUSER where BID = '.$usrId;
         $res = db::Query($getSQL);
         $usrArr = db::FetchArr($res);
@@ -752,8 +734,7 @@ class Central
     /**
      * Update user details in database
      */
-    public static function updateUserDetails($userId, $details)
-    {
+    public static function updateUserDetails($userId, $details) {
         $detailsJson = json_encode($details, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
         $detailsEscaped = db::EscString($detailsJson);
 
@@ -764,8 +745,7 @@ class Central
     // ******************************************************************************************************
     // RAG FILE PROCESSING - specifically for file manager uploads with custom group keys
     // ******************************************************************************************************
-    public static function processRAGFiles($filesArray, $userId, $groupKey = 'DEFAULT', $streamOutput = false): array
-    {
+    public static function processRAGFiles($filesArray, $userId, $groupKey = 'DEFAULT', $streamOutput = false): array {
         $results = [];
         $processedCount = 0;
 
@@ -862,8 +842,7 @@ class Central
     }
 
     // Helper method to extract file content without vectorization
-    private static function extractFileContent($arrMessage, $streamOutput = false): array
-    {
+    private static function extractFileContent($arrMessage, $streamOutput = false): array {
         $fileType = 0;
 
         // image file - Vision to text
@@ -910,8 +889,7 @@ class Central
     }
 
     // Helper method to get file type number for BRAG table
-    private static function getFileTypeNumber($fileExtension): int
-    {
+    private static function getFileTypeNumber($fileExtension): int {
         $typeMap = [
             'jpg' => 1, 'jpeg' => 1, 'png' => 1,
             'mp3' => 2, 'mp4' => 2,
@@ -933,8 +911,7 @@ class Central
      * @param string $fileExtension Original file extension
      * @return array ['converted' => bool, 'newExtension' => string, 'content' => string]
      */
-    public static function sanitizeHtmlUpload(string $tmpFilePath, string $fileExtension): array
-    {
+    public static function sanitizeHtmlUpload(string $tmpFilePath, string $fileExtension): array {
         $result = [
             'converted' => false,
             'newExtension' => $fileExtension,

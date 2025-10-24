@@ -18,8 +18,7 @@ use Inference\InferTensorContents;
 
 class GRPCInferenceServiceClient extends BaseStub
 {
-    public function __construct($hostname, $opts, $channel = null)
-    {
+    public function __construct($hostname, $opts, $channel = null) {
         parent::__construct($hostname, $opts, $channel);
     }
 
@@ -56,8 +55,7 @@ class AITriton
      *
      * @return bool True if initialization is successful
      */
-    public static function init()
-    {
+    public static function init() {
         self::$serverUrl = ApiKeys::getTritonServer();
         if (!self::$serverUrl) {
             if ($GLOBALS['debug']) {
@@ -75,8 +73,7 @@ class AITriton
     }
 
     // threadArr fixer for triton/tensor based conversations
-    private static function fixThreadArr($threadArr)
-    {
+    private static function fixThreadArr($threadArr) {
         $fixedThreadArr = [];
         $upCount = 0;
         foreach ($threadArr as $msg) {
@@ -99,8 +96,7 @@ class AITriton
      * @param array $threadArr Conversation thread history
      * @return array|string|bool Sorting result or error message
      */
-    public static function sortingPrompt($msgArr, $threadArr): array|string|bool
-    {
+    public static function sortingPrompt($msgArr, $threadArr): array|string|bool {
         $promptArr = [];
         $lineArr = [];
         $threadArr = self::fixThreadArr($threadArr);
@@ -195,8 +191,7 @@ class AITriton
      * @param bool $stream Whether to use streaming mode (default: false)
      * @return array|string|bool Topic-specific response or error message
      */
-    public static function topicPrompt($msgArr, $threadArr, $stream = false): array|string|bool
-    {
+    public static function topicPrompt($msgArr, $threadArr, $stream = false): array|string|bool {
         // Build conversation array like in sortingPrompt()
         $systemPrompt = BasicAI::getAprompt($msgArr['BTOPIC'], $msgArr['BLANG'], $msgArr, true);
 
@@ -264,7 +259,6 @@ class AITriton
 
         try {
             if ($stream) {
-
                 // Use streaming mode
                 $answer = '';
                 $pendingText = '';
@@ -318,7 +312,6 @@ class AITriton
                         if (empty($textChunk)) {
                             $rawContents = $inferResponse->getRawOutputContents();
                             if (!empty($rawContents)) {
-
                                 // Try to decode protobuf length-prefixed data
                                 if (isset($rawContents[0])) {
                                     $textChunk = self::decodeProtobufData($rawContents[0]);
@@ -355,7 +348,6 @@ class AITriton
                     if (!empty($pendingText)) {
                         Frontend::statusToStream($msgArr['BID'], 'ai', $pendingText);
                     }
-
                 } catch (Exception $streamErr) {
                     if ($GLOBALS['debug']) {
                         error_log('Triton streaming error: ' . $streamErr->getMessage());
@@ -397,13 +389,10 @@ class AITriton
                 $arrAnswer['ALREADYSHOWN'] = true;
 
                 return $arrAnswer;
-
             } else {
                 // Use non-streaming mode (collect all output)
                 $answer = self::streamInference($fullPrompt, 1024, false);
             }
-
-
         } catch (Exception $err) {
             if ($GLOBALS['debug']) {
                 error_log('Triton topic error: ' . $err->getMessage());
@@ -443,8 +432,7 @@ class AITriton
      * @param array $arrMessage Message array containing image information
      * @return array|string|bool Error message indicating unsupported feature
      */
-    public static function explainImage($arrMessage): array|string|bool
-    {
+    public static function explainImage($arrMessage): array|string|bool {
         // Triton's mistral-streaming model doesn't support vision
         // This would need a different model or external service
         $arrMessage['BFILETEXT'] = '*API Image Error - Triton mistral-streaming model does not support image analysis. Please use a different AI service for image processing.*';
@@ -458,8 +446,7 @@ class AITriton
      * @param int $maxTokens Maximum tokens to generate
      * @return ModelInferRequest The prepared request
      */
-    private static function createInferRequest($prompt, $maxTokens = 8192)
-    {
+    private static function createInferRequest($prompt, $maxTokens = 8192) {
         // Prepare inputs
         $textInput = new InferInputTensor();
         $textInput->setName('conversation');
@@ -508,8 +495,7 @@ class AITriton
      * @param bool $stream Whether to stream or collect all output
      * @return string The complete response or empty string if streaming
      */
-    private static function streamInference($prompt, $maxTokens = 4096, $stream = true)
-    {
+    private static function streamInference($prompt, $maxTokens = 4096, $stream = true) {
         $client = self::$client;
         $answer = '';
         $seenAny = false;
@@ -563,7 +549,6 @@ class AITriton
                 if (empty($textChunk)) {
                     $rawContents = $inferResponse->getRawOutputContents();
                     if (!empty($rawContents)) {
-
                         // Try to decode protobuf length-prefixed data
                         if (isset($rawContents[0])) {
                             $textChunk = self::decodeProtobufData($rawContents[0]);
@@ -588,7 +573,6 @@ class AITriton
                     break;
                 }
             }
-
         } catch (Exception $e) {
             if ($GLOBALS['debug']) {
                 error_log('Triton stream error: ' . $e->getMessage());
@@ -607,8 +591,7 @@ class AITriton
      * @param string $rawData Raw binary data from Triton
      * @return string Decoded text or original data if decoding fails
      */
-    private static function decodeProtobufData(string $rawData): string
-    {
+    private static function decodeProtobufData(string $rawData): string {
         if (strlen($rawData) < 4) {
             return $rawData;
         }
@@ -628,8 +611,7 @@ class AITriton
      * Attempt to extract BTEXT from a JSON string response.
      * Returns null if no valid BTEXT can be found.
      */
-    private static function extractBTEXTFromJsonString(string $content): ?string
-    {
+    private static function extractBTEXTFromJsonString(string $content): ?string {
         $candidate = trim($content);
 
         // Strip BOM and zero-width/invisible characters that break JSON
@@ -683,8 +665,7 @@ class AITriton
     /**
      * Regex-based fallback to extract BTEXT from malformed JSON-like strings.
      */
-    private static function extractBTEXTViaRegex(string $content): ?string
-    {
+    private static function extractBTEXTViaRegex(string $content): ?string {
         // Try to find BTEXT:"..." or BTEXT:'...' with various quote styles
         $pattern = '/[\"\'\x{201C}\x{201D}\x{201E}]?BTEXT[\"\'\x{201C}\x{201D}\x{201E}]?\s*:\s*([\"\'\x{201C}\x{201D}\x{201E}])(.*?)\1/su';
         if (preg_match($pattern, $content, $m)) {

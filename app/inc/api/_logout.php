@@ -10,8 +10,7 @@
  * Handle logout action
  * Clears local session and redirects to OIDC provider logout if configured
  */
-function handleLogout()
-{
+function handleLogout() {
     // Clear local session first
     unset($_SESSION['USERPROFILE']);
     // Clear any widget/anonymous session flags to avoid UI leaks after login

@@ -22,8 +22,7 @@ class AgainLogic
      * @return array IN message row from BMESSAGES
      * @throws Exception with HTTP status codes: 404 (not found), 403 (ownership)
      */
-    public static function getPrevInMessage($id, $userId)
-    {
+    public static function getPrevInMessage($id, $userId) {
         $id = intval($id);
         $userId = intval($userId);
 
@@ -88,8 +87,7 @@ class AgainLogic
      * @param int $inId IN message ID
      * @return array|null OUT message row or null if no OUT exists
      */
-    public static function getLastOutForIn($inId)
-    {
+    public static function getLastOutForIn($inId) {
         $inId = intval($inId);
 
         if ($inId <= 0) {
@@ -128,8 +126,7 @@ class AgainLogic
      * @param string $btag Model tag (e.g., 'chat', 'pic2text', 'sound2text')
      * @return array Array of model rows
      */
-    public static function getEligibleModels($btag)
-    {
+    public static function getEligibleModels($btag) {
         $btag = db::EscString($btag);
 
         // Get minimum rating from config, fallback to no filtering
@@ -155,8 +152,7 @@ class AgainLogic
      * Get minimum rating threshold from BCONFIG
      * @return float|null Minimum rating or null if not configured
      */
-    private static function getMinRatingFromConfig()
-    {
+    private static function getMinRatingFromConfig() {
         try {
             $sql = "SELECT BVALUE FROM BCONFIG WHERE BGROUP = 'MODEL' AND BSETTING = 'MIN_RATING' LIMIT 1";
             $res = db::Query($sql);
@@ -185,8 +181,7 @@ class AgainLogic
      * @return array Selected model row
      * @throws Exception if no eligible models
      */
-    public static function pickModel($eligible, $prevModelId)
-    {
+    public static function pickModel($eligible, $prevModelId) {
         if (empty($eligible)) {
             http_response_code(422);
             throw new Exception('No eligible models available');
@@ -225,8 +220,7 @@ class AgainLogic
      * @param array|null $lastOut Last OUT message array
      * @return string BTAG to use
      */
-    public static function resolveTagForReplay($inId, $lastOut)
-    {
+    public static function resolveTagForReplay($inId, $lastOut) {
         // 1. Primary: Read BTAG from IN message metadata (new approach)
         $btagSQL = 'SELECT BVALUE FROM BMESSAGEMETA WHERE BMESSID = ' . intval($inId) . " AND BTOKEN = 'BTAG' ORDER BY BID DESC LIMIT 1";
         $btagRes = db::Query($btagSQL);
@@ -265,8 +259,7 @@ class AgainLogic
      * @return array Replay preparation data
      * @throws Exception with various HTTP status codes for different errors
      */
-    public static function replay($prevMessageId, $modelIdOpt, $userId)
-    {
+    public static function replay($prevMessageId, $modelIdOpt, $userId) {
         try {
             // Step 1: Resolve the IN message
             $inMessage = self::getPrevInMessage($prevMessageId, $userId);
@@ -325,7 +318,6 @@ class AgainLogic
                 'in_message' => $inMessage,
                 'selectedModel' => $selectedModel  // Add full model row
             ];
-
         } catch (Exception $e) {
             // Re-throw with preserved HTTP status code
             throw $e;
@@ -337,8 +329,7 @@ class AgainLogic
      * Accepts raw request params, resolves IN message, and (optionally) sets forced model globals.
      * Returns a compact success response for API.
      */
-    public static function prepareAgain(array $params)
-    {
+    public static function prepareAgain(array $params) {
         try {
             // Resolve IN message id
             $inId = isset($params['in_id']) ? intval($params['in_id']) : 0;
@@ -397,8 +388,7 @@ class AgainLogic
      *
      * @return array
      */
-    public static function againOptionsForCurrentSession(): array
-    {
+    public static function againOptionsForCurrentSession(): array {
         try {
             // Determine user ID from session (supports widget sessions)
             if (isset($_SESSION['is_widget']) && $_SESSION['is_widget'] === true) {

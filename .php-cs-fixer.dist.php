@@ -9,5 +9,6 @@ return (new PhpCsFixer\Config())
         '@PSR12' => true,
         'array_syntax' => ['syntax' => 'short'],
         'single_quote' => true,
+        'braces_position' => ['functions_opening_brace' => 'same_line'],
     ])
     ->setFinder($finder);

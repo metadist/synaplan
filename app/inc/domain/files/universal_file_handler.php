@@ -6,8 +6,7 @@ class UniversalFileHandler
      * Extract text using strategy: Native (when trivial) -> Tika -> Rasterize+Vision fallback.
      * Returns extracted text, quality meta, and strategy used.
      */
-    public static function extract(string $relativePath, string $fileTypeExtension): array
-    {
+    public static function extract(string $relativePath, string $fileTypeExtension): array {
         $abs = self::resolveAbsolutePath($relativePath);
         $mime = mime_content_type($abs) ?: '';
         $ext = strtolower($fileTypeExtension);
@@ -68,23 +67,19 @@ class UniversalFileHandler
         return ['', ['strategy' => 'tika'] + $meta];
     }
 
-    private static function isPlainTextMime(string $mime): bool
-    {
+    private static function isPlainTextMime(string $mime): bool {
         return $mime === 'text/plain' || $mime === 'text/markdown' || $mime === 'text/x-markdown' || $mime === 'text/csv' || $mime === 'text/html';
     }
 
-    private static function isPdfMime(string $mime): bool
-    {
+    private static function isPdfMime(string $mime): bool {
         return $mime === 'application/pdf' || $mime === 'application/x-pdf';
     }
 
-    private static function clean(string $text): string
-    {
+    private static function clean(string $text): string {
         return Tools::cleanTextBlock($text);
     }
 
-    private static function resolveAbsolutePath(string $relative): string
-    {
+    private static function resolveAbsolutePath(string $relative): string {
         $base = rtrim(UPLOAD_DIR, '/') . '/';
         $candidates = [
             $base . $relative,
@@ -102,8 +97,7 @@ class UniversalFileHandler
         return $candidates[0];
     }
 
-    private static function isLowQuality(string $text): bool
-    {
+    private static function isLowQuality(string $text): bool {
         $minLen = ApiKeys::getTikaMinLength();
         $minEntropy = ApiKeys::getTikaMinEntropy();
         if (mb_strlen($text) < $minLen) {
@@ -113,8 +107,7 @@ class UniversalFileHandler
         return $entropy < $minEntropy;
     }
 
-    private static function shannonEntropy(string $s): float
-    {
+    private static function shannonEntropy(string $s): float {
         $len = strlen($s);
         if ($len === 0) {
             return 0.0;
@@ -132,8 +125,7 @@ class UniversalFileHandler
         return $entropy;
     }
 
-    private static function visionAggregate(array $imageAbsolutePaths): string
-    {
+    private static function visionAggregate(array $imageAbsolutePaths): string {
         $service = $GLOBALS['AI_PIC2TEXT']['SERVICE'] ?? null;
         if (!$service || !class_exists($service)) {
             return '';
@@ -164,8 +156,7 @@ class UniversalFileHandler
         return $fullText;
     }
 
-    private static function absoluteToRelativeUp(string $abs): string
-    {
+    private static function absoluteToRelativeUp(string $abs): string {
         $uploadBase = rtrim(UPLOAD_DIR, '/') . '/';
         if (strpos($abs, $uploadBase) === 0) {
             return substr($abs, strlen($uploadBase));
@@ -183,8 +174,7 @@ class UniversalFileHandler
         return basename($abs);
     }
 
-    private static function ensureOfficeMime(string $mime, string $ext): string
-    {
+    private static function ensureOfficeMime(string $mime, string $ext): string {
         // Some environments report XLSX/DOCX/PPTX as application/zip; fix by extension
         $map = [
             'xls'  => 'application/vnd.ms-excel',

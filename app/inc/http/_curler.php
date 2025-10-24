@@ -11,8 +11,7 @@ class Curler
      * @return array The response decoded as an array.
      * @throws \Exception If the cURL request fails.
      */
-    public static function callJson(string $url, array $arrHeader, ?array $arrDataOption = null): array
-    {
+    public static function callJson(string $url, array $arrHeader, ?array $arrDataOption = null): array {
         $ch = curl_init();
 
         curl_setopt($ch, CURLOPT_URL, $url);
@@ -41,6 +40,4 @@ class Curler
 
         return $decodedResponse;
     }
-
-
 }

@@ -1,8 +1,7 @@
 <?php
 
 // ------------------------------------ my mail sender
-function _mymail($strFrom, $strTo, $subject, $htmltext, $plaintext, $strReplyTo = '', $strFileAttach = '')
-{
+function _mymail($strFrom, $strTo, $subject, $htmltext, $plaintext, $strReplyTo = '', $strFileAttach = '') {
     // available SMTP providers
     $arrAWScreds = ApiKeys::getAWS();
     if ($GLOBALS['debug']) {

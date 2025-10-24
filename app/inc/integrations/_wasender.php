@@ -9,8 +9,7 @@ class waSender
 {
     public $waApi;
 
-    public function __construct($waDetailsArr)
-    {
+    public function __construct($waDetailsArr) {
         //error_log("WAtoken: " . $GLOBALS['WAtoken'] . " waDetailsArr: ". print_r($waDetailsArr, true));
         $this->waApi = new WhatsAppCloudApi([
             'from_phone_number_id' => $waDetailsArr['BWAPHONEID'], // Phone ID from the DB
@@ -18,16 +17,13 @@ class waSender
         ]);
     }
 
-    public function sendText($phoneNumber, $message): mixed
-    {
+    public function sendText($phoneNumber, $message): mixed {
         $resp = $this->waApi->sendTextMessage($phoneNumber, $message);
         return $resp->decodedBody();
     }
 
     // send image
-    public function sendImage($phoneNumber, $msgArr): mixed
-    {
-
+    public function sendImage($phoneNumber, $msgArr): mixed {
         $link_id = new LinkID($GLOBALS['baseUrl'] . 'up/' . $msgArr['BFILEPATH']);
         $resp = $this->waApi->sendImage($phoneNumber, $link_id, $msgArr['BTEXT']);
         //print "resp:";
@@ -36,9 +32,7 @@ class waSender
     }
 
     // send doc
-    public function sendDoc($phoneNumber, $msgArr): mixed
-    {
-
+    public function sendDoc($phoneNumber, $msgArr): mixed {
         $link_id = new LinkID($GLOBALS['baseUrl'] . 'up/' . $msgArr['BFILEPATH']);
         $resp = $this->waApi->sendDocument($phoneNumber, $link_id, basename($msgArr['BFILEPATH']), substr($msgArr['BTEXT'], 0, 64).'...');
         //print "resp:";
@@ -47,11 +41,9 @@ class waSender
     }
 
     // send audio
-    public function sendAudio($phoneNumber, $msgArr): mixed
-    {
+    public function sendAudio($phoneNumber, $msgArr): mixed {
         $link_id = new LinkID($GLOBALS['baseUrl'] . 'up/' . $msgArr['BFILEPATH']);
         $resp = $this->waApi->sendAudio($phoneNumber, $link_id);
         return $resp->decodedBody();
     }
-
 }

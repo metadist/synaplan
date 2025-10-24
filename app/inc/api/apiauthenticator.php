@@ -66,8 +66,7 @@ class ApiAuthenticator
      *
      * @return bool True if authentication was handled (success or failure)
      */
-    public static function handleBearerAuth(): bool
-    {
+    public static function handleBearerAuth(): bool {
         $authHeader = Tools::getAuthHeaderValue();
 
         if (!$authHeader || stripos($authHeader, 'Bearer ') !== 0) {
@@ -133,8 +132,7 @@ class ApiAuthenticator
      * @param string $action The API action to check
      * @return bool True if action is allowed
      */
-    public static function isActionAllowed(string $action): bool
-    {
+    public static function isActionAllowed(string $action): bool {
         // Public endpoints that require no authentication nor widget session
         if ($action === 'userRegister') {
             // Allow both WordPress plugin registrations AND regular web registrations
@@ -164,8 +162,7 @@ class ApiAuthenticator
      *
      * @return bool True if access is allowed
      */
-    private static function checkRegistrationAccess(): bool
-    {
+    private static function checkRegistrationAccess(): bool {
         // Get client IP for rate limiting
         $clientIp = $_SERVER['HTTP_CF_CONNECTING_IP'] ?? $_SERVER['HTTP_X_FORWARDED_FOR'] ?? $_SERVER['REMOTE_ADDR'] ?? 'unknown';
 
@@ -215,8 +212,7 @@ class ApiAuthenticator
      *
      * @return bool True if access is allowed
      */
-    private static function checkWordPressWizardAccess(): bool
-    {
+    private static function checkWordPressWizardAccess(): bool {
         // Get client IP for rate limiting
         $clientIp = $_SERVER['HTTP_CF_CONNECTING_IP'] ?? $_SERVER['HTTP_X_FORWARDED_FOR'] ?? $_SERVER['REMOTE_ADDR'] ?? 'unknown';
 
@@ -255,8 +251,7 @@ class ApiAuthenticator
      *
      * @return bool True if user is authenticated
      */
-    private static function checkAuthenticatedAccess(): bool
-    {
+    private static function checkAuthenticatedAccess(): bool {
         if (!isset($_SESSION['USERPROFILE']) || !isset($_SESSION['USERPROFILE']['BID'])) {
             http_response_code(401);
             echo json_encode(['error' => 'Authentication required for this endpoint']);
@@ -271,8 +266,7 @@ class ApiAuthenticator
      *
      * @return bool True if access is allowed
      */
-    private static function checkAnonymousOrAuthenticatedAccess(): bool
-    {
+    private static function checkAnonymousOrAuthenticatedAccess(): bool {
         $isAnonymousWidget = isset($_SESSION['is_widget']) && $_SESSION['is_widget'] === true;
 
         if ($isAnonymousWidget) {
@@ -287,8 +281,7 @@ class ApiAuthenticator
      *
      * @return bool True if session is valid
      */
-    private static function validateAnonymousWidgetSession(): bool
-    {
+    private static function validateAnonymousWidgetSession(): bool {
         if ($GLOBALS['debug']) {
             error_log('API Debug - Processing as anonymous widget session');
         }
@@ -297,7 +290,6 @@ class ApiAuthenticator
         if (!isset($_SESSION['widget_owner_id']) ||
             !isset($_SESSION['widget_id']) ||
             !isset($_SESSION['anonymous_session_id'])) {
-
             if ($GLOBALS['debug']) {
                 error_log('API Debug - Missing required session variables for anonymous widget');
             }
@@ -339,8 +331,7 @@ class ApiAuthenticator
      *
      * @return bool True if user session is valid
      */
-    private static function checkRegularUserSession(): bool
-    {
+    private static function checkRegularUserSession(): bool {
         if ($GLOBALS['debug']) {
             error_log('API Debug - Processing as authenticated user session');
         }
@@ -372,8 +363,7 @@ class ApiAuthenticator
      *
      * @param string $message Error message
      */
-    private static function sendUnauthorized(string $message): void
-    {
+    private static function sendUnauthorized(string $message): void {
         http_response_code(401);
         header('Content-Type: application/json; charset=UTF-8');
         echo json_encode(['error' => $message]);
@@ -383,8 +373,7 @@ class ApiAuthenticator
     /**
      * Log debug information about session state
      */
-    public static function logSessionDebugInfo(): void
-    {
+    public static function logSessionDebugInfo(): void {
         if (!$GLOBALS['debug']) {
             return;
         }

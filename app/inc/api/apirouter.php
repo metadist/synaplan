@@ -17,8 +17,7 @@ class ApiRouter
      * @param string $rawPostData Raw POST data
      * @return bool True if request was routed and handled
      */
-    public static function route(string $rawPostData): bool
-    {
+    public static function route(string $rawPostData): bool {
         // Check for JSON-RPC requests first
         if (self::handleJsonRpcRequest($rawPostData)) {
             return true;
@@ -39,8 +38,7 @@ class ApiRouter
      * @param string $rawPostData Raw POST data
      * @return bool True if this was a JSON-RPC request
      */
-    private static function handleJsonRpcRequest(string $rawPostData): bool
-    {
+    private static function handleJsonRpcRequest(string $rawPostData): bool {
         if (empty($rawPostData) || !Tools::isValidJson($rawPostData)) {
             return false;
         }
@@ -64,8 +62,7 @@ class ApiRouter
      *
      * @return bool True if this was an OpenAI route
      */
-    private static function handleOpenAIRoutes(): bool
-    {
+    private static function handleOpenAIRoutes(): bool {
         $requestUri = $_SERVER['REQUEST_URI'] ?? '';
         $requestPath = parse_url($requestUri, PHP_URL_PATH);
         $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
@@ -97,8 +94,7 @@ class ApiRouter
      *
      * @return string The normalized request path
      */
-    public static function getRequestPath(): string
-    {
+    public static function getRequestPath(): string {
         $requestUri = $_SERVER['REQUEST_URI'] ?? '';
         return parse_url($requestUri, PHP_URL_PATH) ?: '';
     }
@@ -108,8 +104,7 @@ class ApiRouter
      *
      * @return string The HTTP request method
      */
-    public static function getRequestMethod(): string
-    {
+    public static function getRequestMethod(): string {
         return $_SERVER['REQUEST_METHOD'] ?? 'GET';
     }
 }

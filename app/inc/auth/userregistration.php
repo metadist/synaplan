@@ -21,8 +21,7 @@ class UserRegistration
      * @param float $minScore Minimum score threshold (0.0 to 1.0, default 0.5)
      * @return array Result array with 'success', 'score', and optional 'reason' or 'error'
      */
-    public static function verifyRecaptcha(string $token, string $expectedAction = '', float $minScore = 0.5): array
-    {
+    public static function verifyRecaptcha(string $token, string $expectedAction = '', float $minScore = 0.5): array {
         // Skip verification in debug mode
         if (!empty($GLOBALS['debug'])) {
             return ['success' => true, 'score' => 1.0];
@@ -80,8 +79,7 @@ class UserRegistration
      *
      * @return array Array with success status and error message if applicable
      */
-    public static function registerNewUser(): array
-    {
+    public static function registerNewUser(): array {
         $retArr = ['success' => false, 'error' => ''];
 
         // Check if this is a WordPress plugin registration
@@ -230,8 +228,7 @@ class UserRegistration
      *
      * @return string 6-character PIN
      */
-    private static function generatePin(): string
-    {
+    private static function generatePin(): string {
         $characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
         $pin = '';
         for ($i = 0; $i < 6; $i++) {
@@ -247,8 +244,7 @@ class UserRegistration
      * writes it (bcrypt) to BUSER and sends an email using EmailService.
      * Always returns a generic success message (no user enumeration).
      */
-    public static function lostPassword(): array
-    {
+    public static function lostPassword(): array {
         // Validate reCAPTCHA v3
         $recaptchaToken = isset($_REQUEST['g-recaptcha-response']) ? $_REQUEST['g-recaptcha-response'] : '';
         $captchaResult = self::verifyRecaptcha($recaptchaToken, 'lostpw', 0.5);
@@ -306,8 +302,7 @@ class UserRegistration
      * @param int $userId User ID to delete
      * @return array Result with success status and detailed log
      */
-    public static function deleteUserCompletely(int $userId): array
-    {
+    public static function deleteUserCompletely(int $userId): array {
         $retArr = ['success' => false, 'error' => '', 'log' => []];
 
         if ($userId <= 0) {
@@ -346,7 +341,6 @@ class UserRegistration
 
             // Success if user record was deleted
             $retArr['success'] = $userResult['success'];
-
         } catch (\Throwable $e) {
             $retArr['error'] = 'Exception during deletion: ' . $e->getMessage();
             $retArr['log'][] = 'ERROR: ' . $e->getMessage();
@@ -361,8 +355,7 @@ class UserRegistration
      * @param int $userId User ID
      * @return array Result with count
      */
-    private static function deleteUserApiKeys(int $userId): array
-    {
+    private static function deleteUserApiKeys(int $userId): array {
         $retArr = ['success' => false, 'error' => '', 'count' => 0];
 
         try {
@@ -390,8 +383,7 @@ class UserRegistration
      * @param int $userId User ID
      * @return array Result with message
      */
-    private static function deleteUserFiles(int $userId): array
-    {
+    private static function deleteUserFiles(int $userId): array {
         $retArr = ['success' => false, 'error' => '', 'message' => ''];
 
         try {
@@ -429,8 +421,7 @@ class UserRegistration
      * @param string $dir Directory path
      * @return bool Success status
      */
-    private static function recursiveDelete(string $dir): bool
-    {
+    private static function recursiveDelete(string $dir): bool {
         if (!file_exists($dir)) {
             return true;
         }
@@ -458,8 +449,7 @@ class UserRegistration
      * @param int $userId User ID
      * @return array Result with count
      */
-    private static function deleteUserConfig(int $userId): array
-    {
+    private static function deleteUserConfig(int $userId): array {
         $retArr = ['success' => false, 'error' => '', 'count' => 0];
 
         try {
@@ -487,8 +477,7 @@ class UserRegistration
      * @param int $userId User ID
      * @return array Result with counts
      */
-    private static function deleteUserPrompts(int $userId): array
-    {
+    private static function deleteUserPrompts(int $userId): array {
         $retArr = ['success' => false, 'error' => '', 'count' => 0, 'metaCount' => 0];
 
         try {
@@ -536,8 +525,7 @@ class UserRegistration
      * @param int $userId User ID
      * @return array Result with count
      */
-    private static function deleteUserRAG(int $userId): array
-    {
+    private static function deleteUserRAG(int $userId): array {
         $retArr = ['success' => false, 'error' => '', 'count' => 0];
 
         try {
@@ -565,8 +553,7 @@ class UserRegistration
      * @param int $userId User ID
      * @return array Result with counts
      */
-    private static function deleteUserMessages(int $userId): array
-    {
+    private static function deleteUserMessages(int $userId): array {
         $retArr = ['success' => false, 'error' => '', 'count' => 0, 'metaCount' => 0];
 
         try {
@@ -614,8 +601,7 @@ class UserRegistration
      * @param int $userId User ID
      * @return array Result
      */
-    private static function deleteUserRecord(int $userId): array
-    {
+    private static function deleteUserRecord(int $userId): array {
         $retArr = ['success' => false, 'error' => ''];
 
         try {

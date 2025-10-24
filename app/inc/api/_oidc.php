@@ -18,8 +18,7 @@ class OidcAuth
     /**
      * Initialize OIDC client
      */
-    private static function initClient()
-    {
+    private static function initClient() {
         if (self::$client !== null) {
             return self::$client;
         }
@@ -66,8 +65,7 @@ class OidcAuth
     /**
      * Start OIDC authentication flow
      */
-    public static function initiateAuth()
-    {
+    public static function initiateAuth() {
         try {
             $client = self::initClient();
             $client->authenticate();
@@ -89,8 +87,7 @@ class OidcAuth
     /**
      * Handle OIDC callback and create/login user
      */
-    public static function handleCallback()
-    {
+    public static function handleCallback() {
         try {
             $client = self::initClient();
 
@@ -132,7 +129,6 @@ class OidcAuth
                 $_SESSION['oidc_error'] = 'Failed to create or retrieve user account.';
                 return false;
             }
-
         } catch (Exception $e) {
             error_log('OIDC callback error: ' . $e->getMessage());
             $_SESSION['oidc_error'] = 'OIDC callback error: ' . $e->getMessage();
@@ -144,8 +140,7 @@ class OidcAuth
     /**
      * Get existing user or create new user from OIDC info using Central functions
      */
-    private static function getOrCreateUserFromOidc($userInfo)
-    {
+    private static function getOrCreateUserFromOidc($userInfo) {
         $email = $userInfo->email;
 
         // Use Central::getUserByMail() - it handles both finding and creating users
@@ -172,8 +167,7 @@ class OidcAuth
     /**
      * Update user details from OIDC information
      */
-    private static function updateUserDetailsFromOidc($user, $userInfo)
-    {
+    private static function updateUserDetailsFromOidc($user, $userInfo) {
         $currentDetails = $user['DETAILS'] ?? [];
 
         // Update with OIDC information (only if not already set)
@@ -210,8 +204,7 @@ class OidcAuth
     /**
      * Check if OIDC is configured
      */
-    public static function isConfigured()
-    {
+    public static function isConfigured() {
         return ApiKeys::getOidcProviderUrl() &&
                ApiKeys::getOidcClientId() &&
                ApiKeys::getOidcClientSecret();
@@ -220,8 +213,7 @@ class OidcAuth
     /**
      * Check if auto-redirect to IDP is enabled
      */
-    public static function isAutoRedirectEnabled()
-    {
+    public static function isAutoRedirectEnabled() {
         $autoRedirect = ApiKeys::get('OIDC_AUTO_REDIRECT');
         // Default to true (enabled) unless explicitly set to 'false'
         return $autoRedirect !== 'false';
@@ -230,8 +222,7 @@ class OidcAuth
     /**
      * Get OIDC login URL
      */
-    public static function getLoginUrl()
-    {
+    public static function getLoginUrl() {
         if (!self::isConfigured()) {
             return null;
         }

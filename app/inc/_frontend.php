@@ -22,8 +22,7 @@ class Frontend
      *
      * @return void
      */
-    public static function clearWidgetSession(): void
-    {
+    public static function clearWidgetSession(): void {
         unset($_SESSION['is_widget']);
         unset($_SESSION['widget_owner_id']);
         unset($_SESSION['widget_id']);
@@ -40,8 +39,7 @@ class Frontend
      *
      * @return bool True if authentication successful, false otherwise
      */
-    public static function setUserFromWebLogin(): bool
-    {
+    public static function setUserFromWebLogin(): bool {
         $success = false;
 
         // Get email and password from request
@@ -104,8 +102,7 @@ class Frontend
      *
      * @return bool True if authentication successful, false otherwise
      */
-    public static function setUserFromTicket()
-    {
+    public static function setUserFromTicket() {
         //print_r($_REQUEST);
         $userId = intval($_REQUEST['id']);
         $ticketVal = db::EscString($_REQUEST['lid']);
@@ -133,8 +130,7 @@ class Frontend
      *
      * @return array Array of chat messages
      */
-    public static function getLatestChats($myLimit = 10, $myOrder = 'DESC')
-    {
+    public static function getLatestChats($myLimit = 10, $myOrder = 'DESC') {
         $chatArr = [];
 
         // Handle anonymous widget sessions
@@ -208,7 +204,6 @@ class Frontend
                    $relatedMessage['BDIRECT'] == $direction &&
                    abs($relatedMessage['BUNIXTIMES'] - $timestamp) <= 5 &&
                    !in_array($relatedMessage['BID'], $processedIds)) {
-
                     $relatedMessages[] = $relatedMessage;
                     $relatedIds[] = $relatedMessage['BID'];
                 }
@@ -253,8 +248,7 @@ class Frontend
      *
      * @return array Array containing status and message information
      */
-    public static function saveWebMessages(): array
-    {
+    public static function saveWebMessages(): array {
         // return the last inserted ids
         $retArr = ['error' => '', 'lastIds' => [], 'success' => false];
         $lastInsertsId = [];
@@ -495,8 +489,7 @@ class Frontend
      *
      * @return array Empty array (output is sent directly to client)
      */
-    public static function chatStream(): array
-    {
+    public static function chatStream(): array {
         // SSE hardening
         if (function_exists('apache_setenv')) {
             @apache_setenv('no-gzip', '1');
@@ -994,8 +987,7 @@ class Frontend
     /**
      * Get the last IN message ID for the current context (user or widget)
      */
-    public static function getLastInMessageIdForCurrentContext(): int
-    {
+    public static function getLastInMessageIdForCurrentContext(): int {
         $isWidget = isset($_SESSION['is_widget']) && $_SESSION['is_widget'] === true;
 
         if ($isWidget) {
@@ -1025,8 +1017,7 @@ class Frontend
     /**
      * Get the last IN message ID for the current context using local variables (SSE-safe)
      */
-    public static function getLastInMessageIdForCurrentContextLocal(bool $isWidget, ?int $widgetOwnerId, ?string $anonymousSessionId, ?array $userProfile): int
-    {
+    public static function getLastInMessageIdForCurrentContextLocal(bool $isWidget, ?int $widgetOwnerId, ?string $anonymousSessionId, ?array $userProfile): int {
         if ($isWidget) {
             if (!$anonymousSessionId || !$widgetOwnerId) {
                 return 0;
@@ -1054,8 +1045,7 @@ class Frontend
     /**
      * Get eligible models for SSE meta (using AgainLogic)
      */
-    private static function getEligibleModels(string $btag): array
-    {
+    private static function getEligibleModels(string $btag): array {
         $models = AgainLogic::getEligibleModels($btag);
 
         // Convert to the format expected by SSE meta
@@ -1075,8 +1065,7 @@ class Frontend
     /**
      * Get predicted next model using AgainLogic round-robin
      */
-    private static function getPredictedNext(array $eligible, int $currentModelId): ?array
-    {
+    private static function getPredictedNext(array $eligible, int $currentModelId): ?array {
         if (empty($eligible)) {
             return null;
         }
@@ -1112,8 +1101,7 @@ class Frontend
     /**
      * Get fallback model from BCONFIG when no eligible models found
      */
-    private static function getFallbackModel(string $btag): ?array
-    {
+    private static function getFallbackModel(string $btag): ?array {
         try {
             // Map BTAG to BSETTING for BCONFIG lookup
             $btagToSetting = [
@@ -1198,7 +1186,6 @@ class Frontend
                 // Use BPROVID if available, fallback to BNAME
                 'model' => !empty($modelRow['BPROVID']) ? $modelRow['BPROVID'] : $modelRow['BNAME']
             ];
-
         } catch (\Throwable $e) {
             error_log('Error getting fallback model: ' . $e->getMessage());
             return null;
@@ -1208,8 +1195,7 @@ class Frontend
     /**
      * Clean up Again-related global variables
      */
-    private static function cleanupAgainGlobals(): void
-    {
+    private static function cleanupAgainGlobals(): void {
         $globalsToClean = [
             'FORCE_AI_MODEL', 'IS_AGAIN', 'FORCED_AI_SERVICE',
             'FORCED_AI_MODEL', 'FORCED_AI_MODELID', 'FORCED_AI_BTAG'
@@ -1227,8 +1213,7 @@ class Frontend
      * Process the message
      *
      */
-    public static function createAnswer($msgId)
-    {
+    public static function createAnswer($msgId) {
         try {
             // Process the message using the provided message ID
             $statusMessage = (isset($GLOBALS['IS_AGAIN']) && $GLOBALS['IS_AGAIN'] === true)
@@ -1271,7 +1256,6 @@ class Frontend
                     'status' => 'pre_processing',
                     'message' => 'Again processing completed.'
                 ]);
-
             } catch (\Throwable $e) {
                 error_log('Again processing error: ' . $e->getMessage());
                 self::printToStream([
@@ -1327,8 +1311,7 @@ class Frontend
      * @param array $data Data to send
      * @return void
      */
-    public static function printToStream($data)
-    {
+    public static function printToStream($data) {
         $data['timestamp'] = time();
         echo 'data: ' . json_encode($data, JSON_UNESCAPED_UNICODE) . "\n\n";
         if (ob_get_level() > 0) {
@@ -1339,8 +1322,7 @@ class Frontend
     // ******************************************************************************************************
     // print to the stream, either AI or status...
     // ******************************************************************************************************
-    public static function statusToStream($channelId = 0, $streamId = 'pre', $myText = ''): bool
-    {
+    public static function statusToStream($channelId = 0, $streamId = 'pre', $myText = ''): bool {
         $update = [
             'msgId' => $channelId,
             'status' => "{$streamId}_processing",
@@ -1358,8 +1340,7 @@ class Frontend
      *
      * @return array User profile data or error message
      */
-    public static function getProfile(): array
-    {
+    public static function getProfile(): array {
         $retArr = ['error' => '', 'success' => false];
 
         if (!isset($_SESSION['USERPROFILE']) || !isset($_SESSION['USERPROFILE']['BID'])) {
@@ -1397,8 +1378,7 @@ class Frontend
     // ******************************************************************************************************
     // Get dashboard statistics for the user
     // ******************************************************************************************************
-    public static function getDashboardStats(): array
-    {
+    public static function getDashboardStats(): array {
         $userId = $_SESSION['USERPROFILE']['BID'];
         $stats = [
             'total_messages' => 0,
@@ -1439,8 +1419,7 @@ class Frontend
      * Translate a short text snippet using summarize model configuration
      * and AIGroq::translateTo(). Keeps API layer thin.
      */
-    public static function translateSnippet(string $sourceText, string $sourceLang, string $destLang): array
-    {
+    public static function translateSnippet(string $sourceText, string $sourceLang, string $destLang): array {
         $sourceText = trim($sourceText);
         $sourceLang = trim($sourceLang ?: 'en');
         $destLang = trim($destLang);
@@ -1519,8 +1498,7 @@ class Frontend
     // @param int $amount Number of messages to load (10, 20, or 30)
     // @return array Array containing processed chat messages with all necessary metadata
     // ******************************************************************************************************
-    public static function loadChatHistory($amount = 10): array
-    {
+    public static function loadChatHistory($amount = 10): array {
         $retArr = ['error' => '', 'success' => false, 'messages' => []];
 
         if (!isset($_SESSION['USERPROFILE']) || !isset($_SESSION['USERPROFILE']['BID'])) {
@@ -1641,8 +1619,7 @@ class Frontend
      *
      * @return array Array containing widget configurations
      */
-    public static function getWidgets(): array
-    {
+    public static function getWidgets(): array {
         $retArr = ['error' => '', 'success' => false, 'widgets' => []];
 
         if (!isset($_SESSION['USERPROFILE']) || !isset($_SESSION['USERPROFILE']['BID'])) {
@@ -1746,8 +1723,7 @@ class Frontend
      *
      * @return array Result of the save operation
      */
-    public static function saveWidget(): array
-    {
+    public static function saveWidget(): array {
         $retArr = ['error' => '', 'success' => false];
 
         if (!isset($_SESSION['USERPROFILE']) || !isset($_SESSION['USERPROFILE']['BID'])) {
@@ -1866,8 +1842,7 @@ class Frontend
      *
      * @return array Result of the delete operation
      */
-    public static function deleteWidget(): array
-    {
+    public static function deleteWidget(): array {
         $retArr = ['error' => '', 'success' => false];
 
         if (!isset($_SESSION['USERPROFILE']) || !isset($_SESSION['USERPROFILE']['BID'])) {
@@ -1901,8 +1876,7 @@ class Frontend
     /**
      * Load mail handler configuration for current user
      */
-    public static function getMailhandler(): array
-    {
+    public static function getMailhandler(): array {
         $retArr = ['success' => false, 'config' => [], 'departments' => []];
 
         if (!isset($_SESSION['USERPROFILE']) || !isset($_SESSION['USERPROFILE']['BID'])) {
@@ -1992,8 +1966,7 @@ class Frontend
     /**
      * Save mail handler configuration for current user
      */
-    public static function saveMailhandler(): array
-    {
+    public static function saveMailhandler(): array {
         $retArr = ['success' => false];
 
         if (!isset($_SESSION['USERPROFILE']) || !isset($_SESSION['USERPROFILE']['BID'])) {
@@ -2096,8 +2069,7 @@ class Frontend
     // Mail OAuth API delegations
     // ******************************************************************************************************
 
-    public static function mailOAuthStart(): array
-    {
+    public static function mailOAuthStart(): array {
         if (!isset($_SESSION['USERPROFILE']) || !isset($_SESSION['USERPROFILE']['BID'])) {
             return ['success' => false, 'error' => 'User not logged in'];
         }
@@ -2111,8 +2083,7 @@ class Frontend
         return mailHandler::oauthStart($provider, $redirectUri, $userId, $email);
     }
 
-    public static function mailOAuthCallback(): array
-    {
+    public static function mailOAuthCallback(): array {
         if (!isset($_SESSION['USERPROFILE']) || !isset($_SESSION['USERPROFILE']['BID'])) {
             return ['success' => false, 'error' => 'User not logged in'];
         }
@@ -2129,8 +2100,7 @@ class Frontend
         return mailHandler::oauthCallback($provider, $code, $redirectUri, $userId);
     }
 
-    public static function mailOAuthStatus(): array
-    {
+    public static function mailOAuthStatus(): array {
         if (!isset($_SESSION['USERPROFILE']) || !isset($_SESSION['USERPROFILE']['BID'])) {
             return ['success' => false, 'error' => 'User not logged in'];
         }
@@ -2138,8 +2108,7 @@ class Frontend
         return mailHandler::oauthStatus($userId);
     }
 
-    public static function mailOAuthDisconnect(): array
-    {
+    public static function mailOAuthDisconnect(): array {
         if (!isset($_SESSION['USERPROFILE']) || !isset($_SESSION['USERPROFILE']['BID'])) {
             return ['success' => false, 'error' => 'User not logged in'];
         }
@@ -2150,8 +2119,7 @@ class Frontend
     /**
      * Test IMAP/POP connection using current form values (does not persist)
      */
-    public static function mailTestConnection(): array
-    {
+    public static function mailTestConnection(): array {
         if (!isset($_SESSION['USERPROFILE']) || !isset($_SESSION['USERPROFILE']['BID'])) {
             return ['success' => false, 'error' => 'User not logged in'];
         }
@@ -2187,8 +2155,7 @@ class Frontend
      * @param int $widgetId The widget ID
      * @return bool True if session was set successfully, false otherwise
      */
-    public static function setAnonymousWidgetSession($ownerId, $widgetId): bool
-    {
+    public static function setAnonymousWidgetSession($ownerId, $widgetId): bool {
         // Validate parameters
         if ($ownerId <= 0 || $widgetId < 1 || $widgetId > 9) {
             return false;
@@ -2215,8 +2182,7 @@ class Frontend
      *
      * @return bool True if session is still valid, false if expired
      */
-    public static function validateAnonymousSession(): bool
-    {
+    public static function validateAnonymousSession(): bool {
         if (!isset($_SESSION['is_widget']) || $_SESSION['is_widget'] !== true) {
             return false;
         }
@@ -2238,8 +2204,7 @@ class Frontend
         return true;
     }
     // --
-    public static function validateTurnstile($token, $secret, $remoteip = null)
-    {
+    public static function validateTurnstile($token, $secret, $remoteip = null) {
         $url = 'https://challenges.cloudflare.com/turnstile/v0/siteverify';
 
         $data = [
@@ -2267,11 +2232,9 @@ class Frontend
         }
 
         return json_decode($response, true);
-
     }
 
-    public static function myCFcaptcha()
-    {
+    public static function myCFcaptcha() {
         //  not locally
         if ($GLOBALS['debug']) {
             return true;

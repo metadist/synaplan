@@ -20,8 +20,7 @@ class ApiKeyManager
      *
      * @return array Array with success status and keys list
      */
-    public static function getApiKeys(): array
-    {
+    public static function getApiKeys(): array {
         $ret = ['success' => false, 'keys' => []];
 
         // Check if user is logged in
@@ -60,8 +59,7 @@ class ApiKeyManager
      *
      * @return array Array with success status and the generated key
      */
-    public static function createApiKey(): array
-    {
+    public static function createApiKey(): array {
         $ret = ['success' => false];
 
         // Check if user is logged in
@@ -96,8 +94,7 @@ class ApiKeyManager
      *
      * @return array Array with success status
      */
-    public static function setApiKeyStatus(): array
-    {
+    public static function setApiKeyStatus(): array {
         $ret = ['success' => false];
 
         // Check if user is logged in
@@ -135,8 +132,7 @@ class ApiKeyManager
      *
      * @return array Array with success status
      */
-    public static function deleteApiKey(): array
-    {
+    public static function deleteApiKey(): array {
         $ret = ['success' => false];
 
         // Check if user is logged in

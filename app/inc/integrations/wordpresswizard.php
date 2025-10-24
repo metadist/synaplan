@@ -24,8 +24,7 @@ class WordPressWizard
      *
      * @return array Result of the setup operation
      */
-    public static function completeWizardSetup(): array
-    {
+    public static function completeWizardSetup(): array {
         $retArr = ['error' => '', 'success' => false];
 
         try {
@@ -93,7 +92,6 @@ class WordPressWizard
             ];
 
             return $retArr;
-
         } catch (\Throwable $e) {
             error_log('WordPress Wizard Error: ' . $e->getMessage());
             $retArr['error'] = 'An error occurred during setup: ' . $e->getMessage();
@@ -106,8 +104,7 @@ class WordPressWizard
      *
      * @return array Verification result
      */
-    private static function verifyWordPressSite(): array
-    {
+    private static function verifyWordPressSite(): array {
         $retArr = ['success' => false, 'error' => ''];
 
         // Get verification data from request
@@ -163,8 +160,7 @@ class WordPressWizard
      *
      * @return array User creation result with user ID
      */
-    private static function createWordPressUser(): array
-    {
+    private static function createWordPressUser(): array {
         $retArr = ['success' => false, 'error' => '', 'user_id' => 0];
 
         // Get and sanitize email and password
@@ -238,8 +234,7 @@ class WordPressWizard
      * @param int $userId User ID
      * @return array API key creation result
      */
-    private static function createUserApiKey(int $userId): array
-    {
+    private static function createUserApiKey(int $userId): array {
         $retArr = ['success' => false, 'error' => '', 'api_key' => ''];
 
         // Generate API key (same format as ApiKeyManager)
@@ -270,8 +265,7 @@ class WordPressWizard
      * @param int $userId User ID
      * @return array Save result
      */
-    private static function saveWidgetConfiguration(int $userId): array
-    {
+    private static function saveWidgetConfiguration(int $userId): array {
         $retArr = ['success' => false, 'error' => ''];
 
         try {
@@ -308,7 +302,6 @@ class WordPressWizard
 
             $retArr['success'] = true;
             $retArr['message'] = 'Widget configuration saved successfully';
-
         } catch (\Throwable $e) {
             error_log('Widget configuration error: ' . $e->getMessage());
             $retArr['error'] = 'Failed to save widget configuration: ' . $e->getMessage();
@@ -323,8 +316,7 @@ class WordPressWizard
      * @param int $userId User ID
      * @return array Processing result
      */
-    private static function processWizardRAGFiles(int $userId): array
-    {
+    private static function processWizardRAGFiles(int $userId): array {
         $retArr = ['error' => '', 'success' => false, 'processedCount' => 0];
 
         // Use the standard group key for WordPress wizard uploads
@@ -452,8 +444,7 @@ class WordPressWizard
      * @param int $userId User ID
      * @return array Result of the operation
      */
-    private static function enableFileSearchOnGeneralPrompt(int $userId): array
-    {
+    private static function enableFileSearchOnGeneralPrompt(int $userId): array {
         $retArr = ['error' => '', 'success' => false];
 
         try {
@@ -522,7 +513,6 @@ class WordPressWizard
             $retArr['promptId'] = $newPromptId;
 
             return $retArr;
-
         } catch (\Throwable $e) {
             error_log('Enable File Search Error: ' . $e->getMessage());
             $retArr['error'] = 'Failed to enable file search: ' . $e->getMessage();

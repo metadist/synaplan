@@ -64,7 +64,6 @@ if (!isset($_SESSION['USERPROFILE']) &&
     OidcAuth::isAutoRedirectEnabled() &&
     !isset($_SESSION['oidc_error']) &&
     !isset($_REQUEST['action'])) {
-
     OidcAuth::initiateAuth();
     exit;
 }

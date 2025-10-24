@@ -44,8 +44,7 @@ class ProcessMethods
     /**
      * Map BTOPIC to operation type for BUSELOG tracking using BCAPABILITIES
      */
-    private static function getOperationTypeFromTopic($topic): string
-    {
+    private static function getOperationTypeFromTopic($topic): string {
         try {
             // Get the operation mapping using the unified mapping from XSControl
             $operationMapping = [
@@ -106,8 +105,7 @@ class ProcessMethods
      * @param bool $stream Stream flag
      * @return void
      */
-    public static function init($msgId, $stream = false)
-    {
+    public static function init($msgId, $stream = false) {
         self::$msgId = $msgId;
         self::$msgArr = Central::getMsgById($msgId);
 
@@ -156,8 +154,7 @@ class ProcessMethods
      *
      * @return void
      */
-    public static function fileTranslation(): void
-    {
+    public static function fileTranslation(): void {
         if (self::$msgArr['BFILE'] > 0 and strlen(self::$msgArr['BFILETEXT']) > 5 and self::$msgArr['BLANG'] != 'en'
             and strlen(self::$msgArr['BFILETYPE']) > 2 and strlen(self::$msgArr['BFILETYPE']) < 5) {
             $translatedText = AIGroq::translateTo(self::$msgArr, self::$msgArr['BLANG'], 'BFILETEXT');
@@ -189,8 +186,7 @@ class ProcessMethods
      *
      * @return void
      */
-    public static function sortMessage(): void
-    {
+    public static function sortMessage(): void {
         // -----------------------------------------------------
         // -----------------------------------------------------
         // Detect tool commands using safer method
@@ -220,7 +216,6 @@ class ProcessMethods
                 if (self::$stream) {
                     Frontend::statusToStream(self::$msgId, 'pre', 'Target set: '.self::$msgArr['BTOPIC'].' ');
                 }
-
             }
 
             // For anonymous widget sessions without explicit per-message prompt: enforce widget-selected prompt
@@ -504,8 +499,7 @@ class ProcessMethods
  * @return void
  */
     // ******************************************************************************************************
-    public static function processMessage(): void
-    {
+    public static function processMessage(): void {
         $answerJsonArr = [];
         $answerSorted  = [];
         $ragArr        = [];
@@ -514,7 +508,6 @@ class ProcessMethods
         // Note: General message limits are already checked in Frontend::saveWebMessages() before counting
         if (XSControl::isRateLimitingEnabled() && !empty(self::$msgArr['BTOPIC']) &&
             !in_array(self::$msgArr['BTOPIC'], ['mediamaker'], true)) {
-
             // Use mapped operation type for rate limiting
             $operationType = self::getOperationTypeFromTopic(self::$msgArr['BTOPIC']);
 
@@ -599,7 +592,6 @@ class ProcessMethods
         if (self::$toolProcessed) {
             $answerSorted = self::$msgArr; // fallthrough to centralized merge/stream
         } else {
-
             // --- Prompt-Settings einlesen ---
             $promptDetails  = BasicAI::getPromptDetails(self::$msgArr['BTOPIC']);
             $promptSettings = [];
@@ -1318,8 +1310,7 @@ class ProcessMethods
      *
      * @return void
      */
-    public static function directChatGeneration(): void
-    {
+    public static function directChatGeneration(): void {
         // For Again requests, process like a normal message but skip sorter
         // Set topic to general for direct chat
         self::$msgArr['BTOPIC'] = 'general';
@@ -1338,8 +1329,7 @@ class ProcessMethods
      * BTAG-based dispatch for Again requests
      * Calls the appropriate generator function based on BTAG
      */
-    public static function dispatchByBTag(string $btag): void
-    {
+    public static function dispatchByBTag(string $btag): void {
         try {
             switch ($btag) {
                 case 'text2pic':
@@ -1385,8 +1375,7 @@ class ProcessMethods
      *
      * @return int The last inserted ID
      */
-    public static function saveAnswerToDB()
-    {
+    public static function saveAnswerToDB() {
         // Debug logging (only if APP_DEBUG=true)
         if (!empty($GLOBALS['debug'])) {
             $debugFile = __DIR__ . '/../../public/debug_websearch.log';
@@ -1598,8 +1587,7 @@ class ProcessMethods
      * @param array $newMsgArr The new message array to use
      * @return array The new message array with essential fields preserved
      */
-    private static function preserveEssentialFields($newMsgArr)
-    {
+    private static function preserveEssentialFields($newMsgArr) {
         // Essential fields that should be preserved from the original message
         $essentialFields = ['BID', 'BUSERID', 'BTRACKID', 'BMESSTYPE', 'BDIRECT'];
 
@@ -1615,8 +1603,7 @@ class ProcessMethods
     /**
      * Ensure BUSELOG operation type is correctly set after processing
      */
-    private static function ensureCorrectOperationType(): void
-    {
+    private static function ensureCorrectOperationType(): void {
         if (!empty(self::$msgArr['BTOPIC']) && !empty(self::$msgArr['BID']) && !empty(self::$msgArr['BUSERID'])) {
             $operationType = self::getOperationTypeFromTopic(self::$msgArr['BTOPIC']);
             XSControl::updateOperationType(self::$msgArr['BUSERID'], self::$msgArr['BID'], $operationType);

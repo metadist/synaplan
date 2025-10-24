@@ -11,8 +11,7 @@ class mailHandler
     // ----------------------------------------------------------------------------------
     // OAuth helpers and storage (per user in BCONFIG)
     // ----------------------------------------------------------------------------------
-    private static function getAuthMethodForUser(int $userId): string
-    {
+    private static function getAuthMethodForUser(int $userId): string {
         $method = 'password';
         $userId = max(0, (int)$userId);
         if ($userId <= 0) {
@@ -27,8 +26,7 @@ class mailHandler
         return $method;
     }
 
-    public static function setAuthMethodForUser(int $userId, string $authMethod): void
-    {
+    public static function setAuthMethodForUser(int $userId, string $authMethod): void {
         $userId = max(0, (int)$userId);
         if ($userId <= 0) {
             return;
@@ -43,8 +41,7 @@ class mailHandler
         }
     }
 
-    private static function getOAuthRow(int $userId): array
-    {
+    private static function getOAuthRow(int $userId): array {
         $userId = max(0, (int)$userId);
         $rows = [];
         if ($userId <= 0) {
@@ -58,8 +55,7 @@ class mailHandler
         return $rows;
     }
 
-    private static function saveOAuthRow(int $userId, string $setting, string $value): void
-    {
+    private static function saveOAuthRow(int $userId, string $setting, string $value): void {
         $userId = max(0, (int)$userId);
         if ($userId <= 0) {
             return;
@@ -75,8 +71,7 @@ class mailHandler
         }
     }
 
-    private static function clearOAuthRows(int $userId): void
-    {
+    private static function clearOAuthRows(int $userId): void {
         $userId = max(0, (int)$userId);
         if ($userId <= 0) {
             return;
@@ -87,8 +82,7 @@ class mailHandler
     // ----------------------------------------------------------------------------------
     // Per-user OAuth App configuration (BYO app)
     // ----------------------------------------------------------------------------------
-    private static function getUserOAuthApp(int $userId): array
-    {
+    private static function getUserOAuthApp(int $userId): array {
         $userId = max(0, (int)$userId);
         if ($userId <= 0) {
             return [];
@@ -102,8 +96,7 @@ class mailHandler
         return $data;
     }
 
-    private static function createGoogleClientForUser(int $userId, string $redirectUri, array $scopes)
-    {
+    private static function createGoogleClientForUser(int $userId, string $redirectUri, array $scopes) {
         // Prefer per-user app; fall back to global OAuthConfig
         $app = self::getUserOAuthApp($userId);
         if (isset($app['provider']) && strtolower($app['provider']) === 'google' && !empty($app['google_client_id']) && !empty($app['google_client_secret'])) {
@@ -129,8 +122,7 @@ class mailHandler
      * Build provider auth URL for Gmail or Microsoft
      * @return array{success:bool,authUrl?:string,error?:string}
      */
-    public static function oauthStart(string $provider, string $redirectUri, int $userId, string $email = ''): array
-    {
+    public static function oauthStart(string $provider, string $redirectUri, int $userId, string $email = ''): array {
         try {
             $provider = strtolower(trim($provider));
             $userId = max(0, (int)$userId);
@@ -182,8 +174,7 @@ class mailHandler
     /**
      * Handle OAuth callback and persist token in BCONFIG
      */
-    public static function oauthCallback(string $provider, string $code, string $redirectUri, int $userId): array
-    {
+    public static function oauthCallback(string $provider, string $code, string $redirectUri, int $userId): array {
         try {
             $provider = strtolower(trim($provider));
             $userId = max(0, (int)$userId);
@@ -247,8 +238,7 @@ class mailHandler
         }
     }
 
-    public static function oauthStatus(int $userId): array
-    {
+    public static function oauthStatus(int $userId): array {
         $userId = max(0, (int)$userId);
         $rows = self::getOAuthRow($userId);
         $provider = $rows['provider'] ?? '';
@@ -266,8 +256,7 @@ class mailHandler
         ];
     }
 
-    public static function oauthDisconnect(int $userId): array
-    {
+    public static function oauthDisconnect(int $userId): array {
         self::clearOAuthRows($userId);
         self::setAuthMethodForUser($userId, 'password');
         return ['success' => true];
@@ -275,8 +264,7 @@ class mailHandler
     // ----------------------------------------------------------------------------------
     // Find all users who configured the mail handler (basic active criteria)
     // ----------------------------------------------------------------------------------
-    public static function getUsersWithMailhandler(): array
-    {
+    public static function getUsersWithMailhandler(): array {
         $users = [];
         $sql = "
 			SELECT b1.BOWNERID
@@ -302,8 +290,7 @@ class mailHandler
     // ----------------------------------------------------------------------------------
     // Build the target list JSON for a specific user
     // ----------------------------------------------------------------------------------
-    public static function getTargetlistForUser(int $userId): string
-    {
+    public static function getTargetlistForUser(int $userId): string {
         $list = [];
         if ($userId > 0) {
             $sql = 'SELECT BSETTING, BVALUE FROM BCONFIG WHERE BOWNERID = ' . $userId . " AND BGROUP = 'mailhandler_dept' ORDER BY CAST(BSETTING AS UNSIGNED) ASC";
@@ -327,8 +314,7 @@ class mailHandler
     // ----------------------------------------------------------------------------------
     // Build the target list JSON from the user's mail handler departments in BCONFIG
     // ----------------------------------------------------------------------------------
-    public static function getTargetlist(): string
-    {
+    public static function getTargetlist(): string {
         $userId = 0;
         if (isset($_SESSION['is_widget']) && $_SESSION['is_widget'] === true && isset($_SESSION['widget_owner_id'])) {
             $userId = intval($_SESSION['widget_owner_id']);
@@ -361,8 +347,7 @@ class mailHandler
     // ----------------------------------------------------------------------------------
     // Build the full mail handler prompt by fetching the template and injecting targets
     // ----------------------------------------------------------------------------------
-    public static function getMailprompt(): string
-    {
+    public static function getMailprompt(): string {
         $promptKey = 'tools:mailhandler';
         $promptArr = BasicAI::getPromptDetails($promptKey);
         $prompt = '';
@@ -383,8 +368,7 @@ class mailHandler
     // ----------------------------------------------------------------------------------
     // Build the mail handler prompt for a specific user (respects per-user prompts)
     // ----------------------------------------------------------------------------------
-    public static function getMailpromptForUser(int $userId): string
-    {
+    public static function getMailpromptForUser(int $userId): string {
         // Backup session
         $backupUser = $_SESSION['USERPROFILE']['BID'] ?? null;
         if (!isset($_SESSION['USERPROFILE'])) {
@@ -414,8 +398,7 @@ class mailHandler
     // ----------------------------------------------------------------------------------
     // Run routing for a specific user against the standard sorting AI
     // ----------------------------------------------------------------------------------
-    public static function runRoutingForUser(int $userId, string $subject, string $body): string
-    {
+    public static function runRoutingForUser(int $userId, string $subject, string $body): string {
         $systemPrompt = self::getMailpromptForUser($userId);
         $userPrompt = 'Subject: ' . trim($subject) . "\n\nBody: " . trim($body);
 
@@ -450,8 +433,7 @@ class mailHandler
      * @param int $userId
      * @return array{server:string,port:int,protocol:string,security:string,username:string,password:string}
      */
-    private static function getImapConfigForUser(int $userId): array
-    {
+    private static function getImapConfigForUser(int $userId): array {
         $cfg = [
             'server' => '',
             'port' => 993,
@@ -492,8 +474,7 @@ class mailHandler
      * @param int $userId
      * @return array{success:bool, client: ?\Webklex\PHPIMAP\Client, error:?string}
      */
-    public static function imapConnectForUser(int $userId): array
-    {
+    public static function imapConnectForUser(int $userId): array {
         try {
             Tools::debugCronLog('[IMAP] Begin connect for userId='.$userId."\n");
             $cfg = self::getImapConfigForUser($userId);
@@ -562,8 +543,7 @@ class mailHandler
      *  Expected keys: server, port, protocol (imap|pop3), security (ssl|tls|none), username, password, authMethod
      * @return array
      */
-    public static function imapTestConnection(int $userId, array $params): array
-    {
+    public static function imapTestConnection(int $userId, array $params): array {
         try {
             $userId = max(0, (int)$userId);
             $server = trim((string)($params['server'] ?? ''));
@@ -697,8 +677,7 @@ class mailHandler
      * @param string $authMethod 'oauth_google'|'oauth_microsoft'
      * @return array{success:bool,access_token?:string,error?:string}
      */
-    private static function refreshAccessTokenIfNeeded(int $userId, string $authMethod): array
-    {
+    private static function refreshAccessTokenIfNeeded(int $userId, string $authMethod): array {
         try {
             $rows = self::getOAuthRow($userId);
             if (empty($rows)) {
@@ -778,8 +757,7 @@ class mailHandler
      * @param int $fallbackWindowSeconds If no state exists, how far back to fetch (default 1 day)
      * @return array{success:bool, error:?string, client:?\Webklex\PHPIMAP\Client, folder:?Folder, messages:?\Webklex\PHPIMAP\Support\MessageCollection, last_seen:int}
      */
-    public static function imapListSinceLast(int $userId, int $fallbackWindowSeconds = 86400): array
-    {
+    public static function imapListSinceLast(int $userId, int $fallbackWindowSeconds = 86400): array {
         $ret = ['success' => false, 'error' => null, 'client' => null, 'folder' => null, 'messages' => null, 'last_seen' => 0];
         $login = self::imapConnectForUser($userId);
         if (!$login['success']) {
@@ -820,8 +798,7 @@ class mailHandler
      * @param \Webklex\PHPIMAP\Message $message
      * @return bool True on success
      */
-    public static function imapDeleteMessage($message): bool
-    {
+    public static function imapDeleteMessage($message): bool {
         try {
             if ($message === null) {
                 return false;
@@ -850,8 +827,7 @@ class mailHandler
      * @param string $targetName Optional recipient name
      * @return bool True if sent
      */
-    public static function imapForwardMessage($message, string $targetEmail, string $targetName = ''): bool
-    {
+    public static function imapForwardMessage($message, string $targetEmail, string $targetName = ''): bool {
         try {
             if ($message === null || trim($targetEmail) === '') {
                 return false;
@@ -909,8 +885,7 @@ class mailHandler
      * @param int $userId
      * @return void
      */
-    public static function imapUpdateLastSeen(int $userId): void
-    {
+    public static function imapUpdateLastSeen(int $userId): void {
         $userId = max(0, (int)$userId);
         if ($userId <= 0) {
             return;
@@ -928,8 +903,7 @@ class mailHandler
     // ----------------------------------------------------------------------------------
     // Departments helpers
     // ----------------------------------------------------------------------------------
-    public static function getDepartmentsForUser(int $userId): array
-    {
+    public static function getDepartmentsForUser(int $userId): array {
         $userId = max(0, (int)$userId);
         $list = [];
         if ($userId <= 0) {
@@ -949,8 +923,7 @@ class mailHandler
         return $list;
     }
 
-    private static function getDefaultDepartmentEmail(array $departments): string
-    {
+    private static function getDefaultDepartmentEmail(array $departments): string {
         foreach ($departments as $d) {
             if (!empty($d['default'])) {
                 return $d['email'];
@@ -959,8 +932,7 @@ class mailHandler
         return count($departments) > 0 ? ($departments[0]['email'] ?? '') : '';
     }
 
-    private static function extractEmailFromText(string $text): string
-    {
+    private static function extractEmailFromText(string $text): string {
         $pattern = '/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i';
         if (preg_match($pattern, $text, $m)) {
             return strtolower(trim($m[0]));
@@ -968,8 +940,7 @@ class mailHandler
         return '';
     }
 
-    private static function formatSender($message): string
-    {
+    private static function formatSender($message): string {
         try {
             $from = $message->getFrom();
             if (is_array($from) && count($from) > 0) {
@@ -988,8 +959,7 @@ class mailHandler
         return '';
     }
 
-    private static function getPlainBody($message): string
-    {
+    private static function getPlainBody($message): string {
         try {
             $plain = (string)$message->getTextBody();
             $html = (string)$message->getHTMLBody();
@@ -1002,8 +972,7 @@ class mailHandler
         }
     }
 
-    private static function getMessageUnixTime($message): int
-    {
+    private static function getMessageUnixTime($message): int {
         try {
             $date = $message->getDate();
             if ($date instanceof \Carbon\Carbon) {
@@ -1023,8 +992,7 @@ class mailHandler
     /**
      * Forward message with ALL attachments to target email.
      */
-    public static function imapForwardMessageAll($message, string $targetEmail, string $targetName = ''): bool
-    {
+    public static function imapForwardMessageAll($message, string $targetEmail, string $targetName = ''): bool {
         try {
             if ($message === null || trim($targetEmail) === '') {
                 return false;
@@ -1077,8 +1045,7 @@ class mailHandler
     /**
      * Process new emails for a user: fetch, route, forward, and update last_seen.
      */
-    public static function processNewEmailsForUser(int $userId, int $maxOnFirstRun = 25): array
-    {
+    public static function processNewEmailsForUser(int $userId, int $maxOnFirstRun = 25): array {
         $userId = max(0, (int)$userId);
         $ret = ['success' => false, 'processed' => 0, 'errors' => []];
         try {
