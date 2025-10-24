@@ -262,8 +262,8 @@ class UserRegistration
             return ['success' => false, 'error' => 'Please provide a valid email address'];
         }
 
-        // Lookup user
-        $uSQL = "SELECT BID, BMAIL FROM BUSER WHERE BMAIL='".$email."' LIMIT 1";
+        // Lookup user (also get BPAYMENTDETAILS to check if it needs fixing)
+        $uSQL = "SELECT BID, BMAIL, BPAYMENTDETAILS FROM BUSER WHERE BMAIL='".$email."' LIMIT 1";
         $uRes = db::Query($uSQL);
         $uArr = db::FetchArr($uRes);
 
@@ -274,8 +274,15 @@ class UserRegistration
             $newPassword = Tools::createRandomString(10, 14);
             $newPasswordHash = PasswordHelper::hash($newPassword);
 
-            // Update DB with bcrypt hash
-            $upd = "UPDATE BUSER SET BPW='".db::EscString($newPasswordHash)."' WHERE BID=".(int)$uArr['BID'];
+            // Fix BPAYMENTDETAILS if it's invalid JSON (to prevent constraint violation)
+            $paymentDetails = $uArr['BPAYMENTDETAILS'] ?? '';
+            if (empty($paymentDetails) || @json_decode($paymentDetails, true) === null) {
+                // Invalid or empty JSON - set to valid empty object
+                $upd = "UPDATE BUSER SET BPW='".db::EscString($newPasswordHash)."', BPAYMENTDETAILS='{}' WHERE BID=".(int)$uArr['BID'];
+            } else {
+                // BPAYMENTDETAILS is valid, just update password
+                $upd = "UPDATE BUSER SET BPW='".db::EscString($newPasswordHash)."' WHERE BID=".(int)$uArr['BID'];
+            }
             db::Query($upd);
 
             // Send mail (English)
