@@ -152,7 +152,7 @@ class AIOpenAI
 
         // Determine if this is an email message that needs JSON handling
         $isEmailMessage = isset($msgArr['BMESSTYPE']) && $msgArr['BMESSTYPE'] === 'MAIL';
-
+        
         // UNIFIED API with smart prompt selection:
         // - Web chat ($stream=true): Simple prompt, plain text
         // - Email (BMESSTYPE=MAIL): JSON prompt with BFILE instructions
@@ -300,6 +300,8 @@ class AIOpenAI
                 $arrAnswer['_USED_MODEL'] = $myModel;
                 $arrAnswer['_AI_SERVICE'] = 'AIOpenAI';
                 $arrAnswer['ALREADYSHOWN'] = true;
+                
+                self::debugLog('WEB/WA RESPONSE: BMESSTYPE=' . ($msgArr['BMESSTYPE'] ?? 'NOT_SET') . ' | BTEXT length=' . strlen($answer) . ' | BFILE=0');
 
                 self::debugLog('WEB/WA RESPONSE: BMESSTYPE=' . ($msgArr['BMESSTYPE'] ?? 'NOT_SET') . ' | BTEXT length=' . strlen($answer) . ' | BFILE=0');
 
@@ -355,6 +357,14 @@ class AIOpenAI
                         self::debugLog('EMAIL JSON DECODE ERROR: ' . $err->getMessage());
                         return '*API topic Error - JSON decode failed: * ' . $err->getMessage();
                     }
+                }
+                
+                // CRITICAL FIX: Normalize BFILE to integer (empty string '' breaks database insert)
+                // BFILE column is tinyint(1) NOT NULL, so '' is invalid
+                if (!isset($arrAnswer['BFILE']) || $arrAnswer['BFILE'] === '' || $arrAnswer['BFILE'] === null) {
+                    $arrAnswer['BFILE'] = 0;
+                } else {
+                    $arrAnswer['BFILE'] = intval($arrAnswer['BFILE']);
                 }
 
                 // CRITICAL FIX: Normalize BFILE to integer (empty string '' breaks database insert)

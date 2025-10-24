@@ -39,7 +39,7 @@ $aiLastId = ProcessMethods::saveAnswerToDB();
 if (!empty($GLOBALS['debug'])) {
     $debugFile = __DIR__ . '/debug_websearch.log';
     $timestamp = date('Y-m-d H:i:s');
-    file_put_contents($debugFile, "[$timestamp] aiprocessor: Calling outprocessor with aiLastId=" . $aiLastId . ' msgId=' . $msgId . "\n", FILE_APPEND);
+    file_put_contents($debugFile, "[$timestamp] aiprocessor: Calling outprocessor with aiLastId=" . $aiLastId . " msgId=" . $msgId . "\n", FILE_APPEND);
 }
 
 // Clean up aiprocessor PID file
