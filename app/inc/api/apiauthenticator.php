@@ -19,7 +19,12 @@ class ApiAuthenticator
         'getMessageFiles',
         'userRegister',
         'lostPassword',
-        'wpWizardComplete'
+        'wpWizardComplete',
+        'wpStep1VerifyAndCreateUser',
+        'wpStep2CreateApiKey',
+        'wpStep3UploadFile',
+        'wpStep4EnableFileSearch',
+        'wpStep5SaveWidget'
     ];
 
     /** @var array Endpoints that require authenticated user sessions */
@@ -138,7 +143,12 @@ class ApiAuthenticator
             // Allow both WordPress plugin registrations AND regular web registrations
             return self::checkRegistrationAccess();
         }
-        if ($action === 'wpWizardComplete') {
+        if ($action === 'wpWizardComplete' || 
+            $action === 'wpStep1VerifyAndCreateUser' ||
+            $action === 'wpStep2CreateApiKey' ||
+            $action === 'wpStep3UploadFile' ||
+            $action === 'wpStep4EnableFileSearch' ||
+            $action === 'wpStep5SaveWidget') {
             // WordPress wizard requires WordPress-specific verification
             return self::checkWordPressWizardAccess();
         }
