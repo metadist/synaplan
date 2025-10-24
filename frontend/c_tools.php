@@ -14,7 +14,7 @@
     </div>
     <div class="alert alert-warning" role="alert">
             <i class="fas fa-info-circle"></i>
-            <?php _s('<B>Please note:</B> The MCP Server functionality is coming by end of August 2025. Stay tuned and use our tools directly.', __FILE__, $_SESSION['LANG']); ?>
+            <?php _s('<B>Please note:</B> The MCP Server functionality is coming by end of November 2025. Stay tuned and use our tools directly.', __FILE__, $_SESSION['LANG']); ?>
         </div>
 
     <div class="alert alert-info" role="alert">

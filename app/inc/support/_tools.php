@@ -49,7 +49,7 @@ class Tools
         $lang = $msgArr['BLANG'];
 
         $arrRes = Curler::callJson(
-            'https://api.search.brave.com/res/v1/web/search?q='.urlencode($qTerm).'&search_lang='.$lang.'&country='.$country.'&count=5',
+            'https://api.search.brave.com/res/v1/web/search?q='.urlencode($qTerm).'&search_lang='.$lang.'&country='.$country.'&count=5&extra_snippets=true',
             ['Accept: application/json', 'Accept-Encoding: gzip', 'X-Subscription-Token: '.$braveKey]
         );
 

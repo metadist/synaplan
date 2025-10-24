@@ -42,7 +42,7 @@ if ($request) {
         foreach ($entry['changes'] as $change) {
             // preformat the message
             $formattedMessages = processWAMessage($change);
-            logMessage($formattedMessages);
+            //logMessage($formattedMessages);
 
             // handle messages
             // examples => https://deskfiler.atlassian.net/wiki/spaces/RAGroll/pages/2444820481/Messages+in+Array+Format
@@ -184,7 +184,6 @@ function logMessage($arrMessage)
     if (file_exists($logFile)) {
         $logContent = file_get_contents($logFile);
     }
-
     $logContent = '<pre>'.json_encode($arrMessage, JSON_PRETTY_PRINT). "</pre>\n****\n" . substr($logContent, 0, 16384) . "...\n****\n";
     $fhd = fopen($logFile, 'w');
     if ($fhd) {
