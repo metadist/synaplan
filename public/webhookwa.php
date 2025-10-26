@@ -160,6 +160,14 @@ if ($request) {
                         $idRes = db::query($updateSQL);
                     }
 
+                    // Store the sender's phone number in BMESSAGEMETA for outprocessor to use
+                    // This is critical for marketing mode where BUSERID=2 but we need to reply to the actual sender
+                    if ($msgDBID > 0 && isset($message['from'])) {
+                        $senderPhone = db::EscString($message['from']);
+                        $metaSQL = "INSERT INTO BMESSAGEMETA (BID, BMESSID, BTOKEN, BVALUE) VALUES (DEFAULT, {$msgDBID}, 'SENDER_PHONE', '{$senderPhone}')";
+                        db::Query($metaSQL);
+                    }
+
                     // ****************************************************************
                     // PREPROCESSOR
                     // if the message was saved successfully, start the preprocessor

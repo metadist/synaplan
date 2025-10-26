@@ -111,34 +111,48 @@ if ($answerMethod == 'WA') {
         }
 
         // ******************************************************
+        // Get the actual sender's phone number from BMESSAGEMETA
+        // This is needed for marketing mode where BUSERID=2 but we reply to the original sender
+        $recipientPhone = $usrArr['BPROVIDERID']; // Default to user's provider ID
+
+        $senderPhoneSQL = 'SELECT BVALUE FROM BMESSAGEMETA WHERE BMESSID = ' . intval($msgId) . " AND BTOKEN = 'SENDER_PHONE' LIMIT 1";
+        $senderPhoneRes = db::Query($senderPhoneSQL);
+        if ($senderPhoneRow = db::FetchArr($senderPhoneRes)) {
+            $recipientPhone = $senderPhoneRow['BVALUE']; // Use the original sender's phone
+            if (!empty($GLOBALS['debug'])) {
+                error_log("Outprocessor: Using sender phone from meta: {$recipientPhone} (instead of user's BPROVIDERID: {$usrArr['BPROVIDERID']})");
+            }
+        }
+
+        // ******************************************************
         // SEND WA
         $waSender = new waSender($waDetailsArr);
 
         if (!empty($GLOBALS['WAtoken'])) {
             if ($aiAnswer['BFILE'] > 0 and $aiAnswer['BFILETYPE'] != '' and str_contains($aiAnswer['BFILEPATH'], '/')) {
                 if ($aiAnswer['BFILETYPE'] == 'png' or $aiAnswer['BFILETYPE'] == 'jpg' or $aiAnswer['BFILETYPE'] == 'jpeg') {
-                    $myRes = $waSender->sendImage($usrArr['BPROVIDERID'], $aiAnswer);
+                    $myRes = $waSender->sendImage($recipientPhone, $aiAnswer);
                     if (!empty($GLOBALS['debug'])) {
-                        error_log("Outprocessor: Sent WhatsApp image to {$usrArr['BPROVIDERID']}");
+                        error_log("Outprocessor: Sent WhatsApp image to {$recipientPhone}");
                     }
                 } elseif ($aiAnswer['BFILETYPE'] == 'mp3') {
-                    $myRes = $waSender->sendAudio($usrArr['BPROVIDERID'], $aiAnswer);
+                    $myRes = $waSender->sendAudio($recipientPhone, $aiAnswer);
                     if (!empty($GLOBALS['debug'])) {
-                        error_log("Outprocessor: Sent WhatsApp audio to {$usrArr['BPROVIDERID']}");
+                        error_log("Outprocessor: Sent WhatsApp audio to {$recipientPhone}");
                     }
                 } else {
-                    $myRes = $waSender->sendText($usrArr['BPROVIDERID'], $aiAnswer['BTEXT']);
+                    $myRes = $waSender->sendText($recipientPhone, $aiAnswer['BTEXT']);
                     if (!empty($GLOBALS['debug'])) {
-                        error_log("Outprocessor: Sent WhatsApp text (unsupported file type) to {$usrArr['BPROVIDERID']}");
+                        error_log("Outprocessor: Sent WhatsApp text (unsupported file type) to {$recipientPhone}");
                     }
                 }
             } else {
                 // No file - send text message with footer
-                $myRes = $waSender->sendText($usrArr['BPROVIDERID'], $aiAnswer['BTEXT']);
+                $myRes = $waSender->sendText($recipientPhone, $aiAnswer['BTEXT']);
                 if (!empty($GLOBALS['debug'])) {
                     $debugFile = __DIR__ . '/debug_websearch.log';
                     $timestamp = date('Y-m-d H:i:s');
-                    file_put_contents($debugFile, "[$timestamp] outprocessor WA: Sent text to {$usrArr['BPROVIDERID']}\n", FILE_APPEND);
+                    file_put_contents($debugFile, "[$timestamp] outprocessor WA: Sent text to {$recipientPhone}\n", FILE_APPEND);
                 }
             }
         } else {
@@ -159,7 +173,7 @@ if ($answerMethod == 'WA') {
 
         // Try to send error notification to user via WhatsApp
         try {
-            if (isset($waDetailsArr) && isset($usrArr['BPROVIDERID'])) {
+            if (isset($waDetailsArr) && isset($recipientPhone)) {
                 $errorNotification = "⚠️ *Error Sending Message*\n\n";
                 $errorNotification .= "Sorry, there was an error delivering your response.\n\n";
                 $errorNotification .= "*Error Details:*\n";
@@ -169,7 +183,7 @@ if ($answerMethod == 'WA') {
                 $errorNotification .= "_Message ID: $msgId | Answer ID: $aiLastId_";
 
                 $errorSender = new waSender($waDetailsArr);
-                $errorSender->sendText($usrArr['BPROVIDERID'], $errorNotification);
+                $errorSender->sendText($recipientPhone, $errorNotification);
             }
         } catch (Exception $notifyEx) {
             error_log('outprocessor.php: Could not send error notification to user: ' . $notifyEx->getMessage());
