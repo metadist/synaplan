@@ -70,17 +70,17 @@ if ($request) {
                     if (!str_starts_with($phoneNumber, '+')) {
                         $phoneNumber = '+' . $phoneNumber;
                     }
-                    
+
                     // Search for user: first in BPROVIDERID (WhatsApp users), then in BUSERDETAILS->phone (platform users)
                     $userFound = false;
-                    
+
                     // Try 1: Search WhatsApp users by BPROVIDERID
                     $existingUser = Central::getUserByPhoneNumber($message['from'], false);
                     if ($existingUser && isset($existingUser['BID'])) {
                         $inMessageArr['BUSERID'] = $existingUser['BID'];
                         $userFound = true;
                     }
-                    
+
                     // Try 2: Search all users by phone in BUSERDETAILS JSON
                     if (!$userFound) {
                         $escapedPhone = db::EscString($phoneNumber);
@@ -92,12 +92,12 @@ if ($request) {
                             $userFound = true;
                         }
                     }
-                    
+
                     // Default: Use platform owner (user ID 2) if no user found
                     if (!$userFound) {
                         $inMessageArr['BUSERID'] = 2; // Platform owner with configured prompts
                     }
-                    
+
                     $inMessageArr['BTEXT'] = $message['content']['text'];
                     $inMessageArr['BUNIXTIMES'] = $message['timestamp'];
                     $inMessageArr['BDATETIME'] = (string) date('YmdHis');
@@ -130,7 +130,8 @@ if ($request) {
                         $limitCheck = XSControl::checkMessagesLimit($inMessageArr['BUSERID']);
                         if (is_array($limitCheck) && $limitCheck['limited']) {
                             // Send rate limit notification via WhatsApp
-                            $limitMessage = "⏳ Usage Limit Reached\n" . $limitCheck['message'] . "\nNext available in: " . $limitCheck['reset_time_formatted'] . "\nNeed higher limits? 🚀 Upgrade your plan";
+                            $limitMessage = "*⏳ Usage Limit Reached*\n" . $limitCheck['message'] . "\nNext available in: " . $limitCheck['reset_time_formatted'] . "\nNeed higher limits? 🚀 Upgrade your plan";
+                            $limitMessage = Tools::formatForWhatsApp($limitMessage);
 
                             // Get WhatsApp details to send reply
                             if (isset($message['metadata']['phone_number_id'])) {
