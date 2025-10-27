@@ -19,7 +19,12 @@ class ApiAuthenticator
         'getMessageFiles',
         'userRegister',
         'lostPassword',
-        'wpWizardComplete'
+        'wpWizardComplete',
+        'wpStep1VerifyAndCreateUser',
+        'wpStep2CreateApiKey',
+        'wpStep3UploadFile',
+        'wpStep4EnableFileSearch',
+        'wpStep5SaveWidget'
     ];
 
     /** @var array Endpoints that require authenticated user sessions */
@@ -138,9 +143,14 @@ class ApiAuthenticator
             // Allow both WordPress plugin registrations AND regular web registrations
             return self::checkRegistrationAccess();
         }
-        if ($action === 'wpWizardComplete') {
-            // WordPress wizard requires WordPress-specific verification
-            return self::checkWordPressWizardAccess();
+        if ($action === 'wpWizardComplete' ||
+            $action === 'wpStep1VerifyAndCreateUser' ||
+            $action === 'wpStep2CreateApiKey' ||
+            $action === 'wpStep3UploadFile' ||
+            $action === 'wpStep4EnableFileSearch' ||
+            $action === 'wpStep5SaveWidget') {
+            // WordPress wizard - pass the action to determine which validation to apply
+            return self::checkWordPressWizardAccess($action);
         }
         if ($action === 'lostPassword') {
             return true;
@@ -210,9 +220,10 @@ class ApiAuthenticator
     /**
      * Check WordPress wizard access with verification requirements
      *
+     * @param string $action The wizard action being performed
      * @return bool True if access is allowed
      */
-    private static function checkWordPressWizardAccess(): bool {
+    private static function checkWordPressWizardAccess(string $action): bool {
         // Get client IP for rate limiting
         $clientIp = $_SERVER['HTTP_CF_CONNECTING_IP'] ?? $_SERVER['HTTP_X_FORWARDED_FOR'] ?? $_SERVER['REMOTE_ADDR'] ?? 'unknown';
 
@@ -230,14 +241,28 @@ class ApiAuthenticator
             exit;
         }
 
-        // WordPress wizard REQUIRES verification fields
-        $requiredFields = ['verification_token', 'verification_url', 'site_url'];
-        foreach ($requiredFields as $field) {
-            if (empty($_REQUEST[$field])) {
+        // Only wpStep1VerifyAndCreateUser and legacy wpWizardComplete require verification fields
+        // Other steps (2-5) use user_id from step 1 instead
+        if ($action === 'wpStep1VerifyAndCreateUser' || $action === 'wpWizardComplete') {
+            $requiredFields = ['verification_token', 'verification_url', 'site_url'];
+            foreach ($requiredFields as $field) {
+                if (empty($_REQUEST[$field])) {
+                    http_response_code(400);
+                    echo json_encode([
+                        'error' => 'Missing required WordPress verification fields',
+                        'message' => 'WordPress site verification is required for step 1',
+                        'missing_field' => $field
+                    ]);
+                    exit;
+                }
+            }
+        } else {
+            // Steps 2-5 require user_id from step 1
+            if (empty($_REQUEST['user_id'])) {
                 http_response_code(400);
                 echo json_encode([
-                    'error' => 'Missing required WordPress verification fields',
-                    'message' => 'WordPress site verification is required for wizard completion'
+                    'error' => 'Missing user_id',
+                    'message' => 'user_id from step 1 is required for subsequent wizard steps'
                 ]);
                 exit;
             }

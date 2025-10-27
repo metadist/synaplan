@@ -64,8 +64,40 @@ if ($request) {
                     // fill the single message array
                     $inMessageArr = [];
 
-                    // fill for sorting first
-                    $inMessageArr['BUSERID'] = Central::getUserByPhoneNumber($message['from'])['BID'];
+                    // fill for sorting first - search for user by phone number, default to platform owner (ID 2)
+                    // Normalize phone number to +XXXXXXXXXXX format
+                    $phoneNumber = $message['from'];
+                    if (!str_starts_with($phoneNumber, '+')) {
+                        $phoneNumber = '+' . $phoneNumber;
+                    }
+
+                    // Search for user: first in BPROVIDERID (WhatsApp users), then in BUSERDETAILS->phone (platform users)
+                    $userFound = false;
+
+                    // Try 1: Search WhatsApp users by BPROVIDERID
+                    $existingUser = Central::getUserByPhoneNumber($message['from'], false);
+                    if ($existingUser && isset($existingUser['BID'])) {
+                        $inMessageArr['BUSERID'] = $existingUser['BID'];
+                        $userFound = true;
+                    }
+
+                    // Try 2: Search all users by phone in BUSERDETAILS JSON
+                    if (!$userFound) {
+                        $escapedPhone = db::EscString($phoneNumber);
+                        $searchSQL = "SELECT * FROM BUSER WHERE BUSERDETAILS LIKE '%\"phone\":\"{$escapedPhone}\"%' OR BUSERDETAILS LIKE '%\"phone\": \"{$escapedPhone}\"%' LIMIT 1";
+                        $userRes = db::Query($searchSQL);
+                        $userArr = db::FetchArr($userRes);
+                        if ($userArr && isset($userArr['BID'])) {
+                            $inMessageArr['BUSERID'] = $userArr['BID'];
+                            $userFound = true;
+                        }
+                    }
+
+                    // Default: Use platform owner (user ID 2) if no user found
+                    if (!$userFound) {
+                        $inMessageArr['BUSERID'] = 2; // Platform owner with configured prompts
+                    }
+
                     $inMessageArr['BTEXT'] = $message['content']['text'];
                     $inMessageArr['BUNIXTIMES'] = $message['timestamp'];
                     $inMessageArr['BDATETIME'] = (string) date('YmdHis');
@@ -98,7 +130,8 @@ if ($request) {
                         $limitCheck = XSControl::checkMessagesLimit($inMessageArr['BUSERID']);
                         if (is_array($limitCheck) && $limitCheck['limited']) {
                             // Send rate limit notification via WhatsApp
-                            $limitMessage = "⏳ Usage Limit Reached\n" . $limitCheck['message'] . "\nNext available in: " . $limitCheck['reset_time_formatted'] . "\nNeed higher limits? 🚀 Upgrade your plan";
+                            $limitMessage = "*⏳ Usage Limit Reached*\n" . $limitCheck['message'] . "\nNext available in: " . $limitCheck['reset_time_formatted'] . "\nNeed higher limits? 🚀 Upgrade your plan";
+                            $limitMessage = Tools::formatForWhatsApp($limitMessage);
 
                             // Get WhatsApp details to send reply
                             if (isset($message['metadata']['phone_number_id'])) {
@@ -125,6 +158,14 @@ if ($request) {
                         $msgToId = intval($message['metadata']['phone_number_id']);
                         $updateSQL = 'insert into BWAIDS (BID, BMID, BWAPHONEID, BWAPHONENO) values (DEFAULT, '.$msgDBID.', '.$msgToId.', '.$msgToPhone.')';
                         $idRes = db::query($updateSQL);
+                    }
+
+                    // Store the sender's phone number in BMESSAGEMETA for outprocessor to use
+                    // This is critical for marketing mode where BUSERID=2 but we need to reply to the actual sender
+                    if ($msgDBID > 0 && isset($message['from'])) {
+                        $senderPhone = db::EscString($message['from']);
+                        $metaSQL = "INSERT INTO BMESSAGEMETA (BID, BMESSID, BTOKEN, BVALUE) VALUES (DEFAULT, {$msgDBID}, 'SENDER_PHONE', '{$senderPhone}')";
+                        db::Query($metaSQL);
                     }
 
                     // ****************************************************************

@@ -17,7 +17,204 @@
 class WordPressWizard
 {
     /**
-     * Complete WordPress wizard setup - NEW VERSION with verification
+     * STEP 1 API: Verify and create user
+     * 
+     * This is called first by WordPress plugin to verify site and create user
+     * 
+     * @return array Result with user_id
+     */
+    public static function wpStep1VerifyAndCreateUser(): array {
+        $retArr = ['error' => '', 'success' => false];
+
+        try {
+            // Verify WordPress site
+            $verification = self::verifyWordPressSite();
+            if (!$verification['success']) {
+                $retArr['error'] = $verification['error'] ?? 'WordPress site verification failed';
+                return $retArr;
+            }
+
+            // Create user with status 'NEW' (not PIN)
+            $userResult = self::createWordPressUser();
+            if (!$userResult['success']) {
+                $retArr['error'] = $userResult['error'] ?? 'User creation failed';
+                return $retArr;
+            }
+
+            $retArr['success'] = true;
+            $retArr['data'] = [
+                'user_id' => $userResult['user_id'],
+                'email' => $userResult['email'],
+                'site_verified' => true
+            ];
+
+            return $retArr;
+        } catch (\Throwable $e) {
+            error_log('WordPress Step 1 Error: ' . $e->getMessage());
+            $retArr['error'] = 'Step 1 failed: ' . $e->getMessage();
+            return $retArr;
+        }
+    }
+
+    /**
+     * STEP 2 API: Create API key for user
+     * 
+     * Expects: user_id in request
+     * 
+     * @return array Result with api_key
+     */
+    public static function wpStep2CreateApiKey(): array {
+        $retArr = ['error' => '', 'success' => false];
+
+        try {
+            $userId = intval($_REQUEST['user_id'] ?? 0);
+            
+            if ($userId <= 0) {
+                $retArr['error'] = 'Invalid user_id';
+                return $retArr;
+            }
+
+            $apiKeyResult = self::createUserApiKey($userId);
+            if (!$apiKeyResult['success']) {
+                $retArr['error'] = $apiKeyResult['error'] ?? 'API key creation failed';
+                return $retArr;
+            }
+
+            $retArr['success'] = true;
+            $retArr['data'] = [
+                'user_id' => $userId,
+                'api_key' => $apiKeyResult['api_key']
+            ];
+
+            return $retArr;
+        } catch (\Throwable $e) {
+            error_log('WordPress Step 2 Error: ' . $e->getMessage());
+            $retArr['error'] = 'Step 2 failed: ' . $e->getMessage();
+            return $retArr;
+        }
+    }
+
+    /**
+     * STEP 3 API: Upload and process RAG file
+     * 
+     * Expects: user_id in request, single file in $_FILES['file']
+     * This is called once per file to avoid complex multipart issues
+     * 
+     * @return array Result with file info
+     */
+    public static function wpStep3UploadFile(): array {
+        $retArr = ['error' => '', 'success' => false];
+
+        try {
+            $userId = intval($_REQUEST['user_id'] ?? 0);
+            
+            if ($userId <= 0) {
+                $retArr['error'] = 'Invalid user_id';
+                return $retArr;
+            }
+
+            // Check for single file upload
+            if (empty($_FILES['file']) || empty($_FILES['file']['name'])) {
+                $retArr['error'] = 'No file uploaded';
+                return $retArr;
+            }
+
+            // Process single file
+            $result = self::processSingleRAGFile($userId, $_FILES['file']);
+            
+            if (!$result['success']) {
+                $retArr['error'] = $result['error'] ?? 'File processing failed';
+                return $retArr;
+            }
+
+            $retArr['success'] = true;
+            $retArr['data'] = $result['data'];
+
+            return $retArr;
+        } catch (\Throwable $e) {
+            error_log('WordPress Step 3 Error: ' . $e->getMessage());
+            $retArr['error'] = 'Step 3 failed: ' . $e->getMessage();
+            return $retArr;
+        }
+    }
+
+    /**
+     * STEP 4 API: Enable file search on general prompt
+     * 
+     * Expects: user_id in request
+     * 
+     * @return array Result
+     */
+    public static function wpStep4EnableFileSearch(): array {
+        $retArr = ['error' => '', 'success' => false];
+
+        try {
+            $userId = intval($_REQUEST['user_id'] ?? 0);
+            
+            if ($userId <= 0) {
+                $retArr['error'] = 'Invalid user_id';
+                return $retArr;
+            }
+
+            $promptResult = self::enableFileSearchOnGeneralPrompt($userId);
+            if (!$promptResult['success']) {
+                $retArr['error'] = $promptResult['error'] ?? 'Failed to enable file search';
+                return $retArr;
+            }
+
+            $retArr['success'] = true;
+            $retArr['data'] = [
+                'prompt_configured' => true,
+                'prompt_id' => $promptResult['promptId'] ?? null
+            ];
+
+            return $retArr;
+        } catch (\Throwable $e) {
+            error_log('WordPress Step 4 Error: ' . $e->getMessage());
+            $retArr['error'] = 'Step 4 failed: ' . $e->getMessage();
+            return $retArr;
+        }
+    }
+
+    /**
+     * STEP 5 API: Save widget configuration
+     * 
+     * Expects: user_id and widget settings in request
+     * 
+     * @return array Result
+     */
+    public static function wpStep5SaveWidget(): array {
+        $retArr = ['error' => '', 'success' => false];
+
+        try {
+            $userId = intval($_REQUEST['user_id'] ?? 0);
+            
+            if ($userId <= 0) {
+                $retArr['error'] = 'Invalid user_id';
+                return $retArr;
+            }
+
+            $widgetResult = self::saveWidgetConfiguration($userId);
+            if (!$widgetResult['success']) {
+                $retArr['error'] = $widgetResult['error'] ?? 'Widget configuration failed';
+                return $retArr;
+            }
+
+            $retArr['success'] = true;
+            $retArr['data'] = [
+                'widget_configured' => true
+            ];
+
+            return $retArr;
+        } catch (\Throwable $e) {
+            error_log('WordPress Step 5 Error: ' . $e->getMessage());
+            $retArr['error'] = 'Step 5 failed: ' . $e->getMessage();
+            return $retArr;
+        }
+    }
+
+    /**
+     * Complete WordPress wizard setup - LEGACY VERSION (kept for backward compatibility)
      *
      * This is the main entry point for WordPress wizard installations
      * Handles complete flow: verification → user → API key → files → prompt → widget
@@ -306,6 +503,118 @@ class WordPressWizard
             error_log('Widget configuration error: ' . $e->getMessage());
             $retArr['error'] = 'Failed to save widget configuration: ' . $e->getMessage();
         }
+
+        return $retArr;
+    }
+
+    /**
+     * Process a single RAG file (for step-by-step API)
+     *
+     * @param int $userId User ID
+     * @param array $file Single file from $_FILES
+     * @return array Processing result
+     */
+    private static function processSingleRAGFile(int $userId, array $file): array {
+        $retArr = ['error' => '', 'success' => false, 'data' => []];
+
+        $groupKey = 'WORDPRESS_WIZARD';
+
+        // Validate file upload
+        if (empty($file['name']) || $file['error'] !== UPLOAD_ERR_OK) {
+            $retArr['error'] = 'File upload error';
+            return $retArr;
+        }
+
+        $tmpName = $file['tmp_name'];
+        $originalName = $file['name'];
+        $fileSize = $file['size'];
+
+        // Validate file size (max 10MB)
+        $maxSize = 10 * 1024 * 1024;
+        if ($fileSize > $maxSize) {
+            $retArr['error'] = "File too large: $originalName (max 10MB)";
+            return $retArr;
+        }
+
+        // Get file extension
+        $pathInfo = pathinfo($originalName);
+        $fileExtension = strtolower($pathInfo['extension'] ?? '');
+
+        // Validate file type
+        $allowedExtensions = ['pdf', 'docx', 'txt', 'jpg', 'jpeg', 'png', 'mp3', 'mp4'];
+        if (!in_array($fileExtension, $allowedExtensions)) {
+            $retArr['error'] = "Invalid file type: $fileExtension";
+            return $retArr;
+        }
+
+        // Generate unique filename
+        $newFileName = time() . '_' . $userId . '_' . uniqid() . '.' . $fileExtension;
+
+        // Create user-specific directory
+        $userSubDir = 'uid_' . $userId;
+        $userDir = rtrim(UPLOAD_DIR, '/') . '/' . $userSubDir;
+
+        if (!file_exists($userDir)) {
+            mkdir($userDir, 0755, true);
+        }
+
+        $targetPath = $userDir . '/' . $newFileName;
+        $userRelPath = $userSubDir . '/';
+
+        // Move uploaded file
+        if (!move_uploaded_file($tmpName, $targetPath)) {
+            $retArr['error'] = "Failed to move file: $originalName";
+            return $retArr;
+        }
+
+        // Create message entry for this file
+        $inMessageArr = [];
+        $inMessageArr['BUSERID'] = $userId;
+        $inMessageArr['BTEXT'] = 'RAG file: ' . $originalName;
+        $inMessageArr['BUNIXTIMES'] = time();
+        $inMessageArr['BDATETIME'] = date('YmdHis');
+        $inMessageArr['BTRACKID'] = (int) (microtime(true) * 1000000);
+        $inMessageArr['BLANG'] = 'en';
+        $inMessageArr['BTOPIC'] = 'RAG';
+        $inMessageArr['BID'] = 'DEFAULT';
+        $inMessageArr['BPROVIDX'] = session_id();
+        $inMessageArr['BMESSTYPE'] = 'RAG';
+        $inMessageArr['BFILE'] = 1;
+        $inMessageArr['BFILEPATH'] = $userRelPath . $newFileName;
+        $inMessageArr['BFILETYPE'] = $fileExtension;
+        $inMessageArr['BDIRECT'] = 'IN';
+        $inMessageArr['BSTATUS'] = 'NEW';
+        $inMessageArr['BFILETEXT'] = '';
+
+        // Save to database
+        $resArr = Central::handleInMessage($inMessageArr);
+
+        if ($resArr['lastId'] <= 0) {
+            $retArr['error'] = 'Failed to save file to database';
+            return $retArr;
+        }
+
+        $fileData = [
+            'BID' => $resArr['lastId'],
+            'BFILEPATH' => $userRelPath . $newFileName,
+            'BFILETYPE' => $fileExtension,
+            'BTEXT' => 'RAG file: ' . $originalName
+        ];
+
+        // Process file through RAG system
+        $ragResult = Central::processRAGFiles([$fileData], $userId, $groupKey, false);
+
+        if (!$ragResult['success']) {
+            $retArr['error'] = 'RAG processing failed';
+            return $retArr;
+        }
+
+        $retArr['success'] = true;
+        $retArr['data'] = [
+            'file_id' => $resArr['lastId'],
+            'filename' => $originalName,
+            'processed' => true
+        ];
 
         return $retArr;
     }

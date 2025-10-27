@@ -179,7 +179,29 @@ switch ($apiAction) {
         break;
     case 'wpWizardComplete':
         // Complete WordPress wizard setup with verification, user creation, API key, files, prompt, and widget
+        // LEGACY: kept for backward compatibility
         $resArr = WordPressWizard::completeWizardSetup();
+        break;
+    // WordPress Wizard - Step-by-step API (recommended for WordPress HTTP API compatibility)
+    case 'wpStep1VerifyAndCreateUser':
+        // STEP 1: Verify WordPress site and create user
+        $resArr = WordPressWizard::wpStep1VerifyAndCreateUser();
+        break;
+    case 'wpStep2CreateApiKey':
+        // STEP 2: Create API key for user
+        $resArr = WordPressWizard::wpStep2CreateApiKey();
+        break;
+    case 'wpStep3UploadFile':
+        // STEP 3: Upload and process single RAG file
+        $resArr = WordPressWizard::wpStep3UploadFile();
+        break;
+    case 'wpStep4EnableFileSearch':
+        // STEP 4: Enable file search on general prompt
+        $resArr = WordPressWizard::wpStep4EnableFileSearch();
+        break;
+    case 'wpStep5SaveWidget':
+        // STEP 5: Save widget configuration
+        $resArr = WordPressWizard::wpStep5SaveWidget();
         break;
     case 'lostPassword':
         $resArr = UserRegistration::lostPassword();

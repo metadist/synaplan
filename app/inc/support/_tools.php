@@ -688,4 +688,117 @@ class Tools
 
         return implode('', $chars);
     }
+
+    // --------------------------------------------------------------------------
+    // Convert markdown to HTML for email messages
+    // Uses Parsedown library to render markdown as HTML
+    public static function markdownToHtml(string $text): string {
+        try {
+            if (empty($text)) {
+                return '';
+            }
+
+            // Initialize Parsedown
+            $parsedown = new \Parsedown();
+            $parsedown->setSafeMode(true); // Prevent XSS attacks
+
+            // Convert markdown to HTML
+            $html = $parsedown->text($text);
+
+            // Add some basic styling for email compatibility
+            $html = str_replace('<pre><code>', '<pre style="background-color: #f5f5f5; padding: 10px; border-radius: 4px; border: 1px solid #ddd; overflow-x: auto;"><code style="font-family: monospace; font-size: 13px;">', $html);
+            $html = str_replace('<code>', '<code style="background-color: #f5f5f5; padding: 2px 4px; border-radius: 3px; font-family: monospace; font-size: 13px;">', $html);
+            $html = str_replace('<blockquote>', '<blockquote style="border-left: 4px solid #ddd; margin: 10px 0; padding-left: 15px; color: #666;">', $html);
+            $html = str_replace('<table>', '<table style="border-collapse: collapse; width: 100%; margin: 10px 0;">', $html);
+            $html = str_replace('<th>', '<th style="border: 1px solid #ddd; padding: 8px; background-color: #f5f5f5; text-align: left;">', $html);
+            $html = str_replace('<td>', '<td style="border: 1px solid #ddd; padding: 8px;">', $html);
+            $html = str_replace('<ul>', '<ul style="margin: 10px 0; padding-left: 20px;">', $html);
+            $html = str_replace('<ol>', '<ol style="margin: 10px 0; padding-left: 20px;">', $html);
+            $html = str_replace('<h1>', '<h1 style="color: #333; margin-top: 20px; margin-bottom: 10px;">', $html);
+            $html = str_replace('<h2>', '<h2 style="color: #333; margin-top: 18px; margin-bottom: 8px;">', $html);
+            $html = str_replace('<h3>', '<h3 style="color: #333; margin-top: 16px; margin-bottom: 8px;">', $html);
+            $html = str_replace('<h4>', '<h4 style="color: #333; margin-top: 14px; margin-bottom: 6px;">', $html);
+            $html = str_replace('<p>', '<p style="margin: 10px 0; line-height: 1.6;">', $html);
+            $html = str_replace('<a ', '<a style="color: #0066cc; text-decoration: none;" ', $html);
+
+            return $html;
+        } catch (\Exception $e) {
+            error_log('markdownToHtml ERROR: ' . $e->getMessage());
+            // Fallback to nl2br if markdown parsing fails
+            return nl2br(htmlspecialchars($text));
+        }
+    }
+
+    // --------------------------------------------------------------------------
+    // Format markdown text for WhatsApp messaging
+    // Converts standard markdown to WhatsApp-compatible formatting
+    public static function formatForWhatsApp(string $text): string {
+        try {
+            // Validate input
+            if (empty($text)) {
+                return '';
+            }
+
+            // WhatsApp supports: *bold*, _italic_, ~strikethrough~, ```monospace```
+
+            // Step 1: Protect already-correct WhatsApp formatting
+            $text = str_replace('***', '⚡TRIPLE_ASTERISK⚡', $text);
+
+            // Step 2: Convert markdown bold (**text**) to WhatsApp bold (*text*)
+            // Handle bold with asterisks
+            $text = preg_replace('/\*\*([^\*]+)\*\*/', '*$1*', $text);
+
+            // Step 3: Restore any triple asterisks that were protected
+            $text = str_replace('⚡TRIPLE_ASTERISK⚡', '***', $text);
+
+            // Step 4: Convert markdown italic with underscores to WhatsApp italic
+            // WhatsApp uses single underscore for italic
+            // No change needed for _text_ - already correct
+
+            // Step 5: Convert markdown strikethrough (~~text~~) to WhatsApp (~text~)
+            $text = preg_replace('/~~([^~]+)~~/', '~$1~', $text);
+
+            // Step 6: Convert inline code (`text`) to WhatsApp monospace (```text```)
+            $text = preg_replace('/(?<!`)` ([^`]+) `(?!`)/', '```$1```', $text);
+            $text = preg_replace('/(?<!`)`([^`\n]+)`(?!`)/', '```$1```', $text);
+
+            // Step 7: Handle code blocks - keep triple backticks as is
+            // WhatsApp supports ```code blocks``` natively
+
+            // Step 8: Convert markdown links [text](url) to plain text with URL
+            $text = preg_replace('/\[([^\]]+)\]\(([^\)]+)\)/', '$1 ($2)', $text);
+
+            // Step 9: Convert headers to bold text
+            $text = preg_replace('/^#{1,6}\s+(.+)$/m', '*$1*', $text);
+
+            // Step 10: Clean up bullet lists - WhatsApp handles them naturally
+            // Just ensure proper spacing
+            $text = preg_replace('/^\s*[-*]\s+/m', '• ', $text);
+
+            // Step 11: Clean up numbered lists
+            $text = preg_replace('/^\s*(\d+)\.\s+/m', '$1. ', $text);
+
+            // Step 12: Limit excessive newlines (max 2 consecutive)
+            $text = preg_replace('/\n{3,}/', "\n\n", $text);
+
+            // Step 13: Remove HTML tags if any slipped through
+            $text = strip_tags($text);
+
+            // Step 14: Ensure proper UTF-8 encoding
+            $text = self::ensure_utf8($text);
+
+            // Step 15: Validate output length (WhatsApp has a 4096 character limit)
+            if (strlen($text) > 4096) {
+                error_log('formatForWhatsApp: Message exceeds WhatsApp 4096 char limit (' . strlen($text) . ' chars)');
+                // Truncate with warning
+                $text = substr($text, 0, 4000) . "\n\n... _(message truncated - too long)_";
+            }
+
+            return trim($text);
+        } catch (\Exception $e) {
+            error_log('formatForWhatsApp ERROR: ' . $e->getMessage());
+            // Return original text if formatting fails
+            return trim($text ?? '');
+        }
+    }
 }
