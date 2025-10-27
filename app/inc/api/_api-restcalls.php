@@ -182,7 +182,7 @@ switch ($apiAction) {
         // LEGACY: kept for backward compatibility
         $resArr = WordPressWizard::completeWizardSetup();
         break;
-    // WordPress Wizard - Step-by-step API (recommended for WordPress HTTP API compatibility)
+        // WordPress Wizard - Step-by-step API (recommended for WordPress HTTP API compatibility)
     case 'wpStep1VerifyAndCreateUser':
         // STEP 1: Verify WordPress site and create user
         $resArr = WordPressWizard::wpStep1VerifyAndCreateUser();

@@ -18,9 +18,9 @@ class WordPressWizard
 {
     /**
      * STEP 1 API: Verify and create user
-     * 
+     *
      * This is called first by WordPress plugin to verify site and create user
-     * 
+     *
      * @return array Result with user_id
      */
     public static function wpStep1VerifyAndCreateUser(): array {
@@ -58,9 +58,9 @@ class WordPressWizard
 
     /**
      * STEP 2 API: Create API key for user
-     * 
+     *
      * Expects: user_id in request
-     * 
+     *
      * @return array Result with api_key
      */
     public static function wpStep2CreateApiKey(): array {
@@ -68,7 +68,7 @@ class WordPressWizard
 
         try {
             $userId = intval($_REQUEST['user_id'] ?? 0);
-            
+
             if ($userId <= 0) {
                 $retArr['error'] = 'Invalid user_id';
                 return $retArr;
@@ -96,10 +96,10 @@ class WordPressWizard
 
     /**
      * STEP 3 API: Upload and process RAG file
-     * 
+     *
      * Expects: user_id in request, single file in $_FILES['file']
      * This is called once per file to avoid complex multipart issues
-     * 
+     *
      * @return array Result with file info
      */
     public static function wpStep3UploadFile(): array {
@@ -107,7 +107,7 @@ class WordPressWizard
 
         try {
             $userId = intval($_REQUEST['user_id'] ?? 0);
-            
+
             if ($userId <= 0) {
                 $retArr['error'] = 'Invalid user_id';
                 return $retArr;
@@ -121,7 +121,7 @@ class WordPressWizard
 
             // Process single file
             $result = self::processSingleRAGFile($userId, $_FILES['file']);
-            
+
             if (!$result['success']) {
                 $retArr['error'] = $result['error'] ?? 'File processing failed';
                 return $retArr;
@@ -140,9 +140,9 @@ class WordPressWizard
 
     /**
      * STEP 4 API: Enable file search on general prompt
-     * 
+     *
      * Expects: user_id in request
-     * 
+     *
      * @return array Result
      */
     public static function wpStep4EnableFileSearch(): array {
@@ -150,7 +150,7 @@ class WordPressWizard
 
         try {
             $userId = intval($_REQUEST['user_id'] ?? 0);
-            
+
             if ($userId <= 0) {
                 $retArr['error'] = 'Invalid user_id';
                 return $retArr;
@@ -178,9 +178,9 @@ class WordPressWizard
 
     /**
      * STEP 5 API: Save widget configuration
-     * 
+     *
      * Expects: user_id and widget settings in request
-     * 
+     *
      * @return array Result
      */
     public static function wpStep5SaveWidget(): array {
@@ -188,7 +188,7 @@ class WordPressWizard
 
         try {
             $userId = intval($_REQUEST['user_id'] ?? 0);
-            
+
             if ($userId <= 0) {
                 $retArr['error'] = 'Invalid user_id';
                 return $retArr;
