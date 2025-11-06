@@ -834,13 +834,46 @@ class mailHandler
             }
             $origSubject = trim((string)$message->getSubject());
             $subject = (strlen($origSubject) > 0 ? 'Fwd: '.$origSubject : 'Fwd: (no subject)');
-            $html = (string)$message->getHTMLBody();
-            $plain = (string)$message->getTextBody();
-            if ($html === '' && $plain !== '') {
-                $html = nl2br($plain);
+
+            $html = '';
+            $plain = '';
+
+            // Get properly decoded bodies with charset conversion
+            $userId = $_SESSION['USERPROFILE']['BID'] ?? 0;
+
+            if ($userId > 0) {
+                // Get message UID from attributes
+                $uid = null;
+                if (method_exists($message, 'get')) {
+                    $uid = $message->get('uid');
+                    if (is_object($uid)) {
+                        $uid = (int)(string)$uid;
+                    } else {
+                        $uid = (int)$uid;
+                    }
+                }
+
+                if ($uid > 0) {
+                    $bodies = self::getMessageBodiesUtf8ByUid($userId, $uid);
+                    $plain = $bodies['text'] ?? '';
+                    $html = $bodies['html'] ?? '';
+                }
             }
-            if ($plain === '' && $html !== '') {
+
+            // Prefer HTML for formatting, create plain from HTML if needed
+            if ($html !== '' && $plain === '') {
                 $plain = strip_tags($html);
+            }
+            // If we have plain but no HTML, create basic HTML preserving line breaks
+            if ($plain !== '' && $html === '') {
+                $html = '<!DOCTYPE html><html><head><meta charset="UTF-8"></head><body style="font-family: sans-serif; white-space: pre-wrap;">' . htmlspecialchars($plain, ENT_QUOTES, 'UTF-8') . '</body></html>';
+            }
+            // Ensure HTML has proper UTF-8 meta tag
+            if ($html !== '' && stripos($html, '<meta') === false && stripos($html, '<head>') !== false) {
+                $html = str_replace('<head>', '<head><meta charset="UTF-8">', $html);
+            } elseif ($html !== '' && stripos($html, '<!DOCTYPE') === false && stripos($html, '<html') === false) {
+                // Wrap HTML fragment in proper document structure
+                $html = '<!DOCTYPE html><html><head><meta charset="UTF-8"></head><body>' . $html . '</body></html>';
             }
             $fromAddresses = $message->getFrom();
             $replyTo = '';
@@ -848,6 +881,29 @@ class mailHandler
                 $first = $fromAddresses[0];
                 $replyTo = trim(($first->mail ?? ''));
             }
+
+            if ($GLOBALS['debug'] ?? false) {
+                error_log('[MAILHANDLER] Reply-To will be set to: ' . $replyTo);
+            }
+
+            // Prepend ReplyTo information to body for visibility (in case email client doesn't respect Reply-To header)
+            if ($replyTo !== '') {
+                $replyToLine = 'ReplyTo: ' . $replyTo . "\n\n";
+                $plain = $replyToLine . $plain;
+
+                // Add to HTML version as well
+                if ($html !== '') {
+                    $replyToHtml = '<div style="margin-bottom: 16px; padding: 8px; background-color: #f0f0f0; border-left: 4px solid #0066cc;"><strong>ReplyTo:</strong> ' . htmlspecialchars($replyTo, ENT_QUOTES, 'UTF-8') . '</div>';
+                    // Insert after opening body tag if it exists
+                    if (stripos($html, '<body') !== false) {
+                        $html = preg_replace('/(<body[^>]*>)/i', '$1' . $replyToHtml, $html);
+                    } else {
+                        // If no body tag, just prepend
+                        $html = $replyToHtml . $html;
+                    }
+                }
+            }
+
             $attachPath = '';
             $attachments = $message->getAttachments();
             if ($attachments && $attachments->count() > 0) {
@@ -959,14 +1015,178 @@ class mailHandler
         return '';
     }
 
+    /**
+     * Extract charset from IMAP part structure
+     */
+    private static function getPartCharset($part): ?string {
+        foreach (['parameters', 'dparameters'] as $prop) {
+            if (!empty($part->$prop)) {
+                foreach ($part->$prop as $p) {
+                    if (strtolower($p->attribute ?? '') === 'charset') {
+                        return $p->value;
+                    }
+                }
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Decode content based on transfer encoding
+     */
+    private static function decodeTransferEncoding(string $data, int $encoding): string {
+        switch ($encoding) {
+            case 3: // BASE64
+                $decoded = base64_decode($data, true);
+                return $decoded !== false ? $decoded : $data;
+            case 4: // QUOTED-PRINTABLE
+                return quoted_printable_decode($data);
+            default: // 7bit/8bit/binary
+                return $data;
+        }
+    }
+
+    /**
+     * Normalize charset name
+     */
+    private static function normalizeCharset(?string $cs): string {
+        if (!$cs) {
+            return 'UTF-8';
+        }
+        $cs = strtoupper($cs);
+        if ($cs === 'ISO-8859-1' || $cs === 'UNKNOWN-8BIT') {
+            return 'WINDOWS-1252';
+        }
+        if ($cs === 'UTF8') {
+            return 'UTF-8';
+        }
+        return $cs;
+    }
+
+    /**
+     * Convert data to UTF-8
+     */
+    private static function convertToUtf8(string $data, ?string $charset): string {
+        $charset = self::normalizeCharset($charset);
+        if ($charset === 'UTF-8') {
+            return mb_check_encoding($data, 'UTF-8') ? $data : @iconv('UTF-8', 'UTF-8//IGNORE', $data);
+        }
+        $out = @iconv($charset, 'UTF-8//IGNORE', $data);
+        return $out !== false ? $out : mb_convert_encoding($data, 'UTF-8', $charset);
+    }
+
+    /**
+     * Decode IMAP part with proper charset conversion
+     * @param \IMAP\Connection|resource $imap IMAP connection (PHP 8+ uses IMAP\Connection objects)
+     */
+    private static function decodeImapPart($imap, int $msgNo, $part, string $partNo): string {
+        $raw = imap_fetchbody($imap, $msgNo, $partNo);
+        $decoded = self::decodeTransferEncoding($raw, $part->encoding ?? 0);
+        $charset = self::getPartCharset($part);
+
+        // If HTML and no charset, check meta tag
+        if (!$charset && strtoupper($part->subtype ?? '') === 'HTML') {
+            if (preg_match('/<meta[^>]+charset=["\']?([A-Za-z0-9\-\_]+)["\']?/i', $decoded, $m)) {
+                $charset = $m[1];
+            }
+        }
+
+        return self::convertToUtf8($decoded, $charset);
+    }
+
+    /**
+     * Get message bodies as UTF-8 using message UID
+     * @param int $userId User ID
+     * @param int $uid Message UID
+     */
+    private static function getMessageBodiesUtf8ByUid(int $userId, int $uid): array {
+        try {
+            // Always open fresh native IMAP connection to avoid caching issues
+            $cfg = self::getImapConfigForUser($userId);
+            if ($cfg['server'] === '' || $cfg['username'] === '') {
+                return ['text' => null, 'html' => null];
+            }
+
+            $protocol = strtolower($cfg['protocol']) === 'pop3' ? '/pop3' : '/imap';
+            $security = $cfg['security'] === 'ssl' ? '/ssl' : ($cfg['security'] === 'tls' ? '/tls' : '');
+            $mailbox = '{' . $cfg['server'] . ':' . $cfg['port'] . $protocol . $security . '/novalidate-cert}INBOX';
+
+            $nativeImap = @imap_open($mailbox, $cfg['username'], $cfg['password'], 0, 1);
+            if (!$nativeImap) {
+                return ['text' => null, 'html' => null];
+            }
+
+            // Convert UID to message sequence number
+            $msgNo = imap_msgno($nativeImap, $uid);
+            if (!$msgNo) {
+                @imap_close($nativeImap);
+                return ['text' => null, 'html' => null];
+            }
+
+            $struct = imap_fetchstructure($nativeImap, $msgNo);
+            $out = ['text' => null, 'html' => null];
+
+            $walk = function ($part, $prefix = '') use (&$walk, $nativeImap, $msgNo, &$out) {
+                $isMultipart = isset($part->parts) && is_array($part->parts);
+                if ($isMultipart) {
+                    foreach ($part->parts as $i => $p) {
+                        $newPrefix = $prefix === '' ? (string)($i + 1) : $prefix . '.' . ($i + 1);
+                        $walk($p, $newPrefix);
+                    }
+                } else {
+                    $type = $part->type ?? 0;
+                    $sub = strtoupper($part->subtype ?? '');
+                    if ($type === 0 && ($sub === 'PLAIN' || $sub === 'HTML')) {
+                        $body = self::decodeImapPart($nativeImap, $msgNo, $part, $prefix ?: '1');
+                        if ($sub === 'PLAIN' && $out['text'] === null) {
+                            $out['text'] = $body;
+                        }
+                        if ($sub === 'HTML' && $out['html'] === null) {
+                            $out['html'] = $body;
+                        }
+                    }
+                }
+            };
+
+            $walk($struct);
+
+            // Always close immediately to avoid caching
+            @imap_close($nativeImap);
+
+            return $out;
+        } catch (\Throwable $e) {
+            return ['text' => null, 'html' => null];
+        }
+    }
+
     private static function getPlainBody($message): string {
         try {
-            $plain = (string)$message->getTextBody();
-            $html = (string)$message->getHTMLBody();
-            if ($plain === '' && $html !== '') {
-                $plain = strip_tags($html);
+            $userId = $_SESSION['USERPROFILE']['BID'] ?? 0;
+            if ($userId <= 0) {
+                return '';
             }
-            return trim($plain);
+
+            // Get message UID from attributes
+            $uid = null;
+            if (method_exists($message, 'get')) {
+                $uid = $message->get('uid');
+                if (is_object($uid)) {
+                    $uid = (int)(string)$uid;
+                } else {
+                    $uid = (int)$uid;
+                }
+            }
+
+            if ($uid > 0) {
+                $bodies = self::getMessageBodiesUtf8ByUid($userId, $uid);
+                $plain = $bodies['text'] ?? '';
+                if ($plain === '' && !empty($bodies['html'])) {
+                    $plain = strip_tags($bodies['html']);
+                }
+                return trim($plain);
+            }
+
+            return '';
         } catch (\Throwable $e) {
             return '';
         }
@@ -999,13 +1219,46 @@ class mailHandler
             }
             $origSubject = trim((string)$message->getSubject());
             $subject = (strlen($origSubject) > 0 ? 'Fwd: '.$origSubject : 'Fwd: (no subject)');
-            $html = (string)$message->getHTMLBody();
-            $plain = (string)$message->getTextBody();
-            if ($html === '' && $plain !== '') {
-                $html = nl2br($plain);
+
+            $html = '';
+            $plain = '';
+
+            // Get properly decoded bodies with charset conversion
+            $userId = $_SESSION['USERPROFILE']['BID'] ?? 0;
+
+            if ($userId > 0) {
+                // Get message UID from attributes
+                $uid = null;
+                if (method_exists($message, 'get')) {
+                    $uid = $message->get('uid');
+                    if (is_object($uid)) {
+                        $uid = (int)(string)$uid;
+                    } else {
+                        $uid = (int)$uid;
+                    }
+                }
+
+                if ($uid > 0) {
+                    $bodies = self::getMessageBodiesUtf8ByUid($userId, $uid);
+                    $plain = $bodies['text'] ?? '';
+                    $html = $bodies['html'] ?? '';
+                }
             }
-            if ($plain === '' && $html !== '') {
+
+            // Prefer HTML for formatting, create plain from HTML if needed
+            if ($html !== '' && $plain === '') {
                 $plain = strip_tags($html);
+            }
+            // If we have plain but no HTML, create basic HTML preserving line breaks
+            if ($plain !== '' && $html === '') {
+                $html = '<!DOCTYPE html><html><head><meta charset="UTF-8"></head><body style="font-family: sans-serif; white-space: pre-wrap;">' . htmlspecialchars($plain, ENT_QUOTES, 'UTF-8') . '</body></html>';
+            }
+            // Ensure HTML has proper UTF-8 meta tag
+            if ($html !== '' && stripos($html, '<meta') === false && stripos($html, '<head>') !== false) {
+                $html = str_replace('<head>', '<head><meta charset="UTF-8">', $html);
+            } elseif ($html !== '' && stripos($html, '<!DOCTYPE') === false && stripos($html, '<html') === false) {
+                // Wrap HTML fragment in proper document structure
+                $html = '<!DOCTYPE html><html><head><meta charset="UTF-8"></head><body>' . $html . '</body></html>';
             }
             $fromAddresses = $message->getFrom();
             $replyTo = '';
@@ -1013,6 +1266,29 @@ class mailHandler
                 $first = $fromAddresses[0];
                 $replyTo = trim(($first->mail ?? ''));
             }
+
+            if ($GLOBALS['debug'] ?? false) {
+                error_log('[MAILHANDLER] Reply-To will be set to: ' . $replyTo);
+            }
+
+            // Prepend ReplyTo information to body for visibility (in case email client doesn't respect Reply-To header)
+            if ($replyTo !== '') {
+                $replyToLine = 'ReplyTo: ' . $replyTo . "\n\n";
+                $plain = $replyToLine . $plain;
+
+                // Add to HTML version as well
+                if ($html !== '') {
+                    $replyToHtml = '<div style="margin-bottom: 16px; padding: 8px; background-color: #f0f0f0; border-left: 4px solid #0066cc;"><strong>ReplyTo:</strong> ' . htmlspecialchars($replyTo, ENT_QUOTES, 'UTF-8') . '</div>';
+                    // Insert after opening body tag if it exists
+                    if (stripos($html, '<body') !== false) {
+                        $html = preg_replace('/(<body[^>]*>)/i', '$1' . $replyToHtml, $html);
+                    } else {
+                        // If no body tag, just prepend
+                        $html = $replyToHtml . $html;
+                    }
+                }
+            }
+
             $attachPaths = [];
             $attachments = $message->getAttachments();
             if ($attachments && $attachments->count() > 0) {
@@ -1049,6 +1325,12 @@ class mailHandler
         $userId = max(0, (int)$userId);
         $ret = ['success' => false, 'processed' => 0, 'errors' => []];
         try {
+            // Ensure session is set up for cron context (required by getPlainBody and forward functions)
+            if (!isset($_SESSION['USERPROFILE'])) {
+                $_SESSION['USERPROFILE'] = [];
+            }
+            $_SESSION['USERPROFILE']['BID'] = $userId;
+
             $login = self::imapConnectForUser($userId);
             if (!$login['success']) {
                 return ['success' => false, 'processed' => 0, 'errors' => [$login['error'] ?? 'login failed']];
@@ -1113,8 +1395,20 @@ class mailHandler
             $allowedEmails = array_map(function ($d) { return strtolower($d['email']); }, $departments);
             $defaultEmail = self::getDefaultDepartmentEmail($departments);
             Tools::debugCronLog('[ROUTING] Allowed targets: '.implode(',', $allowedEmails).' default='.strtolower($defaultEmail)."\n");
+
+            // Check if messages should be deleted after processing
+            $deleteAfter = false;
+            $deleteSql = 'SELECT BVALUE FROM BCONFIG WHERE BOWNERID = '.$userId." AND BGROUP='mailhandler' AND BSETTING='deleteAfter' LIMIT 1";
+            $deleteRes = db::Query($deleteSql);
+            $deleteRow = db::FetchArr($deleteRes);
+            if ($deleteRow && ($deleteRow['BVALUE'] === '1' || $deleteRow['BVALUE'] === 1)) {
+                $deleteAfter = true;
+            }
+            Tools::debugCronLog('[CONFIG] deleteAfter='.($deleteAfter ? 'yes' : 'no')."\n");
+
             $latestTs = $lastSeenTs;
             $processed = 0;
+
             foreach ($collected as $msg) {
                 try {
                     $sender = self::formatSender($msg);
@@ -1146,22 +1440,36 @@ class mailHandler
                     // Forward with all attachments
                     $sentOk = self::imapForwardMessageAll($msg, $chosen, '');
                     Tools::debugCronLog('[FORWARD] sent='.($sentOk ? '1' : '0').' to="'.$chosen."\"\n");
-                    // Mark read rules: mark as read unless default was selected
-                    if ($chosen !== '' && $chosen !== strtolower($defaultEmail)) {
-                        try {
-                            // set seen via flags API; ignore failures
-                            if (method_exists($msg, 'setFlag')) {
-                                $msg->setFlag('Seen');
+
+                    // Delete or mark read based on configuration
+                    if ($sentOk) {
+                        if ($deleteAfter) {
+                            // Delete message from server
+                            try {
+                                $deleted = self::imapDeleteMessage($msg);
+                                Tools::debugCronLog('[DELETE] deleted='.($deleted ? 'yes' : 'no')."\n");
+                            } catch (\Throwable $e) {
+                                Tools::debugCronLog('[DELETE] error: '.$e->getMessage()."\n");
                             }
-                            if (method_exists($msg, 'setFlags')) {
-                                $msg->setFlags(['Seen']);
+                        } else {
+                            // Mark all forwarded messages as read
+                            try {
+                                if (method_exists($msg, 'setFlag')) {
+                                    $msg->setFlag('Seen');
+                                }
+                                if (method_exists($msg, 'setFlags')) {
+                                    $msg->setFlags(['Seen']);
+                                }
+                                if (method_exists($msg, 'markAsRead')) {
+                                    $msg->markAsRead();
+                                }
+                                Tools::debugCronLog('[MARK] marked as read'."\n");
+                            } catch (\Throwable $e) {
+                                Tools::debugCronLog('[MARK] error: '.$e->getMessage()."\n");
                             }
-                            if (method_exists($msg, 'markAsRead')) {
-                                $msg->markAsRead();
-                            }
-                        } catch (\Throwable $e) {
                         }
                     }
+
                     $ts = self::getMessageUnixTime($msg);
                     if ($ts > $latestTs) {
                         $latestTs = $ts;
@@ -1183,6 +1491,7 @@ class mailHandler
                 }
                 Tools::debugCronLog('[STATE] Updated last_seen to '.$latestTs."\n");
             }
+
             try {
                 $client->disconnect();
             } catch (\Throwable $e) {

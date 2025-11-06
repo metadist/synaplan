@@ -13,6 +13,11 @@ if (php_sapi_name() !== 'cli') {
     exit(1);
 }
 
+// Start session for mail handler functions
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+
 // CLI args: optional user id and optional debug flag
 // Supports: php cron/mailhandler.php 2 DEBUG
 //           php cron/mailhandler.php --user=2 --debug
@@ -67,26 +72,59 @@ Tools::debugCronLog("Starting mailhandler cron\n");
 
 // 1) Get all users with active mail handler settings
 $users = mailHandler::getUsersWithMailhandler();
+
+if ($DEBUG_CRON) {
+    echo 'Users with mail handler configured: ' . implode(', ', $users) . "\n";
+}
+
 // Filter to specific user if requested
 if ($targetUserId !== null) {
     $users = array_values(array_filter($users, function ($uid) use ($targetUserId) { return (int)$uid === (int)$targetUserId; }));
+    if ($DEBUG_CRON) {
+        echo "Filtered to user ID {$targetUserId}: " . (count($users) > 0 ? 'FOUND' : 'NOT FOUND') . "\n";
+    }
 }
 // if no users with mail handler configuration found, exit
 if (count($users) === 0) {
     Tools::debugCronLog("No users with mail handler configuration found.\n");
+    if ($DEBUG_CRON) {
+        echo "No users found. Make sure you have:\n";
+        echo "  1. Configured mail server settings (server, username, password)\n";
+        echo "  2. Configured at least one department email\n";
+    }
     exit(0);
 }
 
 
 Tools::debugCronLog('Found '.count($users)." user(s) with mail handler configured.\n");
+if ($DEBUG_CRON) {
+    echo 'Processing ' . count($users) . " user(s)...\n\n";
+}
 
 foreach ($users as $uid) {
     Tools::debugCronLog("\n---\nUser ID: $uid\n");
+    if ($DEBUG_CRON) {
+        echo "\n--- Processing User ID: {$uid} ---\n";
+    }
+
     $res = mailHandler::processNewEmailsForUser((int)$uid, 25);
+
     Tools::debugCronLog('Processed: '.$res['processed']." message(s).\n");
+    if ($DEBUG_CRON) {
+        echo 'Result: ' . ($res['success'] ? 'SUCCESS' : 'FAILED') . "\n";
+        echo "Messages processed: {$res['processed']}\n";
+    }
+
     if (!empty($res['errors'])) {
         Tools::debugCronLog('Errors: '.json_encode($res['errors'])."\n");
+        if ($DEBUG_CRON) {
+            echo "Errors:\n";
+            foreach ($res['errors'] as $err) {
+                echo "  - {$err}\n";
+            }
+        }
     }
+
     // Touch heartbeat so other runners can see it's active
     Tools::updateCron('MAILHANDLER');
 }
