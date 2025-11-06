@@ -888,6 +888,10 @@ class mailHandler
 
             // Prepend ReplyTo information to body for visibility (in case email client doesn't respect Reply-To header)
             if ($replyTo !== '') {
+                Tools::debugCronLog('[REPLYTO] Adding ReplyTo line to body: ' . $replyTo . "\n");
+                Tools::debugCronLog('[REPLYTO] Plain text before: ' . substr($plain, 0, 100) . "\n");
+                Tools::debugCronLog('[REPLYTO] HTML before: ' . substr($html, 0, 200) . "\n");
+
                 $replyToLine = 'ReplyTo: ' . $replyTo . "\n\n";
                 $plain = $replyToLine . $plain;
 
@@ -897,11 +901,18 @@ class mailHandler
                     // Insert after opening body tag if it exists
                     if (stripos($html, '<body') !== false) {
                         $html = preg_replace('/(<body[^>]*>)/i', '$1' . $replyToHtml, $html);
+                        Tools::debugCronLog('[REPLYTO] Inserted into HTML after <body> tag' . "\n");
                     } else {
                         // If no body tag, just prepend
                         $html = $replyToHtml . $html;
+                        Tools::debugCronLog('[REPLYTO] Prepended to HTML (no body tag found)' . "\n");
                     }
                 }
+
+                Tools::debugCronLog('[REPLYTO] Plain text after: ' . substr($plain, 0, 100) . "\n");
+                Tools::debugCronLog('[REPLYTO] HTML after: ' . substr($html, 0, 300) . "\n");
+            } else {
+                Tools::debugCronLog('[REPLYTO] No replyTo address found!' . "\n");
             }
 
             $attachPath = '';
@@ -1273,6 +1284,10 @@ class mailHandler
 
             // Prepend ReplyTo information to body for visibility (in case email client doesn't respect Reply-To header)
             if ($replyTo !== '') {
+                Tools::debugCronLog('[REPLYTO] Adding ReplyTo line to body: ' . $replyTo . "\n");
+                Tools::debugCronLog('[REPLYTO] Plain text before: ' . substr($plain, 0, 100) . "\n");
+                Tools::debugCronLog('[REPLYTO] HTML before: ' . substr($html, 0, 200) . "\n");
+
                 $replyToLine = 'ReplyTo: ' . $replyTo . "\n\n";
                 $plain = $replyToLine . $plain;
 
@@ -1282,11 +1297,18 @@ class mailHandler
                     // Insert after opening body tag if it exists
                     if (stripos($html, '<body') !== false) {
                         $html = preg_replace('/(<body[^>]*>)/i', '$1' . $replyToHtml, $html);
+                        Tools::debugCronLog('[REPLYTO] Inserted into HTML after <body> tag' . "\n");
                     } else {
                         // If no body tag, just prepend
                         $html = $replyToHtml . $html;
+                        Tools::debugCronLog('[REPLYTO] Prepended to HTML (no body tag found)' . "\n");
                     }
                 }
+
+                Tools::debugCronLog('[REPLYTO] Plain text after: ' . substr($plain, 0, 100) . "\n");
+                Tools::debugCronLog('[REPLYTO] HTML after: ' . substr($html, 0, 300) . "\n");
+            } else {
+                Tools::debugCronLog('[REPLYTO] No replyTo address found!' . "\n");
             }
 
             $attachPaths = [];
