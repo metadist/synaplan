@@ -54,16 +54,6 @@ function _mymail($strFrom, $strTo, $subject, $htmltext, $plaintext, $strReplyTo 
         $mail->addAddress($strTo, 'Forjo App Service');
     }
 
-    // - reply
-    if ($strReplyTo) {
-        $mail->addReplyTo($strReplyTo);
-    } elseif (substr_count($strFrom, ';') > 0) {
-        $fromparts = explode(';', $strFrom);
-        $mail->addReplyTo($fromparts[0], $fromparts[1]);
-    } else {
-        $mail->addReplyTo($strFrom, 'Forjo Mail Service');
-    }
-
     // support single string path or array of paths
     if (is_array($strFileAttach)) {
         foreach ($strFileAttach as $path) {
@@ -88,6 +78,28 @@ function _mymail($strFrom, $strTo, $subject, $htmltext, $plaintext, $strReplyTo 
 
     list($mail->Host, $mail->SMTPAuth, $mail->Port, $mail->Username, $mail->Password, $mail->From, $mail->FromName) = array_values($arrSmtpSrvs[$strUseProvider]);
     $mail->SMTPSecure = 'tls';
+
+    // Set Reply-To AFTER From is configured
+    if ($strReplyTo && trim($strReplyTo) !== '') {
+        $mail->clearReplyTos();
+        $mail->addReplyTo(trim($strReplyTo));
+        if ($GLOBALS['debug'] ?? false) {
+            error_log('[_MYMAIL] Reply-To set to: ' . trim($strReplyTo));
+        }
+    } elseif (substr_count($strFrom, ';') > 0) {
+        $mail->clearReplyTos();
+        $fromparts = explode(';', $strFrom);
+        $mail->addReplyTo($fromparts[0], $fromparts[1]);
+        if ($GLOBALS['debug'] ?? false) {
+            error_log('[_MYMAIL] Reply-To set to: ' . $fromparts[0]);
+        }
+    } else {
+        $mail->clearReplyTos();
+        $mail->addReplyTo($strFrom, 'Forjo Mail Service');
+        if ($GLOBALS['debug'] ?? false) {
+            error_log('[_MYMAIL] Reply-To set to: ' . $strFrom);
+        }
+    }
     //$mail->SMTPDebug = 2;
 
     $mail->Subject = $subject;

@@ -127,8 +127,16 @@ for ($msgNo = 1; $msgNo <= $max; $msgNo++) {
     echo str_repeat('-', 80) . "\n";
 
     $header = imap_headerinfo($imap, $msgNo);
-    echo 'From: ' . ($header->fromaddress ?? 'Unknown') . "\n";
-    echo 'Subject: ' . ($header->subject ?? 'No subject') . "\n\n";
+    $fromAddress = ($header->fromaddress ?? 'Unknown');
+    $fromEmail = '';
+    if (isset($header->from[0])) {
+        $fromEmail = ($header->from[0]->mailbox ?? '') . '@' . ($header->from[0]->host ?? '');
+    }
+
+    echo "From: {$fromAddress}\n";
+    echo "From Email (will be Reply-To): {$fromEmail}\n";
+    echo 'Subject: ' . ($header->subject ?? 'No subject') . "\n";
+    echo 'Date: ' . ($header->date ?? 'Unknown') . "\n\n";
 
     // Decode bodies
     $bodies = getMessageBodiesUtf8($imap, $msgNo);
@@ -160,6 +168,11 @@ for ($msgNo = 1; $msgNo <= $max; $msgNo++) {
 
     // Show final result
     echo "FINAL OUTPUT (what will be forwarded):\n\n";
+
+    echo "Email Headers:\n";
+    echo "  From: noreply@synaplan.com (Synaplan Mailhandler)\n";
+    echo "  Reply-To: {$fromEmail}\n";
+    echo '  Subject: Fwd: ' . ($header->subject ?? 'No subject') . "\n\n";
 
     echo "--- Plain Text ---\n";
     echo mb_substr($plain, 0, 400);

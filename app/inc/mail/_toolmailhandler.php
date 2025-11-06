@@ -840,17 +840,21 @@ class mailHandler
 
             // Get properly decoded bodies with charset conversion
             $userId = $_SESSION['USERPROFILE']['BID'] ?? 0;
+
             if ($userId > 0) {
-                $reflection = new \ReflectionObject($message);
-                $msgNo = null;
-                if ($reflection->hasProperty('sequence')) {
-                    $seqProp = $reflection->getProperty('sequence');
-                    $seqProp->setAccessible(true);
-                    $msgNo = (int)$seqProp->getValue($message);
+                // Get message UID from attributes
+                $uid = null;
+                if (method_exists($message, 'get')) {
+                    $uid = $message->get('uid');
+                    if (is_object($uid)) {
+                        $uid = (int)(string)$uid;
+                    } else {
+                        $uid = (int)$uid;
+                    }
                 }
 
-                if ($msgNo > 0) {
-                    $bodies = self::getMessageBodiesUtf8ForUser($userId, $msgNo);
+                if ($uid > 0) {
+                    $bodies = self::getMessageBodiesUtf8ByUid($userId, $uid);
                     $plain = $bodies['text'] ?? '';
                     $html = $bodies['html'] ?? '';
                 }
@@ -877,6 +881,11 @@ class mailHandler
                 $first = $fromAddresses[0];
                 $replyTo = trim(($first->mail ?? ''));
             }
+
+            if ($GLOBALS['debug'] ?? false) {
+                error_log('[MAILHANDLER] Reply-To will be set to: ' . $replyTo);
+            }
+
             $attachPath = '';
             $attachments = $message->getAttachments();
             if ($attachments && $attachments->count() > 0) {
@@ -1068,11 +1077,13 @@ class mailHandler
     }
 
     /**
-     * Get message bodies as UTF-8 - opens native IMAP connection to work around PHP 8+ incompatibility
+     * Get message bodies as UTF-8 using message UID
+     * @param int $userId User ID
+     * @param int $uid Message UID
      */
-    private static function getMessageBodiesUtf8ForUser(int $userId, int $msgNo): array {
+    private static function getMessageBodiesUtf8ByUid(int $userId, int $uid): array {
         try {
-            // Open native IMAP connection (to bypass webklex resource incompatibility with PHP 8+)
+            // Always open fresh native IMAP connection to avoid caching issues
             $cfg = self::getImapConfigForUser($userId);
             if ($cfg['server'] === '' || $cfg['username'] === '') {
                 return ['text' => null, 'html' => null];
@@ -1080,10 +1091,17 @@ class mailHandler
 
             $protocol = strtolower($cfg['protocol']) === 'pop3' ? '/pop3' : '/imap';
             $security = $cfg['security'] === 'ssl' ? '/ssl' : ($cfg['security'] === 'tls' ? '/tls' : '');
-            $mailbox = '{' . $cfg['server'] . ':' . $cfg['port'] . $protocol . $security . '}INBOX';
+            $mailbox = '{' . $cfg['server'] . ':' . $cfg['port'] . $protocol . $security . '/novalidate-cert}INBOX';
 
-            $nativeImap = @imap_open($mailbox, $cfg['username'], $cfg['password']);
+            $nativeImap = @imap_open($mailbox, $cfg['username'], $cfg['password'], 0, 1);
             if (!$nativeImap) {
+                return ['text' => null, 'html' => null];
+            }
+
+            // Convert UID to message sequence number
+            $msgNo = imap_msgno($nativeImap, $uid);
+            if (!$msgNo) {
+                @imap_close($nativeImap);
                 return ['text' => null, 'html' => null];
             }
 
@@ -1113,7 +1131,10 @@ class mailHandler
             };
 
             $walk($struct);
-            imap_close($nativeImap);
+
+            // Always close immediately to avoid caching
+            @imap_close($nativeImap);
+
             return $out;
         } catch (\Throwable $e) {
             return ['text' => null, 'html' => null];
@@ -1127,17 +1148,19 @@ class mailHandler
                 return '';
             }
 
-            // Get message sequence number
-            $reflection = new \ReflectionObject($message);
-            $msgNo = null;
-            if ($reflection->hasProperty('sequence')) {
-                $seqProp = $reflection->getProperty('sequence');
-                $seqProp->setAccessible(true);
-                $msgNo = (int)$seqProp->getValue($message);
+            // Get message UID from attributes
+            $uid = null;
+            if (method_exists($message, 'get')) {
+                $uid = $message->get('uid');
+                if (is_object($uid)) {
+                    $uid = (int)(string)$uid;
+                } else {
+                    $uid = (int)$uid;
+                }
             }
 
-            if ($msgNo > 0) {
-                $bodies = self::getMessageBodiesUtf8ForUser($userId, $msgNo);
+            if ($uid > 0) {
+                $bodies = self::getMessageBodiesUtf8ByUid($userId, $uid);
                 $plain = $bodies['text'] ?? '';
                 if ($plain === '' && !empty($bodies['html'])) {
                     $plain = strip_tags($bodies['html']);
@@ -1184,17 +1207,21 @@ class mailHandler
 
             // Get properly decoded bodies with charset conversion
             $userId = $_SESSION['USERPROFILE']['BID'] ?? 0;
+
             if ($userId > 0) {
-                $reflection = new \ReflectionObject($message);
-                $msgNo = null;
-                if ($reflection->hasProperty('sequence')) {
-                    $seqProp = $reflection->getProperty('sequence');
-                    $seqProp->setAccessible(true);
-                    $msgNo = (int)$seqProp->getValue($message);
+                // Get message UID from attributes
+                $uid = null;
+                if (method_exists($message, 'get')) {
+                    $uid = $message->get('uid');
+                    if (is_object($uid)) {
+                        $uid = (int)(string)$uid;
+                    } else {
+                        $uid = (int)$uid;
+                    }
                 }
 
-                if ($msgNo > 0) {
-                    $bodies = self::getMessageBodiesUtf8ForUser($userId, $msgNo);
+                if ($uid > 0) {
+                    $bodies = self::getMessageBodiesUtf8ByUid($userId, $uid);
                     $plain = $bodies['text'] ?? '';
                     $html = $bodies['html'] ?? '';
                 }
@@ -1221,6 +1248,11 @@ class mailHandler
                 $first = $fromAddresses[0];
                 $replyTo = trim(($first->mail ?? ''));
             }
+
+            if ($GLOBALS['debug'] ?? false) {
+                error_log('[MAILHANDLER] Reply-To will be set to: ' . $replyTo);
+            }
+
             $attachPaths = [];
             $attachments = $message->getAttachments();
             if ($attachments && $attachments->count() > 0) {
@@ -1257,6 +1289,12 @@ class mailHandler
         $userId = max(0, (int)$userId);
         $ret = ['success' => false, 'processed' => 0, 'errors' => []];
         try {
+            // Ensure session is set up for cron context (required by getPlainBody and forward functions)
+            if (!isset($_SESSION['USERPROFILE'])) {
+                $_SESSION['USERPROFILE'] = [];
+            }
+            $_SESSION['USERPROFILE']['BID'] = $userId;
+
             $login = self::imapConnectForUser($userId);
             if (!$login['success']) {
                 return ['success' => false, 'processed' => 0, 'errors' => [$login['error'] ?? 'login failed']];
@@ -1321,8 +1359,20 @@ class mailHandler
             $allowedEmails = array_map(function ($d) { return strtolower($d['email']); }, $departments);
             $defaultEmail = self::getDefaultDepartmentEmail($departments);
             Tools::debugCronLog('[ROUTING] Allowed targets: '.implode(',', $allowedEmails).' default='.strtolower($defaultEmail)."\n");
+
+            // Check if messages should be deleted after processing
+            $deleteAfter = false;
+            $deleteSql = 'SELECT BVALUE FROM BCONFIG WHERE BOWNERID = '.$userId." AND BGROUP='mailhandler' AND BSETTING='deleteAfter' LIMIT 1";
+            $deleteRes = db::Query($deleteSql);
+            $deleteRow = db::FetchArr($deleteRes);
+            if ($deleteRow && ($deleteRow['BVALUE'] === '1' || $deleteRow['BVALUE'] === 1)) {
+                $deleteAfter = true;
+            }
+            Tools::debugCronLog('[CONFIG] deleteAfter='.($deleteAfter ? 'yes' : 'no')."\n");
+
             $latestTs = $lastSeenTs;
             $processed = 0;
+
             foreach ($collected as $msg) {
                 try {
                     $sender = self::formatSender($msg);
@@ -1354,22 +1404,36 @@ class mailHandler
                     // Forward with all attachments
                     $sentOk = self::imapForwardMessageAll($msg, $chosen, '');
                     Tools::debugCronLog('[FORWARD] sent='.($sentOk ? '1' : '0').' to="'.$chosen."\"\n");
-                    // Mark read rules: mark as read unless default was selected
-                    if ($chosen !== '' && $chosen !== strtolower($defaultEmail)) {
-                        try {
-                            // set seen via flags API; ignore failures
-                            if (method_exists($msg, 'setFlag')) {
-                                $msg->setFlag('Seen');
+
+                    // Delete or mark read based on configuration
+                    if ($sentOk) {
+                        if ($deleteAfter) {
+                            // Delete message from server
+                            try {
+                                $deleted = self::imapDeleteMessage($msg);
+                                Tools::debugCronLog('[DELETE] deleted='.($deleted ? 'yes' : 'no')."\n");
+                            } catch (\Throwable $e) {
+                                Tools::debugCronLog('[DELETE] error: '.$e->getMessage()."\n");
                             }
-                            if (method_exists($msg, 'setFlags')) {
-                                $msg->setFlags(['Seen']);
+                        } else {
+                            // Mark all forwarded messages as read
+                            try {
+                                if (method_exists($msg, 'setFlag')) {
+                                    $msg->setFlag('Seen');
+                                }
+                                if (method_exists($msg, 'setFlags')) {
+                                    $msg->setFlags(['Seen']);
+                                }
+                                if (method_exists($msg, 'markAsRead')) {
+                                    $msg->markAsRead();
+                                }
+                                Tools::debugCronLog('[MARK] marked as read'."\n");
+                            } catch (\Throwable $e) {
+                                Tools::debugCronLog('[MARK] error: '.$e->getMessage()."\n");
                             }
-                            if (method_exists($msg, 'markAsRead')) {
-                                $msg->markAsRead();
-                            }
-                        } catch (\Throwable $e) {
                         }
                     }
+
                     $ts = self::getMessageUnixTime($msg);
                     if ($ts > $latestTs) {
                         $latestTs = $ts;
@@ -1391,6 +1455,7 @@ class mailHandler
                 }
                 Tools::debugCronLog('[STATE] Updated last_seen to '.$latestTs."\n");
             }
+
             try {
                 $client->disconnect();
             } catch (\Throwable $e) {
