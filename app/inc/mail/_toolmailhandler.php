@@ -886,6 +886,24 @@ class mailHandler
                 error_log('[MAILHANDLER] Reply-To will be set to: ' . $replyTo);
             }
 
+            // Prepend ReplyTo information to body for visibility (in case email client doesn't respect Reply-To header)
+            if ($replyTo !== '') {
+                $replyToLine = 'ReplyTo: ' . $replyTo . "\n\n";
+                $plain = $replyToLine . $plain;
+
+                // Add to HTML version as well
+                if ($html !== '') {
+                    $replyToHtml = '<div style="margin-bottom: 16px; padding: 8px; background-color: #f0f0f0; border-left: 4px solid #0066cc;"><strong>ReplyTo:</strong> ' . htmlspecialchars($replyTo, ENT_QUOTES, 'UTF-8') . '</div>';
+                    // Insert after opening body tag if it exists
+                    if (stripos($html, '<body') !== false) {
+                        $html = preg_replace('/(<body[^>]*>)/i', '$1' . $replyToHtml, $html);
+                    } else {
+                        // If no body tag, just prepend
+                        $html = $replyToHtml . $html;
+                    }
+                }
+            }
+
             $attachPath = '';
             $attachments = $message->getAttachments();
             if ($attachments && $attachments->count() > 0) {
@@ -1251,6 +1269,24 @@ class mailHandler
 
             if ($GLOBALS['debug'] ?? false) {
                 error_log('[MAILHANDLER] Reply-To will be set to: ' . $replyTo);
+            }
+
+            // Prepend ReplyTo information to body for visibility (in case email client doesn't respect Reply-To header)
+            if ($replyTo !== '') {
+                $replyToLine = 'ReplyTo: ' . $replyTo . "\n\n";
+                $plain = $replyToLine . $plain;
+
+                // Add to HTML version as well
+                if ($html !== '') {
+                    $replyToHtml = '<div style="margin-bottom: 16px; padding: 8px; background-color: #f0f0f0; border-left: 4px solid #0066cc;"><strong>ReplyTo:</strong> ' . htmlspecialchars($replyTo, ENT_QUOTES, 'UTF-8') . '</div>';
+                    // Insert after opening body tag if it exists
+                    if (stripos($html, '<body') !== false) {
+                        $html = preg_replace('/(<body[^>]*>)/i', '$1' . $replyToHtml, $html);
+                    } else {
+                        // If no body tag, just prepend
+                        $html = $replyToHtml . $html;
+                    }
+                }
             }
 
             $attachPaths = [];
