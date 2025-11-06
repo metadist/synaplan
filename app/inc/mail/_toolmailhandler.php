@@ -834,13 +834,42 @@ class mailHandler
             }
             $origSubject = trim((string)$message->getSubject());
             $subject = (strlen($origSubject) > 0 ? 'Fwd: '.$origSubject : 'Fwd: (no subject)');
-            $html = (string)$message->getHTMLBody();
-            $plain = (string)$message->getTextBody();
-            if ($html === '' && $plain !== '') {
-                $html = nl2br($plain);
+
+            $html = '';
+            $plain = '';
+
+            // Get properly decoded bodies with charset conversion
+            $userId = $_SESSION['USERPROFILE']['BID'] ?? 0;
+            if ($userId > 0) {
+                $reflection = new \ReflectionObject($message);
+                $msgNo = null;
+                if ($reflection->hasProperty('sequence')) {
+                    $seqProp = $reflection->getProperty('sequence');
+                    $seqProp->setAccessible(true);
+                    $msgNo = (int)$seqProp->getValue($message);
+                }
+
+                if ($msgNo > 0) {
+                    $bodies = self::getMessageBodiesUtf8ForUser($userId, $msgNo);
+                    $plain = $bodies['text'] ?? '';
+                    $html = $bodies['html'] ?? '';
+                }
             }
-            if ($plain === '' && $html !== '') {
+
+            // Prefer HTML for formatting, create plain from HTML if needed
+            if ($html !== '' && $plain === '') {
                 $plain = strip_tags($html);
+            }
+            // If we have plain but no HTML, create basic HTML preserving line breaks
+            if ($plain !== '' && $html === '') {
+                $html = '<!DOCTYPE html><html><head><meta charset="UTF-8"></head><body style="font-family: sans-serif; white-space: pre-wrap;">' . htmlspecialchars($plain, ENT_QUOTES, 'UTF-8') . '</body></html>';
+            }
+            // Ensure HTML has proper UTF-8 meta tag
+            if ($html !== '' && stripos($html, '<meta') === false && stripos($html, '<head>') !== false) {
+                $html = str_replace('<head>', '<head><meta charset="UTF-8">', $html);
+            } elseif ($html !== '' && stripos($html, '<!DOCTYPE') === false && stripos($html, '<html') === false) {
+                // Wrap HTML fragment in proper document structure
+                $html = '<!DOCTYPE html><html><head><meta charset="UTF-8"></head><body>' . $html . '</body></html>';
             }
             $fromAddresses = $message->getFrom();
             $replyTo = '';
@@ -959,14 +988,164 @@ class mailHandler
         return '';
     }
 
+    /**
+     * Extract charset from IMAP part structure
+     */
+    private static function getPartCharset($part): ?string {
+        foreach (['parameters', 'dparameters'] as $prop) {
+            if (!empty($part->$prop)) {
+                foreach ($part->$prop as $p) {
+                    if (strtolower($p->attribute ?? '') === 'charset') {
+                        return $p->value;
+                    }
+                }
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Decode content based on transfer encoding
+     */
+    private static function decodeTransferEncoding(string $data, int $encoding): string {
+        switch ($encoding) {
+            case 3: // BASE64
+                $decoded = base64_decode($data, true);
+                return $decoded !== false ? $decoded : $data;
+            case 4: // QUOTED-PRINTABLE
+                return quoted_printable_decode($data);
+            default: // 7bit/8bit/binary
+                return $data;
+        }
+    }
+
+    /**
+     * Normalize charset name
+     */
+    private static function normalizeCharset(?string $cs): string {
+        if (!$cs) {
+            return 'UTF-8';
+        }
+        $cs = strtoupper($cs);
+        if ($cs === 'ISO-8859-1' || $cs === 'UNKNOWN-8BIT') {
+            return 'WINDOWS-1252';
+        }
+        if ($cs === 'UTF8') {
+            return 'UTF-8';
+        }
+        return $cs;
+    }
+
+    /**
+     * Convert data to UTF-8
+     */
+    private static function convertToUtf8(string $data, ?string $charset): string {
+        $charset = self::normalizeCharset($charset);
+        if ($charset === 'UTF-8') {
+            return mb_check_encoding($data, 'UTF-8') ? $data : @iconv('UTF-8', 'UTF-8//IGNORE', $data);
+        }
+        $out = @iconv($charset, 'UTF-8//IGNORE', $data);
+        return $out !== false ? $out : mb_convert_encoding($data, 'UTF-8', $charset);
+    }
+
+    /**
+     * Decode IMAP part with proper charset conversion
+     * @param \IMAP\Connection|resource $imap IMAP connection (PHP 8+ uses IMAP\Connection objects)
+     */
+    private static function decodeImapPart($imap, int $msgNo, $part, string $partNo): string {
+        $raw = imap_fetchbody($imap, $msgNo, $partNo);
+        $decoded = self::decodeTransferEncoding($raw, $part->encoding ?? 0);
+        $charset = self::getPartCharset($part);
+
+        // If HTML and no charset, check meta tag
+        if (!$charset && strtoupper($part->subtype ?? '') === 'HTML') {
+            if (preg_match('/<meta[^>]+charset=["\']?([A-Za-z0-9\-\_]+)["\']?/i', $decoded, $m)) {
+                $charset = $m[1];
+            }
+        }
+
+        return self::convertToUtf8($decoded, $charset);
+    }
+
+    /**
+     * Get message bodies as UTF-8 - opens native IMAP connection to work around PHP 8+ incompatibility
+     */
+    private static function getMessageBodiesUtf8ForUser(int $userId, int $msgNo): array {
+        try {
+            // Open native IMAP connection (to bypass webklex resource incompatibility with PHP 8+)
+            $cfg = self::getImapConfigForUser($userId);
+            if ($cfg['server'] === '' || $cfg['username'] === '') {
+                return ['text' => null, 'html' => null];
+            }
+
+            $protocol = strtolower($cfg['protocol']) === 'pop3' ? '/pop3' : '/imap';
+            $security = $cfg['security'] === 'ssl' ? '/ssl' : ($cfg['security'] === 'tls' ? '/tls' : '');
+            $mailbox = '{' . $cfg['server'] . ':' . $cfg['port'] . $protocol . $security . '}INBOX';
+
+            $nativeImap = @imap_open($mailbox, $cfg['username'], $cfg['password']);
+            if (!$nativeImap) {
+                return ['text' => null, 'html' => null];
+            }
+
+            $struct = imap_fetchstructure($nativeImap, $msgNo);
+            $out = ['text' => null, 'html' => null];
+
+            $walk = function ($part, $prefix = '') use (&$walk, $nativeImap, $msgNo, &$out) {
+                $isMultipart = isset($part->parts) && is_array($part->parts);
+                if ($isMultipart) {
+                    foreach ($part->parts as $i => $p) {
+                        $newPrefix = $prefix === '' ? (string)($i + 1) : $prefix . '.' . ($i + 1);
+                        $walk($p, $newPrefix);
+                    }
+                } else {
+                    $type = $part->type ?? 0;
+                    $sub = strtoupper($part->subtype ?? '');
+                    if ($type === 0 && ($sub === 'PLAIN' || $sub === 'HTML')) {
+                        $body = self::decodeImapPart($nativeImap, $msgNo, $part, $prefix ?: '1');
+                        if ($sub === 'PLAIN' && $out['text'] === null) {
+                            $out['text'] = $body;
+                        }
+                        if ($sub === 'HTML' && $out['html'] === null) {
+                            $out['html'] = $body;
+                        }
+                    }
+                }
+            };
+
+            $walk($struct);
+            imap_close($nativeImap);
+            return $out;
+        } catch (\Throwable $e) {
+            return ['text' => null, 'html' => null];
+        }
+    }
+
     private static function getPlainBody($message): string {
         try {
-            $plain = (string)$message->getTextBody();
-            $html = (string)$message->getHTMLBody();
-            if ($plain === '' && $html !== '') {
-                $plain = strip_tags($html);
+            $userId = $_SESSION['USERPROFILE']['BID'] ?? 0;
+            if ($userId <= 0) {
+                return '';
             }
-            return trim($plain);
+
+            // Get message sequence number
+            $reflection = new \ReflectionObject($message);
+            $msgNo = null;
+            if ($reflection->hasProperty('sequence')) {
+                $seqProp = $reflection->getProperty('sequence');
+                $seqProp->setAccessible(true);
+                $msgNo = (int)$seqProp->getValue($message);
+            }
+
+            if ($msgNo > 0) {
+                $bodies = self::getMessageBodiesUtf8ForUser($userId, $msgNo);
+                $plain = $bodies['text'] ?? '';
+                if ($plain === '' && !empty($bodies['html'])) {
+                    $plain = strip_tags($bodies['html']);
+                }
+                return trim($plain);
+            }
+
+            return '';
         } catch (\Throwable $e) {
             return '';
         }
@@ -999,13 +1178,42 @@ class mailHandler
             }
             $origSubject = trim((string)$message->getSubject());
             $subject = (strlen($origSubject) > 0 ? 'Fwd: '.$origSubject : 'Fwd: (no subject)');
-            $html = (string)$message->getHTMLBody();
-            $plain = (string)$message->getTextBody();
-            if ($html === '' && $plain !== '') {
-                $html = nl2br($plain);
+
+            $html = '';
+            $plain = '';
+
+            // Get properly decoded bodies with charset conversion
+            $userId = $_SESSION['USERPROFILE']['BID'] ?? 0;
+            if ($userId > 0) {
+                $reflection = new \ReflectionObject($message);
+                $msgNo = null;
+                if ($reflection->hasProperty('sequence')) {
+                    $seqProp = $reflection->getProperty('sequence');
+                    $seqProp->setAccessible(true);
+                    $msgNo = (int)$seqProp->getValue($message);
+                }
+
+                if ($msgNo > 0) {
+                    $bodies = self::getMessageBodiesUtf8ForUser($userId, $msgNo);
+                    $plain = $bodies['text'] ?? '';
+                    $html = $bodies['html'] ?? '';
+                }
             }
-            if ($plain === '' && $html !== '') {
+
+            // Prefer HTML for formatting, create plain from HTML if needed
+            if ($html !== '' && $plain === '') {
                 $plain = strip_tags($html);
+            }
+            // If we have plain but no HTML, create basic HTML preserving line breaks
+            if ($plain !== '' && $html === '') {
+                $html = '<!DOCTYPE html><html><head><meta charset="UTF-8"></head><body style="font-family: sans-serif; white-space: pre-wrap;">' . htmlspecialchars($plain, ENT_QUOTES, 'UTF-8') . '</body></html>';
+            }
+            // Ensure HTML has proper UTF-8 meta tag
+            if ($html !== '' && stripos($html, '<meta') === false && stripos($html, '<head>') !== false) {
+                $html = str_replace('<head>', '<head><meta charset="UTF-8">', $html);
+            } elseif ($html !== '' && stripos($html, '<!DOCTYPE') === false && stripos($html, '<html') === false) {
+                // Wrap HTML fragment in proper document structure
+                $html = '<!DOCTYPE html><html><head><meta charset="UTF-8"></head><body>' . $html . '</body></html>';
             }
             $fromAddresses = $message->getFrom();
             $replyTo = '';
