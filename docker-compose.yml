@@ -214,7 +214,7 @@ services:
 
   # Whisper Models Download Service
   whisper-models:
-    image: alpine:3.20
+    image: alpine:3.22
     container_name: synaplan-whisper-models
     command: >
       sh -c '
