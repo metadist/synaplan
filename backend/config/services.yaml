@@ -1,0 +1,212 @@
+parameters:
+    # reCAPTCHA defaults (disabled by default)
+    recaptcha_enabled_default: false
+    recaptcha_min_score_default: 0.5
+
+services:
+    _defaults:
+        autowire: true
+        autoconfigure: true
+
+    App\:
+        resource: '../src/'
+        exclude:
+            - '../src/DependencyInjection/'
+            - '../src/Entity/'
+            - '../src/Kernel.php'
+
+    # AI Providers - TestProvider supports all capabilities
+    App\AI\Provider\TestProvider:
+        tags:
+            - { name: 'app.ai.chat' }
+            - { name: 'app.ai.embedding' }
+            - { name: 'app.ai.vision' }
+            - { name: 'app.ai.image_generation' }
+            - { name: 'app.ai.speech_to_text' }
+            - { name: 'app.ai.text_to_speech' }
+            - { name: 'app.ai.file_analysis' }
+
+    App\AI\Provider\AnthropicProvider:
+        arguments:
+            $apiKey: '%env(ANTHROPIC_API_KEY)%'
+            $uploadDir: '%kernel.project_dir%/var/uploads'
+        tags:
+            - { name: 'app.ai.chat' }
+            - { name: 'app.ai.vision' }
+
+    App\AI\Provider\OpenAIProvider:
+        arguments:
+            $apiKey: '%env(OPENAI_API_KEY)%'
+            $uploadDir: '%kernel.project_dir%/var/uploads'
+        tags:
+            - { name: 'app.ai.chat' }
+            - { name: 'app.ai.embedding' }
+            - { name: 'app.ai.vision' }
+            - { name: 'app.ai.image_generation' }
+            - { name: 'app.ai.speech_to_text' }
+            - { name: 'app.ai.text_to_speech' }
+
+    App\AI\Provider\OllamaProvider:
+        arguments:
+            $baseUrl: '%env(OLLAMA_BASE_URL)%'
+        tags:
+            - { name: 'app.ai.chat' }
+            - { name: 'app.ai.embedding' }
+
+    App\AI\Provider\GroqProvider:
+        arguments:
+            $apiKey: '%env(GROQ_API_KEY)%'
+            $uploadDir: '%kernel.project_dir%/var/uploads'
+        tags:
+            - { name: 'app.ai.chat' }
+            - { name: 'app.ai.vision' }
+
+    App\AI\Provider\GoogleProvider:
+        arguments:
+            $apiKey: '%env(GOOGLE_GEMINI_API_KEY)%'
+            $projectId: '%env(string:default::GOOGLE_CLOUD_PROJECT_ID)%'
+            $region: 'us-central1'
+            $uploadDir: '%kernel.project_dir%/var/uploads'
+        tags:
+            - { name: 'app.ai.chat' }
+            - { name: 'app.ai.vision' }
+            - { name: 'app.ai.image_generation' }
+            - { name: 'app.ai.video_generation' }
+            - { name: 'app.ai.text_to_speech' }
+
+    # AI Facade
+    App\AI\Service\AiFacade: ~
+
+    # Whisper Service for Audio Transcription
+    App\Service\WhisperService:
+        arguments:
+            $whisperBinary: '%env(WHISPER_BINARY)%'
+            $whisperModelsPath: '%env(WHISPER_MODELS_PATH)%'
+            $defaultModel: '%env(WHISPER_DEFAULT_MODEL)%'
+            $ffmpegBinary: '%env(FFMPEG_BINARY)%'
+
+    # Brave Search API Service
+    App\Service\Search\BraveSearchService:
+        arguments:
+            $braveSearchApiKey: '%env(BRAVE_SEARCH_API_KEY)%'
+            $braveSearchApiUrl: '%env(BRAVE_SEARCH_API_URL)%'
+            $braveSearchEnabled: '%env(bool:BRAVE_SEARCH_ENABLED)%'
+            $braveSearchCount: '%env(int:BRAVE_SEARCH_COUNT)%'
+            $braveSearchCountry: '%env(BRAVE_SEARCH_COUNTRY)%'
+            $braveSearchLang: '%env(BRAVE_SEARCH_SEARCH_LANG)%'
+
+    # WhatsApp Business API Service
+    App\Service\WhatsAppService:
+        arguments:
+            $whatsappAccessToken: '%env(WHATSAPP_ACCESS_TOKEN)%'
+            $whatsappPhoneNumberId: '%env(WHATSAPP_PHONE_NUMBER_ID)%'
+            $whatsappBusinessAccountId: '%env(WHATSAPP_BUSINESS_ACCOUNT_ID)%'
+            $whatsappEnabled: '%env(bool:WHATSAPP_ENABLED)%'
+
+    # Webhook Controller - Bind WhatsApp Verify Token
+    App\Controller\WebhookController:
+        bind:
+            $whatsappWebhookVerifyToken: '%env(WHATSAPP_WEBHOOK_VERIFY_TOKEN)%'
+
+    # Message Processing Services
+    App\Service\Message\MessagePreProcessor:
+        arguments:
+            $tikaBaseUrl: '%env(TIKA_BASE_URL)%'
+            $uploadsDir: '%kernel.project_dir%/var/uploads'
+    App\Service\Message\MessageSorter: ~
+    App\Service\Message\MessageClassifier: ~
+    App\Service\Message\InferenceRouter: ~
+    App\Service\Message\MessageProcessor: ~
+    
+    # Message Handlers
+    App\Service\Message\Handler\ChatHandler:
+        tags:
+            - { name: 'app.message.handler' }
+    
+    App\Service\Message\Handler\MediaGenerationHandler:
+        arguments:
+            $uploadDir: '%kernel.project_dir%/var/uploads'
+        tags:
+            - { name: 'app.message.handler' }
+    
+    App\Service\Message\Handler\FileAnalysisHandler:
+        arguments:
+            $uploadDir: '%kernel.project_dir%/var/uploads'
+        tags:
+            - { name: 'app.message.handler' }
+
+    # Circuit Breaker
+    App\Service\CircuitBreaker: ~
+
+    # Model Configuration Service
+    App\Service\ModelConfigService: ~
+
+    # Rate Limiter Service
+    App\Service\RateLimiterService: ~
+
+    # Mailer Service
+    App\Service\MailerService: ~
+
+    # reCAPTCHA Service
+    App\Service\RecaptchaService:
+        arguments:
+            $secretKey: '%env(string:default::RECAPTCHA_SECRET_KEY)%'
+            $enabled: '%env(string:default:recaptcha_enabled_default:RECAPTCHA_ENABLED)%'
+            $minScore: '%env(string:default:recaptcha_min_score_default:RECAPTCHA_MIN_SCORE)%'
+
+    App\Service\Message\AgainHandler: ~
+
+    # File Processing Services
+    App\Service\File\TikaClient:
+        arguments:
+            $tikaUrl: '%env(TIKA_BASE_URL)%'
+            $tikaTimeoutMs: '%env(int:TIKA_TIMEOUT_MS)%'
+            $tikaRetries: '%env(int:TIKA_RETRIES)%'
+            $tikaRetryBackoffMs: '%env(int:TIKA_RETRY_BACKOFF_MS)%'
+            $tikaHttpUser: '%env(default::TIKA_HTTP_USER)%'
+            $tikaHttpPass: '%env(default::TIKA_HTTP_PASS)%'
+
+    App\Service\File\FileStorageService:
+        arguments:
+            $uploadDir: '%kernel.project_dir%/var/uploads'
+    
+    App\Controller\FileController:
+        arguments:
+            $uploadDir: '%kernel.project_dir%/var/uploads'
+    
+    App\Controller\FileServeController:
+        arguments:
+            $uploadDir: '%kernel.project_dir%/var/uploads'
+    
+    App\Controller\StaticUploadController:
+        arguments:
+            $uploadDir: '%kernel.project_dir%/var/uploads'
+        tags:
+            - { name: 'controller.service_arguments' }
+
+    App\Controller\WidgetPublicController:
+        arguments:
+            $uploadDir: '%kernel.project_dir%/var/uploads'
+
+    App\Service\File\PdfRasterizer:
+        arguments:
+            $uploadDir: '%kernel.project_dir%/var/uploads'
+            $rasterizeDpi: '%env(int:RASTERIZE_DPI)%'
+            $rasterizePageCap: '%env(int:RASTERIZE_PAGE_CAP)%'
+            $rasterizeTimeoutMs: '%env(int:RASTERIZE_TIMEOUT_MS)%'
+
+    App\Service\File\TextCleaner: ~
+
+    App\Service\File\FileProcessor:
+        arguments:
+            $uploadDir: '%kernel.project_dir%/var/uploads'
+            $tikaMinLength: '%env(int:TIKA_MIN_LENGTH)%'
+            $tikaMinEntropy: '%env(float:TIKA_MIN_ENTROPY)%'
+
+    App\Service\File\TextChunker:
+        arguments:
+            $maxChunkSize: 500
+            $overlapSize: 50
+            $minChunkSize: 100
+
+    App\Service\File\VectorizationService: ~

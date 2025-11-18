@@ -1,0 +1,78 @@
+security:
+    # Password hashers
+    password_hashers:
+        Symfony\Component\Security\Core\User\PasswordAuthenticatedUserInterface: 'auto'
+
+    # Providers
+    providers:
+        app_user_provider:
+            entity:
+                class: App\Entity\User
+                property: id
+
+    firewalls:
+        dev:
+            pattern: ^/(_(profiler|wdt)|css|images|js)/
+            security: false
+
+        api:
+            pattern: ^/api
+            stateless: true
+            entry_point: jwt
+            jwt: ~
+            custom_authenticators:
+                - App\Security\QueryTokenAuthenticator
+                - App\Security\ApiKeyAuthenticator
+
+        main:
+            lazy: true
+            provider: app_user_provider
+
+    access_control:
+        # Public API documentation (Swagger)
+        - { path: ^/api/doc, roles: PUBLIC_ACCESS }
+        
+        # Public auth endpoints
+        - { path: ^/api/v1/auth/login, roles: PUBLIC_ACCESS }
+        - { path: ^/api/v1/auth/register, roles: PUBLIC_ACCESS }
+        - { path: ^/api/v1/auth/verify-email, roles: PUBLIC_ACCESS }
+        - { path: ^/api/v1/auth/forgot-password, roles: PUBLIC_ACCESS }
+        - { path: ^/api/v1/auth/reset-password, roles: PUBLIC_ACCESS }
+        - { path: ^/api/v1/auth/resend-verification, roles: PUBLIC_ACCESS }
+        
+        # Authenticated auth endpoints
+        - { path: ^/api/v1/auth/me, roles: IS_AUTHENTICATED_FULLY }
+        - { path: ^/api/v1/auth/logout, roles: IS_AUTHENTICATED_FULLY }
+        
+        # Public test endpoints
+        - { path: ^/api/health, roles: PUBLIC_ACCESS }
+        - { path: ^/api/test, roles: PUBLIC_ACCESS }
+        
+        # Public shared chat endpoint (no auth required)
+        - { path: ^/api/v1/chats/shared/, roles: PUBLIC_ACCESS }
+        
+        # Public file uploads endpoint (controller handles auth internally)
+        - { path: ^/api/v1/files/uploads/, roles: PUBLIC_ACCESS }
+        
+        # Public widget endpoints (no auth required - embedded on external websites)
+        - { path: ^/api/v1/widget/[^/]+/config, roles: PUBLIC_ACCESS }
+        - { path: ^/api/v1/widget/[^/]+/history, roles: PUBLIC_ACCESS }
+        - { path: ^/api/v1/widget/[^/]+/message, roles: PUBLIC_ACCESS }
+        - { path: ^/api/v1/widget/[^/]+/upload, roles: PUBLIC_ACCESS }
+        - { path: ^/api/v1/messages/stream, roles: PUBLIC_ACCESS }
+        - { path: ^/api, methods: [OPTIONS], roles: PUBLIC_ACCESS }
+        
+        # Webhook endpoints (require API key authentication)
+        - { path: ^/api/v1/webhooks, roles: IS_AUTHENTICATED_FULLY }
+        
+        # All other API routes require authentication
+        - { path: ^/api, roles: IS_AUTHENTICATED_FULLY }
+
+when@test:
+    security:
+        password_hashers:
+            Symfony\Component\Security\Core\User\PasswordAuthenticatedUserInterface:
+                algorithm: auto
+                cost: 4
+                time_cost: 3
+                memory_cost: 10

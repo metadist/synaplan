@@ -1,0 +1,57 @@
+framework:
+    messenger:
+        failure_transport: failed
+
+        transports:
+            # High Priority: AI Processing
+            async_ai_high:
+                dsn: '%env(MESSENGER_TRANSPORT_DSN)%'
+                options:
+                    stream: 'messenger_ai_high'
+                    group: 'ai_workers'
+                    consumer: 'worker_ai'
+                    stream_max_entries: 10000
+                retry_strategy:
+                    max_retries: 3
+                    delay: 1000
+                    multiplier: 2
+                    max_delay: 10000
+
+            # Medium Priority: File Extraction
+            async_extract:
+                dsn: '%env(MESSENGER_TRANSPORT_DSN)%'
+                options:
+                    stream: 'messenger_extract'
+                    group: 'extract_workers'
+                    consumer: 'worker_extract'
+                retry_strategy:
+                    max_retries: 2
+                    delay: 2000
+
+            # Low Priority: Indexing
+            async_index:
+                dsn: '%env(MESSENGER_TRANSPORT_DSN)%'
+                options:
+                    stream: 'messenger_index'
+                    group: 'index_workers'
+                    consumer: 'worker_index'
+                retry_strategy:
+                    max_retries: 5
+                    delay: 5000
+
+            # Failed Messages (Dead-Letter-Queue)
+            failed:
+                dsn: 'doctrine://default?queue_name=failed'
+
+        routing:
+            # Route your messages to the transports
+            'App\Message\ProcessMessageCommand': async_ai_high
+
+when@test:
+    framework:
+        messenger:
+            transports:
+                async_ai_high: 'in-memory://'
+                async_extract: 'in-memory://'
+                async_index: 'in-memory://'
+                failed: 'in-memory://'

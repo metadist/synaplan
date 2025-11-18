@@ -1,0 +1,19 @@
+nelmio_api_doc:
+    documentation:
+        info:
+            title: Synaplan API
+            description: Synaplan AI Assistant API Documentation
+            version: 1.0.0
+        servers:
+            - url: http://localhost:8000
+              description: Local development server
+        components:
+            securitySchemes:
+                Bearer:
+                    type: http
+                    scheme: bearer
+                    bearerFormat: JWT
+                    description: 'JWT Authorization header using the Bearer scheme. Example: "Authorization: Bearer {token}"'
+    areas:
+        path_patterns:
+            - ^/api(?!/doc$) # Accepts all routes except /api/doc

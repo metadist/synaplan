@@ -1,3 +1,0 @@
-<?php
-
-$GLOBALS['debug'] = true;

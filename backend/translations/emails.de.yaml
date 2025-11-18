@@ -1,0 +1,37 @@
+email:
+  password_reset:
+    title: 'Passwort zurücksetzen'
+    intro: 'Sie haben eine Anfrage zum Zurücksetzen Ihres Passworts für Ihr Synaplan-Konto gestellt.'
+    instruction: 'Klicken Sie auf die Schaltfläche unten, um Ihr Passwort zurückzusetzen:'
+    button: 'Passwort zurücksetzen'
+    or_copy: 'Oder kopieren Sie diesen Link in Ihren Browser:'
+    security_notice:
+      title: 'Sicherheitshinweis:'
+      text: 'Dieser Link läuft in 1 Stunde ab. Wenn Sie diese Passwort-Zurücksetzung nicht angefordert haben, können Sie diese E-Mail ignorieren und Ihr Passwort bleibt unverändert.'
+  
+  verification:
+    title: 'E-Mail-Adresse bestätigen'
+    intro: 'Vielen Dank für Ihre Registrierung bei Synaplan!'
+    instruction: 'Bitte klicken Sie auf die Schaltfläche unten, um Ihre E-Mail-Adresse zu bestätigen:'
+    button: 'E-Mail bestätigen'
+    or_copy: 'Oder kopieren Sie diesen Link in Ihren Browser:'
+    expiry: 'Dieser Link läuft in 24 Stunden ab.'
+    footer_notice: 'Wenn Sie kein Konto bei Synaplan erstellt haben, können Sie diese E-Mail ignorieren.'
+  
+  welcome:
+    title: 'Willkommen bei Synaplan!'
+    greeting: 'Hallo %name%,'
+    intro: 'Ihre E-Mail wurde erfolgreich bestätigt und Ihr Konto ist jetzt aktiv.'
+    features_intro: 'Sie können jetzt alle Funktionen von Synaplan nutzen:'
+    feature_1: 'KI-gestützter Chat-Assistent'
+    feature_2: 'Dokumentenanalyse'
+    feature_3: 'Multi-Kanal-Kommunikation'
+    feature_4: 'Und vieles mehr!'
+    button: 'Jetzt starten'
+  
+  footer:
+    support: 'Bei Problemen wenden Sie sich bitte an unser Support-Team.'
+    help: 'Benötigen Sie Hilfe? Schauen Sie in unsere Dokumentation oder kontaktieren Sie den Support.'
+    company: 'Synaplan'
+    rights: 'Alle Rechte vorbehalten'
+

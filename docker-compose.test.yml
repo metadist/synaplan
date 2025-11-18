@@ -1,0 +1,108 @@
+services:
+  # Symfony Backend for Testing
+  app_test:
+    build:
+      context: .
+      dockerfile: _docker/backend/Dockerfile
+    container_name: synaplan-app-test
+    ports:
+      - "8001:80"
+    volumes:
+      - ./backend:/var/www/html
+    environment:
+      APP_ENV: test
+      APP_SECRET: test_secret_not_for_production
+      DATABASE_WRITE_URL: mysql://synaplan_test:synaplan_test@db_test:3306/synaplan_test?serverVersion=11.8&charset=utf8mb4
+      DATABASE_READ_URL: mysql://synaplan_test:synaplan_test@db_test:3306/synaplan_test?serverVersion=11.8&charset=utf8mb4
+      REDIS_URL: redis://redis_test:6379
+      MESSENGER_TRANSPORT_DSN: redis://redis_test:6379/messages
+      OLLAMA_BASE_URL: http://ollama_test:11434
+      TIKA_BASE_URL: http://tika_test:9998
+      AI_DEFAULT_PROVIDER: test
+      MAILER_DSN: null://null
+    depends_on:
+      db_test:
+        condition: service_healthy
+      redis_test:
+        condition: service_healthy
+    restart: "no"
+    networks:
+      - synaplan-test-network
+
+  # MariaDB Test Database
+  db_test:
+    image: mariadb:11.8.2
+    container_name: synaplan-db-test
+    command: --max-allowed-packet=256M --innodb-buffer-pool-size=256M
+    environment:
+      MYSQL_DATABASE: synaplan_test
+      MYSQL_USER: synaplan_test
+      MYSQL_PASSWORD: synaplan_test
+      MYSQL_ROOT_PASSWORD: test_root_password
+    ports:
+      - "3308:3306"
+    tmpfs:
+      - /var/lib/mysql:rw,noexec,nosuid,size=512m
+    healthcheck:
+      test: ["CMD", "mariadb", "-h", "localhost", "-u", "root", "-ptest_root_password", "-e", "SELECT 1;"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    restart: "no"
+    networks:
+      - synaplan-test-network
+
+  # Redis Test Cache & Queue
+  redis_test:
+    image: redis:7-alpine
+    container_name: synaplan-redis-test
+    command: redis-server --save "" --appendonly no --maxmemory 128mb --maxmemory-policy allkeys-lru
+    ports:
+      - "6381:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    restart: "no"
+    networks:
+      - synaplan-test-network
+
+  # Ollama Test (Optional - Integration Profile)
+  ollama_test:
+    image: ollama/ollama:latest
+    container_name: synaplan-ollama-test
+    ports:
+      - "11436:11434"
+    volumes:
+      - ollama_test_data:/root/.ollama
+    environment:
+      OLLAMA_HOST: 0.0.0.0
+    profiles:
+      - integration
+    restart: "no"
+    networks:
+      - synaplan-test-network
+
+  # Apache Tika Test (Optional - Integration Profile)
+  tika_test:
+    image: apache/tika:2.9.2.0
+    container_name: synaplan-tika-test
+    command: -h 0.0.0.0 -p 9998
+    ports:
+      - "9997:9998"
+    profiles:
+      - integration
+    restart: "no"
+    networks:
+      - synaplan-test-network
+
+volumes:
+  ollama_test_data:
+
+networks:
+  synaplan-test-network:
+    driver: bridge
+
+
