@@ -5,7 +5,7 @@ It can be freely tested on https://www.synaplan.com/ and is in use in various pr
 
 ## Legacy Meaning
 
-On the 11th of November 2025 we retired the actual platform branch into this version 1.0.10. We have decided to move forward into a clean API first design on Symfony with a Vue.js frontend.
+On the 18th of November 2025 we retired the actual platform branch into this version 1.0.10. We have decided to move forward into a clean API first design on Symfony with a Vue.js frontend.
 This version works fine as a monolithic release and the platform was started with this. You can create a complete chatbot infrastructure based on this.
 
 ## 🚀 Dev Setup
