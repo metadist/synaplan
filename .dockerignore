@@ -1,0 +1,42 @@
+# Git
+.git
+.gitignore
+.gitattributes
+
+# Documentation
+README.md
+LICENSE.md
+_devextras/history.md
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+*~
+
+# Backend excludes
+backend/var/cache/*
+backend/var/log/*
+backend/vendor
+backend/.env.local
+backend/.env.docker
+
+# Frontend excludes
+frontend/node_modules
+frontend/dist
+frontend/.env.local
+frontend/.env.docker
+
+# Docker
+docker-compose*.yml
+# Note: _docker is needed for build context
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Testing
+backend/phpunit.xml
+frontend/coverage
+

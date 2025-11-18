@@ -1,257 +1,188 @@
 services:
-  # Configuration Check (prints which env config is active)
-  env-check:
-    image: alpine:3.20
-    container_name: synaplan-env-check
-    command: >
-      sh -c '
-        if [ -f /workspace/.env ]; then
-          echo "✓ Using custom .env file (values may be overridden by docker-compose.yml)";
-        else
-          echo "✓ Using .env.docker defaults (create .env to customize)";
-        fi;
-        echo "Docker Base URL: $${APP_URL:-http://localhost:8080/}";
-      '
+  # Vue.js Frontend
+  frontend:
+    build:
+      context: .
+      dockerfile: _docker/frontend/Dockerfile
+    container_name: synaplan-frontend
+    ports:
+      - "5173:5173"
     volumes:
-      - ./:/workspace:ro
-    env_file:
-      - .env.docker
-    environment:
-      - APP_URL=${APP_URL:-http://localhost:8080/}
-    restart: "no"
+      - ./frontend:/app
+      - /app/node_modules
+    depends_on:
+      - backend
+    restart: unless-stopped
     networks:
       - synaplan-network
 
-  # PHP Application
-  app:
+  # Symfony PHP Backend
+  backend:
     build:
       context: .
-      dockerfile: dev/docker/Dockerfile
-    container_name: synaplan-app
-    extra_hosts:
-      - host.docker.internal:${DOCKER_HOST:-host-gateway}
+      dockerfile: _docker/backend/Dockerfile
+    container_name: synaplan-backend
+    # Note: .env file is optional - will be auto-created from .env.example on first start
+    # env_file:
+    #   - backend/.env
     ports:
-      - "8080:80"
+      - "8000:80"
     volumes:
-      - ./:/var/www/html
-      - whisper_models:/var/www/html/inc/whispermodels:ro
-    env_file:
-      - .env.docker
+      - ./backend:/var/www/html
+      - whisper_models:/var/www/html/var/whisper:ro
     environment:
-      # Application
-      - APP_ENV=${APP_ENV:-development}
-      - APP_DEBUG=${APP_DEBUG:-true}
-      - APP_URL=${APP_URL:-http://localhost:8080/}
-      # Database
-      - DB_HOST=${DB_HOST:-db}
-      - DB_NAME=${DB_NAME:-synaplan}
-      - DB_USER=${DB_USER:-synaplan_user}
-      - DB_PASSWORD=${DB_PASSWORD:-synaplan_password}
-      # Services
-      - OLLAMA_SERVER=${OLLAMA_SERVER:-ollama:11434}
-      - TIKA_URL=${TIKA_URL:-http://tika:9998}
-      - TIKA_ENABLED=${TIKA_ENABLED:-true}
-      - TIKA_HTTP_USER=${TIKA_HTTP_USER:-}
-      - TIKA_HTTP_PASS=${TIKA_HTTP_PASS:-}
-      # Debug
-      - XDEBUG_MODE=debug
-      - XDEBUG_CONFIG=client_host=host.docker.internal client_port=9003
-      # OIDC
-      - OIDC_PROVIDER_URL=${OIDC_PROVIDER_URL:-}
-      - OIDC_CLIENT_ID=${OIDC_CLIENT_ID:-}
-      - OIDC_CLIENT_SECRET=${OIDC_CLIENT_SECRET:-}
-      - OIDC_REDIRECT_URI=${OIDC_REDIRECT_URI:-}
-      - OIDC_SCOPES=${OIDC_SCOPES:-openid profile email}
-      # Features
-      - RATE_LIMITING_ENABLED=${RATE_LIMITING_ENABLED:-false}
-      # API Keys (pass through from .env if set)
-      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
-      - GROQ_API_KEY=${GROQ_API_KEY:-}
-      - GOOGLE_GEMINI_API_KEY=${GOOGLE_GEMINI_API_KEY:-}
-      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
-      - THEHIVE_API_KEY=${THEHIVE_API_KEY:-}
-      - ELEVENLABS_API_KEY=${ELEVENLABS_API_KEY:-}
-      - BRAVE_SEARCH_API_KEY=${BRAVE_SEARCH_API_KEY:-}
-      - WHATSAPP_TOKEN=${WHATSAPP_TOKEN:-}
-      - AWS_CREDENTIALS=${AWS_CREDENTIALS:-}
-      - GOOGLE_OAUTH_CREDENTIALS=${GOOGLE_OAUTH_CREDENTIALS:-}
-      - GMAIL_OAUTH_TOKEN=${GMAIL_OAUTH_TOKEN:-}
-      # Tika tuning
-      - TIKA_TIMEOUT_MS=${TIKA_TIMEOUT_MS:-20000}
-      - TIKA_RETRIES=${TIKA_RETRIES:-2}
-      - TIKA_RETRY_BACKOFF_MS=${TIKA_RETRY_BACKOFF_MS:-500}
-      - TIKA_MIN_LENGTH=${TIKA_MIN_LENGTH:-200}
-      - TIKA_MIN_ENTROPY=${TIKA_MIN_ENTROPY:-2.5}
-      - TIKA_OCR_SIGNAL_MIN=${TIKA_OCR_SIGNAL_MIN:-1}
-      - RASTERIZE_DPI=${RASTERIZE_DPI:-150}
-      - RASTERIZE_PAGE_CAP=${RASTERIZE_PAGE_CAP:-5}
-      - RASTERIZE_TIMEOUT_MS=${RASTERIZE_TIMEOUT_MS:-60000}
-      - TIKA_MIN_CHAR_PER_KB=${TIKA_MIN_CHAR_PER_KB:-10}
-      # System URLs
-      - SYSTEM_PRICING_URL=${SYSTEM_PRICING_URL:-https://www.synaplan.com/pricing}
-      - SYSTEM_ACCOUNT_URL=${SYSTEM_ACCOUNT_URL:-https://www.synaplan.com/account}
-      - SYSTEM_UPGRADE_URL=${SYSTEM_UPGRADE_URL:-https://www.synaplan.com/upgrade}
+      APP_ENV: dev
+      APP_SECRET: change_me_in_production_12345678901234567890
+      APP_URL: http://localhost:8000
+      FRONTEND_URL: http://localhost:5173
+      DATABASE_WRITE_URL: mysql://synaplan_user:synaplan_password@db:3306/synaplan?serverVersion=11.8&charset=utf8mb4
+      DATABASE_READ_URL: mysql://synaplan_user:synaplan_password@db:3306/synaplan?serverVersion=11.8&charset=utf8mb4
+      REDIS_URL: redis://redis:6379
+      MESSENGER_TRANSPORT_DSN: redis://redis:6379/messages
+      OLLAMA_BASE_URL: http://ollama:11434
+      TIKA_BASE_URL: http://tika:9998
+      AI_DEFAULT_PROVIDER: ollama
+      # JWT Configuration
+      JWT_SECRET_KEY: '%kernel.project_dir%/config/jwt/private.pem'
+      JWT_PUBLIC_KEY: '%kernel.project_dir%/config/jwt/public.pem'
+      JWT_PASSPHRASE: 'change_me_in_production'
+      # Mailer
+      MAILER_DSN: ${MAILER_DSN:-null://null}
+      # External API Keys loaded from backend/.env via env_file
+      # WhatsApp Business API
+      WHATSAPP_ACCESS_TOKEN: ${WHATSAPP_ACCESS_TOKEN:-}
+      WHATSAPP_PHONE_NUMBER_ID: ${WHATSAPP_PHONE_NUMBER_ID:-}
+      WHATSAPP_BUSINESS_ACCOUNT_ID: ${WHATSAPP_BUSINESS_ACCOUNT_ID:-}
+      WHATSAPP_WEBHOOK_VERIFY_TOKEN: ${WHATSAPP_WEBHOOK_VERIFY_TOKEN:-}
+      WHATSAPP_ENABLED: ${WHATSAPP_ENABLED:-false}
+      # AI Provider API Keys (loaded from backend/.env via env_file above)
+      # GROQ_API_KEY is automatically loaded from backend/.env
+      AUTO_DOWNLOAD_MODELS: ${AUTO_DOWNLOAD_MODELS:-false}
+      # reCAPTCHA (optional - disabled by default)
+      RECAPTCHA_SITE_KEY: ${RECAPTCHA_SITE_KEY:-}
+      RECAPTCHA_SECRET_KEY: ${RECAPTCHA_SECRET_KEY:-}
+      RECAPTCHA_ENABLED: ${RECAPTCHA_ENABLED:-false}
     depends_on:
-      env-check:
-        condition: service_completed_successfully
       db:
         condition: service_healthy
-      ollama:
+      redis:
         condition: service_healthy
-      whisper-models:
-        condition: service_completed_successfully
-      composer-install:
-        condition: service_completed_successfully
-      npm-install:
-        condition: service_completed_successfully
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "curl -fsS http://localhost/ || exit 1"]
+      test: ["CMD", "curl", "-f", "http://localhost/api/health"]
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 40s
-    logging:
-      options:
-        max-size: "10m"
-        max-file: "3"
+      start_period: 90s
     networks:
       - synaplan-network
 
-  # Composer Dependencies Installer
-  composer-install:
-    build:
-      context: .
-      dockerfile: dev/docker/Dockerfile
-    container_name: synaplan-composer-install
-    working_dir: /var/www/html
-    env_file:
-      - .env.docker
-    environment:
-      - COMPOSER_ALLOW_SUPERUSER=1
-      - COMPOSER_PROCESS_TIMEOUT=${COMPOSER_PROCESS_TIMEOUT:-1600}
-    volumes:
-      - ./:/var/www/html
-    command: composer install --prefer-dist --no-interaction
-    restart: "no"
-    logging:
-      options:
-        max-size: "10m"
-        max-file: "3"
-    networks:
-      - synaplan-network
-
-  # NPM Dependencies Installer
-  npm-install:
-    image: node:20-alpine
-    container_name: synaplan-npm-install
-    working_dir: /var/www/html/public
-    volumes:
-      - ./:/var/www/html
-    command: npm ci --no-audit --no-fund
-    restart: "no"
-    logging:
-      options:
-        max-size: "10m"
-        max-file: "3"
-    networks:
-      - synaplan-network
-
-  # MariaDB Database
+  # MariaDB 11.8 Database
   db:
     image: mariadb:11.8.2
     container_name: synaplan-db
-    restart: unless-stopped
+    command: --max-allowed-packet=256M --innodb-buffer-pool-size=512M
     environment:
       MYSQL_DATABASE: synaplan
       MYSQL_USER: synaplan_user
       MYSQL_PASSWORD: synaplan_password
       MYSQL_ROOT_PASSWORD: root_password
     ports:
-      - "3306:3306"
+      - "3307:3306"
     volumes:
       - mysql_data:/var/lib/mysql
-      - ./dev/db-loadfiles:/docker-entrypoint-initdb.d
+      - ./_devextras/db-init:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test: ["CMD", "mariadb", "-h", "localhost", "-u", "root", "-proot_password", "-e", "SELECT 1;"]
       interval: 30s
       timeout: 10s
       retries: 5
       start_period: 60s
-    logging:
-      options:
-        max-size: "10m"
-        max-file: "3"
+    restart: unless-stopped
     networks:
       - synaplan-network
 
-  # Ollama for local AI models
+  # Redis Cache & Queue
+  redis:
+    image: redis:7-alpine
+    container_name: synaplan-redis
+    command: redis-server --appendonly yes --maxmemory 512mb --maxmemory-policy allkeys-lru
+    ports:
+      - "6380:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - synaplan-network
+
+  # Ollama - Local AI Models
   ollama:
-    build:
-      context: dev/docker/
-      dockerfile: Dockerfile.ollama
+    image: ollama/ollama:latest
     container_name: synaplan-ollama
     ports:
-      - "11434:11434"
+      - "11435:11434"
     volumes:
       - ollama_data:/root/.ollama
     environment:
-      - OLLAMA_HOST=0.0.0.0
-      - OLLAMA_PULL_MODELS=mistral:7b,deepseek-r1:14b,bge-m3
-    restart: unless-stopped
+      OLLAMA_HOST: 0.0.0.0
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:11434/api/tags"]
       interval: 30s
       timeout: 10s
       retries: 5
       start_period: 60s
-    logging:
-      options:
-        max-size: "10m"
-        max-file: "3"
+    restart: unless-stopped
     networks:
       - synaplan-network
 
-  # Whisper Models Download Service
+  # Apache Tika - Document Text Extraction
+  tika:
+    image: apache/tika:2.9.2.0
+    container_name: synaplan-tika
+    command: -h 0.0.0.0 -p 9998
+    ports:
+      - "9999:9998"
+    healthcheck:
+      test: ["CMD", "sh", "-c", "wget -qO- http://localhost:9998/version >/dev/null 2>&1 || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 20s
+    restart: unless-stopped
+    networks:
+      - synaplan-network
+
+  # Whisper Models Download (runs once)
   whisper-models:
     image: alpine:3.20
     container_name: synaplan-whisper-models
     command: >
       sh -c '
-        set -e;
-        echo "Installing curl and certificates..." &&
         apk add --no-cache curl ca-certificates &&
-        echo "Creating models directory..." &&
         mkdir -p /models &&
-        echo "Checking existing models..." &&
-        f() { 
-          if [ -f "/models/$1.bin" ]; then
-            echo "Model $1.bin already exists, skipping download"
-          else
-            echo "Downloading $1 model..." &&
-            curl -fL --retry 3 --retry-delay 5 --retry-all-errors --max-time 600 -o "/models/$1.bin.tmp" "$2" &&
-            mv "/models/$1.bin.tmp" "/models/$1.bin" &&
-            echo "Successfully downloaded $1.bin"
-          fi
-        } &&
-        f base      https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.bin &&
-        echo "Setting permissions..." &&
-        ls /models/*.bin >/dev/null 2>&1 && chmod 644 /models/*.bin &&
-        echo "Models check/download completed successfully!" &&
-        ls -lh /models/ &&
-        echo "Whisper models service completed."
+        if [ ! -f "/models/ggml-base.bin" ]; then
+          echo "Downloading Whisper base model..." &&
+          curl -fL --retry 3 --retry-delay 5 --max-time 600 \
+            -o "/models/ggml-base.bin" \
+            "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.bin" &&
+          chmod 644 /models/*.bin &&
+          echo "Whisper model downloaded successfully"
+        else
+          echo "Whisper model already exists, skipping download"
+        fi
       '
     volumes:
       - whisper_models:/models
     restart: "no"
-    logging:
-      options:
-        max-size: "10m"
-        max-file: "3"
     networks:
       - synaplan-network
 
-  # phpMyAdmin for database management
+  # phpMyAdmin (optional - for DB management)
   phpmyadmin:
     image: phpmyadmin/phpmyadmin:latest
     container_name: synaplan-phpmyadmin
@@ -261,44 +192,31 @@ services:
       PMA_USER: synaplan_user
       PMA_PASSWORD: synaplan_password
     ports:
-      - "8081:80"
+      - "8082:80"
     depends_on:
       - db
     restart: unless-stopped
-    logging:
-      options:
-        max-size: "10m"
-        max-file: "3"
     networks:
       - synaplan-network
 
-  # Apache Tika (optional;)
-  tika:
-    image: apache/tika:2.9.2.0
-    container_name: synaplan-tika
-    restart: unless-stopped
-    command: -h 0.0.0.0 -p 9998
+  # MailHog (SMTP testing)
+  mailhog:
+    image: mailhog/mailhog:latest
+    container_name: synaplan-mailhog
     ports:
-      - "9998:9998"
-    healthcheck:
-      test: ["CMD", "sh", "-lc", "wget -qO- http://localhost:9998/version >/dev/null 2>&1 || exit 1"]
-      interval: 30s
-      timeout: 10s
-      retries: 5
-      start_period: 20s
-    logging:
-      options:
-        max-size: "10m"
-        max-file: "3"
+      - "1025:1025"  # SMTP
+      - "8025:8025"  # Web UI
+    restart: unless-stopped
     networks:
       - synaplan-network
 
 volumes:
   mysql_data:
+  redis_data:
   ollama_data:
   whisper_models:
-    name: synaplan_whisper_models
 
 networks:
   synaplan-network:
     driver: bridge
+

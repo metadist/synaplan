@@ -1,4 +1,0 @@
-https://cloud.google.com/document-ai#demo
-https://dev.docanalyzer.ai/documents/upload-document-s
-
-COMPOSER_PROCESS_TIMEOUT=6000 composer update

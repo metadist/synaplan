@@ -1,0 +1,26 @@
+{
+  "name": "synaplan-test",
+  "version": "1.0.0",
+  "description": "Minimal-robustes Playwright-Smoke-Setup",
+  "type": "module",
+  "scripts": {
+    "test": "playwright test",
+    "test:smoke": "playwright test -g @smoke",
+    "test:ui": "playwright test --ui",
+    "codegen": "playwright codegen --color-scheme dark",
+    "report": "playwright show-report tests/reports/html",
+    "trace": "playwright show-trace tests/test-results/**/"
+  },
+  "keywords": [
+    "playwright",
+    "e2e",
+    "testing"
+  ],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@playwright/test": "^1.40.0",
+    "@types/node": "^20.10.0",
+    "dotenv": "^17.2.3"
+  }
+}

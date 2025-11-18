@@ -1,31 +1,53 @@
+# Environment files (auto-generated or local overrides)
 .env
-!.env.example
-!.env.docker
+backend/.env
+backend/.env.docker
+backend/.env.local
+backend/.env.*.local
+backend/var/.fixtures_loaded
+frontend/.env
+frontend/.env.docker
+frontend/.env.local
+frontend/.env.*.local
 
-public/node_modules/
-public/up/*
-public/inc/models
-public/whispermodels/large-v3-turbo.pt
-public/whispermodels/medium.pt
-.specstory
-
-vendor/
-
-# IDE/editor settings
+# IDE
 .vscode/
 .idea/
-*.code-workspace
+*.swp
+*.swo
+*~
 
-# OS files
+# OS
 .DS_Store
 Thumbs.db
+.DS_Store?
+._*
 
-# Test/coverage artifacts
-coverage/
-testing/reports/
+# Docker volumes and data
+volumes/
+/data/
+# But allow frontend source data
+!frontend/src/data/
 
-.php-cs-fixer.cache
-app/inc/ai/grpc-triton/
-dev/ai_readme.md
+# Logs
+*.log
+logs/
 
-.claude/refactor_plan/refactor_symfony_vue.md
+# Backend cache & build
+backend/var/cache/
+backend/var/log/
+backend/.phpunit.cache/
+backend/vendor/
+
+# Frontend cache & build
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+frontend/package-lock.json
+
+# Test artifacts
+*.cache
+tests/test-results/
+tests/reports/
+tests/node_modules/
+tests/.env.local

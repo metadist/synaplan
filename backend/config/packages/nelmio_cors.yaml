@@ -1,0 +1,13 @@
+nelmio_cors:
+    defaults:
+        allow_origin: ['*']
+        allow_methods: ['GET', 'OPTIONS', 'POST', 'PUT', 'PATCH', 'DELETE']
+        allow_headers: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'X-Widget-Id', 'X-Widget-Session', 'X-Widget-Host']
+        expose_headers: ['Link', 'X-Total-Count']
+        max_age: 3600
+    paths:
+        '^/':
+            allow_origin: ['*']
+            allow_headers: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'X-Widget-Id', 'X-Widget-Session', 'X-Widget-Host']
+            allow_methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS']
+            max_age: 3600

@@ -1,0 +1,10 @@
+parameters:
+    level: 8
+    paths:
+        - src
+        - tests
+    excludePaths:
+        - src/Kernel.php
+    checkMissingIterableValueType: false
+    checkGenericClassInNonGenericObjectType: false
+

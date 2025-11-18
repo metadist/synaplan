@@ -1,8 +1,0 @@
-# .git-blame-ignore-revs
-# This file contains a list of commits that should be ignored by git blame.
-# To configure git to use this file locally, run:
-# git config blame.ignoreRevsFile .git-blame-ignore-revs
-
-# Formatting changes from PR #92
-489d28638ddcc0fbee45c59969a5a12e24ec3cb0 # Merge pull request #92 from metadist/feat/formatter-applied
-4a54fbb7995903649be275a07363c8abddc46aac # chore: apply format

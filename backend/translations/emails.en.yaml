@@ -1,0 +1,37 @@
+email:
+  password_reset:
+    title: 'Reset Your Password'
+    intro: 'You requested to reset your password for your Synaplan account.'
+    instruction: 'Click the button below to reset your password:'
+    button: 'Reset Password'
+    or_copy: 'Or copy and paste this link into your browser:'
+    security_notice:
+      title: 'Security Notice:'
+      text: 'This link will expire in 1 hour. If you didn''t request this password reset, please ignore this email and your password will remain unchanged.'
+  
+  verification:
+    title: 'Verify Your Email Address'
+    intro: 'Thank you for registering with Synaplan!'
+    instruction: 'Please click the button below to verify your email address:'
+    button: 'Verify Email'
+    or_copy: 'Or copy and paste this link into your browser:'
+    expiry: 'This link will expire in 24 hours.'
+    footer_notice: 'If you didn''t create an account with Synaplan, you can safely ignore this email.'
+  
+  welcome:
+    title: 'Welcome to Synaplan!'
+    greeting: 'Hi %name%,'
+    intro: 'Your email has been successfully verified and your account is now active.'
+    features_intro: 'You can now start using all features of Synaplan:'
+    feature_1: 'AI-powered chat assistant'
+    feature_2: 'Document analysis'
+    feature_3: 'Multi-channel communication'
+    feature_4: 'And much more!'
+    button: 'Get Started'
+  
+  footer:
+    support: 'If you''re having trouble, please contact our support team.'
+    help: 'Need help? Check out our documentation or contact support.'
+    company: 'Synaplan'
+    rights: 'All rights reserved'
+

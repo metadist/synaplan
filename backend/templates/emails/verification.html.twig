@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <style>
+        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; background: #f9fafb; }
+        .container { max-width: 600px; margin: 0 auto; padding: 20px; background: white; border-radius: 8px; }
+        .button { 
+            display: inline-block; 
+            padding: 14px 28px; 
+            background: #4F46E5; 
+            color: #ffffff !important; 
+            text-decoration: none; 
+            border-radius: 8px; 
+            margin: 20px 0;
+            font-weight: 600;
+            font-size: 16px;
+        }
+        .button:hover { background: #4338CA; }
+        .footer { margin-top: 30px; padding-top: 20px; border-top: 1px solid #e5e7eb; font-size: 12px; color: #6b7280; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>{{ 'email.verification.title'|trans }}</h2>
+        <p>{{ 'email.verification.intro'|trans }}</p>
+        <p>{{ 'email.verification.instruction'|trans }}</p>
+        <a href="{{ verificationUrl }}" class="button">{{ 'email.verification.button'|trans }}</a>
+        <p>{{ 'email.verification.or_copy'|trans }}</p>
+        <p style="word-break: break-all; color: #666;">{{ verificationUrl }}</p>
+        <p>{{ 'email.verification.expiry'|trans }}</p>
+        <div class="footer">
+            <p>{{ 'email.verification.footer_notice'|trans }}</p>
+            <p>&copy; {{ "now"|date("Y") }} {{ 'email.footer.company'|trans }}. {{ 'email.footer.rights'|trans }}</p>
+        </div>
+    </div>
+</body>
+</html>
+
