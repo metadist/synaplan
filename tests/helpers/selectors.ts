@@ -1,13 +1,8 @@
-/**
- * Zentrale Selektor-Konstanten
- * TODO: Passe Selektoren an deine App an
- * Bevorzugt: [data-testid] Attribute verwenden
- */
 export const selectors = {
   login: {
-    email: '#email', // oder '[data-testid="login-email"]' - Best Practice: data-testid hinzufügen
-    password: '#password', // oder '[data-testid="login-password"]'
-    submit: 'button[type="submit"]', // oder 'button:has-text("Sign In")' oder '[data-testid="login-submit"]'
+    email: '#email', 
+    password: '#password', 
+    submit: 'button[type="submit"]', 
   },
   nav: {
     newChatButton: '[data-testid="btn-chat-new"]',
