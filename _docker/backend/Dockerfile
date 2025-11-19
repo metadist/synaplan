@@ -52,7 +52,7 @@ COPY backend/ .
 RUN composer install --prefer-dist --no-interaction --optimize-autoloader --no-scripts --ignore-platform-req=ext-redis
 
 # Set proper permissions for www-data (uid:gid = 33:33)
-RUN mkdir -p /var/www/html/var/cache /var/www/html/var/log /var/www/html/public/up && \
+RUN mkdir -p /var/www/html/var/cache /var/www/html/var/log /var/www/html/var/uploads /var/www/html/public/up && \
     chown -R www-data:www-data /var/www/html/var /var/www/html/vendor /var/www/html/public/up && \
     chmod -R 775 /var/www/html/var /var/www/html/public/up
 
