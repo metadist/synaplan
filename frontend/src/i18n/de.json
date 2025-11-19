@@ -220,6 +220,8 @@
       "verify": "Verifizieren",
       "resendCode": "Code erneut senden",
       "verified": "Telefonnummer verifiziert",
+      "statusVerified": "Verifiziert",
+      "statusNotVerified": "Nicht verifiziert",
       "verifiedAt": "Verifiziert am {date}",
       "verifiedSuccess": "Telefonnummer erfolgreich verifiziert!",
       "removePhone": "Telefonnummer entfernen",
