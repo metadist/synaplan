@@ -14,7 +14,7 @@ export default defineConfig({
 
   // Retries und Timeout auf Config-Ebene
   retries: 0,
-  timeout: 10_000,
+  timeout: 60_000,
 
   // BaseURL aus ENV oder Default
   use: {

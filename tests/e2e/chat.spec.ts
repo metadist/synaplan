@@ -2,20 +2,26 @@ import { test, expect } from '@playwright/test';
 import { login } from '../helpers/auth';
 import { selectors } from '../helpers/selectors';
 
-test.describe('Dashboard Load Smoke Test', () => {
-  test.beforeEach(async ({ page }) => {
+  test('Chat generates valid answer "success" id=003', async ({ page }) => {
     await login(page);
-  });
-
-  test('@smoke sollte Chat anzeigen und antworten können id=003', async ({ page }) => {
     await page.locator(selectors.nav.newChatButton).click();
-    await page.locator(selectors.chat.textInput).fill('hi, this is a smoke test. Answer with "success" add nothing else');
-    await expect()
+    await page.locator(selectors.chat.textInput)
+      .fill('hi, this is a smoke test. Answer with "success" add nothing else');
+    await page.locator(selectors.chat.sendBtn).click();
+
+    const loadingIndicator = page.locator(selectors.chat.loadIndicator);
+    await loadingIndicator.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
+    await loadingIndicator.waitFor({ state: 'hidden' });
+
+    const aiBubble = page.locator(selectors.chat.aiAnswerBubble).last();
+    const aiAnswer = aiBubble.locator(selectors.chat.messageText);
+    const aiText = (await aiAnswer.innerText()).trim().toLowerCase();
+
+    await expect(aiText).toBe('success');
   });
 
+   test('All models can generate a valid answer "success" id=004', async ({ page }) => {
 
-  test('@smoke alle Modelle generieren eine Antwort id=004', async ({ page }) => {     
   });
 
-});
 
