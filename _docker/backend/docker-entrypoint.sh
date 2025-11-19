@@ -24,7 +24,9 @@ if [ -f "composer.json" ]; then
     echo "✅ Composer dependencies ready!"
 fi
 
-# Ensure proper permissions
+# Ensure runtime directories exist with correct permissions
+echo "📁 Ensuring runtime directories exist..."
+mkdir -p var/cache var/log var/uploads public/up
 chown -R www-data:www-data var/ public/up/ 2>/dev/null || true
 chmod -R 775 var/ public/up/ 2>/dev/null || true
 
