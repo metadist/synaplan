@@ -14,12 +14,12 @@ export default defineConfig({
 
   // Retries und Timeout auf Config-Ebene
   retries: 0,
-  timeout: 30_000,
+  timeout: 10_000,
 
   // BaseURL aus ENV oder Default
   use: {
     baseURL: process.env.BASE_URL || 'http://localhost:5137',
-    headless: true,
+    headless: false,
     screenshot: 'only-on-failure',
     video: 'retain-on-failure',
     trace: 'retain-on-failure',
@@ -33,7 +33,7 @@ export default defineConfig({
   ],
 
   // Ausgabeordner für Traces, Screenshots etc.
-  outputDir: 'tests/test-results',
+  outputDir: 'test-results',
 
   // Worker-Konfiguration
   workers: 1,

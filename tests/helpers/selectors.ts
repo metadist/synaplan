@@ -10,10 +10,11 @@ export const selectors = {
     submit: 'button[type="submit"]', // oder 'button:has-text("Sign In")' oder '[data-testid="login-submit"]'
   },
   nav: {
-    newChatButton: 'button:has-text("New Chat")',
+    newChatButton: '[data-testid="btn-chat-new"]',
   },
   chat: {
-    marker: 'textarea[placeholder="Type your message..."]',
+    textInput: '[data-testid="input-chat-message"]',
+    sendBtn: '[data-testid="btn-chat-send"]',
     widget: '[data-testid="dashboard-widget"]', // TODO: Kern-Widget-Selektor
   },
   userMenu: {

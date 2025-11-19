@@ -1,5 +1,8 @@
 <template>
-  <div :class="['flex gap-4 p-4 text-[16px] leading-6', role === 'user' ? 'justify-end' : '', isSuperseded && 'opacity-50']">
+  <div
+    :class="['flex gap-4 p-4 text-[16px] leading-6', role === 'user' ? 'justify-end' : '', isSuperseded && 'opacity-50']"
+    data-testid="message-container"
+  >
     <!-- Avatar with provider logo for assistant -->
     <div
       v-if="role === 'assistant'"
@@ -29,9 +32,16 @@
       </template>
 
       <!-- Single bubble with content + footer -->
-      <div :class="['flex flex-col', role === 'user' ? 'bubble-user' : 'bubble-ai']">
+      <div
+        :class="['flex flex-col', role === 'user' ? 'bubble-user' : 'bubble-ai']"
+        :data-testid="role === 'user' ? 'user-message-bubble' : 'assistant-message-bubble'"
+      >
         <!-- Processing Status (inside bubble, before content) -->
-        <div v-if="isStreaming && processingStatus && role === 'assistant'" class="px-4 pt-3 pb-3 processing-enter">
+        <div
+          v-if="isStreaming && processingStatus && role === 'assistant'"
+          class="px-4 pt-3 pb-3 processing-enter"
+          data-testid="loading-typing-indicator"
+        >
         <div class="flex items-center gap-3">
           <svg class="w-5 h-5 animate-spin txt-brand flex-shrink-0" fill="none" viewBox="0 0 24 24">
             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
