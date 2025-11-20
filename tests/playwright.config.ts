@@ -47,5 +47,6 @@ export default defineConfig({
   ],
 
   // Standard-Grep für @smoke
-  grep: /@smoke/,
+ // grep: /@smoke/,
+  grep: /id=004/,
 });
