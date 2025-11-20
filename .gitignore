@@ -50,4 +50,4 @@ tests/test-results/
 tests/reports/
 tests/node_modules/
 tests/.env.local
-tests/e2e/prompt_guide
+tests/e2e/prompt_guide.md
