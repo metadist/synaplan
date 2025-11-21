@@ -1,22 +1,32 @@
 <template>
-  <div class="surface-card p-6" data-testid="section-phone-verification">
+  <div class="surface-card p-6 space-y-6" data-testid="section-phone-verification">
     <!-- Header -->
-    <div class="mb-6" data-testid="section-header">
-      <h2 class="text-xl font-semibold txt-primary mb-2">
-        {{ $t('config.phoneVerification.title') }}
-      </h2>
-      <p class="text-sm txt-secondary">
-        {{ $t('config.phoneVerification.description') }}
-      </p>
+    <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between" data-testid="section-header">
+      <div>
+        <h3 class="text-lg font-semibold txt-primary flex items-center gap-2">
+          <DevicePhoneMobileIcon class="w-5 h-5 text-green-500" />
+          {{ $t('config.phoneVerification.title') }}
+        </h3>
+        <p class="text-sm txt-secondary mt-1">
+          {{ $t('config.phoneVerification.description') }}
+        </p>
+      </div>
+
+      <span
+        class="pill text-xs w-fit"
+        :class="status?.verified ? 'pill--active' : 'pill--warning'"
+      >
+        {{ status?.verified ? $t('config.phoneVerification.statusVerified') : $t('config.phoneVerification.statusNotVerified') }}
+      </span>
     </div>
 
     <!-- Loading -->
-    <div v-if="loading" class="flex items-center justify-center py-8" data-testid="section-loading">
+    <div v-if="loading" class="flex items-center justify-center py-8 rounded-lg surface-chip" data-testid="section-loading">
       <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-brand"></div>
     </div>
 
     <!-- Error -->
-    <div v-if="error" class="mb-4 surface-card p-4 border-l-4 border-red-500" data-testid="alert-error">
+    <div v-if="error" class="surface-card p-4 border border-red-500/50 rounded-lg bg-red-500/5" data-testid="alert-error">
       <p class="text-sm text-red-600 dark:text-red-400">{{ error }}</p>
     </div>
 
@@ -70,7 +80,7 @@
             v-model="verificationCode"
             type="text"
             maxlength="6"
-            :placeholder="$t('config.phoneVerification.codePlace holder')"
+            :placeholder="$t('config.phoneVerification.codePlaceholder')"
             class="w-full px-4 py-3 rounded-lg surface-chip txt-primary border border-light-border focus:border-brand focus:ring-2 focus:ring-brand/20 transition-colors text-center text-2xl font-mono tracking-widest"
             @input="formatCode"
             data-testid="input-code"
@@ -148,6 +158,7 @@ import { ref, onMounted } from 'vue'
 import { useNotification } from '@/composables/useNotification'
 import { useDialog } from '@/composables/useDialog'
 import { useI18n } from 'vue-i18n'
+import { DevicePhoneMobileIcon } from '@heroicons/vue/24/outline'
 
 const { success, error: showError } = useNotification()
 const dialog = useDialog()
@@ -162,25 +173,77 @@ const verificationPending = ref(false)
 const requesting = ref(false)
 const confirming = ref(false)
 
+const AUTH_TOKEN_KEY = import.meta.env.VITE_AUTH_TOKEN_KEY || 'auth_token'
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'
+const API_BASE = API_BASE_URL.replace(/\/$/, '')
+
+const buildHeaders = (withJson = false) => {
+  const headers: Record<string, string> = {}
+  if (withJson) {
+    headers['Content-Type'] = 'application/json'
+  }
+
+  const token = localStorage.getItem(AUTH_TOKEN_KEY)
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`
+  }
+
+  return headers
+}
+
+const requestWithFallback = async (path: string, options: RequestInit = {}) => {
+  const url = `${API_BASE}${path}`
+  const response = await fetch(url, options)
+
+  const contentType = response.headers.get('content-type') ?? ''
+  const isJson = contentType.includes('application/json')
+  const payload = isJson ? await response.json() : await response.text()
+
+  return { response, payload }
+}
+
+const getErrorMessage = (payload: unknown, fallback: string) => {
+  if (typeof payload === 'string' && payload.trim() !== '') {
+    return payload
+  }
+  if (payload && typeof payload === 'object' && 'error' in payload) {
+    return String(payload.error)
+  }
+  return fallback
+}
+
+const isNetworkError = (err: any) => {
+  if (!err) return false
+  const message = err.message || ''
+  return message === 'Failed to fetch' || message.includes('NetworkError')
+}
+
 const loadStatus = async () => {
   try {
     loading.value = true
     error.value = null
 
-    const response = await fetch('/api/v1/user/verify-phone/status', {
-      headers: {
-        'Authorization': `Bearer ${localStorage.getItem('token')}`
-      }
+    const { response, payload } = await requestWithFallback('/api/v1/user/verify-phone/status', {
+      headers: buildHeaders()
     })
 
-    if (!response.ok) throw new Error('Failed to load status')
+    if (!response.ok) {
+      throw new Error(getErrorMessage(payload, 'Failed to load status'))
+    }
 
-    const data = await response.json()
+    const data = payload as any
     status.value = data
+    verificationPending.value = Boolean(data?.pending_verification)
+
+    if (data?.phone_number) {
+      phoneNumber.value = data.phone_number
+    }
 
   } catch (err: any) {
     console.error('Failed to load phone verification status:', err)
-    error.value = err.message || t('config.phoneVerification.errorLoading')
+    error.value = isNetworkError(err)
+      ? t('config.phoneVerification.errorLoading')
+      : err?.message || t('config.phoneVerification.errorLoading')
   } finally {
     loading.value = false
   }
@@ -193,19 +256,14 @@ const requestVerification = async () => {
     requesting.value = true
     error.value = null
 
-    const response = await fetch('/api/v1/user/verify-phone/request', {
+    const { response, payload } = await requestWithFallback('/api/v1/user/verify-phone/request', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${localStorage.getItem('token')}`
-      },
+      headers: buildHeaders(true),
       body: JSON.stringify({ phone_number: phoneNumber.value })
     })
 
-    const data = await response.json()
-
     if (!response.ok) {
-      throw new Error(data.error || 'Failed to send verification code')
+      throw new Error(getErrorMessage(payload, 'Failed to send verification code'))
     }
 
     verificationPending.value = true
@@ -213,8 +271,11 @@ const requestVerification = async () => {
 
   } catch (err: any) {
     console.error('Failed to request verification:', err)
-    error.value = err.message || t('config.phoneVerification.errorSending')
-    showError(error.value)
+    const message = isNetworkError(err)
+      ? t('config.phoneVerification.errorLoading')
+      : err?.message || t('config.phoneVerification.errorSending')
+    error.value = message
+    showError(message)
   } finally {
     requesting.value = false
   }
@@ -227,19 +288,14 @@ const confirmVerification = async () => {
     confirming.value = true
     error.value = null
 
-    const response = await fetch('/api/v1/user/verify-phone/confirm', {
+    const { response, payload } = await requestWithFallback('/api/v1/user/verify-phone/confirm', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${localStorage.getItem('token')}`
-      },
+      headers: buildHeaders(true),
       body: JSON.stringify({ code: verificationCode.value })
     })
 
-    const data = await response.json()
-
     if (!response.ok) {
-      throw new Error(data.error || 'Invalid verification code')
+      throw new Error(getErrorMessage(payload, 'Invalid verification code'))
     }
 
     success(t('config.phoneVerification.verifiedSuccess'))
@@ -249,8 +305,11 @@ const confirmVerification = async () => {
 
   } catch (err: any) {
     console.error('Failed to confirm verification:', err)
-    error.value = err.message || t('config.phoneVerification.errorVerifying')
-    showError(error.value)
+    const message = isNetworkError(err)
+      ? t('config.phoneVerification.errorLoading')
+      : err?.message || t('config.phoneVerification.errorVerifying')
+    error.value = message
+    showError(message)
   } finally {
     confirming.value = false
   }
@@ -277,17 +336,13 @@ const removeVerification = async () => {
     loading.value = true
     error.value = null
 
-    const response = await fetch('/api/v1/user/verify-phone', {
+    const { response, payload } = await requestWithFallback('/api/v1/user/verify-phone', {
       method: 'DELETE',
-      headers: {
-        'Authorization': `Bearer ${localStorage.getItem('token')}`
-      }
+      headers: buildHeaders()
     })
 
-    const data = await response.json()
-
     if (!response.ok) {
-      throw new Error(data.error || 'Failed to remove phone')
+      throw new Error(getErrorMessage(payload, 'Failed to remove phone'))
     }
 
     success(t('config.phoneVerification.removedSuccess'))
@@ -295,8 +350,11 @@ const removeVerification = async () => {
 
   } catch (err: any) {
     console.error('Failed to remove phone verification:', err)
-    error.value = err.message || t('config.phoneVerification.errorRemoving')
-    showError(error.value)
+    const message = isNetworkError(err)
+      ? t('config.phoneVerification.errorLoading')
+      : err?.message || t('config.phoneVerification.errorRemoving')
+    error.value = message
+    showError(message)
   } finally {
     loading.value = false
   }
@@ -306,7 +364,8 @@ const formatCode = () => {
   verificationCode.value = verificationCode.value.replace(/\D/g, '').slice(0, 6)
 }
 
-const formatDate = (timestamp: number) => {
+const formatDate = (timestamp?: number) => {
+  if (!timestamp) return '—'
   return new Date(timestamp * 1000).toLocaleDateString()
 }
 

@@ -2,6 +2,7 @@
 
 namespace App\Tests\Service;
 
+use App\AI\Service\AiFacade;
 use App\Service\RAG\VectorSearchService;
 use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
 
@@ -10,9 +11,14 @@ use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
  */
 class VectorSearchServiceTest extends KernelTestCase
 {
+    private const NON_EXISTENT_USER_ID = 999999;
+
     private VectorSearchService $vectorSearchService;
-    private int $testUserId = 1;
-    private int $testMessageId;
+    private int $testUserId = 0;
+    private int $testMessageId = 0;
+    private int $testModelId = 0;
+    private int $userModelConfigId = 0;
+    private int $fallbackModelConfigId = 0;
 
     protected function setUp(): void
     {
@@ -20,10 +26,83 @@ class VectorSearchServiceTest extends KernelTestCase
         self::bootKernel();
         
         $container = static::getContainer();
+
+        $aiFacadeMock = $this->createMock(AiFacade::class);
+        $aiFacadeMock->method('embed')
+            ->willReturnCallback(fn(string $text, ?int $userId = null, array $options = []): array => array_fill(0, 1024, 0.2));
+        $container->set(AiFacade::class, $aiFacadeMock);
+
         $this->vectorSearchService = $container->get(VectorSearchService::class);
         
-        // Create test data
+        // Create test user + data
+        $this->testUserId = $this->createTestUser();
+        $this->testModelId = $this->createTestEmbeddingModel();
+        $this->userModelConfigId = $this->configureDefaultVectorizeModel($this->testUserId);
+        $this->fallbackModelConfigId = $this->configureDefaultVectorizeModel(self::NON_EXISTENT_USER_ID);
         $this->testMessageId = $this->createTestVectorData();
+    }
+
+    private function createTestUser(): int
+    {
+        $container = static::getContainer();
+        $em = $container->get('doctrine')->getManager();
+
+        $user = new \App\Entity\User();
+        $user->setCreated((string) time());
+        $user->setType('WEB');
+        $user->setMail(sprintf('vector-test-%s@example.test', uniqid('', true)));
+        $user->setPw(password_hash('vector-test', PASSWORD_BCRYPT) ?: 'vector-test');
+        $user->setProviderId('vector-test');
+        $user->setUserLevel('NEW');
+        $user->setEmailVerified(true);
+        $user->setUserDetails([]);
+        $user->setPaymentDetails([]);
+
+        $em->persist($user);
+        $em->flush();
+
+        return (int) $user->getId();
+    }
+
+    private function createTestEmbeddingModel(): int
+    {
+        $container = static::getContainer();
+        $em = $container->get('doctrine')->getManager();
+
+        $model = new \App\Entity\Model();
+        $model->setService('test');
+        $model->setName('Test Embedding Model');
+        $model->setTag('vector-test');
+        $model->setSelectable(0);
+        $model->setProviderId('test-embedding');
+        $model->setPriceIn(0);
+        $model->setPriceOut(0);
+        $model->setJson([
+            'capability' => 'VECTORIZE',
+            'dimensions' => 1024,
+        ]);
+
+        $em->persist($model);
+        $em->flush();
+
+        return (int) $model->getId();
+    }
+
+    private function configureDefaultVectorizeModel(int $ownerId): int
+    {
+        $container = static::getContainer();
+        $em = $container->get('doctrine')->getManager();
+
+        $config = new \App\Entity\Config();
+        $config->setOwnerId($ownerId);
+        $config->setGroup('DEFAULTMODEL');
+        $config->setSetting('VECTORIZE');
+        $config->setValue((string) $this->testModelId);
+
+        $em->persist($config);
+        $em->flush();
+
+        return (int) $config->getId();
     }
 
     private function createTestVectorData(): int
@@ -47,7 +126,7 @@ class VectorSearchServiceTest extends KernelTestCase
         
         // Insert test vector (using dummy embedding)
         $conn = $em->getConnection();
-        $dummyVector = array_fill(0, 1024, 0.1); // 1024-dim vector
+        $dummyVector = array_fill(0, 1024, 0.1);
         $vectorStr = '[' . implode(',', $dummyVector) . ']';
         
         $sql = 'INSERT INTO BRAG (BUID, BMID, BGROUPKEY, BTYPE, BSTART, BEND, BTEXT, BEMBED, BCREATED) 
@@ -125,7 +204,7 @@ class VectorSearchServiceTest extends KernelTestCase
     {
         $results = $this->vectorSearchService->semanticSearch(
             'test query',
-            999999,
+            self::NON_EXISTENT_USER_ID,
             5
         );
 
@@ -157,10 +236,48 @@ class VectorSearchServiceTest extends KernelTestCase
         // Delete test vectors
         $conn->executeStatement('DELETE FROM BRAG WHERE BMID = ?', [$this->testMessageId]);
         
+        $entitiesToRemove = [];
+
         // Delete test message
-        $message = $em->find(\App\Entity\Message::class, $this->testMessageId);
+        $message = $this->testMessageId > 0 ? $em->find(\App\Entity\Message::class, $this->testMessageId) : null;
         if ($message) {
-            $em->remove($message);
+            $entitiesToRemove[] = $message;
+        }
+
+        // Delete configs
+        if ($this->userModelConfigId > 0) {
+            $config = $em->find(\App\Entity\Config::class, $this->userModelConfigId);
+            if ($config) {
+                $entitiesToRemove[] = $config;
+            }
+        }
+
+        if ($this->fallbackModelConfigId > 0) {
+            $config = $em->find(\App\Entity\Config::class, $this->fallbackModelConfigId);
+            if ($config) {
+                $entitiesToRemove[] = $config;
+            }
+        }
+
+        // Delete test model
+        if ($this->testModelId > 0) {
+            $model = $em->find(\App\Entity\Model::class, $this->testModelId);
+            if ($model) {
+                $entitiesToRemove[] = $model;
+            }
+        }
+
+        // Delete test user
+        $user = $this->testUserId > 0 ? $em->find(\App\Entity\User::class, $this->testUserId) : null;
+        if ($user) {
+            $entitiesToRemove[] = $user;
+        }
+
+        foreach ($entitiesToRemove as $entity) {
+            $em->remove($entity);
+        }
+
+        if (!empty($entitiesToRemove)) {
             $em->flush();
         }
     }

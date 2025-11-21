@@ -35,7 +35,7 @@
         />
 
         <button
-          v-if="!showAllMy && myChats.length > 5"
+          v-if="!showAllMy && allMyChats.length > 5"
           @click="showAllMy = true"
           class="px-3 py-2 rounded-lg txt-secondary hover-surface transition-colors text-left text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary min-h-[44px]"
           data-testid="btn-chat-show-more-my"
@@ -92,7 +92,7 @@
         />
 
         <button
-          v-if="!showAllWidget && widgetChats.length > 5"
+          v-if="!showAllWidget && allWidgetChats.length > 5"
           @click="showAllWidget = true"
           class="px-3 py-2 rounded-lg txt-secondary hover-surface transition-colors text-left text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary min-h-[44px]"
           data-testid="btn-chat-show-more-widget"
@@ -177,17 +177,20 @@ const formatDate = (value: string | number): string => {
 }
 
 // Map API chats to sidebar format
-const myChats = computed(() => {
-  const apiChats = chatsStore.chats
+const allMyChats = computed(() => {
+  return chatsStore.chats
     .filter(c => !c.widgetSession)
     .map(c => ({
-    id: String(c.id),
-    title: c.title,
-    timestamp: formatDate(c.updatedAt),
-    type: 'personal' as const,
-    archived: false
-  }))
-  return showAllMy.value ? apiChats : apiChats.slice(0, 5)
+      id: String(c.id),
+      title: c.title,
+      timestamp: formatDate(c.updatedAt),
+      type: 'personal' as const,
+      archived: false
+    }))
+})
+
+const myChats = computed(() => {
+  return showAllMy.value ? allMyChats.value : allMyChats.value.slice(0, 5)
 })
 
 const myArchivedChats = computed((): Chat[] => {
@@ -195,7 +198,7 @@ const myArchivedChats = computed((): Chat[] => {
   return []
 })
 
-const widgetChats = computed((): Chat[] => {
+const allWidgetChats = computed((): Chat[] => {
   const sessionChatsRaw = chatsStore.chats
     .filter(c => c.widgetSession)
     .map(c => {
@@ -218,9 +221,11 @@ const widgetChats = computed((): Chat[] => {
     })
     .sort((a, b) => b.metaTimestamp - a.metaTimestamp)
 
-  const sessionChats = sessionChatsRaw.map(entry => entry.item)
+  return sessionChatsRaw.map(entry => entry.item)
+})
 
-  return showAllWidget.value ? sessionChats : sessionChats.slice(0, 5)
+const widgetChats = computed((): Chat[] => {
+  return showAllWidget.value ? allWidgetChats.value : allWidgetChats.value.slice(0, 5)
 })
 
 const widgetArchivedChats = computed((): Chat[] => {

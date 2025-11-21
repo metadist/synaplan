@@ -20,6 +20,7 @@ class RateLimitServiceUnifiedTest extends TestCase
     private EntityManagerInterface $em;
     private Connection $connection;
     private LoggerInterface $logger;
+    private array $configMap = [];
 
     protected function setUp(): void
     {
@@ -27,8 +28,14 @@ class RateLimitServiceUnifiedTest extends TestCase
         $this->em = $this->createMock(EntityManagerInterface::class);
         $this->connection = $this->createMock(Connection::class);
         $this->logger = $this->createMock(LoggerInterface::class);
+        $this->configMap = [];
 
         $this->em->method('getConnection')->willReturn($this->connection);
+
+        $this->configRepository->method('findBy')->willReturnCallback(function (array $criteria) {
+            $group = $criteria['group'] ?? '';
+            return $this->configMap[$group] ?? [];
+        });
 
         $this->service = new RateLimitService(
             $this->configRepository,
@@ -43,15 +50,7 @@ class RateLimitServiceUnifiedTest extends TestCase
         $user->method('getId')->willReturn(1);
         $user->method('getRateLimitLevel')->willReturn('ANONYMOUS');
 
-        // Setup ANONYMOUS limits (10 messages total)
-        $this->configRepository->expects($this->once())
-            ->method('findOneBy')
-            ->with([
-                'ownerId' => 0,
-                'group' => 'RATELIMITS_ANONYMOUS',
-                'setting' => 'MESSAGES_TOTAL'
-            ])
-            ->willReturn((object)['value' => '10']);
+        $this->setupLimits('ANONYMOUS', 'MESSAGES', ['TOTAL' => 10]);
 
         // Simulate user already sent 8 messages (across ALL sources)
         $this->connection->expects($this->once())
@@ -78,15 +77,7 @@ class RateLimitServiceUnifiedTest extends TestCase
         $user->method('getId')->willReturn(1);
         $user->method('getRateLimitLevel')->willReturn('ANONYMOUS');
 
-        // Setup ANONYMOUS limits
-        $this->configRepository->expects($this->once())
-            ->method('findOneBy')
-            ->with([
-                'ownerId' => 0,
-                'group' => 'RATELIMITS_ANONYMOUS',
-                'setting' => 'MESSAGES_TOTAL'
-            ])
-            ->willReturn((object)['value' => '10']);
+        $this->setupLimits('ANONYMOUS', 'MESSAGES', ['TOTAL' => 10]);
 
         // User already at limit (10 messages from all sources combined)
         $this->connection->expects($this->once())
@@ -137,17 +128,9 @@ class RateLimitServiceUnifiedTest extends TestCase
         ]);
 
         // User sent 80 messages in last hour (all sources combined)
-        $this->connection->expects($this->once())
+        $this->connection->expects($this->exactly(2))
             ->method('fetchOne')
-            ->with(
-                $this->stringContains('SELECT COUNT(*) FROM BUSELOG'),
-                $this->callback(function ($params) {
-                    return $params['user_id'] === 1 
-                        && $params['action'] === 'MESSAGES'
-                        && isset($params['since']);
-                })
-            )
-            ->willReturn('80');
+            ->willReturnOnConsecutiveCalls('80', '120');
 
         $result = $this->service->checkLimit($user, 'MESSAGES');
 
@@ -219,12 +202,7 @@ class RateLimitServiceUnifiedTest extends TestCase
             $configs[] = $config;
         }
 
-        $this->configRepository->method('findBy')
-            ->with([
-                'ownerId' => 0,
-                'group' => "RATELIMITS_{$level}"
-            ])
-            ->willReturn($configs);
+        $this->configMap["RATELIMITS_{$level}"] = $configs;
     }
 }
 

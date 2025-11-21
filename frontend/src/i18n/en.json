@@ -428,6 +428,8 @@
       "verify": "Verify",
       "resendCode": "Resend Code",
       "verified": "Phone Number Verified",
+      "statusVerified": "Verified",
+      "statusNotVerified": "Not Verified",
       "verifiedAt": "Verified on {date}",
       "verifiedSuccess": "Phone number verified successfully!",
       "removePhone": "Remove Phone Number",

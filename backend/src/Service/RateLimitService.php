@@ -58,8 +58,8 @@ class RateLimitService
             ];
         }
 
-        // NEW users: lifetime limits (never reset)
-        if ($level === 'NEW') {
+        // NEW & ANONYMOUS users: lifetime limits (never reset)
+        if (in_array($level, ['NEW', 'ANONYMOUS'], true)) {
             return $this->checkLifetimeLimit($user, $action, $limits);
         }
 
