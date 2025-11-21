@@ -79,6 +79,26 @@ export interface Message {
  * Parse content to extract thinking blocks and regular text
  */
 function parseContentWithThinking(content: string): Part[] {
+  // Handle special file generation markers from backend
+  if (content.startsWith('__FILE_GENERATED__:')) {
+    const filename = content.replace('__FILE_GENERATED__:', '').trim()
+    // Return a placeholder - the actual translation will be done in the component
+    // because we need access to i18n there
+    return [{
+      type: 'text',
+      content: `__FILE_GENERATED__:${filename}`
+    }]
+  }
+  
+  if (content === '__FILE_GENERATION_FAILED__') {
+    return [{
+      type: 'text',
+      content: '__FILE_GENERATION_FAILED__'
+    }]
+  }
+  
+  // Legacy: Check for old JSON format (BTEXT) from database
+  // This is only for backward compatibility with old messages
   const extraction = extractBTextPayload(content)
   if (extraction.text !== undefined) {
     const remainder = extraction.remainder?.trim()

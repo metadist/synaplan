@@ -31,7 +31,8 @@ class StreamController extends AbstractController
         private LoggerInterface $logger,
         private ModelConfigService $modelConfigService,
         private WidgetService $widgetService,
-        private WidgetSessionService $widgetSessionService
+        private WidgetSessionService $widgetSessionService,
+        private string $uploadDir
     ) {}
 
     #[Route('/stream', name: 'stream', methods: ['GET'])]
@@ -656,21 +657,79 @@ class StreamController extends AbstractController
                 
                 // ✨ Parse JSON response if AI responded in JSON format (fallback for non-streamed parsing)
                 $finalText = $responseText;
-                if (str_starts_with(trim($responseText), '{')) {
-                    // ✨ FIX: AI sometimes generates invalid JSON with "BFILE": \n} instead of "BFILE": 0
-                    $cleanedJson = preg_replace('/"BFILE":\s*\n/', '"BFILE": 0' . "\n", $responseText);
-                    $cleanedJson = preg_replace('/"BFILE":\s*\r\n/', '"BFILE": 0' . "\r\n", $cleanedJson);
-                    $cleanedJson = preg_replace('/"BFILE":\s*}/', '"BFILE": 0}', $cleanedJson);
-                    
+                $generatedFile = null;
+                
+                // NEW: Check for file generation format first (for OfficeM maker)
+                // Extract JSON from markdown code blocks if present (```json ... ```)
+                $jsonContent = $responseText;
+                if (preg_match('/```(?:json)?\s*\n(.*?)\n```/s', $responseText, $matches)) {
+                    $jsonContent = trim($matches[1]);
+                    $this->logger->info('StreamController: Extracted JSON from markdown code block');
+                }
+                
+                if (str_starts_with(trim($jsonContent), '{')) {
                     try {
-                        $jsonData = json_decode($cleanedJson, true, 512, JSON_THROW_ON_ERROR);
+                        $jsonData = json_decode($jsonContent, true, 512, JSON_THROW_ON_ERROR);
                         
-                        // Extract BTEXT as main content
-                        if (isset($jsonData['BTEXT'])) {
+                        // Check for NEW file generation format
+                        if (isset($jsonData['BFILEPATH']) && isset($jsonData['BFILETEXT'])) {
+                            $this->logger->info('StreamController: Detected AI file generation', [
+                                'filename' => $jsonData['BFILEPATH']
+                            ]);
+                            
+                            // Send generating status BEFORE creating the file
+                            $this->sendSSE('generating', [
+                                'message' => 'Datei wird generiert...',
+                                'metadata' => [
+                                    'customMessage' => 'Erstelle Datei: ' . $jsonData['BFILEPATH']
+                                ]
+                            ]);
+                            
+                            // Store the file
+                            $fileData = [
+                                'filename' => $jsonData['BFILEPATH'],
+                                'content' => $jsonData['BFILETEXT'],
+                                'extension' => strtolower(pathinfo($jsonData['BFILEPATH'], PATHINFO_EXTENSION))
+                            ];
+                            
+                            $generatedFile = $this->storeGeneratedFileInStream($fileData, $incomingMessage);
+                            
+                            if ($generatedFile) {
+                                $finalText = "__FILE_GENERATED__:{$jsonData['BFILEPATH']}";
+                                $this->logger->info('StreamController: File generation successful', [
+                                    'file_id' => $generatedFile->getId(),
+                                    'filename' => $generatedFile->getFileName()
+                                ]);
+                            } else {
+                                $finalText = "__FILE_GENERATION_FAILED__";
+                                $this->logger->error('StreamController: File generation failed');
+                            }
+                        }
+                        // Legacy BTEXT format
+                        elseif (isset($jsonData['BTEXT'])) {
                             $finalText = $jsonData['BTEXT'];
                         }
                     } catch (\JsonException $e) {
-                        // Not valid JSON or extraction failed, use content as-is
+                        // Not valid JSON or extraction failed
+                        // ✨ FIX: AI sometimes generates invalid JSON with "BFILE": \n} instead of "BFILE": 0
+                        $cleanedJson = preg_replace('/"BFILE":\s*\n/', '"BFILE": 0' . "\n", $jsonContent);
+                        $cleanedJson = preg_replace('/"BFILE":\s*\r\n/', '"BFILE": 0' . "\r\n", $cleanedJson);
+                        $cleanedJson = preg_replace('/"BFILE":\s*}/', '"BFILE": 0}', $cleanedJson);
+                        
+                        try {
+                            $jsonData = json_decode($cleanedJson, true, 512, JSON_THROW_ON_ERROR);
+                            
+                            // Extract BTEXT as main content
+                            if (isset($jsonData['BTEXT'])) {
+                                $finalText = $jsonData['BTEXT'];
+                            }
+                        } catch (\JsonException $e2) {
+                            // Not valid JSON or extraction failed, use content as-is
+                            $this->logger->warning('StreamController: Failed to parse JSON', [
+                                'error' => $e2->getMessage(),
+                                'content_preview' => substr($jsonContent, 0, 200)
+                            ]);
+                        }
                     }
                 }
                 
@@ -680,6 +739,12 @@ class StreamController extends AbstractController
 
                 $this->em->persist($outgoingMessage);
                 $this->em->flush(); // Flush to get message ID for metadata
+                
+                // Attach generated file to message if present
+                if ($generatedFile) {
+                    $outgoingMessage->addFile($generatedFile);
+                    $this->em->flush();
+                }
                 
                 // DEBUG: Log what we're about to save
                 error_log('🔍 CHAT MODEL: ' . ($response['metadata']['provider'] ?? 'unknown') . ' / ' . ($response['metadata']['model'] ?? 'unknown'));
@@ -785,7 +850,7 @@ class StreamController extends AbstractController
                 }
 
                 // Send complete event (WITHOUT againData - frontend handles this)
-                $this->sendSSE('complete', [
+                $completeData = [
                     'messageId' => $outgoingMessage->getId(),
                     'trackId' => $trackId,
                     'provider' => $response['metadata']['provider'] ?? 'test',
@@ -793,7 +858,26 @@ class StreamController extends AbstractController
                     'topic' => $classification['topic'],
                     'language' => $classification['language'],
                     'searchResults' => $searchResults, // Include search results
-                ]);
+                ];
+                
+                // Include generated file info if present
+                if ($generatedFile) {
+                    $completeData['generatedFile'] = [
+                        'id' => $generatedFile->getId(),
+                        'filename' => $generatedFile->getFileName(),
+                        'path' => $generatedFile->getFilePath(),
+                        'size' => $generatedFile->getFileSize(),
+                        'type' => $generatedFile->getFileType(),
+                        'mime' => $generatedFile->getFileMime()
+                    ];
+                    
+                    $this->logger->info('StreamController: Including generated file in complete event', [
+                        'file_id' => $generatedFile->getId(),
+                        'filename' => $generatedFile->getFileName()
+                    ]);
+                }
+                
+                $this->sendSSE('complete', $completeData);
                 
                 usleep(100000);
 
@@ -946,6 +1030,106 @@ class StreamController extends AbstractController
         }
         
         return $value;
+    }
+
+    /**
+     * Store AI-generated file in the file system and create File entity
+     * Same logic as ChatHandler::storeGeneratedFile
+     */
+    private function storeGeneratedFileInStream(array $fileData, Message $message): ?File
+    {
+        $userId = $message->getUserId();
+        $filename = $fileData['filename'];
+        $content = $fileData['content'];
+        $extension = $fileData['extension'];
+        
+        try {
+            // Generate storage path similar to FileStorageService
+            $year = date('Y');
+            $month = date('m');
+            $timestamp = time();
+            
+            // Sanitize filename
+            $sanitized = preg_replace('/[^a-zA-Z0-9._-]/', '_', $filename);
+            $sanitized = preg_replace('/_+/', '_', $sanitized);
+            
+            // Add timestamp to prevent collisions
+            $basename = pathinfo($sanitized, PATHINFO_FILENAME);
+            $finalFilename = $basename . '_' . $timestamp . '.' . $extension;
+            
+            // Create relative path
+            $relativePath = sprintf('%d/%s/%s/%s', $userId, $year, $month, $finalFilename);
+            $absolutePath = $this->uploadDir . '/' . $relativePath;
+            
+            // Create directory if not exists
+            $dir = dirname($absolutePath);
+            if (!is_dir($dir)) {
+                if (!mkdir($dir, 0755, true)) {
+                    $this->logger->error('StreamController: Failed to create directory', ['dir' => $dir]);
+                    return null;
+                }
+            }
+            
+            // Write file content
+            if (!file_put_contents($absolutePath, $content)) {
+                $this->logger->error('StreamController: Failed to write file', ['path' => $absolutePath]);
+                return null;
+            }
+            
+            // Detect MIME type
+            $mimeType = $this->getMimeTypeForExtension($extension);
+            
+            // Create File entity
+            $file = new File();
+            $file->setUserId($userId);
+            $file->setFilePath($relativePath);
+            $file->setFileType($extension);
+            $file->setFileName($filename);
+            $file->setFileSize(strlen($content));
+            $file->setFileMime($mimeType);
+            $file->setFileText($content); // Store content as text for searchability
+            $file->setStatus('generated');
+            
+            $this->em->persist($file);
+            $this->em->flush();
+            
+            $this->logger->info('StreamController: File generated and stored successfully', [
+                'file_id' => $file->getId(),
+                'filename' => $filename,
+                'path' => $relativePath,
+                'size' => $file->getFileSize()
+            ]);
+            
+            return $file;
+            
+        } catch (\Throwable $e) {
+            $this->logger->error('StreamController: Failed to store generated file', [
+                'filename' => $filename,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            return null;
+        }
+    }
+
+    /**
+     * Get MIME type for file extension
+     */
+    private function getMimeTypeForExtension(string $extension): string
+    {
+        return match(strtolower($extension)) {
+            'csv' => 'text/csv',
+            'txt' => 'text/plain',
+            'md' => 'text/markdown',
+            'html' => 'text/html',
+            'json' => 'application/json',
+            'xml' => 'application/xml',
+            'xlsx' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'docx' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            'pptx' => 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+            'pdf' => 'application/pdf',
+            default => 'application/octet-stream'
+        };
     }
 
 }

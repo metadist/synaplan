@@ -106,13 +106,18 @@
     "generating": "Generiere Antwort...",
     "generatingTitle": "Generiere Antwort",
     "generatingDesc": "KI erstellt deine Antwort mit",
+    "generatingFile": "Erstelle Datei...",
+    "generatingFileTitle": "Datei wird generiert",
+    "generatingFileDesc": "KI erstellt die angeforderte Datei",
     "topic": "Thema",
     "language": "Sprache",
     "modelId": "Model ID"
   },
   "message": {
     "thinking": "Denkprozess",
-    "reasoning": "KI-Überlegung"
+    "reasoning": "KI-Überlegung",
+    "fileGenerated": "Ich habe die Datei '{filename}' für dich erstellt. Du kannst sie jetzt herunterladen.",
+    "fileGenerationFailed": "Es gab ein Problem beim Erstellen der Datei. Bitte versuche es erneut."
   },
   "config": {
     "inbound": {

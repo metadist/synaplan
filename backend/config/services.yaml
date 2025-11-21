@@ -120,6 +120,8 @@ services:
     
     # Message Handlers
     App\Service\Message\Handler\ChatHandler:
+        arguments:
+            $uploadDir: '%kernel.project_dir%/var/uploads'
         tags:
             - { name: 'app.message.handler' }
     
@@ -154,6 +156,11 @@ services:
             $enabled: '%env(string:default:recaptcha_enabled_default:RECAPTCHA_ENABLED)%'
             $minScore: '%env(string:default:recaptcha_min_score_default:RECAPTCHA_MIN_SCORE)%'
 
+    # Encryption Service
+    App\Service\EncryptionService:
+        arguments:
+            $secretKey: '%env(APP_SECRET)%'
+
     App\Service\Message\AgainHandler: ~
 
     # File Processing Services
@@ -171,6 +178,10 @@ services:
             $uploadDir: '%kernel.project_dir%/var/uploads'
     
     App\Controller\FileController:
+        arguments:
+            $uploadDir: '%kernel.project_dir%/var/uploads'
+    
+    App\Controller\StreamController:
         arguments:
             $uploadDir: '%kernel.project_dir%/var/uploads'
     

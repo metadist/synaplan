@@ -6,15 +6,27 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 
 interface Props {
   content: string
 }
 
 const props = defineProps<Props>()
+const { t } = useI18n()
 
 const formattedContent = computed(() => {
-  let html = props.content
+  let content = props.content
+  
+  // Handle special file generation markers from backend
+  if (content.startsWith('__FILE_GENERATED__:')) {
+    const filename = content.replace('__FILE_GENERATED__:', '').trim()
+    content = t('message.fileGenerated', { filename })
+  } else if (content === '__FILE_GENERATION_FAILED__') {
+    content = t('message.fileGenerationFailed')
+  }
+  
+  let html = content
 
   html = html.replace(/```(\w+)?\n([\s\S]*?)```/g, (_, lang, code) => {
     const language = lang || 'text'

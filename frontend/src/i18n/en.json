@@ -866,13 +866,18 @@
     "generating": "Generating response...",
     "generatingTitle": "Generating response",
     "generatingDesc": "AI is crafting your answer with",
+    "generatingFile": "Creating file...",
+    "generatingFileTitle": "File is being generated",
+    "generatingFileDesc": "AI is creating the requested file",
     "topic": "Topic",
     "language": "Language",
     "modelId": "Model ID"
   },
   "message": {
     "thinking": "Thinking process",
-    "reasoning": "AI Reasoning"
+    "reasoning": "AI Reasoning",
+    "fileGenerated": "I've created the file '{filename}' for you. You can now download it.",
+    "fileGenerationFailed": "There was a problem creating the file. Please try again."
   },
   "aiProvider": {
     "error": {
