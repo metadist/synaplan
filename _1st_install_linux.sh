@@ -88,10 +88,14 @@ if [ "$USE_GROQ" -eq 1 ]; then
 else
   echo "📡 Tracking Ollama model downloads (gpt-oss:20b + bge-m3)..."
 fi
-set +euo pipefail
+set +e
+set +u
+set +o pipefail
 ( docker compose logs -f backend | awk '/\[Background\]/ {printf "\r%s", $0; fflush(); if ($0 ~ /\[Background\] 🎉 Model downloads completed!/) { printf "\n"; exit }}' )
 RESULT=$?
-set -euo pipefail
+set -e
+set -u
+set -o pipefail
 if [ "$RESULT" -ne 0 ]; then
   echo ""
   echo "⚠️ Could not confirm model download completion. Check 'docker compose logs backend'."
@@ -102,7 +106,7 @@ fi
 echo ""
 echo "⏳ Waiting for backend console availability..."
 READY=0
-for i in {1..30}; do
+for i in $(seq 1 30); do
   if docker compose exec backend php bin/console about >/dev/null 2>&1; then
     READY=1
     break
