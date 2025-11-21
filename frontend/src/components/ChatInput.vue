@@ -243,7 +243,8 @@ interface Props {
   isStreaming?: boolean
 }
 
-defineProps<Props>()
+const props = defineProps<Props>()
+const isStreaming = computed(() => props.isStreaming ?? false)
 
 const message = ref('')
 const originalMessage = ref('')
@@ -345,6 +346,11 @@ watch(message, (newValue) => {
 }, { immediate: false })
 
 const sendMessage = () => {
+  if (isStreaming.value) {
+    warning('Please wait for the current response to finish before sending another message.')
+    return
+  }
+
   if (canSend.value) {
     const hasWebSearch = activeTools.value.some(t => t.id === 'web-search')
     
