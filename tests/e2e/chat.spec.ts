@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 import { selectors } from '../helpers/selectors';
 import { login } from '../helpers/auth';
 
-const PROMPT = 'hi, this is a smoke test. Answer with "success" add nothing else';
+const PROMPT = 'Ai, this is a smoke test. Answer with "success" add nothing else';
 
 test('@smoke Standard model generates valid answer "success" id=003', async ({ page }) => {
 
