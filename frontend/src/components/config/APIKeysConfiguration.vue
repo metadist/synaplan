@@ -106,15 +106,6 @@
                   <code class="text-xs font-mono txt-secondary bg-black/5 dark:bg-white/5 px-2 py-1 rounded">
                     {{ maskAPIKey(apiKey.key) }}
                   </code>
-                  <button
-                    @click="copyToClipboard(apiKey.key, apiKey.id)"
-                    class="p-1.5 rounded hover:bg-black/10 dark:hover:bg-white/10 txt-secondary transition-colors"
-                    :title="$t('config.apiKeys.actions.copy')"
-                    data-testid="btn-copy"
-                  >
-                    <CheckIcon v-if="copiedKeyId === apiKey.id" class="w-4 h-4 text-green-500" />
-                    <ClipboardDocumentIcon v-else class="w-4 h-4" />
-                  </button>
                 </div>
               </td>
               <td class="px-6 py-4 whitespace-nowrap">
@@ -310,7 +301,6 @@ interface UIApiKey {
 
 const apiKeys = ref<UIApiKey[]>([])
 const newKeyName = ref('')
-const copiedKeyId = ref<number | null>(null)
 const loading = ref(false)
 const error = ref<string | null>(null)
 const showKeyModal = ref(false)
@@ -358,11 +348,13 @@ const createAPIKey = async () => {
     })
 
     // Add to list with full key
+    const keyPrefix = response.api_key.key_prefix ?? `${response.api_key.key.substring(0, 8)}...`
+
     const newKey: UIApiKey = {
       id: response.api_key.id,
       name: response.api_key.name,
-      key: response.api_key.key, // Full key
-      key_prefix: response.api_key.key.substring(0, 8) + '...',
+      key: keyPrefix,
+      key_prefix: keyPrefix,
       status: 'active',
       created: response.api_key.created,
       lastUsed: null,
@@ -424,20 +416,6 @@ const copyKeyFromModal = async () => {
     }, 2000)
   } catch (err) {
     console.error('Failed to copy to clipboard:', err)
-    showError(t('config.apiKeys.errorCopying'))
-  }
-}
-
-const copyToClipboard = async (key: string, keyId: number) => {
-  try {
-    await navigator.clipboard.writeText(key)
-    copiedKeyId.value = keyId
-    success(t('config.apiKeys.actions.copied'))
-    setTimeout(() => {
-      copiedKeyId.value = null
-    }, 2000)
-  } catch (err) {
-    console.error('Failed to copy:', err)
     showError(t('config.apiKeys.errorCopying'))
   }
 }
