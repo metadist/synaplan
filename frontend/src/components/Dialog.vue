@@ -88,7 +88,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, nextTick } from 'vue'
+import { ref, watch, nextTick, onMounted, onBeforeUnmount } from 'vue'
 import { useDialog } from '@/composables/useDialog'
 import {
   ExclamationTriangleIcon,
@@ -133,6 +133,28 @@ const handleBackdropClick = () => {
     handleCancel()
   }
 }
+
+const handleGlobalKeydown = (event: KeyboardEvent) => {
+  if (!dialog.value.isOpen) return
+
+  if (event.key === 'Enter' && dialog.value.type === 'confirm') {
+    event.preventDefault()
+    handleConfirm()
+  }
+
+  if (event.key === 'Escape' && dialog.value.type !== 'alert') {
+    event.preventDefault()
+    handleCancel()
+  }
+}
+
+onMounted(() => {
+  document.addEventListener('keydown', handleGlobalKeydown)
+})
+
+onBeforeUnmount(() => {
+  document.removeEventListener('keydown', handleGlobalKeydown)
+})
 </script>
 
 <style scoped>

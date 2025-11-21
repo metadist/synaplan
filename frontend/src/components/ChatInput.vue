@@ -243,10 +243,12 @@ interface Props {
   isStreaming?: boolean
 }
 
-defineProps<Props>()
+const props = defineProps<Props>()
+const isStreaming = computed(() => props.isStreaming ?? false)
 
 const message = ref('')
 const originalMessage = ref('')
+const enhancedMessage = ref('')
 const uploadedFiles = ref<UploadedFile[]>([])
 const uploading = ref(false)
 const enhanceEnabled = ref(false)
@@ -328,9 +330,27 @@ watch(message, (newValue) => {
     paletteVisible.value = false
     activeCommand.value = null
   }
+  
+  // Auto-disable enhance if message has been edited (differs from enhanced version)
+  if (enhanceEnabled.value && enhancedMessage.value) {
+    const currentText = newValue.trim()
+    const enhancedText = enhancedMessage.value.trim()
+    
+    // If message is empty (deleted) or differs from enhanced version, disable enhance
+    if (!currentText || currentText !== enhancedText) {
+      enhanceEnabled.value = false
+      originalMessage.value = ''
+      enhancedMessage.value = ''
+    }
+  }
 }, { immediate: false })
 
 const sendMessage = () => {
+  if (isStreaming.value) {
+    warning('Please wait for the current response to finish before sending another message.')
+    return
+  }
+
   if (canSend.value) {
     const hasWebSearch = activeTools.value.some(t => t.id === 'web-search')
     
@@ -344,6 +364,10 @@ const sendMessage = () => {
     uploadedFiles.value = []
     paletteVisible.value = false
     activeCommand.value = null
+    // Reset enhance state after sending
+    enhanceEnabled.value = false
+    originalMessage.value = ''
+    enhancedMessage.value = ''
   }
 }
 
@@ -630,8 +654,18 @@ const toggleEnhance = async () => {
   if (enhanceLoading.value) return
 
   if (enhanceEnabled.value) {
-    message.value = originalMessage.value
+    // Only restore original message if current message still matches the enhanced version
+    // If message was deleted or edited, don't restore
+    const currentText = message.value.trim()
+    const enhancedText = enhancedMessage.value.trim()
+    
+    // Only restore if message still matches enhanced version (not empty, not edited)
+    if (currentText && currentText === enhancedText) {
+      message.value = originalMessage.value
+    }
+    
     originalMessage.value = ''
+    enhancedMessage.value = ''
     enhanceEnabled.value = false
     return
   }
@@ -647,6 +681,7 @@ const toggleEnhance = async () => {
   try {
     const result = await chatApi.enhanceMessage(currentText)
     originalMessage.value = currentText
+    enhancedMessage.value = result.enhanced
     message.value = result.enhanced
     enhanceEnabled.value = true
   } catch (err: any) {

@@ -5,6 +5,7 @@ namespace App\Controller;
 use App\Entity\Prompt;
 use App\Entity\User;
 use App\Repository\PromptRepository;
+use App\Repository\PromptMetaRepository;
 use App\Service\PromptService;
 use Doctrine\ORM\EntityManagerInterface;
 use OpenApi\Attributes as OA;
@@ -27,6 +28,7 @@ class PromptController extends AbstractController
 {
     public function __construct(
         private PromptRepository $promptRepository,
+        private PromptMetaRepository $promptMetaRepository,
         private PromptService $promptService,
         private EntityManagerInterface $em,
         private LoggerInterface $logger
@@ -683,6 +685,18 @@ class PromptController extends AbstractController
 
         $topic = $prompt->getTopic();
         
+        // Delete metadata entries first (to avoid foreign key constraint violation)
+        $metaEntries = $this->promptMetaRepository->findBy(['promptId' => $prompt->getId()]);
+        foreach ($metaEntries as $meta) {
+            $this->em->remove($meta);
+        }
+        
+        // Flush metadata deletions first
+        if (!empty($metaEntries)) {
+            $this->em->flush();
+        }
+        
+        // Now delete the prompt itself
         $this->em->remove($prompt);
         $this->em->flush();
 

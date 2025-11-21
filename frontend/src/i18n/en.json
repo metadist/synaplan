@@ -345,7 +345,9 @@
       "deleteWarning": "Deleting this prompt is permanent and cannot be undone.",
       "deletePrompt": "Delete Prompt",
       "saveChanges": "Save Changes",
-      "noPrompts": "No prompts available"
+      "noPrompts": "No prompts available",
+      "selectPromptTitle": "Select a prompt to get started",
+      "selectPromptDescription": "Choose a prompt from the dropdown above to view and edit its configuration."
     },
     "sortingPrompt": {
       "title": "Preprocessor",

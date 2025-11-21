@@ -1,5 +1,5 @@
 <template>
-  <div class="relative" data-testid="comp-tools-dropdown">
+  <div ref="dropdownRef" class="relative" data-testid="comp-tools-dropdown">
     <button
       @click="toggleOpen"
       type="button"
@@ -137,14 +137,14 @@
         v-for="cmd in availableCommands"
         :key="cmd.name"
         ref="itemRefs"
-        class="dropdown-item"
+        class="dropdown-item flex items-center justify-between"
         @click="selectCommand(cmd)"
         @keydown.down.prevent="focusNext"
         @keydown.up.prevent="focusPrevious"
         type="button"
       >
         <code class="font-mono text-sm txt-primary">{{ cmd.usage }}</code>
-        <span class="text-xs txt-secondary ml-2">{{ cmd.description }}</span>
+        <span class="text-xs txt-secondary text-right ml-auto">{{ cmd.description }}</span>
       </button>
     </div>
   </div>
@@ -178,6 +178,7 @@ const emit = defineEmits<{
 const router = useRouter()
 const isOpen = ref(false)
 const itemRefs = ref<HTMLElement[]>([])
+const dropdownRef = ref<HTMLElement | null>(null)
 const featuresStatus = ref<Record<string, Feature>>({})
 const isLoadingFeatures = ref(true)
 
@@ -266,9 +267,22 @@ const focusPrevious = () => {
 
 const handleClickOutside = (e: MouseEvent) => {
   const target = e.target as HTMLElement
-  if (isOpen.value && !target.closest('.relative')) {
-    closeDropdown()
+  if (!isOpen.value) return
+  
+  // Check if click is inside the dropdown container
+  if (dropdownRef.value && dropdownRef.value.contains(target)) {
+    return
   }
+  
+  // Check if click is on chat-related elements (input, messages area, etc.)
+  const chatElements = target.closest('[data-testid="comp-chat-input"], [data-testid="section-messages"], [data-testid="input-chat-message"], [data-testid="comp-chat-input-shell"]')
+  if (chatElements) {
+    closeDropdown()
+    return
+  }
+  
+  // Close if click is outside dropdown
+  closeDropdown()
 }
 
 onMounted(() => document.addEventListener('click', handleClickOutside))

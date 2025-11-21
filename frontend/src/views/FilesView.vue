@@ -702,6 +702,9 @@ const deleteSelected = async () => {
     selectedFileIds.value = []
     await loadFiles()
     await loadFileGroups()
+    if (storageWidget.value) {
+      await storageWidget.value.refresh()
+    }
   } catch (error) {
     console.error('Delete error:', error)
     showError('Failed to delete files')
@@ -721,6 +724,9 @@ const confirmDelete = async () => {
     showSuccess('File deleted successfully')
     await loadFiles()
     await loadFileGroups()
+    if (storageWidget.value) {
+      await storageWidget.value.refresh()
+    }
   } catch (error) {
     console.error('Delete error:', error)
     showError('Failed to delete file')

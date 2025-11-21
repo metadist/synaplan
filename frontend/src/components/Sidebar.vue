@@ -94,8 +94,8 @@
                 v-for="child in item.children"
                 :key="child.path"
                 :to="child.path"
-                class="flex items-center gap-2 px-3 py-2 rounded-lg text-sm txt-secondary hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
-                active-class="txt-primary font-medium bg-black/5 dark:bg-white/5"
+                class="sidebar-subitem flex items-center gap-2 px-3 py-2 rounded-lg text-sm txt-secondary hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+                active-class="sidebar-subitem--active"
               >
                 <span class="flex-1">{{ child.label }}</span>
                 <span 
