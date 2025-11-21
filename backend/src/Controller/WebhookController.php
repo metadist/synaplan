@@ -121,15 +121,16 @@ class WebhookController extends AbstractController
         // Find or create user from email
         $userResult = $this->emailChatService->findOrCreateUserFromEmail($fromEmail);
 
-        if ($userResult['blacklisted']) {
-            $this->logger->warning('Blacklisted email attempted to send message', [
-                'email' => $fromEmail
+        if (isset($userResult['error'])) {
+            $this->logger->warning('Email rejected', [
+                'email' => $fromEmail,
+                'reason' => $userResult['error']
             ]);
 
             return $this->json([
                 'success' => false,
-                'error' => 'Email address is blocked'
-            ], Response::HTTP_FORBIDDEN);
+                'error' => $userResult['error']
+            ], Response::HTTP_TOO_MANY_REQUESTS);
         }
 
         $user = $userResult['user'];
@@ -163,7 +164,7 @@ class WebhookController extends AbstractController
             $message->setProviderIndex('EMAIL');
             $message->setUnixTimestamp(time());
             $message->setDateTime(date('YmdHis'));
-            $message->setMessageType('EMAIL');
+            $message->setMessageType('MAIL');
             $message->setFile(0);
             $message->setTopic('CHAT');
             $message->setLanguage('en'); // Will be detected by classifier
@@ -194,11 +195,7 @@ class WebhookController extends AbstractController
             }
             if ($messageId) {
                 $message->setMeta('external_id', $messageId);
-                // Store for email threading
-                $chatData = $chat->getChatData();
-                $chatData['email_message_id'] = $messageId;
-                $chat->setChatData($chatData);
-                $this->em->flush();
+                // Note: Email threading is handled via Chat titles (Email: keyword or Email Conversation)
             }
             if (!empty($data['attachments'])) {
                 $message->setMeta('has_attachments', 'true');
@@ -260,12 +257,14 @@ class WebhookController extends AbstractController
         } catch (\Exception $e) {
             $this->logger->error('Email webhook processing failed', [
                 'from' => $fromEmail ?? 'unknown',
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
             ]);
 
             return $this->json([
                 'success' => false,
-                'error' => 'Internal error processing email'
+                'error' => 'Internal error processing email',
+                'details' => $_ENV['APP_ENV'] === 'dev' ? $e->getMessage() : null
             ], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }

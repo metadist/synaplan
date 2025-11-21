@@ -285,6 +285,197 @@
       </Transition>
     </div>
 
+    <!-- SMTP Configuration (Required for Forwarding) -->
+    <div v-if="currentStep === 0" class="surface-card p-6 mt-6">
+      <div class="flex items-center justify-between mb-4">
+        <h3 class="text-lg font-semibold txt-primary flex items-center gap-2">
+          <PaperAirplaneIcon class="w-5 h-5" />
+          {{ $t('mail.smtpConfig') }}
+          <span class="text-xs pill pill--active">{{ $t('mail.required') }}</span>
+        </h3>
+      </div>
+
+      <p class="text-sm txt-secondary mb-4">
+        {{ $t('mail.smtpConfigHelp') }}
+      </p>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-4">
+        <div>
+          <label class="block text-sm font-medium txt-primary mb-2">
+            {{ $t('mail.smtpServer') }}
+          </label>
+          <input
+            v-model="smtpConfig.smtpServer"
+            type="text"
+            class="w-full px-4 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+            :placeholder="$t('mail.smtpServerPlaceholder')"
+            data-testid="input-smtp-server"
+          />
+          <p class="text-xs txt-secondary mt-1">
+            {{ $t('mail.smtpServerHelp') }}
+          </p>
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium txt-primary mb-2">
+            {{ $t('mail.smtpPort') }}
+          </label>
+          <input
+            v-model.number="smtpConfig.smtpPort"
+            type="number"
+            class="w-full px-4 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+            :placeholder="$t('mail.smtpPortPlaceholder')"
+            data-testid="input-smtp-port"
+          />
+          <p class="text-xs txt-secondary mt-1">
+            {{ $t('mail.smtpPortHelp') }}
+          </p>
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium txt-primary mb-2">
+            {{ $t('mail.smtpSecurity') }}
+          </label>
+          <select
+            v-model="smtpConfig.smtpSecurity"
+            class="w-full px-4 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+            data-testid="input-smtp-security"
+          >
+            <option value="STARTTLS">STARTTLS (Port 587)</option>
+            <option value="SSL/TLS">SSL/TLS (Port 465)</option>
+            <option value="None">None (Port 25)</option>
+          </select>
+          <p class="text-xs txt-secondary mt-1">
+            {{ $t('mail.smtpSecurityHelp') }}
+          </p>
+        </div>
+
+        <div></div>
+
+        <div>
+          <label class="block text-sm font-medium txt-primary mb-2">
+            {{ $t('mail.smtpUsername') }}
+          </label>
+          <input
+            v-model="smtpConfig.smtpUsername"
+            type="text"
+            class="w-full px-4 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+            placeholder="user@example.com"
+            data-testid="input-smtp-username"
+          />
+          <p class="text-xs txt-secondary mt-1">
+            {{ $t('mail.smtpUsernameHelp') }}
+          </p>
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium txt-primary mb-2">
+            {{ $t('mail.smtpPassword') }}
+          </label>
+          <input
+            v-model="smtpConfig.smtpPassword"
+            type="password"
+            class="w-full px-4 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+            :placeholder="$t('mail.smtpPasswordPlaceholder')"
+            data-testid="input-smtp-password"
+          />
+          <p class="text-xs txt-secondary mt-1">
+            {{ $t('mail.smtpPasswordHelp') }}
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Email Processing Filter (When to process emails) -->
+    <div v-if="currentStep === 0" class="surface-card p-6 mt-6">
+      <div class="flex items-center justify-between mb-4">
+        <h3 class="text-lg font-semibold txt-primary flex items-center gap-2">
+          <FunnelIcon class="w-5 h-5" />
+          {{ $t('mail.emailFilter') }}
+        </h3>
+      </div>
+
+      <p class="text-sm txt-secondary mb-4">
+        {{ $t('mail.emailFilterHelp') }}
+      </p>
+
+      <div class="space-y-4">
+        <!-- Option 1: New emails only (default) -->
+        <label 
+          class="flex items-start p-4 rounded-lg border cursor-pointer transition-all hover:shadow-md"
+          :class="emailFilter.mode === 'new' ? 'border-[var(--brand)] bg-[var(--brand)]/5' : 'border-light-border/30 dark:border-dark-border/20'"
+        >
+          <input
+            type="radio"
+            v-model="emailFilter.mode"
+            value="new"
+            class="mt-1 w-4 h-4 text-[var(--brand)] focus:ring-[var(--brand)]"
+            data-testid="input-filter-new"
+          />
+          <div class="ml-3 flex-1">
+            <div class="font-medium txt-primary">{{ $t('mail.filterNewOnly') }}</div>
+            <p class="text-sm txt-secondary mt-1">
+              {{ $t('mail.filterNewOnlyHelp') }}
+            </p>
+          </div>
+          <span class="ml-2 pill pill--active text-xs">{{ $t('mail.recommended') }}</span>
+        </label>
+
+        <!-- Option 2: Historical emails (PRO+) -->
+        <label 
+          class="flex items-start p-4 rounded-lg border cursor-pointer transition-all"
+          :class="[
+            emailFilter.mode === 'historical' ? 'border-[var(--brand)] bg-[var(--brand)]/5' : 'border-light-border/30 dark:border-dark-border/20',
+            !isPro ? 'opacity-50 cursor-not-allowed' : 'hover:shadow-md'
+          ]"
+        >
+          <input
+            type="radio"
+            v-model="emailFilter.mode"
+            value="historical"
+            :disabled="!isPro"
+            class="mt-1 w-4 h-4 text-[var(--brand)] focus:ring-[var(--brand)]"
+            data-testid="input-filter-historical"
+          />
+          <div class="ml-3 flex-1">
+            <div class="flex items-center gap-2">
+              <span class="font-medium txt-primary">{{ $t('mail.filterHistorical') }}</span>
+              <span v-if="!isPro" class="text-xs pill">{{ $t('mail.proOnly') }}</span>
+            </div>
+            <p class="text-sm txt-secondary mt-1">
+              {{ $t('mail.filterHistoricalHelp') }}
+            </p>
+            
+            <!-- Date range inputs (only show if historical is selected and user is PRO) -->
+            <div v-if="emailFilter.mode === 'historical' && isPro" class="mt-4 grid grid-cols-2 gap-3">
+              <div>
+                <label class="block text-xs font-medium txt-primary mb-1">
+                  {{ $t('mail.filterFromDate') }}
+                </label>
+                <input
+                  type="datetime-local"
+                  v-model="emailFilter.fromDate"
+                  class="w-full px-3 py-2 text-sm rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+                  data-testid="input-from-date"
+                />
+              </div>
+              <div>
+                <label class="block text-xs font-medium txt-primary mb-1">
+                  {{ $t('mail.filterToDate') }}
+                </label>
+                <input
+                  type="datetime-local"
+                  v-model="emailFilter.toDate"
+                  class="w-full px-3 py-2 text-sm rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+                  data-testid="input-to-date"
+                />
+              </div>
+            </div>
+          </div>
+        </label>
+      </div>
+    </div>
+
     <!-- Step 2: Departments -->
     <div v-else-if="currentStep === 1" class="surface-card p-6" data-testid="section-step-departments">
       <h3 class="text-lg font-semibold txt-primary mb-2 flex items-center gap-2">
@@ -525,7 +716,9 @@ import {
   UserGroupIcon,
   XMarkIcon,
   CheckCircleIcon,
-  XCircleIcon
+  XCircleIcon,
+  PaperAirplaneIcon,
+  FunnelIcon
 } from '@heroicons/vue/24/outline'
 import type { MailConfig, Department, SavedMailHandler } from '@/mocks/mail'
 import {
@@ -535,6 +728,9 @@ import {
   checkIntervalOptions
 } from '@/mocks/mail'
 import { inboundEmailHandlersApi } from '@/services/api/inboundEmailHandlersApi'
+import { useAuth } from '@/composables/useAuth'
+
+const { isPro } = useAuth()
 
 interface Props {
   handler?: SavedMailHandler
@@ -543,8 +739,22 @@ interface Props {
 
 const props = defineProps<Props>()
 
+interface SmtpConfig {
+  smtpServer: string
+  smtpPort: number
+  smtpSecurity: 'STARTTLS' | 'SSL/TLS' | 'None'
+  smtpUsername: string
+  smtpPassword: string
+}
+
+interface EmailFilter {
+  mode: 'new' | 'historical'
+  fromDate?: string
+  toDate?: string
+}
+
 const emit = defineEmits<{
-  save: [name: string, config: MailConfig, departments: Department[]]
+  save: [name: string, config: MailConfig, departments: Department[], smtpConfig: SmtpConfig, emailFilter: EmailFilter]
   cancel: []
 }>()
 
@@ -555,6 +765,30 @@ const config = ref<MailConfig>({ ...defaultMailConfig })
 const departments = ref<Department[]>([])
 const isTestingConnection = ref(false)
 const testResult = ref<{ success: boolean; message: string } | null>(null)
+
+// SMTP Configuration (Required)
+const smtpConfig = ref<SmtpConfig>({
+  smtpServer: '',
+  smtpPort: 587,
+  smtpSecurity: 'STARTTLS',
+  smtpUsername: '',
+  smtpPassword: ''
+})
+
+// Email Filter Configuration
+const emailFilter = ref<EmailFilter>({
+  mode: 'new', // Default: only new emails
+  fromDate: undefined,
+  toDate: undefined
+})
+
+// Watch for mode change - reset dates if switching to 'new'
+watch(() => emailFilter.value.mode, (newMode) => {
+  if (newMode === 'new') {
+    emailFilter.value.fromDate = undefined
+    emailFilter.value.toDate = undefined
+  }
+})
 
 // Initialize if editing
 watch(() => props.handler, (handler) => {
@@ -567,7 +801,12 @@ watch(() => props.handler, (handler) => {
 
 // Validation for each step
 const isStep1Valid = computed(() => {
-  return !!(config.value.mailServer && config.value.port && config.value.username && config.value.password)
+  const basicValid = !!(config.value.mailServer && config.value.port && config.value.username && config.value.password)
+  
+  // SMTP is now required for forwarding
+  const smtpValid = !!(smtpConfig.value.smtpServer && smtpConfig.value.smtpPort && smtpConfig.value.smtpUsername && smtpConfig.value.smtpPassword)
+  
+  return basicValid && smtpValid
 })
 
 const isStep2Valid = computed(() => {
@@ -655,7 +894,9 @@ const saveConfiguration = () => {
   if (!handlerName.value.trim()) {
     handlerName.value = `Mail Handler ${Date.now()}`
   }
-  emit('save', handlerName.value, config.value, departments.value)
+  
+  // SMTP config and email filter are always required
+  emit('save', handlerName.value, config.value, departments.value, smtpConfig.value, emailFilter.value)
 }
 </script>
 

@@ -9,6 +9,12 @@ security:
             entity:
                 class: App\Entity\User
                 property: id
+        
+        jwt_user_provider:
+            id: App\Security\JwtUserLoader
+        
+        oidc_user_provider:
+            id: App\Security\OidcUserProvider
 
     firewalls:
         dev:
@@ -19,6 +25,7 @@ security:
             pattern: ^/api
             stateless: true
             entry_point: jwt
+            provider: jwt_user_provider
             jwt: ~
             custom_authenticators:
                 - App\Security\QueryTokenAuthenticator
@@ -48,6 +55,19 @@ security:
         - { path: ^/api/health, roles: PUBLIC_ACCESS }
         - { path: ^/api/test, roles: PUBLIC_ACCESS }
         
+        # Public OIDC endpoints
+        - { path: ^/api/v1/oidc/discovery, roles: PUBLIC_ACCESS }
+        - { path: ^/api/v1/oidc/refresh, roles: PUBLIC_ACCESS }
+        
+        # Public Social Login endpoints (Google, GitHub & Keycloak OAuth)
+        - { path: ^/api/v1/auth/providers, roles: PUBLIC_ACCESS }
+        - { path: ^/api/v1/auth/google/login, roles: PUBLIC_ACCESS }
+        - { path: ^/api/v1/auth/google/callback, roles: PUBLIC_ACCESS }
+        - { path: ^/api/v1/auth/github/login, roles: PUBLIC_ACCESS }
+        - { path: ^/api/v1/auth/github/callback, roles: PUBLIC_ACCESS }
+        - { path: ^/api/v1/auth/keycloak/login, roles: PUBLIC_ACCESS }
+        - { path: ^/api/v1/auth/keycloak/callback, roles: PUBLIC_ACCESS }
+        
         # Public shared chat endpoint (no auth required)
         - { path: ^/api/v1/chats/shared/, roles: PUBLIC_ACCESS }
         
@@ -62,8 +82,9 @@ security:
         - { path: ^/api/v1/messages/stream, roles: PUBLIC_ACCESS }
         - { path: ^/api, methods: [OPTIONS], roles: PUBLIC_ACCESS }
         
-        # Webhook endpoints (require API key authentication)
-        - { path: ^/api/v1/webhooks, roles: IS_AUTHENTICATED_FULLY }
+        # Webhook endpoints (email webhook is public, WhatsApp requires verification)
+        - { path: ^/api/v1/webhooks/email, roles: PUBLIC_ACCESS }
+        - { path: ^/api/v1/webhooks/whatsapp, roles: PUBLIC_ACCESS }
         
         # All other API routes require authentication
         - { path: ^/api, roles: IS_AUTHENTICATED_FULLY }

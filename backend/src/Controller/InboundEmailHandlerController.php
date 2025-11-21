@@ -142,6 +142,35 @@ class InboundEmailHandlerController extends AbstractController
         $handler->setStatus('inactive'); // Start as inactive until tested
         $handler->setDepartments($data['departments']);
 
+        // SMTP credentials for forwarding (optional, encrypted)
+        if (isset($data['smtpServer']) && isset($data['smtpUsername']) && isset($data['smtpPassword'])) {
+            $handler->setSmtpCredentials(
+                $data['smtpServer'],
+                $data['smtpPort'] ?? 587,
+                $data['smtpUsername'],
+                $data['smtpPassword'],
+                $this->encryptionService,
+                $data['smtpSecurity'] ?? 'STARTTLS'
+            );
+        }
+
+        // Email filter configuration
+        $emailFilterMode = $data['emailFilterMode'] ?? 'new';
+        
+        // PRO+ required for historical emails
+        if ($emailFilterMode === 'historical' && !in_array($user->getUserLevel(), ['PRO', 'TEAM', 'BUSINESS'])) {
+            return $this->json([
+                'success' => false,
+                'error' => 'Historical email processing is only available for PRO users and above'
+            ], Response::HTTP_FORBIDDEN);
+        }
+        
+        $handler->setEmailFilter(
+            $emailFilterMode,
+            $data['emailFilterFromDate'] ?? null,
+            $data['emailFilterToDate'] ?? null
+        );
+
         $this->em->persist($handler);
         $this->em->flush();
 
@@ -215,6 +244,35 @@ class InboundEmailHandlerController extends AbstractController
         }
         if (isset($data['departments'])) {
             $handler->setDepartments($data['departments']);
+        }
+
+        // Update SMTP credentials for forwarding (optional, encrypted)
+        if (isset($data['smtpServer']) && isset($data['smtpUsername']) && isset($data['smtpPassword'])) {
+            $handler->setSmtpCredentials(
+                $data['smtpServer'],
+                $data['smtpPort'] ?? 587,
+                $data['smtpUsername'],
+                $data['smtpPassword'],
+                $this->encryptionService,
+                $data['smtpSecurity'] ?? 'STARTTLS'
+            );
+        }
+
+        // Update email filter configuration
+        if (isset($data['emailFilterMode'])) {
+            // PRO+ required for historical emails
+            if ($data['emailFilterMode'] === 'historical' && !in_array($user->getUserLevel(), ['PRO', 'TEAM', 'BUSINESS'])) {
+                return $this->json([
+                    'success' => false,
+                    'error' => 'Historical email processing is only available for PRO users and above'
+                ], Response::HTTP_FORBIDDEN);
+            }
+            
+            $handler->setEmailFilter(
+                $data['emailFilterMode'],
+                $data['emailFilterFromDate'] ?? null,
+                $data['emailFilterToDate'] ?? null
+            );
         }
 
         $handler->touch();

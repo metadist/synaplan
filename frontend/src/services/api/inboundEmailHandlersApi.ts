@@ -65,6 +65,16 @@ export interface CreateHandlerRequest {
   checkInterval: number
   deleteAfter: boolean
   departments: Department[]
+  // SMTP credentials for forwarding (REQUIRED)
+  smtpServer: string
+  smtpPort: number
+  smtpSecurity: 'STARTTLS' | 'SSL/TLS' | 'None'
+  smtpUsername: string
+  smtpPassword: string
+  // Email filter settings
+  emailFilterMode: 'new' | 'historical'
+  emailFilterFromDate?: string | null
+  emailFilterToDate?: string | null
 }
 
 export interface UpdateHandlerRequest {
@@ -79,6 +89,16 @@ export interface UpdateHandlerRequest {
   deleteAfter?: boolean
   status?: 'active' | 'inactive' | 'error'
   departments?: Department[]
+  // SMTP credentials for forwarding (optional for updates)
+  smtpServer?: string
+  smtpPort?: number
+  smtpSecurity?: 'STARTTLS' | 'SSL/TLS' | 'None'
+  smtpUsername?: string
+  smtpPassword?: string
+  // Email filter settings
+  emailFilterMode?: 'new' | 'historical'
+  emailFilterFromDate?: string | null
+  emailFilterToDate?: string | null
 }
 
 /**

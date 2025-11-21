@@ -632,22 +632,40 @@ const editMailHandler = (handler: SavedMailHandler) => {
   currentMailHandlerId.value = handler.id
 }
 
-const saveMailHandler = async (name: string, config: MailConfig, departments: Department[]) => {
+const saveMailHandler = async (name: string, config: MailConfig, departments: Department[], smtpConfig: any, emailFilter: any) => {
   try {
+    // Validate that SMTP config is provided
+    if (!smtpConfig || !smtpConfig.smtpServer || !smtpConfig.smtpUsername || !smtpConfig.smtpPassword) {
+      showError('SMTP configuration is required for email forwarding')
+      return
+    }
+
+    const payload: any = {
+      name,
+      mailServer: config.mailServer,
+      port: config.port,
+      protocol: config.protocol,
+      security: config.security,
+      username: config.username,
+      password: config.password, // Will be encrypted by backend
+      checkInterval: config.checkInterval,
+      deleteAfter: config.deleteAfter,
+      departments,
+      // SMTP credentials (required)
+      smtpServer: smtpConfig.smtpServer,
+      smtpPort: smtpConfig.smtpPort,
+      smtpSecurity: smtpConfig.smtpSecurity,
+      smtpUsername: smtpConfig.smtpUsername,
+      smtpPassword: smtpConfig.smtpPassword, // Will be encrypted by backend
+      // Email filter settings
+      emailFilterMode: emailFilter.mode || 'new',
+      emailFilterFromDate: emailFilter.fromDate || null,
+      emailFilterToDate: emailFilter.toDate || null
+    }
+
     if (currentMailHandlerId.value) {
       // Update existing
-      const updated = await inboundEmailHandlersApi.update(currentMailHandlerId.value, {
-        name,
-        mailServer: config.mailServer,
-        port: config.port,
-        protocol: config.protocol,
-        security: config.security,
-        username: config.username,
-        password: config.password, // Will be encrypted by backend
-        checkInterval: config.checkInterval,
-        deleteAfter: config.deleteAfter,
-        departments
-      })
+      const updated = await inboundEmailHandlersApi.update(currentMailHandlerId.value, payload)
       
       const index = mailHandlers.value.findIndex(h => h.id === currentMailHandlerId.value)
       if (index > -1) {
@@ -656,18 +674,7 @@ const saveMailHandler = async (name: string, config: MailConfig, departments: De
       success('Mail handler updated successfully!')
     } else {
       // Create new
-      const newHandler = await inboundEmailHandlersApi.create({
-        name,
-        mailServer: config.mailServer,
-        port: config.port,
-        protocol: config.protocol,
-        security: config.security,
-        username: config.username,
-        password: config.password, // Will be encrypted by backend
-        checkInterval: config.checkInterval,
-        deleteAfter: config.deleteAfter,
-        departments
-      })
+      const newHandler = await inboundEmailHandlersApi.create(payload)
       mailHandlers.value.push(newHandler)
       success('Mail handler created successfully!')
     }

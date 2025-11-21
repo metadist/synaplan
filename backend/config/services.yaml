@@ -166,6 +166,48 @@ services:
         arguments:
             $secretKey: '%env(APP_SECRET)%'
 
+    # Social Login Controllers (Google & GitHub OAuth)
+    App\Controller\GoogleAuthController:
+        arguments:
+            $googleClientId: '%env(GOOGLE_CLIENT_ID)%'
+            $googleClientSecret: '%env(GOOGLE_CLIENT_SECRET)%'
+            $appUrl: '%env(APP_URL)%'
+            $frontendUrl: '%env(FRONTEND_URL)%'
+    
+    App\Controller\GitHubAuthController:
+        arguments:
+            $githubClientId: '%env(GITHUB_CLIENT_ID)%'
+            $githubClientSecret: '%env(GITHUB_CLIENT_SECRET)%'
+            $appUrl: '%env(APP_URL)%'
+            $frontendUrl: '%env(FRONTEND_URL)%'
+    
+    # Keycloak OIDC OAuth Controller
+    App\Controller\KeycloakAuthController:
+        arguments:
+            $oidcClientId: '%env(OIDC_CLIENT_ID)%'
+            $oidcClientSecret: '%env(OIDC_CLIENT_SECRET)%'
+            $oidcDiscoveryUrl: '%env(OIDC_DISCOVERY_URL)%'
+            $appUrl: '%env(APP_URL)%'
+            $frontendUrl: '%env(FRONTEND_URL)%'
+    
+    # Auth Providers Controller (returns enabled providers)
+    App\Controller\AuthProvidersController:
+        arguments:
+            $googleClientId: '%env(string:default::GOOGLE_CLIENT_ID)%'
+            $githubClientId: '%env(string:default::GITHUB_CLIENT_ID)%'
+            $oidcClientId: '%env(string:default::OIDC_CLIENT_ID)%'
+            $oidcDiscoveryUrl: '%env(string:default::OIDC_DISCOVERY_URL)%'
+
+    App\Controller\OidcRefreshController:
+        arguments:
+            $oidcClientId: '%env(string:default::OIDC_CLIENT_ID)%'
+            $oidcClientSecret: '%env(string:default::OIDC_CLIENT_SECRET)%'
+            $oidcDiscoveryUrl: '%env(string:default::OIDC_DISCOVERY_URL)%'
+            $googleClientId: '%env(string:default::GOOGLE_CLIENT_ID)%'
+            $googleClientSecret: '%env(string:default::GOOGLE_CLIENT_SECRET)%'
+            $githubClientId: '%env(string:default::GITHUB_CLIENT_ID)%'
+            $githubClientSecret: '%env(string:default::GITHUB_CLIENT_SECRET)%'
+
     # reCAPTCHA Service
     App\Service\RecaptchaService:
         arguments:

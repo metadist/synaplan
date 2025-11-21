@@ -72,7 +72,11 @@ class InboundEmailHandler
     #[ORM\Column(name: 'BUPDATED', type: 'string', length: 20)]
     private string $updated;
 
-    // Additional config (JSON)
+    // Additional config (JSON) - includes SMTP credentials + email filter settings
+    // Format: {
+    //   "smtp": {"server": "smtp.gmail.com", "port": 587, "username": "user@gmail.com", "password": "encrypted..."},
+    //   "email_filter": {"mode": "new", "from_date": null, "to_date": null}
+    // }
     #[ORM\Column(name: 'BCONFIG', type: 'json', nullable: true)]
     private ?array $config = null;
 
@@ -290,6 +294,98 @@ class InboundEmailHandler
     {
         $this->config = $config;
         return $this;
+    }
+
+    /**
+     * Set SMTP credentials for email forwarding (encrypts password)
+     */
+    public function setSmtpCredentials(
+        string $smtpServer,
+        int $smtpPort,
+        string $smtpUsername,
+        string $smtpPassword,
+        \App\Service\EncryptionService $encryptionService,
+        string $smtpSecurity = 'SSL/TLS'
+    ): self {
+        $config = $this->config ?? [];
+        $config['smtp'] = [
+            'server' => $smtpServer,
+            'port' => $smtpPort,
+            'username' => $smtpUsername,
+            'password' => empty($smtpPassword) ? '' : $encryptionService->encrypt($smtpPassword),
+            'security' => $smtpSecurity
+        ];
+        $this->config = $config;
+        $this->updated = date('YmdHis');
+        return $this;
+    }
+
+    /**
+     * Get SMTP credentials (decrypts password)
+     */
+    public function getSmtpCredentials(\App\Service\EncryptionService $encryptionService): ?array
+    {
+        if (!isset($this->config['smtp'])) {
+            return null;
+        }
+
+        $smtp = $this->config['smtp'];
+        return [
+            'server' => $smtp['server'] ?? '',
+            'port' => $smtp['port'] ?? 587,
+            'username' => $smtp['username'] ?? '',
+            'password' => empty($smtp['password']) ? '' : $encryptionService->decrypt($smtp['password']),
+            'security' => $smtp['security'] ?? 'SSL/TLS'
+        ];
+    }
+
+    /**
+     * Check if SMTP credentials are configured
+     */
+    public function hasSmtpCredentials(): bool
+    {
+        return isset($this->config['smtp']) && !empty($this->config['smtp']['server']);
+    }
+
+    /**
+     * Set email filter configuration
+     */
+    public function setEmailFilter(string $mode, ?string $fromDate = null, ?string $toDate = null): self
+    {
+        $config = $this->config ?? [];
+        $config['email_filter'] = [
+            'mode' => $mode, // 'new' or 'historical'
+            'from_date' => $fromDate,
+            'to_date' => $toDate
+        ];
+        $this->config = $config;
+        $this->updated = date('YmdHis');
+        return $this;
+    }
+
+    /**
+     * Get email filter configuration
+     */
+    public function getEmailFilter(): array
+    {
+        if (!isset($this->config['email_filter'])) {
+            return [
+                'mode' => 'new',
+                'from_date' => null,
+                'to_date' => null
+            ];
+        }
+
+        return $this->config['email_filter'];
+    }
+
+    /**
+     * Check if handler should process historical emails
+     */
+    public function shouldProcessHistoricalEmails(): bool
+    {
+        $filter = $this->getEmailFilter();
+        return $filter['mode'] === 'historical';
     }
 
     /**

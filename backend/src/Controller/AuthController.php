@@ -99,7 +99,7 @@ class AuthController extends AbstractController
         $user = new User();
         $user->setMail($dto->email);
         $user->setPw($this->passwordHasher->hashPassword($user, $dto->password));
-        $user->setCreated(date('YmdHis'));
+        $user->setCreated(date('Y-m-d H:i:s'));
         $user->setType('WEB');
         $user->setUserLevel('NEW');
         $user->setEmailVerified(false);
@@ -187,6 +187,14 @@ class AuthController extends AbstractController
         if (!$user || !$this->passwordHasher->isPasswordValid($user, $password)) {
             usleep(100000); // Timing attack prevention
             return $this->json(['error' => 'Invalid credentials'], Response::HTTP_UNAUTHORIZED);
+        }
+
+        // Check if user is an OAuth user (no password set)
+        if ($user->getPw() === null) {
+            return $this->json([
+                'error' => 'OAuth account',
+                'message' => 'This account uses social login. Please use Google, GitHub, or Keycloak to sign in.'
+            ], Response::HTTP_UNAUTHORIZED);
         }
 
         // Check email verification

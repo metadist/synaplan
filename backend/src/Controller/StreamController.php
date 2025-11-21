@@ -711,20 +711,20 @@ class StreamController extends AbstractController
                         }
                     } catch (\JsonException $e) {
                         // Not valid JSON or extraction failed
-                        // ✨ FIX: AI sometimes generates invalid JSON with "BFILE": \n} instead of "BFILE": 0
+                    // ✨ FIX: AI sometimes generates invalid JSON with "BFILE": \n} instead of "BFILE": 0
                         $cleanedJson = preg_replace('/"BFILE":\s*\n/', '"BFILE": 0' . "\n", $jsonContent);
-                        $cleanedJson = preg_replace('/"BFILE":\s*\r\n/', '"BFILE": 0' . "\r\n", $cleanedJson);
-                        $cleanedJson = preg_replace('/"BFILE":\s*}/', '"BFILE": 0}', $cleanedJson);
+                    $cleanedJson = preg_replace('/"BFILE":\s*\r\n/', '"BFILE": 0' . "\r\n", $cleanedJson);
+                    $cleanedJson = preg_replace('/"BFILE":\s*}/', '"BFILE": 0}', $cleanedJson);
+                    
+                    try {
+                        $jsonData = json_decode($cleanedJson, true, 512, JSON_THROW_ON_ERROR);
                         
-                        try {
-                            $jsonData = json_decode($cleanedJson, true, 512, JSON_THROW_ON_ERROR);
-                            
-                            // Extract BTEXT as main content
-                            if (isset($jsonData['BTEXT'])) {
-                                $finalText = $jsonData['BTEXT'];
-                            }
+                        // Extract BTEXT as main content
+                        if (isset($jsonData['BTEXT'])) {
+                            $finalText = $jsonData['BTEXT'];
+                        }
                         } catch (\JsonException $e2) {
-                            // Not valid JSON or extraction failed, use content as-is
+                        // Not valid JSON or extraction failed, use content as-is
                             $this->logger->warning('StreamController: Failed to parse JSON', [
                                 'error' => $e2->getMessage(),
                                 'content_preview' => substr($jsonContent, 0, 200)

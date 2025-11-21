@@ -6,7 +6,6 @@ use App\Entity\User;
 use App\Entity\Chat;
 use App\Repository\UserRepository;
 use App\Repository\ChatRepository;
-use App\Repository\EmailBlacklistRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 
@@ -28,7 +27,6 @@ class EmailChatService
         private EntityManagerInterface $em,
         private UserRepository $userRepository,
         private ChatRepository $chatRepository,
-        private EmailBlacklistRepository $blacklistRepository,
         private LoggerInterface $logger
     ) {}
 
@@ -57,53 +55,39 @@ class EmailChatService
     {
         $fromEmail = strtolower(trim($fromEmail));
 
-        // Check blacklist first
-        if ($this->blacklistRepository->isBlacklisted($fromEmail)) {
-            return [
-                'user' => null,
-                'blacklisted' => true,
-                'error' => 'Email address is blacklisted'
-            ];
-        }
-
         // Try to find registered user by email
         $user = $this->userRepository->findOneBy(['mail' => $fromEmail]);
 
         if ($user) {
             return [
                 'user' => $user,
-                'is_anonymous' => false,
-                'blacklisted' => false
+                'is_anonymous' => false
             ];
         }
 
         // Check if anonymous user with this email exists
-        $userDetails = $this->userRepository->createQueryBuilder('u')
-            ->where('JSON_EXTRACT(u.userDetails, \'$.anonymous_email\') = :email')
-            ->setParameter('email', $fromEmail)
-            ->getQuery()
-            ->getOneOrNullResult();
+        // Use native SQL query because Doctrine DQL doesn't support JSON_EXTRACT
+        $sql = "SELECT BID FROM BUSER WHERE JSON_EXTRACT(BUSERDETAILS, '$.anonymous_email') = :email LIMIT 1";
+        $stmt = $this->em->getConnection()->prepare($sql);
+        $result = $stmt->executeQuery(['email' => $fromEmail]);
+        $userId = $result->fetchOne();
 
-        if ($userDetails) {
-            return [
-                'user' => $userDetails,
-                'is_anonymous' => true,
-                'blacklisted' => false
-            ];
+        if ($userId) {
+            $userDetails = $this->userRepository->find($userId);
+            if ($userDetails) {
+                return [
+                    'user' => $userDetails,
+                    'is_anonymous' => true
+                ];
+            }
         }
 
-        // Check spam protection for new anonymous users
+        // Check spam protection via usage tracking
         if ($this->isSpamming($fromEmail)) {
-            $this->blacklistRepository->addToBlacklist(
-                $fromEmail,
-                'Automatic: Too many emails in short time',
-                null
-            );
-
             return [
                 'user' => null,
-                'blacklisted' => true,
-                'error' => 'Too many requests. Email has been blacklisted.'
+                'is_anonymous' => true,
+                'error' => 'Too many requests. Please try again later.'
             ];
         }
 
@@ -111,8 +95,8 @@ class EmailChatService
         $anonymousUser = new User();
         $anonymousUser->setMail('anonymous_' . bin2hex(random_bytes(8)) . '@synaplan.local');
         $anonymousUser->setPw(''); // No password for anonymous
-        $anonymousUser->setInType('EMAIL');
-        $anonymousUser->setUserLevel('NEW'); // Will become ANONYMOUS if phone not verified
+        $anonymousUser->setType('MAIL'); // EMAIL-based anonymous user
+        $anonymousUser->setUserLevel('ANONYMOUS'); // Anonymous users get ANONYMOUS rate limits
         
         $details = [
             'anonymous_email' => $fromEmail,
@@ -134,7 +118,6 @@ class EmailChatService
         return [
             'user' => $anonymousUser,
             'is_anonymous' => true,
-            'blacklisted' => false,
             'created' => true
         ];
     }
@@ -179,17 +162,6 @@ class EmailChatService
             return $chat;
         }
 
-        // Try to find chat by In-Reply-To header (email threading)
-        if ($inReplyTo) {
-            $chats = $this->chatRepository->findBy(['userId' => $user->getId()]);
-            foreach ($chats as $chat) {
-                $chatData = $chat->getChatData();
-                if (isset($chatData['email_message_id']) && $chatData['email_message_id'] === $inReplyTo) {
-                    return $chat;
-                }
-            }
-        }
-
         // No specific context - create/use general email chat
         $chat = $this->chatRepository->findOneBy([
             'userId' => $user->getId(),
@@ -217,14 +189,14 @@ class EmailChatService
         $createdAfter = date('YmdHis', $oneHourAgo);
 
         // Count anonymous users created from this email in last hour
-        $count = $this->userRepository->createQueryBuilder('u')
-            ->select('COUNT(u.id)')
-            ->where('JSON_EXTRACT(u.userDetails, \'$.anonymous_email\') = :email')
-            ->andWhere('u.created >= :created_after')
-            ->setParameter('email', $email)
-            ->setParameter('created_after', $createdAfter)
-            ->getQuery()
-            ->getSingleScalarResult();
+        // Use native SQL query because Doctrine DQL doesn't support JSON_EXTRACT
+        $sql = "SELECT COUNT(BID) FROM BUSER WHERE JSON_EXTRACT(BUSERDETAILS, '$.anonymous_email') = :email AND BCREATED >= :created_after";
+        $stmt = $this->em->getConnection()->prepare($sql);
+        $result = $stmt->executeQuery([
+            'email' => $email,
+            'created_after' => $createdAfter
+        ]);
+        $count = $result->fetchOne();
 
         return $count >= self::MAX_ANONYMOUS_EMAILS_PER_HOUR;
     }

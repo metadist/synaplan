@@ -49,6 +49,12 @@ const router = createRouter({
       meta: { requiresAuth: false, public: true }
     },
     {
+      path: '/auth/callback',
+      name: 'oauth-callback',
+      component: () => import('../components/auth/OAuthCallback.vue'),
+      meta: { requiresAuth: false, public: true }
+    },
+    {
       path: '/shared/:token',
       name: 'shared-chat',
       component: () => import('../views/SharedChatView.vue'),

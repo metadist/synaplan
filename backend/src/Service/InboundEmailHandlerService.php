@@ -8,6 +8,9 @@ use App\Repository\PromptRepository;
 use App\AI\Service\AiFacade;
 use App\Service\EncryptionService;
 use Psr\Log\LoggerInterface;
+use Symfony\Component\Mailer\MailerInterface;
+use Symfony\Component\Mailer\Transport;
+use Symfony\Component\Mime\Email;
 
 /**
  * Inbound Email Handler Service
@@ -146,8 +149,8 @@ class InboundEmailHandlerService
                 messages: [
                     ['role' => 'user', 'content' => $fullPrompt]
                 ],
-                modelId: null, // Use default model
-                userId: $handler->getUserId()
+                userId: $handler->getUserId(),
+                options: [] // Use default model
             );
 
             $routedEmail = trim($response['content'] ?? '');
@@ -276,8 +279,10 @@ class InboundEmailHandlerService
                     $routedEmail = $this->routeEmailToDepartment($handler, $subject, $body);
                     
                     if ($routedEmail) {
-                        // TODO: Forward email to routed department or process via webhook
-                        $this->logger->info('Email processed', [
+                        // Forward email to routed department using SMTP
+                        $this->forwardEmail($handler, $from, $routedEmail, $subject, $body);
+                        
+                        $this->logger->info('Email processed and forwarded', [
                             'handler_id' => $handler->getId(),
                             'from' => $from,
                             'subject' => $subject,
@@ -332,6 +337,83 @@ class InboundEmailHandlerService
                 'errors' => [$e->getMessage()]
             ];
         }
+    }
+
+    /**
+     * Forward email to department using handler's SMTP credentials
+     */
+    private function forwardEmail(
+        InboundEmailHandler $handler,
+        string $fromEmail,
+        string $toEmail,
+        string $subject,
+        string $body
+    ): void {
+        // Get SMTP credentials (decrypted)
+        $smtpConfig = $handler->getSmtpCredentials($this->encryptionService);
+        
+        if (!$smtpConfig) {
+            $this->logger->warning('No SMTP credentials configured for forwarding', [
+                'handler_id' => $handler->getId()
+            ]);
+            return;
+        }
+
+        try {
+            // Build DSN for Symfony Mailer Transport
+            $dsn = $this->buildSmtpDsn($smtpConfig);
+            
+            // Create transport from DSN
+            $transport = Transport::fromDsn($dsn);
+            $mailer = new \Symfony\Component\Mailer\Mailer($transport);
+
+            // Create email
+            $email = (new Email())
+                ->from($smtpConfig['username'])
+                ->to($toEmail)
+                ->replyTo($fromEmail)
+                ->subject('Fwd: ' . $subject)
+                ->text($body);
+
+            // Send email
+            $mailer->send($email);
+
+            $this->logger->info('Email forwarded successfully', [
+                'handler_id' => $handler->getId(),
+                'from' => $fromEmail,
+                'to' => $toEmail,
+                'subject' => $subject
+            ]);
+
+        } catch (\Exception $e) {
+            $this->logger->error('Failed to forward email', [
+                'handler_id' => $handler->getId(),
+                'error' => $e->getMessage(),
+                'to' => $toEmail
+            ]);
+            throw $e;
+        }
+    }
+
+    /**
+     * Build SMTP DSN from config
+     */
+    private function buildSmtpDsn(array $smtpConfig): string
+    {
+        $scheme = match($smtpConfig['security']) {
+            'SSL/TLS' => 'smtps',
+            'STARTTLS' => 'smtp',
+            default => 'smtp'
+        };
+
+        return sprintf(
+            '%s://%s:%s@%s:%d',
+            $scheme,
+            urlencode($smtpConfig['username']),
+            urlencode($smtpConfig['password']),
+            $smtpConfig['server'],
+            $smtpConfig['port']
+        );
     }
 
     /**
