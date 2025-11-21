@@ -137,14 +137,14 @@
         v-for="cmd in availableCommands"
         :key="cmd.name"
         ref="itemRefs"
-        class="dropdown-item"
+        class="dropdown-item flex items-center justify-between"
         @click="selectCommand(cmd)"
         @keydown.down.prevent="focusNext"
         @keydown.up.prevent="focusPrevious"
         type="button"
       >
         <code class="font-mono text-sm txt-primary">{{ cmd.usage }}</code>
-        <span class="text-xs txt-secondary ml-2">{{ cmd.description }}</span>
+        <span class="text-xs txt-secondary text-right ml-auto">{{ cmd.description }}</span>
       </button>
     </div>
   </div>
