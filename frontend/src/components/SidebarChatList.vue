@@ -42,6 +42,14 @@
         >
           Show more...
         </button>
+        <button
+          v-else-if="showAllMy && allMyChats.length > 5"
+          @click="showAllMy = false"
+          class="px-3 py-2 rounded-lg txt-secondary hover-surface transition-colors text-left text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary min-h-[44px]"
+          data-testid="btn-chat-show-less-my"
+        >
+          Show less...
+        </button>
 
         <button
           v-if="myArchivedChats.length > 0"
@@ -98,6 +106,14 @@
           data-testid="btn-chat-show-more-widget"
         >
           Show more...
+        </button>
+        <button
+          v-else-if="showAllWidget && allWidgetChats.length > 5"
+          @click="showAllWidget = false"
+          class="px-3 py-2 rounded-lg txt-secondary hover-surface transition-colors text-left text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary min-h-[44px]"
+          data-testid="btn-chat-show-less-widget"
+        >
+          Show less...
         </button>
 
         <button

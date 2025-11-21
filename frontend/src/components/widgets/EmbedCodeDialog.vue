@@ -1,9 +1,9 @@
 <template>
   <!-- Fullscreen Modal Overlay -->
   <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm" data-testid="modal-embed-code">
-    <div class="surface-card rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto shadow-2xl" data-testid="section-embed-shell">
+    <div class="surface-card rounded-2xl max-w-4xl w-full max-h-[90vh] flex flex-col shadow-2xl" data-testid="section-embed-shell">
       <!-- Header -->
-      <div class="sticky top-0 surface-card border-b border-light-border/30 dark:border-dark-border/20 px-6 py-4 flex items-center justify-between" data-testid="section-header">
+      <div class="flex-shrink-0 surface-card border-b border-light-border/30 dark:border-dark-border/20 px-6 py-4 flex items-center justify-between z-10" data-testid="section-header">
         <div data-testid="section-preview">
           <h2 class="text-xl font-semibold txt-primary flex items-center gap-2">
             <Icon icon="heroicons:code-bracket" class="w-6 h-6 text-[var(--brand)]" />
@@ -21,8 +21,8 @@
         </button>
       </div>
 
-      <!-- Content -->
-      <div class="p-6 space-y-6" data-testid="section-content">
+      <!-- Content (scrollable) -->
+      <div class="flex-1 overflow-y-auto p-6 space-y-6" data-testid="section-content">
         <!-- HTML Embed Code -->
         <div data-testid="section-html-code">
           <div class="flex items-center justify-between mb-3">
@@ -121,7 +121,7 @@
       </div>
 
       <!-- Footer -->
-      <div class="sticky bottom-0 surface-card border-t border-light-border/30 dark:border-dark-border/20 px-6 py-4 flex items-center justify-end gap-3">
+      <div class="flex-shrink-0 surface-card border-t border-light-border/30 dark:border-dark-border/20 px-6 py-4 flex items-center justify-end gap-3 z-10">
         <button
           @click="$emit('close')"
           class="px-6 py-2.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 transition-colors txt-primary font-medium"

@@ -1,13 +1,8 @@
-/**
- * Zentrale Selektor-Konstanten
- * TODO: Passe Selektoren an deine App an
- * Bevorzugt: [data-testid] Attribute verwenden
- */
 export const selectors = {
   login: {
-    email: '#email', // oder '[data-testid="login-email"]' - Best Practice: data-testid hinzufügen
-    password: '#password', // oder '[data-testid="login-password"]'
-    submit: 'button[type="submit"]', // oder 'button:has-text("Sign In")' oder '[data-testid="login-submit"]'
+    email: '#email', 
+    password: '#password', 
+    submit: 'button[type="submit"]', 
   },
   nav: {
     newChatButton: '[data-testid="btn-chat-new"]',
@@ -15,13 +10,18 @@ export const selectors = {
   chat: {
     textInput: '[data-testid="input-chat-message"]',
     sendBtn: '[data-testid="btn-chat-send"]',
-    widget: '[data-testid="dashboard-widget"]', // TODO: Kern-Widget-Selektor
+    messageContainer: '[data-testid="message-container"]',
+    aiAnswerBubble: '[data-testid="assistant-message-bubble"]',
+    loadIndicator: '[data-testid="loading-typing-indicator"]',
+    messageText: '[data-testid="message-text"]',
+    againDropdown: '[data-testid="btn-message-model-toggle"]',
+    againDropdownItem: 'button.dropdown-item'
   },
   userMenu: {
-    button: '[data-testid="user-menu"]', // oder '.user-menu'
-    logout: '[data-testid="logout"]', // oder 'text=Logout'
+    button:  '[data-testid="btn-user-menu-toggle"]',
+    logoutBtn: '[data-testid="btn-user-logout"]',
   },
   toast: {
-    success: '[data-testid="toast-success"]', // oder '.toast-success'
+    
   },
 } as const;

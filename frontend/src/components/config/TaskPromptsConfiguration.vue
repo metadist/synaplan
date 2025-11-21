@@ -368,6 +368,17 @@
         </button>
       </div>
     </template>
+    <template v-else>
+      <div class="surface-card p-10 text-center rounded-lg" data-testid="section-no-prompt-selected">
+        <Icon icon="heroicons:cursor-arrow-ripple" class="w-12 h-12 mx-auto mb-4 txt-secondary opacity-50" />
+        <h3 class="text-lg font-semibold txt-primary mb-2">
+          {{ $t('config.taskPrompts.selectPromptTitle') }}
+        </h3>
+        <p class="text-sm txt-secondary max-w-xl mx-auto">
+          {{ $t('config.taskPrompts.selectPromptDescription') }}
+        </p>
+      </div>
+    </template>
 
     <!-- Create New Prompt Modal -->
     <div
