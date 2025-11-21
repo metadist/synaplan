@@ -14,12 +14,22 @@ AI-powered knowledge management with chat, document processing, and RAG (Retriev
 ```bash
 git clone <repository-url>
 cd synaplan-dev
+```
 
-# Quick start (models download on-demand)
+Run the first-install script for your platform (it verifies Docker, lets you pick your AI provider, and handles all bootstrapping):
+
+```bash
+# Linux / macOS (WSL): 
+./_1st_install_linux.sh
+
+# Windows (PowerShell or cmd):
+_1st_install_win.bat
+```
+
+After the initial install, subsequent restarts only need:
+
+```bash
 docker compose up -d
-
-# Or: Pre-download AI models during startup
-AUTO_DOWNLOAD_MODELS=true docker compose up -d
 ```
 
 **What happens automatically:**
@@ -29,6 +39,8 @@ AUTO_DOWNLOAD_MODELS=true docker compose up -d
 - ✅ Generates JWT keypair for authentication
 - ✅ Creates database schema (migrations)
 - ✅ Loads test users and fixtures (if database is empty)
+- ✅ Pulls the local `gpt-oss:20b` chat model and `bge-m3` embedding model with live progress (unless disabled)
+- ✅ Ensures the schema + fixtures are applied (runs `doctrine:schema:update` + fixtures once)
 - ✅ Starts all services
 - ✅ **System ready in ~40 seconds!**
 
@@ -43,36 +55,30 @@ AUTO_DOWNLOAD_MODELS=true docker compose up -d
 
 **AI Model Download Behavior:**
 
-By default, AI models are **NOT** downloaded automatically. They download on-demand when first used.
+`./_1st_install_linux.sh` (or `_1st_install_win.bat`) guides you through one of two options:
 
-**Option 1: Quick Start (Recommended for Development)**
+1. **Local Ollama** – downloads `gpt-oss:20b` (chat) + `bge-m3` (vector) so the stack runs fully offline (needs ~24 GB VRAM).
+2. **Groq Cloud (recommended)** – prompts for your free `GROQ_API_KEY`, writes it to `backend/.env`, switches all defaults to Groq’s `llama-3.3-70b-versatile`, and skips the heavy local downloads.
+
+Progress (downloads or schema work) streams directly in the script output, so you always know what’s happening.
+
+**Option 1: Default Auto Download (Recommended)**
 ```bash
-docker compose up -d
+./_1st_install_linux.sh      # or _1st_install_win.bat
 ```
-- ⚡ **Fast startup**: ~40 seconds (first run), ~15s (subsequent)
-- 📥 **Models**: Download automatically when you first send a chat message (~2-3 minutes)
-- 💡 **Best for**: Development, testing, quick demos
-- 🎯 **System is immediately usable** for login, file uploads, user management
+- ⚡ **Fast startup** for services (~40s) while downloads (if Ollama) or migrations (if Groq) run in the background
+- 📦 **Progress shown live** in the script (tailing `backend` logs)
+- ✅ **AI chat + RAG ready** as soon as the selected provider is configured
+- 💡 **Best for**: Development/prod setups that either have local GPU (option 1) or prefer Groq’s hosted models (option 2)
 
-**Option 2: Pre-download Models**
+**Option 2: On-demand Downloads**
 ```bash
-AUTO_DOWNLOAD_MODELS=true docker compose up -d
+AUTO_DOWNLOAD_MODELS=false docker compose up -d
 ```
-- 🔄 **Backend ready**: Still ~40 seconds
-- 📦 **Models download in background**: `mistral:7b` (4.1GB) + `bge-m3` (670MB)
-- ⏱️ **Total download time**: ~5-10 minutes (depends on internet speed)
-- ✅ **AI chat ready immediately** after models finish downloading
-- 💡 **Best for**: Production, demos where AI must work immediately
-
-**Check download progress:**
-```bash
-docker compose logs -f backend | grep -i "model\|background"
-```
-
-**When to use which option:**
-- **Development/Testing**: Use default (on-demand download)
-- **Production/Demos**: Use `AUTO_DOWNLOAD_MODELS=true`
-- **CI/CD**: Build a custom image with pre-downloaded models
+- Pulling on-demand keeps UI usable immediately, but the first chat/search that needs a model will block until the download finishes.
+- 📥 **Models pulled on first use** (login UI stays available meanwhile)
+- 🔁 **Useful** for limited bandwidth / CI runners
+- 📝 Monitor on-demand pulls with `docker compose logs -f backend | grep "[Background]"`
 
 ## 🌐 Access
 
@@ -301,25 +307,14 @@ docker compose exec frontend npm install <package>
 
 ## 🤖 AI Models
 
-Models are downloaded **on-demand** when first used:
-- **mistral:7b** - Main chat model (4.1 GB) - Downloaded on first chat
-- **bge-m3** - Embedding model for RAG (2.2 GB) - Downloaded when using document search
+- **gpt-oss:20b (Ollama)** – Pulled automatically by the first-install script (or any `docker compose up -d` with `AUTO_DOWNLOAD_MODELS=true`) so local chat is ready without extra steps. Progress prints as `[Background] [gpt-oss:20b] ...`.
+- **bge-m3 (Ollama)** – Pulled alongside `gpt-oss:20b` during the first-install script so vector search works immediately; progress lines look like `[Background] [bge-m3] ...`.
+- **All cloud models (Groq, OpenAI, etc.)** – Instantly available once their respective API keys are set.
 
-### Pre-download Models (Recommended)
-
-To download models during startup (in background):
+Disable the auto download by running:
 ```bash
-AUTO_DOWNLOAD_MODELS=true docker compose up -d
+AUTO_DOWNLOAD_MODELS=false docker compose up -d
 ```
-
-**The backend starts immediately** while models download in parallel. Monitor progress:
-```bash
-docker compose logs -f backend
-```
-
-You'll see messages like:
-- `[Background] ⏳ Model 'mistral:7b' download in progress...`
-- `[Background] ✅ Model 'mistral:7b' downloaded successfully!`
 
 ## ✨ Features
 

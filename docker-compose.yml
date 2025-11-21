@@ -57,7 +57,8 @@ services:
       WHATSAPP_ENABLED: ${WHATSAPP_ENABLED:-false}
       # AI Provider API Keys (loaded from backend/.env via env_file above)
       # GROQ_API_KEY is automatically loaded from backend/.env
-      AUTO_DOWNLOAD_MODELS: ${AUTO_DOWNLOAD_MODELS:-false}
+      AUTO_DOWNLOAD_MODELS: ${AUTO_DOWNLOAD_MODELS:-true}
+      ENABLE_LOCAL_GPT_OSS: ${ENABLE_LOCAL_GPT_OSS:-true}
       # reCAPTCHA (optional - disabled by default)
       RECAPTCHA_SITE_KEY: ${RECAPTCHA_SITE_KEY:-}
       RECAPTCHA_SECRET_KEY: ${RECAPTCHA_SECRET_KEY:-}
@@ -91,7 +92,6 @@ services:
       - "3307:3306"
     volumes:
       - mysql_data:/var/lib/mysql
-      - ./_devextras/db-init:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test: ["CMD", "mariadb", "-h", "localhost", "-u", "root", "-proot_password", "-e", "SELECT 1;"]
       interval: 30s

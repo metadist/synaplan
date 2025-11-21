@@ -1,10 +1,20 @@
 #!/bin/bash
-set -e
+set -euo pipefail
 
 echo "🚀 Starting Synaplan Backend..."
 
 # Initialize environment configuration
 /usr/local/bin/init-env.sh
+
+if [ -z "${GROQ_API_KEY:-}" ]; then
+cat <<'EOM'
+=====================================================================
+🚀  GROQ TIP
+💥  groq.com has fast, cheap and good models - get your free key there
+💥  and put it into backend/.env (GROQ_API_KEY=...) to unlock them!
+=====================================================================
+EOM
+fi
 
 # Update Composer dependencies if composer.json changed (handles bind mounts)
 echo "📦 Checking Composer dependencies..."
@@ -110,15 +120,25 @@ if [ -n "$OLLAMA_BASE_URL" ] && [ "$AUTO_DOWNLOAD_MODELS" = "true" ]; then
         done
         echo "[Background] ✅ Ollama ready, downloading models..."
         
-        MODELS=("mistral:7b" "bge-m3")
+        MODELS=("bge-m3")
+        if [ "${ENABLE_LOCAL_GPT_OSS:-true}" = "true" ]; then
+            MODELS+=("gpt-oss:20b")
+        fi
         for MODEL in "${MODELS[@]}"; do
             if ! curl -s "$OLLAMA_BASE_URL/api/tags" | grep -q "\"name\":\"$MODEL\""; then
                 echo "[Background] 📥 Downloading $MODEL..."
-                curl -X POST "$OLLAMA_BASE_URL/api/pull" \
+                if curl -sS -N "$OLLAMA_BASE_URL/api/pull" \
                     -H "Content-Type: application/json" \
-                    -d "{\"name\":\"$MODEL\"}" > /dev/null 2>&1 && \
-                    echo "[Background] ✅ $MODEL downloaded!" || \
+                    -d "{\"name\":\"$MODEL\"}" | while IFS= read -r line; do
+                        [ -z "$line" ] && continue
+                        printf '\r[Background] [%s] %s' "$MODEL" "$line"
+                    done; then
+                    printf '\n'
+                    echo "[Background] ✅ $MODEL downloaded!"
+                else
+                    printf '\n'
                     echo "[Background] ⚠️  $MODEL download failed"
+                fi
             else
                 echo "[Background] ✅ $MODEL already available"
             fi
