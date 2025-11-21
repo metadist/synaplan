@@ -436,4 +436,19 @@
     to { opacity: 1; transform: translateY(0); }
   }
   .processing-enter { animation: fadeSlideIn 0.3s ease-out; }
+
+  /* Code Block - Always dark background for better readability */
+  .code-block {
+    background: #000000 !important;
+    color: #4ade80 !important; /* green-400 */
+    border-radius: 0.5rem;
+  }
+  .code-block pre {
+    margin: 0;
+    color: #4ade80 !important; /* green-400 */
+    background: transparent !important;
+  }
+  .dark .code-block {
+    background: rgba(0, 0, 0, 0.5) !important;
+  }
 }

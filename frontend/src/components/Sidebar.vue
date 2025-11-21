@@ -248,6 +248,7 @@ const navItems = computed(() => {
         { path: '/config/task-prompts', label: 'Task Prompts' },
         { path: '/config/sorting-prompt', label: 'Sorting Prompt' },
         { path: '/config/api-keys', label: 'API Keys' },
+        { path: '/config/api-documentation', label: 'API Documentation' },
       ]
     })
   }

@@ -209,8 +209,15 @@
         </div>
 
             <div v-else-if="currentPage === 'mail-handler'">
+              <div v-if="isLoadingMailHandlers" class="flex items-center justify-center py-12">
+                <svg class="w-6 h-6 animate-spin txt-brand" fill="none" viewBox="0 0 24 24">
+                  <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+                  <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/>
+                </svg>
+                <span class="ml-2 txt-secondary">Loading mail handlers...</span>
+              </div>
               <MailHandlerList
-                v-if="!showMailHandlerEditor"
+                v-else-if="!showMailHandlerEditor"
                 :handlers="mailHandlers"
                 @create="createMailHandler"
                 @edit="editMailHandler"
@@ -273,7 +280,7 @@ import type { Widget, WidgetConfig } from '@/mocks/widgets'
 import { mockWidgets } from '@/mocks/widgets'
 import type { SummaryConfig } from '@/mocks/summaries'
 import type { MailConfig, Department, SavedMailHandler } from '@/mocks/mail'
-import { mockMailHandlers } from '@/mocks/mail'
+import { inboundEmailHandlersApi } from '@/services/api/inboundEmailHandlersApi'
 import * as summaryService from '@/services/summaryService'
 import type { SummaryResponse } from '@/services/summaryService'
 import { useNotification } from '@/composables/useNotification'
@@ -300,10 +307,11 @@ const currentWidgetConfig = ref<WidgetConfig>({
 })
 const originalWidgetConfig = ref<WidgetConfig | null>(null)
 
-const mailHandlers = ref<SavedMailHandler[]>(mockMailHandlers)
+const mailHandlers = ref<SavedMailHandler[]>([])
 const showMailHandlerEditor = ref(false)
 const currentMailHandler = ref<SavedMailHandler | undefined>(undefined)
 const currentMailHandlerId = ref<string>('')
+const isLoadingMailHandlers = ref(false)
 
 // Summary state
 const isGeneratingSummary = ref(false)
@@ -352,10 +360,26 @@ const loadCurrentChatModel = async () => {
   }
 }
 
+// Load mail handlers function (defined before watch)
+const loadMailHandlers = async () => {
+  isLoadingMailHandlers.value = true
+  try {
+    mailHandlers.value = await inboundEmailHandlersApi.list()
+  } catch (error: any) {
+    console.error('Failed to load mail handlers:', error)
+    showError(error.message || 'Failed to load mail handlers')
+  } finally {
+    isLoadingMailHandlers.value = false
+  }
+}
+
 // Watch for page change to doc-summary and load model
 watch(currentPage, async (newPage) => {
   if (newPage === 'doc-summary' && !currentChatModel.value) {
     await loadCurrentChatModel()
+  }
+  if (newPage === 'mail-handler' && mailHandlers.value.length === 0) {
+    await loadMailHandlers()
   }
 }, { immediate: true })
 
@@ -609,37 +633,65 @@ const editMailHandler = (handler: SavedMailHandler) => {
 }
 
 const saveMailHandler = async (name: string, config: MailConfig, departments: Department[]) => {
-  if (currentMailHandlerId.value) {
-    // Update existing
-    const index = mailHandlers.value.findIndex(h => h.id === currentMailHandlerId.value)
-    if (index > -1) {
-      mailHandlers.value[index] = {
-        ...mailHandlers.value[index],
+  try {
+    if (currentMailHandlerId.value) {
+      // Update existing
+      const updated = await inboundEmailHandlersApi.update(currentMailHandlerId.value, {
         name,
-        config,
-        departments,
-        updatedAt: new Date()
+        mailServer: config.mailServer,
+        port: config.port,
+        protocol: config.protocol,
+        security: config.security,
+        username: config.username,
+        password: config.password, // Will be encrypted by backend
+        checkInterval: config.checkInterval,
+        deleteAfter: config.deleteAfter,
+        departments
+      })
+      
+      const index = mailHandlers.value.findIndex(h => h.id === currentMailHandlerId.value)
+      if (index > -1) {
+        mailHandlers.value[index] = updated
       }
+      success('Mail handler updated successfully!')
+    } else {
+      // Create new
+      const newHandler = await inboundEmailHandlersApi.create({
+        name,
+        mailServer: config.mailServer,
+        port: config.port,
+        protocol: config.protocol,
+        security: config.security,
+        username: config.username,
+        password: config.password, // Will be encrypted by backend
+        checkInterval: config.checkInterval,
+        deleteAfter: config.deleteAfter,
+        departments
+      })
+      mailHandlers.value.push(newHandler)
+      success('Mail handler created successfully!')
     }
-  } else {
-    // Create new
-    const newHandler: SavedMailHandler = {
-      id: String(Date.now()),
-      name,
-      config,
-      departments,
-      status: 'inactive',
-      createdAt: new Date(),
-      updatedAt: new Date()
-    }
-    mailHandlers.value.push(newHandler)
+    
+    cancelMailHandlerEdit()
+  } catch (error: any) {
+    console.error('Failed to save mail handler:', error)
+    showError(error.message || 'Failed to save mail handler')
   }
-  
-  cancelMailHandlerEdit()
 }
 
-const deleteMailHandler = (handlerId: string) => {
-  mailHandlers.value = mailHandlers.value.filter(h => h.id !== handlerId)
+const deleteMailHandler = async (handlerId: string) => {
+  if (!confirm('Are you sure you want to delete this mail handler?')) {
+    return
+  }
+  
+  try {
+    await inboundEmailHandlersApi.delete(handlerId)
+    mailHandlers.value = mailHandlers.value.filter(h => h.id !== handlerId)
+    success('Mail handler deleted successfully!')
+  } catch (error: any) {
+    console.error('Failed to delete mail handler:', error)
+    showError(error.message || 'Failed to delete mail handler')
+  }
 }
 
 const cancelMailHandlerEdit = () => {

@@ -21,6 +21,10 @@
         <div v-else-if="currentPage === 'api-keys'" data-testid="section-api-keys">
           <APIKeysConfiguration />
         </div>
+
+        <div v-else-if="currentPage === 'api-documentation'" data-testid="section-api-documentation">
+          <ApiDocumentation />
+        </div>
       </div>
     </div>
   </MainLayout>
@@ -35,6 +39,7 @@ import AIModelsConfiguration from '@/components/config/AIModelsConfiguration.vue
 import TaskPromptsConfiguration from '@/components/config/TaskPromptsConfiguration.vue'
 import SortingPromptConfiguration from '@/components/config/SortingPromptConfiguration.vue'
 import APIKeysConfiguration from '@/components/config/APIKeysConfiguration.vue'
+import ApiDocumentation from '@/components/config/ApiDocumentation.vue'
 
 const route = useRoute()
 
@@ -45,6 +50,7 @@ const currentPage = computed(() => {
   if (path.includes('/config/task-prompts')) return 'task-prompts'
   if (path.includes('/config/sorting-prompt')) return 'sorting-prompt'
   if (path.includes('/config/api-keys')) return 'api-keys'
+  if (path.includes('/config/api-documentation')) return 'api-documentation'
   return 'inbound'
 })
 </script>

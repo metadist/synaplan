@@ -223,11 +223,22 @@
       <div class="flex gap-3 mt-6">
         <button
           @click="testConnection"
-          class="px-4 py-2 rounded-lg border border-[var(--brand)] text-[var(--brand)] hover:bg-[var(--brand)]/10 transition-colors flex items-center gap-2"
+          :disabled="isTestingConnection"
+          class="px-4 py-2 rounded-lg border border-[var(--brand)] text-[var(--brand)] hover:bg-[var(--brand)]/10 transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
           data-testid="btn-test"
         >
-          <BoltIcon class="w-4 h-4" />
-          {{ $t('mail.testConnection') }}
+          <BoltIcon v-if="!isTestingConnection" class="w-4 h-4" />
+          <svg
+            v-else
+            class="w-4 h-4 animate-spin"
+            xmlns="http://www.w3.org/2000/svg"
+            fill="none"
+            viewBox="0 0 24 24"
+          >
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/>
+          </svg>
+          {{ isTestingConnection ? $t('mail.testing') : $t('mail.testConnection') }}
         </button>
         <button
           @click="showHelp"
@@ -238,6 +249,40 @@
           {{ $t('mail.connectionHelp') }}
         </button>
       </div>
+
+      <!-- Test Result Display -->
+      <Transition
+        enter-active-class="transition ease-out duration-200"
+        enter-from-class="opacity-0 transform scale-95"
+        enter-to-class="opacity-100 transform scale-100"
+        leave-active-class="transition ease-in duration-150"
+        leave-from-class="opacity-100 transform scale-100"
+        leave-to-class="opacity-0 transform scale-95"
+      >
+        <div
+          v-if="testResult"
+          :class="[
+            'mt-4 p-4 rounded-lg border flex items-start gap-3',
+            testResult.success
+              ? 'bg-green-500/10 border-green-500/30'
+              : 'bg-red-500/10 border-red-500/30'
+          ]"
+        >
+          <CheckCircleIcon v-if="testResult.success" class="w-5 h-5 text-green-500 flex-shrink-0 mt-0.5" />
+          <XCircleIcon v-else class="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
+          <div>
+            <p
+              :class="[
+                'font-medium',
+                testResult.success ? 'text-green-500' : 'text-red-500'
+              ]"
+            >
+              {{ testResult.success ? $t('mail.testSuccess') : $t('mail.testFailed') }}
+            </p>
+            <p class="text-sm txt-secondary mt-1">{{ testResult.message }}</p>
+          </div>
+        </div>
+      </Transition>
     </div>
 
     <!-- Step 2: Departments -->
@@ -489,6 +534,7 @@ import {
   securityOptions,
   checkIntervalOptions
 } from '@/mocks/mail'
+import { inboundEmailHandlersApi } from '@/services/api/inboundEmailHandlersApi'
 
 interface Props {
   handler?: SavedMailHandler
@@ -573,22 +619,32 @@ const resetToDefault = () => {
 }
 
 const testConnection = async () => {
+  // For new handlers, we need to save first before testing
+  if (!props.handlerId) {
+    testResult.value = {
+      success: false,
+      message: 'Please save the handler first before testing the connection.'
+    }
+    return
+  }
+
   isTestingConnection.value = true
   testResult.value = null
   
-  // Simulate API call
-  await new Promise(resolve => setTimeout(resolve, 2000))
-  
-  // Mock success/fail (90% success rate)
-  const success = Math.random() > 0.1
-  testResult.value = {
-    success,
-    message: success
-      ? 'Successfully connected to mail server. All settings are working correctly.'
-      : 'Failed to connect. Please check your credentials and server settings.'
+  try {
+    const result = await inboundEmailHandlersApi.testConnection(props.handlerId)
+    testResult.value = {
+      success: result.success,
+      message: result.message
+    }
+  } catch (error: any) {
+    testResult.value = {
+      success: false,
+      message: error.message || 'Failed to test connection'
+    }
+  } finally {
+    isTestingConnection.value = false
   }
-  
-  isTestingConnection.value = false
 }
 
 const showHelp = () => {

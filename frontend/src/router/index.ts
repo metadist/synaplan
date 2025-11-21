@@ -153,6 +153,12 @@ const router = createRouter({
       meta: { requiresAuth: true }
     },
     {
+      path: '/config/api-documentation',
+      name: 'config-api-documentation',
+      component: () => import('../views/ConfigView.vue'),
+      meta: { requiresAuth: true }
+    },
+    {
       path: '/statistics',
       name: 'statistics',
       component: () => import('../views/StatisticsView.vue'),

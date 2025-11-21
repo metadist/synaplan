@@ -457,6 +457,40 @@
       "set": "Gesetzt",
       "notSet": "Nicht gesetzt"
     }
+  },
+  "config": {
+    "inbound": {
+      "title": "Eingehend",
+      "description": "Sie können diese Plattform über verschiedene Kanäle erreichen. Verschiedene Kanäle bieten verschiedene Funktionen, wenn Sie diese einrichten. Bitte schauen Sie sich die unten aufgeführten Kanäle an:",
+      "whatsappChannels": "WhatsApp-Kanal(e)",
+      "emailChannels": "E-Mail-Kanal(e)",
+      "apiChannel": "API-Kanal",
+      "webWidget": "Web-Widget",
+      "defaultHandling": "Standardbehandlung",
+      "addKeyword": "Prüfen Sie auf ein freies Schlüsselwort, um Ihre eigene Behandlung hinzuzufügen:",
+      "keywordPlaceholder": "Schlüsselwort",
+      "yourEmailAddress": "Ihre E-Mail-Adresse: {email}",
+      "noKeywordSet": "Du hast noch kein persönliches Keyword festgelegt und er kann nur anonym dem default handler schreiben!",
+      "apiDescription": "Einfache API-Aufrufe mit Ihrem persönlichen API-Schlüssel:",
+      "apiDocumentationInfo": "Für detaillierte API-Dokumentation einschließlich aller verfügbaren Endpunkte, Request/Response-Formate und Authentifizierungsmethoden, besuchen Sie bitte unsere umfassende API-Dokumentation.",
+      "viewApiDocumentation": "API-Dokumentation anzeigen",
+      "apiDocumentation": {
+        "title": "API-Dokumentation",
+        "description": "Vollständige API-Referenz für die Integration mit Synaplan. Alle Endpunkte sind mit Request/Response-Beispielen dokumentiert.",
+        "loading": "API-Dokumentation wird geladen...",
+        "parameters": "Parameter",
+        "requestBody": "Request Body",
+        "responses": "Antworten",
+        "authentication": "Authentifizierung"
+      },
+      "exampleCurl": "Beispiel:",
+      "widgetDescription": "Um das Widget zu aktivieren, geben Sie bitte Ihren Domainnamen wie \"yourdomain.net\" in das Feld unten ein.",
+      "domainPlaceholder": "yourdomain.net",
+      "activateWidget": "Widget aktivieren",
+      "widgetActive": "Widget ist aktiv",
+      "addChannel": "Kanal hinzufügen",
+      "saveChanges": "Änderungen speichern"
+    }
   }
 }
 

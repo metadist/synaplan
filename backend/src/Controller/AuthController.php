@@ -8,7 +8,7 @@ use App\Entity\User;
 use App\Repository\EmailVerificationAttemptRepository;
 use App\Repository\UserRepository;
 use App\Repository\VerificationTokenRepository;
-use App\Service\MailerService;
+use App\Service\InternalEmailService;
 use App\Service\RecaptchaService;
 use Doctrine\ORM\EntityManagerInterface;
 use Lexik\Bundle\JWTAuthenticationBundle\Services\JWTTokenManagerInterface;
@@ -38,7 +38,7 @@ class AuthController extends AbstractController
         private EntityManagerInterface $em,
         private UserPasswordHasherInterface $passwordHasher,
         private JWTTokenManagerInterface $jwtManager,
-        private MailerService $mailerService,
+        private InternalEmailService $internalEmailService,
         private RecaptchaService $recaptchaService,
         private ValidatorInterface $validator,
         private LoggerInterface $logger
@@ -113,7 +113,7 @@ class AuthController extends AbstractController
 
         // Send verification email
         try {
-            $this->mailerService->sendVerificationEmail($user->getMail(), $token->getToken());
+            $this->internalEmailService->sendVerificationEmail($user->getMail(), $token->getToken());
         } catch (\Exception $e) {
             $this->logger->error('Failed to send verification email', [
                 'user_id' => $user->getId(),
@@ -236,7 +236,7 @@ class AuthController extends AbstractController
 
         // Send welcome email
         try {
-            $this->mailerService->sendWelcomeEmail($user->getMail(), $user->getMail());
+            $this->internalEmailService->sendWelcomeEmail($user->getMail(), $user->getMail());
         } catch (\Exception $e) {
             $this->logger->error('Failed to send welcome email', ['user_id' => $user->getId()]);
         }
@@ -273,7 +273,7 @@ class AuthController extends AbstractController
         $token = $this->tokenRepository->createToken($user, 'password_reset', 3600);
 
         try {
-            $this->mailerService->sendPasswordResetEmail($user->getMail(), $token->getToken());
+            $this->internalEmailService->sendPasswordResetEmail($user->getMail(), $token->getToken());
         } catch (\Exception $e) {
             $this->logger->error('Failed to send reset email', ['user_id' => $user->getId()]);
         }
@@ -400,7 +400,7 @@ class AuthController extends AbstractController
         // User exists and is unverified - create token and send email
         try {
             $token = $this->tokenRepository->createToken($user, 'email_verification', 86400);
-            $this->mailerService->sendVerificationEmail($user->getMail(), $token->getToken());
+            $this->internalEmailService->sendVerificationEmail($user->getMail(), $token->getToken());
             
             // Only flush after successful email send
             $this->em->flush();

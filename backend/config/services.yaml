@@ -146,8 +146,25 @@ services:
     # Rate Limiter Service
     App\Service\RateLimiterService: ~
 
-    # Mailer Service
-    App\Service\MailerService: ~
+    # Internal Email Service (system emails - uses SMTP from ENV)
+    App\Service\InternalEmailService: ~
+
+    # Inbound Email Service (fetches emails from Mailhog)
+    App\Service\InboundEmailService:
+        arguments:
+            $mailhogApiUrl: 'http://mailhog:8025/api/v2'
+
+    # Process Emails Command
+    App\Command\ProcessEmailsCommand:
+        arguments:
+            $appUrl: '%env(APP_URL)%'
+        tags:
+            - { name: 'console.command' }
+
+    # Encryption Service (for sensitive data like IMAP passwords)
+    App\Service\EncryptionService:
+        arguments:
+            $secretKey: '%env(APP_SECRET)%'
 
     # reCAPTCHA Service
     App\Service\RecaptchaService:
@@ -155,11 +172,6 @@ services:
             $secretKey: '%env(string:default::RECAPTCHA_SECRET_KEY)%'
             $enabled: '%env(string:default:recaptcha_enabled_default:RECAPTCHA_ENABLED)%'
             $minScore: '%env(string:default:recaptcha_min_score_default:RECAPTCHA_MIN_SCORE)%'
-
-    # Encryption Service
-    App\Service\EncryptionService:
-        arguments:
-            $secretKey: '%env(APP_SECRET)%'
 
     App\Service\Message\AgainHandler: ~
 

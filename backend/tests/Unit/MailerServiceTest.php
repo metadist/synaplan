@@ -2,13 +2,13 @@
 
 namespace App\Tests\Unit;
 
-use App\Service\MailerService;
+use App\Service\InternalEmailService;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Mailer\MailerInterface;
 use Twig\Environment;
 
-class MailerServiceTest extends TestCase
+class InternalEmailServiceTest extends TestCase
 {
     public function testVerificationEmailStructure(): void
     {
@@ -20,7 +20,7 @@ class MailerServiceTest extends TestCase
         $mailer->expects($this->once())
             ->method('send');
 
-        $service = new MailerService($mailer, $twig, $logger);
+        $service = new InternalEmailService($mailer, $twig, $logger);
         $service->sendVerificationEmail('test@example.com', 'test_token_123');
 
         $this->assertTrue(true, 'Verification email method called successfully');
@@ -35,7 +35,7 @@ class MailerServiceTest extends TestCase
         $mailer->expects($this->once())
             ->method('send');
 
-        $service = new MailerService($mailer, $twig, $logger);
+        $service = new InternalEmailService($mailer, $twig, $logger);
         $service->sendPasswordResetEmail('test@example.com', 'reset_token_456');
 
         $this->assertTrue(true, 'Password reset email method called successfully');
