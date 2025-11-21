@@ -1,5 +1,5 @@
 <template>
-  <div class="relative" data-testid="comp-tools-dropdown">
+  <div ref="dropdownRef" class="relative" data-testid="comp-tools-dropdown">
     <button
       @click="toggleOpen"
       type="button"
@@ -178,6 +178,7 @@ const emit = defineEmits<{
 const router = useRouter()
 const isOpen = ref(false)
 const itemRefs = ref<HTMLElement[]>([])
+const dropdownRef = ref<HTMLElement | null>(null)
 const featuresStatus = ref<Record<string, Feature>>({})
 const isLoadingFeatures = ref(true)
 
@@ -266,9 +267,22 @@ const focusPrevious = () => {
 
 const handleClickOutside = (e: MouseEvent) => {
   const target = e.target as HTMLElement
-  if (isOpen.value && !target.closest('.relative')) {
-    closeDropdown()
+  if (!isOpen.value) return
+  
+  // Check if click is inside the dropdown container
+  if (dropdownRef.value && dropdownRef.value.contains(target)) {
+    return
   }
+  
+  // Check if click is on chat-related elements (input, messages area, etc.)
+  const chatElements = target.closest('[data-testid="comp-chat-input"], [data-testid="section-messages"], [data-testid="input-chat-message"], [data-testid="comp-chat-input-shell"]')
+  if (chatElements) {
+    closeDropdown()
+    return
+  }
+  
+  // Close if click is outside dropdown
+  closeDropdown()
 }
 
 onMounted(() => document.addEventListener('click', handleClickOutside))
