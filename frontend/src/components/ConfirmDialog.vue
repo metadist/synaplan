@@ -104,6 +104,8 @@
 </template>
 
 <script setup lang="ts">
+import { onMounted, onBeforeUnmount } from 'vue'
+
 interface Props {
   isOpen: boolean
   title?: string
@@ -113,7 +115,7 @@ interface Props {
   variant?: 'danger' | 'warning' | 'info'
 }
 
-withDefaults(defineProps<Props>(), {
+const props = withDefaults(defineProps<Props>(), {
   title: 'Confirm',
   message: 'Are you sure?',
   confirmText: 'Confirm',
@@ -128,6 +130,26 @@ const emit = defineEmits<{
 
 const confirm = () => emit('confirm')
 const cancel = () => emit('cancel')
+
+const handleKeydown = (event: KeyboardEvent) => {
+  if (!props.isOpen) return
+  if (event.key === 'Enter') {
+    event.preventDefault()
+    confirm()
+  }
+  if (event.key === 'Escape') {
+    event.preventDefault()
+    cancel()
+  }
+}
+
+onMounted(() => {
+  document.addEventListener('keydown', handleKeydown)
+})
+
+onBeforeUnmount(() => {
+  document.removeEventListener('keydown', handleKeydown)
+})
 </script>
 
 <style scoped>
