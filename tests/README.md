@@ -1,101 +1,71 @@
-# Playwright Smoke Test Setup
+# Synaplan E2E Tests
 
-Minimal-robustes Playwright-Smoke-Setup für laufende Web-App.
+Small Playwright test suite for the Synaplan app. Current focus: simple **smoke tests** that run locally against a running instance.
+
+Tests and coverage will be expanded over time.
+
+---
 
 ## Setup
 
-```bash
-# Node.js 18+ erforderlich
-node --version
+From the `tests/` project folder:
 
-# Dependencies installieren
+```bash
 npm install
-
-# Playwright Browser installieren
-npx playwright install chromium
+npx playwright install
 ```
 
-## Environment Variables
+The app itself must be running in parallel (e.g., `http://localhost:5137`).
 
-Kopiere `.env.example` zu `.env` und passe an:
+Optional local configuration via `.env.local`:
+
+```env
+BASE_URL=http://localhost:5137
+AUTH_USER=admin@synaplan.com
+AUTH_PASS=admin123
+API_TOKEN=your-api-token-here
+```
+
+`BASE_URL` overrides the default value from `playwright.config.ts`.
+
+---
+
+## Run tests
+
+All tests:
 
 ```bash
-cp .env.example .env
+npm run test
 ```
 
-Wichtige ENV-Variablen:
-- `BASE_URL`: BaseURL für Tests (Default: `http://localhost:5137`)
-- `AUTH_USER`: Username für Login-Tests
-- `AUTH_PASS`: Password für Login-Tests
-- `API_TOKEN`: Optional: Token für API-Tests
-
-## Lokaler Run
+Run only selected tests by tag/ID in the test title, e.g., `@smoke` or `id=004`:
 
 ```bash
-# Alle Tests
-npm test
-
-# Nur Smoke-Tests
-npm run test:smoke
-
-# Mit custom BASE_URL
-BASE_URL=http://localhost:5137 npm run test:smoke
+npx playwright test -g "@smoke"
+# or
+npx playwright test -g "id=004"
 ```
 
-## Test-Entwicklung
+More handy scripts:
 
 ```bash
-# Codegen: Generiert Test-Code während du interagierst
-npm run codegen
-
-# UI Mode: Visueller Test-Runner mit Live-Preview & Debug
-npm run test:ui
-
-# Einzelnen Test ausführen
-npx playwright test tests/e2e/smoke/01_login.spec.ts
-
-# Headed mode (Browser sichtbar)
-npx playwright test --headed
+npm run test:ui   # Playwright UI
+npm run report    # open the latest HTML report
+npm run trace     # view traces
 ```
 
-## Reports
+---
 
-```bash
-# HTML-Report öffnen
-npm run report
+## Structure (quick overview)
 
-# Trace anzeigen
-npm run trace
+```txt
+tests/
+├─ e2e/              # specs (e.g., chat.spec.ts, login.spec.ts)
+├─ reports/          # HTML & JUnit reports
+├─ test-results/     # traces, screenshots, videos
+├─ playwright.config.ts
+├─ package.json
+└─ .env.local        # local settings (not in repo)
 ```
 
-## Selektoren-Guideline
-
-Bevorzugt `[data-testid]` Attribute verwenden für robuste Selektoren.
-
-Passe Selektoren in `tests/utils/selectors.ts` an deine App an.
-
-## CI/CD
-
-GitHub Actions Workflow läuft:
-- On push to main
-- 3× täglich (6:00, 12:00, 18:00 UTC)
-
-Setze Secrets in GitHub:
-- `BASE_URL`
-- `AUTH_USER`
-- `AUTH_PASS`
-- `API_TOKEN`
-
-## Troubleshooting
-
-**Timeouts:**
-- Erhöhe `timeout` in `playwright.config.ts`
-- Prüfe ob App läuft auf `BASE_URL`
-
-**Flaky Tests:**
-- Nutze `waitForIdle()` statt `sleep()`
-- Prüfe Selektoren in `selectors.ts`
-
-**Langsame CI:**
-- Reduziere `workers` in `playwright.config.ts` (z.B. auf 2)
-
+The layout is intentionally simple: specs up top, helpers/selectors in their own files, no unnecessary magic.
