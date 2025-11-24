@@ -19,7 +19,7 @@ export default defineConfig({
   // BaseURL aus ENV oder Default
   use: {
     baseURL: process.env.BASE_URL || 'http://localhost:5137',
-    headless: false,
+    headless: true,
     screenshot: 'only-on-failure',
     video: 'retain-on-failure',
     trace: 'retain-on-failure',
