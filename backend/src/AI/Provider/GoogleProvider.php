@@ -779,9 +779,10 @@ class GoogleProvider implements
                 default => 'wav'
             };
 
-            // Save to file
+            // Save to file (ensure upload directory exists and is writable)
+            $this->ensureUploadDirectory();
             $filename = 'tts_' . uniqid() . '.' . $extension;
-            $outputPath = $this->uploadDir . '/' . $filename;
+            $outputPath = rtrim($this->uploadDir, '/\\') . '/' . $filename;
             
             $written = file_put_contents($outputPath, $audioData);
             if ($written === false) {
@@ -803,6 +804,19 @@ class GoogleProvider implements
                 'Google TTS error: ' . $e->getMessage(),
                 'google'
             );
+        }
+    }
+
+    private function ensureUploadDirectory(): void
+    {
+        if (!is_dir($this->uploadDir)) {
+            if (!@mkdir($concurrentDirectory = $this->uploadDir, 0775, true) && !is_dir($concurrentDirectory)) {
+                throw new \RuntimeException(sprintf('Unable to create upload directory: %s', $this->uploadDir));
+            }
+        }
+
+        if (!is_writable($this->uploadDir)) {
+            throw new \RuntimeException(sprintf('Upload directory is not writable: %s', $this->uploadDir));
         }
     }
 
@@ -898,4 +912,3 @@ class GoogleProvider implements
         return $contents;
     }
 }
-

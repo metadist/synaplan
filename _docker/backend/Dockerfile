@@ -14,6 +14,7 @@ RUN apt-get update && apt-get install -y \
     ffmpeg libavcodec-extra libavformat-dev libavutil-dev \
     libswscale-dev libavfilter-dev libswresample-dev \
     libx264-dev libx265-dev libvpx-dev libmp3lame-dev libopus-dev \
+    libc-client-dev libkrb5-dev \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /var/www/html
@@ -33,7 +34,7 @@ RUN cd /tmp && \
 RUN install-php-extensions \
     pdo_mysql mysqli \
     exif pcntl bcmath gd imagick zip sodium ffi \
-    grpc intl opcache
+    grpc intl opcache imap
 
 # PHP Configuration
 RUN mkdir -p /var/www/uploads && chmod 777 /var/www/uploads && \

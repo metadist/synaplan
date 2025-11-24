@@ -34,9 +34,13 @@ if [ -f "composer.json" ]; then
     echo "✅ Composer dependencies ready!"
 fi
 
-# Ensure runtime directories exist with correct permissions
-echo "📁 Ensuring runtime directories exist..."
-mkdir -p var/cache var/log var/uploads public/up
+# Ensure upload directory is available before permissions are fixed
+UPLOAD_DIR="/var/www/html/var/uploads"
+if [ ! -d "$UPLOAD_DIR" ]; then
+    mkdir -p "$UPLOAD_DIR"
+fi
+
+# Ensure proper permissions
 chown -R www-data:www-data var/ public/up/ 2>/dev/null || true
 chmod -R 775 var/ public/up/ 2>/dev/null || true
 

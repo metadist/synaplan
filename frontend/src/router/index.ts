@@ -49,6 +49,12 @@ const router = createRouter({
       meta: { requiresAuth: false, public: true }
     },
     {
+      path: '/auth/callback',
+      name: 'oauth-callback',
+      component: () => import('../components/auth/OAuthCallback.vue'),
+      meta: { requiresAuth: false, public: true }
+    },
+    {
       path: '/shared/:token',
       name: 'shared-chat',
       component: () => import('../views/SharedChatView.vue'),
@@ -149,6 +155,12 @@ const router = createRouter({
     {
       path: '/config/api-keys',
       name: 'config-api-keys',
+      component: () => import('../views/ConfigView.vue'),
+      meta: { requiresAuth: true }
+    },
+    {
+      path: '/config/api-documentation',
+      name: 'config-api-documentation',
       component: () => import('../views/ConfigView.vue'),
       meta: { requiresAuth: true }
     },

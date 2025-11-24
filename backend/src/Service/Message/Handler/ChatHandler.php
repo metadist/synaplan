@@ -3,12 +3,14 @@
 namespace App\Service\Message\Handler;
 
 use App\Entity\Message;
+use App\Entity\File;
 use App\Repository\PromptRepository;
 use App\Repository\ModelRepository;
 use App\AI\Service\AiFacade;
 use App\Service\ModelConfigService;
 use App\Service\PromptService;
 use App\Service\RAG\VectorSearchService;
+use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\DependencyInjection\Attribute\AutoconfigureTag;
 
@@ -27,7 +29,9 @@ class ChatHandler implements MessageHandlerInterface
         private ModelConfigService $modelConfigService,
         private ModelRepository $modelRepository,
         private LoggerInterface $logger,
-        private VectorSearchService $vectorSearchService
+        private VectorSearchService $vectorSearchService,
+        private EntityManagerInterface $em,
+        private string $uploadDir
     ) {}
     
     public function getName(): string
@@ -155,23 +159,59 @@ class ChatHandler implements MessageHandlerInterface
             'tokens' => $response['usage'] ?? [],
         ];
         
-        if (is_string($content) && str_starts_with(trim($content), '{')) {
+        // NEW: Check for file generation format first (for OfficeM maker)
+        $fileData = $this->extractFileGenerationData($content);
+        if ($fileData !== null) {
+            $this->logger->info('ChatHandler: Detected AI file generation');
+            
+            // Store the file
+            $generatedFile = $this->storeGeneratedFile($fileData, $message);
+            
+            if ($generatedFile) {
+                // Attach file to message
+                $message->addFile($generatedFile);
+                $this->em->flush();
+                
+                // Return message key for translation in frontend
+                $content = "__FILE_GENERATED__:{$fileData['filename']}";
+                
+                $metadata['generated_file'] = [
+                    'id' => $generatedFile->getId(),
+                    'filename' => $generatedFile->getFileName(),
+                    'path' => $generatedFile->getFilePath(),
+                    'size' => $generatedFile->getFileSize(),
+                    'type' => $generatedFile->getFileType()
+                ];
+                
+                $this->logger->info('ChatHandler: File generation successful', [
+                    'file_id' => $generatedFile->getId(),
+                    'filename' => $generatedFile->getFileName()
+                ]);
+            } else {
+                $content = "__FILE_GENERATION_FAILED__";
+                $this->logger->error('ChatHandler: File generation failed');
+            }
+        }
+        // Legacy: Check for old JSON format (BTEXT, BFILE, BFILETEXT)
+        // This is only for backward compatibility with old AI responses
+        // New responses return plain text directly
+        elseif (is_string($content) && str_starts_with(trim($content), '{')) {
             try {
                 $jsonData = json_decode($content, true, 512, JSON_THROW_ON_ERROR);
                 
                 // Extract BTEXT as main content
                 if (isset($jsonData['BTEXT'])) {
                     $content = $jsonData['BTEXT'];
-                    $this->logger->info('ChatHandler: Extracted BTEXT from JSON response');
+                    $this->logger->info('ChatHandler: Extracted BTEXT from legacy JSON response');
                 }
                 
-                // Extract file information
+                // Extract file information (legacy format)
                 if (!empty($jsonData['BFILE']) && !empty($jsonData['BFILETEXT'])) {
                     $metadata['file'] = [
                         'path' => $jsonData['BFILETEXT'],
                         'type' => $this->detectFileType($jsonData['BFILETEXT']),
                     ];
-                    $this->logger->info('ChatHandler: Extracted file data', $metadata['file']);
+                    $this->logger->info('ChatHandler: Extracted file data from legacy format', $metadata['file']);
                 }
                 
                 // Extract web search results/links
@@ -800,6 +840,168 @@ class ChatHandler implements MessageHandlerInterface
         $formatted .= "\nPlease use this information to answer the user's question. Cite sources using [1], [2], etc. when referencing specific information.\n\n";
 
         return $formatted;
+    }
+
+    /**
+     * Parse AI response and extract file generation data if present
+     * Format: { "BFILEPATH": "filename.ext", "BFILETEXT": "file content" }
+     * Also handles JSON wrapped in markdown code blocks: ```json ... ```
+     * 
+     * @return array|null ['filename' => string, 'content' => string, 'extension' => string] or null
+     */
+    private function extractFileGenerationData(string $content): ?array
+    {
+        // Check if content looks like JSON or is wrapped in markdown code blocks
+        $jsonContent = trim($content);
+        
+        // Extract JSON from markdown code blocks if present (```json ... ``` or ``` ... ```)
+        if (preg_match('/```(?:json)?\s*\n(.*?)\n```/s', $content, $matches)) {
+            $jsonContent = trim($matches[1]);
+            $this->logger->info('ChatHandler: Extracted JSON from markdown code block');
+        }
+        
+        if (!str_starts_with($jsonContent, '{')) {
+            return null;
+        }
+
+        try {
+            $jsonData = json_decode($jsonContent, true, 512, JSON_THROW_ON_ERROR);
+            
+            // Check for file generation format
+            if (isset($jsonData['BFILEPATH']) && isset($jsonData['BFILETEXT'])) {
+                $filename = trim($jsonData['BFILEPATH']);
+                $fileContent = $jsonData['BFILETEXT'];
+                
+                if (empty($filename) || empty($fileContent)) {
+                    return null;
+                }
+                
+                $extension = strtolower(pathinfo($filename, PATHINFO_EXTENSION));
+                
+                $this->logger->info('ChatHandler: Detected file generation', [
+                    'filename' => $filename,
+                    'extension' => $extension,
+                    'content_length' => strlen($fileContent)
+                ]);
+                
+                return [
+                    'filename' => $filename,
+                    'content' => $fileContent,
+                    'extension' => $extension
+                ];
+            }
+            
+            return null;
+        } catch (\JsonException $e) {
+            // Not JSON or invalid format
+            $this->logger->debug('ChatHandler: Content is not valid JSON for file generation', [
+                'error' => $e->getMessage()
+            ]);
+            return null;
+        }
+    }
+
+    /**
+     * Store AI-generated file in the file system and create File entity
+     * 
+     * @param array $fileData ['filename' => string, 'content' => string, 'extension' => string]
+     * @param Message $message The message that triggered the generation
+     * @return File|null The created File entity or null on error
+     */
+    private function storeGeneratedFile(array $fileData, Message $message): ?File
+    {
+        $userId = $message->getUserId();
+        $filename = $fileData['filename'];
+        $content = $fileData['content'];
+        $extension = $fileData['extension'];
+        
+        try {
+            // Generate storage path similar to FileStorageService
+            $year = date('Y');
+            $month = date('m');
+            $timestamp = time();
+            
+            // Sanitize filename
+            $sanitized = preg_replace('/[^a-zA-Z0-9._-]/', '_', $filename);
+            $sanitized = preg_replace('/_+/', '_', $sanitized);
+            
+            // Add timestamp to prevent collisions
+            $basename = pathinfo($sanitized, PATHINFO_FILENAME);
+            $finalFilename = $basename . '_' . $timestamp . '.' . $extension;
+            
+            // Create relative path
+            $relativePath = sprintf('%d/%s/%s/%s', $userId, $year, $month, $finalFilename);
+            $absolutePath = $this->uploadDir . '/' . $relativePath;
+            
+            // Create directory if not exists
+            $dir = dirname($absolutePath);
+            if (!is_dir($dir)) {
+                if (!mkdir($dir, 0755, true)) {
+                    $this->logger->error('ChatHandler: Failed to create directory', ['dir' => $dir]);
+                    return null;
+                }
+            }
+            
+            // Write file content
+            if (!file_put_contents($absolutePath, $content)) {
+                $this->logger->error('ChatHandler: Failed to write file', ['path' => $absolutePath]);
+                return null;
+            }
+            
+            // Detect MIME type
+            $mimeType = $this->getMimeTypeForExtension($extension);
+            
+            // Create File entity
+            $file = new File();
+            $file->setUserId($userId);
+            $file->setFilePath($relativePath);
+            $file->setFileType($extension);
+            $file->setFileName($filename);
+            $file->setFileSize(strlen($content));
+            $file->setFileMime($mimeType);
+            $file->setFileText($content); // Store content as text for searchability
+            $file->setStatus('generated');
+            
+            $this->em->persist($file);
+            $this->em->flush();
+            
+            $this->logger->info('ChatHandler: File generated and stored successfully', [
+                'file_id' => $file->getId(),
+                'filename' => $filename,
+                'path' => $relativePath,
+                'size' => $file->getFileSize()
+            ]);
+            
+            return $file;
+            
+        } catch (\Throwable $e) {
+            $this->logger->error('ChatHandler: Failed to store generated file', [
+                'filename' => $filename,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            return null;
+        }
+    }
+
+    /**
+     * Get MIME type for file extension
+     */
+    private function getMimeTypeForExtension(string $extension): string
+    {
+        return match(strtolower($extension)) {
+            'csv' => 'text/csv',
+            'txt' => 'text/plain',
+            'md' => 'text/markdown',
+            'html' => 'text/html',
+            'json' => 'application/json',
+            'xml' => 'application/xml',
+            'xlsx' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'docx' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            'pptx' => 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+            'pdf' => 'application/pdf',
+            default => 'application/octet-stream'
+        };
     }
 }
 

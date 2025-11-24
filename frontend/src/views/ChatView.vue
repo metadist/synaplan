@@ -426,6 +426,11 @@ const streamAIResponse = async (userMessage: string, options?: { includeReasonin
               ...(data.metadata || {})
             }
             
+            // Check if this is a file generation (backend sends 'Datei wird generiert...')
+            if (data.message && (data.message.includes('Datei') || data.message.includes('file'))) {
+              processingStatus.value = 'generating_file'
+            }
+            
             // Update message with real model from backend (instead of store model)
             const message = historyStore.messages.find(m => m.id === messageId)
             if (message && data.metadata) {
@@ -460,6 +465,32 @@ const streamAIResponse = async (userMessage: string, options?: { includeReasonin
             
             // Don't parse JSON during streaming - it's incomplete!
             // We'll parse it at the end in the 'complete' event
+            
+            // NEW: Detect if this looks like file generation JSON (OfficeM aker)
+            // If it starts with { and contains BFILEPATH, don't display it yet
+            const trimmedContent = fullContent.trim()
+            const looksLikeFileGeneration = 
+              (trimmedContent.startsWith('{') || trimmedContent.startsWith('```json\n{') || trimmedContent.startsWith('```\n{')) &&
+              (trimmedContent.includes('BFILEPATH') || trimmedContent.includes('"BFILEPATH"'))
+            
+            if (looksLikeFileGeneration) {
+              // Set generating_file status but don't display the JSON content yet
+              if (processingStatus.value !== 'generating_file') {
+                processingStatus.value = 'generating_file'
+                processingMetadata.value = { customMessage: 'Erstelle Datei...' }
+              }
+              
+              // Don't update message parts yet - wait for backend to process
+              console.log('📄 Detected file generation JSON, waiting for backend processing...')
+              
+              // Set message parts to EMPTY to hide JSON during generation
+              const message = historyStore.messages.find(m => m.id === messageId)
+              if (message) {
+                message.parts = []  // Clear parts completely during file generation
+              }
+              
+              return // Skip normal parsing
+            }
             
             // Extrahiere thinking blocks und content separat
             const thinkingMatches = fullContent.match(/<think>([\s\S]*?)(<\/think>|$)/g)
@@ -594,6 +625,65 @@ const streamAIResponse = async (userMessage: string, options?: { includeReasonin
             const message = historyStore.messages.find(m => m.id === messageId)
             if (message) {
               console.log('📍 Found message to update:', message.id)
+              
+              // ✨ NEW: Handle generated file from backend
+              if (data.generatedFile) {
+                console.log('📄 Generated file received from backend:', data.generatedFile)
+                
+                // Add file to message FIRST
+                if (!message.files) {
+                  message.files = []
+                }
+                
+                const fileData = {
+                  id: data.generatedFile.id,
+                  fileName: data.generatedFile.filename,
+                  filename: data.generatedFile.filename, // Both camelCase and lowercase for compatibility
+                  filePath: data.generatedFile.path,
+                  fileSize: data.generatedFile.size,
+                  fileType: data.generatedFile.type,
+                  fileMime: data.generatedFile.mime
+                }
+                
+                message.files.push(fileData)
+                
+                console.log('📄 File attached to message:', message.files)
+                
+                // Replace JSON content or special markers with translated message
+                const hasJsonOrMarker = message.parts.length === 0 || 
+                    (message.parts[0].type === 'code' && message.parts[0].content?.includes('BFILEPATH')) ||
+                    (message.parts[0].type === 'text' && message.parts[0].content?.includes('__FILE_GENERATED__'))
+                
+                if (hasJsonOrMarker) {
+                  // Use translation with filename parameter
+                  const translatedMessage = t('message.fileGenerated', { filename: data.generatedFile.filename })
+                  message.parts = [{
+                    type: 'text',
+                    content: translatedMessage
+                  }]
+                  console.log('📄 Set translated message:', translatedMessage)
+                }
+                
+                // Force Vue reactivity with multiple strategies
+                nextTick(() => {
+                  // Strategy 1: Update the message object with a new id to force key-based re-render
+                  const messageIndex = historyStore.messages.findIndex(m => m.id === message.id)
+                  if (messageIndex !== -1) {
+                    // Create completely new message object
+                    const updatedMessage = {
+                      ...message,
+                      files: [...message.files], // New array reference
+                      parts: [...message.parts], // New parts array
+                      timestamp: new Date(message.timestamp) // Force timestamp update
+                    }
+                    
+                    // Replace in store
+                    historyStore.messages.splice(messageIndex, 1, updatedMessage)
+                    
+                    console.log('📄 Message updated with new references')
+                  }
+                })
+              }
               
               // ✨ NEW: Parse JSON response if AI responded in JSON format
               // NOTE: againData is now generated by frontend in ChatMessage.vue

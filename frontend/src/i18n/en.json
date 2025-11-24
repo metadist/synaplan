@@ -217,9 +217,36 @@
     },
     "mailServerPlaceholder": "mail.example.com",
     "portPlaceholder": "993",
-    "emailAddressPlaceholder": "department@company.com",
+    "emailAddressPlaceholder": "department at company.com",
     "department": "Department",
-    "removeDepartment": "Remove department"
+    "removeDepartment": "Remove department",
+    "smtpConfig": "SMTP Configuration (Forwarding)",
+    "enableSmtp": "Enable SMTP for Email Forwarding",
+    "required": "Required",
+    "smtpConfigHelp": "Configure SMTP settings to forward processed emails to departments using your own mail server. SMTP configuration is required for email forwarding to work.",
+    "smtpServer": "SMTP Server:",
+    "smtpServerPlaceholder": "smtp.gmail.com",
+    "smtpServerHelp": "Outgoing mail server address",
+    "smtpPort": "SMTP Port:",
+    "smtpPortPlaceholder": "587",
+    "smtpPortHelp": "SMTP port (587 for STARTTLS, 465 for SSL/TLS)",
+    "smtpSecurity": "SMTP Security:",
+    "smtpSecurityHelp": "Connection encryption method",
+    "smtpUsername": "SMTP Username:",
+    "smtpUsernameHelp": "Username for SMTP authentication",
+    "smtpPassword": "SMTP Password:",
+    "smtpPasswordPlaceholder": "Enter SMTP password",
+    "smtpPasswordHelp": "Password for SMTP authentication (encrypted in database)",
+    "emailFilter": "Email Processing Filter",
+    "emailFilterHelp": "Define which emails should be processed and forwarded to departments.",
+    "filterNewOnly": "New Emails Only",
+    "filterNewOnlyHelp": "Process only emails received after this handler is activated. This is the recommended setting.",
+    "filterHistorical": "Include Historical Emails",
+    "filterHistoricalHelp": "Process emails from a specific time period, including past emails. Available for PRO users and above.",
+    "filterFromDate": "From Date",
+    "filterToDate": "To Date",
+    "recommended": "Recommended",
+    "proOnly": "PRO+"
   },
   "files": {
     "uploadTitle": "Upload RAG Files",
@@ -231,7 +258,8 @@
     "selectFilesButton": "Select files",
     "noFileSelected": "None selected",
     "supportedFormats": "Select one or more files (PDF, DOCX, TXT, JPG, PNG, MP3, MP4)",
-    "processingInfo": "Files are automatically extracted and vectorized for optimal RAG performance.",
+    "autoProcessingTitle": "Automatic Processing",
+    "autoProcessingInfo": "All files are automatically extracted and vectorized for optimal RAG performance with semantic search.",
     "uploadAndProcess": "Upload and Process Files",
     "yourFiles": "Your Files",
     "filterByGroup": "Filter by Group:",
@@ -284,8 +312,21 @@
       "defaultHandling": "default handling",
       "addKeyword": "Check for a free keyword to add your own handling:",
       "keywordPlaceholder": "keyword",
+      "yourEmailAddress": "Your email address: {email}",
+      "noKeywordSet": "You have not set a personal keyword yet. You can only write anonymously to the default handler!",
       "apiDescription": "Simple API calls with your personal API key:",
-      "exampleCurl": "Example:",
+      "apiDocumentationInfo": "For detailed API documentation including all available endpoints, request/response formats, and authentication methods, please visit our comprehensive API documentation.",
+      "viewApiDocumentation": "View API Documentation",
+      "apiDocumentation": {
+        "title": "API Documentation",
+        "description": "Complete API reference for integrating with Synaplan. All endpoints are documented with request/response examples.",
+        "loading": "Loading API documentation...",
+        "parameters": "Parameters",
+        "requestBody": "Request Body",
+        "responses": "Responses",
+          "authentication": "Authentication"
+        },
+        "exampleCurl": "Example:",
       "widgetDescription": "To activate the widget, please enter your domain name like \"yourdomain.net\" in the field below.",
       "domainPlaceholder": "yourdomain.net",
       "activateWidget": "Activate Widget",
@@ -345,9 +386,7 @@
       "deleteWarning": "Deleting this prompt is permanent and cannot be undone.",
       "deletePrompt": "Delete Prompt",
       "saveChanges": "Save Changes",
-      "noPrompts": "No prompts available",
-      "selectPromptTitle": "Select a prompt to get started",
-      "selectPromptDescription": "Choose a prompt from the dropdown above to view and edit its configuration."
+      "noPrompts": "No prompts available"
     },
     "sortingPrompt": {
       "title": "Preprocessor",
@@ -591,7 +630,12 @@
     "emailVerifiedDesc": "Your email has been successfully verified. You can now access all features of your account.",
     "continueToApp": "Continue to Login",
     "redirectIn": "Redirecting in {seconds} seconds...",
-    "accountReady": "Your account is ready to use"
+    "accountReady": "Your account is ready to use",
+    "loginWithGoogle": "Login with Google",
+    "loginWithGitHub": "Login with GitHub",
+    "socialLoginError": "Social login failed. Please try again.",
+    "oauthCallbackProcessing": "Processing login...",
+    "noSocialProviders": "No social login providers configured"
   },
   "unsavedChanges": {
     "title": "You have unsaved changes",
@@ -868,13 +912,18 @@
     "generating": "Generating response...",
     "generatingTitle": "Generating response",
     "generatingDesc": "AI is crafting your answer with",
+    "generatingFile": "Creating file...",
+    "generatingFileTitle": "File is being generated",
+    "generatingFileDesc": "AI is creating the requested file",
     "topic": "Topic",
     "language": "Language",
     "modelId": "Model ID"
   },
   "message": {
     "thinking": "Thinking process",
-    "reasoning": "AI Reasoning"
+    "reasoning": "AI Reasoning",
+    "fileGenerated": "I've created the file '{filename}' for you. You can now download it.",
+    "fileGenerationFailed": "There was a problem creating the file. Please try again."
   },
   "aiProvider": {
     "error": {

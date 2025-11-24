@@ -213,9 +213,8 @@ class MessageSorter
                 'web_search' => $webSearch ?? false,
                 'raw_response' => $aiResponse,
                 'prompt_metadata' => $promptMetadata,
-                'model_id' => $modelId,
-                'provider' => $provider,
-                'model_name' => $modelName
+                // Don't return model_id/provider/model_name from sorting - they are for internal use only
+                // The ChatHandler should use its own model selection logic
             ];
 
         } catch (\App\AI\Exception\ProviderException $e) {

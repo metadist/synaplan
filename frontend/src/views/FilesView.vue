@@ -72,93 +72,9 @@
             <p class="text-xs txt-secondary mt-2">
               {{ $t('files.supportedFormats') }}
             </p>
-            <p class="text-sm txt-secondary mt-3">
-              {{ $t('files.processingInfo') }}
+            <p class="text-sm txt-secondary mt-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
+              <strong>{{ $t('files.autoProcessingTitle') }}:</strong> {{ $t('files.autoProcessingInfo') }}
             </p>
-          </div>
-
-          <div class="mb-6" data-testid="section-processing-level">
-            <label class="label mb-3">Processing Level</label>
-            <div class="grid gap-3">
-              <!-- Extract Option -->
-              <label 
-                class="surface-card p-4 cursor-pointer transition-all hover:shadow-lg"
-                :class="processLevel === 'extract' ? 'ring-2 ring-[var(--brand)]' : ''"
-                data-testid="item-process-option"
-              >
-                <div class="flex items-start gap-3">
-                  <input
-                    type="radio"
-                    v-model="processLevel"
-                    value="extract"
-                    class="mt-1 w-4 h-4 text-[var(--brand)] focus:ring-[var(--brand)]"
-                    data-testid="input-process-extract"
-                  />
-                  <div class="flex-1">
-                    <div class="flex items-center gap-2">
-                      <span class="font-semibold txt-primary">Extract Only</span>
-                      <span class="pill px-2 py-0.5 text-xs">Fastest</span>
-                    </div>
-                    <p class="text-sm txt-secondary mt-1">
-                      Only extracts text from files. Perfect for quick text retrieval.
-                    </p>
-                  </div>
-                </div>
-              </label>
-
-              <!-- Vectorize Option (Recommended) -->
-              <label 
-                class="surface-card p-4 cursor-pointer transition-all hover:shadow-lg"
-                :class="processLevel === 'vectorize' ? 'ring-2 ring-[var(--brand)]' : ''"
-                data-testid="item-process-option"
-              >
-                <div class="flex items-start gap-3">
-                  <input
-                    type="radio"
-                    v-model="processLevel"
-                    value="vectorize"
-                    class="mt-1 w-4 h-4 text-[var(--brand)] focus:ring-[var(--brand)]"
-                    data-testid="input-process-vectorize"
-                  />
-                  <div class="flex-1">
-                    <div class="flex items-center gap-2">
-                      <span class="font-semibold txt-primary">Extract + Vectorize</span>
-                      <span class="pill--active px-2 py-0.5 text-xs">Recommended</span>
-                    </div>
-                    <p class="text-sm txt-secondary mt-1">
-                      Extracts text and creates AI embeddings for semantic search with RAG.
-                    </p>
-                  </div>
-                </div>
-              </label>
-
-              <!-- Full Option -->
-              <label 
-                class="surface-card p-4 cursor-pointer transition-all hover:shadow-lg opacity-60"
-                :class="processLevel === 'full' ? 'ring-2 ring-[var(--brand)]' : ''"
-                data-testid="item-process-option"
-              >
-                <div class="flex items-start gap-3">
-                  <input
-                    type="radio"
-                    v-model="processLevel"
-                    value="full"
-                    class="mt-1 w-4 h-4 text-[var(--brand)] focus:ring-[var(--brand)]"
-                    disabled
-                    data-testid="input-process-full"
-                  />
-                  <div class="flex-1">
-                    <div class="flex items-center gap-2">
-                      <span class="font-semibold txt-primary">Full Processing</span>
-                      <span class="pill px-2 py-0.5 text-xs">Coming Soon</span>
-                    </div>
-                    <p class="text-sm txt-secondary mt-1">
-                      Complete analysis with summarization and advanced features.
-                    </p>
-                  </div>
-                </div>
-              </label>
-            </div>
           </div>
 
           <button
@@ -494,7 +410,7 @@ const storageWidget = ref<InstanceType<typeof StorageQuotaWidget> | null>(null)
 
 const groupKeyword = ref('')
 const selectedGroup = ref('')
-const processLevel = ref<'extract' | 'vectorize' | 'full'>('vectorize')
+// File upload state (removed processLevel - always vectorize)
 const selectedFiles = ref<File[]>([])
 const filterGroup = ref('')
 const files = ref<FileItem[]>([])
@@ -559,7 +475,7 @@ const uploadFiles = async () => {
     const result = await filesService.uploadFiles({
       files: selectedFiles.value,
       groupKey,
-      processLevel: processLevel.value
+      processLevel: 'vectorize' // Always vectorize for optimal RAG performance
     })
 
     if (result.success) {
