@@ -198,6 +198,7 @@ class GoogleAuthController extends AbstractController
             $user = new User();
             $user->setMail($email);
             $user->setType('GOOGLE');
+            $user->setProviderId('google');
             $user->setUserLevel('NEW');
             $user->setEmailVerified(true); // OAuth users are pre-verified
             $user->setCreated(date('Y-m-d H:i:s'));
@@ -228,6 +229,11 @@ class GoogleAuthController extends AbstractController
         }
 
         $user->setUserDetails($userDetails);
+        
+        // Verify email if user logged in via Google (OAuth emails are trusted)
+        if (!$user->isEmailVerified() && ($userInfo['verified_email'] ?? false)) {
+            $user->setEmailVerified(true);
+        }
 
         $this->em->persist($user);
         $this->em->flush();

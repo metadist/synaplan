@@ -49,6 +49,16 @@ class GoogleProvider implements
         return 'google';
     }
 
+    public function getDisplayName(): string
+    {
+        return 'Google AI';
+    }
+
+    public function getDescription(): string
+    {
+        return 'Gemini models with multimodal capabilities including video';
+    }
+
     public function getCapabilities(): array
     {
         return ['chat', 'embedding', 'vision', 'image_generation', 'video_generation', 'text_to_speech'];
@@ -79,6 +89,16 @@ class GoogleProvider implements
     public function isAvailable(): bool
     {
         return !empty($this->apiKey);
+    }
+
+    public function getRequiredEnvVars(): array
+    {
+        return [
+            'GOOGLE_GEMINI_API_KEY' => [
+                'required' => true,
+                'hint' => 'Get your API key from https://aistudio.google.com/app/apikey'
+            ]
+        ];
     }
 
     // ==================== CHAT ====================

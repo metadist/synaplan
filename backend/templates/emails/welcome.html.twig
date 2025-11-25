@@ -22,20 +22,20 @@
 </head>
 <body>
     <div class="container">
-        <h2>{{ 'email.welcome.title'|trans }}</h2>
-        <p>{{ 'email.welcome.greeting'|trans({'%name%': name}) }}</p>
-        <p>{{ 'email.welcome.intro'|trans }}</p>
-        <p>{{ 'email.welcome.features_intro'|trans }}</p>
+        <h2>{{ t.title }}</h2>
+        <p>{{ t.greeting }}</p>
+        <p>{{ t.intro }}</p>
+        <p>{{ t.features_intro }}</p>
         <ul>
-            <li>{{ 'email.welcome.feature_1'|trans }}</li>
-            <li>{{ 'email.welcome.feature_2'|trans }}</li>
-            <li>{{ 'email.welcome.feature_3'|trans }}</li>
-            <li>{{ 'email.welcome.feature_4'|trans }}</li>
+            <li>{{ t.feature_1 }}</li>
+            <li>{{ t.feature_2 }}</li>
+            <li>{{ t.feature_3 }}</li>
+            <li>{{ t.feature_4 }}</li>
         </ul>
-        <a href="{{ app_url ?? 'http://localhost:3000' }}" class="button">{{ 'email.welcome.button'|trans }}</a>
+        <a href="{{ app_url ?? 'http://localhost:5173' }}" class="button">{{ t.button }}</a>
         <div class="footer">
-            <p>{{ 'email.footer.help'|trans }}</p>
-            <p>&copy; {{ "now"|date("Y") }} {{ 'email.footer.company'|trans }}. {{ 'email.footer.rights'|trans }}</p>
+            <p>{{ t.footer_help }}</p>
+            <p>&copy; {{ "now"|date("Y") }} {{ t.footer_company }}. {{ t.footer_rights }}</p>
         </div>
     </div>
 </body>

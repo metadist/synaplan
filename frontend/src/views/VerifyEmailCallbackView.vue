@@ -79,11 +79,11 @@ onMounted(async () => {
   }
 
   try {
-    await apiService.verifyEmail(token)
+    await authApi.verifyEmail(token)
     verified.value = true
   } catch (err: any) {
     console.error('Email verification failed:', err)
-    error.value = err.response?.data?.error || 'Verification failed.'
+    error.value = err.response?.data?.error || err.message || 'Verification failed.'
     verified.value = false
   } finally {
     loading.value = false

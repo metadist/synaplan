@@ -76,7 +76,6 @@ import ChatInput from '@/components/ChatInput.vue'
 import ChatMessage from '@/components/ChatMessage.vue'
 import { useHistoryStore, type Message } from '@/stores/history'
 import { useChatsStore } from '@/stores/chats'
-import { executeCommand } from '@/commands/execute'
 import { useModelsStore } from '@/stores/models'
 import { useAiConfigStore } from '@/stores/aiConfig'
 import { useAuthStore } from '@/stores/auth'
@@ -311,18 +310,8 @@ const handleSendMessage = async (content: string, options?: { includeReasoning?:
     webSearchData // webSearch
   )
 
-  // Commands have no streaming (e.g. /pic, /search)
-  const parts = await executeCommand(content)
-  
-  // If it's a command with special parts (not just text), don't stream
-  const hasNonTextParts = parts.some(p => p.type !== 'text')
-  
-  if (hasNonTextParts) {
-    historyStore.addMessage('assistant', parts, undefined)
-  } else {
-    // Stream the response
-    await streamAIResponse(content, options)
-  }
+  // Stream all messages (including commands) directly to backend
+  await streamAIResponse(content, options)
 }
 
 const streamAIResponse = async (userMessage: string, options?: { includeReasoning?: boolean; webSearch?: boolean; modelId?: number; fileIds?: number[] }) => {
@@ -338,16 +327,17 @@ const streamAIResponse = async (userMessage: string, options?: { includeReasonin
   
   try {
     if (useMockData) {
-      // Generate Mock-Response for development
-      const { generateMockResponse, streamText } = await import('../commands/execute')
-      const fullResponse = generateMockResponse(userMessage)
+      // Mock streaming for development (simple text streaming)
+      const mockResponse = 'This is a mock response for development. The actual streaming is handled by the backend API.'
       
-      // Stream the response
-      for await (const chunk of streamText(fullResponse)) {
+      // Simple character-by-character streaming
+      for (let i = 0; i < mockResponse.length; i += 3) {
         if (streamingAbortController.signal.aborted) {
           break
         }
+        const chunk = mockResponse.slice(0, i + 3)
         historyStore.updateStreamingMessage(messageId, chunk)
+        await new Promise(resolve => setTimeout(resolve, 30))
       }
       
       historyStore.finishStreamingMessage(messageId)

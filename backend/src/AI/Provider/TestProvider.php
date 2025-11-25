@@ -24,6 +24,16 @@ class TestProvider implements
         return 'test';
     }
     
+    public function getDisplayName(): string
+    {
+        return 'Test Provider';
+    }
+
+    public function getDescription(): string
+    {
+        return 'Mock provider for testing and development';
+    }
+    
     public function getCapabilities(): array
     {
         return ['chat', 'embedding', 'vision', 'image_generation', 'speech_to_text', 'text_to_speech', 'file_analysis'];
@@ -50,6 +60,11 @@ class TestProvider implements
     public function isAvailable(): bool
     {
         return true;
+    }
+
+    public function getRequiredEnvVars(): array
+    {
+        return []; // Test provider requires no configuration
     }
 
     public function chat(array $messages, array $options = []): string

@@ -12,6 +12,9 @@ export interface UserProfile {
   language: string
   timezone: string
   invoiceEmail: string
+  canChangePassword?: boolean
+  authProvider?: string
+  isExternalAuth?: boolean
 }
 
 export interface Country {

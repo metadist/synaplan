@@ -111,9 +111,13 @@ class AuthController extends AbstractController
         // Generate verification token
         $token = $this->tokenRepository->createToken($user, 'email_verification', 86400); // 24h
 
-        // Send verification email
+        // Send verification email with user's preferred language
         try {
-            $this->internalEmailService->sendVerificationEmail($user->getMail(), $token->getToken());
+            $this->internalEmailService->sendVerificationEmail(
+                $user->getMail(), 
+                $token->getToken(),
+                $user->getLocale()
+            );
         } catch (\Exception $e) {
             $this->logger->error('Failed to send verification email', [
                 'user_id' => $user->getId(),
@@ -242,9 +246,19 @@ class AuthController extends AbstractController
         $this->tokenRepository->markAsUsed($token);
         $this->em->flush();
 
-        // Send welcome email
+        // Send welcome email with user's preferred language
         try {
-            $this->internalEmailService->sendWelcomeEmail($user->getMail(), $user->getMail());
+            $details = $user->getUserDetails();
+            $userName = trim(($details['first_name'] ?? '') . ' ' . ($details['last_name'] ?? ''));
+            if (empty($userName)) {
+                $userName = $user->getMail();
+            }
+            
+            $this->internalEmailService->sendWelcomeEmail(
+                $user->getMail(), 
+                $userName,
+                $user->getLocale()
+            );
         } catch (\Exception $e) {
             $this->logger->error('Failed to send welcome email', ['user_id' => $user->getId()]);
         }
@@ -277,11 +291,24 @@ class AuthController extends AbstractController
             ]);
         }
 
+        // Block password reset for external auth users (OAuth, OIDC)
+        if (!$user->canChangePassword()) {
+            // Don't reveal user exists or auth method - just return success
+            return $this->json([
+                'success' => true,
+                'message' => 'If email exists, reset instructions sent'
+            ]);
+        }
+
         // Generate reset token (1 hour expiry)
         $token = $this->tokenRepository->createToken($user, 'password_reset', 3600);
 
         try {
-            $this->internalEmailService->sendPasswordResetEmail($user->getMail(), $token->getToken());
+            $this->internalEmailService->sendPasswordResetEmail(
+                $user->getMail(), 
+                $token->getToken(),
+                $user->getLocale()
+            );
         } catch (\Exception $e) {
             $this->logger->error('Failed to send reset email', ['user_id' => $user->getId()]);
         }
@@ -317,6 +344,15 @@ class AuthController extends AbstractController
         }
 
         $user = $token->getUser();
+        
+        // Block password reset for external auth users
+        if (!$user->canChangePassword()) {
+            $provider = $user->getAuthProviderName();
+            return $this->json([
+                'error' => "This account is managed by {$provider}. Please use {$provider} to manage your password."
+            ], Response::HTTP_FORBIDDEN);
+        }
+        
         $user->setPw($this->passwordHasher->hashPassword($user, $newPassword));
         $this->tokenRepository->markAsUsed($token);
         $this->em->flush();
@@ -408,7 +444,11 @@ class AuthController extends AbstractController
         // User exists and is unverified - create token and send email
         try {
             $token = $this->tokenRepository->createToken($user, 'email_verification', 86400);
-            $this->internalEmailService->sendVerificationEmail($user->getMail(), $token->getToken());
+            $this->internalEmailService->sendVerificationEmail(
+                $user->getMail(), 
+                $token->getToken(),
+                $user->getLocale()
+            );
             
             // Only flush after successful email send
             $this->em->flush();
