@@ -74,12 +74,19 @@ echo ""
 echo "📦 Pulling containers (this may take a minute)..."
 docker compose pull
 
+# Stop any running containers to ensure clean start with new env vars
+docker compose down 2>/dev/null || true
+
 if [ "$USE_GROQ" -eq 1 ]; then
-  echo "🚀 Starting stack (Groq cloud mode - still downloading bge-m3 locally)..."
-  AUTO_DOWNLOAD_MODELS=true ENABLE_LOCAL_GPT_OSS=false docker compose up -d
+  echo "🚀 Starting stack (Groq cloud mode - only downloading bge-m3 locally)..."
+  export AUTO_DOWNLOAD_MODELS=true
+  export ENABLE_LOCAL_GPT_OSS=false
+  docker compose up -d
 else
   echo "🚀 Starting stack (Auto-download of gpt-oss:20b and bge-m3 enabled)..."
-  AUTO_DOWNLOAD_MODELS=true ENABLE_LOCAL_GPT_OSS=true docker compose up -d
+  export AUTO_DOWNLOAD_MODELS=true
+  export ENABLE_LOCAL_GPT_OSS=true
+  docker compose up -d
 fi
 
 echo ""
@@ -88,15 +95,35 @@ if [ "$USE_GROQ" -eq 1 ]; then
 else
   echo "📡 Tracking Ollama model downloads (gpt-oss:20b + bge-m3)..."
 fi
+echo "⏳ Waiting for backend to start model downloads..."
 set +e
 set +u
 set +o pipefail
-( docker compose logs -f backend | awk '/\[Background\]/ {printf "\r%s", $0; fflush(); if ($0 ~ /\[Background\] 🎉 Model downloads completed!/) { printf "\n"; exit }}' )
-RESULT=$?
+
+# Wait up to 5 minutes for model downloads
+# Use a simpler approach: just wait for the completion message with a timeout
+RESULT=1
+SECONDS=0
+while [ $SECONDS -lt 300 ]; do
+  if docker compose logs backend 2>&1 | grep -q "\[Background\] 🎉 Model downloads completed!"; then
+    RESULT=0
+    # Show a summary of what was downloaded
+    docker compose logs backend 2>&1 | grep "\[Background\]" | grep -E "(Downloading|downloaded|completed)" | tail -n 5
+    break
+  fi
+  printf "."
+  sleep 3
+done
+echo ""
 set -e
 set -u
 set -o pipefail
-if [ "$RESULT" -ne 0 ]; then
+
+if [ "$RESULT" -eq 124 ]; then
+  echo ""
+  echo "⚠️ Timeout waiting for model downloads (5 min). Downloads may still be running."
+  echo "   Check progress with: docker compose logs -f backend | grep Background"
+elif [ "$RESULT" -ne 0 ]; then
   echo ""
   echo "⚠️ Could not confirm model download completion. Check 'docker compose logs backend'."
 else
@@ -121,8 +148,10 @@ if [ "$READY" -eq 1 ]; then
   docker compose exec backend php bin/console doctrine:fixtures:load --no-interaction
   if [ "$USE_GROQ" -eq 1 ]; then
     echo "⚙️ Switching defaults to Groq llama-3.3-70b-versatile..."
-    docker compose exec backend php bin/console dbal:run-sql "UPDATE BCONFIG SET BVALUE='9' WHERE BGROUP='DEFAULTMODEL' AND BSETTING IN ('CHAT','SORT')"
-    docker compose exec backend php bin/console dbal:run-sql "UPDATE BCONFIG SET BVALUE='groq' WHERE BOWNERID=0 AND BGROUP='ai' AND BSETTING='default_chat_provider'"
+    docker compose exec backend php bin/console dbal:run-sql \
+      'UPDATE BCONFIG SET BVALUE="9" WHERE BGROUP="DEFAULTMODEL" AND BSETTING IN ("CHAT","SORT")'
+    docker compose exec backend php bin/console dbal:run-sql \
+      'UPDATE BCONFIG SET BVALUE="groq" WHERE BOWNERID=0 AND BGROUP="ai" AND BSETTING="default_chat_provider"'
   fi
 else
   echo "⚠️ Backend console did not become ready; please run doctrine:schema:update and fixtures manually."
