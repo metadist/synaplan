@@ -911,7 +911,13 @@ const handleStopStreaming = async () => {
     
     if (trackIdToSave && chatIdToSave) {
       console.log('📤 Saving cancelled message to backend', { trackId: trackIdToSave, chatId: chatIdToSave })
-      saveCancelledMessageToBackend(trackIdToSave, chatIdToSave, finalContent)
+      // Save and update message with backend ID, pass current metadata
+      const metadata = {
+        provider: streamingMessage.provider,
+        model: streamingMessage.modelLabel,
+        topic: streamingMessage.topic
+      }
+      saveCancelledMessageToBackend(trackIdToSave, chatIdToSave, finalContent, streamingMessage.id, metadata)
         .catch(error => console.error('❌ Failed to save cancelled message to backend:', error))
     } else {
       console.warn('⚠️ Cannot save cancelled message - missing trackId or chatId', { trackIdToSave, chatIdToSave })
@@ -924,8 +930,14 @@ const handleStopStreaming = async () => {
 }
 
 // Helper function to save cancelled message to backend
-async function saveCancelledMessageToBackend(trackId: number, chatId: number, content: string) {
-  console.log('📡 saveCancelledMessageToBackend called', { trackId, chatId, contentLength: content.length })
+async function saveCancelledMessageToBackend(
+  trackId: number, 
+  chatId: number, 
+  content: string, 
+  messageId: string,
+  metadata?: { provider?: string, model?: string, topic?: string }
+) {
+  console.log('📡 saveCancelledMessageToBackend called', { trackId, chatId, contentLength: content.length, messageId, metadata })
   
   try {
     const token = localStorage.getItem('auth_token')
@@ -942,7 +954,10 @@ async function saveCancelledMessageToBackend(trackId: number, chatId: number, co
       body: JSON.stringify({
         trackId,
         chatId,
-        content
+        content,
+        provider: metadata?.provider,
+        model: metadata?.model,
+        topic: metadata?.topic
       })
     })
     
@@ -951,6 +966,42 @@ async function saveCancelledMessageToBackend(trackId: number, chatId: number, co
     if (response.ok) {
       const data = await response.json()
       console.log('✅ Cancelled message saved to backend:', data)
+      
+      // Update the message with backend message ID and metadata so the footer buttons appear
+      const message = historyStore.messages.find(m => m.id === messageId)
+      if (message && data.messageId) {
+        message.backendMessageId = data.messageId
+        
+        // Update metadata if provided by backend
+        if (data.topic) {
+          message.topic = data.topic
+        }
+        if (data.provider) {
+          message.provider = data.provider
+        }
+        if (data.model) {
+          message.modelLabel = data.model
+        }
+        
+        // Set aiModels object for proper display of model badges
+        if (data.provider && data.model) {
+          message.aiModels = {
+            chat: {
+              provider: data.provider,
+              model: data.model,
+              model_id: null // We don't have the model_id from cancelled message
+            }
+          }
+        }
+        
+        console.log('✅ Updated message with metadata:', { 
+          backendMessageId: data.messageId,
+          topic: data.topic,
+          provider: data.provider,
+          model: data.model,
+          aiModels: message.aiModels
+        })
+      }
     } else {
       const errorText = await response.text()
       console.warn('⚠️ Failed to save cancelled message:', response.status, errorText)
