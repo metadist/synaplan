@@ -75,12 +75,30 @@ class ProfileController extends AbstractController
         $emailKeyword = $this->emailChatService->getUserEmailKeyword($user);
         $personalEmailAddress = $this->emailChatService->getUserPersonalEmailAddress($user);
 
+        // Get external auth info if applicable
+        $externalAuthInfo = null;
+        if ($user->isExternalAuth()) {
+            $type = $user->getType();
+            $lastLoginKey = match($type) {
+                'GOOGLE' => 'google_last_login',
+                'GITHUB' => 'github_last_login',
+                'OIDC' => 'oidc_last_login',
+                default => null
+            };
+            
+            if ($lastLoginKey && isset($details[$lastLoginKey])) {
+                $externalAuthInfo = [
+                    'lastLogin' => $details[$lastLoginKey]
+                ];
+            }
+        }
+
         return $this->json([
             'success' => true,
             'profile' => [
                 'email' => $user->getMail(),
-                'firstName' => $details['firstName'] ?? '',
-                'lastName' => $details['lastName'] ?? '',
+                'firstName' => $details['firstName'] ?? $details['first_name'] ?? '',
+                'lastName' => $details['lastName'] ?? $details['last_name'] ?? '',
                 'phone' => $details['phone'] ?? '',
                 'companyName' => $details['companyName'] ?? '',
                 'vatId' => $details['vatId'] ?? '',
@@ -93,6 +111,10 @@ class ProfileController extends AbstractController
                 'invoiceEmail' => $details['invoiceEmail'] ?? '',
                 'emailKeyword' => $emailKeyword,
                 'personalEmailAddress' => $personalEmailAddress,
+                'canChangePassword' => $user->canChangePassword(),
+                'authProvider' => $user->getAuthProviderName(),
+                'isExternalAuth' => $user->isExternalAuth(),
+                'externalAuthInfo' => $externalAuthInfo
             ]
         ]);
     }
@@ -232,6 +254,14 @@ class ProfileController extends AbstractController
     ): JsonResponse {
         if (!$user) {
             return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
+        }
+
+        // Block password change for external authentication users (OAuth, OIDC)
+        if (!$user->canChangePassword()) {
+            $provider = $user->getAuthProviderName();
+            return $this->json([
+                'error' => "Password cannot be changed for {$provider} accounts. Please manage your password through {$provider}."
+            ], Response::HTTP_FORBIDDEN);
         }
 
         $data = json_decode($request->getContent(), true);

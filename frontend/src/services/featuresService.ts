@@ -17,6 +17,7 @@ export interface Feature {
   env_vars?: Record<string, FeatureEnvVar>
   models_available?: number
   url?: string
+  version?: string
 }
 
 export interface FeaturesStatus {

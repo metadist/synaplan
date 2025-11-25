@@ -258,6 +258,7 @@ class KeycloakAuthController extends AbstractController
             $user = new User();
             $user->setMail($email ?? $username . '@keycloak.local');
             $user->setType('OIDC');
+            $user->setProviderId('keycloak');
             $user->setUserLevel('NEW');
             $user->setEmailVerified(true); // OIDC users are pre-verified
             $user->setCreated(date('Y-m-d H:i:s'));
@@ -289,6 +290,11 @@ class KeycloakAuthController extends AbstractController
         }
 
         $user->setUserDetails($userDetails);
+        
+        // Verify email if user logged in via OIDC (OIDC emails are trusted)
+        if (!$user->isEmailVerified() && $email && ($userInfo['email_verified'] ?? true)) {
+            $user->setEmailVerified(true);
+        }
 
         $this->em->persist($user);
         $this->em->flush();

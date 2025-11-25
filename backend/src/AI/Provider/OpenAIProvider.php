@@ -38,6 +38,16 @@ class OpenAIProvider implements
         return 'openai';
     }
 
+    public function getDisplayName(): string
+    {
+        return 'OpenAI';
+    }
+
+    public function getDescription(): string
+    {
+        return 'GPT models for chat, vision, and content generation';
+    }
+
     public function getCapabilities(): array
     {
         return ['chat', 'embedding', 'vision', 'image_generation', 'speech_to_text', 'text_to_speech'];
@@ -68,6 +78,16 @@ class OpenAIProvider implements
     public function isAvailable(): bool
     {
         return !empty($this->apiKey) && $this->client !== null;
+    }
+
+    public function getRequiredEnvVars(): array
+    {
+        return [
+            'OPENAI_API_KEY' => [
+                'required' => true,
+                'hint' => 'Get your API key from https://platform.openai.com/'
+            ]
+        ];
     }
 
     /**

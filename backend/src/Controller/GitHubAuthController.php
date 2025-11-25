@@ -237,6 +237,7 @@ class GitHubAuthController extends AbstractController
             $user = new User();
             $user->setMail($email ?? $githubLogin . '@github.local');
             $user->setType('GITHUB');
+            $user->setProviderId('github');
             $user->setUserLevel('NEW');
             $user->setEmailVerified(true); // OAuth users are pre-verified
             $user->setCreated(date('Y-m-d H:i:s'));
@@ -279,6 +280,11 @@ class GitHubAuthController extends AbstractController
         }
 
         $user->setUserDetails($userDetails);
+        
+        // Verify email if user logged in via GitHub (OAuth emails are trusted)
+        if (!$user->isEmailVerified() && $email) {
+            $user->setEmailVerified(true);
+        }
 
         $this->em->persist($user);
         $this->em->flush();

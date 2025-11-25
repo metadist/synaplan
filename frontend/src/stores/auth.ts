@@ -126,6 +126,14 @@ export const useAuthStore = defineStore('auth', () => {
     error.value = null
   }
 
+  // Reset store to initial state (for $reset compatibility)
+  function $reset(): void {
+    user.value = null
+    token.value = null
+    loading.value = false
+    error.value = null
+  }
+
   // Initialize on store creation
   checkAuth()
 
@@ -146,6 +154,7 @@ export const useAuthStore = defineStore('auth', () => {
     refreshUser,
     checkAuth,
     clearError,
+    $reset,
   }
 })
 

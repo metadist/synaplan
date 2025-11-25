@@ -36,6 +36,16 @@ class GroqProvider implements ChatProviderInterface, VisionProviderInterface
         return 'groq';
     }
 
+    public function getDisplayName(): string
+    {
+        return 'Groq';
+    }
+
+    public function getDescription(): string
+    {
+        return 'Ultra-fast LLM inference with LPU technology';
+    }
+
     public function getCapabilities(): array
     {
         return ['chat', 'vision'];
@@ -66,6 +76,16 @@ class GroqProvider implements ChatProviderInterface, VisionProviderInterface
     public function isAvailable(): bool
     {
         return !empty($this->apiKey) && $this->client !== null;
+    }
+
+    public function getRequiredEnvVars(): array
+    {
+        return [
+            'GROQ_API_KEY' => [
+                'required' => true,
+                'hint' => 'Get your API key from https://console.groq.com/'
+            ]
+        ];
     }
 
     // ==================== CHAT ====================

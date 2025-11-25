@@ -22,16 +22,16 @@
 </head>
 <body>
     <div class="container">
-        <h2>{{ 'email.verification.title'|trans }}</h2>
-        <p>{{ 'email.verification.intro'|trans }}</p>
-        <p>{{ 'email.verification.instruction'|trans }}</p>
-        <a href="{{ verificationUrl }}" class="button">{{ 'email.verification.button'|trans }}</a>
-        <p>{{ 'email.verification.or_copy'|trans }}</p>
+        <h2>{{ t.title }}</h2>
+        <p>{{ t.intro }}</p>
+        <p>{{ t.instruction }}</p>
+        <a href="{{ verificationUrl }}" class="button">{{ t.button }}</a>
+        <p>{{ t.or_copy }}</p>
         <p style="word-break: break-all; color: #666;">{{ verificationUrl }}</p>
-        <p>{{ 'email.verification.expiry'|trans }}</p>
+        <p>{{ t.expiry }}</p>
         <div class="footer">
-            <p>{{ 'email.verification.footer_notice'|trans }}</p>
-            <p>&copy; {{ "now"|date("Y") }} {{ 'email.footer.company'|trans }}. {{ 'email.footer.rights'|trans }}</p>
+            <p>{{ t.footer_notice }}</p>
+            <p>&copy; {{ "now"|date("Y") }} {{ t.footer_company }}. {{ t.footer_rights }}</p>
         </div>
     </div>
 </body>

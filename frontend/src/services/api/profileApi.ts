@@ -20,6 +20,12 @@ export interface Profile {
   invoiceEmail: string
   emailKeyword?: string | null
   personalEmailAddress: string
+  canChangePassword?: boolean
+  authProvider?: string
+  isExternalAuth?: boolean
+  externalAuthInfo?: {
+    lastLogin?: string
+  } | null
 }
 
 export interface ProfileResponse {

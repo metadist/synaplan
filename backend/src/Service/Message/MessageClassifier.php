@@ -232,6 +232,8 @@ class MessageClassifier
             'text2pic' => 'image_generation',
             'text2vid' => 'image_generation',
             'text2sound' => 'image_generation',
+            'tools:pic' => 'image_generation', // /pic command
+            'tools:vid' => 'image_generation', // /vid command
             
             // Document/Office generation
             'officemaker' => 'document_generation',

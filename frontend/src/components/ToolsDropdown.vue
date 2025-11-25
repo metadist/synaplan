@@ -173,6 +173,7 @@ const props = defineProps<Props>()
 const emit = defineEmits<{
   select: [toolId: string]
   remove: [toolId: string]
+  insertCommand: [command: Command]
 }>()
 
 const router = useRouter()
@@ -184,10 +185,7 @@ const isLoadingFeatures = ref(true)
 
 // Filter commands to show only the most useful ones for the tools menu
 const availableCommands = computed(() => {
-  return commands.filter(cmd => 
-    !cmd.name.startsWith('test') && // Exclude test commands
-    cmd.name !== 'list' // Exclude the list command itself
-  )
+  return commands
 })
 
 const isToolActive = (toolId: string): boolean => {
@@ -248,8 +246,8 @@ const selectTool = (toolId: string) => {
 }
 
 const selectCommand = (cmd: Command) => {
-  // For now, just close the dropdown
-  // In the future, this could insert the command or trigger an action
+  // Emit event to insert command into input
+  emit('insertCommand', cmd)
   closeDropdown()
 }
 

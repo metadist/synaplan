@@ -26,6 +26,16 @@ class OllamaProvider implements ChatProviderInterface, EmbeddingProviderInterfac
         return 'ollama';
     }
 
+    public function getDisplayName(): string
+    {
+        return 'Ollama';
+    }
+
+    public function getDescription(): string
+    {
+        return 'Local AI model runner for privacy-first deployments';
+    }
+
     public function getCapabilities(): array
     {
         return ['chat', 'embedding'];
@@ -66,6 +76,16 @@ class OllamaProvider implements ChatProviderInterface, EmbeddingProviderInterfac
         } catch (\Exception $e) {
             return false;
         }
+    }
+
+    public function getRequiredEnvVars(): array
+    {
+        return [
+            'OLLAMA_BASE_URL' => [
+                'required' => true,
+                'hint' => 'Ollama server URL (e.g., http://ollama:11434)'
+            ]
+        ];
     }
 
     public function chat(array $messages, array $options = []): string

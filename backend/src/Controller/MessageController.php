@@ -496,6 +496,7 @@ class MessageController extends AbstractController
             $this->em->flush();
             
             // CRITICAL: Extract text immediately using FileProcessor!
+            $extractMeta = [];
             try {
                 [$extractedText, $extractMeta] = $this->fileProcessor->extractText(
                     $relativePath,
@@ -533,7 +534,7 @@ class MessageController extends AbstractController
                 'status' => $messageFile->getStatus()
             ]);
 
-            return $this->json([
+            $response = [
                 'success' => true,
                 'file_id' => $messageFile->getId(),
                 'filename' => $uploadedFile->getClientOriginalName(),
@@ -542,7 +543,22 @@ class MessageController extends AbstractController
                 'file_type' => $fileExtension,
                 'extracted_text_length' => strlen($messageFile->getFileText()),
                 'status' => $messageFile->getStatus()
-            ], Response::HTTP_CREATED);
+            ];
+
+            // Include transcribed text for audio files (for microphone input)
+            if (!empty($messageFile->getFileText()) && in_array($fileExtension, ['ogg', 'mp3', 'wav', 'm4a', 'opus', 'flac', 'webm', 'aac', 'wma', 'mp4', 'avi', 'mov', 'mkv', 'mpeg', 'mpg'])) {
+                $response['text'] = $messageFile->getFileText();
+                
+                // Include metadata if available from extraction
+                if (isset($extractMeta['language'])) {
+                    $response['language'] = $extractMeta['language'];
+                }
+                if (isset($extractMeta['duration'])) {
+                    $response['duration'] = $extractMeta['duration'];
+                }
+            }
+
+            return $this->json($response, Response::HTTP_CREATED);
 
         } catch (\Exception $e) {
             $this->logger->error('Chat file upload failed', [
