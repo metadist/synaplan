@@ -64,12 +64,19 @@ export const chatApi = {
 
     const eventSource = new EventSource(url)
     let completionReceived = false
+    let isStopped = false // Flag to prevent processing after manual stop
 
     eventSource.onopen = () => {
       console.log('✅ SSE connection opened')
     }
 
     eventSource.onmessage = (event) => {
+      // CRITICAL: Don't process any events after stop
+      if (isStopped) {
+        console.log('⏹️ Ignoring SSE event - stream was stopped')
+        return
+      }
+      
       try {
         const data = JSON.parse(event.data)
         
@@ -93,7 +100,13 @@ export const chatApi = {
       }
     }
 
-    eventSource.onerror = (error) => {
+    eventSource.onerror = () => {
+      // Don't process errors after manual stop
+      if (isStopped) {
+        console.log('⏹️ Ignoring SSE error - stream was stopped')
+        return
+      }
+      
       console.log('SSE error event received, readyState:', eventSource.readyState, 'completionReceived:', completionReceived)
       
       // If we already received completion, this is just normal stream end
@@ -121,7 +134,12 @@ export const chatApi = {
       }
     }
 
-    return () => eventSource.close()
+    // Return cleanup function that sets the stop flag and closes connection
+    return () => {
+      console.log('🛑 Closing EventSource and setting stop flag')
+      isStopped = true
+      eventSource.close()
+    }
   },
 
   async getHistory(limit = 50, trackId?: number): Promise<any> {
@@ -211,5 +229,23 @@ export const chatApi = {
     }
 
     return response.json()
+  },
+
+  /**
+   * Stop streaming - notify backend to stop streaming
+   */
+  async stopStream(trackId?: number): Promise<{ success: boolean; message: string }> {
+    console.log('📡 chatApi.stopStream called with trackId:', trackId)
+    try {
+      const result = await httpClient<{ success: boolean; message: string }>('/api/v1/messages/stop-stream', {
+        method: 'POST',
+        body: JSON.stringify({ trackId })
+      })
+      console.log('📡 chatApi.stopStream response:', result)
+      return result
+    } catch (error) {
+      console.error('📡 chatApi.stopStream error:', error)
+      throw error
+    }
   }
 }

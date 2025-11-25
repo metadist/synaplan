@@ -223,6 +223,7 @@ class StreamController extends AbstractController
             }
             ob_implicit_flush(1);
             set_time_limit(0);
+            // Stop execution when client disconnects
             ignore_user_abort(false);
 
             try {
@@ -1130,6 +1131,180 @@ class StreamController extends AbstractController
             'pdf' => 'application/pdf',
             default => 'application/octet-stream'
         };
+    }
+
+    /**
+     * Save cancelled message - persist cancelled streaming message to database
+     */
+    #[Route('/save-cancelled', name: 'save_cancelled', methods: ['POST'])]
+    #[OA\Post(
+        path: '/api/v1/messages/save-cancelled',
+        summary: 'Save cancelled streaming message',
+        description: 'Save a cancelled streaming message to the database',
+        security: [['Bearer' => []]],
+        tags: ['Messages']
+    )]
+    #[OA\RequestBody(
+        required: true,
+        content: new OA\JsonContent(
+            properties: [
+                new OA\Property(property: 'trackId', type: 'integer', example: 1234567890),
+                new OA\Property(property: 'chatId', type: 'integer', example: 123),
+                new OA\Property(property: 'content', type: 'string', example: 'Partial response\n\n_Cancelled by user_')
+            ]
+        )
+    )]
+    #[OA\Response(
+        response: 200,
+        description: 'Message saved successfully',
+        content: new OA\JsonContent(
+            properties: [
+                new OA\Property(property: 'success', type: 'boolean', example: true),
+                new OA\Property(property: 'messageId', type: 'integer', example: 456)
+            ]
+        )
+    )]
+    public function saveCancelled(Request $request, #[CurrentUser] ?User $user): Response
+    {
+        if (!$user) {
+            return $this->json(['error' => 'Unauthorized'], Response::HTTP_UNAUTHORIZED);
+        }
+
+        $data = json_decode($request->getContent(), true);
+        $trackId = $data['trackId'] ?? null;
+        $chatId = $data['chatId'] ?? null;
+        $content = $data['content'] ?? '';
+
+        if (!$trackId || !$chatId) {
+            return $this->json(['error' => 'Missing trackId or chatId'], Response::HTTP_BAD_REQUEST);
+        }
+
+        try {
+            // Load chat
+            $chat = $this->em->getRepository(\App\Entity\Chat::class)->find((int)$chatId);
+            if (!$chat || $chat->getUserId() !== $user->getId()) {
+                return $this->json(['error' => 'Chat not found or access denied'], Response::HTTP_FORBIDDEN);
+            }
+
+            // Find the incoming message by trackId
+            $incomingMessage = $this->em->getRepository(Message::class)->findOneBy([
+                'userId' => $user->getId(),
+                'trackingId' => $trackId,
+                'direction' => 'IN'
+            ]);
+
+            if (!$incomingMessage) {
+                $this->logger->warning('Incoming message not found for cancelled response', [
+                    'user_id' => $user->getId(),
+                    'track_id' => $trackId
+                ]);
+                return $this->json(['error' => 'Incoming message not found'], Response::HTTP_NOT_FOUND);
+            }
+
+            // Create outgoing message for the cancelled response
+            $outgoingMessage = new Message();
+            $outgoingMessage->setUserId($user->getId());
+            $outgoingMessage->setChat($chat);
+            $outgoingMessage->setTrackingId($trackId);
+            $outgoingMessage->setProviderIndex($incomingMessage->getProviderIndex());
+            $outgoingMessage->setUnixTimestamp(time());
+            $outgoingMessage->setDateTime(date('YmdHis'));
+            $outgoingMessage->setMessageType($incomingMessage->getMessageType());
+            $outgoingMessage->setFile(0);
+            $outgoingMessage->setTopic($incomingMessage->getTopic());
+            $outgoingMessage->setLanguage($incomingMessage->getLanguage());
+            $outgoingMessage->setText($content);
+            $outgoingMessage->setDirection('OUT');
+            $outgoingMessage->setStatus('cancelled');
+
+            $this->em->persist($outgoingMessage);
+            $this->em->flush();
+
+            // Store metadata indicating it was cancelled
+            $outgoingMessage->setMeta('cancelled', 'true');
+            $outgoingMessage->setMeta('cancelled_at', date('Y-m-d H:i:s'));
+            $this->em->flush();
+
+            // Update incoming message status
+            $incomingMessage->setStatus('cancelled');
+            $this->em->flush();
+
+            $this->logger->info('Cancelled message saved', [
+                'user_id' => $user->getId(),
+                'track_id' => $trackId,
+                'message_id' => $outgoingMessage->getId()
+            ]);
+
+            return $this->json([
+                'success' => true,
+                'messageId' => $outgoingMessage->getId()
+            ]);
+
+        } catch (\Exception $e) {
+            $this->logger->error('Failed to save cancelled message', [
+                'user_id' => $user->getId(),
+                'track_id' => $trackId,
+                'error' => $e->getMessage()
+            ]);
+
+            return $this->json([
+                'success' => false,
+                'error' => 'Failed to save message'
+            ], Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    /**
+     * Stop streaming endpoint - allows frontend to explicitly stop streaming
+     */
+    #[Route('/stop-stream', name: 'stop_stream', methods: ['POST'])]
+    #[OA\Post(
+        path: '/api/v1/messages/stop-stream',
+        summary: 'Stop streaming AI response',
+        description: 'Explicitly stop an ongoing streaming response',
+        security: [['Bearer' => []]],
+        tags: ['Messages']
+    )]
+    #[OA\RequestBody(
+        required: true,
+        content: new OA\JsonContent(
+            properties: [
+                new OA\Property(property: 'trackId', type: 'integer', example: 1234567890)
+            ]
+        )
+    )]
+    #[OA\Response(
+        response: 200,
+        description: 'Stream stop acknowledged',
+        content: new OA\JsonContent(
+            properties: [
+                new OA\Property(property: 'success', type: 'boolean', example: true),
+                new OA\Property(property: 'message', type: 'string', example: 'Stream stop requested')
+            ]
+        )
+    )]
+    public function stopStream(Request $request, #[CurrentUser] ?User $user): Response
+    {
+        if (!$user) {
+            return $this->json(['error' => 'Unauthorized'], Response::HTTP_UNAUTHORIZED);
+        }
+
+        $data = json_decode($request->getContent(), true);
+        $trackId = $data['trackId'] ?? null;
+
+        $this->logger->info('Stop stream requested', [
+            'user_id' => $user->getId(),
+            'track_id' => $trackId
+        ]);
+
+        // Note: The actual stopping happens via connection_aborted() checks in the streaming loop
+        // This endpoint serves as a signal to the frontend that the stop was acknowledged
+        // The EventSource.close() on the frontend side will trigger connection_aborted() on the backend
+
+        return $this->json([
+            'success' => true,
+            'message' => 'Stream stop requested'
+        ]);
     }
 
 }

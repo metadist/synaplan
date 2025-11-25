@@ -117,7 +117,8 @@
     "thinking": "Denkprozess",
     "reasoning": "KI-Überlegung",
     "fileGenerated": "Ich habe die Datei '{filename}' für dich erstellt. Du kannst sie jetzt herunterladen.",
-    "fileGenerationFailed": "Es gab ein Problem beim Erstellen der Datei. Bitte versuche es erneut."
+    "fileGenerationFailed": "Es gab ein Problem beim Erstellen der Datei. Bitte versuche es erneut.",
+    "cancelledByUser": "⚠️ Vom Benutzer abgebrochen"
   },
   "config": {
     "inbound": {
