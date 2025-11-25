@@ -45,16 +45,16 @@
         </p>
 
         <div class="space-y-4">
-          <div class="p-4 bg-blue-500/10 border border-blue-500/20 rounded-lg" data-testid="info-check-spam">
-            <p class="text-sm txt-primary flex items-start gap-2">
-              <InformationCircleIcon class="w-5 h-5 text-blue-500 flex-shrink-0 mt-0.5" />
+          <div class="alert-info" data-testid="info-check-spam">
+            <p class="text-sm alert-info-text flex items-start gap-2">
+              <InformationCircleIcon class="w-5 h-5 alert-info-icon flex-shrink-0 mt-0.5" />
               <span>{{ $t('auth.checkSpam') }}</span>
             </p>
           </div>
 
           <!-- Success Message -->
-          <div v-if="successMessage" class="p-4 bg-green-500/10 border border-green-500/20 rounded-lg" data-testid="alert-resend-success">
-            <p class="text-sm text-green-600 dark:text-green-400 flex items-start gap-2">
+          <div v-if="successMessage" class="alert-success" data-testid="alert-resend-success">
+            <p class="text-sm alert-success-text flex items-start gap-2">
               <svg class="w-5 h-5 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
               </svg>
@@ -63,8 +63,8 @@
           </div>
 
           <!-- Error Message -->
-          <div v-if="error" class="p-4 bg-red-500/10 border border-red-500/20 rounded-lg" data-testid="alert-resend-error">
-            <p class="text-sm text-red-600 dark:text-red-400 flex items-start gap-2">
+          <div v-if="error" class="alert-error" data-testid="alert-resend-error">
+            <p class="text-sm alert-error-text flex items-start gap-2">
               <svg class="w-5 h-5 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
               </svg>
@@ -73,8 +73,8 @@
           </div>
 
           <!-- Remaining Attempts Info -->
-          <div v-if="remainingAttempts < 5" class="p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-lg" data-testid="text-remaining-attempts">
-            <p class="text-xs txt-secondary text-center">
+          <div v-if="remainingAttempts < 5" class="alert-warning" data-testid="text-remaining-attempts">
+            <p class="text-xs alert-warning-text text-center">
               {{ remainingAttempts }} attempt{{ remainingAttempts !== 1 ? 's' : '' }} remaining
             </p>
           </div>

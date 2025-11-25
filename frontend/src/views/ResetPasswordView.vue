@@ -47,8 +47,8 @@
               </p>
             </div>
 
-            <div v-if="error" class="p-3 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800" data-testid="alert-reset-error">
-              <p class="text-sm text-red-600 dark:text-red-400">{{ error }}</p>
+            <div v-if="error" class="alert-error" data-testid="alert-reset-error">
+              <p class="text-sm alert-error-text">{{ error }}</p>
             </div>
 
             <Button

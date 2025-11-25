@@ -4,8 +4,85 @@
     "title": "Chat",
     "newChat": "Neuer Chat"
   },
+  "admin": {
+    "title": "Admin-Panel",
+    "description": "Systemverwaltung und Konfiguration",
+    "tabs": {
+      "overview": "Übersicht",
+      "users": "Benutzer",
+      "prompts": "Prompts",
+      "usage": "Nutzung"
+    },
+    "overview": {
+      "totalUsers": "Gesamtbenutzer",
+      "recentUsers": "Neueste Benutzer"
+    },
+    "analytics": {
+      "registrations": "Benutzer-Registrierungen",
+      "usageByAction": "Nutzung nach Aktion",
+      "period": {
+        "7d": "7 Tage",
+        "30d": "30 Tage",
+        "90d": "90 Tage",
+        "1y": "1 Jahr",
+        "all": "Gesamt"
+      },
+      "groupBy": {
+        "day": "Tag",
+        "week": "Woche",
+        "month": "Monat"
+      }
+    },
+    "users": {
+      "email": "E-Mail",
+      "level": "Level",
+      "type": "Typ",
+      "provider": "Anbieter",
+      "created": "Erstellt",
+      "status": "Status",
+      "actions": "Aktionen",
+      "delete": "Benutzer löschen",
+      "currentUser": "(Du)",
+      "verified": "Verifiziert",
+      "unverified": "Nicht verifiziert",
+      "searchPlaceholder": "Nach E-Mail suchen...",
+      "noUsers": "Keine Benutzer gefunden",
+      "deleteConfirmTitle": "Benutzer löschen?",
+      "deleteConfirmDesc": "Möchtest du {email} wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden."
+    },
+    "prompts": {
+      "shortDesc": "Kurzbeschreibung",
+      "prompt": "Prompt",
+      "selectionRules": "Auswahlregeln",
+      "selectionRulesPlaceholder": "Optional: Regeln zur automatischen Auswahl dieses Prompts"
+    },
+    "usage": {
+      "title": "Nutzungsstatistiken",
+      "period": {
+        "day": "24 Stunden",
+        "week": "7 Tage",
+        "month": "30 Tage",
+        "all": "Gesamt"
+      },
+      "totalRequests": "Anfragen",
+      "totalTokens": "Tokens",
+      "totalCost": "Kosten",
+      "avgLatency": "Durchschn. Latenz",
+      "byAction": "Nach Aktion",
+      "byProvider": "Nach Anbieter",
+      "topModels": "Top Modelle",
+      "topUsers": "Top-Benutzer",
+      "model": "Modell",
+      "requests": "Anfragen",
+      "tokens": "Tokens",
+      "cost": "Kosten",
+      "activeSubscriptions": "Aktive Abos",
+      "subscriptionOverview": "Abo-Übersicht"
+    }
+  },
   "sidebar": {
-    "featureStatus": "Feature-Status"
+    "featureStatus": "Feature-Status",
+    "upgrade": "Upgrade"
   },
   "chatInput": {
     "placeholder": "Schreibe deine Nachricht hier...",
@@ -58,23 +135,82 @@
   },
   "profile": {
     "title": "Profil-Einstellungen",
-    "personalInfo": "Persönliche Informationen",
-    "firstName": "Vorname",
-    "lastName": "Nachname",
-    "email": "E-Mail",
-    "phone": "Telefon",
-    "companyInfo": "Firmeninformationen",
-    "companyName": "Firmenname",
-    "vatId": "USt-IdNr.",
-    "address": "Adresse",
-    "street": "Straße",
-    "zipCode": "PLZ",
-    "city": "Stadt",
-    "country": "Land",
-    "preferences": "Einstellungen",
-    "language": "Sprache",
-    "timezone": "Zeitzone",
-    "invoiceEmail": "Rechnungs-E-Mail",
+    "subtitle": "Verwalte deine persönlichen Daten und Kontoeinstellungen",
+    "personalInfo": {
+      "title": "Persönliche Informationen",
+      "firstName": "Vorname",
+      "firstNamePlaceholder": "Dein Vorname",
+      "lastName": "Nachname",
+      "lastNamePlaceholder": "Dein Nachname",
+      "email": "E-Mail",
+      "emailHint": "Deine Login-E-Mail (kann nicht geändert werden)",
+      "phone": "Telefon",
+      "phonePlaceholder": "Optionale Telefonnummer"
+    },
+    "companyInfo": {
+      "title": "Firmeninformationen",
+      "subtitle": "Optional - Leer lassen wenn du eine Privatperson bist",
+      "companyName": "Firmenname",
+      "companyNamePlaceholder": "Deine Firma GmbH",
+      "vatId": "USt-IdNr.",
+      "vatIdPlaceholder": "Umsatzsteuer-Identifikationsnummer"
+    },
+    "billingAddress": {
+      "title": "Rechnungsadresse",
+      "street": "Straße & Hausnummer",
+      "streetPlaceholder": "Straßenname und Hausnummer",
+      "zipCode": "PLZ",
+      "zipCodePlaceholder": "Postleitzahl",
+      "city": "Stadt",
+      "cityPlaceholder": "Stadtname",
+      "country": "Land",
+      "countryHint": "Erforderlich für korrekte Steuerberechnung"
+    },
+    "accountSettings": {
+      "title": "Kontoeinstellungen",
+      "language": "Sprache",
+      "languageHint": "Sprache der Benutzeroberfläche",
+      "timezone": "Zeitzone",
+      "timezoneHint": "Deine lokale Zeitzone",
+      "invoiceEmail": "Rechnungs-E-Mail",
+      "invoiceEmailPlaceholder": "Alternative E-Mail für Rechnungen (leer lassen um Haupt-E-Mail zu verwenden)"
+    },
+    "changePassword": {
+      "title": "Passwort ändern",
+      "subtitle": "Leer lassen um aktuelles Passwort zu behalten",
+      "currentPassword": "Aktuelles Passwort",
+      "currentPasswordPlaceholder": "Leer lassen um aktuelles Passwort zu behalten",
+      "newPassword": "Neues Passwort",
+      "newPasswordPlaceholder": "Neues Passwort eingeben",
+      "newPasswordHint": "Mindestens 8 Zeichen",
+      "confirmPassword": "Passwort bestätigen",
+      "confirmPasswordPlaceholder": "Neues Passwort bestätigen",
+      "confirmPasswordHint": "Muss mit neuem Passwort übereinstimmen"
+    },
+    "dangerZone": {
+      "title": "Gefahrenzone",
+      "subtitle": "Irreversible Aktionen",
+      "deleteAccount": "Account löschen",
+      "deleteAccountDesc": "Lösche dein Konto dauerhaft. Diese Aktion kann nicht rückgängig gemacht werden.",
+      "deleteButton": "Account dauerhaft löschen"
+    },
+    "deleteAccountModal": {
+      "title": "Account wirklich löschen?",
+      "warning": "Diese Aktion ist dauerhaft und kann nicht rückgängig gemacht werden.",
+      "consequences": "Folgende Daten werden gelöscht:",
+      "consequence1": "Alle deine Nachrichten und Chats",
+      "consequence2": "Alle hochgeladenen Dateien",
+      "consequence3": "Deine persönlichen Daten und Einstellungen",
+      "consequence4": "API-Schlüssel und Zugangsdaten",
+      "confirmPassword": "Bestätige mit deinem Passwort:",
+      "confirmPasswordPlaceholder": "Dein aktuelles Passwort",
+      "externalAuthConfirm": "Gib 'DELETE' ein um zu bestätigen:",
+      "externalAuthPlaceholder": "DELETE eingeben",
+      "deleteButton": "Ja, Account löschen",
+      "cancelButton": "Abbrechen",
+      "deleting": "Wird gelöscht..."
+    },
+    "privacyNotice": "Alle Daten werden sicher gespeichert und nur für Abrechnungszwecke gemäß deutschem Recht (DSGVO) verwendet.",
     "saveChanges": "Änderungen speichern",
     "cancel": "Abbrechen"
   },
@@ -312,6 +448,68 @@
     "verifyPhone": "Telefonnummer Verifizieren",
     "footerNote": "Fragen? Kontaktieren Sie unser Support-Team."
   },
+  "subscription": {
+    "title": "Abonnements",
+    "subtitle": "Schalte mehr Funktionen und höhere Limits frei",
+    "chooseYourPlan": "Wähle deinen Plan",
+    "currentPlan": "Aktueller Plan",
+    "yourPlan": "Dein Plan",
+    "noActiveSubscription": "Kein aktives Abonnement",
+    "upgradePlan": "Plan upgraden",
+    "managePlan": "Plan verwalten",
+    "cancelPlan": "Abo kündigen",
+    "recommended": "Empfohlen",
+    "selectPlan": "Plan wählen",
+    "processing": "Wird verarbeitet...",
+    "perMonth": "Monat",
+    "perYear": "Jahr",
+    "unavailable": "Abonnement-Service nicht verfügbar",
+    "unavailableDesc": "Der Abonnement-Service wird derzeit konfiguriert. Bitte versuche es später noch einmal oder kontaktiere den Support.",
+    "serviceNotConfigured": "Abonnement-Service ist derzeit nicht verfügbar. Bitte kontaktiere den Support.",
+    "checkoutFailed": "Checkout konnte nicht gestartet werden. Bitte versuche es erneut.",
+    "manage": {
+      "title": "Dein Abonnement verwalten",
+      "subtitle": "Sieh und verwalte deine Abonnement-Details",
+      "currentPlanLabel": "Aktueller Plan",
+      "status": "Status",
+      "statusActive": "Aktiv",
+      "statusCanceled": "Gekündigt",
+      "statusPastDue": "Zahlung überfällig",
+      "nextBilling": "Nächstes Abrechnungsdatum",
+      "cancelDate": "Kündigung zum",
+      "billingPortal": "Rechnungsportal",
+      "billingPortalDesc": "Verwalte deine Zahlungsmethoden, sieh Rechnungen ein und aktualisiere Rechnungsinformationen",
+      "openPortal": "Rechnungsportal öffnen",
+      "cancelSubscription": "Abonnement kündigen",
+      "cancelWarning": "Bist du sicher, dass du dein Abonnement kündigen möchtest?",
+      "cancelWarningDesc": "Du behältst den Zugriff bis zum Ende des Abrechnungszeitraums.",
+      "confirmCancel": "Ja, Abonnement kündigen",
+      "keepSubscription": "Abonnement behalten",
+      "loadingPortal": "Rechnungsportal wird geöffnet..."
+    },
+    "plans": {
+      "pro": "Pro",
+      "team": "Team",
+      "business": "Business"
+    },
+    "features": {
+      "unlimitedMessages": "Unbegrenzte Nachrichten",
+      "images": "{count} Bilder/Monat",
+      "unlimitedImages": "Unbegrenzte Bilder",
+      "advancedModels": "Erweiterte KI-Modelle",
+      "prioritySupport": "Priority Support",
+      "storage": "{size}GB Speicher",
+      "everythingInPro": "Alles aus Pro",
+      "everythingInTeam": "Alles aus Team",
+      "teamCollaboration": "Team-Zusammenarbeit",
+      "customPrompts": "Benutzerdefinierte Prompts",
+      "apiAccess": "API-Zugriff",
+      "unlimitedVideo": "Unbegrenzte Video-Generierung",
+      "whiteLabel": "White-label Widgets",
+      "dedicatedSupport": "Dedizierter Support",
+      "slaGuarantee": "SLA-Garantie"
+    }
+  },
   "common": {
     "ok": "OK",
     "cancel": "Abbrechen",
@@ -453,6 +651,8 @@
     },
     "logout": "Abmelden",
     "features": {
+      "title": "System-Status",
+      "subtitle": "Überwache alle Services und Features",
       "loading": "Lade Features...",
       "requiredConfig": "Erforderliche Konfiguration:",
       "set": "Gesetzt",
@@ -568,7 +768,12 @@
     "loginWithGitHub": "Mit GitHub anmelden",
     "socialLoginError": "Social Login fehlgeschlagen. Bitte versuche es erneut.",
     "oauthCallbackProcessing": "Login wird verarbeitet...",
-    "noSocialProviders": "Keine Social Login Anbieter konfiguriert"
+    "noSocialProviders": "Keine Social Login Anbieter konfiguriert",
+    "registrationSuccess": "Registrierung erfolgreich!",
+    "registrationSuccessDesc": "Falls diese E-Mail-Adresse noch nicht registriert ist, haben wir dir eine Bestätigungs-E-Mail gesendet. Bitte überprüfe deinen Posteingang (auch den Spam-Ordner).",
+    "passwordResetSuccess": "Anfrage gesendet!",
+    "passwordResetSuccessDesc": "Falls ein Konto mit dieser E-Mail-Adresse existiert, haben wir dir einen Link zum Zurücksetzen des Passworts gesendet. Bitte überprüfe deinen Posteingang.",
+    "recaptchaError": "reCAPTCHA-Verifizierung fehlgeschlagen. Bitte versuche es erneut."
   }
 }
 

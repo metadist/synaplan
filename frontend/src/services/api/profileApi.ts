@@ -26,6 +26,7 @@ export interface Profile {
   externalAuthInfo?: {
     lastLogin?: string
   } | null
+  isAdmin?: boolean
 }
 
 export interface ProfileResponse {
@@ -70,6 +71,13 @@ export const profileApi = {
     return httpClient<EmailKeywordResponse>('/api/v1/profile/email-keyword', {
       method: 'PUT',
       body: JSON.stringify({ keyword })
+    })
+  },
+
+  async deleteAccount(password: string): Promise<any> {
+    return httpClient<any>('/api/v1/profile', {
+      method: 'DELETE',
+      body: JSON.stringify({ password })
     })
   }
 }

@@ -9,6 +9,7 @@ export interface User {
   level: string
   roles?: string[]
   created?: string
+  isAdmin?: boolean
 }
 
 export const useAuthStore = defineStore('auth', () => {
@@ -22,6 +23,7 @@ export const useAuthStore = defineStore('auth', () => {
   const isAuthenticated = computed(() => !!token.value && !!user.value)
   const userLevel = computed(() => user.value?.level || 'NEW')
   const isPro = computed(() => ['PRO', 'TEAM', 'BUSINESS'].includes(userLevel.value))
+  const isAdmin = computed(() => user.value?.isAdmin === true || user.value?.level === 'ADMIN')
 
   // Actions
   async function login(email: string, password: string, recaptchaToken?: string): Promise<boolean> {
@@ -147,6 +149,7 @@ export const useAuthStore = defineStore('auth', () => {
     isAuthenticated,
     userLevel,
     isPro,
+    isAdmin,
     // Actions
     login,
     register,

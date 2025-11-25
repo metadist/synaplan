@@ -112,16 +112,16 @@ class MediaGenerationHandler implements MessageHandlerInterface
             
             // Detect media type from model tag (only if not a slash command)
             if (!$isSlashCommand) {
-                $model = $this->em->getRepository(\App\Entity\Model::class)->find($modelId);
-                if ($model) {
-                    $tag = $model->getTag();
-                    if ($tag === 'text2vid') {
-                        $mediaType = 'video';
-                    } elseif ($tag === 'text2sound') {
-                        $mediaType = 'audio';
-                    }
-                    $provider = $model->getService();
-                    $modelName = $model->getName();
+            $model = $this->em->getRepository(\App\Entity\Model::class)->find($modelId);
+            if ($model) {
+                $tag = $model->getTag();
+                if ($tag === 'text2vid') {
+                    $mediaType = 'video';
+                } elseif ($tag === 'text2sound') {
+                    $mediaType = 'audio';
+                }
+                $provider = $model->getService();
+                $modelName = $model->getName();
                 }
             }
         } else {

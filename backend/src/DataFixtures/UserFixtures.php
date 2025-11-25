@@ -25,7 +25,7 @@ class UserFixtures extends Fixture
             [
                 'mail' => 'admin@synaplan.com',
                 'password' => 'admin123',
-                'userLevel' => 'BUSINESS',
+                'userLevel' => 'ADMIN',
                 'emailVerified' => true,
                 'type' => 'WEB',
                 'userDetails' => [

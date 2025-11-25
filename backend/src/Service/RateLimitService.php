@@ -44,6 +44,18 @@ class RateLimitService
             'action' => $action
         ]);
 
+        // Admins have unlimited usage
+        if ($level === 'ADMIN') {
+            return [
+                'allowed' => true,
+                'limit' => PHP_INT_MAX,
+                'used' => 0,
+                'remaining' => PHP_INT_MAX,
+                'reset_at' => null,
+                'limit_type' => 'unlimited'
+            ];
+        }
+
         // Get limits for user level
         $limits = $this->getLimitsForLevel($level, $action);
         
@@ -54,7 +66,8 @@ class RateLimitService
                 'limit' => PHP_INT_MAX,
                 'used' => 0,
                 'remaining' => PHP_INT_MAX,
-                'resets_at' => null
+                'reset_at' => null,
+                'limit_type' => 'unlimited'
             ];
         }
 
@@ -147,8 +160,8 @@ class RateLimitService
             'limit' => $limit,
             'used' => $used,
             'remaining' => $remaining,
-            'resets_at' => null, // Lifetime - never resets
-            'type' => 'lifetime'
+            'reset_at' => null, // Lifetime - never resets
+            'limit_type' => 'lifetime'
         ];
     }
 
@@ -192,8 +205,8 @@ class RateLimitService
             'limit' => PHP_INT_MAX,
             'used' => 0,
             'remaining' => PHP_INT_MAX,
-            'resets_at' => null,
-            'type' => 'unlimited'
+            'reset_at' => null,
+            'limit_type' => 'unlimited'
         ];
     }
 
@@ -223,8 +236,8 @@ class RateLimitService
             'limit' => $limit,
             'used' => $used,
             'remaining' => $remaining,
-            'resets_at' => $resetsAt,
-            'type' => $seconds === 3600 ? 'hourly' : 'monthly'
+            'reset_at' => $resetsAt,
+            'limit_type' => $seconds === 3600 ? 'hourly' : 'monthly'
         ];
     }
 
