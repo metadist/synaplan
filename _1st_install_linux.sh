@@ -100,37 +100,21 @@ set +e
 set +u
 set +o pipefail
 
-# Wait up to 5 minutes for model downloads with timeout
-( timeout 300 docker compose logs -f backend 2>&1 | \
-  grep --line-buffered "\[Background\]" | \
-  sed -u '/Model downloads completed!/q' | \
-  awk '
-    BEGIN { count = 0; had_dots = 0 }
-    /"status":/ {
-      # JSON progress line - print a dot every 10 updates
-      count++
-      if (count % 10 == 0) {
-        printf "." > "/dev/stderr"
-        had_dots = 1
-        fflush("/dev/stderr")
-      }
-      next
-    }
-    {
-      # Important message - print it
-      if (had_dots == 1) {
-        print "" > "/dev/stderr"
-        had_dots = 0
-      }
-      print $0 > "/dev/stderr"
-      fflush("/dev/stderr")
-    }
-    END {
-      if (had_dots == 1) print "" > "/dev/stderr"
-    }
-  '
-)
-RESULT=$?
+# Wait up to 5 minutes for model downloads
+# Use a simpler approach: just wait for the completion message with a timeout
+RESULT=1
+SECONDS=0
+while [ $SECONDS -lt 300 ]; do
+  if docker compose logs backend 2>&1 | grep -q "\[Background\] 🎉 Model downloads completed!"; then
+    RESULT=0
+    # Show a summary of what was downloaded
+    docker compose logs backend 2>&1 | grep "\[Background\]" | grep -E "(Downloading|downloaded|completed)" | tail -n 5
+    break
+  fi
+  printf "."
+  sleep 3
+done
+echo ""
 set -e
 set -u
 set -o pipefail
