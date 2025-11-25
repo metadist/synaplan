@@ -109,26 +109,6 @@
         </div>
       </div>
 
-      <div class="flex flex-col sm:flex-row gap-3 justify-end mt-6">
-        <button
-          @click="resetForm"
-          class="px-6 py-2.5 rounded-lg border-2 border-light-border/30 dark:border-dark-border/20 txt-primary hover:bg-black/5 dark:hover:bg-white/5 transition-all text-sm font-medium"
-          data-testid="btn-reset"
-        >
-          Reset Form
-        </button>
-        <button
-          @click="saveConfiguration"
-          :disabled="saving || !hasChanges"
-          class="btn-primary px-6 py-2.5 rounded-lg flex items-center justify-center gap-2 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-          data-testid="btn-save"
-        >
-          <div v-if="saving" class="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-          <CheckIcon v-else class="w-5 h-5" />
-          {{ saving ? 'Saving...' : hasChanges ? 'Save Configuration' : 'No Changes' }}
-        </button>
-      </div>
-
       <div class="mt-4 flex items-start gap-2 p-3 rounded-lg bg-blue-500/5 border border-blue-500/20">
         <InformationCircleIcon class="w-5 h-5 text-blue-500 flex-shrink-0 mt-0.5" />
         <span class="text-sm txt-primary">System models are automatically locked and cannot be changed. These are core models required for specific functionality.</span>
@@ -245,7 +225,6 @@ import { ref, computed, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
 import { useRoute } from 'vue-router'
 import {
   CpuChipIcon,
-  CheckIcon,
   InformationCircleIcon,
   LockClosedIcon,
   FunnelIcon,
@@ -297,14 +276,6 @@ const selectedPurpose = ref<Capability | null>(null)
 const highlightedCapability = ref<Capability | 'ALL' | null>(null)
 const capabilityRefs = ref<Record<Capability, HTMLElement | null>>({} as Record<Capability, HTMLElement | null>)
 const openDropdown = ref<Capability | null>(null)
-
-// Check if configuration has changed
-const hasChanges = computed(() => {
-  return Object.keys(defaultConfig.value).some((key) => {
-    const capability = key as Capability
-    return defaultConfig.value[capability] !== originalConfig.value[capability]
-  })
-})
 
 const { success, error: showError, warning, info } = useNotification()
 
@@ -493,6 +464,9 @@ const selectModel = async (capability: Capability, modelId: number | null) => {
       console.error('Failed to check model availability:', error)
     }
   }
+  
+  // Auto-save after selection
+  await saveConfiguration()
 }
 
 const handleClickOutside = (event: MouseEvent) => {
@@ -544,8 +518,5 @@ const saveConfiguration = async () => {
   }
 }
 
-const resetForm = () => {
-  defaultConfig.value = { ...originalConfig.value }
-}
 
 </script>
