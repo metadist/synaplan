@@ -200,25 +200,29 @@ const router = createRouter({
 
 // Global navigation guard for authentication
 router.beforeEach((to, _from, next) => {
-  const { isAuthenticated } = useAuth()
   const requiresAuth = to.meta.requiresAuth !== false // Default to true
   const isPublicRoute = to.meta.public === true
   const autoLoginEnabled = import.meta.env.VITE_AUTO_LOGIN_DEV === 'true'
 
+  // Check if token exists in localStorage (more reliable than store state)
+  const hasToken = !!localStorage.getItem('auth_token')
+
   // Auto-login in development if enabled
-  if (autoLoginEnabled && !isAuthenticated.value && requiresAuth) {
+  if (autoLoginEnabled && !hasToken && requiresAuth) {
     localStorage.setItem('auth_token', 'dev-token')
     const { checkAuth } = useAuth()
     checkAuth()
   }
 
-  if (requiresAuth && !isAuthenticated.value) {
+  // Use hasToken instead of isAuthenticated for more reliable check
+  if (requiresAuth && !hasToken) {
+    console.warn('🔒 Protected route accessed without auth - redirecting to login')
     // Redirect to login, save intended destination
     next({
       name: 'login',
-      query: { redirect: to.fullPath }
+      query: { redirect: to.fullPath, reason: 'auth_required' }
     })
-  } else if (isPublicRoute && isAuthenticated.value && to.name === 'login' && !autoLoginEnabled) {
+  } else if (isPublicRoute && hasToken && to.name === 'login' && !autoLoginEnabled) {
     // Already logged in, redirect to home (but not in dev mode with auto-login)
     next({ name: 'chat' })
   } else {
