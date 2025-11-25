@@ -95,9 +95,14 @@ class MessageController extends AbstractController
         if (!$rateLimitCheck['allowed']) {
             return $this->json([
                 'error' => 'Rate limit exceeded',
+                'limit_type' => $rateLimitCheck['limit_type'] ?? 'lifetime',
+                'action_type' => 'MESSAGES',
                 'limit' => $rateLimitCheck['limit'],
                 'used' => $rateLimitCheck['used'],
-                'reset_at' => $rateLimitCheck['reset_at'] ?? null
+                'remaining' => $rateLimitCheck['remaining'],
+                'reset_at' => $rateLimitCheck['reset_at'] ?? null,
+                'user_level' => $user->getUserLevel(),
+                'phone_verified' => $user->getEmailVerified() // Using email verification as proxy
             ], Response::HTTP_TOO_MANY_REQUESTS);
         }
 
@@ -485,6 +490,7 @@ class MessageController extends AbstractController
             
             // Create File entity (NEW: separate entity for files)
             $messageFile = new File();
+            $messageFile->setUserId($user->getId()); // CRITICAL: Set user ID to avoid NULL constraint violation
             $messageFile->setFilePath($relativePath);
             $messageFile->setFileType($fileExtension);
             $messageFile->setFileName($uploadedFile->getClientOriginalName());

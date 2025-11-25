@@ -71,12 +71,8 @@ export const authService = {
         return { success: false, error: data.error || 'Registration failed' }
       }
 
-      // Store token and user
-      token.value = data.token
-      user.value = data.user
-      localStorage.setItem('auth_token', data.token)
-      localStorage.setItem('auth_user', JSON.stringify(data.user))
-
+      // Note: Backend now returns generic success message for security (user enumeration prevention)
+      // No token or user data is returned, user must verify email first
       return { success: true }
     } catch (error) {
       console.error('Registration error:', error)

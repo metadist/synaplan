@@ -65,6 +65,21 @@
         @stop="handleStopStreaming"
       />
     </div>
+
+    <!-- Limit Reached Modal -->
+    <LimitReachedModal
+      :is-open="showLimitModal"
+      :limit-type="limitData?.limitType || 'lifetime'"
+      :action-type="limitData?.actionType || 'MESSAGES'"
+      :used="limitData?.used || 0"
+      :current-limit="limitData?.limit || 0"
+      :reset-time="limitData?.resetTime"
+      :user-level="limitData?.userLevel || 'NEW'"
+      :phone-verified="limitData?.phoneVerified || false"
+      @close="closeLimitModal"
+      @upgrade="closeLimitModal"
+      @verify-phone="closeLimitModal"
+    />
   </MainLayout>
 </template>
 
@@ -74,17 +89,20 @@ import { useI18n } from 'vue-i18n'
 import MainLayout from '@/components/MainLayout.vue'
 import ChatInput from '@/components/ChatInput.vue'
 import ChatMessage from '@/components/ChatMessage.vue'
+import LimitReachedModal from '@/components/common/LimitReachedModal.vue'
 import { useHistoryStore, type Message } from '@/stores/history'
 import { useChatsStore } from '@/stores/chats'
 import { useModelsStore } from '@/stores/models'
 import { useAiConfigStore } from '@/stores/aiConfig'
 import { useAuthStore } from '@/stores/auth'
+import { useLimitCheck } from '@/composables/useLimitCheck'
 import { chatApi } from '@/services/api'
 import { mockModelOptions, type ModelOption } from '@/mocks/aiModels'
 import { parseAIResponse } from '@/utils/responseParser'
 import { normalizeMediaUrl } from '@/utils/urlHelper'
 
 const { t } = useI18n()
+const { showLimitModal, limitData, checkAndShowLimit, closeLimitModal } = useLimitCheck()
 
 const chatContainer = ref<HTMLElement | null>(null)
 const chatInputRef = ref<InstanceType<typeof ChatInput> | null>(null)
@@ -312,7 +330,7 @@ const handleSendMessage = async (content: string, options?: { includeReasoning?:
   )
 
   // Stream all messages (including commands) directly to backend
-  await streamAIResponse(content, options)
+    await streamAIResponse(content, options)
 }
 
 const streamAIResponse = async (userMessage: string, options?: { includeReasoning?: boolean; webSearch?: boolean; modelId?: number; fileIds?: number[] }) => {
@@ -742,6 +760,23 @@ const streamAIResponse = async (userMessage: string, options?: { includeReasonin
             console.error('Error:', errorMsg, data)
             processingStatus.value = ''
             processingMetadata.value = {}
+
+            // Handle rate limit errors with modal
+            if (errorMsg.toLowerCase().includes('rate limit')) {
+              historyStore.removeMessage(messageId)
+              checkAndShowLimit({
+                allowed: false,
+                limitType: data.limit_type || 'lifetime',
+                actionType: data.action_type || 'MESSAGES',
+                used: data.used || 0,
+                limit: data.limit || 0,
+                remaining: data.remaining || 0,
+                resetTime: data.reset_at || null,
+                userLevel: data.user_level || authStore.user?.level || 'NEW',
+                phoneVerified: data.phone_verified || false
+              })
+              return
+            }
             
             // Format user-friendly error message with installation instructions
             let displayError = '## ⚠️ ' + errorMsg + '\n\n'
@@ -911,7 +946,13 @@ const handleStopStreaming = async () => {
     
     if (trackIdToSave && chatIdToSave) {
       console.log('📤 Saving cancelled message to backend', { trackId: trackIdToSave, chatId: chatIdToSave })
-      saveCancelledMessageToBackend(trackIdToSave, chatIdToSave, finalContent)
+      // Save and update message with backend ID, pass current metadata
+      const metadata = {
+        provider: streamingMessage.provider,
+        model: streamingMessage.modelLabel,
+        topic: streamingMessage.topic
+      }
+      saveCancelledMessageToBackend(trackIdToSave, chatIdToSave, finalContent, streamingMessage.id, metadata)
         .catch(error => console.error('❌ Failed to save cancelled message to backend:', error))
     } else {
       console.warn('⚠️ Cannot save cancelled message - missing trackId or chatId', { trackIdToSave, chatIdToSave })
@@ -924,8 +965,14 @@ const handleStopStreaming = async () => {
 }
 
 // Helper function to save cancelled message to backend
-async function saveCancelledMessageToBackend(trackId: number, chatId: number, content: string) {
-  console.log('📡 saveCancelledMessageToBackend called', { trackId, chatId, contentLength: content.length })
+async function saveCancelledMessageToBackend(
+  trackId: number, 
+  chatId: number, 
+  content: string, 
+  messageId: string,
+  metadata?: { provider?: string, model?: string, topic?: string }
+) {
+  console.log('📡 saveCancelledMessageToBackend called', { trackId, chatId, contentLength: content.length, messageId, metadata })
   
   try {
     const token = localStorage.getItem('auth_token')
@@ -942,7 +989,10 @@ async function saveCancelledMessageToBackend(trackId: number, chatId: number, co
       body: JSON.stringify({
         trackId,
         chatId,
-        content
+        content,
+        provider: metadata?.provider,
+        model: metadata?.model,
+        topic: metadata?.topic
       })
     })
     
@@ -951,6 +1001,42 @@ async function saveCancelledMessageToBackend(trackId: number, chatId: number, co
     if (response.ok) {
       const data = await response.json()
       console.log('✅ Cancelled message saved to backend:', data)
+      
+      // Update the message with backend message ID and metadata so the footer buttons appear
+      const message = historyStore.messages.find(m => m.id === messageId)
+      if (message && data.messageId) {
+        message.backendMessageId = data.messageId
+        
+        // Update metadata if provided by backend
+        if (data.topic) {
+          message.topic = data.topic
+        }
+        if (data.provider) {
+          message.provider = data.provider
+        }
+        if (data.model) {
+          message.modelLabel = data.model
+        }
+        
+        // Set aiModels object for proper display of model badges
+        if (data.provider && data.model) {
+          message.aiModels = {
+            chat: {
+              provider: data.provider,
+              model: data.model,
+              model_id: null // We don't have the model_id from cancelled message
+            }
+          }
+        }
+        
+        console.log('✅ Updated message with metadata:', { 
+          backendMessageId: data.messageId,
+          topic: data.topic,
+          provider: data.provider,
+          model: data.model,
+          aiModels: message.aiModels
+        })
+      }
     } else {
       const errorText = await response.text()
       console.warn('⚠️ Failed to save cancelled message:', response.status, errorText)
@@ -1023,42 +1109,9 @@ const handleRegenerate = async (message: Message, modelOption: ModelOption) => {
         .map(part => part.content || '')
         .join('\n')
       
-      // Check if it's a command
-      const parts = await executeCommand(content)
-      const hasNonTextParts = parts.some(p => p.type !== 'text')
-      
-      if (hasNonTextParts) {
-        historyStore.addMessage('assistant', parts, undefined)
-        streamingAbortController = null
-      } else {
-        try {
-          // Stream the response again with selected model
-          const provider = modelOption.provider
-          const modelLabel = modelOption.label
-          
-          // Create empty streaming message with provider info
-          const messageId = historyStore.addStreamingMessage('assistant', provider, modelLabel)
-          
-          // Generate mock response
-          const { generateMockResponse, streamText } = await import('../commands/execute')
-          const fullResponse = generateMockResponse(content)
-          
-          // Stream the response
-          for await (const chunk of streamText(fullResponse)) {
-            if (streamingAbortController.signal.aborted) {
-              break
-            }
-            historyStore.updateStreamingMessage(messageId, chunk)
-          }
-          
-          // Mark as finished
-          historyStore.finishStreamingMessage(messageId)
-        } catch (error) {
-          console.error('Regenerate error:', error)
-        } finally {
-          streamingAbortController = null
-        }
-      }
+      // Re-send the user message with the selected model
+      // This will trigger normal streaming flow
+      await handleSendMessage(content, { modelId: modelOption.id })
     }
   }
 }

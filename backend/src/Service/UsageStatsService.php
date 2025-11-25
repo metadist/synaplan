@@ -279,6 +279,124 @@ class UsageStatsService
     }
 
     /**
+     * Get overall stats for all users (admin only)
+     */
+    public function getOverallStats(string $period = 'all'): array
+    {
+        $conn = $this->em->getConnection();
+        
+        // Calculate date range
+        $since = match($period) {
+            'day' => strtotime('today'),
+            'week' => strtotime('monday this week'),
+            'month' => strtotime('first day of this month'),
+            default => 0, // All time
+        };
+
+        $whereClause = $since > 0 ? "WHERE BUNIXTIMES >= :since" : "";
+        $params = $since > 0 ? ['since' => $since] : [];
+
+        // Total stats
+        $sql = "
+            SELECT 
+                COUNT(*) as total_requests,
+                SUM(BTOKENS) as total_tokens,
+                SUM(BCOST) as total_cost,
+                AVG(BLATENCY) as avg_latency
+            FROM BUSELOG
+            {$whereClause}
+        ";
+        
+        $totals = $conn->fetchAssociative($sql, $params);
+
+        // By action
+        $sql = "
+            SELECT 
+                BACTION as action,
+                COUNT(*) as count,
+                SUM(BTOKENS) as tokens,
+                SUM(BCOST) as cost
+            FROM BUSELOG
+            {$whereClause}
+            GROUP BY BACTION
+            ORDER BY count DESC
+        ";
+        
+        $byAction = $conn->fetchAllAssociative($sql, $params);
+        $byActionFormatted = [];
+        foreach ($byAction as $row) {
+            $byActionFormatted[$row['action']] = [
+                'count' => (int) $row['count'],
+                'tokens' => (int) $row['tokens'],
+                'cost' => (float) $row['cost']
+            ];
+        }
+
+        // By provider
+        $sql = "
+            SELECT 
+                BPROVIDER as provider,
+                COUNT(*) as count,
+                SUM(BTOKENS) as tokens,
+                SUM(BCOST) as cost
+            FROM BUSELOG
+            {$whereClause}
+            GROUP BY BPROVIDER
+            ORDER BY count DESC
+        ";
+        
+        $byProvider = $conn->fetchAllAssociative($sql, $params);
+        $byProviderFormatted = [];
+        foreach ($byProvider as $row) {
+            $provider = $row['provider'] ?: 'WEB';
+            $byProviderFormatted[$provider] = [
+                'count' => (int) $row['count'],
+                'tokens' => (int) $row['tokens'],
+                'cost' => (float) $row['cost']
+            ];
+        }
+
+        // By model
+        $modelWhereClause = $since > 0 
+            ? "WHERE BUNIXTIMES >= :since AND BMODEL IS NOT NULL AND BMODEL != ''"
+            : "WHERE BMODEL IS NOT NULL AND BMODEL != ''";
+            
+        $sql = "
+            SELECT 
+                BMODEL as model,
+                COUNT(*) as count,
+                SUM(BTOKENS) as tokens,
+                SUM(BCOST) as cost
+            FROM BUSELOG
+            {$modelWhereClause}
+            GROUP BY BMODEL
+            ORDER BY count DESC
+            LIMIT 10
+        ";
+        
+        $byModel = $conn->fetchAllAssociative($sql, $params);
+        $byModelFormatted = [];
+        foreach ($byModel as $row) {
+            $byModelFormatted[$row['model']] = [
+                'count' => (int) $row['count'],
+                'tokens' => (int) $row['tokens'],
+                'cost' => (float) $row['cost']
+            ];
+        }
+
+        return [
+            'period' => $period,
+            'total_requests' => (int) $totals['total_requests'],
+            'total_tokens' => (int) ($totals['total_tokens'] ?? 0),
+            'total_cost' => (float) ($totals['total_cost'] ?? 0),
+            'avg_latency' => (float) ($totals['avg_latency'] ?? 0),
+            'byAction' => $byActionFormatted,
+            'byProvider' => $byProviderFormatted,
+            'byModel' => $byModelFormatted,
+        ];
+    }
+
+    /**
      * Export usage data as CSV
      */
     public function exportUsageAsCsv(User $user, ?int $sinceTimestamp = null): string

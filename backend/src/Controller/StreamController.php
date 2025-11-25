@@ -10,6 +10,7 @@ use App\Service\Message\MessageProcessor;
 use App\Service\ModelConfigService;
 use App\Service\WidgetService;
 use App\Service\WidgetSessionService;
+use App\Service\RateLimitService;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -32,6 +33,7 @@ class StreamController extends AbstractController
         private ModelConfigService $modelConfigService,
         private WidgetService $widgetService,
         private WidgetSessionService $widgetSessionService,
+        private RateLimitService $rateLimitService,
         private string $uploadDir
     ) {}
 
@@ -176,6 +178,9 @@ class StreamController extends AbstractController
             }
         }
 
+        // Check rate limit for authenticated users (not widget mode)
+        // We'll check this inside the stream to send a proper SSE error event
+
         $messageText = $request->query->get('message', '');
         $trackId = $request->query->get('trackId', time());
         $chatId = $request->query->get('chatId', null);
@@ -232,6 +237,25 @@ class StreamController extends AbstractController
                 if (!$chat || $chat->getUserId() !== $user->getId()) {
                     $this->sendSSE('error', ['error' => 'Chat not found or access denied']);
                     return;
+                }
+
+                // Check rate limit for authenticated users (not widget mode)
+                if (!$isWidgetMode) {
+                    $rateLimitCheck = $this->rateLimitService->checkLimit($user, 'MESSAGES');
+                    if (!$rateLimitCheck['allowed']) {
+                        $this->sendSSE('error', [
+                            'error' => 'Rate limit exceeded',
+                            'limit_type' => $rateLimitCheck['limit_type'] ?? 'lifetime',
+                            'action_type' => 'MESSAGES',
+                            'limit' => $rateLimitCheck['limit'],
+                            'used' => $rateLimitCheck['used'],
+                            'remaining' => $rateLimitCheck['remaining'],
+                            'reset_at' => $rateLimitCheck['reset_at'] ?? null,
+                            'user_level' => $user->getUserLevel(),
+                            'phone_verified' => $user->getEmailVerified()
+                        ]);
+                        return;
+                    }
                 }
                 
                 // Create incoming message
@@ -1174,6 +1198,9 @@ class StreamController extends AbstractController
         $trackId = $data['trackId'] ?? null;
         $chatId = $data['chatId'] ?? null;
         $content = $data['content'] ?? '';
+        $provider = $data['provider'] ?? null;
+        $model = $data['model'] ?? null;
+        $topic = $data['topic'] ?? null;
 
         if (!$trackId || !$chatId) {
             return $this->json(['error' => 'Missing trackId or chatId'], Response::HTTP_BAD_REQUEST);
@@ -1223,6 +1250,32 @@ class StreamController extends AbstractController
             // Store metadata indicating it was cancelled
             $outgoingMessage->setMeta('cancelled', 'true');
             $outgoingMessage->setMeta('cancelled_at', date('Y-m-d H:i:s'));
+            
+            // Use metadata from request (set during streaming) or fall back to incoming message
+            $chatProvider = $provider ?? $incomingMessage->getMeta('ai_chat_provider');
+            $chatModel = $model ?? $incomingMessage->getMeta('ai_chat_model');
+            $sortingProvider = $incomingMessage->getMeta('ai_sorting_provider');
+            $sortingModel = $incomingMessage->getMeta('ai_sorting_model');
+            
+            // Store model metadata if available
+            if ($chatProvider) {
+                $outgoingMessage->setMeta('ai_chat_provider', $chatProvider);
+            }
+            if ($chatModel) {
+                $outgoingMessage->setMeta('ai_chat_model', $chatModel);
+            }
+            if ($sortingProvider) {
+                $outgoingMessage->setMeta('ai_sorting_provider', $sortingProvider);
+            }
+            if ($sortingModel) {
+                $outgoingMessage->setMeta('ai_sorting_model', $sortingModel);
+            }
+            
+            // Update topic if provided from frontend
+            if ($topic) {
+                $outgoingMessage->setTopic($topic);
+            }
+            
             $this->em->flush();
 
             // Update incoming message status
@@ -1237,7 +1290,10 @@ class StreamController extends AbstractController
 
             return $this->json([
                 'success' => true,
-                'messageId' => $outgoingMessage->getId()
+                'messageId' => $outgoingMessage->getId(),
+                'topic' => $outgoingMessage->getTopic(),
+                'provider' => $chatProvider,
+                'model' => $chatModel
             ]);
 
         } catch (\Exception $e) {

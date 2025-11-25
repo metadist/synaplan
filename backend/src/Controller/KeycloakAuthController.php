@@ -253,15 +253,30 @@ class KeycloakAuthController extends AbstractController
             }
         }
 
-        if (!$user) {
+        if ($user) {
+            // User exists - verify they registered with Keycloak/OIDC
+            if ($user->getProviderId() !== 'keycloak') {
+                throw new \Exception(sprintf(
+                    'This email is already registered using %s. Please use the same login method.',
+                    $user->getAuthProviderName()
+                ));
+            }
+            
+            $this->logger->info('Existing Keycloak user logging in', [
+                'user_id' => $user->getId(),
+                'email' => $email
+            ]);
+        } else {
             // Create new user
             $user = new User();
             $user->setMail($email ?? $username . '@keycloak.local');
-            $user->setType('OIDC');
-            $user->setProviderId('keycloak');
+            $user->setType('WEB'); // Always WEB for web-based logins
+            $user->setProviderId('keycloak'); // Provider tracked here
             $user->setUserLevel('NEW');
             $user->setEmailVerified(true); // OIDC users are pre-verified
             $user->setCreated(date('Y-m-d H:i:s'));
+            $user->setUserDetails([]); // Initialize with empty array
+            $user->setPaymentDetails([]); // Initialize with empty array
 
             $this->logger->info('Creating new user from Keycloak OAuth', [
                 'email' => $email,

@@ -81,16 +81,18 @@
           </div>
         </div>
 
-        <div v-else class="text-center space-y-4" data-testid="section-email-sent">
-          <div class="w-16 h-16 mx-auto rounded-full bg-green-500/10 flex items-center justify-center">
-            <CheckCircleIcon class="w-8 h-8 text-green-500" />
+        <div v-else class="text-center space-y-6" data-testid="section-email-sent">
+          <div class="success-icon-container">
+            <svg class="success-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
           </div>
-          <h3 class="text-xl font-semibold txt-primary">{{ $t('auth.emailSent') }}</h3>
-          <p class="txt-secondary">{{ $t('auth.emailSentDesc', { email: email }) }}</p>
-          <div class="pt-4">
+          <h3 class="text-2xl font-bold txt-primary">{{ $t('auth.passwordResetSuccess') }}</h3>
+          <p class="txt-secondary text-sm leading-relaxed">{{ $t('auth.passwordResetSuccessDesc') }}</p>
+          <div class="pt-4 space-y-3">
             <Button
               @click="emailSent = false"
-              class="btn-secondary py-2 px-6 rounded-lg font-medium"
+              class="w-full btn-secondary py-3 rounded-lg font-medium"
               data-testid="btn-resend"
             >
               {{ $t('auth.resendEmail') }}
@@ -168,4 +170,42 @@ const handleResetPassword = async () => {
   }
 }
 </script>
+
+<style scoped>
+/* Success icon container */
+.success-icon-container {
+  width: 4rem;
+  height: 4rem;
+  margin: 0 auto;
+  border-radius: 50%;
+  background: rgba(22, 163, 74, 0.1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: scaleIn 0.4s ease-out;
+}
+.dark .success-icon-container {
+  background: rgba(34, 197, 94, 0.15);
+}
+
+.success-icon {
+  width: 2rem;
+  height: 2rem;
+  color: #16a34a;
+}
+.dark .success-icon {
+  color: #4ade80;
+}
+
+@keyframes scaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.8);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+</style>
 

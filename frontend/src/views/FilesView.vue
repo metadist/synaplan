@@ -72,8 +72,9 @@
             <p class="text-xs txt-secondary mt-2">
               {{ $t('files.supportedFormats') }}
             </p>
-            <p class="text-sm txt-secondary mt-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
-              <strong>{{ $t('files.autoProcessingTitle') }}:</strong> {{ $t('files.autoProcessingInfo') }}
+            <p class="text-sm alert-info mt-3">
+              <strong class="alert-info-text">{{ $t('files.autoProcessingTitle') }}:</strong> 
+              <span class="alert-info-text">{{ $t('files.autoProcessingInfo') }}</span>
             </p>
           </div>
 

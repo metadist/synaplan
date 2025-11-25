@@ -23,7 +23,7 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     #[ORM\Column(name: 'BCREATED', length: 20)]
     private string $created = '';
 
-    #[ORM\Column(name: 'BINTYPE', length: 4, options: ['default' => 'WEB'])]
+    #[ORM\Column(name: 'BINTYPE', length: 16, options: ['default' => 'WEB'])]
     private string $type = 'WEB';
 
     #[ORM\Column(name: 'BMAIL', length: 128)]
@@ -48,7 +48,7 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     private array $paymentDetails = [];
     
     // Subscription wird via BUSERLEVEL + BPAYMENTDETAILS JSON gesteuert
-    // BUSERLEVEL: NEW, PRO, TEAM, BUSINESS
+    // BUSERLEVEL: NEW, PRO, TEAM, BUSINESS, ADMIN
     // BPAYMENTDETAILS: {subscription_id, status, starts, ends, period, stripe_customer_id, stripe_subscription_id}
 
     public function getId(): ?int
@@ -166,6 +166,13 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
         // Map user level to roles
         $roles = ['ROLE_USER'];
         
+        if ($this->userLevel === 'ADMIN') {
+            $roles[] = 'ROLE_ADMIN';
+            $roles[] = 'ROLE_PRO';
+            $roles[] = 'ROLE_BUSINESS';
+            return array_unique($roles);
+        }
+        
         if (in_array($this->userLevel, ['PRO', 'TEAM', 'BUSINESS'])) {
             $roles[] = 'ROLE_PRO';
         }
@@ -222,9 +229,18 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     }
 
     /**
+     * Check if user is admin
+     */
+    public function isAdmin(): bool
+    {
+        return $this->userLevel === 'ADMIN';
+    }
+
+    /**
      * Get effective rate limiting level
      * 
      * Logic:
+     * - ADMIN: Unlimited usage, no rate limits
      * - ANONYMOUS: Only for non-logged-in users (widget, unlinked WhatsApp/Email)
      * - NEW: Default for all logged-in users without active subscription
      * - PRO/TEAM/BUSINESS: Users with active paid subscription
@@ -234,6 +250,11 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
      */
     public function getRateLimitLevel(): string
     {
+        // Admins have no rate limits
+        if ($this->userLevel === 'ADMIN') {
+            return 'ADMIN';
+        }
+        
         // If user is logged in via web (has email), they are at least NEW
         // ANONYMOUS is only for widget/API users without authentication
         
@@ -279,34 +300,38 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     /**
      * Check if user is using external authentication (OAuth, OIDC)
      * External users cannot change their password locally
+     * 
+     * Note: BINTYPE is always 'WEB' for web-based logins
+     * BPROVIDERID determines the actual authentication provider
      */
     public function isExternalAuth(): bool
     {
-        return in_array($this->type, ['GOOGLE', 'GITHUB', 'OIDC', 'MAIL'], true);
+        // Check provider ID instead of type
+        return $this->providerId !== 'local' && $this->providerId !== '';
     }
 
     /**
      * Check if user can change password
-     * Only local/WEB users with passwords can change their password
+     * Only local users with passwords can change their password
      */
     public function canChangePassword(): bool
     {
-        // Only WEB users with a local password can change it
-        return $this->type === 'WEB' && !empty($this->pw);
+        // Only local provider users with a password can change it
+        return $this->providerId === 'local' && !empty($this->pw);
     }
 
     /**
      * Get authentication provider name for display
+     * Based on BPROVIDERID, not BINTYPE
      */
     public function getAuthProviderName(): string
     {
-        return match($this->type) {
-            'GOOGLE' => 'Google',
-            'GITHUB' => 'GitHub',
-            'OIDC' => 'Keycloak/OIDC',
-            'MAIL' => 'Email',
-            'WEB' => 'Email/Password',
-            default => 'Unknown'
+        return match($this->providerId) {
+            'google' => 'Google',
+            'github' => 'GitHub',
+            'keycloak' => 'Keycloak/OIDC',
+            'local' => 'Email/Password',
+            default => ucfirst($this->providerId) ?: 'Unknown'
         };
     }
 

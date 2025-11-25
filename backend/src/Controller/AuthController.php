@@ -89,10 +89,21 @@ class AuthController extends AbstractController
         }
 
         // Check if user exists
-        if ($this->userRepository->findOneBy(['mail' => $dto->email])) {
+        $existingUser = $this->userRepository->findOneBy(['mail' => $dto->email]);
+        
+        if ($existingUser) {
+            // Security: Don't reveal that email is already registered
+            // Log attempt but return generic success message
+            $this->logger->warning('Registration attempt with existing email', [
+                'email' => $dto->email,
+                'ip' => $request->getClientIp()
+            ]);
+            
+            // Return generic success message (same as for new registrations)
             return $this->json([
-                'error' => 'Email already registered'
-            ], Response::HTTP_CONFLICT);
+                'success' => true,
+                'message' => 'If this email is not already registered, you will receive a verification email shortly.'
+            ], Response::HTTP_OK);
         }
 
         // Create user
@@ -129,9 +140,8 @@ class AuthController extends AbstractController
 
         return $this->json([
             'success' => true,
-            'message' => 'Registration successful. Please check your email to verify your account.',
-            'userId' => $user->getId()
-        ], Response::HTTP_CREATED);
+            'message' => 'If this email is not already registered, you will receive a verification email shortly.'
+        ], Response::HTTP_OK);
     }
 
     #[Route('/login', name: 'login', methods: ['POST'])]
@@ -193,6 +203,20 @@ class AuthController extends AbstractController
             return $this->json(['error' => 'Invalid credentials'], Response::HTTP_UNAUTHORIZED);
         }
 
+        // Check if user registered with external auth (Google, GitHub, Keycloak, Mail)
+        if ($user->isExternalAuth()) {
+            $this->logger->warning('Login attempt with password for external auth user', [
+                'email' => $email,
+                'auth_provider' => $user->getAuthProviderName()
+            ]);
+            return $this->json([
+                'error' => sprintf('This account uses %s for authentication. Please use the "%s" button to sign in.', 
+                    $user->getAuthProviderName(),
+                    $user->getAuthProviderName()
+                )
+            ], Response::HTTP_FORBIDDEN);
+        }
+
         // Check if user is an OAuth user (no password set)
         if ($user->getPw() === null) {
             return $this->json([
@@ -221,6 +245,7 @@ class AuthController extends AbstractController
                 'email' => $user->getMail(),
                 'level' => $user->getUserLevel(),
                 'emailVerified' => $user->isEmailVerified(),
+                'isAdmin' => $user->isAdmin(),
             ]
         ]);
     }
@@ -493,6 +518,7 @@ class AuthController extends AbstractController
                 'level' => $user->getUserLevel(),
                 'emailVerified' => $user->isEmailVerified(),
                 'created' => $user->getCreated(),
+                'isAdmin' => $user->isAdmin(),
             ]
         ]);
     }

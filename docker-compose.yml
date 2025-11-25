@@ -23,8 +23,8 @@ services:
       dockerfile: _docker/backend/Dockerfile
     container_name: synaplan-backend
     # Note: .env file is optional - will be auto-created from .env.example on first start
-    # env_file:
-    #   - backend/.env
+    env_file:
+      - backend/.env
     ports:
       - "8000:80"
     volumes:
@@ -61,6 +61,14 @@ services:
       RECAPTCHA_SITE_KEY: ${RECAPTCHA_SITE_KEY:-}
       RECAPTCHA_SECRET_KEY: ${RECAPTCHA_SECRET_KEY:-}
       RECAPTCHA_ENABLED: ${RECAPTCHA_ENABLED:-false}
+      # Stripe Payment Integration (optional)
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
+      STRIPE_PUBLISHABLE_KEY: ${STRIPE_PUBLISHABLE_KEY:-}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
+      STRIPE_PRICE_PRO: ${STRIPE_PRICE_PRO:-price_pro}
+      STRIPE_PRICE_TEAM: ${STRIPE_PRICE_TEAM:-price_team}
+      STRIPE_PRICE_BUSINESS: ${STRIPE_PRICE_BUSINESS:-price_business}
+      # OAuth Social Login Providers (loaded from backend/.env via env_file)
     depends_on:
       db:
         condition: service_healthy

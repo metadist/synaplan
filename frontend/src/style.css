@@ -461,4 +461,295 @@
   .dark .code-block {
     background: rgba(0, 0, 0, 0.5) !important;
   }
+
+  /* Info Boxes - High contrast for light mode */
+  .info-box-blue {
+    background: #DBEAFE;
+    border: 2px solid #3B82F6;
+    border-radius: 0.5rem;
+    padding: 1rem;
+  }
+  .info-box-blue-title {
+    color: #1E3A8A;
+    font-weight: 700;
+  }
+  .info-box-blue-text {
+    color: #1E40AF;
+    font-weight: 500;
+  }
+  .info-box-blue-icon {
+    color: #2563EB;
+  }
+  .dark .info-box-blue {
+    background: rgba(59, 130, 246, 0.1);
+    border-color: #1E40AF;
+  }
+  .dark .info-box-blue-title {
+    color: #BFDBFE;
+  }
+  .dark .info-box-blue-text {
+    color: #93C5FD;
+  }
+  .dark .info-box-blue-icon {
+    color: #60A5FA;
+  }
+
+  .info-box-yellow {
+    background: #FEF3C7;
+    border: 2px solid #F59E0B;
+    border-radius: 0.5rem;
+    padding: 1rem;
+  }
+  .info-box-yellow-title {
+    color: #92400E;
+    font-weight: 700;
+  }
+  .info-box-yellow-text {
+    color: #B45309;
+    font-weight: 500;
+  }
+  .info-box-yellow-icon {
+    color: #D97706;
+  }
+  .dark .info-box-yellow {
+    background: rgba(245, 158, 11, 0.1);
+    border-color: #B45309;
+  }
+  .dark .info-box-yellow-title {
+    color: #FDE68A;
+  }
+  .dark .info-box-yellow-text {
+    color: #FCD34D;
+  }
+  .dark .info-box-yellow-icon {
+    color: #FBBF24;
+  }
+
+  .info-box-red {
+    background: #FEE2E2;
+    border: 2px solid #EF4444;
+    border-radius: 0.5rem;
+    padding: 1rem;
+  }
+  .info-box-red-title {
+    color: #7F1D1D;
+    font-weight: 700;
+  }
+  .info-box-red-text {
+    color: #991B1B;
+    font-weight: 500;
+  }
+  .info-box-red-icon {
+    color: #DC2626;
+  }
+  .dark .info-box-red {
+    background: rgba(239, 68, 68, 0.1);
+    border-color: #991B1B;
+  }
+  .dark .info-box-red-title {
+    color: #FCA5A5;
+  }
+  .dark .info-box-red-text {
+    color: #F87171;
+  }
+  .dark .info-box-red-icon {
+    color: #EF4444;
+  }
+
+  /* Badges - Userlevel with high contrast */
+  .badge-level {
+    display: inline-block;
+    padding: 0.25rem 0.5rem;
+    font-size: 0.75rem;
+    font-weight: 700;
+    border-radius: 9999px;
+    text-transform: uppercase;
+  }
+  .badge-new {
+    background: #D1D5DB;
+    color: #1F2937;
+    border: 1px solid #9CA3AF;
+  }
+  .dark .badge-new {
+    background: #374151;
+    color: #E5E7EB;
+    border: 1px solid #4B5563;
+  }
+  .badge-pro {
+    background: #BFDBFE;
+    color: #1E3A8A;
+    border: 1px solid #3B82F6;
+  }
+  .dark .badge-pro {
+    background: rgba(59, 130, 246, 0.2);
+    color: #93C5FD;
+    border: 1px solid #2563EB;
+  }
+  .badge-team {
+    background: #DDD6FE;
+    color: #5B21B6;
+    border: 1px solid #8B5CF6;
+  }
+  .dark .badge-team {
+    background: rgba(139, 92, 246, 0.2);
+    color: #C4B5FD;
+    border: 1px solid #7C3AED;
+  }
+  .badge-business {
+    background: #BBF7D0;
+    color: #14532D;
+    border: 1px solid #22C55E;
+  }
+  .dark .badge-business {
+    background: rgba(34, 197, 94, 0.2);
+    color: #86EFAC;
+    border: 1px solid #16A34A;
+  }
+  .badge-admin {
+    background: #FECACA;
+    color: #7F1D1D;
+    border: 1px solid #EF4444;
+  }
+  .dark .badge-admin {
+    background: rgba(239, 68, 68, 0.2);
+    color: #FCA5A5;
+    border: 1px solid #DC2626;
+  }
+
+  /* Alert/Message Boxes - Compact versions with high contrast */
+  .alert-error {
+    background: #FEE2E2;
+    border: 1px solid #DC2626;
+    border-radius: 0.5rem;
+    padding: 0.75rem;
+  }
+  .alert-error-text {
+    color: #991B1B;
+    font-weight: 500;
+  }
+  .dark .alert-error {
+    background: rgba(239, 68, 68, 0.15);
+    border-color: #991B1B;
+  }
+  .dark .alert-error-text {
+    color: #FCA5A5;
+  }
+
+  .alert-success {
+    background: #D1FAE5;
+    border: 1px solid #10B981;
+    border-radius: 0.5rem;
+    padding: 0.75rem;
+  }
+  .alert-success-text {
+    color: #065F46;
+    font-weight: 500;
+  }
+  .dark .alert-success {
+    background: rgba(34, 197, 94, 0.15);
+    border-color: #047857;
+  }
+  .dark .alert-success-text {
+    color: #86EFAC;
+  }
+
+  .alert-info {
+    background: #DBEAFE;
+    border: 1px solid #3B82F6;
+    border-radius: 0.5rem;
+    padding: 0.75rem;
+  }
+  .alert-info-text {
+    color: #1E40AF;
+    font-weight: 500;
+  }
+  .alert-info-icon {
+    color: #2563EB;
+  }
+  .dark .alert-info {
+    background: rgba(59, 130, 246, 0.15);
+    border-color: #1D4ED8;
+  }
+  .dark .alert-info-text {
+    color: #93C5FD;
+  }
+  .dark .alert-info-icon {
+    color: #60A5FA;
+  }
+
+  .alert-warning {
+    background: #FEF3C7;
+    border: 1px solid #F59E0B;
+    border-radius: 0.5rem;
+    padding: 0.75rem;
+  }
+  .alert-warning-text {
+    color: #92400E;
+    font-weight: 500;
+  }
+  .dark .alert-warning {
+    background: rgba(245, 158, 11, 0.15);
+    border-color: #D97706;
+  }
+  .dark .alert-warning-text {
+    color: #FCD34D;
+  }
+
+  /* Premium/Upgrade Button - Golden Shine Effect */
+  .btn-upgrade {
+    position: relative;
+    background: linear-gradient(135deg, #F59E0B 0%, #D97706 50%, #F59E0B 100%);
+    background-size: 200% 200%;
+    color: #FFF;
+    font-weight: 700;
+    box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+    animation: golden-shimmer 3s ease-in-out infinite;
+    overflow: hidden;
+  }
+  .btn-upgrade::before {
+    content: '';
+    position: absolute;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background: linear-gradient(
+      45deg,
+      transparent 30%,
+      rgba(255, 255, 255, 0.3) 50%,
+      transparent 70%
+    );
+    animation: golden-shine 2.5s ease-in-out infinite;
+  }
+  .btn-upgrade:hover {
+    background: linear-gradient(135deg, #FBBF24 0%, #F59E0B 50%, #FBBF24 100%);
+    box-shadow: 0 6px 20px rgba(245, 158, 11, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.3);
+    transform: translateY(-1px);
+  }
+  .dark .btn-upgrade {
+    background: linear-gradient(135deg, #FBBF24 0%, #F59E0B 50%, #FBBF24 100%);
+    box-shadow: 0 4px 12px rgba(251, 191, 36, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  }
+  .dark .btn-upgrade:hover {
+    background: linear-gradient(135deg, #FCD34D 0%, #FBBF24 50%, #FCD34D 100%);
+    box-shadow: 0 6px 20px rgba(251, 191, 36, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.3);
+  }
+  
+  @keyframes golden-shimmer {
+    0%, 100% {
+      background-position: 0% 50%;
+    }
+    50% {
+      background-position: 100% 50%;
+    }
+  }
+  
+  @keyframes golden-shine {
+    0% {
+      transform: translateX(-100%) translateY(-100%) rotate(45deg);
+    }
+    100% {
+      transform: translateX(100%) translateY(100%) rotate(45deg);
+    }
+  }
 }
