@@ -74,12 +74,19 @@ echo ""
 echo "📦 Pulling containers (this may take a minute)..."
 docker compose pull
 
+# Stop any running containers to ensure clean start with new env vars
+docker compose down 2>/dev/null || true
+
 if [ "$USE_GROQ" -eq 1 ]; then
-  echo "🚀 Starting stack (Groq cloud mode - still downloading bge-m3 locally)..."
-  AUTO_DOWNLOAD_MODELS=true ENABLE_LOCAL_GPT_OSS=false docker compose up -d
+  echo "🚀 Starting stack (Groq cloud mode - only downloading bge-m3 locally)..."
+  export AUTO_DOWNLOAD_MODELS=true
+  export ENABLE_LOCAL_GPT_OSS=false
+  docker compose up -d
 else
   echo "🚀 Starting stack (Auto-download of gpt-oss:20b and bge-m3 enabled)..."
-  AUTO_DOWNLOAD_MODELS=true ENABLE_LOCAL_GPT_OSS=true docker compose up -d
+  export AUTO_DOWNLOAD_MODELS=true
+  export ENABLE_LOCAL_GPT_OSS=true
+  docker compose up -d
 fi
 
 echo ""
@@ -94,12 +101,35 @@ set +u
 set +o pipefail
 
 # Wait up to 5 minutes for model downloads with timeout
-( timeout 300 docker compose logs -f backend 2>&1 | grep --line-buffered "\[Background\]" | while IFS= read -r line; do
-    echo "$line"
-    if echo "$line" | grep -q "\[Background\] 🎉 Model downloads completed!"; then
-      exit 0
-    fi
-  done )
+( timeout 300 docker compose logs -f backend 2>&1 | \
+  grep --line-buffered "\[Background\]" | \
+  sed -u '/Model downloads completed!/q' | \
+  awk '
+    BEGIN { count = 0; had_dots = 0 }
+    /"status":/ {
+      # JSON progress line - print a dot every 10 updates
+      count++
+      if (count % 10 == 0) {
+        printf "." > "/dev/stderr"
+        had_dots = 1
+        fflush("/dev/stderr")
+      }
+      next
+    }
+    {
+      # Important message - print it
+      if (had_dots == 1) {
+        print "" > "/dev/stderr"
+        had_dots = 0
+      }
+      print $0 > "/dev/stderr"
+      fflush("/dev/stderr")
+    }
+    END {
+      if (had_dots == 1) print "" > "/dev/stderr"
+    }
+  '
+)
 RESULT=$?
 set -e
 set -u
@@ -134,8 +164,10 @@ if [ "$READY" -eq 1 ]; then
   docker compose exec backend php bin/console doctrine:fixtures:load --no-interaction
   if [ "$USE_GROQ" -eq 1 ]; then
     echo "⚙️ Switching defaults to Groq llama-3.3-70b-versatile..."
-    docker compose exec backend php bin/console dbal:run-sql "UPDATE BCONFIG SET BVALUE='9' WHERE BGROUP='DEFAULTMODEL' AND BSETTING IN ('CHAT','SORT')"
-    docker compose exec backend php bin/console dbal:run-sql "UPDATE BCONFIG SET BVALUE='groq' WHERE BOWNERID=0 AND BGROUP='ai' AND BSETTING='default_chat_provider'"
+    docker compose exec backend php bin/console dbal:run-sql \
+      'UPDATE BCONFIG SET BVALUE="9" WHERE BGROUP="DEFAULTMODEL" AND BSETTING IN ("CHAT","SORT")'
+    docker compose exec backend php bin/console dbal:run-sql \
+      'UPDATE BCONFIG SET BVALUE="groq" WHERE BOWNERID=0 AND BGROUP="ai" AND BSETTING="default_chat_provider"'
   fi
 else
   echo "⚠️ Backend console did not become ready; please run doctrine:schema:update and fixtures manually."

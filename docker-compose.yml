@@ -56,6 +56,7 @@ services:
       # AI Provider API Keys (loaded from backend/.env via env_file above)
       # GROQ_API_KEY is automatically loaded from backend/.env
       AUTO_DOWNLOAD_MODELS: ${AUTO_DOWNLOAD_MODELS:-false}
+      ENABLE_LOCAL_GPT_OSS: ${ENABLE_LOCAL_GPT_OSS:-true}
       # reCAPTCHA (optional - disabled by default)
       RECAPTCHA_SITE_KEY: ${RECAPTCHA_SITE_KEY:-}
       RECAPTCHA_SECRET_KEY: ${RECAPTCHA_SECRET_KEY:-}
