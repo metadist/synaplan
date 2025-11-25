@@ -31,6 +31,8 @@
       </div>
     </div>
 
+    <PhoneVerification />
+
     <div class="surface-card p-6" data-testid="section-email">
       <h3 class="text-lg font-semibold txt-primary mb-4 flex items-center gap-2">
         <EnvelopeIcon class="w-5 h-5 text-blue-500" />
@@ -129,6 +131,7 @@ import {
   CheckCircleIcon
 } from '@heroicons/vue/24/outline'
 import UnsavedChangesBar from '@/components/UnsavedChangesBar.vue'
+import PhoneVerification from '@/components/config/PhoneVerification.vue'
 import {
   mockWhatsAppChannels,
   mockEmailChannels,
