@@ -150,18 +150,6 @@ class MediaGenerationHandler implements MessageHandlerInterface
                     'model_id' => $modelId
                 ]);
             } elseif ($promptMediaType === 'video') {
-            // For slash commands, skip auto-detection and use the detected type
-            if ($isSlashCommand) {
-                if ($mediaType === 'video') {
-                    $modelId = $this->modelConfigService->getDefaultModel('TEXT2VID', $message->getUserId());
-                } else {
-                    $modelId = $this->modelConfigService->getDefaultModel('TEXT2PIC', $message->getUserId());
-                }
-                $this->logger->info('MediaGenerationHandler: Using default model for slash command', [
-                    'media_type' => $mediaType,
-                    'model_id' => $modelId
-                ]);
-            } elseif ($promptMediaType === 'video') {
                 $modelId = $this->modelConfigService->getDefaultModel('TEXT2VID', $message->getUserId());
                 $mediaType = 'video';
                 $this->logger->info('MediaGenerationHandler: Using media type hint from extractor (video)');
