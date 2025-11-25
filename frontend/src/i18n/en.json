@@ -439,6 +439,8 @@
       "title": "Prompt Management",
       "subtitle": "Manage and customize AI prompts for different tasks",
       "selectPrompt": "Select Prompt",
+      "selectPromptTitle": "Select a Prompt",
+      "selectPromptDescription": "Choose an existing prompt to view or edit",
       "selectPromptHelp": "Choose an existing prompt to edit or use as template",
       "promptDetails": "Prompt Details",
       "rulesForSelection": "Selection Rules",

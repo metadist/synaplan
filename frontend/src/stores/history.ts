@@ -4,6 +4,17 @@ import { normalizeMediaUrl } from '@/utils/urlHelper'
 import { extractBTextPayload } from '@/utils/jsonResponse'
 import type { AgainData } from '@/types/ai-models'
 
+// Helper function to check authentication and redirect if needed
+function checkAuthOrRedirect(): boolean {
+  const token = localStorage.getItem('auth_token')
+  if (!token) {
+    console.warn('🔒 No auth token found - redirecting to login')
+    window.location.href = '/login?reason=session_expired'
+    return false
+  }
+  return true
+}
+
 export type PartType = 'text' | 'image' | 'video' | 'audio' | 'code' | 'links' | 'docs' | 'screenshot' | 'translation' | 'link' | 'commandList' | 'thinking'
 
 export interface Part {
@@ -252,6 +263,8 @@ export const useHistoryStore = defineStore('history', () => {
   }
 
   const loadMessages = async (chatId: number, offset = 0, limit = 50) => {
+    if (!checkAuthOrRedirect()) return
+    
     isLoadingMessages.value = true
     try {
       const { chatApi } = await import('@/services/api')

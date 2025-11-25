@@ -32,31 +32,80 @@ export const authApi = {
   },
 
   async verifyEmail(token: string): Promise<any> {
-    return httpClient<any>('/api/v1/auth/verify-email', {
+    // Email verification should work without authentication
+    // Don't use httpClient as it may send expired auth tokens causing 401
+    const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'
+    const response = await fetch(`${API_BASE_URL}/api/v1/auth/verify-email`, {
       method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
       body: JSON.stringify({ token })
     })
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}))
+      throw new Error(errorData.error || errorData.message || `HTTP ${response.status}`)
+    }
+
+    return response.json()
   },
 
   async resendVerification(email: string): Promise<any> {
-    return httpClient<any>('/api/v1/auth/resend-verification', {
+    // Resend verification should work without authentication
+    const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'
+    const response = await fetch(`${API_BASE_URL}/api/v1/auth/resend-verification`, {
       method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
       body: JSON.stringify({ email })
     })
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}))
+      throw new Error(errorData.error || errorData.message || `HTTP ${response.status}`)
+    }
+
+    return response.json()
   },
 
   async forgotPassword(email: string): Promise<any> {
-    return httpClient<any>('/api/v1/auth/forgot-password', {
+    // Forgot password should work without authentication
+    const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'
+    const response = await fetch(`${API_BASE_URL}/api/v1/auth/forgot-password`, {
       method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
       body: JSON.stringify({ email })
     })
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}))
+      throw new Error(errorData.error || errorData.message || `HTTP ${response.status}`)
+    }
+
+    return response.json()
   },
 
   async resetPassword(token: string, password: string): Promise<any> {
-    return httpClient<any>('/api/v1/auth/reset-password', {
+    // Password reset should work without authentication
+    const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'
+    const response = await fetch(`${API_BASE_URL}/api/v1/auth/reset-password`, {
       method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
       body: JSON.stringify({ token, password })
     })
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}))
+      throw new Error(errorData.error || errorData.message || `HTTP ${response.status}`)
+    }
+
+    return response.json()
   }
 }
 

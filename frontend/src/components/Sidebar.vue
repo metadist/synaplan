@@ -118,7 +118,7 @@
         <div class="h-20"></div>
       </div>
 
-      <div class="sticky bottom-0 bg-sidebar p-4 border-t border-light-border/30 dark:border-dark-border/20" data-testid="section-sidebar-footer">
+      <div class="sticky bottom-0 bg-sidebar p-4 border-t border-light-border/30 dark:border-dark-border/20 z-20" data-testid="section-sidebar-footer">
         <UserMenu :email="authStore.user?.email || 'guest@synaplan.com'" :collapsed="sidebarStore.isCollapsed" />
       </div>
     </div>

@@ -4,6 +4,17 @@ import { ref, computed } from 'vue'
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'
 const ACTIVE_CHAT_STORAGE_KEY = 'synaplan_active_chat_id'
 
+// Helper function to check authentication and redirect if needed
+function checkAuthOrRedirect(): boolean {
+  const token = localStorage.getItem('auth_token')
+  if (!token) {
+    console.warn('🔒 No auth token found - redirecting to login')
+    window.location.href = '/login?reason=session_expired'
+    return false
+  }
+  return true
+}
+
 export interface Chat {
   id: number
   title: string
@@ -86,14 +97,13 @@ export const useChatsStore = defineStore('chats', () => {
   }
 
   async function loadChats() {
+    if (!checkAuthOrRedirect()) return
+    
     loading.value = true
     error.value = null
     
     try {
-      const token = localStorage.getItem('auth_token')
-      if (!token) {
-        throw new Error('Not authenticated')
-      }
+      const token = localStorage.getItem('auth_token')!
 
       const response = await fetch(`${API_BASE_URL}/api/v1/chats`, {
         headers: {
@@ -118,14 +128,13 @@ export const useChatsStore = defineStore('chats', () => {
   }
 
   async function createChat(title?: string): Promise<Chat | null> {
+    if (!checkAuthOrRedirect()) return null
+    
     loading.value = true
     error.value = null
     
     try {
-      const token = localStorage.getItem('auth_token')
-      if (!token) {
-        throw new Error('Not authenticated')
-      }
+      const token = localStorage.getItem('auth_token')!
 
       const response = await fetch(`${API_BASE_URL}/api/v1/chats`, {
         method: 'POST',
@@ -157,11 +166,10 @@ export const useChatsStore = defineStore('chats', () => {
   }
 
   async function updateChatTitle(chatId: number, title: string) {
+    if (!checkAuthOrRedirect()) return
+    
     try {
-      const token = localStorage.getItem('auth_token')
-      if (!token) {
-        throw new Error('Not authenticated')
-      }
+      const token = localStorage.getItem('auth_token')!
 
       const response = await fetch(`${API_BASE_URL}/api/v1/chats/${chatId}`, {
         method: 'PATCH',
@@ -187,11 +195,10 @@ export const useChatsStore = defineStore('chats', () => {
   }
 
   async function deleteChat(chatId: number) {
+    if (!checkAuthOrRedirect()) return
+    
     try {
-      const token = localStorage.getItem('auth_token')
-      if (!token) {
-        throw new Error('Not authenticated')
-      }
+      const token = localStorage.getItem('auth_token')!
 
       const response = await fetch(`${API_BASE_URL}/api/v1/chats/${chatId}`, {
         method: 'DELETE',
@@ -218,11 +225,10 @@ export const useChatsStore = defineStore('chats', () => {
   }
 
   async function shareChat(chatId: number, enable: boolean = true) {
+    if (!checkAuthOrRedirect()) return null
+    
     try {
-      const token = localStorage.getItem('auth_token')
-      if (!token) {
-        throw new Error('Not authenticated')
-      }
+      const token = localStorage.getItem('auth_token')!
 
       const response = await fetch(`${API_BASE_URL}/api/v1/chats/${chatId}/share`, {
         method: 'POST',
@@ -259,11 +265,10 @@ export const useChatsStore = defineStore('chats', () => {
   }
 
   async function getShareInfo(chatId: number) {
+    if (!checkAuthOrRedirect()) return null
+    
     try {
-      const token = localStorage.getItem('auth_token')
-      if (!token) {
-        throw new Error('Not authenticated')
-      }
+      const token = localStorage.getItem('auth_token')!
 
       const response = await fetch(`${API_BASE_URL}/api/v1/chats/${chatId}`, {
         headers: {
