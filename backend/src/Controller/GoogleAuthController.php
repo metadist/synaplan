@@ -147,15 +147,38 @@ class GoogleAuthController extends AbstractController
             ]);
 
             // Find or create user
+            try {
             $user = $this->findOrCreateUser($userInfo, $refreshToken);
+                $this->logger->info('User found/created successfully', [
+                    'user_id' => $user->getId(),
+                    'email' => $user->getMail()
+                ]);
+            } catch (\Exception $e) {
+                $this->logger->error('Failed to find/create user', [
+                    'error' => $e->getMessage(),
+                    'file' => $e->getFile(),
+                    'line' => $e->getLine()
+                ]);
+                throw $e;
+            }
 
             // Generate JWT token for our app
+            try {
             $jwtToken = $this->jwtManager->create($user);
+                $this->logger->info('JWT token created successfully');
+            } catch (\Exception $e) {
+                $this->logger->error('Failed to create JWT token', [
+                    'error' => $e->getMessage(),
+                    'user_id' => $user->getId()
+                ]);
+                throw $e;
+            }
 
             // Redirect to frontend with token
             $callbackUrl = $this->frontendUrl . '/auth/callback?' . http_build_query([
                 'token' => $jwtToken,
-                'provider' => 'google'
+                'provider' => 'google',
+                'isAdmin' => $user->isAdmin()
             ]);
 
             $this->logger->info('Google OAuth successful, redirecting to frontend', [
@@ -166,9 +189,11 @@ class GoogleAuthController extends AbstractController
             return $this->redirect($callbackUrl);
 
         } catch (\Exception $e) {
-            $this->logger->error('Google OAuth callback error', [
+            $this->logger->error('Google OAuth callback error [FINAL]', [
                 'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+                'trace' => substr($e->getTraceAsString(), 0, 1000)
             ]);
 
             // Redirect to frontend with error
@@ -193,15 +218,30 @@ class GoogleAuthController extends AbstractController
         // Try to find existing user by email
         $user = $this->userRepository->findOneBy(['mail' => $email]);
 
-        if (!$user) {
+        if ($user) {
+            // User exists - verify they registered with Google
+            if ($user->getProviderId() !== 'google') {
+                throw new \Exception(sprintf(
+                    'This email is already registered using %s. Please use the same login method.',
+                    $user->getAuthProviderName()
+                ));
+            }
+            
+            $this->logger->info('Existing Google user logging in', [
+                'user_id' => $user->getId(),
+                'email' => $email
+            ]);
+        } else {
             // Create new user
             $user = new User();
             $user->setMail($email);
-            $user->setType('GOOGLE');
-            $user->setProviderId('google');
+            $user->setType('WEB'); // Always WEB for web-based logins
+            $user->setProviderId('google'); // Provider tracked here
             $user->setUserLevel('NEW');
             $user->setEmailVerified(true); // OAuth users are pre-verified
             $user->setCreated(date('Y-m-d H:i:s'));
+            $user->setUserDetails([]); // Initialize with empty array
+            $user->setPaymentDetails([]); // Initialize with empty array
 
             $this->logger->info('Creating new user from Google OAuth', [
                 'email' => $email,

@@ -35,7 +35,29 @@
       </div>
 
       <div class="surface-card p-8" data-testid="section-register-card">
-        <form @submit.prevent="handleRegister" class="space-y-5" data-testid="form-register">
+        <!-- Success State (shown after registration) -->
+        <div v-if="registrationSuccess" class="text-center space-y-6" data-testid="section-registration-success">
+          <div class="success-icon-container">
+            <svg class="success-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          </div>
+          <h3 class="text-2xl font-bold txt-primary">{{ $t('auth.registrationSuccess') }}</h3>
+          <p class="txt-secondary text-sm leading-relaxed">{{ $t('auth.registrationSuccessDesc') }}</p>
+          
+          <div class="pt-4 space-y-3">
+            <Button
+              @click="router.push('/login')"
+              class="w-full btn-primary py-3 rounded-lg font-medium"
+              data-testid="btn-goto-login"
+            >
+              {{ $t('auth.backToLogin') }}
+            </Button>
+          </div>
+        </div>
+
+        <!-- Registration Form -->
+        <form v-else @submit.prevent="handleRegister" class="space-y-5" data-testid="form-register">
           <div data-testid="field-full-name">
             <label for="fullName" class="block text-sm font-medium txt-primary mb-2">
               {{ $t('auth.fullName') }}
@@ -104,13 +126,23 @@
           </div>
 
           <!-- Error Message -->
-          <div v-if="error" class="p-3 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800" data-testid="alert-register-error">
-            <p class="text-sm text-red-600 dark:text-red-400">{{ error }}</p>
+          <div v-if="error" class="notification notification--error" data-testid="alert-register-error">
+            <div class="notification-icon">
+              <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.662 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              </svg>
+            </div>
+            <p class="notification-text">{{ error }}</p>
           </div>
 
           <!-- Password Mismatch Warning -->
-          <div v-if="password && confirmPassword && password !== confirmPassword" class="p-3 rounded-lg bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800" data-testid="alert-password-mismatch">
-            <p class="text-sm text-yellow-600 dark:text-yellow-400">{{ $t('auth.passwordMismatch') || 'Passwords do not match' }}</p>
+          <div v-if="password && confirmPassword && password !== confirmPassword" class="notification notification--warning" data-testid="alert-password-mismatch">
+            <div class="notification-icon">
+              <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.662 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              </svg>
+            </div>
+            <p class="notification-text">{{ $t('auth.passwordMismatch') }}</p>
           </div>
 
           <Button
@@ -119,7 +151,7 @@
             :disabled="loading || password !== confirmPassword"
             data-testid="btn-register"
           >
-            <span v-if="loading">{{ $t('auth.signingUp') || 'Creating account...' }}</span>
+            <span v-if="loading">{{ $t('auth.signingUp') }}</span>
             <span v-else>{{ $t('auth.signUp') }}</span>
           </Button>
         </form>
@@ -244,6 +276,7 @@ const toggleTheme = () => {
 const { register, error, loading, clearError } = useAuth()
 const passwordErrors = ref<string[]>([])
 const emailError = ref('')
+const registrationSuccess = ref(false)
 
 const handleRegister = async () => {
   clearError()
@@ -274,7 +307,7 @@ const handleRegister = async () => {
   const success = await register(email.value, password.value, recaptchaToken)
   
   if (success) {
-    router.push('/verify-email')
+    registrationSuccess.value = true
   }
 }
 
@@ -283,3 +316,124 @@ const handleSocialLogin = (provider: string) => {
   // TODO: Implement social login
 }
 </script>
+
+<style scoped>
+/* Notification styles using colors from style.css */
+.notification {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 1rem;
+  border-radius: 0.75rem;
+  border: 1px solid;
+  animation: slideInDown 0.3s ease-out;
+}
+
+.notification-icon {
+  flex-shrink: 0;
+  width: 1.25rem;
+  height: 1.25rem;
+  margin-top: 0.125rem;
+}
+
+.notification-text {
+  flex: 1;
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+
+/* Error notification */
+.notification--error {
+  background: rgba(220, 38, 38, 0.05);
+  border-color: rgba(220, 38, 38, 0.2);
+}
+.dark .notification--error {
+  background: rgba(239, 68, 68, 0.1);
+  border-color: rgba(239, 68, 68, 0.25);
+}
+
+.notification--error .notification-icon {
+  color: #dc2626;
+}
+.dark .notification--error .notification-icon {
+  color: #f87171;
+}
+
+.notification--error .notification-text {
+  color: #991b1b;
+}
+.dark .notification--error .notification-text {
+  color: #fca5a5;
+}
+
+/* Warning notification */
+.notification--warning {
+  background: rgba(234, 179, 8, 0.05);
+  border-color: rgba(234, 179, 8, 0.2);
+}
+.dark .notification--warning {
+  background: rgba(250, 204, 21, 0.1);
+  border-color: rgba(250, 204, 21, 0.25);
+}
+
+.notification--warning .notification-icon {
+  color: #ca8a04;
+}
+.dark .notification--warning .notification-icon {
+  color: #fbbf24;
+}
+
+.notification--warning .notification-text {
+  color: #854d0e;
+}
+.dark .notification--warning .notification-text {
+  color: #fde047;
+}
+
+/* Success icon container */
+.success-icon-container {
+  width: 4rem;
+  height: 4rem;
+  margin: 0 auto;
+  border-radius: 50%;
+  background: rgba(22, 163, 74, 0.1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: scaleIn 0.4s ease-out;
+}
+.dark .success-icon-container {
+  background: rgba(34, 197, 94, 0.15);
+}
+
+.success-icon {
+  width: 2rem;
+  height: 2rem;
+  color: #16a34a;
+}
+.dark .success-icon {
+  color: #4ade80;
+}
+
+@keyframes slideInDown {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes scaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.8);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+</style>

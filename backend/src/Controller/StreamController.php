@@ -10,6 +10,7 @@ use App\Service\Message\MessageProcessor;
 use App\Service\ModelConfigService;
 use App\Service\WidgetService;
 use App\Service\WidgetSessionService;
+use App\Service\RateLimitService;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -32,6 +33,7 @@ class StreamController extends AbstractController
         private ModelConfigService $modelConfigService,
         private WidgetService $widgetService,
         private WidgetSessionService $widgetSessionService,
+        private RateLimitService $rateLimitService,
         private string $uploadDir
     ) {}
 
@@ -176,6 +178,9 @@ class StreamController extends AbstractController
             }
         }
 
+        // Check rate limit for authenticated users (not widget mode)
+        // We'll check this inside the stream to send a proper SSE error event
+
         $messageText = $request->query->get('message', '');
         $trackId = $request->query->get('trackId', time());
         $chatId = $request->query->get('chatId', null);
@@ -232,6 +237,25 @@ class StreamController extends AbstractController
                 if (!$chat || $chat->getUserId() !== $user->getId()) {
                     $this->sendSSE('error', ['error' => 'Chat not found or access denied']);
                     return;
+                }
+
+                // Check rate limit for authenticated users (not widget mode)
+                if (!$isWidgetMode) {
+                    $rateLimitCheck = $this->rateLimitService->checkLimit($user, 'MESSAGES');
+                    if (!$rateLimitCheck['allowed']) {
+                        $this->sendSSE('error', [
+                            'error' => 'Rate limit exceeded',
+                            'limit_type' => $rateLimitCheck['limit_type'] ?? 'lifetime',
+                            'action_type' => 'MESSAGES',
+                            'limit' => $rateLimitCheck['limit'],
+                            'used' => $rateLimitCheck['used'],
+                            'remaining' => $rateLimitCheck['remaining'],
+                            'reset_at' => $rateLimitCheck['reset_at'] ?? null,
+                            'user_level' => $user->getUserLevel(),
+                            'phone_verified' => $user->getEmailVerified()
+                        ]);
+                        return;
+                    }
                 }
                 
                 // Create incoming message

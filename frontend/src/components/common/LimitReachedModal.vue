@@ -198,7 +198,7 @@ const handleClose = () => {
 
 const handleUpgrade = () => {
   emit('upgrade')
-  router.push('/settings/subscription')
+  router.push('/subscription')
 }
 
 const handleVerifyPhone = () => {

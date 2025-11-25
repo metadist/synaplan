@@ -190,6 +190,19 @@ services:
             $appUrl: '%env(APP_URL)%'
             $frontendUrl: '%env(FRONTEND_URL)%'
     
+    # Stripe Payment Controllers
+    App\Controller\SubscriptionController:
+        arguments:
+            $stripeSecretKey: '%env(STRIPE_SECRET_KEY)%'
+            $stripePricePro: '%env(STRIPE_PRICE_PRO)%'
+            $stripePriceTeam: '%env(STRIPE_PRICE_TEAM)%'
+            $stripePriceBusiness: '%env(STRIPE_PRICE_BUSINESS)%'
+            $frontendUrl: '%env(FRONTEND_URL)%'
+    
+    App\Controller\StripeWebhookController:
+        arguments:
+            $stripeWebhookSecret: '%env(STRIPE_WEBHOOK_SECRET)%'
+    
     # Auth Providers Controller (returns enabled providers)
     App\Controller\AuthProvidersController:
         arguments:

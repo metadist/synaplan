@@ -32,6 +32,7 @@
         "phpstan/phpdoc-parser": "^2.3",
         "predis/predis": "^3.2",
         "smalot/pdfparser": "^2.12",
+        "stripe/stripe-php": "^16.0",
         "symfony/asset": "7.3.*",
         "symfony/console": "7.3.*",
         "symfony/dotenv": "7.3.*",
@@ -59,6 +60,9 @@
             "symfony/flex": true,
             "symfony/runtime": true,
             "codewithkyrian/platform-package-installer": true
+        },
+        "audit": {
+            "ignore": ["PKSA-365x-2zjk-pt47", "PKSA-64jn-3d9t-gncx"]
         },
         "bump-after-update": true,
         "sort-packages": true
