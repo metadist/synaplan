@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'
+const ACTIVE_CHAT_STORAGE_KEY = 'synaplan_active_chat_id'
 
 export interface Chat {
   id: number
@@ -25,7 +26,7 @@ export interface WidgetSessionInfo {
 
 export const useChatsStore = defineStore('chats', () => {
   const chats = ref<Chat[]>([])
-  const activeChatId = ref<number | null>(null)
+  const activeChatId = ref<number | null>(readActiveChatId())
   const loading = ref(false)
   const error = ref<string | null>(null)
 
@@ -37,6 +38,52 @@ export const useChatsStore = defineStore('chats', () => {
   const activeChat = computed(() => {
     return chats.value.find(c => c.id === activeChatId.value) || null
   })
+
+  function readActiveChatId(): number | null {
+    try {
+      const storedId = localStorage.getItem(ACTIVE_CHAT_STORAGE_KEY)
+      if (!storedId) {
+        return null
+      }
+
+      const parsed = Number(storedId)
+      return Number.isFinite(parsed) ? parsed : null
+    } catch (error) {
+      console.warn('Unable to read active chat from storage', error)
+      return null
+    }
+  }
+
+  function persistActiveChatId(chatId: number | null) {
+    try {
+      if (chatId === null) {
+        localStorage.removeItem(ACTIVE_CHAT_STORAGE_KEY)
+      } else {
+        localStorage.setItem(ACTIVE_CHAT_STORAGE_KEY, String(chatId))
+      }
+    } catch (error) {
+      console.warn('Unable to persist active chat to storage', error)
+    }
+  }
+
+  function updateActiveChatSelection(chatId: number | null) {
+    activeChatId.value = chatId
+    persistActiveChatId(chatId)
+  }
+
+  function ensureValidActiveChat() {
+    const candidateId = activeChatId.value ?? readActiveChatId()
+    if (candidateId && chats.value.some(chat => chat.id === candidateId)) {
+      updateActiveChatSelection(candidateId)
+      return
+    }
+
+    if (chats.value.length > 0) {
+      updateActiveChatSelection(chats.value[0].id)
+    } else {
+      updateActiveChatSelection(null)
+    }
+  }
 
   async function loadChats() {
     loading.value = true
@@ -61,11 +108,7 @@ export const useChatsStore = defineStore('chats', () => {
 
       const data = await response.json()
       chats.value = (data.chats || []).map((chat: any) => normalizeChat(chat))
-      
-      // Auto-select first chat if none selected
-      if (chats.value.length > 0 && !activeChatId.value) {
-        activeChatId.value = chats.value[0].id
-      }
+      ensureValidActiveChat()
     } catch (err: any) {
       error.value = err.message || 'Failed to load chats'
       console.error('Error loading chats:', err)
@@ -101,7 +144,7 @@ export const useChatsStore = defineStore('chats', () => {
       const newChat = normalizeChat(data.chat)
       
       chats.value.unshift(newChat)
-      activeChatId.value = newChat.id
+      updateActiveChatSelection(newChat.id)
       
       return newChat
     } catch (err: any) {
@@ -166,7 +209,7 @@ export const useChatsStore = defineStore('chats', () => {
       
       // Select another chat if the deleted one was active
       if (activeChatId.value === chatId) {
-        activeChatId.value = chats.value.length > 0 ? chats.value[0].id : null
+        updateActiveChatSelection(chats.value.length > 0 ? chats.value[0].id : null)
       }
     } catch (err: any) {
       error.value = err.message || 'Failed to delete chat'
@@ -249,12 +292,12 @@ export const useChatsStore = defineStore('chats', () => {
   }
 
   function setActiveChat(chatId: number) {
-    activeChatId.value = chatId
+    updateActiveChatSelection(chatId)
   }
 
   function $reset() {
     chats.value = []
-    activeChatId.value = null
+    updateActiveChatSelection(null)
     loading.value = false
     error.value = null
   }
