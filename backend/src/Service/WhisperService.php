@@ -282,14 +282,18 @@ class WhisperService
             $this->whisperBinary,
             '-m', $modelPath,
             '-f', $audioPath,
-            '--output-txt',  // Text output
-            '--no-timestamps', // No timestamps in output
+            '--output-txt',   // Text output
+            '--no-timestamps' // No timestamps in output
         ];
 
         // Language hint (speeds up processing)
         if (isset($options['language'])) {
             $command[] = '-l';
             $command[] = $options['language'];
+        } else {
+            // Force auto language detection so that Whisper always reports detected language
+            $command[] = '-l';
+            $command[] = 'auto';
         }
 
         // Translation mode (translate to English)
@@ -333,6 +337,11 @@ class WhisperService
         $language = 'unknown';
         if (preg_match('/auto-detected language: (\w+)/i', $errorOutput, $matches)) {
             $language = strtolower($matches[1]);
+        }
+
+        // Fallback: if language could not be detected, default to English
+        if ($language === 'unknown' || $language === '') {
+            $language = 'en';
         }
 
         return [

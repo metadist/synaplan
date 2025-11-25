@@ -485,6 +485,7 @@ class MessageController extends AbstractController
             
             // Create File entity (NEW: separate entity for files)
             $messageFile = new File();
+            $messageFile->setUserId($user->getId()); // CRITICAL: Set user ID to avoid NULL constraint violation
             $messageFile->setFilePath($relativePath);
             $messageFile->setFileType($fileExtension);
             $messageFile->setFileName($uploadedFile->getClientOriginalName());
