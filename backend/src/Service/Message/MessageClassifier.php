@@ -140,7 +140,6 @@ class MessageClassifier
             'topic' => $result['topic'],
             'language' => $result['language'],
             'web_search' => $result['web_search'] ?? false,
-            'model_id' => $result['model_id'] ?? null,
             'raw_ai_response' => $result['raw_response'] ?? 'N/A'
         ]);
 
@@ -150,9 +149,6 @@ class MessageClassifier
             'web_search' => $result['web_search'] ?? false,
             'source' => 'ai_sorting',
             'skip_sorting' => false,
-            'model_id' => $result['model_id'] ?? null,
-            'provider' => $result['provider'] ?? null,
-            'model_name' => $result['model_name'] ?? null,
             'intent' => $this->mapTopicToIntent($result['topic']) // Map topic to intent for routing
         ];
     }

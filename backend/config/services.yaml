@@ -120,6 +120,8 @@ services:
     
     # Message Handlers
     App\Service\Message\Handler\ChatHandler:
+        arguments:
+            $uploadDir: '%kernel.project_dir%/var/uploads'
         tags:
             - { name: 'app.message.handler' }
     
@@ -144,8 +146,67 @@ services:
     # Rate Limiter Service
     App\Service\RateLimiterService: ~
 
-    # Mailer Service
-    App\Service\MailerService: ~
+    # Internal Email Service (system emails - uses SMTP from ENV)
+    App\Service\InternalEmailService: ~
+
+    # Inbound Email Service (fetches emails from Mailhog)
+    App\Service\InboundEmailService:
+        arguments:
+            $mailhogApiUrl: 'http://mailhog:8025/api/v2'
+
+    # Process Emails Command
+    App\Command\ProcessEmailsCommand:
+        arguments:
+            $appUrl: '%env(APP_URL)%'
+        tags:
+            - { name: 'console.command' }
+
+    # Encryption Service (for sensitive data like IMAP passwords)
+    App\Service\EncryptionService:
+        arguments:
+            $secretKey: '%env(APP_SECRET)%'
+
+    # Social Login Controllers (Google & GitHub OAuth)
+    App\Controller\GoogleAuthController:
+        arguments:
+            $googleClientId: '%env(GOOGLE_CLIENT_ID)%'
+            $googleClientSecret: '%env(GOOGLE_CLIENT_SECRET)%'
+            $appUrl: '%env(APP_URL)%'
+            $frontendUrl: '%env(FRONTEND_URL)%'
+    
+    App\Controller\GitHubAuthController:
+        arguments:
+            $githubClientId: '%env(GITHUB_CLIENT_ID)%'
+            $githubClientSecret: '%env(GITHUB_CLIENT_SECRET)%'
+            $appUrl: '%env(APP_URL)%'
+            $frontendUrl: '%env(FRONTEND_URL)%'
+    
+    # Keycloak OIDC OAuth Controller
+    App\Controller\KeycloakAuthController:
+        arguments:
+            $oidcClientId: '%env(OIDC_CLIENT_ID)%'
+            $oidcClientSecret: '%env(OIDC_CLIENT_SECRET)%'
+            $oidcDiscoveryUrl: '%env(OIDC_DISCOVERY_URL)%'
+            $appUrl: '%env(APP_URL)%'
+            $frontendUrl: '%env(FRONTEND_URL)%'
+    
+    # Auth Providers Controller (returns enabled providers)
+    App\Controller\AuthProvidersController:
+        arguments:
+            $googleClientId: '%env(string:default::GOOGLE_CLIENT_ID)%'
+            $githubClientId: '%env(string:default::GITHUB_CLIENT_ID)%'
+            $oidcClientId: '%env(string:default::OIDC_CLIENT_ID)%'
+            $oidcDiscoveryUrl: '%env(string:default::OIDC_DISCOVERY_URL)%'
+
+    App\Controller\OidcRefreshController:
+        arguments:
+            $oidcClientId: '%env(string:default::OIDC_CLIENT_ID)%'
+            $oidcClientSecret: '%env(string:default::OIDC_CLIENT_SECRET)%'
+            $oidcDiscoveryUrl: '%env(string:default::OIDC_DISCOVERY_URL)%'
+            $googleClientId: '%env(string:default::GOOGLE_CLIENT_ID)%'
+            $googleClientSecret: '%env(string:default::GOOGLE_CLIENT_SECRET)%'
+            $githubClientId: '%env(string:default::GITHUB_CLIENT_ID)%'
+            $githubClientSecret: '%env(string:default::GITHUB_CLIENT_SECRET)%'
 
     # reCAPTCHA Service
     App\Service\RecaptchaService:
@@ -171,6 +232,10 @@ services:
             $uploadDir: '%kernel.project_dir%/var/uploads'
     
     App\Controller\FileController:
+        arguments:
+            $uploadDir: '%kernel.project_dir%/var/uploads'
+    
+    App\Controller\StreamController:
         arguments:
             $uploadDir: '%kernel.project_dir%/var/uploads'
     

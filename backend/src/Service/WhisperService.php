@@ -13,7 +13,7 @@ use Symfony\Component\Process\Exception\ProcessFailedException;
  */
 class WhisperService
 {
-    private const SUPPORTED_FORMATS = ['ogg', 'mp3', 'wav', 'm4a', 'opus', 'flac', 'webm', 'aac', 'wma'];
+    private const SUPPORTED_FORMATS = ['ogg', 'mp3', 'wav', 'm4a', 'opus', 'flac', 'webm', 'aac', 'wma', 'mp4', 'avi', 'mov', 'mkv', 'mpeg', 'mpg'];
     
     // Whisper.cpp optimal format: 16kHz, mono, 16-bit PCM WAV
     private const OPTIMAL_SAMPLE_RATE = 16000;
@@ -211,14 +211,14 @@ class WhisperService
      * - Channels: mono (OPTIMAL_CHANNELS)
      * - Format: 16-bit PCM WAV
      * 
-     * This is plattform-independent as long as FFmpeg is available
+     * This handles ALL audio/video formats and extracts audio track automatically.
+     * Platform-independent as long as FFmpeg is available.
      */
     private function convertAudio(string $audioPath): string
     {
         $fileExtension = strtolower(pathinfo($audioPath, PATHINFO_EXTENSION));
         
-        // Even if already WAV, we convert to ensure optimal format
-        // (16kHz, mono, 16-bit PCM) for best Whisper performance
+        // Always convert to ensure optimal format (16kHz, mono, 16-bit PCM)
         
         $tempWav = sys_get_temp_dir() . '/' . uniqid('whisper_', true) . '.wav';
         
@@ -235,6 +235,7 @@ class WhisperService
             '-ac', (string) self::OPTIMAL_CHANNELS,      // mono
             '-c:a', 'pcm_s16le',                         // 16-bit PCM
             '-f', 'wav',                                 // force WAV format
+            '-vn',                                       // no video (extract audio only from video files)
             '-y',                                        // overwrite if exists
             '-loglevel', 'error',                        // only errors
             $tempWav

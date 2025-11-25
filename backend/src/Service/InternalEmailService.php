@@ -7,7 +7,13 @@ use Symfony\Component\Mailer\MailerInterface;
 use Symfony\Component\Mime\Email;
 use Twig\Environment;
 
-class MailerService
+/**
+ * Internal Email Service
+ * 
+ * Handles system emails for authentication (verification, password reset, welcome).
+ * Uses SMTP configuration from environment variables (MAILER_DSN).
+ */
+class InternalEmailService
 {
     public function __construct(
         private MailerInterface $mailer,
@@ -15,6 +21,9 @@ class MailerService
         private LoggerInterface $logger
     ) {}
 
+    /**
+     * Send email verification link
+     */
     public function sendVerificationEmail(string $to, string $token): void
     {
         $frontendUrl = $_ENV['FRONTEND_URL'] ?? $_ENV['APP_URL'] ?? 'http://localhost:5173';
@@ -43,6 +52,9 @@ class MailerService
         }
     }
 
+    /**
+     * Send password reset link
+     */
     public function sendPasswordResetEmail(string $to, string $token): void
     {
         $frontendUrl = $_ENV['FRONTEND_URL'] ?? $_ENV['APP_URL'] ?? 'http://localhost:5173';
@@ -71,6 +83,9 @@ class MailerService
         }
     }
 
+    /**
+     * Send welcome email after email verification
+     */
     public function sendWelcomeEmail(string $to, string $name): void
     {
         $fromEmail = $_ENV['APP_SENDER_EMAIL'] ?? 'noreply@synaplan.com';
@@ -93,6 +108,46 @@ class MailerService
                 'error' => $e->getMessage()
             ]);
             // Don't throw - welcome email is not critical
+        }
+    }
+
+    /**
+     * Send AI response email (for smart@synaplan.com chat)
+     */
+    public function sendAiResponseEmail(
+        string $to,
+        string $subject,
+        string $bodyText,
+        ?string $inReplyTo = null
+    ): void {
+        $fromEmail = $_ENV['APP_SENDER_EMAIL'] ?? 'smart@synaplan.com';
+        $fromName = $_ENV['APP_SENDER_NAME'] ?? 'Synaplan AI';
+        
+        $email = (new Email())
+            ->from(sprintf('%s <%s>', $fromName, $fromEmail))
+            ->to($to)
+            ->subject('Re: ' . $subject)
+            ->text($bodyText)
+            ->html(nl2br(htmlspecialchars($bodyText)));
+
+        // Add In-Reply-To header for email threading
+        if ($inReplyTo) {
+            $email->getHeaders()->addTextHeader('In-Reply-To', $inReplyTo);
+            $email->getHeaders()->addTextHeader('References', $inReplyTo);
+        }
+
+        try {
+            $this->mailer->send($email);
+            $this->logger->info('AI response email sent', [
+                'to' => $to,
+                'subject' => $subject
+            ]);
+        } catch (\Exception $e) {
+            $this->logger->error('Failed to send AI response email', [
+                'to' => $to,
+                'error' => $e->getMessage()
+            ]);
+            throw $e;
         }
     }
 }

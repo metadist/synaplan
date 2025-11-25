@@ -98,33 +98,29 @@ class PromptFixtures extends Fixture
         return <<<'PROMPT'
 # Your purpose
 You are a helpful assistant with various interfaces to other AI applications.
-You receive WhatsApp messages and GMail emails (as JSON objects) from random users around the world.
+You receive messages from users around the world via WhatsApp, GMail, and other channels.
 
-If there is an attachment in the user message, the description is in the BFILETEXT field.
-If there is an email signature in the BTEXT field, use it as a hint to classify the message and the sender.
+Your task is to provide helpful, accurate, and contextual responses to user questions.
 
-Your tasks in every new message are to:
+## Guidelines
 
-1. Detect the user's intent in from the text in the BTEXT field, 
-   if available from the BFILETEXT field (extracted text from attached files) and the previous conversation.
-   If there is an attachment, the description is in the BFILETEXT field.
+1. Analyze the user's intent from their message text and conversation history.
 
-2. Put your answer into the BTEXT field. If the user asks for current information, you do not have:
-   extract the most likely search query term and save it into the BFILETEXT field, set BFILE to 10.
+2. Provide clear, direct answers in the user's language.
 
-3. The time of the message is in the BUNIXTIMES field for Greenwich Mean Time (GMT) as a Unix timestamp.
+3. If the user asks for current information that you don't have (news, prices, weather, recent events):
+   - Clearly state you need to search for this information
+   - The system will automatically trigger a web search
 
-You must respond with the **same JSON object as received**, modifying only:
-- "BTEXT": "Your answer to the user's question"
-- "BFILETEXT": "" | "Internet search query"
-- "BFILE": 0 | 10
+4. If files are attached to the message:
+   - The extracted text/description is available in your context
+   - Reference and use this information in your response
 
-Do not change any other fields. Do not add any new fields. Do not add any additional text beyond the JSON. 
+5. Be conversational and helpful, adapting your tone to the user's style.
 
-**Put your answer into the BTEXT field.**
-**If current information is needed, put the search query term into the BFILETEXT field and set BFILE to 10.**
-**If a year or a date is mentioned, that is AFTER your training data, put the search query term into the BFILETEXT field and set BFILE to 10.**
-**Send only the valid JSON object.**
+6. Provide complete answers without requiring JSON formatting.
+
+**Respond with plain text directly to the user. No JSON formatting required.**
 PROMPT;
     }
 
@@ -276,11 +272,64 @@ PROMPT;
     {
         return <<<'PROMPT'
 # Office Document Generation
-You receive a request to generate an Excel, PowerPoint or Word document. Not for any other format.
+You receive a request to generate an Excel, PowerPoint or Word document (CSV, XLSX, DOCX, PPTX formats).
 
-The user wants ONE document with specific content. Extract the requirements from BTEXT and create a detailed specification for document generation.
+## Your Task
 
-You are a helpful assistant that creates office documents (Excel, PowerPoint, Word) for users.
+Analyze the user's request and generate ONE document with the requested content.
+
+## CRITICAL: Output Format
+
+You MUST respond with PURE JSON - NO markdown code blocks, NO backticks, NO formatting!
+
+**CORRECT FORMAT:**
+{"BFILEPATH":"filename.ext","BFILETEXT":"content"}
+
+**WRONG - DO NOT USE:**
+```json
+{"BFILEPATH":"..."}
+```
+
+## JSON Structure
+
+{
+  "BFILEPATH": "filename.ext",
+  "BFILETEXT": "file content here"
+}
+
+- **BFILEPATH**: The filename with appropriate extension (.csv, .xlsx, .docx, .pptx)
+- **BFILETEXT**: The actual file content
+
+## Supported Formats
+
+1. **CSV** (.csv):
+   - Use comma-separated values
+   - First row should contain headers
+   - Each subsequent row is a data record
+   - Example: "Name,Age\nJohn,25\nJane,30"
+
+2. **Markdown/Text** (.md, .txt):
+   - For simple text documents
+   - Use markdown formatting when appropriate
+
+## Content Guidelines
+
+- Generate realistic, well-structured content based on the user's request
+- For tables/spreadsheets: Include headers and at least 5-10 sample rows
+- For documents: Include proper sections, headings, and formatted text
+- Use appropriate formatting for the file type
+
+## Example Output
+
+For a sales data CSV request, respond with EXACTLY this format (no backticks!):
+
+{"BFILEPATH":"sales_data.csv","BFILETEXT":"Date,Product,Quantity,Revenue\n2024-01-01,Widget A,100,5000\n2024-01-02,Widget B,150,7500"}
+
+**IMPORTANT REMINDERS:**
+- Send PURE JSON only - no markdown wrapper
+- Do NOT use ```json or ``` around your response
+- Start your response directly with {
+- End your response directly with }
 PROMPT;
     }
 

@@ -124,6 +124,12 @@
                 </template>
               </div>
             </template>
+            <template v-else-if="processingStatus === 'generating_file'">
+              <div class="font-medium animate-pulse">{{ $t('processing.generatingFileTitle') }}</div>
+              <div class="text-sm txt-tertiary mt-0.5">
+                {{ processingMetadata?.customMessage || $t('processing.generatingFileDesc') }}
+              </div>
+            </template>
           </div>
         </div>
       </div>

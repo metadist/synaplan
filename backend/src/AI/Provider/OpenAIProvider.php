@@ -819,6 +819,15 @@ class OpenAIProvider implements
             // Save to temporary file
             $filename = 'tts_' . uniqid() . '.mp3';
             $outputPath = $this->uploadDir . '/' . $filename;
+            
+            if (!is_dir($this->uploadDir) && !mkdir($this->uploadDir, 0775, true) && !is_dir($this->uploadDir)) {
+                throw new \RuntimeException('Unable to create upload directory: ' . $this->uploadDir);
+            }
+            
+            if (!is_writable($this->uploadDir)) {
+                throw new \RuntimeException('Upload directory is not writable: ' . $this->uploadDir);
+            }
+
             file_put_contents($outputPath, $response);
 
             return $filename;
@@ -867,4 +876,3 @@ class OpenAIProvider implements
         ];
     }
 }
-

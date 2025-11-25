@@ -112,14 +112,22 @@ export const authService = {
    * Get Current User
    */
   async getCurrentUser(): Promise<any | null> {
-    if (!token.value) {
+    // Re-read token from localStorage in case it was updated externally
+    const currentToken = token.value || localStorage.getItem('auth_token')
+    
+    if (!currentToken) {
       return null
+    }
+
+    // Update the ref if it was read from localStorage
+    if (!token.value && currentToken) {
+      token.value = currentToken
     }
 
     try {
       const response = await fetch(`${API_BASE_URL}/api/v1/auth/me`, {
         headers: {
-          'Authorization': `Bearer ${token.value}`,
+          'Authorization': `Bearer ${currentToken}`,
         },
       })
 

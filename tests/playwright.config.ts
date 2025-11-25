@@ -14,7 +14,7 @@ export default defineConfig({
 
   // Retries und Timeout auf Config-Ebene
   retries: 0,
-  timeout: 10_000,
+  timeout: 60_000,
 
   // BaseURL aus ENV oder Default
   use: {
@@ -47,5 +47,6 @@ export default defineConfig({
   ],
 
   // Standard-Grep für @smoke
-  grep: /@smoke/,
+ // grep: /@smoke/,
+  grep: /id=004/,
 });

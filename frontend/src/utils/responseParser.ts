@@ -29,6 +29,8 @@ export function parseAIResponse(content: string): ParsedResponse {
   let hasJson = false
   let jsonPayload: Record<string, any> | null = null
 
+  // Legacy: Extract BTEXT from JSON (only for backward compatibility with old messages)
+  // New messages return plain text directly
   const extraction = extractBTextPayload(content)
   if (extraction.text !== undefined) {
     jsonPayload = extraction.data || null

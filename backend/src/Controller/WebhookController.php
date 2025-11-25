@@ -7,7 +7,8 @@ use App\Entity\User;
 use App\Service\Message\MessageProcessor;
 use App\Service\RateLimitService;
 use App\Service\WhatsAppService;
-use App\Service\EmailChannelService;
+use App\Service\EmailChatService;
+use App\Service\InternalEmailService;
 use Doctrine\ORM\EntityManagerInterface;
 use OpenApi\Attributes as OA;
 use Psr\Log\LoggerInterface;
@@ -27,7 +28,8 @@ class WebhookController extends AbstractController
         private MessageProcessor $messageProcessor,
         private RateLimitService $rateLimitService,
         private WhatsAppService $whatsAppService,
-        private EmailChannelService $emailChannelService,
+        private EmailChatService $emailChatService,
+        private InternalEmailService $internalEmailService,
         private LoggerInterface $logger,
         private string $whatsappWebhookVerifyToken
     ) {}
@@ -106,7 +108,7 @@ class WebhookController extends AbstractController
         $inReplyTo = $data['in_reply_to'] ?? null;
 
         // Parse keyword from to-address (smart+keyword@synaplan.com)
-        $keyword = $this->emailChannelService->parseEmailKeyword($toEmail);
+        $keyword = $this->emailChatService->parseEmailKeyword($toEmail);
 
         $this->logger->info('Email webhook received', [
             'from' => $fromEmail,
@@ -117,17 +119,18 @@ class WebhookController extends AbstractController
         ]);
 
         // Find or create user from email
-        $userResult = $this->emailChannelService->findOrCreateUserFromEmail($fromEmail);
+        $userResult = $this->emailChatService->findOrCreateUserFromEmail($fromEmail);
 
-        if ($userResult['blacklisted']) {
-            $this->logger->warning('Blacklisted email attempted to send message', [
-                'email' => $fromEmail
+        if (isset($userResult['error'])) {
+            $this->logger->warning('Email rejected', [
+                'email' => $fromEmail,
+                'reason' => $userResult['error']
             ]);
 
             return $this->json([
                 'success' => false,
-                'error' => 'Email address is blocked'
-            ], Response::HTTP_FORBIDDEN);
+                'error' => $userResult['error']
+            ], Response::HTTP_TOO_MANY_REQUESTS);
         }
 
         $user = $userResult['user'];
@@ -146,7 +149,7 @@ class WebhookController extends AbstractController
 
         try {
             // Find or create chat context
-            $chat = $this->emailChannelService->findOrCreateChatContext(
+            $chat = $this->emailChatService->findOrCreateChatContext(
                 $user,
                 $keyword,
                 $subject,
@@ -161,7 +164,7 @@ class WebhookController extends AbstractController
             $message->setProviderIndex('EMAIL');
             $message->setUnixTimestamp(time());
             $message->setDateTime(date('YmdHis'));
-            $message->setMessageType('EMAIL');
+            $message->setMessageType('MAIL');
             $message->setFile(0);
             $message->setTopic('CHAT');
             $message->setLanguage('en'); // Will be detected by classifier
@@ -192,11 +195,7 @@ class WebhookController extends AbstractController
             }
             if ($messageId) {
                 $message->setMeta('external_id', $messageId);
-                // Store for email threading
-                $chatData = $chat->getChatData();
-                $chatData['email_message_id'] = $messageId;
-                $chat->setChatData($chatData);
-                $this->em->flush();
+                // Note: Email threading is handled via Chat titles (Email: keyword or Email Conversation)
             }
             if (!empty($data['attachments'])) {
                 $message->setMeta('has_attachments', 'true');
@@ -220,10 +219,26 @@ class WebhookController extends AbstractController
             $aiResponse = $result['response'];
             $responseText = $aiResponse['content'] ?? '';
 
-            // TODO: Send email response back to user
-            // This requires SMTP configuration
-            // For now, we just return the response in JSON
-            // A background job should send the actual email
+            // Send email response back to user
+            try {
+                $this->internalEmailService->sendAiResponseEmail(
+                    $fromEmail,
+                    $subject,
+                    $responseText,
+                    $messageId
+                );
+                
+                $this->logger->info('Email response sent', [
+                    'to' => $fromEmail,
+                    'subject' => $subject
+                ]);
+            } catch (\Exception $e) {
+                $this->logger->error('Failed to send email response', [
+                    'to' => $fromEmail,
+                    'error' => $e->getMessage()
+                ]);
+                // Don't fail the whole request if email sending fails
+            }
 
             return $this->json([
                 'success' => true,
@@ -242,12 +257,14 @@ class WebhookController extends AbstractController
         } catch (\Exception $e) {
             $this->logger->error('Email webhook processing failed', [
                 'from' => $fromEmail ?? 'unknown',
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
             ]);
 
             return $this->json([
                 'success' => false,
-                'error' => 'Internal error processing email'
+                'error' => 'Internal error processing email',
+                'details' => $_ENV['APP_ENV'] === 'dev' ? $e->getMessage() : null
             ], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }

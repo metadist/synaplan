@@ -29,8 +29,8 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     #[ORM\Column(name: 'BMAIL', length: 128)]
     private string $mail = '';
 
-    #[ORM\Column(name: 'BPW', length: 64)]
-    private string $pw = '';
+    #[ORM\Column(name: 'BPW', length: 64, nullable: true)]
+    private ?string $pw = null;
 
     #[ORM\Column(name: 'BPROVIDERID', length: 32)]
     private string $providerId = '';
@@ -89,12 +89,12 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
         return $this;
     }
 
-    public function getPw(): string
+    public function getPw(): ?string
     {
         return $this->pw;
     }
 
-    public function setPw(string $pw): self
+    public function setPw(?string $pw): self
     {
         $this->pw = $pw;
         return $this;
@@ -185,7 +185,9 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     // PasswordAuthenticatedUserInterface
     public function getPassword(): string
     {
-        return $this->pw;
+        // Return empty string for OAuth users (who have no password)
+        // This is required by PasswordAuthenticatedUserInterface
+        return $this->pw ?? '';
     }
 
     // Subscription helper methods (using BPAYMENTDETAILS JSON)
@@ -244,6 +246,11 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
         // Check if subscription is active
         if ($this->hasActiveSubscription()) {
             return $this->userLevel; // PRO, TEAM, BUSINESS from subscription
+        }
+        
+        // If explicitly set to ANONYMOUS (e.g., for email-based anonymous users), return that
+        if ($this->userLevel === 'ANONYMOUS') {
+            return 'ANONYMOUS';
         }
         
         // Default to NEW for all logged-in users

@@ -37,8 +37,6 @@ services:
       FRONTEND_URL: http://localhost:5173
       DATABASE_WRITE_URL: mysql://synaplan_user:synaplan_password@db:3306/synaplan?serverVersion=11.8&charset=utf8mb4
       DATABASE_READ_URL: mysql://synaplan_user:synaplan_password@db:3306/synaplan?serverVersion=11.8&charset=utf8mb4
-      REDIS_URL: redis://redis:6379
-      MESSENGER_TRANSPORT_DSN: redis://redis:6379/messages
       OLLAMA_BASE_URL: http://ollama:11434
       TIKA_BASE_URL: http://tika:9998
       AI_DEFAULT_PROVIDER: ollama
@@ -46,8 +44,8 @@ services:
       JWT_SECRET_KEY: '%kernel.project_dir%/config/jwt/private.pem'
       JWT_PUBLIC_KEY: '%kernel.project_dir%/config/jwt/public.pem'
       JWT_PASSPHRASE: 'change_me_in_production'
-      # Mailer
-      MAILER_DSN: ${MAILER_DSN:-null://null}
+      # Mailer (Mailhog for development)
+      MAILER_DSN: smtp://mailhog:1025
       # External API Keys loaded from backend/.env via env_file
       # WhatsApp Business API
       WHATSAPP_ACCESS_TOKEN: ${WHATSAPP_ACCESS_TOKEN:-}
@@ -57,16 +55,13 @@ services:
       WHATSAPP_ENABLED: ${WHATSAPP_ENABLED:-false}
       # AI Provider API Keys (loaded from backend/.env via env_file above)
       # GROQ_API_KEY is automatically loaded from backend/.env
-      AUTO_DOWNLOAD_MODELS: ${AUTO_DOWNLOAD_MODELS:-true}
-      ENABLE_LOCAL_GPT_OSS: ${ENABLE_LOCAL_GPT_OSS:-true}
+      AUTO_DOWNLOAD_MODELS: ${AUTO_DOWNLOAD_MODELS:-false}
       # reCAPTCHA (optional - disabled by default)
       RECAPTCHA_SITE_KEY: ${RECAPTCHA_SITE_KEY:-}
       RECAPTCHA_SECRET_KEY: ${RECAPTCHA_SECRET_KEY:-}
       RECAPTCHA_ENABLED: ${RECAPTCHA_ENABLED:-false}
     depends_on:
       db:
-        condition: service_healthy
-      redis:
         condition: service_healthy
     restart: unless-stopped
     healthcheck:
@@ -92,30 +87,13 @@ services:
       - "3307:3306"
     volumes:
       - mysql_data:/var/lib/mysql
+      - ./_devextras/db-init:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test: ["CMD", "mariadb", "-h", "localhost", "-u", "root", "-proot_password", "-e", "SELECT 1;"]
       interval: 30s
       timeout: 10s
       retries: 5
       start_period: 60s
-    restart: unless-stopped
-    networks:
-      - synaplan-network
-
-  # Redis Cache & Queue
-  redis:
-    image: redis:7-alpine
-    container_name: synaplan-redis
-    command: redis-server --appendonly yes --maxmemory 512mb --maxmemory-policy allkeys-lru
-    ports:
-      - "6380:6379"
-    volumes:
-      - redis_data:/data
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
     restart: unless-stopped
     networks:
       - synaplan-network
@@ -212,7 +190,6 @@ services:
 
 volumes:
   mysql_data:
-  redis_data:
   ollama_data:
   whisper_models:
 

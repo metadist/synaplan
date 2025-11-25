@@ -3,6 +3,7 @@
 namespace App\Controller;
 
 use App\Entity\User;
+use App\Service\EmailChatService;
 use Doctrine\ORM\EntityManagerInterface;
 use OpenApi\Attributes as OA;
 use Psr\Log\LoggerInterface;
@@ -21,6 +22,7 @@ class ProfileController extends AbstractController
     public function __construct(
         private EntityManagerInterface $em,
         private UserPasswordHasherInterface $passwordHasher,
+        private EmailChatService $emailChatService,
         private LoggerInterface $logger
     ) {}
 
@@ -54,7 +56,9 @@ class ProfileController extends AbstractController
                         new OA\Property(property: 'country', type: 'string', example: 'Germany'),
                         new OA\Property(property: 'language', type: 'string', example: 'en'),
                         new OA\Property(property: 'timezone', type: 'string', example: 'Europe/Berlin'),
-                        new OA\Property(property: 'invoiceEmail', type: 'string', example: 'billing@example.com')
+                        new OA\Property(property: 'invoiceEmail', type: 'string', example: 'billing@example.com'),
+                        new OA\Property(property: 'emailKeyword', type: 'string', nullable: true, example: 'myproject'),
+                        new OA\Property(property: 'personalEmailAddress', type: 'string', example: 'smart+myproject@synaplan.com')
                     ]
                 )
             ]
@@ -68,6 +72,8 @@ class ProfileController extends AbstractController
         }
 
         $details = $user->getUserDetails();
+        $emailKeyword = $this->emailChatService->getUserEmailKeyword($user);
+        $personalEmailAddress = $this->emailChatService->getUserPersonalEmailAddress($user);
 
         return $this->json([
             'success' => true,
@@ -85,6 +91,8 @@ class ProfileController extends AbstractController
                 'language' => $details['language'] ?? 'en',
                 'timezone' => $details['timezone'] ?? '',
                 'invoiceEmail' => $details['invoiceEmail'] ?? '',
+                'emailKeyword' => $emailKeyword,
+                'personalEmailAddress' => $personalEmailAddress,
             ]
         ]);
     }
@@ -112,7 +120,8 @@ class ProfileController extends AbstractController
                 new OA\Property(property: 'country', type: 'string', example: 'Germany'),
                 new OA\Property(property: 'language', type: 'string', example: 'en'),
                 new OA\Property(property: 'timezone', type: 'string', example: 'Europe/Berlin'),
-                new OA\Property(property: 'invoiceEmail', type: 'string', example: 'billing@example.com')
+                new OA\Property(property: 'invoiceEmail', type: 'string', example: 'billing@example.com'),
+                new OA\Property(property: 'emailKeyword', type: 'string', nullable: true, example: 'myproject')
             ]
         )
     )]
@@ -154,6 +163,24 @@ class ProfileController extends AbstractController
         foreach ($allowedFields as $field) {
             if (isset($data[$field])) {
                 $details[$field] = $data[$field];
+            }
+        }
+
+        // Handle email keyword separately (uses EmailChatService)
+        if (isset($data['emailKeyword'])) {
+            $keyword = $data['emailKeyword'];
+            if (empty($keyword) || trim($keyword) === '') {
+                // Remove keyword if empty
+                $details['email_keyword'] = null;
+                $user->setUserDetails($details);
+            } else {
+                try {
+                    $this->emailChatService->setUserEmailKeyword($user, $keyword);
+                } catch (\InvalidArgumentException $e) {
+                    return $this->json([
+                        'error' => 'Invalid email keyword format. Only lowercase letters, numbers, hyphens, and underscores are allowed.'
+                    ], Response::HTTP_BAD_REQUEST);
+                }
             }
         }
 
@@ -248,6 +275,121 @@ class ProfileController extends AbstractController
             'success' => true,
             'message' => 'Password changed successfully'
         ]);
+    }
+
+    #[Route('/email-keyword', name: 'get_email_keyword', methods: ['GET'])]
+    #[OA\Get(
+        path: '/api/v1/profile/email-keyword',
+        summary: 'Get user email keyword',
+        description: 'Returns the user\'s email keyword for smart+keyword@synaplan.com',
+        security: [['Bearer' => []]],
+        tags: ['Profile']
+    )]
+    #[OA\Response(
+        response: 200,
+        description: 'Email keyword',
+        content: new OA\JsonContent(
+            properties: [
+                new OA\Property(property: 'success', type: 'boolean', example: true),
+                new OA\Property(property: 'keyword', type: 'string', nullable: true, example: 'myproject'),
+                new OA\Property(property: 'emailAddress', type: 'string', example: 'smart+myproject@synaplan.com')
+            ]
+        )
+    )]
+    #[OA\Response(response: 401, description: 'Not authenticated')]
+    public function getEmailKeyword(#[CurrentUser] ?User $user): JsonResponse
+    {
+        if (!$user) {
+            return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
+        }
+
+        $keyword = $this->emailChatService->getUserEmailKeyword($user);
+        $emailAddress = $this->emailChatService->getUserPersonalEmailAddress($user);
+
+        return $this->json([
+            'success' => true,
+            'keyword' => $keyword,
+            'emailAddress' => $emailAddress
+        ]);
+    }
+
+    #[Route('/email-keyword', name: 'set_email_keyword', methods: ['PUT', 'POST'])]
+    #[OA\Put(
+        path: '/api/v1/profile/email-keyword',
+        summary: 'Set user email keyword',
+        description: 'Set or update the user\'s email keyword for smart+keyword@synaplan.com',
+        security: [['Bearer' => []]],
+        tags: ['Profile']
+    )]
+    #[OA\RequestBody(
+        required: true,
+        content: new OA\JsonContent(
+            required: ['keyword'],
+            properties: [
+                new OA\Property(property: 'keyword', type: 'string', example: 'myproject', description: 'Keyword (lowercase letters, numbers, hyphens, underscores only). Empty string to remove.')
+            ]
+        )
+    )]
+    #[OA\Response(
+        response: 200,
+        description: 'Email keyword updated successfully',
+        content: new OA\JsonContent(
+            properties: [
+                new OA\Property(property: 'success', type: 'boolean', example: true),
+                new OA\Property(property: 'message', type: 'string', example: 'Email keyword updated successfully'),
+                new OA\Property(property: 'keyword', type: 'string', nullable: true, example: 'myproject'),
+                new OA\Property(property: 'emailAddress', type: 'string', example: 'smart+myproject@synaplan.com')
+            ]
+        )
+    )]
+    #[OA\Response(response: 401, description: 'Not authenticated')]
+    #[OA\Response(response: 400, description: 'Invalid keyword format')]
+    public function setEmailKeyword(
+        Request $request,
+        #[CurrentUser] ?User $user
+    ): JsonResponse {
+        if (!$user) {
+            return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
+        }
+
+        $data = json_decode($request->getContent(), true);
+
+        if (!isset($data['keyword'])) {
+            return $this->json(['error' => 'Keyword is required'], Response::HTTP_BAD_REQUEST);
+        }
+
+        $keyword = trim($data['keyword']);
+
+        // If empty, remove keyword
+        if (empty($keyword)) {
+            $details = $user->getUserDetails();
+            unset($details['email_keyword']);
+            $user->setUserDetails($details);
+            $this->em->flush();
+
+            return $this->json([
+                'success' => true,
+                'message' => 'Email keyword removed successfully',
+                'keyword' => null,
+                'emailAddress' => $this->emailChatService->getUserPersonalEmailAddress($user)
+            ]);
+        }
+
+        try {
+            $this->emailChatService->setUserEmailKeyword($user, $keyword);
+            $emailAddress = $this->emailChatService->getUserPersonalEmailAddress($user);
+
+            return $this->json([
+                'success' => true,
+                'message' => 'Email keyword updated successfully',
+                'keyword' => $keyword,
+                'emailAddress' => $emailAddress
+            ]);
+        } catch (\InvalidArgumentException $e) {
+            return $this->json([
+                'error' => 'Invalid keyword format. Only lowercase letters, numbers, hyphens, and underscores are allowed.'
+            ], Response::HTTP_BAD_REQUEST);
+        }
     }
 }
 
