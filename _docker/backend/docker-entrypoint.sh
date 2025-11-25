@@ -135,12 +135,33 @@ if [ -n "$OLLAMA_BASE_URL" ] && [ "$AUTO_DOWNLOAD_MODELS" = "true" ]; then
                     -H "Content-Type: application/json" \
                     -d "{\"name\":\"$MODEL\"}" | while IFS= read -r line; do
                         [ -z "$line" ] && continue
-                        printf '\r[Background] [%s] %s' "$MODEL" "$line"
+                        
+                        # Parse JSON fields using sed
+                        STATUS=$(echo "$line" | sed -n 's/.*"status":"\([^"]*\)".*/\1/p')
+                        COMPLETED=$(echo "$line" | sed -n 's/.*"completed":\([0-9]*\).*/\1/p')
+                        TOTAL=$(echo "$line" | sed -n 's/.*"total":\([0-9]*\).*/\1/p')
+                        
+                        if [ -n "$COMPLETED" ] && [ -n "$TOTAL" ] && [ "$TOTAL" -gt 0 ]; then
+                            PERCENT=$((COMPLETED * 100 / TOTAL))
+                            MB_COMPLETED=$((COMPLETED / 1048576))
+                            MB_TOTAL=$((TOTAL / 1048576))
+                            
+                            # Only print at 10, 20, 30...90, 100% milestones
+                            MILESTONE=$((PERCENT - PERCENT % 10))
+                            if [ $PERCENT -gt 0 ] && [ $((PERCENT % 10)) -lt 2 ]; then
+                                echo "[Background] [${MODEL}] ${STATUS} - ${MB_COMPLETED}MB/${MB_TOTAL}MB (${MILESTONE}%)"
+                            fi
+                        elif [ -n "$STATUS" ]; then
+                            # Show important status changes
+                            case "$STATUS" in
+                                "pulling manifest"|"verifying sha256"|"success")
+                                    echo "[Background] [${MODEL}] ${STATUS}"
+                                    ;;
+                            esac
+                        fi
                     done; then
-                    printf '\n'
                     echo "[Background] ✅ $MODEL downloaded!"
                 else
-                    printf '\n'
                     echo "[Background] ⚠️  $MODEL download failed"
                 fi
             else

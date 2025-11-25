@@ -1,5 +1,6 @@
 # Synaplan Symfony Backend - FrankenPHP + PHP 8.3
-FROM dunglas/frankenphp:php8.3
+# Using bookworm (Debian 12) because Trixie (Debian 13) removed libc-client-dev needed for IMAP
+FROM dunglas/frankenphp:php8.3-bookworm
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y \

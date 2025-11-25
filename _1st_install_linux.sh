@@ -88,15 +88,28 @@ if [ "$USE_GROQ" -eq 1 ]; then
 else
   echo "📡 Tracking Ollama model downloads (gpt-oss:20b + bge-m3)..."
 fi
+echo "⏳ Waiting for backend to start model downloads..."
 set +e
 set +u
 set +o pipefail
-( docker compose logs -f backend | awk '/\[Background\]/ {printf "\r%s", $0; fflush(); if ($0 ~ /\[Background\] 🎉 Model downloads completed!/) { printf "\n"; exit }}' )
+
+# Wait up to 5 minutes for model downloads with timeout
+( timeout 300 docker compose logs -f backend 2>&1 | grep --line-buffered "\[Background\]" | while IFS= read -r line; do
+    echo "$line"
+    if echo "$line" | grep -q "\[Background\] 🎉 Model downloads completed!"; then
+      exit 0
+    fi
+  done )
 RESULT=$?
 set -e
 set -u
 set -o pipefail
-if [ "$RESULT" -ne 0 ]; then
+
+if [ "$RESULT" -eq 124 ]; then
+  echo ""
+  echo "⚠️ Timeout waiting for model downloads (5 min). Downloads may still be running."
+  echo "   Check progress with: docker compose logs -f backend | grep Background"
+elif [ "$RESULT" -ne 0 ]; then
   echo ""
   echo "⚠️ Could not confirm model download completion. Check 'docker compose logs backend'."
 else
