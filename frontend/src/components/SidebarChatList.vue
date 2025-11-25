@@ -22,7 +22,7 @@
         <span class="text-xs font-medium uppercase tracking-wider">My Chats</span>
       </button>
 
-      <div v-if="sections.my" class="flex flex-col gap-1 mt-1">
+      <div v-if="sections.my" class="flex flex-col gap-1 mt-1 relative">
         <SidebarChatListItem
           v-for="chat in myChats"
           :key="chat.id"
@@ -42,10 +42,18 @@
         >
           Show more...
         </button>
+        
+        <!-- End marker for intersection observer -->
+        <div ref="myChatsEndRef" class="h-px" v-if="showAllMy && allMyChats.length > 5"></div>
+        
+        <!-- Show less button - sticky when list is long -->
         <button
-          v-else-if="showAllMy && allMyChats.length > 5"
+          v-if="showAllMy && allMyChats.length > 5"
           @click="showAllMy = false"
-          class="px-3 py-2 rounded-lg txt-secondary hover-surface transition-colors text-left text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary min-h-[44px]"
+          :class="[
+            'px-3 py-2 rounded-lg txt-secondary transition-all text-left text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary min-h-[44px]',
+            isMyButtonSticky ? 'sticky bottom-[4px] z-10 bg-sidebar shadow-lg border border-light-border/30 dark:border-dark-border/20' : 'hover-surface'
+          ]"
           data-testid="btn-chat-show-less-my"
         >
           Show less...
@@ -87,7 +95,7 @@
         <PuzzlePieceIcon class="w-3.5 h-3.5 ml-auto" />
       </button>
 
-      <div v-if="sections.widget" class="flex flex-col gap-1 mt-1">
+      <div v-if="sections.widget" class="flex flex-col gap-1 mt-1 relative">
         <SidebarChatListItem
           v-for="chat in widgetChats"
           :key="chat.id"
@@ -107,10 +115,18 @@
         >
           Show more...
         </button>
+        
+        <!-- End marker for intersection observer -->
+        <div ref="widgetChatsEndRef" class="h-px" v-if="showAllWidget && allWidgetChats.length > 5"></div>
+        
+        <!-- Show less button - sticky when list is long -->
         <button
-          v-else-if="showAllWidget && allWidgetChats.length > 5"
+          v-if="showAllWidget && allWidgetChats.length > 5"
           @click="showAllWidget = false"
-          class="px-3 py-2 rounded-lg txt-secondary hover-surface transition-colors text-left text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary min-h-[44px]"
+          :class="[
+            'px-3 py-2 rounded-lg txt-secondary hover-surface transition-all text-left text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary min-h-[44px]',
+            isWidgetButtonSticky ? 'sticky bottom-[4px] z-10 bg-sidebar shadow-lg border border-light-border/30 dark:border-dark-border/20' : ''
+          ]"
           data-testid="btn-chat-show-less-widget"
         >
           Show less...
@@ -154,7 +170,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, nextTick, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { ChevronRightIcon, PuzzlePieceIcon } from '@heroicons/vue/24/outline'
 import SidebarChatListItem from './SidebarChatListItem.vue'
@@ -178,6 +194,12 @@ const sections = ref({
 
 const showAllMy = ref(false)
 const showAllWidget = ref(false)
+
+// Refs for sticky button behavior
+const myChatsEndRef = ref<HTMLElement | null>(null)
+const widgetChatsEndRef = ref<HTMLElement | null>(null)
+const isMyButtonSticky = ref(false)
+const isWidgetButtonSticky = ref(false)
 
 // Helper to format dates
 const formatDate = (value: string | number): string => {
@@ -318,8 +340,61 @@ const handleDelete = async (id: string) => {
   }
 }
 
+// Setup Intersection Observer for sticky button behavior
+let myObserver: IntersectionObserver | null = null
+let widgetObserver: IntersectionObserver | null = null
+
+const setupIntersectionObserver = async () => {
+  await nextTick()
+  
+  // Clean up existing observers
+  if (myObserver) myObserver.disconnect()
+  if (widgetObserver) widgetObserver.disconnect()
+  
+  const options = {
+    root: null,
+    rootMargin: '0px 0px -80px 0px', // Trigger sticky when end marker is 80px from bottom (just above footer)
+    threshold: 0
+  }
+
+  // Observer for My Chats end marker
+  if (showAllMy.value && myChatsEndRef.value) {
+    myObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        isMyButtonSticky.value = !entry.isIntersecting
+      })
+    }, options)
+    myObserver.observe(myChatsEndRef.value)
+  } else {
+    isMyButtonSticky.value = false
+  }
+
+  // Observer for Widget Chats end marker
+  if (showAllWidget.value && widgetChatsEndRef.value) {
+    widgetObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        isWidgetButtonSticky.value = !entry.isIntersecting
+      })
+    }, options)
+    widgetObserver.observe(widgetChatsEndRef.value)
+  } else {
+    isWidgetButtonSticky.value = false
+  }
+}
+
+// Watch for changes in showAll states
+watch([showAllMy, showAllWidget], () => {
+  setupIntersectionObserver()
+})
+
 // Load chats on mount
-onMounted(() => {
-  chatsStore.loadChats()
+onMounted(async () => {
+  await chatsStore.loadChats()
+  await setupIntersectionObserver()
+})
+
+onBeforeUnmount(() => {
+  if (myObserver) myObserver.disconnect()
+  if (widgetObserver) widgetObserver.disconnect()
 })
 </script>
