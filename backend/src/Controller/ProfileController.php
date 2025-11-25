@@ -3,6 +3,18 @@
 namespace App\Controller;
 
 use App\Entity\User;
+use App\Repository\ApiKeyRepository;
+use App\Repository\ChatRepository;
+use App\Repository\EmailVerificationAttemptRepository;
+use App\Repository\FileRepository;
+use App\Repository\InboundEmailHandlerRepository;
+use App\Repository\MessageRepository;
+use App\Repository\RagDocumentRepository;
+use App\Repository\SessionRepository;
+use App\Repository\TokenRepository;
+use App\Repository\UseLogRepository;
+use App\Repository\VerificationTokenRepository;
+use App\Repository\WidgetRepository;
 use App\Service\EmailChatService;
 use Doctrine\ORM\EntityManagerInterface;
 use OpenApi\Attributes as OA;
@@ -23,7 +35,19 @@ class ProfileController extends AbstractController
         private EntityManagerInterface $em,
         private UserPasswordHasherInterface $passwordHasher,
         private EmailChatService $emailChatService,
-        private LoggerInterface $logger
+        private LoggerInterface $logger,
+        private VerificationTokenRepository $verificationTokenRepository,
+        private TokenRepository $tokenRepository,
+        private ApiKeyRepository $apiKeyRepository,
+        private SessionRepository $sessionRepository,
+        private RagDocumentRepository $ragDocumentRepository,
+        private UseLogRepository $useLogRepository,
+        private WidgetRepository $widgetRepository,
+        private ChatRepository $chatRepository,
+        private MessageRepository $messageRepository,
+        private EmailVerificationAttemptRepository $emailVerificationAttemptRepository,
+        private FileRepository $fileRepository,
+        private InboundEmailHandlerRepository $inboundEmailHandlerRepository
     ) {}
 
     #[Route('', name: 'get', methods: ['GET'])]
@@ -114,7 +138,8 @@ class ProfileController extends AbstractController
                 'canChangePassword' => $user->canChangePassword(),
                 'authProvider' => $user->getAuthProviderName(),
                 'isExternalAuth' => $user->isExternalAuth(),
-                'externalAuthInfo' => $externalAuthInfo
+                'externalAuthInfo' => $externalAuthInfo,
+                'isAdmin' => $user->isAdmin()
             ]
         ]);
     }
@@ -419,6 +444,184 @@ class ProfileController extends AbstractController
             return $this->json([
                 'error' => 'Invalid keyword format. Only lowercase letters, numbers, hyphens, and underscores are allowed.'
             ], Response::HTTP_BAD_REQUEST);
+        }
+    }
+
+    #[Route('', name: 'delete_account', methods: ['DELETE'])]
+    #[OA\Delete(
+        path: '/api/v1/profile',
+        summary: 'Delete user account',
+        description: 'Permanently delete the authenticated user account (requires password confirmation)',
+        security: [['Bearer' => []]],
+        tags: ['Profile']
+    )]
+    #[OA\RequestBody(
+        required: true,
+        content: new OA\JsonContent(
+            required: ['password'],
+            properties: [
+                new OA\Property(property: 'password', type: 'string', format: 'password', example: 'CurrentPassword123!', description: 'Current password for confirmation')
+            ]
+        )
+    )]
+    #[OA\Response(
+        response: 200,
+        description: 'Account deleted successfully',
+        content: new OA\JsonContent(
+            properties: [
+                new OA\Property(property: 'success', type: 'boolean', example: true),
+                new OA\Property(property: 'message', type: 'string', example: 'Account deleted successfully')
+            ]
+        )
+    )]
+    #[OA\Response(response: 401, description: 'Not authenticated')]
+    #[OA\Response(response: 403, description: 'Incorrect password or external auth user')]
+    #[OA\Response(response: 400, description: 'Password required')]
+    public function deleteAccount(
+        Request $request,
+        #[CurrentUser] ?User $user
+    ): JsonResponse {
+        if (!$user) {
+            return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
+        }
+
+        $data = json_decode($request->getContent(), true);
+        $password = $data['password'] ?? '';
+
+        if (empty($password)) {
+            return $this->json([
+                'error' => 'Password confirmation required'
+            ], Response::HTTP_BAD_REQUEST);
+        }
+
+        // For external auth users (OAuth, OIDC), we cannot verify password
+        if ($user->isExternalAuth()) {
+            // External auth users don't have a password
+            // We could allow deletion without password check, or require special confirmation
+            // For security, let's allow it but log it
+            $this->logger->warning('External auth user deleted account', [
+                'user_id' => $user->getId(),
+                'email' => $user->getMail(),
+                'provider' => $user->getAuthProviderName()
+            ]);
+        } else {
+            // Verify password for local auth users
+            if (!$this->passwordHasher->isPasswordValid($user, $password)) {
+                usleep(100000); // Timing attack prevention
+                return $this->json([
+                    'error' => 'Incorrect password'
+                ], Response::HTTP_FORBIDDEN);
+            }
+        }
+
+        // Log account deletion
+        $this->logger->info('User account deletion initiated', [
+            'user_id' => $user->getId(),
+            'email' => $user->getMail(),
+            'type' => $user->getType()
+        ]);
+
+        $userId = $user->getId();
+
+        try {
+            // Delete all related entities to avoid foreign key constraint violations
+            
+            // 1. Delete verification tokens
+            $verificationTokens = $this->verificationTokenRepository->findBy(['userId' => $userId]);
+            foreach ($verificationTokens as $token) {
+                $this->em->remove($token);
+            }
+
+            // 2. Delete authentication tokens
+            $tokens = $this->tokenRepository->findBy(['userId' => $userId]);
+            foreach ($tokens as $token) {
+                $this->em->remove($token);
+            }
+
+            // 3. Delete API keys
+            $apiKeys = $this->apiKeyRepository->findBy(['ownerId' => $userId]);
+            foreach ($apiKeys as $apiKey) {
+                $this->em->remove($apiKey);
+            }
+
+            // 4. Delete sessions
+            $sessions = $this->sessionRepository->findBy(['userId' => $userId]);
+            foreach ($sessions as $session) {
+                $this->em->remove($session);
+            }
+
+            // 5. Delete RAG documents
+            $ragDocs = $this->ragDocumentRepository->findBy(['userId' => $userId]);
+            foreach ($ragDocs as $ragDoc) {
+                $this->em->remove($ragDoc);
+            }
+
+            // 6. Delete use logs
+            $useLogs = $this->useLogRepository->findBy(['userId' => $userId]);
+            foreach ($useLogs as $useLog) {
+                $this->em->remove($useLog);
+            }
+
+            // 7. Delete widgets
+            $widgets = $this->widgetRepository->findBy(['ownerId' => $userId]);
+            foreach ($widgets as $widget) {
+                $this->em->remove($widget);
+            }
+
+            // 8. Delete chats (this will cascade to messages)
+            $chats = $this->chatRepository->findBy(['userId' => $userId]);
+            foreach ($chats as $chat) {
+                $this->em->remove($chat);
+            }
+
+            // 9. Delete messages (in case there are orphaned messages)
+            $messages = $this->messageRepository->findBy(['userId' => $userId]);
+            foreach ($messages as $message) {
+                $this->em->remove($message);
+            }
+
+            // 10. Delete email verification attempts
+            $emailAttempts = $this->emailVerificationAttemptRepository->findBy(['email' => $user->getMail()]);
+            foreach ($emailAttempts as $attempt) {
+                $this->em->remove($attempt);
+            }
+
+            // 11. Delete files
+            $files = $this->fileRepository->findBy(['userId' => $userId]);
+            foreach ($files as $file) {
+                // TODO: Also delete physical files from storage
+                $this->em->remove($file);
+            }
+
+            // 12. Delete inbound email handlers
+            $emailHandlers = $this->inboundEmailHandlerRepository->findBy(['userId' => $userId]);
+            foreach ($emailHandlers as $handler) {
+                $this->em->remove($handler);
+            }
+
+            // Finally, delete the user account
+            $this->em->remove($user);
+            $this->em->flush();
+
+            $this->logger->info('User account and all related data deleted successfully', [
+                'user_id' => $userId,
+                'email' => $user->getMail()
+            ]);
+
+            return $this->json([
+                'success' => true,
+                'message' => 'Account deleted successfully'
+            ]);
+        } catch (\Exception $e) {
+            $this->logger->error('Failed to delete user account', [
+                'user_id' => $userId,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+
+            return $this->json([
+                'error' => 'Failed to delete account. Please contact support.'
+            ], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
 }

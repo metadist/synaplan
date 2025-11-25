@@ -61,7 +61,8 @@
             v-if="!item.children"
             :to="item.path"
             :class="[
-              'group flex items-center gap-3 rounded-xl px-3 min-h-[42px] nav-item',
+              'group flex items-center gap-3 rounded-xl px-3 min-h-[42px]',
+              item.isUpgrade ? 'btn-upgrade' : 'nav-item',
               sidebarStore.isCollapsed ? 'justify-center py-2' : 'py-2.5'
             ]"
             active-class="nav-item--active"
@@ -127,7 +128,7 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
-import { ChatBubbleLeftRightIcon, WrenchScrewdriverIcon, FolderIcon, Cog6ToothIcon, ChartBarIcon, Bars3Icon, ChevronDownIcon } from '@heroicons/vue/24/outline'
+import { ChatBubbleLeftRightIcon, WrenchScrewdriverIcon, FolderIcon, Cog6ToothIcon, ChartBarIcon, Bars3Icon, ChevronDownIcon, ShieldCheckIcon, SparklesIcon } from '@heroicons/vue/24/outline'
 import { useSidebarStore } from '../stores/sidebar'
 import { useAuthStore } from '../stores/auth'
 import { useAppModeStore } from '../stores/appMode'
@@ -189,35 +190,35 @@ const isDark = computed(() => {
 
 const logoSrc = computed(() => isDark.value ? '/synaplan-light.svg' : '/synaplan-dark.svg')
 
-const navItems = computed(() => {
-  const items = [
+interface NavItem {
+  path: string
+  label: string
+  icon: any
+  isUpgrade?: boolean
+  children?: Array<{
+    path: string
+    label: string
+    badge?: string
+  }>
+}
+
+const navItems = computed<NavItem[]>(() => {
+  const items: NavItem[] = [
     { path: '/', label: 'Chat', icon: ChatBubbleLeftRightIcon },
   ]
 
   // Tools: nur in Advanced Mode
   if (appModeStore.isAdvancedMode) {
-    const toolsChildren = [
-      { path: '/tools/introduction', label: 'Introduction' },
-      { path: '/tools/chat-widget', label: 'Chat Widget' },
-      { path: '/tools/doc-summary', label: 'Doc Summary' },
-      { path: '/tools/mail-handler', label: 'Mail Handler' },
-    ]
-    
-    // Feature Status: nur in Development Mode
-    const isDevelopment = import.meta.env.DEV
-    if (isDevelopment) {
-      toolsChildren.push({
-        path: '/settings?tab=features', 
-        label: 'Feature Status',
-        badge: disabledFeaturesCount.value > 0 ? disabledFeaturesCount.value : undefined
-      })
-    }
-    
     items.push({ 
       path: '/tools', 
       label: 'Tools', 
       icon: WrenchScrewdriverIcon,
-      children: toolsChildren
+      children: [
+        { path: '/tools/introduction', label: 'Introduction' },
+        { path: '/tools/chat-widget', label: 'Chat Widget' },
+        { path: '/tools/doc-summary', label: 'Doc Summary' },
+        { path: '/tools/mail-handler', label: 'Mail Handler' },
+      ]
     })
   }
 
@@ -254,6 +255,35 @@ const navItems = computed(() => {
 
   items.push({ path: '/statistics', label: 'Statistics', icon: ChartBarIcon })
 
+  // Upgrade - only for non-pro users
+  if (!authStore.isPro) {
+    items.push({ path: '/subscription', label: 'Upgrade', icon: SparklesIcon, isUpgrade: true })
+  }
+
+  // Admin panel - only for admins
+  if (authStore.isAdmin) {
+    const adminChildren = [
+      { path: '/admin', label: 'Dashboard' },
+    ]
+    
+    // Feature Status in Admin (always available for admins)
+    const featureStatusItem: { path: string; label: string; badge?: string } = {
+      path: '/admin/features', 
+      label: 'Feature Status'
+    }
+    if (disabledFeaturesCount.value > 0) {
+      featureStatusItem.badge = String(disabledFeaturesCount.value)
+    }
+    adminChildren.push(featureStatusItem)
+    
+    items.push({ 
+      path: '/admin', 
+      label: 'Admin', 
+      icon: ShieldCheckIcon,
+      children: adminChildren
+    })
+  }
+
   return items
 })
 
@@ -261,7 +291,7 @@ const navItems = computed(() => {
 const findParentMenu = (currentPath: string) => {
   for (const item of navItems.value) {
     if (item.children) {
-      const isChildActive = item.children.some(child => currentPath.startsWith(child.path))
+      const isChildActive = item.children.some((child: { path: string; label: string; badge?: string }) => currentPath.startsWith(child.path))
       if (isChildActive && !expandedMenus.value.includes(item.path)) {
         expandedMenus.value.push(item.path)
       }
@@ -270,7 +300,7 @@ const findParentMenu = (currentPath: string) => {
 }
 
 // Bei Routenänderungen das entsprechende Menü öffnen
-watch(() => route.path, (newPath) => {
+watch(() => route.path, (newPath: string) => {
   findParentMenu(newPath)
 }, { immediate: true })
 
@@ -295,4 +325,3 @@ const handleToggle = () => {
   }
 }
 </script>
->>>>>>> origin/main

@@ -232,15 +232,30 @@ class GitHubAuthController extends AbstractController
             }
         }
 
-        if (!$user) {
+        if ($user) {
+            // User exists - verify they registered with GitHub
+            if ($user->getProviderId() !== 'github') {
+                throw new \Exception(sprintf(
+                    'This email is already registered using %s. Please use the same login method.',
+                    $user->getAuthProviderName()
+                ));
+            }
+            
+            $this->logger->info('Existing GitHub user logging in', [
+                'user_id' => $user->getId(),
+                'email' => $email
+            ]);
+        } else {
             // Create new user
             $user = new User();
             $user->setMail($email ?? $githubLogin . '@github.local');
-            $user->setType('GITHUB');
-            $user->setProviderId('github');
+            $user->setType('WEB'); // Always WEB for web-based logins
+            $user->setProviderId('github'); // Provider tracked here
             $user->setUserLevel('NEW');
             $user->setEmailVerified(true); // OAuth users are pre-verified
             $user->setCreated(date('Y-m-d H:i:s'));
+            $user->setUserDetails([]); // Initialize with empty array
+            $user->setPaymentDetails([]); // Initialize with empty array
 
             $this->logger->info('Creating new user from GitHub OAuth', [
                 'email' => $email,

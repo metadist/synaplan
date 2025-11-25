@@ -1,19 +1,53 @@
 <!-- OAuth Callback Handler Component -->
 <template>
-  <div class="oauth-callback">
-    <div class="loading-spinner">
-      <div class="spinner"></div>
-      <h2>{{ $t('auth.oauthCallbackProcessing') }}</h2>
-      <p v-if="provider">{{ providerName }}</p>
+  <div class="min-h-screen bg-light-bg dark:bg-dark-bg flex items-center justify-center px-4 relative overflow-hidden">
+    <!-- Background decoration (same as LoginView) -->
+    <div class="absolute inset-0 overflow-hidden pointer-events-none">
+      <div class="absolute top-0 left-1/4 w-96 h-96 bg-primary/5 dark:bg-primary/10 rounded-full blur-3xl animate-float"></div>
+      <div class="absolute bottom-0 right-1/4 w-96 h-96 bg-primary/5 dark:bg-primary/10 rounded-full blur-3xl animate-float-delayed"></div>
     </div>
 
-    <div v-if="error" class="error-container">
-      <div class="error-icon">⚠️</div>
-      <h2>{{ $t('auth.socialLoginError') }}</h2>
-      <p>{{ error }}</p>
-      <button @click="goToLogin" class="btn-primary">
-        {{ $t('auth.backToLogin') }}
-      </button>
+    <!-- Loading State -->
+    <div v-if="!error" class="surface-card p-8 max-w-md w-full relative z-10">
+      <div class="text-center">
+        <!-- Spinner -->
+        <div class="inline-block w-16 h-16 border-4 border-gray-200 dark:border-gray-700 border-t-[var(--brand)] rounded-full animate-spin mb-6"></div>
+        
+        <!-- Title -->
+        <h2 class="text-2xl font-bold txt-primary mb-2">
+          {{ $t('auth.oauthCallbackProcessing') }}
+        </h2>
+        
+        <!-- Provider Name -->
+        <p v-if="provider" class="txt-secondary text-sm">
+          {{ providerName }}
+        </p>
+      </div>
+    </div>
+
+    <!-- Error State -->
+    <div v-if="error" class="surface-card p-8 max-w-md w-full relative z-10">
+      <div class="text-center">
+        <!-- Error Icon -->
+        <div class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-red-100 dark:bg-red-900/30 mb-4">
+          <svg class="w-8 h-8 text-red-600 dark:text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+          </svg>
+        </div>
+        
+        <!-- Error Message -->
+        <h2 class="text-2xl font-bold txt-primary mb-2">
+          {{ $t('auth.socialLoginError') }}
+        </h2>
+        <p class="txt-secondary text-sm mb-6">
+          {{ error }}
+        </p>
+        
+        <!-- Back Button -->
+        <Button @click="goToLogin" class="w-full btn-primary">
+          {{ $t('auth.backToLogin') }}
+        </Button>
+      </div>
     </div>
   </div>
 </template>
@@ -23,6 +57,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useI18n } from 'vue-i18n'
+import Button from '../Button.vue'
 
 const router = useRouter()
 const authStore = useAuthStore()
@@ -48,35 +83,55 @@ onMounted(async () => {
     const token = urlParams.get('token')
     const providerParam = urlParams.get('provider')
     const errorParam = urlParams.get('error')
+    const isAdminParam = urlParams.get('isAdmin')
 
     provider.value = providerParam
 
+    console.log('🔐 OAuth Callback - URL Params:', {
+      hasToken: !!token,
+      tokenLength: token?.length,
+      tokenPreview: token ? token.substring(0, 50) + '...' : null,
+      provider: providerParam,
+      error: errorParam,
+      isAdmin: isAdminParam,
+      fullURL: window.location.href
+    })
+
     if (errorParam) {
-      error.value = errorParam
+      // Decode error message from URL
+      error.value = decodeURIComponent(errorParam)
       return
     }
 
     if (!token) {
+      console.error('❌ No token found in URL params')
       error.value = t('auth.socialLoginError')
       return
     }
 
-    // Store JWT token in localStorage
+    console.log('✅ Token found, storing in localStorage')
+    // Store JWT token in localStorage first
     localStorage.setItem('auth_token', token)
 
     // Set token in auth store
     authStore.token = token
 
+    console.log('✅ Token set in auth store, refreshing user')
+    
+    // Small delay to ensure token is fully stored before making API calls
+    await new Promise(resolve => setTimeout(resolve, 100))
+
     // Fetch user info with the new token
     try {
       await authStore.refreshUser()
       
+      console.log('✅ User refreshed successfully, redirecting to home')
       // Redirect to home after successful authentication
       setTimeout(() => {
         router.push('/')
       }, 500)
     } catch (e: any) {
-      console.error('Failed to fetch user after OAuth:', e)
+      console.error('❌ Failed to fetch user after OAuth:', e)
       error.value = t('auth.socialLoginError')
       // Clear invalid token
       localStorage.removeItem('auth_token')
@@ -84,123 +139,30 @@ onMounted(async () => {
     }
 
   } catch (e: any) {
-    console.error('OAuth callback error:', e)
+    console.error('❌ OAuth callback error:', e)
     error.value = e.message || t('auth.socialLoginError')
   }
 })
 </script>
 
 <style scoped>
-.oauth-callback {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 100vh;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+/* Animations matching LoginView */
+@keyframes float {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-20px); }
 }
 
-.loading-spinner,
-.error-container {
-  text-align: center;
-  padding: 48px;
-  background: white;
-  border-radius: 16px;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-  max-width: 400px;
-  margin: 24px;
+@keyframes float-delayed {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(20px); }
 }
 
-.spinner {
-  width: 48px;
-  height: 48px;
-  border: 4px solid #f3f3f3;
-  border-top: 4px solid #667eea;
-  border-radius: 50%;
-  animation: spin 1s linear infinite;
-  margin: 0 auto 24px;
+.animate-float {
+  animation: float 6s ease-in-out infinite;
 }
 
-@keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
-}
-
-h2 {
-  font-size: 24px;
-  font-weight: 600;
-  color: #333;
-  margin: 0 0 12px;
-}
-
-p {
-  font-size: 16px;
-  color: #666;
-  margin: 0;
-}
-
-.error-container {
-  background: #fff5f5;
-  border: 2px solid #feb2b2;
-}
-
-.error-icon {
-  font-size: 48px;
-  margin-bottom: 16px;
-}
-
-.error-container h2 {
-  color: #c53030;
-}
-
-.error-container p {
-  color: #742a2a;
-  margin-bottom: 24px;
-}
-
-.btn-primary {
-  padding: 12px 24px;
-  background: #667eea;
-  color: white;
-  border: none;
-  border-radius: 8px;
-  font-size: 16px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.btn-primary:hover {
-  background: #5568d3;
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
-}
-
-.btn-primary:active {
-  transform: translateY(0);
-}
-
-/* Dark mode support */
-@media (prefers-color-scheme: dark) {
-  .loading-spinner,
-  .error-container {
-    background: #2a2a2a;
-  }
-
-  h2 {
-    color: #fff;
-  }
-
-  p {
-    color: #ccc;
-  }
-
-  .error-container {
-    background: #3a1f1f;
-  }
-
-  .error-container p {
-    color: #ffb3b3;
-  }
+.animate-float-delayed {
+  animation: float-delayed 8s ease-in-out infinite;
 }
 </style>
 

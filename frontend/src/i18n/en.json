@@ -8,8 +8,85 @@
     "config": "AI Config",
     "statistics": "Statistics"
   },
+  "admin": {
+    "title": "Admin Panel",
+    "description": "System management and configuration",
+    "tabs": {
+      "overview": "Overview",
+      "users": "Users",
+      "prompts": "Prompts",
+      "usage": "Usage"
+    },
+    "overview": {
+      "totalUsers": "Total Users",
+      "recentUsers": "Recent Users"
+    },
+    "analytics": {
+      "registrations": "User Registrations",
+      "usageByAction": "Usage by Action",
+      "period": {
+        "7d": "7 Days",
+        "30d": "30 Days",
+        "90d": "90 Days",
+        "1y": "1 Year",
+        "all": "All Time"
+      },
+      "groupBy": {
+        "day": "Day",
+        "week": "Week",
+        "month": "Month"
+      }
+    },
+    "users": {
+      "email": "Email",
+      "level": "Level",
+      "type": "Type",
+      "provider": "Provider",
+      "created": "Created",
+      "status": "Status",
+      "actions": "Actions",
+      "delete": "Delete user",
+      "currentUser": "(You)",
+      "verified": "Verified",
+      "unverified": "Unverified",
+      "searchPlaceholder": "Search by email...",
+      "noUsers": "No users found",
+      "deleteConfirmTitle": "Delete User?",
+      "deleteConfirmDesc": "Are you sure you want to delete {email}? This action cannot be undone."
+    },
+    "prompts": {
+      "shortDesc": "Short Description",
+      "prompt": "Prompt",
+      "selectionRules": "Selection Rules",
+      "selectionRulesPlaceholder": "Optional: Rules for automatic selection of this prompt"
+    },
+    "usage": {
+      "title": "Usage Statistics",
+      "period": {
+        "day": "24 Hours",
+        "week": "7 Days",
+        "month": "30 Days",
+        "all": "All Time"
+      },
+      "totalRequests": "Requests",
+      "totalTokens": "Tokens",
+      "totalCost": "Cost",
+      "avgLatency": "Avg. Latency",
+      "byAction": "By Action",
+      "byProvider": "By Provider",
+      "topModels": "Top Models",
+      "topUsers": "Top Users",
+      "model": "Model",
+      "requests": "requests",
+      "tokens": "tokens",
+      "cost": "Cost",
+      "activeSubscriptions": "Active Subscriptions",
+      "subscriptionOverview": "Subscription Overview"
+    }
+  },
   "sidebar": {
-    "featureStatus": "Feature Status"
+    "featureStatus": "Feature Status",
+    "upgrade": "Upgrade"
   },
   "chatInput": {
     "placeholder": "Type your message...",
@@ -558,6 +635,68 @@
     "verifyPhone": "Verify Phone Number",
     "footerNote": "Questions? Contact our support team."
   },
+  "subscription": {
+    "title": "Subscription Plans",
+    "subtitle": "Unlock more features and higher limits",
+    "chooseYourPlan": "Choose Your Plan",
+    "currentPlan": "Current Plan",
+    "yourPlan": "Your Plan",
+    "noActiveSubscription": "No active subscription",
+    "upgradePlan": "Upgrade Plan",
+    "managePlan": "Manage Plan",
+    "cancelPlan": "Cancel Subscription",
+    "recommended": "Recommended",
+    "selectPlan": "Select Plan",
+    "processing": "Processing...",
+    "perMonth": "month",
+    "perYear": "year",
+    "unavailable": "Subscription Service Unavailable",
+    "unavailableDesc": "The subscription service is currently being configured. Please check back later or contact support for more information.",
+    "serviceNotConfigured": "Subscription service is currently unavailable. Please contact support.",
+    "checkoutFailed": "Failed to start checkout. Please try again.",
+    "manage": {
+      "title": "Manage Your Subscription",
+      "subtitle": "View and manage your subscription details",
+      "currentPlanLabel": "Current Plan",
+      "status": "Status",
+      "statusActive": "Active",
+      "statusCanceled": "Canceled",
+      "statusPastDue": "Past Due",
+      "nextBilling": "Next Billing Date",
+      "cancelDate": "Cancels on",
+      "billingPortal": "Billing Portal",
+      "billingPortalDesc": "Manage your payment methods, view invoices, and update billing information",
+      "openPortal": "Open Billing Portal",
+      "cancelSubscription": "Cancel Subscription",
+      "cancelWarning": "Are you sure you want to cancel your subscription?",
+      "cancelWarningDesc": "You will retain access until the end of your billing period.",
+      "confirmCancel": "Yes, Cancel Subscription",
+      "keepSubscription": "Keep Subscription",
+      "loadingPortal": "Opening billing portal..."
+    },
+    "plans": {
+      "pro": "Pro",
+      "team": "Team",
+      "business": "Business"
+    },
+    "features": {
+      "unlimitedMessages": "Unlimited Messages",
+      "images": "{count} Images/Month",
+      "unlimitedImages": "Unlimited Images",
+      "advancedModels": "Advanced AI Models",
+      "prioritySupport": "Priority Support",
+      "storage": "{size}GB Storage",
+      "everythingInPro": "Everything in Pro",
+      "everythingInTeam": "Everything in Team",
+      "teamCollaboration": "Team Collaboration",
+      "customPrompts": "Custom Prompts",
+      "apiAccess": "API Access",
+      "unlimitedVideo": "Unlimited Video Generation",
+      "whiteLabel": "White-label Widgets",
+      "dedicatedSupport": "Dedicated Support",
+      "slaGuarantee": "SLA Guarantee"
+    }
+  },
   "common": {
     "ok": "OK",
     "cancel": "Cancel",
@@ -637,7 +776,12 @@
     "loginWithGitHub": "Login with GitHub",
     "socialLoginError": "Social login failed. Please try again.",
     "oauthCallbackProcessing": "Processing login...",
-    "noSocialProviders": "No social login providers configured"
+    "noSocialProviders": "No social login providers configured",
+    "registrationSuccess": "Registration Successful!",
+    "registrationSuccessDesc": "If this email address is not already registered, we have sent you a verification email. Please check your inbox (including spam folder).",
+    "passwordResetSuccess": "Request Sent!",
+    "passwordResetSuccessDesc": "If an account with this email address exists, we have sent you a password reset link. Please check your inbox.",
+    "recaptchaError": "reCAPTCHA verification failed. Please try again."
   },
   "unsavedChanges": {
     "title": "You have unsaved changes",
@@ -856,6 +1000,29 @@
       "confirmPasswordPlaceholder": "Confirm new password",
       "confirmPasswordHint": "Must match new password"
     },
+    "dangerZone": {
+      "title": "Danger Zone",
+      "subtitle": "Irreversible actions",
+      "deleteAccount": "Delete Account",
+      "deleteAccountDesc": "Permanently delete your account. This action cannot be undone.",
+      "deleteButton": "Delete Account Permanently"
+    },
+    "deleteAccountModal": {
+      "title": "Really Delete Account?",
+      "warning": "This action is permanent and cannot be undone.",
+      "consequences": "The following data will be deleted:",
+      "consequence1": "All your messages and chats",
+      "consequence2": "All uploaded files",
+      "consequence3": "Your personal data and settings",
+      "consequence4": "API keys and credentials",
+      "confirmPassword": "Confirm with your password:",
+      "confirmPasswordPlaceholder": "Your current password",
+      "externalAuthConfirm": "Type 'DELETE' to confirm:",
+      "externalAuthPlaceholder": "Type DELETE",
+      "deleteButton": "Yes, Delete Account",
+      "cancelButton": "Cancel",
+      "deleting": "Deleting..."
+    },
     "privacyNotice": "All data is stored securely and used only for invoicing purposes according to German law (DSGVO).",
     "saveChanges": "Save Changes",
     "cancel": "Cancel"
@@ -998,6 +1165,8 @@
     },
     "logout": "Logout",
     "features": {
+      "title": "System Status",
+      "subtitle": "Monitor all services and features",
       "loading": "Loading features...",
       "requiredConfig": "Required Configuration:",
       "set": "Set",

@@ -188,6 +188,36 @@ const router = createRouter({
       component: () => import('../views/ProfileView.vue'),
       meta: { requiresAuth: true }
     },
+    {
+      path: '/admin',
+      name: 'admin',
+      component: () => import('../views/AdminView.vue'),
+      meta: { requiresAuth: true, requiresAdmin: true }
+    },
+    {
+      path: '/admin/features',
+      name: 'admin-features',
+      component: () => import('../views/FeatureStatusView.vue'),
+      meta: { requiresAuth: true, requiresAdmin: true }
+    },
+    {
+      path: '/subscription',
+      name: 'subscription',
+      component: () => import('../views/SubscriptionView.vue'),
+      meta: { requiresAuth: true }
+    },
+    {
+      path: '/subscription/success',
+      name: 'subscription-success',
+      component: () => import('../views/SubscriptionSuccessView.vue'),
+      meta: { requiresAuth: true }
+    },
+    {
+      path: '/subscription/cancel',
+      name: 'subscription-cancel',
+      component: () => import('../views/SubscriptionCancelView.vue'),
+      meta: { requiresAuth: true }
+    },
     // 404 - Must be last
     {
       path: '/:pathMatch(.*)*',
@@ -200,7 +230,9 @@ const router = createRouter({
 
 // Global navigation guard for authentication
 router.beforeEach((to, _from, next) => {
+  const { isAuthenticated, isAdmin } = useAuth()
   const requiresAuth = to.meta.requiresAuth !== false // Default to true
+  const requiresAdminAccess = to.meta.requiresAdmin === true
   const isPublicRoute = to.meta.public === true
   const autoLoginEnabled = import.meta.env.VITE_AUTO_LOGIN_DEV === 'true'
 
@@ -222,7 +254,10 @@ router.beforeEach((to, _from, next) => {
       name: 'login',
       query: { redirect: to.fullPath, reason: 'auth_required' }
     })
-  } else if (isPublicRoute && hasToken && to.name === 'login' && !autoLoginEnabled) {
+  } else if (requiresAdminAccess && !isAdmin.value) {
+    // Admin route without admin privileges
+    next({ name: 'chat' })
+  } else if (isPublicRoute && isAuthenticated.value && to.name === 'login' && !autoLoginEnabled) {
     // Already logged in, redirect to home (but not in dev mode with auto-login)
     next({ name: 'chat' })
   } else {
