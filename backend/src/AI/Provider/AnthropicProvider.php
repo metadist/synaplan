@@ -48,6 +48,16 @@ class AnthropicProvider implements ChatProviderInterface, VisionProviderInterfac
         return 'anthropic';
     }
 
+    public function getDisplayName(): string
+    {
+        return 'Anthropic';
+    }
+
+    public function getDescription(): string
+    {
+        return 'Claude models with advanced reasoning capabilities';
+    }
+
     public function getCapabilities(): array
     {
         return ['chat', 'vision'];
@@ -81,6 +91,16 @@ class AnthropicProvider implements ChatProviderInterface, VisionProviderInterfac
     public function isAvailable(): bool
     {
         return !empty($this->apiKey);
+    }
+
+    public function getRequiredEnvVars(): array
+    {
+        return [
+            'ANTHROPIC_API_KEY' => [
+                'required' => true,
+                'hint' => 'Get your API key from https://console.anthropic.com/'
+            ]
+        ];
     }
 
     // ==================== CHAT ====================

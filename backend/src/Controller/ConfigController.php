@@ -7,6 +7,7 @@ use App\Repository\ConfigRepository;
 use App\Repository\ModelRepository;
 use App\AI\Service\ProviderRegistry;
 use App\Service\Search\BraveSearchService;
+use App\Service\WhisperService;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -26,7 +27,8 @@ class ConfigController extends AbstractController
         private ConfigRepository $configRepository,
         private ModelRepository $modelRepository,
         private ProviderRegistry $providerRegistry,
-        private BraveSearchService $braveSearchService
+        private BraveSearchService $braveSearchService,
+        private WhisperService $whisperService
     ) {}
 
     /**
@@ -445,147 +447,131 @@ class ConfigController extends AbstractController
             'models_available' => count($imageModels)
         ];
 
-        // Code Interpreter
-        $features['code-interpreter'] = [
-            'id' => 'code-interpreter',
-            'category' => 'AI Features',
-            'name' => 'Code Interpreter',
-            'enabled' => true,
-            'status' => 'active',
-            'message' => 'Code interpreter is active',
-            'setup_required' => false
-        ];
-
-        // ========== AI Providers ==========
+        // ========== AI Providers (Dynamic from ProviderRegistry) ==========
         
-        // Ollama
-        $ollamaUrl = $_ENV['OLLAMA_BASE_URL'] ?? '';
-        $ollamaHealthy = $this->checkServiceHealth($ollamaUrl . '/api/tags');
-        $features['ollama'] = [
-            'id' => 'ollama',
-            'category' => 'AI Providers',
-            'name' => 'Ollama (Local AI)',
-            'enabled' => !empty($ollamaUrl),
-            'status' => $ollamaHealthy ? 'healthy' : ($ollamaUrl ? 'unhealthy' : 'disabled'),
-            'message' => $ollamaHealthy 
-                ? 'Ollama is running and accessible' 
-                : ($ollamaUrl ? 'Ollama service is not responding' : 'Ollama URL not configured'),
-            'setup_required' => empty($ollamaUrl),
-            'url' => $ollamaUrl
-        ];
+        $providersMetadata = $this->providerRegistry->getProvidersMetadata();
+        
+        foreach ($providersMetadata as $providerName => $providerData) {
+            // Skip test provider in production
+            if ($providerName === 'test' && $env !== 'dev') {
+                continue;
+            }
 
-        // OpenAI
-        $openaiKey = $_ENV['OPENAI_API_KEY'] ?? '';
-        $features['openai'] = [
-            'id' => 'openai',
-            'category' => 'AI Providers',
-            'name' => 'OpenAI',
-            'enabled' => !empty($openaiKey),
-            'status' => !empty($openaiKey) ? 'active' : 'disabled',
-            'message' => !empty($openaiKey) 
-                ? 'OpenAI API key configured' 
-                : 'OpenAI API key not configured',
-            'setup_required' => empty($openaiKey),
-            'env_vars' => [
-                'OPENAI_API_KEY' => [
-                    'required' => true,
-                    'set' => !empty($openaiKey),
-                    'hint' => 'Get your API key from https://platform.openai.com/'
-                ]
-            ]
-        ];
+            // Get model count from database for this provider
+            $modelsCount = 0;
+            try {
+                $models = $this->modelRepository->findBy([
+                    'provider' => $providerName,
+                    'active' => true
+                ]);
+                $modelsCount = count($models);
+            } catch (\Exception $e) {
+                // Ignore
+            }
 
-        // Anthropic (Claude)
-        $anthropicKey = $_ENV['ANTHROPIC_API_KEY'] ?? '';
-        $features['anthropic'] = [
-            'id' => 'anthropic',
+            // Get URL for services that have one
+            $url = null;
+            if ($providerName === 'ollama') {
+                $url = $_ENV['OLLAMA_BASE_URL'] ?? null;
+            }
+
+            // Convert env_vars format (check if actually set in environment)
+            $envVars = [];
+            foreach ($providerData['env_vars'] ?? [] as $varName => $varConfig) {
+                $envVars[$varName] = [
+                    'required' => $varConfig['required'],
+                    'set' => !empty($_ENV[$varName] ?? ''),
+                    'hint' => $varConfig['hint']
+                ];
+            }
+
+            // Determine status: active if enabled and healthy, unhealthy if enabled but not healthy, disabled otherwise
+            $status = 'disabled';
+            if ($providerData['enabled']) {
+                $status = ($providerData['status'] === 'healthy') ? 'active' : 'unhealthy';
+            }
+
+            $features[$providerName] = [
+                'id' => $providerName,
             'category' => 'AI Providers',
-            'name' => 'Anthropic (Claude)',
-            'enabled' => !empty($anthropicKey),
-            'status' => !empty($anthropicKey) ? 'active' : 'disabled',
-            'message' => !empty($anthropicKey) 
-                ? 'Anthropic API key configured' 
-                : 'Anthropic API key not configured',
-            'setup_required' => empty($anthropicKey),
-            'env_vars' => [
-                'ANTHROPIC_API_KEY' => [
-                    'required' => true,
-                    'set' => !empty($anthropicKey),
-                    'hint' => 'Get your API key from https://console.anthropic.com/'
-                ]
-            ]
+                'name' => $providerData['name'],
+                'enabled' => $providerData['enabled'],
+                'status' => $status,
+                'message' => $providerData['enabled'] 
+                    ? $providerData['description']
+                    : ($providerData['status_message'] ?? 'API key not configured'),
+                'setup_required' => $providerData['setup_required'],
+                'env_vars' => $envVars,
+                'models_available' => $modelsCount,
+                'url' => $url
         ];
+        }
 
         // ========== Processing Services ==========
         
-        // Whisper (Speech-to-Text)
-        $whisperUrl = $_ENV['WHISPER_API_URL'] ?? 'http://whisper:9000';
-        $whisperHealthy = $this->checkServiceHealth($whisperUrl . '/health');
+        // Whisper.cpp (Speech-to-Text) - runs in backend container
+        $whisperHealthy = $this->whisperService->isAvailable();
+        $availableModels = $whisperHealthy ? $this->whisperService->getAvailableModels() : [];
         $features['whisper'] = [
             'id' => 'whisper',
             'category' => 'Processing Services',
-            'name' => 'Whisper (Speech-to-Text)',
-            'enabled' => true,
+            'name' => 'Whisper.cpp',
+            'enabled' => $whisperHealthy,
             'status' => $whisperHealthy ? 'healthy' : 'unhealthy',
             'message' => $whisperHealthy 
-                ? 'Whisper service is running' 
-                : 'Whisper service is not responding',
-            'setup_required' => false,
-            'url' => $whisperUrl
+                ? 'Speech-to-text transcription is ready'
+                : 'Whisper.cpp binary or models not found',
+            'setup_required' => !$whisperHealthy,
+            'models_available' => count($availableModels)
         ];
 
         // Apache Tika (Document Processing)
-        $tikaUrl = $_ENV['TIKA_URL'] ?? 'http://tika:9998';
+        $tikaUrl = $_ENV['TIKA_BASE_URL'] ?? 'http://tika:9998';
         $tikaHealthy = $this->checkServiceHealth($tikaUrl . '/tika');
-        $features['tika'] = [
-            'id' => 'tika',
-            'category' => 'Processing Services',
-            'name' => 'Apache Tika (Document Processing)',
-            'enabled' => true,
-            'status' => $tikaHealthy ? 'healthy' : 'unhealthy',
-            'message' => $tikaHealthy 
-                ? 'Tika service is running and processing documents' 
-                : 'Tika service is not responding',
-            'setup_required' => false,
-            'url' => $tikaUrl
-        ];
-
-        // ========== Infrastructure Services ==========
         
-        // Redis (Cache & Queue)
-        $redisHost = $_ENV['REDIS_HOST'] ?? 'redis';
-        $redisPort = $_ENV['REDIS_PORT'] ?? 6379;
-        $redisHealthy = false;
-        
-        if (extension_loaded('redis')) {
+        // Try to get Tika version
+        $tikaVersion = '';
+        if ($tikaHealthy) {
             try {
-                $redis = new \Redis();
-                $redisHealthy = @$redis->connect($redisHost, (int)$redisPort, 1);
-                if ($redisHealthy) {
-                    $redis->close();
+                $versionResponse = @file_get_contents($tikaUrl . '/version', false, stream_context_create([
+                    'http' => ['timeout' => 2]
+                ]));
+                if ($versionResponse) {
+                    $tikaVersion = trim($versionResponse);
                 }
             } catch (\Exception $e) {
-                $redisHealthy = false;
+                // Ignore
             }
         }
         
-        $features['redis'] = [
-            'id' => 'redis',
-            'category' => 'Infrastructure',
-            'name' => 'Redis (Cache & Queue)',
-            'enabled' => extension_loaded('redis'),
-            'status' => $redisHealthy ? 'healthy' : (extension_loaded('redis') ? 'unhealthy' : 'disabled'),
-            'message' => $redisHealthy 
-                ? 'Redis is running and accessible' 
-                : (extension_loaded('redis') ? 'Redis is not responding' : 'Redis PHP extension not installed'),
-            'setup_required' => !extension_loaded('redis'),
-            'url' => "$redisHost:$redisPort"
+        $features['tika'] = [
+            'id' => 'tika',
+            'category' => 'Processing Services',
+            'name' => 'Apache Tika',
+            'enabled' => true,
+            'status' => $tikaHealthy ? 'healthy' : 'unhealthy',
+            'message' => $tikaHealthy 
+                ? 'Document processing service is running' 
+                : 'Tika service is not responding',
+            'setup_required' => false,
+            'url' => $tikaUrl,
+            'version' => $tikaVersion
         ];
 
+        // ========== Infrastructure Services ==========
+
         // Database (MariaDB)
+        $dbHealthy = false;
+        $dbVersion = '';
         try {
             $this->em->getConnection()->executeQuery('SELECT 1');
             $dbHealthy = true;
+            
+            // Get DB version
+            $versionResult = $this->em->getConnection()->executeQuery('SELECT VERSION()')->fetchOne();
+            if ($versionResult) {
+                $dbVersion = explode('-', $versionResult)[0];
+            }
         } catch (\Exception $e) {
             $dbHealthy = false;
         }
@@ -593,13 +579,14 @@ class ConfigController extends AbstractController
         $features['database'] = [
             'id' => 'database',
             'category' => 'Infrastructure',
-            'name' => 'Database (MariaDB)',
+            'name' => 'MariaDB',
             'enabled' => true,
             'status' => $dbHealthy ? 'healthy' : 'unhealthy',
             'message' => $dbHealthy 
-                ? 'Database connection is active' 
+                ? 'Database connection is active and responding' 
                 : 'Database connection failed',
-            'setup_required' => false
+            'setup_required' => false,
+            'version' => $dbVersion
         ];
 
         // Count ready services

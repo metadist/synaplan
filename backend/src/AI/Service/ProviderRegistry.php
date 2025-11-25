@@ -283,5 +283,61 @@ class ProviderRegistry
         }
         return array_unique($all, SORT_REGULAR);
     }
+
+    /**
+     * Get all unique providers (deduplicated by name)
+     * Returns array keyed by provider name
+     */
+    public function getUniqueProviders(): array
+    {
+        $unique = [];
+        foreach ($this->providers as $capability => $providers) {
+            foreach ($providers as $provider) {
+                $name = $provider->getName();
+                if (!isset($unique[$name])) {
+                    $unique[$name] = $provider;
+                }
+            }
+        }
+        return $unique;
+    }
+
+    /**
+     * Get metadata for all providers (for status/features UI)
+     * 
+     * @return array Provider metadata with status, capabilities, env vars, etc.
+     */
+    public function getProvidersMetadata(): array
+    {
+        $metadata = [];
+        $uniqueProviders = $this->getUniqueProviders();
+
+        foreach ($uniqueProviders as $name => $provider) {
+            $status = $provider->getStatus();
+            $envVars = $provider->getRequiredEnvVars();
+
+            $metadata[$name] = [
+                'id' => $name,
+                'name' => $provider->getDisplayName(),
+                'description' => $provider->getDescription(),
+                'capabilities' => $provider->getCapabilities(),
+                'enabled' => $provider->isAvailable(),
+                'status' => $status['healthy'] ? 'healthy' : 'unhealthy',
+                'status_message' => $status['error'] ?? $provider->getDescription(),
+                'setup_required' => !$provider->isAvailable(),
+                'env_vars' => $envVars,
+            ];
+
+            // Add additional status info if available
+            if (isset($status['latency_ms'])) {
+                $metadata[$name]['latency_ms'] = $status['latency_ms'];
+            }
+            if (isset($status['models'])) {
+                $metadata[$name]['models_available'] = $status['models'];
+            }
+        }
+
+        return $metadata;
+    }
 }
 

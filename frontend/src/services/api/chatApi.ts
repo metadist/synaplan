@@ -147,6 +147,7 @@ export const chatApi = {
 
   /**
    * Upload file for chat message (File wird sofort hochgeladen und extrahiert)
+   * For audio files, response includes transcribed text
    */
   async uploadChatFile(file: File): Promise<{
     success: boolean
@@ -155,6 +156,9 @@ export const chatApi = {
     size: number
     mime: string
     file_type: string
+    text?: string
+    language?: string
+    duration?: number
   }> {
     const formData = new FormData()
     formData.append('file', file)
@@ -179,13 +183,15 @@ export const chatApi = {
 
   /**
    * Upload audio for transcription with WhisperCPP
+   * Returns transcribed text that can be inserted into chat input
    */
   async transcribeAudio(audioBlob: Blob, filename = 'recording.webm'): Promise<{
     success: boolean
     file_id: number
-    text: string
-    language: string
-    duration: number
+    filename: string
+    text?: string
+    language?: string
+    duration?: number
   }> {
     const formData = new FormData()
     formData.append('file', audioBlob, filename)

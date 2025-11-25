@@ -69,8 +69,9 @@ class OidcUserProvider
         
         $email = $oidcData['email'] ?? 'oidc_' . bin2hex(random_bytes(8)) . '@synaplan.local';
         $user->setMail($email);
-        $user->setPw(''); // No password for OIDC users
+        $user->setPw(null); // No password for OIDC users
         $user->setType('OIDC');
+        $user->setProviderId('oidc');
         $user->setUserLevel('NEW'); // Default level, can be upgraded
 
         $details = [

@@ -275,5 +275,52 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
         $details = $this->getUserDetails();
         return $details['phone_number'] ?? null;
     }
+
+    /**
+     * Check if user is using external authentication (OAuth, OIDC)
+     * External users cannot change their password locally
+     */
+    public function isExternalAuth(): bool
+    {
+        return in_array($this->type, ['GOOGLE', 'GITHUB', 'OIDC', 'MAIL'], true);
+    }
+
+    /**
+     * Check if user can change password
+     * Only local/WEB users with passwords can change their password
+     */
+    public function canChangePassword(): bool
+    {
+        // Only WEB users with a local password can change it
+        return $this->type === 'WEB' && !empty($this->pw);
+    }
+
+    /**
+     * Get authentication provider name for display
+     */
+    public function getAuthProviderName(): string
+    {
+        return match($this->type) {
+            'GOOGLE' => 'Google',
+            'GITHUB' => 'GitHub',
+            'OIDC' => 'Keycloak/OIDC',
+            'MAIL' => 'Email',
+            'WEB' => 'Email/Password',
+            default => 'Unknown'
+        };
+    }
+
+    /**
+     * Get user's preferred language/locale
+     * Returns 'de', 'en', etc. for email translations
+     */
+    public function getLocale(): string
+    {
+        $details = $this->getUserDetails();
+        $language = $details['language'] ?? 'en';
+        
+        // Ensure we return a valid locale code
+        return in_array($language, ['de', 'en', 'fr', 'es'], true) ? $language : 'en';
+    }
 }
 

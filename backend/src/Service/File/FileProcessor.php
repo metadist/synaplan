@@ -3,6 +3,7 @@
 namespace App\Service\File;
 
 use App\AI\Service\AiFacade;
+use App\Service\WhisperService;
 use Psr\Log\LoggerInterface;
 
 /**
@@ -13,7 +14,7 @@ use Psr\Log\LoggerInterface;
  * 2. Tika (documents: PDF, DOCX, XLSX, etc.)
  * 3. Rasterize + Vision AI (fallback for PDFs with low-quality Tika extraction)
  * 4. Vision AI (images)
- * 5. Speech-to-Text (audio/video files)
+ * 5. Speech-to-Text (audio/video files via Whisper.cpp)
  * 
  * Strategy from legacy: Native -> Tika -> Rasterize+Vision fallback
  */
@@ -39,6 +40,11 @@ class FileProcessor
         'image/webp',
     ];
 
+    private const AUDIO_EXTENSIONS = [
+        'ogg', 'mp3', 'wav', 'm4a', 'opus', 'flac', 'webm', 'aac', 'wma', 
+        'mp4', 'avi', 'mov', 'mkv', 'mpeg', 'mpg'
+    ];
+
     private const OFFICE_EXT_TO_MIME = [
         'xls'  => 'application/vnd.ms-excel',
         'xlsx' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
@@ -57,6 +63,7 @@ class FileProcessor
         private PdfRasterizer $rasterizer,
         private TextCleaner $textCleaner,
         private AiFacade $aiFacade,
+        private WhisperService $whisperService,
         private LoggerInterface $logger,
         private string $uploadDir,
         private int $tikaMinLength,
@@ -104,7 +111,12 @@ class FileProcessor
             return $this->extractFromImage($relativePath, $userId, $meta);
         }
 
-        // Strategy 3: Tika for documents
+        // Strategy 3: Audio/Video files -> Whisper.cpp
+        if ($this->isAudioExtension($ext)) {
+            return $this->extractFromAudio($absolutePath, $meta);
+        }
+
+        // Strategy 4: Tika for documents
         if (!$this->tikaClient->isEnabled()) {
             // Tika disabled: Only support PDFs via vision
             if ($this->isPdfMime($mime) || $ext === 'pdf') {
@@ -330,6 +342,54 @@ class FileProcessor
         }
 
         return $mime;
+    }
+
+    /**
+     * Check if file extension is audio/video
+     */
+    private function isAudioExtension(string $ext): bool
+    {
+        return in_array($ext, self::AUDIO_EXTENSIONS, true);
+    }
+
+    /**
+     * Extract text from audio/video file using Whisper.cpp
+     */
+    private function extractFromAudio(string $absolutePath, array $baseMeta): array
+    {
+        if (!$this->whisperService->isAvailable()) {
+            $this->logger->warning('FileProcessor: Whisper not available', $baseMeta);
+            return ['', ['strategy' => 'whisper_unavailable'] + $baseMeta];
+        }
+
+        $this->logger->info('FileProcessor: Transcribing audio with Whisper', $baseMeta);
+
+        try {
+            $result = $this->whisperService->transcribe($absolutePath);
+            
+            $text = $result['text'] ?? '';
+            $text = $this->textCleaner->clean($text);
+
+            $this->logger->info('FileProcessor: Whisper transcription success', [
+                'strategy' => 'whisper',
+                'bytes' => strlen($text),
+                'language' => $result['language'] ?? 'unknown',
+                'duration' => $result['duration'] ?? 0
+            ]);
+
+            return [$text, [
+                'strategy' => 'whisper',
+                'language' => $result['language'] ?? 'unknown',
+                'duration' => $result['duration'] ?? 0,
+                'model' => $result['model'] ?? 'base'
+            ] + $baseMeta];
+
+        } catch (\Throwable $e) {
+            $this->logger->error('FileProcessor: Whisper transcription failed', [
+                'error' => $e->getMessage()
+            ] + $baseMeta);
+            return ['', ['strategy' => 'whisper_failed', 'error' => $e->getMessage()] + $baseMeta];
+        }
     }
 }
 

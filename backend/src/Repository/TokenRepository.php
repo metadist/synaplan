@@ -59,6 +59,35 @@ class TokenRepository extends ServiceEntityRepository
     }
 
     /**
+     * Markiert einen Token als verwendet
+     */
+    public function markAsUsed(Token $token, bool $flush = true): void
+    {
+        $token->markAsUsed();
+        
+        if ($flush) {
+            $this->getEntityManager()->flush();
+        }
+    }
+
+    /**
+     * Erstellt einen neuen Token
+     */
+    public function createToken(\App\Entity\User $user, string $type, int $expirySeconds = 3600): Token
+    {
+        $token = new Token();
+        $token->setUser($user);
+        $token->setType($type);
+        $token->setToken(bin2hex(random_bytes(32)));
+        $token->setExpires(time() + $expirySeconds);
+        $token->setUsed(false);
+        
+        $this->save($token, true);
+        
+        return $token;
+    }
+
+    /**
      * Löscht einen Token
      */
     public function remove(Token $token, bool $flush = true): void

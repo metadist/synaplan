@@ -164,6 +164,7 @@
           :active-tools="activeTools" 
           @select="toggleTool" 
           @remove="removeTool"
+          @insert-command="handleInsertCommand"
           class="flex-shrink-0"
         />
         <button
@@ -209,7 +210,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { PaperAirplaneIcon, XMarkIcon, SparklesIcon, MicrophoneIcon, PlusIcon } from '@heroicons/vue/24/outline'
 import { Icon } from '@iconify/vue'
@@ -389,6 +390,23 @@ const handleCommandSelect = (cmd: Command) => {
   }
   paletteVisible.value = false
   activeCommand.value = cmd.name
+  // Focus textarea after command selection
+  nextTick(() => {
+    textareaRef.value?.focus()
+  })
+}
+
+const handleInsertCommand = (cmd: Command) => {
+  if (cmd.requiresArgs) {
+    message.value = `${cmd.usage.split('[')[0].trim()} `
+  } else {
+    message.value = cmd.usage
+  }
+  activeCommand.value = cmd.name
+  // Focus textarea after command insertion
+  nextTick(() => {
+    textareaRef.value?.focus()
+  })
 }
 
 const closePalette = () => {
@@ -488,6 +506,13 @@ const uploadFiles = async (files: File[]) => {
         }
       }
       
+      // For audio files, show transcription info if available
+      if (result.text) {
+        const preview = result.text.substring(0, 50) + (result.text.length > 50 ? '...' : '')
+        const languageInfo = result.language ? ` (${result.language})` : ''
+        success(`🎙️ Audio transcribed${languageInfo}: "${preview}"`)
+      }
+      
       console.log('✅ File uploaded and processed:', result)
     } catch (err: any) {
       console.error('❌ File upload failed:', err)
@@ -554,47 +579,36 @@ const toggleRecording = async () => {
 const transcribeAudio = async (audioBlob: Blob) => {
   uploading.value = true
   
-  // Add to UI as "processing"
-  const tempFile: UploadedFile = {
-    file_id: 0,
-    filename: 'Audio Recording',
-    file_type: 'audio',
-    processing: true
-  }
-  uploadedFiles.value.push(tempFile)
-  
   try {
     // Upload for transcription (WhisperCPP on backend)
     const result = await chatApi.transcribeAudio(audioBlob)
     
-    // Update file entry
-    const index = uploadedFiles.value.findIndex(f => f.filename === 'Audio Recording' && f.processing)
-    if (index !== -1) {
-      uploadedFiles.value[index] = {
-        file_id: result.file_id,
-        filename: `Recording (${result.language})`,
-        file_type: 'audio',
-        processing: false
-      }
-    }
-    
     // CRITICAL: Add transcribed text directly to message input!
     if (result.text) {
+      // Insert text with space separator if there's existing text
       message.value += (message.value ? ' ' : '') + result.text
-      success(`✅ Transcribed: "${result.text.substring(0, 50)}${result.text.length > 50 ? '...' : ''}"`)
-    }
+      
+      // Show success notification with preview
+      const preview = result.text.substring(0, 50) + (result.text.length > 50 ? '...' : '')
+      const languageInfo = result.language ? ` (${result.language})` : ''
+      success(`🎙️ Transcribed${languageInfo}: "${preview}"`)
     
-    console.log('✅ Audio transcribed:', result)
-    success('Recording transcribed!')
+      console.log('✅ Audio transcribed:', {
+        text_length: result.text.length,
+        language: result.language,
+        duration: result.duration
+      })
+      
+      // Focus textarea for immediate editing
+      nextTick(() => {
+        textareaRef.value?.focus()
+      })
+    } else {
+      warning('⚠️ No speech detected in recording')
+    }
   } catch (err: any) {
     console.error('❌ Transcription failed:', err)
     showError(`Transcription failed: ${err.message}`)
-    
-    // Remove from list
-    const index = uploadedFiles.value.findIndex(f => f.filename === 'Audio Recording')
-    if (index !== -1) {
-      uploadedFiles.value.splice(index, 1)
-    }
   } finally {
     isRecording.value = false
     uploading.value = false

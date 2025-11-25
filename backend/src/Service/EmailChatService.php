@@ -94,8 +94,9 @@ class EmailChatService
         // Create new anonymous user
         $anonymousUser = new User();
         $anonymousUser->setMail('anonymous_' . bin2hex(random_bytes(8)) . '@synaplan.local');
-        $anonymousUser->setPw(''); // No password for anonymous
+        $anonymousUser->setPw(null); // No password for anonymous users
         $anonymousUser->setType('MAIL'); // EMAIL-based anonymous user
+        $anonymousUser->setProviderId('email'); // Identify as email-based
         $anonymousUser->setUserLevel('ANONYMOUS'); // Anonymous users get ANONYMOUS rate limits
         
         $details = [

@@ -42,8 +42,14 @@
               </div>
 
               <div data-testid="field-email">
-                <label class="block txt-primary font-medium mb-2">
+                <label class="block txt-primary font-medium mb-2 flex items-center gap-2">
                   {{ $t('profile.personalInfo.email') }}
+                  <span
+                    v-if="isExternalAuth"
+                    class="px-2 py-0.5 rounded text-xs font-semibold bg-gradient-to-br from-blue-500 to-blue-600 text-white shadow-sm"
+                  >
+                    {{ authProvider }}
+                  </span>
                 </label>
                 <input
                   v-model="formData.email"
@@ -53,6 +59,9 @@
                   :title="$t('profile.personalInfo.emailHint')"
                   data-testid="input-email"
                 />
+                <p v-if="isExternalAuth" class="text-xs txt-secondary mt-1">
+                  This account is managed by {{ authProvider }}
+                </p>
               </div>
 
               <div data-testid="field-phone">
@@ -228,9 +237,28 @@
               <Icon icon="mdi:lock" class="w-5 h-5" />
               {{ $t('profile.changePassword.title') }}
             </h2>
-            <p class="txt-secondary text-sm mb-6">{{ $t('profile.changePassword.subtitle') }}</p>
             
-            <div class="grid grid-cols-1 gap-6 max-w-2xl">
+            <!-- External Auth Warning -->
+            <div v-if="isExternalAuth" class="mb-6 p-4 rounded-lg bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-900/30 border border-blue-300 dark:border-blue-700">
+              <div class="flex items-start gap-3">
+                <Icon icon="mdi:shield-check" class="w-6 h-6 text-blue-600 dark:text-blue-400 flex-shrink-0" />
+                <div class="flex-1">
+                  <p class="text-sm font-semibold text-blue-900 dark:text-blue-100 mb-1">
+                    🔒 Managed by {{ authProvider }}
+                  </p>
+                  <p class="text-sm text-blue-700 dark:text-blue-300 mb-2">
+                    You're using {{ authProvider }} to sign in. Password management is handled through {{ authProvider }}.
+                  </p>
+                  <p v-if="externalAuthLastLogin" class="text-xs text-blue-600 dark:text-blue-400">
+                    Last authenticated: {{ externalAuthLastLogin }}
+                  </p>
+                </div>
+              </div>
+            </div>
+            
+            <p v-else class="txt-secondary text-sm mb-6">{{ $t('profile.changePassword.subtitle') }}</p>
+            
+            <div v-if="canChangePassword" class="grid grid-cols-1 gap-6 max-w-2xl">
               <div data-testid="field-current-password">
                 <label class="block txt-primary font-medium mb-2">
                   {{ $t('profile.changePassword.currentPassword') }}
@@ -328,6 +356,10 @@ const passwordData = ref({
   confirm: '',
 })
 const loading = ref(false)
+const canChangePassword = ref(true)
+const authProvider = ref<string>('Email/Password')
+const isExternalAuth = ref(false)
+const externalAuthLastLogin = ref<string | null>(null)
 
 const { hasUnsavedChanges, saveChanges, discardChanges, setupNavigationGuard } = useUnsavedChanges(
   formData,
@@ -346,6 +378,12 @@ onMounted(async () => {
     if (response.success && response.profile) {
       Object.assign(formData.value, response.profile)
       originalData.value = { ...formData.value }
+      
+      // Set auth info
+      canChangePassword.value = response.profile.canChangePassword ?? true
+      authProvider.value = response.profile.authProvider ?? 'Email/Password'
+      isExternalAuth.value = response.profile.isExternalAuth ?? false
+      externalAuthLastLogin.value = response.profile.externalAuthInfo?.lastLogin ?? null
     }
   } catch (err: any) {
     error(err.message || 'Failed to load profile')
@@ -359,15 +397,17 @@ onUnmounted(() => {
 })
 
 const handleSave = saveChanges(async () => {
-  // Validate password if provided
-  if (passwordData.value.new && passwordData.value.new !== passwordData.value.confirm) {
-    error('Passwords do not match')
-    throw new Error('Validation failed')
-  }
+  // Validate password if provided (only for local auth users)
+  if (canChangePassword.value && passwordData.value.new) {
+    if (passwordData.value.new !== passwordData.value.confirm) {
+      error('Passwords do not match')
+      throw new Error('Validation failed')
+    }
 
-  if (passwordData.value.new && passwordData.value.new.length < 8) {
-    error('Password must be at least 8 characters')
-    throw new Error('Validation failed')
+    if (passwordData.value.new.length < 8) {
+      error('Password must be at least 8 characters')
+      throw new Error('Validation failed')
+    }
   }
 
   try {
@@ -376,8 +416,8 @@ const handleSave = saveChanges(async () => {
     // Update profile
     await profileApi.updateProfile(formData.value)
     
-    // Change password if provided
-    if (passwordData.value.current && passwordData.value.new) {
+    // Change password if provided and allowed
+    if (canChangePassword.value && passwordData.value.current && passwordData.value.new) {
       await profileApi.changePassword(passwordData.value.current, passwordData.value.new)
       passwordData.value = { current: '', new: '', confirm: '' }
     }
