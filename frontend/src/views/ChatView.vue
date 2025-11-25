@@ -114,6 +114,7 @@ const aiConfigStore = useAiConfigStore()
 const authStore = useAuthStore()
 let streamingAbortController: AbortController | null = null
 let stopStreamingFn: (() => void) | null = null // Store EventSource close function
+let currentTrackId: number | undefined = undefined // Store current trackId for stop request
 
 // Processing status for real-time feedback
 const processingStatus = ref<string>('')
@@ -370,6 +371,8 @@ const streamAIResponse = async (userMessage: string, options?: { includeReasonin
       }
       
       const trackId = Date.now()
+      currentTrackId = trackId // Store for stop functionality
+      console.log('🎯 TrackId set for streaming:', currentTrackId)
       let fullContent = ''
       
       const includeReasoning = options?.includeReasoning ?? false
@@ -387,7 +390,9 @@ const streamAIResponse = async (userMessage: string, options?: { includeReasonin
         trackId,
         chatId,
         (data) => {
+          // CRITICAL: Check abort signal at the very beginning
           if (streamingAbortController?.signal.aborted) {
+            console.log('⏹️ Ignoring chunk - streaming aborted')
             return
           }
 
@@ -744,6 +749,12 @@ const streamAIResponse = async (userMessage: string, options?: { includeReasonin
             generateChatTitleFromFirstMessage(userMessage)
             
             historyStore.finishStreamingMessage(messageId)
+            
+            // Clean up streaming resources after successful completion
+            console.log('🧹 Cleaning up after successful stream completion')
+            streamingAbortController = null
+            stopStreamingFn = null
+            currentTrackId = undefined
           } else if (data.status === 'error') {
             const errorMsg = data.error || data.message || 'Unknown error'
             console.error('Error:', errorMsg, data)
@@ -812,6 +823,12 @@ const streamAIResponse = async (userMessage: string, options?: { includeReasonin
               historyStore.updateStreamingMessage(messageId, displayError)
               historyStore.finishStreamingMessage(messageId)
             }
+            
+            // Clean up streaming resources after error
+            console.log('🧹 Cleaning up after streaming error')
+            streamingAbortController = null
+            stopStreamingFn = null
+            currentTrackId = undefined
           } else {
             console.log('⚠️ Unknown status:', data.status, data)
           }
@@ -832,38 +849,149 @@ const streamAIResponse = async (userMessage: string, options?: { includeReasonin
       })
     }
   } catch (error) {
-    console.error('Streaming error:', error)
+    console.error('❌ Streaming error:', error)
     historyStore.updateStreamingMessage(messageId, 'Sorry, an error occurred.')
     historyStore.finishStreamingMessage(messageId)
-  } finally {
+    // Clean up on error
     streamingAbortController = null
     stopStreamingFn = null
+    currentTrackId = undefined
   }
+  // NOTE: Don't clean up in finally block! The streaming is async and still running.
+  // Cleanup happens in the 'complete' event handler or in handleStopStreaming()
 }
 
-const handleStopStreaming = () => {
-  console.log('🛑 Stop streaming requested')
+const handleStopStreaming = async () => {
+  console.log('🛑 Stop streaming requested', { 
+    hasAbortController: !!streamingAbortController, 
+    hasStopFn: !!stopStreamingFn,
+    currentTrackId,
+    typeOfTrackId: typeof currentTrackId,
+    isUndefined: currentTrackId === undefined,
+    isNull: currentTrackId === null,
+    isFalsy: !currentTrackId
+  })
   
-  // Abort the AbortController signal
+  // CRITICAL: Abort signal FIRST to prevent any further chunk processing
   if (streamingAbortController) {
     streamingAbortController.abort()
-    streamingAbortController = null
+    console.log('✅ Abort signal sent')
   }
   
-  // Close the EventSource connection
+  // Close the EventSource connection IMMEDIATELY
   if (stopStreamingFn) {
     stopStreamingFn()
+    console.log('✅ EventSource closed')
     stopStreamingFn = null
+  }
+  
+  // Notify backend to stop streaming
+  if (currentTrackId) {
+    console.log('📤 Sending stop request to backend with trackId:', currentTrackId)
+    try {
+      await chatApi.stopStream(currentTrackId)
+      console.log('✅ Backend notified to stop streaming')
+    } catch (error) {
+      console.error('❌ Failed to notify backend:', error)
+    }
+  } else {
+    console.warn('⚠️ No currentTrackId - skipping backend notification')
   }
   
   // Clear processing status
   processingStatus.value = ''
   processingMetadata.value = {}
   
-  // Finish any streaming message
+  // Finish any streaming message and add cancellation notice
   const streamingMessage = historyStore.messages.find(m => m.isStreaming)
   if (streamingMessage) {
+    const cancelMessage = t('message.cancelledByUser')
+    
+    // Collect the current content for saving to backend
+    let finalContent = ''
+    
+    // Add cancellation message if there's no content yet
+    if (streamingMessage.parts.length === 0 || 
+        (streamingMessage.parts.length === 1 && streamingMessage.parts[0].content === '')) {
+      historyStore.updateStreamingMessage(streamingMessage.id, cancelMessage)
+      finalContent = cancelMessage
+    } else {
+      // Collect existing text content
+      finalContent = streamingMessage.parts
+        .filter(p => p.type === 'text')
+        .map(p => p.content || '')
+        .join('\n\n')
+      
+      // Append cancellation notice to existing content
+      const lastPart = streamingMessage.parts[streamingMessage.parts.length - 1]
+      if (lastPart && lastPart.type === 'text') {
+        lastPart.content += `\n\n${cancelMessage}`
+      } else {
+        streamingMessage.parts.push({
+          type: 'text',
+          content: `\n\n${cancelMessage}`
+        })
+      }
+      
+      finalContent += `\n\n${cancelMessage}`
+    }
+    
     historyStore.finishStreamingMessage(streamingMessage.id)
+    console.log('✅ Streaming message finished with cancellation notice')
+    
+    // Save the cancelled message to backend so it persists after refresh
+    // IMPORTANT: Use the trackId and chatId BEFORE clearing them
+    const trackIdToSave = currentTrackId
+    const chatIdToSave = chatsStore.activeChatId
+    
+    if (trackIdToSave && chatIdToSave) {
+      console.log('📤 Saving cancelled message to backend', { trackId: trackIdToSave, chatId: chatIdToSave })
+      saveCancelledMessageToBackend(trackIdToSave, chatIdToSave, finalContent)
+        .catch(error => console.error('❌ Failed to save cancelled message to backend:', error))
+    } else {
+      console.warn('⚠️ Cannot save cancelled message - missing trackId or chatId', { trackIdToSave, chatIdToSave })
+    }
+  }
+  
+  // Clear references AFTER saving
+  streamingAbortController = null
+  currentTrackId = undefined
+}
+
+// Helper function to save cancelled message to backend
+async function saveCancelledMessageToBackend(trackId: number, chatId: number, content: string) {
+  console.log('📡 saveCancelledMessageToBackend called', { trackId, chatId, contentLength: content.length })
+  
+  try {
+    const token = localStorage.getItem('auth_token')
+    const url = `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'}/api/v1/messages/save-cancelled`
+    
+    console.log('📡 Sending request to:', url)
+    
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        trackId,
+        chatId,
+        content
+      })
+    })
+    
+    console.log('📡 Response status:', response.status)
+    
+    if (response.ok) {
+      const data = await response.json()
+      console.log('✅ Cancelled message saved to backend:', data)
+    } else {
+      const errorText = await response.text()
+      console.warn('⚠️ Failed to save cancelled message:', response.status, errorText)
+    }
+  } catch (error) {
+    console.error('❌ Error saving cancelled message:', error)
   }
 }
 

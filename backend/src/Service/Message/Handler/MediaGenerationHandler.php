@@ -103,6 +103,19 @@ class MediaGenerationHandler implements MessageHandlerInterface
             $this->logger->info('MediaGenerationHandler: Detected /vid command, forcing video generation');
         }
         
+        // Check if this is a slash command (e.g., /pic, /vid)
+        $topic = $classification['topic'] ?? null;
+        $isSlashCommand = false;
+        if ($topic === 'tools:pic') {
+            $mediaType = 'image';
+            $isSlashCommand = true;
+            $this->logger->info('MediaGenerationHandler: Detected /pic command, forcing image generation');
+        } elseif ($topic === 'tools:vid') {
+            $mediaType = 'video';
+            $isSlashCommand = true;
+            $this->logger->info('MediaGenerationHandler: Detected /vid command, forcing video generation');
+        }
+        
         // Priority: Classification override > DB default
         if (isset($classification['model_id']) && $classification['model_id']) {
             $modelId = $classification['model_id'];
@@ -125,6 +138,18 @@ class MediaGenerationHandler implements MessageHandlerInterface
                 }
             }
         } else {
+            // For slash commands, skip auto-detection and use the detected type
+            if ($isSlashCommand) {
+                if ($mediaType === 'video') {
+                    $modelId = $this->modelConfigService->getDefaultModel('TEXT2VID', $message->getUserId());
+                } else {
+                    $modelId = $this->modelConfigService->getDefaultModel('TEXT2PIC', $message->getUserId());
+                }
+                $this->logger->info('MediaGenerationHandler: Using default model for slash command', [
+                    'media_type' => $mediaType,
+                    'model_id' => $modelId
+                ]);
+            } elseif ($promptMediaType === 'video') {
             // For slash commands, skip auto-detection and use the detected type
             if ($isSlashCommand) {
                 if ($mediaType === 'video') {
