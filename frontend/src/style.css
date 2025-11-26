@@ -616,6 +616,18 @@
     border: 1px solid #DC2626;
   }
 
+  .badge-language {
+    background: #93C5FD;
+    color: #1E3A8A;
+    border: 1px solid #3B82F6;
+    font-weight: 500;
+  }
+  .dark .badge-language {
+    background: rgba(59, 130, 246, 0.3);
+    color: #BFDBFE;
+    border: 1px solid #2563EB;
+  }
+
   /* Alert/Message Boxes - Compact versions with high contrast */
   .alert-error {
     background: #FEE2E2;
