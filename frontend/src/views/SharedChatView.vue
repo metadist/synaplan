@@ -143,10 +143,10 @@
             
             <!-- Topic Badge -->
             <div v-if="message.topic" class="mt-3 flex items-center gap-2 flex-wrap">
-              <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300">
+              <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium" style="background-color: #1e40af; color: white;">
                 {{ message.topic }}
               </span>
-              <span v-if="message.language" class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 dark:bg-gray-800 txt-secondary">
+              <span v-if="message.language" class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium" style="background-color: #4b5563; color: white;">
                 {{ message.language }}
               </span>
             </div>
@@ -361,12 +361,130 @@ const formatDate = (timestamp: number): string => {
   return new Date(timestamp * 1000).toLocaleString()
 }
 
+const escapeHtml = (text: string): string => {
+  const div = document.createElement('div')
+  div.textContent = text
+  return div.innerHTML
+}
+
 const formatMessageText = (text: string): string => {
-  // Basic markdown-like formatting
+  // Handle code blocks first
+  const codeBlocks: string[] = []
+  let content = text.replace(/```(\w+)?\n([\s\S]*?)```/g, (_, lang, code) => {
+    const placeholder = `__CODEBLOCK_${codeBlocks.length}__`
+    codeBlocks.push(`<pre class="bg-black/5 dark:bg-white/5 p-3 rounded-lg overflow-x-auto my-2"><code class="text-xs font-mono">${escapeHtml(code.trim())}</code></pre>`)
+    return placeholder
+  })
+
+  // Process line by line for block-level elements
+  const lines = content.split('\n')
+  let html = ''
+  let inList = false
+  let inOrderedList = false
+  let inBlockquote = false
+
+  for (let i = 0; i < lines.length; i++) {
+    let line = lines[i]
+    const trimmed = line.trim()
+
+    // Empty line
+    if (trimmed === '') {
+      if (inList) html += '</ul>', inList = false
+      if (inOrderedList) html += '</ol>', inOrderedList = false
+      if (inBlockquote) html += '</blockquote>', inBlockquote = false
+      html += '<br>'
+      continue
+    }
+
+    // Horizontal rule
+    if (trimmed === '---' || trimmed === '***') {
+      if (inList) html += '</ul>', inList = false
+      if (inOrderedList) html += '</ol>', inOrderedList = false
+      if (inBlockquote) html += '</blockquote>', inBlockquote = false
+      html += '<hr class="my-3 border-t border-gray-300 dark:border-gray-600">'
+      continue
+    }
+
+    // Blockquote
+    if (trimmed.startsWith('> ')) {
+      if (inList) html += '</ul>', inList = false
+      if (inOrderedList) html += '</ol>', inOrderedList = false
+      if (!inBlockquote) {
+        inBlockquote = true
+        html += '<blockquote class="border-l-4 pl-3 py-1 my-2 italic rounded-r" style="border-color: #6b7280; background-color: #f3f4f6; color: #1f2937;">'
+      }
+      html += `<p class="mb-1">${formatInline(trimmed.substring(2))}</p>`
+      continue
+    } else if (inBlockquote) {
+      html += '</blockquote>'
+      inBlockquote = false
+    }
+
+    // Headers
+    const headingMatch = trimmed.match(/^(#{1,6})\s+(.*)$/)
+    if (headingMatch) {
+      if (inList) html += '</ul>', inList = false
+      if (inOrderedList) html += '</ol>', inOrderedList = false
+      const level = headingMatch[1].length
+      const headingClasses = ['text-2xl font-bold mt-4', 'text-xl font-bold mt-3', 'text-lg font-semibold mt-2', 'text-base font-semibold mt-2', 'text-sm font-semibold mt-1', 'text-sm font-medium mt-1']
+      html += `<h${level} class="${headingClasses[level - 1] || headingClasses[5]}">${formatInline(headingMatch[2])}</h${level}>`
+      continue
+    }
+
+    // Unordered list
+    if (/^[-*]\s+/.test(trimmed)) {
+      if (inOrderedList) html += '</ol>', inOrderedList = false
+      if (inBlockquote) html += '</blockquote>', inBlockquote = false
+      if (!inList) {
+        inList = true
+        html += '<ul class="list-disc pl-5 space-y-1 my-2">'
+      }
+      html += `<li>${formatInline(trimmed.replace(/^[-*]\s+/, ''))}</li>`
+      continue
+    }
+
+    // Ordered list
+    const orderedMatch = trimmed.match(/^(\d+)\.\s+(.*)$/)
+    if (orderedMatch) {
+      if (inList) html += '</ul>', inList = false
+      if (inBlockquote) html += '</blockquote>', inBlockquote = false
+      if (!inOrderedList) {
+        inOrderedList = true
+        html += '<ol class="list-decimal pl-5 space-y-1 my-2">'
+      }
+      html += `<li>${formatInline(orderedMatch[2])}</li>`
+      continue
+    }
+
+    // Regular paragraph
+    if (inList) html += '</ul>', inList = false
+    if (inOrderedList) html += '</ol>', inOrderedList = false
+    if (inBlockquote) html += '</blockquote>', inBlockquote = false
+    html += `<p class="mb-2">${formatInline(line)}</p>`
+  }
+
+  // Close any open tags
+  if (inList) html += '</ul>'
+  if (inOrderedList) html += '</ol>'
+  if (inBlockquote) html += '</blockquote>'
+
+  // Restore code blocks
+  codeBlocks.forEach((block, index) => {
+    html = html.replace(`__CODEBLOCK_${index}__`, block)
+  })
+
+  return html
+}
+
+const formatInline = (text: string): string => {
   return text
-    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-    .replace(/\*(.*?)\*/g, '<em>$1</em>')
-    .replace(/`(.*?)`/g, '<code class="px-1 py-0.5 rounded bg-black/10 dark:bg-white/10 font-mono text-sm">$1</code>')
-    .replace(/\n/g, '<br />')
+    // Links [text](url)
+    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer" class="text-blue-600 dark:text-blue-400 hover:underline">$1</a>')
+    // Inline code
+    .replace(/`([^`]+)`/g, '<code class="px-1 py-0.5 rounded bg-black/10 dark:bg-white/10 font-mono text-sm">$1</code>')
+    // Bold
+    .replace(/\*\*([^*]+)\*\*/g, '<strong class="font-semibold">$1</strong>')
+    // Italic
+    .replace(/\*([^*]+)\*/g, '<em class="italic">$1</em>')
 }
 </script>

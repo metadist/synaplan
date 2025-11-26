@@ -952,14 +952,34 @@ const renderMessageContent = (value: string): string => {
     return ''
   }
 
-  const lines = value.split(/\r?\n/)
+  // First handle code blocks
+  let content = value
+  const codeBlocks: string[] = []
+  content = content.replace(/```(\w+)?\n([\s\S]*?)```/g, (_: string, lang: string, code: string) => {
+    const language = lang || 'text'
+    const placeholder = `__CODEBLOCK_${codeBlocks.length}__`
+    codeBlocks.push(`<pre class="bg-black/5 dark:bg-white/5 p-3 rounded-lg overflow-x-auto my-2"><code class="language-${language} text-xs font-mono">${escapeHtml(code.trim())}</code></pre>`)
+    return placeholder
+  })
+
+  const lines = content.split(/\r?\n/)
   const htmlParts: string[] = []
   let inList = false
+  let inOrderedList = false
+  let inBlockquote = false
 
   const closeListIfNeeded = () => {
     if (inList) {
       htmlParts.push('</ul>')
       inList = false
+    }
+    if (inOrderedList) {
+      htmlParts.push('</ol>')
+      inOrderedList = false
+    }
+    if (inBlockquote) {
+      htmlParts.push('</blockquote>')
+      inBlockquote = false
     }
   }
 
@@ -972,6 +992,29 @@ const renderMessageContent = (value: string): string => {
       continue
     }
 
+    // Check for horizontal rule
+    if (trimmed === '---' || trimmed === '***') {
+      closeListIfNeeded()
+      htmlParts.push('<hr class="my-3 border-t border-gray-300 dark:border-gray-600" />')
+      continue
+    }
+
+    // Check for blockquote
+    if (trimmed.startsWith('> ')) {
+      if (inList) htmlParts.push('</ul>'), inList = false
+      if (inOrderedList) htmlParts.push('</ol>'), inOrderedList = false
+      if (!inBlockquote) {
+        inBlockquote = true
+        htmlParts.push('<blockquote class="border-l-4 pl-3 py-1 my-2 italic rounded-r" style="border-color: #6b7280; background-color: #f3f4f6; color: #1f2937;">')
+      }
+      const quoteContent = applyInlineFormatting(escapeHtml(trimmed.substring(2)))
+      htmlParts.push(`<p class="mb-1">${quoteContent}</p>`)
+      continue
+    } else if (inBlockquote) {
+      htmlParts.push('</blockquote>')
+      inBlockquote = false
+    }
+
     const headingMatch = trimmed.match(/^(#{1,6})\s+(.*)$/)
     if (headingMatch) {
       closeListIfNeeded()
@@ -982,7 +1025,10 @@ const renderMessageContent = (value: string): string => {
       continue
     }
 
+    // Unordered list
     if (/^[-*]\s+/.test(trimmed)) {
+      if (inOrderedList) htmlParts.push('</ol>'), inOrderedList = false
+      if (inBlockquote) htmlParts.push('</blockquote>'), inBlockquote = false
       if (!inList) {
         inList = true
         htmlParts.push('<ul class="list-disc pl-5 space-y-1 my-2">')
@@ -993,13 +1039,34 @@ const renderMessageContent = (value: string): string => {
       continue
     }
 
+    // Ordered list
+    const orderedMatch = trimmed.match(/^(\d+)\.\s+(.*)$/)
+    if (orderedMatch) {
+      if (inList) htmlParts.push('</ul>'), inList = false
+      if (inBlockquote) htmlParts.push('</blockquote>'), inBlockquote = false
+      if (!inOrderedList) {
+        inOrderedList = true
+        htmlParts.push('<ol class="list-decimal pl-5 space-y-1 my-2">')
+      }
+      const content = applyInlineFormatting(escapeHtml(orderedMatch[2]))
+      htmlParts.push(`<li>${content}</li>`)
+      continue
+    }
+
     closeListIfNeeded()
     const content = applyInlineFormatting(escapeHtml(rawLine))
     htmlParts.push(`<p class="mb-2 last:mb-0">${content}</p>`)
   }
 
   closeListIfNeeded()
-  return htmlParts.join('')
+  let result = htmlParts.join('')
+  
+  // Restore code blocks
+  codeBlocks.forEach((block, index) => {
+    result = result.replace(`__CODEBLOCK_${index}__`, block)
+  })
+  
+  return result
 }
 
 // Load session ID from localStorage on mount
