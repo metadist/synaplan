@@ -723,6 +723,26 @@
     "recommended": "Empfohlen",
     "proOnly": "PRO+"
   },
+  "widgets": {
+    "buttonIcon": "Button-Icon",
+    "customIcon": "Eigenes Icon hochladen",
+    "uploadIcon": "Eigenes Icon hochladen",
+    "changeIcon": "Icon ändern",
+    "customIconActive": "Eigenes Icon aktiv",
+    "customIconHint": "Unterstützte Formate: SVG, PNG, JPG, GIF, WebP (max 500KB)",
+    "iconTooLarge": "Icon-Datei ist zu groß. Maximale Größe ist 500KB.",
+    "invalidIconType": "Ungültiger Dateityp. Nur SVG, PNG, JPG, GIF und WebP sind erlaubt.",
+    "iconUploadSuccess": "Icon erfolgreich hochgeladen",
+    "iconUploadFailed": "Icon-Upload fehlgeschlagen",
+    "icons": {
+      "chat": "Chat",
+      "headset": "Headset",
+      "help": "Hilfe",
+      "robot": "Roboter",
+      "message": "Nachricht",
+      "support": "Support"
+    }
+  },
   "auth": {
     "login": "Anmelden",
     "register": "Registrieren",

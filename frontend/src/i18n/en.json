@@ -942,7 +942,25 @@
     "deleteSuccess": "Widget deleted successfully",
     "deleteTitle": "Delete Widget?",
     "deleteDescription": "Are you sure you want to delete \"{name}\"? This action cannot be undone.",
-    "deleteConfirm": "Delete"
+    "deleteConfirm": "Delete",
+    "buttonIcon": "Button Icon",
+    "customIcon": "Custom Icon Upload",
+    "uploadIcon": "Upload Custom Icon",
+    "changeIcon": "Change Icon",
+    "customIconActive": "Custom icon active",
+    "customIconHint": "Supported formats: SVG, PNG, JPG, GIF, WebP (max 500KB)",
+    "iconTooLarge": "Icon file is too large. Maximum size is 500KB.",
+    "invalidIconType": "Invalid file type. Only SVG, PNG, JPG, GIF, and WebP are allowed.",
+    "iconUploadSuccess": "Icon uploaded successfully",
+    "iconUploadFailed": "Icon upload failed",
+    "icons": {
+      "chat": "Chat",
+      "headset": "Headset",
+      "help": "Help",
+      "robot": "Robot",
+      "message": "Message",
+      "support": "Support"
+    }
   },
   "profile": {
     "title": "Profile Settings",

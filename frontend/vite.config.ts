@@ -4,7 +4,48 @@ import { fileURLToPath, URL } from 'node:url'
 import { resolve } from 'path'
 
 export default defineConfig(({ mode }) => {
-  // Library mode for widget bundle
+  // Widget Loader (tiny, loads on page load)
+  if (mode === 'widget-loader') {
+    return {
+      plugins: [vue()],
+      resolve: {
+        alias: {
+          '@': fileURLToPath(new URL('./src', import.meta.url))
+        }
+      },
+      define: {
+        'process.env.NODE_ENV': JSON.stringify('production')
+      },
+      build: {
+        lib: {
+          entry: resolve(__dirname, 'src/widget-loader.ts'),
+          name: 'SynaplanWidget',
+          fileName: 'widget-loader',
+          formats: ['iife']
+        },
+        rollupOptions: {
+          output: {
+            entryFileNames: 'widget-loader.js',
+            inlineDynamicImports: true
+          }
+        },
+        outDir: 'dist-widget',
+        emptyOutDir: false,
+        minify: 'terser',
+        terserOptions: {
+          compress: {
+            drop_console: true,
+            passes: 2
+          },
+          mangle: {
+            toplevel: true
+          }
+        }
+      }
+    }
+  }
+
+  // Full Widget (loads on-demand when user clicks button)
   if (mode === 'widget') {
     return {
       plugins: [vue()],
@@ -18,16 +59,19 @@ export default defineConfig(({ mode }) => {
       },
       build: {
         lib: {
-          entry: resolve(__dirname, 'src/widget.ts'),
-          name: 'SynaplanWidget',
-          fileName: 'widget',
+          entry: resolve(__dirname, 'src/widget-full.ts'),
+          name: 'SynaplanWidgetFull',
+          fileName: 'widget-full',
           formats: ['iife']
         },
         rollupOptions: {
+          external: ['vue'],
           output: {
-            entryFileNames: 'widget.js',
-            // Inline all CSS into JS for single-file widget
+            entryFileNames: 'widget-full.js',
             inlineDynamicImports: true,
+            globals: {
+              vue: 'Vue'
+            },
             assetFileNames: (assetInfo) => {
               if (assetInfo.name === 'style.css') return 'widget.css'
               return assetInfo.name || 'asset'
@@ -35,12 +79,13 @@ export default defineConfig(({ mode }) => {
           }
         },
         outDir: 'dist-widget',
-        emptyOutDir: true,
+        emptyOutDir: false,
         cssCodeSplit: false,
         minify: 'terser',
         terserOptions: {
           compress: {
-            drop_console: true
+            drop_console: true,
+            passes: 2
           }
         }
       }

@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vue-tsc -b && vite build",
-    "build:widget": "vite build --mode widget && node ./scripts/copy-widget-bundle.mjs",
+    "build:widget": "vite build --mode widget-loader && vite build --mode widget && node ./scripts/copy-widget-bundle.mjs",
     "preview": "vite preview",
     "test": "vitest",
     "test:ui": "vitest --ui",

@@ -7,7 +7,11 @@ const __dirname = path.dirname(__filename)
 
 const distDir = path.resolve(__dirname, '..', 'dist-widget')
 const targetDir = path.resolve(__dirname, '..', '..', 'backend', 'public')
-const filesToCopy = ['widget.js']
+const filesToCopy = [
+  { name: 'widget-loader.js', desc: 'Widget Loader (3.7 KB)' },
+  { name: 'widget-full.js', desc: 'Full Widget (203 KB)' },
+  { name: 'widget.js', desc: 'Legacy Widget (for backward compatibility)' }
+]
 
 async function ensureDistExists() {
   try {
@@ -33,11 +37,21 @@ async function copyBundle() {
 
   const targetAvailable = await ensureTargetAvailable()
 
-  for (const fileName of filesToCopy) {
+  for (const file of filesToCopy) {
+    const fileName = typeof file === 'string' ? file : file.name
+    const desc = typeof file === 'string' ? '' : ` - ${file.desc}`
     const source = path.join(distDir, fileName)
 
+    // Check if file exists
+    try {
+      await fs.access(source)
+    } catch {
+      console.log(`⏭️  ${fileName} not found, skipping...`)
+      continue
+    }
+
     if (!targetAvailable) {
-      console.log(`ℹ️ Build artifact ready at ${path.relative(process.cwd(), source)}`)
+      console.log(`ℹ️ Build artifact ready at ${path.relative(process.cwd(), source)}${desc}`)
       continue
     }
 
@@ -45,7 +59,7 @@ async function copyBundle() {
 
     try {
       await fs.copyFile(source, destination)
-      console.log(`✅ Copied ${fileName} → ${path.relative(process.cwd(), destination)}`)
+      console.log(`✅ Copied ${fileName}${desc} → ${path.relative(process.cwd(), destination)}`)
     } catch (error) {
       console.error(`❌ Failed to copy ${fileName}:`, error.message)
       process.exit(1)
