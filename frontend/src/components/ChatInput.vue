@@ -290,9 +290,17 @@ const commandIcon = computed(() => {
 })
 
 const canSend = computed(() => {
-  const hasMessage = message.value.trim().length > 0
+  const trimmedMessage = message.value.trim()
+  const hasMessage = trimmedMessage.length > 0
   const hasFiles = uploadedFiles.value.length > 0
   const filesReady = uploadedFiles.value.every(f => !f.processing)
+  
+  // Prevent sending if only a command is present (e.g., just "/pic" without arguments)
+  const isOnlyCommand = trimmedMessage.startsWith('/') && !trimmedMessage.includes(' ')
+  if (isOnlyCommand && !hasFiles) {
+    return false
+  }
+  
   return (hasMessage || hasFiles) && filesReady && !uploading.value
 })
 
@@ -320,12 +328,17 @@ watch(supportsReasoning, (newValue) => {
 
 watch(message, (newValue) => {
   if (newValue.startsWith('/')) {
-    paletteVisible.value = true
+    // Only show palette if no space (still typing command) or only command without args
+    const hasSpace = newValue.includes(' ')
     const parsed = parseCommand(newValue)
+    
     if (parsed) {
       activeCommand.value = parsed.command
+      // Hide palette if user has started typing arguments (command + space)
+      paletteVisible.value = !hasSpace || parsed.args.length === 0
     } else {
       activeCommand.value = null
+      paletteVisible.value = true
     }
   } else {
     paletteVisible.value = false
@@ -423,6 +436,8 @@ const handleKeyDown = (e: KeyboardEvent) => {
   if (paletteVisible.value && paletteRef.value) {
     const handled = ['ArrowUp', 'ArrowDown', 'Enter', 'Escape', 'Tab']
     if (handled.includes(e.key)) {
+      e.preventDefault()
+      e.stopPropagation()
       paletteRef.value.handleKeyDown(e)
     }
   }
