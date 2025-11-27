@@ -35,9 +35,41 @@
           <!-- Content -->
           <div class="flex-1 overflow-y-auto p-6 scroll-thin">
             <div v-if="summary" class="space-y-6">
-              <!-- Summary Text -->
+              <!-- Thinking Block (Optional) -->
+              <div v-if="parsedContent.thinking" class="surface-card rounded-lg border-2 border-light-border/20 dark:border-dark-border/10">
+                <button
+                  @click="showThinking = !showThinking"
+                  class="w-full flex items-center justify-between p-4 text-left hover:bg-black/5 dark:hover:bg-white/5 transition-colors rounded-lg"
+                >
+                  <div class="flex items-center gap-2">
+                    <svg class="w-5 h-5 txt-secondary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                    </svg>
+                    <span class="font-medium txt-primary">Thinking Process</span>
+                    <span class="text-xs txt-secondary">(AI reasoning - not included in copy)</span>
+                  </div>
+                  <component :is="showThinking ? ChevronUpIcon : ChevronDownIcon" class="w-5 h-5 txt-secondary" />
+                </button>
+                <Transition
+                  enter-active-class="transition-all duration-300 ease-out"
+                  leave-active-class="transition-all duration-200 ease-in"
+                  enter-from-class="opacity-0 max-h-0"
+                  enter-to-class="opacity-100 max-h-[500px]"
+                  leave-from-class="opacity-100 max-h-[500px]"
+                  leave-to-class="opacity-0 max-h-0"
+                >
+                  <div v-if="showThinking" class="px-4 pb-4 overflow-hidden">
+                    <div class="surface-elevated rounded-lg p-4 text-sm txt-secondary font-mono whitespace-pre-wrap leading-relaxed">{{ parsedContent.thinking }}</div>
+                  </div>
+                </Transition>
+              </div>
+
+              <!-- Summary Text (Markdown formatted) -->
               <div class="surface-elevated rounded-lg p-6">
-                <pre class="whitespace-pre-wrap font-sans text-base txt-primary leading-relaxed">{{ summary }}</pre>
+                <div 
+                  v-html="formattedSummary" 
+                  class="prose prose-sm max-w-none txt-primary leading-relaxed"
+                ></div>
               </div>
 
               <!-- Statistics -->
@@ -114,7 +146,8 @@
 </template>
 
 <script setup lang="ts">
-import { SparklesIcon, XMarkIcon } from '@heroicons/vue/24/outline'
+import { ref, computed } from 'vue'
+import { SparklesIcon, XMarkIcon, ChevronDownIcon, ChevronUpIcon } from '@heroicons/vue/24/outline'
 import { useNotification } from '@/composables/useNotification'
 import type { SummaryConfig } from '@/mocks/summaries'
 import type { SummaryMetadata } from '@/services/summaryService'
@@ -133,15 +166,180 @@ const emit = defineEmits<{
 
 const { success, error: showError } = useNotification()
 
+const showThinking = ref(false)
+
+// Parse thinking block from summary
+const parsedContent = computed(() => {
+  if (!props.summary) return { thinking: null, content: '' }
+  
+  // Extract <think>...</think> block
+  const thinkMatch = props.summary.match(/<think>([\s\S]*?)<\/think>/i)
+  
+  if (thinkMatch) {
+    const thinking = thinkMatch[1].trim()
+    const content = props.summary.replace(/<think>[\s\S]*?<\/think>/i, '').trim()
+    return { thinking, content }
+  }
+  
+  return { thinking: null, content: props.summary }
+})
+
+// Format summary content with Markdown
+function escapeHtml(text: string): string {
+  const div = document.createElement('div')
+  div.textContent = text
+  return div.innerHTML
+}
+
+function applyInlineFormatting(text: string): string {
+  return text
+    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+    .replace(/\*(.*?)\*/g, '<em>$1</em>')
+    .replace(/~~(.+?)~~/g, '<del>$1</del>')
+    .replace(/`([^`]+)`/g, '<code class="surface-chip px-1.5 py-0.5 text-sm font-mono rounded">$1</code>')
+    .replace(/\[(.+?)\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2" class="underline text-[var(--brand)]" target="_blank" rel="noopener noreferrer">$1</a>')
+}
+
+const formattedSummary = computed(() => {
+  const content = parsedContent.value.content
+  if (!content) return ''
+
+  const htmlParts: string[] = []
+  const codeBlocks: string[] = []
+  let inList = false
+  let inOrderedList = false
+  let inBlockquote = false
+
+  const closeListIfNeeded = () => {
+    if (inList) {
+      htmlParts.push('</ul>')
+      inList = false
+    }
+    if (inOrderedList) {
+      htmlParts.push('</ol>')
+      inOrderedList = false
+    }
+  }
+
+  const closeBlockquoteIfNeeded = () => {
+    if (inBlockquote) {
+      htmlParts.push('</blockquote>')
+      inBlockquote = false
+    }
+  }
+
+  // Handle code blocks first
+  let processedContent = content.replace(/```(\w+)?\n([\s\S]*?)```/g, (_, lang, code) => {
+    const language = lang || 'text'
+    const placeholder = `__CODEBLOCK_${codeBlocks.length}__`
+    codeBlocks.push(`<pre class="surface-chip p-4 overflow-x-auto my-3 rounded-lg"><code class="language-${language} text-sm">${escapeHtml(code.trim())}</code></pre>`)
+    return placeholder
+  })
+
+  const processedLines = processedContent.split(/\r?\n/)
+
+  for (const rawLine of processedLines) {
+    const trimmed = rawLine.trim()
+
+    if (trimmed === '') {
+      closeListIfNeeded()
+      closeBlockquoteIfNeeded()
+      htmlParts.push('<br>')
+      continue
+    }
+
+    // Headings
+    const headingMatch = trimmed.match(/^(#{1,6})\s+(.*)$/)
+    if (headingMatch) {
+      closeListIfNeeded()
+      closeBlockquoteIfNeeded()
+      const level = headingMatch[1].length
+      const content = applyInlineFormatting(escapeHtml(headingMatch[2]))
+      const sizeClass = level === 1 ? 'text-2xl' : level === 2 ? 'text-xl' : level === 3 ? 'text-lg' : 'text-base'
+      htmlParts.push(`<h${level} class="font-semibold ${sizeClass} mt-4 mb-2">${content}</h${level}>`)
+      continue
+    }
+
+    // Blockquotes
+    if (trimmed.startsWith('> ')) {
+      closeListIfNeeded()
+      if (!inBlockquote) {
+        inBlockquote = true
+        htmlParts.push('<blockquote style="border-left: 4px solid var(--brand); padding-left: 12px; padding-top: 4px; padding-bottom: 4px; margin-top: 8px; margin-bottom: 8px; font-style: italic; opacity: 0.8;">')
+      }
+      const quoteContent = trimmed.substring(2)
+      htmlParts.push(`<p>${applyInlineFormatting(escapeHtml(quoteContent))}</p>`)
+      continue
+    } else {
+      closeBlockquoteIfNeeded()
+    }
+
+    // Horizontal Rule
+    if (trimmed === '---' || trimmed === '***' || trimmed === '___') {
+      closeListIfNeeded()
+      closeBlockquoteIfNeeded()
+      htmlParts.push('<hr class="my-3 border-t border-light-border/30 dark:border-dark-border/20">')
+      continue
+    }
+
+    // Unordered list
+    if (/^[-*]\s+/.test(trimmed)) {
+      closeBlockquoteIfNeeded()
+      if (!inList) {
+        if (inOrderedList) {
+          htmlParts.push('</ol>')
+          inOrderedList = false
+        }
+        inList = true
+        htmlParts.push('<ul class="list-disc pl-5 space-y-1 my-2">')
+      }
+      const item = trimmed.replace(/^[-*]\s+/, '')
+      htmlParts.push(`<li>${applyInlineFormatting(escapeHtml(item))}</li>`)
+      continue
+    }
+
+    // Ordered list
+    const orderedMatch = trimmed.match(/^(\d+)\.\s+(.*)$/)
+    if (orderedMatch) {
+      closeListIfNeeded()
+      closeBlockquoteIfNeeded()
+      if (!inOrderedList) {
+        inOrderedList = true
+        htmlParts.push('<ol class="list-decimal pl-5 space-y-1 my-2">')
+      }
+      const content = applyInlineFormatting(escapeHtml(orderedMatch[2]))
+      htmlParts.push(`<li>${content}</li>`)
+      continue
+    }
+
+    closeListIfNeeded()
+    closeBlockquoteIfNeeded()
+    htmlParts.push(`<p class="mb-2 last:mb-0">${applyInlineFormatting(escapeHtml(rawLine))}</p>`)
+  }
+
+  closeListIfNeeded()
+  closeBlockquoteIfNeeded()
+  let result = htmlParts.join('')
+
+  // Restore code blocks
+  codeBlocks.forEach((block, index) => {
+    result = result.replace(`__CODEBLOCK_${index}__`, block)
+  })
+
+  return result
+})
+
 const close = () => {
   emit('close')
 }
 
 const copyToClipboard = async () => {
-  if (!props.summary) return
+  // Copy only the summary content (without thinking)
+  const contentToCopy = parsedContent.value.content
+  if (!contentToCopy) return
 
   try {
-    await navigator.clipboard.writeText(props.summary)
+    await navigator.clipboard.writeText(contentToCopy)
     success('Summary copied to clipboard!')
   } catch (err) {
     showError('Failed to copy summary')
