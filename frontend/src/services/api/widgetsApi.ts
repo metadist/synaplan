@@ -22,6 +22,8 @@ export interface WidgetConfig {
   position?: 'bottom-left' | 'bottom-right' | 'top-left' | 'top-right'
   primaryColor?: string
   iconColor?: string
+  buttonIcon?: string
+  buttonIconUrl?: string
   defaultTheme?: 'light' | 'dark'
   autoOpen?: boolean
   autoMessage?: string
@@ -386,6 +388,42 @@ export async function uploadWidgetFile(
       'X-Widget-Session': sessionId,
       ...(typeof window !== 'undefined' && window.location?.host ? { 'X-Widget-Host': window.location.host } : {})
     },
+    body: formData
+  })
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ error: 'Upload failed' }))
+    throw new Error(error.error || `HTTP ${response.status}`)
+  }
+
+  return await response.json()
+}
+
+/**
+ * Upload widget button icon
+ */
+export async function uploadWidgetIcon(
+  widgetId: string,
+  file: File
+): Promise<{
+  success: boolean
+  iconUrl: string
+  filename: string
+}> {
+  const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000'
+  const token = localStorage.getItem('auth_token')
+  
+  const formData = new FormData()
+  formData.append('icon', file)
+
+  const headers: Record<string, string> = {}
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`
+  }
+
+  const response = await fetch(`${apiUrl}/api/v1/widgets/${widgetId}/upload-icon`, {
+    method: 'POST',
+    headers,
     body: formData
   })
 

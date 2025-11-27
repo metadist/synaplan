@@ -162,6 +162,74 @@
              />
             </div>
           </div>
+
+          <!-- Button Icon Selection -->
+          <div>
+            <label class="block text-sm font-medium txt-primary mb-3">
+              {{ $t('widgets.buttonIcon') }}
+            </label>
+            
+            <!-- Predefined Icons -->
+            <div class="grid grid-cols-3 md:grid-cols-6 gap-3 mb-4">
+              <button
+                v-for="icon in predefinedIcons"
+                :key="icon.value"
+                type="button"
+                @click="selectIcon(icon.value)"
+                :class="[
+                  'p-4 rounded-lg border-2 transition-all flex flex-col items-center gap-2',
+                  formData.config.buttonIcon === icon.value && !formData.config.buttonIconUrl
+                    ? 'border-[var(--brand)] bg-[var(--brand)]/10'
+                    : 'border-light-border/30 dark:border-dark-border/20 hover:border-[var(--brand)]/50'
+                ]"
+                :title="icon.label"
+                data-testid="btn-icon"
+              >
+                <div v-html="getIconPreview(icon.value)"></div>
+                <span class="text-xs txt-secondary">{{ icon.label }}</span>
+              </button>
+            </div>
+
+            <!-- Custom Icon Upload -->
+            <div class="mt-4">
+              <label class="block text-sm font-medium txt-secondary mb-2">
+                {{ $t('widgets.customIcon') }}
+              </label>
+              <div class="flex gap-3">
+                <input
+                  ref="iconUploadInput"
+                  type="file"
+                  accept="image/svg+xml,image/png,image/jpeg,image/gif,image/webp"
+                  @change="handleIconUpload"
+                  class="hidden"
+                  data-testid="input-icon-upload"
+                />
+                <button
+                  type="button"
+                  @click="triggerIconUpload"
+                  class="flex-1 px-4 py-2 border-2 border-dashed border-light-border/30 dark:border-dark-border/20 rounded-lg hover:border-[var(--brand)]/50 transition-colors txt-secondary hover:txt-primary flex items-center justify-center gap-2"
+                  data-testid="btn-upload-icon"
+                >
+                  <Icon icon="heroicons:arrow-up-tray" class="w-5 h-5" />
+                  {{ formData.config.buttonIconUrl ? $t('widgets.changeIcon') : $t('widgets.uploadIcon') }}
+                </button>
+                <button
+                  v-if="formData.config.buttonIconUrl"
+                  type="button"
+                  @click="removeCustomIcon"
+                  class="px-4 py-2 bg-red-500/10 text-red-600 dark:text-red-400 rounded-lg hover:bg-red-500/20 transition-colors"
+                  data-testid="btn-remove-icon"
+                >
+                  <Icon icon="heroicons:trash" class="w-5 h-5" />
+                </button>
+              </div>
+              <div v-if="formData.config.buttonIconUrl" class="mt-3 p-3 bg-green-500/10 rounded-lg flex items-center gap-3">
+                <img :src="formData.config.buttonIconUrl" alt="Custom Icon" class="w-10 h-10 object-contain" />
+                <span class="text-sm text-green-700 dark:text-green-400">{{ $t('widgets.customIconActive') }}</span>
+              </div>
+              <p class="text-xs txt-secondary mt-2">{{ $t('widgets.customIconHint') }}</p>
+            </div>
+          </div>
         </div>
 
         <!-- Behavior Settings -->
@@ -378,6 +446,7 @@ import type { Widget, WidgetConfig } from '@/services/api/widgetsApi'
 import { promptsApi } from '@/services/api/promptsApi'
 import * as widgetsApi from '@/services/api/widgetsApi'
 import { useI18n } from 'vue-i18n'
+import { useNotification } from '@/composables/useNotification'
 
 interface Props {
   widget?: Widget | null
@@ -394,6 +463,7 @@ const isEdit = computed(() => !!props.widget)
 
 const taskPrompts = ref<any[]>([])
 const { t } = useI18n()
+const { error, success } = useNotification()
 
 const MAX_ALLOWED_DOMAINS = 20
 const newAllowedDomain = ref('')
@@ -476,11 +546,175 @@ watch(newAllowedDomain, () => {
   }
 })
 
+// Icon Selection
+const iconUploadInput = ref<HTMLInputElement | null>(null)
+
+const predefinedIcons = [
+  { value: 'chat', label: t('widgets.icons.chat') },
+  { value: 'headset', label: t('widgets.icons.headset') },
+  { value: 'help', label: t('widgets.icons.help') },
+  { value: 'robot', label: t('widgets.icons.robot') },
+  { value: 'message', label: t('widgets.icons.message') },
+  { value: 'support', label: t('widgets.icons.support') }
+]
+
+const getIconPreview = (iconType: string): string => {
+  const iconColor = formData.value.config.iconColor || '#ffffff'
+  const icons: Record<string, string> = {
+    chat: `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="${iconColor}" stroke-width="2">
+      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+    </svg>`,
+    headset: `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="${iconColor}" stroke-width="2">
+      <path d="M3 18v-6a9 9 0 0 1 18 0v6"></path>
+      <path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"></path>
+    </svg>`,
+    help: `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="${iconColor}" stroke-width="2">
+      <circle cx="12" cy="12" r="10"></circle>
+      <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+      <line x1="12" y1="17" x2="12.01" y2="17"></line>
+    </svg>`,
+    robot: `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="${iconColor}" stroke-width="2">
+      <rect x="3" y="11" width="18" height="10" rx="2"></rect>
+      <circle cx="12" cy="5" r="2"></circle>
+      <path d="M12 7v4"></path>
+      <line x1="8" y1="16" x2="8" y2="16"></line>
+      <line x1="16" y1="16" x2="16" y2="16"></line>
+    </svg>`,
+    message: `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="${iconColor}" stroke-width="2">
+      <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path>
+    </svg>`,
+    support: `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="${iconColor}" stroke-width="2">
+      <circle cx="12" cy="12" r="10"></circle>
+      <path d="M12 16v-4"></path>
+      <path d="M12 8h.01"></path>
+    </svg>`
+  }
+  return icons[iconType] || icons.chat
+}
+
+const selectIcon = async (iconValue: string) => {
+  formData.value.config.buttonIcon = iconValue
+  formData.value.config.buttonIconUrl = undefined
+
+  // If editing existing widget, update backend immediately
+  if (isEdit.value && props.widget?.widgetId) {
+    try {
+      await widgetsApi.updateWidget(props.widget.widgetId, {
+        config: {
+          ...formData.value.config,
+          buttonIcon: iconValue,
+          buttonIconUrl: null
+        }
+      })
+    } catch (err: any) {
+      console.error('Failed to update icon:', err)
+      error('Failed to update icon')
+    }
+  }
+}
+
+const triggerIconUpload = () => {
+  iconUploadInput.value?.click()
+}
+
+const handleIconUpload = async (event: Event) => {
+  const target = event.target as HTMLInputElement
+  const file = target.files?.[0]
+  
+  if (!file) return
+
+  // Validate file size (max 500KB)
+  if (file.size > 500 * 1024) {
+    error(t('widgets.iconTooLarge'))
+    target.value = ''
+    return
+  }
+
+  // Validate file type
+  const validTypes = ['image/svg+xml', 'image/png', 'image/jpeg', 'image/gif', 'image/webp']
+  if (!validTypes.includes(file.type)) {
+    error(t('widgets.invalidIconType'))
+    target.value = ''
+    return
+  }
+
+  // Need widgetId for upload - only allow upload when editing
+  if (!isEdit.value || !props.widget?.widgetId) {
+    error('Please save the widget first before uploading a custom icon')
+    target.value = ''
+    return
+  }
+
+  try {
+    // Upload icon using widget icon upload API
+    const uploadResult = await widgetsApi.uploadWidgetIcon(props.widget.widgetId, file)
+    
+    if (uploadResult.success) {
+      formData.value.config.buttonIconUrl = uploadResult.iconUrl
+      formData.value.config.buttonIcon = 'custom'
+      
+      // Update widget config in backend without closing modal
+      await widgetsApi.updateWidget(props.widget.widgetId, {
+        config: {
+          ...formData.value.config,
+          buttonIconUrl: uploadResult.iconUrl,
+          buttonIcon: 'custom'
+        }
+      })
+      
+      success(t('widgets.iconUploadSuccess') || 'Icon uploaded successfully')
+    } else {
+      error(t('widgets.iconUploadFailed') || 'Icon upload failed')
+    }
+  } catch (err: any) {
+    console.error('Icon upload error:', err)
+    error(err?.message || t('widgets.iconUploadFailed') || 'Icon upload failed')
+  } finally {
+    // Reset input
+    target.value = ''
+  }
+}
+
+const removeCustomIcon = async () => {
+  if (!isEdit.value || !props.widget?.widgetId) {
+    // Only clear locally if creating new widget
+    formData.value.config.buttonIconUrl = undefined
+    formData.value.config.buttonIcon = 'chat'
+    if (iconUploadInput.value) {
+      iconUploadInput.value.value = ''
+    }
+    return
+  }
+
+  try {
+    // Update backend to remove custom icon
+    await widgetsApi.updateWidget(props.widget.widgetId, {
+      config: {
+        ...formData.value.config,
+        buttonIconUrl: null,
+        buttonIcon: 'chat'
+      }
+    })
+
+    // Update local state
+    formData.value.config.buttonIconUrl = undefined
+    formData.value.config.buttonIcon = 'chat'
+    if (iconUploadInput.value) {
+      iconUploadInput.value.value = ''
+    }
+
+    success('Custom icon removed successfully')
+  } catch (err: any) {
+    console.error('Failed to remove custom icon:', err)
+    error('Failed to remove custom icon')
+  }
+}
+
 const formData = ref<{
   name: string
   taskPromptTopic: string
   status: 'active' | 'inactive'
-  config: WidgetEditorConfig
+  config: WidgetEditorConfig & { buttonIcon?: string; buttonIconUrl?: string }
 }>({
   name: '',
   taskPromptTopic: '',
@@ -489,6 +723,7 @@ const formData = ref<{
     position: 'bottom-right',
     primaryColor: '#007bff',
     iconColor: '#ffffff',
+    buttonIcon: 'chat',
     defaultTheme: 'light',
     autoOpen: false,
     autoMessage: 'Hello! How can I help you today?',
@@ -538,6 +773,8 @@ const applyWidgetToForm = (widget?: Widget | null) => {
       position: config.position || 'bottom-right',
       primaryColor: config.primaryColor || '#007bff',
       iconColor: config.iconColor || '#ffffff',
+      buttonIcon: config.buttonIcon || 'chat',
+      buttonIconUrl: config.buttonIconUrl,
       defaultTheme: config.defaultTheme || 'light',
       autoOpen: config.autoOpen || false,
       autoMessage: config.autoMessage || 'Hello! How can I help you today?',

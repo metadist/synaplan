@@ -2,6 +2,8 @@
 export {};
 
 ; declare global {
+	var __VLS_PROPS_FALLBACK: Record<string, unknown>;
+
 	const __VLS_directiveBindingRestFields: { instance: null, oldValue: null, modifiers: any, dir: any };
 	const __VLS_unref: typeof import('vue').unref;
 	const __VLS_placeholder: any;
@@ -35,7 +37,7 @@ export {};
 			attrs?: any;
 			slots?: T extends { $slots: infer Slots } ? Slots : Record<string, any>;
 			emit?: T extends { $emit: infer Emit } ? Emit : {};
-			props?: (T extends { $props: infer Props } ? Props : {}) & Record<string, unknown>;
+			props?: typeof props;
 			expose?: (exposed: T) => void;
 		};
 	};
