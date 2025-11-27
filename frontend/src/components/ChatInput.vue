@@ -1,8 +1,8 @@
 <template>
   <div class="sticky bottom-0 bg-chat-input-area pb-[env(safe-area-inset-bottom)]" data-testid="comp-chat-input">
     <div class="max-w-4xl mx-auto px-4 py-4">
-      <!-- Active Tools and Command Display (above input) -->
-      <div v-if="activeTools.length > 0 || activeCommand || uploadedFiles.length > 0" class="mb-3 flex flex-wrap gap-2">
+      <!-- Active Command and File Display (above input) -->
+      <div v-if="activeCommand || uploadedFiles.length > 0" class="mb-3 flex flex-wrap gap-2">
         <!-- Uploaded Files -->
         <div
           v-for="(file, index) in uploadedFiles"
@@ -20,24 +20,6 @@
             class="icon-ghost p-0 min-w-0 w-auto h-auto"
             aria-label="Remove file"
             :disabled="file.processing"
-          >
-            <XMarkIcon class="w-4 h-4" />
-          </button>
-        </div>
-
-        <!-- Active Tools -->
-        <div 
-          v-for="tool in activeTools" 
-          :key="'tool-' + tool.id"
-          class="pill pill--active text-xs flex items-center gap-2"
-        >
-          <Icon :icon="tool.icon" class="w-4 h-4" />
-          <span class="font-medium">{{ tool.name }}</span>
-          <button
-            @click="removeTool(tool.id)"
-            type="button"
-            class="hover:opacity-75 transition-opacity"
-            :aria-label="$t('chatInput.removeTool')"
           >
             <XMarkIcon class="w-4 h-4" />
           </button>
@@ -161,9 +143,7 @@
       <!-- Main controls - always visible below input -->
       <div class="mt-3 flex items-center gap-2" data-testid="section-chat-secondary-actions">
         <ToolsDropdown 
-          :active-tools="activeTools" 
-          @select="toggleTool" 
-          @remove="removeTool"
+          :active-command="activeCommand"
           @insert-command="handleInsertCommand"
           class="flex-shrink-0"
         />
@@ -226,12 +206,6 @@ import { chatApi } from '@/services/api/chatApi'
 import type { FileItem } from '@/services/filesService'
 import { AudioRecorder } from '@/services/audioRecorder'
 
-interface Tool {
-  id: string
-  name: string
-  icon: string
-}
-
 interface UploadedFile {
   file_id: number
   filename: string
@@ -260,7 +234,6 @@ const paletteRef = ref<InstanceType<typeof CommandPalette> | null>(null)
 const textareaRef = ref<InstanceType<typeof Textarea> | null>(null)
 const fileInputRef = ref<HTMLInputElement | null>(null)
 const activeCommand = ref<string | null>(null)
-const activeTools = ref<Tool[]>([])
 const isDragging = ref(false)
 const isFocused = ref(false)
 const isMobile = ref(window.innerWidth < 768)
@@ -366,14 +339,18 @@ const sendMessage = () => {
   }
 
   if (canSend.value) {
-    const hasWebSearch = activeTools.value.some(t => t.id === 'web-search')
+    const hasWebSearch = activeCommand.value === 'search'
+    
+    // Send the full message with command to backend (it needs it for /pic and /vid)
+    // The UI cleanup will happen in ChatView before adding to history
+    const messageToSend = message.value
     
     const options = {
       includeReasoning: thinkingEnabled.value,
       webSearch: hasWebSearch,
       fileIds: uploadedFiles.value.filter(f => !f.processing).map(f => f.file_id)
     }
-    emit('send', message.value, options)
+    emit('send', messageToSend, options)
     message.value = ''
     uploadedFiles.value = []
     paletteVisible.value = false
@@ -643,33 +620,6 @@ const getFileIcon = (fileType: string): string => {
   return 'mdi:file'
 }
 
-const toggleTool = (toolId: string) => {
-  const existingIndex = activeTools.value.findIndex(t => t.id === toolId)
-  
-  if (existingIndex >= 0) {
-    // Tool is active, remove it
-    activeTools.value.splice(existingIndex, 1)
-  } else {
-    // Tool is not active, add it
-    const toolDefinitions: Record<string, Tool> = {
-      'web-search': { id: 'web-search', name: 'Web Search', icon: 'mdi:web' },
-      'image-gen': { id: 'image-gen', name: 'Image Generation', icon: 'mdi:image' },
-      'code-interpreter': { id: 'code-interpreter', name: 'Code', icon: 'mdi:code-braces' },
-    }
-    
-    const tool = toolDefinitions[toolId]
-    if (tool) {
-      activeTools.value.push(tool)
-    }
-  }
-}
-
-const removeTool = (toolId: string) => {
-  const index = activeTools.value.findIndex(t => t.id === toolId)
-  if (index >= 0) {
-    activeTools.value.splice(index, 1)
-  }
-}
 
 const updateIsMobile = () => {
   isMobile.value = window.innerWidth < 768

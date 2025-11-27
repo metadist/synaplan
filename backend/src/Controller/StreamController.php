@@ -1293,7 +1293,9 @@ class StreamController extends AbstractController
                 'messageId' => $outgoingMessage->getId(),
                 'topic' => $outgoingMessage->getTopic(),
                 'provider' => $chatProvider,
-                'model' => $chatModel
+                'model' => $chatModel,
+                'incomingMessageId' => $incomingMessage->getId(),
+                'incomingTopic' => $incomingMessage->getTopic()
             ]);
 
         } catch (\Exception $e) {

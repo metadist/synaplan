@@ -51,6 +51,7 @@
               :search-results="message.searchResults"
               :ai-models="message.aiModels"
               :web-search="message.webSearch"
+              :tool="message.tool"
               @regenerate="handleRegenerate(message, $event)"
               @again="handleAgain"
             />
@@ -316,21 +317,55 @@ const handleSendMessage = async (content: string, options?: { includeReasoning?:
   // Prepare webSearch metadata for user message
   const webSearchData = options?.webSearch ? { enabled: true } : null
 
-  // Add user message with files and webSearch info
+  // Prepare tool metadata based on command in message
+  // Also extract the clean content without command prefix for display
+  let toolData: { command: string; label: string; icon: string } | null = null
+  let displayContent = content
+  let backendContent = content // Content to send to backend
+  
+  if (content.startsWith('/')) {
+    const commandMatch = content.match(/^\/(\w+)\s+(.*)$/)
+    if (commandMatch) {
+      const cmd = commandMatch[1]
+      const args = commandMatch[2] || ''
+      
+      const toolMap: Record<string, { label: string; icon: string }> = {
+        'search': { label: 'Web Search', icon: 'mdi:web' },
+        'pic': { label: 'Image Generation', icon: 'mdi:image' },
+        'vid': { label: 'Video Generation', icon: 'mdi:video' }
+      }
+      
+      if (toolMap[cmd]) {
+        toolData = { command: cmd, ...toolMap[cmd] }
+        // Remove command prefix from display content
+        displayContent = args.trim()
+        
+        // For /search, send only the query to backend (we use webSearch flag)
+        // For /pic and /vid, keep the full command (backend needs it for routing)
+        if (cmd === 'search') {
+          backendContent = args.trim()
+        }
+      }
+    }
+  }
+
+  // Add user message with files, webSearch, and tool info
+  // Use displayContent (without command) for the message text shown in UI
   historyStore.addMessage(
     'user', 
-    [{ type: 'text', content }], 
+    [{ type: 'text', content: displayContent }], 
     files, 
     undefined, // provider 
     undefined, // modelLabel
     undefined, // againData
     undefined, // backendMessageId
     undefined, // originalMessageId
-    webSearchData // webSearch
+    webSearchData, // webSearch
+    toolData // tool
   )
 
-  // Stream all messages (including commands) directly to backend
-    await streamAIResponse(content, options)
+  // Stream to backend - use backendContent which may differ from displayContent
+  await streamAIResponse(backendContent, options)
 }
 
 const streamAIResponse = async (userMessage: string, options?: { includeReasoning?: boolean; webSearch?: boolean; modelId?: number; fileIds?: number[] }) => {
@@ -1036,6 +1071,57 @@ async function saveCancelledMessageToBackend(
           model: data.model,
           aiModels: message.aiModels
         })
+      }
+      
+      // ALSO: Update the user message with tool metadata if it's a command
+      // Find the last user message before the current streaming message (which is the one that triggered this response)
+      const messages = historyStore.messages
+      const currentIndex = messages.findIndex(m => m.id === messageId)
+      let userMessage: any = null
+      
+      // Search backwards from current message to find the most recent user message
+      if (currentIndex >= 0) {
+        for (let i = currentIndex - 1; i >= 0; i--) {
+          if (messages[i].role === 'user') {
+            userMessage = messages[i]
+            break
+          }
+        }
+      }
+      
+      if (userMessage && data.incomingMessageId && data.incomingTopic) {
+        userMessage.backendMessageId = data.incomingMessageId
+        userMessage.topic = data.incomingTopic
+        
+        // Reconstruct tool metadata from topic if it's a tool command
+        if (data.incomingTopic.startsWith('tools:')) {
+          const cmd = data.incomingTopic.replace('tools:', '')
+          const toolMap: Record<string, { label: string; icon: string }> = {
+            'search': { label: 'Web Search', icon: 'mdi:web' },
+            'pic': { label: 'Image Generation', icon: 'mdi:image' },
+            'vid': { label: 'Video Generation', icon: 'mdi:video' }
+          }
+          
+          if (toolMap[cmd]) {
+            userMessage.tool = { command: cmd, ...toolMap[cmd] }
+            
+            // Also ensure command prefix is removed from display
+            if (userMessage.parts.length > 0 && userMessage.parts[0].type === 'text' && userMessage.parts[0].content) {
+              const content = userMessage.parts[0].content
+              const commandMatch = content.match(/^\/(\w+)\s+(.*)$/)
+              if (commandMatch && commandMatch[1] === cmd) {
+                userMessage.parts[0] = { ...userMessage.parts[0], content: commandMatch[2].trim() }
+              }
+            }
+            
+            console.log('✅ Reconstructed tool metadata for user message:', {
+              command: cmd,
+              tool: userMessage.tool,
+              content: userMessage.parts[0]?.content,
+              originalContent: content
+            })
+          }
+        }
       }
     } else {
       const errorText = await response.text()

@@ -136,8 +136,8 @@
       
         <!-- Bubble content (only non-thinking parts) -->
         <div class="px-4 py-3 overflow-hidden space-y-3">
-          <!-- Combined Badges: Files + Web Search (NEW) -->
-          <div v-if="(files && files.length > 0) || webSearch" class="space-y-2">
+          <!-- Combined Badges: Files + Web Search + Tool (NEW) -->
+          <div v-if="(files && files.length > 0) || webSearch || tool" class="space-y-2">
             <!-- Show badges with smart collapsing -->
             <div class="flex flex-wrap gap-2">
               <!-- Files (show based on collapse state) -->
@@ -154,8 +154,14 @@
                 </div>
               </template>
 
-              <!-- Web Search Badge -->
-              <div v-if="webSearch" class="flex items-center gap-2 px-3 py-2 rounded-lg bg-[var(--brand-alpha-light)] text-[var(--brand)] text-sm">
+              <!-- Tool Badge (replaces Web Search Badge for better consistency) -->
+              <div v-if="tool" class="flex items-center gap-2 px-3 py-2 rounded-lg bg-[var(--brand-alpha-light)] text-[var(--brand)] text-sm">
+                <Icon :icon="tool.icon" class="w-4 h-4 flex-shrink-0" />
+                <span class="font-medium">{{ tool.label }}</span>
+              </div>
+              
+              <!-- Web Search Badge (fallback for legacy messages without tool metadata) -->
+              <div v-else-if="webSearch" class="flex items-center gap-2 px-3 py-2 rounded-lg bg-[var(--brand-alpha-light)] text-[var(--brand)] text-sm">
                 <Icon icon="mdi:web" class="w-4 h-4 flex-shrink-0" />
                 <span class="font-medium">Web Search</span>
                 <span v-if="webSearch.query && showAllBadges" class="text-xs opacity-80 hidden sm:inline truncate max-w-[150px]">· {{ webSearch.query }}</span>
@@ -171,7 +177,7 @@
                 class="flex items-center gap-1 px-3 py-2 rounded-lg bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 transition-colors text-sm txt-secondary font-medium"
                 data-testid="btn-message-badges-toggle"
               >
-                <span v-if="!showAllBadges">+{{ totalBadgesCount - (webSearch ? 3 : 2) }}</span>
+                <span v-if="!showAllBadges">+{{ totalBadgesCount - ((tool || webSearch) ? 3 : 2) }}</span>
                 <Icon :icon="showAllBadges ? 'mdi:chevron-up' : 'mdi:chevron-down'" class="w-4 h-4" />
               </button>
             </div>
@@ -551,6 +557,11 @@ interface Props {
     query?: string
     resultsCount?: number
   } | null // Web search metadata
+  tool?: {
+    command: string // The command name (e.g., 'search', 'pic', 'vid')
+    label: string // Display label (e.g., 'Web Search', 'Image Generation', 'Video Generation')
+    icon: string // Icon identifier
+  } | null // Tool/command metadata
 }
 
 interface ModelOption {
@@ -572,11 +583,11 @@ const carouselPage = ref(0) // Which "page" we're on (0-based)
 const highlightedSource = ref<number | null>(null)
 const sourceRefs = ref<any[]>([])
 
-// Calculate total badges count (files + webSearch)
+// Calculate total badges count (files + webSearch/tool)
 const totalBadgesCount = computed(() => {
   let count = 0
   if (props.files) count += props.files.length
-  if (props.webSearch) count += 1
+  if (props.tool || props.webSearch) count += 1
   return count
 })
 

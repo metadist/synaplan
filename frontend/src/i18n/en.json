@@ -111,8 +111,8 @@
       "webSearchDesc": "Search the internet",
       "imageGen": "Image Generation",
       "imageGenDesc": "Create images from text",
-      "codeInterpreter": "Code Interpreter",
-      "codeInterpreterDesc": "Execute code and analyze data"
+      "videoGen": "Video Generation",
+      "videoGenDesc": "Generate videos from text"
     },
     "removeTool": "Remove tool"
   },

@@ -84,6 +84,11 @@ export interface Message {
     query?: string
     resultsCount?: number
   } | null // Web search metadata
+  tool?: {
+    command: string // The command name (e.g., 'search', 'pic', 'vid')
+    label: string // Display label (e.g., 'Web Search', 'Image Generation', 'Video Generation')
+    icon: string // Icon identifier
+  } | null // Tool/command metadata
 }
 
 /**
@@ -174,7 +179,8 @@ export const useHistoryStore = defineStore('history', () => {
     againData?: AgainData,
     backendMessageId?: number,
     originalMessageId?: number,
-    webSearch?: { enabled?: boolean; query?: string; resultsCount?: number } | null
+    webSearch?: { enabled?: boolean; query?: string; resultsCount?: number } | null,
+    tool?: { command: string; label: string; icon: string } | null
   ) => {
     messages.value.push({
       id: crypto.randomUUID(),
@@ -187,7 +193,8 @@ export const useHistoryStore = defineStore('history', () => {
       againData,
       backendMessageId,
       originalMessageId,
-      webSearch
+      webSearch,
+      tool
     })
   }
 
@@ -311,6 +318,31 @@ export const useHistoryStore = defineStore('history', () => {
             })))
           }
           
+          // Reconstruct tool metadata from topic field for user messages
+          // Also clean command prefix from message content
+          let toolData: { command: string; label: string; icon: string } | null = null
+          if (role === 'user' && m.topic && m.topic.startsWith('tools:')) {
+            const cmd = m.topic.replace('tools:', '')
+            const toolMap: Record<string, { label: string; icon: string }> = {
+              'search': { label: 'Web Search', icon: 'mdi:web' },
+              'pic': { label: 'Image Generation', icon: 'mdi:image' },
+              'vid': { label: 'Video Generation', icon: 'mdi:video' }
+            }
+            if (toolMap[cmd]) {
+              toolData = { command: cmd, ...toolMap[cmd] }
+              
+              // Remove command prefix from parts content if present
+              if (parts.length > 0 && parts[0].type === 'text' && parts[0].content) {
+                const content = parts[0].content
+                const commandMatch = content.match(/^\/(\w+)\s+(.*)$/)
+                if (commandMatch && commandMatch[1] === cmd) {
+                  // Remove the command prefix from display
+                  parts[0] = { ...parts[0], content: commandMatch[2].trim() }
+                }
+              }
+            }
+          }
+          
           return {
             id: `backend-${m.id}`,
             role,
@@ -323,7 +355,8 @@ export const useHistoryStore = defineStore('history', () => {
             files: files.length > 0 ? files : undefined,
             aiModels: m.aiModels || null, // Parse AI model metadata from backend
             webSearch: m.webSearch || null, // Parse web search metadata from backend
-            searchResults: m.searchResults || null // Parse actual search results from backend
+            searchResults: m.searchResults || null, // Parse actual search results from backend
+            tool: toolData // Reconstruct tool metadata from topic
           }
         })
         
