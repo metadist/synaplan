@@ -214,6 +214,60 @@
     "saveChanges": "Änderungen speichern",
     "cancel": "Abbrechen"
   },
+  "summary": {
+    "title": "Zusammenfassungskonfiguration",
+    "description": "Dies erstellt einen Prompt für das konfigurierte KI-Modell, um den übermittelten Text zusammenzufassen.",
+    "summaryType": "Zusammenfassungstyp:",
+    "summaryTypeHelp": "Art der zu generierenden Zusammenfassung",
+    "length": "Länge:",
+    "lengthHelp": "Gewünschte Länge der Zusammenfassung",
+    "customLength": "Benutzerdefinierte Länge:",
+    "customLengthHelp": "Anzahl der Wörter (50-2000)",
+    "outputLanguage": "Ausgabesprache:",
+    "outputLanguageHelp": "Sprache für die Zusammenfassung",
+    "focusAreas": "Schwerpunktbereiche:",
+    "focusAreasHelp": "Wähle worauf in der Zusammenfassung fokussiert werden soll",
+    "documentInput": "Dokumenteingabe",
+    "inputMethod": "Eingabemethode:",
+    "textInput": "Texteingabe",
+    "documentText": "Dokumenttext:",
+    "documentTextPlaceholder": "Füge deinen Dokumenttext hier ein...",
+    "charactersCount": "{count} Zeichen | {words} Wörter | {tokens} geschätzte Tokens",
+    "generateSummary": "Zusammenfassung generieren",
+    "generating": "Generiere...",
+    "showSummary": "Zusammenfassung anzeigen",
+    "regenerateSummary": "Zusammenfassung neu generieren",
+    "usingModel": "Verwendetes KI-Modell",
+    "loadingModel": "Lädt...",
+    "clearForm": "Formular zurücksetzen",
+    "processingNote": "Die Verarbeitung großer Dokumente kann mehrere Minuten dauern. Bitte habe Geduld.",
+    "quickPresets": "Schnelle Voreinstellungen",
+    "presets": {
+      "invoice": {
+        "title": "Rechnung",
+        "desc": "Optimiert für Finanzdokumente"
+      },
+      "contract": {
+        "title": "Vertrag",
+        "desc": "Fokus auf Bedingungen und Konditionen"
+      },
+      "generic": {
+        "title": "Allgemein",
+        "desc": "Ausgewogen für alle Dokumenttypen"
+      }
+    },
+    "dragDropTitle": "Datei hier ablegen oder klicken zum Durchsuchen",
+    "dragDropDesc": "Lade ein Dokument hoch, um dessen Inhalt zu extrahieren und zusammenzufassen",
+    "supportedFormats": "Unterstützte Formate",
+    "maxSize": "Max. Größe",
+    "orPasteText": "oder Text direkt einfügen",
+    "uploadingFile": "Lade hoch und extrahiere Text...",
+    "uploadingFileDesc": "Bitte warte, während wir deine Datei verarbeiten",
+    "selectFromExisting": "Aus bereits hochgeladenen Dateien auswählen",
+    "fileUploadSuccess": "Datei \"{filename}\" erfolgreich hochgeladen und Text extrahiert!",
+    "fileExtractionFailed": "Datei hochgeladen, aber kein Text konnte extrahiert werden.",
+    "fileUploadFailed": "Fehler beim Hochladen der Datei. Bitte versuche es erneut."
+  },
   "processing": {
     "started": "Starte Verarbeitung...",
     "startedTitle": "Verarbeite deine Nachricht",
