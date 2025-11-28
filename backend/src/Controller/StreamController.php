@@ -1198,6 +1198,9 @@ class StreamController extends AbstractController
         $trackId = $data['trackId'] ?? null;
         $chatId = $data['chatId'] ?? null;
         $content = $data['content'] ?? '';
+        $provider = $data['provider'] ?? null;
+        $model = $data['model'] ?? null;
+        $topic = $data['topic'] ?? null;
 
         if (!$trackId || !$chatId) {
             return $this->json(['error' => 'Missing trackId or chatId'], Response::HTTP_BAD_REQUEST);
@@ -1247,6 +1250,32 @@ class StreamController extends AbstractController
             // Store metadata indicating it was cancelled
             $outgoingMessage->setMeta('cancelled', 'true');
             $outgoingMessage->setMeta('cancelled_at', date('Y-m-d H:i:s'));
+            
+            // Use metadata from request (set during streaming) or fall back to incoming message
+            $chatProvider = $provider ?? $incomingMessage->getMeta('ai_chat_provider');
+            $chatModel = $model ?? $incomingMessage->getMeta('ai_chat_model');
+            $sortingProvider = $incomingMessage->getMeta('ai_sorting_provider');
+            $sortingModel = $incomingMessage->getMeta('ai_sorting_model');
+            
+            // Store model metadata if available
+            if ($chatProvider) {
+                $outgoingMessage->setMeta('ai_chat_provider', $chatProvider);
+            }
+            if ($chatModel) {
+                $outgoingMessage->setMeta('ai_chat_model', $chatModel);
+            }
+            if ($sortingProvider) {
+                $outgoingMessage->setMeta('ai_sorting_provider', $sortingProvider);
+            }
+            if ($sortingModel) {
+                $outgoingMessage->setMeta('ai_sorting_model', $sortingModel);
+            }
+            
+            // Update topic if provided from frontend
+            if ($topic) {
+                $outgoingMessage->setTopic($topic);
+            }
+            
             $this->em->flush();
 
             // Update incoming message status
@@ -1261,7 +1290,10 @@ class StreamController extends AbstractController
 
             return $this->json([
                 'success' => true,
-                'messageId' => $outgoingMessage->getId()
+                'messageId' => $outgoingMessage->getId(),
+                'topic' => $outgoingMessage->getTopic(),
+                'provider' => $chatProvider,
+                'model' => $chatModel
             ]);
 
         } catch (\Exception $e) {

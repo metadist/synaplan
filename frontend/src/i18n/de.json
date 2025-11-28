@@ -330,6 +330,8 @@
       "description": "Verwalten Sie Ihre Prompts",
       "subtitle": "Verwalten und anpassen von KI-Prompts für verschiedene Aufgaben",
       "selectPrompt": "Prompt auswählen",
+      "selectPromptTitle": "Prompt auswählen",
+      "selectPromptDescription": "Wählen Sie einen vorhandenen Prompt zum Anzeigen oder Bearbeiten",
       "promptDetails": "Prompt-Details",
       "rulesForSelection": "Auswahlregeln",
       "aiModel": "KI-Modell",

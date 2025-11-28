@@ -71,10 +71,12 @@ async function httpClient<T>(endpoint: string, options: HttpClientOptions = {}):
       historyStore.clear()
       chatsStore.$reset()
       
-      // Redirect to login
+      // Redirect to login (this will navigate away from the current page)
       window.location.href = '/login?reason=session_expired'
       
-      throw new Error('Session expired. Please login again.')
+      // Return a never-resolving promise to prevent further execution
+      // This avoids error logs in console after redirect
+      return new Promise(() => {}) as Promise<T>
     }
     
     let errorMessage = `HTTP ${response.status}: ${response.statusText}`
