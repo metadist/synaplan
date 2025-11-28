@@ -6,10 +6,11 @@ const PROMPT = 'Ai, this is a smoke test. Answer with "success" add nothing else
 
 test('@smoke Standard model generates valid answer "success" id=003', async ({ page }) => {
 
-  await login;
+  await login(page);
 
   await page.locator(selectors.nav.newChatButton).waitFor({ state: 'visible' });
   await page.click(selectors.nav.newChatButton);
+  await page.waitForTimeout(2000);
   await page.fill(selectors.chat.textInput, PROMPT);
   await page.click(selectors.chat.sendBtn);
 
@@ -24,11 +25,15 @@ test('@smoke Standard model generates valid answer "success" id=003', async ({ p
   await expect(aiText).toContain('success');
 });
 
-
+// precondition: sorting model has to be anything but ollama
 test('@smoke All models can generate a valid answer "success" id=004', async ({ page }) => {
   await login(page);
   await page.locator(selectors.nav.newChatButton).waitFor({ state: 'visible' });
+    //TODO wait logic instead of hard wait
+  await page.waitForTimeout(2000);
   await page.click(selectors.nav.newChatButton);
+  await page.waitForTimeout(2000);
+  await page.click(selectors.chat.textInput);
   await page.fill(selectors.chat.textInput, PROMPT);
   await page.click(selectors.chat.sendBtn);
 
@@ -91,4 +96,3 @@ for (let i = 0; i < modelCount; i += 1) {
 }
 
 });
-
