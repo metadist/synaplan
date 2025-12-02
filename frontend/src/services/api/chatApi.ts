@@ -3,7 +3,6 @@
  */
 
 import { httpClient, API_BASE_URL } from './httpClient'
-import type { MessageResponse } from '@/types/ai-models'
 
 export const chatApi = {
   async sendMessage(userId: number, message: string, trackId?: number): Promise<any> {
@@ -45,6 +44,7 @@ export const chatApi = {
     const paramsObj: Record<string, string> = {
       message,
       chatId: chatId.toString(),
+      userId: userId.toString()
     }
     
     if (trackId) paramsObj.trackId = trackId.toString()

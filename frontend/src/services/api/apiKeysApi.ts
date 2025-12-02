@@ -6,7 +6,7 @@ export interface ApiKey {
   key_prefix: string
   status: 'active' | 'inactive'
   scopes: string[]
-  last_used: number
+  last_used: number | null
   created: number
 }
 
@@ -21,8 +21,11 @@ export interface CreateApiKeyResponse {
     id: number
     name: string
     key: string // Full key - only shown once!
+    key_prefix?: string
     scopes: string[]
     created: number
+    status: 'active' | 'inactive'
+    last_used: number | null
   }
   message: string
 }

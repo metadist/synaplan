@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { ref, computed } from 'vue'
+import { ref } from 'vue'
 import { configApi } from '@/services/api/configApi'
 
 export interface AIModel {
@@ -7,10 +7,10 @@ export interface AIModel {
   service: string
   name: string
   providerId: string
-  description?: string
+  description?: string | null
   quality: number
   rating: number
-  tag: string
+  tag?: string | null
   isSystemModel?: boolean
   features?: string[]
 }
@@ -59,9 +59,16 @@ export const useAiConfigStore = defineStore('aiConfig', () => {
   const saveDefaults = async (newDefaults: DefaultModels) => {
     loading.value = true
     try {
-      const response = await configApi.saveDefaultModels(newDefaults)
+      const payload: Record<string, number> = {}
+      Object.entries(newDefaults).forEach(([capability, value]) => {
+        if (value !== null) {
+          payload[capability] = value
+        }
+      })
+
+      const response = await configApi.saveDefaultModels({ defaults: payload })
       if (response.success) {
-        defaults.value = newDefaults
+        defaults.value = { ...newDefaults }
       }
       return response
     } catch (error) {

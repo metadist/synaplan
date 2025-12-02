@@ -276,8 +276,7 @@ import {
   listApiKeys,
   createApiKey,
   updateApiKey,
-  revokeApiKey as deleteApiKeyApi,
-  type ApiKey
+  revokeApiKey as deleteApiKeyApi
 } from '@/services/api/apiKeysApi'
 import { useDialog } from '@/composables/useDialog'
 import { useNotification } from '@/composables/useNotification'
@@ -385,7 +384,7 @@ const createAPIKey = async () => {
   } catch (err: any) {
     console.error('Failed to create API key:', err)
     error.value = err.message || t('config.apiKeys.errorCreating')
-    showError(error.value)
+    showError(error.value ?? t('config.apiKeys.errorCreating'))
   } finally {
     loading.value = false
   }

@@ -45,6 +45,7 @@ export interface FileItem {
   uploaded_date: string
   message_id: number | null
   is_attached: boolean
+  group_key?: string
 }
 
 export interface FileListResponse {
