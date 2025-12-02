@@ -85,7 +85,25 @@ cp backend/.env.example backend/.env
 cp frontend/.env.example frontend/.env
 ```
 
-## 8. Backend environment essentials
+## 8. Ollama service + required models
+Install the systemd-managed Ollama daemon (same API the Docker stack exposes) and make sure the two baseline models exist before Symfony starts:
+```bash
+curl -fsSL https://ollama.com/install.sh | sh
+sudo systemctl enable --now ollama
+sudo systemctl status --no-pager ollama
+sudo ss -ltnp | grep 11434   # should show ollama on 127.0.0.1:11434
+```
+
+Pull the chat + embedding models once so the backend can answer immediately:
+```bash
+ollama pull gpt-oss:20b
+ollama pull bge-m3
+ollama list
+curl -fsS http://127.0.0.1:11434/api/tags | grep -E 'gpt-oss|bge-m3'
+```
+*If the backend lives on another host, run `sudo systemctl edit ollama`, set `Environment="OLLAMA_HOST=0.0.0.0"`, restart the service, and point `OLLAMA_BASE_URL=http://<ollama-host>:11434` in `backend/.env`. When Ollama is local keep `AUTO_DOWNLOAD_MODELS=false` so Symfony skips redundant pulls.*
+
+## 9. Backend environment essentials
 - `APP_ENV=prod`, `APP_URL=https://api.example.com`
 - Database (you said you can provide MariaDB 11 → create DB/user first):
   ```
@@ -103,7 +121,7 @@ cp frontend/.env.example frontend/.env
 - Generate/update JWT keys: `php bin/console lexik:jwt:generate-keypair`.
 - Adjust optional providers (Groq/OpenAI/WhatsApp/Stripe) as needed.
 
-## 9. Backend install & database prep
+## 10. Backend install & database prep
 ```bash
 cd /wwwroot/synaplan/backend
 composer install --no-dev --optimize-autoloader
@@ -123,7 +141,7 @@ Run background workers (keep under Supervisor/systemd):
 php bin/console messenger:consume async_ai_high async_extract async_index -vv
 ```
 
-## 10. Apache virtual host example
+## 11. Apache virtual host example
 ```
 <VirtualHost *:80>
     ServerName api.example.com
@@ -142,7 +160,7 @@ php bin/console messenger:consume async_ai_high async_extract async_index -vv
 ```
 Enable the site (`sudo a2ensite synaplan.conf && sudo systemctl reload apache2`). Use HTTPS in production.
 
-## 11. Frontend environment & build
+## 12. Frontend environment & build
 Edit `frontend/.env`:
 - `VITE_API_BASE_URL=https://api.example.com`
 - Optional toggles: `VITE_RECAPTCHA_ENABLED`, `VITE_SHOW_ERROR_STACK=false`, etc.
@@ -156,13 +174,13 @@ npm run build && npm run preview -- --host 0.0.0.0 --port 4173  # production pre
 ```
 For production hosting, serve `frontend/dist` via nginx/Apache and proxy API calls to the backend.
 
-## 12. External services you already have
+## 13. External services you already have
 - **Ollama**: expose `http://<host>:11434`, ensure backend host can reach it, and pre-pull `gpt-oss:20b` + `bge-m3` there.
 - **Amazon SES**: use SMTP credentials in `MAILER_DSN`.
 - **Apache Tika**: leave the service running at `http://<tika-host>:9998`; backend only needs the URL.
 - **MariaDB**: provision an empty schema, grant `CREATE/DROP/ALTER` so migrations succeed.
 
-## 13. Final checklist
+## 14. Final checklist
 1. Confirm `php -m` lists every extension above (especially `imagick`, `intl`, `imap`, `ffi`, `sodium`).
 2. Run `php bin/console about` to verify Symfony sees the environment.
 3. Hit `https://api.example.com/api/health` (healthcheck endpoint referenced in docker-compose).
