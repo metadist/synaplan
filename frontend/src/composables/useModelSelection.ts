@@ -1,15 +1,16 @@
 import { computed, type ComputedRef } from 'vue'
-import { useAiConfigStore, type AIModel } from '@/stores/aiConfig'
+import { useAiConfigStore } from '@/stores/aiConfig'
+import type { AIModel } from '@/types/ai-models'
 import type { AgainData as BackendAgainData } from '@/types/ai-models'
 
 export interface ModelOption {
   provider: string
   model: string
   label: string
-  id?: number
-  quality?: number
-  rating?: number
-  description?: string
+  id: number
+  quality?: number | null
+  rating?: number | null
+  description?: string | null
 }
 
 /**
@@ -37,11 +38,11 @@ export function useModelSelection(
    * Resolve preferred tag based on backend-provided Again data
    * Falls back from direct tag → predicted model tag → first eligible tag
    */
-  const preferredTag = computed((): string | null => {
+  const preferredTag = computed((): string | undefined => {
     const tagSources: Array<string | undefined> = [
-      againData?.value?.tag,
-      againData?.value?.predictedNext?.tag,
-      againData?.value?.eligible?.[0]?.tag
+      againData?.value?.tag ?? undefined,
+      againData?.value?.predictedNext?.tag ?? undefined,
+      againData?.value?.eligible?.[0]?.tag ?? undefined
     ]
 
     for (const tag of tagSources) {
@@ -50,7 +51,7 @@ export function useModelSelection(
       }
     }
 
-    return null
+    return undefined
   })
 
   /**

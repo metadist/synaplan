@@ -212,6 +212,7 @@ export interface ModelOption {
   provider: string
   model: string
   label: string
+  id?: number
 }
 
 export const mockModelOptions: ModelOption[] = [

@@ -1,30 +1,10 @@
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'
+import type { AIModel } from '@/types/ai-models'
 
-export interface ModelInfo {
-  id: number
-  service: string
-  name: string
-  providerId: string
-  description: string | null
-  quality: number
-  rating: number
-  isSystemModel: boolean
-  features?: string[]
-}
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'
 
 export interface ModelsResponse {
   success: boolean
-  models: {
-    SORT: ModelInfo[]
-    CHAT: ModelInfo[]
-    VECTORIZE: ModelInfo[]
-    PIC2TEXT: ModelInfo[]
-    TEXT2PIC: ModelInfo[]
-    TEXT2VID: ModelInfo[]
-    SOUND2TEXT: ModelInfo[]
-    TEXT2SOUND: ModelInfo[]
-    ANALYZE: ModelInfo[]
-  }
+  models: Record<string, AIModel[]>
 }
 
 export interface DefaultsResponse {

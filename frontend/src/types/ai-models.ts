@@ -6,13 +6,16 @@ export interface AIModel {
   id: number
   service: string
   name: string
-  tag: string
-  providerId: string
-  quality: number
-  rating: number
-  priceIn: number
-  priceOut: number
-  selectable: boolean
+  tag?: string | null
+  providerId?: string | null
+  quality?: number | null
+  rating?: number | null
+  priceIn?: number | null
+  priceOut?: number | null
+  selectable?: boolean
+  description?: string | null
+  isSystemModel?: boolean
+  features?: string[]
 }
 
 export interface AgainData {

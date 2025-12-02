@@ -1,19 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { configApi } from '@/services/api/configApi'
-
-export interface AIModel {
-  id: number
-  service: string
-  name: string
-  providerId: string
-  description?: string | null
-  quality: number
-  rating: number
-  tag?: string | null
-  isSystemModel?: boolean
-  features?: string[]
-}
+import type { AIModel } from '@/types/ai-models'
 
 export interface ModelsList {
   [capability: string]: AIModel[]
@@ -33,7 +21,7 @@ export const useAiConfigStore = defineStore('aiConfig', () => {
     try {
       const response = await configApi.getModels()
       if (response.success) {
-        models.value = response.models
+        models.value = response.models as ModelsList
       }
     } catch (error) {
       console.error('Failed to load models:', error)

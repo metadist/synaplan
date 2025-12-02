@@ -598,7 +598,8 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { Icon } from '@iconify/vue'
 import { promptsApi, type TaskPrompt as ApiTaskPrompt, type PromptFile, type AvailableFile } from '@/services/api/promptsApi'
-import { configApi, type ModelInfo } from '@/services/api/configApi'
+import { configApi } from '@/services/api/configApi'
+import type { AIModel } from '@/types/ai-models'
 import { useNotification } from '@/composables/useNotification'
 import { useUnsavedChanges } from '@/composables/useUnsavedChanges'
 import { useDialog } from '@/composables/useDialog'
@@ -665,7 +666,7 @@ const availableFilesSearch = ref('')
 const loadingAvailableFiles = ref(false)
 
 // Models from API
-const allModels = ref<{ [capability: string]: ModelInfo[] }>({})
+const allModels = ref<{ [capability: string]: AIModel[] }>({})
 const loadingModels = ref(false)
 
 // Available tools with icons (removed image/video generation as they're not clickable tools)
@@ -677,7 +678,7 @@ const availableTools: ToolOption[] = [
 
 // Group models by capability for dropdown
 const groupedModels = computed(() => {
-  const groups: { label: string; models: ModelInfo[]; capability: string }[] = []
+  const groups: { label: string; models: AIModel[]; capability: string }[] = []
   
   const capabilityLabels: Record<string, string> = {
     'CHAT': 'Chat & General AI',

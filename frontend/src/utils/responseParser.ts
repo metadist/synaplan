@@ -122,17 +122,18 @@ function parseTextContent(text: string, parts: ParsedResponsePart[]) {
   const urlRegex = /https?:\/\/[^\s<>"{}|\\^`\[\]]+/g
   while ((urlMatch = urlRegex.exec(text)) !== null) {
     const currentMatch = urlMatch
+    const matchIndex = currentMatch.index ?? 0
     // Check if this URL is part of a markdown link
     const isInMarkdown = links.some(l => 
-      currentMatch.index >= l.position && 
-      currentMatch.index < l.position + l.title.length + l.url.length + 4
+      matchIndex >= l.position && 
+      matchIndex < l.position + l.title.length + l.url.length + 4
     )
     
     if (!isInMarkdown) {
       links.push({
         url: currentMatch[0],
         title: currentMatch[0],
-        position: currentMatch.index
+        position: matchIndex
       })
     }
   }

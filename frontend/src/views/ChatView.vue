@@ -685,9 +685,9 @@ const streamAIResponse = async (userMessage: string, options?: { includeReasonin
                     // Create completely new message object
                     const updatedMessage = {
                       ...message,
-                      files: [...message.files], // New array reference
-                      parts: [...message.parts], // New parts array
-                      timestamp: new Date(message.timestamp) // Force timestamp update
+                      files: message.files ? [...message.files] : undefined,
+                      parts: [...message.parts],
+                      timestamp: new Date(message.timestamp)
                     }
                     
                     // Replace in store
@@ -1109,6 +1109,10 @@ const handleRegenerate = async (message: Message, modelOption: ModelOption) => {
         .map(part => part.content || '')
         .join('\n')
       
+      if (!modelOption.id) {
+        console.warn('Selected model has no ID, cannot regenerate.')
+        return
+      }
       // Re-send the user message with the selected model
       // This will trigger normal streaming flow
       await handleSendMessage(content, { modelId: modelOption.id })

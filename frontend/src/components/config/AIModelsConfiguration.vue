@@ -232,7 +232,8 @@ import {
   ChevronDownIcon
 } from '@heroicons/vue/24/outline'
 import { Icon } from '@iconify/vue'
-import { getModels, getDefaultModels, saveDefaultModels, checkModelAvailability, type ModelInfo } from '@/services/api/configApi'
+import { getModels, getDefaultModels, saveDefaultModels, checkModelAvailability } from '@/services/api/configApi'
+import type { AIModel } from '@/types/ai-models'
 import { serviceColors } from '@/mocks/aiModels'
 import { getProviderIcon } from '@/utils/providerIcons'
 import { useNotification } from '@/composables/useNotification'
@@ -241,7 +242,7 @@ import GroqIcon from '@/components/icons/GroqIcon.vue'
 type Capability = 'SORT' | 'CHAT' | 'VECTORIZE' | 'PIC2TEXT' | 'TEXT2PIC' | 'TEXT2VID' | 'SOUND2TEXT' | 'TEXT2SOUND' | 'ANALYZE'
 
 interface ModelsData {
-  [key: string]: ModelInfo[]
+  [key: string]: AIModel[]
 }
 
 const route = useRoute()
@@ -414,7 +415,7 @@ const loadData = async () => {
   }
 }
 
-const getModelsByPurpose = (purpose: Capability): ModelInfo[] => {
+const getModelsByPurpose = (purpose: Capability): AIModel[] => {
   return availableModels.value[purpose] || []
 }
 
@@ -479,7 +480,7 @@ const handleClickOutside = (event: MouseEvent) => {
 }
 
 const allModels = computed(() => {
-  const all: Array<ModelInfo & { purpose: Capability }> = []
+  const all: Array<AIModel & { purpose: Capability }> = []
   for (const [cap, models] of Object.entries(availableModels.value)) {
     models.forEach(model => {
       all.push({ ...model, purpose: cap as Capability })

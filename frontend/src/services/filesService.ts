@@ -180,6 +180,8 @@ export const getFileContent = async (fileId: number): Promise<{
   filename: string
   file_path: string
   file_type: string
+  file_size?: number
+  mime?: string
   extracted_text: string
   status: string
   uploaded_at: number
@@ -190,6 +192,8 @@ export const getFileContent = async (fileId: number): Promise<{
     filename: string
     file_path: string
     file_type: string
+    file_size?: number
+    mime?: string
     extracted_text: string
     status: string
     uploaded_at: number

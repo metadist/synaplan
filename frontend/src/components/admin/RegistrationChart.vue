@@ -151,8 +151,8 @@ const providers = computed(() => {
   return Array.from(set)
 })
 
-const buildLineDatasets = (): ChartDataset<'line'>[] => {
-  return providers.value.map(provider => {
+const createLineDatasets = (): ChartDataset<'line'>[] =>
+  providers.value.map(provider => {
     const color = getProviderColor(provider)
     return {
       label: provider,
@@ -163,12 +163,11 @@ const buildLineDatasets = (): ChartDataset<'line'>[] => {
       fill: true,
       tension: 0.4,
       type: 'line'
-    }
+    } satisfies ChartDataset<'line'>
   })
-}
 
-const buildBarDatasets = (): ChartDataset<'bar'>[] => {
-  return providers.value.map(provider => {
+const createBarDatasets = (): ChartDataset<'bar'>[] =>
+  providers.value.map(provider => {
     const color = getProviderColor(provider)
     return {
       label: provider,
@@ -177,18 +176,17 @@ const buildBarDatasets = (): ChartDataset<'bar'>[] => {
       borderColor: color,
       borderWidth: 0,
       type: 'bar'
-    }
+    } satisfies ChartDataset<'bar'>
   })
-}
 
 const lineChartData = computed<ChartData<'line'>>(() => ({
   labels: props.data.timeline.map(item => formatLabel(item.date)),
-  datasets: buildLineDatasets()
+  datasets: createLineDatasets()
 }))
 
 const barChartData = computed<ChartData<'bar'>>(() => ({
   labels: props.data.timeline.map(item => formatLabel(item.date)),
-  datasets: buildBarDatasets()
+  datasets: createBarDatasets()
 }))
 
 const lineChartOptions = computed<ChartOptions<'line'>>(() => ({
