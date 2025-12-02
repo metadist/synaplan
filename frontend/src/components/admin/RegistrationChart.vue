@@ -85,7 +85,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
+import { ref, computed } from 'vue'
 import { Icon } from '@iconify/vue'
 import { Bar, Line } from 'vue-chartjs'
 import {
@@ -99,15 +99,14 @@ import {
   Tooltip,
   Legend,
   Filler,
-  type ChartOptions
+  type ChartOptions,
+  type ChartData,
+  type ChartDataset
 } from 'chart.js'
 import type { RegistrationAnalytics } from '@/services/api/adminApi'
-import { useI18n } from 'vue-i18n'
 
 // Register Chart.js components
 ChartJS.register(CategoryScale, LinearScale, BarElement, LineElement, PointElement, Title, Tooltip, Legend, Filler)
-
-const { t } = useI18n()
 
 interface Props {
   data: RegistrationAnalytics
@@ -120,7 +119,7 @@ const props = withDefaults(defineProps<Props>(), {
   initialGroupBy: 'day'
 })
 
-const emit = defineEmits<{
+defineEmits<{
   'update:period': [value: string]
   'update:groupBy': [value: string]
 }>()
@@ -144,9 +143,9 @@ const getProviderColor = (provider: string) => {
 }
 
 // Chart data
-const chartData = computed(() => {
+const chartData = computed<ChartData<'bar' | 'line'>>(() => {
   const labels = props.data.timeline.map(item => formatLabel(item.date))
-  const datasets = []
+  const datasets: ChartDataset<'bar' | 'line'>[] = []
 
   // Get all unique providers
   const providers = new Set<string>()
@@ -165,6 +164,7 @@ const chartData = computed(() => {
       borderWidth: chartType.value === 'line' ? 2 : 0,
       fill: chartType.value === 'line',
       tension: 0.4,
+      type: chartType.value
     })
   })
 
@@ -223,7 +223,7 @@ const formatLabel = (dateStr: string) => {
   } else if (groupBy.value === 'week') {
     return dateStr.replace('W', 'Week ')
   } else {
-    const [year, month, day] = dateStr.split('-')
+    const [, month, day] = dateStr.split('-')
     return `${day}.${month}`
   }
 }

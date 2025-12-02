@@ -20,6 +20,7 @@ export interface ModelsResponse {
     VECTORIZE: ModelInfo[]
     PIC2TEXT: ModelInfo[]
     TEXT2PIC: ModelInfo[]
+    TEXT2VID: ModelInfo[]
     SOUND2TEXT: ModelInfo[]
     TEXT2SOUND: ModelInfo[]
     ANALYZE: ModelInfo[]
@@ -34,6 +35,7 @@ export interface DefaultsResponse {
     VECTORIZE: number | null
     PIC2TEXT: number | null
     TEXT2PIC: number | null
+    TEXT2VID: number | null
     SOUND2TEXT: number | null
     TEXT2SOUND: number | null
     ANALYZE: number | null
@@ -55,6 +57,7 @@ export interface ModelCheckResponse {
   install_command?: string
   env_var?: string
   setup_instructions?: string
+  setup_required?: boolean
 }
 
 /**

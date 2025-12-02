@@ -146,7 +146,6 @@ const expandedMenus = ref<string[]>([])
 
 // Feature Status
 const disabledFeaturesCount = ref(0)
-const hasDisabledFeatures = computed(() => disabledFeaturesCount.value > 0)
 
 // Load feature status (only in development)
 const loadFeatureStatus = async () => {

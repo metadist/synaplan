@@ -4,7 +4,7 @@ Short checklist for running the Symfony backend and Vite/Vue frontend directly o
 
 ## 1. Base system packages
 ```bash
-sudo apt update && sudo apt install -y ca-certificates curl gnupg lsb-release software-properties-common unzip git make build-essential pkg-config
+sudo apt update && sudo apt install -y ca-certificates curl gnupg lsb-release software-properties-common unzip git make build-essential pkg-config composer
 ```
 
 ## 2. PHP 8.3 + Apache (replacement for FrankenPHP)
@@ -33,6 +33,7 @@ sudo apt install -y nodejs
 sudo apt install -y redis-server supervisor
 ```
 *(Use Redis for Messenger transports if you don’t want to rely on MariaDB queues; use Supervisor/systemd to keep workers alive.)*
+> If you stick to PHP 8.3, the `php8.3-redis` extension is already installed in step 2. For newer distro defaults (PHP 8.4), install the matching `php8.4-redis` package before running Composer.
 
 ## 5. Local Apache Tika (optional)
 ```bash
@@ -110,15 +111,14 @@ curl -fsS http://127.0.0.1:11434/api/tags | grep -E 'gpt-oss|bge-m3'
   DATABASE_WRITE_URL=mysql://synaplan_user:strongpass@db-host:3306/synaplan?serverVersion=11.8&charset=utf8mb4
   DATABASE_READ_URL=mysql://synaplan_user:strongpass@db-host:3306/synaplan?serverVersion=11.8&charset=utf8mb4
   ```
-- Set `MESSENGER_TRANSPORT_DSN=doctrine://default` (or `redis://localhost:6379/messages` if you enabled Redis).
-- Point to your existing services:
+- Set `MESSENGER_TRANSPORT_DSN=redis://127.0.0.1:6379` (recommended). Resist the temptation to append `/messenger` or `?delete_after_ack=1` here—the individual transports already define their stream names, consumer groups, and retention settings in `config/packages/messenger.yaml`. Doctrine transports work too, but require the `symfony/doctrine-messenger` package and different queue options.
+- Point to your existing services (adjust hosts when serving under a subdirectory, e.g. `APP_URL=http://localhost/synaplan/backend` and `FRONTEND_URL=http://localhost/synaplan/frontend` on WSL/Apache setups):
   - `OLLAMA_BASE_URL=http://<ollama-host>:11434`
   - `TIKA_BASE_URL=http://<tika-host>:9998`
   - `MAILER_DSN=smtp://AWS_SMTP_USER:AWS_SMTP_PASS@email-smtp.<region>.amazonaws.com:587`
   - `AI_DEFAULT_PROVIDER=ollama`
   - `FRONTEND_URL=https://app.example.com`
 - Disable auto model downloads if you already run Ollama elsewhere: `AUTO_DOWNLOAD_MODELS=false`.
-- Generate/update JWT keys: `php bin/console lexik:jwt:generate-keypair`.
 - Adjust optional providers (Groq/OpenAI/WhatsApp/Stripe) as needed.
 
 ## 10. Backend install & database prep
@@ -140,6 +140,53 @@ Run background workers (keep under Supervisor/systemd):
 ```bash
 php bin/console messenger:consume async_ai_high async_extract async_index -vv
 ```
+Double-check the worker is picking up the right transport DSN:
+```bash
+php -d variables_order=EGPCS -r "echo getenv('MESSENGER_TRANSPORT_DSN'), PHP_EOL;"
+```
+
+### Systemd worker (recommended)
+Create a tiny env override file so systemd doesn’t need to embed secrets:
+```bash
+sudo mkdir -p /etc/synaplan
+sudo tee /etc/synaplan/backend-worker.env >/dev/null <<'EOF'
+APP_ENV=prod
+APP_DEBUG=0
+MESSENGER_TRANSPORT_DSN=redis://127.0.0.1:6379
+# Add DB URLs, Ollama/Tika endpoints, etc., if they aren’t already exported
+EOF
+sudo chmod 640 /etc/synaplan/backend-worker.env
+sudo chown root:www-data /etc/synaplan/backend-worker.env
+```
+
+Drop the unit file:
+```bash
+sudo tee /etc/systemd/system/synaplan-messenger.service >/dev/null <<'EOF'
+[Unit]
+Description=Synaplan Symfony Messenger Worker
+After=network-online.target redis-server.service mariadb.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=www-data
+Group=www-data
+WorkingDirectory=/wwwroot/synaplan/backend
+EnvironmentFile=-/etc/synaplan/backend-worker.env
+ExecStart=/usr/bin/php bin/console messenger:consume async_ai_high async_extract async_index -vv --time-limit=3600 --memory-limit=512M
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
+EOF
+sudo systemctl daemon-reload
+sudo systemctl enable --now synaplan-messenger.service
+sudo systemctl status synaplan-messenger.service
+```
+Tail the logs with `journalctl -u synaplan-messenger.service -f`. Use `sudo systemctl restart synaplan-messenger.service` whenever you deploy new code.
 
 ## 11. Apache virtual host example
 ```
@@ -154,7 +201,7 @@ php bin/console messenger:consume async_ai_high async_extract async_index -vv
     </Directory>
 
     ProxyPassMatch ^/(.*\.php(/.*)?)$ unix:/run/php/php8.3-fpm.sock|fcgi://localhost/wwwroot/synaplan/backend/public
-    ErrorLog ${APACHE_LOG_DIR}/synaplan-error.log
+    ErrorLog ${APACHE_LOG_DI sR}/synaplan-error.log
     CustomLog ${APACHE_LOG_DIR}/synaplan-access.log combined
 </VirtualHost>
 ```
@@ -163,6 +210,7 @@ Enable the site (`sudo a2ensite synaplan.conf && sudo systemctl reload apache2`)
 ## 12. Frontend environment & build
 Edit `frontend/.env`:
 - `VITE_API_BASE_URL=https://api.example.com`
+- `VITE_BASE_PATH=/` (use `/synaplan/frontend/` when the SPA is served from `http://localhost/synaplan/frontend/`)
 - Optional toggles: `VITE_RECAPTCHA_ENABLED`, `VITE_SHOW_ERROR_STACK=false`, etc.
 
 Install & serve:

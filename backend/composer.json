@@ -35,6 +35,7 @@
         "stripe/stripe-php": "^16.0",
         "symfony/asset": "7.3.*",
         "symfony/console": "7.3.*",
+        "symfony/doctrine-messenger": "7.3.*",
         "symfony/dotenv": "7.3.*",
         "symfony/expression-language": "7.3.*",
         "symfony/flex": "^2",

@@ -247,8 +247,9 @@ export const apiService = {
   ): () => void {
     if (useMockData) {
       // Mock streaming
-      const { mockStreamingResponse } = require('@/mocks/chatResponses')
-      mockStreamingResponse(message, onUpdate)
+      import('@/mocks/chatResponses').then(({ mockStreamingResponse }) => {
+        mockStreamingResponse(message, onUpdate)
+      })
       return () => {}
     }
 
