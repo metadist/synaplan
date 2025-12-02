@@ -214,40 +214,140 @@ Enable the site (`sudo a2ensite synaplan.conf && sudo systemctl reload apache2`)
 
 ### WSL subdirectory setup (localhost/synaplan/...)
 
-For running both frontend and backend under `http://localhost/synaplan/...` on WSL, see the detailed guide:
-- **`_devextras/wsl-subdirectory-setup.md`** — full configuration walkthrough
-- **`_devextras/synaplan-wsl.conf`** — ready-to-use Apache config
+For running both frontend and backend under `http://localhost/synaplan/...` on WSL (keeps Docker setup intact):
 
-Quick summary of `.env` differences for WSL subdirectory mode:
+**URLs after setup:**
+| Component | URL |
+|-----------|-----|
+| Frontend | `http://localhost/synaplan/frontend/` |
+| Backend API | `http://localhost/synaplan/backend/` |
 
-**Backend `.env`:**
-```ini
-APP_URL=http://localhost/synaplan/backend
-FRONTEND_URL=http://localhost/synaplan/frontend
+**Create Apache config** `/etc/apache2/sites-available/synaplan-wsl.conf`:
+```bash
+sudo tee /etc/apache2/sites-available/synaplan-wsl.conf >/dev/null <<'EOF'
+<VirtualHost *:80>
+    ServerName localhost
+
+    # Backend API: /synaplan/backend → Symfony via PHP-FPM
+    Alias /synaplan/backend /wwwroot/synaplan/backend/public
+
+    <Directory /wwwroot/synaplan/backend/public>
+        AllowOverride All
+        Require all granted
+        FallbackResource /synaplan/backend/index.php
+        Options -Indexes +FollowSymLinks
+    </Directory>
+
+    <FilesMatch \.php$>
+        SetHandler "proxy:unix:/run/php/php8.3-fpm.sock|fcgi://localhost"
+    </FilesMatch>
+
+    # Frontend (Production): /synaplan/frontend → Vue SPA dist
+    Alias /synaplan/frontend /wwwroot/synaplan/frontend/dist
+
+    <Directory /wwwroot/synaplan/frontend/dist>
+        AllowOverride None
+        Require all granted
+        Options -Indexes
+        FallbackResource /synaplan/frontend/index.html
+    </Directory>
+
+    ErrorLog ${APACHE_LOG_DIR}/synaplan-error.log
+    CustomLog ${APACHE_LOG_DIR}/synaplan-access.log combined
+</VirtualHost>
+EOF
 ```
 
-**Frontend `.env`:**
+**Enable the site:**
+```bash
+sudo a2enmod rewrite proxy_fcgi alias
+sudo a2ensite synaplan-wsl.conf
+sudo systemctl reload apache2
+```
+
+**Backend `.env` settings for WSL:**
+```ini
+APP_ENV=dev
+APP_DEBUG=true
+APP_URL=http://localhost/synaplan/backend
+FRONTEND_URL=http://localhost/synaplan/frontend
+
+DATABASE_WRITE_URL=mysql://synaplan:password@127.0.0.1:3306/synaplan?serverVersion=11.8&charset=utf8mb4
+DATABASE_READ_URL=mysql://synaplan:password@127.0.0.1:3306/synaplan?serverVersion=11.8&charset=utf8mb4
+MESSENGER_TRANSPORT_DSN=redis://127.0.0.1:6379
+
+OLLAMA_BASE_URL=http://127.0.0.1:11434
+TIKA_BASE_URL=http://127.0.0.1:9998
+AI_DEFAULT_PROVIDER=ollama
+AUTO_DOWNLOAD_MODELS=false
+MAILER_DSN=null://null
+```
+
+**Frontend `.env` settings for WSL:**
 ```ini
 VITE_API_BASE_URL=http://localhost/synaplan/backend
 VITE_BASE_PATH=/synaplan/frontend/
+VITE_SHOW_ERROR_STACK=true
 ```
 
-Then rebuild the frontend: `cd frontend && npm run build`
+**Build frontend with WSL base path:**
+```bash
+cd /wwwroot/synaplan/frontend
+npm install
+npm run build
+```
+
+**Verify setup:**
+```bash
+curl -s http://localhost/synaplan/backend/api/health | head -c 200
+# Then open http://localhost/synaplan/frontend/ in browser
+```
+
+**Development with Vite hot-reload (optional):**
+
+Instead of serving static files, proxy to Vite dev server. Add to Apache config (before the static Alias):
+```apache
+# Uncomment for dev mode, comment out the static frontend Alias/Directory above
+# ProxyPass /synaplan/frontend http://127.0.0.1:5173/synaplan/frontend
+# ProxyPassReverse /synaplan/frontend http://127.0.0.1:5173/synaplan/frontend
+```
+
+Then run Vite:
+```bash
+cd /wwwroot/synaplan/frontend
+npm run dev -- --host 0.0.0.0 --port 5173 --base /synaplan/frontend/
+```
+
+> **Note:** A ready-to-use Apache config file is also available at `_devextras/synaplan-wsl.conf` and detailed troubleshooting at `_devextras/wsl-subdirectory-setup.md`.
 
 ## 12. Frontend environment & build
-Edit `frontend/.env`:
-- `VITE_API_BASE_URL=https://api.example.com`
-- `VITE_BASE_PATH=/` (use `/synaplan/frontend/` when the SPA is served from `http://localhost/synaplan/frontend/`)
-- Optional toggles: `VITE_RECAPTCHA_ENABLED`, `VITE_SHOW_ERROR_STACK=false`, etc.
+
+Edit `frontend/.env` based on your deployment scenario:
+
+| Setting | Production (separate domains) | WSL subdirectory |
+|---------|------------------------------|------------------|
+| `VITE_API_BASE_URL` | `https://api.example.com` | `http://localhost/synaplan/backend` |
+| `VITE_BASE_PATH` | `/` | `/synaplan/frontend/` |
+
+Other optional settings:
+- `VITE_RECAPTCHA_ENABLED=false` — disable reCAPTCHA for local dev
+- `VITE_SHOW_ERROR_STACK=true` — show detailed errors in dev
+- `VITE_AUTO_LOGIN_DEV=false` — auto-login for testing
 
 Install & serve:
 ```bash
 cd /wwwroot/synaplan/frontend
 npm install
-npm run dev -- --host 0.0.0.0 --port 5173   # development
+npm run dev -- --host 0.0.0.0 --port 5173   # development (default base path)
 npm run build && npm run preview -- --host 0.0.0.0 --port 4173  # production preview
 ```
-For production hosting, serve `frontend/dist` via nginx/Apache and proxy API calls to the backend.
+
+For WSL subdirectory dev mode, pass the base path explicitly:
+```bash
+npm run dev -- --host 0.0.0.0 --port 5173 --base /synaplan/frontend/
+```
+
+For production hosting, serve `frontend/dist` via Apache (see section 11) and the backend API handles CORS automatically.
 
 ## 13. External services you already have
 - **Ollama**: expose `http://<host>:11434`, ensure backend host can reach it, and pre-pull `gpt-oss:20b` + `bge-m3` there.
@@ -256,11 +356,35 @@ For production hosting, serve `frontend/dist` via nginx/Apache and proxy API cal
 - **MariaDB**: provision an empty schema, grant `CREATE/DROP/ALTER` so migrations succeed.
 
 ## 14. Final checklist
+
+**For all setups:**
 1. Confirm `php -m` lists every extension above (especially `imagick`, `intl`, `imap`, `ffi`, `sodium`).
 2. Run `php bin/console about` to verify Symfony sees the environment.
-3. Hit `https://api.example.com/api/health` (healthcheck endpoint referenced in docker-compose).
-4. Start the frontend and visit `https://app.example.com` (or `http://localhost:5173`) to log in with the seeded demo users (`admin@synaplan.com / admin123`, etc.).
-5. Monitor logs: `tail -f var/log/prod.log`, `sudo journalctl -u apache2`, `tail -f frontend/vite.log`.
 
-That’s all that is required to reproduce the Docker Compose setup on a plain Ubuntu host.
+**Production (separate domains):**
+3. Hit `https://api.example.com/api/health` (healthcheck endpoint).
+4. Visit `https://app.example.com` to log in with demo users (`admin@synaplan.com` / `admin123`).
+
+**WSL subdirectory:**
+3. Hit `http://localhost/synaplan/backend/api/health`
+4. Visit `http://localhost/synaplan/frontend/` to log in with demo users (`admin@synaplan.com` / `admin123`).
+
+**Monitoring:**
+5. Monitor logs: `tail -f backend/var/log/dev.log`, `sudo journalctl -u apache2 -f`
+
+---
+
+## Configuration Quick Reference
+
+| Environment | Backend `APP_URL` | Backend `FRONTEND_URL` | Frontend `VITE_API_BASE_URL` | Frontend `VITE_BASE_PATH` |
+|-------------|-------------------|------------------------|------------------------------|---------------------------|
+| **Docker** | `http://localhost:8000` | `http://localhost:5173` | `http://localhost:8000` | `/` |
+| **Production** | `https://api.example.com` | `https://app.example.com` | `https://api.example.com` | `/` |
+| **WSL subdirectory** | `http://localhost/synaplan/backend` | `http://localhost/synaplan/frontend` | `http://localhost/synaplan/backend` | `/synaplan/frontend/` |
+
+The codebase requires **no code changes** between environments—only `.env` file adjustments.
+
+---
+
+That's all that is required to reproduce the Docker Compose setup on a plain Ubuntu host or WSL.
 
