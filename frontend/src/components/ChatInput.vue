@@ -232,6 +232,12 @@ interface Tool {
   icon: string
 }
 
+declare global {
+  interface Props {
+    isStreaming?: boolean
+  }
+}
+
 interface UploadedFile {
   file_id: number
   filename: string
@@ -240,11 +246,13 @@ interface UploadedFile {
   processing: boolean
 }
 
-interface Props {
-  isStreaming?: boolean
-}
+const props = defineProps({
+  isStreaming: {
+    type: Boolean,
+    default: false
+  }
+})
 
-const props = defineProps<Props>()
 const isStreaming = computed(() => props.isStreaming ?? false)
 
 const message = ref('')

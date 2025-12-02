@@ -10,7 +10,7 @@ export interface MailConfig {
 }
 
 export interface Department {
-  id: string
+  id?: string
   email: string
   rules: string
   isDefault: boolean

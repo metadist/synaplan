@@ -720,7 +720,7 @@ import {
   PaperAirplaneIcon,
   FunnelIcon
 } from '@heroicons/vue/24/outline'
-import type { MailConfig, Department, SavedMailHandler } from '@/mocks/mail'
+import type { MailConfig, Department, SavedMailHandler } from '@/services/api/inboundEmailHandlersApi'
 import {
   defaultMailConfig,
   protocolOptions,
@@ -836,7 +836,8 @@ const addDepartment = () => {
   }
 }
 
-const removeDepartment = (id: string) => {
+const removeDepartment = (id?: string) => {
+  if (!id) return
   const index = departments.value.findIndex(d => d.id === id)
   if (index !== -1) {
     const wasDefault = departments.value[index].isDefault
@@ -847,7 +848,8 @@ const removeDepartment = (id: string) => {
   }
 }
 
-const setDefault = (id: string) => {
+const setDefault = (id?: string) => {
+  if (!id) return
   departments.value.forEach(d => {
     d.isDefault = d.id === id
   })
