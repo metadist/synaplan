@@ -189,6 +189,8 @@ sudo systemctl status synaplan-messenger.service
 Tail the logs with `journalctl -u synaplan-messenger.service -f`. Use `sudo systemctl restart synaplan-messenger.service` whenever you deploy new code.
 
 ## 11. Apache virtual host example
+
+### Production setup (separate domains)
 ```
 <VirtualHost *:80>
     ServerName api.example.com
@@ -200,12 +202,37 @@ Tail the logs with `journalctl -u synaplan-messenger.service -f`. Use `sudo syst
         FallbackResource /index.php
     </Directory>
 
-    ProxyPassMatch ^/(.*\.php(/.*)?)$ unix:/run/php/php8.3-fpm.sock|fcgi://localhost/wwwroot/synaplan/backend/public
-    ErrorLog ${APACHE_LOG_DI sR}/synaplan-error.log
+    <FilesMatch \.php$>
+        SetHandler "proxy:unix:/run/php/php8.3-fpm.sock|fcgi://localhost"
+    </FilesMatch>
+
+    ErrorLog ${APACHE_LOG_DIR}/synaplan-error.log
     CustomLog ${APACHE_LOG_DIR}/synaplan-access.log combined
 </VirtualHost>
 ```
 Enable the site (`sudo a2ensite synaplan.conf && sudo systemctl reload apache2`). Use HTTPS in production.
+
+### WSL subdirectory setup (localhost/synaplan/...)
+
+For running both frontend and backend under `http://localhost/synaplan/...` on WSL, see the detailed guide:
+- **`_devextras/wsl-subdirectory-setup.md`** — full configuration walkthrough
+- **`_devextras/synaplan-wsl.conf`** — ready-to-use Apache config
+
+Quick summary of `.env` differences for WSL subdirectory mode:
+
+**Backend `.env`:**
+```ini
+APP_URL=http://localhost/synaplan/backend
+FRONTEND_URL=http://localhost/synaplan/frontend
+```
+
+**Frontend `.env`:**
+```ini
+VITE_API_BASE_URL=http://localhost/synaplan/backend
+VITE_BASE_PATH=/synaplan/frontend/
+```
+
+Then rebuild the frontend: `cd frontend && npm run build`
 
 ## 12. Frontend environment & build
 Edit `frontend/.env`:
