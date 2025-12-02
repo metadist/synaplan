@@ -43,6 +43,7 @@ backend/vendor/
 frontend/node_modules/
 frontend/dist/
 frontend/.vite/
+frontend/*.tsbuildinfo
 
 # Test artifacts
 *.cache
@@ -51,3 +52,6 @@ tests/reports/
 tests/node_modules/
 tests/.env.local
 tests/e2e/prompt_guide.md
+
+# devextras
+_devextras/test/
