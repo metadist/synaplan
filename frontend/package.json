@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vue-tsc -b && vite build",
+    "build": "vue-tsc --noEmit && vite build",
     "build:widget": "vite build --mode widget && node ./scripts/copy-widget-bundle.mjs",
     "preview": "vite preview",
     "test": "vitest",

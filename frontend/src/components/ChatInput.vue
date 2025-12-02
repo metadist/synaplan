@@ -232,12 +232,6 @@ interface Tool {
   icon: string
 }
 
-declare global {
-  interface Props {
-    isStreaming?: boolean
-  }
-}
-
 interface UploadedFile {
   file_id: number
   filename: string
