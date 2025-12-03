@@ -289,22 +289,38 @@ php bin/console doctrine:schema:create --no-interaction
 php bin/console doctrine:schema:update --force
 ```
 
-### Step 5: Clear cache and set permissions
+### Step 5: Load initial data (fixtures)
+
+Load the demo users, AI models, rate limits, and system configuration:
+
+```bash
+cd /wwwroot/synaplan/backend
+php bin/console doctrine:fixtures:load --no-interaction
+```
+
+This creates the following demo users:
+
+| Email | Password | Level | Status |
+|-------|----------|-------|--------|
+| `admin@synaplan.com` | `admin123` | ADMIN | Verified |
+| `demo@synaplan.com` | `demo123` | PRO | Verified |
+| `test@example.com` | `test123` | NEW | Unverified |
+
+It also loads:
+- **AI Models** - Ollama, Groq, OpenAI, Google, Anthropic model configurations
+- **Rate Limits** - Usage limits for different user tiers
+- **System Config** - Default system settings
+
+> **⚠️ Warning:** Running fixtures again will **reset** all data. Use `--append` to add without clearing:
+> ```bash
+> php bin/console doctrine:fixtures:load --append --no-interaction
+> ```
+
+### Step 6: Clear cache and set permissions
 ```bash
 php bin/console cache:clear
 sudo chown -R www-data:www-data var config/jwt
 sudo chmod -R 775 var
-```
-
-### Step 6: Create a test user (optional)
-```bash
-# Via API:
-curl -X POST http://localhost/synaplan/backend/api/v1/auth/register \
-  -H "Content-Type: application/json" \
-  -d '{"email":"admin@synaplan.com","password":"admin123","name":"Admin User"}'
-
-# Then verify the user in database:
-mysql -u synaplan -p synaplan -e "UPDATE BUSER SET BEMAILVERIFIED = 1 WHERE BMAIL = 'admin@test.com';"
 ```
 
 ### Step 7: Setup message transports (if using Redis)
@@ -467,9 +483,12 @@ Open in browser: `http://localhost/synaplan/frontend/`
 
 ### Test login
 ```bash
+# Using demo user (created by fixtures)
 curl -X POST http://localhost/synaplan/backend/api/v1/auth/login \
   -H "Content-Type: application/json" \
-  -d '{"email":"admin@test.com","password":"Test1234!"}'
+  -d '{"email":"admin@synaplan.com","password":"admin123"}'
+
+# Should return: {"success":true,"token":"eyJ0...","refresh_token":"..."}
 ```
 
 ---
