@@ -1,25 +1,59 @@
 # Synaplan plain Ubuntu setup
 
-Short checklist for running the Symfony backend and Vite/Vue frontend directly on Ubuntu 22.04/24.04 without Docker. All commands are copy‑paste ready.
+Short checklist for running the Symfony backend and Vite/Vue frontend directly on Ubuntu 22.04/24.04 without Docker. All commands are copy‑paste ready.
+
+---
 
 ## 1. Base system packages
 ```bash
 sudo apt update && sudo apt install -y ca-certificates curl gnupg lsb-release software-properties-common unzip git make build-essential pkg-config composer
 ```
 
-## 2. PHP 8.3 + Apache (replacement for FrankenPHP)
+## 2. PHP 8.3/8.4 + Apache (replacement for FrankenPHP)
+
+### For PHP 8.3:
 ```bash
 sudo add-apt-repository ppa:ondrej/php -y && sudo apt update
 sudo apt install -y apache2 libapache2-mod-fcgid php8.3 php8.3-cli php8.3-fpm php8.3-common php8.3-mysql php8.3-xml php8.3-mbstring php8.3-intl php8.3-zip php8.3-gd php8.3-curl php8.3-bcmath php8.3-exif php8.3-pcntl php8.3-opcache php8.3-readline php8.3-soap php8.3-sodium php8.3-ffi php8.3-imagick php8.3-imap php8.3-redis
+```
+
+### For PHP 8.4 (Ubuntu 24.04+):
+```bash
+sudo apt install -y apache2 libapache2-mod-fcgid php8.4 php8.4-cli php8.4-fpm php8.4-common php8.4-mysql php8.4-xml php8.4-mbstring php8.4-intl php8.4-zip php8.4-gd php8.4-curl php8.4-bcmath php8.4-exif php8.4-pcntl php8.4-opcache php8.4-readline php8.4-soap php8.4-sodium php8.4-ffi php8.4-imagick php8.4-imap php8.4-redis
+```
+
+### Common dependencies (both versions):
+```bash
 sudo apt install -y ghostscript imagemagick libmagickwand-dev poppler-utils ffmpeg libavcodec-extra libavformat-dev libavutil-dev libswscale-dev libavfilter-dev libswresample-dev libx264-dev libx265-dev libvpx-dev libmp3lame-dev libopus-dev libsodium-dev libffi-dev libpng-dev libjpeg-dev libfreetype6-dev libzip-dev libxml2-dev libonig-dev cmake gfortran libopenblas-dev liblapack-dev protobuf-compiler
-sudo a2enmod proxy proxy_fcgi setenvif rewrite headers expires ssl && sudo a2enconf php8.3-fpm && sudo systemctl reload apache2
 ```
-Apache 2.4 + PHP‑FPM easily replaces FrankenPHP as long as you keep the same extensions/uploads limits. Create `/etc/php/8.3/fpm/conf.d/99-synaplan.ini` with:
+
+### Enable Apache modules:
+```bash
+# For PHP 8.3:
+sudo a2enmod proxy proxy_fcgi setenvif rewrite headers expires ssl alias && sudo a2enconf php8.3-fpm && sudo systemctl reload apache2
+
+# For PHP 8.4:
+sudo a2enmod proxy proxy_fcgi setenvif rewrite headers expires ssl alias && sudo a2enconf php8.4-fpm && sudo systemctl reload apache2
 ```
+
+> **Important:** Note your PHP-FPM socket path - it differs by version:
+> - PHP 8.3: `/run/php/php8.3-fpm.sock`
+> - PHP 8.4: `/run/php/php8.4-fpm.sock`
+> 
+> Check your actual socket: `ls -la /run/php/`
+
+### PHP configuration
+Create `/etc/php/8.X/fpm/conf.d/99-synaplan.ini` (replace 8.X with your version):
+```ini
 upload_max_filesize=128M
 post_max_size=128M
 max_file_uploads=50
 memory_limit=512M
+```
+
+Restart PHP-FPM:
+```bash
+sudo systemctl restart php8.4-fpm  # or php8.3-fpm
 ```
 
 ## 3. Node.js toolchain (frontend + Vite)
@@ -28,12 +62,16 @@ curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
 sudo apt install -y nodejs
 ```
 
+Alternatively, use pnpm (faster):
+```bash
+npm install -g pnpm
+```
+
 ## 4. Optional helpers
 ```bash
 sudo apt install -y redis-server supervisor
 ```
-*(Use Redis for Messenger transports if you don’t want to rely on MariaDB queues; use Supervisor/systemd to keep workers alive.)*
-> If you stick to PHP 8.3, the `php8.3-redis` extension is already installed in step 2. For newer distro defaults (PHP 8.4), install the matching `php8.4-redis` package before running Composer.
+*(Use Redis for Messenger transports if you don't want to rely on MariaDB queues; use Supervisor/systemd to keep workers alive.)*
 
 ## 5. Local Apache Tika (optional)
 ```bash
@@ -45,7 +83,7 @@ sha256sum tika-server.jar             # optional integrity check
 nohup java -jar tika-server.jar --host 0.0.0.0 --port 9998 >/wwwroot/synaplan/services/tika/tika.log 2>&1 &
 sleep 3 && curl -fsS http://127.0.0.1:9998/tika | head -n1   # should print the HTML banner
 ```
-*Stop the background copy any time with `pkill -f tika-server.jar`. A “Please PUT” banner in the curl response confirms the server is ready. Point `TIKA_BASE_URL=http://localhost:9998`.*
+*Stop the background copy any time with `pkill -f tika-server.jar`. A "Please PUT" banner in the curl response confirms the server is ready.*
 
 **Systemd autostart (optional)**
 ```bash
@@ -87,7 +125,8 @@ cp frontend/.env.example frontend/.env
 ```
 
 ## 8. Ollama service + required models
-Install the systemd-managed Ollama daemon (same API the Docker stack exposes) and make sure the two baseline models exist before Symfony starts:
+
+Install the systemd-managed Ollama daemon:
 ```bash
 curl -fsSL https://ollama.com/install.sh | sh
 sudo systemctl enable --now ollama
@@ -95,71 +134,350 @@ sudo systemctl status --no-pager ollama
 sudo ss -ltnp | grep 11434   # should show ollama on 127.0.0.1:11434
 ```
 
-Pull the chat + embedding models once so the backend can answer immediately:
+Pull the chat + embedding models:
 ```bash
 ollama pull gpt-oss:20b
 ollama pull bge-m3
 ollama list
 curl -fsS http://127.0.0.1:11434/api/tags | grep -E 'gpt-oss|bge-m3'
 ```
-*If the backend lives on another host, run `sudo systemctl edit ollama`, set `Environment="OLLAMA_HOST=0.0.0.0"`, restart the service, and point `OLLAMA_BASE_URL=http://<ollama-host>:11434` in `backend/.env`. When Ollama is local keep `AUTO_DOWNLOAD_MODELS=false` so Symfony skips redundant pulls.*
 
-## 9. Backend environment essentials
-- `APP_ENV=prod`, `APP_URL=https://api.example.com`
-- Database (you said you can provide MariaDB 11 → create DB/user first):
-  ```
-  DATABASE_WRITE_URL=mysql://synaplan_user:strongpass@db-host:3306/synaplan?serverVersion=11.8&charset=utf8mb4
-  DATABASE_READ_URL=mysql://synaplan_user:strongpass@db-host:3306/synaplan?serverVersion=11.8&charset=utf8mb4
-  ```
-- Set `MESSENGER_TRANSPORT_DSN=redis://127.0.0.1:6379` (recommended). Resist the temptation to append `/messenger` or `?delete_after_ack=1` here—the individual transports already define their stream names, consumer groups, and retention settings in `config/packages/messenger.yaml`. Doctrine transports work too, but require the `symfony/doctrine-messenger` package and different queue options.
-- Point to your existing services (adjust hosts when serving under a subdirectory, e.g. `APP_URL=http://localhost/synaplan/backend` and `FRONTEND_URL=http://localhost/synaplan/frontend` on WSL/Apache setups):
-  - `OLLAMA_BASE_URL=http://<ollama-host>:11434`
-  - `TIKA_BASE_URL=http://<tika-host>:9998`
-  - `MAILER_DSN=smtp://AWS_SMTP_USER:AWS_SMTP_PASS@email-smtp.<region>.amazonaws.com:587`
-  - `AI_DEFAULT_PROVIDER=ollama`
-  - `FRONTEND_URL=https://app.example.com`
-- Disable auto model downloads if you already run Ollama elsewhere: `AUTO_DOWNLOAD_MODELS=false`.
-- Adjust optional providers (Groq/OpenAI/WhatsApp/Stripe) as needed.
+*If the backend lives on another host, run `sudo systemctl edit ollama`, set `Environment="OLLAMA_HOST=0.0.0.0"`, restart the service.*
+
+---
+
+## 9. Backend environment setup
+
+### Complete backend `.env` template
+
+Create/edit `/wwwroot/synaplan/backend/.env` with ALL required variables:
+
+```ini
+# =============================================================================
+# REQUIRED SETTINGS
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# Application
+# -----------------------------------------------------------------------------
+APP_ENV=dev
+APP_DEBUG=true
+APP_SECRET=change_this_to_a_random_string_in_production
+
+# URLs (adjust for your setup - see Configuration Quick Reference below)
+APP_URL=http://localhost/synaplan/backend
+FRONTEND_URL=http://localhost/synaplan/frontend
+
+# -----------------------------------------------------------------------------
+# Database (REQUIRED)
+# -----------------------------------------------------------------------------
+DATABASE_WRITE_URL=mysql://synaplan:password@127.0.0.1:3306/synaplan?serverVersion=11.8&charset=utf8mb4
+DATABASE_READ_URL=mysql://synaplan:password@127.0.0.1:3306/synaplan?serverVersion=11.8&charset=utf8mb4
+
+# -----------------------------------------------------------------------------
+# JWT Authentication (REQUIRED - keys generated in step 10)
+# -----------------------------------------------------------------------------
+JWT_SECRET_KEY=%kernel.project_dir%/config/jwt/private.pem
+JWT_PUBLIC_KEY=%kernel.project_dir%/config/jwt/public.pem
+JWT_PASSPHRASE=
+
+# -----------------------------------------------------------------------------
+# AI Services (REQUIRED - at minimum set OLLAMA_BASE_URL)
+# -----------------------------------------------------------------------------
+OLLAMA_BASE_URL=http://127.0.0.1:11434
+AI_DEFAULT_PROVIDER=ollama
+AUTO_DOWNLOAD_MODELS=false
+
+# =============================================================================
+# OPTIONAL SETTINGS
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# Message Queue (recommended: Redis)
+# -----------------------------------------------------------------------------
+MESSENGER_TRANSPORT_DSN=redis://127.0.0.1:6379
+
+# -----------------------------------------------------------------------------
+# Document Processing
+# -----------------------------------------------------------------------------
+TIKA_BASE_URL=http://127.0.0.1:9998
+
+# -----------------------------------------------------------------------------
+# Email (use null://null for dev)
+# -----------------------------------------------------------------------------
+MAILER_DSN=null://null
+
+# -----------------------------------------------------------------------------
+# reCAPTCHA (disabled for dev)
+# -----------------------------------------------------------------------------
+RECAPTCHA_ENABLED=false
+
+# -----------------------------------------------------------------------------
+# External AI APIs (optional)
+# -----------------------------------------------------------------------------
+# OPENAI_API_KEY=sk-...
+# ANTHROPIC_API_KEY=sk-ant-...
+# GROQ_API_KEY=gsk_...
+# GOOGLE_GEMINI_API_KEY=...
+
+# -----------------------------------------------------------------------------
+# Social Login (optional)
+# -----------------------------------------------------------------------------
+# GOOGLE_CLIENT_ID=
+# GOOGLE_CLIENT_SECRET=
+# GITHUB_CLIENT_ID=
+# GITHUB_CLIENT_SECRET=
+
+# -----------------------------------------------------------------------------
+# Whisper Transcription (optional)
+# -----------------------------------------------------------------------------
+WHISPER_ENABLED=false
+WHISPER_BINARY=/usr/local/bin/whisper
+WHISPER_MODELS_PATH=/wwwroot/synaplan/backend/var/whisper
+WHISPER_DEFAULT_MODEL=base
+```
+
+---
 
 ## 10. Backend install & database prep
+
+### Step 1: Install dependencies
 ```bash
 cd /wwwroot/synaplan/backend
 composer install --no-dev --optimize-autoloader
-php bin/console lexik:jwt:generate-keypair --skip-if-exists
-php bin/console doctrine:migrations:migrate --no-interaction
-php bin/console doctrine:fixtures:load --no-interaction # optional demo data
-php bin/console cache:clear --env=prod
+```
+
+### Step 2: Generate JWT keys (CRITICAL)
+
+The JWT keypair command requires env vars to be set first, so generate manually:
+
+```bash
+cd /wwwroot/synaplan/backend
+mkdir -p config/jwt
+openssl genrsa -out config/jwt/private.pem 4096
+openssl rsa -pubout -in config/jwt/private.pem -out config/jwt/public.pem
+```
+
+**CRITICAL: Set permissions so PHP-FPM (www-data) can read the keys:**
+```bash
+chmod 644 config/jwt/private.pem config/jwt/public.pem
+```
+
+> ⚠️ **Common Error:** If you see `Signature key does not exist or is not readable`, the permissions are wrong. Run `chmod 644 config/jwt/*.pem`.
+
+### Step 3: Create database and user
+
+```sql
+-- Run in MySQL/MariaDB as root:
+CREATE DATABASE synaplan CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE USER 'synaplan'@'localhost' IDENTIFIED BY 'your_password';
+GRANT ALL PRIVILEGES ON synaplan.* TO 'synaplan'@'localhost';
+FLUSH PRIVILEGES;
+```
+
+### Step 4: Create database schema
+
+> **Note:** This project uses schema creation, not migrations. The migrations folder is empty.
+
+```bash
+cd /wwwroot/synaplan/backend
+
+# Create schema from entities
+php bin/console doctrine:schema:create --no-interaction
+
+# Or update if tables partially exist
+php bin/console doctrine:schema:update --force
+```
+
+### Step 5: Clear cache and set permissions
+```bash
+php bin/console cache:clear
+sudo chown -R www-data:www-data var config/jwt
+sudo chmod -R 775 var
+```
+
+### Step 6: Create a test user (optional)
+```bash
+# Via API:
+curl -X POST http://localhost/synaplan/backend/api/v1/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"email":"admin@synaplan.com","password":"admin123","name":"Admin User"}'
+
+# Then verify the user in database:
+mysql -u synaplan -p synaplan -e "UPDATE BUSER SET BEMAILVERIFIED = 1 WHERE BMAIL = 'admin@test.com';"
+```
+
+### Step 7: Setup message transports (if using Redis)
+```bash
 php bin/console messenger:setup-transports --no-interaction
 ```
-Ensure writable dirs:
-```bash
-sudo chown -R www-data:www-data var public/up && sudo chmod -R 775 var public/up
-```
 
-Run background workers (keep under Supervisor/systemd):
-```bash
-php bin/console messenger:consume async_ai_high async_extract async_index -vv
-```
-Double-check the worker is picking up the right transport DSN:
-```bash
-php -d variables_order=EGPCS -r "echo getenv('MESSENGER_TRANSPORT_DSN'), PHP_EOL;"
-```
+---
 
-### Systemd worker (recommended)
-Create a tiny env override file so systemd doesn’t need to embed secrets:
+## 11. Apache virtual host configuration
+
+### WSL subdirectory setup (RECOMMENDED for localhost)
+
+> **Important:** Do NOT create a separate VirtualHost with `ServerName localhost` - this will block other applications like PHPMyAdmin. Instead, add Synaplan routes to the default config.
+
+**Option A: Modify existing 000-default.conf (recommended)**
+
 ```bash
-sudo mkdir -p /etc/synaplan
-sudo tee /etc/synaplan/backend-worker.env >/dev/null <<'EOF'
-APP_ENV=prod
-APP_DEBUG=0
-MESSENGER_TRANSPORT_DSN=redis://127.0.0.1:6379
-# Add DB URLs, Ollama/Tika endpoints, etc., if they aren’t already exported
+sudo tee /etc/apache2/sites-available/000-default.conf >/dev/null <<'EOF'
+<VirtualHost *:80>
+    ServerAdmin webmaster@localhost
+    DocumentRoot /wwwroot
+
+    # ─────────────────────────────────────────────────────────────
+    # Synaplan Backend API: /synaplan/backend → Symfony via PHP-FPM
+    # ─────────────────────────────────────────────────────────────
+    Alias /synaplan/backend /wwwroot/synaplan/backend/public
+
+    <Directory /wwwroot/synaplan/backend/public>
+        AllowOverride All
+        Require all granted
+        FallbackResource /synaplan/backend/index.php
+        Options -Indexes +FollowSymLinks
+    </Directory>
+
+    # PHP-FPM handler (adjust socket path for your PHP version!)
+    <FilesMatch \.php$>
+        SetHandler "proxy:unix:/run/php/php8.4-fpm.sock|fcgi://localhost"
+    </FilesMatch>
+
+    # ─────────────────────────────────────────────────────────────
+    # Synaplan Frontend: /synaplan/frontend → Vue SPA
+    # ─────────────────────────────────────────────────────────────
+    Alias /synaplan/frontend /wwwroot/synaplan/frontend/dist
+
+    <Directory /wwwroot/synaplan/frontend/dist>
+        AllowOverride None
+        Require all granted
+        Options -Indexes
+        FallbackResource /synaplan/frontend/index.html
+    </Directory>
+
+    # ─────────────────────────────────────────────────────────────
+    # Default DocumentRoot (for PHPMyAdmin, other apps)
+    # ─────────────────────────────────────────────────────────────
+    <Directory /wwwroot>
+        Options Indexes FollowSymLinks
+        AllowOverride All
+        Require all granted
+    </Directory>
+
+    ErrorLog ${APACHE_LOG_DIR}/error.log
+    CustomLog ${APACHE_LOG_DIR}/access.log combined
+</VirtualHost>
 EOF
-sudo chmod 640 /etc/synaplan/backend-worker.env
-sudo chown root:www-data /etc/synaplan/backend-worker.env
+
+sudo systemctl reload apache2
 ```
 
-Drop the unit file:
+> **PHP Version Note:** Change `php8.4-fpm.sock` to `php8.3-fpm.sock` if using PHP 8.3.
+
+**Option B: Separate config file (may conflict with other sites)**
+
+If you must use a separate file, ensure it doesn't have `ServerName localhost`:
+
+```bash
+# Copy the template and adjust
+sudo cp /wwwroot/synaplan/_devextras/synaplan-wsl.conf /etc/apache2/sites-available/
+# Edit to remove "ServerName localhost" line if present
+sudo a2ensite synaplan-wsl.conf
+sudo systemctl reload apache2
+```
+
+### Production setup (separate domains)
+```apache
+<VirtualHost *:80>
+    ServerName api.example.com
+    DocumentRoot /wwwroot/synaplan/backend/public
+
+    <Directory /wwwroot/synaplan/backend/public>
+        AllowOverride All
+        Require all granted
+        FallbackResource /index.php
+    </Directory>
+
+    <FilesMatch \.php$>
+        SetHandler "proxy:unix:/run/php/php8.4-fpm.sock|fcgi://localhost"
+    </FilesMatch>
+
+    ErrorLog ${APACHE_LOG_DIR}/synaplan-error.log
+    CustomLog ${APACHE_LOG_DIR}/synaplan-access.log combined
+</VirtualHost>
+```
+
+---
+
+## 12. Frontend environment & build
+
+### Frontend `.env` settings
+
+Edit `/wwwroot/synaplan/frontend/.env`:
+
+```ini
+# API endpoint (must point to BACKEND, not frontend!)
+VITE_API_BASE_URL=http://localhost/synaplan/backend
+
+# Base path for assets and routing
+VITE_BASE_PATH=/synaplan/frontend/
+
+# Development settings
+VITE_API_TIMEOUT=30000
+VITE_RECAPTCHA_ENABLED=false
+VITE_SHOW_ERROR_STACK=true
+```
+
+> ⚠️ **Common Mistake:** `VITE_API_BASE_URL` must point to the **backend** URL, not the frontend!
+
+### Build frontend
+
+```bash
+cd /wwwroot/synaplan/frontend
+npm install   # or: pnpm install
+npm run build # or: pnpm build
+```
+
+### Verify build output
+```bash
+cat /wwwroot/synaplan/frontend/dist/index.html | head -20
+# Should show paths like /synaplan/frontend/assets/...
+```
+
+---
+
+## 13. Verify setup
+
+### Test backend API
+```bash
+# Health check
+curl -s http://localhost/synaplan/backend/api/health
+
+# Auth providers (should return JSON)
+curl -s http://localhost/synaplan/backend/api/v1/auth/providers
+
+# If you see HTML error pages, check Apache logs:
+tail -20 /var/log/apache2/error.log
+```
+
+### Test frontend
+Open in browser: `http://localhost/synaplan/frontend/`
+
+### Test login
+```bash
+curl -X POST http://localhost/synaplan/backend/api/v1/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"admin@test.com","password":"Test1234!"}'
+```
+
+---
+
+## 14. Background workers (Messenger)
+
+### Systemd worker service
+
 ```bash
 sudo tee /etc/systemd/system/synaplan-messenger.service >/dev/null <<'EOF'
 [Unit]
@@ -172,7 +490,6 @@ Type=simple
 User=www-data
 Group=www-data
 WorkingDirectory=/wwwroot/synaplan/backend
-EnvironmentFile=-/etc/synaplan/backend-worker.env
 ExecStart=/usr/bin/php bin/console messenger:consume async_ai_high async_extract async_index -vv --time-limit=3600 --memory-limit=512M
 Restart=always
 RestartSec=5
@@ -182,195 +499,69 @@ StandardError=journal
 [Install]
 WantedBy=multi-user.target
 EOF
+
 sudo systemctl daemon-reload
 sudo systemctl enable --now synaplan-messenger.service
 sudo systemctl status synaplan-messenger.service
 ```
-Tail the logs with `journalctl -u synaplan-messenger.service -f`. Use `sudo systemctl restart synaplan-messenger.service` whenever you deploy new code.
 
-## 11. Apache virtual host example
+Tail logs: `journalctl -u synaplan-messenger.service -f`
 
-### Production setup (separate domains)
-```
-<VirtualHost *:80>
-    ServerName api.example.com
-    DocumentRoot /wwwroot/synaplan/backend/public
+---
 
-    <Directory /wwwroot/synaplan/backend/public>
-        AllowOverride All
-        Require all granted
-        FallbackResource /index.php
-    </Directory>
+## 15. Troubleshooting
 
-    <FilesMatch \.php$>
-        SetHandler "proxy:unix:/run/php/php8.3-fpm.sock|fcgi://localhost"
-    </FilesMatch>
+### Common errors and solutions
 
-    ErrorLog ${APACHE_LOG_DIR}/synaplan-error.log
-    CustomLog ${APACHE_LOG_DIR}/synaplan-access.log combined
-</VirtualHost>
-```
-Enable the site (`sudo a2ensite synaplan.conf && sudo systemctl reload apache2`). Use HTTPS in production.
+| Error | Cause | Solution |
+|-------|-------|----------|
+| `Environment variable not found: "JWT_SECRET_KEY"` | JWT env vars not set | Add JWT_SECRET_KEY, JWT_PUBLIC_KEY, JWT_PASSPHRASE to `.env` |
+| `Signature key does not exist or is not readable` | JWT key permissions | `chmod 644 config/jwt/*.pem` |
+| `Environment variable not found: "OLLAMA_BASE_URL"` | Missing AI config | Add `OLLAMA_BASE_URL=http://127.0.0.1:11434` to `.env` |
+| `FCGI: attempt to connect to Unix domain socket failed` | Wrong PHP-FPM socket path | Check socket: `ls /run/php/` and update Apache config |
+| `503 Service Unavailable` | PHP-FPM not running | `sudo systemctl start php8.4-fpm` |
+| `405 Method Not Allowed` on POST | Apache redirect (trailing slash) | Ensure URLs match exactly, check for 301/302 redirects |
+| PHPMyAdmin returns 403/404 | Synaplan VirtualHost blocking | Use Option A (merge into 000-default.conf) |
+| Logo 404 errors | Hardcoded paths | Rebuild frontend after setting `VITE_BASE_PATH` |
+| `Access denied for user` (database) | Wrong credentials | Check DATABASE_WRITE_URL in `.env` |
+| `Table doesn't exist` | Schema not created | Run `php bin/console doctrine:schema:update --force` |
 
-### WSL subdirectory setup (localhost/synaplan/...)
+### Debug commands
 
-For running both frontend and backend under `http://localhost/synaplan/...` on WSL (keeps Docker setup intact):
-
-**URLs after setup:**
-| Component | URL |
-|-----------|-----|
-| Frontend | `http://localhost/synaplan/frontend/` |
-| Backend API | `http://localhost/synaplan/backend/` |
-
-**Create Apache config** `/etc/apache2/sites-available/synaplan-wsl.conf`:
 ```bash
-sudo tee /etc/apache2/sites-available/synaplan-wsl.conf >/dev/null <<'EOF'
-<VirtualHost *:80>
-    ServerName localhost
+# Check Symfony config
+php bin/console about
+php bin/console debug:router | head -30
 
-    # Backend API: /synaplan/backend → Symfony via PHP-FPM
-    Alias /synaplan/backend /wwwroot/synaplan/backend/public
+# Check database connection
+php bin/console doctrine:schema:validate
 
-    <Directory /wwwroot/synaplan/backend/public>
-        AllowOverride All
-        Require all granted
-        FallbackResource /synaplan/backend/index.php
-        Options -Indexes +FollowSymLinks
-    </Directory>
-
-    <FilesMatch \.php$>
-        SetHandler "proxy:unix:/run/php/php8.3-fpm.sock|fcgi://localhost"
-    </FilesMatch>
-
-    # Frontend (Production): /synaplan/frontend → Vue SPA dist
-    Alias /synaplan/frontend /wwwroot/synaplan/frontend/dist
-
-    <Directory /wwwroot/synaplan/frontend/dist>
-        AllowOverride None
-        Require all granted
-        Options -Indexes
-        FallbackResource /synaplan/frontend/index.html
-    </Directory>
-
-    ErrorLog ${APACHE_LOG_DIR}/synaplan-error.log
-    CustomLog ${APACHE_LOG_DIR}/synaplan-access.log combined
-</VirtualHost>
-EOF
-```
-
-**Enable the site:**
-```bash
-sudo a2enmod rewrite proxy_fcgi alias
-sudo a2ensite synaplan-wsl.conf
+# Clear all caches
+php bin/console cache:clear
 sudo systemctl reload apache2
+sudo systemctl restart php8.4-fpm
+
+# Check Apache config syntax
+sudo apache2ctl configtest
+
+# View recent errors
+tail -50 /var/log/apache2/error.log
+tail -50 /wwwroot/synaplan/backend/var/log/dev.log
 ```
 
-**Backend `.env` settings for WSL:**
-```ini
-APP_ENV=dev
-APP_DEBUG=true
-APP_URL=http://localhost/synaplan/backend
-FRONTEND_URL=http://localhost/synaplan/frontend
+### JWT key regeneration
 
-DATABASE_WRITE_URL=mysql://synaplan:password@127.0.0.1:3306/synaplan?serverVersion=11.8&charset=utf8mb4
-DATABASE_READ_URL=mysql://synaplan:password@127.0.0.1:3306/synaplan?serverVersion=11.8&charset=utf8mb4
-MESSENGER_TRANSPORT_DSN=redis://127.0.0.1:6379
-
-OLLAMA_BASE_URL=http://127.0.0.1:11434
-TIKA_BASE_URL=http://127.0.0.1:9998
-AI_DEFAULT_PROVIDER=ollama
-AUTO_DOWNLOAD_MODELS=false
-MAILER_DSN=null://null
-```
-
-**Frontend `.env` settings for WSL:**
-```ini
-VITE_API_BASE_URL=http://localhost/synaplan/backend
-VITE_BASE_PATH=/synaplan/frontend/
-VITE_SHOW_ERROR_STACK=true
-```
-
-**Build frontend with WSL base path:**
+If JWT keys are corrupted or lost:
 ```bash
-cd /wwwroot/synaplan/frontend
-npm install
-npm run build
+cd /wwwroot/synaplan/backend
+rm -f config/jwt/*.pem
+mkdir -p config/jwt
+openssl genrsa -out config/jwt/private.pem 4096
+openssl rsa -pubout -in config/jwt/private.pem -out config/jwt/public.pem
+chmod 644 config/jwt/*.pem
+sudo chown www-data:www-data config/jwt/*.pem
+php bin/console cache:clear
 ```
-
-**Verify setup:**
-```bash
-curl -s http://localhost/synaplan/backend/api/health | head -c 200
-# Then open http://localhost/synaplan/frontend/ in browser
-```
-
-**Development with Vite hot-reload (optional):**
-
-Instead of serving static files, proxy to Vite dev server. Add to Apache config (before the static Alias):
-```apache
-# Uncomment for dev mode, comment out the static frontend Alias/Directory above
-# ProxyPass /synaplan/frontend http://127.0.0.1:5173/synaplan/frontend
-# ProxyPassReverse /synaplan/frontend http://127.0.0.1:5173/synaplan/frontend
-```
-
-Then run Vite:
-```bash
-cd /wwwroot/synaplan/frontend
-npm run dev -- --host 0.0.0.0 --port 5173 --base /synaplan/frontend/
-```
-
-> **Note:** A ready-to-use Apache config file is also available at `_devextras/synaplan-wsl.conf` and detailed troubleshooting at `_devextras/wsl-subdirectory-setup.md`.
-
-## 12. Frontend environment & build
-
-Edit `frontend/.env` based on your deployment scenario:
-
-| Setting | Production (separate domains) | WSL subdirectory |
-|---------|------------------------------|------------------|
-| `VITE_API_BASE_URL` | `https://api.example.com` | `http://localhost/synaplan/backend` |
-| `VITE_BASE_PATH` | `/` | `/synaplan/frontend/` |
-
-Other optional settings:
-- `VITE_RECAPTCHA_ENABLED=false` — disable reCAPTCHA for local dev
-- `VITE_SHOW_ERROR_STACK=true` — show detailed errors in dev
-- `VITE_AUTO_LOGIN_DEV=false` — auto-login for testing
-
-Install & serve:
-```bash
-cd /wwwroot/synaplan/frontend
-npm install
-npm run dev -- --host 0.0.0.0 --port 5173   # development (default base path)
-npm run build && npm run preview -- --host 0.0.0.0 --port 4173  # production preview
-```
-
-For WSL subdirectory dev mode, pass the base path explicitly:
-```bash
-npm run dev -- --host 0.0.0.0 --port 5173 --base /synaplan/frontend/
-```
-
-For production hosting, serve `frontend/dist` via Apache (see section 11) and the backend API handles CORS automatically.
-
-## 13. External services you already have
-- **Ollama**: expose `http://<host>:11434`, ensure backend host can reach it, and pre-pull `gpt-oss:20b` + `bge-m3` there.
-- **Amazon SES**: use SMTP credentials in `MAILER_DSN`.
-- **Apache Tika**: leave the service running at `http://<tika-host>:9998`; backend only needs the URL.
-- **MariaDB**: provision an empty schema, grant `CREATE/DROP/ALTER` so migrations succeed.
-
-## 14. Final checklist
-
-**For all setups:**
-1. Confirm `php -m` lists every extension above (especially `imagick`, `intl`, `imap`, `ffi`, `sodium`).
-2. Run `php bin/console about` to verify Symfony sees the environment.
-
-**Production (separate domains):**
-3. Hit `https://api.example.com/api/health` (healthcheck endpoint).
-4. Visit `https://app.example.com` to log in with demo users (`admin@synaplan.com` / `admin123`).
-
-**WSL subdirectory:**
-3. Hit `http://localhost/synaplan/backend/api/health`
-4. Visit `http://localhost/synaplan/frontend/` to log in with demo users (`admin@synaplan.com` / `admin123`).
-
-**Monitoring:**
-5. Monitor logs: `tail -f backend/var/log/dev.log`, `sudo journalctl -u apache2 -f`
 
 ---
 
@@ -382,9 +573,26 @@ For production hosting, serve `frontend/dist` via Apache (see section 11) and th
 | **Production** | `https://api.example.com` | `https://app.example.com` | `https://api.example.com` | `/` |
 | **WSL subdirectory** | `http://localhost/synaplan/backend` | `http://localhost/synaplan/frontend` | `http://localhost/synaplan/backend` | `/synaplan/frontend/` |
 
+### PHP-FPM Socket Paths
+
+| PHP Version | Socket Path |
+|-------------|-------------|
+| PHP 8.3 | `/run/php/php8.3-fpm.sock` |
+| PHP 8.4 | `/run/php/php8.4-fpm.sock` |
+
 The codebase requires **no code changes** between environments—only `.env` file adjustments.
 
 ---
 
-That's all that is required to reproduce the Docker Compose setup on a plain Ubuntu host or WSL.
+## External services
 
+| Service | Default URL | Environment Variable |
+|---------|-------------|---------------------|
+| Ollama | `http://127.0.0.1:11434` | `OLLAMA_BASE_URL` |
+| Apache Tika | `http://127.0.0.1:9998` | `TIKA_BASE_URL` |
+| Redis | `redis://127.0.0.1:6379` | `MESSENGER_TRANSPORT_DSN` |
+| MariaDB/MySQL | `127.0.0.1:3306` | `DATABASE_WRITE_URL`, `DATABASE_READ_URL` |
+
+---
+
+That's all that is required to reproduce the Docker Compose setup on a plain Ubuntu host or WSL.
