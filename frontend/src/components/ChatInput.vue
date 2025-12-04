@@ -210,7 +210,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, nextTick } from 'vue'
+import { ref, computed, watch, nextTick, type Ref } from 'vue'
 import { PaperAirplaneIcon, XMarkIcon, SparklesIcon, MicrophoneIcon, PlusIcon } from '@heroicons/vue/24/outline'
 import { Icon } from '@iconify/vue'
 import Textarea from './Textarea.vue'
@@ -240,12 +240,11 @@ interface UploadedFile {
   processing: boolean
 }
 
-const props = defineProps({
-  isStreaming: {
-    type: Boolean,
-    default: false
-  }
-})
+interface Props {
+  isStreaming?: boolean
+}
+
+const props = defineProps<Props>()
 
 const isStreaming = computed(() => props.isStreaming ?? false)
 
@@ -712,7 +711,10 @@ const toggleEnhance = async () => {
 }
 
 // Expose textarea ref for parent component (auto-focus)
-defineExpose({
+// ATTENTION: needs to be typed when using vue-tsc -b
+defineExpose<{
+  textareaRef: Ref<InstanceType<typeof Textarea> | null>
+}>({
   textareaRef
 })
 </script>
