@@ -7,6 +7,40 @@
 const isAnonymousWidget = typeof window.isAnonymousWidget !== 'undefined' ? window.isAnonymousWidget : false;
 // Widget mode flag (compact embedded UI)
 const isWidgetMode = typeof window.isWidgetMode !== 'undefined' ? window.isWidgetMode : false;
+// Widget session token for cookie-less authentication (set in widgetloader.php)
+const widgetSessionToken = typeof window.widgetSessionToken !== 'undefined' ? window.widgetSessionToken : null;
+
+/**
+ * Get fetch options with widget token header if available
+ * This ensures API requests work even when third-party cookies are blocked
+ * @param {Object} options - Base fetch options
+ * @returns {Object} - Enhanced fetch options with widget token header
+ */
+function getFetchOptionsWithWidgetToken(options = {}) {
+    const enhancedOptions = { ...options, credentials: 'include' };
+    
+    if (widgetSessionToken && isAnonymousWidget) {
+        enhancedOptions.headers = {
+            ...(enhancedOptions.headers || {}),
+            'X-Widget-Token': widgetSessionToken
+        };
+    }
+    
+    return enhancedOptions;
+}
+
+/**
+ * Append widget token to URL for SSE/EventSource (which can't set headers)
+ * @param {string} url - The URL to append the token to
+ * @returns {string} - URL with widget token parameter
+ */
+function appendWidgetTokenToUrl(url) {
+    if (widgetSessionToken && isAnonymousWidget) {
+        const separator = url.includes('?') ? '&' : '?';
+        return url + separator + 'widget_token=' + encodeURIComponent(widgetSessionToken);
+    }
+    return url;
+}
 
 // ========================================
 // GROQ/DeepSeek REASONING HANDLING
@@ -579,11 +613,10 @@ function handleSendMessage() {
       formData.append('files[]', file, file.name);
     });
 
-    fetch('api.php', {
+    fetch('api.php', getFetchOptionsWithWidgetToken({
       method: 'POST',
-      body: formData,
-      credentials: 'include'
-    })
+      body: formData
+    }))
     .then(res => {
       if (!res.ok) {
         if (res.status === 401) {
@@ -860,6 +893,9 @@ function sseStream(data, outputObject, originalButton = null) {
   if (data.again && data.again.model_id) {
     streamUrl += `&again_model_id=${data.again.model_id}&again=1`;
   }
+  
+  // Append widget token for SSE (EventSource can't set headers)
+  streamUrl = appendWidgetTokenToUrl(streamUrl);
   
   const eventSource = new EventSource(streamUrl);
 
@@ -1175,11 +1211,10 @@ function showMessageFiles(messageId) {
         formData.append('action', 'getMessageFiles');
         formData.append('messageId', messageId);
         
-        fetch('api.php', {
+        fetch('api.php', getFetchOptionsWithWidgetToken({
             method: 'POST',
-            body: formData,
-            credentials: 'include'
-        })
+            body: formData
+        }))
         .then(response => response.json())
         .then(data => {
             if (data.success && data.files && data.files.length > 0) {
@@ -1332,11 +1367,10 @@ function handleAgainMessage(modelId, promptId, $originalButton) {
   if (modelId) formData.append('model_id', modelId);
   if (promptId) formData.append('promptId', promptId);
   
-  fetch('api.php?action=messageAgain', {
+  fetch('api.php?action=messageAgain', getFetchOptionsWithWidgetToken({
     method: 'POST',
-    body: formData,
-    credentials: 'include'
-  })
+    body: formData
+  }))
   .then(response => response.json())
   .then(data => {
     if (data.success) {
@@ -1417,6 +1451,9 @@ function handleAgainMessage(modelId, promptId, $originalButton) {
       if (currentInId) streamUrl += `&in_id=${currentInId}`;
       if (modelId) streamUrl += `&model_id=${modelId}`;
       // Note: promptId intentionally excluded for Again requests
+      
+      // Append widget token for SSE (EventSource can't set headers)
+      streamUrl = appendWidgetTokenToUrl(streamUrl);
       
       const eventSource = new EventSource(streamUrl);
       

@@ -36,6 +36,7 @@ session_start();
 require_once __DIR__ . '/../vendor/autoload.php';
 require_once __DIR__ . '/../app/inc/_coreincludes.php';
 require_once __DIR__ . '/../app/inc/api/_api-openapi.php';
+require_once __DIR__ . '/../app/inc/api/widgetsessiontoken.php';
 
 // ----------------------------- Bearer API key authentication
 ApiAuthenticator::handleBearerAuth();

@@ -42,6 +42,7 @@ session_start();
 // Core app files via Composer autoload and centralized includes
 require_once __DIR__ . '/../vendor/autoload.php';
 require_once __DIR__ . '/../app/inc/_coreincludes.php';
+require_once __DIR__ . '/../app/inc/api/widgetsessiontoken.php';
 
 // Get remaining parameters
 $uid = isset($_REQUEST['uid']) ? intval($_REQUEST['uid']) : 0;
@@ -152,6 +153,14 @@ $darkenedUserColor = darkenColor($config['color'], 0.4);
 $_SESSION['WIDGET_PROMPT'] = $config['prompt'];
 $_SESSION['WIDGET_AUTO_MESSAGE'] = $config['autoMessage'];
 $_SESSION['WIDGET_USER_BUBBLE_COLOR'] = $darkenedUserColor; // For user message bubbles in chat
+
+// Generate widget session token for cross-domain cookie-less authentication
+// This token allows API requests to work even when third-party cookies are blocked
+$widgetSessionToken = WidgetSessionToken::generate(
+    $uid,
+    $widgetId,
+    $_SESSION['anonymous_session_id']
+);
 
 // Set headers to prevent caching and allow iframe embedding
 header('Content-Type: text/html; charset=utf-8');
@@ -358,6 +367,11 @@ header('Pragma: no-cache');
     <script src="node_modules/jquery/dist/jquery.min.js?v=<?php echo @filemtime('node_modules/jquery/dist/jquery.min.js'); ?>"></script>
     <!-- Centralized System Notifications -->
     <script src="assets/statics/js/system-notifications.js?v=<?php echo @filemtime('assets/statics/js/system-notifications.js'); ?>"></script>
+    <script>
+    // Widget session token for cookie-less authentication
+    // This token is used when third-party cookies are blocked by the browser
+    window.widgetSessionToken = <?php echo json_encode($widgetSessionToken); ?>;
+    </script>
 </head>
 <body>
     

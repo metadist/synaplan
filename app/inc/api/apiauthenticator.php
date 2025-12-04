@@ -296,9 +296,57 @@ class ApiAuthenticator
 
         if ($isAnonymousWidget) {
             return self::validateAnonymousWidgetSession();
-        } else {
-            return self::checkRegularUserSession();
         }
+        
+        // Try widget token authentication (for cross-domain widgets with blocked cookies)
+        if (self::tryWidgetTokenAuth()) {
+            return true;
+        }
+        
+        return self::checkRegularUserSession();
+    }
+    
+    /**
+     * Try to authenticate using widget session token
+     * 
+     * This is used when third-party cookies are blocked by the browser.
+     * The token is passed via X-Widget-Token header or widget_token URL parameter.
+     *
+     * @return bool True if token authentication succeeded
+     */
+    private static function tryWidgetTokenAuth(): bool {
+        // Require the token class
+        require_once __DIR__ . '/widgetsessiontoken.php';
+        
+        $token = WidgetSessionToken::extractFromRequest();
+        
+        if (!$token) {
+            return false;
+        }
+        
+        if ($GLOBALS['debug'] ?? false) {
+            error_log('API Debug - Widget token found, attempting validation');
+        }
+        
+        $payload = WidgetSessionToken::validate($token);
+        
+        if (!$payload) {
+            if ($GLOBALS['debug'] ?? false) {
+                error_log('API Debug - Widget token validation failed');
+            }
+            return false;
+        }
+        
+        // Token is valid - restore the session
+        WidgetSessionToken::restoreSession($payload);
+        
+        if ($GLOBALS['debug'] ?? false) {
+            error_log('API Debug - Widget token authentication successful for owner=' . 
+                     $payload['uid'] . ', widget=' . $payload['wid']);
+        }
+        
+        // Now validate as anonymous widget session (rate limiting etc.)
+        return self::validateAnonymousWidgetSession();
     }
 
     /**
