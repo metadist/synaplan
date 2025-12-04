@@ -31,8 +31,8 @@ jobs:
 
       - name: Install dependencies
         working-directory: backend
-        run: composer install --prefer-dist --no-progress --no-interaction
+        run: composer install --prefer-dist --no-progress --no-interaction --no-scripts
 
       - name: Run code formatting check
         working-directory: backend
-        run: make lint
+        run: composer lint
