@@ -39,7 +39,7 @@ backend/vendor/
 node_modules/
 frontend/dist/
 frontend/.vite/
-frontend/*.tsbuildinfo
+*.tsbuildinfo
 
 # Test artifacts
 *.cache
