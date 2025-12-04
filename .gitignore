@@ -1,14 +1,10 @@
 # Environment files (auto-generated or local overrides)
 .env
-backend/.env
-backend/.env.docker
-backend/.env.local
-backend/.env.*.local
-backend/var/.fixtures_loaded
-frontend/.env
-frontend/.env.docker
-frontend/.env.local
-frontend/.env.*.local
+.env.docker
+.env.local
+.env.*.local
+
+.fixtures_loaded
 
 # IDE
 .vscode/
@@ -40,7 +36,7 @@ backend/.phpunit.cache/
 backend/vendor/
 
 # Frontend cache & build
-frontend/node_modules/
+node_modules/
 frontend/dist/
 frontend/.vite/
 frontend/*.tsbuildinfo
@@ -49,9 +45,4 @@ frontend/*.tsbuildinfo
 *.cache
 tests/test-results/
 tests/reports/
-tests/node_modules/
-tests/.env.local
 tests/e2e/prompt_guide.md
-
-# devextras
-_devextras/test/
