@@ -10,6 +10,8 @@ This version works fine as a monolithic release and the platform was started wit
 
 ## 🚀 Dev Setup
 
+This is legacy, please move to version 2.0 to have more fun!
+
 ### Prerequisites
 
 - **docker compose ≥ v2.20**
