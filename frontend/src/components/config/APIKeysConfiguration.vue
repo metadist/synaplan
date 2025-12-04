@@ -380,11 +380,10 @@ const createAPIKey = async () => {
     
     // Show success notification
     success(t('config.apiKeys.keyCreatedSuccess'))
-    
   } catch (err: any) {
     console.error('Failed to create API key:', err)
     error.value = err.message || t('config.apiKeys.errorCreating')
-    showError(error.value ?? t('config.apiKeys.errorCreating'))
+    showError(error.value!)
   } finally {
     loading.value = false
   }
