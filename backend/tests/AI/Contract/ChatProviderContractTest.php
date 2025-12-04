@@ -6,19 +6,19 @@ use App\AI\Interface\ChatProviderInterface;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Abstract Contract Test für ChatProviderInterface
- * 
+ * Abstract Contract Test für ChatProviderInterface.
+ *
  * Alle Provider-Implementierungen müssen diese Tests bestehen.
  */
 abstract class ChatProviderContractTest extends TestCase
 {
     /**
-     * Zu testender Provider (von Subklasse implementiert)
+     * Zu testender Provider (von Subklasse implementiert).
      */
     abstract protected function getProvider(): ChatProviderInterface;
 
     /**
-     * Test: chat returns non-empty string
+     * Test: chat returns non-empty string.
      */
     public function testChatReturnsString(): void
     {
@@ -34,7 +34,7 @@ abstract class ChatProviderContractTest extends TestCase
     }
 
     /**
-     * Test: Provider Metadata
+     * Test: Provider Metadata.
      */
     public function testProviderMetadata(): void
     {
@@ -66,7 +66,7 @@ abstract class ChatProviderContractTest extends TestCase
     }
 
     /**
-     * Test: Streaming callback is invoked
+     * Test: Streaming callback is invoked.
      */
     public function testChatStreamInvokesCallback(): void
     {
@@ -75,7 +75,7 @@ abstract class ChatProviderContractTest extends TestCase
 
         $provider->chatStream(
             [['role' => 'user', 'content' => 'Count to 3']],
-            function($chunk) use (&$chunks) {
+            function ($chunk) use (&$chunks) {
                 $chunks[] = $chunk;
             },
             ['model' => 'test-model']
@@ -85,4 +85,3 @@ abstract class ChatProviderContractTest extends TestCase
         $this->assertIsArray($chunks);
     }
 }
-

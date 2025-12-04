@@ -4,17 +4,17 @@ namespace App\Service\Message\Handler;
 
 use App\AI\Service\AiFacade;
 use App\Entity\Message;
-use App\Service\ModelConfigService;
 use App\Service\Message\MediaPromptExtractor;
+use App\Service\ModelConfigService;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\DependencyInjection\Attribute\AutoconfigureTag;
 
 /**
- * Media Generation Handler
- * 
+ * Media Generation Handler.
+ *
  * Handles media generation requests (images, videos, audio) using AI providers
- * 
+ *
  * User prompts are used directly - frontend has "Enhance Prompt" button for improvements.
  */
 #[AutoconfigureTag('app.message.handler')]
@@ -26,33 +26,34 @@ class MediaGenerationHandler implements MessageHandlerInterface
         private EntityManagerInterface $em,
         private LoggerInterface $logger,
         private MediaPromptExtractor $promptExtractor,
-        private string $uploadDir = '/var/www/html/var/uploads'
-    ) {}
+        private string $uploadDir = '/var/www/html/var/uploads',
+    ) {
+    }
 
     public function getName(): string
     {
         return 'image_generation'; // Keep legacy name for backward compatibility
     }
-    
+
     /**
-     * Non-streaming handle method (required by interface)
+     * Non-streaming handle method (required by interface).
      */
     public function handle(
         Message $message,
         array $thread,
         array $classification,
-        ?callable $progressCallback = null
+        ?callable $progressCallback = null,
     ): array {
         // For media generation, we don't support non-streaming mode
         // Just return a message that it needs streaming
         return [
             'content' => 'Media generation requires streaming mode',
-            'metadata' => []
+            'metadata' => [],
         ];
     }
 
     /**
-     * Handle image generation with streaming
+     * Handle image generation with streaming.
      */
     public function handleStream(
         Message $message,
@@ -60,7 +61,7 @@ class MediaGenerationHandler implements MessageHandlerInterface
         array $classification,
         callable $streamCallback,
         ?callable $progressCallback = null,
-        array $options = []
+        array $options = [],
     ): array {
         // Send initial status based on detected media type (will be refined later)
         $this->notify($progressCallback, 'analyzing', 'Understanding your request...');
@@ -69,19 +70,19 @@ class MediaGenerationHandler implements MessageHandlerInterface
         $promptData = $this->promptExtractor->extract($message, $thread, $classification);
         $prompt = trim($promptData['prompt'] ?? '');
         $promptMediaType = $promptData['media_type'] ?? null;
-        
-        if ($prompt === '') {
+
+        if ('' === $prompt) {
             $prompt = $message->getText();
         }
-        
-        if ($prompt === '') {
+
+        if ('' === $prompt) {
             throw new \RuntimeException('Unable to determine media prompt text');
         }
-        
+
         $this->logger->info('MediaGenerationHandler: Starting media generation', [
             'user_id' => $message->getUserId(),
             'prompt' => substr($prompt, 0, 100),
-            'media_hint' => $promptMediaType
+            'media_hint' => $promptMediaType,
         ]);
 
         // Get media generation model - detect type from model tag if specified
@@ -89,75 +90,75 @@ class MediaGenerationHandler implements MessageHandlerInterface
         $provider = null;
         $modelName = null;
         $mediaType = 'image'; // default
-        
+
         // Check if this is a slash command (e.g., /pic, /vid)
         $topic = $classification['topic'] ?? null;
         $isSlashCommand = false;
-        if ($topic === 'tools:pic') {
+        if ('tools:pic' === $topic) {
             $mediaType = 'image';
             $isSlashCommand = true;
             $this->logger->info('MediaGenerationHandler: Detected /pic command, forcing image generation');
-        } elseif ($topic === 'tools:vid') {
+        } elseif ('tools:vid' === $topic) {
             $mediaType = 'video';
             $isSlashCommand = true;
             $this->logger->info('MediaGenerationHandler: Detected /vid command, forcing video generation');
         }
-        
+
         // Check if this is a slash command (e.g., /pic, /vid)
         $topic = $classification['topic'] ?? null;
         $isSlashCommand = false;
-        if ($topic === 'tools:pic') {
+        if ('tools:pic' === $topic) {
             $mediaType = 'image';
             $isSlashCommand = true;
             $this->logger->info('MediaGenerationHandler: Detected /pic command, forcing image generation');
-        } elseif ($topic === 'tools:vid') {
+        } elseif ('tools:vid' === $topic) {
             $mediaType = 'video';
             $isSlashCommand = true;
             $this->logger->info('MediaGenerationHandler: Detected /vid command, forcing video generation');
         }
-        
+
         // Priority: Classification override > DB default
         if (isset($classification['model_id']) && $classification['model_id']) {
             $modelId = $classification['model_id'];
             $this->logger->info('MediaGenerationHandler: Using classification override model', [
-                'model_id' => $modelId
+                'model_id' => $modelId,
             ]);
-            
+
             // Detect media type from model tag (only if not a slash command)
             if (!$isSlashCommand) {
-            $model = $this->em->getRepository(\App\Entity\Model::class)->find($modelId);
-            if ($model) {
-                $tag = $model->getTag();
-                if ($tag === 'text2vid') {
-                    $mediaType = 'video';
-                } elseif ($tag === 'text2sound') {
-                    $mediaType = 'audio';
-                }
-                $provider = $model->getService();
-                $modelName = $model->getName();
+                $model = $this->em->getRepository(\App\Entity\Model::class)->find($modelId);
+                if ($model) {
+                    $tag = $model->getTag();
+                    if ('text2vid' === $tag) {
+                        $mediaType = 'video';
+                    } elseif ('text2sound' === $tag) {
+                        $mediaType = 'audio';
+                    }
+                    $provider = $model->getService();
+                    $modelName = $model->getName();
                 }
             }
         } else {
             // For slash commands, skip auto-detection and use the detected type
             if ($isSlashCommand) {
-                if ($mediaType === 'video') {
+                if ('video' === $mediaType) {
                     $modelId = $this->modelConfigService->getDefaultModel('TEXT2VID', $message->getUserId());
                 } else {
                     $modelId = $this->modelConfigService->getDefaultModel('TEXT2PIC', $message->getUserId());
                 }
                 $this->logger->info('MediaGenerationHandler: Using default model for slash command', [
                     'media_type' => $mediaType,
-                    'model_id' => $modelId
+                    'model_id' => $modelId,
                 ]);
-            } elseif ($promptMediaType === 'video') {
+            } elseif ('video' === $promptMediaType) {
                 $modelId = $this->modelConfigService->getDefaultModel('TEXT2VID', $message->getUserId());
                 $mediaType = 'video';
                 $this->logger->info('MediaGenerationHandler: Using media type hint from extractor (video)');
-            } elseif ($promptMediaType === 'audio') {
+            } elseif ('audio' === $promptMediaType) {
                 $modelId = $this->modelConfigService->getDefaultModel('TEXT2SOUND', $message->getUserId());
                 $mediaType = 'audio';
                 $this->logger->info('MediaGenerationHandler: Using media type hint from extractor (audio)');
-            } elseif ($promptMediaType === 'image') {
+            } elseif ('image' === $promptMediaType) {
                 $modelId = $this->modelConfigService->getDefaultModel('TEXT2PIC', $message->getUserId());
                 $mediaType = 'image';
                 $this->logger->info('MediaGenerationHandler: Using media type hint from extractor (image)');
@@ -165,7 +166,7 @@ class MediaGenerationHandler implements MessageHandlerInterface
                 // Auto-detect media type from prompt keywords (English only - sorting handles multilingual)
                 $isVideo = preg_match('/\b(video|film|movie|clip|animation|animated)\b/i', $prompt);
                 $isAudio = preg_match('/\b(audio|sound|music|voice|speech|song|read|aloud|speak|tts|text.?to.?speech|convert.?to.?audio|make.?voice)\b/i', $prompt);
-                
+
                 if ($isVideo) {
                     $modelId = $this->modelConfigService->getDefaultModel('TEXT2VID', $message->getUserId());
                     $mediaType = 'video';
@@ -176,23 +177,23 @@ class MediaGenerationHandler implements MessageHandlerInterface
                     $modelId = $this->modelConfigService->getDefaultModel('TEXT2PIC', $message->getUserId());
                     $mediaType = 'image';
                 }
-                
+
                 $this->logger->info('MediaGenerationHandler: Auto-detected media type', [
                     'media_type' => $mediaType,
-                    'model_id' => $modelId
+                    'model_id' => $modelId,
                 ]);
             }
         }
-        
+
         // Resolve model ID to provider + model name
         if ($modelId) {
             $provider = $this->modelConfigService->getProviderForModel($modelId);
             $modelName = $this->modelConfigService->getModelName($modelId);
-            
+
             $this->logger->info('MediaGenerationHandler: Resolved model', [
                 'model_id' => $modelId,
                 'provider' => $provider,
-                'model' => $modelName
+                'model' => $modelName,
             ]);
         }
 
@@ -205,18 +206,18 @@ class MediaGenerationHandler implements MessageHandlerInterface
 
         // Send detailed status update with provider and media type
         $providerName = ucfirst($provider);
-        $mediaTypeLabel = match($mediaType) {
+        $mediaTypeLabel = match ($mediaType) {
             'video' => 'video',
             'audio' => 'audio',
-            default => 'image'
+            default => 'image',
         };
-        
+
         $statusMessage = "AI is crafting your $mediaTypeLabel with $providerName $modelName";
         $this->notify($progressCallback, 'generating', $statusMessage);
 
         try {
             // Generate media based on type
-            if ($mediaType === 'video') {
+            if ('video' === $mediaType) {
                 // Use video generation API
                 $result = $this->aiFacade->generateVideo(
                     $prompt,
@@ -228,38 +229,38 @@ class MediaGenerationHandler implements MessageHandlerInterface
                         'aspect_ratio' => $options['aspect_ratio'] ?? '16:9',
                     ]
                 );
-                
+
                 $media = $result['videos'] ?? [];
-            } elseif ($mediaType === 'audio') {
+            } elseif ('audio' === $mediaType) {
                 // Generate audio using TTS
                 $this->logger->info('MediaGenerationHandler: Starting TTS generation', [
                     'provider' => $provider,
                     'model' => $modelName,
-                    'text_length' => strlen($prompt)
+                    'text_length' => strlen($prompt),
                 ]);
-                
+
                 $result = $this->aiFacade->synthesize(
                     $prompt,
                     $message->getUserId(),
                     [
                         'provider' => $provider,
                         'model' => $modelName,
-                        'format' => 'mp3'
+                        'format' => 'mp3',
                     ]
                 );
-                
+
                 // synthesize() returns ['filename' => 'tts_xxx.mp3', 'provider' => 'openai', 'model' => 'tts-1']
                 $filename = $result['filename'];
-                
+
                 $this->logger->info('MediaGenerationHandler: TTS audio generated', [
                     'filename' => $filename,
-                    'provider' => $result['provider']
+                    'provider' => $result['provider'],
                 ]);
-                
+
                 $media = [[
                     'url' => "/api/v1/files/uploads/{$filename}",
                     'type' => 'audio',
-                    'format' => pathinfo($filename, PATHINFO_EXTENSION)
+                    'format' => pathinfo($filename, PATHINFO_EXTENSION),
                 ]];
             } else {
                 // Generate image
@@ -274,58 +275,58 @@ class MediaGenerationHandler implements MessageHandlerInterface
                         'size' => $options['size'] ?? '1024x1024',
                     ]
                 );
-                
+
                 $media = $result['images'] ?? [];
             }
-            
+
             $this->logger->info('MediaGenerationHandler: Media generated', [
                 'count' => count($media),
                 'provider' => $result['provider'],
                 'media_type' => $mediaType,
                 'raw_result' => json_encode($result),
-                'media_sample' => !empty($media) ? json_encode($media[0]) : 'empty'
+                'media_sample' => !empty($media) ? json_encode($media[0]) : 'empty',
             ]);
 
             // Check if media was actually generated
             if (empty($media)) {
-                throw new \Exception("No {$mediaType} generated by provider. Response: " . json_encode($result));
+                throw new \Exception("No {$mediaType} generated by provider. Response: ".json_encode($result));
             }
 
             // Download first media and save locally
             $mediaUrl = null;
             $localPath = null;
-            
+
             if (isset($media[0]['url'])) {
                 $mediaUrl = $media[0]['url'];
             } else {
                 $this->logger->error('MediaGenerationHandler: No URL in media response', [
                     'media' => json_encode($media[0] ?? null),
-                    'result' => json_encode($result)
+                    'result' => json_encode($result),
                 ]);
                 throw new \Exception("Generated {$mediaType} has no URL. Check provider response format.");
             }
-            
+
             // Only attempt download for images (videos might be too large or streaming-only)
-            if ($mediaType === 'image') {
+            if ('image' === $mediaType) {
                 $localPath = $this->downloadImage($mediaUrl);
             }
-            
+
             if ($localPath) {
                 $this->logger->info('MediaGenerationHandler: Media downloaded', [
                     'path' => $localPath,
-                    'type' => $mediaType
+                    'type' => $mediaType,
                 ]);
             } else {
                 $this->logger->warning('MediaGenerationHandler: Download failed or skipped, will use original URL', [
                     'original_url' => $mediaUrl,
-                    'type' => $mediaType
+                    'type' => $mediaType,
                 ]);
             }
 
             // Use local path if available, otherwise use original URL
             // CRITICAL: Ensure we always have a valid URL
             $displayUrl = $localPath ? "/api/v1/files/uploads/{$localPath}" : $mediaUrl;
-            
+
             // Fallback safety check
             if (!$displayUrl) {
                 throw new \Exception("No valid {$mediaType} URL available (neither local nor remote)");
@@ -334,11 +335,11 @@ class MediaGenerationHandler implements MessageHandlerInterface
             // Stream response with revised prompt
             $revisedPrompt = $media[0]['revised_prompt'] ?? $prompt;
             $responseText = "Generated {$mediaType}: {$revisedPrompt}";
-            
+
             // Stream the response
             $streamCallback($responseText);
 
-            $this->notify($progressCallback, 'generating', ucfirst($mediaType) . ' generated successfully.');
+            $this->notify($progressCallback, 'generating', ucfirst($mediaType).' generated successfully.');
 
             return [
                 'metadata' => [
@@ -359,14 +360,14 @@ class MediaGenerationHandler implements MessageHandlerInterface
         } catch (\Exception $e) {
             $this->logger->error('MediaGenerationHandler: Generation failed', [
                 'error' => $e->getMessage(),
-                'provider' => $provider
+                'provider' => $provider,
             ]);
 
             // Stream error message
-            $errorMessage = "Sorry, {$mediaType} generation failed: " . $e->getMessage();
+            $errorMessage = "Sorry, {$mediaType} generation failed: ".$e->getMessage();
             $streamCallback($errorMessage);
 
-            $this->notify($progressCallback, 'error', ucfirst($mediaType) . ' generation failed.');
+            $this->notify($progressCallback, 'error', ucfirst($mediaType).' generation failed.');
 
             return [
                 'metadata' => [
@@ -379,14 +380,14 @@ class MediaGenerationHandler implements MessageHandlerInterface
     }
 
     /**
-     * Download image from URL to local storage
+     * Download image from URL to local storage.
      */
     private function downloadImage(string $url): ?string
     {
         try {
             $this->logger->info('MediaGenerationHandler: Starting download', [
                 'url' => $url,
-                'upload_dir' => $this->uploadDir
+                'upload_dir' => $this->uploadDir,
             ]);
 
             // Ensure upload directory exists and is writable
@@ -398,7 +399,7 @@ class MediaGenerationHandler implements MessageHandlerInterface
             }
 
             if (!is_writable($this->uploadDir)) {
-                throw new \Exception('Upload directory is not writable: ' . $this->uploadDir);
+                throw new \Exception('Upload directory is not writable: '.$this->uploadDir);
             }
 
             // Try cURL first (more reliable for external URLs)
@@ -410,19 +411,19 @@ class MediaGenerationHandler implements MessageHandlerInterface
                 curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
                 curl_setopt($ch, CURLOPT_TIMEOUT, 30);
                 curl_setopt($ch, CURLOPT_USERAGENT, 'Mozilla/5.0 (compatible; PHP; Synaplan)');
-                
+
                 $imageContent = curl_exec($ch);
                 $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
                 $curlError = curl_error($ch);
                 curl_close($ch);
 
-                if ($imageContent === false || $httpCode !== 200) {
+                if (false === $imageContent || 200 !== $httpCode) {
                     throw new \Exception("cURL download failed (HTTP {$httpCode}): {$curlError}");
                 }
             } else {
                 // Fallback to file_get_contents
                 $imageContent = @file_get_contents($url);
-                if ($imageContent === false) {
+                if (false === $imageContent) {
                     throw new \Exception('file_get_contents download failed');
                 }
             }
@@ -434,22 +435,22 @@ class MediaGenerationHandler implements MessageHandlerInterface
             // Detect image type from content
             $finfo = new \finfo(FILEINFO_MIME_TYPE);
             $mimeType = $finfo->buffer($imageContent);
-            
-            $extension = match($mimeType) {
+
+            $extension = match ($mimeType) {
                 'image/png' => 'png',
                 'image/jpeg' => 'jpg',
                 'image/gif' => 'gif',
                 'image/webp' => 'webp',
-                default => 'png'
+                default => 'png',
             };
 
             // Generate unique filename
-            $filename = 'generated_' . uniqid() . '.' . $extension;
-            $localPath = $this->uploadDir . '/' . $filename;
+            $filename = 'generated_'.uniqid().'.'.$extension;
+            $localPath = $this->uploadDir.'/'.$filename;
 
             // Save to disk
             $bytesWritten = file_put_contents($localPath, $imageContent);
-            if ($bytesWritten === false) {
+            if (false === $bytesWritten) {
                 throw new \Exception('Failed to save image to disk');
             }
 
@@ -457,7 +458,7 @@ class MediaGenerationHandler implements MessageHandlerInterface
                 'filename' => $filename,
                 'bytes' => $bytesWritten,
                 'mime_type' => $mimeType,
-                'path' => $localPath
+                'path' => $localPath,
             ]);
 
             return $filename; // Return relative path (filename only)
@@ -467,14 +468,15 @@ class MediaGenerationHandler implements MessageHandlerInterface
                 'url' => $url,
                 'upload_dir' => $this->uploadDir,
                 'upload_dir_exists' => is_dir($this->uploadDir),
-                'upload_dir_writable' => is_writable($this->uploadDir)
+                'upload_dir_writable' => is_writable($this->uploadDir),
             ]);
+
             return null;
         }
     }
 
     /**
-     * Notify progress callback
+     * Notify progress callback.
      */
     private function notify(?callable $callback, string $status, string $message, array $metadata = []): void
     {
@@ -483,9 +485,8 @@ class MediaGenerationHandler implements MessageHandlerInterface
                 'status' => $status,
                 'message' => $message,
                 'metadata' => $metadata,
-                'timestamp' => time()
+                'timestamp' => time(),
             ]);
         }
     }
 }
-

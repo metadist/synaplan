@@ -29,7 +29,7 @@ class RagDocument
      * BMID can reference EITHER:
      * - BMESSAGES.BID (for chat message attachments)
      * - BMESSAGEFILES.BID (for standalone file uploads)
-     * 
+     *
      * We store only the ID without FK constraint to support both cases flexibly.
      * Application logic determines which table this ID references based on context.
      */
@@ -76,6 +76,7 @@ class RagDocument
     public function setUserId(int $userId): self
     {
         $this->userId = $userId;
+
         return $this;
     }
 
@@ -90,6 +91,7 @@ class RagDocument
         if ($user) {
             $this->userId = $user->getId();
         }
+
         return $this;
     }
 
@@ -101,6 +103,7 @@ class RagDocument
     public function setMessageId(int $messageId): self
     {
         $this->messageId = $messageId;
+
         return $this;
     }
 
@@ -112,6 +115,7 @@ class RagDocument
     public function setGroupKey(string $groupKey): self
     {
         $this->groupKey = $groupKey;
+
         return $this;
     }
 
@@ -123,6 +127,7 @@ class RagDocument
     public function setFileType(int $fileType): self
     {
         $this->fileType = $fileType;
+
         return $this;
     }
 
@@ -134,6 +139,7 @@ class RagDocument
     public function setStartLine(int $startLine): self
     {
         $this->startLine = $startLine;
+
         return $this;
     }
 
@@ -145,6 +151,7 @@ class RagDocument
     public function setEndLine(int $endLine): self
     {
         $this->endLine = $endLine;
+
         return $this;
     }
 
@@ -156,6 +163,7 @@ class RagDocument
     public function setText(string $text): self
     {
         $this->text = $text;
+
         return $this;
     }
 
@@ -167,6 +175,7 @@ class RagDocument
     public function setEmbedding(?array $embedding): self
     {
         $this->embedding = $embedding;
+
         return $this;
     }
 
@@ -178,7 +187,7 @@ class RagDocument
     public function setCreated(int $created): self
     {
         $this->created = $created;
+
         return $this;
     }
 }
-

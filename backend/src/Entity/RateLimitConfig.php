@@ -58,6 +58,7 @@ class RateLimitConfig
     public function setScope(string $scope): self
     {
         $this->scope = $scope;
+
         return $this;
     }
 
@@ -69,6 +70,7 @@ class RateLimitConfig
     public function setPlan(string $plan): self
     {
         $this->plan = $plan;
+
         return $this;
     }
 
@@ -80,6 +82,7 @@ class RateLimitConfig
     public function setLimit(int $limit): self
     {
         $this->limit = $limit;
+
         return $this;
     }
 
@@ -91,6 +94,7 @@ class RateLimitConfig
     public function setWindow(int $window): self
     {
         $this->window = $window;
+
         return $this;
     }
 
@@ -102,6 +106,7 @@ class RateLimitConfig
     public function setDescription(string $description): self
     {
         $this->description = $description;
+
         return $this;
     }
 
@@ -118,13 +123,14 @@ class RateLimitConfig
     public function setUpdated(int $updated): self
     {
         $this->updated = $updated;
+
         return $this;
     }
 
     public function touch(): self
     {
         $this->updated = time();
+
         return $this;
     }
 }
-

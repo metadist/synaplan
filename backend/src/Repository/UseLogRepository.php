@@ -17,7 +17,7 @@ class UseLogRepository extends ServiceEntityRepository
     }
 
     /**
-     * Findet Usage-Logs für einen User in einem Zeitraum
+     * Findet Usage-Logs für einen User in einem Zeitraum.
      */
     public function findByUserAndDateRange(int $userId, int $startTime, int $endTime): array
     {
@@ -34,7 +34,7 @@ class UseLogRepository extends ServiceEntityRepository
     }
 
     /**
-     * Berechnet Gesamtkosten für einen User
+     * Berechnet Gesamtkosten für einen User.
      */
     public function getTotalCostByUser(int $userId, int $startTime, int $endTime): float
     {
@@ -49,11 +49,11 @@ class UseLogRepository extends ServiceEntityRepository
             ->getQuery()
             ->getSingleScalarResult();
 
-        return (float)($result ?? 0);
+        return (float) ($result ?? 0);
     }
 
     /**
-     * Zählt Actions pro Provider
+     * Zählt Actions pro Provider.
      */
     public function countByProviderAndAction(string $provider, string $action, int $startTime, int $endTime): int
     {
@@ -72,15 +72,14 @@ class UseLogRepository extends ServiceEntityRepository
     }
 
     /**
-     * Speichert einen UseLog
+     * Speichert einen UseLog.
      */
     public function save(UseLog $useLog, bool $flush = true): void
     {
         $this->getEntityManager()->persist($useLog);
-        
+
         if ($flush) {
             $this->getEntityManager()->flush();
         }
     }
 }
-

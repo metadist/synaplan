@@ -7,8 +7,8 @@ use Psr\Cache\CacheItemPoolInterface;
 use Psr\Log\LoggerInterface;
 
 /**
- * Service für Rate Limiting basierend auf User-Level und Scope
- * 
+ * Service für Rate Limiting basierend auf User-Level und Scope.
+ *
  * Verwendet Redis Cache für schnelle Zugriffe und RateLimitConfig für Limits
  */
 class RateLimiterService
@@ -16,22 +16,24 @@ class RateLimiterService
     public function __construct(
         private RateLimitConfigRepository $rateLimitConfigRepository,
         private CacheItemPoolInterface $cache,
-        private LoggerInterface $logger
-    ) {}
+        private LoggerInterface $logger,
+    ) {
+    }
 
     /**
-     * Prüft ob ein Request erlaubt ist (unter dem Limit)
-     * 
-     * @param int $userId User ID
+     * Prüft ob ein Request erlaubt ist (unter dem Limit).
+     *
+     * @param int    $userId    User ID
      * @param string $userLevel User Level (NEW, PRO, TEAM, BUSINESS)
-     * @param string $scope Scope (api_calls, widget_messages, ai_requests, file_uploads)
+     * @param string $scope     Scope (api_calls, widget_messages, ai_requests, file_uploads)
+     *
      * @return array ['allowed' => bool, 'remaining' => int, 'reset_at' => int]
      */
     public function check(int $userId, string $userLevel, string $scope): array
     {
         // Hole Rate Limit Config
         $config = $this->rateLimitConfigRepository->findByUserLevel($scope, $userLevel);
-        
+
         if (!$config) {
             // Kein Limit konfiguriert = erlaubt
             return [
@@ -40,13 +42,13 @@ class RateLimiterService
                 'reset_at' => time() + 3600,
             ];
         }
-        
+
         $limit = $config->getLimit();
         $window = $config->getWindow();
         $cacheKey = $this->getCacheKey($userId, $scope);
-        
+
         $item = $this->cache->getItem($cacheKey);
-        
+
         if (!$item->isHit()) {
             // Erste Anfrage im Fenster
             $data = [
@@ -57,11 +59,11 @@ class RateLimiterService
             $item->expiresAfter($window);
             $this->cache->save($item);
         }
-        
+
         $data = $item->get();
         $count = $data['count'] ?? 0;
         $resetAt = $data['reset_at'] ?? time() + $window;
-        
+
         // Prüfe ob Fenster abgelaufen
         if ($resetAt <= time()) {
             // Fenster abgelaufen, reset
@@ -75,10 +77,10 @@ class RateLimiterService
             $item->expiresAfter($window);
             $this->cache->save($item);
         }
-        
+
         $allowed = $count < $limit;
         $remaining = max(0, $limit - $count);
-        
+
         return [
             'allowed' => $allowed,
             'remaining' => $remaining,
@@ -88,22 +90,22 @@ class RateLimiterService
     }
 
     /**
-     * Inkrementiert den Counter für einen Request
+     * Inkrementiert den Counter für einen Request.
      */
     public function increment(int $userId, string $userLevel, string $scope): void
     {
         $config = $this->rateLimitConfigRepository->findByUserLevel($scope, $userLevel);
-        
+
         if (!$config) {
             // Kein Limit = kein Increment
             return;
         }
-        
+
         $window = $config->getWindow();
         $cacheKey = $this->getCacheKey($userId, $scope);
-        
+
         $item = $this->cache->getItem($cacheKey);
-        
+
         if (!$item->isHit()) {
             // Erste Anfrage
             $data = [
@@ -114,14 +116,14 @@ class RateLimiterService
             $data = $item->get();
             $data['count'] = ($data['count'] ?? 0) + 1;
         }
-        
+
         $item->set($data);
         $item->expiresAfter($window);
         $this->cache->save($item);
     }
 
     /**
-     * Reset des Counters für einen User und Scope
+     * Reset des Counters für einen User und Scope.
      */
     public function reset(int $userId, string $scope): void
     {
@@ -130,17 +132,17 @@ class RateLimiterService
     }
 
     /**
-     * Holt den aktuellen Status für einen User
+     * Holt den aktuellen Status für einen User.
      */
     public function getStatus(int $userId, string $userLevel): array
     {
         $scopes = ['api_calls', 'widget_messages', 'ai_requests', 'file_uploads'];
         $status = [];
-        
+
         foreach ($scopes as $scope) {
             $status[$scope] = $this->check($userId, $userLevel, $scope);
         }
-        
+
         return $status;
     }
 
@@ -149,4 +151,3 @@ class RateLimiterService
         return "rate_limit.{$userId}.{$scope}";
     }
 }
-

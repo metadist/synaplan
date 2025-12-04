@@ -16,7 +16,7 @@ class FileStorageServiceTest extends TestCase
     protected function setUp(): void
     {
         // Create temp upload directory
-        $this->testUploadDir = sys_get_temp_dir() . '/synaplan_test_uploads_' . uniqid();
+        $this->testUploadDir = sys_get_temp_dir().'/synaplan_test_uploads_'.uniqid();
         mkdir($this->testUploadDir, 0755, true);
 
         $this->logger = $this->createMock(LoggerInterface::class);
@@ -35,7 +35,7 @@ class FileStorageServiceTest extends TestCase
     {
         // Create test file
         $testFile = $this->createTestFile('test.txt', 'Hello World');
-        
+
         $uploadedFile = new UploadedFile(
             $testFile,
             'test.txt',
@@ -51,7 +51,7 @@ class FileStorageServiceTest extends TestCase
         $this->assertGreaterThan(0, $result['size']);
         $this->assertEquals('text/plain', $result['mime']);
         $this->assertNull($result['error']);
-        
+
         // Verify file exists
         $this->assertTrue($this->service->fileExists($result['path']));
     }
@@ -59,7 +59,7 @@ class FileStorageServiceTest extends TestCase
     public function testStoreUploadedFileWithDisallowedExtension(): void
     {
         $testFile = $this->createTestFile('test.exe', 'binary data');
-        
+
         $uploadedFile = new UploadedFile(
             $testFile,
             'test.exe',
@@ -78,13 +78,13 @@ class FileStorageServiceTest extends TestCase
     {
         // Create a file that reports as larger than allowed
         $testFile = $this->createTestFile('large.pdf', 'test');
-        
+
         // Mock the UploadedFile to report a large size
         $uploadedFile = $this->getMockBuilder(UploadedFile::class)
             ->setConstructorArgs([$testFile, 'large.pdf', 'application/pdf', null, true])
             ->onlyMethods(['getSize'])
             ->getMock();
-        
+
         $uploadedFile->method('getSize')->willReturn(150 * 1024 * 1024); // 150 MB
 
         $result = $this->service->storeUploadedFile($uploadedFile, 123);
@@ -96,7 +96,7 @@ class FileStorageServiceTest extends TestCase
     public function testFileExistsReturnsTrueForExistingFile(): void
     {
         $testFile = $this->createTestFile('exists.txt', 'content');
-        
+
         $uploadedFile = new UploadedFile(
             $testFile,
             'exists.txt',
@@ -106,7 +106,7 @@ class FileStorageServiceTest extends TestCase
         );
 
         $result = $this->service->storeUploadedFile($uploadedFile, 123);
-        
+
         $this->assertTrue($this->service->fileExists($result['path']));
     }
 
@@ -118,7 +118,7 @@ class FileStorageServiceTest extends TestCase
     public function testDeleteFileSuccess(): void
     {
         $testFile = $this->createTestFile('delete.txt', 'to be deleted');
-        
+
         $uploadedFile = new UploadedFile(
             $testFile,
             'delete.txt',
@@ -129,11 +129,11 @@ class FileStorageServiceTest extends TestCase
 
         $result = $this->service->storeUploadedFile($uploadedFile, 123);
         $path = $result['path'];
-        
+
         $this->assertTrue($this->service->fileExists($path));
-        
+
         $deleted = $this->service->deleteFile($path);
-        
+
         $this->assertTrue($deleted);
         $this->assertFalse($this->service->fileExists($path));
     }
@@ -141,14 +141,14 @@ class FileStorageServiceTest extends TestCase
     public function testDeleteNonExistentFile(): void
     {
         $deleted = $this->service->deleteFile('nonexistent/file.txt');
-        
+
         $this->assertFalse($deleted);
     }
 
     public function testGenerateStoragePathCreatesOrganizedStructure(): void
     {
         $testFile = $this->createTestFile('organized.pdf', 'content');
-        
+
         $uploadedFile = new UploadedFile(
             $testFile,
             'organized.pdf',
@@ -159,11 +159,11 @@ class FileStorageServiceTest extends TestCase
 
         $result = $this->service->storeUploadedFile($uploadedFile, 456);
         $path = $result['path'];
-        
+
         // Path should contain: userId/year/month/filename
         $this->assertStringContainsString('456/', $path);
-        $this->assertStringContainsString(date('Y') . '/', $path);
-        $this->assertStringContainsString(date('m') . '/', $path);
+        $this->assertStringContainsString(date('Y').'/', $path);
+        $this->assertStringContainsString(date('m').'/', $path);
     }
 
     // Helper methods
@@ -172,6 +172,7 @@ class FileStorageServiceTest extends TestCase
     {
         $tempFile = tempnam(sys_get_temp_dir(), 'synaplan_test_');
         file_put_contents($tempFile, $content);
+
         return $tempFile;
     }
 
@@ -182,13 +183,12 @@ class FileStorageServiceTest extends TestCase
         }
 
         $files = array_diff(scandir($dir), ['.', '..']);
-        
+
         foreach ($files as $file) {
-            $path = $dir . '/' . $file;
+            $path = $dir.'/'.$file;
             is_dir($path) ? $this->recursiveDelete($path) : unlink($path);
         }
-        
+
         rmdir($dir);
     }
 }
-

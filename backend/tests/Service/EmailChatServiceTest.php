@@ -2,10 +2,10 @@
 
 namespace App\Tests\Service;
 
-use App\Service\EmailChatService;
 use App\Entity\User;
-use App\Repository\UserRepository;
 use App\Repository\ChatRepository;
+use App\Repository\UserRepository;
+use App\Service\EmailChatService;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
@@ -33,31 +33,31 @@ class EmailChatServiceTest extends TestCase
         );
     }
 
-    public function testParseEmailKeyword_WithKeyword(): void
+    public function testParseEmailKeywordWithKeyword(): void
     {
         $keyword = $this->emailChatService->parseEmailKeyword('smart+mybot@synaplan.com');
         $this->assertEquals('mybot', $keyword);
     }
 
-    public function testParseEmailKeyword_WithoutKeyword(): void
+    public function testParseEmailKeywordWithoutKeyword(): void
     {
         $keyword = $this->emailChatService->parseEmailKeyword('smart@synaplan.com');
         $this->assertNull($keyword);
     }
 
-    public function testParseEmailKeyword_InvalidFormat(): void
+    public function testParseEmailKeywordInvalidFormat(): void
     {
         $keyword = $this->emailChatService->parseEmailKeyword('test@example.com');
         $this->assertNull($keyword);
     }
 
-    public function testParseEmailKeyword_WithHyphenAndUnderscore(): void
+    public function testParseEmailKeywordWithHyphenAndUnderscore(): void
     {
         $keyword = $this->emailChatService->parseEmailKeyword('smart+my-bot_123@synaplan.com');
         $this->assertEquals('my-bot_123', $keyword);
     }
 
-    public function testGetUserPersonalEmailAddress_WithKeyword(): void
+    public function testGetUserPersonalEmailAddressWithKeyword(): void
     {
         $user = new User();
         $user->setUserDetails(['email_keyword' => 'mybot']);
@@ -66,7 +66,7 @@ class EmailChatServiceTest extends TestCase
         $this->assertEquals('smart+mybot@synaplan.com', $email);
     }
 
-    public function testGetUserPersonalEmailAddress_WithoutKeyword(): void
+    public function testGetUserPersonalEmailAddressWithoutKeyword(): void
     {
         $user = new User();
         $user->setUserDetails([]);

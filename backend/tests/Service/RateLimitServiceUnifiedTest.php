@@ -11,7 +11,7 @@ use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 
 /**
- * Test unified rate limiting across all sources (WhatsApp, Email, Web)
+ * Test unified rate limiting across all sources (WhatsApp, Email, Web).
  */
 class RateLimitServiceUnifiedTest extends TestCase
 {
@@ -34,6 +34,7 @@ class RateLimitServiceUnifiedTest extends TestCase
 
         $this->configRepository->method('findBy')->willReturnCallback(function (array $criteria) {
             $group = $criteria['group'] ?? '';
+
             return $this->configMap[$group] ?? [];
         });
 
@@ -44,7 +45,7 @@ class RateLimitServiceUnifiedTest extends TestCase
         );
     }
 
-    public function testCheckLimit_UnifiedAcrossAllSources_Anonymous(): void
+    public function testCheckLimitUnifiedAcrossAllSourcesAnonymous(): void
     {
         $user = $this->createMock(User::class);
         $user->method('getId')->willReturn(1);
@@ -57,8 +58,8 @@ class RateLimitServiceUnifiedTest extends TestCase
             ->method('fetchOne')
             ->with(
                 $this->stringContains('SELECT COUNT(*) FROM BUSELOG'),
-                $this->callback(function($params) {
-                    return $params['user_id'] === 1 && $params['action'] === 'MESSAGES';
+                $this->callback(function ($params) {
+                    return 1 === $params['user_id'] && 'MESSAGES' === $params['action'];
                 })
             )
             ->willReturn('8');
@@ -71,7 +72,7 @@ class RateLimitServiceUnifiedTest extends TestCase
         $this->assertEquals(2, $result['remaining']);
     }
 
-    public function testCheckLimit_UnifiedExceedsLimit_Anonymous(): void
+    public function testCheckLimitUnifiedExceedsLimitAnonymous(): void
     {
         $user = $this->createMock(User::class);
         $user->method('getId')->willReturn(1);
@@ -92,7 +93,7 @@ class RateLimitServiceUnifiedTest extends TestCase
         $this->assertEquals(0, $result['remaining']);
     }
 
-    public function testCheckLimit_UnifiedAcrossAllSources_NEW(): void
+    public function testCheckLimitUnifiedAcrossAllSourcesNEW(): void
     {
         $this->markTestSkipped('Complex integration test with mocked repositories - needs refactoring');
         $user = $this->createMock(User::class);
@@ -116,7 +117,7 @@ class RateLimitServiceUnifiedTest extends TestCase
         $this->assertEquals('lifetime', $result['type']);
     }
 
-    public function testCheckLimit_UnifiedAcrossAllSources_PRO_Hourly(): void
+    public function testCheckLimitUnifiedAcrossAllSourcesPROHourly(): void
     {
         $user = $this->createMock(User::class);
         $user->method('getId')->willReturn(1);
@@ -125,7 +126,7 @@ class RateLimitServiceUnifiedTest extends TestCase
         // Setup PRO limits (100/hour, 5000/month)
         $this->setupLimits('PRO', 'MESSAGES', [
             'HOURLY' => 100,
-            'MONTHLY' => 5000
+            'MONTHLY' => 5000,
         ]);
 
         // User sent 80 messages in last hour (all sources combined)
@@ -139,7 +140,7 @@ class RateLimitServiceUnifiedTest extends TestCase
         $this->assertGreaterThanOrEqual(80, $result['used']);
     }
 
-    public function testRecordUsage_CountsForAllSources(): void
+    public function testRecordUsageCountsForAllSources(): void
     {
         $user = $this->createMock(User::class);
         $user->method('getId')->willReturn(1);
@@ -149,8 +150,8 @@ class RateLimitServiceUnifiedTest extends TestCase
             ->with(
                 $this->stringContains('INSERT INTO BUSELOG'),
                 $this->callback(function ($params) {
-                    return $params['user_id'] === 1
-                        && $params['action'] === 'MESSAGES'
+                    return 1 === $params['user_id']
+                        && 'MESSAGES' === $params['action']
                         && isset($params['timestamp']);
                 })
             );
@@ -158,11 +159,11 @@ class RateLimitServiceUnifiedTest extends TestCase
         $this->service->recordUsage($user, 'MESSAGES', [
             'source' => 'email', // Source is logged but doesn't affect limits
             'provider' => 'email',
-            'model' => ''
+            'model' => '',
         ]);
     }
 
-    public function testUnifiedLimit_ScenarioWhatsAppThenEmail(): void
+    public function testUnifiedLimitScenarioWhatsAppThenEmail(): void
     {
         $user = $this->createMock(User::class);
         $user->method('getId')->willReturn(1);
@@ -198,7 +199,7 @@ class RateLimitServiceUnifiedTest extends TestCase
         $configs = [];
         foreach ($limits as $timeframe => $value) {
             $config = $this->createMock(\App\Entity\Config::class);
-            $config->method('getSetting')->willReturn($action . '_' . $timeframe);
+            $config->method('getSetting')->willReturn($action.'_'.$timeframe);
             $config->method('getValue')->willReturn((string) $value);
             $configs[] = $config;
         }
@@ -206,4 +207,3 @@ class RateLimitServiceUnifiedTest extends TestCase
         $this->configMap["RATELIMITS_{$level}"] = $configs;
     }
 }
-

@@ -2,16 +2,16 @@
 
 namespace App\Security;
 
+use Psr\Log\LoggerInterface;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Component\Security\Core\Exception\BadCredentialsException;
 use Symfony\Component\Security\Http\AccessToken\AccessTokenHandlerInterface;
 use Symfony\Component\Security\Http\Authenticator\Passport\Badge\UserBadge;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
-use Psr\Log\LoggerInterface;
 
 /**
- * OIDC Token Handler
- * 
+ * OIDC Token Handler.
+ *
  * Validates access tokens via OIDC UserInfo endpoint and refresh tokens
  * Client Secret is kept server-side only for security
  */
@@ -28,23 +28,24 @@ class OidcTokenHandler implements AccessTokenHandlerInterface
         #[Autowire('%env(OIDC_CLIENT_ID)%')]
         private string $clientId,
         #[Autowire('%env(OIDC_CLIENT_SECRET)%')]
-        private string $clientSecret
-    ) {}
+        private string $clientSecret,
+    ) {
+    }
 
     public function getUserBadgeFrom(string $accessToken): UserBadge
     {
         try {
             // Get OIDC discovery configuration
             $discovery = $this->getDiscoveryConfig();
-            
+
             // Call UserInfo endpoint to get user data
             $response = $this->httpClient->request('GET', $discovery['userinfo_endpoint'], [
                 'headers' => [
-                    'Authorization' => 'Bearer ' . $accessToken,
+                    'Authorization' => 'Bearer '.$accessToken,
                 ],
             ]);
 
-            if ($response->getStatusCode() !== 200) {
+            if (200 !== $response->getStatusCode()) {
                 throw new BadCredentialsException('Invalid access token');
             }
 
@@ -71,26 +72,25 @@ class OidcTokenHandler implements AccessTokenHandlerInterface
                     return $this->userProvider->loadUserFromOidcData($userData);
                 }
             );
-
         } catch (\Exception $e) {
             $this->logger->error('OIDC token validation failed', [
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ]);
             throw new BadCredentialsException('Invalid OIDC token', 0, $e);
         }
     }
 
     /**
-     * Get OIDC discovery configuration (cached)
+     * Get OIDC discovery configuration (cached).
      */
     private function getDiscoveryConfig(): array
     {
-        if ($this->discoveryCache !== null) {
+        if (null !== $this->discoveryCache) {
             return $this->discoveryCache;
         }
 
         // Symfony automatically appends /.well-known/openid-configuration
-        $discoveryEndpoint = rtrim($this->discoveryUrl, '/') . '/.well-known/openid-configuration';
+        $discoveryEndpoint = rtrim($this->discoveryUrl, '/').'/.well-known/openid-configuration';
 
         try {
             $response = $this->httpClient->request('GET', $discoveryEndpoint);
@@ -102,11 +102,10 @@ class OidcTokenHandler implements AccessTokenHandlerInterface
             ]);
 
             return $this->discoveryCache;
-
         } catch (\Exception $e) {
             $this->logger->error('Failed to load OIDC discovery config', [
                 'url' => $discoveryEndpoint,
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ]);
             throw $e;
         }
@@ -114,7 +113,7 @@ class OidcTokenHandler implements AccessTokenHandlerInterface
 
     /**
      * Refresh an access token using a refresh token
-     * This should be called by the frontend/client when the access token expires
+     * This should be called by the frontend/client when the access token expires.
      */
     public function refreshAccessToken(string $refreshToken): array
     {
@@ -130,7 +129,7 @@ class OidcTokenHandler implements AccessTokenHandlerInterface
                 ],
             ]);
 
-            if ($response->getStatusCode() !== 200) {
+            if (200 !== $response->getStatusCode()) {
                 throw new \RuntimeException('Token refresh failed');
             }
 
@@ -144,13 +143,11 @@ class OidcTokenHandler implements AccessTokenHandlerInterface
                 'expires_in' => $tokenData['expires_in'] ?? 3600,
                 'token_type' => $tokenData['token_type'] ?? 'Bearer',
             ];
-
         } catch (\Exception $e) {
             $this->logger->error('OIDC token refresh failed', [
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ]);
             throw new BadCredentialsException('Failed to refresh token', 0, $e);
         }
     }
 }
-

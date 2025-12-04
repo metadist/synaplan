@@ -24,4 +24,3 @@ class RegisterRequest
     )]
     public string $password;
 }
-

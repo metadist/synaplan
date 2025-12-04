@@ -2,12 +2,11 @@
 
 namespace App\DataFixtures;
 
-use App\Entity\Model;
 use Doctrine\Bundle\FixturesBundle\Fixture;
 use Doctrine\Persistence\ObjectManager;
 
 /**
- * Loads AI Models from BMODELS table
+ * Loads AI Models from BMODELS table.
  */
 class ModelFixtures extends Fixture
 {
@@ -30,8 +29,8 @@ class ModelFixtures extends Fixture
                 'rating' => 8,
                 'json' => [
                     'description' => 'Local model on synaplans company server in Germany. DeepSeek R1 is a Chinese Open Source LLM with reasoning capabilities.',
-                    'features' => ['reasoning']
-                ]
+                    'features' => ['reasoning'],
+                ],
             ],
             [
                 'id' => 6,
@@ -47,7 +46,7 @@ class ModelFixtures extends Fixture
                 'outUnit' => '-',
                 'quality' => 5,
                 'rating' => 0,
-                'json' => ['description' => 'Local model on synaplans company server in Germany. Mistral 8b model - internally used for RAG retrieval.']
+                'json' => ['description' => 'Local model on synaplans company server in Germany. Mistral 8b model - internally used for RAG retrieval.'],
             ],
             // ==================== GROQ MODELS ====================
             [
@@ -69,9 +68,9 @@ class ModelFixtures extends Fixture
                     'params' => [
                         'model' => 'llama-3.3-70b-versatile',
                         'reasoning_format' => 'hidden',
-                        'messages' => []
-                    ]
-                ]
+                        'messages' => [],
+                    ],
+                ],
             ],
             [
                 'id' => 17,
@@ -91,9 +90,9 @@ class ModelFixtures extends Fixture
                     'description' => 'Groq Llama 4 Scout vision model - 128K context, up to 5 images, supports tool use and JSON mode',
                     'params' => [
                         'model' => 'meta-llama/llama-4-scout-17b-16e-instruct',
-                        'max_completion_tokens' => 1024
-                    ]
-                ]
+                        'max_completion_tokens' => 1024,
+                    ],
+                ],
             ],
             [
                 'id' => 21,
@@ -114,9 +113,9 @@ class ModelFixtures extends Fixture
                     'params' => [
                         'file' => '*LOCALFILEPATH*',
                         'model' => 'whisper-large-v3',
-                        'response_format' => 'text'
-                    ]
-                ]
+                        'response_format' => 'text',
+                    ],
+                ],
             ],
             [
                 'id' => 49,
@@ -135,9 +134,9 @@ class ModelFixtures extends Fixture
                 'json' => [
                     'description' => 'Groq Llama4 128e processing and text extraction',
                     'params' => [
-                        'model' => 'meta-llama/llama-4-maverick-17b-128e-instruct'
-                    ]
-                ]
+                        'model' => 'meta-llama/llama-4-maverick-17b-128e-instruct',
+                    ],
+                ],
             ],
             [
                 'id' => 53,
@@ -156,14 +155,14 @@ class ModelFixtures extends Fixture
                 'json' => [
                     'description' => '🧠 Groq Qwen3 32B mit Reasoning - 32B-Parameter Reasoning-Modell von Qwen. Zeigt Denkprozess mit <think> Tags. Optimiert für logisches Denken und Problemlösung. Sehr schnell durch Groq Hardware.',
                     'params' => [
-                        'model' => 'qwen/qwen3-32b'
+                        'model' => 'qwen/qwen3-32b',
                     ],
                     'features' => ['reasoning'],
                     'meta' => [
                         'context_window' => '32768',
-                        'reasoning_format' => 'raw'
-                    ]
-                ]
+                        'reasoning_format' => 'raw',
+                    ],
+                ],
             ],
             [
                 'id' => 75,
@@ -182,14 +181,14 @@ class ModelFixtures extends Fixture
                 'json' => [
                     'description' => 'Groq GPT-OSS 20B - 21B-Parameter MoE-Modell. Optimiert für niedrige Latenz und schnelle Inferenz. Sehr schnell durch Groq Hardware.',
                     'params' => [
-                        'model' => 'openai/gpt-oss-20b'
+                        'model' => 'openai/gpt-oss-20b',
                     ],
                     'meta' => [
                         'context_window' => '131072',
                         'license' => 'Apache-2.0',
-                        'quantization' => 'TruePoint Numerics'
-                    ]
-                ]
+                        'quantization' => 'TruePoint Numerics',
+                    ],
+                ],
             ],
             [
                 'id' => 76,
@@ -208,14 +207,14 @@ class ModelFixtures extends Fixture
                 'json' => [
                     'description' => 'Groq GPT-OSS 120B - 120B-Parameter MoE-Modell. Für anspruchsvolle agentische Anwendungen. Schnelle Inferenz dank Groq Hardware.',
                     'params' => [
-                        'model' => 'openai/gpt-oss-120b'
+                        'model' => 'openai/gpt-oss-120b',
                     ],
                     'meta' => [
                         'context_window' => '131072',
                         'license' => 'Apache-2.0',
-                        'quantization' => 'TruePoint Numerics'
-                    ]
-                ]
+                        'quantization' => 'TruePoint Numerics',
+                    ],
+                ],
             ],
             [
                 'id' => 13,
@@ -235,9 +234,9 @@ class ModelFixtures extends Fixture
                     'description' => 'Vectorize text into synaplans MariaDB vector DB (local) for RAG',
                     'params' => [
                         'model' => 'bge-m3',
-                        'input' => []
-                    ]
-                ]
+                        'input' => [],
+                    ],
+                ],
             ],
             // ==================== OPENAI MODELS ====================
             [
@@ -260,9 +259,9 @@ class ModelFixtures extends Fixture
                         'model' => 'dall-e-3',
                         'size' => '1024x1024',
                         'quality' => 'standard',
-                        'style' => 'vivid'
-                    ]
-                ]
+                        'style' => 'vivid',
+                    ],
+                ],
             ],
             [
                 'id' => 29,
@@ -281,9 +280,9 @@ class ModelFixtures extends Fixture
                 'json' => [
                     'description' => 'Open AIs powerful image generation model on OpenAI cloud. Costs are 1:1 funneled.',
                     'params' => [
-                        'model' => 'gpt-image-1'
-                    ]
-                ]
+                        'model' => 'gpt-image-1',
+                    ],
+                ],
             ],
             [
                 'id' => 30,
@@ -302,9 +301,9 @@ class ModelFixtures extends Fixture
                 'json' => [
                     'description' => 'Open AIs text model',
                     'params' => [
-                        'model' => 'gpt-4.1'
-                    ]
-                ]
+                        'model' => 'gpt-4.1',
+                    ],
+                ],
             ],
             [
                 'id' => 41,
@@ -324,9 +323,9 @@ class ModelFixtures extends Fixture
                     'description' => 'Open AIs text to speech, defaulting on voice NOVA.',
                     'params' => [
                         'model' => 'tts-1',
-                        'voice' => 'nova'
-                    ]
-                ]
+                        'voice' => 'nova',
+                    ],
+                ],
             ],
             [
                 'id' => 57,
@@ -345,11 +344,11 @@ class ModelFixtures extends Fixture
                 'json' => [
                     'description' => 'OpenAI o1-preview reasoning model (REQUIRES API TIER 5 - Not available for most accounts)',
                     'params' => [
-                        'model' => 'o1-preview'
+                        'model' => 'o1-preview',
                     ],
                     'features' => ['reasoning'],
-                    'supportsStreaming' => false
-                ]
+                    'supportsStreaming' => false,
+                ],
             ],
             [
                 'id' => 89,
@@ -368,11 +367,11 @@ class ModelFixtures extends Fixture
                 'json' => [
                     'description' => 'OpenAI o1-mini reasoning model (REQUIRES HIGHER API TIER - Not available for most accounts)',
                     'params' => [
-                        'model' => 'o1-mini'
+                        'model' => 'o1-mini',
                     ],
                     'features' => ['reasoning'],
-                    'supportsStreaming' => false
-                ]
+                    'supportsStreaming' => false,
+                ],
             ],
             [
                 'id' => 59,
@@ -392,10 +391,10 @@ class ModelFixtures extends Fixture
                     'description' => 'OpenAI o3 reasoning model (NOT YET AVAILABLE - Limited Preview Only)',
                     'params' => [
                         'model' => 'o3',
-                        'reasoning_effort' => 'high'
+                        'reasoning_effort' => 'high',
                     ],
-                    'features' => ['reasoning']
-                ]
+                    'features' => ['reasoning'],
+                ],
             ],
             [
                 'id' => 70,
@@ -414,9 +413,9 @@ class ModelFixtures extends Fixture
                 'json' => [
                     'description' => 'Open AIs GPT 5 model - latest release',
                     'params' => [
-                        'model' => 'gpt-5'
-                    ]
-                ]
+                        'model' => 'gpt-5',
+                    ],
+                ],
             ],
             [
                 'id' => 72,
@@ -436,9 +435,9 @@ class ModelFixtures extends Fixture
                     'description' => 'OpenAI premium reasoning model (NOT AVAILABLE - API Error). More compute than o3 with higher reliability.',
                     'params' => [
                         'model' => 'o3-pro',
-                        'reasoning_effort' => 'high'
-                    ]
-                ]
+                        'reasoning_effort' => 'high',
+                    ],
+                ],
             ],
             [
                 'id' => 73,
@@ -457,9 +456,9 @@ class ModelFixtures extends Fixture
                 'json' => [
                     'description' => 'OpenAI lightweight GPT-4o-mini model for fast and cost-efficient chat tasks. Optimized for lower latency and cheaper throughput.',
                     'params' => [
-                        'model' => 'gpt-4o-mini'
-                    ]
-                ]
+                        'model' => 'gpt-4o-mini',
+                    ],
+                ],
             ],
             // ==================== ADDITIONAL OPENAI MODELS ====================
             [
@@ -479,10 +478,10 @@ class ModelFixtures extends Fixture
                 'json' => [
                     'description' => 'OpenAI GPT-4o - Omni model with vision, audio and text capabilities.',
                     'params' => [
-                        'model' => 'gpt-4o'
+                        'model' => 'gpt-4o',
                     ],
-                    'features' => ['vision', 'audio']
-                ]
+                    'features' => ['vision', 'audio'],
+                ],
             ],
             [
                 'id' => 81,
@@ -502,9 +501,9 @@ class ModelFixtures extends Fixture
                     'description' => 'OpenAI GPT-4o for image analysis and vision tasks.',
                     'prompt' => 'Describe the image in detail. Extract any text you see.',
                     'params' => [
-                        'model' => 'gpt-4o'
-                    ]
-                ]
+                        'model' => 'gpt-4o',
+                    ],
+                ],
             ],
             [
                 'id' => 82,
@@ -524,10 +523,10 @@ class ModelFixtures extends Fixture
                     'description' => 'OpenAI Whisper model for audio transcription. Supports 50+ languages.',
                     'params' => [
                         'model' => 'whisper-1',
-                        'response_format' => 'verbose_json'
+                        'response_format' => 'verbose_json',
                     ],
-                    'features' => ['multilingual', 'translation']
-                ]
+                    'features' => ['multilingual', 'translation'],
+                ],
             ],
             [
                 'id' => 83,
@@ -546,9 +545,9 @@ class ModelFixtures extends Fixture
                 'json' => [
                     'description' => 'OpenAI high-quality text-to-speech.',
                     'params' => [
-                        'model' => 'tts-1-hd'
-                    ]
-                ]
+                        'model' => 'tts-1-hd',
+                    ],
+                ],
             ],
             [
                 'id' => 86,
@@ -568,9 +567,9 @@ class ModelFixtures extends Fixture
                     'description' => 'OpenAI DALL-E 2 for cost-effective image generation.',
                     'params' => [
                         'model' => 'dall-e-2',
-                        'size' => '1024x1024'
-                    ]
-                ]
+                        'size' => '1024x1024',
+                    ],
+                ],
             ],
             [
                 'id' => 87,
@@ -589,12 +588,12 @@ class ModelFixtures extends Fixture
                 'json' => [
                     'description' => 'OpenAI text embedding model (1536 dimensions) for RAG and semantic search.',
                     'params' => [
-                        'model' => 'text-embedding-3-small'
+                        'model' => 'text-embedding-3-small',
                     ],
                     'meta' => [
-                        'dimensions' => 1536
-                    ]
-                ]
+                        'dimensions' => 1536,
+                    ],
+                ],
             ],
             [
                 'id' => 88,
@@ -613,12 +612,12 @@ class ModelFixtures extends Fixture
                 'json' => [
                     'description' => 'OpenAI large text embedding model (3072 dimensions) for high-accuracy RAG.',
                     'params' => [
-                        'model' => 'text-embedding-3-large'
+                        'model' => 'text-embedding-3-large',
                     ],
                     'meta' => [
-                        'dimensions' => 3072
-                    ]
-                ]
+                        'dimensions' => 3072,
+                    ],
+                ],
             ],
             // ==================== GOOGLE MODELS ====================
             [
@@ -639,10 +638,10 @@ class ModelFixtures extends Fixture
                     'description' => 'Google Gemini 2.5 Flash Preview TTS (native speech generation)',
                     'params' => [
                         'model' => 'gemini-2.5-flash-preview-tts',
-                        'voice' => 'Kore'
+                        'voice' => 'Kore',
                     ],
-                    'features' => ['tts', 'audio']
-                ]
+                    'features' => ['tts', 'audio'],
+                ],
             ],
             [
                 'id' => 45,
@@ -661,9 +660,9 @@ class ModelFixtures extends Fixture
                 'json' => [
                     'description' => 'Google Video Generation model Veo 3.1 - 8 second videos with audio',
                     'params' => [
-                        'model' => 'veo-3.1-generate-preview'
-                    ]
-                ]
+                        'model' => 'veo-3.1-generate-preview',
+                    ],
+                ],
             ],
             [
                 'id' => 61,
@@ -682,9 +681,9 @@ class ModelFixtures extends Fixture
                 'json' => [
                     'description' => 'Googles Answer to the other LLM models',
                     'params' => [
-                        'model' => 'gemini-2.5-pro-preview-06-05'
-                    ]
-                ]
+                        'model' => 'gemini-2.5-pro-preview-06-05',
+                    ],
+                ],
             ],
             [
                 'id' => 65,
@@ -704,9 +703,9 @@ class ModelFixtures extends Fixture
                     'description' => 'Googles Powerhouse can also process images, not just text',
                     'prompt' => 'Describe the image in detail. Extract any text you see.',
                     'params' => [
-                        'model' => 'gemini-2.5-pro-preview-06-05'
-                    ]
-                ]
+                        'model' => 'gemini-2.5-pro-preview-06-05',
+                    ],
+                ],
             ],
             // ==================== ANTHROPIC MODELS ====================
             [
@@ -726,14 +725,14 @@ class ModelFixtures extends Fixture
                 'json' => [
                     'description' => 'Claude 3 Opus - Anthropic\'s most powerful model for complex tasks, analysis, and high-quality outputs. Excellent at reasoning and following instructions.',
                     'params' => [
-                        'model' => 'claude-3-opus-20240229'
+                        'model' => 'claude-3-opus-20240229',
                     ],
                     'features' => ['vision'],
                     'meta' => [
                         'context_window' => '200000',
-                        'max_output' => '4096'
-                    ]
-                ]
+                        'max_output' => '4096',
+                    ],
+                ],
             ],
             [
                 'id' => 92,
@@ -752,14 +751,14 @@ class ModelFixtures extends Fixture
                 'json' => [
                     'description' => 'Claude 3 Haiku - Fast and cost-effective model for everyday tasks. Great for quick responses and simple queries.',
                     'params' => [
-                        'model' => 'claude-3-haiku-20240307'
+                        'model' => 'claude-3-haiku-20240307',
                     ],
                     'features' => ['vision'],
                     'meta' => [
                         'context_window' => '200000',
-                        'max_output' => '4096'
-                    ]
-                ]
+                        'max_output' => '4096',
+                    ],
+                ],
             ],
             [
                 'id' => 93,
@@ -779,12 +778,12 @@ class ModelFixtures extends Fixture
                     'description' => 'Claude 3 Opus for image analysis and vision tasks. Excellent at understanding complex images, charts, diagrams, and extracting text.',
                     'prompt' => 'Describe the image in detail. Extract any text you see.',
                     'params' => [
-                        'model' => 'claude-3-opus-20240229'
+                        'model' => 'claude-3-opus-20240229',
                     ],
                     'meta' => [
-                        'supports_images' => true
-                    ]
-                ]
+                        'supports_images' => true,
+                    ],
+                ],
             ],
             // ==================== ADDITIONAL OLLAMA MODELS ====================
             [
@@ -802,8 +801,8 @@ class ModelFixtures extends Fixture
                 'quality' => 9,
                 'rating' => 1,
                 'json' => [
-                    'description' => 'Local model on synaplans company server in Germany. Metas Llama Model Version 3.3 with 70b parameters. Heavy load model and relatively slow, even on a dedicated NVIDIA card. Yet good quality!'
-                ]
+                    'description' => 'Local model on synaplans company server in Germany. Metas Llama Model Version 3.3 with 70b parameters. Heavy load model and relatively slow, even on a dedicated NVIDIA card. Yet good quality!',
+                ],
             ],
             [
                 'id' => 3,
@@ -821,8 +820,8 @@ class ModelFixtures extends Fixture
                 'rating' => 8,
                 'json' => [
                     'description' => 'Local model on synaplans company server in Germany. DeepSeek R1 is a Chinese Open Source LLM. This is the bigger version with 32b parameters. A bit slower, but more accurate!',
-                    'features' => ['reasoning']
-                ]
+                    'features' => ['reasoning'],
+                ],
             ],
             [
                 'id' => 78,
@@ -841,14 +840,14 @@ class ModelFixtures extends Fixture
                 'json' => [
                     'description' => 'Local model on synaplans company server in Germany. OpenAIs open-weight GPT-OSS (20B). 128K context, Apache-2.0 license, MXFP4 quantization; supports tools/agentic use cases.',
                     'params' => [
-                        'model' => 'gpt-oss:20b'
+                        'model' => 'gpt-oss:20b',
                     ],
                     'meta' => [
                         'context_window' => '128k',
                         'license' => 'Apache-2.0',
-                        'quantization' => 'MXFP4'
-                    ]
-                ]
+                        'quantization' => 'MXFP4',
+                    ],
+                ],
             ],
             [
                 'id' => 79,
@@ -867,25 +866,25 @@ class ModelFixtures extends Fixture
                 'json' => [
                     'description' => 'Local model on synaplans company server in Germany. OpenAIs open-weight GPT-OSS (120B). 128K context, Apache-2.0 license, MXFP4 quantization; supports tools/agentic use cases.',
                     'params' => [
-                        'model' => 'gpt-oss:120b'
+                        'model' => 'gpt-oss:120b',
                     ],
                     'meta' => [
                         'context_window' => '128k',
                         'license' => 'Apache-2.0',
-                        'quantization' => 'MXFP4'
-                    ]
-                ]
+                        'quantization' => 'MXFP4',
+                    ],
+                ],
             ],
         ];
 
         foreach ($models as $data) {
             // Insert with explicit ID using native SQL
             $connection = $manager->getConnection();
-            
+
             // Convert JSON array to string
             $jsonData = json_encode($data['json']);
-            
-            $sql = "INSERT INTO BMODELS (BID, BSERVICE, BNAME, BTAG, BSELECTABLE, BACTIVE, BPROVID, BPRICEIN, BINUNIT, BPRICEOUT, BOUTUNIT, BQUALITY, BRATING, BJSON) 
+
+            $sql = 'INSERT INTO BMODELS (BID, BSERVICE, BNAME, BTAG, BSELECTABLE, BACTIVE, BPROVID, BPRICEIN, BINUNIT, BPRICEOUT, BOUTUNIT, BQUALITY, BRATING, BJSON) 
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     ON DUPLICATE KEY UPDATE 
                         BSERVICE = VALUES(BSERVICE),
@@ -900,8 +899,8 @@ class ModelFixtures extends Fixture
                         BOUTUNIT = VALUES(BOUTUNIT),
                         BQUALITY = VALUES(BQUALITY),
                         BRATING = VALUES(BRATING),
-                        BJSON = VALUES(BJSON)";
-            
+                        BJSON = VALUES(BJSON)';
+
             $connection->executeStatement($sql, [
                 $data['id'],
                 $data['service'],
@@ -916,11 +915,10 @@ class ModelFixtures extends Fixture
                 $data['outUnit'],
                 $data['quality'],
                 $data['rating'],
-                $jsonData
+                $jsonData,
             ]);
         }
 
         $manager->flush();
     }
 }
-

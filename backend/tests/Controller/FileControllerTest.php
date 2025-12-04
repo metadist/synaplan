@@ -16,11 +16,11 @@ class FileControllerTest extends WebTestCase
     protected function setUp(): void
     {
         $this->client = static::createClient();
-        
+
         // Get test user and authenticate
         $userRepository = static::getContainer()->get(UserRepository::class);
         $this->testUser = $userRepository->findOneBy(['mail' => 'admin@synaplan.com']);
-        
+
         if (!$this->testUser) {
             $this->markTestSkipped('Test user not found. Run fixtures first.');
         }
@@ -30,7 +30,7 @@ class FileControllerTest extends WebTestCase
             'CONTENT_TYPE' => 'application/json',
         ], json_encode([
             'email' => 'admin@synaplan.com',
-            'password' => 'admin123'
+            'password' => 'admin123',
         ]));
 
         $response = $this->client->getResponse();
@@ -53,18 +53,18 @@ class FileControllerTest extends WebTestCase
 
         $this->client->request('POST', '/api/v1/files/upload', [
             'group_key' => 'TEST_GROUP',
-            'process_level' => 'vectorize'
+            'process_level' => 'vectorize',
         ], [
-            'files' => [$uploadedFile]
+            'files' => [$uploadedFile],
         ], [
-            'HTTP_AUTHORIZATION' => 'Bearer ' . $this->authToken,
+            'HTTP_AUTHORIZATION' => 'Bearer '.$this->authToken,
         ]);
 
         $response = $this->client->getResponse();
         $this->assertEquals(200, $response->getStatusCode());
 
         $data = json_decode($response->getContent(), true);
-        
+
         $this->assertTrue($data['success']);
         $this->assertCount(1, $data['files']);
         $this->assertArrayHasKey('id', $data['files'][0]);
@@ -83,18 +83,18 @@ class FileControllerTest extends WebTestCase
 
         $this->client->request('POST', '/api/v1/files/upload', [
             'group_key' => 'MULTI_TEST',
-            'process_level' => 'extract'
+            'process_level' => 'extract',
         ], [
-            'files' => [$uploadedFile1, $uploadedFile2]
+            'files' => [$uploadedFile1, $uploadedFile2],
         ], [
-            'HTTP_AUTHORIZATION' => 'Bearer ' . $this->authToken,
+            'HTTP_AUTHORIZATION' => 'Bearer '.$this->authToken,
         ]);
 
         $response = $this->client->getResponse();
         $this->assertEquals(200, $response->getStatusCode());
 
         $data = json_decode($response->getContent(), true);
-        
+
         $this->assertTrue($data['success']);
         $this->assertCount(2, $data['files']);
     }
@@ -106,11 +106,11 @@ class FileControllerTest extends WebTestCase
 
         $this->client->request('POST', '/api/v1/files/upload', [
             'group_key' => 'EXTRACT_ONLY',
-            'process_level' => 'extract'
+            'process_level' => 'extract',
         ], [
-            'files' => [$uploadedFile]
+            'files' => [$uploadedFile],
         ], [
-            'HTTP_AUTHORIZATION' => 'Bearer ' . $this->authToken,
+            'HTTP_AUTHORIZATION' => 'Bearer '.$this->authToken,
         ]);
 
         $response = $this->client->getResponse();
@@ -128,11 +128,11 @@ class FileControllerTest extends WebTestCase
 
         $this->client->request('POST', '/api/v1/files/upload', [
             'group_key' => 'TEST',
-            'process_level' => 'invalid_level'
+            'process_level' => 'invalid_level',
         ], [
-            'files' => [$uploadedFile]
+            'files' => [$uploadedFile],
         ], [
-            'HTTP_AUTHORIZATION' => 'Bearer ' . $this->authToken,
+            'HTTP_AUTHORIZATION' => 'Bearer '.$this->authToken,
         ]);
 
         $response = $this->client->getResponse();
@@ -149,9 +149,9 @@ class FileControllerTest extends WebTestCase
         $uploadedFile = new UploadedFile($testFile, 'test.txt', 'text/plain', null, true);
 
         $this->client->request('POST', '/api/v1/files/upload', [
-            'group_key' => 'TEST'
+            'group_key' => 'TEST',
         ], [
-            'files' => [$uploadedFile]
+            'files' => [$uploadedFile],
         ]);
 
         $response = $this->client->getResponse();
@@ -162,9 +162,9 @@ class FileControllerTest extends WebTestCase
     {
         $this->client->request('POST', '/api/v1/files/upload', [
             'group_key' => 'TEST',
-            'process_level' => 'extract'
+            'process_level' => 'extract',
         ], [], [
-            'HTTP_AUTHORIZATION' => 'Bearer ' . $this->authToken,
+            'HTTP_AUTHORIZATION' => 'Bearer '.$this->authToken,
         ]);
 
         $response = $this->client->getResponse();
@@ -181,23 +181,23 @@ class FileControllerTest extends WebTestCase
         $uploadedFile = new UploadedFile($testFile, 'list_test.txt', 'text/plain', null, true);
 
         $this->client->request('POST', '/api/v1/files/upload', [
-            'group_key' => 'LIST_TEST'
+            'group_key' => 'LIST_TEST',
         ], [
-            'files' => [$uploadedFile]
+            'files' => [$uploadedFile],
         ], [
-            'HTTP_AUTHORIZATION' => 'Bearer ' . $this->authToken,
+            'HTTP_AUTHORIZATION' => 'Bearer '.$this->authToken,
         ]);
 
         // Now list files
         $this->client->request('GET', '/api/v1/files', [], [], [
-            'HTTP_AUTHORIZATION' => 'Bearer ' . $this->authToken,
+            'HTTP_AUTHORIZATION' => 'Bearer '.$this->authToken,
         ]);
 
         $response = $this->client->getResponse();
         $this->assertEquals(200, $response->getStatusCode());
 
         $data = json_decode($response->getContent(), true);
-        
+
         $this->assertArrayHasKey('files', $data);
         $this->assertArrayHasKey('pagination', $data);
         $this->assertIsArray($data['files']);
@@ -211,16 +211,16 @@ class FileControllerTest extends WebTestCase
         $uploadedFile = new UploadedFile($testFile, 'filtered.txt', 'text/plain', null, true);
 
         $this->client->request('POST', '/api/v1/files/upload', [
-            'group_key' => 'FILTER_TEST_UNIQUE'
+            'group_key' => 'FILTER_TEST_UNIQUE',
         ], [
-            'files' => [$uploadedFile]
+            'files' => [$uploadedFile],
         ], [
-            'HTTP_AUTHORIZATION' => 'Bearer ' . $this->authToken,
+            'HTTP_AUTHORIZATION' => 'Bearer '.$this->authToken,
         ]);
 
         // List files with group filter
         $this->client->request('GET', '/api/v1/files?group_key=FILTER_TEST_UNIQUE', [], [], [
-            'HTTP_AUTHORIZATION' => 'Bearer ' . $this->authToken,
+            'HTTP_AUTHORIZATION' => 'Bearer '.$this->authToken,
         ]);
 
         $response = $this->client->getResponse();
@@ -237,19 +237,19 @@ class FileControllerTest extends WebTestCase
         $uploadedFile = new UploadedFile($testFile, 'delete_test.txt', 'text/plain', null, true);
 
         $this->client->request('POST', '/api/v1/files/upload', [
-            'group_key' => 'DELETE_TEST'
+            'group_key' => 'DELETE_TEST',
         ], [
-            'files' => [$uploadedFile]
+            'files' => [$uploadedFile],
         ], [
-            'HTTP_AUTHORIZATION' => 'Bearer ' . $this->authToken,
+            'HTTP_AUTHORIZATION' => 'Bearer '.$this->authToken,
         ]);
 
         $uploadResponse = json_decode($this->client->getResponse()->getContent(), true);
         $fileId = $uploadResponse['files'][0]['id'];
 
         // Now delete it
-        $this->client->request('DELETE', '/api/v1/files/' . $fileId, [], [], [
-            'HTTP_AUTHORIZATION' => 'Bearer ' . $this->authToken,
+        $this->client->request('DELETE', '/api/v1/files/'.$fileId, [], [], [
+            'HTTP_AUTHORIZATION' => 'Bearer '.$this->authToken,
         ]);
 
         $response = $this->client->getResponse();
@@ -262,7 +262,7 @@ class FileControllerTest extends WebTestCase
     public function testDeleteNonExistentFile(): void
     {
         $this->client->request('DELETE', '/api/v1/files/999999', [], [], [
-            'HTTP_AUTHORIZATION' => 'Bearer ' . $this->authToken,
+            'HTTP_AUTHORIZATION' => 'Bearer '.$this->authToken,
         ]);
 
         $response = $this->client->getResponse();
@@ -275,7 +275,7 @@ class FileControllerTest extends WebTestCase
     {
         $tempFile = tempnam(sys_get_temp_dir(), 'synaplan_test_');
         file_put_contents($tempFile, $content);
+
         return $tempFile;
     }
 }
-

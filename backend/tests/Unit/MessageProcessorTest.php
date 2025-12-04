@@ -2,17 +2,17 @@
 
 namespace App\Tests\Unit;
 
-use App\Service\Message\MessageProcessor;
-use App\Service\Message\MessagePreProcessor;
-use App\Service\Message\MessageClassifier;
+use App\Entity\Message;
+use App\Repository\MessageRepository;
+use App\Repository\SearchResultRepository;
 use App\Service\Message\InferenceRouter;
+use App\Service\Message\MessageClassifier;
+use App\Service\Message\MessagePreProcessor;
+use App\Service\Message\MessageProcessor;
 use App\Service\Message\SearchQueryGenerator;
 use App\Service\ModelConfigService;
 use App\Service\PromptService;
 use App\Service\Search\BraveSearchService;
-use App\Repository\MessageRepository;
-use App\Repository\SearchResultRepository;
-use App\Entity\Message;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 
@@ -83,7 +83,7 @@ class MessageProcessorTest extends TestCase
             ->willReturn([
                 'topic' => 'CHAT',
                 'language' => 'en',
-                'source' => 'ai_sorting'
+                'source' => 'ai_sorting',
             ]);
 
         $this->router
@@ -91,7 +91,7 @@ class MessageProcessorTest extends TestCase
             ->method('route')
             ->willReturn([
                 'content' => 'Response',
-                'metadata' => ['provider' => 'test', 'model' => 'test']
+                'metadata' => ['provider' => 'test', 'model' => 'test'],
             ]);
 
         $result = $this->processor->process($message);
@@ -114,15 +114,15 @@ class MessageProcessorTest extends TestCase
         $this->classifier->method('classify')->willReturn([
             'topic' => 'CHAT',
             'language' => 'en',
-            'source' => 'ai_sorting'
+            'source' => 'ai_sorting',
         ]);
         $this->router->method('route')->willReturn([
             'content' => 'Response',
-            'metadata' => ['provider' => 'test', 'model' => 'test']
+            'metadata' => ['provider' => 'test', 'model' => 'test'],
         ]);
 
         $statuses = [];
-        $callback = function($status) use (&$statuses) {
+        $callback = function ($status) use (&$statuses) {
             $statuses[] = $status['status'];
         };
 
@@ -149,7 +149,7 @@ class MessageProcessorTest extends TestCase
         $this->classifier->method('classify')->willReturn([
             'topic' => 'CHAT',
             'language' => 'en',
-            'source' => 'ai_sorting'
+            'source' => 'ai_sorting',
         ]);
 
         $exception = new \App\AI\Exception\ProviderException(
@@ -182,7 +182,7 @@ class MessageProcessorTest extends TestCase
         $this->classifier->method('classify')->willReturn([
             'topic' => 'CHAT',
             'language' => 'en',
-            'source' => 'ai_sorting'
+            'source' => 'ai_sorting',
         ]);
 
         $this->router->method('route')->willThrowException(new \Exception('Generic error'));
@@ -206,11 +206,11 @@ class MessageProcessorTest extends TestCase
         $this->classifier->method('classify')->willReturn([
             'topic' => 'CHAT',
             'language' => 'en',
-            'source' => 'ai_sorting'
+            'source' => 'ai_sorting',
         ]);
 
         $streamCalled = false;
-        $streamCallback = function($chunk) use (&$streamCalled) {
+        $streamCallback = function ($chunk) use (&$streamCalled) {
             $streamCalled = true;
         };
 
@@ -245,7 +245,7 @@ class MessageProcessorTest extends TestCase
         $this->classifier->method('classify')->willReturn([
             'topic' => 'CHAT',
             'language' => 'en',
-            'source' => 'ai_sorting'
+            'source' => 'ai_sorting',
         ]);
 
         $options = ['reasoning' => true, 'temperature' => 0.5];
@@ -263,7 +263,7 @@ class MessageProcessorTest extends TestCase
             )
             ->willReturn(['metadata' => ['provider' => 'test', 'model' => 'test']]);
 
-        $this->processor->processStream($message, function() {}, null, $options);
+        $this->processor->processStream($message, function () {}, null, $options);
     }
 
     public function testProcessLoadsConversationHistory(): void
@@ -285,15 +285,14 @@ class MessageProcessorTest extends TestCase
         $this->classifier->method('classify')->willReturn([
             'topic' => 'CHAT',
             'language' => 'en',
-            'source' => 'ai_sorting'
+            'source' => 'ai_sorting',
         ]);
 
         $this->router->method('route')->willReturn([
             'content' => 'Response',
-            'metadata' => ['provider' => 'test', 'model' => 'test']
+            'metadata' => ['provider' => 'test', 'model' => 'test'],
         ]);
 
         $this->processor->process($message);
     }
 }
-

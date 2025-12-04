@@ -50,6 +50,7 @@ class MessageMeta
     public function setMessageId(int $messageId): self
     {
         $this->messageId = $messageId;
+
         return $this;
     }
 
@@ -64,6 +65,7 @@ class MessageMeta
         if ($message) {
             $this->messageId = $message->getId();
         }
+
         return $this;
     }
 
@@ -75,6 +77,7 @@ class MessageMeta
     public function setMetaKey(string $metaKey): self
     {
         $this->metaKey = $metaKey;
+
         return $this;
     }
 
@@ -86,18 +89,21 @@ class MessageMeta
     public function setMetaValue(string $metaValue): self
     {
         $this->metaValue = $metaValue;
+
         return $this;
     }
 
     public function getMetaValueArray(): ?array
     {
         $decoded = json_decode($this->metaValue, true);
+
         return is_array($decoded) ? $decoded : null;
     }
 
     public function setMetaValueArray(array $value): self
     {
         $this->metaValue = json_encode($value);
+
         return $this;
     }
 
@@ -109,7 +115,7 @@ class MessageMeta
     public function setCreated(int $created): self
     {
         $this->created = $created;
+
         return $this;
     }
 }
-

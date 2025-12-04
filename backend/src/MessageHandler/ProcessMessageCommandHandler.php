@@ -10,8 +10,8 @@ use Psr\Log\LoggerInterface;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
 
 /**
- * Handler für ProcessMessageCommand
- * 
+ * Handler für ProcessMessageCommand.
+ *
  * Verarbeitet Message async im Hintergrund
  * Worker: php bin/console messenger:consume async_ai_high -vv
  */
@@ -21,23 +21,25 @@ class ProcessMessageCommandHandler
     public function __construct(
         private EntityManagerInterface $em,
         private MessageProcessor $processor,
-        private LoggerInterface $logger
-    ) {}
+        private LoggerInterface $logger,
+    ) {
+    }
 
     public function __invoke(ProcessMessageCommand $command): void
     {
         $messageId = $command->getMessageId();
-        
+
         $this->logger->info('🟢 Queue Worker: Processing message', [
             'message_id' => $messageId,
-            'user_id' => $command->getUserId()
+            'user_id' => $command->getUserId(),
         ]);
 
         // Load message from DB
         $message = $this->em->getRepository(Message::class)->find($messageId);
-        
+
         if (!$message) {
             $this->logger->error('Message not found', ['message_id' => $messageId]);
+
             return;
         }
 
@@ -81,13 +83,12 @@ class ProcessMessageCommandHandler
 
             $this->logger->info('✅ Queue Worker: Message processed successfully', [
                 'message_id' => $messageId,
-                'topic' => $classification['topic']
+                'topic' => $classification['topic'],
             ]);
-
         } catch (\Exception $e) {
             $this->logger->error('🔴 Queue Worker: Message processing failed', [
                 'message_id' => $messageId,
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ]);
 
             $message->setStatus('failed');
@@ -97,4 +98,3 @@ class ProcessMessageCommandHandler
         }
     }
 }
-

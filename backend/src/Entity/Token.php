@@ -64,6 +64,7 @@ class Token
     public function setUserId(int $userId): self
     {
         $this->userId = $userId;
+
         return $this;
     }
 
@@ -78,6 +79,7 @@ class Token
         if ($user) {
             $this->userId = $user->getId();
         }
+
         return $this;
     }
 
@@ -89,6 +91,7 @@ class Token
     public function setToken(string $token): self
     {
         $this->token = $token;
+
         return $this;
     }
 
@@ -100,6 +103,7 @@ class Token
     public function setType(string $type): self
     {
         $this->type = $type;
+
         return $this;
     }
 
@@ -111,6 +115,7 @@ class Token
     public function setCreated(int $created): self
     {
         $this->created = $created;
+
         return $this;
     }
 
@@ -122,6 +127,7 @@ class Token
     public function setExpires(int $expires): self
     {
         $this->expires = $expires;
+
         return $this;
     }
 
@@ -141,6 +147,7 @@ class Token
         if ($used && !$this->usedDate) {
             $this->usedDate = time();
         }
+
         return $this;
     }
 
@@ -148,6 +155,7 @@ class Token
     {
         $this->used = true;
         $this->usedDate = time();
+
         return $this;
     }
 
@@ -159,6 +167,7 @@ class Token
     public function setUsedDate(?int $usedDate): self
     {
         $this->usedDate = $usedDate;
+
         return $this;
     }
 
@@ -170,6 +179,7 @@ class Token
     public function setIpAddress(string $ipAddress): self
     {
         $this->ipAddress = $ipAddress;
+
         return $this;
     }
 
@@ -178,4 +188,3 @@ class Token
         return !$this->isExpired() && !$this->isUsed();
     }
 }
-

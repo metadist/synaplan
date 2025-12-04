@@ -28,4 +28,3 @@ class MailerTest extends KernelTestCase
         $this->assertTrue(true, 'Email sent successfully in test environment');
     }
 }
-

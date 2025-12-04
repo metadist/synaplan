@@ -10,7 +10,7 @@ use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
- * Integration tests for AuthController
+ * Integration tests for AuthController.
  */
 class AuthControllerTest extends WebTestCase
 {
@@ -36,12 +36,12 @@ class AuthControllerTest extends WebTestCase
                 foreach ($tokens as $token) {
                     $this->em->remove($token);
                 }
-                
+
                 $this->em->remove($user);
             }
         }
         $this->em->flush();
-        
+
         static::ensureKernelShutdown();
         parent::tearDown();
     }
@@ -56,7 +56,7 @@ class AuthControllerTest extends WebTestCase
             ['CONTENT_TYPE' => 'application/json'],
             json_encode([
                 'email' => 'newuser@test.com',
-            'password' => 'SecurePass123!'
+                'password' => 'SecurePass123!',
             ])
         );
 
@@ -100,7 +100,7 @@ class AuthControllerTest extends WebTestCase
             ['CONTENT_TYPE' => 'application/json'],
             json_encode([
                 'email' => 'existing@test.com',
-                'password' => 'NewPass123!'
+                'password' => 'NewPass123!',
             ])
         );
 
@@ -125,7 +125,7 @@ class AuthControllerTest extends WebTestCase
             ['CONTENT_TYPE' => 'application/json'],
             json_encode([
                 'email' => 'invalid-email',
-            'password' => 'SecurePass123!'
+                'password' => 'SecurePass123!',
             ])
         );
 
@@ -142,7 +142,7 @@ class AuthControllerTest extends WebTestCase
         $user->setProviderId('local');
         $user->setCreated(date('YmdHis'));
         $user->setEmailVerified(true);
-        
+
         $this->em->persist($user);
         $this->em->flush();
 
@@ -155,14 +155,14 @@ class AuthControllerTest extends WebTestCase
             ['CONTENT_TYPE' => 'application/json'],
             json_encode([
                 'email' => 'logintest@test.com',
-                'password' => 'TestPass123!'
+                'password' => 'TestPass123!',
             ])
         );
 
         $this->assertResponseIsSuccessful();
-        
+
         $responseData = json_decode($this->client->getResponse()->getContent(), true);
-        
+
         $this->assertArrayHasKey('token', $responseData);
         $this->assertArrayHasKey('user', $responseData);
         $this->assertNotEmpty($responseData['token']);
@@ -179,7 +179,7 @@ class AuthControllerTest extends WebTestCase
         $user->setProviderId('local');
         $user->setCreated(date('YmdHis'));
         $user->setEmailVerified(true);
-        
+
         $this->em->persist($user);
         $this->em->flush();
 
@@ -192,12 +192,12 @@ class AuthControllerTest extends WebTestCase
             ['CONTENT_TYPE' => 'application/json'],
             json_encode([
                 'email' => 'logintest2@test.com',
-                'password' => 'WrongPassword!'
+                'password' => 'WrongPassword!',
             ])
         );
 
         $this->assertResponseStatusCodeSame(Response::HTTP_UNAUTHORIZED);
-        
+
         // Cleanup
         $this->em->remove($user);
         $this->em->flush();
@@ -213,7 +213,7 @@ class AuthControllerTest extends WebTestCase
             ['CONTENT_TYPE' => 'application/json'],
             json_encode([
                 'email' => 'nonexistent@test.com',
-                'password' => 'AnyPassword123!'
+                'password' => 'AnyPassword123!',
             ])
         );
 
@@ -230,7 +230,7 @@ class AuthControllerTest extends WebTestCase
         $user->setProviderId('local');
         $user->setCreated(date('YmdHis'));
         $user->setEmailVerified(false);
-        
+
         $this->em->persist($user);
         $this->em->flush();
 
@@ -243,12 +243,12 @@ class AuthControllerTest extends WebTestCase
             ['CONTENT_TYPE' => 'application/json'],
             json_encode([
                 'email' => 'unverified@test.com',
-                'password' => 'TestPass123!'
+                'password' => 'TestPass123!',
             ])
         );
 
         $this->assertResponseStatusCodeSame(Response::HTTP_FORBIDDEN);
-        
+
         // Cleanup
         $this->em->remove($user);
         $this->em->flush();
@@ -263,7 +263,7 @@ class AuthControllerTest extends WebTestCase
             [],
             ['CONTENT_TYPE' => 'application/json'],
             json_encode([
-                'email' => 'test@test.com'
+                'email' => 'test@test.com',
                 // Missing password
             ])
         );
@@ -282,7 +282,7 @@ class AuthControllerTest extends WebTestCase
             ['CONTENT_TYPE' => 'application/json'],
             json_encode([
                 'email' => 'weakpass@test.com',
-                'password' => 'weak'
+                'password' => 'weak',
             ])
         );
 

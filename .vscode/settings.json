@@ -1,8 +1,18 @@
 {
-    "php-cs-fixer.executablePath": "${workspaceFolder}/vendor/bin/php-cs-fixer",
-    "php-cs-fixer.config": "${workspaceFolder}/.php-cs-fixer.dist.php",
+    // PHP CS Fixer
+    "php-cs-fixer.executablePath": "${workspaceFolder}/backend/vendor/bin/php-cs-fixer",
+
+    // PHP Language Settings
     "[php]": {
         "editor.formatOnSave": true,
         "editor.defaultFormatter": "junstyle.php-cs-fixer"
+    },
+
+    // Search Exclusions
+    "search.exclude": {
+        "**/backend/vendor": true,
+        "**/backend/var": true,
+        "**/frontend/node_modules": true,
+        "**/frontend/dist": true
     }
 }

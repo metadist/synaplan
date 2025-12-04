@@ -7,7 +7,7 @@ use App\Service\RAG\VectorSearchService;
 use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
 
 /**
- * Test Vector Search Service
+ * Test Vector Search Service.
  */
 class VectorSearchServiceTest extends KernelTestCase
 {
@@ -24,16 +24,16 @@ class VectorSearchServiceTest extends KernelTestCase
     {
         parent::setUp();
         self::bootKernel();
-        
+
         $container = static::getContainer();
 
         $aiFacadeMock = $this->createMock(AiFacade::class);
         $aiFacadeMock->method('embed')
-            ->willReturnCallback(fn(string $text, ?int $userId = null, array $options = []): array => array_fill(0, 1024, 0.2));
+            ->willReturnCallback(fn (string $text, ?int $userId = null, array $options = []): array => array_fill(0, 1024, 0.2));
         $container->set(AiFacade::class, $aiFacadeMock);
 
         $this->vectorSearchService = $container->get(VectorSearchService::class);
-        
+
         // Create test user + data
         $this->testUserId = $this->createTestUser();
         $this->testModelId = $this->createTestEmbeddingModel();
@@ -109,7 +109,7 @@ class VectorSearchServiceTest extends KernelTestCase
     {
         $container = static::getContainer();
         $em = $container->get('doctrine')->getManager();
-        
+
         // Create test message
         $message = new \App\Entity\Message();
         $message->setUserId($this->testUserId);
@@ -120,18 +120,18 @@ class VectorSearchServiceTest extends KernelTestCase
         $message->setFile(1);
         $message->setFilePath('test/ml-doc.txt');
         $message->setFileType(0);
-        
+
         $em->persist($message);
         $em->flush();
-        
+
         // Insert test vector (using dummy embedding)
         $conn = $em->getConnection();
         $dummyVector = array_fill(0, 1024, 0.1);
-        $vectorStr = '[' . implode(',', $dummyVector) . ']';
-        
+        $vectorStr = '['.implode(',', $dummyVector).']';
+
         $sql = 'INSERT INTO BRAG (BUID, BMID, BGROUPKEY, BTYPE, BSTART, BEND, BTEXT, BEMBED, BCREATED) 
                 VALUES (:uid, :mid, :gkey, :ftype, :start, :end, :text, VEC_FromText(:vec), :created)';
-        
+
         $conn->executeStatement($sql, [
             'uid' => $this->testUserId,
             'mid' => $message->getId(),
@@ -141,9 +141,9 @@ class VectorSearchServiceTest extends KernelTestCase
             'end' => 10,
             'text' => 'Machine learning is a subset of artificial intelligence',
             'vec' => $vectorStr,
-            'created' => time()
+            'created' => time(),
         ]);
-        
+
         return $message->getId();
     }
 
@@ -185,7 +185,7 @@ class VectorSearchServiceTest extends KernelTestCase
             $this->assertArrayHasKey('distance', $results[0]);
             $this->assertIsNumeric($results[0]['distance']);
         }
-        
+
         $this->assertIsArray($results);
     }
 
@@ -227,15 +227,15 @@ class VectorSearchServiceTest extends KernelTestCase
     protected function tearDown(): void
     {
         parent::tearDown();
-        
+
         // Cleanup test data
         $container = static::getContainer();
         $em = $container->get('doctrine')->getManager();
         $conn = $em->getConnection();
-        
+
         // Delete test vectors
         $conn->executeStatement('DELETE FROM BRAG WHERE BMID = ?', [$this->testMessageId]);
-        
+
         $entitiesToRemove = [];
 
         // Delete test message
@@ -282,4 +282,3 @@ class VectorSearchServiceTest extends KernelTestCase
         }
     }
 }
-

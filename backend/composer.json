@@ -99,7 +99,9 @@
         ],
         "post-update-cmd": [
             "@auto-scripts"
-        ]
+        ],
+        "lint": "php-cs-fixer check --diff",
+        "lint:fix": "php-cs-fixer fix"
     },
     "conflict": {
         "symfony/symfony": "*"

@@ -4,8 +4,8 @@ namespace App\Controller;
 
 use App\Entity\Prompt;
 use App\Entity\User;
-use App\Repository\PromptRepository;
 use App\Repository\PromptMetaRepository;
+use App\Repository\PromptRepository;
 use App\Service\PromptService;
 use Doctrine\ORM\EntityManagerInterface;
 use OpenApi\Attributes as OA;
@@ -18,8 +18,8 @@ use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\CurrentUser;
 
 /**
- * Task Prompts Management
- * 
+ * Task Prompts Management.
+ *
  * Allows users to view system prompts and create their own custom prompts
  * User prompts override system prompts for the same topic
  */
@@ -31,14 +31,15 @@ class PromptController extends AbstractController
         private PromptMetaRepository $promptMetaRepository,
         private PromptService $promptService,
         private EntityManagerInterface $em,
-        private LoggerInterface $logger
-    ) {}
-    
+        private LoggerInterface $logger,
+    ) {
+    }
+
     // Dependencies will be injected via method parameters for file endpoints
 
     /**
-     * List all accessible prompts (system + user-specific)
-     * 
+     * List all accessible prompts (system + user-specific).
+     *
      * GET /api/v1/prompts
      */
     #[Route('', name: 'list', methods: ['GET'])]
@@ -54,7 +55,7 @@ class PromptController extends AbstractController
                 required: false,
                 description: 'Language code (default: en)',
                 schema: new OA\Schema(type: 'string', example: 'en')
-            )
+            ),
         ],
         responses: [
             new OA\Response(
@@ -75,26 +76,26 @@ class PromptController extends AbstractController
                                     new OA\Property(property: 'prompt', type: 'string', example: 'You are a media generation assistant...'),
                                     new OA\Property(property: 'language', type: 'string', example: 'en'),
                                     new OA\Property(property: 'isDefault', type: 'boolean', example: true, description: 'True if this is a system prompt'),
-                                    new OA\Property(property: 'isUserOverride', type: 'boolean', example: false, description: 'True if user has customized this prompt')
+                                    new OA\Property(property: 'isUserOverride', type: 'boolean', example: false, description: 'True if user has customized this prompt'),
                                 ]
                             )
-                        )
+                        ),
                     ]
                 )
             ),
-            new OA\Response(response: 401, description: 'Not authenticated')
+            new OA\Response(response: 401, description: 'Not authenticated'),
         ]
     )]
     public function list(
         Request $request,
-        #[CurrentUser] ?User $user
+        #[CurrentUser] ?User $user,
     ): JsonResponse {
         if (!$user) {
             return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
         }
 
         $language = $request->query->get('language', 'en');
-        
+
         // Get all system prompts (ownerId = 0, excluding tools:*)
         $systemPrompts = $this->promptRepository->createQueryBuilder('p')
             ->where('p.ownerId = 0')
@@ -120,12 +121,12 @@ class PromptController extends AbstractController
 
         // Build result: user prompts override system prompts
         $promptsMap = [];
-        
+
         // First add all system prompts
         /** @var Prompt $prompt */
         foreach ($systemPrompts as $prompt) {
             $metadata = $this->promptService->loadMetadataForPrompt($prompt->getId());
-            
+
             $promptsMap[$prompt->getTopic()] = [
                 'id' => $prompt->getId(),
                 'topic' => $prompt->getTopic(),
@@ -136,7 +137,7 @@ class PromptController extends AbstractController
                 'language' => $prompt->getLanguage(),
                 'isDefault' => true,
                 'isUserOverride' => false,
-                'metadata' => $metadata
+                'metadata' => $metadata,
             ];
         }
 
@@ -145,7 +146,7 @@ class PromptController extends AbstractController
             $topic = $prompt->getTopic();
             $hasSystemVersion = isset($promptsMap[$topic]);
             $metadata = $this->promptService->loadMetadataForPrompt($prompt->getId());
-            
+
             $promptsMap[$topic] = [
                 'id' => $prompt->getId(),
                 'topic' => $topic,
@@ -156,21 +157,21 @@ class PromptController extends AbstractController
                 'language' => $prompt->getLanguage(),
                 'isDefault' => false,
                 'isUserOverride' => $hasSystemVersion,
-                'metadata' => $metadata
+                'metadata' => $metadata,
             ];
         }
 
         return $this->json([
             'success' => true,
-            'prompts' => array_values($promptsMap)
+            'prompts' => array_values($promptsMap),
         ]);
     }
 
     /**
-     * Get all available files (vectorized) for user
-     * 
+     * Get all available files (vectorized) for user.
+     *
      * GET /api/v1/prompts/available-files
-     * 
+     *
      * IMPORTANT: This route must be BEFORE /{id} route to avoid conflicts!
      */
     #[Route('/available-files', name: 'available_files', methods: ['GET'])]
@@ -186,7 +187,7 @@ class PromptController extends AbstractController
                 required: false,
                 description: 'Search filter for filename',
                 schema: new OA\Schema(type: 'string', example: 'customer')
-            )
+            ),
         ],
         responses: [
             new OA\Response(
@@ -204,31 +205,31 @@ class PromptController extends AbstractController
                                     new OA\Property(property: 'fileName', type: 'string', example: 'customer-faq.pdf'),
                                     new OA\Property(property: 'chunks', type: 'integer', example: 15),
                                     new OA\Property(property: 'currentGroupKey', type: 'string', example: 'DEFAULT'),
-                                    new OA\Property(property: 'uploadedAt', type: 'string', example: '2024-01-15T10:30:00Z')
+                                    new OA\Property(property: 'uploadedAt', type: 'string', example: '2024-01-15T10:30:00Z'),
                                 ]
                             )
-                        )
+                        ),
                     ]
                 )
             ),
-            new OA\Response(response: 401, description: 'Not authenticated')
+            new OA\Response(response: 401, description: 'Not authenticated'),
         ]
     )]
     public function getAvailableFiles(
         Request $request,
         #[CurrentUser] ?User $user,
         \App\Repository\RagDocumentRepository $ragRepository,
-        \App\Repository\FileRepository $fileRepository
+        \App\Repository\FileRepository $fileRepository,
     ): JsonResponse {
         if (!$user) {
             return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
         }
-        
+
         $searchQuery = $request->query->get('search', '');
-        
+
         // Get all RAG documents for this user
         $ragDocs = $ragRepository->findBy(['userId' => $user->getId()]);
-        
+
         // Group by file (using messageId which now references BFILES.BID)
         $filesByFileId = [];
         foreach ($ragDocs as $doc) {
@@ -237,37 +238,37 @@ class PromptController extends AbstractController
                 $file = $fileRepository->find($fileId);
                 if ($file) {
                     $fileName = $file->getFileName();
-                    
+
                     // Apply search filter
-                    if (!empty($searchQuery) && stripos($fileName, $searchQuery) === false) {
+                    if (!empty($searchQuery) && false === stripos($fileName, $searchQuery)) {
                         continue;
                     }
-                    
+
                     $filesByFileId[$fileId] = [
                         'messageId' => $fileId, // Keep as messageId for frontend compatibility
                         'fileName' => $fileName,
                         'chunks' => 0,
                         'currentGroupKey' => $doc->getGroupKey(),
-                        'uploadedAt' => $file->getCreatedAt() 
+                        'uploadedAt' => $file->getCreatedAt()
                             ? date('Y-m-d\TH:i:s\Z', $file->getCreatedAt())
-                            : null
+                            : null,
                     ];
                 }
             }
             if (isset($filesByFileId[$fileId])) {
-                $filesByFileId[$fileId]['chunks']++;
+                ++$filesByFileId[$fileId]['chunks'];
             }
         }
-        
+
         return $this->json([
             'success' => true,
-            'files' => array_values($filesByFileId)
+            'files' => array_values($filesByFileId),
         ]);
     }
 
     /**
-     * Get a specific prompt by ID
-     * 
+     * Get a specific prompt by ID.
+     *
      * GET /api/v1/prompts/{id}
      */
     #[Route('/{id}', name: 'get', methods: ['GET'])]
@@ -282,7 +283,7 @@ class PromptController extends AbstractController
                 required: true,
                 description: 'Prompt ID',
                 schema: new OA\Schema(type: 'integer')
-            )
+            ),
         ],
         responses: [
             new OA\Response(
@@ -291,31 +292,31 @@ class PromptController extends AbstractController
                 content: new OA\JsonContent(
                     properties: [
                         new OA\Property(property: 'success', type: 'boolean'),
-                        new OA\Property(property: 'prompt', type: 'object')
+                        new OA\Property(property: 'prompt', type: 'object'),
                     ]
                 )
             ),
             new OA\Response(response: 401, description: 'Not authenticated'),
             new OA\Response(response: 403, description: 'Access denied - not your prompt'),
-            new OA\Response(response: 404, description: 'Prompt not found')
+            new OA\Response(response: 404, description: 'Prompt not found'),
         ]
     )]
     public function get(
         int $id,
-        #[CurrentUser] ?User $user
+        #[CurrentUser] ?User $user,
     ): JsonResponse {
         if (!$user) {
             return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
         }
 
         $prompt = $this->promptRepository->find($id);
-        
+
         if (!$prompt) {
             return $this->json(['error' => 'Prompt not found'], Response::HTTP_NOT_FOUND);
         }
 
         // Check access: user can only access system prompts (ownerId=0) or their own prompts
-        if ($prompt->getOwnerId() !== 0 && $prompt->getOwnerId() !== $user->getId()) {
+        if (0 !== $prompt->getOwnerId() && $prompt->getOwnerId() !== $user->getId()) {
             return $this->json(['error' => 'Access denied'], Response::HTTP_FORBIDDEN);
         }
 
@@ -324,18 +325,18 @@ class PromptController extends AbstractController
             'prompt' => [
                 'id' => $prompt->getId(),
                 'topic' => $prompt->getTopic(),
-                'name' => $this->formatPromptName($prompt->getTopic(), $prompt->getShortDescription(), $prompt->getOwnerId() === 0),
+                'name' => $this->formatPromptName($prompt->getTopic(), $prompt->getShortDescription(), 0 === $prompt->getOwnerId()),
                 'shortDescription' => $prompt->getShortDescription(),
                 'prompt' => $prompt->getPrompt(),
                 'language' => $prompt->getLanguage(),
-                'isDefault' => $prompt->getOwnerId() === 0
-            ]
+                'isDefault' => 0 === $prompt->getOwnerId(),
+            ],
         ]);
     }
 
     /**
-     * Create a new user-specific prompt
-     * 
+     * Create a new user-specific prompt.
+     *
      * POST /api/v1/prompts
      * Body: {
      *   "topic": "custom-task",
@@ -357,7 +358,7 @@ class PromptController extends AbstractController
                     new OA\Property(property: 'topic', type: 'string', example: 'custom-analyzer', description: 'Unique topic identifier'),
                     new OA\Property(property: 'shortDescription', type: 'string', example: 'Custom file analyzer', description: 'Short description for the prompt'),
                     new OA\Property(property: 'prompt', type: 'string', example: 'You are a specialized file analyzer...', description: 'The actual prompt content'),
-                    new OA\Property(property: 'language', type: 'string', example: 'en', description: 'Language code (default: en)')
+                    new OA\Property(property: 'language', type: 'string', example: 'en', description: 'Language code (default: en)'),
                 ]
             )
         ),
@@ -370,37 +371,39 @@ class PromptController extends AbstractController
                     properties: [
                         new OA\Property(property: 'success', type: 'boolean'),
                         new OA\Property(property: 'prompt', type: 'object'),
-                        new OA\Property(property: 'message', type: 'string')
+                        new OA\Property(property: 'message', type: 'string'),
                     ]
                 )
             ),
             new OA\Response(response: 400, description: 'Invalid input'),
             new OA\Response(response: 401, description: 'Not authenticated'),
-            new OA\Response(response: 409, description: 'Prompt with this topic already exists for this user')
+            new OA\Response(response: 409, description: 'Prompt with this topic already exists for this user'),
         ]
     )]
     public function create(
         Request $request,
-        #[CurrentUser] ?User $user
+        #[CurrentUser] ?User $user,
     ): JsonResponse {
         try {
             if (!$user) {
                 $this->logger->error('PromptController::create - No user authenticated');
+
                 return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
             }
 
             $data = json_decode($request->getContent(), true);
-            
+
             $this->logger->info('🔵 CREATE PROMPT REQUEST', [
                 'data' => $data,
-                'user_id' => $user->getId()
+                'user_id' => $user->getId(),
             ]);
-            
+
             // Validate required fields
             if (empty($data['topic']) || empty($data['shortDescription']) || empty($data['prompt'])) {
                 $this->logger->warning('PromptController::create - Missing required fields', ['data' => $data]);
+
                 return $this->json([
-                    'error' => 'Missing required fields: topic, shortDescription, prompt'
+                    'error' => 'Missing required fields: topic, shortDescription, prompt',
                 ], Response::HTTP_BAD_REQUEST);
             }
 
@@ -414,7 +417,7 @@ class PromptController extends AbstractController
             // Prevent creating tool prompts (reserved for system)
             if (str_starts_with($topic, 'tools:')) {
                 return $this->json([
-                    'error' => 'Cannot create prompts with "tools:" prefix - reserved for system'
+                    'error' => 'Cannot create prompts with "tools:" prefix - reserved for system',
                 ], Response::HTTP_BAD_REQUEST);
             }
 
@@ -422,7 +425,7 @@ class PromptController extends AbstractController
             $existingPrompt = $this->promptRepository->findByTopic($topic, $user->getId());
             if ($existingPrompt) {
                 return $this->json([
-                    'error' => 'You already have a prompt with this topic. Use PUT /api/v1/prompts/{id} to update it.'
+                    'error' => 'You already have a prompt with this topic. Use PUT /api/v1/prompts/{id} to update it.',
                 ], Response::HTTP_CONFLICT);
             }
 
@@ -437,14 +440,14 @@ class PromptController extends AbstractController
 
             $this->em->persist($prompt);
             $this->em->flush();
-            
+
             // Refresh to ensure ID is populated
             $this->em->refresh($prompt);
-            
+
             $this->logger->info('🟢 PROMPT CREATED', [
                 'prompt_id' => $prompt->getId(),
                 'topic' => $topic,
-                'has_metadata' => !empty($metadata)
+                'has_metadata' => !empty($metadata),
             ]);
 
             // Save metadata (AI model, tools)
@@ -452,10 +455,10 @@ class PromptController extends AbstractController
                 if (!$prompt->getId()) {
                     throw new \RuntimeException('Prompt ID is null after flush and refresh!');
                 }
-                
+
                 $this->logger->info('🔵 SAVING METADATA', [
                     'prompt_id' => $prompt->getId(),
-                    'metadata' => $metadata
+                    'metadata' => $metadata,
                 ]);
                 $this->promptService->saveMetadataForPrompt($prompt, $metadata);
                 $this->logger->info('🟢 METADATA SAVED');
@@ -464,7 +467,7 @@ class PromptController extends AbstractController
             $this->logger->info('User created custom prompt', [
                 'user_id' => $user->getId(),
                 'prompt_id' => $prompt->getId(),
-                'topic' => $topic
+                'topic' => $topic,
             ]);
 
             return $this->json([
@@ -477,24 +480,24 @@ class PromptController extends AbstractController
                     'shortDescription' => $prompt->getShortDescription(),
                     'prompt' => $prompt->getPrompt(),
                     'language' => $prompt->getLanguage(),
-                    'isDefault' => false
-                ]
+                    'isDefault' => false,
+                ],
             ], Response::HTTP_CREATED);
         } catch (\Throwable $e) {
             $this->logger->error('❌ PromptController::create - Exception', [
                 'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
+                'trace' => $e->getTraceAsString(),
             ]);
-            
+
             return $this->json([
-                'error' => 'Failed to create prompt: ' . $e->getMessage()
+                'error' => 'Failed to create prompt: '.$e->getMessage(),
             ], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
 
     /**
-     * Update an existing user-specific prompt
-     * 
+     * Update an existing user-specific prompt.
+     *
      * PUT /api/v1/prompts/{id}
      */
     #[Route('/{id}', name: 'update', methods: ['PUT'])]
@@ -507,7 +510,7 @@ class PromptController extends AbstractController
             content: new OA\JsonContent(
                 properties: [
                     new OA\Property(property: 'shortDescription', type: 'string', example: 'Updated description'),
-                    new OA\Property(property: 'prompt', type: 'string', example: 'Updated prompt content...')
+                    new OA\Property(property: 'prompt', type: 'string', example: 'Updated prompt content...'),
                 ]
             )
         ),
@@ -520,34 +523,35 @@ class PromptController extends AbstractController
                     properties: [
                         new OA\Property(property: 'success', type: 'boolean'),
                         new OA\Property(property: 'prompt', type: 'object'),
-                        new OA\Property(property: 'message', type: 'string')
+                        new OA\Property(property: 'message', type: 'string'),
                     ]
                 )
             ),
             new OA\Response(response: 400, description: 'Invalid input'),
             new OA\Response(response: 401, description: 'Not authenticated'),
             new OA\Response(response: 403, description: 'Cannot modify system prompts'),
-            new OA\Response(response: 404, description: 'Prompt not found')
+            new OA\Response(response: 404, description: 'Prompt not found'),
         ]
     )]
     public function update(
         int $id,
         Request $request,
-        #[CurrentUser] ?User $user
+        #[CurrentUser] ?User $user,
     ): JsonResponse {
         $this->logger->info('PromptController::update called', [
             'prompt_id' => $id,
-            'user_id' => $user?->getId()
+            'user_id' => $user?->getId(),
         ]);
-        
+
         if (!$user) {
             return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
         }
 
         $prompt = $this->promptRepository->find($id);
-        
+
         if (!$prompt) {
             $this->logger->error('Prompt not found', ['id' => $id]);
+
             return $this->json(['error' => 'Prompt not found'], Response::HTTP_NOT_FOUND);
         }
 
@@ -556,30 +560,31 @@ class PromptController extends AbstractController
             $this->logger->warning('User tried to update prompt they don\'t own', [
                 'user_id' => $user->getId(),
                 'prompt_owner' => $prompt->getOwnerId(),
-                'prompt_id' => $id
+                'prompt_id' => $id,
             ]);
+
             return $this->json([
-                'error' => 'Cannot modify this prompt. You can only modify your own custom prompts.'
+                'error' => 'Cannot modify this prompt. You can only modify your own custom prompts.',
             ], Response::HTTP_FORBIDDEN);
         }
 
         $data = json_decode($request->getContent(), true);
-        
+
         $this->logger->info('Update data received', [
             'prompt_id' => $id,
             'has_metadata' => isset($data['metadata']),
-            'metadata_keys' => isset($data['metadata']) ? array_keys($data['metadata']) : []
+            'metadata_keys' => isset($data['metadata']) ? array_keys($data['metadata']) : [],
         ]);
 
         // Update fields if provided
         if (isset($data['shortDescription'])) {
             $prompt->setShortDescription(trim($data['shortDescription']));
         }
-        
+
         if (isset($data['prompt'])) {
             $prompt->setPrompt(trim($data['prompt']));
         }
-        
+
         if (isset($data['selectionRules'])) {
             $prompt->setSelectionRules(trim($data['selectionRules']) ?: null);
         }
@@ -590,7 +595,7 @@ class PromptController extends AbstractController
         } catch (\Exception $e) {
             $this->logger->error('Failed to flush prompt entity', [
                 'prompt_id' => $id,
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ]);
             throw $e;
         }
@@ -600,7 +605,7 @@ class PromptController extends AbstractController
             try {
                 $this->logger->info('Saving metadata', [
                     'prompt_id' => $prompt->getId(),
-                    'metadata' => $data['metadata']
+                    'metadata' => $data['metadata'],
                 ]);
                 $this->promptService->saveMetadataForPrompt($prompt, $data['metadata']);
                 $this->logger->info('Metadata saved successfully', ['prompt_id' => $prompt->getId()]);
@@ -608,7 +613,7 @@ class PromptController extends AbstractController
                 $this->logger->error('Failed to save metadata', [
                     'prompt_id' => $prompt->getId(),
                     'error' => $e->getMessage(),
-                    'trace' => $e->getTraceAsString()
+                    'trace' => $e->getTraceAsString(),
                 ]);
                 throw $e;
             }
@@ -617,7 +622,7 @@ class PromptController extends AbstractController
         $this->logger->info('User updated custom prompt', [
             'user_id' => $user->getId(),
             'prompt_id' => $prompt->getId(),
-            'topic' => $prompt->getTopic()
+            'topic' => $prompt->getTopic(),
         ]);
 
         return $this->json([
@@ -630,14 +635,14 @@ class PromptController extends AbstractController
                 'shortDescription' => $prompt->getShortDescription(),
                 'prompt' => $prompt->getPrompt(),
                 'language' => $prompt->getLanguage(),
-                'isDefault' => false
-            ]
+                'isDefault' => false,
+            ],
         ]);
     }
 
     /**
-     * Delete a user-specific prompt
-     * 
+     * Delete a user-specific prompt.
+     *
      * DELETE /api/v1/prompts/{id}
      */
     #[Route('/{id}', name: 'delete', methods: ['DELETE'])]
@@ -653,25 +658,25 @@ class PromptController extends AbstractController
                 content: new OA\JsonContent(
                     properties: [
                         new OA\Property(property: 'success', type: 'boolean'),
-                        new OA\Property(property: 'message', type: 'string')
+                        new OA\Property(property: 'message', type: 'string'),
                     ]
                 )
             ),
             new OA\Response(response: 401, description: 'Not authenticated'),
             new OA\Response(response: 403, description: 'Cannot delete system prompts'),
-            new OA\Response(response: 404, description: 'Prompt not found')
+            new OA\Response(response: 404, description: 'Prompt not found'),
         ]
     )]
     public function delete(
         int $id,
-        #[CurrentUser] ?User $user
+        #[CurrentUser] ?User $user,
     ): JsonResponse {
         if (!$user) {
             return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
         }
 
         $prompt = $this->promptRepository->find($id);
-        
+
         if (!$prompt) {
             return $this->json(['error' => 'Prompt not found'], Response::HTTP_NOT_FOUND);
         }
@@ -679,23 +684,23 @@ class PromptController extends AbstractController
         // Check ownership: only user's own prompts can be deleted
         if ($prompt->getOwnerId() !== $user->getId()) {
             return $this->json([
-                'error' => 'Cannot delete this prompt. You can only delete your own custom prompts.'
+                'error' => 'Cannot delete this prompt. You can only delete your own custom prompts.',
             ], Response::HTTP_FORBIDDEN);
         }
 
         $topic = $prompt->getTopic();
-        
+
         // Delete metadata entries first (to avoid foreign key constraint violation)
         $metaEntries = $this->promptMetaRepository->findBy(['promptId' => $prompt->getId()]);
         foreach ($metaEntries as $meta) {
             $this->em->remove($meta);
         }
-        
+
         // Flush metadata deletions first
         if (!empty($metaEntries)) {
             $this->em->flush();
         }
-        
+
         // Now delete the prompt itself
         $this->em->remove($prompt);
         $this->em->flush();
@@ -703,31 +708,31 @@ class PromptController extends AbstractController
         $this->logger->info('User deleted custom prompt', [
             'user_id' => $user->getId(),
             'prompt_id' => $id,
-            'topic' => $topic
+            'topic' => $topic,
         ]);
 
         return $this->json([
             'success' => true,
-            'message' => 'Prompt deleted successfully. System default (if exists) will be used.'
+            'message' => 'Prompt deleted successfully. System default (if exists) will be used.',
         ]);
     }
 
     /**
-     * Format prompt name for display
+     * Format prompt name for display.
      */
     private function formatPromptName(string $topic, string $shortDescription, bool $isDefault = true): string
     {
         $prefix = $isDefault ? '(default)' : '(custom)';
-        $truncatedDesc = strlen($shortDescription) > 60 
-            ? substr($shortDescription, 0, 57) . '...'
+        $truncatedDesc = strlen($shortDescription) > 60
+            ? substr($shortDescription, 0, 57).'...'
             : $shortDescription;
-        
+
         return "{$prefix} {$topic} - {$truncatedDesc}";
     }
-    
+
     /**
-     * Get all files associated with a task prompt (via BGROUPKEY)
-     * 
+     * Get all files associated with a task prompt (via BGROUPKEY).
+     *
      * GET /api/v1/prompts/{topic}/files
      */
     #[Route('/{topic}/files', name: 'files', methods: ['GET'])]
@@ -743,7 +748,7 @@ class PromptController extends AbstractController
                 required: true,
                 description: 'Task prompt topic (e.g., "general", "customersupport")',
                 schema: new OA\Schema(type: 'string', example: 'customersupport')
-            )
+            ),
         ],
         responses: [
             new OA\Response(
@@ -760,42 +765,42 @@ class PromptController extends AbstractController
                                     new OA\Property(property: 'messageId', type: 'integer', example: 123),
                                     new OA\Property(property: 'fileName', type: 'string', example: 'customer-faq.pdf'),
                                     new OA\Property(property: 'chunks', type: 'integer', example: 15, description: 'Number of text chunks'),
-                                    new OA\Property(property: 'uploadedAt', type: 'string', example: '2024-01-15T10:30:00Z')
+                                    new OA\Property(property: 'uploadedAt', type: 'string', example: '2024-01-15T10:30:00Z'),
                                 ]
                             )
-                        )
+                        ),
                     ]
                 )
             ),
             new OA\Response(response: 401, description: 'Not authenticated'),
-            new OA\Response(response: 404, description: 'Prompt not found')
+            new OA\Response(response: 404, description: 'Prompt not found'),
         ]
     )]
     public function getFiles(
         string $topic,
         #[CurrentUser] ?User $user,
         \App\Repository\RagDocumentRepository $ragRepository,
-        \App\Repository\FileRepository $fileRepository
+        \App\Repository\FileRepository $fileRepository,
     ): JsonResponse {
         if (!$user) {
             return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
         }
-        
+
         // Verify prompt exists and user has access
         $prompt = $this->promptRepository->findByTopicAndUser($topic, $user->getId());
         if (!$prompt) {
             return $this->json(['error' => 'Prompt not found'], Response::HTTP_NOT_FOUND);
         }
-        
+
         // Build groupKey for this task prompt
         $groupKey = "TASKPROMPT:{$topic}";
-        
+
         // Get all RAG documents for this groupKey
         $ragDocs = $ragRepository->findBy([
             'userId' => $user->getId(),
-            'groupKey' => $groupKey
+            'groupKey' => $groupKey,
         ]);
-        
+
         // Group by file (messageId now references BFILES.BID)
         $filesByFileId = [];
         foreach ($ragDocs as $doc) {
@@ -807,27 +812,27 @@ class PromptController extends AbstractController
                         'messageId' => $fileId, // Keep as messageId for frontend compatibility
                         'fileName' => $file->getFileName(),
                         'chunks' => 0,
-                        'uploadedAt' => $file->getCreatedAt() 
+                        'uploadedAt' => $file->getCreatedAt()
                             ? date('Y-m-d\TH:i:s\Z', $file->getCreatedAt())
-                            : null
+                            : null,
                     ];
                 }
             }
             if (isset($filesByFileId[$fileId])) {
-                $filesByFileId[$fileId]['chunks']++;
+                ++$filesByFileId[$fileId]['chunks'];
             }
         }
-        
+
         return $this->json([
             'success' => true,
             'files' => array_values($filesByFileId),
-            'groupKey' => $groupKey
+            'groupKey' => $groupKey,
         ]);
     }
-    
+
     /**
-     * Delete a file from task prompt
-     * 
+     * Delete a file from task prompt.
+     *
      * DELETE /api/v1/prompts/{topic}/files/{messageId}
      */
     #[Route('/{topic}/files/{messageId}', name: 'delete_file', methods: ['DELETE'])]
@@ -848,7 +853,7 @@ class PromptController extends AbstractController
                 in: 'path',
                 required: true,
                 schema: new OA\Schema(type: 'integer', example: 123)
-            )
+            ),
         ],
         responses: [
             new OA\Response(
@@ -857,63 +862,63 @@ class PromptController extends AbstractController
                 content: new OA\JsonContent(
                     properties: [
                         new OA\Property(property: 'success', type: 'boolean'),
-                        new OA\Property(property: 'chunksDeleted', type: 'integer', example: 15)
+                        new OA\Property(property: 'chunksDeleted', type: 'integer', example: 15),
                     ]
                 )
             ),
             new OA\Response(response: 401, description: 'Not authenticated'),
             new OA\Response(response: 403, description: 'Not authorized'),
-            new OA\Response(response: 404, description: 'File not found')
+            new OA\Response(response: 404, description: 'File not found'),
         ]
     )]
     public function deleteFile(
         string $topic,
         int $messageId,
         #[CurrentUser] ?User $user,
-        \App\Repository\RagDocumentRepository $ragRepository
+        \App\Repository\RagDocumentRepository $ragRepository,
     ): JsonResponse {
         if (!$user) {
             return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
         }
-        
+
         $groupKey = "TASKPROMPT:{$topic}";
-        
+
         // Get all chunks for this message and groupKey
         $ragDocs = $ragRepository->findBy([
             'userId' => $user->getId(),
             'messageId' => $messageId,
-            'groupKey' => $groupKey
+            'groupKey' => $groupKey,
         ]);
-        
+
         if (empty($ragDocs)) {
             return $this->json(['error' => 'File not found in this task prompt'], Response::HTTP_NOT_FOUND);
         }
-        
+
         // Delete all chunks
         $chunksDeleted = 0;
         foreach ($ragDocs as $doc) {
             $this->em->remove($doc);
-            $chunksDeleted++;
+            ++$chunksDeleted;
         }
         $this->em->flush();
-        
+
         $this->logger->info('Deleted file from task prompt', [
             'user_id' => $user->getId(),
             'topic' => $topic,
             'message_id' => $messageId,
-            'chunks_deleted' => $chunksDeleted
+            'chunks_deleted' => $chunksDeleted,
         ]);
-        
+
         return $this->json([
             'success' => true,
             'chunksDeleted' => $chunksDeleted,
-            'message' => 'File removed from task prompt knowledge base'
+            'message' => 'File removed from task prompt knowledge base',
         ]);
     }
-    
+
     /**
-     * Link existing file to task prompt
-     * 
+     * Link existing file to task prompt.
+     *
      * POST /api/v1/prompts/{topic}/files/link
      * Body: { "messageId": 123 }
      */
@@ -927,7 +932,7 @@ class PromptController extends AbstractController
             required: true,
             content: new OA\JsonContent(
                 properties: [
-                    new OA\Property(property: 'messageId', type: 'integer', example: 123)
+                    new OA\Property(property: 'messageId', type: 'integer', example: 123),
                 ]
             )
         ),
@@ -938,64 +943,63 @@ class PromptController extends AbstractController
                 content: new OA\JsonContent(
                     properties: [
                         new OA\Property(property: 'success', type: 'boolean'),
-                        new OA\Property(property: 'chunksLinked', type: 'integer', example: 15)
+                        new OA\Property(property: 'chunksLinked', type: 'integer', example: 15),
                     ]
                 )
             ),
             new OA\Response(response: 401, description: 'Not authenticated'),
-            new OA\Response(response: 404, description: 'File not found')
+            new OA\Response(response: 404, description: 'File not found'),
         ]
     )]
     public function linkFile(
         string $topic,
         Request $request,
         #[CurrentUser] ?User $user,
-        \App\Repository\RagDocumentRepository $ragRepository
+        \App\Repository\RagDocumentRepository $ragRepository,
     ): JsonResponse {
         if (!$user) {
             return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
         }
-        
+
         $data = json_decode($request->getContent(), true);
         $messageId = $data['messageId'] ?? null;
-        
+
         if (!$messageId) {
             return $this->json(['error' => 'messageId is required'], Response::HTTP_BAD_REQUEST);
         }
-        
+
         // Get all RAG chunks for this message (any groupKey)
         $ragDocs = $ragRepository->findBy([
             'userId' => $user->getId(),
-            'messageId' => $messageId
+            'messageId' => $messageId,
         ]);
-        
+
         if (empty($ragDocs)) {
             return $this->json(['error' => 'No vectorized chunks found for this file'], Response::HTTP_NOT_FOUND);
         }
-        
+
         // Update groupKey for all chunks
         $newGroupKey = "TASKPROMPT:{$topic}";
         $chunksLinked = 0;
-        
+
         foreach ($ragDocs as $doc) {
             $doc->setGroupKey($newGroupKey);
-            $chunksLinked++;
+            ++$chunksLinked;
         }
-        
+
         $this->em->flush();
-        
+
         $this->logger->info('Linked file to task prompt', [
             'user_id' => $user->getId(),
             'topic' => $topic,
             'message_id' => $messageId,
-            'chunks_linked' => $chunksLinked
+            'chunks_linked' => $chunksLinked,
         ]);
-        
+
         return $this->json([
             'success' => true,
             'chunksLinked' => $chunksLinked,
-            'message' => 'File linked to task prompt successfully'
+            'message' => 'File linked to task prompt successfully',
         ]);
     }
 }
-

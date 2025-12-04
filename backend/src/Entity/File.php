@@ -2,11 +2,11 @@
 
 namespace App\Entity;
 
-use Doctrine\ORM\Mapping as ORM;
 use App\Repository\FileRepository;
+use Doctrine\ORM\Mapping as ORM;
 
 /**
- * File Entity (Table: BFILES)
+ * File Entity (Table: BFILES).
  */
 #[ORM\Entity(repositoryClass: FileRepository::class)]
 #[ORM\Table(name: 'BFILES')]
@@ -26,7 +26,7 @@ class File
 
     /**
      * For widget uploads: BUSERID=0, BUSERSESSIONID=session_id from BWIDGET_SESSIONS
-     * For regular user uploads: BUSERID=user_id, BUSERSESSIONID=null
+     * For regular user uploads: BUSERID=user_id, BUSERSESSIONID=null.
      */
     #[ORM\Column(name: 'BUSERSESSIONID', type: 'bigint', nullable: true)]
     private ?int $userSessionId = null;
@@ -75,6 +75,7 @@ class File
     public function setUserId(int $userId): self
     {
         $this->userId = $userId;
+
         return $this;
     }
 
@@ -86,6 +87,7 @@ class File
     public function setFilePath(string $filePath): self
     {
         $this->filePath = $filePath;
+
         return $this;
     }
 
@@ -97,6 +99,7 @@ class File
     public function setFileType(string $fileType): self
     {
         $this->fileType = $fileType;
+
         return $this;
     }
 
@@ -108,6 +111,7 @@ class File
     public function setFileName(string $fileName): self
     {
         $this->fileName = $fileName;
+
         return $this;
     }
 
@@ -119,6 +123,7 @@ class File
     public function setFileSize(int $fileSize): self
     {
         $this->fileSize = $fileSize;
+
         return $this;
     }
 
@@ -130,6 +135,7 @@ class File
     public function setFileMime(string $fileMime): self
     {
         $this->fileMime = $fileMime;
+
         return $this;
     }
 
@@ -141,6 +147,7 @@ class File
     public function setFileText(string $fileText): self
     {
         $this->fileText = $fileText;
+
         return $this;
     }
 
@@ -152,6 +159,7 @@ class File
     public function setStatus(string $status): self
     {
         $this->status = $status;
+
         return $this;
     }
 
@@ -163,6 +171,7 @@ class File
     public function setCreatedAt(int $createdAt): self
     {
         $this->createdAt = $createdAt;
+
         return $this;
     }
 
@@ -174,7 +183,7 @@ class File
     public function setUserSessionId(?int $userSessionId): self
     {
         $this->userSessionId = $userSessionId;
+
         return $this;
     }
 }
-

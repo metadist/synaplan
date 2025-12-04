@@ -9,17 +9,18 @@ use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\Routing\Annotation\Route;
 
 /**
- * Test Controller für Message Flow Testing mit TestProvider
+ * Test Controller für Message Flow Testing mit TestProvider.
  */
 #[Route('/api/test', name: 'api_test_')]
 class TestMessageController extends AbstractController
 {
     public function __construct(
-        private AiFacade $aiFacade
-    ) {}
+        private AiFacade $aiFacade,
+    ) {
+    }
 
     /**
-     * Test Chat Endpoint (kein User, kein DB - nur AI)
+     * Test Chat Endpoint (kein User, kein DB - nur AI).
      */
     #[Route('/chat', name: 'chat', methods: ['POST'])]
     public function testChat(Request $request): JsonResponse
@@ -29,7 +30,7 @@ class TestMessageController extends AbstractController
 
         try {
             $response = $this->aiFacade->chat([
-                ['role' => 'user', 'content' => $message]
+                ['role' => 'user', 'content' => $message],
             ], null, [
                 'provider' => 'test',
                 'stream' => false,
@@ -44,13 +45,13 @@ class TestMessageController extends AbstractController
             ]);
         } catch (\Exception $e) {
             return $this->json([
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ], 500);
         }
     }
 
     /**
-     * Test Image Generation
+     * Test Image Generation.
      */
     #[Route('/image', name: 'image', methods: ['POST'])]
     public function testImage(Request $request): JsonResponse
@@ -61,17 +62,17 @@ class TestMessageController extends AbstractController
         return $this->json([
             'success' => true,
             'prompt' => $prompt,
-            'imageUrl' => 'https://picsum.photos/1024/768?random=' . rand(1, 100),
+            'imageUrl' => 'https://picsum.photos/1024/768?random='.rand(1, 100),
             'provider' => 'test',
             'metadata' => [
                 'size' => '1024x768',
-                'model' => 'test-image-gen-1.0'
-            ]
+                'model' => 'test-image-gen-1.0',
+            ],
         ]);
     }
 
     /**
-     * Test Full Flow (ohne DB)
+     * Test Full Flow (ohne DB).
      */
     #[Route('/flow', name: 'flow', methods: ['POST'])]
     public function testFlow(Request $request): JsonResponse
@@ -87,7 +88,7 @@ class TestMessageController extends AbstractController
                 'classification' => [
                     'topic' => 'GENERAL',
                     'language' => 'EN',
-                    'intent' => 'chat'
+                    'intent' => 'chat',
                 ],
                 'routing' => 'chat_handler',
                 'response' => "Echo: {$message} (Test Provider)",
@@ -97,11 +98,10 @@ class TestMessageController extends AbstractController
                     'tokens' => [
                         'prompt' => strlen($message) / 4,
                         'completion' => strlen($message) / 4,
-                        'total' => strlen($message) / 2
-                    ]
-                ]
-            ]
+                        'total' => strlen($message) / 2,
+                    ],
+                ],
+            ],
         ]);
     }
 }
-
