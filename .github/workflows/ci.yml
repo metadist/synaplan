@@ -1,0 +1,114 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  backend:
+    name: Backend (PHP/Symfony)
+    runs-on: ubuntu-latest
+
+    services:
+      mysql:
+        image: mariadb:11.8
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: synaplan_test
+          MYSQL_USER: synaplan_test
+          MYSQL_PASSWORD: synaplan_test
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="healthcheck.sh --connect --innodb_initialized"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.3"
+          extensions: mbstring, xml, ctype, iconv, intl, pdo, pdo_mysql, zip, gd, curl, bcmath, exif, pcntl, opcache, readline, soap, sodium, ffi, imagick, redis
+          coverage: none
+
+      - name: Cache composer dependencies
+        uses: actions/cache@v4
+        with:
+          path: backend/vendor
+          key: ${{ runner.os }}-composer-${{ hashFiles('backend/composer.lock') }}
+          restore-keys: ${{ runner.os }}-composer-
+
+      - name: Setup .env file
+        working-directory: backend
+        run: |
+          cp .env.test .env
+          # Override database URLs for CI environment (127.0.0.1 instead of db_test)
+          echo "" >> .env
+          echo "# CI Overrides" >> .env
+          echo "DATABASE_WRITE_URL=mysql://synaplan_test:synaplan_test@127.0.0.1:3306/synaplan_test?serverVersion=11.8&charset=utf8mb4" >> .env
+          echo "DATABASE_READ_URL=mysql://synaplan_test:synaplan_test@127.0.0.1:3306/synaplan_test?serverVersion=11.8&charset=utf8mb4" >> .env
+
+      - name: Install dependencies
+        working-directory: backend
+        run: composer install --prefer-dist --no-progress --no-interaction
+
+      - name: Security audit
+        working-directory: backend
+        run: composer audit || true
+
+      - name: Generate JWT keypair
+        working-directory: backend
+        run: php bin/console lexik:jwt:generate-keypair --skip-if-exists
+
+      - name: Run migrations
+        working-directory: backend
+        run: php bin/console doctrine:migrations:migrate --no-interaction
+
+      - name: Load fixtures
+        working-directory: backend
+        run: php bin/console doctrine:fixtures:load --no-interaction
+
+      - name: Run PHPUnit tests
+        working-directory: backend
+        run: php bin/phpunit
+
+  frontend:
+    name: Frontend (Vue/TypeScript)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Type check
+        working-directory: frontend
+        run: npm run check:types
+
+      - name: Run tests
+        working-directory: frontend
+        run: npm run test
+
+      - name: Build
+        working-directory: frontend
+        run: npm run build
+        env:
+          VITE_API_BASE_URL: http://localhost:8000
+          VITE_BASE_PATH: /
