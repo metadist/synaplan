@@ -1,31 +1,4 @@
-export interface MailConfig {
-  mailServer: string
-  port: number
-  protocol: 'IMAP' | 'POP3'
-  security: 'SSL/TLS' | 'STARTTLS' | 'None'
-  username: string
-  password: string
-  checkInterval: number
-  deleteAfter: boolean
-}
-
-export interface Department {
-  id?: string
-  email: string
-  rules: string
-  isDefault: boolean
-}
-
-export interface SavedMailHandler {
-  id: string
-  name: string
-  config: MailConfig
-  departments: Department[]
-  status: 'active' | 'inactive' | 'error'
-  lastTested?: Date
-  createdAt: Date
-  updatedAt: Date
-}
+import type { MailConfig, Department, SavedMailHandler } from '@/services/api/inboundEmailHandlersApi'
 
 export const protocolOptions = [
   { value: 'IMAP', label: 'IMAP' },
