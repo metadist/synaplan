@@ -1,6 +1,6 @@
 import { computed, type ComputedRef } from 'vue'
 import { useAiConfigStore } from '@/stores/aiConfig'
-import type { AIModel } from '@/types/ai-models'
+import type { AIModel, Capability } from '@/types/ai-models'
 import type { AgainData as BackendAgainData } from '@/types/ai-models'
 
 export interface ModelOption {
@@ -86,7 +86,7 @@ export function useModelSelection(
   /**
    * Get the appropriate model tag based on media type
    */
-  const modelTag = computed((): string => {
+  const modelTag = computed((): Capability => {
     switch (mediaType.value) {
       case 'image': return 'TEXT2PIC'
       case 'video': return 'TEXT2VID'
@@ -113,10 +113,9 @@ export function useModelSelection(
     }
 
     // Search across ALL model tags to find current model
-    const allTags = Object.keys(aiConfigStore.models)
-    for (const tag of allTags) {
-      const models = aiConfigStore.models[tag] || []
-      const found = models.find((m: AIModel) => 
+    for (const [tag, models] of Object.entries(aiConfigStore.models)) {
+      if (!models) continue
+      const found = models.find((m: AIModel) =>
         m.service.toLowerCase() === currentProvider.value?.toLowerCase() &&
         m.name.toLowerCase() === currentModelName.value?.toLowerCase()
       )

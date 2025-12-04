@@ -4,7 +4,7 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000
 
 export interface ModelsResponse {
   success: boolean
-  models: Record<Capability, AIModel[]>
+  models: Partial<Record<Capability, AIModel[]>>
 }
 
 export interface DefaultsResponse {

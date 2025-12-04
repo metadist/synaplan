@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import { configApi } from '@/services/api/configApi'
-import type { AIModel } from '@/types/ai-models'
+import { configApi, ModelsResponse } from '@/services/api/configApi'
+import type { AIModel, Capability } from '@/types/ai-models'
 
 export interface ModelsList {
   [capability: string]: AIModel[]
@@ -12,7 +12,7 @@ export interface DefaultModels {
 }
 
 export const useAiConfigStore = defineStore('aiConfig', () => {
-  const models = ref<ModelsList>({})
+  const models = ref<ModelsResponse["models"]>({})
   const defaults = ref<DefaultModels>({})
   const loading = ref(false)
 
@@ -21,7 +21,7 @@ export const useAiConfigStore = defineStore('aiConfig', () => {
     try {
       const response = await configApi.getModels()
       if (response.success) {
-        models.value = response.models as ModelsList
+        models.value = response.models
       }
     } catch (error) {
       console.error('Failed to load models:', error)
@@ -67,11 +67,12 @@ export const useAiConfigStore = defineStore('aiConfig', () => {
     }
   }
 
-  const getCurrentModel = (capability: string): AIModel | null => {
+  const getCurrentModel = (capability: Capability): AIModel | null => {
     const modelId = defaults.value[capability]
-    if (!modelId || !models.value[capability]) return null
-    
-    return models.value[capability].find(m => m.id === modelId) || null
+    const capabilityModels = models.value[capability]
+    if (!modelId || !capabilityModels) return null
+
+    return capabilityModels.find(m => m.id === modelId) || null
   }
 
   return {
