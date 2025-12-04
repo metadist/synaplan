@@ -8,9 +8,9 @@ export interface ModelOption {
   model: string
   label: string
   id: number
-  quality?: number | null
-  rating?: number | null
-  description?: string | null
+  quality: number
+  rating: number
+  description: string | null
 }
 
 /**

@@ -30,8 +30,8 @@ describe('Models Store', () => {
   it('should set chat models', () => {
     const store = useModelsStore()
     const testModels: ModelOption[] = [
-      { provider: 'openai', model: 'gpt-4', label: 'GPT-4', id: 1 },
-      { provider: 'anthropic', model: 'claude-3', label: 'Claude 3', id: 2 },
+      { provider: 'openai', model: 'gpt-4', label: 'GPT-4', id: 1, quality: 90, rating: 95, description: null },
+      { provider: 'anthropic', model: 'claude-3', label: 'Claude 3', id: 2, quality: 85, rating: 90, description: null },
     ]
 
     store.setChatModels(testModels)
