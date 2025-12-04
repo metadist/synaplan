@@ -1,31 +1,19 @@
-import type { AIModel } from '@/types/ai-models'
+import type { AIModel, Capability } from '@/types/ai-models'
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'
 
 export interface ModelsResponse {
   success: boolean
-  models: Record<string, AIModel[]>
+  models: Record<Capability, AIModel[]>
 }
 
 export interface DefaultsResponse {
   success: boolean
-  defaults: {
-    SORT: number | null
-    CHAT: number | null
-    VECTORIZE: number | null
-    PIC2TEXT: number | null
-    TEXT2PIC: number | null
-    TEXT2VID: number | null
-    SOUND2TEXT: number | null
-    TEXT2SOUND: number | null
-    ANALYZE: number | null
-  }
+  defaults: Record<Capability, number | null>
 }
 
 export interface SaveDefaultsRequest {
-  defaults: {
-    [capability: string]: number
-  }
+  defaults: Partial<Record<Capability, number>>
 }
 
 export interface ModelCheckResponse {

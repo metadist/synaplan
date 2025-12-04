@@ -2,6 +2,17 @@
  * AI Model Types
  */
 
+export type Capability =
+  | 'SORT'
+  | 'CHAT'
+  | 'VECTORIZE'
+  | 'PIC2TEXT'
+  | 'TEXT2PIC'
+  | 'TEXT2VID'
+  | 'SOUND2TEXT'
+  | 'TEXT2SOUND'
+  | 'ANALYZE'
+
 export interface AIModel {
   id: number
   service: string

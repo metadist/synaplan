@@ -233,17 +233,13 @@ import {
 } from '@heroicons/vue/24/outline'
 import { Icon } from '@iconify/vue'
 import { getModels, getDefaultModels, saveDefaultModels, checkModelAvailability } from '@/services/api/configApi'
-import type { AIModel } from '@/types/ai-models'
+import type { AIModel, Capability } from '@/types/ai-models'
 import { serviceColors } from '@/mocks/aiModels'
 import { getProviderIcon } from '@/utils/providerIcons'
 import { useNotification } from '@/composables/useNotification'
 import GroqIcon from '@/components/icons/GroqIcon.vue'
 
-type Capability = 'SORT' | 'CHAT' | 'VECTORIZE' | 'PIC2TEXT' | 'TEXT2PIC' | 'TEXT2VID' | 'SOUND2TEXT' | 'TEXT2SOUND' | 'ANALYZE'
-
-interface ModelsData {
-  [key: string]: AIModel[]
-}
+type ModelsData = Partial<Record<Capability, AIModel[]>>
 
 const route = useRoute()
 const purposeLabels: Record<Capability, string> = {
