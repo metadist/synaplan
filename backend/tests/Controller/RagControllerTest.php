@@ -3,8 +3,8 @@
 namespace App\Tests\Controller;
 
 use App\Entity\User;
-use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
+use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
 
 class RagControllerTest extends WebTestCase
 {
@@ -38,7 +38,7 @@ class RagControllerTest extends WebTestCase
     public function testSearchRequiresAuthentication(): void
     {
         $this->client->jsonRequest('POST', '/api/v1/rag/search', [
-            'query' => 'test query'
+            'query' => 'test query',
         ]);
 
         $this->assertResponseStatusCodeSame(401);
@@ -49,7 +49,7 @@ class RagControllerTest extends WebTestCase
         $token = $this->getAuthToken();
 
         $this->client->jsonRequest('POST', '/api/v1/rag/search', [], [
-            'HTTP_AUTHORIZATION' => 'Bearer ' . $token,
+            'HTTP_AUTHORIZATION' => 'Bearer '.$token,
         ]);
 
         $this->assertResponseStatusCodeSame(400);
@@ -62,9 +62,9 @@ class RagControllerTest extends WebTestCase
         $token = $this->getAuthToken();
 
         $this->client->jsonRequest('POST', '/api/v1/rag/search', [
-            'query' => '   '
+            'query' => '   ',
         ], [
-            'HTTP_AUTHORIZATION' => 'Bearer ' . $token,
+            'HTTP_AUTHORIZATION' => 'Bearer '.$token,
         ]);
 
         $this->assertResponseStatusCodeSame(400);
@@ -100,7 +100,7 @@ class RagControllerTest extends WebTestCase
         $token = $this->getAuthToken();
 
         $this->client->request('GET', '/api/v1/rag/search', [], [], [
-            'HTTP_AUTHORIZATION' => 'Bearer ' . $token,
+            'HTTP_AUTHORIZATION' => 'Bearer '.$token,
         ]);
 
         $this->assertResponseStatusCodeSame(405);
@@ -118,12 +118,12 @@ class RagControllerTest extends WebTestCase
         $token = $this->getAuthToken();
 
         $this->client->request('GET', '/api/v1/rag/similar/1', [], [], [
-            'HTTP_AUTHORIZATION' => 'Bearer ' . $token,
+            'HTTP_AUTHORIZATION' => 'Bearer '.$token,
         ]);
 
         $this->assertResponseIsSuccessful();
         $data = json_decode($this->client->getResponse()->getContent(), true);
-        
+
         $this->assertArrayHasKey('success', $data);
         $this->assertArrayHasKey('source_chunk_id', $data);
         $this->assertArrayHasKey('results', $data);
@@ -135,7 +135,7 @@ class RagControllerTest extends WebTestCase
         $token = $this->getAuthToken();
 
         $this->client->request('GET', '/api/v1/rag/similar/1?limit=20', [], [], [
-            'HTTP_AUTHORIZATION' => 'Bearer ' . $token,
+            'HTTP_AUTHORIZATION' => 'Bearer '.$token,
         ]);
 
         $this->assertResponseIsSuccessful();
@@ -146,7 +146,7 @@ class RagControllerTest extends WebTestCase
         $token = $this->getAuthToken();
 
         $this->client->jsonRequest('POST', '/api/v1/rag/similar/1', [], [
-            'HTTP_AUTHORIZATION' => 'Bearer ' . $token,
+            'HTTP_AUTHORIZATION' => 'Bearer '.$token,
         ]);
 
         $this->assertResponseStatusCodeSame(405);
@@ -164,12 +164,12 @@ class RagControllerTest extends WebTestCase
         $token = $this->getAuthToken();
 
         $this->client->request('GET', '/api/v1/rag/stats', [], [], [
-            'HTTP_AUTHORIZATION' => 'Bearer ' . $token,
+            'HTTP_AUTHORIZATION' => 'Bearer '.$token,
         ]);
 
         $this->assertResponseIsSuccessful();
         $data = json_decode($this->client->getResponse()->getContent(), true);
-        
+
         $this->assertArrayHasKey('success', $data);
         $this->assertArrayHasKey('stats', $data);
     }
@@ -179,10 +179,9 @@ class RagControllerTest extends WebTestCase
         $token = $this->getAuthToken();
 
         $this->client->jsonRequest('POST', '/api/v1/rag/stats', [], [
-            'HTTP_AUTHORIZATION' => 'Bearer ' . $token,
+            'HTTP_AUTHORIZATION' => 'Bearer '.$token,
         ]);
 
         $this->assertResponseStatusCodeSame(405);
     }
 }
-

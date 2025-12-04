@@ -3,10 +3,9 @@
 namespace App\Tests\Controller;
 
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
-use Symfony\Component\HttpFoundation\Response;
 
 /**
- * Test File Serving with Auth Check
+ * Test File Serving with Auth Check.
  */
 class FileServeControllerTest extends WebTestCase
 {
@@ -25,7 +24,7 @@ class FileServeControllerTest extends WebTestCase
             'CONTENT_TYPE' => 'application/json',
         ], json_encode([
             'email' => 'demo@synaplan.com',
-            'password' => 'demo123'
+            'password' => 'demo123',
         ]));
 
         $response = $this->client->getResponse();
@@ -41,9 +40,9 @@ class FileServeControllerTest extends WebTestCase
     {
         $tempFile = tempnam(sys_get_temp_dir(), 'test');
         file_put_contents($tempFile, 'Private file content');
-        
+
         $this->client->request('POST', '/api/v1/files/upload', [
-            'process_level' => 'extract'
+            'process_level' => 'extract',
         ], [
             'files' => [
                 new \Symfony\Component\HttpFoundation\File\UploadedFile(
@@ -52,22 +51,22 @@ class FileServeControllerTest extends WebTestCase
                     'text/plain',
                     null,
                     true
-                )
-            ]
+                ),
+            ],
         ], [
-            'HTTP_AUTHORIZATION' => 'Bearer ' . $this->authToken
+            'HTTP_AUTHORIZATION' => 'Bearer '.$this->authToken,
         ]);
 
         $response = $this->client->getResponse();
 
-        if ($response->getStatusCode() !== 200) {
-            $this->markTestSkipped('File upload failed: ' . $response->getContent());
+        if (200 !== $response->getStatusCode()) {
+            $this->markTestSkipped('File upload failed: '.$response->getContent());
         }
 
         $data = json_decode($response->getContent(), true);
 
         if (!isset($data['files'][0]['file_path'])) {
-            $this->markTestSkipped('No file path in response: ' . json_encode($data));
+            $this->markTestSkipped('No file path in response: '.json_encode($data));
         }
 
         return $data['files'][0]['file_path'];
@@ -75,9 +74,8 @@ class FileServeControllerTest extends WebTestCase
 
     public function testServePrivateFileWithAuth(): void
     {
-        
-        $this->client->request('GET', '/up/' . $this->testFilePath, [], [], [
-            'HTTP_AUTHORIZATION' => 'Bearer ' . $this->authToken
+        $this->client->request('GET', '/up/'.$this->testFilePath, [], [], [
+            'HTTP_AUTHORIZATION' => 'Bearer '.$this->authToken,
         ]);
 
         $response = $this->client->getResponse();
@@ -87,8 +85,7 @@ class FileServeControllerTest extends WebTestCase
 
     public function testServePrivateFileWithoutAuth(): void
     {
-        
-        $this->client->request('GET', '/up/' . $this->testFilePath);
+        $this->client->request('GET', '/up/'.$this->testFilePath);
 
         $response = $this->client->getResponse();
         $this->assertEquals(401, $response->getStatusCode());
@@ -96,18 +93,17 @@ class FileServeControllerTest extends WebTestCase
 
     public function testServePublicFile(): void
     {
-        
         // Get file ID from path
         $fileId = $this->getFileIdFromPath($this->testFilePath);
-        
+
         // Make file public
-        $this->client->request('POST', '/api/v1/files/' . $fileId . '/share', [], [], [
+        $this->client->request('POST', '/api/v1/files/'.$fileId.'/share', [], [], [
             'CONTENT_TYPE' => 'application/json',
-            'HTTP_AUTHORIZATION' => 'Bearer ' . $this->authToken
+            'HTTP_AUTHORIZATION' => 'Bearer '.$this->authToken,
         ], json_encode(['expiry_days' => 7]));
 
         // Access without auth should now work
-        $this->client->request('GET', '/up/' . $this->testFilePath);
+        $this->client->request('GET', '/up/'.$this->testFilePath);
 
         $response = $this->client->getResponse();
         $this->assertEquals(200, $response->getStatusCode());
@@ -115,9 +111,8 @@ class FileServeControllerTest extends WebTestCase
 
     public function testServeNonExistentFile(): void
     {
-        
         $this->client->request('GET', '/up/nonexistent/file.txt', [], [], [
-            'HTTP_AUTHORIZATION' => 'Bearer ' . $this->authToken
+            'HTTP_AUTHORIZATION' => 'Bearer '.$this->authToken,
         ]);
 
         $response = $this->client->getResponse();
@@ -126,17 +121,16 @@ class FileServeControllerTest extends WebTestCase
 
     public function testCacheHeadersForPublicFile(): void
     {
-        
         $fileId = $this->getFileIdFromPath($this->testFilePath);
-        
+
         // Make public
-        $this->client->request('POST', '/api/v1/files/' . $fileId . '/share', [], [], [
+        $this->client->request('POST', '/api/v1/files/'.$fileId.'/share', [], [], [
             'CONTENT_TYPE' => 'application/json',
-            'HTTP_AUTHORIZATION' => 'Bearer ' . $this->authToken
+            'HTTP_AUTHORIZATION' => 'Bearer '.$this->authToken,
         ], json_encode(['expiry_days' => 0]));
 
         // Get file
-        $this->client->request('GET', '/up/' . $this->testFilePath);
+        $this->client->request('GET', '/up/'.$this->testFilePath);
 
         $response = $this->client->getResponse();
         $this->assertEquals(200, $response->getStatusCode());
@@ -145,9 +139,8 @@ class FileServeControllerTest extends WebTestCase
 
     public function testCacheHeadersForPrivateFile(): void
     {
-        
-        $this->client->request('GET', '/up/' . $this->testFilePath, [], [], [
-            'HTTP_AUTHORIZATION' => 'Bearer ' . $this->authToken
+        $this->client->request('GET', '/up/'.$this->testFilePath, [], [], [
+            'HTTP_AUTHORIZATION' => 'Bearer '.$this->authToken,
         ]);
 
         $response = $this->client->getResponse();
@@ -157,21 +150,19 @@ class FileServeControllerTest extends WebTestCase
 
     private function getFileIdFromPath(string $path): int
     {
-        
         $this->client->request('GET', '/api/v1/files?limit=1000', [], [], [
-            'HTTP_AUTHORIZATION' => 'Bearer ' . $this->authToken
+            'HTTP_AUTHORIZATION' => 'Bearer '.$this->authToken,
         ]);
 
         $response = $this->client->getResponse();
         $data = json_decode($response->getContent(), true);
-        
+
         foreach ($data['files'] as $file) {
             if ($file['file_path'] === $path) {
                 return $file['id'];
             }
         }
-        
-        throw new \Exception('File not found: ' . $path);
+
+        throw new \Exception('File not found: '.$path);
     }
 }
-

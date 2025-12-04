@@ -2,8 +2,8 @@
 
 namespace App\Entity;
 
-use Doctrine\ORM\Mapping as ORM;
 use App\Repository\PromptRepository;
+use Doctrine\ORM\Mapping as ORM;
 
 #[ORM\Entity(repositoryClass: PromptRepository::class)]
 #[ORM\Table(name: 'BPROMPTS')]
@@ -46,6 +46,7 @@ class Prompt
     public function setOwnerId(int $ownerId): self
     {
         $this->ownerId = $ownerId;
+
         return $this;
     }
 
@@ -57,6 +58,7 @@ class Prompt
     public function setLanguage(string $language): self
     {
         $this->language = $language;
+
         return $this;
     }
 
@@ -68,6 +70,7 @@ class Prompt
     public function setTopic(string $topic): self
     {
         $this->topic = $topic;
+
         return $this;
     }
 
@@ -79,6 +82,7 @@ class Prompt
     public function setShortDescription(string $shortDescription): self
     {
         $this->shortDescription = $shortDescription;
+
         return $this;
     }
 
@@ -90,6 +94,7 @@ class Prompt
     public function setPrompt(string $prompt): self
     {
         $this->prompt = $prompt;
+
         return $this;
     }
 
@@ -101,7 +106,7 @@ class Prompt
     public function setSelectionRules(?string $selectionRules): self
     {
         $this->selectionRules = $selectionRules;
+
         return $this;
     }
 }
-

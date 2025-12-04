@@ -41,6 +41,7 @@ class StorageQuotaServiceTest extends TestCase
         $user = $this->createMock(User::class);
         $user->method('getId')->willReturn(1);
         $user->method('getRateLimitLevel')->willReturn($level);
+
         return $user;
     }
 
@@ -67,15 +68,17 @@ class StorageQuotaServiceTest extends TestCase
 
         $this->configRepository
             ->method('findOneBy')
-            ->willReturnCallback(function($criteria) {
-                if ($criteria['setting'] === 'STORAGE_GB') {
+            ->willReturnCallback(function ($criteria) {
+                if ('STORAGE_GB' === $criteria['setting']) {
                     return null; // No GB config
                 }
-                if ($criteria['setting'] === 'STORAGE_MB') {
+                if ('STORAGE_MB' === $criteria['setting']) {
                     $config = $this->createMock(Config::class);
                     $config->method('getValue')->willReturn('100'); // 100 MB
+
                     return $config;
                 }
+
                 return null;
             });
 
@@ -153,12 +156,14 @@ class StorageQuotaServiceTest extends TestCase
         // Mock limit: 100 MB
         $this->configRepository
             ->method('findOneBy')
-            ->willReturnCallback(function($criteria) {
-                if ($criteria['setting'] === 'STORAGE_MB') {
+            ->willReturnCallback(function ($criteria) {
+                if ('STORAGE_MB' === $criteria['setting']) {
                     $config = $this->createMock(Config::class);
                     $config->method('getValue')->willReturn('100');
+
                     return $config;
                 }
+
                 return null;
             });
 
@@ -190,12 +195,14 @@ class StorageQuotaServiceTest extends TestCase
         // Mock limit: 100 MB
         $this->configRepository
             ->method('findOneBy')
-            ->willReturnCallback(function($criteria) {
-                if ($criteria['setting'] === 'STORAGE_MB') {
+            ->willReturnCallback(function ($criteria) {
+                if ('STORAGE_MB' === $criteria['setting']) {
                     $config = $this->createMock(Config::class);
                     $config->method('getValue')->willReturn('100');
+
                     return $config;
                 }
+
                 return null;
             });
 
@@ -227,12 +234,14 @@ class StorageQuotaServiceTest extends TestCase
         // Mock limit: 100 MB
         $this->configRepository
             ->method('findOneBy')
-            ->willReturnCallback(function($criteria) {
-                if ($criteria['setting'] === 'STORAGE_MB') {
+            ->willReturnCallback(function ($criteria) {
+                if ('STORAGE_MB' === $criteria['setting']) {
                     $config = $this->createMock(Config::class);
                     $config->method('getValue')->willReturn('100');
+
                     return $config;
                 }
+
                 return null;
             });
 
@@ -264,12 +273,14 @@ class StorageQuotaServiceTest extends TestCase
         // Mock limit: 100 MB
         $this->configRepository
             ->method('findOneBy')
-            ->willReturnCallback(function($criteria) {
-                if ($criteria['setting'] === 'STORAGE_MB') {
+            ->willReturnCallback(function ($criteria) {
+                if ('STORAGE_MB' === $criteria['setting']) {
                     $config = $this->createMock(Config::class);
                     $config->method('getValue')->willReturn('100');
+
                     return $config;
                 }
+
                 return null;
             });
 
@@ -293,4 +304,3 @@ class StorageQuotaServiceTest extends TestCase
         $this->assertFalse($result);
     }
 }
-

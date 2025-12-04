@@ -17,7 +17,7 @@ class TokenRepository extends ServiceEntityRepository
     }
 
     /**
-     * Findet einen gültigen Token (nicht expired, nicht used)
+     * Findet einen gültigen Token (nicht expired, nicht used).
      */
     public function findValidToken(string $token, string $type): ?Token
     {
@@ -34,7 +34,7 @@ class TokenRepository extends ServiceEntityRepository
     }
 
     /**
-     * Löscht abgelaufene Tokens
+     * Löscht abgelaufene Tokens.
      */
     public function deleteExpired(): int
     {
@@ -47,31 +47,31 @@ class TokenRepository extends ServiceEntityRepository
     }
 
     /**
-     * Speichert einen Token
+     * Speichert einen Token.
      */
     public function save(Token $token, bool $flush = true): void
     {
         $this->getEntityManager()->persist($token);
-        
+
         if ($flush) {
             $this->getEntityManager()->flush();
         }
     }
 
     /**
-     * Markiert einen Token als verwendet
+     * Markiert einen Token als verwendet.
      */
     public function markAsUsed(Token $token, bool $flush = true): void
     {
         $token->markAsUsed();
-        
+
         if ($flush) {
             $this->getEntityManager()->flush();
         }
     }
 
     /**
-     * Erstellt einen neuen Token
+     * Erstellt einen neuen Token.
      */
     public function createToken(\App\Entity\User $user, string $type, int $expirySeconds = 3600): Token
     {
@@ -81,22 +81,21 @@ class TokenRepository extends ServiceEntityRepository
         $token->setToken(bin2hex(random_bytes(32)));
         $token->setExpires(time() + $expirySeconds);
         $token->setUsed(false);
-        
+
         $this->save($token, true);
-        
+
         return $token;
     }
 
     /**
-     * Löscht einen Token
+     * Löscht einen Token.
      */
     public function remove(Token $token, bool $flush = true): void
     {
         $this->getEntityManager()->remove($token);
-        
+
         if ($flush) {
             $this->getEntityManager()->flush();
         }
     }
 }
-

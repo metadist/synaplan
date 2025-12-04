@@ -8,8 +8,8 @@ use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 
 /**
- * OIDC User Provider
- * 
+ * OIDC User Provider.
+ *
  * Creates or updates users from OIDC user data
  */
 class OidcUserProvider
@@ -17,11 +17,12 @@ class OidcUserProvider
     public function __construct(
         private UserRepository $userRepository,
         private EntityManagerInterface $em,
-        private LoggerInterface $logger
-    ) {}
+        private LoggerInterface $logger,
+    ) {
+    }
 
     /**
-     * Load or create user from OIDC data
+     * Load or create user from OIDC data.
      */
     public function loadUserFromOidcData(array $oidcData): User
     {
@@ -61,13 +62,13 @@ class OidcUserProvider
     }
 
     /**
-     * Create new user from OIDC data
+     * Create new user from OIDC data.
      */
     private function createUserFromOidcData(array $oidcData): User
     {
         $user = new User();
-        
-        $email = $oidcData['email'] ?? 'oidc_' . bin2hex(random_bytes(8)) . '@synaplan.local';
+
+        $email = $oidcData['email'] ?? 'oidc_'.bin2hex(random_bytes(8)).'@synaplan.local';
         $user->setMail($email);
         $user->setPw(null); // No password for OIDC users
         $user->setType('OIDC');
@@ -99,7 +100,7 @@ class OidcUserProvider
     }
 
     /**
-     * Update existing user with OIDC data
+     * Update existing user with OIDC data.
      */
     private function updateUserFromOidcData(User $user, array $oidcData): void
     {
@@ -135,4 +136,3 @@ class OidcUserProvider
         ]);
     }
 }
-

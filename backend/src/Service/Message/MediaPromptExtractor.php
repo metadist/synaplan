@@ -19,12 +19,13 @@ class MediaPromptExtractor
     public function __construct(
         private ChatHandler $chatHandler,
         private LoggerInterface $logger,
-    ) {}
+    ) {
+    }
 
     /**
-     * @param Message $message     Current user message
-     * @param array   $thread      Conversation history
-     * @param array   $classification  Classification result (topic, language, etc.)
+     * @param Message $message        Current user message
+     * @param array   $thread         Conversation history
+     * @param array   $classification Classification result (topic, language, etc.)
      *
      * @return array{
      *     prompt: string,
@@ -37,6 +38,7 @@ class MediaPromptExtractor
         $overridePrompt = $message->getMeta('media_prompt_override');
         if ($overridePrompt) {
             $overrideType = $this->normalizeMediaType($message->getMeta('media_type'));
+
             return [
                 'prompt' => $overridePrompt,
                 'media_type' => $overrideType,
@@ -74,8 +76,8 @@ class MediaPromptExtractor
 
         $usingJson = is_array($decoded);
 
-        if ($prompt === '') {
-            $prompt = $normalized !== '' ? $normalized : $message->getText();
+        if ('' === $prompt) {
+            $prompt = '' !== $normalized ? $normalized : $message->getText();
         }
 
         if (!$usingJson && $this->shouldForceAudioExtraction($mediaType, $message)) {
@@ -83,7 +85,7 @@ class MediaPromptExtractor
             try {
                 $audioContent = $this->runPrompt($message, $thread, $classification, self::AUDIO_EXTRACTION_TOPIC);
                 $audioContent = trim($this->normalizeContent($audioContent));
-                if ($audioContent !== '') {
+                if ('' !== $audioContent) {
                     $prompt = $audioContent;
                     $mediaType = 'audio';
                 }
@@ -112,7 +114,7 @@ class MediaPromptExtractor
     {
         $content = trim($content);
 
-        if ($content === '') {
+        if ('' === $content) {
             return '';
         }
 
@@ -127,12 +129,13 @@ class MediaPromptExtractor
 
     private function decodeJson(string $content): ?array
     {
-        if ($content === '' || (!str_starts_with($content, '{') && !str_starts_with($content, '['))) {
+        if ('' === $content || (!str_starts_with($content, '{') && !str_starts_with($content, '['))) {
             return null;
         }
 
         try {
             $decoded = json_decode($content, true, 512, JSON_THROW_ON_ERROR);
+
             return is_array($decoded) ? $decoded : null;
         } catch (\JsonException) {
             return null;
@@ -162,7 +165,7 @@ class MediaPromptExtractor
         $promptClassification['intent'] = 'image_generation';
 
         $language = $promptClassification['language'] ?? $message->getLanguage() ?? 'en';
-        $promptClassification['language'] = $language && $language !== 'NN' ? $language : 'en';
+        $promptClassification['language'] = $language && 'NN' !== $language ? $language : 'en';
 
         unset(
             $promptClassification['model_id'],
@@ -178,7 +181,7 @@ class MediaPromptExtractor
 
     private function shouldForceAudioExtraction(?string $mediaType, Message $message): bool
     {
-        if ($mediaType === 'audio') {
+        if ('audio' === $mediaType) {
             return true;
         }
 
@@ -190,4 +193,3 @@ class MediaPromptExtractor
         );
     }
 }
-

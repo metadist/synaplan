@@ -9,7 +9,7 @@ use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
 
 /**
- * Integration tests for ApiKeyRepository
+ * Integration tests for ApiKeyRepository.
  */
 class ApiKeyRepositoryTest extends KernelTestCase
 {
@@ -20,14 +20,14 @@ class ApiKeyRepositoryTest extends KernelTestCase
     protected function setUp(): void
     {
         parent::setUp();
-        
+
         $kernel = self::bootKernel();
         $this->em = $kernel->getContainer()
             ->get('doctrine')
             ->getManager();
-        
+
         $this->repository = $this->em->getRepository(ApiKey::class);
-        
+
         // Get or create test user
         $userRepo = $this->em->getRepository(User::class);
         $this->testUser = $userRepo->findOneBy([]) ?? $this->createTestUser();
@@ -41,14 +41,14 @@ class ApiKeyRepositoryTest extends KernelTestCase
     private function createTestUser(): User
     {
         $user = new User();
-        $user->setMail('apikey_test_' . time() . '@test.com');
+        $user->setMail('apikey_test_'.time().'@test.com');
         $user->setPw('test123');
         $user->setProviderId('TEST');
         $user->setUserLevel('NEW');
-        
+
         $this->em->persist($user);
         $this->em->flush();
-        
+
         return $user;
     }
 
@@ -59,13 +59,13 @@ class ApiKeyRepositoryTest extends KernelTestCase
         }
 
         // Create test API key
-        $key = 'sk_test_' . bin2hex(random_bytes(20));
+        $key = 'sk_test_'.bin2hex(random_bytes(20));
         $apiKey = new ApiKey();
         $apiKey->setOwner($this->testUser); // Use setOwner (relation name)
         $apiKey->setKey($key);
         $apiKey->setName('Test Key');
         $apiKey->setStatus('active'); // ApiKey uses status field, not isActive
-        
+
         $this->em->persist($apiKey);
         $this->em->flush();
 
@@ -84,7 +84,7 @@ class ApiKeyRepositoryTest extends KernelTestCase
     public function testFindValidApiKeyByKeyReturnsNullForInvalidKey(): void
     {
         // Method doesn't exist in repository - test basic findOneBy instead
-        $found = $this->repository->findOneBy(['key' => 'sk_invalid_key_' . time()]);
+        $found = $this->repository->findOneBy(['key' => 'sk_invalid_key_'.time()]);
 
         $this->assertNull($found);
     }
@@ -96,13 +96,13 @@ class ApiKeyRepositoryTest extends KernelTestCase
         }
 
         // Create inactive API key
-        $key = 'sk_inactive_' . bin2hex(random_bytes(20));
+        $key = 'sk_inactive_'.bin2hex(random_bytes(20));
         $apiKey = new ApiKey();
         $apiKey->setOwner($this->testUser);
         $apiKey->setKey($key);
         $apiKey->setName('Inactive Key');
         $apiKey->setStatus('inactive');
-        
+
         $this->em->persist($apiKey);
         $this->em->flush();
 
@@ -145,13 +145,13 @@ class ApiKeyRepositoryTest extends KernelTestCase
             $this->markTestSkipped('No test user available');
         }
 
-        $key = 'sk_required_' . bin2hex(random_bytes(20));
+        $key = 'sk_required_'.bin2hex(random_bytes(20));
         $apiKey = new ApiKey();
         $apiKey->setOwner($this->testUser);
         $apiKey->setKey($key);
         $apiKey->setName('Required Fields Test');
         $apiKey->setStatus('active'); // ApiKey uses status field, not isActive
-        
+
         $this->em->persist($apiKey);
         $this->em->flush();
 
@@ -174,7 +174,7 @@ class ApiKeyRepositoryTest extends KernelTestCase
 
         $keys = $this->repository->findBy([
             'owner' => $this->testUser,
-            'status' => 'active'
+            'status' => 'active',
         ]);
 
         $this->assertIsArray($keys);
@@ -184,4 +184,3 @@ class ApiKeyRepositoryTest extends KernelTestCase
         }
     }
 }
-

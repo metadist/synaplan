@@ -21,8 +21,9 @@ class PhoneVerificationController extends AbstractController
     public function __construct(
         private EntityManagerInterface $em,
         private WhatsAppService $whatsAppService,
-        private LoggerInterface $logger
-    ) {}
+        private LoggerInterface $logger,
+    ) {
+    }
 
     #[Route('/request', name: 'request', methods: ['POST'])]
     #[OA\Post(
@@ -37,7 +38,7 @@ class PhoneVerificationController extends AbstractController
         content: new OA\JsonContent(
             required: ['phone_number'],
             properties: [
-                new OA\Property(property: 'phone_number', type: 'string', example: '+4915112345678')
+                new OA\Property(property: 'phone_number', type: 'string', example: '+4915112345678'),
             ]
         )
     )]
@@ -47,7 +48,7 @@ class PhoneVerificationController extends AbstractController
         content: new OA\JsonContent(
             properties: [
                 new OA\Property(property: 'success', type: 'boolean', example: true),
-                new OA\Property(property: 'message', type: 'string', example: 'Verification code sent')
+                new OA\Property(property: 'message', type: 'string', example: 'Verification code sent'),
             ]
         )
     )]
@@ -56,7 +57,7 @@ class PhoneVerificationController extends AbstractController
     #[OA\Response(response: 503, description: 'WhatsApp service unavailable')]
     public function requestVerification(
         Request $request,
-        #[CurrentUser] ?User $user
+        #[CurrentUser] ?User $user,
     ): JsonResponse {
         if (!$user) {
             return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
@@ -65,7 +66,7 @@ class PhoneVerificationController extends AbstractController
         if (!$this->whatsAppService->isAvailable()) {
             return $this->json([
                 'success' => false,
-                'error' => 'WhatsApp service is not available'
+                'error' => 'WhatsApp service is not available',
             ], Response::HTTP_SERVICE_UNAVAILABLE);
         }
 
@@ -75,7 +76,7 @@ class PhoneVerificationController extends AbstractController
         if (empty($phoneNumber)) {
             return $this->json([
                 'success' => false,
-                'error' => 'Phone number is required'
+                'error' => 'Phone number is required',
             ], Response::HTTP_BAD_REQUEST);
         }
 
@@ -92,10 +93,10 @@ class PhoneVerificationController extends AbstractController
             'code' => $verificationCode,
             'expires_at' => time() + 600, // 10 minutes
             'attempts' => 0,
-            'verified' => false
+            'verified' => false,
         ];
         $user->setUserDetails($userDetails);
-        
+
         $this->em->flush();
 
         // Send verification code via WhatsApp
@@ -110,24 +111,24 @@ class PhoneVerificationController extends AbstractController
             $this->logger->error('Failed to send verification code', [
                 'user_id' => $user->getId(),
                 'phone' => $phoneNumber,
-                'error' => $result['error']
+                'error' => $result['error'],
             ]);
 
             return $this->json([
                 'success' => false,
-                'error' => 'Failed to send verification code. Please check the phone number.'
+                'error' => 'Failed to send verification code. Please check the phone number.',
             ], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
 
         $this->logger->info('Verification code sent', [
             'user_id' => $user->getId(),
-            'phone' => $phoneNumber
+            'phone' => $phoneNumber,
         ]);
 
         return $this->json([
             'success' => true,
             'message' => 'Verification code sent to your WhatsApp',
-            'expires_in' => 600
+            'expires_in' => 600,
         ]);
     }
 
@@ -144,7 +145,7 @@ class PhoneVerificationController extends AbstractController
         content: new OA\JsonContent(
             required: ['code'],
             properties: [
-                new OA\Property(property: 'code', type: 'string', example: '123456')
+                new OA\Property(property: 'code', type: 'string', example: '123456'),
             ]
         )
     )]
@@ -155,7 +156,7 @@ class PhoneVerificationController extends AbstractController
             properties: [
                 new OA\Property(property: 'success', type: 'boolean', example: true),
                 new OA\Property(property: 'message', type: 'string', example: 'Phone verified successfully'),
-                new OA\Property(property: 'phone_number', type: 'string', example: '+4915112345678')
+                new OA\Property(property: 'phone_number', type: 'string', example: '+4915112345678'),
             ]
         )
     )]
@@ -163,7 +164,7 @@ class PhoneVerificationController extends AbstractController
     #[OA\Response(response: 400, description: 'Invalid or expired code')]
     public function confirmVerification(
         Request $request,
-        #[CurrentUser] ?User $user
+        #[CurrentUser] ?User $user,
     ): JsonResponse {
         if (!$user) {
             return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
@@ -175,7 +176,7 @@ class PhoneVerificationController extends AbstractController
         if (empty($code)) {
             return $this->json([
                 'success' => false,
-                'error' => 'Verification code is required'
+                'error' => 'Verification code is required',
             ], Response::HTTP_BAD_REQUEST);
         }
 
@@ -185,7 +186,7 @@ class PhoneVerificationController extends AbstractController
         if (!$verification) {
             return $this->json([
                 'success' => false,
-                'error' => 'No verification pending. Please request a new code.'
+                'error' => 'No verification pending. Please request a new code.',
             ], Response::HTTP_BAD_REQUEST);
         }
 
@@ -194,7 +195,7 @@ class PhoneVerificationController extends AbstractController
             return $this->json([
                 'success' => false,
                 'error' => 'Verification code expired. Please request a new one.',
-                'expired' => true
+                'expired' => true,
             ], Response::HTTP_BAD_REQUEST);
         }
 
@@ -203,13 +204,13 @@ class PhoneVerificationController extends AbstractController
             return $this->json([
                 'success' => false,
                 'error' => 'Too many failed attempts. Please request a new code.',
-                'max_attempts' => true
+                'max_attempts' => true,
             ], Response::HTTP_BAD_REQUEST);
         }
 
         // Verify code
         if ($code !== $verification['code']) {
-            $verification['attempts']++;
+            ++$verification['attempts'];
             $userDetails['phone_verification'] = $verification;
             $user->setUserDetails($userDetails);
             $this->em->flush();
@@ -217,7 +218,7 @@ class PhoneVerificationController extends AbstractController
             return $this->json([
                 'success' => false,
                 'error' => 'Invalid verification code',
-                'attempts_remaining' => 3 - $verification['attempts']
+                'attempts_remaining' => 3 - $verification['attempts'],
             ], Response::HTTP_BAD_REQUEST);
         }
 
@@ -226,41 +227,41 @@ class PhoneVerificationController extends AbstractController
         $userDetails['phone_number'] = $verification['phone_number'];
         $userDetails['phone_verified_at'] = time();
         unset($userDetails['phone_verification']); // Remove temp data
-        
+
         $user->setUserDetails($userDetails);
         $this->em->flush();
 
         $this->logger->info('Phone verified successfully', [
             'user_id' => $user->getId(),
-            'phone' => $verification['phone_number']
+            'phone' => $verification['phone_number'],
         ]);
 
         return $this->json([
             'success' => true,
             'message' => 'Phone number verified successfully',
-            'phone_number' => $verification['phone_number']
+            'phone_number' => $verification['phone_number'],
         ]);
     }
 
     /**
-     * Remove phone verification
-     * 
+     * Remove phone verification.
+     *
      * DELETE /api/v1/user/verify-phone
      */
     #[Route('', name: 'remove', methods: ['DELETE'])]
     public function removeVerification(
-        #[CurrentUser] ?User $user
+        #[CurrentUser] ?User $user,
     ): JsonResponse {
         if (!$user) {
             return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
         }
 
         $userDetails = $user->getUserDetails();
-        
+
         if (empty($userDetails['phone_number'])) {
             return $this->json([
                 'success' => false,
-                'error' => 'No phone number linked to this account'
+                'error' => 'No phone number linked to this account',
             ], Response::HTTP_BAD_REQUEST);
         }
 
@@ -268,28 +269,28 @@ class PhoneVerificationController extends AbstractController
         unset($userDetails['phone_number']);
         unset($userDetails['phone_verified_at']);
         unset($userDetails['phone_verification']);
-        
+
         $user->setUserDetails($userDetails);
         $this->em->flush();
 
         $this->logger->info('Phone verification removed', [
-            'user_id' => $user->getId()
+            'user_id' => $user->getId(),
         ]);
 
         return $this->json([
             'success' => true,
-            'message' => 'Phone number removed successfully'
+            'message' => 'Phone number removed successfully',
         ]);
     }
 
     /**
-     * Get current phone verification status
-     * 
+     * Get current phone verification status.
+     *
      * GET /api/v1/user/verify-phone/status
      */
     #[Route('/status', name: 'status', methods: ['GET'])]
     public function getStatus(
-        #[CurrentUser] ?User $user
+        #[CurrentUser] ?User $user,
     ): JsonResponse {
         if (!$user) {
             return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
@@ -306,8 +307,7 @@ class PhoneVerificationController extends AbstractController
             'verified' => !empty($phoneNumber) && !empty($verifiedAt),
             'verified_at' => $verifiedAt,
             'pending_verification' => !empty($pendingVerification),
-            'whatsapp_available' => $this->whatsAppService->isAvailable()
+            'whatsapp_available' => $this->whatsAppService->isAvailable(),
         ]);
     }
 }
-

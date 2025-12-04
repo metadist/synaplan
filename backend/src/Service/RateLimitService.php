@@ -8,10 +8,10 @@ use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 
 /**
- * Rate Limiting Service
- * 
+ * Rate Limiting Service.
+ *
  * Uses BCONFIG for limits and BUSELOG for tracking usage
- * 
+ *
  * Supports:
  * - NEW: Lifetime totals (never reset)
  * - PRO/TEAM/BUSINESS: Hourly + Monthly limits
@@ -24,41 +24,42 @@ class RateLimitService
     public function __construct(
         private ConfigRepository $configRepository,
         private EntityManagerInterface $em,
-        private LoggerInterface $logger
-    ) {}
+        private LoggerInterface $logger,
+    ) {
+    }
 
     /**
-     * Check if user can perform action
-     * 
-     * @param User $user
+     * Check if user can perform action.
+     *
      * @param string $action MESSAGES|IMAGES|VIDEOS|AUDIOS|FILE_ANALYSIS
+     *
      * @return array ['allowed' => bool, 'limit' => int, 'used' => int, 'remaining' => int, 'resets_at' => ?int]
      */
     public function checkLimit(User $user, string $action): array
     {
         $level = $user->getRateLimitLevel();
-        
+
         $this->logger->debug('Rate limit check', [
             'user_id' => $user->getId(),
             'level' => $level,
-            'action' => $action
+            'action' => $action,
         ]);
 
         // Admins have unlimited usage
-        if ($level === 'ADMIN') {
+        if ('ADMIN' === $level) {
             return [
                 'allowed' => true,
                 'limit' => PHP_INT_MAX,
                 'used' => 0,
                 'remaining' => PHP_INT_MAX,
                 'reset_at' => null,
-                'limit_type' => 'unlimited'
+                'limit_type' => 'unlimited',
             ];
         }
 
         // Get limits for user level
         $limits = $this->getLimitsForLevel($level, $action);
-        
+
         if (empty($limits)) {
             // No limits configured - allow
             return [
@@ -67,7 +68,7 @@ class RateLimitService
                 'used' => 0,
                 'remaining' => PHP_INT_MAX,
                 'reset_at' => null,
-                'limit_type' => 'unlimited'
+                'limit_type' => 'unlimited',
             ];
         }
 
@@ -81,7 +82,7 @@ class RateLimitService
     }
 
     /**
-     * Record usage of an action
+     * Record usage of an action.
      */
     public function recordUsage(User $user, string $action, array $metadata = []): void
     {
@@ -99,23 +100,23 @@ class RateLimitService
                 'latency' => $metadata['latency'] ?? 0,
                 'status' => 'success',
                 'error' => '',
-                'metadata' => json_encode($metadata)
+                'metadata' => json_encode($metadata),
             ]
         );
 
         $this->logger->info('Rate limit usage recorded', [
             'user_id' => $user->getId(),
-            'action' => $action
+            'action' => $action,
         ]);
     }
 
     /**
-     * Get limits for specific level from BCONFIG
+     * Get limits for specific level from BCONFIG.
      */
     private function getLimitsForLevel(string $level, string $action): array
     {
         $cacheKey = "{$level}_{$action}";
-        
+
         if (isset($this->limitsCache[$cacheKey])) {
             return $this->limitsCache[$cacheKey];
         }
@@ -123,29 +124,30 @@ class RateLimitService
         $group = "RATELIMITS_{$level}";
         $configs = $this->configRepository->findBy([
             'ownerId' => 0,
-            'group' => $group
+            'group' => $group,
         ]);
 
         $limits = [];
         foreach ($configs as $config) {
             $setting = $config->getSetting();
-            if (str_starts_with($setting, $action . '_')) {
-                $timeframe = str_replace($action . '_', '', $setting);
+            if (str_starts_with($setting, $action.'_')) {
+                $timeframe = str_replace($action.'_', '', $setting);
                 $limits[$timeframe] = (int) $config->getValue();
             }
         }
 
         $this->limitsCache[$cacheKey] = $limits;
+
         return $limits;
     }
 
     /**
-     * Check lifetime limit (for NEW users)
+     * Check lifetime limit (for NEW users).
      */
     private function checkLifetimeLimit(User $user, string $action, array $limits): array
     {
         $limit = $limits['TOTAL'] ?? PHP_INT_MAX;
-        
+
         // Count total usage from BUSELOG
         $used = (int) $this->em->getConnection()->fetchOne(
             'SELECT COUNT(*) FROM BUSELOG WHERE BUSERID = :user_id AND BACTION = :action',
@@ -161,12 +163,12 @@ class RateLimitService
             'used' => $used,
             'remaining' => $remaining,
             'reset_at' => null, // Lifetime - never resets
-            'limit_type' => 'lifetime'
+            'limit_type' => 'lifetime',
         ];
     }
 
     /**
-     * Check period limit (hourly/monthly for PRO/TEAM/BUSINESS)
+     * Check period limit (hourly/monthly for PRO/TEAM/BUSINESS).
      */
     private function checkPeriodLimit(User $user, string $action, array $limits): array
     {
@@ -185,6 +187,7 @@ class RateLimitService
                 if (isset($hourlyCheck)) {
                     $monthlyCheck['hourly'] = $hourlyCheck;
                 }
+
                 return $monthlyCheck;
             }
 
@@ -206,24 +209,24 @@ class RateLimitService
             'used' => 0,
             'remaining' => PHP_INT_MAX,
             'reset_at' => null,
-            'limit_type' => 'unlimited'
+            'limit_type' => 'unlimited',
         ];
     }
 
     /**
-     * Check usage within timeframe
+     * Check usage within timeframe.
      */
     private function checkTimeframeLimit(User $user, string $action, int $limit, int $seconds): array
     {
         $since = time() - $seconds;
-        
+
         $used = (int) $this->em->getConnection()->fetchOne(
             'SELECT COUNT(*) FROM BUSELOG 
              WHERE BUSERID = :user_id AND BACTION = :action AND BUNIXTIMES >= :since',
             [
                 'user_id' => $user->getId(),
                 'action' => $action,
-                'since' => $since
+                'since' => $since,
             ]
         );
 
@@ -237,21 +240,21 @@ class RateLimitService
             'used' => $used,
             'remaining' => $remaining,
             'reset_at' => $resetsAt,
-            'limit_type' => $seconds === 3600 ? 'hourly' : 'monthly'
+            'limit_type' => 3600 === $seconds ? 'hourly' : 'monthly',
         ];
     }
 
     /**
-     * Get all limits for a user (for display)
+     * Get all limits for a user (for display).
      */
     public function getUserLimits(User $user): array
     {
         $level = $user->getRateLimitLevel();
         $actions = ['MESSAGES', 'IMAGES', 'VIDEOS', 'AUDIOS', 'FILE_ANALYSIS'];
-        
+
         $result = [
             'level' => $level,
-            'limits' => []
+            'limits' => [],
         ];
 
         foreach ($actions as $action) {
@@ -261,4 +264,3 @@ class RateLimitService
         return $result;
     }
 }
-

@@ -4,14 +4,14 @@ declare(strict_types=1);
 
 namespace App\Tests\Controller;
 
-use App\Entity\User;
 use App\Entity\Chat;
+use App\Entity\User;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
  * Integration tests for ChatController
- * Tests all chat management endpoints
+ * Tests all chat management endpoints.
  */
 class ChatControllerTest extends WebTestCase
 {
@@ -24,7 +24,7 @@ class ChatControllerTest extends WebTestCase
     {
         $this->client = static::createClient();
         $this->em = static::getContainer()->get('doctrine')->getManager();
-        
+
         // Create test user
         $this->user = new User();
         $this->user->setMail('chattest@example.com');
@@ -32,7 +32,7 @@ class ChatControllerTest extends WebTestCase
         $this->user->setUserLevel('PRO');
         $this->user->setProviderId('test-provider');
         $this->user->setCreated(date('YmdHis'));
-        
+
         $this->em->persist($this->user);
         $this->em->flush();
 
@@ -47,16 +47,16 @@ class ChatControllerTest extends WebTestCase
             // Cleanup: Remove test chats
             $chats = $this->em->getRepository(Chat::class)
                 ->findBy(['userId' => $this->user->getId()]);
-            
+
             foreach ($chats as $chat) {
                 $this->em->remove($chat);
             }
-            
+
             // Remove test user
             $this->em->remove($this->user);
             $this->em->flush();
         }
-        
+
         static::ensureKernelShutdown();
         parent::tearDown();
     }
@@ -76,12 +76,12 @@ class ChatControllerTest extends WebTestCase
             [],
             [],
             [
-                'HTTP_AUTHORIZATION' => 'Bearer ' . $this->token
+                'HTTP_AUTHORIZATION' => 'Bearer '.$this->token,
             ]
         );
 
         $this->assertResponseIsSuccessful();
-        
+
         $response = json_decode($this->client->getResponse()->getContent(), true);
         $this->assertIsArray($response);
         $this->assertArrayHasKey('success', $response);
@@ -113,7 +113,7 @@ class ChatControllerTest extends WebTestCase
             [],
             [
                 'CONTENT_TYPE' => 'application/json',
-                'HTTP_AUTHORIZATION' => 'Bearer ' . $this->token
+                'HTTP_AUTHORIZATION' => 'Bearer '.$this->token,
             ],
             json_encode(['title' => ''])
         );
@@ -123,7 +123,7 @@ class ChatControllerTest extends WebTestCase
         $this->assertContains($statusCode, [
             Response::HTTP_OK,
             Response::HTTP_CREATED,
-            Response::HTTP_BAD_REQUEST
+            Response::HTTP_BAD_REQUEST,
         ]);
     }
 
@@ -136,13 +136,13 @@ class ChatControllerTest extends WebTestCase
             [],
             [
                 'CONTENT_TYPE' => 'application/json',
-                'HTTP_AUTHORIZATION' => 'Bearer ' . $this->token
+                'HTTP_AUTHORIZATION' => 'Bearer '.$this->token,
             ],
             json_encode(['title' => 'My Test Chat'])
         );
 
         $this->assertResponseIsSuccessful();
-        
+
         $response = json_decode($this->client->getResponse()->getContent(), true);
         $this->assertIsArray($response);
         $this->assertArrayHasKey('success', $response);
@@ -151,7 +151,7 @@ class ChatControllerTest extends WebTestCase
         $this->assertArrayHasKey('id', $response['chat']);
         $this->assertArrayHasKey('title', $response['chat']);
         $this->assertEquals('My Test Chat', $response['chat']['title']);
-        
+
         // Verify chat was created in database
         $chat = $this->em->getRepository(Chat::class)->find($response['chat']['id']);
         $this->assertNotNull($chat);
@@ -161,13 +161,13 @@ class ChatControllerTest extends WebTestCase
     public function testListChatsWithData(): void
     {
         // Create test chats
-        for ($i = 1; $i <= 3; $i++) {
+        for ($i = 1; $i <= 3; ++$i) {
             $chat = new Chat();
             $chat->setUserId($this->user->getId());
-            $chat->setTitle('Test Chat ' . $i);
+            $chat->setTitle('Test Chat '.$i);
             $chat->setCreatedAt(new \DateTime());
             $chat->setUpdatedAt(new \DateTime());
-            
+
             $this->em->persist($chat);
         }
         $this->em->flush();
@@ -178,18 +178,18 @@ class ChatControllerTest extends WebTestCase
             [],
             [],
             [
-                'HTTP_AUTHORIZATION' => 'Bearer ' . $this->token
+                'HTTP_AUTHORIZATION' => 'Bearer '.$this->token,
             ]
         );
 
         $this->assertResponseIsSuccessful();
-        
+
         $response = json_decode($this->client->getResponse()->getContent(), true);
         $this->assertIsArray($response);
         $this->assertArrayHasKey('success', $response);
         $this->assertArrayHasKey('chats', $response);
         $this->assertCount(3, $response['chats']);
-        
+
         // Check structure of first chat
         $firstChat = $response['chats'][0];
         $this->assertArrayHasKey('id', $firstChat);
@@ -213,7 +213,7 @@ class ChatControllerTest extends WebTestCase
             [],
             [],
             [
-                'HTTP_AUTHORIZATION' => 'Bearer ' . $this->token
+                'HTTP_AUTHORIZATION' => 'Bearer '.$this->token,
             ]
         );
 
@@ -228,22 +228,22 @@ class ChatControllerTest extends WebTestCase
         $chat->setTitle('Single Test Chat');
         $chat->setCreatedAt(new \DateTime());
         $chat->setUpdatedAt(new \DateTime());
-        
+
         $this->em->persist($chat);
         $this->em->flush();
 
         $this->client->request(
             'GET',
-            '/api/v1/chats/' . $chat->getId(),
+            '/api/v1/chats/'.$chat->getId(),
             [],
             [],
             [
-                'HTTP_AUTHORIZATION' => 'Bearer ' . $this->token
+                'HTTP_AUTHORIZATION' => 'Bearer '.$this->token,
             ]
         );
 
         $this->assertResponseIsSuccessful();
-        
+
         $response = json_decode($this->client->getResponse()->getContent(), true);
         $this->assertIsArray($response);
         $this->assertArrayHasKey('success', $response);
@@ -261,7 +261,7 @@ class ChatControllerTest extends WebTestCase
         $otherUser->setUserLevel('NEW');
         $otherUser->setProviderId('other');
         $otherUser->setCreated(date('YmdHis'));
-        
+
         $this->em->persist($otherUser);
         $this->em->flush();
 
@@ -270,18 +270,18 @@ class ChatControllerTest extends WebTestCase
         $chat->setTitle('Other User Chat');
         $chat->setCreatedAt(new \DateTime());
         $chat->setUpdatedAt(new \DateTime());
-        
+
         $this->em->persist($chat);
         $this->em->flush();
 
         // Try to access with current user's token
         $this->client->request(
             'GET',
-            '/api/v1/chats/' . $chat->getId(),
+            '/api/v1/chats/'.$chat->getId(),
             [],
             [],
             [
-                'HTTP_AUTHORIZATION' => 'Bearer ' . $this->token
+                'HTTP_AUTHORIZATION' => 'Bearer '.$this->token,
             ]
         );
 
@@ -289,7 +289,7 @@ class ChatControllerTest extends WebTestCase
         $statusCode = $this->client->getResponse()->getStatusCode();
         $this->assertContains($statusCode, [
             Response::HTTP_FORBIDDEN,
-            Response::HTTP_NOT_FOUND
+            Response::HTTP_NOT_FOUND,
         ]);
 
         // Cleanup
@@ -321,7 +321,7 @@ class ChatControllerTest extends WebTestCase
             [],
             [
                 'CONTENT_TYPE' => 'application/json',
-                'HTTP_AUTHORIZATION' => 'Bearer ' . $this->token
+                'HTTP_AUTHORIZATION' => 'Bearer '.$this->token,
             ],
             json_encode(['title' => 'Updated'])
         );
@@ -337,30 +337,30 @@ class ChatControllerTest extends WebTestCase
         $chat->setTitle('Original Title');
         $chat->setCreatedAt(new \DateTime());
         $chat->setUpdatedAt(new \DateTime());
-        
+
         $this->em->persist($chat);
         $this->em->flush();
 
         $this->client->request(
             'PATCH',
-            '/api/v1/chats/' . $chat->getId(),
+            '/api/v1/chats/'.$chat->getId(),
             [],
             [],
             [
                 'CONTENT_TYPE' => 'application/json',
-                'HTTP_AUTHORIZATION' => 'Bearer ' . $this->token
+                'HTTP_AUTHORIZATION' => 'Bearer '.$this->token,
             ],
             json_encode(['title' => 'Updated Title'])
         );
 
         $this->assertResponseIsSuccessful();
-        
+
         $response = json_decode($this->client->getResponse()->getContent(), true);
         $this->assertIsArray($response);
         $this->assertArrayHasKey('success', $response);
         $this->assertArrayHasKey('chat', $response);
         $this->assertEquals('Updated Title', $response['chat']['title']);
-        
+
         // Verify update in database
         $this->em->refresh($chat);
         $this->assertEquals('Updated Title', $chat->getTitle());
@@ -381,7 +381,7 @@ class ChatControllerTest extends WebTestCase
             [],
             [],
             [
-                'HTTP_AUTHORIZATION' => 'Bearer ' . $this->token
+                'HTTP_AUTHORIZATION' => 'Bearer '.$this->token,
             ]
         );
 
@@ -396,24 +396,24 @@ class ChatControllerTest extends WebTestCase
         $chat->setTitle('Chat to Delete');
         $chat->setCreatedAt(new \DateTime());
         $chat->setUpdatedAt(new \DateTime());
-        
+
         $this->em->persist($chat);
         $this->em->flush();
-        
+
         $chatId = $chat->getId();
 
         $this->client->request(
             'DELETE',
-            '/api/v1/chats/' . $chatId,
+            '/api/v1/chats/'.$chatId,
             [],
             [],
             [
-                'HTTP_AUTHORIZATION' => 'Bearer ' . $this->token
+                'HTTP_AUTHORIZATION' => 'Bearer '.$this->token,
             ]
         );
 
         $this->assertResponseIsSuccessful();
-        
+
         // Verify deletion in database
         $deletedChat = $this->em->getRepository(Chat::class)->find($chatId);
         $this->assertNull($deletedChat);

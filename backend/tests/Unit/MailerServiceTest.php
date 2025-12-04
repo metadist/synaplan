@@ -44,4 +44,3 @@ class MailerServiceTest extends TestCase
         $this->assertTrue(true, 'Password reset email method called successfully');
     }
 }
-

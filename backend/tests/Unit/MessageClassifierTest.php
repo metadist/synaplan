@@ -2,12 +2,12 @@
 
 namespace App\Tests\Unit;
 
+use App\Entity\Message;
+use App\Entity\MessageMeta;
+use App\Repository\MessageMetaRepository;
 use App\Service\Message\MessageClassifier;
 use App\Service\Message\MessageSorter;
 use App\Service\ModelConfigService;
-use App\Repository\MessageMetaRepository;
-use App\Entity\Message;
-use App\Entity\MessageMeta;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
@@ -51,10 +51,11 @@ class MessageClassifierTest extends TestCase
 
         $this->messageMetaRepository
             ->method('findOneBy')
-            ->willReturnCallback(function($criteria) use ($promptMeta) {
-                if ($criteria['metaKey'] === 'PROMPTID') {
+            ->willReturnCallback(function ($criteria) use ($promptMeta) {
+                if ('PROMPTID' === $criteria['metaKey']) {
                     return $promptMeta;
                 }
+
                 return null;
             });
 
@@ -112,7 +113,7 @@ class MessageClassifierTest extends TestCase
                 'language' => 'en',
                 'model_id' => 5,
                 'provider' => 'ollama',
-                'model_name' => 'llama3'
+                'model_name' => 'llama3',
             ]);
 
         $result = $this->service->classify($message);
@@ -156,12 +157,13 @@ class MessageClassifierTest extends TestCase
 
         $this->messageMetaRepository
             ->method('findOneBy')
-            ->willReturnCallback(function($criteria) use ($promptMeta, $modelMeta) {
-                if ($criteria['metaKey'] === 'PROMPTID') {
+            ->willReturnCallback(function ($criteria) use ($promptMeta, $modelMeta) {
+                if ('PROMPTID' === $criteria['metaKey']) {
                     return $promptMeta;
-                } elseif ($criteria['metaKey'] === 'MODEL_ID') {
+                } elseif ('MODEL_ID' === $criteria['metaKey']) {
                     return $modelMeta;
                 }
+
                 return null;
             });
 
@@ -188,7 +190,7 @@ class MessageClassifierTest extends TestCase
         $this->messageMetaRepository->method('findOneBy')->willReturn(null);
         $this->messageSorter->method('classify')->willReturn([
             'topic' => 'CHAT',
-            'language' => 'en'
+            'language' => 'en',
         ]);
 
         $this->logger
@@ -198,4 +200,3 @@ class MessageClassifierTest extends TestCase
         $this->service->classify($message);
     }
 }
-

@@ -16,19 +16,20 @@ class VectorSearchService
         private EntityManagerInterface $em,
         private AiFacade $aiFacade,
         private ModelConfigService $modelConfigService,
-        private LoggerInterface $logger
+        private LoggerInterface $logger,
     ) {
         $this->connection = $em->getConnection();
     }
 
     /**
-     * Semantic search using vector embeddings
-     * 
-     * @param string $query Search query
-     * @param int $userId User ID for filtering
+     * Semantic search using vector embeddings.
+     *
+     * @param string      $query    Search query
+     * @param int         $userId   User ID for filtering
      * @param string|null $groupKey Optional group filter
-     * @param int $limit Number of results (default: 10)
-     * @param float $minScore Minimum similarity score (0-1, default: 0.3)
+     * @param int         $limit    Number of results (default: 10)
+     * @param float       $minScore Minimum similarity score (0-1, default: 0.3)
+     *
      * @return array Top-K similar documents
      */
     public function semanticSearch(
@@ -36,13 +37,14 @@ class VectorSearchService
         int $userId,
         ?string $groupKey = null,
         int $limit = 10,
-        float $minScore = 0.3
+        float $minScore = 0.3,
     ): array {
         // 1. Get embedding model from DB
         $embeddingModelId = $this->modelConfigService->getDefaultModel('VECTORIZE', $userId);
-        
+
         if (!$embeddingModelId) {
             $this->logger->error('VectorSearchService: No embedding model configured');
+
             return [];
         }
 
@@ -50,6 +52,7 @@ class VectorSearchService
         $model = $this->em->getRepository('App\Entity\Model')->find($embeddingModelId);
         if (!$model) {
             $this->logger->error('VectorSearchService: Model not found', ['model_id' => $embeddingModelId]);
+
             return [];
         }
 
@@ -61,22 +64,23 @@ class VectorSearchService
             'query_length' => strlen($query),
             'model_id' => $embeddingModelId,
             'model_name' => $modelName,
-            'provider' => $provider
+            'provider' => $provider,
         ]);
 
         // 2. Embed the query with model details
         $queryEmbedding = $this->aiFacade->embed($query, $userId, [
             'model' => $modelName,
-            'provider' => $provider
+            'provider' => $provider,
         ]);
-        
+
         if (empty($queryEmbedding)) {
             $this->logger->error('VectorSearchService: Failed to embed query');
+
             return [];
         }
 
         // 2. Convert to MariaDB VECTOR format
-        $vectorStr = '[' . implode(',', array_map('floatval', $queryEmbedding)) . ']';
+        $vectorStr = '['.implode(',', array_map('floatval', $queryEmbedding)).']';
 
         // 3. Build SQL with VEC_DISTANCE_COSINE (native MariaDB)
         $sql = '
@@ -103,7 +107,7 @@ class VectorSearchService
 
         $params = [
             'query_vector' => $vectorStr,
-            'user_id' => $userId
+            'user_id' => $userId,
         ];
 
         // 4. Optional: Filter by group
@@ -129,22 +133,23 @@ class VectorSearchService
         // 7. Execute query
         try {
             $stmt = $this->connection->prepare($sql);
-            
+
             // Bind parameters
             foreach ($params as $key => $value) {
-                if ($key === 'limit') {
+                if ('limit' === $key) {
                     $stmt->bindValue($key, $value, \PDO::PARAM_INT);
                 } else {
                     $stmt->bindValue($key, $value);
                 }
             }
-            
+
             $result = $stmt->executeQuery();
             $results = $result->fetchAllAssociative();
 
             // Transform: Convert distance (0=identical) to score (1=identical)
-            $results = array_map(function($row) {
-                $row['distance'] = 1.0 - (float)$row['distance'];
+            $results = array_map(function ($row) {
+                $row['distance'] = 1.0 - (float) $row['distance'];
+
                 return $row;
             }, $results);
 
@@ -153,22 +158,22 @@ class VectorSearchService
                 'query_length' => strlen($query),
                 'results_count' => count($results),
                 'group_key' => $groupKey,
-                'min_score' => $minScore
+                'min_score' => $minScore,
             ]);
 
             return $results;
-
         } catch (\Throwable $e) {
             $this->logger->error('VectorSearchService: Search failed', [
                 'error' => $e->getMessage(),
-                'user_id' => $userId
+                'user_id' => $userId,
             ]);
+
             return [];
         }
     }
 
     /**
-     * Get user RAG statistics
+     * Get user RAG statistics.
      */
     public function getUserStats(int $userId): array
     {
@@ -182,43 +187,44 @@ class VectorSearchService
                 FROM BRAG r
                 WHERE r.BUID = :user_id
             ';
-            
+
             $result = $this->connection->executeQuery($sql, ['user_id' => $userId]);
             $stats = $result->fetchAssociative();
-            
+
             return [
-                'total_documents' => (int)($stats['total_documents'] ?? 0),
-                'total_chunks' => (int)($stats['total_chunks'] ?? 0),
-                'total_groups' => (int)($stats['total_groups'] ?? 0),
-                'avg_chunk_size' => (int)($stats['avg_chunk_size'] ?? 0)
+                'total_documents' => (int) ($stats['total_documents'] ?? 0),
+                'total_chunks' => (int) ($stats['total_chunks'] ?? 0),
+                'total_groups' => (int) ($stats['total_groups'] ?? 0),
+                'avg_chunk_size' => (int) ($stats['avg_chunk_size'] ?? 0),
             ];
-            
         } catch (\Exception $e) {
             $this->logger->error('VectorSearchService: getUserStats failed', [
                 'error' => $e->getMessage(),
-                'user_id' => $userId
+                'user_id' => $userId,
             ]);
+
             return [
                 'total_documents' => 0,
                 'total_chunks' => 0,
                 'total_groups' => 0,
-                'avg_chunk_size' => 0
+                'avg_chunk_size' => 0,
             ];
         }
     }
 
     /**
-     * Find similar documents based on a source message ID
-     * 
+     * Find similar documents based on a source message ID.
+     *
      * @param int $sourceMessageId Source message to find similar documents for
-     * @param int $userId User ID for filtering
-     * @param int $limit Number of results
+     * @param int $userId          User ID for filtering
+     * @param int $limit           Number of results
+     *
      * @return array Similar documents
      */
     public function findSimilar(
         int $sourceMessageId,
         int $userId,
-        int $limit = 10
+        int $limit = 10,
     ): array {
         try {
             // Get the embedding of the source message's first chunk
@@ -246,19 +252,20 @@ class VectorSearchService
             $results = $result->fetchAllAssociative();
 
             // Transform: Convert distance to score
-            $results = array_map(function($row) {
-                $row['distance'] = 1.0 - (float)$row['distance'];
+            $results = array_map(function ($row) {
+                $row['distance'] = 1.0 - (float) $row['distance'];
+
                 return $row;
             }, $results);
 
             return $results;
-
         } catch (\Throwable $e) {
             $this->logger->error('VectorSearchService: Find similar failed', [
                 'error' => $e->getMessage(),
                 'source_mid' => $sourceMessageId,
-                'user_id' => $userId
+                'user_id' => $userId,
             ]);
+
             return [];
         }
     }

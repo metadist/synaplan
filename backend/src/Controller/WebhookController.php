@@ -4,11 +4,11 @@ namespace App\Controller;
 
 use App\Entity\Message;
 use App\Entity\User;
+use App\Service\EmailChatService;
+use App\Service\InternalEmailService;
 use App\Service\Message\MessageProcessor;
 use App\Service\RateLimitService;
 use App\Service\WhatsAppService;
-use App\Service\EmailChatService;
-use App\Service\InternalEmailService;
 use Doctrine\ORM\EntityManagerInterface;
 use OpenApi\Attributes as OA;
 use Psr\Log\LoggerInterface;
@@ -31,8 +31,9 @@ class WebhookController extends AbstractController
         private EmailChatService $emailChatService,
         private InternalEmailService $internalEmailService,
         private LoggerInterface $logger,
-        private string $whatsappWebhookVerifyToken
-    ) {}
+        private string $whatsappWebhookVerifyToken,
+    ) {
+    }
 
     #[Route('/email', name: 'email', methods: ['POST'])]
     #[OA\Post(
@@ -60,10 +61,10 @@ class WebhookController extends AbstractController
                             new OA\Property(property: 'filename', type: 'string'),
                             new OA\Property(property: 'content_type', type: 'string'),
                             new OA\Property(property: 'size', type: 'integer'),
-                            new OA\Property(property: 'url', type: 'string')
+                            new OA\Property(property: 'url', type: 'string'),
                         ]
                     )
-                )
+                ),
             ]
         )
     )]
@@ -74,7 +75,7 @@ class WebhookController extends AbstractController
             properties: [
                 new OA\Property(property: 'success', type: 'boolean', example: true),
                 new OA\Property(property: 'message_id', type: 'integer', example: 123),
-                new OA\Property(property: 'chat_id', type: 'integer', example: 456)
+                new OA\Property(property: 'chat_id', type: 'integer', example: 456),
             ]
         )
     )]
@@ -88,7 +89,7 @@ class WebhookController extends AbstractController
         if (!$data) {
             return $this->json([
                 'success' => false,
-                'error' => 'Invalid JSON payload'
+                'error' => 'Invalid JSON payload',
             ], Response::HTTP_BAD_REQUEST);
         }
 
@@ -96,7 +97,7 @@ class WebhookController extends AbstractController
         if (empty($data['from']) || empty($data['to']) || empty($data['body'])) {
             return $this->json([
                 'success' => false,
-                'error' => 'Missing required fields: from, to, body'
+                'error' => 'Missing required fields: from, to, body',
             ], Response::HTTP_BAD_REQUEST);
         }
 
@@ -115,7 +116,7 @@ class WebhookController extends AbstractController
             'to' => $toEmail,
             'keyword' => $keyword,
             'subject' => $subject,
-            'body_length' => strlen($body)
+            'body_length' => strlen($body),
         ]);
 
         // Find or create user from email
@@ -124,12 +125,12 @@ class WebhookController extends AbstractController
         if (isset($userResult['error'])) {
             $this->logger->warning('Email rejected', [
                 'email' => $fromEmail,
-                'reason' => $userResult['error']
+                'reason' => $userResult['error'],
             ]);
 
             return $this->json([
                 'success' => false,
-                'error' => $userResult['error']
+                'error' => $userResult['error'],
             ], Response::HTTP_TOO_MANY_REQUESTS);
         }
 
@@ -143,7 +144,7 @@ class WebhookController extends AbstractController
                 'error' => 'Rate limit exceeded',
                 'limit' => $rateLimitCheck['limit'],
                 'used' => $rateLimitCheck['used'],
-                'reset_at' => $rateLimitCheck['reset_at'] ?? null
+                'reset_at' => $rateLimitCheck['reset_at'] ?? null,
             ], Response::HTTP_TOO_MANY_REQUESTS);
         }
 
@@ -168,25 +169,25 @@ class WebhookController extends AbstractController
             $message->setFile(0);
             $message->setTopic('CHAT');
             $message->setLanguage('en'); // Will be detected by classifier
-            
+
             // Use subject as context if provided
             $messageText = $body;
-            if (!empty($subject) && $subject !== '(no subject)') {
-                $messageText = "Subject: " . $subject . "\n\n" . $messageText;
+            if (!empty($subject) && '(no subject)' !== $subject) {
+                $messageText = 'Subject: '.$subject."\n\n".$messageText;
             }
-            
+
             $message->setText($messageText);
             $message->setDirection('IN');
             $message->setStatus('processing');
 
             $this->em->persist($message);
             $this->em->flush(); // MUST flush before setMeta() to get message ID
-            
+
             // Store email metadata
             $message->setMeta('channel', 'email');
             $message->setMeta('from_email', $fromEmail);
             $message->setMeta('to_email', $toEmail);
-            
+
             if ($keyword) {
                 $message->setMeta('email_keyword', $keyword);
             }
@@ -212,7 +213,7 @@ class WebhookController extends AbstractController
                 return $this->json([
                     'success' => false,
                     'error' => 'Message processing failed',
-                    'details' => $result['error'] ?? 'Unknown error'
+                    'details' => $result['error'] ?? 'Unknown error',
                 ], Response::HTTP_INTERNAL_SERVER_ERROR);
             }
 
@@ -227,15 +228,15 @@ class WebhookController extends AbstractController
                     $responseText,
                     $messageId
                 );
-                
+
                 $this->logger->info('Email response sent', [
                     'to' => $fromEmail,
-                    'subject' => $subject
+                    'subject' => $subject,
                 ]);
             } catch (\Exception $e) {
                 $this->logger->error('Failed to send email response', [
                     'to' => $fromEmail,
-                    'error' => $e->getMessage()
+                    'error' => $e->getMessage(),
                 ]);
                 // Don't fail the whole request if email sending fails
             }
@@ -246,34 +247,33 @@ class WebhookController extends AbstractController
                 'chat_id' => $chat->getId(),
                 'response' => [
                     'text' => $responseText,
-                    'metadata' => $aiResponse['metadata'] ?? []
+                    'metadata' => $aiResponse['metadata'] ?? [],
                 ],
                 'user_info' => [
                     'is_anonymous' => $userResult['is_anonymous'] ?? false,
-                    'rate_limit_level' => $user->getRateLimitLevel()
-                ]
+                    'rate_limit_level' => $user->getRateLimitLevel(),
+                ],
             ]);
-
         } catch (\Exception $e) {
             $this->logger->error('Email webhook processing failed', [
                 'from' => $fromEmail ?? 'unknown',
                 'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
+                'trace' => $e->getTraceAsString(),
             ]);
 
             return $this->json([
                 'success' => false,
                 'error' => 'Internal error processing email',
-                'details' => $_ENV['APP_ENV'] === 'dev' ? $e->getMessage() : null
+                'details' => 'dev' === $_ENV['APP_ENV'] ? $e->getMessage() : null,
             ], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
 
     /**
-     * WhatsApp Webhook Verification (GET)
-     * 
+     * WhatsApp Webhook Verification (GET).
+     *
      * GET /api/v1/webhooks/whatsapp
-     * 
+     *
      * Meta requires webhook verification with challenge
      */
     #[Route('/whatsapp', name: 'whatsapp_verify', methods: ['GET'])]
@@ -283,33 +283,34 @@ class WebhookController extends AbstractController
         $token = $request->query->get('hub_verify_token');
         $challenge = $request->query->get('hub_challenge');
 
-        if ($mode === 'subscribe' && $token === $this->whatsappWebhookVerifyToken) {
+        if ('subscribe' === $mode && $token === $this->whatsappWebhookVerifyToken) {
             $this->logger->info('WhatsApp webhook verified');
+
             return new Response($challenge, Response::HTTP_OK, [
-                'Content-Type' => 'text/plain'
+                'Content-Type' => 'text/plain',
             ]);
         }
 
         $this->logger->warning('WhatsApp webhook verification failed', [
             'mode' => $mode,
-            'token_match' => $token === $this->whatsappWebhookVerifyToken
+            'token_match' => $token === $this->whatsappWebhookVerifyToken,
         ]);
 
         return new Response('Forbidden', Response::HTTP_FORBIDDEN);
     }
 
     /**
-     * WhatsApp Webhook (POST)
-     * 
+     * WhatsApp Webhook (POST).
+     *
      * POST /api/v1/webhooks/whatsapp
-     * 
+     *
      * Receives messages from Meta WhatsApp Business API
      * https://developers.facebook.com/docs/whatsapp/cloud-api/webhooks/payload-examples
      */
     #[Route('/whatsapp', name: 'whatsapp', methods: ['POST'])]
     public function whatsapp(
         Request $request,
-        #[CurrentUser] ?User $user
+        #[CurrentUser] ?User $user,
     ): JsonResponse {
         if (!$user) {
             return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
@@ -320,7 +321,7 @@ class WebhookController extends AbstractController
         if (!$data || !isset($data['entry'])) {
             return $this->json([
                 'success' => false,
-                'error' => 'Invalid WhatsApp webhook payload'
+                'error' => 'Invalid WhatsApp webhook payload',
             ], Response::HTTP_BAD_REQUEST);
         }
 
@@ -330,12 +331,12 @@ class WebhookController extends AbstractController
             // Process all entries
             foreach ($data['entry'] as $entry) {
                 foreach ($entry['changes'] as $change) {
-                    if ($change['field'] !== 'messages') {
+                    if ('messages' !== $change['field']) {
                         continue;
                     }
 
                     $value = $change['value'];
-                    
+
                     // Skip status updates
                     if (empty($value['messages'])) {
                         continue;
@@ -350,24 +351,23 @@ class WebhookController extends AbstractController
             return $this->json([
                 'success' => true,
                 'processed' => count($responses),
-                'responses' => $responses
+                'responses' => $responses,
             ]);
-
         } catch (\Exception $e) {
             $this->logger->error('WhatsApp webhook processing failed', [
                 'user_id' => $user->getId(),
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ]);
 
             return $this->json([
                 'success' => false,
-                'error' => 'Internal error processing WhatsApp message'
+                'error' => 'Internal error processing WhatsApp message',
             ], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
 
     /**
-     * Process single WhatsApp message
+     * Process single WhatsApp message.
      */
     private function processWhatsAppMessage(array $incomingMsg, array $value, User $user): array
     {
@@ -380,7 +380,7 @@ class WebhookController extends AbstractController
             'user_id' => $user->getId(),
             'from' => $from,
             'type' => $type,
-            'message_id' => $messageId
+            'message_id' => $messageId,
         ]);
 
         // Check rate limit
@@ -389,7 +389,7 @@ class WebhookController extends AbstractController
             return [
                 'success' => false,
                 'message_id' => $messageId,
-                'error' => 'Rate limit exceeded'
+                'error' => 'Rate limit exceeded',
             ];
         }
 
@@ -440,30 +440,30 @@ class WebhookController extends AbstractController
 
         $this->em->persist($message);
         $this->em->flush(); // MUST flush before setMeta() to get message ID
-        
+
         // Store WhatsApp metadata
         $message->setMeta('channel', 'whatsapp');
         $message->setMeta('from_phone', $from);
         $message->setMeta('external_id', $messageId);
         $message->setMeta('message_type', $type);
-        
+
         if (!empty($value['contacts'][0]['profile']['name'])) {
             $message->setMeta('profile_name', $value['contacts'][0]['profile']['name']);
         }
-        
+
         if ($mediaId) {
             $message->setMeta('media_id', $mediaId);
-            
+
             // Get media URL from WhatsApp API if not provided
             if (!$mediaUrl) {
                 $mediaUrl = $this->whatsAppService->getMediaUrl($mediaId);
             }
-            
+
             if ($mediaUrl) {
                 $message->setMeta('media_url', $mediaUrl);
             }
         }
-        
+
         $this->em->flush(); // Flush metadata
 
         // Record usage
@@ -479,7 +479,7 @@ class WebhookController extends AbstractController
             return [
                 'success' => false,
                 'message_id' => $messageId,
-                'error' => $result['error'] ?? 'Processing failed'
+                'error' => $result['error'] ?? 'Processing failed',
             ];
         }
 
@@ -489,7 +489,7 @@ class WebhookController extends AbstractController
         // Send response back to WhatsApp
         if (!empty($responseText)) {
             $sendResult = $this->whatsAppService->sendMessage($from, $responseText);
-            
+
             if ($sendResult['success']) {
                 // Store outgoing message
                 $outgoingMessage = new Message();
@@ -505,10 +505,10 @@ class WebhookController extends AbstractController
                 $outgoingMessage->setText($responseText);
                 $outgoingMessage->setDirection('OUT');
                 $outgoingMessage->setStatus('sent');
-                
+
                 $this->em->persist($outgoingMessage);
                 $this->em->flush();
-                
+
                 $outgoingMessage->setMeta('channel', 'whatsapp');
                 $outgoingMessage->setMeta('to_phone', $from);
                 $outgoingMessage->setMeta('external_id', $sendResult['message_id']);
@@ -519,19 +519,19 @@ class WebhookController extends AbstractController
         return [
             'success' => true,
             'message_id' => $messageId,
-            'response_sent' => !empty($responseText)
+            'response_sent' => !empty($responseText),
         ];
     }
 
     /**
-     * Generic Webhook for other channels
-     * 
+     * Generic Webhook for other channels.
+     *
      * POST /api/v1/webhooks/generic
      */
     #[Route('/generic', name: 'generic', methods: ['POST'])]
     public function generic(
         Request $request,
-        #[CurrentUser] ?User $user
+        #[CurrentUser] ?User $user,
     ): JsonResponse {
         if (!$user) {
             return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
@@ -542,7 +542,7 @@ class WebhookController extends AbstractController
         if (!$data || empty($data['message'])) {
             return $this->json([
                 'success' => false,
-                'error' => 'Missing required field: message'
+                'error' => 'Missing required field: message',
             ], Response::HTTP_BAD_REQUEST);
         }
 
@@ -554,7 +554,7 @@ class WebhookController extends AbstractController
                 'error' => 'Rate limit exceeded',
                 'limit' => $rateLimitCheck['limit'],
                 'used' => $rateLimitCheck['used'],
-                'reset_at' => $rateLimitCheck['reset_at'] ?? null
+                'reset_at' => $rateLimitCheck['reset_at'] ?? null,
             ], Response::HTTP_TOO_MANY_REQUESTS);
         }
 
@@ -575,7 +575,7 @@ class WebhookController extends AbstractController
 
             $this->em->persist($message);
             $this->em->flush(); // MUST flush before setMeta() to get message ID
-            
+
             // Store custom metadata if provided
             if (!empty($data['metadata']) && is_array($data['metadata'])) {
                 foreach ($data['metadata'] as $key => $value) {
@@ -594,7 +594,7 @@ class WebhookController extends AbstractController
             if (!$result['success']) {
                 return $this->json([
                     'success' => false,
-                    'error' => $result['error'] ?? 'Processing failed'
+                    'error' => $result['error'] ?? 'Processing failed',
                 ], Response::HTTP_INTERNAL_SERVER_ERROR);
             }
 
@@ -605,20 +605,18 @@ class WebhookController extends AbstractController
                 'message_id' => $message->getId(),
                 'response' => [
                     'text' => $response['content'] ?? '',
-                    'metadata' => $response['metadata'] ?? []
-                ]
+                    'metadata' => $response['metadata'] ?? [],
+                ],
             ]);
-
         } catch (\Exception $e) {
             $this->logger->error('Generic webhook failed', [
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ]);
 
             return $this->json([
                 'success' => false,
-                'error' => 'Internal error'
+                'error' => 'Internal error',
             ], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
 }
-

@@ -14,7 +14,7 @@ class InboundEmailHandlerRepository extends ServiceEntityRepository
     }
 
     /**
-     * Find all handlers for a user
+     * Find all handlers for a user.
      */
     public function findByUser(int $userId): array
     {
@@ -27,7 +27,7 @@ class InboundEmailHandlerRepository extends ServiceEntityRepository
     }
 
     /**
-     * Find active handlers for a user
+     * Find active handlers for a user.
      */
     public function findActiveByUser(int $userId): array
     {
@@ -42,7 +42,7 @@ class InboundEmailHandlerRepository extends ServiceEntityRepository
     }
 
     /**
-     * Find handler by ID and user (security check)
+     * Find handler by ID and user (security check).
      */
     public function findByIdAndUser(int $id, int $userId): ?InboundEmailHandler
     {
@@ -56,7 +56,7 @@ class InboundEmailHandlerRepository extends ServiceEntityRepository
     }
 
     /**
-     * Find all active handlers (for background processing)
+     * Find all active handlers (for background processing).
      */
     public function findAllActive(): array
     {
@@ -68,12 +68,12 @@ class InboundEmailHandlerRepository extends ServiceEntityRepository
     }
 
     /**
-     * Find handlers that need to be checked (based on checkInterval)
+     * Find handlers that need to be checked (based on checkInterval).
      */
     public function findHandlersToCheck(): array
     {
         $now = time();
-        
+
         return $this->createQueryBuilder('h')
             ->where('h.status = :status')
             ->setParameter('status', 'active')
@@ -84,4 +84,3 @@ class InboundEmailHandlerRepository extends ServiceEntityRepository
             ->getResult();
     }
 }
-

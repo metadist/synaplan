@@ -14,7 +14,7 @@ class WhisperServiceTest extends TestCase
     protected function setUp(): void
     {
         $this->logger = $this->createMock(LoggerInterface::class);
-        $this->tempDir = sys_get_temp_dir() . '/whisper_test_' . uniqid();
+        $this->tempDir = sys_get_temp_dir().'/whisper_test_'.uniqid();
         mkdir($this->tempDir);
     }
 
@@ -43,14 +43,14 @@ class WhisperServiceTest extends TestCase
     public function testIsAvailableReturnsFalseWhenModelNotFound(): void
     {
         // Create fake binary
-        $fakeBinary = $this->tempDir . '/whisper';
+        $fakeBinary = $this->tempDir.'/whisper';
         touch($fakeBinary);
         chmod($fakeBinary, 0755);
 
         $service = new WhisperService(
             $this->logger,
             $fakeBinary,
-            $this->tempDir . '/models',
+            $this->tempDir.'/models',
             'base',
             '/usr/bin/ffmpeg'
         );
@@ -61,19 +61,19 @@ class WhisperServiceTest extends TestCase
     public function testIsAvailableReturnsTrueWhenBothExist(): void
     {
         // Create fake binary
-        $fakeBinary = $this->tempDir . '/whisper';
+        $fakeBinary = $this->tempDir.'/whisper';
         touch($fakeBinary);
         chmod($fakeBinary, 0755);
 
         // Create fake ffmpeg
-        $fakeFfmpeg = $this->tempDir . '/ffmpeg';
+        $fakeFfmpeg = $this->tempDir.'/ffmpeg';
         touch($fakeFfmpeg);
         chmod($fakeFfmpeg, 0755);
 
         // Create models directory and model file
-        $modelsDir = $this->tempDir . '/models';
+        $modelsDir = $this->tempDir.'/models';
         mkdir($modelsDir);
-        touch($modelsDir . '/ggml-base.bin');
+        touch($modelsDir.'/ggml-base.bin');
 
         $service = new WhisperService(
             $this->logger,
@@ -134,7 +134,7 @@ class WhisperServiceTest extends TestCase
         );
 
         // Create a fake file with unsupported format
-        $fakeFile = $this->tempDir . '/test.xyz';
+        $fakeFile = $this->tempDir.'/test.xyz';
         touch($fakeFile);
 
         $this->expectException(\InvalidArgumentException::class);
@@ -145,12 +145,12 @@ class WhisperServiceTest extends TestCase
 
     public function testGetAvailableModelsReturnsEmptyArrayWhenNoModels(): void
     {
-        mkdir($this->tempDir . '/models');
+        mkdir($this->tempDir.'/models');
 
         $service = new WhisperService(
             $this->logger,
             '/usr/local/bin/whisper',
-            $this->tempDir . '/models',
+            $this->tempDir.'/models',
             'base',
             '/usr/bin/ffmpeg'
         );
@@ -163,13 +163,13 @@ class WhisperServiceTest extends TestCase
 
     public function testGetAvailableModelsReturnsModelList(): void
     {
-        $modelsDir = $this->tempDir . '/models';
+        $modelsDir = $this->tempDir.'/models';
         mkdir($modelsDir);
-        
+
         // Create fake model files
-        touch($modelsDir . '/ggml-tiny.bin');
-        touch($modelsDir . '/ggml-base.bin');
-        touch($modelsDir . '/ggml-small.bin');
+        touch($modelsDir.'/ggml-tiny.bin');
+        touch($modelsDir.'/ggml-base.bin');
+        touch($modelsDir.'/ggml-small.bin');
 
         $service = new WhisperService(
             $this->logger,
@@ -191,14 +191,14 @@ class WhisperServiceTest extends TestCase
     public function testIsAvailableReturnsFalseWhenFfmpegNotFound(): void
     {
         // Create fake whisper binary
-        $fakeBinary = $this->tempDir . '/whisper';
+        $fakeBinary = $this->tempDir.'/whisper';
         touch($fakeBinary);
         chmod($fakeBinary, 0755);
 
         // Create models directory and model file
-        $modelsDir = $this->tempDir . '/models';
+        $modelsDir = $this->tempDir.'/models';
         mkdir($modelsDir);
-        touch($modelsDir . '/ggml-base.bin');
+        touch($modelsDir.'/ggml-base.bin');
 
         // But FFmpeg doesn't exist
         $service = new WhisperService(
@@ -233,4 +233,3 @@ class WhisperServiceTest extends TestCase
         $this->assertTrue(method_exists($service, 'translateToEnglish'));
     }
 }
-

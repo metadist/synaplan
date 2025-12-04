@@ -9,8 +9,8 @@ use Psr\Log\LoggerInterface;
 use Symfony\Component\DependencyInjection\Attribute\AutoconfigureTag;
 
 /**
- * File Analysis Handler
- * 
+ * File Analysis Handler.
+ *
  * Handles file analysis requests (image-to-text, document analysis) using Vision AI
  */
 #[AutoconfigureTag('app.message.handler')]
@@ -20,8 +20,9 @@ class FileAnalysisHandler implements MessageHandlerInterface
         private AiFacade $aiFacade,
         private ModelConfigService $modelConfigService,
         private LoggerInterface $logger,
-        private string $uploadDir = '/var/www/html/var/uploads'
-    ) {}
+        private string $uploadDir = '/var/www/html/var/uploads',
+    ) {
+    }
 
     public function getName(): string
     {
@@ -29,13 +30,13 @@ class FileAnalysisHandler implements MessageHandlerInterface
     }
 
     /**
-     * Non-streaming handle method
+     * Non-streaming handle method.
      */
     public function handle(
         Message $message,
         array $thread,
         array $classification,
-        ?callable $progressCallback = null
+        ?callable $progressCallback = null,
     ): array {
         $this->notify($progressCallback, 'analyzing', 'Analyzing file...');
 
@@ -45,7 +46,7 @@ class FileAnalysisHandler implements MessageHandlerInterface
         // For Vision API: Use user's text directly as the prompt
         // The DB prompt for "analyzefile" is designed for prompt improvement, not vision analysis
         $userPrompt = $message->getText();
-        
+
         if (!empty($userPrompt)) {
             $analysisPrompt = $userPrompt;
         } else {
@@ -55,32 +56,32 @@ class FileAnalysisHandler implements MessageHandlerInterface
 
         // Get the image file path
         $imagePath = $this->getImagePath($message);
-        
+
         if (!$imagePath) {
             $this->logger->error('FileAnalysisHandler: No image file found', [
                 'message_id' => $message->getId(),
                 'file_path' => $message->getFilePath(),
-                'file_flag' => $message->getFile()
+                'file_flag' => $message->getFile(),
             ]);
-            
+
             return [
                 'content' => 'No image file was provided for analysis. Please upload an image and try again.',
-                'metadata' => ['error' => 'no_image']
+                'metadata' => ['error' => 'no_image'],
             ];
         }
 
         // Check if file actually exists
-        $fullImagePath = $this->uploadDir . '/' . $imagePath;
+        $fullImagePath = $this->uploadDir.'/'.$imagePath;
         if (!file_exists($fullImagePath)) {
             $this->logger->error('FileAnalysisHandler: Image file not found on disk', [
                 'relative_path' => $imagePath,
                 'full_path' => $fullImagePath,
-                'upload_dir' => $this->uploadDir
+                'upload_dir' => $this->uploadDir,
             ]);
-            
+
             return [
                 'content' => "Image file not found at: {$imagePath}\nPlease ensure the file was uploaded correctly.",
-                'metadata' => ['error' => 'file_not_found', 'path' => $imagePath]
+                'metadata' => ['error' => 'file_not_found', 'path' => $imagePath],
             ];
         }
 
@@ -90,7 +91,7 @@ class FileAnalysisHandler implements MessageHandlerInterface
             'file_exists' => true,
             'file_size' => filesize($fullImagePath),
             'prompt' => substr($analysisPrompt, 0, 100),
-            'user_id' => $message->getUserId()
+            'user_id' => $message->getUserId(),
         ]);
 
         // Determine model to use
@@ -101,24 +102,24 @@ class FileAnalysisHandler implements MessageHandlerInterface
         if (isset($classification['model_id']) && $classification['model_id']) {
             $modelId = $classification['model_id'];
             $this->logger->info('FileAnalysisHandler: Using user-selected model', [
-                'model_id' => $modelId
+                'model_id' => $modelId,
             ]);
         } else {
             $modelId = $this->modelConfigService->getDefaultModel('PIC2TEXT', $message->getUserId());
             $this->logger->info('FileAnalysisHandler: Using DB default model', [
                 'model_id' => $modelId,
-                'user_id' => $message->getUserId()
+                'user_id' => $message->getUserId(),
             ]);
         }
 
         if ($modelId) {
             $provider = $this->modelConfigService->getProviderForModel($modelId);
             $modelName = $this->modelConfigService->getModelName($modelId);
-            
+
             $this->logger->info('FileAnalysisHandler: Resolved model', [
                 'model_id' => $modelId,
                 'provider' => $provider,
-                'model' => $modelName
+                'model' => $modelName,
             ]);
         }
 
@@ -149,11 +150,11 @@ class FileAnalysisHandler implements MessageHandlerInterface
         } catch (\Exception $e) {
             $this->logger->error('FileAnalysisHandler: Analysis failed', [
                 'error' => $e->getMessage(),
-                'image_path' => $imagePath
+                'image_path' => $imagePath,
             ]);
 
             return [
-                'content' => 'Image analysis failed: ' . $e->getMessage(),
+                'content' => 'Image analysis failed: '.$e->getMessage(),
                 'metadata' => [
                     'error' => $e->getMessage(),
                     'provider' => $provider,
@@ -164,7 +165,7 @@ class FileAnalysisHandler implements MessageHandlerInterface
     }
 
     /**
-     * Handle with streaming support
+     * Handle with streaming support.
      */
     public function handleStream(
         Message $message,
@@ -172,7 +173,7 @@ class FileAnalysisHandler implements MessageHandlerInterface
         array $classification,
         callable $streamCallback,
         ?callable $progressCallback = null,
-        array $options = []
+        array $options = [],
     ): array {
         $this->notify($progressCallback, 'analyzing', 'Analyzing file...');
 
@@ -182,7 +183,7 @@ class FileAnalysisHandler implements MessageHandlerInterface
         // For Vision API: Use user's text directly as the prompt
         // The DB prompt for "analyzefile" is designed for prompt improvement, not vision analysis
         $userPrompt = $message->getText();
-        
+
         if (!empty($userPrompt)) {
             $analysisPrompt = $userPrompt;
         } else {
@@ -192,34 +193,34 @@ class FileAnalysisHandler implements MessageHandlerInterface
 
         // Get the image file path
         $imagePath = $this->getImagePath($message);
-        
+
         if (!$imagePath) {
             $this->logger->error('FileAnalysisHandler: No image file found', [
                 'message_id' => $message->getId(),
                 'file_path' => $message->getFilePath(),
-                'file_flag' => $message->getFile()
+                'file_flag' => $message->getFile(),
             ]);
-            
+
             $streamCallback('No image file was provided for analysis. Please upload an image and try again.');
-            
+
             return [
-                'metadata' => ['error' => 'no_image']
+                'metadata' => ['error' => 'no_image'],
             ];
         }
 
         // Check if file actually exists
-        $fullImagePath = $this->uploadDir . '/' . $imagePath;
+        $fullImagePath = $this->uploadDir.'/'.$imagePath;
         if (!file_exists($fullImagePath)) {
             $this->logger->error('FileAnalysisHandler: Image file not found on disk (streaming)', [
                 'relative_path' => $imagePath,
                 'full_path' => $fullImagePath,
-                'upload_dir' => $this->uploadDir
+                'upload_dir' => $this->uploadDir,
             ]);
-            
+
             $streamCallback("Image file not found at: {$imagePath}\nPlease ensure the file was uploaded correctly.");
-            
+
             return [
-                'metadata' => ['error' => 'file_not_found', 'path' => $imagePath]
+                'metadata' => ['error' => 'file_not_found', 'path' => $imagePath],
             ];
         }
 
@@ -229,7 +230,7 @@ class FileAnalysisHandler implements MessageHandlerInterface
             'file_exists' => true,
             'file_size' => filesize($fullImagePath),
             'prompt' => substr($analysisPrompt, 0, 100),
-            'user_id' => $message->getUserId()
+            'user_id' => $message->getUserId(),
         ]);
 
         // Determine model to use
@@ -240,24 +241,24 @@ class FileAnalysisHandler implements MessageHandlerInterface
         if (isset($classification['model_id']) && $classification['model_id']) {
             $modelId = $classification['model_id'];
             $this->logger->info('FileAnalysisHandler: Using user-selected model', [
-                'model_id' => $modelId
+                'model_id' => $modelId,
             ]);
         } else {
             $modelId = $this->modelConfigService->getDefaultModel('PIC2TEXT', $message->getUserId());
             $this->logger->info('FileAnalysisHandler: Using DB default model', [
                 'model_id' => $modelId,
-                'user_id' => $message->getUserId()
+                'user_id' => $message->getUserId(),
             ]);
         }
 
         if ($modelId) {
             $provider = $this->modelConfigService->getProviderForModel($modelId);
             $modelName = $this->modelConfigService->getModelName($modelId);
-            
+
             $this->logger->info('FileAnalysisHandler: Resolved model', [
                 'model_id' => $modelId,
                 'provider' => $provider,
-                'model' => $modelName
+                'model' => $modelName,
             ]);
         }
 
@@ -291,10 +292,10 @@ class FileAnalysisHandler implements MessageHandlerInterface
         } catch (\Exception $e) {
             $this->logger->error('FileAnalysisHandler: Analysis failed', [
                 'error' => $e->getMessage(),
-                'image_path' => $imagePath
+                'image_path' => $imagePath,
             ]);
 
-            $errorMessage = 'Image analysis failed: ' . $e->getMessage();
+            $errorMessage = 'Image analysis failed: '.$e->getMessage();
             $streamCallback($errorMessage);
 
             return [
@@ -308,7 +309,7 @@ class FileAnalysisHandler implements MessageHandlerInterface
     }
 
     /**
-     * Get the image file path from the message
+     * Get the image file path from the message.
      */
     private function getImagePath(Message $message): ?string
     {
@@ -316,7 +317,7 @@ class FileAnalysisHandler implements MessageHandlerInterface
             'message_id' => $message->getId(),
             'legacy_file_path' => $message->getFilePath(),
             'legacy_file_flag' => $message->getFile(),
-            'files_collection_count' => $message->getFiles()->count()
+            'files_collection_count' => $message->getFiles()->count(),
         ]);
 
         // Check for files in the new MessageFiles relation FIRST
@@ -324,14 +325,14 @@ class FileAnalysisHandler implements MessageHandlerInterface
         if ($files->count() > 0) {
             $file = $files->first();
             $fileRelativePath = $file->getFilePath();
-            
+
             $this->logger->info('FileAnalysisHandler: Found file in collection', [
                 'file_id' => $file->getId(),
                 'file_path' => $fileRelativePath,
                 'file_type' => $file->getFileType(),
-                'file_name' => $file->getFileName()
+                'file_name' => $file->getFileName(),
             ]);
-            
+
             // The path should already be relative (e.g., "uploads/user_123/file.jpg")
             // But just in case, handle various formats
             if (str_starts_with($fileRelativePath, 'uploads/')) {
@@ -339,7 +340,7 @@ class FileAnalysisHandler implements MessageHandlerInterface
                 return $fileRelativePath;
             } elseif (str_contains($fileRelativePath, '/uploads/')) {
                 // Absolute path, extract relative part
-                return 'uploads/' . substr($fileRelativePath, strpos($fileRelativePath, '/uploads/') + 9);
+                return 'uploads/'.substr($fileRelativePath, strpos($fileRelativePath, '/uploads/') + 9);
             } else {
                 // Assume it's just the filename, return as-is
                 return $fileRelativePath;
@@ -348,20 +349,20 @@ class FileAnalysisHandler implements MessageHandlerInterface
 
         // Fallback: Check for legacy file path in message
         $filePath = $message->getFilePath();
-        
+
         if ($filePath) {
             $this->logger->info('FileAnalysisHandler: Using legacy file path', [
-                'file_path' => $filePath
+                'file_path' => $filePath,
             ]);
-            
+
             // Handle various path formats
             if (str_starts_with($filePath, 'uploads/')) {
                 return $filePath;
             } elseif (str_contains($filePath, '/uploads/')) {
-                return 'uploads/' . substr($filePath, strpos($filePath, '/uploads/') + 9);
+                return 'uploads/'.substr($filePath, strpos($filePath, '/uploads/') + 9);
             } elseif (str_starts_with($filePath, '/')) {
                 // Absolute path without 'uploads', just take filename
-                return 'uploads/' . basename($filePath);
+                return 'uploads/'.basename($filePath);
             } else {
                 // Relative path or filename
                 return $filePath;
@@ -369,11 +370,12 @@ class FileAnalysisHandler implements MessageHandlerInterface
         }
 
         $this->logger->warning('FileAnalysisHandler: No file path found in message');
+
         return null;
     }
 
     /**
-     * Notify progress callback
+     * Notify progress callback.
      */
     private function notify(?callable $callback, string $status, string $message): void
     {
@@ -386,4 +388,3 @@ class FileAnalysisHandler implements MessageHandlerInterface
         }
     }
 }
-

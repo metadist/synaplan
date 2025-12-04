@@ -2,20 +2,20 @@
 
 namespace App\Service;
 
-use App\Entity\User;
 use App\Entity\Chat;
-use App\Repository\UserRepository;
+use App\Entity\User;
 use App\Repository\ChatRepository;
+use App\Repository\UserRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 
 /**
- * Email Chat Service
- * 
+ * Email Chat Service.
+ *
  * Handles email-based chat system:
  * - smart@synaplan.com (general chat)
  * - smart+keyword@synaplan.com (specific chat context)
- * 
+ *
  * This is a TOOL that allows users to chat via email.
  */
 class EmailChatService
@@ -27,18 +27,19 @@ class EmailChatService
         private EntityManagerInterface $em,
         private UserRepository $userRepository,
         private ChatRepository $chatRepository,
-        private LoggerInterface $logger
-    ) {}
+        private LoggerInterface $logger,
+    ) {
+    }
 
     /**
      * Parse email address to extract keyword
      * smart@synaplan.com -> null
-     * smart+keyword@synaplan.com -> 'keyword'
+     * smart+keyword@synaplan.com -> 'keyword'.
      */
     public function parseEmailKeyword(string $toEmail): ?string
     {
         $toEmail = strtolower(trim($toEmail));
-        
+
         // Check if email matches pattern: smart+keyword@synaplan.com
         if (preg_match('/^smart\+([a-z0-9\-_]+)@synaplan\.com$/i', $toEmail, $matches)) {
             return $matches[1];
@@ -49,7 +50,7 @@ class EmailChatService
 
     /**
      * Find or create user from email address
-     * Returns registered user or creates anonymous user
+     * Returns registered user or creates anonymous user.
      */
     public function findOrCreateUserFromEmail(string $fromEmail): array
     {
@@ -61,7 +62,7 @@ class EmailChatService
         if ($user) {
             return [
                 'user' => $user,
-                'is_anonymous' => false
+                'is_anonymous' => false,
             ];
         }
 
@@ -77,7 +78,7 @@ class EmailChatService
             if ($userDetails) {
                 return [
                     'user' => $userDetails,
-                    'is_anonymous' => true
+                    'is_anonymous' => true,
                 ];
             }
         }
@@ -87,24 +88,24 @@ class EmailChatService
             return [
                 'user' => null,
                 'is_anonymous' => true,
-                'error' => 'Too many requests. Please try again later.'
+                'error' => 'Too many requests. Please try again later.',
             ];
         }
 
         // Create new anonymous user
         $anonymousUser = new User();
-        $anonymousUser->setMail('anonymous_' . bin2hex(random_bytes(8)) . '@synaplan.local');
+        $anonymousUser->setMail('anonymous_'.bin2hex(random_bytes(8)).'@synaplan.local');
         $anonymousUser->setPw(null); // No password for anonymous users
         $anonymousUser->setType('MAIL'); // EMAIL-based anonymous user
         $anonymousUser->setProviderId('email'); // Identify as email-based
         $anonymousUser->setUserLevel('ANONYMOUS'); // Anonymous users get ANONYMOUS rate limits
-        
+
         $details = [
             'anonymous_email' => $fromEmail,
             'firstName' => 'Email User',
             'lastName' => '',
             'created_via' => 'email',
-            'original_email' => $fromEmail
+            'original_email' => $fromEmail,
         ];
         $anonymousUser->setUserDetails($details);
 
@@ -113,42 +114,40 @@ class EmailChatService
 
         $this->logger->info('Created anonymous user from email', [
             'email' => $fromEmail,
-            'user_id' => $anonymousUser->getId()
+            'user_id' => $anonymousUser->getId(),
         ]);
 
         return [
             'user' => $anonymousUser,
             'is_anonymous' => true,
-            'created' => true
+            'created' => true,
         ];
     }
 
     /**
-     * Find or create chat context for email thread
-     * 
-     * @param User $user
-     * @param string|null $keyword From smart+keyword@synaplan.com
+     * Find or create chat context for email thread.
+     *
+     * @param string|null $keyword      From smart+keyword@synaplan.com
      * @param string|null $emailSubject Email subject (for thread detection)
-     * @param string|null $inReplyTo In-Reply-To header (for threading)
-     * @return Chat
+     * @param string|null $inReplyTo    In-Reply-To header (for threading)
      */
     public function findOrCreateChatContext(
         User $user,
         ?string $keyword,
         ?string $emailSubject,
-        ?string $inReplyTo
+        ?string $inReplyTo,
     ): Chat {
         // If keyword is provided, use it as chat identifier
         if ($keyword) {
             $chat = $this->chatRepository->findOneBy([
                 'userId' => $user->getId(),
-                'title' => 'Email: ' . $keyword
+                'title' => 'Email: '.$keyword,
             ]);
 
             if (!$chat) {
                 $chat = new Chat();
                 $chat->setUserId($user->getId());
-                $chat->setTitle('Email: ' . $keyword);
+                $chat->setTitle('Email: '.$keyword);
 
                 $this->em->persist($chat);
                 $this->em->flush();
@@ -156,7 +155,7 @@ class EmailChatService
                 $this->logger->info('Created new email chat context', [
                     'user_id' => $user->getId(),
                     'keyword' => $keyword,
-                    'chat_id' => $chat->getId()
+                    'chat_id' => $chat->getId(),
                 ]);
             }
 
@@ -166,7 +165,7 @@ class EmailChatService
         // No specific context - create/use general email chat
         $chat = $this->chatRepository->findOneBy([
             'userId' => $user->getId(),
-            'title' => 'Email Conversation'
+            'title' => 'Email Conversation',
         ]);
 
         if (!$chat) {
@@ -182,7 +181,7 @@ class EmailChatService
     }
 
     /**
-     * Check if email address is spamming
+     * Check if email address is spamming.
      */
     private function isSpamming(string $email): bool
     {
@@ -195,7 +194,7 @@ class EmailChatService
         $stmt = $this->em->getConnection()->prepare($sql);
         $result = $stmt->executeQuery([
             'email' => $email,
-            'created_after' => $createdAfter
+            'created_after' => $createdAfter,
         ]);
         $count = $result->fetchOne();
 
@@ -203,21 +202,22 @@ class EmailChatService
     }
 
     /**
-     * Get user's email keyword (for smart+keyword@synaplan.com)
+     * Get user's email keyword (for smart+keyword@synaplan.com).
      */
     public function getUserEmailKeyword(User $user): ?string
     {
         $details = $user->getUserDetails();
+
         return $details['email_keyword'] ?? null;
     }
 
     /**
-     * Set user's email keyword
+     * Set user's email keyword.
      */
     public function setUserEmailKeyword(User $user, string $keyword): void
     {
         $keyword = preg_replace('/[^a-z0-9\-_]/', '', strtolower($keyword));
-        
+
         if (empty($keyword)) {
             throw new \InvalidArgumentException('Invalid keyword format');
         }
@@ -230,17 +230,17 @@ class EmailChatService
 
         $this->logger->info('Set user email keyword', [
             'user_id' => $user->getId(),
-            'keyword' => $keyword
+            'keyword' => $keyword,
         ]);
     }
 
     /**
-     * Get user's personal email address
+     * Get user's personal email address.
      */
     public function getUserPersonalEmailAddress(User $user): string
     {
         $keyword = $this->getUserEmailKeyword($user);
-        
+
         if ($keyword) {
             return "smart+{$keyword}@synaplan.com";
         }
@@ -248,4 +248,3 @@ class EmailChatService
         return self::BASE_EMAIL;
     }
 }
-

@@ -27,8 +27,9 @@ class ChatController extends AbstractController
         private MessageRepository $messageRepository,
         private SearchResultRepository $searchResultRepository,
         private WidgetSessionService $widgetSessionService,
-        private LoggerInterface $logger
-    ) {}
+        private LoggerInterface $logger,
+    ) {
+    }
 
     #[Route('', name: 'list', methods: ['GET'])]
     #[OA\Get(
@@ -52,14 +53,14 @@ class ChatController extends AbstractController
                                     new OA\Property(property: 'createdAt', type: 'string', format: 'date-time'),
                                     new OA\Property(property: 'updatedAt', type: 'string', format: 'date-time'),
                                     new OA\Property(property: 'messageCount', type: 'integer', example: 5),
-                                    new OA\Property(property: 'isShared', type: 'boolean', example: false)
+                                    new OA\Property(property: 'isShared', type: 'boolean', example: false),
                                 ]
                             )
-                        )
+                        ),
                     ]
                 )
             ),
-            new OA\Response(response: 401, description: 'Not authenticated')
+            new OA\Response(response: 401, description: 'Not authenticated'),
         ]
     )]
     public function list(#[CurrentUser] ?User $user): JsonResponse
@@ -95,7 +96,7 @@ class ChatController extends AbstractController
             required: false,
             content: new OA\JsonContent(
                 properties: [
-                    new OA\Property(property: 'title', type: 'string', example: 'New Discussion', nullable: true)
+                    new OA\Property(property: 'title', type: 'string', example: 'New Discussion', nullable: true),
                 ]
             )
         ),
@@ -114,18 +115,18 @@ class ChatController extends AbstractController
                                 new OA\Property(property: 'id', type: 'integer', example: 1),
                                 new OA\Property(property: 'title', type: 'string', example: 'New Chat'),
                                 new OA\Property(property: 'createdAt', type: 'string', format: 'date-time'),
-                                new OA\Property(property: 'updatedAt', type: 'string', format: 'date-time')
+                                new OA\Property(property: 'updatedAt', type: 'string', format: 'date-time'),
                             ]
-                        )
+                        ),
                     ]
                 )
             ),
-            new OA\Response(response: 401, description: 'Not authenticated')
+            new OA\Response(response: 401, description: 'Not authenticated'),
         ]
     )]
     public function create(
         Request $request,
-        #[CurrentUser] ?User $user
+        #[CurrentUser] ?User $user,
     ): JsonResponse {
         if (!$user) {
             return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
@@ -146,7 +147,7 @@ class ChatController extends AbstractController
 
         $this->logger->info('Chat created', [
             'chat_id' => $chat->getId(),
-            'user_id' => $user->getId()
+            'user_id' => $user->getId(),
         ]);
 
         return $this->json([
@@ -156,7 +157,7 @@ class ChatController extends AbstractController
                 'title' => $chat->getTitle() ?? 'New Chat',
                 'createdAt' => $chat->getCreatedAt()->format('c'),
                 'updatedAt' => $chat->getUpdatedAt()->format('c'),
-            ]
+            ],
         ], Response::HTTP_CREATED);
     }
 
@@ -166,7 +167,7 @@ class ChatController extends AbstractController
         summary: 'Get a specific chat by ID',
         tags: ['Chats'],
         parameters: [
-            new OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'integer'))
+            new OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'integer')),
         ],
         responses: [
             new OA\Response(
@@ -184,19 +185,19 @@ class ChatController extends AbstractController
                                 new OA\Property(property: 'createdAt', type: 'string', format: 'date-time'),
                                 new OA\Property(property: 'updatedAt', type: 'string', format: 'date-time'),
                                 new OA\Property(property: 'isShared', type: 'boolean'),
-                                new OA\Property(property: 'shareToken', type: 'string', nullable: true)
+                                new OA\Property(property: 'shareToken', type: 'string', nullable: true),
                             ]
-                        )
+                        ),
                     ]
                 )
             ),
             new OA\Response(response: 401, description: 'Not authenticated'),
-            new OA\Response(response: 404, description: 'Chat not found')
+            new OA\Response(response: 404, description: 'Chat not found'),
         ]
     )]
     public function get(
         int $id,
-        #[CurrentUser] ?User $user
+        #[CurrentUser] ?User $user,
     ): JsonResponse {
         if (!$user) {
             return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
@@ -220,7 +221,7 @@ class ChatController extends AbstractController
                 'isShared' => $chat->isPublic(),
                 'shareToken' => $chat->getShareToken(),
                 'widgetSession' => $sessionInfo[$chat->getId()] ?? null,
-            ]
+            ],
         ]);
     }
 
@@ -231,24 +232,24 @@ class ChatController extends AbstractController
         requestBody: new OA\RequestBody(
             content: new OA\JsonContent(
                 properties: [
-                    new OA\Property(property: 'title', type: 'string', example: 'Updated Title')
+                    new OA\Property(property: 'title', type: 'string', example: 'Updated Title'),
                 ]
             )
         ),
         tags: ['Chats'],
         parameters: [
-            new OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'integer'))
+            new OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'integer')),
         ],
         responses: [
             new OA\Response(response: 200, description: 'Chat updated successfully'),
             new OA\Response(response: 401, description: 'Not authenticated'),
-            new OA\Response(response: 404, description: 'Chat not found')
+            new OA\Response(response: 404, description: 'Chat not found'),
         ]
     )]
     public function update(
         int $id,
         Request $request,
-        #[CurrentUser] ?User $user
+        #[CurrentUser] ?User $user,
     ): JsonResponse {
         if (!$user) {
             return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
@@ -275,7 +276,7 @@ class ChatController extends AbstractController
                 'id' => $chat->getId(),
                 'title' => $chat->getTitle(),
                 'updatedAt' => $chat->getUpdatedAt()->format('c'),
-            ]
+            ],
         ]);
     }
 
@@ -285,17 +286,17 @@ class ChatController extends AbstractController
         summary: 'Delete a chat',
         tags: ['Chats'],
         parameters: [
-            new OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'integer'))
+            new OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'integer')),
         ],
         responses: [
             new OA\Response(response: 200, description: 'Chat deleted successfully'),
             new OA\Response(response: 401, description: 'Not authenticated'),
-            new OA\Response(response: 404, description: 'Chat not found')
+            new OA\Response(response: 404, description: 'Chat not found'),
         ]
     )]
     public function delete(
         int $id,
-        #[CurrentUser] ?User $user
+        #[CurrentUser] ?User $user,
     ): JsonResponse {
         if (!$user) {
             return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
@@ -312,7 +313,7 @@ class ChatController extends AbstractController
 
         $this->logger->info('Chat deleted', [
             'chat_id' => $id,
-            'user_id' => $user->getId()
+            'user_id' => $user->getId(),
         ]);
 
         return $this->json(['success' => true]);
@@ -325,13 +326,13 @@ class ChatController extends AbstractController
         requestBody: new OA\RequestBody(
             content: new OA\JsonContent(
                 properties: [
-                    new OA\Property(property: 'enable', type: 'boolean', example: true)
+                    new OA\Property(property: 'enable', type: 'boolean', example: true),
                 ]
             )
         ),
         tags: ['Chats'],
         parameters: [
-            new OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'integer'))
+            new OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'integer')),
         ],
         responses: [
             new OA\Response(
@@ -342,18 +343,18 @@ class ChatController extends AbstractController
                         new OA\Property(property: 'success', type: 'boolean'),
                         new OA\Property(property: 'shareToken', type: 'string', nullable: true),
                         new OA\Property(property: 'isShared', type: 'boolean'),
-                        new OA\Property(property: 'shareUrl', type: 'string', nullable: true)
+                        new OA\Property(property: 'shareUrl', type: 'string', nullable: true),
                     ]
                 )
             ),
             new OA\Response(response: 401, description: 'Not authenticated'),
-            new OA\Response(response: 404, description: 'Chat not found')
+            new OA\Response(response: 404, description: 'Chat not found'),
         ]
     )]
     public function share(
         int $id,
         Request $request,
-        #[CurrentUser] ?User $user
+        #[CurrentUser] ?User $user,
     ): JsonResponse {
         if (!$user) {
             return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
@@ -385,7 +386,7 @@ class ChatController extends AbstractController
             'isShared' => $chat->isPublic(),
             'shareUrl' => $chat->isPublic()
                 ? $this->generateUrl('api_chats_shared', ['token' => $chat->getShareToken()], true)
-                : null
+                : null,
         ]);
     }
 
@@ -397,7 +398,7 @@ class ChatController extends AbstractController
         parameters: [
             new OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'integer')),
             new OA\Parameter(name: 'limit', in: 'query', required: false, schema: new OA\Schema(type: 'integer', default: 50, maximum: 100)),
-            new OA\Parameter(name: 'offset', in: 'query', required: false, schema: new OA\Schema(type: 'integer', default: 0))
+            new OA\Parameter(name: 'offset', in: 'query', required: false, schema: new OA\Schema(type: 'integer', default: 0)),
         ],
         responses: [
             new OA\Response(
@@ -414,20 +415,20 @@ class ChatController extends AbstractController
                                 new OA\Property(property: 'offset', type: 'integer'),
                                 new OA\Property(property: 'limit', type: 'integer'),
                                 new OA\Property(property: 'total', type: 'integer'),
-                                new OA\Property(property: 'hasMore', type: 'boolean')
+                                new OA\Property(property: 'hasMore', type: 'boolean'),
                             ]
-                        )
+                        ),
                     ]
                 )
             ),
             new OA\Response(response: 401, description: 'Not authenticated'),
-            new OA\Response(response: 404, description: 'Chat not found')
+            new OA\Response(response: 404, description: 'Chat not found'),
         ]
     )]
     public function getMessages(
         int $id,
         Request $request,
-        #[CurrentUser] ?User $user
+        #[CurrentUser] ?User $user,
     ): JsonResponse {
         if (!$user) {
             return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
@@ -473,7 +474,7 @@ class ChatController extends AbstractController
             $webSearchData = null;
             $searchResultsData = [];
 
-            if ($m->getDirection() === 'OUT') {
+            if ('OUT' === $m->getDirection()) {
                 // Chat model (used for generating the response)
                 $chatProvider = $m->getMeta('ai_chat_provider');
                 $chatModel = $m->getMeta('ai_chat_model');
@@ -493,7 +494,7 @@ class ChatController extends AbstractController
                     $aiModels['sorting'] = [
                         'provider' => $sortingProvider,
                         'model' => $sortingModel,
-                        'model_id' => $sortingModelId ? (int)$sortingModelId : null,
+                        'model_id' => $sortingModelId ? (int) $sortingModelId : null,
                     ];
                 }
 
@@ -503,7 +504,7 @@ class ChatController extends AbstractController
                 if ($searchQuery || $searchResultsCount) {
                     $webSearchData = [
                         'query' => $searchQuery,
-                        'resultsCount' => $searchResultsCount ? (int)$searchResultsCount : 0
+                        'resultsCount' => $searchResultsCount ? (int) $searchResultsCount : 0,
                     ];
 
                     // Load actual search results from DB
@@ -535,12 +536,12 @@ class ChatController extends AbstractController
                         }
                     }
                 }
-            } else if ($m->getDirection() === 'IN') {
+            } elseif ('IN' === $m->getDirection()) {
                 // Check if web search was enabled for incoming message
                 $webSearchEnabled = $m->getMeta('web_search_enabled');
-                if ($webSearchEnabled === 'true') {
+                if ('true' === $webSearchEnabled) {
                     $webSearchData = [
-                        'enabled' => true
+                        'enabled' => true,
                     ];
                 }
             }
@@ -561,7 +562,7 @@ class ChatController extends AbstractController
                 // Generated content (images, videos from AI)
                 'file' => ($m->getFile() && $m->getFilePath()) ? [
                     'path' => $m->getFilePath(),
-                    'type' => $m->getFileType()
+                    'type' => $m->getFileType(),
                 ] : null,
             ];
         }, $messages);
@@ -580,8 +581,8 @@ class ChatController extends AbstractController
                 'offset' => $offset,
                 'limit' => $limit,
                 'total' => (int) $totalCount,
-                'hasMore' => ($offset + count($messages)) < $totalCount
-            ]
+                'hasMore' => ($offset + count($messages)) < $totalCount,
+            ],
         ]);
     }
 
@@ -592,7 +593,7 @@ class ChatController extends AbstractController
         security: [],
         tags: ['Chats'],
         parameters: [
-            new OA\Parameter(name: 'token', in: 'path', required: true, schema: new OA\Schema(type: 'string'))
+            new OA\Parameter(name: 'token', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
         ],
         responses: [
             new OA\Response(
@@ -606,14 +607,14 @@ class ChatController extends AbstractController
                             type: 'object',
                             properties: [
                                 new OA\Property(property: 'title', type: 'string'),
-                                new OA\Property(property: 'createdAt', type: 'string', format: 'date-time')
+                                new OA\Property(property: 'createdAt', type: 'string', format: 'date-time'),
                             ]
                         ),
-                        new OA\Property(property: 'messages', type: 'array', items: new OA\Items())
+                        new OA\Property(property: 'messages', type: 'array', items: new OA\Items()),
                     ]
                 )
             ),
-            new OA\Response(response: 404, description: 'Chat not found or not shared')
+            new OA\Response(response: 404, description: 'Chat not found or not shared'),
         ]
     )]
     public function getShared(string $token): JsonResponse
@@ -644,7 +645,7 @@ class ChatController extends AbstractController
             if ($m->getFile() && $m->getFilePath()) {
                 $data['file'] = [
                     'path' => $m->getFilePath(),
-                    'type' => $m->getFileType()
+                    'type' => $m->getFileType(),
                 ];
             }
 
@@ -657,8 +658,7 @@ class ChatController extends AbstractController
                 'title' => $chat->getTitle() ?? 'Shared Chat',
                 'createdAt' => $chat->getCreatedAt()->format('c'),
             ],
-            'messages' => $messageData
+            'messages' => $messageData,
         ]);
     }
 }
-

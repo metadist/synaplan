@@ -2,22 +2,22 @@
 
 namespace App\AI\Service;
 
+use App\AI\Exception\ProviderException;
 use App\AI\Interface\ChatProviderInterface;
 use App\AI\Interface\EmbeddingProviderInterface;
-use App\AI\Interface\VisionProviderInterface;
+use App\AI\Interface\FileAnalysisProviderInterface;
 use App\AI\Interface\ImageGenerationProviderInterface;
-use App\AI\Interface\VideoGenerationProviderInterface;
 use App\AI\Interface\SpeechToTextProviderInterface;
 use App\AI\Interface\TextToSpeechProviderInterface;
-use App\AI\Interface\FileAnalysisProviderInterface;
-use App\AI\Exception\ProviderException;
+use App\AI\Interface\VideoGenerationProviderInterface;
+use App\AI\Interface\VisionProviderInterface;
 use App\Repository\ModelRepository;
-use Symfony\Component\DependencyInjection\Attribute\TaggedIterator;
 use Psr\Log\LoggerInterface;
+use Symfony\Component\DependencyInjection\Attribute\TaggedIterator;
 
 /**
- * Provider Registry with DB-driven Capabilities
- * 
+ * Provider Registry with DB-driven Capabilities.
+ *
  * Providers register with all their interfaces,
  * but DB (BMODELS.BTAG) controls which capabilities are actually available
  */
@@ -45,7 +45,7 @@ class ProviderRegistry
         iterable $fileAnalysisProviders = [],
         private ModelRepository $modelRepository,
         private LoggerInterface $logger,
-        private string $defaultProvider = 'test'
+        private string $defaultProvider = 'test',
     ) {
         // Index providers by their getName() method dynamically
         foreach ($chatProviders as $provider) {
@@ -75,39 +75,40 @@ class ProviderRegistry
     }
 
     /**
-     * Load capabilities from DB (cached after first call)
+     * Load capabilities from DB (cached after first call).
      */
     private function loadDbCapabilities(): array
     {
-        if ($this->dbCapabilities === null) {
+        if (null === $this->dbCapabilities) {
             $this->dbCapabilities = $this->modelRepository->getProviderCapabilities();
             $this->logger->info('Loaded provider capabilities from DB', [
-                'capabilities' => $this->dbCapabilities
+                'capabilities' => $this->dbCapabilities,
             ]);
         }
+
         return $this->dbCapabilities;
     }
 
     /**
-     * Check if provider supports capability according to DB
+     * Check if provider supports capability according to DB.
      */
     private function isCapabilityEnabled(string $providerName, string $capability): bool
     {
         // EXCEPTION: TestProvider is always enabled (for unit tests & development)
-        if (strtolower($providerName) === 'test') {
+        if ('test' === strtolower($providerName)) {
             return true;
         }
-        
+
         $dbCaps = $this->loadDbCapabilities();
-        
+
         // Normalize provider name (case-insensitive)
         $providerName = strtolower($providerName);
-        
+
         // Normalize DB keys to lowercase
         $dbCaps = array_change_key_case($dbCaps, CASE_LOWER);
-        
-        $this->logger->error('🔍 CAPABILITY CHECK: provider=' . $providerName . ' | capability=' . $capability . ' | dbCaps_keys=' . json_encode(array_keys($dbCaps)) . ' | provider_in_db=' . (isset($dbCaps[$providerName]) ? 'YES' : 'NO'));
-        
+
+        $this->logger->error('🔍 CAPABILITY CHECK: provider='.$providerName.' | capability='.$capability.' | dbCaps_keys='.json_encode(array_keys($dbCaps)).' | provider_in_db='.(isset($dbCaps[$providerName]) ? 'YES' : 'NO'));
+
         // Map capability names: chat -> chat, embedding -> vectorize, vision -> pic2text
         $capabilityMap = [
             'chat' => 'chat',
@@ -117,39 +118,36 @@ class ProviderRegistry
             'video_generation' => 'text2vid',
             'speech_to_text' => 'sound2text',
             'text_to_speech' => 'text2sound',
-            'file_analysis' => 'analyze'
+            'file_analysis' => 'analyze',
         ];
-        
+
         $dbCapability = $capabilityMap[$capability] ?? $capability;
-        
+
         return isset($dbCaps[$providerName]) && in_array($dbCapability, $dbCaps[$providerName]);
     }
 
     /**
-     * Get provider by capability and name (with DB capability check)
-     * 
+     * Get provider by capability and name (with DB capability check).
+     *
      * CASE-INSENSITIVE: Supports both 'Ollama' and 'ollama'
      */
     private function getProvider(string $capability, ?string $name = null, bool $requireCapability = true)
     {
         $name = $name ?? $this->defaultProvider;
-        
+
         // Normalize to lowercase for case-insensitive matching
         $normalizedName = strtolower($name);
-        
+
         if (!isset($this->providers[$capability])) {
-            throw new ProviderException(
-                "No providers registered for capability: {$capability}",
-                $name
-            );
+            throw new ProviderException("No providers registered for capability: {$capability}", $name);
         }
-        
+
         foreach ($this->providers[$capability] as $provider) {
             $providerLower = strtolower($provider->getName());
             $isAvailable = $provider->isAvailable();
-            
-            $this->logger->error('🔍 PROVIDER LOOP: capability=' . $capability . ' | providerLower=' . $providerLower . ' | normalizedName=' . $normalizedName . ' | isAvailable=' . ($isAvailable ? 'YES' : 'NO') . ' | match=' . ($providerLower === $normalizedName ? 'YES' : 'NO'));
-            
+
+            $this->logger->error('🔍 PROVIDER LOOP: capability='.$capability.' | providerLower='.$providerLower.' | normalizedName='.$normalizedName.' | isAvailable='.($isAvailable ? 'YES' : 'NO').' | match='.($providerLower === $normalizedName ? 'YES' : 'NO'));
+
             // Case-insensitive comparison
             if ($providerLower === $normalizedName && $isAvailable) {
                 // Check if capability is enabled in DB (using normalized name)
@@ -157,34 +155,28 @@ class ProviderRegistry
                     $this->logger->warning('Provider capability disabled in DB', [
                         'provider' => $name,
                         'normalized' => $normalizedName,
-                        'capability' => $capability
+                        'capability' => $capability,
                     ]);
-                    throw new ProviderException(
-                        "Provider '{$name}' does not support capability '{$capability}' (not in DB)",
-                        $name
-                    );
+                    throw new ProviderException("Provider '{$name}' does not support capability '{$capability}' (not in DB)", $name);
                 }
-                
+
                 $this->logger->debug('Provider found and available', [
                     'provider' => $provider->getName(),
                     'capability' => $capability,
-                    'requested_name' => $name
+                    'requested_name' => $name,
                 ]);
-                
+
                 return $provider;
             }
         }
-        
+
         // Enhanced error message with available providers
         $availableProviders = array_map(
-            fn($p) => $p->getName(),
+            fn ($p) => $p->getName(),
             $this->providers[$capability] ?? []
         );
-        
-        throw new ProviderException(
-            "{$capability} provider '{$name}' not found or unavailable. Available: " . implode(', ', $availableProviders),
-            $name
-        );
+
+        throw new ProviderException("{$capability} provider '{$name}' not found or unavailable. Available: ".implode(', ', $availableProviders), $name);
     }
 
     public function getChatProvider(?string $name = null): ChatProviderInterface
@@ -210,16 +202,16 @@ class ProviderRegistry
     public function getVideoGenerationProvider(?string $name = null): VideoGenerationProviderInterface
     {
         $dbCaps = $this->loadDbCapabilities();
-        
+
         $registered = array_keys($this->providers['video_generation'] ?? []);
         $allCaps = array_keys($this->providers);
         $dbGoogle = $dbCaps['google'] ?? 'NOT_FOUND';
-        
-        $this->logger->error('🎬 VIDEO DEBUG: requested=' . ($name ?? 'DEFAULT') 
-            . ' | registered=' . json_encode($registered)
-            . ' | all_caps=' . json_encode($allCaps)
-            . ' | db_google=' . json_encode($dbGoogle));
-        
+
+        $this->logger->error('🎬 VIDEO DEBUG: requested='.($name ?? 'DEFAULT')
+            .' | registered='.json_encode($registered)
+            .' | all_caps='.json_encode($allCaps)
+            .' | db_google='.json_encode($dbGoogle));
+
         return $this->getProvider('video_generation', $name);
     }
 
@@ -241,8 +233,8 @@ class ProviderRegistry
     /**
      * Return available providers for a capability.
      *
-     * @param string $capability Registry capability key (chat, vision, embedding, image_generation, video_generation, speech_to_text, text_to_speech, file_analysis)
-     * @param bool $includeTest  Whether to include the internal TestProvider in the results
+     * @param string $capability  Registry capability key (chat, vision, embedding, image_generation, video_generation, speech_to_text, text_to_speech, file_analysis)
+     * @param bool   $includeTest Whether to include the internal TestProvider in the results
      *
      * @return string[] List of provider names (preserves provider casing)
      */
@@ -257,7 +249,7 @@ class ProviderRegistry
         foreach ($this->providers[$capability] as $provider) {
             $normalized = strtolower($provider->getName());
 
-            if (!$includeTest && $normalized === 'test') {
+            if (!$includeTest && 'test' === $normalized) {
                 continue;
             }
 
@@ -281,12 +273,13 @@ class ProviderRegistry
         foreach ($this->providers as $capability => $providers) {
             $all = array_merge($all, $providers);
         }
+
         return array_unique($all, SORT_REGULAR);
     }
 
     /**
      * Get all unique providers (deduplicated by name)
-     * Returns array keyed by provider name
+     * Returns array keyed by provider name.
      */
     public function getUniqueProviders(): array
     {
@@ -299,13 +292,14 @@ class ProviderRegistry
                 }
             }
         }
+
         return $unique;
     }
 
     /**
-     * Get metadata for all providers (for status/features UI)
-     * 
-     * @return array Provider metadata with status, capabilities, env vars, etc.
+     * Get metadata for all providers (for status/features UI).
+     *
+     * @return array provider metadata with status, capabilities, env vars, etc
      */
     public function getProvidersMetadata(): array
     {
@@ -340,4 +334,3 @@ class ProviderRegistry
         return $metadata;
     }
 }
-

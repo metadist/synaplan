@@ -2,10 +2,10 @@
 
 namespace App\Tests\Controller;
 
-use App\Entity\User;
 use App\Entity\Chat;
-use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
+use App\Entity\User;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
+use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
 
 class StreamControllerTest extends WebTestCase
 {
@@ -58,7 +58,7 @@ class StreamControllerTest extends WebTestCase
     {
         $this->client->request('GET', '/api/v1/messages/stream', [
             'message' => 'Test',
-            'chatId' => 1
+            'chatId' => 1,
         ]);
 
         $this->assertResponseStatusCodeSame(401);
@@ -89,7 +89,7 @@ class StreamControllerTest extends WebTestCase
         $token = $this->getAuthToken();
 
         $this->client->request('POST', '/api/v1/messages/stream', [], [], [
-            'HTTP_AUTHORIZATION' => 'Bearer ' . $token,
+            'HTTP_AUTHORIZATION' => 'Bearer '.$token,
         ]);
 
         $this->assertResponseStatusCodeSame(405);
@@ -100,4 +100,3 @@ class StreamControllerTest extends WebTestCase
         $this->markTestSkipped('SSE streaming tests are not compatible with PHPUnit WebTestCase (output buffering issues)');
     }
 }
-

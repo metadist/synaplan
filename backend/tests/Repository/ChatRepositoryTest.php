@@ -9,7 +9,7 @@ use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
 
 /**
- * Integration tests for ChatRepository
+ * Integration tests for ChatRepository.
  */
 class ChatRepositoryTest extends KernelTestCase
 {
@@ -20,14 +20,14 @@ class ChatRepositoryTest extends KernelTestCase
     protected function setUp(): void
     {
         parent::setUp();
-        
+
         $kernel = self::bootKernel();
         $this->em = $kernel->getContainer()
             ->get('doctrine')
             ->getManager();
-        
+
         $this->repository = $this->em->getRepository(Chat::class);
-        
+
         // Get or create test user
         $userRepo = $this->em->getRepository(User::class);
         $this->testUser = $userRepo->findOneBy([]) ?? $this->createTestUser();
@@ -41,14 +41,14 @@ class ChatRepositoryTest extends KernelTestCase
     private function createTestUser(): User
     {
         $user = new User();
-        $user->setMail('chatrepo_test_' . time() . '@test.com');
+        $user->setMail('chatrepo_test_'.time().'@test.com');
         $user->setPw('test123');
         $user->setProviderId('TEST');
         $user->setUserLevel('NEW');
-        
+
         $this->em->persist($user);
         $this->em->flush();
-        
+
         return $user;
     }
 
@@ -76,15 +76,15 @@ class ChatRepositoryTest extends KernelTestCase
         // Create a test chat
         $chat = new Chat();
         $chat->setUserId($this->testUser->getId());
-        $chat->setTitle('Test Chat ' . time());
-        
+        $chat->setTitle('Test Chat '.time());
+
         $this->em->persist($chat);
         $this->em->flush();
 
         // Find it
         $found = $this->repository->findOneBy([
             'userId' => $this->testUser->getId(),
-            'title' => $chat->getTitle()
+            'title' => $chat->getTitle(),
         ]);
 
         $this->assertNotNull($found);
@@ -123,7 +123,7 @@ class ChatRepositoryTest extends KernelTestCase
         $chat = new Chat();
         $chat->setUserId($this->testUser->getId());
         $chat->setTitle('Required Fields Test');
-        
+
         $this->em->persist($chat);
         $this->em->flush();
 
@@ -159,7 +159,7 @@ class ChatRepositoryTest extends KernelTestCase
         );
 
         $this->assertIsArray($chats);
-        
+
         // Check ordering if multiple chats exist
         if (count($chats) > 1) {
             $prevId = PHP_INT_MAX;
@@ -170,4 +170,3 @@ class ChatRepositoryTest extends KernelTestCase
         }
     }
 }
-

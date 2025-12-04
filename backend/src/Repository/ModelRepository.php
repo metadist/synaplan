@@ -17,11 +17,12 @@ class ModelRepository extends ServiceEntityRepository
     }
 
     /**
-     * Get eligible models by tag (capability)
-     * 
-     * @param string $tag Model tag (e.g., 'chat', 'pic2text', 'text2pic', 'vectorize')
-     * @param bool $selectableOnly Only selectable models (BSELECTABLE = 1)
-     * @param float|null $minRating Minimum rating filter
+     * Get eligible models by tag (capability).
+     *
+     * @param string     $tag            Model tag (e.g., 'chat', 'pic2text', 'text2pic', 'vectorize')
+     * @param bool       $selectableOnly Only selectable models (BSELECTABLE = 1)
+     * @param float|null $minRating      Minimum rating filter
+     *
      * @return Model[] Array of models sorted by quality DESC, id ASC
      */
     public function findByTag(string $tag, bool $selectableOnly = true, ?float $minRating = null): array
@@ -36,7 +37,7 @@ class ModelRepository extends ServiceEntityRepository
             $qb->andWhere('m.selectable = 1');
         }
 
-        if ($minRating !== null) {
+        if (null !== $minRating) {
             $qb->andWhere('m.rating > :minRating')
                 ->setParameter('minRating', $minRating);
         }
@@ -45,11 +46,10 @@ class ModelRepository extends ServiceEntityRepository
     }
 
     /**
-     * Get model by service and provider ID
-     * 
-     * @param string $service Service name (e.g., 'Ollama', 'OpenAI')
+     * Get model by service and provider ID.
+     *
+     * @param string $service    Service name (e.g., 'Ollama', 'OpenAI')
      * @param string $providerId Provider-specific model ID
-     * @return Model|null
      */
     public function findByServiceAndProviderId(string $service, string $providerId): ?Model
     {
@@ -64,8 +64,8 @@ class ModelRepository extends ServiceEntityRepository
     }
 
     /**
-     * Get all available tags/capabilities
-     * 
+     * Get all available tags/capabilities.
+     *
      * @return array Array of tag strings
      */
     public function getAllTags(): array
@@ -76,12 +76,12 @@ class ModelRepository extends ServiceEntityRepository
             ->getQuery()
             ->getScalarResult();
 
-        return array_map(fn($r) => $r['tag'], $results);
+        return array_map(fn ($r) => $r['tag'], $results);
     }
 
     /**
      * Get all unique provider-capability combinations from DB
-     * Returns: ['openai' => ['chat', 'embedding'], 'ollama' => ['chat', 'vectorize'], ...]
+     * Returns: ['openai' => ['chat', 'embedding'], 'ollama' => ['chat', 'vectorize'], ...].
      */
     public function getProviderCapabilities(): array
     {
@@ -97,11 +97,11 @@ class ModelRepository extends ServiceEntityRepository
         foreach ($results as $row) {
             $provider = $row['provider'];
             $capability = $row['capability'];
-            
+
             if (!isset($capabilities[$provider])) {
                 $capabilities[$provider] = [];
             }
-            
+
             if (!in_array($capability, $capabilities[$provider])) {
                 $capabilities[$provider][] = $capability;
             }

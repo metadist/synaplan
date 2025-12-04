@@ -17,7 +17,7 @@ class ApiKeyRepository extends ServiceEntityRepository
     }
 
     /**
-     * Findet einen aktiven API-Key
+     * Findet einen aktiven API-Key.
      */
     public function findActiveByKey(string $key): ?ApiKey
     {
@@ -31,7 +31,7 @@ class ApiKeyRepository extends ServiceEntityRepository
     }
 
     /**
-     * Findet alle API-Keys eines Owners
+     * Findet alle API-Keys eines Owners.
      */
     public function findByOwner(int $ownerId): array
     {
@@ -44,27 +44,26 @@ class ApiKeyRepository extends ServiceEntityRepository
     }
 
     /**
-     * Speichert einen API-Key
+     * Speichert einen API-Key.
      */
     public function save(ApiKey $apiKey, bool $flush = true): void
     {
         $this->getEntityManager()->persist($apiKey);
-        
+
         if ($flush) {
             $this->getEntityManager()->flush();
         }
     }
 
     /**
-     * Löscht einen API-Key
+     * Löscht einen API-Key.
      */
     public function remove(ApiKey $apiKey, bool $flush = true): void
     {
         $this->getEntityManager()->remove($apiKey);
-        
+
         if ($flush) {
             $this->getEntityManager()->flush();
         }
     }
 }
-

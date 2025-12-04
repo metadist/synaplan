@@ -9,7 +9,7 @@ use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
- * Integration tests for ProfileController
+ * Integration tests for ProfileController.
  */
 class ProfileControllerTest extends WebTestCase
 {
@@ -22,7 +22,7 @@ class ProfileControllerTest extends WebTestCase
     {
         $this->client = static::createClient();
         $this->em = static::getContainer()->get('doctrine')->getManager();
-        
+
         // Create test user (local auth, not OAuth)
         $this->user = new User();
         $this->user->setMail('profiletest@example.com');
@@ -33,9 +33,9 @@ class ProfileControllerTest extends WebTestCase
         $this->user->setUserDetails([
             'firstName' => 'John',
             'lastName' => 'Doe',
-            'language' => 'en'
+            'language' => 'en',
         ]);
-        
+
         $this->em->persist($this->user);
         $this->em->flush();
 
@@ -50,7 +50,7 @@ class ProfileControllerTest extends WebTestCase
             $this->em->remove($this->user);
             $this->em->flush();
         }
-        
+
         static::ensureKernelShutdown();
         parent::tearDown();
     }
@@ -69,19 +69,19 @@ class ProfileControllerTest extends WebTestCase
             '/api/v1/profile',
             [],
             [],
-            ['HTTP_AUTHORIZATION' => 'Bearer ' . $this->token]
+            ['HTTP_AUTHORIZATION' => 'Bearer '.$this->token]
         );
 
         $this->assertResponseIsSuccessful();
-        
+
         $responseData = json_decode($this->client->getResponse()->getContent(), true);
-        
+
         $this->assertArrayHasKey('success', $responseData);
         $this->assertTrue($responseData['success']);
-        
+
         $this->assertArrayHasKey('profile', $responseData);
         $profile = $responseData['profile'];
-        
+
         $this->assertEquals('profiletest@example.com', $profile['email']);
         $this->assertEquals('John', $profile['firstName']);
         $this->assertEquals('Doe', $profile['lastName']);
@@ -110,28 +110,28 @@ class ProfileControllerTest extends WebTestCase
             [],
             [],
             [
-                'HTTP_AUTHORIZATION' => 'Bearer ' . $this->token,
-                'CONTENT_TYPE' => 'application/json'
+                'HTTP_AUTHORIZATION' => 'Bearer '.$this->token,
+                'CONTENT_TYPE' => 'application/json',
             ],
             json_encode([
                 'firstName' => 'Jane',
                 'lastName' => 'Smith',
                 'phone' => '+4915112345678',
-                'city' => 'Berlin'
+                'city' => 'Berlin',
             ])
         );
 
         $this->assertResponseIsSuccessful();
-        
+
         $responseData = json_decode($this->client->getResponse()->getContent(), true);
-        
+
         $this->assertArrayHasKey('success', $responseData);
         $this->assertTrue($responseData['success']);
-        
+
         // Verify changes were saved
         $this->em->refresh($this->user);
         $details = $this->user->getUserDetails();
-        
+
         $this->assertEquals('Jane', $details['firstName']);
         $this->assertEquals('Smith', $details['lastName']);
         $this->assertEquals('+4915112345678', $details['phone']);
@@ -146,8 +146,8 @@ class ProfileControllerTest extends WebTestCase
             [],
             [],
             [
-                'HTTP_AUTHORIZATION' => 'Bearer ' . $this->token,
-                'CONTENT_TYPE' => 'application/json'
+                'HTTP_AUTHORIZATION' => 'Bearer '.$this->token,
+                'CONTENT_TYPE' => 'application/json',
             ],
             'invalid json'
         );
@@ -165,7 +165,7 @@ class ProfileControllerTest extends WebTestCase
             ['CONTENT_TYPE' => 'application/json'],
             json_encode([
                 'currentPassword' => 'OldPass123!',
-                'newPassword' => 'NewPass456!'
+                'newPassword' => 'NewPass456!',
             ])
         );
 
@@ -180,19 +180,19 @@ class ProfileControllerTest extends WebTestCase
             [],
             [],
             [
-                'HTTP_AUTHORIZATION' => 'Bearer ' . $this->token,
-                'CONTENT_TYPE' => 'application/json'
+                'HTTP_AUTHORIZATION' => 'Bearer '.$this->token,
+                'CONTENT_TYPE' => 'application/json',
             ],
             json_encode([
                 'currentPassword' => 'OldPass123!',
-                'newPassword' => 'NewSecurePass456!'
+                'newPassword' => 'NewSecurePass456!',
             ])
         );
 
         $this->assertResponseIsSuccessful();
-        
+
         $responseData = json_decode($this->client->getResponse()->getContent(), true);
-        
+
         $this->assertArrayHasKey('success', $responseData);
         $this->assertTrue($responseData['success']);
     }
@@ -205,12 +205,12 @@ class ProfileControllerTest extends WebTestCase
             [],
             [],
             [
-                'HTTP_AUTHORIZATION' => 'Bearer ' . $this->token,
-                'CONTENT_TYPE' => 'application/json'
+                'HTTP_AUTHORIZATION' => 'Bearer '.$this->token,
+                'CONTENT_TYPE' => 'application/json',
             ],
             json_encode([
                 'currentPassword' => 'WrongPassword',
-                'newPassword' => 'NewPass456!'
+                'newPassword' => 'NewPass456!',
             ])
         );
 
@@ -225,12 +225,12 @@ class ProfileControllerTest extends WebTestCase
             [],
             [],
             [
-                'HTTP_AUTHORIZATION' => 'Bearer ' . $this->token,
-                'CONTENT_TYPE' => 'application/json'
+                'HTTP_AUTHORIZATION' => 'Bearer '.$this->token,
+                'CONTENT_TYPE' => 'application/json',
             ],
             json_encode([
                 'currentPassword' => 'OldPass123!',
-                'newPassword' => 'Short1'
+                'newPassword' => 'Short1',
             ])
         );
 
@@ -245,12 +245,12 @@ class ProfileControllerTest extends WebTestCase
             [],
             [],
             [
-                'HTTP_AUTHORIZATION' => 'Bearer ' . $this->token,
-                'CONTENT_TYPE' => 'application/json'
+                'HTTP_AUTHORIZATION' => 'Bearer '.$this->token,
+                'CONTENT_TYPE' => 'application/json',
             ],
             json_encode([
                 'currentPassword' => 'OldPass123!',
-                'newPassword' => 'alllowercase'
+                'newPassword' => 'alllowercase',
             ])
         );
 
@@ -265,11 +265,11 @@ class ProfileControllerTest extends WebTestCase
             [],
             [],
             [
-                'HTTP_AUTHORIZATION' => 'Bearer ' . $this->token,
-                'CONTENT_TYPE' => 'application/json'
+                'HTTP_AUTHORIZATION' => 'Bearer '.$this->token,
+                'CONTENT_TYPE' => 'application/json',
             ],
             json_encode([
-                'currentPassword' => 'OldPass123!'
+                'currentPassword' => 'OldPass123!',
                 // Missing newPassword
             ])
         );
@@ -277,4 +277,3 @@ class ProfileControllerTest extends WebTestCase
         $this->assertResponseStatusCodeSame(Response::HTTP_BAD_REQUEST);
     }
 }
-

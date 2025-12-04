@@ -13,8 +13,8 @@ use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\CurrentUser;
 
 /**
- * Transparent File Serving
- * 
+ * Transparent File Serving.
+ *
  * Handles /up/* URLs - serves files with auth check for private files
  */
 #[Route('/up')]
@@ -23,12 +23,13 @@ class FileServeController extends AbstractController
     public function __construct(
         private MessageRepository $messageRepository,
         private string $uploadDir,
-        private LoggerInterface $logger
-    ) {}
+        private LoggerInterface $logger,
+    ) {
+    }
 
     /**
-     * Serve file by path
-     * 
+     * Serve file by path.
+     *
      * GET /up/{path}
      * Examples:
      * - /up/1/2025/10/image.jpg
@@ -37,7 +38,7 @@ class FileServeController extends AbstractController
     #[Route('/{path}', name: 'serve_file', requirements: ['path' => '.+'], methods: ['GET'])]
     public function serve(
         string $path,
-        #[CurrentUser] ?User $user
+        #[CurrentUser] ?User $user,
     ): Response {
         // 1. Find message by file path WITH metadata (EAGER load)
         $message = $this->messageRepository->createQueryBuilder('m')
@@ -56,17 +57,17 @@ class FileServeController extends AbstractController
         $isPublicCheck = $message->isPublic();
         $isExpiredCheck = $message->isShareExpired();
         $isPublicAndValid = $isPublicCheck && !$isExpiredCheck;
-        
+
         $this->logger->info('FileServeController: Access check', [
             'path' => $path,
             'message_id' => $message->getId(),
             'is_public' => $isPublicCheck,
             'is_expired' => $isExpiredCheck,
             'is_public_and_valid' => $isPublicAndValid,
-            'has_user' => $user !== null,
+            'has_user' => null !== $user,
             'user_id' => $user?->getId(),
             'owner_id' => $message->getUserId(),
-            'metadata_count' => $message->getMetadata()->count()
+            'metadata_count' => $message->getMetadata()->count(),
         ]);
 
         // 3. Permission check: Public files OR authenticated owner
@@ -76,10 +77,11 @@ class FileServeController extends AbstractController
                 $this->logger->warning('Unauthorized file access attempt', [
                     'path' => $path,
                     'is_public' => $message->isPublic(),
-                    'ip' => $_SERVER['REMOTE_ADDR'] ?? 'unknown'
+                    'ip' => $_SERVER['REMOTE_ADDR'] ?? 'unknown',
                 ]);
+
                 return $this->json([
-                    'error' => 'Authentication required'
+                    'error' => 'Authentication required',
                 ], Response::HTTP_UNAUTHORIZED);
             }
 
@@ -89,10 +91,11 @@ class FileServeController extends AbstractController
                     'path' => $path,
                     'user_id' => $user->getId(),
                     'owner_id' => $message->getUserId(),
-                    'is_public' => $message->isPublic()
+                    'is_public' => $message->isPublic(),
                 ]);
+
                 return $this->json([
-                    'error' => 'Access denied'
+                    'error' => 'Access denied',
                 ], Response::HTTP_FORBIDDEN);
             }
         }
@@ -100,25 +103,26 @@ class FileServeController extends AbstractController
         // 4. Additional check for expired public shares (redundant but explicit)
         if ($message->isPublic() && $message->isShareExpired()) {
             $this->logger->info('Expired share link accessed', ['path' => $path]);
+
             return $this->json([
-                'error' => 'Share link has expired'
+                'error' => 'Share link has expired',
             ], Response::HTTP_GONE);
         }
 
         // 4. Build absolute path with path traversal protection
-        $absolutePath = $this->uploadDir . '/' . $path;
-        
+        $absolutePath = $this->uploadDir.'/'.$path;
+
         // Resolve to real path (prevents symlink attacks)
         $realPath = realpath($absolutePath);
         $realUploadDir = realpath($this->uploadDir);
-        
+
         // Security: Ensure file is within upload directory (no path traversal)
-        if (!$realPath || !$realUploadDir || strpos($realPath, $realUploadDir) !== 0) {
+        if (!$realPath || !$realUploadDir || 0 !== strpos($realPath, $realUploadDir)) {
             $this->logger->error('Path traversal attempt detected', [
                 'path' => $path,
                 'absolute_path' => $absolutePath,
                 'real_path' => $realPath,
-                'upload_dir' => $realUploadDir
+                'upload_dir' => $realUploadDir,
             ]);
             throw $this->createNotFoundException('Invalid file path');
         }
@@ -126,7 +130,7 @@ class FileServeController extends AbstractController
         if (!file_exists($realPath)) {
             $this->logger->error('File not found on disk', [
                 'path' => $path,
-                'real_path' => $realPath
+                'real_path' => $realPath,
             ]);
             throw $this->createNotFoundException('File not found on disk');
         }
@@ -146,7 +150,7 @@ class FileServeController extends AbstractController
 
         $response = new BinaryFileResponse($realPath);
         $response->setContentDisposition($disposition, $filename);
-        
+
         // Set explicit MIME type based on extension
         $mimeType = $this->getMimeType($extension);
         if ($mimeType) {
@@ -174,18 +178,18 @@ class FileServeController extends AbstractController
             'path' => $path,
             'user_id' => $user?->getId(),
             'is_public' => $message->isPublic(),
-            'disposition' => $disposition
+            'disposition' => $disposition,
         ]);
 
         return $response;
     }
-    
+
     /**
-     * Get MIME type for file extension
+     * Get MIME type for file extension.
      */
     private function getMimeType(string $extension): ?string
     {
-        return match(strtolower($extension)) {
+        return match (strtolower($extension)) {
             // Images
             'jpg', 'jpeg' => 'image/jpeg',
             'png' => 'image/png',
@@ -218,8 +222,7 @@ class FileServeController extends AbstractController
             '7z' => 'application/x-7z-compressed',
             'tar' => 'application/x-tar',
             'gz' => 'application/gzip',
-            default => null
+            default => null,
         };
     }
 }
-

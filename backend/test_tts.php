@@ -1,9 +1,10 @@
 <?php
-require __DIR__ . '/vendor/autoload.php';
+
+require __DIR__.'/vendor/autoload.php';
 
 use App\AI\Provider\GoogleProvider;
-use Symfony\Component\HttpClient\HttpClient;
 use Psr\Log\NullLogger;
+use Symfony\Component\HttpClient\HttpClient;
 
 $logger = new NullLogger();
 $httpClient = HttpClient::create();
@@ -22,9 +23,9 @@ $provider = new GoogleProvider(
 );
 
 try {
-    $filename = $provider->synthesize('Diagnose Gemini audio output at ' . date('c'));
+    $filename = $provider->synthesize('Diagnose Gemini audio output at '.date('c'));
     echo "Generated file: $filename\n";
 } catch (Throwable $e) {
-    fwrite(STDERR, 'Error: ' . $e->getMessage() . "\n");
+    fwrite(STDERR, 'Error: '.$e->getMessage()."\n");
     exit(1);
 }

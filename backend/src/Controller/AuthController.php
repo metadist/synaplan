@@ -12,6 +12,7 @@ use App\Service\InternalEmailService;
 use App\Service\RecaptchaService;
 use Doctrine\ORM\EntityManagerInterface;
 use Lexik\Bundle\JWTAuthenticationBundle\Services\JWTTokenManagerInterface;
+use OpenApi\Attributes as OA;
 use Psr\Log\LoggerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -22,7 +23,6 @@ use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\CurrentUser;
 use Symfony\Component\Validator\Validator\ValidatorInterface;
-use OpenApi\Attributes as OA;
 
 #[Route('/api/v1/auth', name: 'api_auth_')]
 #[OA\Tag(name: 'Authentication')]
@@ -41,7 +41,7 @@ class AuthController extends AbstractController
         private InternalEmailService $internalEmailService,
         private RecaptchaService $recaptchaService,
         private ValidatorInterface $validator,
-        private LoggerInterface $logger
+        private LoggerInterface $logger,
     ) {
         $this->resendCooldownMinutes = (int) ($_ENV['EMAIL_VERIFICATION_COOLDOWN_MINUTES'] ?? 2);
         $this->maxResendAttempts = (int) ($_ENV['EMAIL_VERIFICATION_MAX_ATTEMPTS'] ?? 5);
@@ -60,7 +60,7 @@ class AuthController extends AbstractController
             required: ['email', 'password'],
             properties: [
                 new OA\Property(property: 'email', type: 'string', format: 'email', example: 'user@example.com'),
-                new OA\Property(property: 'password', type: 'string', format: 'password', example: 'SecurePass123!')
+                new OA\Property(property: 'password', type: 'string', format: 'password', example: 'SecurePass123!'),
             ]
         )
     )]
@@ -70,7 +70,7 @@ class AuthController extends AbstractController
         content: new OA\JsonContent(
             properties: [
                 new OA\Property(property: 'message', type: 'string', example: 'User registered successfully'),
-                new OA\Property(property: 'user_id', type: 'integer', example: 123)
+                new OA\Property(property: 'user_id', type: 'integer', example: 123),
             ]
         )
     )]
@@ -78,31 +78,31 @@ class AuthController extends AbstractController
     #[OA\Response(response: 400, description: 'Validation error')]
     public function register(
         #[MapRequestPayload] RegisterRequest $dto,
-        Request $request
+        Request $request,
     ): JsonResponse {
         // Verify reCAPTCHA
         $recaptchaToken = $request->request->get('recaptchaToken') ?? $request->toArray()['recaptchaToken'] ?? '';
         if (!$this->recaptchaService->verify($recaptchaToken, 'register', $request->getClientIp())) {
             return $this->json([
-                'error' => 'reCAPTCHA verification failed. Please try again.'
+                'error' => 'reCAPTCHA verification failed. Please try again.',
             ], Response::HTTP_BAD_REQUEST);
         }
 
         // Check if user exists
         $existingUser = $this->userRepository->findOneBy(['mail' => $dto->email]);
-        
+
         if ($existingUser) {
             // Security: Don't reveal that email is already registered
             // Log attempt but return generic success message
             $this->logger->warning('Registration attempt with existing email', [
                 'email' => $dto->email,
-                'ip' => $request->getClientIp()
+                'ip' => $request->getClientIp(),
             ]);
-            
+
             // Return generic success message (same as for new registrations)
             return $this->json([
                 'success' => true,
-                'message' => 'If this email is not already registered, you will receive a verification email shortly.'
+                'message' => 'If this email is not already registered, you will receive a verification email shortly.',
             ], Response::HTTP_OK);
         }
 
@@ -125,14 +125,14 @@ class AuthController extends AbstractController
         // Send verification email with user's preferred language
         try {
             $this->internalEmailService->sendVerificationEmail(
-                $user->getMail(), 
+                $user->getMail(),
                 $token->getToken(),
                 $user->getLocale()
             );
         } catch (\Exception $e) {
             $this->logger->error('Failed to send verification email', [
                 'user_id' => $user->getId(),
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ]);
         }
 
@@ -140,7 +140,7 @@ class AuthController extends AbstractController
 
         return $this->json([
             'success' => true,
-            'message' => 'If this email is not already registered, you will receive a verification email shortly.'
+            'message' => 'If this email is not already registered, you will receive a verification email shortly.',
         ], Response::HTTP_OK);
     }
 
@@ -158,7 +158,7 @@ class AuthController extends AbstractController
             properties: [
                 new OA\Property(property: 'email', type: 'string', format: 'email', example: 'user@example.com'),
                 new OA\Property(property: 'password', type: 'string', format: 'password', example: 'SecurePass123!'),
-                new OA\Property(property: 'recaptchaToken', type: 'string', description: 'Google reCAPTCHA v3 token (required in production)', example: '03AGdBq27...')
+                new OA\Property(property: 'recaptchaToken', type: 'string', description: 'Google reCAPTCHA v3 token (required in production)', example: '03AGdBq27...'),
             ]
         )
     )]
@@ -171,8 +171,8 @@ class AuthController extends AbstractController
                 new OA\Property(property: 'user', type: 'object', properties: [
                     new OA\Property(property: 'id', type: 'integer', example: 123),
                     new OA\Property(property: 'email', type: 'string', example: 'user@example.com'),
-                    new OA\Property(property: 'email_verified', type: 'boolean', example: true)
-                ])
+                    new OA\Property(property: 'email_verified', type: 'boolean', example: true),
+                ]),
             ]
         )
     )]
@@ -188,7 +188,7 @@ class AuthController extends AbstractController
         // Verify reCAPTCHA
         if (!$this->recaptchaService->verify($recaptchaToken, 'login', $request->getClientIp())) {
             return $this->json([
-                'error' => 'reCAPTCHA verification failed. Please try again.'
+                'error' => 'reCAPTCHA verification failed. Please try again.',
             ], Response::HTTP_BAD_REQUEST);
         }
 
@@ -200,6 +200,7 @@ class AuthController extends AbstractController
 
         if (!$user || !$this->passwordHasher->isPasswordValid($user, $password)) {
             usleep(100000); // Timing attack prevention
+
             return $this->json(['error' => 'Invalid credentials'], Response::HTTP_UNAUTHORIZED);
         }
 
@@ -207,21 +208,22 @@ class AuthController extends AbstractController
         if ($user->isExternalAuth()) {
             $this->logger->warning('Login attempt with password for external auth user', [
                 'email' => $email,
-                'auth_provider' => $user->getAuthProviderName()
+                'auth_provider' => $user->getAuthProviderName(),
             ]);
+
             return $this->json([
-                'error' => sprintf('This account uses %s for authentication. Please use the "%s" button to sign in.', 
+                'error' => sprintf('This account uses %s for authentication. Please use the "%s" button to sign in.',
                     $user->getAuthProviderName(),
                     $user->getAuthProviderName()
-                )
+                ),
             ], Response::HTTP_FORBIDDEN);
         }
 
         // Check if user is an OAuth user (no password set)
-        if ($user->getPw() === null) {
+        if (null === $user->getPw()) {
             return $this->json([
                 'error' => 'OAuth account',
-                'message' => 'This account uses social login. Please use Google, GitHub, or Keycloak to sign in.'
+                'message' => 'This account uses social login. Please use Google, GitHub, or Keycloak to sign in.',
             ], Response::HTTP_UNAUTHORIZED);
         }
 
@@ -229,7 +231,7 @@ class AuthController extends AbstractController
         if (!$user->isEmailVerified()) {
             return $this->json([
                 'error' => 'Email not verified',
-                'message' => 'Please verify your email before logging in'
+                'message' => 'Please verify your email before logging in',
             ], Response::HTTP_FORBIDDEN);
         }
 
@@ -246,7 +248,7 @@ class AuthController extends AbstractController
                 'level' => $user->getUserLevel(),
                 'emailVerified' => $user->isEmailVerified(),
                 'isAdmin' => $user->isAdmin(),
-            ]
+            ],
         ]);
     }
 
@@ -274,13 +276,13 @@ class AuthController extends AbstractController
         // Send welcome email with user's preferred language
         try {
             $details = $user->getUserDetails();
-            $userName = trim(($details['first_name'] ?? '') . ' ' . ($details['last_name'] ?? ''));
+            $userName = trim(($details['first_name'] ?? '').' '.($details['last_name'] ?? ''));
             if (empty($userName)) {
                 $userName = $user->getMail();
             }
-            
+
             $this->internalEmailService->sendWelcomeEmail(
-                $user->getMail(), 
+                $user->getMail(),
                 $userName,
                 $user->getLocale()
             );
@@ -292,7 +294,7 @@ class AuthController extends AbstractController
 
         return $this->json([
             'success' => true,
-            'message' => 'Email verified successfully'
+            'message' => 'Email verified successfully',
         ]);
     }
 
@@ -312,7 +314,7 @@ class AuthController extends AbstractController
             // Don't reveal if user exists
             return $this->json([
                 'success' => true,
-                'message' => 'If email exists, reset instructions sent'
+                'message' => 'If email exists, reset instructions sent',
             ]);
         }
 
@@ -321,7 +323,7 @@ class AuthController extends AbstractController
             // Don't reveal user exists or auth method - just return success
             return $this->json([
                 'success' => true,
-                'message' => 'If email exists, reset instructions sent'
+                'message' => 'If email exists, reset instructions sent',
             ]);
         }
 
@@ -330,7 +332,7 @@ class AuthController extends AbstractController
 
         try {
             $this->internalEmailService->sendPasswordResetEmail(
-                $user->getMail(), 
+                $user->getMail(),
                 $token->getToken(),
                 $user->getLocale()
             );
@@ -342,7 +344,7 @@ class AuthController extends AbstractController
 
         return $this->json([
             'success' => true,
-            'message' => 'If email exists, reset instructions sent'
+            'message' => 'If email exists, reset instructions sent',
         ]);
     }
 
@@ -369,15 +371,16 @@ class AuthController extends AbstractController
         }
 
         $user = $token->getUser();
-        
+
         // Block password reset for external auth users
         if (!$user->canChangePassword()) {
             $provider = $user->getAuthProviderName();
+
             return $this->json([
-                'error' => "This account is managed by {$provider}. Please use {$provider} to manage your password."
+                'error' => "This account is managed by {$provider}. Please use {$provider} to manage your password.",
             ], Response::HTTP_FORBIDDEN);
         }
-        
+
         $user->setPw($this->passwordHasher->hashPassword($user, $newPassword));
         $this->tokenRepository->markAsUsed($token);
         $this->em->flush();
@@ -386,7 +389,7 @@ class AuthController extends AbstractController
 
         return $this->json([
             'success' => true,
-            'message' => 'Password reset successfully'
+            'message' => 'Password reset successfully',
         ]);
     }
 
@@ -402,7 +405,7 @@ class AuthController extends AbstractController
 
         // ALWAYS check rate limiting first (prevent spam with any email)
         $attempt = $this->attemptRepository->findByEmail($email);
-        
+
         if (!$attempt) {
             // First attempt - create tracking
             $attempt = new EmailVerificationAttempt();
@@ -413,31 +416,31 @@ class AuthController extends AbstractController
             // Check if can resend (applies to ALL requests, not just valid users)
             if (!$attempt->canResend($this->resendCooldownMinutes, $this->maxResendAttempts)) {
                 $remainingAttempts = $attempt->getRemainingAttempts($this->maxResendAttempts);
-                
+
                 if ($remainingAttempts <= 0) {
                     $this->logger->warning('Max resend attempts reached', [
                         'email' => $email,
-                        'ip' => $request->getClientIp()
+                        'ip' => $request->getClientIp(),
                     ]);
-                    
+
                     return $this->json([
                         'error' => 'Maximum verification attempts reached',
                         'message' => 'You have reached the maximum number of verification email requests. Please contact support if you need assistance.',
-                        'maxAttemptsReached' => true
+                        'maxAttemptsReached' => true,
                     ], Response::HTTP_TOO_MANY_REQUESTS);
                 }
-                
+
                 $nextAvailable = $attempt->getNextAvailableAt($this->resendCooldownMinutes);
                 $waitSeconds = $nextAvailable->getTimestamp() - (new \DateTime())->getTimestamp();
-                
+
                 return $this->json([
                     'error' => 'Please wait before requesting another verification email',
                     'waitSeconds' => max(0, $waitSeconds),
                     'remainingAttempts' => $remainingAttempts,
-                    'nextAvailableAt' => $nextAvailable->format('c')
+                    'nextAvailableAt' => $nextAvailable->format('c'),
                 ], Response::HTTP_TOO_MANY_REQUESTS);
             }
-            
+
             // Increment attempts
             $attempt->incrementAttempts();
         }
@@ -453,16 +456,16 @@ class AuthController extends AbstractController
             } catch (\Exception $e) {
                 $this->logger->error('Failed to save rate limit attempt', ['error' => $e->getMessage()]);
             }
-            
+
             $this->logger->info('Resend verification requested for non-existent or verified user', [
                 'email' => $email,
-                'ip' => $request->getClientIp()
+                'ip' => $request->getClientIp(),
             ]);
-            
+
             // Security: Don't reveal if user exists or is verified
             return $this->json([
                 'success' => true,
-                'message' => 'If your email is registered and unverified, you will receive a verification email.'
+                'message' => 'If your email is registered and unverified, you will receive a verification email.',
             ]);
         }
 
@@ -470,35 +473,35 @@ class AuthController extends AbstractController
         try {
             $token = $this->tokenRepository->createToken($user, 'email_verification', 86400);
             $this->internalEmailService->sendVerificationEmail(
-                $user->getMail(), 
+                $user->getMail(),
                 $token->getToken(),
                 $user->getLocale()
             );
-            
+
             // Only flush after successful email send
             $this->em->flush();
-            
+
             $this->logger->info('Verification email sent successfully', [
                 'user_id' => $user->getId(),
-                'attempt' => $attempt->getAttempts()
+                'attempt' => $attempt->getAttempts(),
             ]);
-            
+
             return $this->json([
                 'success' => true,
                 'message' => 'Verification email sent successfully',
                 'remainingAttempts' => $attempt->getRemainingAttempts($this->maxResendAttempts),
-                'cooldownMinutes' => $this->resendCooldownMinutes
+                'cooldownMinutes' => $this->resendCooldownMinutes,
             ]);
         } catch (\Exception $e) {
             $this->logger->error('Failed to send verification email', [
                 'user_id' => $user->getId(),
                 'email' => $email,
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ]);
-            
+
             return $this->json([
                 'error' => 'Technical error',
-                'message' => 'An error occurred while sending the verification email. Please try again later.'
+                'message' => 'An error occurred while sending the verification email. Please try again later.',
             ], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
@@ -519,7 +522,7 @@ class AuthController extends AbstractController
                 'emailVerified' => $user->isEmailVerified(),
                 'created' => $user->getCreated(),
                 'isAdmin' => $user->isAdmin(),
-            ]
+            ],
         ]);
     }
 

@@ -4,14 +4,14 @@ declare(strict_types=1);
 
 namespace App\Tests\Controller;
 
-use App\Entity\User;
 use App\Entity\Message;
+use App\Entity\User;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
  * Integration tests for MessageController
- * Tests all message-related endpoints
+ * Tests all message-related endpoints.
  */
 class MessageControllerTest extends WebTestCase
 {
@@ -88,6 +88,7 @@ class MessageControllerTest extends WebTestCase
     private function generateJwtToken(User $user): string
     {
         $jwtManager = $this->client->getContainer()->get('lexik_jwt_authentication.jwt_manager');
+
         return $jwtManager->create($user);
     }
 
@@ -114,13 +115,13 @@ class MessageControllerTest extends WebTestCase
             [],
             [
                 'CONTENT_TYPE' => 'application/json',
-                'HTTP_AUTHORIZATION' => 'Bearer ' . $this->token
+                'HTTP_AUTHORIZATION' => 'Bearer '.$this->token,
             ],
             json_encode(['message' => ''])
         );
 
         $this->assertResponseStatusCodeSame(Response::HTTP_BAD_REQUEST);
-        
+
         $response = json_decode($this->client->getResponse()->getContent(), true);
         $this->assertArrayHasKey('error', $response);
         $this->assertEquals('Message is required', $response['error']);
@@ -135,16 +136,16 @@ class MessageControllerTest extends WebTestCase
             [],
             [
                 'CONTENT_TYPE' => 'application/json',
-                'HTTP_AUTHORIZATION' => 'Bearer ' . $this->token
+                'HTTP_AUTHORIZATION' => 'Bearer '.$this->token,
             ],
             json_encode([
                 'message' => 'Hello, AI!',
-                'trackId' => time()
+                'trackId' => time(),
             ])
         );
 
         $this->assertResponseIsSuccessful();
-        
+
         $response = json_decode($this->client->getResponse()->getContent(), true);
         $this->assertArrayHasKey('success', $response);
         $this->assertTrue($response['success']);
@@ -163,7 +164,7 @@ class MessageControllerTest extends WebTestCase
     public function testGetHistorySuccess(): void
     {
         // Create some test messages
-        for ($i = 0; $i < 5; $i++) {
+        for ($i = 0; $i < 5; ++$i) {
             $message = new Message();
             $message->setUserId($this->user->getId());
             $message->setTrackingId(time() + $i);
@@ -174,10 +175,10 @@ class MessageControllerTest extends WebTestCase
             $message->setFile(0);
             $message->setTopic('CHAT');
             $message->setLanguage('en');
-            $message->setText('Test message ' . $i);
-            $message->setDirection($i % 2 === 0 ? 'IN' : 'OUT');
+            $message->setText('Test message '.$i);
+            $message->setDirection(0 === $i % 2 ? 'IN' : 'OUT');
             $message->setStatus('complete');
-            
+
             $this->em->persist($message);
         }
         $this->em->flush();
@@ -189,7 +190,7 @@ class MessageControllerTest extends WebTestCase
             [],
             [
                 'CONTENT_TYPE' => 'application/json',
-                'HTTP_AUTHORIZATION' => 'Bearer ' . $this->token
+                'HTTP_AUTHORIZATION' => 'Bearer '.$this->token,
             ]
         );
 
@@ -214,7 +215,7 @@ class MessageControllerTest extends WebTestCase
     public function testGetHistoryWithTrackId(): void
     {
         $trackId = time() + 1000;
-        
+
         // Create messages with specific trackId
         $message1 = new Message();
         $message1->setUserId($this->user->getId());
@@ -229,7 +230,7 @@ class MessageControllerTest extends WebTestCase
         $message1->setText('Message with trackId');
         $message1->setDirection('IN');
         $message1->setStatus('complete');
-        
+
         $this->em->persist($message1);
         $this->em->flush();
 
@@ -240,7 +241,7 @@ class MessageControllerTest extends WebTestCase
             [],
             [
                 'CONTENT_TYPE' => 'application/json',
-                'HTTP_AUTHORIZATION' => 'Bearer ' . $this->token
+                'HTTP_AUTHORIZATION' => 'Bearer '.$this->token,
             ]
         );
 
@@ -280,7 +281,7 @@ class MessageControllerTest extends WebTestCase
             [],
             [
                 'CONTENT_TYPE' => 'application/json',
-                'HTTP_AUTHORIZATION' => 'Bearer ' . $this->token
+                'HTTP_AUTHORIZATION' => 'Bearer '.$this->token,
             ],
             json_encode(['text' => ''])
         );
@@ -297,11 +298,11 @@ class MessageControllerTest extends WebTestCase
             [],
             [
                 'CONTENT_TYPE' => 'application/json',
-                'HTTP_AUTHORIZATION' => 'Bearer ' . $this->token
+                'HTTP_AUTHORIZATION' => 'Bearer '.$this->token,
             ],
             json_encode([
                 'text' => 'make this better',
-                'mode' => 'improve'
+                'mode' => 'improve',
             ])
         );
 
@@ -310,7 +311,7 @@ class MessageControllerTest extends WebTestCase
         $this->assertContains($statusCode, [
             Response::HTTP_OK,
             Response::HTTP_SERVICE_UNAVAILABLE,
-            Response::HTTP_INTERNAL_SERVER_ERROR
+            Response::HTTP_INTERNAL_SERVER_ERROR,
         ]);
     }
 
@@ -337,7 +338,7 @@ class MessageControllerTest extends WebTestCase
             [],
             [
                 'CONTENT_TYPE' => 'application/json',
-                'HTTP_AUTHORIZATION' => 'Bearer ' . $this->token
+                'HTTP_AUTHORIZATION' => 'Bearer '.$this->token,
             ],
             json_encode([])
         );
@@ -370,7 +371,7 @@ class MessageControllerTest extends WebTestCase
             [],
             [
                 'CONTENT_TYPE' => 'application/json',
-                'HTTP_AUTHORIZATION' => 'Bearer ' . $this->token
+                'HTTP_AUTHORIZATION' => 'Bearer '.$this->token,
             ],
             json_encode(['message' => ''])
         );
@@ -387,11 +388,11 @@ class MessageControllerTest extends WebTestCase
             [],
             [
                 'CONTENT_TYPE' => 'application/json',
-                'HTTP_AUTHORIZATION' => 'Bearer ' . $this->token
+                'HTTP_AUTHORIZATION' => 'Bearer '.$this->token,
             ],
             json_encode([
                 'message' => 'Async message',
-                'trackId' => time()
+                'trackId' => time(),
             ])
         );
 

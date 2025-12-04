@@ -4,6 +4,7 @@ namespace App\Controller;
 
 use App\Entity\User;
 use Doctrine\ORM\EntityManagerInterface;
+use OpenApi\Attributes as OA;
 use Psr\Log\LoggerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -11,11 +12,10 @@ use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\CurrentUser;
-use OpenApi\Attributes as OA;
 
 /**
  * Subscription Management Controller
- * Handles subscription plans and Stripe checkout
+ * Handles subscription plans and Stripe checkout.
  */
 #[Route('/api/v1/subscription')]
 #[OA\Tag(name: 'Subscription')]
@@ -28,22 +28,23 @@ class SubscriptionController extends AbstractController
         private string $stripePricePro,
         private string $stripePriceTeam,
         private string $stripePriceBusiness,
-        private string $frontendUrl
-    ) {}
-
-    /**
-     * Check if Stripe is properly configured
-     */
-    private function isStripeConfigured(): bool
-    {
-        return !empty($this->stripeSecretKey) 
-            && $this->stripeSecretKey !== 'your_stripe_secret_key_here'
-            && !empty($this->stripePricePro)
-            && $this->stripePricePro !== 'price_xxx';
+        private string $frontendUrl,
+    ) {
     }
 
     /**
-     * Get available subscription plans
+     * Check if Stripe is properly configured.
+     */
+    private function isStripeConfigured(): bool
+    {
+        return !empty($this->stripeSecretKey)
+            && 'your_stripe_secret_key_here' !== $this->stripeSecretKey
+            && !empty($this->stripePricePro)
+            && 'price_xxx' !== $this->stripePricePro;
+    }
+
+    /**
+     * Get available subscription plans.
      */
     #[Route('/plans', name: 'subscription_plans', methods: ['GET'])]
     #[OA\Get(
@@ -84,7 +85,7 @@ class SubscriptionController extends AbstractController
                     'Advanced AI Models',
                     'Priority Support',
                     '10GB Storage',
-                ]
+                ],
             ],
             [
                 'id' => 'TEAM',
@@ -100,7 +101,7 @@ class SubscriptionController extends AbstractController
                     'Custom Prompts',
                     '50GB Storage',
                     'API Access',
-                ]
+                ],
             ],
             [
                 'id' => 'BUSINESS',
@@ -117,18 +118,18 @@ class SubscriptionController extends AbstractController
                     '200GB Storage',
                     'Dedicated Support',
                     'SLA Guarantee',
-                ]
+                ],
             ],
         ];
 
         return $this->json([
             'plans' => $plans,
-            'stripeConfigured' => $this->isStripeConfigured()
+            'stripeConfigured' => $this->isStripeConfigured(),
         ]);
     }
 
     /**
-     * Create Stripe checkout session
+     * Create Stripe checkout session.
      */
     #[Route('/checkout', name: 'subscription_checkout', methods: ['POST'])]
     #[OA\Post(
@@ -142,7 +143,7 @@ class SubscriptionController extends AbstractController
         content: new OA\JsonContent(
             required: ['planId'],
             properties: [
-                new OA\Property(property: 'planId', type: 'string', enum: ['PRO', 'TEAM', 'BUSINESS'])
+                new OA\Property(property: 'planId', type: 'string', enum: ['PRO', 'TEAM', 'BUSINESS']),
             ]
         )
     )]
@@ -160,7 +161,7 @@ class SubscriptionController extends AbstractController
     #[OA\Response(response: 503, description: 'Stripe not configured')]
     public function createCheckoutSession(
         Request $request,
-        #[CurrentUser] ?User $user
+        #[CurrentUser] ?User $user,
     ): JsonResponse {
         if (!$user) {
             return $this->json(['error' => 'Authentication required'], Response::HTTP_UNAUTHORIZED);
@@ -169,20 +170,21 @@ class SubscriptionController extends AbstractController
         // Check if Stripe is configured
         if (!$this->isStripeConfigured()) {
             $this->logger->warning('Stripe checkout attempted but Stripe is not configured');
+
             return $this->json([
                 'error' => 'Subscription service is currently unavailable. Please contact support.',
-                'code' => 'STRIPE_NOT_CONFIGURED'
+                'code' => 'STRIPE_NOT_CONFIGURED',
             ], Response::HTTP_SERVICE_UNAVAILABLE);
         }
 
         $data = json_decode($request->getContent(), true);
         $planId = $data['planId'] ?? null;
 
-        $priceId = match($planId) {
+        $priceId = match ($planId) {
             'PRO' => $this->stripePricePro,
             'TEAM' => $this->stripePriceTeam,
             'BUSINESS' => $this->stripePriceBusiness,
-            default => null
+            default => null,
         };
 
         if (!$priceId) {
@@ -204,9 +206,9 @@ class SubscriptionController extends AbstractController
                     'quantity' => 1,
                 ]],
                 'mode' => 'subscription',
-                'success_url' => $this->frontendUrl . '/subscription/success?session_id={CHECKOUT_SESSION_ID}',
-                'cancel_url' => $this->frontendUrl . '/subscription/cancel',
-                'client_reference_id' => (string)$user->getId(),
+                'success_url' => $this->frontendUrl.'/subscription/success?session_id={CHECKOUT_SESSION_ID}',
+                'cancel_url' => $this->frontendUrl.'/subscription/cancel',
+                'client_reference_id' => (string) $user->getId(),
                 'metadata' => [
                     'user_id' => $user->getId(),
                     'plan' => $planId,
@@ -216,7 +218,7 @@ class SubscriptionController extends AbstractController
             $this->logger->info('Stripe checkout session created', [
                 'user_id' => $user->getId(),
                 'session_id' => $session->id,
-                'plan' => $planId
+                'plan' => $planId,
             ]);
 
             return $this->json([
@@ -226,14 +228,15 @@ class SubscriptionController extends AbstractController
         } catch (\Exception $e) {
             $this->logger->error('Failed to create checkout session', [
                 'user_id' => $user->getId(),
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ]);
+
             return $this->json(['error' => 'Failed to create checkout session'], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
 
     /**
-     * Get current subscription status
+     * Get current subscription status.
      */
     #[Route('/status', name: 'subscription_status', methods: ['GET'])]
     #[OA\Get(
@@ -256,7 +259,7 @@ class SubscriptionController extends AbstractController
         )
     )]
     public function getSubscriptionStatus(
-        #[CurrentUser] ?User $user
+        #[CurrentUser] ?User $user,
     ): JsonResponse {
         if (!$user) {
             return $this->json(['error' => 'Authentication required'], Response::HTTP_UNAUTHORIZED);
@@ -283,7 +286,7 @@ class SubscriptionController extends AbstractController
     }
 
     /**
-     * Create Stripe Customer Portal session
+     * Create Stripe Customer Portal session.
      */
     #[Route('/portal', name: 'subscription_portal', methods: ['POST'])]
     #[OA\Post(
@@ -302,7 +305,7 @@ class SubscriptionController extends AbstractController
         )
     )]
     public function createPortalSession(
-        #[CurrentUser] ?User $user
+        #[CurrentUser] ?User $user,
     ): JsonResponse {
         if (!$user) {
             return $this->json(['error' => 'Authentication required'], Response::HTTP_UNAUTHORIZED);
@@ -311,7 +314,7 @@ class SubscriptionController extends AbstractController
         if (!$this->isStripeConfigured()) {
             return $this->json([
                 'error' => 'Subscription service is currently unavailable.',
-                'code' => 'STRIPE_NOT_CONFIGURED'
+                'code' => 'STRIPE_NOT_CONFIGURED',
             ], Response::HTTP_SERVICE_UNAVAILABLE);
         }
 
@@ -328,12 +331,12 @@ class SubscriptionController extends AbstractController
             // Create portal session
             $session = \Stripe\BillingPortal\Session::create([
                 'customer' => $customerId,
-                'return_url' => $this->frontendUrl . '/subscription',
+                'return_url' => $this->frontendUrl.'/subscription',
             ]);
 
             $this->logger->info('Stripe portal session created', [
                 'user_id' => $user->getId(),
-                'session_id' => $session->id
+                'session_id' => $session->id,
             ]);
 
             return $this->json([
@@ -342,14 +345,15 @@ class SubscriptionController extends AbstractController
         } catch (\Exception $e) {
             $this->logger->error('Failed to create portal session', [
                 'user_id' => $user->getId(),
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ]);
+
             return $this->json(['error' => 'Failed to create portal session'], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
 
     /**
-     * Get or create Stripe customer for user
+     * Get or create Stripe customer for user.
      */
     private function getOrCreateStripeCustomer(User $user): string
     {
@@ -380,18 +384,20 @@ class SubscriptionController extends AbstractController
     private function handleSubscriptionCreated($subscription): void
     {
         $user = $this->getUserByStripeCustomer($subscription->customer);
-        if (!$user) return;
+        if (!$user) {
+            return;
+        }
 
         $priceId = $subscription->items->data[0]->price->id ?? null;
-        $userLevel = match($priceId) {
+        $userLevel = match ($priceId) {
             $this->stripePricePro => 'PRO',
             $this->stripePriceTeam => 'TEAM',
             $this->stripePriceBusiness => 'BUSINESS',
-            default => 'NEW'
+            default => 'NEW',
         };
 
         $user->setUserLevel($userLevel);
-        
+
         $paymentDetails = $user->getPaymentDetails();
         $paymentDetails['subscription'] = [
             'stripe_subscription_id' => $subscription->id,
@@ -401,34 +407,38 @@ class SubscriptionController extends AbstractController
             'plan' => $userLevel,
         ];
         $user->setPaymentDetails($paymentDetails);
-        
+
         $this->em->flush();
     }
 
     private function handleSubscriptionUpdated($subscription): void
     {
         $user = $this->getUserByStripeCustomer($subscription->customer);
-        if (!$user) return;
+        if (!$user) {
+            return;
+        }
 
         $paymentDetails = $user->getPaymentDetails();
         $paymentDetails['subscription']['status'] = $subscription->status;
         $paymentDetails['subscription']['subscription_end'] = $subscription->current_period_end;
         $user->setPaymentDetails($paymentDetails);
-        
+
         $this->em->flush();
     }
 
     private function handleSubscriptionDeleted($subscription): void
     {
         $user = $this->getUserByStripeCustomer($subscription->customer);
-        if (!$user) return;
+        if (!$user) {
+            return;
+        }
 
         $user->setUserLevel('NEW');
-        
+
         $paymentDetails = $user->getPaymentDetails();
         $paymentDetails['subscription']['status'] = 'canceled';
         $user->setPaymentDetails($paymentDetails);
-        
+
         $this->em->flush();
     }
 
@@ -436,18 +446,20 @@ class SubscriptionController extends AbstractController
     {
         $this->logger->info('Payment succeeded', [
             'invoice_id' => $invoice->id,
-            'amount' => $invoice->amount_paid
+            'amount' => $invoice->amount_paid,
         ]);
     }
 
     private function handlePaymentFailed($invoice): void
     {
         $user = $this->getUserByStripeCustomer($invoice->customer);
-        if (!$user) return;
+        if (!$user) {
+            return;
+        }
 
         $this->logger->warning('Payment failed', [
             'user_id' => $user->getId(),
-            'invoice_id' => $invoice->id
+            'invoice_id' => $invoice->id,
         ]);
     }
 
@@ -466,4 +478,3 @@ class SubscriptionController extends AbstractController
         return null;
     }
 }
-

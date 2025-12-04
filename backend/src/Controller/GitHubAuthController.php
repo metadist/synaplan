@@ -5,15 +5,14 @@ namespace App\Controller;
 use App\Entity\User;
 use App\Repository\UserRepository;
 use Doctrine\ORM\EntityManagerInterface;
+use Lexik\Bundle\JWTAuthenticationBundle\Services\JWTTokenManagerInterface;
+use OpenApi\Attributes as OA;
 use Psr\Log\LoggerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
-use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Annotation\Route;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
-use Lexik\Bundle\JWTAuthenticationBundle\Services\JWTTokenManagerInterface;
-use OpenApi\Attributes as OA;
 
 #[Route('/api/v1/auth/github')]
 class GitHubAuthController extends AbstractController
@@ -32,7 +31,7 @@ class GitHubAuthController extends AbstractController
         private string $githubClientId,
         private string $githubClientSecret,
         private string $appUrl,
-        private string $frontendUrl
+        private string $frontendUrl,
     ) {
     }
 
@@ -48,9 +47,9 @@ class GitHubAuthController extends AbstractController
     )]
     public function login(Request $request): Response
     {
-        $redirectUri = $this->appUrl . '/api/v1/auth/github/callback';
+        $redirectUri = $this->appUrl.'/api/v1/auth/github/callback';
         $state = bin2hex(random_bytes(16));
-        
+
         // Store state in session for CSRF protection
         $request->getSession()->set('github_oauth_state', $state);
 
@@ -58,14 +57,14 @@ class GitHubAuthController extends AbstractController
             'client_id' => $this->githubClientId,
             'redirect_uri' => $redirectUri,
             'scope' => 'user:email read:user',
-            'state' => $state
+            'state' => $state,
         ];
 
-        $authUrl = self::GITHUB_AUTH_URL . '?' . http_build_query($params);
+        $authUrl = self::GITHUB_AUTH_URL.'?'.http_build_query($params);
 
         $this->logger->info('GitHub OAuth login initiated', [
             'redirect_uri' => $redirectUri,
-            'state' => $state
+            'state' => $state,
         ]);
 
         return $this->redirect($authUrl);
@@ -91,11 +90,12 @@ class GitHubAuthController extends AbstractController
         if (!$state || $state !== $storedState) {
             $this->logger->error('GitHub OAuth state mismatch', [
                 'received_state' => $state,
-                'stored_state' => $storedState
+                'stored_state' => $storedState,
             ]);
+
             return $this->json([
                 'success' => false,
-                'error' => 'Invalid state parameter'
+                'error' => 'Invalid state parameter',
             ], Response::HTTP_BAD_REQUEST);
         }
 
@@ -105,7 +105,7 @@ class GitHubAuthController extends AbstractController
         if (!$code) {
             return $this->json([
                 'success' => false,
-                'error' => 'Authorization code not received'
+                'error' => 'Authorization code not received',
             ], Response::HTTP_BAD_REQUEST);
         }
 
@@ -113,14 +113,14 @@ class GitHubAuthController extends AbstractController
             // Exchange authorization code for access token
             $tokenResponse = $this->httpClient->request('POST', self::GITHUB_TOKEN_URL, [
                 'headers' => [
-                    'Accept' => 'application/json'
+                    'Accept' => 'application/json',
                 ],
                 'body' => [
                     'code' => $code,
                     'client_id' => $this->githubClientId,
                     'client_secret' => $this->githubClientSecret,
-                    'redirect_uri' => $this->appUrl . '/api/v1/auth/github/callback'
-                ]
+                    'redirect_uri' => $this->appUrl.'/api/v1/auth/github/callback',
+                ],
             ]);
 
             $tokenData = $tokenResponse->toArray();
@@ -134,9 +134,9 @@ class GitHubAuthController extends AbstractController
             // Fetch user info from GitHub
             $userInfoResponse = $this->httpClient->request('GET', self::GITHUB_USER_URL, [
                 'headers' => [
-                    'Authorization' => ucfirst($tokenType) . ' ' . $accessToken,
-                    'Accept' => 'application/json'
-                ]
+                    'Authorization' => ucfirst($tokenType).' '.$accessToken,
+                    'Accept' => 'application/json',
+                ],
             ]);
 
             $userInfo = $userInfoResponse->toArray();
@@ -146,9 +146,9 @@ class GitHubAuthController extends AbstractController
             if (!$email) {
                 $emailsResponse = $this->httpClient->request('GET', self::GITHUB_EMAIL_URL, [
                     'headers' => [
-                        'Authorization' => ucfirst($tokenType) . ' ' . $accessToken,
-                        'Accept' => 'application/json'
-                    ]
+                        'Authorization' => ucfirst($tokenType).' '.$accessToken,
+                        'Accept' => 'application/json',
+                    ],
                 ]);
 
                 $emails = $emailsResponse->toArray();
@@ -167,7 +167,7 @@ class GitHubAuthController extends AbstractController
             $this->logger->info('GitHub user info retrieved', [
                 'login' => $userInfo['login'] ?? 'unknown',
                 'email' => $email ?? 'no_email',
-                'id' => $userInfo['id'] ?? 'unknown'
+                'id' => $userInfo['id'] ?? 'unknown',
             ]);
 
             // Find or create user
@@ -177,28 +177,27 @@ class GitHubAuthController extends AbstractController
             $jwtToken = $this->jwtManager->create($user);
 
             // Redirect to frontend with token
-            $callbackUrl = $this->frontendUrl . '/auth/callback?' . http_build_query([
+            $callbackUrl = $this->frontendUrl.'/auth/callback?'.http_build_query([
                 'token' => $jwtToken,
-                'provider' => 'github'
+                'provider' => 'github',
             ]);
 
             $this->logger->info('GitHub OAuth successful, redirecting to frontend', [
                 'user_id' => $user->getId(),
-                'email' => $user->getMail()
+                'email' => $user->getMail(),
             ]);
 
             return $this->redirect($callbackUrl);
-
         } catch (\Exception $e) {
             $this->logger->error('GitHub OAuth callback error', [
                 'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
+                'trace' => $e->getTraceAsString(),
             ]);
 
             // Redirect to frontend with error
-            $errorUrl = $this->frontendUrl . '/auth/callback?' . http_build_query([
+            $errorUrl = $this->frontendUrl.'/auth/callback?'.http_build_query([
                 'error' => 'Failed to authenticate with GitHub',
-                'provider' => 'github'
+                'provider' => 'github',
             ]);
 
             return $this->redirect($errorUrl);
@@ -234,21 +233,18 @@ class GitHubAuthController extends AbstractController
 
         if ($user) {
             // User exists - verify they registered with GitHub
-            if ($user->getProviderId() !== 'github') {
-                throw new \Exception(sprintf(
-                    'This email is already registered using %s. Please use the same login method.',
-                    $user->getAuthProviderName()
-                ));
+            if ('github' !== $user->getProviderId()) {
+                throw new \Exception(sprintf('This email is already registered using %s. Please use the same login method.', $user->getAuthProviderName()));
             }
-            
+
             $this->logger->info('Existing GitHub user logging in', [
                 'user_id' => $user->getId(),
-                'email' => $email
+                'email' => $email,
             ]);
         } else {
             // Create new user
             $user = new User();
-            $user->setMail($email ?? $githubLogin . '@github.local');
+            $user->setMail($email ?? $githubLogin.'@github.local');
             $user->setType('WEB'); // Always WEB for web-based logins
             $user->setProviderId('github'); // Provider tracked here
             $user->setUserLevel('NEW');
@@ -260,7 +256,7 @@ class GitHubAuthController extends AbstractController
             $this->logger->info('Creating new user from GitHub OAuth', [
                 'email' => $email,
                 'github_id' => $githubId,
-                'github_login' => $githubLogin
+                'github_login' => $githubLogin,
             ]);
         }
 
@@ -295,7 +291,7 @@ class GitHubAuthController extends AbstractController
         }
 
         $user->setUserDetails($userDetails);
-        
+
         // Verify email if user logged in via GitHub (OAuth emails are trusted)
         if (!$user->isEmailVerified() && $email) {
             $user->setEmailVerified(true);
@@ -307,4 +303,3 @@ class GitHubAuthController extends AbstractController
         return $user;
     }
 }
-

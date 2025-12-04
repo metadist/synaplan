@@ -2,9 +2,9 @@
 
 namespace App\AI\Provider;
 
+use App\AI\Exception\ProviderException;
 use App\AI\Interface\ChatProviderInterface;
 use App\AI\Interface\EmbeddingProviderInterface;
-use App\AI\Exception\ProviderException;
 use ArdaGnsrn\Ollama\Ollama;
 use Psr\Log\LoggerInterface;
 
@@ -14,7 +14,7 @@ class OllamaProvider implements ChatProviderInterface, EmbeddingProviderInterfac
 
     public function __construct(
         private LoggerInterface $logger,
-        private string $baseUrl
+        private string $baseUrl,
     ) {
         // Set timeout to 5 minutes for slow CPU-based models
         ini_set('default_socket_timeout', 300);
@@ -72,6 +72,7 @@ class OllamaProvider implements ChatProviderInterface, EmbeddingProviderInterfac
     {
         try {
             $this->client->models()->list();
+
             return true;
         } catch (\Exception $e) {
             return false;
@@ -83,8 +84,8 @@ class OllamaProvider implements ChatProviderInterface, EmbeddingProviderInterfac
         return [
             'OLLAMA_BASE_URL' => [
                 'required' => true,
-                'hint' => 'Ollama server URL (e.g., http://ollama:11434)'
-            ]
+                'hint' => 'Ollama server URL (e.g., http://ollama:11434)',
+            ],
         ];
     }
 
@@ -96,10 +97,10 @@ class OllamaProvider implements ChatProviderInterface, EmbeddingProviderInterfac
 
         try {
             $model = $options['model'];
-            
+
             $this->logger->info('Ollama chat request', [
                 'model' => $model,
-                'message_count' => count($messages)
+                'message_count' => count($messages),
             ]);
 
             // Build prompt from messages (Ollama Completions API style)
@@ -107,13 +108,13 @@ class OllamaProvider implements ChatProviderInterface, EmbeddingProviderInterfac
             foreach ($messages as $message) {
                 $role = $message['role'] ?? 'user';
                 $content = $message['content'] ?? '';
-                
-                if ($role === 'system') {
-                    $prompt .= $content . "\n\n";
-                } elseif ($role === 'user') {
-                    $prompt .= "User: " . $content . "\n";
-                } elseif ($role === 'assistant') {
-                    $prompt .= "Assistant: " . $content . "\n";
+
+                if ('system' === $role) {
+                    $prompt .= $content."\n\n";
+                } elseif ('user' === $role) {
+                    $prompt .= 'User: '.$content."\n";
+                } elseif ('assistant' === $role) {
+                    $prompt .= 'Assistant: '.$content."\n";
                 }
             }
 
@@ -127,21 +128,18 @@ class OllamaProvider implements ChatProviderInterface, EmbeddingProviderInterfac
         } catch (\Exception $e) {
             $this->logger->error('Ollama chat error', [
                 'error' => $e->getMessage(),
-                'model' => $options['model'] ?? 'unknown'
+                'model' => $options['model'] ?? 'unknown',
             ]);
-            
+
             // Check if error is about model not found
             $errorMsg = $e->getMessage();
-            if (stripos($errorMsg, '404') !== false || 
-                stripos($errorMsg, 'not found') !== false || 
-                stripos($errorMsg, 'model') !== false) {
+            if (false !== stripos($errorMsg, '404')
+                || false !== stripos($errorMsg, 'not found')
+                || false !== stripos($errorMsg, 'model')) {
                 throw ProviderException::noModelAvailable('chat', 'ollama', $model, $e);
             }
-            
-            throw new ProviderException(
-                'Ollama chat error: ' . $e->getMessage(),
-                'ollama'
-            );
+
+            throw new ProviderException('Ollama chat error: '.$e->getMessage(), 'ollama');
         }
     }
 
@@ -155,29 +153,29 @@ class OllamaProvider implements ChatProviderInterface, EmbeddingProviderInterfac
             $model = $options['model'];
             $modelFeatures = $options['modelFeatures'] ?? [];
             $supportsReasoning = in_array('reasoning', $modelFeatures, true);
-            
+
             // Check if model exists before attempting to use it
             $availableModels = $this->getAvailableModels();
             if (empty($availableModels)) {
                 throw ProviderException::noModelAvailable('chat', 'ollama', $model);
             }
-            
+
             $modelExists = false;
             foreach ($availableModels as $availableModel) {
-                if (stripos($availableModel, $model) !== false || stripos($model, $availableModel) !== false) {
+                if (false !== stripos($availableModel, $model) || false !== stripos($model, $availableModel)) {
                     $modelExists = true;
                     break;
                 }
             }
-            
+
             if (!$modelExists) {
                 throw ProviderException::noModelAvailable('chat', 'ollama', $model);
             }
-            
+
             $this->logger->info('🔵 Ollama streaming chat START', [
                 'model' => $model,
                 'message_count' => count($messages),
-                'supportsReasoning' => $supportsReasoning
+                'supportsReasoning' => $supportsReasoning,
             ]);
 
             // Build prompt from messages (Ollama Completions API style)
@@ -185,16 +183,16 @@ class OllamaProvider implements ChatProviderInterface, EmbeddingProviderInterfac
             foreach ($messages as $message) {
                 $role = $message['role'] ?? 'user';
                 $content = $message['content'] ?? '';
-                
-                if ($role === 'system') {
-                    $prompt .= $content . "\n\n";
-                } elseif ($role === 'user') {
-                    $prompt .= "User: " . $content . "\n";
-                } elseif ($role === 'assistant') {
-                    $prompt .= "Assistant: " . $content . "\n";
+
+                if ('system' === $role) {
+                    $prompt .= $content."\n\n";
+                } elseif ('user' === $role) {
+                    $prompt .= 'User: '.$content."\n";
+                } elseif ('assistant' === $role) {
+                    $prompt .= 'Assistant: '.$content."\n";
                 }
             }
-            
+
             $this->logger->info('🟡 Ollama: Prompt built', ['length' => strlen($prompt)]);
 
             // Use completions API with streaming
@@ -202,16 +200,16 @@ class OllamaProvider implements ChatProviderInterface, EmbeddingProviderInterfac
                 'model' => $model,
                 'prompt' => $prompt,
             ]);
-            
+
             $this->logger->info('🟡 Ollama: Stream created, iterating...');
-            
+
             $chunkCount = 0;
             $fullResponse = '';
-            
+
             foreach ($stream as $completion) {
                 // Extract response content
                 $textChunk = $completion->response ?? '';
-                
+
                 // Sanitize UTF-8 to prevent "Malformed UTF-8 characters" errors
                 if (!empty($textChunk)) {
                     // Remove invalid UTF-8 characters
@@ -219,33 +217,33 @@ class OllamaProvider implements ChatProviderInterface, EmbeddingProviderInterfac
                     // Alternative: use iconv for more aggressive cleaning
                     // $textChunk = iconv('UTF-8', 'UTF-8//IGNORE', $textChunk);
                 }
-                
+
                 if (!empty($textChunk)) {
                     $fullResponse .= $textChunk;
-                    
+
                     // Send chunk as-is (including <think> tags if present)
                     // Frontend will parse <think> tags from the accumulated content
                     $callback($textChunk);
-                    $chunkCount++;
-                    
-                    if ($chunkCount === 1) {
+                    ++$chunkCount;
+
+                    if (1 === $chunkCount) {
                         $this->logger->info('🟢 Ollama: First chunk sent!', [
                             'length' => strlen($textChunk),
-                            'preview' => substr($textChunk, 0, 50)
+                            'preview' => substr($textChunk, 0, 50),
                         ]);
                     }
                 }
-                
+
                 // Check if done
                 if (isset($completion->done) && $completion->done) {
                     $this->logger->info('🔵 Ollama: Stream done signal received');
                     break;
                 }
             }
-            
+
             $this->logger->info('🔵 Ollama: Streaming complete', [
                 'chunks_sent' => $chunkCount,
-                'total_length' => strlen($fullResponse)
+                'total_length' => strlen($fullResponse),
             ]);
         } catch (ProviderException $e) {
             // Re-throw ProviderException as-is (with our friendly message)
@@ -253,29 +251,23 @@ class OllamaProvider implements ChatProviderInterface, EmbeddingProviderInterfac
         } catch (\Exception $e) {
             $this->logger->error('🔴 Ollama streaming error', [
                 'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
+                'trace' => $e->getTraceAsString(),
             ]);
-            
+
             // Check if error is about model not found (404, "not found", etc.)
             $errorMsg = $e->getMessage();
-            if (stripos($errorMsg, '404') !== false || 
-                stripos($errorMsg, 'not found') !== false || 
-                stripos($errorMsg, 'model') !== false) {
+            if (false !== stripos($errorMsg, '404')
+                || false !== stripos($errorMsg, 'not found')
+                || false !== stripos($errorMsg, 'model')) {
                 throw ProviderException::noModelAvailable('chat', 'ollama', $model, $e);
             }
-            
-            throw new ProviderException(
-                'Ollama streaming error: ' . $e->getMessage(),
-                'ollama',
-                null,
-                0,
-                $e
-            );
+
+            throw new ProviderException('Ollama streaming error: '.$e->getMessage(), 'ollama', null, 0, $e);
         }
     }
-    
+
     /**
-     * Get list of available models from Ollama
+     * Get list of available models from Ollama.
      */
     private function getAvailableModels(): array
     {
@@ -285,9 +277,11 @@ class OllamaProvider implements ChatProviderInterface, EmbeddingProviderInterfac
             foreach (($models->models ?? []) as $model) {
                 $modelNames[] = $model->model ?? $model->name ?? '';
             }
+
             return array_filter($modelNames);
         } catch (\Exception $e) {
             $this->logger->error('Failed to list Ollama models', ['error' => $e->getMessage()]);
+
             return [];
         }
     }
@@ -305,12 +299,10 @@ class OllamaProvider implements ChatProviderInterface, EmbeddingProviderInterfac
             ]);
 
             $arrRes = method_exists($response, 'toArray') ? $response->toArray() : (array) $response;
+
             return $arrRes['embeddings'][0] ?? [];
         } catch (\Exception $e) {
-            throw new ProviderException(
-                'Ollama embedding error: ' . $e->getMessage(),
-                'ollama'
-            );
+            throw new ProviderException('Ollama embedding error: '.$e->getMessage(), 'ollama');
         }
     }
 
@@ -320,18 +312,17 @@ class OllamaProvider implements ChatProviderInterface, EmbeddingProviderInterfac
             throw new ProviderException('Embedding model must be specified in options', 'ollama');
         }
 
-        return array_map(fn($text) => $this->embed($text, $options), $texts);
+        return array_map(fn ($text) => $this->embed($text, $options), $texts);
     }
 
     public function getDimensions(string $model): int
     {
-        return match(true) {
+        return match (true) {
             str_contains($model, 'bge-m3') => 1024,
             str_contains($model, 'nomic-embed-text') => 768,
             str_contains($model, 'mxbai-embed-large') => 1024,
             str_contains($model, 'all-minilm') => 384,
-            default => 1024 // Default to 1024 for Ollama models
+            default => 1024, // Default to 1024 for Ollama models
         };
     }
 }
-

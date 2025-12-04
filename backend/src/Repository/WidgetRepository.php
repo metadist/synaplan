@@ -35,7 +35,7 @@ class WidgetRepository extends ServiceEntityRepository
     }
 
     /**
-     * Find widget by widgetId (public ID)
+     * Find widget by widgetId (public ID).
      */
     public function findByWidgetId(string $widgetId): ?Widget
     {
@@ -43,7 +43,7 @@ class WidgetRepository extends ServiceEntityRepository
     }
 
     /**
-     * Alias for findByWidgetId
+     * Alias for findByWidgetId.
      */
     public function findOneByWidgetId(string $widgetId): ?Widget
     {
@@ -51,7 +51,7 @@ class WidgetRepository extends ServiceEntityRepository
     }
 
     /**
-     * Find all widgets for a user
+     * Find all widgets for a user.
      */
     public function findByOwner(int $ownerId): array
     {
@@ -64,7 +64,7 @@ class WidgetRepository extends ServiceEntityRepository
     }
 
     /**
-     * Alias for findByOwner
+     * Alias for findByOwner.
      */
     public function findByOwnerId(int $ownerId): array
     {
@@ -72,7 +72,7 @@ class WidgetRepository extends ServiceEntityRepository
     }
 
     /**
-     * Find active widgets for a user
+     * Find active widgets for a user.
      */
     public function findActiveByOwner(int $ownerId): array
     {
@@ -87,7 +87,7 @@ class WidgetRepository extends ServiceEntityRepository
     }
 
     /**
-     * Count widgets for a user
+     * Count widgets for a user.
      */
     public function countByOwner(int $ownerId): int
     {
@@ -99,4 +99,3 @@ class WidgetRepository extends ServiceEntityRepository
             ->getSingleScalarResult();
     }
 }
-

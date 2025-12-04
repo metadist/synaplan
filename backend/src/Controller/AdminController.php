@@ -2,21 +2,21 @@
 
 namespace App\Controller;
 
-use App\Entity\User;
 use App\Entity\Prompt;
-use App\Repository\UserRepository;
+use App\Entity\User;
 use App\Repository\PromptRepository;
 use App\Repository\UseLogRepository;
+use App\Repository\UserRepository;
 use App\Service\UsageStatsService;
 use Doctrine\ORM\EntityManagerInterface;
+use OpenApi\Attributes as OA;
+use Psr\Log\LoggerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Annotation\Route;
 use Symfony\Component\Security\Http\Attribute\CurrentUser;
-use Psr\Log\LoggerInterface;
-use OpenApi\Attributes as OA;
 
 #[Route('/api/v1/admin')]
 #[OA\Tag(name: 'Admin')]
@@ -28,11 +28,12 @@ class AdminController extends AbstractController
         private PromptRepository $promptRepository,
         private UseLogRepository $useLogRepository,
         private UsageStatsService $usageStatsService,
-        private LoggerInterface $logger
-    ) {}
+        private LoggerInterface $logger,
+    ) {
+    }
 
     /**
-     * Get all users (admin only)
+     * Get all users (admin only).
      */
     #[Route('/users', name: 'admin_get_users', methods: ['GET'])]
     #[OA\Get(
@@ -78,14 +79,14 @@ class AdminController extends AbstractController
     #[OA\Response(response: 403, description: 'Not authorized')]
     public function getUsers(
         Request $request,
-        #[CurrentUser] ?User $user
+        #[CurrentUser] ?User $user,
     ): JsonResponse {
         if (!$user || !$user->isAdmin()) {
             return $this->json(['error' => 'Admin access required'], Response::HTTP_FORBIDDEN);
         }
 
-        $page = max(1, (int)$request->query->get('page', 1));
-        $limit = max(1, min(100, (int)$request->query->get('limit', 50)));
+        $page = max(1, (int) $request->query->get('page', 1));
+        $limit = max(1, min(100, (int) $request->query->get('limit', 50)));
         $search = $request->query->get('search', '');
 
         $qb = $this->userRepository->createQueryBuilder('u')
@@ -93,12 +94,12 @@ class AdminController extends AbstractController
 
         if ($search) {
             $qb->andWhere('u.mail LIKE :search')
-                ->setParameter('search', '%' . $search . '%');
+                ->setParameter('search', '%'.$search.'%');
         }
 
         // Get total count
         $totalQb = clone $qb;
-        $total = (int)$totalQb->select('COUNT(u.id)')
+        $total = (int) $totalQb->select('COUNT(u.id)')
             ->getQuery()
             ->getSingleScalarResult();
 
@@ -109,7 +110,7 @@ class AdminController extends AbstractController
             ->getQuery()
             ->getResult();
 
-        $usersData = array_map(function(User $u) {
+        $usersData = array_map(function (User $u) {
             return [
                 'id' => $u->getId(),
                 'email' => $u->getMail(),
@@ -132,7 +133,7 @@ class AdminController extends AbstractController
     }
 
     /**
-     * Update user level (admin only)
+     * Update user level (admin only).
      */
     #[Route('/users/{id}/level', name: 'admin_update_user_level', methods: ['PATCH'])]
     #[OA\Patch(
@@ -154,7 +155,7 @@ class AdminController extends AbstractController
         content: new OA\JsonContent(
             required: ['level'],
             properties: [
-                new OA\Property(property: 'level', type: 'string', enum: ['NEW', 'PRO', 'TEAM', 'BUSINESS', 'ADMIN'], example: 'PRO')
+                new OA\Property(property: 'level', type: 'string', enum: ['NEW', 'PRO', 'TEAM', 'BUSINESS', 'ADMIN'], example: 'PRO'),
             ]
         )
     )]
@@ -164,7 +165,7 @@ class AdminController extends AbstractController
     public function updateUserLevel(
         int $id,
         Request $request,
-        #[CurrentUser] ?User $user
+        #[CurrentUser] ?User $user,
     ): JsonResponse {
         if (!$user || !$user->isAdmin()) {
             return $this->json(['error' => 'Admin access required'], Response::HTTP_FORBIDDEN);
@@ -189,7 +190,7 @@ class AdminController extends AbstractController
         $this->logger->info('Admin updated user level', [
             'admin_id' => $user->getId(),
             'target_user_id' => $id,
-            'new_level' => $newLevel
+            'new_level' => $newLevel,
         ]);
 
         return $this->json([
@@ -198,12 +199,12 @@ class AdminController extends AbstractController
                 'id' => $targetUser->getId(),
                 'email' => $targetUser->getMail(),
                 'level' => $targetUser->getUserLevel(),
-            ]
+            ],
         ]);
     }
 
     /**
-     * Delete user (admin only)
+     * Delete user (admin only).
      */
     #[Route('/users/{id}', name: 'admin_delete_user', methods: ['DELETE'])]
     #[OA\Delete(
@@ -225,7 +226,7 @@ class AdminController extends AbstractController
     #[OA\Response(response: 404, description: 'User not found')]
     public function deleteUser(
         int $id,
-        #[CurrentUser] ?User $user
+        #[CurrentUser] ?User $user,
     ): JsonResponse {
         if (!$user || !$user->isAdmin()) {
             return $this->json(['error' => 'Admin access required'], Response::HTTP_FORBIDDEN);
@@ -247,14 +248,14 @@ class AdminController extends AbstractController
         $this->logger->info('Admin deleted user', [
             'admin_id' => $user->getId(),
             'deleted_user_id' => $id,
-            'deleted_email' => $email
+            'deleted_email' => $email,
         ]);
 
         return $this->json(['success' => true, 'message' => 'User deleted']);
     }
 
     /**
-     * Get all system prompts (admin only)
+     * Get all system prompts (admin only).
      */
     #[Route('/prompts', name: 'admin_get_prompts', methods: ['GET'])]
     #[OA\Get(
@@ -269,13 +270,13 @@ class AdminController extends AbstractController
         description: 'List of prompts',
         content: new OA\JsonContent(
             properties: [
-                new OA\Property(property: 'prompts', type: 'array', items: new OA\Items(type: 'object'))
+                new OA\Property(property: 'prompts', type: 'array', items: new OA\Items(type: 'object')),
             ]
         )
     )]
     #[OA\Response(response: 403, description: 'Not authorized')]
     public function getSystemPrompts(
-        #[CurrentUser] ?User $user
+        #[CurrentUser] ?User $user,
     ): JsonResponse {
         if (!$user || !$user->isAdmin()) {
             return $this->json(['error' => 'Admin access required'], Response::HTTP_FORBIDDEN);
@@ -283,7 +284,7 @@ class AdminController extends AbstractController
 
         $prompts = $this->promptRepository->findBy(['ownerId' => 0], ['topic' => 'ASC']);
 
-        $promptsData = array_map(function(Prompt $p) {
+        $promptsData = array_map(function (Prompt $p) {
             return [
                 'id' => $p->getId(),
                 'topic' => $p->getTopic(),
@@ -298,7 +299,7 @@ class AdminController extends AbstractController
     }
 
     /**
-     * Update system prompt (admin only)
+     * Update system prompt (admin only).
      */
     #[Route('/prompts/{id}', name: 'admin_update_prompt', methods: ['PATCH'])]
     #[OA\Patch(
@@ -331,14 +332,14 @@ class AdminController extends AbstractController
     public function updatePrompt(
         int $id,
         Request $request,
-        #[CurrentUser] ?User $user
+        #[CurrentUser] ?User $user,
     ): JsonResponse {
         if (!$user || !$user->isAdmin()) {
             return $this->json(['error' => 'Admin access required'], Response::HTTP_FORBIDDEN);
         }
 
         $prompt = $this->promptRepository->find($id);
-        if (!$prompt || $prompt->getOwnerId() !== 0) {
+        if (!$prompt || 0 !== $prompt->getOwnerId()) {
             return $this->json(['error' => 'System prompt not found'], Response::HTTP_NOT_FOUND);
         }
 
@@ -359,7 +360,7 @@ class AdminController extends AbstractController
         $this->logger->info('Admin updated system prompt', [
             'admin_id' => $user->getId(),
             'prompt_id' => $id,
-            'topic' => $prompt->getTopic()
+            'topic' => $prompt->getTopic(),
         ]);
 
         return $this->json([
@@ -371,12 +372,12 @@ class AdminController extends AbstractController
                 'shortDescription' => $prompt->getShortDescription(),
                 'prompt' => $prompt->getPrompt(),
                 'selectionRules' => $prompt->getSelectionRules(),
-            ]
+            ],
         ]);
     }
 
     /**
-     * Get usage statistics (admin only)
+     * Get usage statistics (admin only).
      */
     #[Route('/usage-stats', name: 'admin_get_usage_stats', methods: ['GET'])]
     #[OA\Get(
@@ -411,7 +412,7 @@ class AdminController extends AbstractController
     #[OA\Response(response: 403, description: 'Not authorized')]
     public function getUsageStats(
         Request $request,
-        #[CurrentUser] ?User $user
+        #[CurrentUser] ?User $user,
     ): JsonResponse {
         if (!$user || !$user->isAdmin()) {
             return $this->json(['error' => 'Admin access required'], Response::HTTP_FORBIDDEN);
@@ -419,12 +420,12 @@ class AdminController extends AbstractController
 
         $period = $request->query->get('period', 'all');
         $stats = $this->usageStatsService->getOverallStats($period);
-        
+
         return $this->json($stats);
     }
 
     /**
-     * Get system overview (admin only)
+     * Get system overview (admin only).
      */
     #[Route('/overview', name: 'admin_get_overview', methods: ['GET'])]
     #[OA\Get(
@@ -447,7 +448,7 @@ class AdminController extends AbstractController
     )]
     #[OA\Response(response: 403, description: 'Not authorized')]
     public function getOverview(
-        #[CurrentUser] ?User $user
+        #[CurrentUser] ?User $user,
     ): JsonResponse {
         if (!$user || !$user->isAdmin()) {
             return $this->json(['error' => 'Admin access required'], Response::HTTP_FORBIDDEN);
@@ -466,12 +467,12 @@ class AdminController extends AbstractController
 
         $levelCounts = [];
         foreach ($usersByLevel as $row) {
-            $levelCounts[$row['level']] = (int)$row['count'];
+            $levelCounts[$row['level']] = (int) $row['count'];
         }
 
         // Recent users (last 10)
         $recentUsers = $this->userRepository->findBy([], ['id' => 'DESC'], 10);
-        $recentUsersData = array_map(function(User $u) {
+        $recentUsersData = array_map(function (User $u) {
             return [
                 'id' => $u->getId(),
                 'email' => $u->getMail(),
@@ -489,7 +490,7 @@ class AdminController extends AbstractController
     }
 
     /**
-     * Get user registration analytics (admin only)
+     * Get user registration analytics (admin only).
      */
     #[Route('/analytics/registrations', name: 'admin_get_registrations', methods: ['GET'])]
     #[OA\Get(
@@ -527,7 +528,7 @@ class AdminController extends AbstractController
     #[OA\Response(response: 403, description: 'Not authorized')]
     public function getRegistrationAnalytics(
         Request $request,
-        #[CurrentUser] ?User $user
+        #[CurrentUser] ?User $user,
     ): JsonResponse {
         if (!$user || !$user->isAdmin()) {
             return $this->json(['error' => 'Admin access required'], Response::HTTP_FORBIDDEN);
@@ -538,7 +539,7 @@ class AdminController extends AbstractController
 
         // Calculate date range
         $now = new \DateTime();
-        $since = match($period) {
+        $since = match ($period) {
             '7d' => (clone $now)->modify('-7 days'),
             '30d' => (clone $now)->modify('-30 days'),
             '90d' => (clone $now)->modify('-90 days'),
@@ -548,12 +549,12 @@ class AdminController extends AbstractController
 
         // Get all users within period
         $qb = $this->userRepository->createQueryBuilder('u');
-        
-        if ($period !== 'all') {
+
+        if ('all' !== $period) {
             $qb->where('u.created >= :since')
                 ->setParameter('since', $since->format('Y-m-d H:i:s'));
         }
-        
+
         $users = $qb->orderBy('u.created', 'ASC')
             ->getQuery()
             ->getResult();
@@ -565,9 +566,9 @@ class AdminController extends AbstractController
 
         foreach ($users as $user) {
             $created = new \DateTime($user->getCreated());
-            
+
             // Determine group key based on groupBy
-            $groupKey = match($groupBy) {
+            $groupKey = match ($groupBy) {
                 'week' => $created->format('Y-\WW'),
                 'month' => $created->format('Y-m'),
                 default => $created->format('Y-m-d'), // day
@@ -582,36 +583,36 @@ class AdminController extends AbstractController
                     'byType' => [],
                 ];
             }
-            $timeline[$groupKey]['count']++;
+            ++$timeline[$groupKey]['count'];
 
             // By provider
             $providerId = $user->getProviderId();
             if (!isset($timeline[$groupKey]['byProvider'][$providerId])) {
                 $timeline[$groupKey]['byProvider'][$providerId] = 0;
             }
-            $timeline[$groupKey]['byProvider'][$providerId]++;
+            ++$timeline[$groupKey]['byProvider'][$providerId];
 
             if (!isset($byProvider[$providerId])) {
                 $byProvider[$providerId] = 0;
             }
-            $byProvider[$providerId]++;
+            ++$byProvider[$providerId];
 
             // By type
             $type = $user->getType();
             if (!isset($timeline[$groupKey]['byType'][$type])) {
                 $timeline[$groupKey]['byType'][$type] = 0;
             }
-            $timeline[$groupKey]['byType'][$type]++;
+            ++$timeline[$groupKey]['byType'][$type];
 
             if (!isset($byType[$type])) {
                 $byType[$type] = 0;
             }
-            $byType[$type]++;
+            ++$byType[$type];
         }
 
         // Convert timeline to array and sort
         $timelineArray = array_values($timeline);
-        usort($timelineArray, function($a, $b) {
+        usort($timelineArray, function ($a, $b) {
             return strcmp($a['date'], $b['date']);
         });
 
@@ -624,4 +625,3 @@ class AdminController extends AbstractController
         ]);
     }
 }
-

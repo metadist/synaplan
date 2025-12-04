@@ -6,10 +6,10 @@ use Psr\Cache\CacheItemPoolInterface;
 use Psr\Log\LoggerInterface;
 
 /**
- * Circuit Breaker Pattern Implementation
- * 
+ * Circuit Breaker Pattern Implementation.
+ *
  * States: CLOSED → OPEN → HALF_OPEN → CLOSED
- * 
+ *
  * - CLOSED: Normal operation, requests pass through
  * - OPEN: Too many failures, all requests fail fast
  * - HALF_OPEN: Testing if service recovered, limited requests
@@ -26,16 +26,17 @@ class CircuitBreaker
         private int $failureThreshold = 5,
         private int $successThreshold = 2,
         private int $timeout = 60,
-        private int $halfOpenMaxCalls = 3
-    ) {}
+        private int $halfOpenMaxCalls = 3,
+    ) {
+    }
 
     /**
-     * Execute callable with Circuit Breaker protection
-     * 
-     * @param callable $callback The operation to execute
-     * @param string $serviceName Service identifier
-     * @param callable|null $fallback Fallback when circuit is open
-     * @return mixed
+     * Execute callable with Circuit Breaker protection.
+     *
+     * @param callable      $callback    The operation to execute
+     * @param string        $serviceName Service identifier
+     * @param callable|null $fallback    Fallback when circuit is open
+     *
      * @throws \Exception
      */
     public function execute(callable $callback, string $serviceName, ?callable $fallback = null): mixed
@@ -43,41 +44,35 @@ class CircuitBreaker
         $state = $this->getState($serviceName);
 
         // OPEN: Fail fast
-        if ($state === self::STATE_OPEN) {
+        if (self::STATE_OPEN === $state) {
             if ($this->shouldAttemptReset($serviceName)) {
                 $this->setState($serviceName, self::STATE_HALF_OPEN);
                 $this->logger->info('Circuit breaker transitioning to HALF_OPEN', [
-                    'service' => $serviceName
+                    'service' => $serviceName,
                 ]);
             } else {
                 $this->logger->warning('Circuit breaker is OPEN, failing fast', [
-                    'service' => $serviceName
+                    'service' => $serviceName,
                 ]);
-                
+
                 if ($fallback) {
                     return $fallback();
                 }
-                
+
                 // Throw ProviderException instead of RuntimeException
                 // Extract provider name from service name (format: ai_provider_xxx)
                 $providerName = str_replace('ai_provider_', '', $serviceName);
-                throw new \App\AI\Exception\ProviderException(
-                    "Service temporarily unavailable (circuit breaker is OPEN). Please try again in " . $this->timeout . " seconds.",
-                    $providerName
-                );
+                throw new \App\AI\Exception\ProviderException('Service temporarily unavailable (circuit breaker is OPEN). Please try again in '.$this->timeout.' seconds.', $providerName);
             }
         }
 
         // HALF_OPEN: Limit test calls
-        if ($state === self::STATE_HALF_OPEN) {
+        if (self::STATE_HALF_OPEN === $state) {
             if ($this->getHalfOpenAttempts($serviceName) >= $this->halfOpenMaxCalls) {
                 $this->setState($serviceName, self::STATE_OPEN);
                 // Throw ProviderException instead of RuntimeException
                 $providerName = str_replace('ai_provider_', '', $serviceName);
-                throw new \App\AI\Exception\ProviderException(
-                    "Service temporarily unavailable (too many test attempts). Please try again later.",
-                    $providerName
-                );
+                throw new \App\AI\Exception\ProviderException('Service temporarily unavailable (too many test attempts). Please try again later.', $providerName);
             }
             $this->incrementHalfOpenAttempts($serviceName);
         }
@@ -85,37 +80,37 @@ class CircuitBreaker
         // Execute callback
         try {
             $result = $callback();
-            
+
             // Success
             $this->recordSuccess($serviceName);
-            
-            return $result;
 
+            return $result;
         } catch (\Exception $e) {
             // Failure
             $this->recordFailure($serviceName);
-            
+
             $this->logger->error('Circuit breaker recorded failure', [
                 'service' => $serviceName,
                 'error' => $e->getMessage(),
-                'state' => $this->getState($serviceName)
+                'state' => $this->getState($serviceName),
             ]);
-            
+
             throw $e;
         }
     }
 
     /**
-     * Get current circuit state
+     * Get current circuit state.
      */
     private function getState(string $serviceName): string
     {
         $item = $this->cache->getItem($this->getStateKey($serviceName));
+
         return $item->isHit() ? $item->get() : self::STATE_CLOSED;
     }
 
     /**
-     * Set circuit state
+     * Set circuit state.
      */
     private function setState(string $serviceName, string $state): void
     {
@@ -125,39 +120,39 @@ class CircuitBreaker
         $this->cache->save($item);
 
         // Reset counters on state change
-        if ($state === self::STATE_HALF_OPEN) {
+        if (self::STATE_HALF_OPEN === $state) {
             $this->resetHalfOpenAttempts($serviceName);
         }
-        if ($state === self::STATE_CLOSED) {
+        if (self::STATE_CLOSED === $state) {
             $this->resetCounters($serviceName);
         }
     }
 
     /**
-     * Record successful execution
+     * Record successful execution.
      */
     private function recordSuccess(string $serviceName): void
     {
         $state = $this->getState($serviceName);
 
-        if ($state === self::STATE_HALF_OPEN) {
+        if (self::STATE_HALF_OPEN === $state) {
             $successCount = $this->incrementSuccessCount($serviceName);
-            
+
             if ($successCount >= $this->successThreshold) {
                 $this->setState($serviceName, self::STATE_CLOSED);
                 $this->logger->info('Circuit breaker closed', [
-                    'service' => $serviceName
+                    'service' => $serviceName,
                 ]);
             }
         }
 
-        if ($state === self::STATE_CLOSED) {
+        if (self::STATE_CLOSED === $state) {
             $this->resetFailureCount($serviceName);
         }
     }
 
     /**
-     * Record failed execution
+     * Record failed execution.
      */
     private function recordFailure(string $serviceName): void
     {
@@ -166,31 +161,32 @@ class CircuitBreaker
         if ($failureCount >= $this->failureThreshold) {
             $this->setState($serviceName, self::STATE_OPEN);
             $this->setOpenTimestamp($serviceName);
-            
+
             $this->logger->warning('Circuit breaker opened', [
                 'service' => $serviceName,
-                'failure_count' => $failureCount
+                'failure_count' => $failureCount,
             ]);
         }
     }
 
     /**
-     * Check if should attempt reset from OPEN to HALF_OPEN
+     * Check if should attempt reset from OPEN to HALF_OPEN.
      */
     private function shouldAttemptReset(string $serviceName): bool
     {
         $item = $this->cache->getItem($this->getOpenTimestampKey($serviceName));
-        
+
         if (!$item->isHit()) {
             return true;
         }
 
         $openTimestamp = $item->get();
+
         return (time() - $openTimestamp) >= $this->timeout;
     }
 
     /**
-     * Cache key helpers
+     * Cache key helpers.
      */
     private function getStateKey(string $serviceName): string
     {
@@ -218,7 +214,7 @@ class CircuitBreaker
     }
 
     /**
-     * Counter helpers
+     * Counter helpers.
      */
     private function incrementFailureCount(string $serviceName): int
     {
@@ -255,7 +251,8 @@ class CircuitBreaker
     private function getHalfOpenAttempts(string $serviceName): int
     {
         $item = $this->cache->getItem($this->getHalfOpenAttemptsKey($serviceName));
-        return $item->isHit() ? (int)$item->get() : 0;
+
+        return $item->isHit() ? (int) $item->get() : 0;
     }
 
     private function setOpenTimestamp(string $serviceName): void
@@ -269,18 +266,18 @@ class CircuitBreaker
     private function incrementCounter(string $key): int
     {
         $item = $this->cache->getItem($key);
-        $count = $item->isHit() ? (int)$item->get() : 0;
-        $count++;
-        
+        $count = $item->isHit() ? (int) $item->get() : 0;
+        ++$count;
+
         $item->set($count);
         $item->expiresAfter(300); // 5 minutes
         $this->cache->save($item);
-        
+
         return $count;
     }
 
     /**
-     * Public API for monitoring
+     * Public API for monitoring.
      */
     public function getCircuitStatus(string $serviceName): array
     {
@@ -289,11 +286,10 @@ class CircuitBreaker
 
         return [
             'state' => $this->getState($serviceName),
-            'failure_count' => $failureItem->isHit() ? (int)$failureItem->get() : 0,
-            'success_count' => $successItem->isHit() ? (int)$successItem->get() : 0,
+            'failure_count' => $failureItem->isHit() ? (int) $failureItem->get() : 0,
+            'success_count' => $successItem->isHit() ? (int) $successItem->get() : 0,
             'threshold' => $this->failureThreshold,
-            'timeout' => $this->timeout
+            'timeout' => $this->timeout,
         ];
     }
 }
-

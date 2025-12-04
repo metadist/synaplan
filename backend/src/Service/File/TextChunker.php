@@ -3,8 +3,8 @@
 namespace App\Service\File;
 
 /**
- * Text Chunker for RAG (Retrieval-Augmented Generation)
- * 
+ * Text Chunker for RAG (Retrieval-Augmented Generation).
+ *
  * Splits long text into semantic chunks suitable for vectorization and embedding.
  * Based on legacy BasicAI::chunkify() logic.
  */
@@ -13,13 +13,15 @@ class TextChunker
     public function __construct(
         private int $maxChunkSize = 500,        // Max characters per chunk
         private int $overlapSize = 50,          // Overlap between chunks
-        private int $minChunkSize = 100         // Min chunk size (avoid tiny chunks)
-    ) {}
+        private int $minChunkSize = 100,         // Min chunk size (avoid tiny chunks)
+    ) {
+    }
 
     /**
-     * Split text into semantic chunks
-     * 
+     * Split text into semantic chunks.
+     *
      * @param string $text The text to chunk
+     *
      * @return array Array of chunks: [['content' => string, 'start_line' => int, 'end_line' => int], ...]
      */
     public function chunkify(string $text): array
@@ -52,11 +54,11 @@ class TextChunker
 
                     // Start new chunk with overlap
                     $overlapText = $this->getOverlapText($currentChunk);
-                    $currentChunk = $overlapText . "\n" . $line;
+                    $currentChunk = $overlapText."\n".$line;
                     $chunkStartLine = max(0, $lineNum - $this->getOverlapLines($lines, $lineNum));
                 } else {
                     // Chunk too small, just add line
-                    $currentChunk .= "\n" . $line;
+                    $currentChunk .= "\n".$line;
                 }
             } else {
                 // Add line to current chunk
@@ -64,7 +66,7 @@ class TextChunker
                     $currentChunk = $line;
                     $chunkStartLine = $lineNum;
                 } else {
-                    $currentChunk .= "\n" . $line;
+                    $currentChunk .= "\n".$line;
                 }
             }
 
@@ -84,7 +86,7 @@ class TextChunker
     }
 
     /**
-     * Get overlap text from the end of current chunk
+     * Get overlap text from the end of current chunk.
      */
     private function getOverlapText(string $text): string
     {
@@ -95,8 +97,8 @@ class TextChunker
         // Get last N characters, but try to break at word boundary
         $overlap = substr($text, -$this->overlapSize);
         $spacePos = strpos($overlap, ' ');
-        
-        if ($spacePos !== false && $spacePos < $this->overlapSize / 2) {
+
+        if (false !== $spacePos && $spacePos < $this->overlapSize / 2) {
             return substr($overlap, $spacePos + 1);
         }
 
@@ -104,23 +106,23 @@ class TextChunker
     }
 
     /**
-     * Calculate how many lines to overlap
+     * Calculate how many lines to overlap.
      */
     private function getOverlapLines(array $lines, int $currentLineNum): int
     {
         $overlapChars = 0;
         $overlapLines = 0;
 
-        for ($i = $currentLineNum - 1; $i >= 0 && $overlapChars < $this->overlapSize; $i--) {
+        for ($i = $currentLineNum - 1; $i >= 0 && $overlapChars < $this->overlapSize; --$i) {
             $overlapChars += strlen($lines[$i]);
-            $overlapLines++;
+            ++$overlapLines;
         }
 
         return $overlapLines;
     }
 
     /**
-     * Chunk by fixed size (alternative simple method)
+     * Chunk by fixed size (alternative simple method).
      */
     public function chunkBySize(string $text, int $chunkSize = 500): array
     {
@@ -132,8 +134,8 @@ class TextChunker
             if (!empty(trim($chunk))) {
                 $chunks[] = [
                     'content' => trim($chunk),
-                    'start_line' => (int)($i / 100), // Approximate line number
-                    'end_line' => (int)(($i + strlen($chunk)) / 100),
+                    'start_line' => (int) ($i / 100), // Approximate line number
+                    'end_line' => (int) (($i + strlen($chunk)) / 100),
                 ];
             }
         }
@@ -141,4 +143,3 @@ class TextChunker
         return $chunks;
     }
 }
-

@@ -3,14 +3,13 @@
 namespace App\Tests\Unit;
 
 use App\AI\Service\AiFacade;
+use App\Entity\Message;
+use App\Repository\MessageRepository;
 use App\Service\Message\MessagePreProcessor;
 use App\Service\WhisperService;
-use App\Repository\MessageRepository;
-use App\Entity\Message;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
-use Symfony\Contracts\HttpClient\ResponseInterface;
 
 class MessagePreProcessorTest extends TestCase
 {
@@ -83,7 +82,7 @@ class MessagePreProcessorTest extends TestCase
         $message->method('getFilePath')->willReturn('test.pdf');
 
         $callbackCalled = false;
-        $callback = function($data) use (&$callbackCalled) {
+        $callback = function ($data) use (&$callbackCalled) {
             $callbackCalled = true;
             $this->assertArrayHasKey('status', $data);
             $this->assertArrayHasKey('message', $data);
@@ -127,7 +126,7 @@ class MessagePreProcessorTest extends TestCase
         $this->markTestSkipped('Complex mock test with logger expectations - needs refactoring');
         // Create temp audio file
         $tempDir = sys_get_temp_dir();
-        $tempFile = $tempDir . '/test_audio_' . uniqid() . '.mp3';
+        $tempFile = $tempDir.'/test_audio_'.uniqid().'.mp3';
         touch($tempFile);
 
         try {
@@ -173,7 +172,7 @@ class MessagePreProcessorTest extends TestCase
     {
         // Create temp audio file
         $tempDir = sys_get_temp_dir();
-        $tempFile = $tempDir . '/test_audio_' . uniqid() . '.ogg';
+        $tempFile = $tempDir.'/test_audio_'.uniqid().'.ogg';
         touch($tempFile);
 
         try {
@@ -231,4 +230,3 @@ class MessagePreProcessorTest extends TestCase
         $this->service->process($message);
     }
 }
-

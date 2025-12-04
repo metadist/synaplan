@@ -50,6 +50,7 @@ class EmailVerificationAttempt
     public function setEmail(string $email): self
     {
         $this->email = $email;
+
         return $this;
     }
 
@@ -60,8 +61,9 @@ class EmailVerificationAttempt
 
     public function incrementAttempts(): self
     {
-        $this->attempts++;
+        ++$this->attempts;
         $this->lastAttemptAt = new \DateTime();
+
         return $this;
     }
 
@@ -69,6 +71,7 @@ class EmailVerificationAttempt
     {
         $this->attempts = 1;
         $this->lastAttemptAt = new \DateTime();
+
         return $this;
     }
 
@@ -90,6 +93,7 @@ class EmailVerificationAttempt
     public function setIpAddress(?string $ipAddress): self
     {
         $this->ipAddress = $ipAddress;
+
         return $this;
     }
 
@@ -103,6 +107,7 @@ class EmailVerificationAttempt
         // Check cooldown
         $now = new \DateTime();
         $diff = $now->getTimestamp() - $this->lastAttemptAt->getTimestamp();
+
         return $diff >= ($cooldownMinutes * 60);
     }
 
@@ -110,6 +115,7 @@ class EmailVerificationAttempt
     {
         $nextAvailable = \DateTime::createFromInterface($this->lastAttemptAt);
         $nextAvailable->modify("+{$cooldownMinutes} minutes");
+
         return $nextAvailable;
     }
 
@@ -118,4 +124,3 @@ class EmailVerificationAttempt
         return max(0, $maxAttempts - $this->attempts);
     }
 }
-

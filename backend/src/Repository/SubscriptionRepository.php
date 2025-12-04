@@ -17,7 +17,7 @@ class SubscriptionRepository extends ServiceEntityRepository
     }
 
     /**
-     * Find subscription by level
+     * Find subscription by level.
      */
     public function findByLevel(string $level): ?Subscription
     {
@@ -25,11 +25,10 @@ class SubscriptionRepository extends ServiceEntityRepository
     }
 
     /**
-     * Find all active subscriptions
+     * Find all active subscriptions.
      */
     public function findAllActive(): array
     {
         return $this->findBy(['active' => true], ['priceMonthly' => 'ASC']);
     }
 }
-

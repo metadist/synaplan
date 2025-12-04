@@ -2,20 +2,19 @@
 
 namespace App\Tests\Unit;
 
-use App\Service\Message\Handler\ChatHandler;
 use App\AI\Service\AiFacade;
-use App\Repository\PromptRepository;
+use App\Entity\Message;
+use App\Entity\Model;
+use App\Entity\Prompt;
 use App\Repository\ModelRepository;
+use App\Repository\PromptRepository;
+use App\Service\Message\Handler\ChatHandler;
 use App\Service\ModelConfigService;
 use App\Service\PromptService;
 use App\Service\RAG\VectorSearchService;
-use App\Entity\Message;
-use App\Entity\Prompt;
-use App\Entity\Model;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
-use Symfony\Component\DependencyInjection\ContainerInterface;
 
 class ChatHandlerTest extends TestCase
 {
@@ -74,7 +73,7 @@ class ChatHandlerTest extends TestCase
         $classification = [
             'topic' => 'CHAT',
             'language' => 'en',
-            'model_id' => 42 // User-selected model
+            'model_id' => 42, // User-selected model
         ];
 
         $this->promptRepository->method('findOneBy')->willReturn(null);
@@ -87,14 +86,14 @@ class ChatHandlerTest extends TestCase
             ->with(
                 $this->anything(),
                 1,
-                $this->callback(function($options) {
-                    return $options['provider'] === 'ollama' && $options['model'] === 'llama3';
+                $this->callback(function ($options) {
+                    return 'ollama' === $options['provider'] && 'llama3' === $options['model'];
                 })
             )
             ->willReturn([
                 'content' => 'Response text',
                 'provider' => 'ollama',
-                'model' => 'llama3'
+                'model' => 'llama3',
             ]);
 
         $result = $this->handler->handle($message, [], $classification);
@@ -119,7 +118,7 @@ class ChatHandlerTest extends TestCase
 
         $classification = [
             'topic' => 'CHAT',
-            'language' => 'en'
+            'language' => 'en',
         ];
 
         $this->promptRepository->method('findOneBy')->willReturn(null);
@@ -132,7 +131,7 @@ class ChatHandlerTest extends TestCase
             ->willReturn([
                 'content' => 'Response',
                 'provider' => 'openai',
-                'model' => 'gpt-4'
+                'model' => 'gpt-4',
             ]);
 
         $result = $this->handler->handle($message, [], $classification);
@@ -162,7 +161,7 @@ class ChatHandlerTest extends TestCase
         $jsonResponse = json_encode([
             'BTEXT' => 'Extracted text content',
             'BFILE' => 1,
-            'BFILETEXT' => '/path/to/file.jpg'
+            'BFILETEXT' => '/path/to/file.jpg',
         ]);
 
         $this->aiFacade
@@ -170,7 +169,7 @@ class ChatHandlerTest extends TestCase
             ->willReturn([
                 'content' => $jsonResponse,
                 'provider' => 'test',
-                'model' => 'test'
+                'model' => 'test',
             ]);
 
         $result = $this->handler->handle($message, [], $classification);
@@ -207,7 +206,7 @@ class ChatHandlerTest extends TestCase
             ->expects($this->once())
             ->method('chat')
             ->with(
-                $this->callback(function($messages) {
+                $this->callback(function ($messages) {
                     // Should have system, thread, and current message
                     return count($messages) >= 3;
                 }),
@@ -217,7 +216,7 @@ class ChatHandlerTest extends TestCase
             ->willReturn([
                 'content' => 'Response',
                 'provider' => 'test',
-                'model' => 'test'
+                'model' => 'test',
             ]);
 
         $this->handler->handle($message, $thread, $classification);
@@ -241,12 +240,12 @@ class ChatHandlerTest extends TestCase
         $this->aiFacade->method('chat')->willReturn([
             'content' => 'Response',
             'provider' => 'test',
-            'model' => 'test'
+            'model' => 'test',
         ]);
 
         $callbackCalled = 0;
-        $callback = function($status) use (&$callbackCalled) {
-            $callbackCalled++;
+        $callback = function ($status) use (&$callbackCalled) {
+            ++$callbackCalled;
             $this->assertArrayHasKey('status', $status);
             $this->assertArrayHasKey('message', $status);
         };
@@ -284,7 +283,7 @@ class ChatHandlerTest extends TestCase
         $this->aiFacade->method('chat')->willReturn([
             'content' => 'Response',
             'provider' => 'test',
-            'model' => 'test'
+            'model' => 'test',
         ]);
 
         $this->handler->handle($message, [], ['topic' => 'CHAT', 'language' => 'de']);
@@ -301,7 +300,7 @@ class ChatHandlerTest extends TestCase
         $this->modelConfigService->method('getDefaultModel')->willReturn(null);
 
         $chunks = [];
-        $streamCallback = function($chunk) use (&$chunks) {
+        $streamCallback = function ($chunk) use (&$chunks) {
             $chunks[] = $chunk;
         };
 
@@ -335,7 +334,7 @@ class ChatHandlerTest extends TestCase
         // Mock PromptService to return prompt data with metadata
         $promptMock = $this->createMock(Prompt::class);
         $promptMock->method('getPrompt')->willReturn('You are an AI assistant with knowledge about Cristian Grosu.');
-        
+
         $this->promptService
             ->expects($this->once())
             ->method('getPromptWithMetadata')
@@ -346,8 +345,8 @@ class ChatHandlerTest extends TestCase
                     'aiModel' => -1,
                     'tool_internet_search' => true,
                     'tool_files_search' => true,
-                    'tool_url_screenshot' => false
-                ]
+                    'tool_url_screenshot' => false,
+                ],
             ]);
 
         $this->modelConfigService->method('getDefaultModel')->willReturn(30);
@@ -359,7 +358,7 @@ class ChatHandlerTest extends TestCase
         $model->method('getJson')->willReturn(['supportsStreaming' => true]);
         $this->modelRepository->method('find')->willReturn($model);
 
-        $streamCallback = function($chunk) {};
+        $streamCallback = function ($chunk) {};
 
         $this->aiFacade
             ->expects($this->once())
@@ -375,4 +374,3 @@ class ChatHandlerTest extends TestCase
         );
     }
 }
-

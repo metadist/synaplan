@@ -5,15 +5,14 @@ namespace App\Controller;
 use App\Entity\User;
 use Doctrine\ORM\EntityManagerInterface;
 use Lexik\Bundle\JWTAuthenticationBundle\Services\JWTTokenManagerInterface;
+use OpenApi\Attributes as OA;
 use Psr\Log\LoggerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
-use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\CurrentUser;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
-use OpenApi\Attributes as OA;
 
 #[Route('/api/v1/auth')]
 class OidcRefreshController extends AbstractController
@@ -29,8 +28,9 @@ class OidcRefreshController extends AbstractController
         private ?string $googleClientId,
         private ?string $googleClientSecret,
         private ?string $githubClientId,
-        private ?string $githubClientSecret
-    ) {}
+        private ?string $githubClientSecret,
+    ) {
+    }
 
     #[Route('/refresh-token', name: 'auth_refresh_token', methods: ['POST'])]
     #[OA\Post(
@@ -45,7 +45,7 @@ class OidcRefreshController extends AbstractController
         content: new OA\JsonContent(
             properties: [
                 new OA\Property(property: 'success', type: 'boolean', example: true),
-                new OA\Property(property: 'token', type: 'string', example: 'eyJ0eXAiOiJKV1QiLCJhbGc...')
+                new OA\Property(property: 'token', type: 'string', example: 'eyJ0eXAiOiJKV1QiLCJhbGc...'),
             ]
         )
     )]
@@ -64,19 +64,19 @@ class OidcRefreshController extends AbstractController
             $refreshToken = null;
             $newAccessToken = null;
 
-            if ($userType === 'OIDC' && isset($userDetails['oidc_refresh_token'])) {
+            if ('OIDC' === $userType && isset($userDetails['oidc_refresh_token'])) {
                 $refreshToken = $userDetails['oidc_refresh_token'];
                 $newAccessToken = $this->refreshOidcToken($refreshToken, $userDetails);
-            } elseif ($userType === 'GOOGLE' && isset($userDetails['google_refresh_token'])) {
+            } elseif ('GOOGLE' === $userType && isset($userDetails['google_refresh_token'])) {
                 $refreshToken = $userDetails['google_refresh_token'];
                 $newAccessToken = $this->refreshGoogleToken($refreshToken, $userDetails);
-            } elseif ($userType === 'GITHUB' && isset($userDetails['github_access_token'])) {
+            } elseif ('GITHUB' === $userType && isset($userDetails['github_access_token'])) {
                 // GitHub tokens don't expire, just verify it's still valid
                 $newAccessToken = $userDetails['github_access_token'];
             } else {
                 return $this->json([
                     'error' => 'No refresh token available',
-                    'message' => 'This account type does not support token refresh'
+                    'message' => 'This account type does not support token refresh',
                 ], Response::HTTP_BAD_REQUEST);
             }
 
@@ -85,30 +85,29 @@ class OidcRefreshController extends AbstractController
 
             $this->logger->info('Token refreshed successfully', [
                 'user_id' => $user->getId(),
-                'type' => $userType
+                'type' => $userType,
             ]);
 
             return $this->json([
                 'success' => true,
-                'token' => $jwtToken
+                'token' => $jwtToken,
             ]);
-
         } catch (\Exception $e) {
             $this->logger->error('Token refresh failed', [
                 'user_id' => $user->getId(),
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ]);
 
             return $this->json([
                 'error' => 'Token refresh failed',
-                'message' => $e->getMessage()
+                'message' => $e->getMessage(),
             ], Response::HTTP_UNAUTHORIZED);
         }
     }
 
     private function refreshOidcToken(string $refreshToken, array $userDetails): string
     {
-        $discoveryEndpoint = rtrim($this->oidcDiscoveryUrl, '/') . '/.well-known/openid-configuration';
+        $discoveryEndpoint = rtrim($this->oidcDiscoveryUrl, '/').'/.well-known/openid-configuration';
         $discoveryResponse = $this->httpClient->request('GET', $discoveryEndpoint);
         $discovery = $discoveryResponse->toArray();
 
@@ -117,8 +116,8 @@ class OidcRefreshController extends AbstractController
                 'client_id' => $this->oidcClientId,
                 'client_secret' => $this->oidcClientSecret,
                 'refresh_token' => $refreshToken,
-                'grant_type' => 'refresh_token'
-            ]
+                'grant_type' => 'refresh_token',
+            ],
         ]);
 
         $tokenData = $tokenResponse->toArray();
@@ -153,8 +152,8 @@ class OidcRefreshController extends AbstractController
                 'client_id' => $this->googleClientId,
                 'client_secret' => $this->googleClientSecret,
                 'refresh_token' => $refreshToken,
-                'grant_type' => 'refresh_token'
-            ]
+                'grant_type' => 'refresh_token',
+            ],
         ]);
 
         $tokenData = $tokenResponse->toArray();
@@ -170,7 +169,7 @@ class OidcRefreshController extends AbstractController
     private function getCurrentUser(): ?User
     {
         $user = $this->getUser();
+
         return $user instanceof User ? $user : null;
     }
 }
-

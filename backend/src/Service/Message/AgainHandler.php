@@ -5,16 +5,15 @@ namespace App\Service\Message;
 use App\Entity\Message;
 use App\Entity\MessageMeta;
 use App\Entity\User;
-use App\Service\Message\MessageProcessor;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 
 /**
- * AgainHandler
- * 
+ * AgainHandler.
+ *
  * Handles "Again" requests where a user wants to re-process
  * their message with a different AI model.
- * 
+ *
  * This keeps the MessageController clean and separates concerns.
  */
 class AgainHandler
@@ -22,15 +21,18 @@ class AgainHandler
     public function __construct(
         private EntityManagerInterface $em,
         private MessageProcessor $messageProcessor,
-        private LoggerInterface $logger
-    ) {}
+        private LoggerInterface $logger,
+    ) {
+    }
 
     /**
-     * Process an "Again" request
-     * 
-     * @param User $user Current user
+     * Process an "Again" request.
+     *
+     * @param User  $user Current user
      * @param array $data Request data with originalMessageId, modelId, promptId
+     *
      * @return array Response data
+     *
      * @throws \Exception On processing errors
      */
     public function processAgainRequest(User $user, array $data): array
@@ -45,7 +47,7 @@ class AgainHandler
 
         // Get original incoming message
         $originalMessage = $this->em->getRepository(Message::class)->find($originalMessageId);
-        
+
         if (!$originalMessage || $originalMessage->getUserId() !== $user->getId()) {
             throw new \RuntimeException('Original message not found or access denied');
         }
@@ -55,13 +57,13 @@ class AgainHandler
 
         // Create new incoming message with same content (or media prompt override)
         $incomingMessage = $this->createIncomingMessage($user, $originalMessage, $mediaPrompt, $mediaType);
-        
+
         $this->em->persist($incomingMessage);
         $this->em->flush();
-        
+
         $this->logger->info('AgainHandler: Message persisted and flushed', [
             'message_id' => $incomingMessage->getId(),
-            'has_id' => $incomingMessage->getId() !== null
+            'has_id' => null !== $incomingMessage->getId(),
         ]);
 
         // Set metadata for skipping sorting
@@ -108,20 +110,19 @@ class AgainHandler
                 'timestamp' => $outgoingMessage->getUnixTimestamp(),
                 'trackId' => $outgoingMessage->getTrackingId(),
                 'topic' => $incomingMessage->getTopic(),
-            ]
+            ],
         ];
     }
 
     /**
-     * Create incoming message clone
+     * Create incoming message clone.
      */
     private function createIncomingMessage(
         User $user,
         Message $originalMessage,
         ?string $mediaPrompt = null,
-        ?string $mediaType = null
-    ): Message
-    {
+        ?string $mediaType = null,
+    ): Message {
         $message = new Message();
         $message->setUserId($user->getId());
         $message->setTrackingId($originalMessage->getTrackingId());
@@ -142,7 +143,7 @@ class AgainHandler
         $message->setDirection('IN');
         $message->setStatus('processing');
 
-        if ($mediaPrompt && $mediaType === 'audio') {
+        if ($mediaPrompt && 'audio' === $mediaType) {
             $message->setText($mediaPrompt);
             $message->setTopic('mediamaker');
             $message->setMeta('media_prompt_override', $mediaPrompt);
@@ -164,12 +165,12 @@ class AgainHandler
                 if (($chunk['type'] ?? '') === 'content' && isset($chunk['content'])) {
                     $buffer .= $chunk['content'];
                 } elseif (isset($chunk['message'])) {
-                    $buffer .= (string)$chunk['message'];
+                    $buffer .= (string) $chunk['message'];
                 } elseif (isset($chunk['content'])) {
-                    $buffer .= (string)$chunk['content'];
+                    $buffer .= (string) $chunk['content'];
                 }
             } else {
-                $buffer .= (string)$chunk;
+                $buffer .= (string) $chunk;
             }
         };
 
@@ -195,21 +196,21 @@ class AgainHandler
     }
 
     /**
-     * Set message metadata to skip sorting
+     * Set message metadata to skip sorting.
      */
     private function setMessageMetadata(Message $message, ?string $promptId, ?int $modelId): void
     {
         $this->logger->info('AgainHandler: setMessageMetadata called', [
             'message_id' => $message->getId(),
-            'has_id' => $message->getId() !== null,
+            'has_id' => null !== $message->getId(),
             'prompt_id' => $promptId,
-            'model_id' => $modelId
+            'model_id' => $modelId,
         ]);
-        
+
         // Message must be flushed before creating MessageMeta (needs message ID)
         if (!$message->getId()) {
             $this->logger->error('AgainHandler: Message has no ID!', [
-                'message' => $message
+                'message' => $message,
             ]);
             throw new \LogicException('Message must be persisted and flushed before setting metadata');
         }
@@ -244,7 +245,7 @@ class AgainHandler
         string $responseText,
         array $classification,
         array $handlerResponse,
-        ?int $selectedModelId
+        ?int $selectedModelId,
     ): Message {
         $metadata = $handlerResponse['metadata'] ?? [];
         $fileMeta = $metadata['file'] ?? null;
@@ -285,9 +286,9 @@ class AgainHandler
         $message->setMeta('ai_chat_model', $metadata['model'] ?? 'unknown');
 
         if ($selectedModelId) {
-            $message->setMeta('ai_chat_model_id', (string)$selectedModelId);
+            $message->setMeta('ai_chat_model_id', (string) $selectedModelId);
         } elseif (!empty($metadata['model_id'])) {
-            $message->setMeta('ai_chat_model_id', (string)$metadata['model_id']);
+            $message->setMeta('ai_chat_model_id', (string) $metadata['model_id']);
         }
 
         if (!empty($metadata['usage'])) {
@@ -301,14 +302,14 @@ class AgainHandler
             $message->setMeta('ai_sorting_model', $classification['sorting_model_name']);
         }
         if (!empty($classification['sorting_model_id'])) {
-            $message->setMeta('ai_sorting_model_id', (string)$classification['sorting_model_id']);
+            $message->setMeta('ai_sorting_model_id', (string) $classification['sorting_model_id']);
         }
 
         return $message;
     }
 
     /**
-     * Parse media markers like [IMAGE:url] or [VIDEO:url]
+     * Parse media markers like [IMAGE:url] or [VIDEO:url].
      */
     private function parseMediaMarkers(string $text): array
     {
@@ -331,6 +332,4 @@ class AgainHandler
 
         return [$hasFile, $filePath, $fileType, $cleanText];
     }
-
 }
-
