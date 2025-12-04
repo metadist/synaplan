@@ -464,7 +464,7 @@ const streamAIResponse = async (userMessage: string, options?: { includeReasonin
 
             // Check if this is a file generation (backend sends 'Datei wird generiert...')
             if (data.message && (data.message.includes('Datei') || data.message.includes('file'))) {
-              processingStatus.value = 'generating_file'
+              processingStatus.value = 'generatingFile'
             }
 
             // Update message with real model from backend (instead of store model)
