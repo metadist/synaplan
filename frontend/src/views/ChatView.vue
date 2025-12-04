@@ -683,6 +683,9 @@ const streamAIResponse = async (userMessage: string, options?: { includeReasonin
                   const messageIndex = historyStore.messages.findIndex(m => m.id === message.id)
                   if (messageIndex !== -1) {
                     // Create completely new message object
+                    // FIXME: This entire block is cargo-cult reactivity code - message is already a store reference,
+                    // Vue 3 Proxy detects mutations automatically. The ternary is unnecessary (files already mutated above),
+                    // and spreading parts/files just wastes CPU creating shallow copies of already-mutated arrays.
                     const updatedMessage = {
                       ...message,
                       files: message.files ? [...message.files] : undefined,
