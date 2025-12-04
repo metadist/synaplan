@@ -836,8 +836,7 @@ const addDepartment = () => {
   }
 }
 
-const removeDepartment = (id?: string) => {
-  if (!id) return
+const removeDepartment = (id: string) => {
   const index = departments.value.findIndex(d => d.id === id)
   if (index !== -1) {
     const wasDefault = departments.value[index].isDefault
@@ -848,8 +847,7 @@ const removeDepartment = (id?: string) => {
   }
 }
 
-const setDefault = (id?: string) => {
-  if (!id) return
+const setDefault = (id: string) => {
   departments.value.forEach(d => {
     d.isDefault = d.id === id
   })
