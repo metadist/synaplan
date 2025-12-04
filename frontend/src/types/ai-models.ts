@@ -17,16 +17,16 @@ export interface AIModel {
   id: number
   service: string
   name: string
-  tag?: string | null
-  providerId?: string | null
-  quality?: number | null
-  rating?: number | null
-  priceIn?: number | null
-  priceOut?: number | null
-  selectable?: boolean
-  description?: string | null
-  isSystemModel?: boolean
-  features?: string[]
+  tag: string
+  providerId: string
+  quality: number
+  rating: number
+  priceIn?: number | null  // Not returned by backend getModels
+  priceOut?: number | null  // Not returned by backend getModels
+  selectable?: boolean  // Not returned by backend getModels
+  description: string | null
+  isSystemModel: boolean
+  features: string[]
 }
 
 export interface AgainData {
