@@ -136,7 +136,7 @@ class ChatController extends AbstractController
 
         $chat = new Chat();
         $chat->setUserId($user->getId());
-        
+
         if ($title) {
             $chat->setTitle($title);
         }
@@ -383,7 +383,7 @@ class ChatController extends AbstractController
             'success' => true,
             'shareToken' => $chat->getShareToken(),
             'isShared' => $chat->isPublic(),
-            'shareUrl' => $chat->isPublic() 
+            'shareUrl' => $chat->isPublic()
                 ? $this->generateUrl('api_chats_shared', ['token' => $chat->getShareToken()], true)
                 : null
         ]);
@@ -467,12 +467,12 @@ class ChatController extends AbstractController
                     ];
                 }
             }
-            
+
             // Get AI model metadata for assistant messages
             $aiModels = [];
             $webSearchData = null;
             $searchResultsData = [];
-            
+
             if ($m->getDirection() === 'OUT') {
                 // Chat model (used for generating the response)
                 $chatProvider = $m->getMeta('ai_chat_provider');
@@ -484,7 +484,7 @@ class ChatController extends AbstractController
                         'model_id' => null, // Chat model ID is not stored (selected from config)
                     ];
                 }
-                
+
                 // Sorting model (used for classification/routing)
                 $sortingProvider = $m->getMeta('ai_sorting_provider');
                 $sortingModel = $m->getMeta('ai_sorting_model');
@@ -496,7 +496,7 @@ class ChatController extends AbstractController
                         'model_id' => $sortingModelId ? (int)$sortingModelId : null,
                     ];
                 }
-                
+
                 // Web Search metadata
                 $searchQuery = $m->getMeta('web_search_query');
                 $searchResultsCount = $m->getMeta('web_search_results_count');
@@ -505,7 +505,7 @@ class ChatController extends AbstractController
                         'query' => $searchQuery,
                         'resultsCount' => $searchResultsCount ? (int)$searchResultsCount : 0
                     ];
-                    
+
                     // Load actual search results from DB
                     // Search results are stored on the INCOMING (user) message, but we need to display them
                     // on the OUTGOING (AI) message. So we need to find the previous incoming message.
@@ -520,7 +520,7 @@ class ChatController extends AbstractController
                         ->setMaxResults(1)
                         ->getQuery()
                         ->getOneOrNullResult();
-                    
+
                     if ($incomingMessage) {
                         $searchResults = $this->searchResultRepository->findByMessage($incomingMessage);
                         foreach ($searchResults as $sr) {
@@ -544,7 +544,7 @@ class ChatController extends AbstractController
                     ];
                 }
             }
-            
+
             return [
                 'id' => $m->getId(),
                 'text' => $m->getText(),
@@ -639,7 +639,7 @@ class ChatController extends AbstractController
                 'topic' => $m->getTopic(),
                 'language' => $m->getLanguage(),
             ];
-            
+
             // Include file information if present
             if ($m->getFile() && $m->getFilePath()) {
                 $data['file'] = [
@@ -647,7 +647,7 @@ class ChatController extends AbstractController
                     'type' => $m->getFileType()
                 ];
             }
-            
+
             return $data;
         }, $messages);
 
