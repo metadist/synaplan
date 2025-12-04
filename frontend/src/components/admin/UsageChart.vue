@@ -73,20 +73,6 @@ const props = defineProps<Props>()
 
 const chartType = ref<'line' | 'bar'>('line')
 
-// Action colors
-const actionColors: Record<string, string> = {
-  'chat': '#3b82f6',
-  'image_generation': '#ec4899',
-  'video_generation': '#8b5cf6',
-  'embedding': '#10b981',
-  'search': '#f59e0b',
-  'file_analysis': '#06b6d4',
-}
-
-const getActionColor = (action: string) => {
-  return actionColors[action.toLowerCase()] || '#6b7280'
-}
-
 // Chart data
 const chartData = computed(() => {
   const labels = Object.keys(props.data)

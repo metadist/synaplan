@@ -45,6 +45,7 @@ export interface FileItem {
   uploaded_date: string
   message_id: number | null
   is_attached: boolean
+  group_key?: string
 }
 
 export interface FileListResponse {
@@ -179,6 +180,8 @@ export const getFileContent = async (fileId: number): Promise<{
   filename: string
   file_path: string
   file_type: string
+  file_size?: number
+  mime?: string
   extracted_text: string
   status: string
   uploaded_at: number
@@ -189,6 +192,8 @@ export const getFileContent = async (fileId: number): Promise<{
     filename: string
     file_path: string
     file_type: string
+    file_size?: number
+    mime?: string
     extracted_text: string
     status: string
     uploaded_at: number

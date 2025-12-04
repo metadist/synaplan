@@ -203,7 +203,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import { getUsageStats, downloadUsageExport } from '@/api/usageApi'
+import { getUsageStats, downloadUsageExport, type UsageStats } from '@/api/usageApi'
 import { useNotification } from '@/composables/useNotification'
 import { useI18n } from 'vue-i18n'
 
@@ -213,7 +213,7 @@ const { t } = useI18n()
 const loading = ref(false)
 const exporting = ref(false)
 const error = ref<string | null>(null)
-const stats = ref<any>(null)
+const stats = ref<UsageStats | null>(null)
 
 const loadStats = async () => {
   try {
@@ -289,7 +289,7 @@ const getSourceIcon = (source: string) => {
 }
 
 const getTimePeriodLabel = (period: string) => {
-  return t(`config.usage.periods.${period}`)
+  return t(`config.usage.periods.${period.toLowerCase()}`)
 }
 
 const formatLimit = (limit: number) => {

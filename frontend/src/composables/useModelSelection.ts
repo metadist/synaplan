@@ -1,15 +1,16 @@
 import { computed, type ComputedRef } from 'vue'
-import { useAiConfigStore, type AIModel } from '@/stores/aiConfig'
+import { useAiConfigStore } from '@/stores/aiConfig'
+import type { AIModel, Capability } from '@/types/ai-models'
 import type { AgainData as BackendAgainData } from '@/types/ai-models'
 
 export interface ModelOption {
   provider: string
   model: string
   label: string
-  id?: number
-  quality?: number
-  rating?: number
-  description?: string
+  id: number
+  quality: number
+  rating: number
+  description: string | null
 }
 
 /**
@@ -37,11 +38,11 @@ export function useModelSelection(
    * Resolve preferred tag based on backend-provided Again data
    * Falls back from direct tag → predicted model tag → first eligible tag
    */
-  const preferredTag = computed((): string | null => {
+  const preferredTag = computed((): string | undefined => {
     const tagSources: Array<string | undefined> = [
-      againData?.value?.tag,
-      againData?.value?.predictedNext?.tag,
-      againData?.value?.eligible?.[0]?.tag
+      againData?.value?.tag ?? undefined,
+      againData?.value?.predictedNext?.tag ?? undefined,
+      againData?.value?.eligible?.[0]?.tag ?? undefined
     ]
 
     for (const tag of tagSources) {
@@ -50,7 +51,7 @@ export function useModelSelection(
       }
     }
 
-    return null
+    return undefined
   })
 
   /**
@@ -85,7 +86,7 @@ export function useModelSelection(
   /**
    * Get the appropriate model tag based on media type
    */
-  const modelTag = computed((): string => {
+  const modelTag = computed((): Capability => {
     switch (mediaType.value) {
       case 'image': return 'TEXT2PIC'
       case 'video': return 'TEXT2VID'
@@ -112,10 +113,9 @@ export function useModelSelection(
     }
 
     // Search across ALL model tags to find current model
-    const allTags = Object.keys(aiConfigStore.models)
-    for (const tag of allTags) {
-      const models = aiConfigStore.models[tag] || []
-      const found = models.find((m: AIModel) => 
+    for (const models of Object.values(aiConfigStore.models)) {
+      if (!models) continue
+      const found = models.find((m: AIModel) =>
         m.service.toLowerCase() === currentProvider.value?.toLowerCase() &&
         m.name.toLowerCase() === currentModelName.value?.toLowerCase()
       )
@@ -149,7 +149,7 @@ export function useModelSelection(
     }
 
     return models
-      .sort((a: AIModel, b: AIModel) => (b.rating || 0) - (a.rating || 0)) // Sort by BRANKING descending
+      .sort((a: AIModel, b: AIModel) => b.rating - a.rating) // Sort by BRANKING descending
       .map((model: AIModel) => ({
         provider: model.service,
         model: model.name,

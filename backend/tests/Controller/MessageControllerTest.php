@@ -22,9 +22,10 @@ class MessageControllerTest extends WebTestCase
 
     protected function setUp(): void
     {
+        self::ensureKernelShutdown();
         $this->client = static::createClient();
-        $this->em = static::getContainer()->get('doctrine')->getManager();
-        
+        $this->em = $this->client->getContainer()->get('doctrine')->getManager();
+
         // Create test user
         $this->user = new User();
         $this->user->setMail('test@example.com');
@@ -32,9 +33,13 @@ class MessageControllerTest extends WebTestCase
         $this->user->setUserLevel('PRO');
         $this->user->setProviderId('test-provider');
         $this->user->setCreated(date('YmdHis'));
-        
+
         $this->em->persist($this->user);
         $this->em->flush();
+
+        // Configure test user to use 'test' AI provider
+        $modelConfigService = $this->client->getContainer()->get(\App\Service\ModelConfigService::class);
+        $modelConfigService->setDefaultProvider($this->user->getId(), 'chat', 'test');
 
         // Generate JWT token for authentication
         $this->token = $this->generateJwtToken($this->user);
@@ -42,29 +47,47 @@ class MessageControllerTest extends WebTestCase
 
     protected function tearDown(): void
     {
-        // Cleanup: Remove test messages
+        // Cleanup: Remove test data
         if ($this->em && $this->user) {
+            $userId = $this->user->getId();
+
+            // Remove test messages
             $messages = $this->em->getRepository(Message::class)
-                ->findBy(['userId' => $this->user->getId()]);
-            
+                ->findBy(['userId' => $userId]);
             foreach ($messages as $message) {
                 $this->em->remove($message);
             }
-            
-            // Remove test user
+
+            // Remove UseLog entries (rate limit tracking)
+            $useLogs = $this->em->getRepository(\App\Entity\UseLog::class)
+                ->findBy(['userId' => $userId]);
+            foreach ($useLogs as $useLog) {
+                $this->em->remove($useLog);
+            }
+
+            // Remove Config entries (model preferences)
+            $configs = $this->em->getRepository(\App\Entity\Config::class)
+                ->findBy(['ownerId' => $userId]);
+            foreach ($configs as $config) {
+                $this->em->remove($config);
+            }
+
+            $this->em->flush();
+
+            // Now safe to remove test user
             $this->em->remove($this->user);
             $this->em->flush();
         }
-        
+
         // Ensure kernel is shutdown for next test
         static::ensureKernelShutdown();
-        
+
         parent::tearDown();
     }
 
     private function generateJwtToken(User $user): string
     {
-        $jwtManager = static::getContainer()->get('lexik_jwt_authentication.jwt_manager');
+        $jwtManager = $this->client->getContainer()->get('lexik_jwt_authentication.jwt_manager');
         return $jwtManager->create($user);
     }
 
@@ -171,14 +194,16 @@ class MessageControllerTest extends WebTestCase
         );
 
         $this->assertResponseIsSuccessful();
-        
+
         $response = json_decode($this->client->getResponse()->getContent(), true);
-        $this->assertIsArray($response);
-        $this->assertGreaterThanOrEqual(5, count($response));
-        
+        $this->assertArrayHasKey('success', $response);
+        $this->assertArrayHasKey('messages', $response);
+        $this->assertIsArray($response['messages']);
+        $this->assertGreaterThanOrEqual(5, count($response['messages']));
+
         // Check structure of first message
-        if (count($response) > 0) {
-            $firstMessage = $response[0];
+        if (count($response['messages']) > 0) {
+            $firstMessage = $response['messages'][0];
             $this->assertArrayHasKey('id', $firstMessage);
             $this->assertArrayHasKey('text', $firstMessage);
             $this->assertArrayHasKey('direction', $firstMessage);
@@ -220,12 +245,14 @@ class MessageControllerTest extends WebTestCase
         );
 
         $this->assertResponseIsSuccessful();
-        
+
         $response = json_decode($this->client->getResponse()->getContent(), true);
-        $this->assertIsArray($response);
-        
+        $this->assertArrayHasKey('success', $response);
+        $this->assertArrayHasKey('messages', $response);
+        $this->assertIsArray($response['messages']);
+
         // All messages should have the same trackId
-        foreach ($response as $msg) {
+        foreach ($response['messages'] as $msg) {
             $this->assertEquals($trackId, $msg['trackId']);
         }
     }
@@ -368,11 +395,13 @@ class MessageControllerTest extends WebTestCase
             ])
         );
 
-        $this->assertResponseIsSuccessful();
-        
+        // Enqueue returns HTTP 202 Accepted
+        $this->assertResponseStatusCodeSame(Response::HTTP_ACCEPTED);
+
         $response = json_decode($this->client->getResponse()->getContent(), true);
-        $this->assertArrayHasKey('success', $response);
-        $this->assertTrue($response['success']);
-        $this->assertArrayHasKey('messageId', $response);
+        $this->assertArrayHasKey('message_id', $response);
+        $this->assertArrayHasKey('tracking_id', $response);
+        $this->assertArrayHasKey('status', $response);
+        $this->assertEquals('queued', $response['status']);
     }
 }

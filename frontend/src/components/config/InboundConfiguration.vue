@@ -164,7 +164,6 @@ const originalData = ref({
 // Computed refs for template access
 const whatsappChannels = computed(() => formData.value.whatsappChannels)
 const emailChannels = computed(() => formData.value.emailChannels)
-const apiConfig = computed(() => formData.value.apiConfig)
 const emailKeyword = computed({
   get: () => formData.value.emailKeyword,
   set: (val: string) => formData.value.emailKeyword = val

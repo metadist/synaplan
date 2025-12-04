@@ -598,7 +598,8 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { Icon } from '@iconify/vue'
 import { promptsApi, type TaskPrompt as ApiTaskPrompt, type PromptFile, type AvailableFile } from '@/services/api/promptsApi'
-import { configApi, type ModelInfo } from '@/services/api/configApi'
+import { configApi } from '@/services/api/configApi'
+import type { AIModel, Capability } from '@/types/ai-models'
 import { useNotification } from '@/composables/useNotification'
 import { useUnsavedChanges } from '@/composables/useUnsavedChanges'
 import { useDialog } from '@/composables/useDialog'
@@ -665,7 +666,7 @@ const availableFilesSearch = ref('')
 const loadingAvailableFiles = ref(false)
 
 // Models from API
-const allModels = ref<{ [capability: string]: ModelInfo[] }>({})
+const allModels = ref<Partial<Record<Capability, AIModel[]>>>({})
 const loadingModels = ref(false)
 
 // Available tools with icons (removed image/video generation as they're not clickable tools)
@@ -677,22 +678,22 @@ const availableTools: ToolOption[] = [
 
 // Group models by capability for dropdown
 const groupedModels = computed(() => {
-  const groups: { label: string; models: ModelInfo[]; capability: string }[] = []
+  const groups: { label: string; models: AIModel[]; capability: Capability }[] = []
   
-  const capabilityLabels: Record<string, string> = {
-    'CHAT': 'Chat & General AI',
-    'SORT': 'Message Sorting',
-    'TEXT2PIC': 'Image Generation',
-    'TEXT2VID': 'Video Generation',
-    'TEXT2SOUND': 'Text-to-Speech',
-    'SOUND2TEXT': 'Speech-to-Text',
-    'PIC2TEXT': 'Vision (Image Analysis)',
-    'VECTORIZE': 'Embedding / RAG',
-    'ANALYZE': 'File Analysis'
+  const capabilityLabels: Record<Capability, string> = {
+    CHAT: 'Chat & General AI',
+    SORT: 'Message Sorting',
+    TEXT2PIC: 'Image Generation',
+    TEXT2VID: 'Video Generation',
+    TEXT2SOUND: 'Text-to-Speech',
+    SOUND2TEXT: 'Speech-to-Text',
+    PIC2TEXT: 'Vision (Image Analysis)',
+    VECTORIZE: 'Embedding / RAG',
+    ANALYZE: 'File Analysis'
   }
-  
+
   // Order of capabilities in dropdown
-  const orderedCapabilities = ['CHAT', 'TEXT2PIC', 'TEXT2VID', 'TEXT2SOUND', 'SOUND2TEXT', 'PIC2TEXT', 'ANALYZE', 'VECTORIZE', 'SORT']
+  const orderedCapabilities: Capability[] = ['CHAT', 'TEXT2PIC', 'TEXT2VID', 'TEXT2SOUND', 'SOUND2TEXT', 'PIC2TEXT', 'ANALYZE', 'VECTORIZE', 'SORT']
   
   orderedCapabilities.forEach(capability => {
     if (allModels.value[capability] && allModels.value[capability].length > 0) {
@@ -792,10 +793,11 @@ const loadPrompts = async () => {
       if (metadata.aiModel && metadata.aiModel > 0) {
         // Find model by ID in all capabilities
         let foundModel = null
-        for (const capability in allModels.value) {
-          const models = allModels.value[capability]
-          foundModel = models.find((m: any) => m.id === metadata.aiModel)
-          if (foundModel) break
+        for (const models of Object.values(allModels.value)) {
+          if (models) {
+            foundModel = models.find((m: any) => m.id === metadata.aiModel)
+            if (foundModel) break
+          }
         }
         if (foundModel) {
           aiModelString = `${foundModel.name} (${foundModel.service})`
@@ -908,10 +910,11 @@ const handleSave = saveChanges(async () => {
       const selectedModelString = formData.value.aiModel
       // Find model by ID in all capabilities
       let foundModel = null
-      for (const capability in allModels.value) {
-        const models = allModels.value[capability]
-        foundModel = models.find((m: any) => `${m.name} (${m.service})` === selectedModelString)
-        if (foundModel) break
+      for (const models of Object.values(allModels.value)) {
+        if (models) {
+          foundModel = models.find((m: any) => `${m.name} (${m.service})` === selectedModelString)
+          if (foundModel) break
+        }
       }
       if (foundModel) {
         metadata.aiModel = foundModel.id

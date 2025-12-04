@@ -5,17 +5,17 @@ namespace App\Tests\Unit;
 use App\Entity\Config;
 use App\Entity\User;
 use App\Repository\ConfigRepository;
-use App\Repository\MessageFileRepository;
+use App\Repository\FileRepository;
 use App\Service\StorageQuotaService;
-use Doctrine\ORM\AbstractQuery;
 use Doctrine\ORM\EntityManagerInterface;
+use Doctrine\ORM\Query;
 use Doctrine\ORM\QueryBuilder;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 
 class StorageQuotaServiceTest extends TestCase
 {
-    private MessageFileRepository $messageFileRepository;
+    private FileRepository $fileRepository;
     private ConfigRepository $configRepository;
     private EntityManagerInterface $em;
     private LoggerInterface $logger;
@@ -23,13 +23,13 @@ class StorageQuotaServiceTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->messageFileRepository = $this->createMock(MessageFileRepository::class);
+        $this->fileRepository = $this->createMock(FileRepository::class);
         $this->configRepository = $this->createMock(ConfigRepository::class);
         $this->em = $this->createMock(EntityManagerInterface::class);
         $this->logger = $this->createMock(LoggerInterface::class);
 
         $this->service = new StorageQuotaService(
-            $this->messageFileRepository,
+            $this->fileRepository,
             $this->configRepository,
             $this->em,
             $this->logger
@@ -108,12 +108,12 @@ class StorageQuotaServiceTest extends TestCase
         $qb->method('where')->willReturnSelf();
         $qb->method('setParameter')->willReturnSelf();
 
-        $query = $this->createMock(AbstractQuery::class);
+        $query = $this->createMock(Query::class);
         $query->method('getSingleScalarResult')->willReturn(null);
 
         $qb->method('getQuery')->willReturn($query);
 
-        $this->messageFileRepository
+        $this->fileRepository
             ->method('createQueryBuilder')
             ->willReturn($qb);
 
@@ -132,12 +132,12 @@ class StorageQuotaServiceTest extends TestCase
         $qb->method('where')->willReturnSelf();
         $qb->method('setParameter')->willReturnSelf();
 
-        $query = $this->createMock(AbstractQuery::class);
+        $query = $this->createMock(Query::class);
         $query->method('getSingleScalarResult')->willReturn($totalSize);
 
         $qb->method('getQuery')->willReturn($query);
 
-        $this->messageFileRepository
+        $this->fileRepository
             ->method('createQueryBuilder')
             ->willReturn($qb);
 
@@ -168,12 +168,12 @@ class StorageQuotaServiceTest extends TestCase
         $qb->method('where')->willReturnSelf();
         $qb->method('setParameter')->willReturnSelf();
 
-        $query = $this->createMock(AbstractQuery::class);
+        $query = $this->createMock(Query::class);
         $query->method('getSingleScalarResult')->willReturn(40 * 1024 * 1024);
 
         $qb->method('getQuery')->willReturn($query);
 
-        $this->messageFileRepository
+        $this->fileRepository
             ->method('createQueryBuilder')
             ->willReturn($qb);
 
@@ -205,12 +205,12 @@ class StorageQuotaServiceTest extends TestCase
         $qb->method('where')->willReturnSelf();
         $qb->method('setParameter')->willReturnSelf();
 
-        $query = $this->createMock(AbstractQuery::class);
+        $query = $this->createMock(Query::class);
         $query->method('getSingleScalarResult')->willReturn(150 * 1024 * 1024);
 
         $qb->method('getQuery')->willReturn($query);
 
-        $this->messageFileRepository
+        $this->fileRepository
             ->method('createQueryBuilder')
             ->willReturn($qb);
 
@@ -242,12 +242,12 @@ class StorageQuotaServiceTest extends TestCase
         $qb->method('where')->willReturnSelf();
         $qb->method('setParameter')->willReturnSelf();
 
-        $query = $this->createMock(AbstractQuery::class);
+        $query = $this->createMock(Query::class);
         $query->method('getSingleScalarResult')->willReturn(40 * 1024 * 1024);
 
         $qb->method('getQuery')->willReturn($query);
 
-        $this->messageFileRepository
+        $this->fileRepository
             ->method('createQueryBuilder')
             ->willReturn($qb);
 
@@ -279,12 +279,12 @@ class StorageQuotaServiceTest extends TestCase
         $qb->method('where')->willReturnSelf();
         $qb->method('setParameter')->willReturnSelf();
 
-        $query = $this->createMock(AbstractQuery::class);
+        $query = $this->createMock(Query::class);
         $query->method('getSingleScalarResult')->willReturn(90 * 1024 * 1024);
 
         $qb->method('getQuery')->willReturn($query);
 
-        $this->messageFileRepository
+        $this->fileRepository
             ->method('createQueryBuilder')
             ->willReturn($qb);
 

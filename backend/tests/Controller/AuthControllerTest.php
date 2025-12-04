@@ -61,17 +61,18 @@ class AuthControllerTest extends WebTestCase
         );
 
         $this->assertResponseIsSuccessful();
-        
+
         $responseData = json_decode($this->client->getResponse()->getContent(), true);
-        
+
         $this->assertArrayHasKey('success', $responseData);
         $this->assertTrue($responseData['success']);
-        $this->assertArrayHasKey('userId', $responseData);
-        
+        $this->assertArrayHasKey('message', $responseData);
+        $this->assertStringContainsString('verification email', $responseData['message']);
+
         // Verify user was created in database
         $user = $this->em->getRepository(User::class)
             ->findOneBy(['mail' => 'newuser@test.com']);
-        
+
         $this->assertNotNull($user);
         $this->assertFalse($user->isEmailVerified());
         $this->assertEquals('WEB', $user->getType());
@@ -86,7 +87,7 @@ class AuthControllerTest extends WebTestCase
         $existingUser->setUserLevel('NEW');
         $existingUser->setProviderId('local');
         $existingUser->setCreated(date('YmdHis'));
-        
+
         $this->em->persist($existingUser);
         $this->em->flush();
 
@@ -103,8 +104,12 @@ class AuthControllerTest extends WebTestCase
             ])
         );
 
-        $this->assertResponseStatusCodeSame(Response::HTTP_CONFLICT);
-        
+        $this->assertResponseStatusCodeSame(Response::HTTP_OK);
+
+        $responseData = json_decode($this->client->getResponse()->getContent(), true);
+        $this->assertTrue($responseData['success']);
+        $this->assertStringContainsString('verification email', $responseData['message']);
+
         // Cleanup
         $this->em->remove($existingUser);
         $this->em->flush();

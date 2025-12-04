@@ -64,7 +64,8 @@
 
     <!-- Chart -->
     <div class="relative h-[300px]">
-      <component :is="chartType === 'line' ? Line : Bar" :data="chartData" :options="chartOptions" />
+      <Line v-if="chartType === 'line'" :data="lineChartData" :options="lineChartOptions" />
+      <Bar v-else :data="barChartData" :options="barChartOptions" />
     </div>
 
     <!-- Legend -->
@@ -85,7 +86,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
+import { ref, computed } from 'vue'
 import { Icon } from '@iconify/vue'
 import { Bar, Line } from 'vue-chartjs'
 import {
@@ -99,15 +100,14 @@ import {
   Tooltip,
   Legend,
   Filler,
-  type ChartOptions
+  type ChartOptions,
+  type ChartData,
+  type ChartDataset
 } from 'chart.js'
 import type { RegistrationAnalytics } from '@/services/api/adminApi'
-import { useI18n } from 'vue-i18n'
 
 // Register Chart.js components
 ChartJS.register(CategoryScale, LinearScale, BarElement, LineElement, PointElement, Title, Tooltip, Legend, Filler)
-
-const { t } = useI18n()
 
 interface Props {
   data: RegistrationAnalytics
@@ -120,7 +120,7 @@ const props = withDefaults(defineProps<Props>(), {
   initialGroupBy: 'day'
 })
 
-const emit = defineEmits<{
+defineEmits<{
   'update:period': [value: string]
   'update:groupBy': [value: string]
 }>()
@@ -143,44 +143,105 @@ const getProviderColor = (provider: string) => {
   return providerColors[provider.toLowerCase()] || '#6b7280'
 }
 
-// Chart data
-const chartData = computed(() => {
-  const labels = props.data.timeline.map(item => formatLabel(item.date))
-  const datasets = []
-
-  // Get all unique providers
-  const providers = new Set<string>()
+const providers = computed(() => {
+  const set = new Set<string>()
   props.data.timeline.forEach(item => {
-    Object.keys(item.byProvider).forEach(p => providers.add(p))
+    Object.keys(item.byProvider).forEach(p => set.add(p))
   })
-
-  // Create dataset for each provider
-  providers.forEach(provider => {
-    const color = getProviderColor(provider)
-    datasets.push({
-      label: provider,
-      data: props.data.timeline.map(item => item.byProvider[provider] || 0),
-      backgroundColor: chartType.value === 'line' ? color + '20' : color,
-      borderColor: color,
-      borderWidth: chartType.value === 'line' ? 2 : 0,
-      fill: chartType.value === 'line',
-      tension: 0.4,
-    })
-  })
-
-  return {
-    labels,
-    datasets
-  }
+  return Array.from(set)
 })
 
-// Chart options
-const chartOptions = computed<ChartOptions<'bar'>>(() => ({
+const createLineDatasets = (): ChartDataset<'line'>[] =>
+  providers.value.map(provider => {
+    const color = getProviderColor(provider)
+    return {
+      label: provider,
+      data: props.data.timeline.map(item => item.byProvider[provider] || 0),
+      backgroundColor: `${color}33`,
+      borderColor: color,
+      borderWidth: 2,
+      fill: true,
+      tension: 0.4,
+      type: 'line'
+    } satisfies ChartDataset<'line'>
+  })
+
+const createBarDatasets = (): ChartDataset<'bar'>[] =>
+  providers.value.map(provider => {
+    const color = getProviderColor(provider)
+    return {
+      label: provider,
+      data: props.data.timeline.map(item => item.byProvider[provider] || 0),
+      backgroundColor: color,
+      borderColor: color,
+      borderWidth: 0,
+      type: 'bar'
+    } satisfies ChartDataset<'bar'>
+  })
+
+const lineChartData = computed<ChartData<'line'>>(() => ({
+  labels: props.data.timeline.map(item => formatLabel(item.date)),
+  datasets: createLineDatasets()
+}))
+
+const barChartData = computed<ChartData<'bar'>>(() => ({
+  labels: props.data.timeline.map(item => formatLabel(item.date)),
+  datasets: createBarDatasets()
+}))
+
+const lineChartOptions = computed<ChartOptions<'line'>>(() => ({
   responsive: true,
   maintainAspectRatio: false,
   interaction: {
-    mode: 'index',
+    mode: 'index' as const,
     intersect: false,
+  },
+  plugins: {
+    legend: {
+      display: false,
+    },
+    tooltip: {
+      mode: 'index',
+      intersect: false,
+    }
+  },
+  scales: {
+    x: {
+      grid: {
+        display: false,
+      },
+      ticks: {
+        color: 'rgb(156, 163, 175)',
+      }
+    },
+    y: {
+      beginAtZero: true,
+      ticks: {
+        color: 'rgb(156, 163, 175)',
+        precision: 0,
+      },
+      grid: {
+        color: 'rgba(156, 163, 175, 0.1)',
+      }
+    }
+  }
+}))
+
+const barChartOptions = computed<ChartOptions<'bar'>>(() => ({
+  responsive: true,
+  maintainAspectRatio: false,
+  interaction: {
+    mode: 'index' as const,
+    intersect: false,
+  },
+  plugins: {
+    legend: {
+      display: false,
+    },
+    tooltip: {
+      mode: 'index',
+      intersect: false,
+    }
   },
   scales: {
     x: {
@@ -203,15 +264,6 @@ const chartOptions = computed<ChartOptions<'bar'>>(() => ({
         color: 'rgba(156, 163, 175, 0.1)',
       }
     }
-  },
-  plugins: {
-    legend: {
-      display: false,
-    },
-    tooltip: {
-      mode: 'index',
-      intersect: false,
-    }
   }
 }))
 
@@ -223,7 +275,7 @@ const formatLabel = (dateStr: string) => {
   } else if (groupBy.value === 'week') {
     return dateStr.replace('W', 'Week ')
   } else {
-    const [year, month, day] = dateStr.split('-')
+    const [, month, day] = dateStr.split('-')
     return `${day}.${month}`
   }
 }

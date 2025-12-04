@@ -11,7 +11,18 @@ export interface HelpSection {
   category: 'general' | 'features' | 'account' | 'api' | 'troubleshooting';
 }
 
-export const helpContent: HelpSection[] = [
+export interface HelpStep {
+  title: string;
+  content: string;
+  selector?: string;
+}
+
+export interface HelpContent extends HelpSection {
+  description?: string;
+  steps?: HelpStep[];
+}
+
+export const helpContent: HelpContent[] = [
   // General
   {
     id: 'getting-started',
@@ -186,21 +197,21 @@ export const helpContent: HelpSection[] = [
 /**
  * Get help content by ID
  */
-export function getHelpById(id: string): HelpSection | undefined {
+export function getHelpById(id: string): HelpContent | undefined {
   return helpContent.find(section => section.id === id);
 }
 
 /**
  * Get help content by category
  */
-export function getHelpByCategory(category: HelpSection['category']): HelpSection[] {
+export function getHelpByCategory(category: HelpSection['category']): HelpContent[] {
   return helpContent.filter(section => section.category === category);
 }
 
 /**
  * Search help content
  */
-export function searchHelp(query: string): HelpSection[] {
+export function searchHelp(query: string): HelpContent[] {
   const lowercaseQuery = query.toLowerCase();
   return helpContent.filter(section => 
     section.title.toLowerCase().includes(lowercaseQuery) ||

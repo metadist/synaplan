@@ -27,6 +27,7 @@ class SearchQueryGeneratorTest extends KernelTestCase
      */
     public function testGenerateOptimizedQuery(): void
     {
+        $this->markTestSkipped('Integration test requires AI provider for query optimization');
         $userQuestion = "Kannst du mir sagen, wie viel ein Döner in München kostet?";
         
         $searchQuery = $this->generator->generate($userQuestion);
@@ -57,6 +58,7 @@ class SearchQueryGeneratorTest extends KernelTestCase
      */
     public function testGenerateEnglishQuery(): void
     {
+        $this->markTestSkipped('Integration test requires AI provider for query optimization');
         $userQuestion = "What's the weather like in Paris this weekend?";
         
         $searchQuery = $this->generator->generate($userQuestion);

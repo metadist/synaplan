@@ -678,12 +678,6 @@ const downloadFile = async (fileId: number, filename: string) => {
   }
 }
 
-const openShareModal = (fileId: number, filename: string) => {
-  shareFileId.value = fileId
-  shareFileName.value = filename
-  isShareModalOpen.value = true
-}
-
 const closeShareModal = () => {
   isShareModalOpen.value = false
   shareFileId.value = null

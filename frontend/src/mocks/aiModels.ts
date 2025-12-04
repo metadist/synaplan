@@ -1,3 +1,5 @@
+import type { ModelOption } from '@/composables/useModelSelection'
+
 export type ModelPurpose = 'chat' | 'pic2text' | 'sound2text' | 'text2pic' | 'text2sound' | 'text2vid' | 'vectorize' | 'sort' | 'summarize'
 
 export interface AIModel {
@@ -208,17 +210,11 @@ export const serviceColors: Record<string, string> = {
   'RunwayML': 'bg-yellow-500'
 }
 
-export interface ModelOption {
-  provider: string
-  model: string
-  label: string
-}
-
 export const mockModelOptions: ModelOption[] = [
-  { provider: 'OpenAI', model: 'gpt-4', label: 'GPT-4' },
-  { provider: 'OpenAI', model: 'gpt-4-turbo', label: 'GPT-4 Turbo' },
-  { provider: 'OpenAI', model: 'gpt-3.5-turbo', label: 'GPT-3.5 Turbo' },
-  { provider: 'Anthropic', model: 'claude-3-opus', label: 'Claude 3 Opus' },
-  { provider: 'Anthropic', model: 'claude-3-sonnet', label: 'Claude 3 Sonnet' },
-  { provider: 'Google', model: 'gemini-pro', label: 'Gemini Pro' },
+  { provider: 'OpenAI', model: 'gpt-4', label: 'GPT-4', id: 1, quality: 90, rating: 95, description: 'Most capable GPT-4 model' },
+  { provider: 'OpenAI', model: 'gpt-4-turbo', label: 'GPT-4 Turbo', id: 2, quality: 85, rating: 90, description: 'Faster GPT-4 variant' },
+  { provider: 'OpenAI', model: 'gpt-3.5-turbo', label: 'GPT-3.5 Turbo', id: 3, quality: 75, rating: 80, description: 'Fast and efficient' },
+  { provider: 'Anthropic', model: 'claude-3-opus', label: 'Claude 3 Opus', id: 4, quality: 95, rating: 97, description: 'Most capable Claude model' },
+  { provider: 'Anthropic', model: 'claude-3-sonnet', label: 'Claude 3 Sonnet', id: 5, quality: 85, rating: 88, description: 'Balanced performance' },
+  { provider: 'Google', model: 'gemini-pro', label: 'Gemini Pro', id: 6, quality: 80, rating: 85, description: null },
 ]

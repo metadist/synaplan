@@ -2,9 +2,9 @@
 
 namespace App\Tests\Integration;
 
-use App\Entity\MessageFile;
+use App\Entity\File;
 use App\Entity\User;
-use App\Repository\MessageFileRepository;
+use App\Repository\FileRepository;
 use App\Service\StorageQuotaService;
 use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
 
@@ -16,7 +16,7 @@ use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
 class StorageQuotaServiceIntegrationTest extends KernelTestCase
 {
     private StorageQuotaService $service;
-    private MessageFileRepository $messageFileRepository;
+    private FileRepository $fileRepository;
     private User $testUser;
 
     protected function setUp(): void
@@ -25,7 +25,7 @@ class StorageQuotaServiceIntegrationTest extends KernelTestCase
         
         $container = static::getContainer();
         $this->service = $container->get(StorageQuotaService::class);
-        $this->messageFileRepository = $container->get(MessageFileRepository::class);
+        $this->fileRepository = $container->get(FileRepository::class);
         
         // Create a test user (PRO level for 5GB limit)
         $em = $container->get('doctrine')->getManager();
@@ -47,7 +47,7 @@ class StorageQuotaServiceIntegrationTest extends KernelTestCase
         $em = static::getContainer()->get('doctrine')->getManager();
         
         // Remove all files for test user
-        $files = $this->messageFileRepository->findBy(['userId' => $this->testUser->getId()]);
+        $files = $this->fileRepository->findBy(['userId' => $this->testUser->getId()]);
         foreach ($files as $file) {
             $em->remove($file);
         }
@@ -80,7 +80,7 @@ class StorageQuotaServiceIntegrationTest extends KernelTestCase
         $em = static::getContainer()->get('doctrine')->getManager();
         
         // Create test files
-        $file1 = new MessageFile();
+        $file1 = new File();
         $file1->setUserId($this->testUser->getId());
         $file1->setFileName('test1.pdf');
         $file1->setFilePath('/uploads/test1.pdf');
@@ -89,7 +89,7 @@ class StorageQuotaServiceIntegrationTest extends KernelTestCase
         $file1->setFileMime('application/pdf');
         $file1->setStatus('uploaded');
         
-        $file2 = new MessageFile();
+        $file2 = new File();
         $file2->setUserId($this->testUser->getId());
         $file2->setFileName('test2.pdf');
         $file2->setFilePath('/uploads/test2.pdf');
@@ -113,7 +113,7 @@ class StorageQuotaServiceIntegrationTest extends KernelTestCase
         $em = static::getContainer()->get('doctrine')->getManager();
         
         // Create a 1 GB file
-        $file = new MessageFile();
+        $file = new File();
         $file->setUserId($this->testUser->getId());
         $file->setFileName('large.pdf');
         $file->setFilePath('/uploads/large.pdf');
@@ -153,7 +153,7 @@ class StorageQuotaServiceIntegrationTest extends KernelTestCase
         $em = static::getContainer()->get('doctrine')->getManager();
         
         // Create a 250 MB file (instead of 2.5 GB to avoid INT overflow)
-        $file = new MessageFile();
+        $file = new File();
         $file->setUserId($this->testUser->getId());
         $file->setFileName('large.pdf');
         $file->setFilePath('/uploads/large.pdf');

@@ -232,17 +232,14 @@ import {
   ChevronDownIcon
 } from '@heroicons/vue/24/outline'
 import { Icon } from '@iconify/vue'
-import { getModels, getDefaultModels, saveDefaultModels, checkModelAvailability, type ModelInfo } from '@/services/api/configApi'
+import { getModels, getDefaultModels, saveDefaultModels, checkModelAvailability } from '@/services/api/configApi'
+import type { AIModel, Capability } from '@/types/ai-models'
 import { serviceColors } from '@/mocks/aiModels'
 import { getProviderIcon } from '@/utils/providerIcons'
 import { useNotification } from '@/composables/useNotification'
 import GroqIcon from '@/components/icons/GroqIcon.vue'
 
-type Capability = 'SORT' | 'CHAT' | 'VECTORIZE' | 'PIC2TEXT' | 'TEXT2PIC' | 'TEXT2VID' | 'SOUND2TEXT' | 'TEXT2SOUND' | 'ANALYZE'
-
-interface ModelsData {
-  [key: string]: ModelInfo[]
-}
+type ModelsData = Partial<Record<Capability, AIModel[]>>
 
 const route = useRoute()
 const purposeLabels: Record<Capability, string> = {
@@ -277,10 +274,7 @@ const highlightedCapability = ref<Capability | 'ALL' | null>(null)
 const capabilityRefs = ref<Record<Capability, HTMLElement | null>>({} as Record<Capability, HTMLElement | null>)
 const openDropdown = ref<Capability | null>(null)
 
-const { success, error: showError, warning, info } = useNotification()
-
-// Check if we're in development mode
-const isDev = import.meta.env.DEV
+const { success, error: showError, warning } = useNotification()
 
 // Map URL parameter to actual capability name
 const normalizeHighlight = (highlight: string): Capability | 'ALL' | null => {
@@ -345,31 +339,32 @@ onBeforeUnmount(() => {
 })
 
 // Watch for route changes to handle highlight parameter
-watch(() => route.query.highlight, async (newHighlightParam: string | string[] | undefined) => {
-  if (!newHighlightParam || typeof newHighlightParam !== 'string') return
-  
-  const newHighlight = normalizeHighlight(newHighlightParam)
-  if (!newHighlight) return
-  
-  if (newHighlight === 'ALL') {
-    // Highlight all model dropdowns
-    highlightedCapability.value = 'ALL'
+watch(
+  () => route.query.highlight as string | string[] | undefined,
+  async (newHighlightParam) => {
+    if (!newHighlightParam || typeof newHighlightParam !== 'string') return
     
-    await nextTick()
-    window.scrollTo({ top: 0, behavior: 'smooth' })
+    const newHighlight = normalizeHighlight(newHighlightParam)
+    if (!newHighlight) return
     
-    setTimeout(() => {
-      highlightedCapability.value = null
-    }, 4000)
-  } else {
-    // Highlight specific capability
-    selectedPurpose.value = newHighlight
-    highlightedCapability.value = newHighlight
-    
-    await nextTick()
-    scrollToCapability(newHighlight)
+    if (newHighlight === 'ALL') {
+      highlightedCapability.value = 'ALL'
+      
+      await nextTick()
+      window.scrollTo({ top: 0, behavior: 'smooth' })
+      
+      setTimeout(() => {
+        highlightedCapability.value = null
+      }, 4000)
+    } else {
+      selectedPurpose.value = newHighlight
+      highlightedCapability.value = newHighlight
+      
+      await nextTick()
+      scrollToCapability(newHighlight)
+    }
   }
-})
+)
 
 const scrollToCapability = (capability: Capability) => {
   // Use ref to find the container element
@@ -402,8 +397,12 @@ const loadData = async () => {
     }
 
     if (defaultsRes.success) {
-      defaultConfig.value = { ...defaultsRes.defaults }
-      originalConfig.value = { ...defaultsRes.defaults }
+      const mergedDefaults: Record<Capability, number | null> = {
+        ...defaultConfig.value,
+        ...defaultsRes.defaults as Partial<Record<Capability, number | null>>
+      }
+      defaultConfig.value = mergedDefaults
+      originalConfig.value = { ...mergedDefaults }
     }
   } catch (error) {
     console.error('Failed to load models:', error)
@@ -412,7 +411,7 @@ const loadData = async () => {
   }
 }
 
-const getModelsByPurpose = (purpose: Capability): ModelInfo[] => {
+const getModelsByPurpose = (purpose: Capability): AIModel[] => {
   return availableModels.value[purpose] || []
 }
 
@@ -477,7 +476,7 @@ const handleClickOutside = (event: MouseEvent) => {
 }
 
 const allModels = computed(() => {
-  const all: Array<ModelInfo & { purpose: Capability }> = []
+  const all: Array<AIModel & { purpose: Capability }> = []
   for (const [cap, models] of Object.entries(availableModels.value)) {
     models.forEach(model => {
       all.push({ ...model, purpose: cap as Capability })

@@ -1,0 +1,127 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  backend:
+    name: Backend (PHP/Symfony)
+    runs-on: ubuntu-latest
+
+    env:
+      DATABASE_WRITE_URL: mysql://synaplan_test:synaplan_test@127.0.0.1:3306/synaplan?serverVersion=11.8&charset=utf8mb4
+      DATABASE_READ_URL: mysql://synaplan_test:synaplan_test@127.0.0.1:3306/synaplan?serverVersion=11.8&charset=utf8mb4
+
+    services:
+      mysql:
+        image: mariadb:11.8
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: synaplan_test
+          MYSQL_USER: synaplan_test
+          MYSQL_PASSWORD: synaplan_test
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="healthcheck.sh --connect --innodb_initialized"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.3"
+          extensions: mbstring, xml, ctype, iconv, intl, pdo, pdo_mysql, zip, gd, curl, bcmath, exif, pcntl, opcache, readline, soap, sodium, ffi, imagick, redis
+          coverage: none
+
+      - name: Cache composer dependencies
+        uses: actions/cache@v4
+        with:
+          path: backend/vendor
+          key: ${{ runner.os }}-composer-${{ hashFiles('backend/composer.lock') }}
+          restore-keys: ${{ runner.os }}-composer-
+
+      - name: Create .env file
+        working-directory: backend
+        run: |
+          cat > .env <<EOF
+          APP_ENV=test
+          APP_SECRET=test_secret_not_for_production
+          DATABASE_WRITE_URL=${DATABASE_WRITE_URL}
+          DATABASE_READ_URL=${DATABASE_READ_URL}
+          MAILER_DSN=null://null
+          JWT_SECRET_KEY=%kernel.project_dir%/config/jwt/private.pem
+          JWT_PUBLIC_KEY=%kernel.project_dir%/config/jwt/public.pem
+          JWT_PASSPHRASE=test_passphrase
+          MESSENGER_TRANSPORT_DSN=sync://
+          EOF
+
+      - name: Install dependencies
+        working-directory: backend
+        run: composer install --prefer-dist --no-progress --no-interaction
+
+      - name: Security audit
+        working-directory: backend
+        run: composer audit || true
+
+      - name: Generate JWT keypair
+        working-directory: backend
+        run: php bin/console lexik:jwt:generate-keypair --skip-if-exists
+
+      - name: Setup database schema
+        working-directory: backend
+        run: |
+          # Run migrations (won't fail if none exist due to --allow-no-migration)
+          php bin/console doctrine:migrations:migrate --no-interaction --allow-no-migration
+          # Always run schema update to ensure all tables exist (idempotent)
+          php bin/console doctrine:schema:update --force
+
+      - name: Load fixtures
+        working-directory: backend
+        run: php bin/console doctrine:fixtures:load --no-interaction
+
+      - name: Run PHPUnit tests
+        working-directory: backend
+        run: php bin/phpunit
+
+  frontend:
+    name: Frontend (Vue/TypeScript)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Type check
+        working-directory: frontend
+        run: npm run check:types
+
+      - name: Run tests
+        working-directory: frontend
+        run: npm run test
+
+      - name: Build
+        working-directory: frontend
+        run: npm run build
+        env:
+          VITE_API_BASE_URL: http://localhost:8000
+          VITE_BASE_PATH: /

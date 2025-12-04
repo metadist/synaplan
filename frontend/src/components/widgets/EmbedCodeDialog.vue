@@ -147,7 +147,7 @@ interface Props {
   wordpressShortcode: string
 }
 
-const props = defineProps<Props>()
+defineProps<Props>()
 defineEmits<{
   close: []
 }>()

@@ -146,7 +146,6 @@ const expandedMenus = ref<string[]>([])
 
 // Feature Status
 const disabledFeaturesCount = ref(0)
-const hasDisabledFeatures = computed(() => disabledFeaturesCount.value > 0)
 
 // Load feature status (only in development)
 const loadFeatureStatus = async () => {
@@ -188,7 +187,7 @@ const isDark = computed(() => {
   return matchMedia('(prefers-color-scheme: dark)').matches
 })
 
-const logoSrc = computed(() => isDark.value ? '/synaplan-light.svg' : '/synaplan-dark.svg')
+const logoSrc = computed(() => `${import.meta.env.BASE_URL}${isDark.value ? 'synaplan-light.svg' : 'synaplan-dark.svg'}`)
 
 interface NavItem {
   path: string

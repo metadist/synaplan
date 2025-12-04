@@ -10,7 +10,7 @@ export function useHelp() {
   const currentHelpId = computed(() => route.meta.helpId as string | undefined)
   const currentHelp = computed(() => {
     if (!currentHelpId.value) return null
-    return helpContent[currentHelpId.value] || null
+    return helpContent.find(section => section.id === currentHelpId.value) || null
   })
 
   const openHelp = () => {

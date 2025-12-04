@@ -1,49 +1,19 @@
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'
+import type { AIModel, Capability } from '@/types/ai-models'
 
-export interface ModelInfo {
-  id: number
-  service: string
-  name: string
-  providerId: string
-  description: string | null
-  quality: number
-  rating: number
-  isSystemModel: boolean
-  features?: string[]
-}
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'
 
 export interface ModelsResponse {
   success: boolean
-  models: {
-    SORT: ModelInfo[]
-    CHAT: ModelInfo[]
-    VECTORIZE: ModelInfo[]
-    PIC2TEXT: ModelInfo[]
-    TEXT2PIC: ModelInfo[]
-    SOUND2TEXT: ModelInfo[]
-    TEXT2SOUND: ModelInfo[]
-    ANALYZE: ModelInfo[]
-  }
+  models: Partial<Record<Capability, AIModel[]>>
 }
 
 export interface DefaultsResponse {
   success: boolean
-  defaults: {
-    SORT: number | null
-    CHAT: number | null
-    VECTORIZE: number | null
-    PIC2TEXT: number | null
-    TEXT2PIC: number | null
-    SOUND2TEXT: number | null
-    TEXT2SOUND: number | null
-    ANALYZE: number | null
-  }
+  defaults: Record<Capability, number | null>
 }
 
 export interface SaveDefaultsRequest {
-  defaults: {
-    [capability: string]: number
-  }
+  defaults: Partial<Record<Capability, number>>
 }
 
 export interface ModelCheckResponse {
@@ -55,6 +25,7 @@ export interface ModelCheckResponse {
   install_command?: string
   env_var?: string
   setup_instructions?: string
+  setup_required?: boolean
 }
 
 /**

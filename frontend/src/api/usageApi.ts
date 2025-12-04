@@ -4,7 +4,7 @@ function getAuthToken(): string | null {
   return localStorage.getItem('auth_token')
 }
 
-interface UsageStats {
+export interface UsageStats {
   user_level: string
   phone_verified: boolean
   subscription: {

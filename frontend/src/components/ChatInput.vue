@@ -10,7 +10,7 @@
           class="flex items-center gap-2 px-3 py-2 surface-chip rounded-lg"
         >
           <Icon 
-            :icon="getFileIcon(file.file_type || file.name)" 
+            :icon="getFileIcon(file.file_type || file.name || '')" 
             class="w-4 h-4" 
           />
           <span class="text-sm txt-secondary">{{ file.filename || file.name }}</span>
@@ -210,8 +210,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, nextTick } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, computed, watch, nextTick, type Ref } from 'vue'
 import { PaperAirplaneIcon, XMarkIcon, SparklesIcon, MicrophoneIcon, PlusIcon } from '@heroicons/vue/24/outline'
 import { Icon } from '@iconify/vue'
 import Textarea from './Textarea.vue'
@@ -225,6 +224,7 @@ import { useNotification } from '@/composables/useNotification'
 import { chatApi } from '@/services/api/chatApi'
 import type { FileItem } from '@/services/filesService'
 import { AudioRecorder } from '@/services/audioRecorder'
+import { useI18n } from 'vue-i18n'
 
 interface Tool {
   id: string
@@ -245,6 +245,7 @@ interface Props {
 }
 
 const props = defineProps<Props>()
+
 const isStreaming = computed(() => props.isStreaming ?? false)
 
 const message = ref('')
@@ -270,6 +271,7 @@ const fileSelectionModalVisible = ref(false)
 
 const aiConfigStore = useAiConfigStore()
 const { warning, error: showError, success } = useNotification()
+const { t } = useI18n()
 
 const emit = defineEmits<{
   send: [message: string, options?: { includeReasoning?: boolean; webSearch?: boolean; fileIds?: number[] }]
@@ -375,8 +377,8 @@ const sendMessage = () => {
 const toggleThinking = () => {
   // Check if current model supports reasoning
   if (!supportsReasoning.value) {
-    warning($t('chatInput.reasoningNotSupported'))
-      return
+    warning(t('chatInput.reasoningNotSupported'))
+    return
   }
   
   thinkingEnabled.value = !thinkingEnabled.value
@@ -709,7 +711,10 @@ const toggleEnhance = async () => {
 }
 
 // Expose textarea ref for parent component (auto-focus)
-defineExpose({
+// ATTENTION: needs to be typed when using vue-tsc -b
+defineExpose<{
+  textareaRef: Ref<InstanceType<typeof Textarea> | null>
+}>({
   textareaRef
 })
 </script>

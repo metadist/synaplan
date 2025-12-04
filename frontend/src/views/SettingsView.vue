@@ -107,7 +107,7 @@
               </div>
               <div data-testid="text-account-level">
                 <label class="block text-sm font-medium txt-secondary mb-1">{{ $t('settings.account.userLevel') }}</label>
-                <div class="txt-primary">{{ authStore.user?.userLevel || 'N/A' }}</div>
+                <div class="txt-primary">{{ authStore.user?.level || 'N/A' }}</div>
               </div>
             </div>
           </div>
@@ -130,7 +130,6 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useAppModeStore } from '@/stores/appMode'
