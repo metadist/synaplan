@@ -149,7 +149,7 @@ export function useModelSelection(
     }
 
     return models
-      .sort((a: AIModel, b: AIModel) => (b.rating || 0) - (a.rating || 0)) // Sort by BRANKING descending
+      .sort((a: AIModel, b: AIModel) => b.rating - a.rating) // Sort by BRANKING descending
       .map((model: AIModel) => ({
         provider: model.service,
         model: model.name,
