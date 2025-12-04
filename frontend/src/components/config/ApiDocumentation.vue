@@ -381,24 +381,6 @@ const getTypeString = (schema: any): string => {
   return 'object'
 }
 
-const formatRequestBody = (requestBody: any): string => {
-  if (!requestBody?.content) return ''
-  
-  const jsonContent = requestBody.content['application/json']
-  if (!jsonContent?.schema) return ''
-  
-  return JSON.stringify(formatSchema(jsonContent.schema), null, 2)
-}
-
-const formatResponseContent = (content: any): string => {
-  if (!content) return ''
-  
-  const jsonContent = content['application/json']
-  if (!jsonContent?.schema) return ''
-  
-  return JSON.stringify(formatSchema(jsonContent.schema), null, 2)
-}
-
 const formatSchema = (schema: any): any => {
   if (!schema) return {}
   

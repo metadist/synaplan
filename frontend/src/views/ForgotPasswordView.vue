@@ -116,14 +116,12 @@
 
 <script setup lang="ts">
 import { ref, computed } from 'vue'
-import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { SunIcon, MoonIcon, ArrowLeftIcon, CheckCircleIcon } from '@heroicons/vue/24/outline'
+import { SunIcon, MoonIcon, ArrowLeftIcon } from '@heroicons/vue/24/outline'
 import { useTheme } from '../composables/useTheme'
 import { authApi } from '@/services/api'
 import Button from '../components/Button.vue'
 
-const router = useRouter()
 const { locale } = useI18n()
 const themeStore = useTheme()
 

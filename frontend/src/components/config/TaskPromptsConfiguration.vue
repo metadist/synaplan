@@ -793,7 +793,7 @@ const loadPrompts = async () => {
       if (metadata.aiModel && metadata.aiModel > 0) {
         // Find model by ID in all capabilities
         let foundModel = null
-        for (const [capability, models] of Object.entries(allModels.value)) {
+        for (const models of Object.values(allModels.value)) {
           if (models) {
             foundModel = models.find((m: any) => m.id === metadata.aiModel)
             if (foundModel) break
@@ -910,7 +910,7 @@ const handleSave = saveChanges(async () => {
       const selectedModelString = formData.value.aiModel
       // Find model by ID in all capabilities
       let foundModel = null
-      for (const [capability, models] of Object.entries(allModels.value)) {
+      for (const models of Object.values(allModels.value)) {
         if (models) {
           foundModel = models.find((m: any) => `${m.name} (${m.service})` === selectedModelString)
           if (foundModel) break

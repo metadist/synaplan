@@ -49,12 +49,11 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { useRoute } from 'vue-router'
 import { useTheme } from '../composables/useTheme'
 import { authApi } from '@/services/api'
 
 const route = useRoute()
-const router = useRouter()
 const themeStore = useTheme()
 
 const isDark = computed(() => {

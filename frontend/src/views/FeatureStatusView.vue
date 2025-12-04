@@ -164,10 +164,6 @@ import { ref, computed, onMounted } from 'vue'
 import { Icon } from '@iconify/vue'
 import MainLayout from '@/components/MainLayout.vue'
 import { getFeaturesStatus, type FeaturesStatus, type Feature } from '@/services/featuresService'
-import { useI18n } from 'vue-i18n'
-
-const { t } = useI18n()
-
 const featuresStatus = ref<FeaturesStatus | null>(null)
 const isLoadingFeatures = ref(false)
 

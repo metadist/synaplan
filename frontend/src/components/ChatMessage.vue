@@ -505,7 +505,7 @@ import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { UserIcon, ArrowPathIcon, ChevronDownIcon } from '@heroicons/vue/24/outline'
 import { Icon } from '@iconify/vue'
-import { useModelSelection } from '@/composables/useModelSelection'
+import { useModelSelection, type ModelOption } from '@/composables/useModelSelection'
 import { getProviderIcon } from '@/utils/providerIcons'
 import MessagePart from './MessagePart.vue'
 import GroqIcon from '@/components/icons/GroqIcon.vue'
@@ -551,12 +551,6 @@ interface Props {
     query?: string
     resultsCount?: number
   } | null // Web search metadata
-}
-
-interface ModelOption {
-  provider: string
-  model: string
-  label: string
 }
 
 const props = defineProps<Props>()

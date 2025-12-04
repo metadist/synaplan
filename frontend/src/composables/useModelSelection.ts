@@ -113,7 +113,7 @@ export function useModelSelection(
     }
 
     // Search across ALL model tags to find current model
-    for (const [tag, models] of Object.entries(aiConfigStore.models)) {
+    for (const models of Object.values(aiConfigStore.models)) {
       if (!models) continue
       const found = models.find((m: AIModel) =>
         m.service.toLowerCase() === currentProvider.value?.toLowerCase() &&

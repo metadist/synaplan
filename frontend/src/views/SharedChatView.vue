@@ -370,7 +370,7 @@ const escapeHtml = (text: string): string => {
 const formatMessageText = (text: string): string => {
   // Handle code blocks first
   const codeBlocks: string[] = []
-  let content = text.replace(/```(\w+)?\n([\s\S]*?)```/g, (_, lang, code) => {
+  let content = text.replace(/```(\w+)?\n([\s\S]*?)```/g, (_, _lang, code) => {
     const placeholder = `__CODEBLOCK_${codeBlocks.length}__`
     codeBlocks.push(`<pre class="bg-black/5 dark:bg-white/5 p-3 rounded-lg overflow-x-auto my-2"><code class="text-xs font-mono">${escapeHtml(code.trim())}</code></pre>`)
     return placeholder

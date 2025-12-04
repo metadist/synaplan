@@ -97,7 +97,7 @@ import { useAiConfigStore } from '@/stores/aiConfig'
 import { useAuthStore } from '@/stores/auth'
 import { useLimitCheck } from '@/composables/useLimitCheck'
 import { chatApi } from '@/services/api'
-import { mockModelOptions, type ModelOption } from '@/mocks/aiModels'
+import type { ModelOption } from '@/composables/useModelSelection'
 import { parseAIResponse } from '@/utils/responseParser'
 import { normalizeMediaUrl } from '@/utils/urlHelper'
 
@@ -659,14 +659,14 @@ const streamAIResponse = async (userMessage: string, options?: { includeReasonin
                 }
                 
                 message.files.push(fileData)
-                
+
                 console.log('📄 File attached to message:', message.files)
-                
+
                 // Replace JSON content or special markers with translated message
-                const hasJsonOrMarker = message.parts.length === 0 || 
+                const hasJsonOrMarker = message.parts.length === 0 ||
                     (message.parts[0].type === 'code' && message.parts[0].content?.includes('BFILEPATH')) ||
                     (message.parts[0].type === 'text' && message.parts[0].content?.includes('__FILE_GENERATED__'))
-                
+
                 if (hasJsonOrMarker) {
                   // Use translation with filename parameter
                   const translatedMessage = t('message.fileGenerated', { filename: data.generatedFile.filename })
@@ -676,7 +676,7 @@ const streamAIResponse = async (userMessage: string, options?: { includeReasonin
                   }]
                   console.log('📄 Set translated message:', translatedMessage)
                 }
-                
+
                 // Force Vue reactivity with multiple strategies
                 nextTick(() => {
                   // Strategy 1: Update the message object with a new id to force key-based re-render
@@ -692,10 +692,10 @@ const streamAIResponse = async (userMessage: string, options?: { includeReasonin
                       parts: [...message.parts],
                       timestamp: new Date(message.timestamp)
                     }
-                    
+
                     // Replace in store
                     historyStore.messages.splice(messageIndex, 1, updatedMessage)
-                    
+
                     console.log('📄 Message updated with new references')
                   }
                 })
