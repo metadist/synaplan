@@ -20,6 +20,10 @@ services:
       TIKA_BASE_URL: http://tika_test:9998
       AI_DEFAULT_PROVIDER: test
       MAILER_DSN: null://null
+      AUTO_DOWNLOAD_MODELS: "false"
+      JWT_SECRET_KEY: "%kernel.project_dir%/config/jwt/private.pem"
+      JWT_PUBLIC_KEY: "%kernel.project_dir%/config/jwt/public.pem"
+      JWT_PASSPHRASE: "test_passphrase"
     depends_on:
       db_test:
         condition: service_healthy

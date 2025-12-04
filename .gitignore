@@ -12,6 +12,7 @@
 *.swp
 *.swo
 *~
+.claude/
 
 # OS
 .DS_Store

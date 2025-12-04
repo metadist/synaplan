@@ -5,20 +5,18 @@ namespace App\Tests\Service;
 use App\Entity\Chat;
 use App\Entity\User;
 use App\Repository\ChatRepository;
-use App\Repository\EmailBlacklistRepository;
 use App\Repository\UserRepository;
 use App\Service\EmailChatService;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 
-class EmailChatServiceTest extends TestCase
+class EmailChannelServiceTest extends TestCase
 {
     private EmailChatService $service;
     private EntityManagerInterface $em;
     private UserRepository $userRepository;
     private ChatRepository $chatRepository;
-    private EmailBlacklistRepository $blacklistRepository;
     private LoggerInterface $logger;
 
     protected function setUp(): void
@@ -26,14 +24,12 @@ class EmailChatServiceTest extends TestCase
         $this->em = $this->createMock(EntityManagerInterface::class);
         $this->userRepository = $this->createMock(UserRepository::class);
         $this->chatRepository = $this->createMock(ChatRepository::class);
-        $this->blacklistRepository = $this->createMock(EmailBlacklistRepository::class);
         $this->logger = $this->createMock(LoggerInterface::class);
 
         $this->service = new EmailChatService(
             $this->em,
             $this->userRepository,
             $this->chatRepository,
-            $this->blacklistRepository,
             $this->logger
         );
     }
@@ -62,31 +58,10 @@ class EmailChatServiceTest extends TestCase
         $this->assertNull($result);
     }
 
-    public function testFindOrCreateUserFromEmail_BlacklistedEmail(): void
-    {
-        $email = 'spammer@evil.com';
-
-        $this->blacklistRepository->expects($this->once())
-            ->method('isBlacklisted')
-            ->with($email)
-            ->willReturn(true);
-
-        $result = $this->service->findOrCreateUserFromEmail($email);
-
-        $this->assertNull($result['user']);
-        $this->assertTrue($result['blacklisted']);
-        $this->assertEquals('Email address is blacklisted', $result['error']);
-    }
-
     public function testFindOrCreateUserFromEmail_RegisteredUser(): void
     {
         $email = 'user@example.com';
         $user = $this->createMock(User::class);
-
-        $this->blacklistRepository->expects($this->once())
-            ->method('isBlacklisted')
-            ->with($email)
-            ->willReturn(false);
 
         $this->userRepository->expects($this->once())
             ->method('findOneBy')
@@ -97,7 +72,6 @@ class EmailChatServiceTest extends TestCase
 
         $this->assertSame($user, $result['user']);
         $this->assertFalse($result['is_anonymous']);
-        $this->assertFalse($result['blacklisted']);
     }
 
     /**

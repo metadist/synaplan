@@ -6,7 +6,6 @@ use App\Service\EmailChatService;
 use App\Entity\User;
 use App\Repository\UserRepository;
 use App\Repository\ChatRepository;
-use App\Repository\EmailBlacklistRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
@@ -17,7 +16,6 @@ class EmailChatServiceTest extends TestCase
     private EntityManagerInterface $em;
     private UserRepository $userRepository;
     private ChatRepository $chatRepository;
-    private EmailBlacklistRepository $blacklistRepository;
     private LoggerInterface $logger;
 
     protected function setUp(): void
@@ -25,14 +23,12 @@ class EmailChatServiceTest extends TestCase
         $this->em = $this->createMock(EntityManagerInterface::class);
         $this->userRepository = $this->createMock(UserRepository::class);
         $this->chatRepository = $this->createMock(ChatRepository::class);
-        $this->blacklistRepository = $this->createMock(EmailBlacklistRepository::class);
         $this->logger = $this->createMock(LoggerInterface::class);
 
         $this->emailChatService = new EmailChatService(
             $this->em,
             $this->userRepository,
             $this->chatRepository,
-            $this->blacklistRepository,
             $this->logger
         );
     }

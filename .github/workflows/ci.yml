@@ -11,6 +11,10 @@ jobs:
     name: Backend (PHP/Symfony)
     runs-on: ubuntu-latest
 
+    env:
+      DATABASE_WRITE_URL: mysql://synaplan_test:synaplan_test@127.0.0.1:3306/synaplan?serverVersion=11.8&charset=utf8mb4
+      DATABASE_READ_URL: mysql://synaplan_test:synaplan_test@127.0.0.1:3306/synaplan?serverVersion=11.8&charset=utf8mb4
+
     services:
       mysql:
         image: mariadb:11.8
@@ -45,15 +49,20 @@ jobs:
           key: ${{ runner.os }}-composer-${{ hashFiles('backend/composer.lock') }}
           restore-keys: ${{ runner.os }}-composer-
 
-      - name: Setup .env file
+      - name: Create .env file
         working-directory: backend
         run: |
-          cp .env.test .env
-          # Override database URLs for CI environment (127.0.0.1 instead of db_test)
-          echo "" >> .env
-          echo "# CI Overrides" >> .env
-          echo "DATABASE_WRITE_URL=mysql://synaplan_test:synaplan_test@127.0.0.1:3306/synaplan_test?serverVersion=11.8&charset=utf8mb4" >> .env
-          echo "DATABASE_READ_URL=mysql://synaplan_test:synaplan_test@127.0.0.1:3306/synaplan_test?serverVersion=11.8&charset=utf8mb4" >> .env
+          cat > .env <<EOF
+          APP_ENV=test
+          APP_SECRET=test_secret_not_for_production
+          DATABASE_WRITE_URL=${DATABASE_WRITE_URL}
+          DATABASE_READ_URL=${DATABASE_READ_URL}
+          MAILER_DSN=null://null
+          JWT_SECRET_KEY=%kernel.project_dir%/config/jwt/private.pem
+          JWT_PUBLIC_KEY=%kernel.project_dir%/config/jwt/public.pem
+          JWT_PASSPHRASE=test_passphrase
+          MESSENGER_TRANSPORT_DSN=sync://
+          EOF
 
       - name: Install dependencies
         working-directory: backend
@@ -67,9 +76,13 @@ jobs:
         working-directory: backend
         run: php bin/console lexik:jwt:generate-keypair --skip-if-exists
 
-      - name: Run migrations
+      - name: Setup database schema
         working-directory: backend
-        run: php bin/console doctrine:migrations:migrate --no-interaction
+        run: |
+          # Run migrations (won't fail if none exist due to --allow-no-migration)
+          php bin/console doctrine:migrations:migrate --no-interaction --allow-no-migration
+          # Always run schema update to ensure all tables exist (idempotent)
+          php bin/console doctrine:schema:update --force
 
       - name: Load fixtures
         working-directory: backend

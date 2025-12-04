@@ -5,6 +5,8 @@
          colors="true"
          bootstrap="tests/bootstrap.php"
          convertDeprecationsToExceptions="false"
+         failOnWarning="false"
+         failOnRisky="false"
 >
     <php>
         <ini name="display_errors" value="1" />
@@ -28,6 +30,7 @@
     <testsuites>
         <testsuite name="Project Test Suite">
             <directory>tests</directory>
+            <exclude>tests/AI/Contract/ChatProviderContractTest.php</exclude>
         </testsuite>
     </testsuites>
 

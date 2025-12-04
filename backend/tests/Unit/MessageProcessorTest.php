@@ -6,8 +6,12 @@ use App\Service\Message\MessageProcessor;
 use App\Service\Message\MessagePreProcessor;
 use App\Service\Message\MessageClassifier;
 use App\Service\Message\InferenceRouter;
+use App\Service\Message\SearchQueryGenerator;
 use App\Service\ModelConfigService;
+use App\Service\PromptService;
+use App\Service\Search\BraveSearchService;
 use App\Repository\MessageRepository;
+use App\Repository\SearchResultRepository;
 use App\Entity\Message;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
@@ -15,28 +19,40 @@ use Psr\Log\LoggerInterface;
 class MessageProcessorTest extends TestCase
 {
     private MessageRepository $messageRepository;
+    private SearchResultRepository $searchResultRepository;
     private MessagePreProcessor $preProcessor;
     private MessageClassifier $classifier;
     private InferenceRouter $router;
     private ModelConfigService $modelConfigService;
+    private PromptService $promptService;
+    private BraveSearchService $braveSearchService;
+    private SearchQueryGenerator $searchQueryGenerator;
     private LoggerInterface $logger;
     private MessageProcessor $processor;
 
     protected function setUp(): void
     {
         $this->messageRepository = $this->createMock(MessageRepository::class);
+        $this->searchResultRepository = $this->createMock(SearchResultRepository::class);
         $this->preProcessor = $this->createMock(MessagePreProcessor::class);
         $this->classifier = $this->createMock(MessageClassifier::class);
         $this->router = $this->createMock(InferenceRouter::class);
         $this->modelConfigService = $this->createMock(ModelConfigService::class);
+        $this->promptService = $this->createMock(PromptService::class);
+        $this->braveSearchService = $this->createMock(BraveSearchService::class);
+        $this->searchQueryGenerator = $this->createMock(SearchQueryGenerator::class);
         $this->logger = $this->createMock(LoggerInterface::class);
 
         $this->processor = new MessageProcessor(
             $this->messageRepository,
+            $this->searchResultRepository,
             $this->preProcessor,
             $this->classifier,
             $this->router,
             $this->modelConfigService,
+            $this->promptService,
+            $this->braveSearchService,
+            $this->searchQueryGenerator,
             $this->logger
         );
     }
@@ -110,7 +126,7 @@ class MessageProcessorTest extends TestCase
             $statuses[] = $status['status'];
         };
 
-        $this->processor->process($message, $callback);
+        $this->processor->process($message, [], $callback);
 
         $this->assertContains('started', $statuses);
         $this->assertContains('preprocessing', $statuses);

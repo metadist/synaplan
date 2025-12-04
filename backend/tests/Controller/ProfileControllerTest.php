@@ -23,12 +23,12 @@ class ProfileControllerTest extends WebTestCase
         $this->client = static::createClient();
         $this->em = static::getContainer()->get('doctrine')->getManager();
         
-        // Create test user
+        // Create test user (local auth, not OAuth)
         $this->user = new User();
         $this->user->setMail('profiletest@example.com');
         $this->user->setPw(password_hash('OldPass123!', PASSWORD_BCRYPT));
         $this->user->setUserLevel('PRO');
-        $this->user->setProviderId('test-provider');
+        $this->user->setProviderId('local'); // Local auth = can change password
         $this->user->setCreated(date('YmdHis'));
         $this->user->setUserDetails([
             'firstName' => 'John',
