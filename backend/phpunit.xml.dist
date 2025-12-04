@@ -1,30 +1,36 @@
 <?xml version="1.0" encoding="UTF-8"?>
+
+<!-- https://phpunit.readthedocs.io/en/latest/configuration.html -->
 <phpunit xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:noNamespaceSchemaLocation="vendor/phpunit/phpunit/phpunit.xsd"
-         backupGlobals="false"
          colors="true"
-         bootstrap="tests/bootstrap.php"
-         convertDeprecationsToExceptions="false"
+         failOnDeprecation="false"
+         failOnNotice="false"
          failOnWarning="false"
-         failOnRisky="false"
+         bootstrap="tests/bootstrap.php"
+         cacheDirectory=".phpunit.cache"
 >
     <php>
         <ini name="display_errors" value="1" />
         <ini name="error_reporting" value="-1" />
         <server name="APP_ENV" value="test" force="true" />
         <server name="SHELL_VERBOSITY" value="-1" />
-        <server name="SYMFONY_PHPUNIT_REMOVE" value="" />
-        <server name="SYMFONY_PHPUNIT_VERSION" value="9.5" />
         <server name="KERNEL_CLASS" value="App\Kernel" force="true" />
-        
-        <!-- Use .env.test for configuration -->
         <env name="SYMFONY_DEPRECATIONS_HELPER" value="weak" />
-        
-        <!-- Mailer: No emails in tests -->
         <env name="MAILER_DSN" value="null://null" />
-        
-        <!-- AI: Use TestProvider -->
         <env name="AI_DEFAULT_PROVIDER" value="test" />
+        <!-- AI Provider API Keys (defaults for testing) -->
+        <env name="ANTHROPIC_API_KEY" value="" />
+        <env name="OPENAI_API_KEY" value="" />
+        <env name="GROQ_API_KEY" value="" />
+        <env name="GOOGLE_GEMINI_API_KEY" value="" />
+        <!-- Brave Search API (defaults for testing) -->
+        <env name="BRAVE_SEARCH_API_KEY" value="" />
+        <env name="BRAVE_SEARCH_API_URL" value="https://api.search.brave.com/res/v1" />
+        <env name="BRAVE_SEARCH_ENABLED" value="false" />
+        <env name="BRAVE_SEARCH_COUNT" value="10" />
+        <env name="BRAVE_SEARCH_COUNTRY" value="us" />
+        <env name="BRAVE_SEARCH_SEARCH_LANG" value="en" />
     </php>
 
     <testsuites>
@@ -34,21 +40,27 @@
         </testsuite>
     </testsuites>
 
-    <coverage processUncoveredFiles="true">
+    <source ignoreSuppressionOfDeprecations="true"
+            ignoreIndirectDeprecations="true"
+            restrictNotices="true"
+            restrictWarnings="true"
+    >
         <include>
-            <directory suffix=".php">src</directory>
+            <directory>src</directory>
         </include>
-        <exclude>
-            <directory>src/DataFixtures</directory>
-            <file>src/Kernel.php</file>
-        </exclude>
-    </coverage>
 
-    <listeners>
-        <listener class="Symfony\Bridge\PhpUnit\SymfonyTestsListener" />
-    </listeners>
+        <deprecationTrigger>
+            <method>Doctrine\Deprecations\Deprecation::trigger</method>
+            <method>Doctrine\Deprecations\Deprecation::delegateTriggerToBackend</method>
+            <function>trigger_deprecation</function>
+        </deprecationTrigger>
+    </source>
 
     <extensions>
     </extensions>
-</phpunit>
 
+    <logging>
+        <testdoxHtml outputFile="var/phpunit/testdox.html"/>
+        <junit outputFile="var/phpunit/junit.xml"/>
+    </logging>
+</phpunit>
