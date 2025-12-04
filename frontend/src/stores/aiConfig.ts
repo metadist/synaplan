@@ -3,13 +3,8 @@ import { ref } from 'vue'
 import { configApi, ModelsResponse } from '@/services/api/configApi'
 import type { AIModel, Capability } from '@/types/ai-models'
 
-export interface ModelsList {
-  [capability: string]: AIModel[]
-}
-
-export interface DefaultModels {
-  [capability: string]: number | null
-}
+// Local state can have nulls (no model selected for a capability)
+export type DefaultModels = Partial<Record<Capability, number | null>>
 
 export const useAiConfigStore = defineStore('aiConfig', () => {
   const models = ref<ModelsResponse["models"]>({})
