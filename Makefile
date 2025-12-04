@@ -9,3 +9,6 @@ lint: ## Run linting checks on backend
 
 format: ## Format code in backend
 	$(MAKE) -C backend format
+
+stan: ## Run static analysis
+  $(MAKE) -C backend stan
