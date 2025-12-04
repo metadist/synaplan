@@ -50,15 +50,15 @@
               </div>
 
                 <div
-                  v-for="entry in usersByLevelEntries"
-                  :key="entry.level"
+                  v-for="(count, level) in overview.usersByLevel"
+                  :key="level"
                   class="surface-card rounded-lg p-6"
                 >
                 <div class="flex items-center justify-between mb-2">
-                    <span class="text-sm txt-secondary">{{ entry.level }}</span>
-                    <Icon :icon="getLevelIcon(entry.level)" class="w-5 h-5 txt-secondary" />
+                    <span class="text-sm txt-secondary">{{ level }}</span>
+                    <Icon :icon="getLevelIcon(level)" class="w-5 h-5 txt-secondary" />
                 </div>
-                  <div class="text-3xl font-bold txt-primary">{{ entry.count }}</div>
+                  <div class="text-3xl font-bold txt-primary">{{ count }}</div>
               </div>
             </div>
 
@@ -79,18 +79,22 @@
                 {{ $t('admin.usage.activeSubscriptions') }}
               </h3>
               <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div
-                  v-for="entry in filteredSubscriptionLevels"
-                  :key="entry.level"
-                  class="surface-elevated rounded-lg p-4"
+                <template
+                  v-for="(count, level) in overview.usersByLevel"
+                  :key="level"
                 >
-                  <div class="flex items-center justify-between mb-2">
-                    <span class="font-semibold txt-primary">{{ entry.level }}</span>
-                    <Icon :icon="getLevelIcon(entry.level)" class="w-5 h-5 txt-secondary" />
+                  <div
+                    v-if="level !== 'NEW' && level !== 'ADMIN'"
+                    class="surface-elevated rounded-lg p-4"
+                  >
+                    <div class="flex items-center justify-between mb-2">
+                      <span class="font-semibold txt-primary">{{ level }}</span>
+                      <Icon :icon="getLevelIcon(level)" class="w-5 h-5 txt-secondary" />
+                    </div>
+                    <div class="text-2xl font-bold txt-primary">{{ count }}</div>
+                    <div class="text-xs txt-secondary mt-1">{{ $t('admin.usage.activeSubscriptions') }}</div>
                   </div>
-                  <div class="text-2xl font-bold txt-primary">{{ entry.count }}</div>
-                  <div class="text-xs txt-secondary mt-1">{{ $t('admin.usage.activeSubscriptions') }}</div>
-                </div>
+                </template>
               </div>
             </div>
 
@@ -579,16 +583,6 @@ const tabs = computed<AdminTab[]>(() => [
 // Overview
 const overview = ref<SystemOverview | null>(null)
 const overviewLoading = ref(false)
-const usersByLevelEntries = computed(() => {
-  if (!overview.value) return []
-  return Object.entries(overview.value.usersByLevel).map(([level, count]) => ({
-    level,
-    count,
-  }))
-})
-const filteredSubscriptionLevels = computed(() =>
-  usersByLevelEntries.value.filter(entry => entry.level !== 'NEW' && entry.level !== 'ADMIN')
-)
 const recentUsers = computed(() => overview.value?.recentUsers ?? [])
 
 // Registration Analytics
