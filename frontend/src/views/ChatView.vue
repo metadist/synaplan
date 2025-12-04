@@ -1111,11 +1111,7 @@ const handleRegenerate = async (message: Message, modelOption: ModelOption) => {
         .filter(part => part.type === 'text')
         .map(part => part.content || '')
         .join('\n')
-      
-      if (!modelOption.id) {
-        console.warn('Selected model has no ID, cannot regenerate.')
-        return
-      }
+
       // Re-send the user message with the selected model
       // This will trigger normal streaming flow
       await handleSendMessage(content, { modelId: modelOption.id })

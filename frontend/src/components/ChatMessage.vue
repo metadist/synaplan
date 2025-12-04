@@ -768,7 +768,7 @@ const closeModelDropdown = () => {
   modelDropdownOpen.value = false
 }
 
-const selectModel = (model: ModelOption & { id?: number }) => {
+const selectModel = (model: ModelOption) => {
   // Trigger again with selected model
   if (props.backendMessageId && model.id) {
     emit('again', props.backendMessageId, model.id)

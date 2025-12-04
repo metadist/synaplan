@@ -1,7 +1,8 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
 import { useModelsStore } from '@/stores/models'
-import type { ModelOption, AIModel } from '@/stores/models'
+import type { AIModel } from '@/stores/models'
+import type { ModelOption } from '@/composables/useModelSelection'
 
 describe('Models Store', () => {
   beforeEach(() => {
@@ -29,12 +30,12 @@ describe('Models Store', () => {
   it('should set chat models', () => {
     const store = useModelsStore()
     const testModels: ModelOption[] = [
-      { provider: 'openai', model: 'gpt-4', label: 'GPT-4' },
-      { provider: 'anthropic', model: 'claude-3', label: 'Claude 3' },
+      { provider: 'openai', model: 'gpt-4', label: 'GPT-4', id: 1 },
+      { provider: 'anthropic', model: 'claude-3', label: 'Claude 3', id: 2 },
     ]
-    
+
     store.setChatModels(testModels)
-    
+
     expect(store.chatModels).toEqual(testModels)
   })
 
