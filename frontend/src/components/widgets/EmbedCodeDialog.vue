@@ -138,7 +138,7 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { Icon } from '@iconify/vue'
-import { config } from '@/stores/config'
+import { useConfigStore } from '@/stores/config'
 import ChatWidget from '@/components/widgets/ChatWidget.vue'
 import type { Widget } from '@/services/api/widgetsApi'
 import { useNotification } from '@/composables/useNotification'
@@ -154,6 +154,7 @@ defineEmits<{
   close: []
 }>()
 
+const config = useConfigStore()
 const { success } = useNotification()
 
 const copiedHTML = ref(false)

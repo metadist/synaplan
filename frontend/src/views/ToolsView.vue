@@ -253,7 +253,7 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
 import { useRoute } from 'vue-router'
-import { config } from '@/stores/config'
+import { useConfigStore } from '@/stores/config'
 import MainLayout from '@/components/MainLayout.vue'
 import WidgetList from '@/components/widgets/WidgetList.vue'
 import WidgetEditor from '@/components/widgets/WidgetEditor.vue'
@@ -289,6 +289,7 @@ import type { SummaryResponse } from '@/services/summaryService'
 import { useNotification } from '@/composables/useNotification'
 
 const route = useRoute()
+const config = useConfigStore()
 const commandsStore = useCommandsStore()
 const aiConfigStore = useAiConfigStore()
 const { success, error: showError } = useNotification()

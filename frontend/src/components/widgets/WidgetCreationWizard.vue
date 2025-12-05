@@ -613,7 +613,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import { Icon } from '@iconify/vue'
-import { config } from '@/stores/config'
+import { useConfigStore } from '@/stores/config'
 import ChatWidget from '@/components/widgets/ChatWidget.vue'
 import * as widgetsApi from '@/services/api/widgetsApi'
 import { promptsApi } from '@/services/api/promptsApi'
@@ -625,6 +625,7 @@ const emit = defineEmits<{
   created: []
 }>()
 
+const config = useConfigStore()
 const { error: showError } = useNotification()
 const { t } = useI18n()
 
