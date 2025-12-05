@@ -19,7 +19,7 @@ $provider = new GoogleProvider(
     $apiKey,
     getenv('GOOGLE_PROJECT_ID') ?: null,
     'us-central1',
-    '/var/www/html/var/uploads'
+    '/var/www/backend/var/uploads'
 );
 
 try {

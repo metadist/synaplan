@@ -8,7 +8,7 @@ services:
     ports:
       - "8001:80"
     volumes:
-      - ./backend:/var/www/html
+      - ./backend:/var/www/backend
     environment:
       APP_ENV: test
       APP_SECRET: test_secret_not_for_production

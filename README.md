@@ -123,7 +123,7 @@ Audio files are automatically transcribed using **Whisper.cpp** when uploaded:
 **Environment variables** (see `.env.example`):
 ```bash
 WHISPER_BINARY=/usr/local/bin/whisper    # Whisper.cpp binary path
-WHISPER_MODELS_PATH=/var/www/html/var/whisper  # Model storage
+WHISPER_MODELS_PATH=/var/www/backend/var/whisper  # Model storage
 WHISPER_DEFAULT_MODEL=base               # tiny|base|small|medium|large
 WHISPER_ENABLED=true                     # Enable/disable transcription
 FFMPEG_BINARY=/usr/bin/ffmpeg           # FFmpeg for audio conversion

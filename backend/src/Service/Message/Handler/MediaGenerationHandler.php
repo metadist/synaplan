@@ -26,7 +26,7 @@ class MediaGenerationHandler implements MessageHandlerInterface
         private EntityManagerInterface $em,
         private LoggerInterface $logger,
         private MediaPromptExtractor $promptExtractor,
-        private string $uploadDir = '/var/www/html/var/uploads',
+        private string $uploadDir = '/var/www/backend/var/uploads',
     ) {
     }
 

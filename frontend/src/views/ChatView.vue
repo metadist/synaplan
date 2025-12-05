@@ -111,6 +111,7 @@ import { chatApi } from '@/services/api'
 import type { ModelOption } from '@/composables/useModelSelection'
 import { parseAIResponse } from '@/utils/responseParser'
 import { normalizeMediaUrl } from '@/utils/urlHelper'
+import { httpClient } from '@/services/api/httpClient'
 
 const { t } = useI18n()
 const { showLimitModal, limitData, checkAndShowLimit, closeLimitModal } = useLimitCheck()
@@ -1001,17 +1002,8 @@ async function saveCancelledMessageToBackend(
   console.log('📡 saveCancelledMessageToBackend called', { trackId, chatId, contentLength: content.length, messageId, metadata })
 
   try {
-    const token = localStorage.getItem('auth_token')
-    const url = `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'}/api/v1/messages/save-cancelled`
-
-    console.log('📡 Sending request to:', url)
-
-    const response = await fetch(url, {
+    const data = await httpClient<any>('/api/v1/messages/save-cancelled', {
       method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      },
       body: JSON.stringify({
         trackId,
         chatId,
@@ -1022,50 +1014,42 @@ async function saveCancelledMessageToBackend(
       })
     })
 
-    console.log('📡 Response status:', response.status)
+    console.log('✅ Cancelled message saved to backend:', data)
 
-    if (response.ok) {
-      const data = await response.json()
-      console.log('✅ Cancelled message saved to backend:', data)
+    // Update the message with backend message ID and metadata so the footer buttons appear
+    const message = historyStore.messages.find(m => m.id === messageId)
+    if (message && data.messageId) {
+      message.backendMessageId = data.messageId
 
-      // Update the message with backend message ID and metadata so the footer buttons appear
-      const message = historyStore.messages.find(m => m.id === messageId)
-      if (message && data.messageId) {
-        message.backendMessageId = data.messageId
+      // Update metadata if provided by backend
+      if (data.topic) {
+        message.topic = data.topic
+      }
+      if (data.provider) {
+        message.provider = data.provider
+      }
+      if (data.model) {
+        message.modelLabel = data.model
+      }
 
-        // Update metadata if provided by backend
-        if (data.topic) {
-          message.topic = data.topic
-        }
-        if (data.provider) {
-          message.provider = data.provider
-        }
-        if (data.model) {
-          message.modelLabel = data.model
-        }
-
-        // Set aiModels object for proper display of model badges
-        if (data.provider && data.model) {
-          message.aiModels = {
-            chat: {
-              provider: data.provider,
-              model: data.model,
-              model_id: null // We don't have the model_id from cancelled message
-            }
+      // Set aiModels object for proper display of model badges
+      if (data.provider && data.model) {
+        message.aiModels = {
+          chat: {
+            provider: data.provider,
+            model: data.model,
+            model_id: null // We don't have the model_id from cancelled message
           }
         }
-
-        console.log('✅ Updated message with metadata:', {
-          backendMessageId: data.messageId,
-          topic: data.topic,
-          provider: data.provider,
-          model: data.model,
-          aiModels: message.aiModels
-        })
       }
-    } else {
-      const errorText = await response.text()
-      console.warn('⚠️ Failed to save cancelled message:', response.status, errorText)
+
+      console.log('✅ Updated message with metadata:', {
+        backendMessageId: data.messageId,
+        topic: data.topic,
+        provider: data.provider,
+        model: data.model,
+        aiModels: message.aiModels
+      })
     }
   } catch (error) {
     console.error('❌ Error saving cancelled message:', error)

@@ -40,15 +40,21 @@ test-clean: ## Stop test infrastructure and remove volumes
 	docker compose -f ../docker-compose.test.yml down -v
 
 ## Testing
-test: test-up migrate-test ## Run all tests
+test: test-up ## Run all tests
+	$(MAKE) migrate-test
+	$(MAKE) fixtures-test
 	docker compose -f ../docker-compose.test.yml exec -T app_test php bin/phpunit
 	$(MAKE) test-down
 
-test-unit: test-up migrate-test ## Run unit tests only
+test-unit: test-up ## Run unit tests only
+	$(MAKE) migrate-test
+	$(MAKE) fixtures-test
 	docker compose -f ../docker-compose.test.yml exec -T app_test php bin/phpunit --testsuite unit
 	$(MAKE) test-down
 
-test-integration: test-up-full migrate-test ## Run integration tests
+test-integration: test-up-full ## Run integration tests
+	$(MAKE) migrate-test
+	$(MAKE) fixtures-test
 	docker compose -f ../docker-compose.test.yml exec -T app_test php bin/phpunit --testsuite integration
 	$(MAKE) test-down
 
@@ -59,8 +65,9 @@ test-watch: test-up migrate-test ## Run tests in watch mode
 migrate: ## Run dev migrations
 	docker compose -f ../docker-compose.yml exec -T backend php bin/console doctrine:migrations:migrate --no-interaction
 
-migrate-test: ## Run test migrations
-	docker compose -f ../docker-compose.test.yml exec -T app_test php bin/console doctrine:migrations:migrate --no-interaction --env=test
+migrate-test: ## Run test migrations and schema setup
+	docker compose -f ../docker-compose.test.yml exec -T app_test php bin/console doctrine:migrations:migrate --no-interaction --allow-no-migration --env=test
+	docker compose -f ../docker-compose.test.yml exec -T app_test php bin/console doctrine:schema:update --force --env=test
 
 fixtures: ## Load dev fixtures
 	docker compose -f ../docker-compose.yml exec -T backend php bin/console doctrine:fixtures:load --no-interaction
@@ -78,4 +85,14 @@ cache-clear: ## Clear Symfony cache
 
 cache-clear-test: ## Clear test cache
 	docker compose -f ../docker-compose.test.yml exec -T app_test php bin/console cache:clear --env=test
+
+## JWT Keys
+jwt-generate: ## Generate JWT keys (passphrase from .env JWT_PASSPHRASE)
+	@mkdir -p config/jwt
+	@JWT_PASS=$$(grep JWT_PASSPHRASE .env | cut -d '=' -f2); \
+	openssl genrsa -aes256 -passout pass:$$JWT_PASS -out config/jwt/private.pem 4096 && \
+	openssl rsa -in config/jwt/private.pem -passin pass:$$JWT_PASS -pubout -out config/jwt/public.pem && \
+	chmod 600 config/jwt/private.pem && \
+	chmod 644 config/jwt/public.pem && \
+	echo "✅ JWT keys generated with passphrase from .env"
 

@@ -200,6 +200,7 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import MessageImage from '../components/MessageImage.vue'
 import MessageVideo from '../components/MessageVideo.vue'
+import { httpClient } from '@/services/api/httpClient'
 
 const route = useRoute()
 const loading = ref(true)
@@ -334,15 +335,10 @@ onMounted(async () => {
   }
 
   try {
-    const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'
-    const response = await fetch(`${API_BASE}/api/v1/chats/shared/${token}`)
-    
-    if (!response.ok) {
-      throw new Error('Chat not found')
-    }
+    const data = await httpClient<any>(`/api/v1/chats/shared/${token}`, {
+      skipAuth: true
+    })
 
-    const data = await response.json()
-    
     if (!data.success) {
       throw new Error('Chat not found or not shared')
     }

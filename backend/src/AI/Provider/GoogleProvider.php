@@ -31,7 +31,7 @@ class GoogleProvider implements ChatProviderInterface, ImageGenerationProviderIn
         private ?string $apiKey = null,
         private ?string $projectId = null,
         private string $region = 'us-central1',
-        private string $uploadDir = '/var/www/html/var/uploads',
+        private string $uploadDir = '/var/www/backend/var/uploads',
     ) {
         // Ensure projectId is null if empty string
         if (empty($this->projectId)) {
