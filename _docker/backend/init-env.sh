@@ -7,7 +7,7 @@ echo "🔧 Checking environment files..."
 create_env_from_example() {
     local ENV_FILE=$1
     local EXAMPLE_FILE=$2
-    
+
     if [ ! -f "$ENV_FILE" ]; then
         if [ -f "$EXAMPLE_FILE" ]; then
             echo "📝 Creating $ENV_FILE from $EXAMPLE_FILE..."
@@ -52,12 +52,8 @@ DATABASE_READ_URL=mysql://synaplan_user:synaplan_password@db:3306/synaplan?serve
 ###< doctrine/doctrine-bundle ###
 
 ###> symfony/messenger ###
-MESSENGER_TRANSPORT_DSN=redis://redis:6379/messages
+MESSENGER_TRANSPORT_DSN=doctrine://default
 ###< symfony/messenger ###
-
-###> redis ###
-REDIS_URL=redis://redis:6379
-###< redis ###
 
 ###> AI Providers ###
 OLLAMA_BASE_URL=http://ollama:11434

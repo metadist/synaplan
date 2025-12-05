@@ -6,39 +6,39 @@
     @apply m-0 font-sans text-base leading-relaxed antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
-  
+
   :root {
     --brand: #00B79D;
     --brand-light: #00F0D3;
     --brand-hover: #00A08A;
-    
+
     --bg-app: #F2F2F2;
     --bg-sidebar: #EBEBEB;
     --bg-chat: #F0F0F0;
     --bg-card: #F5F5F5;
     --bg-chip: #F0F0F0;
-    
+
     --txt-primary: #000;
     --txt-secondary: #6B6B6B;
-    
+
     --border-light: rgba(0,0,0,.06);
     --brand-alpha-light: rgba(0,183,157,.08);
   }
-  
+
   .dark {
     --brand: #00B79D;
     --brand-light: #00F0D3;
     --brand-hover: #00D4BC;
-    
+
     --bg-app: #0A0E1A;
     --bg-sidebar: #0D1525;
     --bg-chat: #0F1726;
     --bg-card: #121B2E;
     --bg-chip: #1A2438;
-    
+
     --txt-primary: #fff;
     --txt-secondary: #A1A1A3;
-    
+
     --border-light: rgba(0,183,157,.12);
     --brand-alpha-light: rgba(0,183,157,.15);
   }
@@ -47,7 +47,7 @@
 /* Utilities */
 @layer utilities {
   .bg-app { background: var(--bg-app); }
-  
+
   .bg-sidebar {
     background: var(--bg-sidebar);
     box-shadow: inset 0 0 0 1px rgb(212 212 212);
@@ -167,13 +167,13 @@
     border-radius:.75rem;
     box-shadow: 0 1px 2px rgb(0 0 0 / .12);
   }
-  
+
   /* Ensure all text inside user bubble is white/high contrast */
   .bubble-user,
   .bubble-user * {
     color: #FFFFFF !important;
   }
-  
+
   /* Override for light mode if brand color is too light */
   @media (prefers-color-scheme: light) {
     .bubble-user,
@@ -189,7 +189,7 @@
   .txt-tertiary { color: var(--txt-secondary); opacity: 0.6; }
   .txt-brand { color: var(--brand); }
   .dark .txt-brand { color: var(--brand-light); }
-  
+
   .border-light-border { border-color: rgba(0,0,0,.1); }
   .dark .border-light-border { border-color: rgba(255,255,255,.1); }
   .border-dark-border { border-color: rgba(0,0,0,.2); }
@@ -304,15 +304,15 @@
   select option { background: var(--bg-chip); color: var(--txt-primary); }
 
   /* Scrollbars */
-  .chat-input-scroll { 
-    scrollbar-width: thin; 
+  .chat-input-scroll {
+    scrollbar-width: thin;
     scrollbar-gutter: stable;
   }
   .chat-input-scroll::-webkit-scrollbar { width:8px; }
   .chat-input-scroll::-webkit-scrollbar-track { background:transparent; margin:4px; }
-  .chat-input-scroll::-webkit-scrollbar-thumb { 
-    background: rgba(0,0,0,.15); 
-    border-radius:9999px; 
+  .chat-input-scroll::-webkit-scrollbar-thumb {
+    background: rgba(0,0,0,.15);
+    border-radius:9999px;
     border:2px solid transparent;
     background-clip:padding-box;
     transition: background .2s;
@@ -328,9 +328,9 @@
   .sidebar-scroll { scrollbar-width:thin; scrollbar-gutter:stable; }
   .sidebar-scroll::-webkit-scrollbar { width:8px; height:8px; }
   .sidebar-scroll::-webkit-scrollbar-track { background:transparent; margin:4px; }
-  .sidebar-scroll::-webkit-scrollbar-thumb { 
-    background: rgba(0,0,0,.12); 
-    border-radius:9999px; 
+  .sidebar-scroll::-webkit-scrollbar-thumb {
+    background: rgba(0,0,0,.12);
+    border-radius:9999px;
     border:2px solid transparent;
     background-clip:padding-box;
     transition: background .2s;
@@ -346,9 +346,9 @@
   .scroll-thin { scrollbar-width:thin; }
   .scroll-thin::-webkit-scrollbar { width:8px; height:8px; }
   .scroll-thin::-webkit-scrollbar-track { background:transparent; margin:4px; }
-  .scroll-thin::-webkit-scrollbar-thumb { 
-    background: rgba(0,0,0,.15); 
-    border-radius:9999px; 
+  .scroll-thin::-webkit-scrollbar-thumb {
+    background: rgba(0,0,0,.15);
+    border-radius:9999px;
     border:2px solid transparent;
     background-clip:padding-box;
     transition: background .2s;
@@ -439,7 +439,7 @@
   }
   .animate-float{ animation: float 20s ease-in-out infinite; }
   .animate-float-delayed{ animation: float-delayed 25s ease-in-out infinite; }
-  
+
   /* Processing Status Animation */
   @keyframes fadeSlideIn {
     from { opacity: 0; transform: translateY(-4px); }
@@ -746,7 +746,7 @@
     background: linear-gradient(135deg, #FCD34D 0%, #FBBF24 50%, #FCD34D 100%);
     box-shadow: 0 6px 20px rgba(251, 191, 36, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.3);
   }
-  
+
   @keyframes golden-shimmer {
     0%, 100% {
       background-position: 0% 50%;
@@ -755,7 +755,7 @@
       background-position: 100% 50%;
     }
   }
-  
+
   @keyframes golden-shine {
     0% {
       transform: translateX(-100%) translateY(-100%) rotate(45deg);
