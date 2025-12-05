@@ -22,7 +22,7 @@ class WhisperService
     public function __construct(
         private LoggerInterface $logger,
         private string $whisperBinary = '/usr/local/bin/whisper',
-        private string $whisperModelsPath = '/var/www/html/var/whisper',
+        private string $whisperModelsPath = '/var/www/backend/var/whisper',
         private string $defaultModel = 'base',
         private string $ffmpegBinary = '/usr/bin/ffmpeg',
     ) {

@@ -1,14 +1,20 @@
 services:
   # Vue.js Frontend
   frontend:
-    build:
-      context: .
-      dockerfile: _docker/frontend/Dockerfile
+    image: node:22
     container_name: synaplan-frontend
+    working_dir: /app
+    entrypoint: ["/usr/local/bin/docker-entrypoint.sh"]
+    environment:
+      BACKEND_URL: http://backend
     ports:
       - "5173:5173"
     volumes:
+      - ./_docker/frontend/docker-entrypoint.sh:/usr/local/bin/docker-entrypoint.sh:ro
+      - ./_docker/frontend/init-env.sh:/usr/local/bin/init-env.sh:ro
+
       - ./frontend:/app
+       # Anonymous volume to prevent host node_modules from being mounted (avoids platform-specific binary conflicts)
       - /app/node_modules
     depends_on:
       - backend
@@ -17,6 +23,7 @@ services:
       - synaplan-network
 
   # Symfony PHP Backend
+  # Serves both API and production frontend from frontend/dist
   backend:
     build:
       context: .
@@ -28,8 +35,10 @@ services:
     ports:
       - "8000:80"
     volumes:
-      - ./backend:/var/www/html
-      - whisper_models:/var/www/html/var/whisper:ro
+      - ./backend:/var/www/backend
+      - ./frontend/dist:/var/www/frontend:ro
+      - ./_docker/backend/Caddyfile:/etc/caddy/Caddyfile:ro
+      - whisper_models:/var/www/backend/var/whisper:ro
     environment:
       APP_ENV: dev
       APP_SECRET: change_me_in_production_12345678901234567890

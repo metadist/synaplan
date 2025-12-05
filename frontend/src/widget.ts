@@ -64,6 +64,12 @@ class SynaplanWidget {
       return
     }
 
+    // Derive API base URL from widget.js location
+    // e.g., https://api.synaplan.com/static/widget.js -> https://api.synaplan.com/static
+    const scriptUrl = new URL(import.meta.url)
+    const basePath = scriptUrl.pathname.replace(/\/[^\/]+$/, '') // Remove filename
+    const defaultApiUrl = `${scriptUrl.origin}${basePath}`
+
     this.config = {
       position: 'bottom-right',
       primaryColor: '#007bff',
@@ -75,7 +81,7 @@ class SynaplanWidget {
       maxFileSize: 10,
       widgetTitle: 'Chat Support',
       isPreview: false,
-      apiUrl: import.meta.env.VITE_API_URL || 'http://localhost:8000',
+      apiUrl: defaultApiUrl,
       allowedDomains: [],
       allowFileUpload: false,
       fileUploadLimit: 3,

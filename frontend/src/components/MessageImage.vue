@@ -68,6 +68,7 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, watch } from 'vue'
 import { useAuthStore } from '../stores/auth'
+import { useConfigStore } from '@/stores/config'
 
 interface Props {
   url: string
@@ -76,6 +77,7 @@ interface Props {
 
 const props = defineProps<Props>()
 const authStore = useAuthStore()
+const config = useConfigStore()
 
 const isFullscreen = ref(false)
 const blobUrl = ref<string>('')
@@ -90,8 +92,7 @@ const loadImage = async () => {
     }
 
     // Internal API URLs need authentication
-    const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'
-    const fullUrl = props.url.startsWith('/') ? `${API_BASE_URL}${props.url}` : props.url
+    const fullUrl = props.url.startsWith('/') ? `${config.appBaseUrl}${props.url}` : props.url
 
     const token = authStore.token
     const response = await fetch(fullUrl, {

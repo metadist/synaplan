@@ -52,12 +52,22 @@ export default defineConfig(({ mode }) => {
   // Default app mode
   const env = loadEnv(mode, process.cwd(), '')
   const basePath = env.VITE_BASE_PATH || '/'
+  const backendUrl = env.BACKEND_URL || 'http://localhost:8000'
+
   return {
     base: basePath,
     plugins: [vue()],
     resolve: {
       alias: {
         '@': fileURLToPath(new URL('./src', import.meta.url))
+      }
+    },
+    server: {
+      proxy: {
+        '/api': {
+          target: backendUrl,
+          changeOrigin: true,
+        }
       }
     },
     test: {

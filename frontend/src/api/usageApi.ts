@@ -1,8 +1,5 @@
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000'
-
-function getAuthToken(): string | null {
-  return localStorage.getItem('auth_token')
-}
+import { httpClient } from '@/services/api/httpClient'
+import { useConfigStore } from '@/stores/config'
 
 export interface UsageStats {
   user_level: string
@@ -54,69 +51,39 @@ interface UsageResponse {
 }
 
 export async function getUsageStats(): Promise<UsageStats> {
-  const token = getAuthToken()
-  
-  if (!token) {
-    throw new Error('Not authenticated. Please log in.')
-  }
-  
-  const response = await fetch(`${API_BASE}/api/v1/usage/stats`, {
-    method: 'GET',
-    headers: {
-      'Authorization': `Bearer ${token}`,
-      'Content-Type': 'application/json'
-    }
+  const data = await httpClient<UsageResponse>('/api/v1/usage/stats', {
+    method: 'GET'
   })
-
-  if (response.status === 401) {
-    throw new Error('Session expired. Please log in again.')
-  }
-
-  if (!response.ok) {
-    const errorText = await response.text()
-    throw new Error(`Failed to fetch usage stats: ${response.statusText} - ${errorText}`)
-  }
-
-  const data: UsageResponse = await response.json()
   return data.data
 }
 
 export function getExportCsvUrl(sinceTimestamp?: number): string {
-  const token = getAuthToken()
-  let url = `${API_BASE}/api/v1/usage/export?token=${token}`
-  
+  const config = useConfigStore()
+  const token = localStorage.getItem('auth_token')
+  // Note: apiBaseUrl is either '' (same-origin) or 'https://example.com/api'
+  // For same-origin, we need the full path /api/v1/...
+  const basePath = config.apiBaseUrl || '/api'
+  let url = `${basePath}/v1/usage/export?token=${token}`
+
   if (sinceTimestamp) {
     url += `&since=${sinceTimestamp}`
   }
-  
+
   return url
 }
 
 export async function downloadUsageExport(sinceTimestamp?: number): Promise<void> {
-  const token = getAuthToken()
-  let url = `${API_BASE}/api/v1/usage/export`
-  
-  const params = new URLSearchParams()
+  const params: Record<string, string> = {}
   if (sinceTimestamp) {
-    params.append('since', sinceTimestamp.toString())
-  }
-  
-  if (params.toString()) {
-    url += `?${params.toString()}`
+    params.since = sinceTimestamp.toString()
   }
 
-  const response = await fetch(url, {
+  const blob = await httpClient<Blob>('/api/v1/usage/export', {
     method: 'GET',
-    headers: {
-      'Authorization': `Bearer ${token}`
-    }
+    params,
+    responseType: 'blob'
   })
 
-  if (!response.ok) {
-    throw new Error(`Failed to export usage: ${response.statusText}`)
-  }
-
-  const blob = await response.blob()
   const downloadUrl = window.URL.createObjectURL(blob)
   const link = document.createElement('a')
   link.href = downloadUrl

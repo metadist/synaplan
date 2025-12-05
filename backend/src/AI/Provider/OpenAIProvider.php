@@ -20,7 +20,7 @@ class OpenAIProvider implements ChatProviderInterface, EmbeddingProviderInterfac
     public function __construct(
         private LoggerInterface $logger,
         private ?string $apiKey = null,
-        private string $uploadDir = '/var/www/html/var/uploads',
+        private string $uploadDir = '/var/www/backend/var/uploads',
     ) {
         if (!empty($apiKey)) {
             $this->client = \OpenAI::client($apiKey);
