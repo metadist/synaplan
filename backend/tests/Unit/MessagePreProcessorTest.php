@@ -35,7 +35,7 @@ class MessagePreProcessorTest extends TestCase
             $this->aiFacade,
             $this->logger,
             'http://tika:9998',
-            '/var/www/html/uploads'
+            '/var/www/backend/uploads'
         );
     }
 

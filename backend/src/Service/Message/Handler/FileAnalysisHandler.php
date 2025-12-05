@@ -20,7 +20,7 @@ class FileAnalysisHandler implements MessageHandlerInterface
         private AiFacade $aiFacade,
         private ModelConfigService $modelConfigService,
         private LoggerInterface $logger,
-        private string $uploadDir = '/var/www/html/var/uploads',
+        private string $uploadDir = '/var/www/backend/var/uploads',
     ) {
     }
 

@@ -3,6 +3,12 @@ set -e
 
 echo "🚀 Starting Synaplan Frontend..."
 
+# Install dependencies if node_modules doesn't exist
+if [ ! -d "node_modules" ]; then
+  echo "📦 Installing dependencies..."
+  npm ci
+fi
+
 # Initialize environment files
 /usr/local/bin/init-env.sh
 

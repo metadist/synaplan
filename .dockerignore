@@ -24,7 +24,7 @@ backend/.env.docker
 
 # Frontend excludes
 frontend/node_modules
-frontend/dist
+# frontend/dist - needed for backend production build
 frontend/.env.local
 frontend/.env.docker
 

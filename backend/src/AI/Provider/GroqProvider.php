@@ -20,7 +20,7 @@ class GroqProvider implements ChatProviderInterface, VisionProviderInterface
     public function __construct(
         private LoggerInterface $logger,
         private ?string $apiKey = null,
-        private string $uploadDir = '/var/www/html/var/uploads',
+        private string $uploadDir = '/var/www/backend/var/uploads',
     ) {
         if (!empty($apiKey)) {
             // Groq uses OpenAI-compatible client with custom base URL

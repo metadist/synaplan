@@ -1,0 +1,47 @@
+{
+	# Global options
+	frankenphp
+	order php_server before file_server
+}
+
+:80 {
+	# Enable compression
+	encode zstd gzip
+
+	# Security headers (applied to all responses)
+	header {
+		X-Frame-Options "SAMEORIGIN"
+		X-Content-Type-Options "nosniff"
+		X-XSS-Protection "1; mode=block"
+	}
+
+	# Cache static assets from frontend
+	@static_assets {
+		path *.css *.js *.jpg *.jpeg *.png *.gif *.ico *.svg *.woff *.woff2 *.ttf *.eot *.webp
+	}
+	header @static_assets {
+		Cache-Control "public, max-age=31536000, immutable"
+	}
+
+	# Backend routes (handled by PHP in /var/www/backend/public)
+	# Dev routes (_profiler, _wdt, _error) only when APP_ENV=dev
+	@backend expression `
+		path('/bundles/*') ||
+		path('/uploads/*') ||
+		path('/up/*') ||
+		path('/api/*') ||
+		path('/api.php') ||
+		({env.APP_ENV} == 'dev' && (path('/_profiler/*') || path('/_wdt/*') || path('/_error/*')))
+	`
+	route @backend {
+		root * /var/www/backend/public
+		php_server
+	}
+
+	# Everything else: serve from frontend dist
+	route {
+		root * /var/www/frontend
+		try_files {path} /index.html
+		file_server
+	}
+}

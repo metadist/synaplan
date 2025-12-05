@@ -40,7 +40,7 @@ class AnthropicProvider implements ChatProviderInterface, VisionProviderInterfac
         private LoggerInterface $logger,
         private ?string $apiKey = null,
         private int $timeout = 120,
-        private string $uploadDir = '/var/www/html/var/uploads',
+        private string $uploadDir = '/var/www/backend/var/uploads',
     ) {
     }
 

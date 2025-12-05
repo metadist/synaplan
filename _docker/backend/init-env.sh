@@ -24,7 +24,7 @@ create_env_from_example() {
 }
 
 # Root .env for Docker Compose (bind-mounted, accessible from container)
-ROOT_DIR="/var/www/html/.."
+ROOT_DIR="/var/www/backend/.."
 ROOT_ENV="$ROOT_DIR/.env"
 ROOT_EXAMPLE="$ROOT_DIR/.env.example"
 
@@ -33,7 +33,7 @@ if [ -f "$ROOT_EXAMPLE" ]; then
 fi
 
 # Backend .env
-BACKEND_DIR="/var/www/html"
+BACKEND_DIR="/var/www/backend"
 BACKEND_ENV="$BACKEND_DIR/.env"
 BACKEND_EXAMPLE="$BACKEND_DIR/.env.example"
 
@@ -90,7 +90,7 @@ RASTERIZE_TIMEOUT_MS=30000
 
 ###> Whisper Service (Audio Transcription) ###
 WHISPER_BINARY=/usr/local/bin/whisper
-WHISPER_MODELS_PATH=/var/www/html/var/whisper
+WHISPER_MODELS_PATH=/var/www/backend/var/whisper
 WHISPER_DEFAULT_MODEL=base
 WHISPER_ENABLED=true
 FFMPEG_BINARY=/usr/bin/ffmpeg

@@ -35,7 +35,7 @@ if [ -f "composer.json" ]; then
 fi
 
 # Ensure upload directory is available before permissions are fixed
-UPLOAD_DIR="/var/www/html/var/uploads"
+UPLOAD_DIR="/var/www/backend/var/uploads"
 if [ ! -d "$UPLOAD_DIR" ]; then
     mkdir -p "$UPLOAD_DIR"
 fi
@@ -66,7 +66,7 @@ php bin/console doctrine:migrations:migrate --no-interaction --allow-no-migratio
 echo "✅ Database schema ready!"
 
 # Load fixtures on first run (dev/test only)
-FIXTURES_MARKER="/var/www/html/var/.fixtures_loaded"
+FIXTURES_MARKER="/var/www/backend/var/.fixtures_loaded"
 
 if [ "$APP_ENV" = "dev" ] || [ "$APP_ENV" = "test" ]; then
     if [ -f "$FIXTURES_MARKER" ]; then
@@ -78,14 +78,14 @@ if [ "$APP_ENV" = "dev" ] || [ "$APP_ENV" = "test" ]; then
         # If table doesn't exist, command will fail and we get 0
         USER_COUNT=$(php bin/console dbal:run-sql "SELECT COUNT(*) as count FROM BUSER" 2>/dev/null | grep -oE '[0-9]+' | tail -1)
         USER_COUNT=${USER_COUNT:-0}  # Default to 0 if empty
-        
+
         if [ "$USER_COUNT" -eq 0 ]; then
             echo "🌱 Loading test data (current users: $USER_COUNT)..."
-            
+
             # Ensure schema is complete
             echo "   Updating database schema..."
             php bin/console doctrine:schema:update --force --complete || true
-            
+
             # Load fixtures
             echo "   Loading fixtures..."
             if php bin/console doctrine:fixtures:load --no-interaction 2>&1 | tee /tmp/fixtures.log; then
@@ -116,14 +116,14 @@ fi
 if [ -n "$OLLAMA_BASE_URL" ] && [ "$AUTO_DOWNLOAD_MODELS" = "true" ]; then
     echo ""
     echo "🤖 AUTO_DOWNLOAD_MODELS=true - Starting AI model downloads in background..."
-    
+
     (
         echo "[Background] Waiting for Ollama service..."
         until curl -f "$OLLAMA_BASE_URL/api/tags" > /dev/null 2>&1; do
             sleep 3
         done
         echo "[Background] ✅ Ollama ready, downloading models..."
-        
+
         MODELS=("bge-m3")
         if [ "${ENABLE_LOCAL_GPT_OSS:-true}" = "true" ]; then
             MODELS+=("gpt-oss:20b")
@@ -135,17 +135,17 @@ if [ -n "$OLLAMA_BASE_URL" ] && [ "$AUTO_DOWNLOAD_MODELS" = "true" ]; then
                     -H "Content-Type: application/json" \
                     -d "{\"name\":\"$MODEL\"}" | while IFS= read -r line; do
                         [ -z "$line" ] && continue
-                        
+
                         # Parse JSON fields using sed
                         STATUS=$(echo "$line" | sed -n 's/.*"status":"\([^"]*\)".*/\1/p')
                         COMPLETED=$(echo "$line" | sed -n 's/.*"completed":\([0-9]*\).*/\1/p')
                         TOTAL=$(echo "$line" | sed -n 's/.*"total":\([0-9]*\).*/\1/p')
-                        
+
                         if [ -n "$COMPLETED" ] && [ -n "$TOTAL" ] && [ "$TOTAL" -gt 0 ]; then
                             PERCENT=$((COMPLETED * 100 / TOTAL))
                             MB_COMPLETED=$((COMPLETED / 1048576))
                             MB_TOTAL=$((TOTAL / 1048576))
-                            
+
                             # Only print at 10, 20, 30...90, 100% milestones
                             MILESTONE=$((PERCENT - PERCENT % 10))
                             if [ $PERCENT -gt 0 ] && [ $((PERCENT % 10)) -lt 2 ]; then
@@ -170,7 +170,7 @@ if [ -n "$OLLAMA_BASE_URL" ] && [ "$AUTO_DOWNLOAD_MODELS" = "true" ]; then
         done
         echo "[Background] 🎉 Model downloads completed!"
     ) &
-    
+
     echo "✅ Model download started in background"
 else
     echo ""
@@ -187,8 +187,9 @@ echo "✅ Cache ready!"
 # Start FrankenPHP
 echo ""
 echo "🎉 Backend ready! Starting FrankenPHP..."
-echo "   🌐 API: http://localhost:8000"
+echo "   🌐 Frontend: http://localhost:8000"
+echo "   🌐 API: http://localhost:8000/api"
 echo "   📚 Swagger: http://localhost:8000/api/doc"
 echo ""
 
-exec frankenphp php-server --listen 0.0.0.0:80 --root public/
+exec frankenphp run --config /etc/caddy/Caddyfile
