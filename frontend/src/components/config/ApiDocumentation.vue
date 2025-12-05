@@ -257,7 +257,7 @@ const loadApiSpec = async () => {
 
     // Fetch OpenAPI JSON from backend
     const config = useConfigStore()
-    const response = await fetch(`${config.appBaseUrl}/api/doc.json`)
+    const response = await fetch(`${config.apiBaseUrl}/doc.json`)
     
     if (!response.ok) {
       throw new Error(`Failed to load API documentation: ${response.statusText}`)

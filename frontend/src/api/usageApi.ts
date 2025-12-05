@@ -60,7 +60,10 @@ export async function getUsageStats(): Promise<UsageStats> {
 export function getExportCsvUrl(sinceTimestamp?: number): string {
   const config = useConfigStore()
   const token = localStorage.getItem('auth_token')
-  let url = `${config.apiBaseUrl}/v1/usage/export?token=${token}`
+  // Note: apiBaseUrl is either '' (same-origin) or 'https://example.com/api'
+  // For same-origin, we need the full path /api/v1/...
+  const basePath = config.apiBaseUrl || '/api'
+  let url = `${basePath}/v1/usage/export?token=${token}`
 
   if (sinceTimestamp) {
     url += `&since=${sinceTimestamp}`
