@@ -188,7 +188,7 @@ export async function sendWidgetMessage(
     onStatus
   } = options
 
-  const apiUrl = apiUrlOverride ?? import.meta.env.VITE_API_URL ?? 'http://localhost:8000'
+  const apiUrl = apiUrlOverride ?? import.meta.env.VITE_API_URL ?? ''
 
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
@@ -375,7 +375,7 @@ export async function uploadWidgetFile(
   chunks_created?: number
   remainingUploads?: number
 }> {
-  const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000'
+  const apiUrl = import.meta.env.VITE_API_URL || ''
   
   const formData = new FormData()
   formData.append('file', file)

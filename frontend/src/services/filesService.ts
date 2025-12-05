@@ -211,7 +211,7 @@ export const getFileContent = async (fileId: number): Promise<{
 export const downloadFile = async (fileId: number, filename: string): Promise<void> => {
   // We need to use fetch directly for file downloads
   const token = localStorage.getItem('auth_token')
-  const response = await fetch(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'}/api/v1/files/${fileId}/download`, {
+  const response = await fetch(`${import.meta.env.VITE_API_BASE_URL || ''}/api/v1/files/${fileId}/download`, {
     headers: {
       'Authorization': `Bearer ${token}`
     }

@@ -75,7 +75,7 @@ class SynaplanWidget {
       maxFileSize: 10,
       widgetTitle: 'Chat Support',
       isPreview: false,
-      apiUrl: import.meta.env.VITE_API_URL || 'http://localhost:8000',
+      apiUrl: import.meta.env.VITE_API_URL || '',
       allowedDomains: [],
       allowFileUpload: false,
       fileUploadLimit: 3,

@@ -12,7 +12,7 @@ export function normalizeMediaUrl(url: string | undefined | null): string {
   
   // Get API base URL from environment
   // @ts-ignore - Vite env types
-  const API_BASE_URL: string = import.meta.env?.VITE_API_BASE_URL || 'http://localhost:8000'
+  const API_BASE_URL: string = import.meta.env?.VITE_API_BASE_URL || ''
   
   // Add leading slash if missing
   const normalizedPath = url.startsWith('/') ? url : `/${url}`

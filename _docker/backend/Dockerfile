@@ -64,7 +64,7 @@ COPY _docker/backend/init-env.sh /usr/local/bin/
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh /usr/local/bin/init-env.sh
 
 # Copy built frontend (built externally in CI, empty in dev)
-COPY frontend/dist ./public
+COPY frontend/dist /var/www/frontend
 
 # Copy Caddyfile for production routing (API vs SPA)
 COPY _docker/backend/Caddyfile /etc/caddy/Caddyfile

@@ -979,7 +979,7 @@ async function saveCancelledMessageToBackend(
   
   try {
     const token = localStorage.getItem('auth_token')
-    const url = `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'}/api/v1/messages/save-cancelled`
+    const url = `${import.meta.env.VITE_API_BASE_URL || ''}/api/v1/messages/save-cancelled`
     
     console.log('📡 Sending request to:', url)
     

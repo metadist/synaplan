@@ -142,7 +142,7 @@ class PromptsApi {
     formData.append('process_level', 'vectorize')
     
     // Use httpClient which handles auth headers automatically
-    const backendUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000'
+    const backendUrl = import.meta.env.VITE_API_URL || ''
     const token = localStorage.getItem('token')
     
     const response = await fetch(`${backendUrl}/api/v1/files/upload`, {

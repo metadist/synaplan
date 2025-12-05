@@ -90,7 +90,7 @@ const loadImage = async () => {
     }
 
     // Internal API URLs need authentication
-    const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'
+    const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || ''
     const fullUrl = props.url.startsWith('/') ? `${API_BASE_URL}${props.url}` : props.url
 
     const token = authStore.token

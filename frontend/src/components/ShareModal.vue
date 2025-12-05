@@ -187,7 +187,7 @@ const expiryOptions = [
 
 const fullShareUrl = computed(() => {
   if (!shareInfo.value?.share_url) return ''
-  const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'
+  const baseUrl = import.meta.env.VITE_API_BASE_URL || ''
   return baseUrl + shareInfo.value.share_url
 })
 

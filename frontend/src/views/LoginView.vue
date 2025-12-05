@@ -218,7 +218,7 @@ const socialProviders = ref<SocialProvider[]>([])
 // Load available social providers
 const loadSocialProviders = async () => {
   try {
-    const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'
+    const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || ''
     const response = await fetch(`${apiBaseUrl}/api/v1/auth/providers`)
     const data = await response.json()
     socialProviders.value = data.providers || []
@@ -269,7 +269,7 @@ const handleLogin = async () => {
 
 const handleSocialLogin = (provider: string) => {
   // Get API base URL
-  const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'
+  const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || ''
   
   // Redirect to backend OAuth endpoint
   const oauthUrl = `${apiBaseUrl}/api/v1/auth/${provider}/login`

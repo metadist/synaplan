@@ -334,7 +334,7 @@ onMounted(async () => {
   }
 
   try {
-    const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'
+    const API_BASE = import.meta.env.VITE_API_BASE_URL || ''
     const response = await fetch(`${API_BASE}/api/v1/chats/shared/${token}`)
     
     if (!response.ok) {

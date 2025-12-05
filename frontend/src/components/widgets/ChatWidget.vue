@@ -452,7 +452,7 @@ const canSend = computed(() => {
   return !limitReached.value && !isSending.value
 })
 
-const resolveApiUrl = () => props.apiUrl || import.meta.env.VITE_API_URL || 'http://localhost:8000'
+const resolveApiUrl = () => props.apiUrl || import.meta.env.VITE_API_URL || ''
 
 const showLimitWarning = computed(() => {
   const warningThreshold = props.messageLimit * 0.8

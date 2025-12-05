@@ -34,7 +34,7 @@ export const authApi = {
   async verifyEmail(token: string): Promise<any> {
     // Email verification should work without authentication
     // Don't use httpClient as it may send expired auth tokens causing 401
-    const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'
+    const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || ''
     const response = await fetch(`${API_BASE_URL}/api/v1/auth/verify-email`, {
       method: 'POST',
       headers: {
@@ -53,7 +53,7 @@ export const authApi = {
 
   async resendVerification(email: string): Promise<any> {
     // Resend verification should work without authentication
-    const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'
+    const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || ''
     const response = await fetch(`${API_BASE_URL}/api/v1/auth/resend-verification`, {
       method: 'POST',
       headers: {
@@ -72,7 +72,7 @@ export const authApi = {
 
   async forgotPassword(email: string): Promise<any> {
     // Forgot password should work without authentication
-    const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'
+    const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || ''
     const response = await fetch(`${API_BASE_URL}/api/v1/auth/forgot-password`, {
       method: 'POST',
       headers: {
@@ -91,7 +91,7 @@ export const authApi = {
 
   async resetPassword(token: string, password: string): Promise<any> {
     // Password reset should work without authentication
-    const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'
+    const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || ''
     const response = await fetch(`${API_BASE_URL}/api/v1/auth/reset-password`, {
       method: 'POST',
       headers: {
