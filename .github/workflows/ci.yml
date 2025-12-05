@@ -228,9 +228,9 @@ jobs:
     if: always()
     steps:
       - name: Check for failures
-        if: ${{ !cancelled() && (needs.lint.result == 'failure' || needs.backend.result == 'failure' || needs.frontend.result == 'failure' || needs.docker.result == 'failure') }}
+        if: ${{ !cancelled() && (needs.lint.result != 'success' || needs.backend.result != 'success' || needs.frontend.result != 'success' || needs.docker.result != 'success') }}
         run: |
-          echo "One or more checks failed"
+          echo "One or more checks failed, were cancelled, or were skipped"
           exit 1
 
       - name: All checks passed

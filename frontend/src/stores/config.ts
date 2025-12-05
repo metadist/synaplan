@@ -19,8 +19,9 @@ export const config = {
 
   /**
    * API base URL for backend API requests.
-   * Same as appBaseUrl (endpoints include /api/ prefix)
-   * Empty string = same-origin API (e.g., /api/v1/...)
+   * Defaults to same as appBaseUrl for same-origin deployments.
+   * For widget embedding, this is typically the full backend URL.
+   * Endpoints include /api/ prefix (e.g., /api/v1/...)
    * Always normalized (no trailing slash)
    */
   apiBaseUrl: '',
