@@ -172,6 +172,7 @@
                       <div class="pointer-events-auto">
                         <ChatWidget
                           widget-id="preview-widget"
+                          :api-url="config.apiBaseUrl"
                           :primary-color="currentWidgetConfig.primaryColor"
                           :icon-color="currentWidgetConfig.iconColor"
                           :position="currentWidgetConfig.position"
@@ -252,6 +253,7 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
 import { useRoute } from 'vue-router'
+import { config } from '@/stores/config'
 import MainLayout from '@/components/MainLayout.vue'
 import WidgetList from '@/components/widgets/WidgetList.vue'
 import WidgetEditor from '@/components/widgets/WidgetEditor.vue'

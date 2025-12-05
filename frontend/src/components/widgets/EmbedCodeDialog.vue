@@ -90,6 +90,7 @@
             <div class="absolute inset-0 z-10">
               <ChatWidget
                 :widget-id="widget.widgetId"
+                :api-url="config.apiBaseUrl"
                 :primary-color="widget.config.primaryColor || '#007bff'"
                 :icon-color="widget.config.iconColor || '#ffffff'"
                 :position="widget.config.position || 'bottom-right'"
@@ -137,6 +138,7 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { Icon } from '@iconify/vue'
+import { config } from '@/stores/config'
 import ChatWidget from '@/components/widgets/ChatWidget.vue'
 import type { Widget } from '@/services/api/widgetsApi'
 import { useNotification } from '@/composables/useNotification'
