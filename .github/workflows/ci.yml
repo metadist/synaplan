@@ -226,12 +226,12 @@ jobs:
 
   # Gate job that depends on all checks - only this needs to be required in branch protection
   all-checks-passed:
-    name: CI ✓
+    name: All Checks Passed
     runs-on: ubuntu-latest
     needs: [lint, backend, frontend, docker]
     if: always()
     steps:
-      - name: Check all jobs succeeded
+      - name: Verify all jobs succeeded
         run: |
           if [ "${{ needs.lint.result }}" != "success" ] || \
              [ "${{ needs.backend.result }}" != "success" ] || \
