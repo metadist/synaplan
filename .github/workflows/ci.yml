@@ -220,10 +220,6 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - name: Push to registry
-        if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/'))
-        run: echo "✅ Image pushed to ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}"
-
   # Gate job that depends on all checks - only this needs to be required in branch protection
   all-checks-passed:
     name: All Checks Passed
@@ -231,13 +227,12 @@ jobs:
     needs: [lint, backend, frontend, docker]
     if: always()
     steps:
-      - name: Verify all jobs succeeded
+      - name: Check for failures
+        if: ${{ !cancelled() && (needs.lint.result == 'failure' || needs.backend.result == 'failure' || needs.frontend.result == 'failure' || needs.docker.result == 'failure') }}
         run: |
-          if [ "${{ needs.lint.result }}" != "success" ] || \
-             [ "${{ needs.backend.result }}" != "success" ] || \
-             [ "${{ needs.frontend.result }}" != "success" ] || \
-             [ "${{ needs.docker.result }}" != "success" ]; then
-            echo "One or more checks failed"
-            exit 1
-          fi
-          echo "All checks passed!"
+          echo "One or more checks failed"
+          exit 1
+
+      - name: All checks passed
+        if: ${{ !cancelled() && needs.lint.result == 'success' && needs.backend.result == 'success' && needs.frontend.result == 'success' && needs.docker.result == 'success' }}
+        run: echo "All checks passed!"
