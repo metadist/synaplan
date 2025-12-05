@@ -3,11 +3,9 @@ set -e
 
 echo "🚀 Starting Synaplan Frontend..."
 
-# Install dependencies if needed (node_modules missing or package-lock.json changed)
-if [ ! -d "node_modules" ] || [ "package-lock.json" -nt "node_modules" ]; then
-  echo "📦 Installing dependencies..."
-  npm ci
-fi
+# Always run npm ci - it's quick and ensures dependencies are always correct
+echo "📦 Installing dependencies..."
+npm ci
 
 # Initialize environment files
 /usr/local/bin/init-env.sh
