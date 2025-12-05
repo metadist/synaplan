@@ -1091,6 +1091,7 @@
   "message": {
     "thinking": "Thinking process",
     "reasoning": "AI Reasoning",
+    "waiting": "Thinking...",
     "fileGenerated": "I've created the file '{filename}' for you. You can now download it.",
     "fileGenerationFailed": "There was a problem creating the file. Please try again.",
     "cancelledByUser": "⚠️ Cancelled by user"

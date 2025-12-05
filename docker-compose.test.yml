@@ -15,7 +15,7 @@ services:
       DATABASE_WRITE_URL: mysql://synaplan_test:synaplan_test@db_test:3306/synaplan_test?serverVersion=11.8&charset=utf8mb4
       DATABASE_READ_URL: mysql://synaplan_test:synaplan_test@db_test:3306/synaplan_test?serverVersion=11.8&charset=utf8mb4
       REDIS_URL: redis://redis_test:6379
-      MESSENGER_TRANSPORT_DSN: redis://redis_test:6379/messages
+      MESSENGER_TRANSPORT_DSN: doctrine://default
       OLLAMA_BASE_URL: http://ollama_test:11434
       TIKA_BASE_URL: http://tika_test:9998
       AI_DEFAULT_PROVIDER: test
