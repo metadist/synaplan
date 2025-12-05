@@ -159,6 +159,7 @@ import { useNotification } from '@/composables/useNotification'
 import { useDialog } from '@/composables/useDialog'
 import { useI18n } from 'vue-i18n'
 import { DevicePhoneMobileIcon } from '@heroicons/vue/24/outline'
+import { useConfigStore } from '@/stores/config'
 
 const { success, error: showError } = useNotification()
 const dialog = useDialog()
@@ -174,8 +175,8 @@ const requesting = ref(false)
 const confirming = ref(false)
 
 const AUTH_TOKEN_KEY = import.meta.env.VITE_AUTH_TOKEN_KEY || 'auth_token'
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || ''
-const API_BASE = API_BASE_URL.replace(/\/$/, '')
+const config = useConfigStore()
+const API_BASE = config.appBaseUrl
 
 const buildHeaders = (withJson = false) => {
   const headers: Record<string, string> = {}

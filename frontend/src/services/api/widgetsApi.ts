@@ -1,4 +1,5 @@
 import { httpClient } from './httpClient'
+import { useConfigStore } from '@/stores/config'
 
 // Widget Interface
 export interface Widget {
@@ -188,7 +189,8 @@ export async function sendWidgetMessage(
     onStatus
   } = options
 
-  const apiUrl = apiUrlOverride ?? import.meta.env.VITE_API_URL ?? ''
+  const config = useConfigStore()
+  const apiUrl = apiUrlOverride ?? config.apiBaseUrl
 
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
@@ -368,32 +370,36 @@ export async function uploadWidgetFile(
   file: File
 ): Promise<{
   success: boolean
-  id: number
-  filename: string
-  size: number
-  extracted_text_length: number
-  chunks_created?: number
+  file: {
+    id: number
+    filename: string
+    size: number
+    extracted_text_length: number
+    chunks_created?: number
+  }
   remainingUploads?: number
 }> {
-  const apiUrl = import.meta.env.VITE_API_URL || ''
-  
   const formData = new FormData()
   formData.append('file', file)
 
-  const response = await fetch(`${apiUrl}/api/v1/widget/${widgetId}/upload`, {
+  return httpClient<{
+    success: boolean
+    file: {
+      id: number
+      filename: string
+      size: number
+      extracted_text_length: number
+      chunks_created?: number
+    }
+    remainingUploads?: number
+  }>(`/api/v1/widget/${widgetId}/upload`, {
     method: 'POST',
     headers: {
       'X-Widget-Session': sessionId,
       ...(typeof window !== 'undefined' && window.location?.host ? { 'X-Widget-Host': window.location.host } : {})
     },
-    body: formData
+    body: formData,
+    skipAuth: true
   })
-
-  if (!response.ok) {
-    const error = await response.json().catch(() => ({ error: 'Upload failed' }))
-    throw new Error(error.error || `HTTP ${response.status}`)
-  }
-
-  return await response.json()
 }
 

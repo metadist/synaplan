@@ -1,7 +1,8 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
+import { httpClient } from '@/services/api/httpClient'
+import { useConfigStore } from '@/stores/config'
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || ''
 const ACTIVE_CHAT_STORAGE_KEY = 'synaplan_active_chat_id'
 
 // Helper function to check authentication and redirect if needed
@@ -98,25 +99,12 @@ export const useChatsStore = defineStore('chats', () => {
 
   async function loadChats() {
     if (!checkAuthOrRedirect()) return
-    
+
     loading.value = true
     error.value = null
-    
+
     try {
-      const token = localStorage.getItem('auth_token')!
-
-      const response = await fetch(`${API_BASE_URL}/api/v1/chats`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      })
-
-      if (!response.ok) {
-        throw new Error('Failed to load chats')
-      }
-
-      const data = await response.json()
+      const data = await httpClient<{ chats: any[] }>('/api/v1/chats')
       chats.value = (data.chats || []).map((chat: any) => normalizeChat(chat))
       ensureValidActiveChat()
     } catch (err: any) {
@@ -129,32 +117,21 @@ export const useChatsStore = defineStore('chats', () => {
 
   async function createChat(title?: string): Promise<Chat | null> {
     if (!checkAuthOrRedirect()) return null
-    
+
     loading.value = true
     error.value = null
-    
-    try {
-      const token = localStorage.getItem('auth_token')!
 
-      const response = await fetch(`${API_BASE_URL}/api/v1/chats`, {
+    try {
+      const data = await httpClient<{ success: boolean; chat: any }>('/api/v1/chats', {
         method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
         body: JSON.stringify({ title })
       })
 
-      if (!response.ok) {
-        throw new Error('Failed to create chat')
-      }
-
-      const data = await response.json()
       const newChat = normalizeChat(data.chat)
-      
+
       chats.value.unshift(newChat)
       updateActiveChatSelection(newChat.id)
-      
+
       return newChat
     } catch (err: any) {
       error.value = err.message || 'Failed to create chat'
@@ -167,22 +144,12 @@ export const useChatsStore = defineStore('chats', () => {
 
   async function updateChatTitle(chatId: number, title: string) {
     if (!checkAuthOrRedirect()) return
-    
-    try {
-      const token = localStorage.getItem('auth_token')!
 
-      const response = await fetch(`${API_BASE_URL}/api/v1/chats/${chatId}`, {
+    try {
+      await httpClient(`/api/v1/chats/${chatId}`, {
         method: 'PATCH',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
         body: JSON.stringify({ title })
       })
-
-      if (!response.ok) {
-        throw new Error('Failed to update chat title')
-      }
 
       const chat = chats.value.find(c => c.id === chatId)
       if (chat) {
@@ -196,24 +163,14 @@ export const useChatsStore = defineStore('chats', () => {
 
   async function deleteChat(chatId: number) {
     if (!checkAuthOrRedirect()) return
-    
-    try {
-      const token = localStorage.getItem('auth_token')!
 
-      const response = await fetch(`${API_BASE_URL}/api/v1/chats/${chatId}`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
+    try {
+      await httpClient(`/api/v1/chats/${chatId}`, {
+        method: 'DELETE'
       })
 
-      if (!response.ok) {
-        throw new Error('Failed to delete chat')
-      }
-
       chats.value = chats.value.filter(c => c.id !== chatId)
-      
+
       // Select another chat if the deleted one was active
       if (activeChatId.value === chatId) {
         updateActiveChatSelection(chats.value.length > 0 ? chats.value[0].id : null)
@@ -226,31 +183,19 @@ export const useChatsStore = defineStore('chats', () => {
 
   async function shareChat(chatId: number, enable: boolean = true) {
     if (!checkAuthOrRedirect()) return null
-    
-    try {
-      const token = localStorage.getItem('auth_token')!
 
-      const response = await fetch(`${API_BASE_URL}/api/v1/chats/${chatId}/share`, {
+    try {
+      const data = await httpClient<{ success: boolean; shareToken: string; isShared: boolean; shareUrl: string }>(`/api/v1/chats/${chatId}/share`, {
         method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
         body: JSON.stringify({ enable })
       })
 
-      if (!response.ok) {
-        throw new Error('Failed to share chat')
-      }
-
-      const data = await response.json()
-      
       // Update chat in store
       const chat = chats.value.find(c => c.id === chatId)
       if (chat) {
         chat.isShared = data.isShared
       }
-      
+
       return {
         success: data.success,
         shareToken: data.shareToken,
@@ -266,27 +211,18 @@ export const useChatsStore = defineStore('chats', () => {
 
   async function getShareInfo(chatId: number) {
     if (!checkAuthOrRedirect()) return null
-    
+
     try {
-      const token = localStorage.getItem('auth_token')!
+      const data = await httpClient<{ chat: any }>(`/api/v1/chats/${chatId}`)
 
-      const response = await fetch(`${API_BASE_URL}/api/v1/chats/${chatId}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      })
+      // Import config store for building share URL
+      const config = useConfigStore()
 
-      if (!response.ok) {
-        throw new Error('Failed to get share info')
-      }
-
-      const data = await response.json()
       return {
         isShared: data.chat.isShared || false,
         shareToken: data.chat.shareToken || null,
-        shareUrl: data.chat.shareToken 
-          ? `${API_BASE_URL}/shared/${data.chat.shareToken}`
+        shareUrl: data.chat.shareToken
+          ? `${config.appBaseUrl}/shared/${data.chat.shareToken}`
           : null
       }
     } catch (err: any) {

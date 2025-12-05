@@ -181,22 +181,10 @@ export const chatApi = {
     const formData = new FormData()
     formData.append('file', file)
 
-    // Use native fetch for FormData upload (httpClient auto-adds JSON Content-Type)
-    const token = localStorage.getItem('auth_token')
-    const response = await fetch(`${API_BASE_URL}/api/v1/messages/upload-file`, {
+    return httpClient<any>('/api/v1/messages/upload-file', {
       method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${token}`
-      },
       body: formData
     })
-
-    if (!response.ok) {
-      const error = await response.json()
-      throw new Error(error.error || 'File upload failed')
-    }
-
-    return response.json()
   },
 
   /**
@@ -214,21 +202,10 @@ export const chatApi = {
     const formData = new FormData()
     formData.append('file', audioBlob, filename)
 
-    const token = localStorage.getItem('auth_token')
-    const response = await fetch(`${API_BASE_URL}/api/v1/messages/upload-file`, {
+    return httpClient<any>('/api/v1/messages/upload-file', {
       method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${token}`
-      },
       body: formData
     })
-
-    if (!response.ok) {
-      const error = await response.json()
-      throw new Error(error.error || 'Audio transcription failed')
-    }
-
-    return response.json()
   },
 
   /**

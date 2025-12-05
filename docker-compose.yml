@@ -5,6 +5,8 @@ services:
     container_name: synaplan-frontend
     working_dir: /app
     entrypoint: ["/usr/local/bin/docker-entrypoint.sh"]
+    environment:
+      BACKEND_URL: http://backend
     ports:
       - "5173:5173"
     volumes:

@@ -1,4 +1,7 @@
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || ''
+import { useConfigStore } from '@/stores/config'
+
+const config = useConfigStore()
+const API_BASE_URL = config.apiBaseUrl
 
 export interface ApiKey {
   id: number

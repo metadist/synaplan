@@ -452,7 +452,7 @@ const canSend = computed(() => {
   return !limitReached.value && !isSending.value
 })
 
-const resolveApiUrl = () => props.apiUrl || import.meta.env.VITE_API_URL || ''
+const resolveApiUrl = () => props.apiUrl || ''
 
 const showLimitWarning = computed(() => {
   const warningThreshold = props.messageLimit * 0.8
@@ -553,11 +553,11 @@ const sendMessage = async () => {
 
       const uploadResult = await uploadWidgetFile(props.widgetId, sessionId.value, selectedFile.value)
 
-      fileIds.push(uploadResult.id)
+      fileIds.push(uploadResult.file.id)
       fileUploadCount.value += 1
 
       messages.value.push({
-        id: `file-${uploadResult.id}`,
+        id: `file-${uploadResult.file.id}`,
         role: 'user',
         type: 'file',
         content: selectedFile.value.name,

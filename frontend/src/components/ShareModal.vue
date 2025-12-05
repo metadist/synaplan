@@ -146,8 +146,10 @@
 import { ref, computed, watch } from 'vue'
 import * as filesService from '@/services/filesService'
 import { useNotification } from '@/composables/useNotification'
+import { useConfigStore } from '@/stores/config'
 
 const { success: showSuccess, error: showError } = useNotification()
+const config = useConfigStore()
 
 interface Props {
   isOpen: boolean
@@ -187,8 +189,7 @@ const expiryOptions = [
 
 const fullShareUrl = computed(() => {
   if (!shareInfo.value?.share_url) return ''
-  const baseUrl = import.meta.env.VITE_API_BASE_URL || ''
-  return baseUrl + shareInfo.value.share_url
+  return config.appBaseUrl + shareInfo.value.share_url
 })
 
 watch(() => props.isOpen, async (open) => {
