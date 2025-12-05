@@ -340,7 +340,7 @@ interface Props {
   defaultTheme?: 'light' | 'dark'
   isPreview?: boolean
   widgetTitle?: string
-  apiUrl?: string
+  apiUrl: string
   allowFileUpload?: boolean
   fileUploadLimit?: number
 }
@@ -451,8 +451,6 @@ const canSend = computed(() => {
   }
   return !limitReached.value && !isSending.value
 })
-
-const resolveApiUrl = () => props.apiUrl || ''
 
 const showLimitWarning = computed(() => {
   const warningThreshold = props.messageLimit * 0.8
@@ -625,7 +623,7 @@ const sendMessage = async () => {
       {
         chatId: chatId.value ?? undefined,
         fileIds,
-        apiUrl: resolveApiUrl(),
+        apiUrl: props.apiUrl,
         onChunk: async (chunk: string) => {
           if (!chunk) return
           if (isTyping.value) {
@@ -884,9 +882,8 @@ const loadConversationHistory = async (force = false) => {
   isLoadingHistory.value = true
 
   try {
-    const baseUrl = resolveApiUrl()
     const params = new URLSearchParams({ sessionId: sessionId.value })
-    const response = await fetch(`${baseUrl}/api/v1/widget/${props.widgetId}/history?${params.toString()}`, {
+    const response = await fetch(`${props.apiUrl}/api/v1/widget/${props.widgetId}/history?${params.toString()}`, {
       headers: buildWidgetHeaders(false)
     })
 

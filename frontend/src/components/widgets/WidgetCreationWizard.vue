@@ -531,6 +531,7 @@
                   <ChatWidget
                     v-if="previewWidget"
                     :widget-id="previewWidget.widgetId"
+                    :api-url="config.apiBaseUrl"
                     :primary-color="formData.config.primaryColor"
                     :icon-color="formData.config.iconColor"
                     :position="formData.config.position"
@@ -612,6 +613,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import { Icon } from '@iconify/vue'
+import { useConfigStore } from '@/stores/config'
 import ChatWidget from '@/components/widgets/ChatWidget.vue'
 import * as widgetsApi from '@/services/api/widgetsApi'
 import { promptsApi } from '@/services/api/promptsApi'
@@ -623,6 +625,7 @@ const emit = defineEmits<{
   created: []
 }>()
 
+const config = useConfigStore()
 const { error: showError } = useNotification()
 const { t } = useI18n()
 
