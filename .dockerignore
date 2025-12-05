@@ -24,7 +24,10 @@ backend/.env.docker
 
 # Frontend excludes
 frontend/node_modules
-# frontend/dist - needed for backend production build
+# Note: frontend/dist is NOT excluded because it's needed for the unified Docker image
+# It contains the pre-built Vue.js app that gets copied into the backend container
+# In development: contains only .gitkeep (minimal size)
+# In CI: contains production build artifacts from the frontend job
 frontend/.env.local
 frontend/.env.docker
 
