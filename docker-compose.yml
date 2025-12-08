@@ -11,9 +11,7 @@ services:
       - "5173:5173"
     volumes:
       - ./_docker/frontend/docker-entrypoint.sh:/usr/local/bin/docker-entrypoint.sh:ro
-      - ./_docker/frontend/init-env.sh:/usr/local/bin/init-env.sh:ro
       - ./_devextras/frontend/docker-entrypoint.d:/docker-entrypoint.d:ro
-
       - ./frontend:/app
        # Anonymous volume to prevent host node_modules from being mounted (avoids platform-specific binary conflicts)
       - /app/node_modules
@@ -30,9 +28,10 @@ services:
       context: .
       dockerfile: _docker/backend/Dockerfile
     container_name: synaplan-backend
-    # Note: .env file is optional - will be auto-created from .env.example on first start
+    # Optional: Load extra config from backend/.env (for API keys, etc.)
     env_file:
-      - backend/.env
+      - path: backend/.env
+        required: false
     ports:
       - "8000:80"
     volumes:
@@ -58,6 +57,9 @@ services:
       JWT_PASSPHRASE: 'change_me_in_production'
       # Mailer (Mailhog for development)
       MAILER_DSN: smtp://mailhog:1025
+      # Symfony Messenger & Redis
+      MESSENGER_TRANSPORT_DSN: redis://redis:6379/messages
+      REDIS_URL: redis://redis:6379
       # External API Keys loaded from backend/.env via env_file
       # WhatsApp Business API
       WHATSAPP_ACCESS_TOKEN: ${WHATSAPP_ACCESS_TOKEN:-}

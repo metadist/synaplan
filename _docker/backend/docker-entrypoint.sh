@@ -3,9 +3,6 @@ set -euo pipefail
 
 echo "🚀 Starting Synaplan Backend..."
 
-# Initialize environment configuration
-/usr/local/bin/init-env.sh
-
 # Build DATABASE URLs from environment variables if not already set
 # Fallback for deployments that provide DB credentials as separate env vars
 if [ -z "${DATABASE_WRITE_URL:-}" ] && [ -n "${DB_HOST:-}" ]; then
