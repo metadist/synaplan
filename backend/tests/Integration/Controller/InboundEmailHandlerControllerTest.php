@@ -20,7 +20,7 @@ class InboundEmailHandlerControllerTest extends WebTestCase
         $this->client = static::createClient();
 
         // Find test user and authenticate using TokenService
-        $userRepository = static::getContainer()->get('doctrine')->getRepository(User::class);
+        $userRepository = $this->client->getContainer()->get('doctrine')->getRepository(User::class);
         $user = $userRepository->findOneBy(['mail' => 'admin@synaplan.com']);
 
         if (!$user) {

@@ -51,15 +51,10 @@ services:
       TRITON_SERVER_URL: ${TRITON_SERVER_URL:-}
       TIKA_BASE_URL: http://tika:9998
       AI_DEFAULT_PROVIDER: ollama
-      # JWT Configuration
-      JWT_SECRET_KEY: '%kernel.project_dir%/config/jwt/private.pem'
-      JWT_PUBLIC_KEY: '%kernel.project_dir%/config/jwt/public.pem'
-      JWT_PASSPHRASE: 'change_me_in_production'
+      # Token Configuration
+      TOKEN_SECRET: 'change_me_in_production_use_openssl_rand_hex_32'
       # Mailer (Mailhog for development)
       MAILER_DSN: smtp://mailhog:1025
-      # Symfony Messenger & Redis
-      MESSENGER_TRANSPORT_DSN: redis://redis:6379/messages
-      REDIS_URL: redis://redis:6379
       # External API Keys loaded from backend/.env via env_file
       # WhatsApp Business API
       WHATSAPP_ACCESS_TOKEN: ${WHATSAPP_ACCESS_TOKEN:-}

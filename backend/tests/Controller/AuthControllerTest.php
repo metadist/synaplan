@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Controller;
 
+use App\Entity\Token;
 use App\Entity\User;
 use App\Entity\VerificationToken;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
@@ -20,20 +21,27 @@ class AuthControllerTest extends WebTestCase
     protected function setUp(): void
     {
         $this->client = static::createClient();
-        $this->em = static::getContainer()->get('doctrine')->getManager();
+        $this->em = $this->client->getContainer()->get('doctrine')->getManager();
     }
 
     protected function tearDown(): void
     {
         // Cleanup test users
-        $testEmails = ['newuser@test.com', 'logintest@test.com'];
+        $testEmails = ['newuser@test.com', 'logintest@test.com', 'logintest2@test.com', 'unverified@test.com', 'existing@test.com'];
         foreach ($testEmails as $email) {
             $user = $this->em->getRepository(User::class)->findOneBy(['mail' => $email]);
             if ($user) {
-                // Remove verification tokens
-                $tokens = $this->em->getRepository(VerificationToken::class)
+                // Remove auth tokens (BTOKENS table)
+                $authTokens = $this->em->getRepository(Token::class)
                     ->findBy(['userId' => $user->getId()]);
-                foreach ($tokens as $token) {
+                foreach ($authTokens as $token) {
+                    $this->em->remove($token);
+                }
+
+                // Remove verification tokens
+                $verificationTokens = $this->em->getRepository(VerificationToken::class)
+                    ->findBy(['userId' => $user->getId()]);
+                foreach ($verificationTokens as $token) {
                     $this->em->remove($token);
                 }
 
@@ -163,10 +171,17 @@ class AuthControllerTest extends WebTestCase
 
         $responseData = json_decode($this->client->getResponse()->getContent(), true);
 
-        $this->assertArrayHasKey('token', $responseData);
+        $this->assertArrayHasKey('success', $responseData);
+        $this->assertTrue($responseData['success']);
         $this->assertArrayHasKey('user', $responseData);
-        $this->assertNotEmpty($responseData['token']);
         $this->assertEquals('logintest@test.com', $responseData['user']['email']);
+
+        // Verify auth cookies are set
+        $response = $this->client->getResponse();
+        $cookies = $response->headers->getCookies();
+        $cookieNames = array_map(fn($cookie) => $cookie->getName(), $cookies);
+        $this->assertContains('access_token', $cookieNames);
+        $this->assertContains('refresh_token', $cookieNames);
     }
 
     public function testLoginWithInvalidPassword(): void

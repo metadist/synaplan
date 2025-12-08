@@ -2,6 +2,9 @@
 
 namespace App\Tests\Controller;
 
+use App\Entity\User;
+use App\Repository\UserRepository;
+use App\Tests\Trait\AuthenticatedTestTrait;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
 
 /**
@@ -9,6 +12,8 @@ use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
  */
 class FileServeControllerTest extends WebTestCase
 {
+    use AuthenticatedTestTrait;
+
     private $client;
     private string $authToken;
     private int $userId;
@@ -18,19 +23,18 @@ class FileServeControllerTest extends WebTestCase
     {
         parent::setUp();
 
-        // Login
         $this->client = static::createClient();
-        $this->client->request('POST', '/api/v1/auth/login', [], [], [
-            'CONTENT_TYPE' => 'application/json',
-        ], json_encode([
-            'email' => 'demo@synaplan.com',
-            'password' => 'demo123',
-        ]));
 
-        $response = $this->client->getResponse();
-        $data = json_decode($response->getContent(), true);
-        $this->authToken = $data['token'];
-        $this->userId = $data['user']['id'];
+        // Get test user and authenticate using TokenService
+        $userRepository = $this->client->getContainer()->get(UserRepository::class);
+        $user = $userRepository->findOneBy(['mail' => 'demo@synaplan.com']);
+
+        if (!$user) {
+            $this->markTestSkipped('Test user demo@synaplan.com not found. Run fixtures first.');
+        }
+
+        $this->userId = $user->getId();
+        $this->authToken = $this->authenticateClient($this->client, $user);
 
         // Upload test file and get path
         $this->testFilePath = $this->uploadAndGetPath();

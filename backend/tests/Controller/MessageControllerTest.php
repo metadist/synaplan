@@ -52,34 +52,58 @@ class MessageControllerTest extends WebTestCase
     protected function tearDown(): void
     {
         // Cleanup: Remove test data
-        if ($this->em && $this->user) {
+        if ($this->user) {
+            // Get a fresh entity manager if the current one is closed
+            if (!$this->em || !$this->em->isOpen()) {
+                self::bootKernel();
+                $this->em = self::getContainer()->get('doctrine')->getManager();
+            }
+
             $userId = $this->user->getId();
 
-            // Remove test messages
-            $messages = $this->em->getRepository(Message::class)
-                ->findBy(['userId' => $userId]);
-            foreach ($messages as $message) {
-                $this->em->remove($message);
+            // Collect IDs first, then remove by re-fetching
+            $messageIds = array_map(
+                fn($m) => $m->getId(),
+                $this->em->getRepository(Message::class)->findBy(['userId' => $userId])
+            );
+            foreach ($messageIds as $id) {
+                $message = $this->em->find(Message::class, $id);
+                if ($message) {
+                    $this->em->remove($message);
+                }
             }
 
             // Remove UseLog entries (rate limit tracking)
-            $useLogs = $this->em->getRepository(\App\Entity\UseLog::class)
-                ->findBy(['userId' => $userId]);
-            foreach ($useLogs as $useLog) {
-                $this->em->remove($useLog);
+            $useLogIds = array_map(
+                fn($u) => $u->getId(),
+                $this->em->getRepository(\App\Entity\UseLog::class)->findBy(['userId' => $userId])
+            );
+            foreach ($useLogIds as $id) {
+                $useLog = $this->em->find(\App\Entity\UseLog::class, $id);
+                if ($useLog) {
+                    $this->em->remove($useLog);
+                }
             }
 
             // Remove Config entries (model preferences)
-            $configs = $this->em->getRepository(\App\Entity\Config::class)
-                ->findBy(['ownerId' => $userId]);
-            foreach ($configs as $config) {
-                $this->em->remove($config);
+            $configIds = array_map(
+                fn($c) => $c->getId(),
+                $this->em->getRepository(\App\Entity\Config::class)->findBy(['ownerId' => $userId])
+            );
+            foreach ($configIds as $id) {
+                $config = $this->em->find(\App\Entity\Config::class, $id);
+                if ($config) {
+                    $this->em->remove($config);
+                }
             }
 
             $this->em->flush();
 
-            // Now safe to remove test user
-            $this->em->remove($this->user);
+            // Now safe to remove test user (find again if detached)
+            $user = $this->em->find(User::class, $userId);
+            if ($user) {
+                $this->em->remove($user);
+            }
             $this->em->flush();
         }
 
@@ -91,6 +115,7 @@ class MessageControllerTest extends WebTestCase
 
     public function testSendMessageWithoutAuth(): void
     {
+        self::ensureKernelShutdown();
         $client = static::createClient();
         $client->request(
             'POST',
@@ -154,6 +179,7 @@ class MessageControllerTest extends WebTestCase
 
     public function testGetHistoryWithoutAuth(): void
     {
+        self::ensureKernelShutdown();
         $client = static::createClient();
         $client->request('GET', '/api/v1/messages/history');
 
@@ -259,6 +285,7 @@ class MessageControllerTest extends WebTestCase
 
     public function testEnhanceWithoutAuth(): void
     {
+        self::ensureKernelShutdown();
         $client = static::createClient();
         $client->request(
             'POST',
@@ -317,6 +344,7 @@ class MessageControllerTest extends WebTestCase
 
     public function testAgainWithoutAuth(): void
     {
+        self::ensureKernelShutdown();
         $client = static::createClient();
         $client->request(
             'POST',
@@ -351,6 +379,7 @@ class MessageControllerTest extends WebTestCase
 
     public function testEnqueueWithoutAuth(): void
     {
+        self::ensureKernelShutdown();
         $client = static::createClient();
         $client->request(
             'POST',
