@@ -211,8 +211,7 @@ class WidgetSessionService
     }
 
     /**
-     * Get messages sent in the last minute
-     * (For now, we'll implement a simple check; in production, use Redis/Cache).
+     * Get messages sent in the last minute.
      */
     private function getMessagesInLastMinute(WidgetSession $session): int
     {

@@ -3,11 +3,15 @@
 namespace App\Tests\Controller;
 
 use App\Entity\User;
+use App\Service\TokenService;
+use App\Tests\Trait\AuthenticatedTestTrait;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
 
 class RagControllerTest extends WebTestCase
 {
+    use AuthenticatedTestTrait;
+
     private KernelBrowser $client;
     private ?string $token = null;
 
@@ -29,15 +33,16 @@ class RagControllerTest extends WebTestCase
             $this->fail('Test user not found');
         }
 
-        $jwtManager = static::getContainer()->get('lexik_jwt_authentication.jwt_manager');
-        $this->token = $jwtManager->create($user);
+        // Generate access token using TokenService
+        $this->token = $this->authenticateClient($this->client, $user);
 
         return $this->token;
     }
 
     public function testSearchRequiresAuthentication(): void
     {
-        $this->client->jsonRequest('POST', '/api/v1/rag/search', [
+        $client = static::createClient();
+        $client->jsonRequest('POST', '/api/v1/rag/search', [
             'query' => 'test query',
         ]);
 
@@ -108,7 +113,8 @@ class RagControllerTest extends WebTestCase
 
     public function testFindSimilarRequiresAuthentication(): void
     {
-        $this->client->request('GET', '/api/v1/rag/similar/1');
+        $client = static::createClient();
+        $client->request('GET', '/api/v1/rag/similar/1');
 
         $this->assertResponseStatusCodeSame(401);
     }
@@ -154,7 +160,8 @@ class RagControllerTest extends WebTestCase
 
     public function testStatsRequiresAuthentication(): void
     {
-        $this->client->request('GET', '/api/v1/rag/stats');
+        $client = static::createClient();
+        $client->request('GET', '/api/v1/rag/stats');
 
         $this->assertResponseStatusCodeSame(401);
     }

@@ -417,19 +417,13 @@ export async function uploadWidgetIcon(
   filename: string
 }> {
   const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000'
-  const token = localStorage.getItem('auth_token')
   
   const formData = new FormData()
   formData.append('icon', file)
 
-  const headers: Record<string, string> = {}
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`
-  }
-
   const response = await fetch(`${apiUrl}/api/v1/widgets/${widgetId}/upload-icon`, {
     method: 'POST',
-    headers,
+    credentials: 'include', // Use cookies for auth
     body: formData
   })
 

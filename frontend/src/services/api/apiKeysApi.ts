@@ -46,19 +46,16 @@ export interface UpdateApiKeyRequest {
 
 /**
  * Helper function to make authenticated API calls
+ * Uses cookie-based authentication
  */
 async function apiFetch<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
-  const token = localStorage.getItem('auth_token')
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
   }
 
-  if (token) {
-    headers.Authorization = `Bearer ${token}`
-  }
-
   const response = await fetch(`${API_BASE_URL}${endpoint}`, {
     ...options,
+    credentials: 'include', // Use cookies for auth
     headers: {
       ...headers,
       ...options.headers,

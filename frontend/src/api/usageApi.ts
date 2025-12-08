@@ -57,12 +57,24 @@ export async function getUsageStats(): Promise<UsageStats> {
   return data.data
 }
 
-export function getExportCsvUrl(sinceTimestamp?: number): string {
+/**
+ * Get export CSV URL with auth token
+ * @deprecated Use downloadUsageExport() instead for secure downloads
+ */
+export async function getExportCsvUrl(sinceTimestamp?: number): Promise<string> {
   const config = useConfigStore()
-  const token = localStorage.getItem('auth_token')
-  // Note: apiBaseUrl is either '' (same-origin) or 'https://example.com/api'
-  // For same-origin, we need the full path /api/v1/...
   const basePath = config.apiBaseUrl || '/api'
+  
+  // Fetch SSE token for URL-based auth (needed for direct links)
+  const tokenResponse = await fetch(`${basePath}/v1/auth/token`, {
+    credentials: 'include'
+  })
+  
+  if (!tokenResponse.ok) {
+    throw new Error('Authentication required')
+  }
+  
+  const { token } = await tokenResponse.json()
   let url = `${basePath}/v1/usage/export?token=${token}`
 
   if (sinceTimestamp) {

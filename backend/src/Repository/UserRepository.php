@@ -23,6 +23,19 @@ class UserRepository extends ServiceEntityRepository
         return $this->findOneBy(['providerId' => $providerId]);
     }
 
+    /**
+     * Find user by Stripe customer ID (searches in paymentDetails JSON).
+     */
+    public function findByStripeCustomerId(string $stripeCustomerId): ?User
+    {
+        return $this->createQueryBuilder('u')
+            ->where('u.paymentDetails LIKE :customerId')
+            ->setParameter('customerId', '%"stripe_customer_id":"' . $stripeCustomerId . '"%')
+            ->setMaxResults(1)
+            ->getQuery()
+            ->getOneOrNullResult();
+    }
+
     public function save(User $user): void
     {
         $this->getEntityManager()->persist($user);

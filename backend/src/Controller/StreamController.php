@@ -214,6 +214,25 @@ class StreamController extends AbstractController
             'file_count' => count($fileIdArray),
         ]);
 
+        // Check rate limit BEFORE starting the stream (not widget mode)
+        // This allows returning a proper JSON error that the frontend can handle
+        if (!$isWidgetMode) {
+            $rateLimitCheck = $this->rateLimitService->checkLimit($user, 'MESSAGES');
+            if (!$rateLimitCheck['allowed']) {
+                return $this->json([
+                    'error' => 'Rate limit exceeded',
+                    'limit_type' => $rateLimitCheck['limit_type'] ?? 'lifetime',
+                    'action_type' => 'MESSAGES',
+                    'limit' => $rateLimitCheck['limit'],
+                    'used' => $rateLimitCheck['used'],
+                    'remaining' => $rateLimitCheck['remaining'],
+                    'reset_at' => $rateLimitCheck['reset_at'] ?? null,
+                    'user_level' => $user->getUserLevel(),
+                    'phone_verified' => $user->isEmailVerified(),
+                ], Response::HTTP_TOO_MANY_REQUESTS);
+            }
+        }
+
         // StreamedResponse für SSE
         $response = new StreamedResponse();
         $response->headers->set('Content-Type', 'text/event-stream');
@@ -240,25 +259,8 @@ class StreamController extends AbstractController
                     return;
                 }
 
-                // Check rate limit for authenticated users (not widget mode)
-                if (!$isWidgetMode) {
-                    $rateLimitCheck = $this->rateLimitService->checkLimit($user, 'MESSAGES');
-                    if (!$rateLimitCheck['allowed']) {
-                        $this->sendSSE('error', [
-                            'error' => 'Rate limit exceeded',
-                            'limit_type' => $rateLimitCheck['limit_type'] ?? 'lifetime',
-                            'action_type' => 'MESSAGES',
-                            'limit' => $rateLimitCheck['limit'],
-                            'used' => $rateLimitCheck['used'],
-                            'remaining' => $rateLimitCheck['remaining'],
-                            'reset_at' => $rateLimitCheck['reset_at'] ?? null,
-                            'user_level' => $user->getUserLevel(),
-                            'phone_verified' => $user->getEmailVerified(),
-                        ]);
-
-                        return;
-                    }
-                }
+                // Rate limit was already checked before stream started
+                // (see check before StreamedResponse creation)
 
                 // Create incoming message
                 $incomingMessage = new Message();
@@ -859,6 +861,16 @@ class StreamController extends AbstractController
                 $chat->updateTimestamp();
 
                 $this->em->flush();
+
+                // Record usage for rate limiting and statistics
+                $this->rateLimitService->recordUsage($user, 'MESSAGES', [
+                    'provider' => $response['metadata']['provider'] ?? 'unknown',
+                    'model' => $response['metadata']['model'] ?? 'unknown',
+                    'tokens' => $response['metadata']['usage']['total_tokens'] ?? 0,
+                    'latency' => $response['metadata']['latency'] ?? 0,
+                    'chat_id' => $chatId,
+                    'source' => $isWidgetMode ? 'WIDGET' : 'WEB',
+                ]);
 
                 // Get search results if available
                 $searchResults = null;

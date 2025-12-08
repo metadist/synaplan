@@ -103,7 +103,7 @@ class MessageController extends AbstractController
                 'remaining' => $rateLimitCheck['remaining'],
                 'reset_at' => $rateLimitCheck['reset_at'] ?? null,
                 'user_level' => $user->getUserLevel(),
-                'phone_verified' => $user->getEmailVerified(), // Using email verification as proxy
+                'phone_verified' => $user->isEmailVerified(), // Using email verification as proxy
             ], Response::HTTP_TOO_MANY_REQUESTS);
         }
 

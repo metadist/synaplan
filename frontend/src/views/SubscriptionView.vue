@@ -8,85 +8,58 @@
           <Icon icon="mdi:loading" class="w-8 h-8 animate-spin mx-auto txt-secondary" />
         </div>
 
-        <!-- Subscription Management (if user has active subscription) -->
-        <template v-else-if="subscriptionStatus?.hasSubscription && hasActivePlan">
-          <div class="text-center mb-12">
-            <h1 class="text-4xl font-bold txt-primary mb-3">{{ $t('subscription.manage.title') }}</h1>
-            <p class="txt-secondary text-lg">{{ $t('subscription.manage.subtitle') }}</p>
-          </div>
-
-          <!-- Current Plan Card -->
-          <div class="surface-card rounded-xl p-8 max-w-2xl mx-auto">
-            <div class="flex items-start justify-between mb-6">
-              <div>
-                <h2 class="text-2xl font-bold txt-primary mb-2">{{ $t('subscription.manage.currentPlanLabel') }}</h2>
-                <div class="flex items-center gap-3">
-                  <span :class="getLevelBadgeClass(subscriptionStatus.plan)">
-                    {{ subscriptionStatus.plan }}
-                  </span>
-                  <span :class="getStatusBadgeClass(subscriptionStatus.status || 'active')">
-                    {{ getStatusText(subscriptionStatus.status || 'active') }}
-                  </span>
-                </div>
-              </div>
-              <Icon icon="mdi:crown" class="w-12 h-12 text-yellow-500" />
-            </div>
-
-            <!-- Billing Info -->
-            <div class="space-y-4 mb-8">
-              <div v-if="subscriptionStatus.nextBilling" class="flex justify-between items-center py-3 border-b border-light-border dark:border-dark-border">
-                <span class="txt-secondary">{{ $t('subscription.manage.nextBilling') }}</span>
-                <span class="txt-primary font-medium">{{ formatDate(subscriptionStatus.nextBilling) }}</span>
-              </div>
-              <div v-if="subscriptionStatus.cancelAt" class="flex justify-between items-center py-3 border-b border-light-border dark:border-dark-border">
-                <span class="txt-secondary">{{ $t('subscription.manage.cancelDate') }}</span>
-                <span class="txt-primary font-medium">{{ formatDate(subscriptionStatus.cancelAt) }}</span>
-              </div>
-            </div>
-
-            <!-- Stripe Not Configured Warning -->
-            <div v-if="!stripeConfigured" class="alert-warning mb-6">
-              <div class="flex items-start gap-3">
-                <Icon icon="mdi:alert-circle" class="w-6 h-6 flex-shrink-0" />
-                <div>
-                  <p class="font-semibold alert-warning-text mb-2">{{ $t('subscription.unavailable') }}</p>
-                  <p class="text-sm alert-warning-text">{{ $t('subscription.unavailableDesc') }}</p>
-                </div>
-              </div>
-            </div>
-
-            <!-- Billing Portal Button -->
-            <div class="info-box-blue mb-6">
-              <div class="flex items-start gap-3">
-                <Icon icon="mdi:credit-card-settings" class="w-6 h-6 info-box-blue-icon flex-shrink-0" />
-                <div class="flex-1">
-                  <p class="text-sm info-box-blue-title mb-1">{{ $t('subscription.manage.billingPortal') }}</p>
-                  <p class="text-sm info-box-blue-text mb-3">{{ $t('subscription.manage.billingPortalDesc') }}</p>
-                  <button
-                    @click="openBillingPortal"
-                    :disabled="isProcessing || !stripeConfigured"
-                    class="btn-primary px-4 py-2 rounded-lg text-sm font-medium"
-                    data-testid="btn-open-portal"
-                  >
-                    <Icon v-if="isProcessing" icon="mdi:loading" class="w-4 h-4 animate-spin inline mr-2" />
-                    {{ isProcessing ? $t('subscription.manage.loadingPortal') : $t('subscription.manage.openPortal') }}
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </template>
-
-        <!-- Plan Selection (if no active subscription) -->
+        <!-- Main Content -->
         <template v-else>
           <!-- Header -->
           <div class="text-center mb-12">
-            <h1 class="text-4xl font-bold txt-primary mb-3">{{ $t('subscription.chooseYourPlan') }}</h1>
-            <p class="txt-secondary text-lg">{{ $t('subscription.subtitle') }}</p>
+            <h1 class="text-4xl font-bold txt-primary mb-3">
+              {{ hasActivePlan ? $t('subscription.manage.title') : $t('subscription.chooseYourPlan') }}
+            </h1>
+            <p class="txt-secondary text-lg">
+              {{ hasActivePlan ? $t('subscription.manage.subtitle') : $t('subscription.subtitle') }}
+            </p>
+          </div>
+
+          <!-- Current Subscription Info (if active) -->
+          <div v-if="hasActivePlan" class="surface-card rounded-xl p-6 max-w-2xl mx-auto mb-8">
+            <div class="flex items-center justify-between flex-wrap gap-4">
+              <div class="flex items-center gap-4">
+                <Icon icon="mdi:crown" class="w-10 h-10 text-yellow-500" />
+                <div>
+                  <div class="flex items-center gap-3 mb-1 flex-wrap">
+                    <span class="text-lg font-bold txt-primary">{{ $t('subscription.manage.currentPlanLabel') }}</span>
+                    <span :class="getLevelBadgeClass(currentLevel || 'NEW')">{{ currentLevel }}</span>
+                    <span v-if="subscriptionStatus?.hasSubscription" :class="getStatusBadgeClass(subscriptionStatus.status || 'active')">
+                      {{ getStatusText(subscriptionStatus.status || 'active') }}
+                    </span>
+                  </div>
+                  <p v-if="subscriptionStatus?.cancelAt" class="text-amber-500 text-sm font-medium">
+                    <Icon icon="mdi:alert" class="w-4 h-4 inline mr-1" />
+                    {{ $t('subscription.manage.cancelDate') }}: {{ formatDate(subscriptionStatus.cancelAt) }}
+                  </p>
+                  <p v-else-if="subscriptionStatus?.nextBilling" class="txt-secondary text-sm">
+                    {{ $t('subscription.manage.nextBilling') }}: {{ formatDate(subscriptionStatus.nextBilling) }}
+                  </p>
+                  <p v-if="isHighestPlan && !subscriptionStatus?.cancelAt" class="txt-secondary text-sm mt-1">
+                    {{ $t('subscription.highestPlan') }}
+                  </p>
+                </div>
+              </div>
+              <button
+                v-if="subscriptionStatus?.hasSubscription"
+                @click="openBillingPortal"
+                :disabled="isProcessing || !stripeConfigured"
+                class="btn-secondary px-4 py-2 rounded-lg text-sm font-medium"
+                data-testid="btn-open-portal"
+              >
+                <Icon v-if="isProcessing" icon="mdi:loading" class="w-4 h-4 animate-spin inline mr-2" />
+                {{ $t('subscription.manage.openPortal') }}
+              </button>
+            </div>
           </div>
 
           <!-- Stripe Not Configured Warning -->
-          <div v-if="!stripeConfigured" class="alert-warning max-w-2xl mx-auto">
+          <div v-if="!stripeConfigured" class="alert-warning max-w-2xl mx-auto mb-8">
             <div class="flex items-start gap-3">
               <Icon icon="mdi:alert-circle" class="w-6 h-6 flex-shrink-0" />
               <div>
@@ -97,17 +70,28 @@
           </div>
 
           <!-- Plans Grid -->
-          <div v-else class="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div v-if="stripeConfigured" class="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div
               v-for="plan in plans"
               :key="plan.id"
-              class="surface-card rounded-xl p-8 flex flex-col hover:shadow-xl transition-shadow"
-              :class="plan.id === 'TEAM' ? 'border-2 border-[var(--brand)] relative' : ''"
+              class="surface-card rounded-xl p-8 flex flex-col transition-shadow"
+              :class="[
+                plan.id === 'TEAM' && !isCurrentPlan(plan.id) ? 'border-2 border-[var(--brand)] relative hover:shadow-xl' : '',
+                isCurrentPlan(plan.id) ? 'ring-2 ring-green-500 relative' : 'hover:shadow-xl',
+                isLowerPlan(plan.id) ? 'opacity-60' : ''
+              ]"
               data-testid="card-plan"
             >
-              <!-- Recommended Badge -->
+              <!-- Current Plan Badge -->
               <div
-                v-if="plan.id === 'TEAM'"
+                v-if="isCurrentPlan(plan.id)"
+                class="absolute -top-4 left-1/2 transform -translate-x-1/2 bg-green-500 text-white px-4 py-1 rounded-full text-sm font-semibold shadow-lg"
+              >
+                {{ $t('subscription.currentPlan') }}
+              </div>
+              <!-- Recommended Badge (only if not current and not lower) -->
+              <div
+                v-else-if="plan.id === 'TEAM' && !isLowerPlan(plan.id)"
                 class="absolute -top-4 left-1/2 transform -translate-x-1/2 bg-gradient-to-r from-blue-600 to-purple-600 text-white px-4 py-1 rounded-full text-sm font-semibold shadow-lg"
               >
                 {{ $t('subscription.recommended') }}
@@ -136,6 +120,22 @@
 
               <!-- CTA Button -->
               <button
+                v-if="isCurrentPlan(plan.id)"
+                disabled
+                class="w-full py-3 rounded-lg font-semibold bg-green-500/20 text-green-600 dark:text-green-400 cursor-default"
+              >
+                <Icon icon="mdi:check" class="w-5 h-5 inline mr-2" />
+                {{ $t('subscription.currentPlan') }}
+              </button>
+              <button
+                v-else-if="isLowerPlan(plan.id)"
+                disabled
+                class="w-full py-3 rounded-lg font-semibold surface-chip txt-secondary cursor-not-allowed"
+              >
+                {{ $t('subscription.includedInCurrent') }}
+              </button>
+              <button
+                v-else
                 @click="selectPlan(plan.id)"
                 :disabled="isProcessing"
                 :class="[
@@ -146,18 +146,8 @@
                 ]"
                 :data-testid="`btn-select-${plan.id.toLowerCase()}`"
               >
-                {{ isProcessing ? $t('subscription.processing') : $t('subscription.selectPlan') }}
+                {{ isProcessing ? $t('subscription.processing') : (hasActivePlan ? $t('subscription.upgrade') : $t('subscription.selectPlan')) }}
               </button>
-            </div>
-          </div>
-
-          <!-- Current Plan Info (for users with level but no Stripe subscription) -->
-          <div v-if="currentLevel && currentLevel !== 'NEW'" class="surface-card rounded-lg p-6 text-center">
-            <div class="flex items-center justify-center gap-3 mb-2">
-              <Icon icon="mdi:information-outline" class="w-5 h-5 txt-secondary" />
-              <span class="txt-secondary">
-                {{ $t('subscription.currentPlan') }}: <strong class="txt-primary">{{ currentLevel }}</strong>
-              </span>
             </div>
           </div>
         </template>
@@ -186,6 +176,25 @@ const currentLevel = computed(() => authStore.user?.level)
 const hasActivePlan = computed(() => {
   return currentLevel.value && ['PRO', 'TEAM', 'BUSINESS', 'ADMIN'].includes(currentLevel.value)
 })
+
+// Plan hierarchy for upgrade logic (ADMIN is special - unlimited, not a purchasable plan)
+const planHierarchy = ['NEW', 'PRO', 'TEAM', 'BUSINESS', 'ADMIN']
+const purchasablePlans = ['PRO', 'TEAM', 'BUSINESS']
+
+const isHighestPlan = computed(() => {
+  return currentLevel.value === 'BUSINESS' || currentLevel.value === 'ADMIN'
+})
+
+function isCurrentPlan(planId: string): boolean {
+  return currentLevel.value === planId
+}
+
+function isLowerPlan(planId: string): boolean {
+  if (!currentLevel.value) return false
+  const currentIndex = planHierarchy.indexOf(currentLevel.value)
+  const planIndex = planHierarchy.indexOf(planId)
+  return planIndex < currentIndex
+}
 
 async function loadPlans() {
   loading.value = true

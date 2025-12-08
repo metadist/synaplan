@@ -9,12 +9,6 @@ security:
             entity:
                 class: App\Entity\User
                 property: id
-        
-        jwt_user_provider:
-            id: App\Security\JwtUserLoader
-        
-        oidc_user_provider:
-            id: App\Security\OidcUserProvider
 
     firewalls:
         dev:
@@ -24,10 +18,9 @@ security:
         api:
             pattern: ^/api
             stateless: true
-            entry_point: jwt
-            provider: jwt_user_provider
-            jwt: ~
+            provider: app_user_provider
             custom_authenticators:
+                - App\Security\CookieTokenAuthenticator
                 - App\Security\QueryTokenAuthenticator
                 - App\Security\ApiKeyAuthenticator
 
@@ -46,10 +39,12 @@ security:
         - { path: ^/api/v1/auth/forgot-password, roles: PUBLIC_ACCESS }
         - { path: ^/api/v1/auth/reset-password, roles: PUBLIC_ACCESS }
         - { path: ^/api/v1/auth/resend-verification, roles: PUBLIC_ACCESS }
+        - { path: ^/api/v1/auth/refresh, roles: PUBLIC_ACCESS }
         
         # Authenticated auth endpoints
         - { path: ^/api/v1/auth/me, roles: IS_AUTHENTICATED_FULLY }
         - { path: ^/api/v1/auth/logout, roles: IS_AUTHENTICATED_FULLY }
+        - { path: ^/api/v1/auth/revoke-all, roles: IS_AUTHENTICATED_FULLY }
         
         # Public test endpoints
         - { path: ^/api/health, roles: PUBLIC_ACCESS }
@@ -57,7 +52,6 @@ security:
         
         # Public OIDC endpoints
         - { path: ^/api/v1/oidc/discovery, roles: PUBLIC_ACCESS }
-        - { path: ^/api/v1/oidc/refresh, roles: PUBLIC_ACCESS }
         
         # Public Social Login endpoints (Google, GitHub & Keycloak OAuth)
         - { path: ^/api/v1/auth/providers, roles: PUBLIC_ACCESS }
@@ -88,6 +82,12 @@ security:
         # Webhook endpoints (email webhook is public, WhatsApp requires verification)
         - { path: ^/api/v1/webhooks/email, roles: PUBLIC_ACCESS }
         - { path: ^/api/v1/webhooks/whatsapp, roles: PUBLIC_ACCESS }
+        
+        # Stripe webhook (public - secured by signature verification)
+        - { path: ^/api/v1/stripe/webhook, roles: PUBLIC_ACCESS }
+        
+        # Public subscription plans (no auth needed to view plans)
+        - { path: ^/api/v1/subscription/plans, roles: PUBLIC_ACCESS }
         
         # All other API routes require authentication
         - { path: ^/api, roles: IS_AUTHENTICATED_FULLY }

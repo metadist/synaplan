@@ -28,7 +28,7 @@ use Symfony\Component\Routing\Attribute\Route;
 /**
  * Widget Public API Controller.
  *
- * PUBLIC endpoints (no JWT required) for chat widgets embedded on external websites
+ * PUBLIC endpoints (no authentication required) for chat widgets embedded on external websites
  */
 #[Route('/api/v1/widget', name: 'api_widget_public_')]
 #[OA\Tag(name: 'Widget (Public)')]
@@ -574,7 +574,7 @@ class WidgetPublicController extends AbstractController
     /**
      * Upload file for widget session.
      *
-     * PUBLIC endpoint - no JWT required
+     * PUBLIC endpoint - no authentication required
      * Uses same file processing workflow as authenticated uploads
      * Files are stored with BUSERID=0 and BUSERSESSIONID=session_id
      */

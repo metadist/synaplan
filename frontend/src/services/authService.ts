@@ -1,28 +1,21 @@
 // synaplan-ui/src/services/authService.ts
+// Cookie-based authentication - no localStorage at all (security)
 import { ref } from 'vue'
 import { useConfigStore } from '@/stores/config'
+import { clearSseToken } from '@/services/api/chatApi'
 
 const config = useConfigStore()
 const API_BASE_URL = config.apiBaseUrl
 
-// Auth State
-const token = ref<string | null>(localStorage.getItem('auth_token'))
+// Auth State - only in memory, never in localStorage
+// This prevents manipulation of isAdmin, level, etc.
 const user = ref<any | null>(null)
-
-// Load user from localStorage on init
-const storedUser = localStorage.getItem('auth_user')
-if (storedUser && storedUser !== 'undefined' && storedUser !== 'null') {
-  try {
-    user.value = JSON.parse(storedUser)
-  } catch (e) {
-    console.error('Failed to parse stored user:', e)
-    localStorage.removeItem('auth_user')
-  }
-}
+const isRefreshing = ref(false)
+let refreshPromise: Promise<boolean> | null = null
 
 export const authService = {
   /**
-   * Login User
+   * Login User - cookies are set by backend
    */
   async login(email: string, password: string, recaptchaToken?: string): Promise<{ success: boolean; error?: string }> {
     try {
@@ -31,6 +24,7 @@ export const authService = {
         headers: {
           'Content-Type': 'application/json',
         },
+        credentials: 'include', // Important: include cookies
         body: JSON.stringify({ email, password, recaptchaToken }),
       })
 
@@ -40,11 +34,8 @@ export const authService = {
         return { success: false, error: data.error || 'Login failed' }
       }
 
-      // Store token and user
-      token.value = data.token
+      // Store user info only in memory (not localStorage for security)
       user.value = data.user
-      localStorage.setItem('auth_token', data.token)
-      localStorage.setItem('auth_user', JSON.stringify(data.user))
 
       return { success: true }
     } catch (error) {
@@ -63,6 +54,7 @@ export const authService = {
         headers: {
           'Content-Type': 'application/json',
         },
+        credentials: 'include',
         body: JSON.stringify({ email, password, recaptchaToken }),
       })
 
@@ -72,8 +64,6 @@ export const authService = {
         return { success: false, error: data.error || 'Registration failed' }
       }
 
-      // Note: Backend now returns generic success message for security (user enumeration prevention)
-      // No token or user data is returned, user must verify email first
       return { success: true }
     } catch (error) {
       console.error('Registration error:', error)
@@ -82,61 +72,51 @@ export const authService = {
   },
 
   /**
-   * Logout User
+   * Logout User - clears cookies on backend
    */
   async logout(): Promise<void> {
     try {
-      if (token.value) {
-        await fetch(`${API_BASE_URL}/api/v1/auth/logout`, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${token.value}`,
-          },
-        })
-      }
+      await fetch(`${API_BASE_URL}/api/v1/auth/logout`, {
+        method: 'POST',
+        credentials: 'include',
+      })
     } catch (error) {
       console.error('Logout error:', error)
     } finally {
-      // Clear local state regardless of API call success
-      token.value = null
+      // Clear local state (memory only)
       user.value = null
-      localStorage.removeItem('auth_token')
-      localStorage.removeItem('auth_user')
+      // Clear SSE token cache
+      clearSseToken()
     }
   },
 
   /**
-   * Get Current User
+   * Get Current User - validates session via cookie
    */
   async getCurrentUser(): Promise<any | null> {
-    // Re-read token from localStorage in case it was updated externally
-    const currentToken = token.value || localStorage.getItem('auth_token')
-    
-    if (!currentToken) {
-      return null
-    }
-
-    // Update the ref if it was read from localStorage
-    if (!token.value && currentToken) {
-      token.value = currentToken
-    }
-
     try {
       const response = await fetch(`${API_BASE_URL}/api/v1/auth/me`, {
-        headers: {
-          'Authorization': `Bearer ${currentToken}`,
-        },
+        credentials: 'include',
       })
 
-      if (!response.ok) {
-        // Token invalid, clear auth
+      if (response.status === 401) {
+        // Try to refresh token
+        const refreshed = await this.refreshToken()
+        if (refreshed) {
+          // Retry getting user
+          return await this.getCurrentUser()
+        }
+        // Refresh failed, clear auth
         await this.logout()
+        return null
+      }
+
+      if (!response.ok) {
         return null
       }
 
       const data = await response.json()
       user.value = data.user
-      localStorage.setItem('auth_user', JSON.stringify(data.user))
 
       return data.user
     } catch (error) {
@@ -146,30 +126,47 @@ export const authService = {
   },
 
   /**
-   * Refresh Token
+   * Refresh Access Token using Refresh Token cookie
    */
   async refreshToken(): Promise<boolean> {
-    if (!token.value) {
-      return false
+    // Prevent multiple simultaneous refresh calls
+    if (isRefreshing.value && refreshPromise) {
+      return refreshPromise
     }
 
+    isRefreshing.value = true
+    refreshPromise = this._doRefresh()
+    
+    try {
+      return await refreshPromise
+    } finally {
+      isRefreshing.value = false
+      refreshPromise = null
+    }
+  },
+
+  async _doRefresh(): Promise<boolean> {
     try {
       const response = await fetch(`${API_BASE_URL}/api/v1/auth/refresh`, {
         method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token.value}`,
-        },
+        credentials: 'include',
       })
 
       if (!response.ok) {
+        // Refresh token invalid/expired
+        console.log('Token refresh failed, logging out')
         await this.logout()
         return false
       }
 
       const data = await response.json()
-      token.value = data.token
-      localStorage.setItem('auth_token', data.token)
+      
+      // Update user info if provided (memory only)
+      if (data.user) {
+        user.value = data.user
+      }
 
+      console.log('Token refreshed successfully')
       return true
     } catch (error) {
       console.error('Token refresh error:', error)
@@ -178,17 +175,19 @@ export const authService = {
   },
 
   /**
-   * Check if user is authenticated
+   * Check if user is authenticated (has user info)
    */
   isAuthenticated(): boolean {
-    return token.value !== null
+    return user.value !== null
   },
 
   /**
-   * Get Auth Token
+   * Get Auth Token - not available with HttpOnly cookies
+   * @deprecated Use cookies instead
    */
   getToken(): string | null {
-    return token.value
+    console.warn('getToken() is deprecated - tokens are now HttpOnly cookies')
+    return null
   },
 
   /**
@@ -197,5 +196,49 @@ export const authService = {
   getUser() {
     return user
   },
-}
 
+  /**
+   * Handle OAuth callback - cookies are already set by redirect
+   */
+  async handleOAuthCallback(): Promise<{ success: boolean; error?: string }> {
+    try {
+      // Just fetch current user - cookies were set by OAuth redirect
+      const currentUser = await this.getCurrentUser()
+      
+      if (currentUser) {
+        return { success: true }
+      }
+      
+      return { success: false, error: 'Failed to get user after OAuth' }
+    } catch (error) {
+      console.error('OAuth callback error:', error)
+      return { success: false, error: 'OAuth callback failed' }
+    }
+  },
+
+  /**
+   * Revoke all sessions
+   */
+  async revokeAllSessions(): Promise<{ success: boolean; sessionsRevoked?: number }> {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/v1/auth/revoke-all`, {
+        method: 'POST',
+        credentials: 'include',
+      })
+
+      if (!response.ok) {
+        return { success: false }
+      }
+
+      const data = await response.json()
+      
+      // Clear local state (memory only)
+      user.value = null
+
+      return { success: true, sessionsRevoked: data.sessions_revoked }
+    } catch (error) {
+      console.error('Revoke all sessions error:', error)
+      return { success: false }
+    }
+  },
+}

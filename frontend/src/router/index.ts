@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { useAuth } from '@/composables/useAuth'
+import { authReady } from '@/stores/auth'
 import LoadingView from '@/views/LoadingView.vue'
 
 const router = createRouter({
@@ -229,27 +230,20 @@ const router = createRouter({
 })
 
 // Global navigation guard for authentication
-router.beforeEach((to, _from, next) => {
+// With cookie-based auth, we wait for auth check then verify session
+router.beforeEach(async (to, _from, next) => {
+  // Wait for initial auth check to complete (validates cookies via /me)
+  await authReady
+  
   const { isAuthenticated, isAdmin } = useAuth()
   const requiresAuth = to.meta.requiresAuth !== false // Default to true
   const requiresAdminAccess = to.meta.requiresAdmin === true
   const isPublicRoute = to.meta.public === true
-  const autoLoginEnabled = import.meta.env.VITE_AUTO_LOGIN_DEV === 'true'
 
-  // Check if token exists in localStorage (more reliable than store state)
-  const hasToken = !!localStorage.getItem('auth_token')
+  const authenticated = isAuthenticated.value
 
-  // Auto-login in development if enabled
-  if (autoLoginEnabled && !hasToken && requiresAuth) {
-    localStorage.setItem('auth_token', 'dev-token')
-    const { checkAuth } = useAuth()
-    checkAuth()
-  }
-
-  // Use hasToken instead of isAuthenticated for more reliable check
-  if (requiresAuth && !hasToken) {
+  if (requiresAuth && !authenticated) {
     console.warn('🔒 Protected route accessed without auth - redirecting to login')
-    // Redirect to login, save intended destination
     next({
       name: 'login',
       query: { redirect: to.fullPath, reason: 'auth_required' }
@@ -257,8 +251,8 @@ router.beforeEach((to, _from, next) => {
   } else if (requiresAdminAccess && !isAdmin.value) {
     // Admin route without admin privileges
     next({ name: 'chat' })
-  } else if (isPublicRoute && isAuthenticated.value && to.name === 'login' && !autoLoginEnabled) {
-    // Already logged in, redirect to home (but not in dev mode with auto-login)
+  } else if (isPublicRoute && isAuthenticated.value && to.name === 'login') {
+    // Already logged in, redirect to home
     next({ name: 'chat' })
   } else {
     next()

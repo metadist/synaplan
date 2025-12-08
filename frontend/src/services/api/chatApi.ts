@@ -4,6 +4,62 @@
 
 import { httpClient, API_BASE_URL } from './httpClient'
 
+// Cache SSE token (needed because EventSource can't send cookies)
+let cachedSseToken: string | null = null
+let tokenFetchPromise: Promise<string | null> | null = null
+
+/**
+ * Get access token for SSE (EventSource can't send cookies)
+ */
+async function getSseToken(): Promise<string | null> {
+  // Return cached token if available
+  if (cachedSseToken) {
+    return cachedSseToken
+  }
+
+  // Prevent multiple simultaneous fetches
+  if (tokenFetchPromise) {
+    return tokenFetchPromise
+  }
+
+  tokenFetchPromise = (async () => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/v1/auth/token`, {
+        credentials: 'include',
+      })
+
+      if (!response.ok) {
+        console.error('Failed to get SSE token:', response.status)
+        return null
+      }
+
+      const data = await response.json()
+      cachedSseToken = data.token
+      
+      // Token expires in 5 min, refresh after 4 min
+      setTimeout(() => {
+        cachedSseToken = null
+      }, 4 * 60 * 1000)
+
+      return cachedSseToken
+    } catch (error) {
+      console.error('Error fetching SSE token:', error)
+      return null
+    } finally {
+      tokenFetchPromise = null
+    }
+  })()
+
+  return tokenFetchPromise
+}
+
+/**
+ * Clear cached SSE token (call on logout)
+ */
+export function clearSseToken(): void {
+  cachedSseToken = null
+}
+
 export const chatApi = {
   async sendMessage(userId: number, message: string, trackId?: number): Promise<any> {
     // Mock data temporarily disabled - direct backend communication
@@ -36,10 +92,8 @@ export const chatApi = {
     includeReasoning: boolean = false,
     webSearch: boolean = false,
     modelId?: number,
-    fileIds?: number[] // Changed: array of fileIds instead of single fileId
+    fileIds?: number[]
   ): () => void {
-    const token = localStorage.getItem('auth_token')
-    
     // Build params object
     const paramsObj: Record<string, string> = {
       message,
@@ -52,93 +106,224 @@ export const chatApi = {
     if (webSearch) paramsObj.webSearch = '1'
     if (modelId) paramsObj.modelId = modelId.toString()
     
-    // NEW: Multiple fileIds as comma-separated list
+    // Multiple fileIds as comma-separated list
     if (fileIds && fileIds.length > 0) {
       paramsObj.fileIds = fileIds.join(',')
     }
     
     const params = new URLSearchParams(paramsObj)
+    const baseUrl = `${API_BASE_URL}/api/v1/messages/stream?${params}`
 
-    // Build URL with token for authentication
-    const url = `${API_BASE_URL}/api/v1/messages/stream?${params}&token=${token}`
-
-    const eventSource = new EventSource(url)
+    let eventSource: EventSource | null = null
     let completionReceived = false
     let isStopped = false // Flag to prevent processing after manual stop
 
-    eventSource.onopen = () => {
-      console.log('✅ SSE connection opened')
-    }
-
-    eventSource.onmessage = (event) => {
-      // CRITICAL: Don't process any events after stop
-      if (isStopped) {
-        console.log('⏹️ Ignoring SSE event - stream was stopped')
-        return
-      }
-      
+    // Get SSE token and start stream (async IIFE, but return cleanup sync)
+    ;(async () => {
       try {
-        const data = JSON.parse(event.data)
+        if (isStopped) return
         
-        // Debug logging for chunk events
-        if (data.status === 'data') {
-          console.log('📦 SSE chunk received:', data.chunk?.substring(0, 20) + '...')
+        const token = await getSseToken()
+        if (!token) {
+          console.error('🚫 No SSE token available')
+          onUpdate({ status: 'error', error: 'Authentication required' })
+          return
+        }
+
+        const url = `${baseUrl}&token=${token}`
+
+        // First, do a preflight check to catch HTTP errors (like 429 rate limit)
+        // before opening EventSource (which can't read HTTP status codes)
+        const response = await fetch(url, { 
+          method: 'GET', 
+          headers: { 'Accept': 'text/event-stream' }, 
+          credentials: 'include' 
+        })
+
+        if (!response.ok) {
+          // Try to parse the error response
+          const contentType = response.headers.get('content-type')
+          if (contentType?.includes('application/json')) {
+            const errorData = await response.json()
+            console.error('🚫 Stream preflight error:', response.status, errorData)
+            
+            // Handle rate limit error specially
+            if (response.status === 429 || errorData.error?.toLowerCase().includes('rate limit')) {
+              onUpdate({
+                status: 'error',
+                error: 'Rate limit exceeded',
+                limit_type: errorData.limit_type || 'lifetime',
+                action_type: errorData.action_type || 'MESSAGES',
+                limit: errorData.limit,
+                used: errorData.used,
+                remaining: errorData.remaining,
+                reset_at: errorData.reset_at,
+                user_level: errorData.user_level,
+                phone_verified: errorData.phone_verified
+              })
+              return
+            }
+            
+            onUpdate({ status: 'error', error: errorData.error || 'Request failed' })
+            return
+          }
+          
+          onUpdate({ status: 'error', error: `HTTP Error: ${response.status}` })
+          return
         }
         
-        onUpdate(data)
+        // Response is OK, but we already consumed it with fetch
+        // Abort this response and open EventSource
+        response.body?.cancel()
         
-        if (data.status === 'complete') {
-          completionReceived = true
-          console.log('✅ Stream completed successfully')
-          // Close immediately - all chunks have been received
-          eventSource.close()
-        } else if (data.status === 'error') {
-          eventSource.close()
+        if (isStopped) return
+        
+        // Now open the actual EventSource
+        eventSource = new EventSource(url)
+        
+        eventSource.onopen = () => {
+          console.log('✅ SSE connection opened')
+        }
+
+        eventSource.onmessage = (event) => {
+          // CRITICAL: Don't process any events after stop
+          if (isStopped) {
+            console.log('⏹️ Ignoring SSE event - stream was stopped')
+            return
+          }
+          
+          try {
+            const data = JSON.parse(event.data)
+            completionReceived = data.status === 'complete'
+            onUpdate(data)
+            
+            // Close connection on completion
+            if (data.status === 'complete') {
+              eventSource?.close()
+            } else if (data.status === 'error') {
+              eventSource?.close()
+            }
+          } catch (error) {
+            console.error('Failed to parse SSE data:', error, 'Raw data:', event.data)
+          }
+        }
+
+        eventSource.onerror = () => {
+          // Don't process errors after manual stop
+          if (isStopped) {
+            console.log('⏹️ Ignoring SSE error - stream was stopped')
+            return
+          }
+          
+          console.log('SSE error event received, readyState:', eventSource?.readyState, 'completionReceived:', completionReceived)
+          
+          // If we already received completion, this is just normal stream end
+          if (completionReceived) {
+            console.log('✅ Stream ended after completion (normal)')
+            eventSource?.close()
+            return
+          }
+          
+          // SSE CLOSED (2) or CONNECTING (0) - Connection closed by server
+          if (eventSource?.readyState === EventSource.CLOSED || eventSource?.readyState === EventSource.CONNECTING) {
+            console.log('⚠️ SSE connection closed by server (treating as completion)')
+            eventSource?.close()
+            onUpdate({ status: 'complete', message: 'Response complete', metadata: {} })
+            return
+          }
+          
+          // SSE OPEN (1) - Only treat as error if still open and something went wrong
+          if (eventSource?.readyState === EventSource.OPEN) {
+            console.error('❌ SSE connection error during active stream')
+            eventSource?.close()
+            onUpdate({ status: 'error', error: 'Connection interrupted' })
+          }
         }
       } catch (error) {
-        console.error('Failed to parse SSE data:', error, 'Raw data:', event.data)
+        console.error('🚫 Stream setup error:', error)
+        onUpdate({ status: 'error', error: 'Failed to connect' })
       }
-    }
-
-    eventSource.onerror = () => {
-      // Don't process errors after manual stop
-      if (isStopped) {
-        console.log('⏹️ Ignoring SSE error - stream was stopped')
-        return
-      }
-      
-      console.log('SSE error event received, readyState:', eventSource.readyState, 'completionReceived:', completionReceived)
-      
-      // If we already received completion, this is just normal stream end
-      if (completionReceived) {
-        console.log('✅ Stream ended after completion (normal)')
-        eventSource.close()
-        return
-      }
-      
-      // SSE CLOSED (2) or CONNECTING (0) - Connection closed by server
-      // Usually means all data sent, treat as completion if we haven't received it
-      if (eventSource.readyState === EventSource.CLOSED || eventSource.readyState === EventSource.CONNECTING) {
-        console.log('⚠️ SSE connection closed by server (treating as completion)')
-        eventSource.close()
-        // Send a synthetic complete event to clean up UI
-        onUpdate({ status: 'complete', message: 'Response complete', metadata: {} })
-        return
-      }
-      
-      // SSE OPEN (1) - Only treat as error if still open and something went wrong
-      if (eventSource.readyState === EventSource.OPEN) {
-        console.error('❌ SSE connection error during active stream')
-        eventSource.close()
-        onUpdate({ status: 'error', error: 'Connection interrupted' })
-      }
-    }
+    })()
 
     // Return cleanup function that sets the stop flag and closes connection
     return () => {
       console.log('🛑 Closing EventSource and setting stop flag')
       isStopped = true
-      eventSource.close()
+      eventSource?.close()
+    }
+  },
+
+  // Legacy streamMessage that doesn't use preflight check (for reference)
+  streamMessageLegacy(
+    userId: number,
+    message: string,
+    trackId: number | undefined,
+    chatId: number,
+    onUpdate: (data: any) => void,
+    includeReasoning: boolean = false,
+    webSearch: boolean = false,
+    modelId?: number,
+    fileIds?: number[]
+  ): () => void {
+    const paramsObj: Record<string, string> = {
+      message,
+      chatId: chatId.toString(),
+      userId: userId.toString()
+    }
+    if (trackId) paramsObj.trackId = trackId.toString()
+    if (includeReasoning) paramsObj.reasoning = '1'
+    if (webSearch) paramsObj.webSearch = '1'
+    if (modelId) paramsObj.modelId = modelId.toString()
+    if (fileIds && fileIds.length > 0) paramsObj.fileIds = fileIds.join(',')
+    const params = new URLSearchParams(paramsObj)
+    const baseUrl = `${API_BASE_URL}/api/v1/messages/stream?${params}`
+
+    let eventSource: EventSource | null = null
+    let completionReceived = false
+    let isStopped = false
+
+    getSseToken().then((token) => {
+      if (isStopped || !token) {
+        onUpdate({ status: 'error', error: 'Authentication required' })
+        return
+      }
+
+      const url = `${baseUrl}&token=${token}`
+      eventSource = new EventSource(url)
+
+      eventSource.onopen = () => {
+        console.log('✅ SSE connection opened (legacy)')
+      }
+
+      eventSource.onmessage = (event) => {
+        if (isStopped) return
+        try {
+          const data = JSON.parse(event.data)
+          onUpdate(data)
+          if (data.status === 'complete' || data.status === 'error') {
+            completionReceived = true
+            eventSource?.close()
+          }
+        } catch (error) {
+          console.error('Failed to parse SSE data:', error)
+        }
+      }
+
+      eventSource.onerror = () => {
+        if (isStopped || completionReceived) {
+          eventSource?.close()
+          return
+        }
+        if (eventSource?.readyState === EventSource.CLOSED) {
+          onUpdate({ status: 'complete', message: 'Response complete', metadata: {} })
+        }
+        eventSource?.close()
+      }
+    })
+
+    return () => {
+      isStopped = true
+      eventSource?.close()
     }
   },
 

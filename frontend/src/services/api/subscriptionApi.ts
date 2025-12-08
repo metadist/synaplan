@@ -53,6 +53,12 @@ export const subscriptionApi = {
     return httpClient<PortalSession>('/api/v1/subscription/portal', {
       method: 'POST'
     })
+  },
+
+  async syncFromStripe(): Promise<{ success: boolean; level: string; status: string; message?: string }> {
+    return httpClient<{ success: boolean; level: string; status: string; message?: string }>('/api/v1/subscription/sync', {
+      method: 'POST'
+    })
   }
 }
 

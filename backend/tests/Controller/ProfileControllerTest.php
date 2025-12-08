@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Tests\Controller;
 
 use App\Entity\User;
+use App\Service\TokenService;
+use App\Tests\Trait\AuthenticatedTestTrait;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
 use Symfony\Component\HttpFoundation\Response;
 
@@ -13,6 +15,8 @@ use Symfony\Component\HttpFoundation\Response;
  */
 class ProfileControllerTest extends WebTestCase
 {
+    use AuthenticatedTestTrait;
+
     private $client;
     private $em;
     private $user;
@@ -39,9 +43,8 @@ class ProfileControllerTest extends WebTestCase
         $this->em->persist($this->user);
         $this->em->flush();
 
-        // Generate JWT token
-        $jwtManager = static::getContainer()->get('lexik_jwt_authentication.jwt_manager');
-        $this->token = $jwtManager->create($this->user);
+        // Generate access token using TokenService
+        $this->token = $this->authenticateClient($this->client, $this->user);
     }
 
     protected function tearDown(): void
@@ -57,7 +60,8 @@ class ProfileControllerTest extends WebTestCase
 
     public function testGetProfileWithoutAuth(): void
     {
-        $this->client->request('GET', '/api/v1/profile');
+        $client = static::createClient();
+        $client->request('GET', '/api/v1/profile');
 
         $this->assertResponseStatusCodeSame(Response::HTTP_UNAUTHORIZED);
     }
@@ -90,7 +94,8 @@ class ProfileControllerTest extends WebTestCase
 
     public function testUpdateProfileWithoutAuth(): void
     {
-        $this->client->request(
+        $client = static::createClient();
+        $client->request(
             'PUT',
             '/api/v1/profile',
             [],
@@ -157,7 +162,8 @@ class ProfileControllerTest extends WebTestCase
 
     public function testChangePasswordWithoutAuth(): void
     {
-        $this->client->request(
+        $client = static::createClient();
+        $client->request(
             'PUT',
             '/api/v1/profile/password',
             [],
