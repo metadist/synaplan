@@ -86,16 +86,7 @@ jobs:
 
       - name: Create .env file
         working-directory: backend
-        run: |
-          cat > .env <<EOF
-          APP_ENV=test
-          APP_SECRET=test_secret_not_for_production
-          DATABASE_WRITE_URL=${DATABASE_WRITE_URL}
-          DATABASE_READ_URL=${DATABASE_READ_URL}
-          MAILER_DSN=null://null
-          TOKEN_SECRET=test_token_secret_for_ci
-          MESSENGER_TRANSPORT_DSN=sync://
-          EOF
+        run: bash ../.github/scripts/create-test-env.sh
 
       - name: Install dependencies
         working-directory: backend
