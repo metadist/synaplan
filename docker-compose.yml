@@ -12,6 +12,7 @@ services:
     volumes:
       - ./_docker/frontend/docker-entrypoint.sh:/usr/local/bin/docker-entrypoint.sh:ro
       - ./_docker/frontend/init-env.sh:/usr/local/bin/init-env.sh:ro
+      - ./_devextras/frontend/docker-entrypoint.d:/docker-entrypoint.d:ro
 
       - ./frontend:/app
        # Anonymous volume to prevent host node_modules from being mounted (avoids platform-specific binary conflicts)
@@ -39,6 +40,7 @@ services:
       - ./frontend/dist:/var/www/frontend:ro
       - ./_docker/backend/Caddyfile:/etc/caddy/Caddyfile:ro
       - whisper_models:/var/www/backend/var/whisper:ro
+      - ./_devextras/backend/docker-entrypoint.d:/docker-entrypoint.d:ro
     environment:
       APP_ENV: dev
       APP_SECRET: change_me_in_production_12345678901234567890
