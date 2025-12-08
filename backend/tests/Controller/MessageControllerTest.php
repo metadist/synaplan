@@ -81,7 +81,7 @@ class MessageControllerTest extends WebTestCase
                 }
             }
 
-            // Remove Config entries (model preferences) - keep fixture configs
+            // Remove all Config entries (model preferences) (including fixture configs)
             $configIds = array_map(
                 fn ($c) => $c->getId(),
                 $this->em->getRepository(\App\Entity\Config::class)->findBy(['ownerId' => $userId])
