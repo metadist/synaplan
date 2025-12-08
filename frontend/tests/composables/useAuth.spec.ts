@@ -84,7 +84,7 @@ describe('useAuth', () => {
       })
     ) as any
 
-    const { login, isAuthenticated, error } = useAuth()
+    const { login, isAuthenticated } = useAuth()
     const result = await login('test@example.com', 'wrongpassword')
 
     expect(result).toBe(false)
