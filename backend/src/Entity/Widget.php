@@ -52,7 +52,7 @@ class Widget
     {
         $this->created = time();
         $this->updated = time();
-        $this->widgetId = 'wdg_' . bin2hex(random_bytes(16));
+        $this->widgetId = 'wdg_'.bin2hex(random_bytes(16));
         $this->allowedDomains = [];
     }
 
@@ -69,6 +69,7 @@ class Widget
     public function setOwnerId(int $ownerId): self
     {
         $this->ownerId = $ownerId;
+
         return $this;
     }
 
@@ -83,6 +84,7 @@ class Widget
         if ($owner) {
             $this->ownerId = $owner->getId();
         }
+
         return $this;
     }
 
@@ -94,6 +96,7 @@ class Widget
     public function setWidgetId(string $widgetId): self
     {
         $this->widgetId = $widgetId;
+
         return $this;
     }
 
@@ -105,6 +108,7 @@ class Widget
     public function setTaskPromptTopic(string $taskPromptTopic): self
     {
         $this->taskPromptTopic = $taskPromptTopic;
+
         return $this;
     }
 
@@ -116,6 +120,7 @@ class Widget
     public function setName(string $name): self
     {
         $this->name = $name;
+
         return $this;
     }
 
@@ -127,12 +132,13 @@ class Widget
     public function setStatus(string $status): self
     {
         $this->status = $status;
+
         return $this;
     }
 
     public function isActive(): bool
     {
-        return $this->status === 'active';
+        return 'active' === $this->status;
     }
 
     public function getConfig(): array
@@ -140,6 +146,7 @@ class Widget
         if (!isset($this->config['allowedDomains'])) {
             $this->config['allowedDomains'] = $this->allowedDomains;
         }
+
         return $this->config;
     }
 
@@ -149,6 +156,7 @@ class Widget
         if (isset($config['allowedDomains']) && is_array($config['allowedDomains'])) {
             $this->setAllowedDomains($config['allowedDomains']);
         }
+
         return $this;
     }
 
@@ -160,6 +168,7 @@ class Widget
     public function setConfigValue(string $key, mixed $value): self
     {
         $this->config[$key] = $value;
+
         return $this;
     }
 
@@ -171,6 +180,7 @@ class Widget
     public function setCreated(int $created): self
     {
         $this->created = $created;
+
         return $this;
     }
 
@@ -182,12 +192,14 @@ class Widget
     public function setUpdated(int $updated): self
     {
         $this->updated = $updated;
+
         return $this;
     }
 
     public function touch(): self
     {
         $this->updated = time();
+
         return $this;
     }
 
@@ -207,8 +219,9 @@ class Widget
         $this->config['allowedDomains'] = $normalized;
 
         $this->config = array_merge($this->config, [
-            'allowedDomains' => $normalized
+            'allowedDomains' => $normalized,
         ]);
+
         return $this;
     }
 
@@ -229,4 +242,3 @@ class Widget
         $this->config['allowedDomains'] = $normalized;
     }
 }
-

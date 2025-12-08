@@ -6,7 +6,7 @@ use App\AI\Interface\ChatProviderInterface;
 use App\AI\Provider\TestProvider;
 
 /**
- * Contract Test für TestProvider
+ * Contract Test für TestProvider.
  */
 class TestProviderContractTest extends ChatProviderContractTest
 {
@@ -16,18 +16,18 @@ class TestProviderContractTest extends ChatProviderContractTest
     }
 
     /**
-     * TestProvider sollte immer verfügbar sein
+     * TestProvider sollte immer verfügbar sein.
      */
     public function testTestProviderIsAlwaysAvailable(): void
     {
         $provider = $this->getProvider();
-        
+
         $this->assertTrue($provider->isAvailable());
         $this->assertEquals('test', $provider->getName());
     }
 
     /**
-     * TestProvider sollte alle Capabilities haben
+     * TestProvider sollte alle Capabilities haben.
      */
     public function testTestProviderHasAllCapabilities(): void
     {
@@ -41,13 +41,12 @@ class TestProviderContractTest extends ChatProviderContractTest
             'image_generation',
             'speech_to_text',
             'text_to_speech',
-            'file_analysis'
+            'file_analysis',
         ];
 
         foreach ($expectedCapabilities as $capability) {
-            $this->assertContains($capability, $capabilities, 
+            $this->assertContains($capability, $capabilities,
                 "TestProvider should have '$capability' capability");
         }
     }
 }
-

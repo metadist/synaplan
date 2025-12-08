@@ -14,23 +14,23 @@ class RateLimitConfigRepository extends ServiceEntityRepository
 {
     public function __construct(
         ManagerRegistry $registry,
-        private CacheItemPoolInterface $cache
+        private CacheItemPoolInterface $cache,
     ) {
         parent::__construct($registry, RateLimitConfig::class);
     }
 
     /**
-     * Findet Rate-Limit-Config für Scope und Plan (mit Cache)
+     * Findet Rate-Limit-Config für Scope und Plan (mit Cache).
      */
     public function findByUserLevel(string $scope, string $userLevel): ?RateLimitConfig
     {
         $cacheKey = "rate_limit.{$scope}.{$userLevel}";
         $item = $this->cache->getItem($cacheKey);
-        
+
         if ($item->isHit()) {
             return $item->get();
         }
-        
+
         $config = $this->createQueryBuilder('r')
             ->where('r.scope = :scope')
             ->andWhere('r.plan = :plan')
@@ -38,16 +38,16 @@ class RateLimitConfigRepository extends ServiceEntityRepository
             ->setParameter('plan', $userLevel)
             ->getQuery()
             ->getOneOrNullResult();
-        
+
         $item->set($config);
         $item->expiresAfter(3600); // 1 Stunde Cache
         $this->cache->save($item);
-        
+
         return $config;
     }
 
     /**
-     * Findet alle Configs für einen Scope
+     * Findet alle Configs für einen Scope.
      */
     public function findByScope(string $scope): array
     {
@@ -60,20 +60,19 @@ class RateLimitConfigRepository extends ServiceEntityRepository
     }
 
     /**
-     * Speichert Config
+     * Speichert Config.
      */
     public function save(RateLimitConfig $config, bool $flush = true): void
     {
         $config->touch();
         $this->getEntityManager()->persist($config);
-        
+
         if ($flush) {
             $this->getEntityManager()->flush();
-            
+
             // Clear Cache
             $cacheKey = "rate_limit.{$config->getScope()}.{$config->getPlan()}";
             $this->cache->deleteItem($cacheKey);
         }
     }
 }
-

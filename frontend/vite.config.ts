@@ -1,7 +1,9 @@
-import { defineConfig } from 'vite'
+import { defineConfig, loadEnv } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import { fileURLToPath, URL } from 'node:url'
 import { resolve } from 'path'
+
+const projectRoot = fileURLToPath(new URL('.', import.meta.url))
 
 export default defineConfig(({ mode }) => {
   // Widget Loader (tiny, loads on page load)
@@ -59,9 +61,9 @@ export default defineConfig(({ mode }) => {
       },
       build: {
         lib: {
-          entry: resolve(__dirname, 'src/widget-full.ts'),
-          name: 'SynaplanWidgetFull',
-          fileName: 'widget-full',
+          entry: resolve(projectRoot, 'src/widget.ts'),
+          name: 'SynaplanWidget',
+          fileName: 'widget',
           formats: ['iife']
         },
         rollupOptions: {
@@ -93,11 +95,24 @@ export default defineConfig(({ mode }) => {
   }
 
   // Default app mode
+  const env = loadEnv(mode, process.cwd(), '')
+  const basePath = env.VITE_BASE_PATH || '/'
+  const backendUrl = env.BACKEND_URL || 'http://localhost:8000'
+
   return {
+    base: basePath,
     plugins: [vue()],
     resolve: {
       alias: {
         '@': fileURLToPath(new URL('./src', import.meta.url))
+      }
+    },
+    server: {
+      proxy: {
+        '/api': {
+          target: backendUrl,
+          changeOrigin: true,
+        }
       }
     },
     test: {

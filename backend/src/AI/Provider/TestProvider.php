@@ -4,26 +4,19 @@ namespace App\AI\Provider;
 
 use App\AI\Interface\ChatProviderInterface;
 use App\AI\Interface\EmbeddingProviderInterface;
-use App\AI\Interface\VisionProviderInterface;
+use App\AI\Interface\FileAnalysisProviderInterface;
 use App\AI\Interface\ImageGenerationProviderInterface;
 use App\AI\Interface\SpeechToTextProviderInterface;
 use App\AI\Interface\TextToSpeechProviderInterface;
-use App\AI\Interface\FileAnalysisProviderInterface;
+use App\AI\Interface\VisionProviderInterface;
 
-class TestProvider implements 
-    ChatProviderInterface,
-    EmbeddingProviderInterface,
-    VisionProviderInterface,
-    ImageGenerationProviderInterface,
-    SpeechToTextProviderInterface,
-    TextToSpeechProviderInterface,
-    FileAnalysisProviderInterface
+class TestProvider implements ChatProviderInterface, EmbeddingProviderInterface, VisionProviderInterface, ImageGenerationProviderInterface, SpeechToTextProviderInterface, TextToSpeechProviderInterface, FileAnalysisProviderInterface
 {
     public function getName(): string
     {
         return 'test';
     }
-    
+
     public function getDisplayName(): string
     {
         return 'Test Provider';
@@ -33,12 +26,12 @@ class TestProvider implements
     {
         return 'Mock provider for testing and development';
     }
-    
+
     public function getCapabilities(): array
     {
         return ['chat', 'embedding', 'vision', 'image_generation', 'speech_to_text', 'text_to_speech', 'file_analysis'];
     }
-    
+
     public function getDefaultModels(): array
     {
         return [
@@ -46,7 +39,7 @@ class TestProvider implements
             'embedding' => 'test-embedding',
         ];
     }
-    
+
     public function getStatus(): array
     {
         return [
@@ -56,7 +49,7 @@ class TestProvider implements
             'active_connections' => 0,
         ];
     }
-    
+
     public function isAvailable(): bool
     {
         return true;
@@ -97,7 +90,8 @@ class TestProvider implements
         }
 
         // Default response with context
-        $contextInfo = count($messages) > 1 ? " (Message #" . count($messages) . " in conversation)" : "";
+        $contextInfo = count($messages) > 1 ? ' (Message #'.count($messages).' in conversation)' : '';
+
         return "TestProvider response: I received your message '{$userMessage}'{$contextInfo}. This is a mock response to test the system. Try asking me to create an image or video!";
     }
 
@@ -119,7 +113,7 @@ class TestProvider implements
 
     public function embedBatch(array $texts, array $options = []): array
     {
-        return array_map(fn($t) => $this->embed($t, $options), $texts);
+        return array_map(fn ($t) => $this->embed($t, $options), $texts);
     }
 
     public function getDimensions(string $model): int
@@ -135,7 +129,7 @@ class TestProvider implements
 
     public function extractTextFromImage(string $imageUrl): string
     {
-        return "Extracted text from test image";
+        return 'Extracted text from test image';
     }
 
     public function compareImages(string $imageUrl1, string $imageUrl2): array
@@ -203,4 +197,3 @@ class TestProvider implements
         return "Test answer to: {$question}";
     }
 }
-

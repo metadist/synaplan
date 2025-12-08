@@ -2,10 +2,10 @@
 
 namespace App\Entity;
 
+use App\Repository\MessageRepository;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
-use App\Repository\MessageRepository;
 
 #[ORM\Entity(repositoryClass: MessageRepository::class)]
 #[ORM\Table(name: 'BMESSAGES')]
@@ -90,6 +90,7 @@ class Message
     public function setUserId(int $userId): self
     {
         $this->userId = $userId;
+
         return $this;
     }
 
@@ -101,6 +102,7 @@ class Message
     public function setTrackingId(int $trackingId): self
     {
         $this->trackingId = $trackingId;
+
         return $this;
     }
 
@@ -112,6 +114,7 @@ class Message
     public function setProviderIndex(string $providerIndex): self
     {
         $this->providerIndex = $providerIndex;
+
         return $this;
     }
 
@@ -123,6 +126,7 @@ class Message
     public function setUnixTimestamp(int $unixTimestamp): self
     {
         $this->unixTimestamp = $unixTimestamp;
+
         return $this;
     }
 
@@ -134,6 +138,7 @@ class Message
     public function setDateTime(string $dateTime): self
     {
         $this->dateTime = $dateTime;
+
         return $this;
     }
 
@@ -145,6 +150,7 @@ class Message
     public function setMessageType(string $messageType): self
     {
         $this->messageType = $messageType;
+
         return $this;
     }
 
@@ -156,6 +162,7 @@ class Message
     public function setFile(int $file): self
     {
         $this->file = $file;
+
         return $this;
     }
 
@@ -167,6 +174,7 @@ class Message
     public function setText(string $text): self
     {
         $this->text = $text;
+
         return $this;
     }
 
@@ -178,6 +186,7 @@ class Message
     public function setTopic(string $topic): self
     {
         $this->topic = $topic;
+
         return $this;
     }
 
@@ -189,6 +198,7 @@ class Message
     public function setLanguage(string $language): self
     {
         $this->language = $language;
+
         return $this;
     }
 
@@ -200,6 +210,7 @@ class Message
     public function setDirection(string $direction): self
     {
         $this->direction = $direction;
+
         return $this;
     }
 
@@ -211,6 +222,7 @@ class Message
     public function setStatus(string $status): self
     {
         $this->status = $status;
+
         return $this;
     }
 
@@ -222,6 +234,7 @@ class Message
     public function setFileText(string $fileText): self
     {
         $this->fileText = $fileText;
+
         return $this;
     }
 
@@ -238,6 +251,7 @@ class Message
     public function setFilePath(string $filePath): self
     {
         $this->filePath = $filePath;
+
         return $this;
     }
 
@@ -249,6 +263,7 @@ class Message
     public function setFileType(string $fileType): self
     {
         $this->fileType = $fileType;
+
         return $this;
     }
 
@@ -260,6 +275,7 @@ class Message
     public function setChatId(?int $chatId): self
     {
         $this->chatId = $chatId;
+
         return $this;
     }
 
@@ -272,6 +288,7 @@ class Message
     {
         $this->chat = $chat;
         $this->chatId = $chat?->getId();
+
         return $this;
     }
 
@@ -312,17 +329,19 @@ class Message
         if (!$this->files->contains($file)) {
             $this->files->add($file);
         }
+
         return $this;
     }
 
     public function removeFile(File $file): self
     {
         $this->files->removeElement($file);
+
         return $this;
     }
 
     /**
-     * Check if message has any files attached
+     * Check if message has any files attached.
      */
     public function hasFiles(): bool
     {
@@ -330,29 +349,29 @@ class Message
     }
 
     /**
-     * Get concatenated text from all attached files
+     * Get concatenated text from all attached files.
      */
     public function getAllFilesText(): string
     {
         $texts = [];
-        
+
         // Legacy single file
         if ($this->file > 0 && !empty($this->fileText)) {
             $texts[] = $this->fileText;
         }
-        
+
         // New multiple files
         foreach ($this->files as $file) {
             if (!empty($file->getFileText())) {
                 $texts[] = $file->getFileText();
             }
         }
-        
+
         return implode("\n\n---\n\n", $texts);
     }
 
     /**
-     * Get meta value by key
+     * Get meta value by key.
      */
     public function getMeta(string $key, ?string $default = null): ?string
     {
@@ -361,11 +380,12 @@ class Message
                 return $meta->getMetaValue();
             }
         }
+
         return $default;
     }
 
     /**
-     * Set meta value (creates or updates)
+     * Set meta value (creates or updates).
      */
     public function setMeta(string $key, string $value): self
     {
@@ -373,6 +393,7 @@ class Message
         foreach ($this->metadata as $meta) {
             if ($meta->getMetaKey() === $key) {
                 $meta->setMetaValue($value);
+
                 return $this;
             }
         }
@@ -388,7 +409,7 @@ class Message
     }
 
     /**
-     * Remove meta by key
+     * Remove meta by key.
      */
     public function removeMeta(string $key): self
     {
@@ -398,21 +419,22 @@ class Message
                 break;
             }
         }
+
         return $this;
     }
 
     // File Sharing Helpers
 
     /**
-     * Check if file is publicly accessible
+     * Check if file is publicly accessible.
      */
     public function isPublic(): bool
     {
-        return $this->getMeta('file.is_public') === '1';
+        return '1' === $this->getMeta('file.is_public');
     }
 
     /**
-     * Set public/private status
+     * Set public/private status.
      */
     public function setPublic(bool $public): self
     {
@@ -420,7 +442,7 @@ class Message
     }
 
     /**
-     * Get share token
+     * Get share token.
      */
     public function getShareToken(): ?string
     {
@@ -428,40 +450,43 @@ class Message
     }
 
     /**
-     * Generate new share token
+     * Generate new share token.
      */
     public function generateShareToken(): string
     {
         $token = bin2hex(random_bytes(32));
         $this->setMeta('file.share_token', $token);
-        $this->setMeta('file.share_created_at', (string)time());
+        $this->setMeta('file.share_created_at', (string) time());
+
         return $token;
     }
 
     /**
-     * Set share expiry timestamp
+     * Set share expiry timestamp.
      */
     public function setShareExpires(?int $timestamp): self
     {
         if ($timestamp) {
-            $this->setMeta('file.share_expires', (string)$timestamp);
+            $this->setMeta('file.share_expires', (string) $timestamp);
         } else {
             $this->removeMeta('file.share_expires');
         }
+
         return $this;
     }
 
     /**
-     * Get share expiry timestamp
+     * Get share expiry timestamp.
      */
     public function getShareExpires(): ?int
     {
         $expires = $this->getMeta('file.share_expires');
-        return $expires ? (int)$expires : null;
+
+        return $expires ? (int) $expires : null;
     }
 
     /**
-     * Check if share link has expired
+     * Check if share link has expired.
      */
     public function isShareExpired(): bool
     {
@@ -469,11 +494,12 @@ class Message
         if (!$expires) {
             return false;
         }
+
         return time() > $expires;
     }
 
     /**
-     * Revoke public access (remove share data)
+     * Revoke public access (remove share data).
      */
     public function revokeShare(): self
     {
@@ -481,6 +507,7 @@ class Message
         $this->removeMeta('file.share_token');
         $this->removeMeta('file.share_expires');
         $this->removeMeta('file.share_created_at');
+
         return $this;
     }
 }

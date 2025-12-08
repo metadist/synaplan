@@ -50,6 +50,7 @@ class PromptMeta
     public function setPromptId(int $promptId): self
     {
         $this->promptId = $promptId;
+
         return $this;
     }
 
@@ -64,6 +65,7 @@ class PromptMeta
         if ($prompt) {
             $this->promptId = $prompt->getId();
         }
+
         return $this;
     }
 
@@ -75,6 +77,7 @@ class PromptMeta
     public function setMetaKey(string $metaKey): self
     {
         $this->metaKey = $metaKey;
+
         return $this;
     }
 
@@ -86,18 +89,21 @@ class PromptMeta
     public function setMetaValue(string $metaValue): self
     {
         $this->metaValue = $metaValue;
+
         return $this;
     }
 
     public function getMetaValueArray(): ?array
     {
         $decoded = json_decode($this->metaValue, true);
+
         return is_array($decoded) ? $decoded : null;
     }
 
     public function setMetaValueArray(array $value): self
     {
         $this->metaValue = json_encode($value);
+
         return $this;
     }
 
@@ -106,4 +112,3 @@ class PromptMeta
         return $this->created;
     }
 }
-

@@ -1,8 +1,9 @@
 // synaplan-ui/src/services/authService.ts
 import { ref } from 'vue'
-import { authApi } from './api'
+import { useConfigStore } from '@/stores/config'
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'
+const config = useConfigStore()
+const API_BASE_URL = config.apiBaseUrl
 
 // Auth State
 const token = ref<string | null>(localStorage.getItem('auth_token'))

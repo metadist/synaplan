@@ -4,8 +4,8 @@ namespace App\Repository;
 
 use App\Entity\WidgetSession;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
-use Doctrine\Persistence\ManagerRegistry;
 use Doctrine\DBAL\ArrayParameterType;
+use Doctrine\Persistence\ManagerRegistry;
 
 /**
  * @extends ServiceEntityRepository<WidgetSession>
@@ -36,18 +36,18 @@ class WidgetSessionRepository extends ServiceEntityRepository
     }
 
     /**
-     * Find session by widget ID and session ID
+     * Find session by widget ID and session ID.
      */
     public function findByWidgetAndSession(string $widgetId, string $sessionId): ?WidgetSession
     {
         return $this->findOneBy([
             'widgetId' => $widgetId,
-            'sessionId' => $sessionId
+            'sessionId' => $sessionId,
         ]);
     }
 
     /**
-     * Delete expired sessions
+     * Delete expired sessions.
      */
     public function deleteExpiredSessions(): int
     {
@@ -60,7 +60,7 @@ class WidgetSessionRepository extends ServiceEntityRepository
     }
 
     /**
-     * Count active sessions for a widget
+     * Count active sessions for a widget.
      */
     public function countActiveSessionsByWidget(string $widgetId): int
     {
@@ -75,7 +75,7 @@ class WidgetSessionRepository extends ServiceEntityRepository
     }
 
     /**
-     * Get total message count for a widget
+     * Get total message count for a widget.
      */
     public function getTotalMessageCountByWidget(string $widgetId): int
     {
@@ -123,4 +123,3 @@ class WidgetSessionRepository extends ServiceEntityRepository
         )->fetchAllAssociative();
     }
 }
-

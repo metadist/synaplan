@@ -5,8 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vue-tsc -b && vite build",
-    "build:widget": "vite build --mode widget-loader && vite build --mode widget && node ./scripts/copy-widget-bundle.mjs",
+    "build": "npm run check:types && vite build",
+    "build:widget": "vite build --mode widget && node ./scripts/copy-widget-bundle.mjs",
+    "check:types": "vue-tsc -b --noEmit",
     "preview": "vite preview",
     "test": "vitest",
     "test:ui": "vitest --ui",
@@ -37,6 +38,7 @@
     "typescript": "^5.5.3",
     "vite": "^5.4.2",
     "vitest": "^1.6.0",
-    "vue-tsc": "^2.1.4"
+    "vue-tsc": "^2.1.4",
+    "@types/node": "^22.10.1"
   }
 }

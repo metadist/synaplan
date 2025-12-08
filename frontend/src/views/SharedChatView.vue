@@ -200,6 +200,7 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import MessageImage from '../components/MessageImage.vue'
 import MessageVideo from '../components/MessageVideo.vue'
+import { httpClient } from '@/services/api/httpClient'
 
 const route = useRoute()
 const loading = ref(true)
@@ -334,15 +335,10 @@ onMounted(async () => {
   }
 
   try {
-    const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'
-    const response = await fetch(`${API_BASE}/api/v1/chats/shared/${token}`)
-    
-    if (!response.ok) {
-      throw new Error('Chat not found')
-    }
+    const data = await httpClient<any>(`/api/v1/chats/shared/${token}`, {
+      skipAuth: true
+    })
 
-    const data = await response.json()
-    
     if (!data.success) {
       throw new Error('Chat not found or not shared')
     }
@@ -370,7 +366,7 @@ const escapeHtml = (text: string): string => {
 const formatMessageText = (text: string): string => {
   // Handle code blocks first
   const codeBlocks: string[] = []
-  let content = text.replace(/```(\w+)?\n([\s\S]*?)```/g, (_, lang, code) => {
+  let content = text.replace(/```(\w+)?\n([\s\S]*?)```/g, (_, _lang, code) => {
     const placeholder = `__CODEBLOCK_${codeBlocks.length}__`
     codeBlocks.push(`<pre class="bg-black/5 dark:bg-white/5 p-3 rounded-lg overflow-x-auto my-2"><code class="text-xs font-mono">${escapeHtml(code.trim())}</code></pre>`)
     return placeholder

@@ -4,22 +4,22 @@ namespace App\Controller;
 
 use App\Entity\User;
 use App\Entity\Widget;
+use App\Repository\WidgetRepository;
 use App\Service\WidgetService;
 use App\Service\WidgetSessionService;
-use App\Repository\WidgetRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use OpenApi\Attributes as OA;
+use Psr\Log\LoggerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\CurrentUser;
-use Psr\Log\LoggerInterface;
 
 /**
- * Widget Management Controller
- * 
+ * Widget Management Controller.
+ *
  * Authenticated endpoints for widget owners to manage their widgets
  */
 #[Route('/api/v1/widgets', name: 'api_widgets_')]
@@ -31,11 +31,12 @@ class WidgetController extends AbstractController
         private WidgetSessionService $sessionService,
         private WidgetRepository $widgetRepository,
         private EntityManagerInterface $em,
-        private LoggerInterface $logger
-    ) {}
+        private LoggerInterface $logger,
+    ) {
+    }
 
     /**
-     * List all widgets for current user
+     * List all widgets for current user.
      */
     #[Route('', name: 'list', methods: ['GET'])]
     #[OA\Get(
@@ -62,10 +63,10 @@ class WidgetController extends AbstractController
                             new OA\Property(property: 'status', type: 'string', enum: ['active', 'inactive']),
                             new OA\Property(property: 'config', type: 'object'),
                             new OA\Property(property: 'created', type: 'integer'),
-                            new OA\Property(property: 'updated', type: 'integer')
+                            new OA\Property(property: 'updated', type: 'integer'),
                         ]
                     )
-                )
+                ),
             ]
         )
     )]
@@ -88,18 +89,18 @@ class WidgetController extends AbstractController
                 'allowedDomains' => $widget->getAllowedDomains(),
                 'isActive' => $this->widgetService->isWidgetActive($widget),
                 'created' => $widget->getCreated(),
-                'updated' => $widget->getUpdated()
+                'updated' => $widget->getUpdated(),
             ];
         }, $widgets);
 
         return $this->json([
             'success' => true,
-            'widgets' => $widgetsData
+            'widgets' => $widgetsData,
         ]);
     }
 
     /**
-     * Create new widget
+     * Create new widget.
      */
     #[Route('', name: 'create', methods: ['POST'])]
     #[OA\Post(
@@ -115,7 +116,7 @@ class WidgetController extends AbstractController
             properties: [
                 new OA\Property(property: 'name', type: 'string', example: 'Support Chat'),
                 new OA\Property(property: 'taskPromptTopic', type: 'string', example: 'customer-support'),
-                new OA\Property(property: 'config', type: 'object')
+                new OA\Property(property: 'config', type: 'object'),
             ]
         )
     )]
@@ -129,7 +130,7 @@ class WidgetController extends AbstractController
 
         if (empty($data['name']) || empty($data['taskPromptTopic'])) {
             return $this->json([
-                'error' => 'Missing required fields: name, taskPromptTopic'
+                'error' => 'Missing required fields: name, taskPromptTopic',
             ], Response::HTTP_BAD_REQUEST);
         }
 
@@ -155,27 +156,27 @@ class WidgetController extends AbstractController
                     'config' => $widget->getConfig(),
                     'allowedDomains' => $widget->getAllowedDomains(),
                     'created' => $widget->getCreated(),
-                    'updated' => $widget->getUpdated()
-                ]
+                    'updated' => $widget->getUpdated(),
+                ],
             ], Response::HTTP_CREATED);
         } catch (\InvalidArgumentException $e) {
             return $this->json([
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ], Response::HTTP_BAD_REQUEST);
         } catch (\Exception $e) {
             $this->logger->error('Failed to create widget', [
                 'error' => $e->getMessage(),
-                'user_id' => $user->getId()
+                'user_id' => $user->getId(),
             ]);
 
             return $this->json([
-                'error' => 'Failed to create widget'
+                'error' => 'Failed to create widget',
             ], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
 
     /**
-     * Get widget details
+     * Get widget details.
      */
     #[Route('/{widgetId}', name: 'get', methods: ['GET'])]
     #[OA\Get(
@@ -222,13 +223,13 @@ class WidgetController extends AbstractController
                 'isActive' => $this->widgetService->isWidgetActive($widget),
                 'created' => $widget->getCreated(),
                 'updated' => $widget->getUpdated(),
-                'stats' => $stats
-            ]
+                'stats' => $stats,
+            ],
         ]);
     }
 
     /**
-     * Update widget
+     * Update widget.
      */
     #[Route('/{widgetId}', name: 'update', methods: ['PUT'])]
     #[OA\Put(
@@ -255,8 +256,8 @@ class WidgetController extends AbstractController
 
         $data = json_decode($request->getContent(), true);
 
-        error_log('🔧 Widget update request - widgetId: ' . $widgetId);
-        error_log('🔧 Data received: ' . json_encode($data));
+        error_log('🔧 Widget update request - widgetId: '.$widgetId);
+        error_log('🔧 Data received: '.json_encode($data));
 
         try {
             if (isset($data['name'])) {
@@ -264,8 +265,8 @@ class WidgetController extends AbstractController
             }
 
             if (isset($data['config'])) {
-                error_log('🔧 Config received: ' . json_encode($data['config']));
-                error_log('🔧 allowedDomains in config: ' . json_encode($data['config']['allowedDomains'] ?? []));
+                error_log('🔧 Config received: '.json_encode($data['config']));
+                error_log('🔧 allowedDomains in config: '.json_encode($data['config']['allowedDomains'] ?? []));
                 $this->widgetService->updateWidget($widget, $data['config']);
             }
 
@@ -275,31 +276,31 @@ class WidgetController extends AbstractController
 
             // Always flush after updates
             $this->em->flush();
-            
-            error_log('🔧 After flush - allowedDomains: ' . json_encode($widget->getAllowedDomains()));
+
+            error_log('🔧 After flush - allowedDomains: '.json_encode($widget->getAllowedDomains()));
 
             return $this->json([
                 'success' => true,
-                'message' => 'Widget updated successfully'
+                'message' => 'Widget updated successfully',
             ]);
         } catch (\Exception $e) {
-            error_log('❌ Widget update error: ' . $e->getMessage());
-            error_log('❌ Stack trace: ' . $e->getTraceAsString());
-            
+            error_log('❌ Widget update error: '.$e->getMessage());
+            error_log('❌ Stack trace: '.$e->getTraceAsString());
+
             $this->logger->error('Failed to update widget', [
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
-                'widget_id' => $widgetId
+                'widget_id' => $widgetId,
             ]);
 
             return $this->json([
-                'error' => 'Failed to update widget'
+                'error' => 'Failed to update widget',
             ], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
 
     /**
-     * Delete widget
+     * Delete widget.
      */
     #[Route('/{widgetId}', name: 'delete', methods: ['DELETE'])]
     #[OA\Delete(
@@ -329,22 +330,22 @@ class WidgetController extends AbstractController
 
             return $this->json([
                 'success' => true,
-                'message' => 'Widget deleted successfully'
+                'message' => 'Widget deleted successfully',
             ]);
         } catch (\Exception $e) {
             $this->logger->error('Failed to delete widget', [
                 'error' => $e->getMessage(),
-                'widget_id' => $widgetId
+                'widget_id' => $widgetId,
             ]);
 
             return $this->json([
-                'error' => 'Failed to delete widget'
+                'error' => 'Failed to delete widget',
             ], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
 
     /**
-     * Get embed code for widget
+     * Get embed code for widget.
      */
     #[Route('/{widgetId}/embed', name: 'embed', methods: ['GET'])]
     #[OA\Get(
@@ -377,12 +378,12 @@ class WidgetController extends AbstractController
             'success' => true,
             'embedCode' => $embedCode,
             'wordpressShortcode' => $wordpressShortcode,
-            'widgetUrl' => $baseUrl . '/widget.js'
+            'widgetUrl' => $baseUrl.'/widget.js',
         ]);
     }
 
     /**
-     * Get widget statistics
+     * Get widget statistics.
      */
     #[Route('/{widgetId}/stats', name: 'stats', methods: ['GET'])]
     #[OA\Get(
@@ -411,7 +412,7 @@ class WidgetController extends AbstractController
 
         return $this->json([
             'success' => true,
-            'stats' => $stats
+            'stats' => $stats,
         ]);
     }
 
@@ -500,4 +501,3 @@ class WidgetController extends AbstractController
         }
     }
 }
-

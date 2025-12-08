@@ -40,8 +40,8 @@
           </div>
           <div v-else-if="overview" class="space-y-6">
             <!-- Stats Grid -->
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-              <div class="surface-card rounded-lg p-6">
+              <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div class="surface-card rounded-lg p-6">
                 <div class="flex items-center justify-between mb-2">
                   <span class="text-sm txt-secondary">{{ $t('admin.overview.totalUsers') }}</span>
                   <Icon icon="mdi:account-multiple" class="w-5 h-5 txt-secondary" />
@@ -49,16 +49,16 @@
                 <div class="text-3xl font-bold txt-primary">{{ overview.totalUsers }}</div>
               </div>
 
-              <div
-                v-for="(count, level) in overview.usersByLevel"
-                :key="level"
-                class="surface-card rounded-lg p-6"
-              >
+                <div
+                  v-for="(count, level) in overview.usersByLevel"
+                  :key="level"
+                  class="surface-card rounded-lg p-6"
+                >
                 <div class="flex items-center justify-between mb-2">
-                  <span class="text-sm txt-secondary">{{ level }}</span>
-                  <Icon :icon="getLevelIcon(level)" class="w-5 h-5 txt-secondary" />
+                    <span class="text-sm txt-secondary">{{ level }}</span>
+                    <Icon :icon="getLevelIcon(level)" class="w-5 h-5 txt-secondary" />
                 </div>
-                <div class="text-3xl font-bold txt-primary">{{ count }}</div>
+                  <div class="text-3xl font-bold txt-primary">{{ count }}</div>
               </div>
             </div>
 
@@ -79,19 +79,22 @@
                 {{ $t('admin.usage.activeSubscriptions') }}
               </h3>
               <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div
+                <template
                   v-for="(count, level) in overview.usersByLevel"
                   :key="level"
-                  v-if="level !== 'NEW' && level !== 'ADMIN'"
-                  class="surface-elevated rounded-lg p-4"
                 >
-                  <div class="flex items-center justify-between mb-2">
-                    <span class="font-semibold txt-primary">{{ level }}</span>
-                    <Icon :icon="getLevelIcon(level)" class="w-5 h-5 txt-secondary" />
+                  <div
+                    v-if="level !== 'NEW' && level !== 'ADMIN'"
+                    class="surface-elevated rounded-lg p-4"
+                  >
+                    <div class="flex items-center justify-between mb-2">
+                      <span class="font-semibold txt-primary">{{ level }}</span>
+                      <Icon :icon="getLevelIcon(level)" class="w-5 h-5 txt-secondary" />
+                    </div>
+                    <div class="text-2xl font-bold txt-primary">{{ count }}</div>
+                    <div class="text-xs txt-secondary mt-1">{{ $t('admin.usage.activeSubscriptions') }}</div>
                   </div>
-                  <div class="text-2xl font-bold txt-primary">{{ count }}</div>
-                  <div class="text-xs txt-secondary mt-1">{{ $t('admin.usage.activeSubscriptions') }}</div>
-                </div>
+                </template>
               </div>
             </div>
 
@@ -113,7 +116,7 @@
                   </thead>
                   <tbody>
                     <tr
-                      v-for="user in overview.recentUsers"
+                      v-for="user in recentUsers"
                       :key="user.id"
                       class="border-b border-light-border/30 dark:border-dark-border/20 hover:bg-black/5 dark:hover:bg-white/5"
                     >
@@ -561,9 +564,16 @@ import { useI18n } from 'vue-i18n'
 const { t } = useI18n()
 const authStore = useAuthStore()
 
+type TabId = 'overview' | 'users' | 'prompts' | 'usage'
+interface AdminTab {
+  id: TabId
+  label: string
+  icon: string
+}
+
 // Tabs
-const activeTab = ref<'overview' | 'users' | 'prompts' | 'usage'>('overview')
-const tabs = computed(() => [
+const activeTab = ref<TabId>('overview')
+const tabs = computed<AdminTab[]>(() => [
   { id: 'overview', label: t('admin.tabs.overview'), icon: 'mdi:view-dashboard' },
   { id: 'users', label: t('admin.tabs.users'), icon: 'mdi:account-multiple' },
   { id: 'prompts', label: t('admin.tabs.prompts'), icon: 'mdi:text-box-multiple' },
@@ -573,6 +583,7 @@ const tabs = computed(() => [
 // Overview
 const overview = ref<SystemOverview | null>(null)
 const overviewLoading = ref(false)
+const recentUsers = computed(() => overview.value?.recentUsers ?? [])
 
 // Registration Analytics
 const registrationAnalytics = ref<RegistrationAnalytics | null>(null)

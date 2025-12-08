@@ -56,6 +56,7 @@ class VerificationToken
     public function setUserId(int $userId): self
     {
         $this->userId = $userId;
+
         return $this;
     }
 
@@ -68,6 +69,7 @@ class VerificationToken
     {
         $this->user = $user;
         $this->userId = $user->getId();
+
         return $this;
     }
 
@@ -79,6 +81,7 @@ class VerificationToken
     public function setToken(string $token): self
     {
         $this->token = $token;
+
         return $this;
     }
 
@@ -90,6 +93,7 @@ class VerificationToken
     public function setType(string $type): self
     {
         $this->type = $type;
+
         return $this;
     }
 
@@ -101,6 +105,7 @@ class VerificationToken
     public function setCreated(int $created): self
     {
         $this->created = $created;
+
         return $this;
     }
 
@@ -112,6 +117,7 @@ class VerificationToken
     public function setExpires(int $expires): self
     {
         $this->expires = $expires;
+
         return $this;
     }
 
@@ -123,6 +129,7 @@ class VerificationToken
     public function setUsed(bool $used): self
     {
         $this->used = $used;
+
         return $this;
     }
 
@@ -136,4 +143,3 @@ class VerificationToken
         return !$this->used && !$this->isExpired();
     }
 }
-

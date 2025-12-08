@@ -4,14 +4,14 @@ namespace App\Service;
 
 use App\Entity\User;
 use App\Entity\Widget;
-use App\Repository\WidgetRepository;
 use App\Repository\PromptRepository;
+use App\Repository\WidgetRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 
 /**
- * Widget Management Service
- * 
+ * Widget Management Service.
+ *
  * Handles widget CRUD operations and embed code generation
  */
 class WidgetService
@@ -21,18 +21,19 @@ class WidgetService
         private WidgetRepository $widgetRepository,
         private PromptRepository $promptRepository,
         private RateLimitService $rateLimitService,
-        private LoggerInterface $logger
-    ) {}
+        private LoggerInterface $logger,
+    ) {
+    }
 
     /**
-     * Create a new widget
+     * Create a new widget.
      */
     public function createWidget(User $owner, string $name, string $taskPromptTopic, array $config = []): Widget
     {
         // Validate task prompt exists
         $prompt = $this->promptRepository->findByTopic($taskPromptTopic, $owner->getId());
         if (!$prompt) {
-            throw new \InvalidArgumentException('Task prompt not found: ' . $taskPromptTopic);
+            throw new \InvalidArgumentException('Task prompt not found: '.$taskPromptTopic);
         }
 
         $widget = new Widget();
@@ -49,38 +50,38 @@ class WidgetService
         $this->logger->info('Widget created', [
             'widget_id' => $widget->getWidgetId(),
             'owner_id' => $owner->getId(),
-            'task_prompt' => $taskPromptTopic
+            'task_prompt' => $taskPromptTopic,
         ]);
 
         return $widget;
     }
 
     /**
-     * Update widget configuration
+     * Update widget configuration.
      */
     public function updateWidget(Widget $widget, array $config): void
     {
         $currentConfig = $widget->getConfig();
-        
+
         $this->logger->info('🔧 WidgetService::updateWidget', [
             'widget_id' => $widget->getWidgetId(),
             'current_config' => $currentConfig,
-            'incoming_config' => $config
+            'incoming_config' => $config,
         ]);
-        
+
         $mergedConfig = array_replace($currentConfig, $config);
-        
+
         $this->logger->info('🔧 After merge', [
-            'merged_config' => $mergedConfig
+            'merged_config' => $mergedConfig,
         ]);
-        
+
         $sanitizedConfig = $this->sanitizeConfig($mergedConfig);
-        
+
         $this->logger->info('🔧 After sanitize', [
             'sanitized_config' => $sanitizedConfig,
-            'allowedDomains' => $sanitizedConfig['allowedDomains'] ?? []
+            'allowedDomains' => $sanitizedConfig['allowedDomains'] ?? [],
         ]);
-        
+
         $widget->setConfig($sanitizedConfig);
         $widget->setAllowedDomains($sanitizedConfig['allowedDomains'] ?? []);
         $widget->touch();
@@ -88,12 +89,12 @@ class WidgetService
 
         $this->logger->info('Widget updated', [
             'widget_id' => $widget->getWidgetId(),
-            'final_allowedDomains' => $widget->getAllowedDomains()
+            'final_allowedDomains' => $widget->getAllowedDomains(),
         ]);
     }
 
     /**
-     * Update widget name
+     * Update widget name.
      */
     public function updateWidgetName(Widget $widget, string $name): void
     {
@@ -103,7 +104,7 @@ class WidgetService
     }
 
     /**
-     * Delete widget
+     * Delete widget.
      */
     public function deleteWidget(Widget $widget): void
     {
@@ -112,12 +113,12 @@ class WidgetService
         $this->em->flush();
 
         $this->logger->info('Widget deleted', [
-            'widget_id' => $widgetId
+            'widget_id' => $widgetId,
         ]);
     }
 
     /**
-     * Get widget by widgetId
+     * Get widget by widgetId.
      */
     public function getWidgetById(string $widgetId): ?Widget
     {
@@ -125,7 +126,7 @@ class WidgetService
     }
 
     /**
-     * List all widgets for a user
+     * List all widgets for a user.
      */
     public function listWidgetsByOwner(User $owner): array
     {
@@ -133,7 +134,7 @@ class WidgetService
     }
 
     /**
-     * Generate embed code for a widget
+     * Generate embed code for a widget.
      */
     public function generateEmbedCode(Widget $widget, string $baseUrl): string
     {
@@ -150,10 +151,10 @@ class WidgetService
         $autoOpen = $config['autoOpen'] ?? false;
         $autoOpenStr = $autoOpen ? 'true' : 'false';
         $autoMessage = $config['autoMessage'] ?? 'Hello! How can I help you today?';
-        $messageLimit = (int)($config['messageLimit'] ?? 50);
-        $maxFileSize = (int)($config['maxFileSize'] ?? 10);
+        $messageLimit = (int) ($config['messageLimit'] ?? 50);
+        $maxFileSize = (int) ($config['maxFileSize'] ?? 10);
         $allowFileUpload = !empty($config['allowFileUpload']);
-        $fileUploadLimit = (int)($config['fileUploadLimit'] ?? 3);
+        $fileUploadLimit = (int) ($config['fileUploadLimit'] ?? 3);
         $allowFileUploadStr = $allowFileUpload ? 'true' : 'false';
 
         // Build icon config
@@ -191,7 +192,7 @@ HTML;
     }
 
     /**
-     * Generate WordPress shortcode
+     * Generate WordPress shortcode.
      */
     public function generateWordPressShortcode(Widget $widget): string
     {
@@ -199,7 +200,7 @@ HTML;
     }
 
     /**
-     * Check if widget is active (owner limits not exceeded)
+     * Check if widget is active (owner limits not exceeded).
      */
     public function isWidgetActive(Widget $widget): bool
     {
@@ -215,8 +216,9 @@ HTML;
         if (!$owner instanceof User) {
             $this->logger->warning('Widget owner not found', [
                 'widget_id' => $widget->getWidgetId(),
-                'owner_id' => $widget->getOwnerId()
+                'owner_id' => $widget->getOwnerId(),
             ]);
+
             return false;
         }
 
@@ -227,8 +229,9 @@ HTML;
             $this->logger->warning('Widget owner rate limit exceeded', [
                 'widget_id' => $widget->getWidgetId(),
                 'owner_id' => $owner->getId(),
-                'remaining' => $limitCheck['remaining'] ?? 0
+                'remaining' => $limitCheck['remaining'] ?? 0,
             ]);
+
             return false;
         }
 
@@ -236,7 +239,7 @@ HTML;
     }
 
     /**
-     * Sanitize and validate widget configuration
+     * Sanitize and validate widget configuration.
      */
     private function sanitizeConfig(array $config): array
     {
@@ -301,14 +304,14 @@ HTML;
         }
 
         // Validate limits
-        $config['messageLimit'] = max(1, min(100, (int)$config['messageLimit']));
-        $config['maxFileSize'] = max(1, min(50, (int)$config['maxFileSize']));
+        $config['messageLimit'] = max(1, min(100, (int) $config['messageLimit']));
+        $config['maxFileSize'] = max(1, min(50, (int) $config['maxFileSize']));
 
         // Validate boolean flags
-        $config['allowFileUpload'] = (bool)($config['allowFileUpload'] ?? false);
+        $config['allowFileUpload'] = (bool) ($config['allowFileUpload'] ?? false);
 
         // Validate file upload limit
-        $config['fileUploadLimit'] = max(0, min(20, (int)$config['fileUploadLimit']));
+        $config['fileUploadLimit'] = max(0, min(20, (int) $config['fileUploadLimit']));
 
         if (!isset($config['allowedDomains']) || !is_array($config['allowedDomains'])) {
             $config['allowedDomains'] = [];
@@ -319,7 +322,7 @@ HTML;
         } catch (\Throwable $e) {
             $this->logger->warning('Failed to sanitize allowed domains', [
                 'error' => $e->getMessage(),
-                'domains' => $config['allowedDomains']
+                'domains' => $config['allowedDomains'],
             ]);
             $config['allowedDomains'] = [];
         }
@@ -328,9 +331,10 @@ HTML;
     }
 
     /**
-     * Normalize and validate the allowed domains list
+     * Normalize and validate the allowed domains list.
      *
      * @param array<string> $domains
+     *
      * @return array<string>
      */
     private function sanitizeAllowedDomains(array $domains): array
@@ -343,7 +347,7 @@ HTML;
             }
 
             $normalized = strtolower(trim($domain));
-            if ($normalized === '') {
+            if ('' === $normalized) {
                 continue;
             }
 
@@ -351,14 +355,14 @@ HTML;
             $normalized = preg_replace('~^https?://~', '', $normalized);
             $normalized = preg_replace('~^//~', '', $normalized);
 
-            if ($normalized === null) {
+            if (null === $normalized) {
                 continue;
             }
 
             // Strip any path fragments - use ~ delimiter to avoid conflict with # in character class
             $parts = preg_split('~[/?#]~', $normalized);
             $normalized = $parts[0] ?? '';
-            if ($normalized === '') {
+            if ('' === $normalized) {
                 continue;
             }
 
@@ -366,7 +370,7 @@ HTML;
             if (!preg_match('/^(?:\*\.)?[a-z0-9-]+(?:\.[a-z0-9-]+)*(?::\d+)?$/', $normalized)) {
                 $this->logger->warning('Invalid domain format rejected', [
                     'domain' => $domain,
-                    'normalized' => $normalized
+                    'normalized' => $normalized,
                 ]);
                 continue;
             }
@@ -379,4 +383,3 @@ HTML;
         return array_values($sanitized);
     }
 }
-

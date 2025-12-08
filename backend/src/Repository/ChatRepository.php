@@ -32,8 +32,7 @@ class ChatRepository extends ServiceEntityRepository
     {
         return $this->findOneBy([
             'shareToken' => $token,
-            'isPublic' => true
+            'isPublic' => true,
         ]);
     }
 }
-

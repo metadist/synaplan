@@ -7,15 +7,15 @@ use App\Service\WhisperService;
 use Psr\Log\LoggerInterface;
 
 /**
- * Universal File Processor
- * 
+ * Universal File Processor.
+ *
  * Extracts text from files using multiple strategies:
  * 1. Native (plain text files)
  * 2. Tika (documents: PDF, DOCX, XLSX, etc.)
  * 3. Rasterize + Vision AI (fallback for PDFs with low-quality Tika extraction)
  * 4. Vision AI (images)
  * 5. Speech-to-Text (audio/video files via Whisper.cpp)
- * 
+ *
  * Strategy from legacy: Native -> Tika -> Rasterize+Vision fallback
  */
 class FileProcessor
@@ -41,21 +41,21 @@ class FileProcessor
     ];
 
     private const AUDIO_EXTENSIONS = [
-        'ogg', 'mp3', 'wav', 'm4a', 'opus', 'flac', 'webm', 'aac', 'wma', 
-        'mp4', 'avi', 'mov', 'mkv', 'mpeg', 'mpg'
+        'ogg', 'mp3', 'wav', 'm4a', 'opus', 'flac', 'webm', 'aac', 'wma',
+        'mp4', 'avi', 'mov', 'mkv', 'mpeg', 'mpg',
     ];
 
     private const OFFICE_EXT_TO_MIME = [
-        'xls'  => 'application/vnd.ms-excel',
+        'xls' => 'application/vnd.ms-excel',
         'xlsx' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-        'doc'  => 'application/msword',
+        'doc' => 'application/msword',
         'docx' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-        'ppt'  => 'application/vnd.ms-powerpoint',
+        'ppt' => 'application/vnd.ms-powerpoint',
         'pptx' => 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-        'csv'  => 'text/csv',
-        'md'   => 'text/markdown',
+        'csv' => 'text/csv',
+        'md' => 'text/markdown',
         'html' => 'text/html',
-        'htm'  => 'text/html',
+        'htm' => 'text/html',
     ];
 
     public function __construct(
@@ -67,16 +67,18 @@ class FileProcessor
         private LoggerInterface $logger,
         private string $uploadDir,
         private int $tikaMinLength,
-        private float $tikaMinEntropy
-    ) {}
+        private float $tikaMinEntropy,
+    ) {
+    }
 
     /**
-     * Extract text from a file
-     * 
-     * @param string $relativePath Relative path to file (from upload dir)
-     * @param string $fileExtension File extension (e.g. 'pdf', 'docx')
-     * @param int|null $userId User ID for Vision AI fallback
-     * @return array [extractedText, meta] where meta contains strategy, mime, ext, etc.
+     * Extract text from a file.
+     *
+     * @param string   $relativePath  Relative path to file (from upload dir)
+     * @param string   $fileExtension File extension (e.g. 'pdf', 'docx')
+     * @param int|null $userId        User ID for Vision AI fallback
+     *
+     * @return array [extractedText, meta] where meta contains strategy, mime, ext, etc
      */
     public function extractText(string $relativePath, string $fileExtension, ?int $userId = null): array
     {
@@ -97,10 +99,10 @@ class FileProcessor
         if ($this->isPlainTextMime($mime)) {
             $text = @file_get_contents($absolutePath) ?: '';
             $text = $this->textCleaner->clean($text);
-            
+
             $this->logger->info('FileProcessor: Native text extraction', [
                 'strategy' => 'native_text',
-                'bytes' => strlen($text)
+                'bytes' => strlen($text),
             ]);
 
             return [$text, ['strategy' => 'native_text'] + $meta];
@@ -119,30 +121,31 @@ class FileProcessor
         // Strategy 4: Tika for documents
         if (!$this->tikaClient->isEnabled()) {
             // Tika disabled: Only support PDFs via vision
-            if ($this->isPdfMime($mime) || $ext === 'pdf') {
+            if ($this->isPdfMime($mime) || 'pdf' === $ext) {
                 return $this->extractFromPdfViaVision($absolutePath, $userId, $meta);
             }
-            
+
             $this->logger->warning('FileProcessor: Tika disabled, cannot extract', $meta);
+
             return ['', ['strategy' => 'tika_disabled'] + $meta];
         }
 
         // Try Tika first for documents
         [$tikaText, $tikaMeta] = $this->tikaClient->extractText($absolutePath, $mime);
-        
+
         if (is_string($tikaText)) {
             $tikaText = $this->textCleaner->clean($tikaText);
-            $isPdf = $this->isPdfMime($mime) || $ext === 'pdf';
-            
+            $isPdf = $this->isPdfMime($mime) || 'pdf' === $ext;
+
             // Check quality for PDFs
-            $lowQuality = $isPdf 
+            $lowQuality = $isPdf
                 ? $this->textCleaner->isLowQuality($tikaText, $this->tikaMinLength, $this->tikaMinEntropy)
                 : false;
 
             if (mb_strlen(trim($tikaText)) > 0 && !$lowQuality) {
                 $this->logger->info('FileProcessor: Tika extraction success', [
                     'strategy' => 'tika',
-                    'bytes' => strlen($tikaText)
+                    'bytes' => strlen($tikaText),
                 ]);
 
                 return [$tikaText, ['strategy' => 'tika'] + $meta + $tikaMeta];
@@ -151,24 +154,27 @@ class FileProcessor
             // Low-quality Tika output for PDF -> fallback to vision
             if ($isPdf) {
                 $this->logger->info('FileProcessor: Tika quality too low, trying vision fallback');
+
                 return $this->extractFromPdfViaVision($absolutePath, $userId, $meta);
             }
         }
 
         // Tika failed or produced unusable output
         $this->logger->warning('FileProcessor: Extraction failed', ['strategy' => 'tika_failed'] + $meta);
+
         return ['', ['strategy' => 'tika_failed'] + $meta];
     }
 
     /**
-     * Extract text from PDF using rasterization + Vision AI
+     * Extract text from PDF using rasterization + Vision AI.
      */
     private function extractFromPdfViaVision(string $absolutePath, ?int $userId, array $baseMeta): array
     {
         $images = $this->rasterizer->pdfToPng($absolutePath);
-        
+
         if (empty($images)) {
             $this->logger->warning('FileProcessor: PDF rasterization failed');
+
             return ['', ['strategy' => 'rasterize_failed'] + $baseMeta];
         }
 
@@ -181,7 +187,7 @@ class FileProcessor
             $this->logger->info('FileProcessor: Vision extraction success', [
                 'strategy' => 'rasterize_vision',
                 'pages' => count($images),
-                'bytes' => strlen($fullText)
+                'bytes' => strlen($fullText),
             ]);
 
             return [$fullText, [
@@ -195,7 +201,7 @@ class FileProcessor
     }
 
     /**
-     * Extract text from image using Vision AI
+     * Extract text from image using Vision AI.
      */
     private function extractFromImage(string $relativePath, ?int $userId, array $baseMeta): array
     {
@@ -204,33 +210,34 @@ class FileProcessor
         try {
             // Use Vision AI provider
             $prompt = 'Extract all visible text from this image. '
-                . 'Return only the text exactly as it appears, preserving line breaks. '
-                . 'Do not add descriptions or commentary. '
-                . 'If no text is present, return empty string.';
+                .'Return only the text exactly as it appears, preserving line breaks. '
+                .'Do not add descriptions or commentary. '
+                .'If no text is present, return empty string.';
             $result = $this->aiFacade->analyzeImage($relativePath, $prompt, $userId);
-            
+
             $text = $result['content'] ?? '';
             $text = $this->textCleaner->clean($text);
-            if (stripos($text, 'test image description:') === 0) {
+            if (0 === stripos($text, 'test image description:')) {
                 $text = preg_replace('/^test image description:\s*/i', '', $text);
             }
 
             $this->logger->info('FileProcessor: Vision AI extraction', [
                 'strategy' => 'vision_ai',
-                'bytes' => strlen($text)
+                'bytes' => strlen($text),
             ]);
 
             return [$text, ['strategy' => 'vision_ai', 'provider' => $result['provider'] ?? 'unknown'] + $baseMeta];
         } catch (\Throwable $e) {
             $this->logger->error('FileProcessor: Vision AI failed', [
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ]);
+
             return ['', ['strategy' => 'vision_failed', 'error' => $e->getMessage()] + $baseMeta];
         }
     }
 
     /**
-     * Aggregate Vision AI results from multiple images (PDF pages)
+     * Aggregate Vision AI results from multiple images (PDF pages).
      */
     private function aggregateVisionResults(array $imagePaths, ?int $userId): string
     {
@@ -238,12 +245,12 @@ class FileProcessor
 
         foreach ($imagePaths as $imgPath) {
             $relativePath = $this->absoluteToRelative($imgPath);
-            
+
             try {
                 $prompt = 'Extract every piece of written text from this PDF page. '
-                    . 'Return only the text exactly as it appears, preserving line breaks. '
-                    . 'Do not provide any descriptions. '
-                    . 'If no text is present, return an empty string.';
+                    .'Return only the text exactly as it appears, preserving line breaks. '
+                    .'Do not provide any descriptions. '
+                    .'If no text is present, return an empty string.';
                 $result = $this->aiFacade->analyzeImage($relativePath, $prompt, $userId);
                 $text = $result['content'] ?? '';
 
@@ -258,7 +265,7 @@ class FileProcessor
             } catch (\Throwable $e) {
                 $this->logger->warning('FileProcessor: Vision AI failed for page', [
                     'image' => basename($imgPath),
-                    'error' => $e->getMessage()
+                    'error' => $e->getMessage(),
                 ]);
             }
         }
@@ -267,13 +274,13 @@ class FileProcessor
     }
 
     /**
-     * Resolve absolute file path from relative path
+     * Resolve absolute file path from relative path.
      */
     private function resolveAbsolutePath(string $relativePath): string
     {
-        $uploadBase = rtrim($this->uploadDir, '/') . '/';
+        $uploadBase = rtrim($this->uploadDir, '/').'/';
         $candidates = [
-            $uploadBase . $relativePath,
+            $uploadBase.$relativePath,
             $relativePath, // Already absolute?
         ];
 
@@ -285,19 +292,19 @@ class FileProcessor
 
         $this->logger->warning('FileProcessor: File not found', [
             'relative' => $relativePath,
-            'tried' => $candidates
+            'tried' => $candidates,
         ]);
 
         return $candidates[0]; // Return first candidate even if not found
     }
 
     /**
-     * Convert absolute path to relative (from upload dir)
+     * Convert absolute path to relative (from upload dir).
      */
     private function absoluteToRelative(string $absolutePath): string
     {
-        $uploadBase = rtrim($this->uploadDir, '/') . '/';
-        
+        $uploadBase = rtrim($this->uploadDir, '/').'/';
+
         if (str_starts_with($absolutePath, $uploadBase)) {
             return substr($absolutePath, strlen($uploadBase));
         }
@@ -306,7 +313,7 @@ class FileProcessor
     }
 
     /**
-     * Check if MIME type is plain text
+     * Check if MIME type is plain text.
      */
     private function isPlainTextMime(string $mime): bool
     {
@@ -314,7 +321,7 @@ class FileProcessor
     }
 
     /**
-     * Check if MIME type is PDF
+     * Check if MIME type is PDF.
      */
     private function isPdfMime(string $mime): bool
     {
@@ -322,7 +329,7 @@ class FileProcessor
     }
 
     /**
-     * Check if MIME type is image
+     * Check if MIME type is image.
      */
     private function isImageMime(string $mime): bool
     {
@@ -331,12 +338,12 @@ class FileProcessor
 
     /**
      * Ensure correct MIME type for Office documents
-     * (Some environments report XLSX/DOCX as application/zip)
+     * (Some environments report XLSX/DOCX as application/zip).
      */
     private function ensureOfficeMime(string $mime, string $ext): string
     {
         if (isset(self::OFFICE_EXT_TO_MIME[$ext])) {
-            if (empty($mime) || $mime === 'application/zip' || $mime === 'application/octet-stream') {
+            if (empty($mime) || 'application/zip' === $mime || 'application/octet-stream' === $mime) {
                 return self::OFFICE_EXT_TO_MIME[$ext];
             }
         }
@@ -345,7 +352,7 @@ class FileProcessor
     }
 
     /**
-     * Check if file extension is audio/video
+     * Check if file extension is audio/video.
      */
     private function isAudioExtension(string $ext): bool
     {
@@ -353,12 +360,13 @@ class FileProcessor
     }
 
     /**
-     * Extract text from audio/video file using Whisper.cpp
+     * Extract text from audio/video file using Whisper.cpp.
      */
     private function extractFromAudio(string $absolutePath, array $baseMeta): array
     {
         if (!$this->whisperService->isAvailable()) {
             $this->logger->warning('FileProcessor: Whisper not available', $baseMeta);
+
             return ['', ['strategy' => 'whisper_unavailable'] + $baseMeta];
         }
 
@@ -366,7 +374,7 @@ class FileProcessor
 
         try {
             $result = $this->whisperService->transcribe($absolutePath);
-            
+
             $text = $result['text'] ?? '';
             $text = $this->textCleaner->clean($text);
 
@@ -374,22 +382,21 @@ class FileProcessor
                 'strategy' => 'whisper',
                 'bytes' => strlen($text),
                 'language' => $result['language'] ?? 'unknown',
-                'duration' => $result['duration'] ?? 0
+                'duration' => $result['duration'] ?? 0,
             ]);
 
             return [$text, [
                 'strategy' => 'whisper',
                 'language' => $result['language'] ?? 'unknown',
                 'duration' => $result['duration'] ?? 0,
-                'model' => $result['model'] ?? 'base'
+                'model' => $result['model'] ?? 'base',
             ] + $baseMeta];
-
         } catch (\Throwable $e) {
             $this->logger->error('FileProcessor: Whisper transcription failed', [
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ] + $baseMeta);
+
             return ['', ['strategy' => 'whisper_failed', 'error' => $e->getMessage()] + $baseMeta];
         }
     }
 }
-

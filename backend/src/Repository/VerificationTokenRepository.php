@@ -2,8 +2,8 @@
 
 namespace App\Repository;
 
-use App\Entity\VerificationToken;
 use App\Entity\User;
+use App\Entity\VerificationToken;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
 
@@ -62,4 +62,3 @@ class VerificationTokenRepository extends ServiceEntityRepository
             ->execute();
     }
 }
-

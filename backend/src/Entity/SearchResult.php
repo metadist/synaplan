@@ -6,7 +6,7 @@ use App\Repository\SearchResultRepository;
 use Doctrine\ORM\Mapping as ORM;
 
 /**
- * Entity to store web search results for messages
+ * Entity to store web search results for messages.
  */
 #[ORM\Entity(repositoryClass: SearchResultRepository::class)]
 #[ORM\Table(name: 'BSEARCHRESULTS')]
@@ -71,6 +71,7 @@ class SearchResult
     public function setMessage(Message $message): self
     {
         $this->message = $message;
+
         return $this;
     }
 
@@ -82,6 +83,7 @@ class SearchResult
     public function setQuery(string $query): self
     {
         $this->query = $query;
+
         return $this;
     }
 
@@ -93,6 +95,7 @@ class SearchResult
     public function setTitle(string $title): self
     {
         $this->title = $title;
+
         return $this;
     }
 
@@ -104,6 +107,7 @@ class SearchResult
     public function setUrl(string $url): self
     {
         $this->url = $url;
+
         return $this;
     }
 
@@ -115,6 +119,7 @@ class SearchResult
     public function setDescription(?string $description): self
     {
         $this->description = $description;
+
         return $this;
     }
 
@@ -126,6 +131,7 @@ class SearchResult
     public function setPublished(?string $published): self
     {
         $this->published = $published;
+
         return $this;
     }
 
@@ -137,6 +143,7 @@ class SearchResult
     public function setSource(?string $source): self
     {
         $this->source = $source;
+
         return $this;
     }
 
@@ -148,6 +155,7 @@ class SearchResult
     public function setThumbnail(?string $thumbnail): self
     {
         $this->thumbnail = $thumbnail;
+
         return $this;
     }
 
@@ -159,6 +167,7 @@ class SearchResult
     public function setPosition(int $position): self
     {
         $this->position = $position;
+
         return $this;
     }
 
@@ -170,6 +179,7 @@ class SearchResult
     public function setExtraSnippets(?array $extraSnippets): self
     {
         $this->extraSnippets = $extraSnippets;
+
         return $this;
     }
 
@@ -181,11 +191,12 @@ class SearchResult
     public function setCreatedAt(\DateTimeInterface $createdAt): self
     {
         $this->createdAt = $createdAt;
+
         return $this;
     }
 
     /**
-     * Convert to array for JSON serialization
+     * Convert to array for JSON serialization.
      */
     public function toArray(): array
     {
@@ -203,4 +214,3 @@ class SearchResult
         ];
     }
 }
-

@@ -2,11 +2,11 @@
 
 namespace App\Tests\Unit;
 
-use App\Service\MessageEnqueueService;
 use App\Entity\Message;
 use App\Entity\User;
 use App\Message\ProcessMessageCommand;
 use App\Repository\MessageRepository;
+use App\Service\MessageEnqueueService;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
@@ -46,7 +46,7 @@ class MessageEnqueueServiceTest extends TestCase
         // Mock persist to set ID on message
         $this->em->expects($this->once())
             ->method('persist')
-            ->willReturnCallback(function($message) {
+            ->willReturnCallback(function ($message) {
                 $reflection = new \ReflectionClass($message);
                 $property = $reflection->getProperty('id');
                 $property->setAccessible(true);
@@ -83,7 +83,7 @@ class MessageEnqueueServiceTest extends TestCase
 
         $this->em->expects($this->once())
             ->method('persist')
-            ->willReturnCallback(function($message) {
+            ->willReturnCallback(function ($message) {
                 $reflection = new \ReflectionClass($message);
                 $property = $reflection->getProperty('id');
                 $property->setAccessible(true);
@@ -117,7 +117,7 @@ class MessageEnqueueServiceTest extends TestCase
         $capturedMessage = null;
         $this->em->expects($this->once())
             ->method('persist')
-            ->willReturnCallback(function($message) use (&$capturedMessage) {
+            ->willReturnCallback(function ($message) use (&$capturedMessage) {
                 $capturedMessage = $message;
                 $reflection = new \ReflectionClass($message);
                 $property = $reflection->getProperty('id');
@@ -163,7 +163,7 @@ class MessageEnqueueServiceTest extends TestCase
             ->with([
                 'userId' => 1,
                 'trackingId' => 123456,
-                'direction' => 'OUT'
+                'direction' => 'OUT',
             ])
             ->willReturn($responseMessage);
 
@@ -233,16 +233,17 @@ class MessageEnqueueServiceTest extends TestCase
         $options = ['reasoning' => true];
 
         $capturedCommand = null;
-        
+
         $this->messageBus->expects($this->once())
             ->method('dispatch')
-            ->willReturnCallback(function($command) use (&$capturedCommand) {
+            ->willReturnCallback(function ($command) use (&$capturedCommand) {
                 $capturedCommand = $command;
+
                 return new Envelope($command);
             });
 
         $this->em->method('persist')
-            ->willReturnCallback(function($message) {
+            ->willReturnCallback(function ($message) {
                 $reflection = new \ReflectionClass($message);
                 $property = $reflection->getProperty('id');
                 $property->setAccessible(true);
@@ -255,4 +256,3 @@ class MessageEnqueueServiceTest extends TestCase
         $this->assertInstanceOf(ProcessMessageCommand::class, $capturedCommand);
     }
 }
-

@@ -2,6 +2,17 @@
  * AI Model Types
  */
 
+export type Capability =
+  | 'SORT'
+  | 'CHAT'
+  | 'VECTORIZE'
+  | 'PIC2TEXT'
+  | 'TEXT2PIC'
+  | 'TEXT2VID'
+  | 'SOUND2TEXT'
+  | 'TEXT2SOUND'
+  | 'ANALYZE'
+
 export interface AIModel {
   id: number
   service: string
@@ -10,9 +21,12 @@ export interface AIModel {
   providerId: string
   quality: number
   rating: number
-  priceIn: number
-  priceOut: number
-  selectable: boolean
+  priceIn?: number | null  // Not returned by backend getModels
+  priceOut?: number | null  // Not returned by backend getModels
+  selectable?: boolean  // Not returned by backend getModels
+  description: string | null
+  isSystemModel: boolean
+  features: string[]
 }
 
 export interface AgainData {

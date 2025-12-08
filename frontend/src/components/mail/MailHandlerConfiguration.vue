@@ -720,7 +720,7 @@ import {
   PaperAirplaneIcon,
   FunnelIcon
 } from '@heroicons/vue/24/outline'
-import type { MailConfig, Department, SavedMailHandler } from '@/mocks/mail'
+import type { MailConfig, Department, SavedMailHandler } from '@/services/api/inboundEmailHandlersApi'
 import {
   defaultMailConfig,
   protocolOptions,

@@ -18,7 +18,7 @@ RUN apt-get update && apt-get install -y \
     libc-client-dev libkrb5-dev \
     && rm -rf /var/lib/apt/lists/*
 
-WORKDIR /var/www/html
+WORKDIR /var/www/backend
 
 # Install whisper.cpp
 RUN cd /tmp && \
@@ -54,14 +54,20 @@ COPY backend/ .
 RUN composer install --prefer-dist --no-interaction --optimize-autoloader --no-scripts --ignore-platform-req=ext-redis
 
 # Set proper permissions for www-data (uid:gid = 33:33)
-RUN mkdir -p /var/www/html/var/cache /var/www/html/var/log /var/www/html/var/uploads /var/www/html/public/up && \
-    chown -R www-data:www-data /var/www/html/var /var/www/html/vendor /var/www/html/public/up && \
-    chmod -R 775 /var/www/html/var /var/www/html/public/up
+RUN mkdir -p /var/www/backend/var/cache /var/www/backend/var/log /var/www/backend/var/uploads /var/www/backend/var/whisper /var/www/backend/public/up && \
+    chown -R www-data:www-data /var/www/backend/var /var/www/backend/vendor /var/www/backend/public/up && \
+    chmod -R 775 /var/www/backend/var /var/www/backend/public/up
 
 # Copy and setup entrypoint scripts
 COPY _docker/backend/docker-entrypoint.sh /usr/local/bin/
 COPY _docker/backend/init-env.sh /usr/local/bin/
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh /usr/local/bin/init-env.sh
+
+# Copy built frontend (built externally in CI, empty in dev)
+COPY frontend/dist /var/www/frontend
+
+# Copy Caddyfile for production routing (API vs SPA)
+COPY _docker/backend/Caddyfile /etc/caddy/Caddyfile
 
 EXPOSE 80
 

@@ -2,8 +2,8 @@
 
 namespace App\Repository;
 
-use App\Entity\SearchResult;
 use App\Entity\Message;
+use App\Entity\SearchResult;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
 
@@ -18,7 +18,7 @@ class SearchResultRepository extends ServiceEntityRepository
     }
 
     /**
-     * Get all search results for a message
+     * Get all search results for a message.
      *
      * @return SearchResult[]
      */
@@ -33,12 +33,10 @@ class SearchResultRepository extends ServiceEntityRepository
     }
 
     /**
-     * Save search results for a message
+     * Save search results for a message.
      *
-     * @param Message $message
-     * @param array $searchResults Parsed search results from BraveSearchService
-     * @param string $query The search query
-     * @return void
+     * @param array  $searchResults Parsed search results from BraveSearchService
+     * @param string $query         The search query
      */
     public function saveSearchResults(Message $message, array $searchResults, string $query): void
     {
@@ -72,4 +70,3 @@ class SearchResultRepository extends ServiceEntityRepository
         $em->flush();
     }
 }
-

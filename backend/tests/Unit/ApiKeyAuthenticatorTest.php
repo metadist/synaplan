@@ -3,7 +3,6 @@
 namespace App\Tests\Unit;
 
 use App\Entity\ApiKey;
-use App\Entity\User;
 use App\Repository\ApiKeyRepository;
 use App\Security\ApiKeyAuthenticator;
 use PHPUnit\Framework\TestCase;
@@ -153,4 +152,3 @@ class ApiKeyAuthenticatorTest extends TestCase
         $this->authenticator->authenticate($request);
     }
 }
-

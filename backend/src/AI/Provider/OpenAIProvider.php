@@ -2,23 +2,17 @@
 
 namespace App\AI\Provider;
 
+use App\AI\Exception\ProviderException;
 use App\AI\Interface\ChatProviderInterface;
 use App\AI\Interface\EmbeddingProviderInterface;
 use App\AI\Interface\ImageGenerationProviderInterface;
-use App\AI\Interface\VisionProviderInterface;
 use App\AI\Interface\SpeechToTextProviderInterface;
 use App\AI\Interface\TextToSpeechProviderInterface;
-use App\AI\Exception\ProviderException;
+use App\AI\Interface\VisionProviderInterface;
 use OpenAI;
 use Psr\Log\LoggerInterface;
 
-class OpenAIProvider implements 
-    ChatProviderInterface, 
-    EmbeddingProviderInterface,
-    ImageGenerationProviderInterface,
-    VisionProviderInterface,
-    SpeechToTextProviderInterface,
-    TextToSpeechProviderInterface
+class OpenAIProvider implements ChatProviderInterface, EmbeddingProviderInterface, ImageGenerationProviderInterface, VisionProviderInterface, SpeechToTextProviderInterface, TextToSpeechProviderInterface
 {
     private $client;
     private array $modelCapabilities = [];
@@ -26,10 +20,10 @@ class OpenAIProvider implements
     public function __construct(
         private LoggerInterface $logger,
         private ?string $apiKey = null,
-        private string $uploadDir = '/var/www/html/var/uploads'
+        private string $uploadDir = '/var/www/backend/var/uploads',
     ) {
         if (!empty($apiKey)) {
-            $this->client = OpenAI::client($apiKey);
+            $this->client = \OpenAI::client($apiKey);
         }
     }
 
@@ -77,7 +71,7 @@ class OpenAIProvider implements
 
     public function isAvailable(): bool
     {
-        return !empty($this->apiKey) && $this->client !== null;
+        return !empty($this->apiKey) && null !== $this->client;
     }
 
     public function getRequiredEnvVars(): array
@@ -85,16 +79,17 @@ class OpenAIProvider implements
         return [
             'OPENAI_API_KEY' => [
                 'required' => true,
-                'hint' => 'Get your API key from https://platform.openai.com/'
-            ]
+                'hint' => 'Get your API key from https://platform.openai.com/',
+            ],
         ];
     }
 
     /**
      * Check if model uses max_completion_tokens instead of max_tokens
-     * Based on OpenAI API model capabilities (reasoning models use max_completion_tokens)
-     * 
+     * Based on OpenAI API model capabilities (reasoning models use max_completion_tokens).
+     *
      * @param string $model Model name
+     *
      * @return bool True if model uses max_completion_tokens
      */
     private function usesCompletionTokens(string $model): bool
@@ -107,30 +102,31 @@ class OpenAIProvider implements
         // Try to fetch model details from OpenAI API
         try {
             $modelInfo = $this->client->models()->retrieve($model);
-            
+
             // Check if model has reasoning capabilities or is o-series/gpt-5
             // Reasoning models (o1, o3, gpt-5) use max_completion_tokens
-            $isReasoningModel = isset($modelInfo->capabilities['reasoning']) || 
-                               str_starts_with($model, 'o1') || 
-                               str_starts_with($model, 'o3') ||
-                               str_starts_with($model, 'gpt-5');
-            
+            $isReasoningModel = isset($modelInfo->capabilities['reasoning'])
+                               || str_starts_with($model, 'o1')
+                               || str_starts_with($model, 'o3')
+                               || str_starts_with($model, 'gpt-5');
+
             $this->modelCapabilities[$model] = $isReasoningModel;
+
             return $isReasoningModel;
-            
         } catch (\Exception $e) {
             // If API call fails, use heuristic fallback
             $this->logger->warning('Failed to fetch model capabilities from OpenAI, using heuristic', [
                 'model' => $model,
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ]);
-            
+
             // Heuristic: o-series and gpt-5 models use max_completion_tokens
-            $usesCompletionTokens = str_starts_with($model, 'o1') || 
-                                   str_starts_with($model, 'o3') ||
-                                   str_starts_with($model, 'gpt-5');
-            
+            $usesCompletionTokens = str_starts_with($model, 'o1')
+                                   || str_starts_with($model, 'o3')
+                                   || str_starts_with($model, 'gpt-5');
+
             $this->modelCapabilities[$model] = $usesCompletionTokens;
+
             return $usesCompletionTokens;
         }
     }
@@ -150,9 +146,9 @@ class OpenAIProvider implements
         try {
             $reasoning = $options['reasoning'] ?? false;
             $model = $options['model'];
-            
+
             $usesCompletionTokensParam = $this->usesCompletionTokens($model);
-            
+
             $requestOptions = [
                 'model' => $model,
                 'messages' => $messages,
@@ -184,15 +180,12 @@ class OpenAIProvider implements
 
             $this->logger->info('OpenAI: Chat completed', [
                 'model' => $options['model'],
-                'usage' => $usage
+                'usage' => $usage,
             ]);
 
             return $response['choices'][0]['message']['content'] ?? '';
         } catch (\Exception $e) {
-            throw new ProviderException(
-                'OpenAI chat error: ' . $e->getMessage(),
-                'openai'
-            );
+            throw new ProviderException('OpenAI chat error: '.$e->getMessage(), 'openai');
         }
     }
 
@@ -209,9 +202,9 @@ class OpenAIProvider implements
         try {
             $reasoning = $options['reasoning'] ?? false;
             $model = $options['model'];
-            
+
             $usesCompletionTokensParam = $this->usesCompletionTokens($model);
-            
+
             $requestOptions = [
                 'model' => $model,
                 'messages' => $messages,
@@ -237,22 +230,22 @@ class OpenAIProvider implements
             $firstChunk = true;
             foreach ($stream as $response) {
                 $responseArray = $response->toArray();
-                
+
                 // Debug first chunk to see structure
                 if ($firstChunk && $reasoning) {
                     error_log('🧠 OpenAI reasoning stream - First chunk structure:');
-                    error_log('  Response keys: ' . implode(', ', array_keys($responseArray)));
-                    error_log('  Choices: ' . json_encode($responseArray['choices'] ?? null));
+                    error_log('  Response keys: '.implode(', ', array_keys($responseArray)));
+                    error_log('  Choices: '.json_encode($responseArray['choices'] ?? null));
                     if (isset($responseArray['choices'][0]['delta'])) {
-                        error_log('  Delta keys: ' . implode(', ', array_keys($responseArray['choices'][0]['delta'])));
-                        error_log('  Has reasoning_content: ' . (isset($responseArray['choices'][0]['delta']['reasoning_content']) ? 'YES' : 'NO'));
+                        error_log('  Delta keys: '.implode(', ', array_keys($responseArray['choices'][0]['delta'])));
+                        error_log('  Has reasoning_content: '.(isset($responseArray['choices'][0]['delta']['reasoning_content']) ? 'YES' : 'NO'));
                     }
                     $firstChunk = false;
                 }
 
                 // Handle reasoning content (o1, o3, gpt-5 models)
                 $reasoningContent = $responseArray['choices'][0]['delta']['reasoning_content'] ?? null;
-                if ($reasoningContent !== null) {
+                if (null !== $reasoningContent) {
                     $callback(['type' => 'reasoning', 'content' => $reasoningContent]);
                 }
 
@@ -263,10 +256,7 @@ class OpenAIProvider implements
                 }
             }
         } catch (\Exception $e) {
-            throw new ProviderException(
-                'OpenAI streaming error: ' . $e->getMessage(),
-                'openai'
-            );
+            throw new ProviderException('OpenAI streaming error: '.$e->getMessage(), 'openai');
         }
     }
 
@@ -290,10 +280,7 @@ class OpenAIProvider implements
 
             return $response['data'][0]['embedding'] ?? [];
         } catch (\Exception $e) {
-            throw new ProviderException(
-                'OpenAI embedding error: ' . $e->getMessage(),
-                'openai'
-            );
+            throw new ProviderException('OpenAI embedding error: '.$e->getMessage(), 'openai');
         }
     }
 
@@ -313,22 +300,19 @@ class OpenAIProvider implements
                 'input' => $texts,
             ]);
 
-            return array_map(fn($item) => $item['embedding'], $response['data']);
+            return array_map(fn ($item) => $item['embedding'], $response['data']);
         } catch (\Exception $e) {
-            throw new ProviderException(
-                'OpenAI batch embedding error: ' . $e->getMessage(),
-                'openai'
-            );
+            throw new ProviderException('OpenAI batch embedding error: '.$e->getMessage(), 'openai');
         }
     }
 
     public function getDimensions(string $model): int
     {
-        return match(true) {
+        return match (true) {
             str_contains($model, 'text-embedding-3-small') => 1536,
             str_contains($model, 'text-embedding-3-large') => 3072,
             str_contains($model, 'text-embedding-ada-002') => 1536,
-            default => 1536
+            default => 1536,
         };
     }
 
@@ -342,12 +326,12 @@ class OpenAIProvider implements
 
         try {
             $model = $options['model'] ?? 'dall-e-3';
-            
+
             // GPT-Image-1 uses Chat Completions API with special modalities
-            if ($model === 'gpt-image-1') {
+            if ('gpt-image-1' === $model) {
                 return $this->generateImageWithGptImage1($prompt, $options);
             }
-            
+
             // DALL-E models use Images API
             $requestOptions = [
                 'model' => $model,
@@ -357,14 +341,14 @@ class OpenAIProvider implements
             ];
 
             // DALL-E 3 specific options
-            if ($model === 'dall-e-3') {
+            if ('dall-e-3' === $model) {
                 $requestOptions['quality'] = $options['quality'] ?? 'standard'; // standard or hd
                 $requestOptions['style'] = $options['style'] ?? 'vivid'; // vivid or natural
             }
 
             $this->logger->info('OpenAI: Generating image', [
                 'model' => $model,
-                'prompt_length' => strlen($prompt)
+                'prompt_length' => strlen($prompt),
             ]);
 
             $response = $this->client->images()->create($requestOptions);
@@ -381,43 +365,37 @@ class OpenAIProvider implements
             return $images;
         } catch (\Exception $e) {
             // Check for content policy violations
-            if (stripos($e->getMessage(), 'content_policy') !== false || 
-                stripos($e->getMessage(), 'safety') !== false) {
-                throw new ProviderException(
-                    'Content policy violation: The prompt was rejected by OpenAI safety system',
-                    'openai',
-                    ['prompt' => substr($prompt, 0, 100)]
-                );
+            if (false !== stripos($e->getMessage(), 'content_policy')
+                || false !== stripos($e->getMessage(), 'safety')) {
+                throw new ProviderException('Content policy violation: The prompt was rejected by OpenAI safety system', 'openai', ['prompt' => substr($prompt, 0, 100)]);
             }
 
-            throw new ProviderException(
-                'OpenAI image generation error: ' . $e->getMessage(),
-                'openai'
-            );
+            throw new ProviderException('OpenAI image generation error: '.$e->getMessage(), 'openai');
         }
     }
-    
+
     /**
-     * Generate image using gpt-image-1 via Image Generations API
+     * Generate image using gpt-image-1 via Image Generations API.
+     *
      * @see https://platform.openai.com/docs/guides/image-generation?image-generation-model=gpt-image-1
      */
     private function generateImageWithGptImage1(string $prompt, array $options = []): array
     {
         try {
             $this->logger->info('OpenAI: Generating image with gpt-image-1', [
-                'prompt_length' => strlen($prompt)
+                'prompt_length' => strlen($prompt),
             ]);
-            
+
             $requestBody = [
                 'model' => 'gpt-image-1',
                 'prompt' => $prompt,
                 'n' => $options['n'] ?? 1,
                 'size' => $options['size'] ?? '1024x1024',
             ];
-            
+
             if (isset($options['quality'])) {
                 $quality = $options['quality'];
-                
+
                 // Map legacy values to supported ones
                 $qualityMap = [
                     'standard' => 'medium',
@@ -426,90 +404,84 @@ class OpenAIProvider implements
                 if (isset($qualityMap[strtolower((string) $quality)])) {
                     $quality = $qualityMap[strtolower((string) $quality)];
                 }
-                
+
                 $quality = strtolower((string) $quality);
                 $allowedQualities = ['low', 'medium', 'high', 'auto'];
                 if (!in_array($quality, $allowedQualities, true)) {
                     $this->logger->warning('OpenAI gpt-image-1: Unsupported quality value, defaulting to high', [
-                        'provided' => $options['quality']
+                        'provided' => $options['quality'],
                     ]);
                     $quality = 'high';
                 }
-                
+
                 $requestBody['quality'] = $quality;
             }
             if (isset($options['background'])) {
                 $requestBody['background'] = $options['background'];
             }
-            
+
             $ch = curl_init('https://api.openai.com/v1/images/generations');
             curl_setopt_array($ch, [
                 CURLOPT_RETURNTRANSFER => true,
                 CURLOPT_POST => true,
                 CURLOPT_HTTPHEADER => [
                     'Content-Type: application/json',
-                    'Authorization: Bearer ' . $this->apiKey,
+                    'Authorization: Bearer '.$this->apiKey,
                 ],
                 CURLOPT_POSTFIELDS => json_encode($requestBody),
                 CURLOPT_TIMEOUT => 120,
             ]);
-            
+
             $responseBody = curl_exec($ch);
             $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
             $curlError = curl_error($ch);
             curl_close($ch);
-            
+
             if ($curlError) {
-                throw new \Exception('cURL error: ' . $curlError);
+                throw new \Exception('cURL error: '.$curlError);
             }
-            
-            if ($httpCode !== 200) {
+
+            if (200 !== $httpCode) {
                 $this->logger->error('OpenAI gpt-image-1: HTTP error', [
                     'http_code' => $httpCode,
-                    'response' => substr((string) $responseBody, 0, 500)
+                    'response' => substr((string) $responseBody, 0, 500),
                 ]);
-                throw new \Exception('HTTP ' . $httpCode . ': ' . $responseBody);
+                throw new \Exception('HTTP '.$httpCode.': '.$responseBody);
             }
-            
+
             $response = json_decode((string) $responseBody, true);
             if (!$response || !isset($response['data'])) {
                 throw new \Exception('Failed to parse JSON response');
             }
-            
+
             $images = [];
             foreach ($response['data'] as $item) {
                 $base64 = $item['b64_json'] ?? null;
                 $url = $item['url'] ?? null;
-                
+
                 if (!$url && $base64) {
-                    $url = 'data:image/png;base64,' . $base64;
+                    $url = 'data:image/png;base64,'.$base64;
                 }
-                
+
                 $images[] = [
                     'url' => $url,
                     'b64_json' => $base64,
                     'revised_prompt' => $item['revised_prompt'] ?? null,
                 ];
             }
-            
+
             if (empty($images)) {
                 $this->logger->error('OpenAI gpt-image-1: No images in response', [
-                    'response' => $responseBody
+                    'response' => $responseBody,
                 ]);
-                throw new ProviderException(
-                    'gpt-image-1 returned no images. Response format may have changed.',
-                    'openai'
-                );
+                throw new ProviderException('gpt-image-1 returned no images. Response format may have changed.', 'openai');
             }
-            
+
             return $images;
         } catch (ProviderException $e) {
             throw $e;
         } catch (\Exception $e) {
-            throw new ProviderException(
-                'OpenAI gpt-image-1 error: ' . $e->getMessage(),
-                'openai'
-            );
+            throw new ProviderException('OpenAI gpt-image-1 error: '.$e->getMessage(), 'openai');
         }
     }
 
@@ -522,7 +494,7 @@ class OpenAIProvider implements
         try {
             // Convert URL to file resource
             $imageContent = file_get_contents($imageUrl);
-            if ($imageContent === false) {
+            if (false === $imageContent) {
                 throw new \Exception('Failed to download image from URL');
             }
 
@@ -548,10 +520,7 @@ class OpenAIProvider implements
 
             return $variations;
         } catch (\Exception $e) {
-            throw new ProviderException(
-                'OpenAI image variations error: ' . $e->getMessage(),
-                'openai'
-            );
+            throw new ProviderException('OpenAI image variations error: '.$e->getMessage(), 'openai');
         }
     }
 
@@ -565,8 +534,8 @@ class OpenAIProvider implements
             // Download images
             $imageContent = file_get_contents($imageUrl);
             $maskContent = file_get_contents($maskUrl);
-            
-            if ($imageContent === false || $maskContent === false) {
+
+            if (false === $imageContent || false === $maskContent) {
                 throw new \Exception('Failed to download image or mask');
             }
 
@@ -591,10 +560,7 @@ class OpenAIProvider implements
 
             return $response['data'][0]['url'] ?? '';
         } catch (\Exception $e) {
-            throw new ProviderException(
-                'OpenAI image edit error: ' . $e->getMessage(),
-                'openai'
-            );
+            throw new ProviderException('OpenAI image edit error: '.$e->getMessage(), 'openai');
         }
     }
 
@@ -604,6 +570,7 @@ class OpenAIProvider implements
     {
         // Use analyzeImage internally
         $defaultPrompt = 'Describe what you see in this image in detail.';
+
         return $this->analyzeImage($imageUrl, $prompt ?: $defaultPrompt, $options);
     }
 
@@ -620,11 +587,11 @@ class OpenAIProvider implements
 
         try {
             // Build full paths
-            $fullPath1 = $this->uploadDir . '/' . ltrim($imageUrl1, '/');
-            $fullPath2 = $this->uploadDir . '/' . ltrim($imageUrl2, '/');
-            
+            $fullPath1 = $this->uploadDir.'/'.ltrim($imageUrl1, '/');
+            $fullPath2 = $this->uploadDir.'/'.ltrim($imageUrl2, '/');
+
             if (!file_exists($fullPath1) || !file_exists($fullPath2)) {
-                throw new \Exception("One or both images not found");
+                throw new \Exception('One or both images not found');
             }
 
             // Read images and convert to base64
@@ -642,37 +609,34 @@ class OpenAIProvider implements
                     'content' => [
                         [
                             'type' => 'text',
-                            'text' => 'Compare these two images and describe the similarities and differences.'
+                            'text' => 'Compare these two images and describe the similarities and differences.',
                         ],
                         [
                             'type' => 'image_url',
                             'image_url' => [
-                                'url' => "data:{$mimeType1};base64,{$base64Image1}"
-                            ]
+                                'url' => "data:{$mimeType1};base64,{$base64Image1}",
+                            ],
                         ],
                         [
                             'type' => 'image_url',
                             'image_url' => [
-                                'url' => "data:{$mimeType2};base64,{$base64Image2}"
-                            ]
-                        ]
-                    ]
+                                'url' => "data:{$mimeType2};base64,{$base64Image2}",
+                            ],
+                        ],
+                    ],
                 ]],
                 'max_tokens' => 1000,
             ]);
 
             $comparison = $response['choices'][0]['message']['content'] ?? '';
-            
+
             return [
                 'comparison' => $comparison,
                 'image1' => basename($imageUrl1),
                 'image2' => basename($imageUrl2),
             ];
         } catch (\Exception $e) {
-            throw new ProviderException(
-                'OpenAI image comparison error: ' . $e->getMessage(),
-                'openai'
-            );
+            throw new ProviderException('OpenAI image comparison error: '.$e->getMessage(), 'openai');
         }
     }
 
@@ -684,10 +648,10 @@ class OpenAIProvider implements
 
         try {
             $model = $options['model'] ?? 'gpt-4o';
-            
+
             // Build full path
-            $fullPath = $this->uploadDir . '/' . ltrim($imagePath, '/');
-            
+            $fullPath = $this->uploadDir.'/'.ltrim($imagePath, '/');
+
             // Check if file exists
             if (!file_exists($fullPath)) {
                 throw new \Exception("Image file not found: {$fullPath}");
@@ -701,7 +665,7 @@ class OpenAIProvider implements
             $this->logger->info('OpenAI: Analyzing image', [
                 'model' => $model,
                 'image' => basename($imagePath),
-                'prompt_length' => strlen($prompt)
+                'prompt_length' => strlen($prompt),
             ]);
 
             $response = $this->client->chat()->create([
@@ -711,25 +675,22 @@ class OpenAIProvider implements
                     'content' => [
                         [
                             'type' => 'text',
-                            'text' => $prompt
+                            'text' => $prompt,
                         ],
                         [
                             'type' => 'image_url',
                             'image_url' => [
-                                'url' => "data:{$mimeType};base64,{$base64Image}"
-                            ]
-                        ]
-                    ]
+                                'url' => "data:{$mimeType};base64,{$base64Image}",
+                            ],
+                        ],
+                    ],
                 ]],
                 'max_tokens' => $options['max_tokens'] ?? 1000,
             ]);
 
             return $response['choices'][0]['message']['content'] ?? '';
         } catch (\Exception $e) {
-            throw new ProviderException(
-                'OpenAI vision error: ' . $e->getMessage(),
-                'openai'
-            );
+            throw new ProviderException('OpenAI vision error: '.$e->getMessage(), 'openai');
         }
     }
 
@@ -743,17 +704,17 @@ class OpenAIProvider implements
 
         try {
             $model = $options['model'] ?? 'whisper-1';
-            
+
             // Build full path
-            $fullPath = $this->uploadDir . '/' . ltrim($audioPath, '/');
-            
+            $fullPath = $this->uploadDir.'/'.ltrim($audioPath, '/');
+
             if (!file_exists($fullPath)) {
                 throw new \Exception("Audio file not found: {$fullPath}");
             }
 
             $this->logger->info('OpenAI: Transcribing audio', [
                 'model' => $model,
-                'file' => basename($audioPath)
+                'file' => basename($audioPath),
             ]);
 
             $response = $this->client->audio()->transcribe([
@@ -770,10 +731,7 @@ class OpenAIProvider implements
                 'segments' => $response['segments'] ?? [],
             ];
         } catch (\Exception $e) {
-            throw new ProviderException(
-                'OpenAI transcription error: ' . $e->getMessage(),
-                'openai'
-            );
+            throw new ProviderException('OpenAI transcription error: '.$e->getMessage(), 'openai');
         }
     }
 
@@ -784,15 +742,15 @@ class OpenAIProvider implements
         }
 
         try {
-            $fullPath = $this->uploadDir . '/' . ltrim($audioPath, '/');
-            
+            $fullPath = $this->uploadDir.'/'.ltrim($audioPath, '/');
+
             if (!file_exists($fullPath)) {
                 throw new \Exception("Audio file not found: {$fullPath}");
             }
 
             $this->logger->info('OpenAI: Translating audio', [
                 'file' => basename($audioPath),
-                'target_lang' => $targetLang
+                'target_lang' => $targetLang,
             ]);
 
             // Whisper's translate endpoint translates to English only
@@ -803,10 +761,7 @@ class OpenAIProvider implements
 
             return $response['text'] ?? '';
         } catch (\Exception $e) {
-            throw new ProviderException(
-                'OpenAI audio translation error: ' . $e->getMessage(),
-                'openai'
-            );
+            throw new ProviderException('OpenAI audio translation error: '.$e->getMessage(), 'openai');
         }
     }
 
@@ -821,11 +776,11 @@ class OpenAIProvider implements
         try {
             $model = $options['model'] ?? 'tts-1';
             $voice = $options['voice'] ?? 'alloy'; // alloy, echo, fable, onyx, nova, shimmer
-            
+
             $this->logger->info('OpenAI: Synthesizing speech', [
                 'model' => $model,
                 'voice' => $voice,
-                'text_length' => strlen($text)
+                'text_length' => strlen($text),
             ]);
 
             $response = $this->client->audio()->speech([
@@ -837,25 +792,22 @@ class OpenAIProvider implements
             ]);
 
             // Save to temporary file
-            $filename = 'tts_' . uniqid() . '.mp3';
-            $outputPath = $this->uploadDir . '/' . $filename;
-            
+            $filename = 'tts_'.uniqid().'.mp3';
+            $outputPath = $this->uploadDir.'/'.$filename;
+
             if (!is_dir($this->uploadDir) && !mkdir($this->uploadDir, 0775, true) && !is_dir($this->uploadDir)) {
-                throw new \RuntimeException('Unable to create upload directory: ' . $this->uploadDir);
+                throw new \RuntimeException('Unable to create upload directory: '.$this->uploadDir);
             }
-            
+
             if (!is_writable($this->uploadDir)) {
-                throw new \RuntimeException('Upload directory is not writable: ' . $this->uploadDir);
+                throw new \RuntimeException('Upload directory is not writable: '.$this->uploadDir);
             }
 
             file_put_contents($outputPath, $response);
 
             return $filename;
         } catch (\Exception $e) {
-            throw new ProviderException(
-                'OpenAI TTS error: ' . $e->getMessage(),
-                'openai'
-            );
+            throw new ProviderException('OpenAI TTS error: '.$e->getMessage(), 'openai');
         }
     }
 

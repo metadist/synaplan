@@ -4,14 +4,14 @@ declare(strict_types=1);
 
 namespace App\Tests\Controller;
 
-use App\Entity\User;
 use App\Entity\Message;
+use App\Entity\User;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
  * Integration tests for MessageController
- * Tests all message-related endpoints
+ * Tests all message-related endpoints.
  */
 class MessageControllerTest extends WebTestCase
 {
@@ -22,9 +22,10 @@ class MessageControllerTest extends WebTestCase
 
     protected function setUp(): void
     {
+        self::ensureKernelShutdown();
         $this->client = static::createClient();
-        $this->em = static::getContainer()->get('doctrine')->getManager();
-        
+        $this->em = $this->client->getContainer()->get('doctrine')->getManager();
+
         // Create test user
         $this->user = new User();
         $this->user->setMail('test@example.com');
@@ -32,9 +33,13 @@ class MessageControllerTest extends WebTestCase
         $this->user->setUserLevel('PRO');
         $this->user->setProviderId('test-provider');
         $this->user->setCreated(date('YmdHis'));
-        
+
         $this->em->persist($this->user);
         $this->em->flush();
+
+        // Configure test user to use 'test' AI provider
+        $modelConfigService = $this->client->getContainer()->get(\App\Service\ModelConfigService::class);
+        $modelConfigService->setDefaultProvider($this->user->getId(), 'chat', 'test');
 
         // Generate JWT token for authentication
         $this->token = $this->generateJwtToken($this->user);
@@ -42,29 +47,48 @@ class MessageControllerTest extends WebTestCase
 
     protected function tearDown(): void
     {
-        // Cleanup: Remove test messages
+        // Cleanup: Remove test data
         if ($this->em && $this->user) {
+            $userId = $this->user->getId();
+
+            // Remove test messages
             $messages = $this->em->getRepository(Message::class)
-                ->findBy(['userId' => $this->user->getId()]);
-            
+                ->findBy(['userId' => $userId]);
             foreach ($messages as $message) {
                 $this->em->remove($message);
             }
-            
-            // Remove test user
+
+            // Remove UseLog entries (rate limit tracking)
+            $useLogs = $this->em->getRepository(\App\Entity\UseLog::class)
+                ->findBy(['userId' => $userId]);
+            foreach ($useLogs as $useLog) {
+                $this->em->remove($useLog);
+            }
+
+            // Remove Config entries (model preferences)
+            $configs = $this->em->getRepository(\App\Entity\Config::class)
+                ->findBy(['ownerId' => $userId]);
+            foreach ($configs as $config) {
+                $this->em->remove($config);
+            }
+
+            $this->em->flush();
+
+            // Now safe to remove test user
             $this->em->remove($this->user);
             $this->em->flush();
         }
-        
+
         // Ensure kernel is shutdown for next test
         static::ensureKernelShutdown();
-        
+
         parent::tearDown();
     }
 
     private function generateJwtToken(User $user): string
     {
-        $jwtManager = static::getContainer()->get('lexik_jwt_authentication.jwt_manager');
+        $jwtManager = $this->client->getContainer()->get('lexik_jwt_authentication.jwt_manager');
+
         return $jwtManager->create($user);
     }
 
@@ -91,13 +115,13 @@ class MessageControllerTest extends WebTestCase
             [],
             [
                 'CONTENT_TYPE' => 'application/json',
-                'HTTP_AUTHORIZATION' => 'Bearer ' . $this->token
+                'HTTP_AUTHORIZATION' => 'Bearer '.$this->token,
             ],
             json_encode(['message' => ''])
         );
 
         $this->assertResponseStatusCodeSame(Response::HTTP_BAD_REQUEST);
-        
+
         $response = json_decode($this->client->getResponse()->getContent(), true);
         $this->assertArrayHasKey('error', $response);
         $this->assertEquals('Message is required', $response['error']);
@@ -112,16 +136,16 @@ class MessageControllerTest extends WebTestCase
             [],
             [
                 'CONTENT_TYPE' => 'application/json',
-                'HTTP_AUTHORIZATION' => 'Bearer ' . $this->token
+                'HTTP_AUTHORIZATION' => 'Bearer '.$this->token,
             ],
             json_encode([
                 'message' => 'Hello, AI!',
-                'trackId' => time()
+                'trackId' => time(),
             ])
         );
 
         $this->assertResponseIsSuccessful();
-        
+
         $response = json_decode($this->client->getResponse()->getContent(), true);
         $this->assertArrayHasKey('success', $response);
         $this->assertTrue($response['success']);
@@ -140,7 +164,7 @@ class MessageControllerTest extends WebTestCase
     public function testGetHistorySuccess(): void
     {
         // Create some test messages
-        for ($i = 0; $i < 5; $i++) {
+        for ($i = 0; $i < 5; ++$i) {
             $message = new Message();
             $message->setUserId($this->user->getId());
             $message->setTrackingId(time() + $i);
@@ -151,10 +175,10 @@ class MessageControllerTest extends WebTestCase
             $message->setFile(0);
             $message->setTopic('CHAT');
             $message->setLanguage('en');
-            $message->setText('Test message ' . $i);
-            $message->setDirection($i % 2 === 0 ? 'IN' : 'OUT');
+            $message->setText('Test message '.$i);
+            $message->setDirection(0 === $i % 2 ? 'IN' : 'OUT');
             $message->setStatus('complete');
-            
+
             $this->em->persist($message);
         }
         $this->em->flush();
@@ -166,19 +190,21 @@ class MessageControllerTest extends WebTestCase
             [],
             [
                 'CONTENT_TYPE' => 'application/json',
-                'HTTP_AUTHORIZATION' => 'Bearer ' . $this->token
+                'HTTP_AUTHORIZATION' => 'Bearer '.$this->token,
             ]
         );
 
         $this->assertResponseIsSuccessful();
-        
+
         $response = json_decode($this->client->getResponse()->getContent(), true);
-        $this->assertIsArray($response);
-        $this->assertGreaterThanOrEqual(5, count($response));
-        
+        $this->assertArrayHasKey('success', $response);
+        $this->assertArrayHasKey('messages', $response);
+        $this->assertIsArray($response['messages']);
+        $this->assertGreaterThanOrEqual(5, count($response['messages']));
+
         // Check structure of first message
-        if (count($response) > 0) {
-            $firstMessage = $response[0];
+        if (count($response['messages']) > 0) {
+            $firstMessage = $response['messages'][0];
             $this->assertArrayHasKey('id', $firstMessage);
             $this->assertArrayHasKey('text', $firstMessage);
             $this->assertArrayHasKey('direction', $firstMessage);
@@ -189,7 +215,7 @@ class MessageControllerTest extends WebTestCase
     public function testGetHistoryWithTrackId(): void
     {
         $trackId = time() + 1000;
-        
+
         // Create messages with specific trackId
         $message1 = new Message();
         $message1->setUserId($this->user->getId());
@@ -204,7 +230,7 @@ class MessageControllerTest extends WebTestCase
         $message1->setText('Message with trackId');
         $message1->setDirection('IN');
         $message1->setStatus('complete');
-        
+
         $this->em->persist($message1);
         $this->em->flush();
 
@@ -215,17 +241,19 @@ class MessageControllerTest extends WebTestCase
             [],
             [
                 'CONTENT_TYPE' => 'application/json',
-                'HTTP_AUTHORIZATION' => 'Bearer ' . $this->token
+                'HTTP_AUTHORIZATION' => 'Bearer '.$this->token,
             ]
         );
 
         $this->assertResponseIsSuccessful();
-        
+
         $response = json_decode($this->client->getResponse()->getContent(), true);
-        $this->assertIsArray($response);
-        
+        $this->assertArrayHasKey('success', $response);
+        $this->assertArrayHasKey('messages', $response);
+        $this->assertIsArray($response['messages']);
+
         // All messages should have the same trackId
-        foreach ($response as $msg) {
+        foreach ($response['messages'] as $msg) {
             $this->assertEquals($trackId, $msg['trackId']);
         }
     }
@@ -253,7 +281,7 @@ class MessageControllerTest extends WebTestCase
             [],
             [
                 'CONTENT_TYPE' => 'application/json',
-                'HTTP_AUTHORIZATION' => 'Bearer ' . $this->token
+                'HTTP_AUTHORIZATION' => 'Bearer '.$this->token,
             ],
             json_encode(['text' => ''])
         );
@@ -270,11 +298,11 @@ class MessageControllerTest extends WebTestCase
             [],
             [
                 'CONTENT_TYPE' => 'application/json',
-                'HTTP_AUTHORIZATION' => 'Bearer ' . $this->token
+                'HTTP_AUTHORIZATION' => 'Bearer '.$this->token,
             ],
             json_encode([
                 'text' => 'make this better',
-                'mode' => 'improve'
+                'mode' => 'improve',
             ])
         );
 
@@ -283,7 +311,7 @@ class MessageControllerTest extends WebTestCase
         $this->assertContains($statusCode, [
             Response::HTTP_OK,
             Response::HTTP_SERVICE_UNAVAILABLE,
-            Response::HTTP_INTERNAL_SERVER_ERROR
+            Response::HTTP_INTERNAL_SERVER_ERROR,
         ]);
     }
 
@@ -310,7 +338,7 @@ class MessageControllerTest extends WebTestCase
             [],
             [
                 'CONTENT_TYPE' => 'application/json',
-                'HTTP_AUTHORIZATION' => 'Bearer ' . $this->token
+                'HTTP_AUTHORIZATION' => 'Bearer '.$this->token,
             ],
             json_encode([])
         );
@@ -343,7 +371,7 @@ class MessageControllerTest extends WebTestCase
             [],
             [
                 'CONTENT_TYPE' => 'application/json',
-                'HTTP_AUTHORIZATION' => 'Bearer ' . $this->token
+                'HTTP_AUTHORIZATION' => 'Bearer '.$this->token,
             ],
             json_encode(['message' => ''])
         );
@@ -360,19 +388,21 @@ class MessageControllerTest extends WebTestCase
             [],
             [
                 'CONTENT_TYPE' => 'application/json',
-                'HTTP_AUTHORIZATION' => 'Bearer ' . $this->token
+                'HTTP_AUTHORIZATION' => 'Bearer '.$this->token,
             ],
             json_encode([
                 'message' => 'Async message',
-                'trackId' => time()
+                'trackId' => time(),
             ])
         );
 
-        $this->assertResponseIsSuccessful();
-        
+        // Enqueue returns HTTP 202 Accepted
+        $this->assertResponseStatusCodeSame(Response::HTTP_ACCEPTED);
+
         $response = json_decode($this->client->getResponse()->getContent(), true);
-        $this->assertArrayHasKey('success', $response);
-        $this->assertTrue($response['success']);
-        $this->assertArrayHasKey('messageId', $response);
+        $this->assertArrayHasKey('message_id', $response);
+        $this->assertArrayHasKey('tracking_id', $response);
+        $this->assertArrayHasKey('status', $response);
+        $this->assertEquals('queued', $response['status']);
     }
 }

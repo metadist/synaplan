@@ -7,9 +7,9 @@ use Doctrine\Bundle\FixturesBundle\Fixture;
 use Doctrine\Persistence\ObjectManager;
 
 /**
- * Rate Limiting Configuration Fixtures
- * 
- * SIMPLIFIED: 
+ * Rate Limiting Configuration Fixtures.
+ *
+ * SIMPLIFIED:
  * - NEW = lifetime totals (no reset)
  * - PAID (PRO, TEAM, BUSINESS) = hourly + monthly
  */
@@ -77,15 +77,14 @@ class RateLimitFixtures extends Fixture
         int $ownerId,
         string $group,
         string $setting,
-        string $value
+        string $value,
     ): void {
         $config = new Config();
         $config->setOwnerId($ownerId);
         $config->setGroup($group);
         $config->setSetting($setting);
         $config->setValue($value);
-        
+
         $manager->persist($config);
     }
 }
-

@@ -5,8 +5,8 @@ namespace App\Controller;
 use App\Entity\InboundEmailHandler;
 use App\Entity\User;
 use App\Repository\InboundEmailHandlerRepository;
-use App\Service\InboundEmailHandlerService;
 use App\Service\EncryptionService;
+use App\Service\InboundEmailHandlerService;
 use Doctrine\ORM\EntityManagerInterface;
 use OpenApi\Attributes as OA;
 use Psr\Log\LoggerInterface;
@@ -18,8 +18,8 @@ use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\CurrentUser;
 
 /**
- * Inbound Email Handler Controller
- * 
+ * Inbound Email Handler Controller.
+ *
  * CRUD API for managing email handlers (IMAP/POP3 configuration).
  * This is a TOOL that allows users to automatically sort incoming emails.
  */
@@ -32,11 +32,12 @@ class InboundEmailHandlerController extends AbstractController
         private InboundEmailHandlerService $handlerService,
         private EncryptionService $encryptionService,
         private EntityManagerInterface $em,
-        private LoggerInterface $logger
-    ) {}
+        private LoggerInterface $logger,
+    ) {
+    }
 
     /**
-     * List all handlers for current user
+     * List all handlers for current user.
      */
     #[Route('', name: 'list', methods: ['GET'])]
     #[OA\Get(
@@ -59,12 +60,12 @@ class InboundEmailHandlerController extends AbstractController
 
         return $this->json([
             'success' => true,
-            'handlers' => $handlersData
+            'handlers' => $handlersData,
         ]);
     }
 
     /**
-     * Get single handler by ID
+     * Get single handler by ID.
      */
     #[Route('/{id}', name: 'get', methods: ['GET'])]
     #[OA\Get(
@@ -84,18 +85,18 @@ class InboundEmailHandlerController extends AbstractController
         if (!$handler) {
             return $this->json([
                 'success' => false,
-                'error' => 'Handler not found'
+                'error' => 'Handler not found',
             ], Response::HTTP_NOT_FOUND);
         }
 
         return $this->json([
             'success' => true,
-            'handler' => $this->serializeHandler($handler)
+            'handler' => $this->serializeHandler($handler),
         ]);
     }
 
     /**
-     * Create new handler
+     * Create new handler.
      */
     #[Route('', name: 'create', methods: ['POST'])]
     #[OA\Post(
@@ -116,7 +117,7 @@ class InboundEmailHandlerController extends AbstractController
         if (empty($data['name']) || empty($data['mailServer']) || empty($data['username']) || empty($data['password'])) {
             return $this->json([
                 'success' => false,
-                'error' => 'Missing required fields: name, mailServer, username, password'
+                'error' => 'Missing required fields: name, mailServer, username, password',
             ], Response::HTTP_BAD_REQUEST);
         }
 
@@ -124,7 +125,7 @@ class InboundEmailHandlerController extends AbstractController
         if (empty($data['departments']) || !is_array($data['departments'])) {
             return $this->json([
                 'success' => false,
-                'error' => 'At least one department is required'
+                'error' => 'At least one department is required',
             ], Response::HTTP_BAD_REQUEST);
         }
 
@@ -156,15 +157,15 @@ class InboundEmailHandlerController extends AbstractController
 
         // Email filter configuration
         $emailFilterMode = $data['emailFilterMode'] ?? 'new';
-        
+
         // PRO+ required for historical emails
-        if ($emailFilterMode === 'historical' && !in_array($user->getUserLevel(), ['PRO', 'TEAM', 'BUSINESS'])) {
+        if ('historical' === $emailFilterMode && !in_array($user->getUserLevel(), ['PRO', 'TEAM', 'BUSINESS'])) {
             return $this->json([
                 'success' => false,
-                'error' => 'Historical email processing is only available for PRO users and above'
+                'error' => 'Historical email processing is only available for PRO users and above',
             ], Response::HTTP_FORBIDDEN);
         }
-        
+
         $handler->setEmailFilter(
             $emailFilterMode,
             $data['emailFilterFromDate'] ?? null,
@@ -176,17 +177,17 @@ class InboundEmailHandlerController extends AbstractController
 
         $this->logger->info('Email handler created', [
             'handler_id' => $handler->getId(),
-            'user_id' => $user->getId()
+            'user_id' => $user->getId(),
         ]);
 
         return $this->json([
             'success' => true,
-            'handler' => $this->serializeHandler($handler)
+            'handler' => $this->serializeHandler($handler),
         ], Response::HTTP_CREATED);
     }
 
     /**
-     * Update handler
+     * Update handler.
      */
     #[Route('/{id}', name: 'update', methods: ['PUT'])]
     #[OA\Put(
@@ -206,7 +207,7 @@ class InboundEmailHandlerController extends AbstractController
         if (!$handler) {
             return $this->json([
                 'success' => false,
-                'error' => 'Handler not found'
+                'error' => 'Handler not found',
             ], Response::HTTP_NOT_FOUND);
         }
 
@@ -261,13 +262,13 @@ class InboundEmailHandlerController extends AbstractController
         // Update email filter configuration
         if (isset($data['emailFilterMode'])) {
             // PRO+ required for historical emails
-            if ($data['emailFilterMode'] === 'historical' && !in_array($user->getUserLevel(), ['PRO', 'TEAM', 'BUSINESS'])) {
+            if ('historical' === $data['emailFilterMode'] && !in_array($user->getUserLevel(), ['PRO', 'TEAM', 'BUSINESS'])) {
                 return $this->json([
                     'success' => false,
-                    'error' => 'Historical email processing is only available for PRO users and above'
+                    'error' => 'Historical email processing is only available for PRO users and above',
                 ], Response::HTTP_FORBIDDEN);
             }
-            
+
             $handler->setEmailFilter(
                 $data['emailFilterMode'],
                 $data['emailFilterFromDate'] ?? null,
@@ -280,17 +281,17 @@ class InboundEmailHandlerController extends AbstractController
 
         $this->logger->info('Email handler updated', [
             'handler_id' => $handler->getId(),
-            'user_id' => $user->getId()
+            'user_id' => $user->getId(),
         ]);
 
         return $this->json([
             'success' => true,
-            'handler' => $this->serializeHandler($handler)
+            'handler' => $this->serializeHandler($handler),
         ]);
     }
 
     /**
-     * Delete handler
+     * Delete handler.
      */
     #[Route('/{id}', name: 'delete', methods: ['DELETE'])]
     #[OA\Delete(
@@ -310,7 +311,7 @@ class InboundEmailHandlerController extends AbstractController
         if (!$handler) {
             return $this->json([
                 'success' => false,
-                'error' => 'Handler not found'
+                'error' => 'Handler not found',
             ], Response::HTTP_NOT_FOUND);
         }
 
@@ -319,17 +320,17 @@ class InboundEmailHandlerController extends AbstractController
 
         $this->logger->info('Email handler deleted', [
             'handler_id' => $id,
-            'user_id' => $user->getId()
+            'user_id' => $user->getId(),
         ]);
 
         return $this->json([
             'success' => true,
-            'message' => 'Handler deleted successfully'
+            'message' => 'Handler deleted successfully',
         ]);
     }
 
     /**
-     * Test IMAP connection
+     * Test IMAP connection.
      */
     #[Route('/{id}/test', name: 'test', methods: ['POST'])]
     #[OA\Post(
@@ -349,7 +350,7 @@ class InboundEmailHandlerController extends AbstractController
         if (!$handler) {
             return $this->json([
                 'success' => false,
-                'error' => 'Handler not found'
+                'error' => 'Handler not found',
             ], Response::HTTP_NOT_FOUND);
         }
 
@@ -367,24 +368,24 @@ class InboundEmailHandlerController extends AbstractController
 
             return $this->json([
                 'success' => $result['success'],
-                'message' => $result['message']
+                'message' => $result['message'],
             ]);
         } catch (\Exception $e) {
             $this->logger->error('Test connection failed', [
                 'handler_id' => $id,
                 'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
+                'trace' => $e->getTraceAsString(),
             ]);
-            
+
             return $this->json([
                 'success' => false,
-                'message' => 'Test connection failed: ' . $e->getMessage()
+                'message' => 'Test connection failed: '.$e->getMessage(),
             ], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
 
     /**
-     * Serialize handler for API response (hide password)
+     * Serialize handler for API response (hide password).
      */
     private function serializeHandler(InboundEmailHandler $handler): array
     {
@@ -403,8 +404,7 @@ class InboundEmailHandlerController extends AbstractController
             'departments' => $handler->getDepartments(),
             'lastChecked' => $handler->getLastChecked(),
             'created' => $handler->getCreated(),
-            'updated' => $handler->getUpdated()
+            'updated' => $handler->getUpdated(),
         ];
     }
 }
-

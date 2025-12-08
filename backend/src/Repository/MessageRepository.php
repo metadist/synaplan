@@ -35,7 +35,7 @@ class MessageRepository extends ServiceEntityRepository
     }
 
     /**
-     * Find conversation thread for a message (based on TrackId and time window)
+     * Find conversation thread for a message (based on TrackId and time window).
      */
     public function findThread(Message $message, int $limit = 20, int $timeWindowSeconds = 1200): array
     {
@@ -57,8 +57,8 @@ class MessageRepository extends ServiceEntityRepository
     }
 
     /**
-     * Find conversation history for context (legacy - uses trackingId)
-     * 
+     * Find conversation history for context (legacy - uses trackingId).
+     *
      * Used as fallback when chatId is not available (backward compatibility).
      * For new code with chatId, use findChatHistory() instead.
      */
@@ -76,22 +76,23 @@ class MessageRepository extends ServiceEntityRepository
     }
 
     /**
-     * Find chat history from a specific chat window with intelligent limit
-     * 
+     * Find chat history from a specific chat window with intelligent limit.
+     *
      * Retrieves the most recent messages from a chat, with adaptive limit
      * based on message length to optimize context window usage.
-     * 
-     * @param int $userId User ID to filter by
-     * @param int $chatId Chat ID to get messages from
-     * @param int $maxMessages Maximum number of messages (default: 30)
+     *
+     * @param int $userId        User ID to filter by
+     * @param int $chatId        Chat ID to get messages from
+     * @param int $maxMessages   Maximum number of messages (default: 30)
      * @param int $maxTotalChars Maximum total characters across all messages (default: 15000)
+     *
      * @return array Array of Message entities, ordered oldest first
      */
     public function findChatHistory(
-        int $userId, 
-        int $chatId, 
+        int $userId,
+        int $chatId,
         int $maxMessages = 30,
-        int $maxTotalChars = 15000
+        int $maxTotalChars = 15000,
     ): array {
         // Get recent messages from this chat
         $messages = $this->createQueryBuilder('m')
@@ -129,15 +130,14 @@ class MessageRepository extends ServiceEntityRepository
     }
 
     /**
-     * Save message
+     * Save message.
      */
     public function save(Message $message, bool $flush = true): void
     {
         $this->getEntityManager()->persist($message);
-        
+
         if ($flush) {
             $this->getEntityManager()->flush();
         }
     }
 }
-

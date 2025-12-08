@@ -53,6 +53,7 @@ class Subscription
     public function setName(string $name): self
     {
         $this->name = $name;
+
         return $this;
     }
 
@@ -64,6 +65,7 @@ class Subscription
     public function setLevel(string $level): self
     {
         $this->level = $level;
+
         return $this;
     }
 
@@ -75,6 +77,7 @@ class Subscription
     public function setPriceMonthly(string $priceMonthly): self
     {
         $this->priceMonthly = $priceMonthly;
+
         return $this;
     }
 
@@ -86,6 +89,7 @@ class Subscription
     public function setPriceYearly(string $priceYearly): self
     {
         $this->priceYearly = $priceYearly;
+
         return $this;
     }
 
@@ -97,6 +101,7 @@ class Subscription
     public function setDescription(string $description): self
     {
         $this->description = $description;
+
         return $this;
     }
 
@@ -108,6 +113,7 @@ class Subscription
     public function setActive(bool $active): self
     {
         $this->active = $active;
+
         return $this;
     }
 
@@ -119,6 +125,7 @@ class Subscription
     public function setStripeMonthlyId(?string $stripeMonthlyId): self
     {
         $this->stripeMonthlyId = $stripeMonthlyId;
+
         return $this;
     }
 
@@ -130,7 +137,7 @@ class Subscription
     public function setStripeYearlyId(?string $stripeYearlyId): self
     {
         $this->stripeYearlyId = $stripeYearlyId;
+
         return $this;
     }
 }
-

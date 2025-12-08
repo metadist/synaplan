@@ -20,7 +20,7 @@ export interface ParsedResponse {
 const URL_REGEX = /https?:\/\/[^\s<>"{}|\\^`\[\]]+/g
 const MARKDOWN_LINK_REGEX = /\[([^\]]+)\]\(([^)]+)\)/g
 const CODE_BLOCK_REGEX = /```(\w+)?\n([\s\S]*?)```/g
-const INLINE_CODE_REGEX = /`([^`]+)`/g
+
 
 export function parseAIResponse(content: string): ParsedResponse {
   const parts: ParsedResponsePart[] = []
@@ -107,7 +107,7 @@ function parseTextContent(text: string, parts: ParsedResponsePart[]) {
   const links: Array<{ url: string; title: string; position: number }> = []
   
   // Find markdown links
-  let mdLinkMatch
+  let mdLinkMatch: RegExpExecArray | null
   const markdownLinkRegex = /\[([^\]]+)\]\(([^)]+)\)/g
   while ((mdLinkMatch = markdownLinkRegex.exec(text)) !== null) {
     links.push({
@@ -118,20 +118,22 @@ function parseTextContent(text: string, parts: ParsedResponsePart[]) {
   }
 
   // Find plain URLs (that are not part of markdown links)
-  let urlMatch
+  let urlMatch: RegExpExecArray | null
   const urlRegex = /https?:\/\/[^\s<>"{}|\\^`\[\]]+/g
   while ((urlMatch = urlRegex.exec(text)) !== null) {
+    const currentMatch = urlMatch
+    const matchIndex = currentMatch.index ?? 0
     // Check if this URL is part of a markdown link
     const isInMarkdown = links.some(l => 
-      urlMatch.index >= l.position && 
-      urlMatch.index < l.position + l.title.length + l.url.length + 4
+      matchIndex >= l.position && 
+      matchIndex < l.position + l.title.length + l.url.length + 4
     )
     
     if (!isInMarkdown) {
       links.push({
-        url: urlMatch[0],
-        title: urlMatch[0],
-        position: urlMatch.index
+        url: currentMatch[0],
+        title: currentMatch[0],
+        position: matchIndex
       })
     }
   }

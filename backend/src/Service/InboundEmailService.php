@@ -6,8 +6,8 @@ use Psr\Log\LoggerInterface;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 
 /**
- * Inbound Email Service
- * 
+ * Inbound Email Service.
+ *
  * Handles fetching emails from Mailhog (or IMAP) and forwarding them to the email webhook.
  */
 class InboundEmailService
@@ -15,37 +15,40 @@ class InboundEmailService
     public function __construct(
         private HttpClientInterface $httpClient,
         private LoggerInterface $logger,
-        private string $mailhogApiUrl = 'http://mailhog:8025/api/v2'
-    ) {}
+        private string $mailhogApiUrl = 'http://mailhog:8025/api/v2',
+    ) {
+    }
 
     /**
-     * Fetch emails from Mailhog API
+     * Fetch emails from Mailhog API.
      */
     public function fetchMailhogEmails(int $limit = 50): array
     {
         try {
             $response = $this->httpClient->request('GET', "{$this->mailhogApiUrl}/messages", [
-                'query' => ['limit' => $limit]
+                'query' => ['limit' => $limit],
             ]);
 
             $data = $response->toArray();
+
             return $data['items'] ?? [];
         } catch (\Exception $e) {
             $this->logger->error('Failed to fetch emails from Mailhog', [
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ]);
+
             return [];
         }
     }
 
     /**
-     * Parse Mailhog message format
+     * Parse Mailhog message format.
      */
     public function parseMailhogMessage(array $message): array
     {
         $headers = $message['Content']['Headers'] ?? [];
         $body = $message['Content']['Body'] ?? '';
-        
+
         // Extract 'To' address
         $toAddresses = $headers['To'] ?? [];
         $toEmail = '';
@@ -78,7 +81,7 @@ class InboundEmailService
 
         // Message ID
         $messageId = $headers['Message-ID'][0] ?? null;
-        
+
         // In-Reply-To (for threading)
         $inReplyTo = $headers['In-Reply-To'][0] ?? null;
 
@@ -90,12 +93,12 @@ class InboundEmailService
             'body' => $body,
             'message_id' => $messageId,
             'in_reply_to' => $inReplyTo,
-            'raw' => $message
+            'raw' => $message,
         ];
     }
 
     /**
-     * Send email to webhook for processing
+     * Send email to webhook for processing.
      */
     public function forwardToWebhook(array $emailData, string $webhookUrl): array
     {
@@ -107,51 +110,53 @@ class InboundEmailService
                     'subject' => $emailData['subject'],
                     'body' => $emailData['body'],
                     'message_id' => $emailData['message_id'],
-                    'in_reply_to' => $emailData['in_reply_to']
+                    'in_reply_to' => $emailData['in_reply_to'],
                 ],
                 'headers' => [
-                    'Content-Type' => 'application/json'
-                ]
+                    'Content-Type' => 'application/json',
+                ],
             ]);
 
             return [
                 'success' => true,
                 'status_code' => $response->getStatusCode(),
-                'response' => $response->toArray()
+                'response' => $response->toArray(),
             ];
         } catch (\Exception $e) {
             $this->logger->error('Failed to forward email to webhook', [
                 'email_id' => $emailData['id'] ?? 'unknown',
                 'from' => $emailData['from'] ?? 'unknown',
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ]);
 
             return [
                 'success' => false,
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ];
         }
     }
 
     /**
-     * Delete email from Mailhog
+     * Delete email from Mailhog.
      */
     public function deleteMailhogMessage(string $messageId): bool
     {
         try {
             $response = $this->httpClient->request('DELETE', "{$this->mailhogApiUrl}/messages/{$messageId}");
-            return $response->getStatusCode() === 200;
+
+            return 200 === $response->getStatusCode();
         } catch (\Exception $e) {
             $this->logger->error('Failed to delete Mailhog message', [
                 'message_id' => $messageId,
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ]);
+
             return false;
         }
     }
 
     /**
-     * Process all pending emails from Mailhog
+     * Process all pending emails from Mailhog.
      */
     public function processMailhogEmails(string $webhookUrl, bool $deleteAfterProcessing = true): array
     {
@@ -160,16 +165,16 @@ class InboundEmailService
             'total' => count($messages),
             'processed' => 0,
             'failed' => 0,
-            'errors' => []
+            'errors' => [],
         ];
 
         foreach ($messages as $message) {
             $emailData = $this->parseMailhogMessage($message);
-            
+
             // Only process emails to smart@synaplan.com or smart+*@synaplan.com
             if (!$this->isValidDestination($emailData['to'])) {
                 $this->logger->debug('Skipping email to invalid destination', [
-                    'to' => $emailData['to']
+                    'to' => $emailData['to'],
                 ]);
                 continue;
             }
@@ -178,23 +183,23 @@ class InboundEmailService
                 'id' => $emailData['id'],
                 'from' => $emailData['from'],
                 'to' => $emailData['to'],
-                'subject' => $emailData['subject']
+                'subject' => $emailData['subject'],
             ]);
 
             $result = $this->forwardToWebhook($emailData, $webhookUrl);
 
             if ($result['success']) {
-                $results['processed']++;
-                
+                ++$results['processed'];
+
                 // Delete message from Mailhog if requested
                 if ($deleteAfterProcessing && !empty($emailData['id'])) {
                     $this->deleteMailhogMessage($emailData['id']);
                 }
             } else {
-                $results['failed']++;
+                ++$results['failed'];
                 $results['errors'][] = [
                     'email' => $emailData['from'],
-                    'error' => $result['error'] ?? 'Unknown error'
+                    'error' => $result['error'] ?? 'Unknown error',
                 ];
             }
         }
@@ -203,12 +208,12 @@ class InboundEmailService
     }
 
     /**
-     * Check if email destination is valid (smart@synaplan.com or smart+keyword@synaplan.com)
+     * Check if email destination is valid (smart@synaplan.com or smart+keyword@synaplan.com).
      */
     private function isValidDestination(string $email): bool
     {
         $email = strtolower(trim($email));
-        return preg_match('/^smart(\+[a-z0-9\-_]+)?@synaplan\.com$/i', $email) === 1;
+
+        return 1 === preg_match('/^smart(\+[a-z0-9\-_]+)?@synaplan\.com$/i', $email);
     }
 }
-

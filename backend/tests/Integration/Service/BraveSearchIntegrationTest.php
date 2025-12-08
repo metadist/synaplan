@@ -6,8 +6,8 @@ use App\Service\Search\BraveSearchService;
 use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
 
 /**
- * Integration tests for BraveSearchService
- * 
+ * Integration tests for BraveSearchService.
+ *
  * These tests verify the search functionality works correctly
  * with different configurations.
  */
@@ -19,7 +19,7 @@ class BraveSearchIntegrationTest extends KernelTestCase
     {
         parent::setUp();
         self::bootKernel();
-        
+
         $container = self::getContainer();
         $this->braveSearchService = $container->get(BraveSearchService::class);
     }
@@ -69,17 +69,17 @@ class BraveSearchIntegrationTest extends KernelTestCase
         $results = $this->braveSearchService->search('artificial intelligence', [
             'count' => 5,
             'country' => 'de',
-            'search_lang' => 'de'
+            'search_lang' => 'de',
         ]);
 
         $this->assertIsArray($results);
         $this->assertArrayHasKey('query', $results);
         $this->assertArrayHasKey('results', $results);
         $this->assertArrayHasKey('query_metadata', $results);
-        
+
         $this->assertEquals('artificial intelligence', $results['query']);
         $this->assertIsArray($results['results']);
-        
+
         // Check that results have expected structure
         if (!empty($results['results'])) {
             $firstResult = $results['results'][0];
@@ -96,12 +96,12 @@ class BraveSearchIntegrationTest extends KernelTestCase
         }
 
         $languages = ['en', 'de', 'fr', 'es'];
-        
+
         foreach ($languages as $lang) {
             $results = $this->braveSearchService->search('test', [
                 'count' => 3,
                 'country' => $lang,
-                'search_lang' => $lang
+                'search_lang' => $lang,
             ]);
 
             $this->assertIsArray($results);
@@ -120,21 +120,21 @@ class BraveSearchIntegrationTest extends KernelTestCase
                     'url' => 'https://example.com/1',
                     'description' => 'Test description 1',
                     'age' => '2 days ago',
-                    'profile' => ['name' => 'Example Site']
+                    'profile' => ['name' => 'Example Site'],
                 ],
                 [
                     'title' => 'Test Result 2',
                     'url' => 'https://example.com/2',
                     'description' => 'Test description 2',
                     'age' => '1 week ago',
-                    'profile' => ['name' => 'Example Site 2']
-                ]
+                    'profile' => ['name' => 'Example Site 2'],
+                ],
             ],
             'query_metadata' => [
                 'total' => 2,
                 'altered' => null,
-                'original' => 'test query'
-            ]
+                'original' => 'test query',
+            ],
         ];
 
         $formatted = $this->braveSearchService->formatResultsForAI($mockResults);
@@ -155,8 +155,8 @@ class BraveSearchIntegrationTest extends KernelTestCase
             'query_metadata' => [
                 'total' => 0,
                 'altered' => null,
-                'original' => 'empty query'
-            ]
+                'original' => 'empty query',
+            ],
         ];
 
         $formatted = $this->braveSearchService->formatResultsForAI($emptyResults);
@@ -185,13 +185,13 @@ class BraveSearchIntegrationTest extends KernelTestCase
                 $results = $this->braveSearchService->search('test query', [
                     'count' => 1,
                     'search_lang' => $case['search_lang'],
-                    'country' => $case['country']
+                    'country' => $case['country'],
                 ]);
 
                 $this->assertIsArray($results);
                 $this->assertArrayHasKey('results', $results);
                 $this->assertArrayHasKey('query', $results);
-                
+
                 // Verify normalization worked by checking results structure
                 $this->assertEquals('test query', $results['query']);
             } catch (\Exception $e) {
@@ -212,7 +212,7 @@ class BraveSearchIntegrationTest extends KernelTestCase
             $results = $this->braveSearchService->search('test', [
                 'count' => 1,
                 'search_lang' => 'invalid_lang',
-                'country' => 'INVALID'
+                'country' => 'INVALID',
             ]);
 
             // Should not throw exception - should use defaults
@@ -224,4 +224,3 @@ class BraveSearchIntegrationTest extends KernelTestCase
         }
     }
 }
-

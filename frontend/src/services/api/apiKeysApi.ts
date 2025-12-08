@@ -1,4 +1,7 @@
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'
+import { useConfigStore } from '@/stores/config'
+
+const config = useConfigStore()
+const API_BASE_URL = config.apiBaseUrl
 
 export interface ApiKey {
   id: number
@@ -6,7 +9,7 @@ export interface ApiKey {
   key_prefix: string
   status: 'active' | 'inactive'
   scopes: string[]
-  last_used: number
+  last_used: number | null
   created: number
 }
 
@@ -21,8 +24,11 @@ export interface CreateApiKeyResponse {
     id: number
     name: string
     key: string // Full key - only shown once!
+    key_prefix?: string
     scopes: string[]
     created: number
+    status: 'active' | 'inactive'
+    last_used: number | null
   }
   message: string
 }

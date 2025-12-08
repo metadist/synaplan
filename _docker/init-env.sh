@@ -4,7 +4,7 @@ set -e
 echo "🔧 Checking environment files..."
 
 # Backend .env.docker
-BACKEND_ENV="/var/www/html/.env.docker"
+BACKEND_ENV="/var/www/backend/.env.docker"
 if [ ! -f "$BACKEND_ENV" ]; then
     echo "📝 Creating backend/.env.docker..."
     cat > "$BACKEND_ENV" << 'EOF'

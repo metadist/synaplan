@@ -7,10 +7,8 @@
 
 <script setup lang="ts">
 import { ref, onErrorCaptured } from 'vue'
-import { useRouter } from 'vue-router'
 import ErrorView from '@/views/ErrorView.vue'
 
-const router = useRouter()
 const error = ref(false)
 const errorInfo = ref<{
   message?: string

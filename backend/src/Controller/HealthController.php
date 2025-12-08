@@ -32,14 +32,14 @@ class HealthController extends AbstractController
                         type: 'object',
                         properties: [
                             new OA\Property(property: 'available', type: 'boolean'),
-                            new OA\Property(property: 'message', type: 'string', nullable: true)
+                            new OA\Property(property: 'message', type: 'string', nullable: true),
                         ]
                     ),
                     example: [
                         'openai' => ['available' => true, 'message' => null],
-                        'ollama' => ['available' => true, 'message' => null]
+                        'ollama' => ['available' => true, 'message' => null],
                     ]
-                )
+                ),
             ]
         )
     )]
@@ -49,7 +49,7 @@ class HealthController extends AbstractController
         foreach ($registry->getAllProviders() as $provider) {
             $providers[$provider->getName()] = $provider->getStatus();
         }
-        
+
         return $this->json([
             'status' => 'ok',
             'timestamp' => time(),
@@ -57,4 +57,3 @@ class HealthController extends AbstractController
         ]);
     }
 }
-

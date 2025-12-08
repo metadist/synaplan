@@ -14,7 +14,7 @@ class ConfigRepository extends ServiceEntityRepository
     }
 
     /**
-     * Get configuration value
+     * Get configuration value.
      */
     public function getValue(int $ownerId, string $group, string $setting): ?string
     {
@@ -28,7 +28,7 @@ class ConfigRepository extends ServiceEntityRepository
     }
 
     /**
-     * Get all configs for a group and owner (with fallback to owner=0)
+     * Get all configs for a group and owner (with fallback to owner=0).
      */
     public function getByGroup(int $ownerId, string $group): array
     {
@@ -43,7 +43,7 @@ class ConfigRepository extends ServiceEntityRepository
     }
 
     /**
-     * Set configuration value (upsert)
+     * Set configuration value (upsert).
      */
     public function setValue(int $ownerId, string $group, string $setting, string $value): Config
     {
@@ -68,7 +68,7 @@ class ConfigRepository extends ServiceEntityRepository
     }
 
     /**
-     * Find config by owner, group and setting
+     * Find config by owner, group and setting.
      */
     public function findByOwnerGroupAndSetting(int $ownerId, string $group, string $setting): ?Config
     {
@@ -80,15 +80,14 @@ class ConfigRepository extends ServiceEntityRepository
     }
 
     /**
-     * Save config
+     * Save config.
      */
     public function save(Config $config, bool $flush = true): void
     {
         $this->getEntityManager()->persist($config);
-        
+
         if ($flush) {
             $this->getEntityManager()->flush();
         }
     }
 }
-

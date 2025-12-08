@@ -33,7 +33,7 @@ class PromptMetaRepository extends ServiceEntityRepository
     public function save(PromptMeta $promptMeta, bool $flush = true): void
     {
         $this->getEntityManager()->persist($promptMeta);
-        
+
         if ($flush) {
             $this->getEntityManager()->flush();
         }
@@ -42,10 +42,9 @@ class PromptMetaRepository extends ServiceEntityRepository
     public function remove(PromptMeta $promptMeta, bool $flush = true): void
     {
         $this->getEntityManager()->remove($promptMeta);
-        
+
         if ($flush) {
             $this->getEntityManager()->flush();
         }
     }
 }
-

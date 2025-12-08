@@ -1,11 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-
-export interface ModelOption {
-  provider: string
-  model: string
-  label: string
-}
+import type { ModelOption } from '@/composables/useModelSelection'
 
 export interface AIModel {
   id: number

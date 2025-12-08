@@ -1,4 +1,5 @@
 import type { AIModel } from '@/stores/models'
+import { useConfigStore } from '@/stores/config'
 
 export interface DefaultModelConfig {
   chat: string
@@ -13,7 +14,8 @@ export interface DefaultModelConfig {
 }
 
 // Base configuration
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'
+const config = useConfigStore()
+const API_BASE_URL = config.apiBaseUrl
 const API_TIMEOUT = import.meta.env.VITE_API_TIMEOUT || 30000
 const AUTH_TOKEN_KEY = import.meta.env.VITE_AUTH_TOKEN_KEY || 'auth_token'
 const REFRESH_TOKEN_KEY = import.meta.env.VITE_REFRESH_TOKEN_KEY || 'refresh_token'
@@ -247,8 +249,9 @@ export const apiService = {
   ): () => void {
     if (useMockData) {
       // Mock streaming
-      const { mockStreamingResponse } = require('@/mocks/chatResponses')
-      mockStreamingResponse(message, onUpdate)
+      import('@/mocks/chatResponses').then(({ mockStreamingResponse }) => {
+        mockStreamingResponse(message, onUpdate)
+      })
       return () => {}
     }
 

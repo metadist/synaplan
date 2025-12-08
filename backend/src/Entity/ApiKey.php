@@ -60,6 +60,7 @@ class ApiKey
     public function setOwnerId(int $ownerId): self
     {
         $this->ownerId = $ownerId;
+
         return $this;
     }
 
@@ -74,6 +75,7 @@ class ApiKey
         if ($owner) {
             $this->ownerId = $owner->getId();
         }
+
         return $this;
     }
 
@@ -85,6 +87,7 @@ class ApiKey
     public function setKey(string $key): self
     {
         $this->key = $key;
+
         return $this;
     }
 
@@ -96,12 +99,13 @@ class ApiKey
     public function setStatus(string $status): self
     {
         $this->status = $status;
+
         return $this;
     }
 
     public function isActive(): bool
     {
-        return $this->status === 'active';
+        return 'active' === $this->status;
     }
 
     public function getLastUsed(): int
@@ -112,12 +116,14 @@ class ApiKey
     public function setLastUsed(int $lastUsed): self
     {
         $this->lastUsed = $lastUsed;
+
         return $this;
     }
 
     public function updateLastUsed(): self
     {
         $this->lastUsed = time();
+
         return $this;
     }
 
@@ -129,6 +135,7 @@ class ApiKey
     public function setScopes(array $scopes): self
     {
         $this->scopes = $scopes;
+
         return $this;
     }
 
@@ -145,6 +152,7 @@ class ApiKey
     public function setCreated(int $created): self
     {
         $this->created = $created;
+
         return $this;
     }
 
@@ -156,7 +164,7 @@ class ApiKey
     public function setName(string $name): self
     {
         $this->name = $name;
+
         return $this;
     }
 }
-

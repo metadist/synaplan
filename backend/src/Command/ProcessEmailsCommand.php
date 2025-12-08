@@ -20,7 +20,7 @@ class ProcessEmailsCommand extends Command
     public function __construct(
         private InboundEmailService $inboundEmailService,
         private LoggerInterface $logger,
-        private string $appUrl
+        private string $appUrl,
     ) {
         parent::__construct();
     }
@@ -40,15 +40,15 @@ class ProcessEmailsCommand extends Command
         $interval = (int) $input->getOption('interval');
         $deleteAfter = !$input->getOption('keep');
 
-        $webhookUrl = rtrim($this->appUrl, '/') . '/api/v1/webhooks/email';
+        $webhookUrl = rtrim($this->appUrl, '/').'/api/v1/webhooks/email';
 
         $io->title('Email Processing Service');
         $io->info("Webhook URL: {$webhookUrl}");
-        $io->info("Delete after processing: " . ($deleteAfter ? 'Yes' : 'No'));
+        $io->info('Delete after processing: '.($deleteAfter ? 'Yes' : 'No'));
 
         if ($watch) {
             $io->note("Watch mode enabled. Checking every {$interval} seconds. Press CTRL+C to stop.");
-            
+
             while (true) {
                 $this->processEmails($io, $webhookUrl, $deleteAfter);
                 sleep($interval);
@@ -62,13 +62,14 @@ class ProcessEmailsCommand extends Command
 
     private function processEmails(SymfonyStyle $io, string $webhookUrl, bool $deleteAfter): void
     {
-        $io->text('[' . date('Y-m-d H:i:s') . '] Checking for new emails...');
+        $io->text('['.date('Y-m-d H:i:s').'] Checking for new emails...');
 
         try {
             $results = $this->inboundEmailService->processMailhogEmails($webhookUrl, $deleteAfter);
 
-            if ($results['total'] === 0) {
+            if (0 === $results['total']) {
                 $io->text('No emails found.');
+
                 return;
             }
 
@@ -85,12 +86,11 @@ class ProcessEmailsCommand extends Command
                 }
             }
         } catch (\Exception $e) {
-            $io->error('Failed to process emails: ' . $e->getMessage());
+            $io->error('Failed to process emails: '.$e->getMessage());
             $this->logger->error('Email processing command failed', [
                 'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
+                'trace' => $e->getTraceAsString(),
             ]);
         }
     }
 }
-

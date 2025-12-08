@@ -5,8 +5,8 @@ namespace App\Service;
 use Psr\Log\LoggerInterface;
 
 /**
- * Encryption Service
- * 
+ * Encryption Service.
+ *
  * Simple encryption/decryption for sensitive data like IMAP passwords.
  * Uses APP_SECRET as encryption key.
  */
@@ -17,14 +17,14 @@ class EncryptionService
 
     public function __construct(
         private string $secretKey,
-        private LoggerInterface $logger
+        private LoggerInterface $logger,
     ) {
         // Derive encryption key from APP_SECRET (32 bytes for AES-256)
         $this->secretKey = hash('sha256', $secretKey, true);
     }
 
     /**
-     * Encrypt plaintext
+     * Encrypt plaintext.
      */
     public function encrypt(string $plaintext): string
     {
@@ -42,22 +42,22 @@ class EncryptionService
                 $iv
             );
 
-            if ($encrypted === false) {
+            if (false === $encrypted) {
                 throw new \RuntimeException('Encryption failed');
             }
 
             // Prepend IV to encrypted data and base64 encode
-            return base64_encode($iv . $encrypted);
+            return base64_encode($iv.$encrypted);
         } catch (\Exception $e) {
             $this->logger->error('Encryption failed', [
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ]);
-            throw new \RuntimeException('Encryption failed: ' . $e->getMessage());
+            throw new \RuntimeException('Encryption failed: '.$e->getMessage());
         }
     }
 
     /**
-     * Decrypt ciphertext
+     * Decrypt ciphertext.
      */
     public function decrypt(string $ciphertext): string
     {
@@ -67,8 +67,8 @@ class EncryptionService
 
         try {
             $data = base64_decode($ciphertext, true);
-            
-            if ($data === false || strlen($data) < self::IV_LENGTH) {
+
+            if (false === $data || strlen($data) < self::IV_LENGTH) {
                 throw new \RuntimeException('Invalid ciphertext');
             }
 
@@ -83,17 +83,16 @@ class EncryptionService
                 $iv
             );
 
-            if ($decrypted === false) {
+            if (false === $decrypted) {
                 throw new \RuntimeException('Decryption failed');
             }
 
             return $decrypted;
         } catch (\Exception $e) {
             $this->logger->error('Decryption failed', [
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ]);
-            throw new \RuntimeException('Decryption failed: ' . $e->getMessage());
+            throw new \RuntimeException('Decryption failed: '.$e->getMessage());
         }
     }
 }
-
