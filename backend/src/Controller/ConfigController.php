@@ -2,21 +2,21 @@
 
 namespace App\Controller;
 
+use App\AI\Service\ProviderRegistry;
 use App\Entity\Config;
+use App\Entity\User;
 use App\Repository\ConfigRepository;
 use App\Repository\ModelRepository;
-use App\AI\Service\ProviderRegistry;
 use App\Service\Search\BraveSearchService;
 use App\Service\WhisperService;
 use Doctrine\ORM\EntityManagerInterface;
+use OpenApi\Attributes as OA;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\CurrentUser;
-use App\Entity\User;
-use OpenApi\Attributes as OA;
 
 #[Route('/api/v1/config', name: 'api_config_')]
 #[OA\Tag(name: 'Configuration')]
@@ -28,12 +28,13 @@ class ConfigController extends AbstractController
         private ModelRepository $modelRepository,
         private ProviderRegistry $providerRegistry,
         private BraveSearchService $braveSearchService,
-        private WhisperService $whisperService
-    ) {}
+        private WhisperService $whisperService,
+    ) {
+    }
 
     /**
      * Get all available models (all active models for all capabilities)
-     * User can choose ANY model for ANY capability (cross-capability usage)
+     * User can choose ANY model for ANY capability (cross-capability usage).
      */
     #[Route('/models', name: 'models_list', methods: ['GET'])]
     #[OA\Get(
@@ -62,12 +63,12 @@ class ConfigController extends AbstractController
                                     new OA\Property(property: 'service', type: 'string', example: 'Groq'),
                                     new OA\Property(property: 'name', type: 'string', example: 'Qwen3 32B (Reasoning)'),
                                     new OA\Property(property: 'quality', type: 'integer', example: 9),
-                                    new OA\Property(property: 'features', type: 'array', items: new OA\Items(type: 'string', example: 'reasoning'))
+                                    new OA\Property(property: 'features', type: 'array', items: new OA\Items(type: 'string', example: 'reasoning')),
                                 ]
                             )
-                        )
+                        ),
                     ]
-                )
+                ),
             ]
         )
     )]
@@ -80,7 +81,7 @@ class ConfigController extends AbstractController
 
         // Get all active models sorted by quality
         $models = $this->modelRepository->findBy(['active' => 1], ['quality' => 'DESC', 'rating' => 'DESC']);
-        
+
         // Build model list with tag information
         $modelList = [];
         foreach ($models as $model) {
@@ -94,10 +95,10 @@ class ConfigController extends AbstractController
                 'rating' => $model->getRating(),
                 'tag' => strtoupper($model->getTag()),
                 'isSystemModel' => $model->isSystemModel(),
-                'features' => $model->getFeatures()
+                'features' => $model->getFeatures(),
             ];
         }
-        
+
         // Group models by their appropriate capability based on tag
         // This allows proper filtering while still enabling cross-capability if needed
         $grouped = [
@@ -109,12 +110,12 @@ class ConfigController extends AbstractController
             'TEXT2VID' => [],
             'SOUND2TEXT' => [],
             'TEXT2SOUND' => [],
-            'ANALYZE' => []
+            'ANALYZE' => [],
         ];
-        
+
         foreach ($modelList as $model) {
             $tag = $model['tag'];
-            
+
             // Map model tags to capabilities
             switch ($tag) {
                 case 'CHAT':
@@ -158,12 +159,12 @@ class ConfigController extends AbstractController
 
         return $this->json([
             'success' => true,
-            'models' => $grouped
+            'models' => $grouped,
         ]);
     }
 
     /**
-     * Get current default model configuration for user
+     * Get current default model configuration for user.
      */
     #[Route('/models/defaults', name: 'models_defaults', methods: ['GET'])]
     public function getDefaultModels(#[CurrentUser] ?User $user): JsonResponse
@@ -174,7 +175,7 @@ class ConfigController extends AbstractController
 
         $userId = $user->getId();
         $capabilities = ['SORT', 'CHAT', 'VECTORIZE', 'PIC2TEXT', 'TEXT2PIC', 'TEXT2VID', 'SOUND2TEXT', 'TEXT2SOUND', 'ANALYZE'];
-        
+
         $defaults = [];
 
         foreach ($capabilities as $capability) {
@@ -182,7 +183,7 @@ class ConfigController extends AbstractController
             $config = $this->configRepository->findOneBy([
                 'ownerId' => $userId,
                 'group' => 'DEFAULTMODEL',
-                'setting' => $capability
+                'setting' => $capability,
             ]);
 
             // Fall back to global config
@@ -190,7 +191,7 @@ class ConfigController extends AbstractController
                 $config = $this->configRepository->findOneBy([
                     'ownerId' => 0,
                     'group' => 'DEFAULTMODEL',
-                    'setting' => $capability
+                    'setting' => $capability,
                 ]);
             }
 
@@ -199,24 +200,24 @@ class ConfigController extends AbstractController
 
         return $this->json([
             'success' => true,
-            'defaults' => $defaults
+            'defaults' => $defaults,
         ]);
     }
 
     /**
-     * Save default model configuration for user
+     * Save default model configuration for user.
      */
     #[Route('/models/defaults', name: 'models_defaults_save', methods: ['POST'])]
     public function saveDefaultModels(
         Request $request,
-        #[CurrentUser] ?User $user
+        #[CurrentUser] ?User $user,
     ): JsonResponse {
         if (!$user) {
             return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
         }
 
         $data = json_decode($request->getContent(), true);
-        
+
         if (!isset($data['defaults']) || !is_array($data['defaults'])) {
             return $this->json(['error' => 'Invalid data'], Response::HTTP_BAD_REQUEST);
         }
@@ -233,14 +234,14 @@ class ConfigController extends AbstractController
             $model = $this->modelRepository->find($modelId);
             if (!$model) {
                 return $this->json([
-                    'error' => "Model {$modelId} not found"
+                    'error' => "Model {$modelId} not found",
                 ], Response::HTTP_BAD_REQUEST);
             }
-            
+
             // Check if model is active
-            if ($model->getActive() !== 1) {
+            if (1 !== $model->getActive()) {
                 return $this->json([
-                    'error' => "Model {$modelId} is not active"
+                    'error' => "Model {$modelId} is not active",
                 ], Response::HTTP_BAD_REQUEST);
             }
 
@@ -248,7 +249,7 @@ class ConfigController extends AbstractController
             $config = $this->configRepository->findOneBy([
                 'ownerId' => $userId,
                 'group' => 'DEFAULTMODEL',
-                'setting' => $capability
+                'setting' => $capability,
             ]);
 
             if (!$config) {
@@ -267,20 +268,21 @@ class ConfigController extends AbstractController
 
         return $this->json([
             'success' => true,
-            'message' => 'Default models saved successfully'
+            'message' => 'Default models saved successfully',
         ]);
     }
 
     /**
-     * Check if a model is available/ready to use
-     * 
+     * Check if a model is available/ready to use.
+     *
      * @param int $modelId Model ID to check
+     *
      * @return JsonResponse {available: bool, provider_type: string, message?: string, install_command?: string}
      */
     #[Route('/models/{modelId}/check', name: 'models_check', methods: ['GET'])]
     public function checkModelAvailability(
         int $modelId,
-        #[CurrentUser] ?User $user
+        #[CurrentUser] ?User $user,
     ): JsonResponse {
         if (!$user) {
             return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
@@ -290,7 +292,7 @@ class ConfigController extends AbstractController
         if (!$model) {
             return $this->json([
                 'available' => false,
-                'error' => 'Model not found'
+                'error' => 'Model not found',
             ], Response::HTTP_NOT_FOUND);
         }
 
@@ -302,16 +304,16 @@ class ConfigController extends AbstractController
         $envVar = null;
 
         // Determine provider type and check availability
-        if ($service === 'ollama') {
+        if ('ollama' === $service) {
             $providerType = 'local';
-            
+
             // Check if Ollama provider is available
             try {
                 $provider = $this->providerRegistry->getChatProvider('ollama');
-                
+
                 // Check if the specific model exists
                 $modelName = $model->getProviderId() ?: $model->getName();
-                
+
                 // Try to list available models
                 $status = $provider->getStatus();
                 if (!empty($status['healthy'])) {
@@ -319,17 +321,17 @@ class ConfigController extends AbstractController
                     // We assume it's available; the user will get a proper error if not
                     $available = true;
                 } else {
-                    $message = "Ollama server is not running";
+                    $message = 'Ollama server is not running';
                 }
-                
+
                 // Always provide install command for Ollama models
                 $installCommand = "docker compose exec ollama ollama pull {$modelName}";
             } catch (\Exception $e) {
-                $message = "Ollama not available: " . $e->getMessage();
+                $message = 'Ollama not available: '.$e->getMessage();
             }
         } elseif (in_array($service, ['openai', 'anthropic', 'groq', 'gemini', 'google', 'mistral'])) {
             $providerType = 'external';
-            
+
             // Check if API key is configured
             $envVarMap = [
                 'openai' => ['OPENAI_API_KEY'],
@@ -337,23 +339,23 @@ class ConfigController extends AbstractController
                 'groq' => ['GROQ_API_KEY'],
                 'gemini' => ['GEMINI_API_KEY', 'GOOGLE_GEMINI_API_KEY', 'GOOGLE_API_KEY'], // Support multiple key names
                 'google' => ['GOOGLE_API_KEY', 'GOOGLE_GEMINI_API_KEY', 'GEMINI_API_KEY'], // Support multiple key names
-                'mistral' => ['MISTRAL_API_KEY']
+                'mistral' => ['MISTRAL_API_KEY'],
             ];
-            
+
             $envVars = $envVarMap[$service] ?? [];
-            
+
             // Check if any of the env vars is set and not empty
             $available = false;
             foreach ($envVars as $envVar) {
                 $apiKey = $_ENV[$envVar] ?? '';
-                if (!empty($apiKey) && $apiKey !== 'your-api-key-here') {
+                if (!empty($apiKey) && 'your-api-key-here' !== $apiKey) {
                     $available = true;
                     break;
                 }
             }
-                
-                if (!$available) {
-                    $message = "API key not configured for {$service}";
+
+            if (!$available) {
+                $message = "API key not configured for {$service}";
                 $envVar = $envVars[0] ?? null; // Use first one for setup instructions
             }
         } else {
@@ -365,7 +367,7 @@ class ConfigController extends AbstractController
             'available' => $available,
             'provider_type' => $providerType,
             'model_name' => $model->getProviderId() ?: $model->getName(),
-            'service' => $service
+            'service' => $service,
         ];
 
         if ($message) {
@@ -386,7 +388,7 @@ class ConfigController extends AbstractController
 
     /**
      * Get status of all features and services (Web Search, AI Providers, Processing Services, etc.)
-     * Only available in development mode
+     * Only available in development mode.
      */
     #[Route('/features', name: 'features_status', methods: ['GET'])]
     public function getFeaturesStatus(#[CurrentUser] ?User $user): JsonResponse
@@ -397,14 +399,14 @@ class ConfigController extends AbstractController
 
         // Only allow in development mode
         $env = $_ENV['APP_ENV'] ?? 'prod';
-        if ($env !== 'dev') {
+        if ('dev' !== $env) {
             return $this->json(['error' => 'Feature only available in development mode'], Response::HTTP_FORBIDDEN);
         }
 
         $features = [];
 
         // ========== AI Features ==========
-        
+
         // Web Search (Brave API)
         $braveEnabled = $this->braveSearchService->isEnabled();
         $features['web-search'] = [
@@ -413,22 +415,22 @@ class ConfigController extends AbstractController
             'name' => 'Web Search',
             'enabled' => $braveEnabled,
             'status' => $braveEnabled ? 'active' : 'disabled',
-            'message' => $braveEnabled 
-                ? 'Web search is active and ready to use' 
+            'message' => $braveEnabled
+                ? 'Web search is active and ready to use'
                 : 'Web search requires Brave Search API configuration',
             'setup_required' => !$braveEnabled,
             'env_vars' => [
                 'BRAVE_SEARCH_API_KEY' => [
                     'required' => true,
                     'set' => !empty($_ENV['BRAVE_SEARCH_API_KEY'] ?? ''),
-                    'hint' => 'Get your API key from https://api.search.brave.com/'
+                    'hint' => 'Get your API key from https://api.search.brave.com/',
                 ],
                 'BRAVE_SEARCH_ENABLED' => [
                     'required' => true,
                     'set' => ($_ENV['BRAVE_SEARCH_ENABLED'] ?? 'false') === 'true',
-                    'hint' => 'Set to "true" to enable web search'
-                ]
-            ]
+                    'hint' => 'Set to "true" to enable web search',
+                ],
+            ],
         ];
 
         // Image Generation
@@ -440,20 +442,20 @@ class ConfigController extends AbstractController
             'name' => 'Image Generation',
             'enabled' => $hasImageModels,
             'status' => $hasImageModels ? 'active' : 'disabled',
-            'message' => $hasImageModels 
-                ? count($imageModels) . ' image generation model(s) available' 
+            'message' => $hasImageModels
+                ? count($imageModels).' image generation model(s) available'
                 : 'No image generation models configured',
             'setup_required' => !$hasImageModels,
-            'models_available' => count($imageModels)
+            'models_available' => count($imageModels),
         ];
 
         // ========== AI Providers (Dynamic from ProviderRegistry) ==========
-        
+
         $providersMetadata = $this->providerRegistry->getProvidersMetadata();
-        
+
         foreach ($providersMetadata as $providerName => $providerData) {
             // Skip test provider in production
-            if ($providerName === 'test' && $env !== 'dev') {
+            if ('test' === $providerName && 'dev' !== $env) {
                 continue;
             }
 
@@ -462,7 +464,7 @@ class ConfigController extends AbstractController
             try {
                 $models = $this->modelRepository->findBy([
                     'provider' => $providerName,
-                    'active' => true
+                    'active' => true,
                 ]);
                 $modelsCount = count($models);
             } catch (\Exception $e) {
@@ -471,7 +473,7 @@ class ConfigController extends AbstractController
 
             // Get URL for services that have one
             $url = null;
-            if ($providerName === 'ollama') {
+            if ('ollama' === $providerName) {
                 $url = $_ENV['OLLAMA_BASE_URL'] ?? null;
             }
 
@@ -481,34 +483,34 @@ class ConfigController extends AbstractController
                 $envVars[$varName] = [
                     'required' => $varConfig['required'],
                     'set' => !empty($_ENV[$varName] ?? ''),
-                    'hint' => $varConfig['hint']
+                    'hint' => $varConfig['hint'],
                 ];
             }
 
             // Determine status: active if enabled and healthy, unhealthy if enabled but not healthy, disabled otherwise
             $status = 'disabled';
             if ($providerData['enabled']) {
-                $status = ($providerData['status'] === 'healthy') ? 'active' : 'unhealthy';
+                $status = ('healthy' === $providerData['status']) ? 'active' : 'unhealthy';
             }
 
             $features[$providerName] = [
                 'id' => $providerName,
-            'category' => 'AI Providers',
+                'category' => 'AI Providers',
                 'name' => $providerData['name'],
                 'enabled' => $providerData['enabled'],
                 'status' => $status,
-                'message' => $providerData['enabled'] 
+                'message' => $providerData['enabled']
                     ? $providerData['description']
                     : ($providerData['status_message'] ?? 'API key not configured'),
                 'setup_required' => $providerData['setup_required'],
                 'env_vars' => $envVars,
                 'models_available' => $modelsCount,
-                'url' => $url
-        ];
+                'url' => $url,
+            ];
         }
 
         // ========== Processing Services ==========
-        
+
         // Whisper.cpp (Speech-to-Text) - runs in backend container
         $whisperHealthy = $this->whisperService->isAvailable();
         $availableModels = $whisperHealthy ? $this->whisperService->getAvailableModels() : [];
@@ -518,23 +520,23 @@ class ConfigController extends AbstractController
             'name' => 'Whisper.cpp',
             'enabled' => $whisperHealthy,
             'status' => $whisperHealthy ? 'healthy' : 'unhealthy',
-            'message' => $whisperHealthy 
+            'message' => $whisperHealthy
                 ? 'Speech-to-text transcription is ready'
                 : 'Whisper.cpp binary or models not found',
             'setup_required' => !$whisperHealthy,
-            'models_available' => count($availableModels)
+            'models_available' => count($availableModels),
         ];
 
         // Apache Tika (Document Processing)
         $tikaUrl = $_ENV['TIKA_BASE_URL'] ?? 'http://tika:9998';
-        $tikaHealthy = $this->checkServiceHealth($tikaUrl . '/tika');
-        
+        $tikaHealthy = $this->checkServiceHealth($tikaUrl.'/tika');
+
         // Try to get Tika version
         $tikaVersion = '';
         if ($tikaHealthy) {
             try {
-                $versionResponse = @file_get_contents($tikaUrl . '/version', false, stream_context_create([
-                    'http' => ['timeout' => 2]
+                $versionResponse = @file_get_contents($tikaUrl.'/version', false, stream_context_create([
+                    'http' => ['timeout' => 2],
                 ]));
                 if ($versionResponse) {
                     $tikaVersion = trim($versionResponse);
@@ -543,19 +545,19 @@ class ConfigController extends AbstractController
                 // Ignore
             }
         }
-        
+
         $features['tika'] = [
             'id' => 'tika',
             'category' => 'Processing Services',
             'name' => 'Apache Tika',
             'enabled' => true,
             'status' => $tikaHealthy ? 'healthy' : 'unhealthy',
-            'message' => $tikaHealthy 
-                ? 'Document processing service is running' 
+            'message' => $tikaHealthy
+                ? 'Document processing service is running'
                 : 'Tika service is not responding',
             'setup_required' => false,
             'url' => $tikaUrl,
-            'version' => $tikaVersion
+            'version' => $tikaVersion,
         ];
 
         // ========== Infrastructure Services ==========
@@ -566,7 +568,7 @@ class ConfigController extends AbstractController
         try {
             $this->em->getConnection()->executeQuery('SELECT 1');
             $dbHealthy = true;
-            
+
             // Get DB version
             $versionResult = $this->em->getConnection()->executeQuery('SELECT VERSION()')->fetchOne();
             if ($versionResult) {
@@ -575,24 +577,23 @@ class ConfigController extends AbstractController
         } catch (\Exception $e) {
             $dbHealthy = false;
         }
-        
+
         $features['database'] = [
             'id' => 'database',
             'category' => 'Infrastructure',
             'name' => 'MariaDB',
             'enabled' => true,
             'status' => $dbHealthy ? 'healthy' : 'unhealthy',
-            'message' => $dbHealthy 
-                ? 'Database connection is active and responding' 
+            'message' => $dbHealthy
+                ? 'Database connection is active and responding'
                 : 'Database connection failed',
             'setup_required' => false,
-            'version' => $dbVersion
+            'version' => $dbVersion,
         ];
 
         // Count ready services
         $totalServices = count($features);
-        $healthyServices = count(array_filter($features, fn($f) => 
-            in_array($f['status'], ['active', 'healthy'])
+        $healthyServices = count(array_filter($features, fn ($f) => in_array($f['status'], ['active', 'healthy'])
         ));
 
         return $this->json([
@@ -601,13 +602,13 @@ class ConfigController extends AbstractController
                 'total' => $totalServices,
                 'healthy' => $healthyServices,
                 'unhealthy' => $totalServices - $healthyServices,
-                'all_ready' => $healthyServices === $totalServices
-            ]
+                'all_ready' => $healthyServices === $totalServices,
+            ],
         ]);
     }
 
     /**
-     * Check if a service is healthy by making a simple HTTP request
+     * Check if a service is healthy by making a simple HTTP request.
      */
     private function checkServiceHealth(string $url): bool
     {
@@ -615,27 +616,27 @@ class ConfigController extends AbstractController
             $context = stream_context_create([
                 'http' => [
                     'timeout' => 2,
-                    'ignore_errors' => true
-                ]
+                    'ignore_errors' => true,
+                ],
             ]);
-            
+
             $response = @file_get_contents($url, false, $context);
-            
-            if ($response === false) {
+
+            if (false === $response) {
                 return false;
             }
-            
+
             // Check HTTP response code
             if (isset($http_response_header[0])) {
                 preg_match('/\d{3}/', $http_response_header[0], $matches);
-                $statusCode = isset($matches[0]) ? (int)$matches[0] : 0;
+                $statusCode = isset($matches[0]) ? (int) $matches[0] : 0;
+
                 return $statusCode >= 200 && $statusCode < 500; // Accept 2xx, 3xx, 4xx (not 5xx)
             }
-            
+
             return true;
         } catch (\Exception $e) {
             return false;
         }
     }
 }
-

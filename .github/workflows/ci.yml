@@ -1,0 +1,238 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+    tags: ['v*']
+  pull_request:
+    branches: [main, develop]
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  lint:
+    name: PHP Code Formatting
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.3"
+          extensions: mbstring, xml, ctype, iconv, intl
+          coverage: none
+
+      - name: Cache composer dependencies
+        uses: actions/cache@v4
+        with:
+          path: backend/vendor
+          key: ${{ runner.os }}-composer-${{ hashFiles('backend/composer.lock') }}
+          restore-keys: ${{ runner.os }}-composer-
+
+      - name: Install dependencies
+        working-directory: backend
+        run: composer install --prefer-dist --no-progress --no-interaction --no-scripts
+
+      - name: Run code formatting check
+        working-directory: backend
+        run: composer lint
+
+  backend:
+    name: Backend (PHP/Symfony)
+    runs-on: ubuntu-latest
+
+    env:
+      DATABASE_WRITE_URL: mysql://synaplan_test:synaplan_test@127.0.0.1:3306/synaplan?serverVersion=11.8&charset=utf8mb4
+      DATABASE_READ_URL: mysql://synaplan_test:synaplan_test@127.0.0.1:3306/synaplan?serverVersion=11.8&charset=utf8mb4
+
+    services:
+      mysql:
+        image: mariadb:11.8
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: synaplan_test
+          MYSQL_USER: synaplan_test
+          MYSQL_PASSWORD: synaplan_test
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="healthcheck.sh --connect --innodb_initialized"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.3"
+          extensions: mbstring, xml, ctype, iconv, intl, pdo, pdo_mysql, zip, gd, curl, bcmath, exif, pcntl, opcache, readline, soap, sodium, ffi, imagick, redis
+          coverage: none
+
+      - name: Cache composer dependencies
+        uses: actions/cache@v4
+        with:
+          path: backend/vendor
+          key: ${{ runner.os }}-composer-${{ hashFiles('backend/composer.lock') }}
+          restore-keys: ${{ runner.os }}-composer-
+
+      - name: Create .env file
+        working-directory: backend
+        run: |
+          cat > .env <<EOF
+          APP_ENV=test
+          APP_SECRET=test_secret_not_for_production
+          DATABASE_WRITE_URL=${DATABASE_WRITE_URL}
+          DATABASE_READ_URL=${DATABASE_READ_URL}
+          MAILER_DSN=null://null
+          JWT_SECRET_KEY=%kernel.project_dir%/config/jwt/private.pem
+          JWT_PUBLIC_KEY=%kernel.project_dir%/config/jwt/public.pem
+          JWT_PASSPHRASE=test_passphrase
+          MESSENGER_TRANSPORT_DSN=sync://
+          EOF
+
+      - name: Install dependencies
+        working-directory: backend
+        run: composer install --prefer-dist --no-progress --no-interaction
+
+      - name: Security audit
+        working-directory: backend
+        run: composer audit || true
+
+      - name: Generate JWT keypair
+        working-directory: backend
+        run: php bin/console lexik:jwt:generate-keypair --skip-if-exists
+
+      - name: Setup database schema
+        working-directory: backend
+        run: |
+          # Run migrations (won't fail if none exist due to --allow-no-migration)
+          php bin/console doctrine:migrations:migrate --no-interaction --allow-no-migration
+          # Always run schema update to ensure all tables exist (idempotent)
+          php bin/console doctrine:schema:update --force
+
+      - name: Load fixtures
+        working-directory: backend
+        run: php bin/console doctrine:fixtures:load --no-interaction
+
+      - name: Run PHPUnit tests
+        working-directory: backend
+        run: php bin/phpunit
+
+  frontend:
+    name: Frontend (Vue/TypeScript)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Type check
+        working-directory: frontend
+        run: npm run check:types
+
+      - name: Run tests
+        working-directory: frontend
+        run: npm run test
+
+      - name: Build
+        working-directory: frontend
+        run: npm run build
+
+      - name: Upload frontend build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-dist
+          path: frontend/dist/
+          retention-days: 1
+
+  docker:
+    name: Build Docker Image
+    runs-on: ubuntu-latest
+    needs: [frontend]
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download frontend build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: frontend-dist
+          path: frontend/dist/
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to the Container registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata (tags, labels)
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            # For main branch, tag as 'latest'
+            type=raw,value=latest,enable={{is_default_branch}}
+            # For tags, extract semantic version (removes 'v' prefix automatically)
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
+            # For PRs, tag with PR number
+            type=ref,event=pr
+
+      - name: Build Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: _docker/backend/Dockerfile
+          # Push only on main branch or tags, not on PRs or develop
+          push: ${{ github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/')) }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # Gate job that depends on all checks - only this needs to be required in branch protection
+  all-checks-passed:
+    name: All Checks Passed
+    runs-on: ubuntu-latest
+    needs: [lint, backend, frontend, docker]
+    if: always()
+    steps:
+      - name: Check for failures
+        if: ${{ !cancelled() && (needs.lint.result != 'success' || needs.backend.result != 'success' || needs.frontend.result != 'success' || needs.docker.result != 'success') }}
+        run: |
+          echo "One or more checks failed, were cancelled, or were skipped"
+          exit 1
+
+      - name: All checks passed
+        if: ${{ !cancelled() && needs.lint.result == 'success' && needs.backend.result == 'success' && needs.frontend.result == 'success' && needs.docker.result == 'success' }}
+        run: echo "All checks passed!"

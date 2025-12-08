@@ -1,30 +1,13 @@
 import { defineStore } from 'pinia'
-import { ref, computed } from 'vue'
-import { configApi } from '@/services/api/configApi'
+import { ref } from 'vue'
+import { configApi, ModelsResponse } from '@/services/api/configApi'
+import type { AIModel, Capability } from '@/types/ai-models'
 
-export interface AIModel {
-  id: number
-  service: string
-  name: string
-  providerId: string
-  description?: string
-  quality: number
-  rating: number
-  tag: string
-  isSystemModel?: boolean
-  features?: string[]
-}
-
-export interface ModelsList {
-  [capability: string]: AIModel[]
-}
-
-export interface DefaultModels {
-  [capability: string]: number | null
-}
+// Local state can have nulls (no model selected for a capability)
+export type DefaultModels = Partial<Record<Capability, number | null>>
 
 export const useAiConfigStore = defineStore('aiConfig', () => {
-  const models = ref<ModelsList>({})
+  const models = ref<ModelsResponse["models"]>({})
   const defaults = ref<DefaultModels>({})
   const loading = ref(false)
 
@@ -59,9 +42,16 @@ export const useAiConfigStore = defineStore('aiConfig', () => {
   const saveDefaults = async (newDefaults: DefaultModels) => {
     loading.value = true
     try {
-      const response = await configApi.saveDefaultModels(newDefaults)
+      const payload: Record<string, number> = {}
+      Object.entries(newDefaults).forEach(([capability, value]) => {
+        if (value !== null) {
+          payload[capability] = value
+        }
+      })
+
+      const response = await configApi.saveDefaultModels({ defaults: payload })
       if (response.success) {
-        defaults.value = newDefaults
+        defaults.value = { ...newDefaults }
       }
       return response
     } catch (error) {
@@ -72,11 +62,12 @@ export const useAiConfigStore = defineStore('aiConfig', () => {
     }
   }
 
-  const getCurrentModel = (capability: string): AIModel | null => {
+  const getCurrentModel = (capability: Capability): AIModel | null => {
     const modelId = defaults.value[capability]
-    if (!modelId || !models.value[capability]) return null
-    
-    return models.value[capability].find(m => m.id === modelId) || null
+    const capabilityModels = models.value[capability]
+    if (!modelId || !capabilityModels) return null
+
+    return capabilityModels.find(m => m.id === modelId) || null
   }
 
   return {

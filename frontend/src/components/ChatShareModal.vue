@@ -213,6 +213,10 @@ const makePublic = async () => {
   sharing.value = true
   try {
     const result = await chatsStore.shareChat(props.chatId, true)
+    if (!result) {
+      showError('Unable to share chat. Please sign in again.')
+      return
+    }
     shareInfo.value = {
       isShared: result.isShared,
       shareUrl: result.shareUrl,

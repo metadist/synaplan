@@ -59,6 +59,7 @@ class MediaPromptExtractorTest extends TestCase
                     $this->assertSame('de', $classification['language']);
                     $this->assertArrayNotHasKey('model_id', $classification);
                     $this->assertArrayNotHasKey('override_model_id', $classification);
+
                     return true;
                 }),
                 $this->isNull()
@@ -120,13 +121,15 @@ class MediaPromptExtractorTest extends TestCase
         $chatHandler->expects($this->exactly(2))
             ->method('handle')
             ->willReturnCallback(function ($message, $thread, $classification, $progress) use (&$call) {
-                if ($call === 0) {
+                if (0 === $call) {
                     $this->assertSame('mediamaker', $classification['topic']);
-                    $call++;
+                    ++$call;
+
                     return ['content' => 'Audio Prompt: Erstelle eine Audiodatei, in der ich sage: "Hallo, was geht?"'];
                 }
 
                 $this->assertSame('tools:mediamaker_audio_extract', $classification['topic']);
+
                 return ['content' => 'Hallo, was geht?'];
             });
 
@@ -137,4 +140,3 @@ class MediaPromptExtractorTest extends TestCase
         $this->assertSame('audio', $result['media_type']);
     }
 }
-

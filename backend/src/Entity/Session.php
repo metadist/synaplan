@@ -60,6 +60,7 @@ class Session
     public function setId(string $id): self
     {
         $this->id = $id;
+
         return $this;
     }
 
@@ -71,6 +72,7 @@ class Session
     public function setUserId(?int $userId): self
     {
         $this->userId = $userId;
+
         return $this;
     }
 
@@ -83,6 +85,7 @@ class Session
     {
         $this->user = $user;
         $this->userId = $user?->getId();
+
         return $this;
     }
 
@@ -94,6 +97,7 @@ class Session
     public function setToken(string $token): self
     {
         $this->token = $token;
+
         return $this;
     }
 
@@ -105,6 +109,7 @@ class Session
     public function setData(string $data): self
     {
         $this->data = $data;
+
         return $this;
     }
 
@@ -116,6 +121,7 @@ class Session
     public function setDataArray(array $data): self
     {
         $this->data = json_encode($data);
+
         return $this;
     }
 
@@ -127,6 +133,7 @@ class Session
     public function setCreated(int $created): self
     {
         $this->created = $created;
+
         return $this;
     }
 
@@ -138,12 +145,14 @@ class Session
     public function setLastActivity(int $lastActivity): self
     {
         $this->lastActivity = $lastActivity;
+
         return $this;
     }
 
     public function updateLastActivity(): self
     {
         $this->lastActivity = time();
+
         return $this;
     }
 
@@ -155,6 +164,7 @@ class Session
     public function setExpires(int $expires): self
     {
         $this->expires = $expires;
+
         return $this;
     }
 
@@ -171,6 +181,7 @@ class Session
     public function setIpAddress(string $ipAddress): self
     {
         $this->ipAddress = $ipAddress;
+
         return $this;
     }
 
@@ -182,7 +193,7 @@ class Session
     public function setUserAgent(string $userAgent): self
     {
         $this->userAgent = $userAgent;
+
         return $this;
     }
 }
-

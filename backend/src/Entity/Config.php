@@ -2,8 +2,8 @@
 
 namespace App\Entity;
 
-use Doctrine\ORM\Mapping as ORM;
 use App\Repository\ConfigRepository;
+use Doctrine\ORM\Mapping as ORM;
 
 #[ORM\Entity(repositoryClass: ConfigRepository::class)]
 #[ORM\Table(name: 'BCONFIG')]
@@ -42,6 +42,7 @@ class Config
     public function setOwnerId(int $ownerId): self
     {
         $this->ownerId = $ownerId;
+
         return $this;
     }
 
@@ -53,6 +54,7 @@ class Config
     public function setGroup(string $group): self
     {
         $this->group = $group;
+
         return $this;
     }
 
@@ -64,6 +66,7 @@ class Config
     public function setSetting(string $setting): self
     {
         $this->setting = $setting;
+
         return $this;
     }
 
@@ -75,7 +78,7 @@ class Config
     public function setValue(string $value): self
     {
         $this->value = $value;
+
         return $this;
     }
 }
-

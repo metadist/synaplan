@@ -31,4 +31,3 @@ class EmailVerificationAttemptRepository extends ServiceEntityRepository
             ->execute();
     }
 }
-

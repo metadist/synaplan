@@ -3,8 +3,8 @@
 namespace App\Message;
 
 /**
- * Message Command für async AI-Processing
- * 
+ * Message Command für async AI-Processing.
+ *
  * Queued in: async_ai_high (Redis)
  * Handled by: ProcessMessageCommandHandler
  */
@@ -13,8 +13,9 @@ class ProcessMessageCommand
     public function __construct(
         private int $messageId,
         private ?int $userId = null,
-        private array $options = []
-    ) {}
+        private array $options = [],
+    ) {
+    }
 
     public function getMessageId(): int
     {
@@ -31,4 +32,3 @@ class ProcessMessageCommand
         return $this->options;
     }
 }
-

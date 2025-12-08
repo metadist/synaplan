@@ -511,7 +511,7 @@ import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { UserIcon, ArrowPathIcon, ChevronDownIcon } from '@heroicons/vue/24/outline'
 import { Icon } from '@iconify/vue'
-import { useModelSelection } from '@/composables/useModelSelection'
+import { useModelSelection, type ModelOption } from '@/composables/useModelSelection'
 import { getProviderIcon } from '@/utils/providerIcons'
 import MessagePart from './MessagePart.vue'
 import GroqIcon from '@/components/icons/GroqIcon.vue'
@@ -562,12 +562,6 @@ interface Props {
     label: string // Display label (e.g., 'Web Search', 'Image Generation', 'Video Generation')
     icon: string // Icon identifier
   } | null // Tool/command metadata
-}
-
-interface ModelOption {
-  provider: string
-  model: string
-  label: string
 }
 
 const props = defineProps<Props>()
@@ -785,7 +779,7 @@ const closeModelDropdown = () => {
   modelDropdownOpen.value = false
 }
 
-const selectModel = (model: ModelOption & { id?: number }) => {
+const selectModel = (model: ModelOption) => {
   // Trigger again with selected model
   if (props.backendMessageId && model.id) {
     emit('again', props.backendMessageId, model.id)

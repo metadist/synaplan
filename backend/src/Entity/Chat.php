@@ -59,6 +59,7 @@ class Chat
     public function setUserId(int $userId): self
     {
         $this->userId = $userId;
+
         return $this;
     }
 
@@ -70,6 +71,7 @@ class Chat
     public function setTitle(?string $title): self
     {
         $this->title = $title;
+
         return $this;
     }
 
@@ -81,6 +83,7 @@ class Chat
     public function setCreatedAt(\DateTimeInterface $createdAt): self
     {
         $this->createdAt = $createdAt;
+
         return $this;
     }
 
@@ -92,6 +95,7 @@ class Chat
     public function setUpdatedAt(\DateTimeInterface $updatedAt): self
     {
         $this->updatedAt = $updatedAt;
+
         return $this;
     }
 
@@ -103,12 +107,14 @@ class Chat
     public function setShareToken(?string $shareToken): self
     {
         $this->shareToken = $shareToken;
+
         return $this;
     }
 
     public function generateShareToken(): self
     {
         $this->shareToken = bin2hex(random_bytes(32));
+
         return $this;
     }
 
@@ -120,6 +126,7 @@ class Chat
     public function setIsPublic(bool $isPublic): self
     {
         $this->isPublic = $isPublic;
+
         return $this;
     }
 
@@ -134,6 +141,7 @@ class Chat
             $this->messages->add($message);
             $message->setChat($this);
         }
+
         return $this;
     }
 
@@ -144,13 +152,14 @@ class Chat
                 $message->setChat(null);
             }
         }
+
         return $this;
     }
 
     public function updateTimestamp(): self
     {
         $this->updatedAt = new \DateTime();
+
         return $this;
     }
 }
-

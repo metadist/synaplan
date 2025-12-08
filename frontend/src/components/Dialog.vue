@@ -118,7 +118,7 @@ const handleConfirm = () => {
     } else if (dialog.value.type === 'prompt') {
       dialog.value.resolve(inputValue.value || null)
     } else {
-      dialog.value.resolve()
+      dialog.value.resolve(undefined)
     }
   }
   dialog.value.isOpen = false

@@ -39,7 +39,7 @@ class InboundEmailHandlerTest extends TestCase
     public function testSetAndGetSmtpCredentials(): void
     {
         $handler = new InboundEmailHandler();
-        
+
         $handler->setSmtpCredentials(
             'smtp.gmail.com',
             587,
@@ -70,7 +70,7 @@ class InboundEmailHandlerTest extends TestCase
 
         // Test historical mode
         $handler->setEmailFilter('historical', '2025-01-01T00:00', '2025-12-31T23:59');
-        
+
         $filter = $handler->getEmailFilter();
         $this->assertEquals('historical', $filter['mode']);
         $this->assertEquals('2025-01-01T00:00', $filter['from_date']);
@@ -86,7 +86,7 @@ class InboundEmailHandlerTest extends TestCase
     public function testEmptyPasswordHandling(): void
     {
         $handler = new InboundEmailHandler();
-        
+
         $handler->setDecryptedPassword('', $this->encryptionService);
         $this->assertEquals('', $handler->getPassword());
 
@@ -102,4 +102,3 @@ class InboundEmailHandlerTest extends TestCase
         $this->assertEquals('', $credentials['password']);
     }
 }
-

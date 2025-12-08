@@ -3,12 +3,12 @@
 namespace App\Service\Search;
 
 use Psr\Log\LoggerInterface;
-use Symfony\Contracts\HttpClient\HttpClientInterface;
 use Symfony\Contracts\HttpClient\Exception\TransportExceptionInterface;
+use Symfony\Contracts\HttpClient\HttpClientInterface;
 
 /**
  * Service for interacting with Brave Search API
- * Documentation: https://api-dashboard.search.brave.com/app/documentation/web-search/get-started
+ * Documentation: https://api-dashboard.search.brave.com/app/documentation/web-search/get-started.
  */
 class BraveSearchService
 {
@@ -27,7 +27,7 @@ class BraveSearchService
         bool $braveSearchEnabled,
         int $braveSearchCount,
         string $braveSearchCountry,
-        string $braveSearchLang
+        string $braveSearchLang,
     ) {
         $this->apiKey = $braveSearchApiKey;
         $this->apiUrl = rtrim($braveSearchApiUrl, '/');
@@ -38,7 +38,7 @@ class BraveSearchService
     }
 
     /**
-     * Check if Brave Search is enabled and configured
+     * Check if Brave Search is enabled and configured.
      */
     public function isEnabled(): bool
     {
@@ -46,11 +46,13 @@ class BraveSearchService
     }
 
     /**
-     * Perform a web search using Brave Search API
-     * 
-     * @param string $query The search query
-     * @param array $options Additional search options (count, country, search_lang, etc.)
+     * Perform a web search using Brave Search API.
+     *
+     * @param string $query   The search query
+     * @param array  $options Additional search options (count, country, search_lang, etc.)
+     *
      * @return array Search results with metadata
+     *
      * @throws \RuntimeException If search fails or is not configured
      */
     public function search(string $query, array $options = []): array
@@ -71,7 +73,7 @@ class BraveSearchService
             'query' => $query,
             'search_lang' => $searchLang,
             'country' => $country,
-            'options' => $options
+            'options' => $options,
         ]);
 
         try {
@@ -96,12 +98,12 @@ class BraveSearchService
             }
 
             $this->logger->info('🔍 Brave Search: Making API request', [
-                'url' => $this->apiUrl . '/web/search',
-                'params' => $params
+                'url' => $this->apiUrl.'/web/search',
+                'params' => $params,
             ]);
 
             // Make API request
-            $response = $this->httpClient->request('GET', $this->apiUrl . '/web/search', [
+            $response = $this->httpClient->request('GET', $this->apiUrl.'/web/search', [
                 'headers' => [
                     'Accept' => 'application/json',
                     'X-Subscription-Token' => $this->apiKey,
@@ -111,15 +113,15 @@ class BraveSearchService
             ]);
 
             $statusCode = $response->getStatusCode();
-            
-            if ($statusCode !== 200) {
+
+            if (200 !== $statusCode) {
                 // Get error message from response body
                 $errorBody = $response->getContent(false); // false = don't throw on error status
-                
+
                 $this->logger->error('Brave Search API error', [
                     'status_code' => $statusCode,
                     'query' => $query,
-                    'error_body' => substr($errorBody, 0, 500) // First 500 chars
+                    'error_body' => substr($errorBody, 0, 500), // First 500 chars
                 ]);
                 throw new \RuntimeException("Brave Search API returned status code: {$statusCode}");
             }
@@ -128,18 +130,17 @@ class BraveSearchService
 
             $this->logger->info('✅ Brave Search: Search completed', [
                 'query' => $query,
-                'results_count' => count($data['web']['results'] ?? [])
+                'results_count' => count($data['web']['results'] ?? []),
             ]);
 
             // Parse and structure the results
             return $this->parseSearchResults($data, $query);
-
         } catch (TransportExceptionInterface $e) {
             $this->logger->error('Brave Search API transport error', [
                 'error' => $e->getMessage(),
-                'query' => $query
+                'query' => $query,
             ]);
-            throw new \RuntimeException('Failed to connect to Brave Search API: ' . $e->getMessage(), 0, $e);
+            throw new \RuntimeException('Failed to connect to Brave Search API: '.$e->getMessage(), 0, $e);
         } catch (\Exception $e) {
             $this->logger->error('Brave Search API unexpected error', [
                 'error' => $e->getMessage(),
@@ -147,15 +148,15 @@ class BraveSearchService
                 'error_trace' => $e->getTraceAsString(),
                 'query' => $query,
                 'line' => $e->getLine(),
-                'file' => $e->getFile()
+                'file' => $e->getFile(),
             ]);
-            throw new \RuntimeException('Brave Search API error: ' . $e->getMessage(), 0, $e);
+            throw new \RuntimeException('Brave Search API error: '.$e->getMessage(), 0, $e);
         }
     }
 
     /**
      * Normalize language code to ISO 639-1 (2-letter) format
-     * Ensures valid language codes with fallback to default
+     * Ensures valid language codes with fallback to default.
      */
     private function normalizeLanguageCode(?string $lang): string
     {
@@ -171,7 +172,7 @@ class BraveSearchService
         $validLangCodes = [
             'en', 'de', 'fr', 'es', 'it', 'pt', 'nl', 'pl', 'ru', 'ja',
             'zh', 'ko', 'ar', 'tr', 'hi', 'sv', 'da', 'fi', 'no', 'cs',
-            'hu', 'ro', 'uk', 'el', 'he', 'id', 'th', 'vi', 'ms', 'bn'
+            'hu', 'ro', 'uk', 'el', 'he', 'id', 'th', 'vi', 'ms', 'bn',
         ];
 
         if (in_array($lang, $validLangCodes, true)) {
@@ -181,15 +182,15 @@ class BraveSearchService
         // Fallback to default if invalid
         $this->logger->debug('Invalid language code, using default', [
             'provided' => $lang,
-            'default' => $this->defaultSearchLang
+            'default' => $this->defaultSearchLang,
         ]);
-        
+
         return $this->defaultSearchLang;
     }
 
     /**
      * Normalize country code to ISO 3166-1 alpha-2 (2-letter) format
-     * Maps language codes to appropriate country codes with fallback
+     * Maps language codes to appropriate country codes with fallback.
      */
     private function normalizeCountryCode(?string $country): string
     {
@@ -241,8 +242,9 @@ class BraveSearchService
             $mappedCountry = $langToCountryMap[$country];
             $this->logger->debug('Mapped language to country', [
                 'language' => $country,
-                'country' => $mappedCountry
+                'country' => $mappedCountry,
             ]);
+
             return $mappedCountry;
         }
 
@@ -252,7 +254,7 @@ class BraveSearchService
             'PL', 'RU', 'JP', 'CN', 'KR', 'IN', 'BR', 'MX', 'AR', 'CL',
             'SE', 'DK', 'FI', 'NO', 'CZ', 'HU', 'RO', 'UA', 'GR', 'TR',
             'IL', 'SA', 'AE', 'ID', 'TH', 'VN', 'MY', 'SG', 'PH', 'BD',
-            'BE', 'AT', 'CH', 'IE', 'NZ', 'ZA', 'EG', 'NG', 'KE', 'CO'
+            'BE', 'AT', 'CH', 'IE', 'NZ', 'ZA', 'EG', 'NG', 'KE', 'CO',
         ];
 
         if (in_array($country, $validCountryCodes, true)) {
@@ -262,19 +264,19 @@ class BraveSearchService
         // Fallback to default if invalid
         $this->logger->debug('Invalid country code, using default', [
             'provided' => $country,
-            'default' => $this->defaultCountry
+            'default' => $this->defaultCountry,
         ]);
-        
+
         return $this->defaultCountry;
     }
 
     /**
-     * Parse and structure Brave Search API results
+     * Parse and structure Brave Search API results.
      */
     private function parseSearchResults(array $data, string $query): array
     {
         $results = [];
-        
+
         // Extract web results
         if (isset($data['web']['results']) && is_array($data['web']['results'])) {
             foreach ($data['web']['results'] as $result) {
@@ -312,12 +314,12 @@ class BraveSearchService
     }
 
     /**
-     * Format search results as plain text for AI model consumption
+     * Format search results as plain text for AI model consumption.
      */
     public function formatResultsForAI(array $searchResults): string
     {
         if (empty($searchResults['results'])) {
-            return "No search results found for query: " . ($searchResults['query'] ?? 'unknown');
+            return 'No search results found for query: '.($searchResults['query'] ?? 'unknown');
         }
 
         $formatted = "Web Search Results for: \"{$searchResults['query']}\"\n\n";
@@ -327,11 +329,11 @@ class BraveSearchService
             $num = $index + 1;
             $formatted .= "[{$num}] {$result['title']}\n";
             $formatted .= "URL: {$result['url']}\n";
-            
+
             if (!empty($result['description'])) {
                 $formatted .= "Description: {$result['description']}\n";
             }
-            
+
             if (!empty($result['age'])) {
                 $formatted .= "Published: {$result['age']}\n";
             }
@@ -340,14 +342,13 @@ class BraveSearchService
             if (!empty($result['extra_snippets'])) {
                 $formatted .= "Snippets:\n";
                 foreach ($result['extra_snippets'] as $snippet) {
-                    $formatted .= "  - " . strip_tags($snippet) . "\n";
+                    $formatted .= '  - '.strip_tags($snippet)."\n";
                 }
             }
-            
+
             $formatted .= "\n";
         }
 
         return $formatted;
     }
 }
-

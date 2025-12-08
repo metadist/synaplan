@@ -16,14 +16,15 @@ use Symfony\Component\Security\Http\Authenticator\Passport\SelfValidatingPasspor
 
 /**
  * Authenticator for JWT tokens in query parameters
- * Used for EventSource/SSE endpoints that can't send Authorization headers
+ * Used for EventSource/SSE endpoints that can't send Authorization headers.
  */
 class QueryTokenAuthenticator extends AbstractAuthenticator
 {
     public function __construct(
         private JWTTokenManagerInterface $jwtManager,
-        private TokenExtractorInterface $tokenExtractor
-    ) {}
+        private TokenExtractorInterface $tokenExtractor,
+    ) {
+    }
 
     public function supports(Request $request): ?bool
     {
@@ -42,7 +43,7 @@ class QueryTokenAuthenticator extends AbstractAuthenticator
         try {
             $payload = $this->jwtManager->parse($token);
         } catch (\Exception $e) {
-            throw new AuthenticationException('Invalid token: ' . $e->getMessage());
+            throw new AuthenticationException('Invalid token: '.$e->getMessage());
         }
 
         if (!isset($payload['id'])) {
@@ -64,8 +65,7 @@ class QueryTokenAuthenticator extends AbstractAuthenticator
     {
         return new JsonResponse([
             'error' => 'Authentication failed',
-            'message' => $exception->getMessage()
+            'message' => $exception->getMessage(),
         ], Response::HTTP_UNAUTHORIZED);
     }
 }
-

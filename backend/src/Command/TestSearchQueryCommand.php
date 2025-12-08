@@ -17,7 +17,7 @@ use Symfony\Component\Console\Style\SymfonyStyle;
 class TestSearchQueryCommand extends Command
 {
     public function __construct(
-        private SearchQueryGenerator $searchQueryGenerator
+        private SearchQueryGenerator $searchQueryGenerator,
     ) {
         parent::__construct();
     }
@@ -32,9 +32,9 @@ class TestSearchQueryCommand extends Command
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
         $io = new SymfonyStyle($input, $output);
-        
+
         $question = $input->getArgument('question');
-        $userId = $input->getArgument('userId') ? (int)$input->getArgument('userId') : null;
+        $userId = $input->getArgument('userId') ? (int) $input->getArgument('userId') : null;
 
         $io->title('Search Query Generator Test');
         $io->section('Input');
@@ -45,29 +45,28 @@ class TestSearchQueryCommand extends Command
 
         $io->section('Processing');
         $startTime = microtime(true);
-        
+
         try {
             $searchQuery = $this->searchQueryGenerator->generate($question, $userId);
             $duration = round((microtime(true) - $startTime) * 1000, 2);
-            
+
             $io->section('Result');
             $io->success("Generated search query in {$duration}ms:");
             $io->writeln("  → {$searchQuery}");
-            
+
             $io->section('Analysis');
             $io->text([
-                "Original length: " . strlen($question) . " characters",
-                "Generated length: " . strlen($searchQuery) . " characters",
-                "Reduction: " . round((1 - strlen($searchQuery) / strlen($question)) * 100, 1) . "%"
+                'Original length: '.strlen($question).' characters',
+                'Generated length: '.strlen($searchQuery).' characters',
+                'Reduction: '.round((1 - strlen($searchQuery) / strlen($question)) * 100, 1).'%',
             ]);
-            
+
             return Command::SUCCESS;
-            
         } catch (\Exception $e) {
-            $io->error("Failed to generate search query: " . $e->getMessage());
-            $io->text("Exception: " . get_class($e));
+            $io->error('Failed to generate search query: '.$e->getMessage());
+            $io->text('Exception: '.get_class($e));
+
             return Command::FAILURE;
         }
     }
 }
-

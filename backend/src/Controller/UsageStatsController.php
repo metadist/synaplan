@@ -13,22 +13,23 @@ use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\CurrentUser;
 
 /**
- * Usage Statistics Controller
- * 
+ * Usage Statistics Controller.
+ *
  * Provides detailed usage statistics for authenticated users
  */
 #[Route('/api/v1/usage', name: 'api_usage_')]
 class UsageStatsController extends AbstractController
 {
     public function __construct(
-        private UsageStatsService $usageStatsService
-    ) {}
+        private UsageStatsService $usageStatsService,
+    ) {
+    }
 
     /**
-     * Get comprehensive usage statistics
-     * 
+     * Get comprehensive usage statistics.
+     *
      * GET /api/v1/usage/stats
-     * 
+     *
      * Returns:
      * - Current user level and subscription info
      * - Usage per action type (Messages, Images, Videos, etc.)
@@ -53,15 +54,15 @@ class UsageStatsController extends AbstractController
                             property: 'data',
                             type: 'object',
                             description: 'Detailed usage statistics including limits, breakdowns by source and time period'
-                        )
+                        ),
                     ]
                 )
             ),
-            new OA\Response(response: 401, description: 'Not authenticated')
+            new OA\Response(response: 401, description: 'Not authenticated'),
         ]
     )]
     public function getStats(
-        #[CurrentUser] ?User $user
+        #[CurrentUser] ?User $user,
     ): JsonResponse {
         if (!$user) {
             return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
@@ -71,23 +72,23 @@ class UsageStatsController extends AbstractController
 
         return $this->json([
             'success' => true,
-            'data' => $stats
+            'data' => $stats,
         ]);
     }
 
     /**
-     * Export usage data as CSV
-     * 
+     * Export usage data as CSV.
+     *
      * GET /api/v1/usage/export
-     * 
+     *
      * Query parameters:
      * - since: Unix timestamp (optional) - only include data since this timestamp
-     * 
+     *
      * Returns CSV file download
      */
     #[Route('/export', name: 'export', methods: ['GET'])]
     public function exportCsv(
-        #[CurrentUser] ?User $user
+        #[CurrentUser] ?User $user,
     ): StreamedResponse {
         if (!$user) {
             return new StreamedResponse(
@@ -116,9 +117,8 @@ class UsageStatsController extends AbstractController
         );
 
         $response->headers->set('Content-Type', 'text/csv');
-        $response->headers->set('Content-Disposition', 'attachment; filename="' . $filename . '"');
+        $response->headers->set('Content-Disposition', 'attachment; filename="'.$filename.'"');
 
         return $response;
     }
 }
-

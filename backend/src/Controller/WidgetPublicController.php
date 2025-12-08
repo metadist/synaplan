@@ -2,32 +2,32 @@
 
 namespace App\Controller;
 
-use App\Entity\Message;
 use App\Entity\Chat;
 use App\Entity\File;
-use App\Service\WidgetService;
-use App\Service\WidgetSessionService;
+use App\Entity\Message;
+use App\Repository\ChatRepository;
+use App\Repository\FileRepository;
+use App\Repository\MessageRepository;
+use App\Service\File\FileProcessor;
+use App\Service\File\FileStorageService;
+use App\Service\File\VectorizationService;
 use App\Service\Message\MessageProcessor;
 use App\Service\RateLimitService;
-use App\Service\File\FileStorageService;
-use App\Service\File\FileProcessor;
-use App\Service\File\VectorizationService;
-use App\Repository\ChatRepository;
-use App\Repository\MessageRepository;
-use App\Repository\FileRepository;
+use App\Service\WidgetService;
+use App\Service\WidgetSessionService;
 use Doctrine\ORM\EntityManagerInterface;
 use OpenApi\Attributes as OA;
+use Psr\Log\LoggerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 use Symfony\Component\Routing\Attribute\Route;
-use Psr\Log\LoggerInterface;
 
 /**
- * Widget Public API Controller
- * 
+ * Widget Public API Controller.
+ *
  * PUBLIC endpoints (no JWT required) for chat widgets embedded on external websites
  */
 #[Route('/api/v1/widget', name: 'api_widget_public_')]
@@ -47,12 +47,13 @@ class WidgetPublicController extends AbstractController
         private FileRepository $fileRepository,
         private EntityManagerInterface $em,
         private LoggerInterface $logger,
-        private string $uploadDir
-    ) {}
+        private string $uploadDir,
+    ) {
+    }
 
     /**
-     * Get widget configuration
-     * 
+     * Get widget configuration.
+     *
      * PUBLIC endpoint - no authentication required
      */
     #[Route('/{widgetId}/config', name: 'config', methods: ['GET'])]
@@ -76,7 +77,7 @@ class WidgetPublicController extends AbstractController
                 new OA\Property(property: 'widgetId', type: 'string'),
                 new OA\Property(property: 'name', type: 'string'),
                 new OA\Property(property: 'config', type: 'object'),
-                new OA\Property(property: 'isActive', type: 'boolean')
+                new OA\Property(property: 'isActive', type: 'boolean'),
             ]
         )
     )]
@@ -86,7 +87,7 @@ class WidgetPublicController extends AbstractController
 
         if (!$widget) {
             return $this->json([
-                'error' => 'Widget not found'
+                'error' => 'Widget not found',
             ], Response::HTTP_NOT_FOUND);
         }
 
@@ -95,7 +96,7 @@ class WidgetPublicController extends AbstractController
         if (!$isActive) {
             return $this->json([
                 'error' => 'Widget is not active',
-                'reason' => 'owner_limits_exceeded'
+                'reason' => 'owner_limits_exceeded',
             ], Response::HTTP_SERVICE_UNAVAILABLE);
         }
 
@@ -109,13 +110,13 @@ class WidgetPublicController extends AbstractController
             'widgetId' => $widget->getWidgetId(),
             'name' => $widget->getName(),
             'config' => $config,
-            'isActive' => true
+            'isActive' => true,
         ]);
     }
 
     /**
-     * Send message to widget (synchronous response)
-     * 
+     * Send message to widget (synchronous response).
+     *
      * PUBLIC endpoint - no authentication required, session-based rate limiting
      */
     #[Route('/{widgetId}/message', name: 'message', methods: ['POST'])]
@@ -132,44 +133,46 @@ class WidgetPublicController extends AbstractController
                 new OA\Property(property: 'sessionId', type: 'string', example: 'sess_xyz123...'),
                 new OA\Property(property: 'text', type: 'string', example: 'Hello, I need help!'),
                 new OA\Property(property: 'chatId', type: 'integer', nullable: true),
-                new OA\Property(property: 'files', type: 'array', items: new OA\Items(type: 'integer'))
+                new OA\Property(property: 'files', type: 'array', items: new OA\Items(type: 'integer')),
             ]
         )
     )]
     public function message(string $widgetId, Request $request): Response
     {
         $data = json_decode($request->getContent(), true);
-        
+
         // Immediate test to see if we reach here
-        if ($data === null) {
+        if (null === $data) {
             return $this->json([
-                'error' => 'Invalid JSON in request body'
+                'error' => 'Invalid JSON in request body',
             ], Response::HTTP_BAD_REQUEST);
         }
 
-        error_log('📥 Widget message request: ' . json_encode($data));
+        error_log('📥 Widget message request: '.json_encode($data));
 
         if (empty($data['sessionId']) || empty($data['text'])) {
-            error_log('❌ Missing fields - sessionId: ' . ($data['sessionId'] ?? 'NULL') . ', text: ' . ($data['text'] ?? 'NULL'));
+            error_log('❌ Missing fields - sessionId: '.($data['sessionId'] ?? 'NULL').', text: '.($data['text'] ?? 'NULL'));
+
             return $this->json([
-                'error' => 'Missing required fields: sessionId, text'
+                'error' => 'Missing required fields: sessionId, text',
             ], Response::HTTP_BAD_REQUEST);
         }
 
         // Get widget
         $widget = $this->widgetService->getWidgetById($widgetId);
         if (!$widget) {
-            error_log('❌ Widget not found: ' . $widgetId);
+            error_log('❌ Widget not found: '.$widgetId);
+
             return $this->json(['error' => 'Widget not found'], Response::HTTP_NOT_FOUND);
         }
 
-        error_log('✅ Widget found: ' . $widget->getName());
+        error_log('✅ Widget found: '.$widget->getName());
 
         // Check if widget is active
         if (!$this->widgetService->isWidgetActive($widget)) {
             return $this->json([
                 'error' => 'Widget is not active',
-                'reason' => 'owner_limits_exceeded'
+                'reason' => 'owner_limits_exceeded',
             ], Response::HTTP_SERVICE_UNAVAILABLE);
         }
 
@@ -182,14 +185,14 @@ class WidgetPublicController extends AbstractController
         $session = $this->sessionService->getOrCreateSession($widgetId, $data['sessionId']);
 
         // Check session limits
-        $messageLimit = (int)($config['messageLimit'] ?? WidgetSessionService::DEFAULT_MAX_MESSAGES);
+        $messageLimit = (int) ($config['messageLimit'] ?? WidgetSessionService::DEFAULT_MAX_MESSAGES);
         $limitCheck = $this->sessionService->checkSessionLimit($session, $messageLimit);
         if (!$limitCheck['allowed']) {
             return $this->json([
                 'error' => 'Rate limit exceeded',
                 'reason' => $limitCheck['reason'],
                 'remaining' => $limitCheck['remaining'],
-                'retryAfter' => $limitCheck['retry_after']
+                'retryAfter' => $limitCheck['retry_after'],
             ], Response::HTTP_TOO_MANY_REQUESTS);
         }
 
@@ -238,7 +241,7 @@ class WidgetPublicController extends AbstractController
                 $this->logger->info('Widget chat created', [
                     'widget_id' => $widget->getWidgetId(),
                     'chat_id' => $chat->getId(),
-                    'session_id' => $session->getSessionId()
+                    'session_id' => $session->getSessionId(),
                 ]);
             } else {
                 $chat->updateTimestamp();
@@ -303,22 +306,19 @@ class WidgetPublicController extends AbstractController
                 'channel' => 'WIDGET',
                 'language' => 'en',
                 'rag_group_key' => sprintf('WIDGET:%s', $widget->getWidgetId()),
-                'rag_limit' => (int)($config['ragResultLimit'] ?? 5),
+                'rag_limit' => (int) ($config['ragResultLimit'] ?? 5),
                 'rag_min_score' => isset($config['ragMinScore'])
                     ? max(0.0, min(1.0, (float) $config['ragMinScore']))
                     : 0.3,
-                'widget_id' => $widget->getWidgetId()
+                'widget_id' => $widget->getWidgetId(),
             ];
 
             $response = new StreamedResponse(function () use (
                 $incomingMessage,
                 $processingOptions,
                 $owner,
-                $widget,
                 $chat,
                 $fileIds,
-                $session,
-                $config,
                 $widgetId
             ) {
                 $responseText = '';
@@ -344,7 +344,7 @@ class WidgetPublicController extends AbstractController
                             }
 
                             $sendChunk = function (string $content) use (&$responseText) {
-                                if ($content === '') {
+                                if ('' === $content) {
                                     return;
                                 }
 
@@ -356,12 +356,13 @@ class WidgetPublicController extends AbstractController
                                 $type = $chunk['type'] ?? 'content';
                                 $content = $chunk['content'] ?? '';
 
-                                if ($type === 'reasoning') {
+                                if ('reasoning' === $type) {
                                     if (!$hasReasoningStarted) {
                                         $reasoningBuffer = '<think>';
                                         $hasReasoningStarted = true;
                                     }
                                     $reasoningBuffer .= $content;
+
                                     return;
                                 }
 
@@ -373,6 +374,7 @@ class WidgetPublicController extends AbstractController
                                 }
 
                                 $sendChunk($content);
+
                                 return;
                             }
 
@@ -385,12 +387,13 @@ class WidgetPublicController extends AbstractController
 
                             $chunkStr = (string) $chunk;
 
-                            if ($chunkCount === 0 && !$isBufferingJson) {
+                            if (0 === $chunkCount && !$isBufferingJson) {
                                 $trimmed = trim($chunkStr);
-                                if ($trimmed !== '' && str_starts_with($trimmed, '{')) {
+                                if ('' !== $trimmed && str_starts_with($trimmed, '{')) {
                                     $isBufferingJson = true;
                                     $jsonBuffer = $chunkStr;
-                                    $chunkCount++;
+                                    ++$chunkCount;
+
                                     return;
                                 }
                             }
@@ -401,10 +404,10 @@ class WidgetPublicController extends AbstractController
                                 if (str_contains($jsonBuffer, '}')) {
                                     $trimmed = trim($jsonBuffer);
                                     $lastBrace = strrpos($trimmed, '}');
-                                    if ($lastBrace !== false) {
+                                    if (false !== $lastBrace) {
                                         $potentialJson = substr($trimmed, 0, $lastBrace + 1);
-                                        $potentialJson = preg_replace('/"BFILE":\s*\n/', '"BFILE": 0' . "\n", $potentialJson);
-                                        $potentialJson = preg_replace('/"BFILE":\s*\r\n/', '"BFILE": 0' . "\r\n", $potentialJson);
+                                        $potentialJson = preg_replace('/"BFILE":\s*\n/', '"BFILE": 0'."\n", $potentialJson);
+                                        $potentialJson = preg_replace('/"BFILE":\s*\r\n/', '"BFILE": 0'."\r\n", $potentialJson);
                                         $potentialJson = preg_replace('/"BFILE":\s*}/', '"BFILE": 0}', $potentialJson);
 
                                         try {
@@ -414,7 +417,8 @@ class WidgetPublicController extends AbstractController
                                                 $sendChunk($extractedText);
                                                 $isBufferingJson = false;
                                                 $jsonBuffer = '';
-                                                $chunkCount++;
+                                                ++$chunkCount;
+
                                                 return;
                                             }
                                         } catch (\JsonException $e) {
@@ -423,15 +427,16 @@ class WidgetPublicController extends AbstractController
                                     }
                                 }
 
-                                $chunkCount++;
+                                ++$chunkCount;
+
                                 return;
                             }
 
-                            if ($chunkStr !== '') {
+                            if ('' !== $chunkStr) {
                                 $sendChunk($chunkStr);
                             }
 
-                            $chunkCount++;
+                            ++$chunkCount;
                         },
                         function ($statusUpdate) {
                             if (!is_array($statusUpdate)) {
@@ -458,10 +463,11 @@ class WidgetPublicController extends AbstractController
                         $this->em->flush();
 
                         $this->sendSse('error', ['error' => $errorMessage]);
+
                         return;
                     }
 
-                    if ($hasReasoningStarted && $reasoningBuffer !== '') {
+                    if ($hasReasoningStarted && '' !== $reasoningBuffer) {
                         $reasoningBuffer .= '</think>';
                         $responseText .= $reasoningBuffer;
                         $this->sendSse('data', ['chunk' => $reasoningBuffer]);
@@ -500,7 +506,7 @@ class WidgetPublicController extends AbstractController
                         'model' => $responseMetadata['model'] ?? null,
                         'tokens' => $tokens,
                         'channel' => 'WIDGET',
-                        'files' => $fileIds
+                        'files' => $fileIds,
                     ]);
 
                     $this->sendSse('complete', [
@@ -511,8 +517,8 @@ class WidgetPublicController extends AbstractController
                             'classification' => $result['classification'] ?? null,
                             'preprocessed' => $result['preprocessed'] ?? null,
                             'search_results' => $result['search_results'] ?? null,
-                            'files' => $fileIds
-                        ]
+                            'files' => $fileIds,
+                        ],
                     ]);
                 } catch (\Throwable $e) {
                     $incomingMessage->setStatus('failed');
@@ -523,7 +529,7 @@ class WidgetPublicController extends AbstractController
                         'trace' => $e->getTraceAsString(),
                         'widget_id' => $widgetId,
                         'file' => $e->getFile(),
-                        'line' => $e->getLine()
+                        'line' => $e->getLine(),
                     ]);
 
                     $this->sendSse('error', [
@@ -531,8 +537,8 @@ class WidgetPublicController extends AbstractController
                         'details' => [
                             'message' => $e->getMessage(),
                             'file' => $e->getFile(),
-                            'line' => $e->getLine()
-                        ]
+                            'line' => $e->getLine(),
+                        ],
                     ]);
                 }
             });
@@ -543,14 +549,13 @@ class WidgetPublicController extends AbstractController
             $response->headers->set('X-Accel-Buffering', 'no');
 
             return $response;
-
         } catch (\Exception $e) {
             $this->logger->error('Widget message failed', [
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
                 'widget_id' => $widgetId,
                 'file' => $e->getFile(),
-                'line' => $e->getLine()
+                'line' => $e->getLine(),
             ]);
 
             // DEBUG: Return detailed error (REMOVE IN PRODUCTION!)
@@ -560,15 +565,15 @@ class WidgetPublicController extends AbstractController
                     'message' => $e->getMessage(),
                     'file' => $e->getFile(),
                     'line' => $e->getLine(),
-                    'trace' => explode("\n", $e->getTraceAsString())
-                ]
+                    'trace' => explode("\n", $e->getTraceAsString()),
+                ],
             ], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
 
     /**
-     * Upload file for widget session
-     * 
+     * Upload file for widget session.
+     *
      * PUBLIC endpoint - no JWT required
      * Uses same file processing workflow as authenticated uploads
      * Files are stored with BUSERID=0 and BUSERSESSIONID=session_id
@@ -582,10 +587,10 @@ class WidgetPublicController extends AbstractController
     public function upload(string $widgetId, Request $request): JsonResponse
     {
         $sessionId = $request->headers->get('X-Widget-Session');
-        
+
         if (!$sessionId) {
             return $this->json([
-                'error' => 'X-Widget-Session header required'
+                'error' => 'X-Widget-Session header required',
             ], Response::HTTP_BAD_REQUEST);
         }
 
@@ -599,7 +604,7 @@ class WidgetPublicController extends AbstractController
         if (!$isActive) {
             return $this->json([
                 'error' => 'Widget is not active',
-                'reason' => 'owner_limits_exceeded'
+                'reason' => 'owner_limits_exceeded',
             ], Response::HTTP_SERVICE_UNAVAILABLE);
         }
 
@@ -612,7 +617,7 @@ class WidgetPublicController extends AbstractController
         // Check if file upload is enabled for this widget
         if (!($config['allowFileUpload'] ?? false)) {
             return $this->json([
-                'error' => 'File upload is disabled for this widget'
+                'error' => 'File upload is disabled for this widget',
             ], Response::HTTP_FORBIDDEN);
         }
 
@@ -629,19 +634,19 @@ class WidgetPublicController extends AbstractController
             if (!($ownerLimit['allowed'] ?? true)) {
                 return $this->json([
                     'error' => 'Owner file upload limit exceeded',
-                    'reason' => $ownerLimit['reason'] ?? 'limit_exceeded'
+                    'reason' => $ownerLimit['reason'] ?? 'limit_exceeded',
                 ], Response::HTTP_TOO_MANY_REQUESTS);
             }
         }
 
-        $fileLimit = (int)($config['fileUploadLimit'] ?? WidgetSessionService::DEFAULT_MAX_FILES);
+        $fileLimit = (int) ($config['fileUploadLimit'] ?? WidgetSessionService::DEFAULT_MAX_FILES);
         $fileLimitCheck = $this->sessionService->checkFileUploadLimit($widgetSession, $fileLimit);
         if (!$fileLimitCheck['allowed']) {
             return $this->json([
                 'error' => 'File upload limit reached',
                 'reason' => $fileLimitCheck['reason'],
                 'remaining' => $fileLimitCheck['remaining'] ?? 0,
-                'max' => $fileLimitCheck['max_files'] ?? $fileLimit
+                'max' => $fileLimitCheck['max_files'] ?? $fileLimit,
             ], Response::HTTP_TOO_MANY_REQUESTS);
         }
 
@@ -649,7 +654,7 @@ class WidgetPublicController extends AbstractController
         $uploadedFile = $request->files->get('file');
         if (!$uploadedFile) {
             return $this->json([
-                'error' => 'No file uploaded. Use form-data with file field'
+                'error' => 'No file uploaded. Use form-data with file field',
             ], Response::HTTP_BAD_REQUEST);
         }
 
@@ -658,7 +663,7 @@ class WidgetPublicController extends AbstractController
         if ($uploadedFile->getSize() > $maxFileSize) {
             return $this->json([
                 'error' => 'File too large',
-                'max_size_mb' => $config['maxFileSize'] ?? 10
+                'max_size_mb' => $config['maxFileSize'] ?? 10,
             ], Response::HTTP_REQUEST_ENTITY_TOO_LARGE);
         }
 
@@ -678,7 +683,7 @@ class WidgetPublicController extends AbstractController
                     $this->rateLimitService->recordUsage($owner, 'FILE_UPLOADS', [
                         'file_id' => $result['id'],
                         'widget_id' => $widgetId,
-                        'session_id' => $sessionId
+                        'session_id' => $sessionId,
                     ]);
                 }
 
@@ -688,38 +693,37 @@ class WidgetPublicController extends AbstractController
                     : max(0, $maxFilesForSession - $widgetSession->getFileCount());
 
                 return $this->json($result + [
-                    'remainingUploads' => $remainingUploads
+                    'remainingUploads' => $remainingUploads,
                 ]);
             } else {
                 return $this->json($result, Response::HTTP_BAD_REQUEST);
             }
-
         } catch (\Throwable $e) {
             $this->logger->error('Widget file upload failed', [
                 'widget_id' => $widgetId,
                 'session_id' => $sessionId,
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ]);
 
             return $this->json([
-                'error' => 'File upload failed: ' . $e->getMessage()
+                'error' => 'File upload failed: '.$e->getMessage(),
             ], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
 
     /**
      * Process uploaded file for widget session
-     * Same workflow as FileController but for anonymous widget users
+     * Same workflow as FileController but for anonymous widget users.
      */
     private function processWidgetFile($uploadedFile, $widget, $widgetSession): array
     {
         $fileExtension = strtolower($uploadedFile->getClientOriginalExtension());
         $owner = $widget->getOwner();
-        
+
         if (!$owner) {
             return [
                 'success' => false,
-                'error' => 'Widget owner not found'
+                'error' => 'Widget owner not found',
             ];
         }
 
@@ -750,7 +754,7 @@ class WidgetPublicController extends AbstractController
             'filename' => $uploadedFile->getClientOriginalName(),
             'size' => $storageResult['size'],
             'mime' => $storageResult['mime'],
-            'path' => $relativePath
+            'path' => $relativePath,
         ];
 
         // Step 2: Extract text
@@ -767,23 +771,22 @@ class WidgetPublicController extends AbstractController
 
             $result['extracted_text_length'] = strlen($extractedText);
             $result['extraction_strategy'] = $extractMeta['strategy'] ?? 'unknown';
-
         } catch (\Throwable $e) {
             $this->logger->error('Widget file extraction failed', [
                 'file_id' => $file->getId(),
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ]);
 
             return [
                 'success' => false,
-                'error' => 'Text extraction failed: ' . $e->getMessage()
+                'error' => 'Text extraction failed: '.$e->getMessage(),
             ];
         }
 
         // Step 3: Vectorize (for widget owner's RAG, grouped by widget)
         try {
             $groupKey = "WIDGET:{$widget->getWidgetId()}";
-            
+
             $vectorResult = $this->vectorizationService->vectorizeAndStore(
                 $extractedText,
                 $owner->getId(), // Store under owner for quota/usage
@@ -801,17 +804,16 @@ class WidgetPublicController extends AbstractController
             } else {
                 $this->logger->warning('Widget file vectorization failed', [
                     'file_id' => $file->getId(),
-                    'error' => $vectorResult['error']
+                    'error' => $vectorResult['error'],
                 ]);
 
                 $result['vectorized'] = false;
                 $result['vectorization_error'] = $vectorResult['error'];
             }
-
         } catch (\Throwable $e) {
             $this->logger->error('Widget file vectorization exception', [
                 'file_id' => $file->getId(),
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ]);
 
             $result['vectorized'] = false;
@@ -822,7 +824,7 @@ class WidgetPublicController extends AbstractController
     }
 
     /**
-     * Get file type code for BFILETYPE column
+     * Get file type code for BFILETYPE column.
      */
     private function getFileTypeCode(string $extension): string
     {
@@ -834,7 +836,7 @@ class WidgetPublicController extends AbstractController
             'txt' => 'text', 'md' => 'text',
             'jpg' => 'image', 'jpeg' => 'image', 'png' => 'image', 'gif' => 'image',
             'mp4' => 'video', 'mov' => 'video', 'avi' => 'video',
-            'mp3' => 'audio', 'wav' => 'audio'
+            'mp3' => 'audio', 'wav' => 'audio',
         ];
 
         return $typeMap[$extension] ?? 'other';
@@ -855,16 +857,16 @@ class WidgetPublicController extends AbstractController
     {
         $sessionId = $request->query->getString('sessionId');
 
-        if ($sessionId === '') {
+        if ('' === $sessionId) {
             return $this->json([
-                'error' => 'sessionId is required'
+                'error' => 'sessionId is required',
             ], Response::HTTP_BAD_REQUEST);
         }
 
         $widget = $this->widgetService->getWidgetById($widgetId);
         if (!$widget) {
             return $this->json([
-                'error' => 'Widget not found'
+                'error' => 'Widget not found',
             ], Response::HTTP_NOT_FOUND);
         }
 
@@ -883,8 +885,8 @@ class WidgetPublicController extends AbstractController
                     'sessionId' => $sessionId,
                     'messageCount' => 0,
                     'fileCount' => 0,
-                    'lastMessage' => null
-                ]
+                    'lastMessage' => null,
+                ],
             ]);
         }
 
@@ -898,8 +900,8 @@ class WidgetPublicController extends AbstractController
                     'sessionId' => $session->getSessionId(),
                     'messageCount' => $session->getMessageCount(),
                     'fileCount' => $session->getFileCount(),
-                    'lastMessage' => $session->getLastMessage() ?: null
-                ]
+                    'lastMessage' => $session->getLastMessage() ?: null,
+                ],
             ]);
         }
 
@@ -913,8 +915,8 @@ class WidgetPublicController extends AbstractController
                     'sessionId' => $session->getSessionId(),
                     'messageCount' => $session->getMessageCount(),
                     'fileCount' => $session->getFileCount(),
-                    'lastMessage' => $session->getLastMessage() ?: null
-                ]
+                    'lastMessage' => $session->getLastMessage() ?: null,
+                ],
             ]);
         }
 
@@ -935,7 +937,7 @@ class WidgetPublicController extends AbstractController
                 'metadata' => [
                     'topic' => $message->getTopic(),
                     'language' => $message->getLanguage(),
-                ]
+                ],
             ];
         }, $messages);
 
@@ -947,8 +949,8 @@ class WidgetPublicController extends AbstractController
                 'sessionId' => $session->getSessionId(),
                 'messageCount' => $session->getMessageCount(),
                 'fileCount' => $session->getFileCount(),
-                'lastMessage' => $session->getLastMessage() ?: null
-            ]
+                'lastMessage' => $session->getLastMessage() ?: null,
+            ],
         ]);
     }
 
@@ -963,19 +965,19 @@ class WidgetPublicController extends AbstractController
         if (!$host) {
             return $this->json([
                 'error' => 'Domain not allowed',
-                'reason' => 'missing_host'
+                'reason' => 'missing_host',
             ], Response::HTTP_FORBIDDEN);
         }
 
         if (!$this->isHostAllowed($host, $allowedDomains)) {
             $this->logger->warning('Widget request blocked by domain whitelist', [
                 'host' => $host,
-                'allowed_domains' => $allowedDomains
+                'allowed_domains' => $allowedDomains,
             ]);
 
             return $this->json([
                 'error' => 'Domain not allowed',
-                'reason' => 'domain_not_whitelisted'
+                'reason' => 'domain_not_whitelisted',
             ], Response::HTTP_FORBIDDEN);
         }
 
@@ -999,16 +1001,16 @@ class WidgetPublicController extends AbstractController
             }
 
             $parts = parse_url($value);
-            if ($parts === false || !isset($parts['host'])) {
+            if (false === $parts || !isset($parts['host'])) {
                 continue;
             }
 
             $host = strtolower($parts['host']);
             if (isset($parts['port'])) {
-                $host .= ':' . $parts['port'];
+                $host .= ':'.$parts['port'];
             }
 
-            if ($host !== '') {
+            if ('' !== $host) {
                 return $host;
             }
         }
@@ -1019,21 +1021,21 @@ class WidgetPublicController extends AbstractController
     private function normalizeHost(string $value): ?string
     {
         $normalized = strtolower(trim($value));
-        if ($normalized === '') {
+        if ('' === $normalized) {
             return null;
         }
 
         $normalized = preg_replace('#^https?://#', '', $normalized);
         $normalized = preg_replace('#^//#', '', $normalized);
 
-        if ($normalized === null) {
+        if (null === $normalized) {
             return null;
         }
 
         $parts = preg_split('~[/?#]~', $normalized);
         $normalized = $parts[0] ?? '';
 
-        return $normalized !== '' ? $normalized : null;
+        return '' !== $normalized ? $normalized : null;
     }
 
     /**
@@ -1052,7 +1054,7 @@ class WidgetPublicController extends AbstractController
         }
 
         foreach ($allowedDomains as $domain) {
-            if (!is_string($domain) || $domain === '') {
+            if (!is_string($domain) || '' === $domain) {
                 continue;
             }
 
@@ -1064,7 +1066,7 @@ class WidgetPublicController extends AbstractController
                 [$domainHost, $domainPort] = explode(':', $domain, 2);
             }
 
-            if ($domainPort !== null && $hostPort !== $domainPort) {
+            if (null !== $domainPort && $hostPort !== $domainPort) {
                 continue;
             }
 
@@ -1091,7 +1093,7 @@ class WidgetPublicController extends AbstractController
 
         $event = array_merge(['status' => $status], $this->sanitizeUtf8($data));
 
-        echo 'data: ' . json_encode($event, JSON_INVALID_UTF8_SUBSTITUTE) . "\n\n";
+        echo 'data: '.json_encode($event, JSON_INVALID_UTF8_SUBSTITUTE)."\n\n";
 
         if (ob_get_level() > 0) {
             ob_flush();
@@ -1113,4 +1115,3 @@ class WidgetPublicController extends AbstractController
         return $value;
     }
 }
-

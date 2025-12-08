@@ -4,14 +4,14 @@ namespace App\Service\Message;
 
 use App\Entity\Message;
 use App\Service\Message\Handler\ChatHandler;
-use App\Service\Message\Handler\MediaGenerationHandler;
 use App\Service\Message\Handler\CodeGenerationHandler;
+use App\Service\Message\Handler\MediaGenerationHandler;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\DependencyInjection\Attribute\TaggedIterator;
 
 /**
- * Router for Message Processing based on Intent/BTAG
- * 
+ * Router for Message Processing based on Intent/BTAG.
+ *
  * Dispatched to:
  * - ChatHandler (normal Chat)
  * - MediaGenerationHandler (Images, Videos, Audio generation)
@@ -26,7 +26,7 @@ class InferenceRouter
     public function __construct(
         #[TaggedIterator('app.message.handler')]
         iterable $handlers,
-        private LoggerInterface $logger
+        private LoggerInterface $logger,
     ) {
         foreach ($handlers as $handler) {
             $this->handlers[$handler->getName()] = $handler;
@@ -34,12 +34,12 @@ class InferenceRouter
     }
 
     /**
-     * Routed Message zu richtigem Handler
+     * Routed Message zu richtigem Handler.
      */
-    public function route(Message $message, array $thread, array $classification, callable $progressCallback = null): array
+    public function route(Message $message, array $thread, array $classification, ?callable $progressCallback = null): array
     {
         $intent = $classification['intent'] ?? 'chat';
-        
+
         $this->notify($progressCallback, 'processing', "Routing to handler: {$intent}");
 
         // Handler für Intent finden
@@ -47,69 +47,71 @@ class InferenceRouter
 
         try {
             $result = $handler->handle($message, $thread, $classification, $progressCallback);
-            
+
             $this->notify($progressCallback, 'processing', "Handler complete: {$intent}");
-            
+
             return $result;
         } catch (\Exception $e) {
             $this->logger->error("Handler failed: {$e->getMessage()}");
-            
+
             // Fallback zu Chat Handler
-            if ($intent !== 'chat') {
-                $this->notify($progressCallback, 'processing', "Falling back to chat handler");
+            if ('chat' !== $intent) {
+                $this->notify($progressCallback, 'processing', 'Falling back to chat handler');
+
                 return $this->handlers['chat']->handle($message, $thread, $classification, $progressCallback);
             }
-            
+
             throw $e;
         }
     }
 
     /**
-     * Routed Message zu richtigem Handler mit Streaming-Support
+     * Routed Message zu richtigem Handler mit Streaming-Support.
      */
     public function routeStream(
-        Message $message, 
-        array $thread, 
-        array $classification, 
+        Message $message,
+        array $thread,
+        array $classification,
         callable $streamCallback,
         ?callable $progressCallback = null,
-        array $options = []
+        array $options = [],
     ): array {
         $intent = $classification['intent'] ?? 'chat';
-        
+
         $this->logger->info('InferenceRouter: Routing to handler', [
             'intent' => $intent,
             'topic' => $classification['topic'] ?? 'unknown',
             'classification' => $classification,
-            'available_handlers' => array_keys($this->handlers)
+            'available_handlers' => array_keys($this->handlers),
         ]);
-        
+
         $this->notify($progressCallback, 'processing', "Routing to handler: {$intent}");
 
         // Handler für Intent finden
         $handler = $this->getHandler($intent);
-        
+
         $this->logger->info('InferenceRouter: Handler resolved', [
             'handler_name' => $handler->getName(),
             'handler_class' => get_class($handler),
-            'intent' => $intent
+            'intent' => $intent,
         ]);
 
         try {
             $result = $handler->handleStream($message, $thread, $classification, $streamCallback, $progressCallback, $options);
-            
+
             $this->notify($progressCallback, 'processing', "Handler complete: {$intent}");
-            
+
             return $result;
         } catch (\Exception $e) {
             $this->logger->error("Handler streaming failed: {$e->getMessage()}");
-            
+
             // Fallback zu Chat Handler
-            if ($intent !== 'chat') {
-                $this->notify($progressCallback, 'processing', "Falling back to chat handler");
+            if ('chat' !== $intent) {
+                $this->notify($progressCallback, 'processing', 'Falling back to chat handler');
+
                 return $this->handlers['chat']->handleStream($message, $thread, $classification, $streamCallback, $progressCallback, $options);
             }
-            
+
             throw $e;
         }
     }
@@ -149,4 +151,3 @@ class InferenceRouter
         }
     }
 }
-

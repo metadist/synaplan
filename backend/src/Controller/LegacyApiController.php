@@ -16,8 +16,8 @@ use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
 
 /**
- * Legacy API Compatibility Layer
- * 
+ * Legacy API Compatibility Layer.
+ *
  * Mappt alte API-Requests (POST /api.php?action=...) auf neue Symfony-Endpoints.
  * Wichtig für Widget-Kompatibilität während der Migration.
  */
@@ -30,12 +30,13 @@ class LegacyApiController extends AbstractController
         private InferenceRouter $inferenceRouter,
         private MessageRepository $messageRepository,
         private UserRepository $userRepository,
-        private LoggerInterface $logger
-    ) {}
+        private LoggerInterface $logger,
+    ) {
+    }
 
     /**
-     * Main Legacy Entry Point
-     * 
+     * Main Legacy Entry Point.
+     *
      * Routed basierend auf 'action' Parameter
      */
     #[Route('', name: 'main', methods: ['GET', 'POST'])]
@@ -46,23 +47,23 @@ class LegacyApiController extends AbstractController
         $this->logger->info('Legacy API call', [
             'action' => $action,
             'method' => $request->getMethod(),
-            'ip' => $request->getClientIp()
+            'ip' => $request->getClientIp(),
         ]);
 
-        return match($action) {
+        return match ($action) {
             'messageNew' => $this->messageNew($request),
             'messageGet' => $this->messageGet($request),
             'againOptions' => $this->againOptions($request),
             'getProfile' => $this->getProfile($request),
             'chatStream' => $this->chatStream($request),
             'ragUpload' => $this->ragUpload($request),
-            default => $this->error('Unknown action: ' . $action, 404)
+            default => $this->error('Unknown action: '.$action, 404),
         };
     }
 
     /**
      * Legacy: messageNew
-     * → Neues System: POST /api/messages/send
+     * → Neues System: POST /api/messages/send.
      */
     private function messageNew(Request $request): JsonResponse
     {
@@ -78,7 +79,7 @@ class LegacyApiController extends AbstractController
 
             // Create Message Entity
             $message = new Message();
-            $message->setUserId((int)$userId);
+            $message->setUserId((int) $userId);
             $message->setText($messageText);
             $message->setDirect('IN');
             $message->setStatus('NEW');
@@ -100,26 +101,26 @@ class LegacyApiController extends AbstractController
             // Legacy Response Format
             return new JsonResponse([
                 'success' => true,
-                'tracking_id' => 'msg_' . $message->getId(),
+                'tracking_id' => 'msg_'.$message->getId(),
                 'message_id' => $message->getId(),
                 'response_id' => $aiResponse->getId(),
                 'response' => $aiResponse->getText(),
                 'status' => 'completed',
-                'timestamp' => time()
+                'timestamp' => time(),
             ]);
-
         } catch (\Exception $e) {
             $this->logger->error('Legacy messageNew failed', [
                 'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
+                'trace' => $e->getTraceAsString(),
             ]);
+
             return $this->error($e->getMessage(), 500);
         }
     }
 
     /**
      * Legacy: messageGet
-     * Holt Message by ID or Tracking-ID
+     * Holt Message by ID or Tracking-ID.
      */
     private function messageGet(Request $request): JsonResponse
     {
@@ -150,18 +151,18 @@ class LegacyApiController extends AbstractController
                     'topic' => $message->getTopic(),
                     'language' => $message->getLang(),
                     'timestamp' => $message->getUnixTimestamp(),
-                ]
+                ],
             ]);
-
         } catch (\Exception $e) {
             $this->logger->error('Legacy messageGet failed', ['error' => $e->getMessage()]);
+
             return $this->error($e->getMessage(), 500);
         }
     }
 
     /**
      * Legacy: againOptions
-     * Gibt alternative Antwort-Optionen zurück
+     * Gibt alternative Antwort-Optionen zurück.
      */
     private function againOptions(Request $request): JsonResponse
     {
@@ -169,7 +170,7 @@ class LegacyApiController extends AbstractController
 
         try {
             $message = $this->messageRepository->find($messageId);
-            
+
             if (!$message) {
                 return $this->error('Message not found', 404);
             }
@@ -180,10 +181,9 @@ class LegacyApiController extends AbstractController
                 'options' => [
                     'regenerate' => true,
                     'edit' => true,
-                    'delete' => true
-                ]
+                    'delete' => true,
+                ],
             ]);
-
         } catch (\Exception $e) {
             return $this->error($e->getMessage(), 500);
         }
@@ -191,7 +191,7 @@ class LegacyApiController extends AbstractController
 
     /**
      * Legacy: getProfile
-     * Gibt User-Profile zurück
+     * Gibt User-Profile zurück.
      */
     private function getProfile(Request $request): JsonResponse
     {
@@ -215,10 +215,9 @@ class LegacyApiController extends AbstractController
                     'email' => $user->getMail(),
                     'level' => $user->getUserlevel(),
                     'created' => $user->getCreated(),
-                    'details' => $user->getUserdetails()
-                ]
+                    'details' => $user->getUserdetails(),
+                ],
             ]);
-
         } catch (\Exception $e) {
             return $this->error($e->getMessage(), 500);
         }
@@ -226,7 +225,7 @@ class LegacyApiController extends AbstractController
 
     /**
      * Legacy: chatStream
-     * SSE Streaming (simplified redirect)
+     * SSE Streaming (simplified redirect).
      */
     private function chatStream(Request $request): Response
     {
@@ -234,33 +233,32 @@ class LegacyApiController extends AbstractController
 
         // Redirect to new streaming endpoint
         return $this->redirectToRoute('api_messages_stream', [
-            'id' => $messageId
+            'id' => $messageId,
         ]);
     }
 
     /**
      * Legacy: ragUpload
-     * File upload for RAG
+     * File upload for RAG.
      */
     private function ragUpload(Request $request): JsonResponse
     {
         // TODO: Implement file upload
         return new JsonResponse([
             'success' => false,
-            'error' => 'Not implemented yet'
+            'error' => 'Not implemented yet',
         ], 501);
     }
 
     /**
-     * Error Response Helper
+     * Error Response Helper.
      */
     private function error(string $message, int $code = 400): JsonResponse
     {
         return new JsonResponse([
             'success' => false,
             'error' => $message,
-            'code' => $code
+            'code' => $code,
         ], $code);
     }
 }
-

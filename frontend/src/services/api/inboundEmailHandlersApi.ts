@@ -26,7 +26,7 @@ export interface BackendMailHandler {
 }
 
 export interface Department {
-  id?: string // Frontend only (for Vue key)
+  id: string
   email: string
   rules: string
   isDefault: boolean

@@ -1,5 +1,6 @@
 {
     "recommendations": [
-        "junstyle.php-cs-fixer"
+        "editorconfig.editorconfig",
+        "junstyle.php-cs-fixer",
     ]
 }

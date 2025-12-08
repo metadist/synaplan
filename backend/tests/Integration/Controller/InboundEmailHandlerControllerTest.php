@@ -13,13 +13,13 @@ class InboundEmailHandlerControllerTest extends WebTestCase
     protected function setUp(): void
     {
         $this->client = static::createClient();
-        
+
         // Login to get JWT token
         $this->client->request('POST', '/api/v1/auth/login', [], [], [
             'CONTENT_TYPE' => 'application/json',
         ], json_encode([
             'email' => 'admin@synaplan.com',
-            'password' => 'admin123'
+            'password' => 'admin123',
         ]));
 
         $response = $this->client->getResponse();
@@ -33,7 +33,7 @@ class InboundEmailHandlerControllerTest extends WebTestCase
     {
         $this->client->request('POST', '/api/v1/inbound-email-handlers', [], [], [
             'CONTENT_TYPE' => 'application/json',
-            'HTTP_AUTHORIZATION' => 'Bearer ' . $this->token,
+            'HTTP_AUTHORIZATION' => 'Bearer '.$this->token,
         ], json_encode([
             'name' => 'Test Handler Integration',
             'mailServer' => 'imap.test.com',
@@ -55,9 +55,9 @@ class InboundEmailHandlerControllerTest extends WebTestCase
                     'name' => 'Support',
                     'email' => 'support@test.com',
                     'rules' => 'help, support',
-                    'isDefault' => true
-                ]
-            ]
+                    'isDefault' => true,
+                ],
+            ],
         ]));
 
         $response = $this->client->getResponse();
@@ -75,10 +75,10 @@ class InboundEmailHandlerControllerTest extends WebTestCase
     {
         // This test assumes admin@synaplan.com has PRO level
         // If admin is not PRO, this test will fail as expected
-        
+
         $this->client->request('POST', '/api/v1/inbound-email-handlers', [], [], [
             'CONTENT_TYPE' => 'application/json',
-            'HTTP_AUTHORIZATION' => 'Bearer ' . $this->token,
+            'HTTP_AUTHORIZATION' => 'Bearer '.$this->token,
         ], json_encode([
             'name' => 'Historical Test',
             'mailServer' => 'imap.test.com',
@@ -96,21 +96,21 @@ class InboundEmailHandlerControllerTest extends WebTestCase
             'emailFilterFromDate' => '2025-01-01T00:00',
             'emailFilterToDate' => '2025-12-31T23:59',
             'departments' => [
-                ['name' => 'Test', 'email' => 'test@test.com', 'rules' => 'test', 'isDefault' => true]
-            ]
+                ['name' => 'Test', 'email' => 'test@test.com', 'rules' => 'test', 'isDefault' => true],
+            ],
         ]));
 
         $response = $this->client->getResponse();
-        
+
         // Should succeed if admin is PRO/TEAM/BUSINESS
         // Should fail with 403 if admin is NEW
         $statusCode = $response->getStatusCode();
         $this->assertTrue(
-            $statusCode === Response::HTTP_CREATED || $statusCode === Response::HTTP_FORBIDDEN,
+            Response::HTTP_CREATED === $statusCode || Response::HTTP_FORBIDDEN === $statusCode,
             'Expected 201 (PRO user) or 403 (NEW user)'
         );
 
-        if ($statusCode === Response::HTTP_FORBIDDEN) {
+        if (Response::HTTP_FORBIDDEN === $statusCode) {
             $data = json_decode($response->getContent(), true);
             $this->assertStringContainsString('PRO', $data['error']);
         }
@@ -121,7 +121,7 @@ class InboundEmailHandlerControllerTest extends WebTestCase
         // Create a handler first
         $this->client->request('POST', '/api/v1/inbound-email-handlers', [], [], [
             'CONTENT_TYPE' => 'application/json',
-            'HTTP_AUTHORIZATION' => 'Bearer ' . $this->token,
+            'HTTP_AUTHORIZATION' => 'Bearer '.$this->token,
         ], json_encode([
             'name' => 'Update Test Handler',
             'mailServer' => 'imap.test.com',
@@ -137,36 +137,36 @@ class InboundEmailHandlerControllerTest extends WebTestCase
             'smtpPassword' => 'test-pwd',
             'emailFilterMode' => 'new',
             'departments' => [
-                ['name' => 'Test', 'email' => 'test@test.com', 'rules' => 'test', 'isDefault' => true]
-            ]
+                ['name' => 'Test', 'email' => 'test@test.com', 'rules' => 'test', 'isDefault' => true],
+            ],
         ]));
 
         $createResponse = json_decode($this->client->getResponse()->getContent(), true);
         $handlerId = $createResponse['handler']['id'];
 
         // Update to historical mode
-        $this->client->request('PUT', '/api/v1/inbound-email-handlers/' . $handlerId, [], [], [
+        $this->client->request('PUT', '/api/v1/inbound-email-handlers/'.$handlerId, [], [], [
             'CONTENT_TYPE' => 'application/json',
-            'HTTP_AUTHORIZATION' => 'Bearer ' . $this->token,
+            'HTTP_AUTHORIZATION' => 'Bearer '.$this->token,
         ], json_encode([
             'emailFilterMode' => 'historical',
             'emailFilterFromDate' => '2025-06-01T00:00',
-            'emailFilterToDate' => '2025-06-30T23:59'
+            'emailFilterToDate' => '2025-06-30T23:59',
         ]));
 
         $response = $this->client->getResponse();
         $statusCode = $response->getStatusCode();
-        
+
         // Should succeed if user is PRO+
         $this->assertTrue(
-            $statusCode === Response::HTTP_OK || $statusCode === Response::HTTP_FORBIDDEN
+            Response::HTTP_OK === $statusCode || Response::HTTP_FORBIDDEN === $statusCode
         );
     }
 
     public function testListHandlers(): void
     {
         $this->client->request('GET', '/api/v1/inbound-email-handlers', [], [], [
-            'HTTP_AUTHORIZATION' => 'Bearer ' . $this->token,
+            'HTTP_AUTHORIZATION' => 'Bearer '.$this->token,
         ]);
 
         $response = $this->client->getResponse();
@@ -178,4 +178,3 @@ class InboundEmailHandlerControllerTest extends WebTestCase
         $this->assertIsArray($data['handlers']);
     }
 }
-

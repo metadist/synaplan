@@ -2,11 +2,11 @@
 
 namespace App\Service\Message\Handler;
 
-use App\Entity\Message;
-use App\Entity\File;
-use App\Repository\PromptRepository;
-use App\Repository\ModelRepository;
 use App\AI\Service\AiFacade;
+use App\Entity\File;
+use App\Entity\Message;
+use App\Repository\ModelRepository;
+use App\Repository\PromptRepository;
 use App\Service\ModelConfigService;
 use App\Service\PromptService;
 use App\Service\RAG\VectorSearchService;
@@ -15,8 +15,8 @@ use Psr\Log\LoggerInterface;
 use Symfony\Component\DependencyInjection\Attribute\AutoconfigureTag;
 
 /**
- * Chat Handler - Normaler Konversations-Chat
- * 
+ * Chat Handler - Normaler Konversations-Chat.
+ *
  * Uses user-defined model from BCONFIG or falls back to global default
  */
 #[AutoconfigureTag('app.message.handler')]
@@ -31,9 +31,10 @@ class ChatHandler implements MessageHandlerInterface
         private LoggerInterface $logger,
         private VectorSearchService $vectorSearchService,
         private EntityManagerInterface $em,
-        private string $uploadDir
-    ) {}
-    
+        private string $uploadDir,
+    ) {
+    }
+
     public function getName(): string
     {
         return 'chat';
@@ -43,7 +44,7 @@ class ChatHandler implements MessageHandlerInterface
         Message $message,
         array $thread,
         array $classification,
-        ?callable $progressCallback = null
+        ?callable $progressCallback = null,
     ): array {
         $this->notify($progressCallback, 'generating', 'Generating response...');
 
@@ -72,26 +73,26 @@ class ChatHandler implements MessageHandlerInterface
             $modelId = (int) $classification['model_id'];
             $this->logger->info('ChatHandler: Using user-selected model (Again)', [
                 'model_id' => $modelId,
-                'user_id' => $message->getUserId()
+                'user_id' => $message->getUserId(),
             ]);
         } elseif (isset($promptMetadata['aiModel']) && (int) $promptMetadata['aiModel'] > 0) {
             $modelId = (int) $promptMetadata['aiModel'];
             $this->logger->info('ChatHandler: Using prompt metadata model', [
                 'model_id' => $modelId,
                 'topic' => $topic,
-                'user_id' => $message->getUserId()
+                'user_id' => $message->getUserId(),
             ]);
         } elseif (isset($classification['override_model_id']) && $classification['override_model_id']) {
             $modelId = (int) $classification['override_model_id'];
             $this->logger->info('ChatHandler: Using classification override model', [
                 'model_id' => $modelId,
-                'user_id' => $message->getUserId()
+                'user_id' => $message->getUserId(),
             ]);
         } else {
             $modelId = $this->modelConfigService->getDefaultModel('CHAT', $message->getUserId());
             $this->logger->info('ChatHandler: Using DB default model', [
                 'model_id' => $modelId,
-                'user_id' => $message->getUserId()
+                'user_id' => $message->getUserId(),
             ]);
         }
 
@@ -102,7 +103,7 @@ class ChatHandler implements MessageHandlerInterface
             $this->logger->info('ChatHandler: Resolved model', [
                 'model_id' => $modelId,
                 'provider' => $provider,
-                'model' => $modelName
+                'model' => $modelName,
             ]);
         }
 
@@ -111,7 +112,7 @@ class ChatHandler implements MessageHandlerInterface
             $systemPrompt = $promptData['prompt']->getPrompt();
             $this->logger->info('ChatHandler: Using custom prompt content', [
                 'topic' => $topic,
-                'prompt_length' => strlen($systemPrompt)
+                'prompt_length' => strlen($systemPrompt),
             ]);
         }
 
@@ -119,7 +120,7 @@ class ChatHandler implements MessageHandlerInterface
             $systemPrompt .= $ragContext;
             $this->logger->info('ChatHandler: RAG context appended to system prompt', [
                 'topic' => $topic,
-                'rag_context_length' => strlen($ragContext)
+                'rag_context_length' => strlen($ragContext),
             ]);
         }
 
@@ -127,7 +128,7 @@ class ChatHandler implements MessageHandlerInterface
             $model = $this->modelRepository->find($modelId);
             if ($model) {
                 $json = $model->getJson();
-                if (isset($json['supportsStreaming']) && $json['supportsStreaming'] === false) {
+                if (isset($json['supportsStreaming']) && false === $json['supportsStreaming']) {
                     $systemPrompt = null;
                 }
             }
@@ -135,7 +136,7 @@ class ChatHandler implements MessageHandlerInterface
 
         $messages = $this->buildMessages($systemPrompt, $thread, $message, [
             'search_results' => $searchResults,
-            'rag_context' => $ragContext
+            'rag_context' => $ragContext,
         ]);
 
         $response = $this->aiFacade->chat(
@@ -158,37 +159,37 @@ class ChatHandler implements MessageHandlerInterface
             'model' => $response['model'] ?? 'unknown',
             'tokens' => $response['usage'] ?? [],
         ];
-        
+
         // NEW: Check for file generation format first (for OfficeM maker)
         $fileData = $this->extractFileGenerationData($content);
-        if ($fileData !== null) {
+        if (null !== $fileData) {
             $this->logger->info('ChatHandler: Detected AI file generation');
-            
+
             // Store the file
             $generatedFile = $this->storeGeneratedFile($fileData, $message);
-            
+
             if ($generatedFile) {
                 // Attach file to message
                 $message->addFile($generatedFile);
                 $this->em->flush();
-                
+
                 // Return message key for translation in frontend
                 $content = "__FILE_GENERATED__:{$fileData['filename']}";
-                
+
                 $metadata['generated_file'] = [
                     'id' => $generatedFile->getId(),
                     'filename' => $generatedFile->getFileName(),
                     'path' => $generatedFile->getFilePath(),
                     'size' => $generatedFile->getFileSize(),
-                    'type' => $generatedFile->getFileType()
+                    'type' => $generatedFile->getFileType(),
                 ];
-                
+
                 $this->logger->info('ChatHandler: File generation successful', [
                     'file_id' => $generatedFile->getId(),
-                    'filename' => $generatedFile->getFileName()
+                    'filename' => $generatedFile->getFileName(),
                 ]);
             } else {
-                $content = "__FILE_GENERATION_FAILED__";
+                $content = '__FILE_GENERATION_FAILED__';
                 $this->logger->error('ChatHandler: File generation failed');
             }
         }
@@ -198,13 +199,13 @@ class ChatHandler implements MessageHandlerInterface
         elseif (is_string($content) && str_starts_with(trim($content), '{')) {
             try {
                 $jsonData = json_decode($content, true, 512, JSON_THROW_ON_ERROR);
-                
+
                 // Extract BTEXT as main content
                 if (isset($jsonData['BTEXT'])) {
                     $content = $jsonData['BTEXT'];
                     $this->logger->info('ChatHandler: Extracted BTEXT from legacy JSON response');
                 }
-                
+
                 // Extract file information (legacy format)
                 if (!empty($jsonData['BFILE']) && !empty($jsonData['BFILETEXT'])) {
                     $metadata['file'] = [
@@ -213,17 +214,16 @@ class ChatHandler implements MessageHandlerInterface
                     ];
                     $this->logger->info('ChatHandler: Extracted file data from legacy format', $metadata['file']);
                 }
-                
+
                 // Extract web search results/links
                 if (!empty($jsonData['BLINKS'])) {
                     $metadata['links'] = $jsonData['BLINKS'];
                     $this->logger->info('ChatHandler: Extracted links');
                 }
-                
             } catch (\JsonException $e) {
                 // Not valid JSON, use content as-is
                 $this->logger->debug('ChatHandler: Response not JSON', [
-                    'error' => $e->getMessage()
+                    'error' => $e->getMessage(),
                 ]);
             }
         }
@@ -231,13 +231,13 @@ class ChatHandler implements MessageHandlerInterface
         return [
             'content' => $content,
             'metadata' => array_merge($metadata, [
-                'model_id' => $modelId // Include resolved model_id for storage
+                'model_id' => $modelId, // Include resolved model_id for storage
             ]),
         ];
     }
 
     /**
-     * Handle with streaming support
+     * Handle with streaming support.
      */
     public function handleStream(
         Message $message,
@@ -245,22 +245,22 @@ class ChatHandler implements MessageHandlerInterface
         array $classification,
         callable $streamCallback,
         ?callable $progressCallback = null,
-        array $options = []
+        array $options = [],
     ): array {
         $this->notify($progressCallback, 'generating', 'Generating response...');
 
         // Load prompt WITH metadata based on topic from classification
         $topic = $classification['topic'] ?? 'general';
         $promptData = $this->promptService->getPromptWithMetadata($topic, $message->getUserId(), $classification['language'] ?? 'en');
-        
+
         $promptMetadata = $promptData['metadata'] ?? [];
-        
+
         $this->logger->info('ChatHandler: Loaded prompt metadata', [
             'topic' => $topic,
             'metadata' => $promptMetadata,
-            'user_id' => $message->getUserId()
+            'user_id' => $message->getUserId(),
         ]);
-        
+
         // ✨ NEW: Load RAG context for task prompt (if files are associated)
         $ragContext = '';
         $ragResultsCount = 0;
@@ -269,7 +269,7 @@ class ChatHandler implements MessageHandlerInterface
         $ragLimit = isset($options['rag_limit']) ? max(1, (int) $options['rag_limit']) : 5;
         $ragMinScore = isset($options['rag_min_score']) ? max(0.0, min(1.0, (float) $options['rag_min_score'])) : 0.3;
 
-        if (!$ragGroupKey && $topic !== 'general') {
+        if (!$ragGroupKey && 'general' !== $topic) {
             $ragGroupKey = "TASKPROMPT:{$topic}";
         }
 
@@ -277,7 +277,7 @@ class ChatHandler implements MessageHandlerInterface
 
         if (!empty($message->getText()) && $ragGroupKey) {
             try {
-                error_log('🔍 ChatHandler: Attempting to load RAG context for topic: ' . $topic . ' (groupKey: ' . $ragGroupKey . ')');
+                error_log('🔍 ChatHandler: Attempting to load RAG context for topic: '.$topic.' (groupKey: '.$ragGroupKey.')');
 
                 $ragResults = $this->vectorSearchService->semanticSearch(
                     $message->getText(),
@@ -287,12 +287,12 @@ class ChatHandler implements MessageHandlerInterface
                     minScore: $ragMinScore
                 );
 
-                error_log('🔍 ChatHandler: RAG search returned ' . count($ragResults) . ' results');
+                error_log('🔍 ChatHandler: RAG search returned '.count($ragResults).' results');
 
-                if (empty($ragResults) && $topic !== 'general') {
+                if (empty($ragResults) && 'general' !== $topic) {
                     $fallbackGroupKey = "TASKPROMPT:{$topic}";
                     if ($fallbackGroupKey !== $ragGroupKey) {
-                        error_log('🔄 ChatHandler: RAG fallback search with groupKey: ' . $fallbackGroupKey);
+                        error_log('🔄 ChatHandler: RAG fallback search with groupKey: '.$fallbackGroupKey);
                         $ragResults = $this->vectorSearchService->semanticSearch(
                             $message->getText(),
                             $message->getUserId(),
@@ -300,7 +300,7 @@ class ChatHandler implements MessageHandlerInterface
                             limit: $ragLimit,
                             minScore: $ragMinScore
                         );
-                        error_log('🔍 ChatHandler: RAG fallback returned ' . count($ragResults) . ' results');
+                        error_log('🔍 ChatHandler: RAG fallback returned '.count($ragResults).' results');
 
                         if (!empty($ragResults)) {
                             $ragGroupKey = $fallbackGroupKey;
@@ -316,28 +316,28 @@ class ChatHandler implements MessageHandlerInterface
                             $idx + 1,
                             trim($result['chunk_text'])
                         );
-                        error_log('🔍 ChatHandler: RAG chunk ' . ($idx + 1) . ': ' . substr($result['chunk_text'], 0, 100) . '...');
+                        error_log('🔍 ChatHandler: RAG chunk '.($idx + 1).': '.substr($result['chunk_text'], 0, 100).'...');
                     }
                     $ragContext .= "\nUse this context to provide accurate and specific answers.\n";
                     $ragResultsCount = count($ragResults);
 
-                    error_log('🔍 ChatHandler: RAG context loaded, total length: ' . strlen($ragContext));
+                    error_log('🔍 ChatHandler: RAG context loaded, total length: '.strlen($ragContext));
 
                     $this->logger->info('ChatHandler: RAG context loaded', [
                         'topic' => $topic,
                         'chunks_found' => $ragResultsCount,
                         'user_id' => $message->getUserId(),
-                        'group_key' => $ragGroupKey
+                        'group_key' => $ragGroupKey,
                     ]);
                 }
             } catch (\Throwable $e) {
-                error_log('❌ ChatHandler: RAG context loading failed: ' . $e->getMessage());
-                error_log('❌ Stack trace: ' . $e->getTraceAsString());
+                error_log('❌ ChatHandler: RAG context loading failed: '.$e->getMessage());
+                error_log('❌ Stack trace: '.$e->getTraceAsString());
 
                 $this->logger->warning('ChatHandler: RAG context loading failed', [
                     'topic' => $topic,
                     'error' => $e->getMessage(),
-                    'group_key' => $ragGroupKey
+                    'group_key' => $ragGroupKey,
                 ]);
                 // Continue without RAG context
             }
@@ -354,13 +354,13 @@ class ChatHandler implements MessageHandlerInterface
         $modelId = null;
         $provider = null;
         $modelName = null;
-        
+
         // 1. Check if user explicitly selected a model (e.g., via "Again" function)
         if (isset($classification['model_id']) && $classification['model_id']) {
             $modelId = $classification['model_id'];
             $this->logger->info('ChatHandler: Using user-selected model (Again)', [
                 'model_id' => $modelId,
-                'user_id' => $message->getUserId()
+                'user_id' => $message->getUserId(),
             ]);
         }
         // 2. Check if prompt metadata defines a model (and it's not AUTOMATED = -1)
@@ -369,7 +369,7 @@ class ChatHandler implements MessageHandlerInterface
             $this->logger->info('ChatHandler: Using prompt metadata model', [
                 'model_id' => $modelId,
                 'topic' => $topic,
-                'user_id' => $message->getUserId()
+                'user_id' => $message->getUserId(),
             ]);
         }
         // 3. Check if classification provides a model override
@@ -377,7 +377,7 @@ class ChatHandler implements MessageHandlerInterface
             $modelId = $classification['override_model_id'];
             $this->logger->info('ChatHandler: Using classification override model', [
                 'model_id' => $modelId,
-                'user_id' => $message->getUserId()
+                'user_id' => $message->getUserId(),
             ]);
         }
         // 4. Fall back to user's default model from DB
@@ -385,28 +385,28 @@ class ChatHandler implements MessageHandlerInterface
             $modelId = $this->modelConfigService->getDefaultModel('CHAT', $message->getUserId());
             $this->logger->info('ChatHandler: Using DB default model', [
                 'model_id' => $modelId,
-                'user_id' => $message->getUserId()
+                'user_id' => $message->getUserId(),
             ]);
         }
 
         // Simple system prompt for streaming (like old system)
         $systemPrompt = 'You are the Synaplan.com AI assistant. Please answer in the language of the user.';
-        
+
         // Use prompt content from metadata if available
         if ($promptData && isset($promptData['prompt'])) {
             $systemPrompt = $promptData['prompt']->getPrompt();
             $this->logger->info('ChatHandler: Using custom prompt content', [
                 'topic' => $topic,
-                'prompt_length' => strlen($systemPrompt)
+                'prompt_length' => strlen($systemPrompt),
             ]);
         }
-        
+
         // ✨ NEW: Append RAG context to system prompt if available
         if (!empty($ragContext)) {
             $systemPrompt .= $ragContext;
             $this->logger->info('ChatHandler: RAG context appended to system prompt', [
                 'topic' => $topic,
-                'rag_context_length' => strlen($ragContext)
+                'rag_context_length' => strlen($ragContext),
             ]);
         }
 
@@ -416,7 +416,7 @@ class ChatHandler implements MessageHandlerInterface
             if ($model) {
                 $json = $model->getJson();
                 // o1 models (non-streaming) don't support system messages
-                if (isset($json['supportsStreaming']) && $json['supportsStreaming'] === false) {
+                if (isset($json['supportsStreaming']) && false === $json['supportsStreaming']) {
                     // Don't use system message - it will be prepended to first user message instead
                     $systemPrompt = null;
                 }
@@ -425,26 +425,26 @@ class ChatHandler implements MessageHandlerInterface
 
         // Conversation History bauen (TEXT only for streaming)
         $messages = $this->buildStreamingMessages($systemPrompt, $thread, $message, $options);
-        
+
         // Resolve model ID to provider + model name + features
         $modelFeatures = [];
         if ($modelId) {
             $provider = $this->modelConfigService->getProviderForModel($modelId);
             $modelName = $this->modelConfigService->getModelName($modelId);
-            
+
             // Get model features from DB
             $model = $this->modelRepository->find($modelId);
             if ($model) {
                 $modelFeatures = $model->getFeatures();
             }
-            
-            error_log('🟢 ChatHandler RESOLVED CHAT MODEL: ' . $provider . ' / ' . $modelName . ' (ID: ' . $modelId . ')');
-            
+
+            error_log('🟢 ChatHandler RESOLVED CHAT MODEL: '.$provider.' / '.$modelName.' (ID: '.$modelId.')');
+
             $this->logger->info('ChatHandler: Resolved model for streaming', [
                 'model_id' => $modelId,
                 'provider' => $provider,
                 'model' => $modelName,
-                'features' => $modelFeatures
+                'features' => $modelFeatures,
             ]);
         }
 
@@ -455,24 +455,24 @@ class ChatHandler implements MessageHandlerInterface
             'temperature' => 0.7,
             'modelFeatures' => $modelFeatures, // Pass features to provider
         ], $options); // Options from frontend (e.g., reasoning: true/false)
-        
+
         // Log reasoning option
-        error_log('🧠 ChatHandler: Reasoning option = ' . ($aiOptions['reasoning'] ?? 'NOT SET'));
-        
+        error_log('🧠 ChatHandler: Reasoning option = '.($aiOptions['reasoning'] ?? 'NOT SET'));
+
         $this->logger->info('🔵 ChatHandler: Calling AiFacade chatStream', [
             'provider' => $provider,
             'model' => $modelName,
             'user_id' => $message->getUserId(),
-            'reasoning' => $aiOptions['reasoning'] ?? false
+            'reasoning' => $aiOptions['reasoning'] ?? false,
         ]);
-        
+
         $metadata = $this->aiFacade->chatStream(
             $messages,
             $streamCallback,
             $message->getUserId(),
             $aiOptions
         );
-        
+
         $this->logger->info('🔵 ChatHandler: AiFacade chatStream returned');
 
         $this->notify($progressCallback, 'generating', 'Response generated.');
@@ -489,7 +489,6 @@ class ChatHandler implements MessageHandlerInterface
 
     private function getSystemPrompt(int $userId, string $language): string
     {
-
         $prompt = $this->promptRepository->findOneBy([
             'ownerId' => $userId,
             'language' => $language,
@@ -510,39 +509,39 @@ class ChatHandler implements MessageHandlerInterface
         }
 
         // Hardcoded Fallback
-        return "You are a helpful AI assistant. Respond in a friendly and professional manner.";
+        return 'You are a helpful AI assistant. Respond in a friendly and professional manner.';
     }
 
     /**
      * Build messages for streaming (TEXT only, no JSON)
-     * Like old system: topicPrompt with $stream = true
+     * Like old system: topicPrompt with $stream = true.
      */
     private function buildStreamingMessages(?string $systemPrompt, array $thread, Message $currentMessage, array $options = []): array
     {
         $messages = [];
-        
+
         // Add system message if supported (o1 models don't support it)
-        if ($systemPrompt !== null) {
+        if (null !== $systemPrompt) {
             $messages[] = ['role' => 'system', 'content' => $systemPrompt];
         }
 
         // Thread Messages hinzufügen (letzte N Messages)
         foreach ($thread as $msg) {
-            $role = $msg->getDirection() === 'IN' ? 'user' : 'assistant';
+            $role = 'IN' === $msg->getDirection() ? 'user' : 'assistant';
             $content = $msg->getText();
-            
+
             // File Text inkludieren wenn vorhanden (Legacy + NEW MessageFiles)
             $allFilesText = $msg->getAllFilesText(); // NEW: combines legacy + File texts
             if (!empty($allFilesText)) {
                 $fileInfo = '';
                 if ($msg->getFiles()->count() > 0) {
-                    $fileInfo = $msg->getFiles()->count() . ' file(s)';
+                    $fileInfo = $msg->getFiles()->count().' file(s)';
                 } elseif ($msg->getFileType()) {
-                    $fileInfo = $msg->getFileType() . ' file';
+                    $fileInfo = $msg->getFileType().' file';
                 }
-                
-                $content .= "\n\n\n---\n\n\nUser provided $fileInfo:\n\n" . 
-                           substr($allFilesText, 0, 10000) . // Increased limit for multiple files
+
+                $content .= "\n\n\n---\n\n\nUser provided $fileInfo:\n\n".
+                           substr($allFilesText, 0, 10000). // Increased limit for multiple files
                            "\n\n";
             }
 
@@ -555,47 +554,47 @@ class ChatHandler implements MessageHandlerInterface
         // Aktuelle Message
         $content = $currentMessage->getText();
         $allFilesText = $currentMessage->getAllFilesText(); // NEW: combines all files
-        
+
         $this->logger->info('🔍 ChatHandler: File text debug', [
             'message_id' => $currentMessage->getId(),
             'has_legacy_file' => $currentMessage->getFile() > 0,
             'legacy_file_text_length' => strlen($currentMessage->getFileText() ?? ''),
             'files_collection_count' => $currentMessage->getFiles()->count(),
             'all_files_text_length' => strlen($allFilesText),
-            'all_files_text_preview' => substr($allFilesText, 0, 200)
+            'all_files_text_preview' => substr($allFilesText, 0, 200),
         ]);
-        
+
         if (!empty($allFilesText)) {
             $fileInfo = '';
             if ($currentMessage->getFiles()->count() > 0) {
-                $fileInfo = $currentMessage->getFiles()->count() . ' file(s)';
+                $fileInfo = $currentMessage->getFiles()->count().' file(s)';
             } elseif ($currentMessage->getFileType()) {
-                $fileInfo = $currentMessage->getFileType() . ' file';
+                $fileInfo = $currentMessage->getFileType().' file';
             }
-            
-            $content .= "\n\n\n---\n\n\nUser provided $fileInfo:\n\n" . 
-                       substr($allFilesText, 0, 10000) . // Increased limit
+
+            $content .= "\n\n\n---\n\n\nUser provided $fileInfo:\n\n".
+                       substr($allFilesText, 0, 10000). // Increased limit
                        "\n\n";
-                       
+
             $this->logger->info('✅ ChatHandler: File text added to prompt', [
                 'file_info' => $fileInfo,
-                'content_length' => strlen($content)
+                'content_length' => strlen($content),
             ]);
         } else {
             $this->logger->warning('⚠️ ChatHandler: No file text found!', [
                 'message_id' => $currentMessage->getId(),
-                'file_flag' => $currentMessage->getFile()
+                'file_flag' => $currentMessage->getFile(),
             ]);
         }
 
         // Add web search results if available
         if (isset($options['search_results']) && !empty($options['search_results']['results'])) {
             $searchContext = $this->formatSearchResultsForPrompt($options['search_results']);
-            $content .= "\n\n" . $searchContext;
-            
+            $content .= "\n\n".$searchContext;
+
             $this->logger->info('✅ ChatHandler: Web search results added to prompt', [
                 'results_count' => count($options['search_results']['results']),
-                'query' => $options['search_results']['query']
+                'query' => $options['search_results']['query'],
             ]);
         }
 
@@ -606,32 +605,33 @@ class ChatHandler implements MessageHandlerInterface
 
         return $messages;
     }
-    
+
     /**
      * Build messages for non-streaming (JSON format)
-     * Like old system: topicPrompt with $stream = false
+     * Like old system: topicPrompt with $stream = false.
      */
     private function loadRagContext(
         Message $message,
         string $topic,
         ?string $groupKey = null,
         int $limit = 5,
-        float $minScore = 0.3
-    ): string
-    {
+        float $minScore = 0.3,
+    ): string {
         if (empty($message->getText())) {
             $this->logger->debug('ChatHandler: Skipping RAG context (empty text)', [
                 'topic' => $topic,
-                'has_text' => false
+                'has_text' => false,
             ]);
+
             return '';
         }
 
         if (!$groupKey) {
-            if ($topic === 'general') {
+            if ('general' === $topic) {
                 $this->logger->debug('ChatHandler: Skipping RAG context (general topic, no group key)', [
-                    'topic' => $topic
+                    'topic' => $topic,
                 ]);
+
                 return '';
             }
 
@@ -639,8 +639,8 @@ class ChatHandler implements MessageHandlerInterface
         }
 
         try {
-            error_log('🔍 ChatHandler: Attempting to load RAG context for topic: ' . $topic . ' (groupKey: ' . $groupKey . ')');
-            error_log('🔍 ChatHandler: Searching RAG with groupKey: ' . $groupKey . ', query: ' . substr($message->getText(), 0, 100));
+            error_log('🔍 ChatHandler: Attempting to load RAG context for topic: '.$topic.' (groupKey: '.$groupKey.')');
+            error_log('🔍 ChatHandler: Searching RAG with groupKey: '.$groupKey.', query: '.substr($message->getText(), 0, 100));
 
             $ragResults = $this->vectorSearchService->semanticSearch(
                 $message->getText(),
@@ -650,12 +650,12 @@ class ChatHandler implements MessageHandlerInterface
                 minScore: $minScore
             );
 
-            error_log('🔍 ChatHandler: RAG search returned ' . count($ragResults) . ' results');
+            error_log('🔍 ChatHandler: RAG search returned '.count($ragResults).' results');
 
-            if (empty($ragResults) && $topic !== 'general') {
+            if (empty($ragResults) && 'general' !== $topic) {
                 $fallbackGroupKey = "TASKPROMPT:{$topic}";
                 if ($fallbackGroupKey !== $groupKey) {
-                    error_log('🔄 ChatHandler: RAG fallback search with groupKey: ' . $fallbackGroupKey);
+                    error_log('🔄 ChatHandler: RAG fallback search with groupKey: '.$fallbackGroupKey);
                     $ragResults = $this->vectorSearchService->semanticSearch(
                         $message->getText(),
                         $message->getUserId(),
@@ -663,7 +663,7 @@ class ChatHandler implements MessageHandlerInterface
                         limit: $limit,
                         minScore: $minScore
                     );
-                    error_log('🔍 ChatHandler: RAG fallback returned ' . count($ragResults) . ' results');
+                    error_log('🔍 ChatHandler: RAG fallback returned '.count($ragResults).' results');
 
                     if (!empty($ragResults)) {
                         $groupKey = $fallbackGroupKey;
@@ -682,7 +682,7 @@ class ChatHandler implements MessageHandlerInterface
                     $idx + 1,
                     trim($result['chunk_text'])
                 );
-                error_log('🔍 ChatHandler: RAG chunk ' . ($idx + 1) . ': ' . substr($result['chunk_text'], 0, 100) . '...');
+                error_log('🔍 ChatHandler: RAG chunk '.($idx + 1).': '.substr($result['chunk_text'], 0, 100).'...');
             }
             $ragContext .= "\nUse this context to provide accurate and specific answers.\n";
 
@@ -690,18 +690,18 @@ class ChatHandler implements MessageHandlerInterface
                 'topic' => $topic,
                 'chunks_found' => count($ragResults),
                 'user_id' => $message->getUserId(),
-                'group_key' => $groupKey
+                'group_key' => $groupKey,
             ]);
 
             return $ragContext;
         } catch (\Throwable $e) {
-            error_log('❌ ChatHandler: RAG context loading failed: ' . $e->getMessage());
-            error_log('❌ Stack trace: ' . $e->getTraceAsString());
+            error_log('❌ ChatHandler: RAG context loading failed: '.$e->getMessage());
+            error_log('❌ Stack trace: '.$e->getTraceAsString());
 
             $this->logger->warning('ChatHandler: RAG context loading failed', [
                 'topic' => $topic,
                 'error' => $e->getMessage(),
-                'group_key' => $groupKey
+                'group_key' => $groupKey,
             ]);
 
             return '';
@@ -711,21 +711,21 @@ class ChatHandler implements MessageHandlerInterface
     private function buildMessages(?string $systemPrompt, array $thread, Message $currentMessage, array $options = []): array
     {
         $messages = [];
-        if ($systemPrompt !== null) {
+        if (null !== $systemPrompt) {
             $messages[] = [
                 'role' => 'system',
-                'content' => $systemPrompt
+                'content' => $systemPrompt,
             ];
         }
 
         // Thread Messages (JSON encoded wie im alten System)
         foreach ($thread as $msg) {
-            $role = $msg->getDirection() === 'IN' ? 'user' : 'assistant';
+            $role = 'IN' === $msg->getDirection() ? 'user' : 'assistant';
             $content = $msg->getText();
 
             $messages[] = [
                 'role' => $role,
-                'content' => '[' . $msg->getDateTime() . ']: ' . $content,
+                'content' => '['.$msg->getDateTime().']: '.$content,
             ];
         }
 
@@ -740,19 +740,19 @@ class ChatHandler implements MessageHandlerInterface
             'BTEXT' => $currentMessage->getText(),
             'BFILETEXT' => $currentMessage->getFileText() ?: '',
         ];
-        
+
         $ragContext = $options['rag_context'] ?? '';
-        if ($systemPrompt === null && !empty($ragContext)) {
-            $msgArr['BTEXT'] .= "\n\n" . trim($ragContext);
+        if (null === $systemPrompt && !empty($ragContext)) {
+            $msgArr['BTEXT'] .= "\n\n".trim($ragContext);
         }
 
         if (isset($options['search_results']) && !empty($options['search_results']['results'])) {
             $searchContext = $this->formatSearchResultsForPrompt($options['search_results']);
-            $msgArr['BTEXT'] .= "\n\n" . $searchContext;
+            $msgArr['BTEXT'] .= "\n\n".$searchContext;
 
             $this->logger->info('ChatHandler: Web search results appended to BTEXT', [
                 'results_count' => count($options['search_results']['results']),
-                'query' => $options['search_results']['query'] ?? ''
+                'query' => $options['search_results']['query'] ?? '',
             ]);
         }
 
@@ -774,16 +774,16 @@ class ChatHandler implements MessageHandlerInterface
             ]);
         }
     }
-    
+
     private function detectFileType(string $path): string
     {
         $extension = strtolower(pathinfo($path, PATHINFO_EXTENSION));
-        
+
         $imageExtensions = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'];
         $videoExtensions = ['mp4', 'webm', 'ogg', 'mov', 'avi'];
         $audioExtensions = ['mp3', 'wav', 'ogg', 'flac'];
         $docExtensions = ['pdf', 'doc', 'docx', 'txt', 'xlsx', 'pptx'];
-        
+
         if (in_array($extension, $imageExtensions)) {
             return 'image';
         }
@@ -796,12 +796,12 @@ class ChatHandler implements MessageHandlerInterface
         if (in_array($extension, $docExtensions)) {
             return 'document';
         }
-        
+
         return 'file';
     }
 
     /**
-     * Format web search results for AI prompt
+     * Format web search results for AI prompt.
      */
     private function formatSearchResultsForPrompt(array $searchResults): string
     {
@@ -817,11 +817,11 @@ class ChatHandler implements MessageHandlerInterface
             $num = $index + 1;
             $formatted .= "[{$num}] **{$result['title']}**\n";
             $formatted .= "Source: {$result['url']}\n";
-            
+
             if (!empty($result['description'])) {
                 $formatted .= "Summary: {$result['description']}\n";
             }
-            
+
             if (!empty($result['age'])) {
                 $formatted .= "Published: {$result['age']}\n";
             }
@@ -830,10 +830,10 @@ class ChatHandler implements MessageHandlerInterface
             if (!empty($result['extra_snippets'])) {
                 $formatted .= "Additional context:\n";
                 foreach (array_slice($result['extra_snippets'], 0, 2) as $snippet) {
-                    $formatted .= "  • " . strip_tags($snippet) . "\n";
+                    $formatted .= '  • '.strip_tags($snippet)."\n";
                 }
             }
-            
+
             $formatted .= "\n";
         }
 
@@ -845,67 +845,69 @@ class ChatHandler implements MessageHandlerInterface
     /**
      * Parse AI response and extract file generation data if present
      * Format: { "BFILEPATH": "filename.ext", "BFILETEXT": "file content" }
-     * Also handles JSON wrapped in markdown code blocks: ```json ... ```
-     * 
+     * Also handles JSON wrapped in markdown code blocks: ```json ... ```.
+     *
      * @return array|null ['filename' => string, 'content' => string, 'extension' => string] or null
      */
     private function extractFileGenerationData(string $content): ?array
     {
         // Check if content looks like JSON or is wrapped in markdown code blocks
         $jsonContent = trim($content);
-        
+
         // Extract JSON from markdown code blocks if present (```json ... ``` or ``` ... ```)
         if (preg_match('/```(?:json)?\s*\n(.*?)\n```/s', $content, $matches)) {
             $jsonContent = trim($matches[1]);
             $this->logger->info('ChatHandler: Extracted JSON from markdown code block');
         }
-        
+
         if (!str_starts_with($jsonContent, '{')) {
             return null;
         }
 
         try {
             $jsonData = json_decode($jsonContent, true, 512, JSON_THROW_ON_ERROR);
-            
+
             // Check for file generation format
             if (isset($jsonData['BFILEPATH']) && isset($jsonData['BFILETEXT'])) {
                 $filename = trim($jsonData['BFILEPATH']);
                 $fileContent = $jsonData['BFILETEXT'];
-                
+
                 if (empty($filename) || empty($fileContent)) {
                     return null;
                 }
-                
+
                 $extension = strtolower(pathinfo($filename, PATHINFO_EXTENSION));
-                
+
                 $this->logger->info('ChatHandler: Detected file generation', [
                     'filename' => $filename,
                     'extension' => $extension,
-                    'content_length' => strlen($fileContent)
+                    'content_length' => strlen($fileContent),
                 ]);
-                
+
                 return [
                     'filename' => $filename,
                     'content' => $fileContent,
-                    'extension' => $extension
+                    'extension' => $extension,
                 ];
             }
-            
+
             return null;
         } catch (\JsonException $e) {
             // Not JSON or invalid format
             $this->logger->debug('ChatHandler: Content is not valid JSON for file generation', [
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ]);
+
             return null;
         }
     }
 
     /**
-     * Store AI-generated file in the file system and create File entity
-     * 
-     * @param array $fileData ['filename' => string, 'content' => string, 'extension' => string]
-     * @param Message $message The message that triggered the generation
+     * Store AI-generated file in the file system and create File entity.
+     *
+     * @param array   $fileData ['filename' => string, 'content' => string, 'extension' => string]
+     * @param Message $message  The message that triggered the generation
+     *
      * @return File|null The created File entity or null on error
      */
     private function storeGeneratedFile(array $fileData, Message $message): ?File
@@ -914,43 +916,45 @@ class ChatHandler implements MessageHandlerInterface
         $filename = $fileData['filename'];
         $content = $fileData['content'];
         $extension = $fileData['extension'];
-        
+
         try {
             // Generate storage path similar to FileStorageService
             $year = date('Y');
             $month = date('m');
             $timestamp = time();
-            
+
             // Sanitize filename
             $sanitized = preg_replace('/[^a-zA-Z0-9._-]/', '_', $filename);
             $sanitized = preg_replace('/_+/', '_', $sanitized);
-            
+
             // Add timestamp to prevent collisions
             $basename = pathinfo($sanitized, PATHINFO_FILENAME);
-            $finalFilename = $basename . '_' . $timestamp . '.' . $extension;
-            
+            $finalFilename = $basename.'_'.$timestamp.'.'.$extension;
+
             // Create relative path
             $relativePath = sprintf('%d/%s/%s/%s', $userId, $year, $month, $finalFilename);
-            $absolutePath = $this->uploadDir . '/' . $relativePath;
-            
+            $absolutePath = $this->uploadDir.'/'.$relativePath;
+
             // Create directory if not exists
             $dir = dirname($absolutePath);
             if (!is_dir($dir)) {
                 if (!mkdir($dir, 0755, true)) {
                     $this->logger->error('ChatHandler: Failed to create directory', ['dir' => $dir]);
+
                     return null;
                 }
             }
-            
+
             // Write file content
             if (!file_put_contents($absolutePath, $content)) {
                 $this->logger->error('ChatHandler: Failed to write file', ['path' => $absolutePath]);
+
                 return null;
             }
-            
+
             // Detect MIME type
             $mimeType = $this->getMimeTypeForExtension($extension);
-            
+
             // Create File entity
             $file = new File();
             $file->setUserId($userId);
@@ -961,35 +965,35 @@ class ChatHandler implements MessageHandlerInterface
             $file->setFileMime($mimeType);
             $file->setFileText($content); // Store content as text for searchability
             $file->setStatus('generated');
-            
+
             $this->em->persist($file);
             $this->em->flush();
-            
+
             $this->logger->info('ChatHandler: File generated and stored successfully', [
                 'file_id' => $file->getId(),
                 'filename' => $filename,
                 'path' => $relativePath,
-                'size' => $file->getFileSize()
+                'size' => $file->getFileSize(),
             ]);
-            
+
             return $file;
-            
         } catch (\Throwable $e) {
             $this->logger->error('ChatHandler: Failed to store generated file', [
                 'filename' => $filename,
                 'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
+                'trace' => $e->getTraceAsString(),
             ]);
+
             return null;
         }
     }
 
     /**
-     * Get MIME type for file extension
+     * Get MIME type for file extension.
      */
     private function getMimeTypeForExtension(string $extension): string
     {
-        return match(strtolower($extension)) {
+        return match (strtolower($extension)) {
             'csv' => 'text/csv',
             'txt' => 'text/plain',
             'md' => 'text/markdown',
@@ -1000,8 +1004,7 @@ class ChatHandler implements MessageHandlerInterface
             'docx' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
             'pptx' => 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
             'pdf' => 'application/pdf',
-            default => 'application/octet-stream'
+            default => 'application/octet-stream',
         };
     }
 }
-

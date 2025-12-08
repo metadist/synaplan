@@ -9,8 +9,8 @@ use Symfony\Contracts\Translation\TranslatorInterface;
 use Twig\Environment;
 
 /**
- * Internal Email Service
- * 
+ * Internal Email Service.
+ *
  * Handles system emails for authentication (verification, password reset, welcome).
  * Uses SMTP configuration from environment variables (MAILER_DSN).
  * Supports multilingual emails based on user locale.
@@ -21,18 +21,19 @@ class InternalEmailService
         private MailerInterface $mailer,
         private Environment $twig,
         private TranslatorInterface $translator,
-        private LoggerInterface $logger
-    ) {}
+        private LoggerInterface $logger,
+    ) {
+    }
 
     /**
-     * Send email verification link
+     * Send email verification link.
      */
     public function sendVerificationEmail(string $to, string $token, string $locale = 'en'): void
     {
         $frontendUrl = $_ENV['FRONTEND_URL'] ?? $_ENV['APP_URL'] ?? 'http://localhost:5173';
         $fromEmail = $_ENV['APP_SENDER_EMAIL'] ?? 'noreply@synaplan.com';
         $fromName = $_ENV['APP_SENDER_NAME'] ?? 'Synaplan';
-        
+
         $verificationUrl = sprintf('%s/verify-email-callback?token=%s', $frontendUrl, $token);
 
         // Translate subject
@@ -52,21 +53,21 @@ class InternalEmailService
         } catch (\Exception $e) {
             $this->logger->error('Failed to send verification email', [
                 'to' => $to,
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ]);
             throw $e;
         }
     }
 
     /**
-     * Send password reset link
+     * Send password reset link.
      */
     public function sendPasswordResetEmail(string $to, string $token, string $locale = 'en'): void
     {
         $frontendUrl = $_ENV['FRONTEND_URL'] ?? $_ENV['APP_URL'] ?? 'http://localhost:5173';
         $fromEmail = $_ENV['APP_SENDER_EMAIL'] ?? 'noreply@synaplan.com';
         $fromName = $_ENV['APP_SENDER_NAME'] ?? 'Synaplan';
-        
+
         $resetUrl = sprintf('%s/reset-password?token=%s', $frontendUrl, $token);
 
         // Translate subject
@@ -86,24 +87,24 @@ class InternalEmailService
         } catch (\Exception $e) {
             $this->logger->error('Failed to send password reset email', [
                 'to' => $to,
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ]);
             throw $e;
         }
     }
 
     /**
-     * Send welcome email after email verification
+     * Send welcome email after email verification.
      */
     public function sendWelcomeEmail(string $to, string $name, string $locale = 'en'): void
     {
         $frontendUrl = $_ENV['FRONTEND_URL'] ?? $_ENV['APP_URL'] ?? 'http://localhost:5173';
         $fromEmail = $_ENV['APP_SENDER_EMAIL'] ?? 'noreply@synaplan.com';
         $fromName = $_ENV['APP_SENDER_NAME'] ?? 'Synaplan';
-        
+
         // Translate subject
         $subject = $this->translator->trans('email.welcome.title', [], 'emails', $locale);
-        
+
         $email = (new Email())
             ->from(sprintf('%s <%s>', $fromName, $fromEmail))
             ->to($to)
@@ -119,28 +120,28 @@ class InternalEmailService
         } catch (\Exception $e) {
             $this->logger->error('Failed to send welcome email', [
                 'to' => $to,
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ]);
             // Don't throw - welcome email is not critical
         }
     }
 
     /**
-     * Send AI response email (for smart@synaplan.com chat)
+     * Send AI response email (for smart@synaplan.com chat).
      */
     public function sendAiResponseEmail(
         string $to,
         string $subject,
         string $bodyText,
-        ?string $inReplyTo = null
+        ?string $inReplyTo = null,
     ): void {
         $fromEmail = $_ENV['APP_SENDER_EMAIL'] ?? 'smart@synaplan.com';
         $fromName = $_ENV['APP_SENDER_NAME'] ?? 'Synaplan AI';
-        
+
         $email = (new Email())
             ->from(sprintf('%s <%s>', $fromName, $fromEmail))
             ->to($to)
-            ->subject('Re: ' . $subject)
+            ->subject('Re: '.$subject)
             ->text($bodyText)
             ->html(nl2br(htmlspecialchars($bodyText)));
 
@@ -154,12 +155,12 @@ class InternalEmailService
             $this->mailer->send($email);
             $this->logger->info('AI response email sent', [
                 'to' => $to,
-                'subject' => $subject
+                'subject' => $subject,
             ]);
         } catch (\Exception $e) {
             $this->logger->error('Failed to send AI response email', [
                 'to' => $to,
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ]);
             throw $e;
         }
@@ -167,13 +168,13 @@ class InternalEmailService
 
     /**
      * Render email template with locale support
-     * Translates all strings before passing to template
+     * Translates all strings before passing to template.
      */
     private function renderTemplate(string $template, array $context, string $locale): string
     {
         // Pre-translate all email strings based on template type
         $translations = [];
-        
+
         if (str_contains($template, 'verification')) {
             $translations = [
                 'title' => $this->translator->trans('email.verification.title', [], 'emails', $locale),
@@ -209,13 +210,12 @@ class InternalEmailService
                 'footer_help' => $this->translator->trans('email.footer.help', [], 'emails', $locale),
             ];
         }
-        
+
         // Add common footer translations
         $translations['footer_company'] = $this->translator->trans('email.footer.company', [], 'emails', $locale);
         $translations['footer_rights'] = $this->translator->trans('email.footer.rights', [], 'emails', $locale);
-        
+
         // Merge translations into context
         return $this->twig->render($template, array_merge($context, ['t' => $translations]));
     }
 }
-

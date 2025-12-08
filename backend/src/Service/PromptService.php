@@ -3,13 +3,13 @@
 namespace App\Service;
 
 use App\Entity\Prompt;
-use App\Repository\PromptRepository;
 use App\Repository\PromptMetaRepository;
+use App\Repository\PromptRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 
 /**
- * Service for loading prompts with their metadata (AI model, tools, etc.)
+ * Service for loading prompts with their metadata (AI model, tools, etc.).
  */
 class PromptService
 {
@@ -17,17 +17,19 @@ class PromptService
         private PromptRepository $promptRepository,
         private PromptMetaRepository $promptMetaRepository,
         private EntityManagerInterface $em,
-        private LoggerInterface $logger
-    ) {}
+        private LoggerInterface $logger,
+    ) {
+    }
 
     /**
      * Get prompt with metadata by topic and user
      * Returns prompt with metadata loaded as array
-     * Note: $lang parameter is kept for backward compatibility but NOT used for filtering
-     * 
-     * @param string $topic Topic identifier
-     * @param int $userId User ID (0 = only system prompts)
-     * @param string $lang Language code (not used for filtering, just for logging)
+     * Note: $lang parameter is kept for backward compatibility but NOT used for filtering.
+     *
+     * @param string $topic  Topic identifier
+     * @param int    $userId User ID (0 = only system prompts)
+     * @param string $lang   Language code (not used for filtering, just for logging)
+     *
      * @return array|null ['prompt' => Prompt, 'metadata' => array] or null
      */
     public function getPromptWithMetadata(string $topic, int $userId = 0, string $lang = 'en'): ?array
@@ -45,26 +47,27 @@ class PromptService
 
         return [
             'prompt' => $prompt,
-            'metadata' => $metadata
+            'metadata' => $metadata,
         ];
     }
 
     /**
-     * Load all metadata for a prompt
-     * 
+     * Load all metadata for a prompt.
+     *
      * @param int $promptId Prompt ID
+     *
      * @return array Metadata as key-value pairs
      */
     public function loadMetadataForPrompt(int $promptId): array
     {
         $metaEntries = $this->promptMetaRepository->findBy(['promptId' => $promptId]);
-        
+
         $metadata = [
             'aiModel' => -1, // -1 = AUTOMATED
             'tool_internet' => false,
             'tool_files' => false,
             'tool_screenshot' => false,
-            'tool_transfer' => false
+            'tool_transfer' => false,
         ];
 
         foreach ($metaEntries as $meta) {
@@ -73,9 +76,9 @@ class PromptService
 
             // Convert boolean strings to actual booleans
             if (str_starts_with($key, 'tool_')) {
-                $metadata[$key] = (bool)(int)$value;
-            } elseif ($key === 'aiModel') {
-                $metadata[$key] = (int)$value;
+                $metadata[$key] = (bool) (int) $value;
+            } elseif ('aiModel' === $key) {
+                $metadata[$key] = (int) $value;
             } else {
                 $metadata[$key] = $value;
             }
@@ -85,10 +88,10 @@ class PromptService
     }
 
     /**
-     * Save metadata for a prompt
-     * 
-     * @param Prompt $prompt The Prompt entity
-     * @param array $metadata Metadata as key-value pairs
+     * Save metadata for a prompt.
+     *
+     * @param Prompt $prompt   The Prompt entity
+     * @param array  $metadata Metadata as key-value pairs
      */
     public function saveMetadataForPrompt(Prompt $prompt, array $metadata): void
     {
@@ -96,13 +99,13 @@ class PromptService
         if (!$promptId) {
             throw new \InvalidArgumentException('Prompt must have an ID before saving metadata');
         }
-        
+
         // Delete existing metadata
         $existing = $this->promptMetaRepository->findBy(['promptId' => $promptId]);
         foreach ($existing as $meta) {
             $this->em->remove($meta);
         }
-        
+
         // Flush deletions if any
         if (!empty($existing)) {
             $this->em->flush();
@@ -113,17 +116,17 @@ class PromptService
             $meta = new \App\Entity\PromptMeta();
             $meta->setPrompt($prompt);  // ✅ Use setPrompt() instead of setPromptId()
             $meta->setMetaKey($key);
-            
+
             // Convert booleans to string "0" or "1"
             if (is_bool($value)) {
                 $meta->setMetaValue($value ? '1' : '0');
             } else {
-                $meta->setMetaValue((string)$value);
+                $meta->setMetaValue((string) $value);
             }
-            
+
             $this->em->persist($meta);
         }
-        
+
         // Flush all new metadata at once
         if (!empty($metadata)) {
             $this->em->flush();
@@ -132,21 +135,22 @@ class PromptService
 
     /**
      * Get all prompts for a user with their metadata
-     * Used for sorting to get ALL available task prompts
-     * 
-     * @param int $userId User ID
-     * @param string $lang Language code
+     * Used for sorting to get ALL available task prompts.
+     *
+     * @param int    $userId User ID
+     * @param string $lang   Language code
+     *
      * @return array Array of ['prompt' => Prompt, 'metadata' => array]
      */
     public function getAllPromptsWithMetadata(int $userId, string $lang = 'en'): array
     {
         $prompts = $this->promptRepository->findAllForUser($userId, $lang);
-        
+
         $result = [];
         foreach ($prompts as $prompt) {
-                $result[] = [
+            $result[] = [
                 'prompt' => $prompt,
-                'metadata' => $this->loadMetadataForPrompt($prompt->getId())
+                'metadata' => $this->loadMetadataForPrompt($prompt->getId()),
             ];
         }
 
@@ -155,11 +159,12 @@ class PromptService
 
     /**
      * Check if a message matches the selection rules of a prompt
-     * Selection rules are simple text-based matching for now
-     * 
-     * @param string|null $selectionRules Selection rules from prompt
-     * @param string $messageText User's message text
-     * @param array $conversationHistory Previous messages (optional)
+     * Selection rules are simple text-based matching for now.
+     *
+     * @param string|null $selectionRules      Selection rules from prompt
+     * @param string      $messageText         User's message text
+     * @param array       $conversationHistory Previous messages (optional)
+     *
      * @return bool True if rules match
      */
     public function matchesSelectionRules(?string $selectionRules, string $messageText, array $conversationHistory = []): bool
@@ -174,7 +179,7 @@ class PromptService
         // Simple keyword matching (can be extended later with AI-based matching)
         // Split rules by newlines or commas
         $keywords = preg_split('/[,\n]+/', $rules);
-        
+
         foreach ($keywords as $keyword) {
             $keyword = trim($keyword);
             if (empty($keyword)) {

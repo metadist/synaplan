@@ -171,6 +171,8 @@
                     <div class="relative w-full h-full pointer-events-none">
                       <div class="pointer-events-auto">
                         <ChatWidget
+                          widget-id="preview-widget"
+                          :api-url="config.apiBaseUrl"
                           :primary-color="currentWidgetConfig.primaryColor"
                           :icon-color="currentWidgetConfig.iconColor"
                           :position="currentWidgetConfig.position"
@@ -251,6 +253,7 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
 import { useRoute } from 'vue-router'
+import { useConfigStore } from '@/stores/config'
 import MainLayout from '@/components/MainLayout.vue'
 import WidgetList from '@/components/widgets/WidgetList.vue'
 import WidgetEditor from '@/components/widgets/WidgetEditor.vue'
@@ -279,13 +282,14 @@ import { useAiConfigStore } from '@/stores/aiConfig'
 import type { Widget, WidgetConfig } from '@/mocks/widgets'
 import { mockWidgets } from '@/mocks/widgets'
 import type { SummaryConfig } from '@/mocks/summaries'
-import type { MailConfig, Department, SavedMailHandler } from '@/mocks/mail'
+import type { MailConfig, Department, SavedMailHandler } from '@/services/api/inboundEmailHandlersApi'
 import { inboundEmailHandlersApi } from '@/services/api/inboundEmailHandlersApi'
 import * as summaryService from '@/services/summaryService'
 import type { SummaryResponse } from '@/services/summaryService'
 import { useNotification } from '@/composables/useNotification'
 
 const route = useRoute()
+const config = useConfigStore()
 const commandsStore = useCommandsStore()
 const aiConfigStore = useAiConfigStore()
 const { success, error: showError } = useNotification()

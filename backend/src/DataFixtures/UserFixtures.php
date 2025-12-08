@@ -8,7 +8,7 @@ use Doctrine\Persistence\ObjectManager;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 
 /**
- * Loads demo users for development
+ * Loads demo users for development.
  */
 class UserFixtures extends Fixture
 {
@@ -31,8 +31,8 @@ class UserFixtures extends Fixture
                 'userDetails' => [
                     'firstName' => 'Admin',
                     'lastName' => 'User',
-                    'company' => 'Synaplan'
-                ]
+                    'company' => 'Synaplan',
+                ],
             ],
             [
                 'mail' => 'demo@synaplan.com',
@@ -42,8 +42,8 @@ class UserFixtures extends Fixture
                 'type' => 'WEB',
                 'userDetails' => [
                     'firstName' => 'Demo',
-                    'lastName' => 'User'
-                ]
+                    'lastName' => 'User',
+                ],
             ],
             [
                 'mail' => 'test@example.com',
@@ -53,9 +53,9 @@ class UserFixtures extends Fixture
                 'type' => 'WEB',
                 'userDetails' => [
                     'firstName' => 'Test',
-                    'lastName' => 'User'
-                ]
-            ]
+                    'lastName' => 'User',
+                ],
+            ],
         ];
 
         foreach ($users as $data) {
@@ -68,15 +68,14 @@ class UserFixtures extends Fixture
             $user->setUserDetails($data['userDetails']);
             $user->setProviderId(''); // Empty for local users
             $user->setPaymentDetails([]);
-            
+
             // Hash the password
             $hashedPassword = $this->passwordHasher->hashPassword($user, $data['password']);
             $user->setPw($hashedPassword);
-            
+
             $manager->persist($user);
         }
 
         $manager->flush();
     }
 }
-

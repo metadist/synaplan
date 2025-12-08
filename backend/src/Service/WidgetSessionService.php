@@ -2,15 +2,15 @@
 
 namespace App\Service;
 
+use App\Entity\Chat;
 use App\Entity\WidgetSession;
 use App\Repository\WidgetSessionRepository;
-use App\Entity\Chat;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 
 /**
- * Widget Session Management Service
- * 
+ * Widget Session Management Service.
+ *
  * Handles anonymous user sessions for chat widgets
  */
 class WidgetSessionService
@@ -28,11 +28,12 @@ class WidgetSessionService
     public function __construct(
         private EntityManagerInterface $em,
         private WidgetSessionRepository $sessionRepository,
-        private LoggerInterface $logger
-    ) {}
+        private LoggerInterface $logger,
+    ) {
+    }
 
     /**
-     * Get or create a session for a widget
+     * Get or create a session for a widget.
      */
     public function getOrCreateSession(string $widgetId, string $sessionId): WidgetSession
     {
@@ -47,7 +48,7 @@ class WidgetSessionService
 
             $this->logger->info('New widget session created', [
                 'widget_id' => $widgetId,
-                'session_id' => substr($sessionId, 0, 8) . '...'
+                'session_id' => substr($sessionId, 0, 8).'...',
             ]);
         } elseif ($session->isExpired()) {
             // Reset expired session
@@ -58,7 +59,7 @@ class WidgetSessionService
 
             $this->logger->info('Widget session reset after expiry', [
                 'widget_id' => $widgetId,
-                'session_id' => substr($sessionId, 0, 8) . '...'
+                'session_id' => substr($sessionId, 0, 8).'...',
             ]);
         }
 
@@ -66,7 +67,7 @@ class WidgetSessionService
     }
 
     /**
-     * Check if session can send a message (rate limits)
+     * Check if session can send a message (rate limits).
      */
     public function checkSessionLimit(WidgetSession $session, ?int $maxMessages = null, ?int $maxPerMinute = null): array
     {
@@ -80,7 +81,7 @@ class WidgetSessionService
                 'reason' => 'total_limit_reached',
                 'remaining' => 0,
                 'retry_after' => null,
-                'max_messages' => $maxMessages
+                'max_messages' => $maxMessages,
             ];
         }
 
@@ -98,7 +99,7 @@ class WidgetSessionService
                         'reason' => 'rate_limit_exceeded',
                         'remaining' => 0,
                         'retry_after' => $retryAfter,
-                        'max_per_minute' => $maxPerMinute
+                        'max_per_minute' => $maxPerMinute,
                     ];
                 }
             }
@@ -111,12 +112,12 @@ class WidgetSessionService
             'reason' => null,
             'remaining' => $remaining,
             'retry_after' => null,
-            'max_messages' => $maxMessages
+            'max_messages' => $maxMessages,
         ];
     }
 
     /**
-     * Increment message count and update last message time
+     * Increment message count and update last message time.
      */
     public function incrementMessageCount(WidgetSession $session): void
     {
@@ -134,7 +135,7 @@ class WidgetSessionService
                 'allowed' => true,
                 'reason' => null,
                 'remaining' => null,
-                'max_files' => $maxFiles
+                'max_files' => $maxFiles,
             ];
         }
 
@@ -143,7 +144,7 @@ class WidgetSessionService
                 'allowed' => false,
                 'reason' => 'file_limit_reached',
                 'remaining' => 0,
-                'max_files' => $maxFiles
+                'max_files' => $maxFiles,
             ];
         }
 
@@ -151,7 +152,7 @@ class WidgetSessionService
             'allowed' => true,
             'reason' => null,
             'remaining' => max(0, $maxFiles - $session->getFileCount()),
-            'max_files' => $maxFiles
+            'max_files' => $maxFiles,
         ];
     }
 
@@ -184,6 +185,7 @@ class WidgetSessionService
      * Map chat IDs to widget session metadata.
      *
      * @param array<int> $chatIds
+     *
      * @return array<int, array<string, mixed>>
      */
     public function getSessionMapForChats(array $chatIds): array
@@ -199,9 +201,9 @@ class WidgetSessionService
                 'sessionId' => $row['session_id'],
                 'messageCount' => (int) $row['message_count'],
                 'fileCount' => isset($row['file_count']) ? (int) $row['file_count'] : 0,
-                'lastMessage' => $row['last_message'] !== null ? (int) $row['last_message'] : null,
+                'lastMessage' => null !== $row['last_message'] ? (int) $row['last_message'] : null,
                 'created' => (int) $row['created'],
-                'expires' => (int) $row['expires']
+                'expires' => (int) $row['expires'],
             ];
         }
 
@@ -210,39 +212,39 @@ class WidgetSessionService
 
     /**
      * Get messages sent in the last minute
-     * (For now, we'll implement a simple check; in production, use Redis/Cache)
+     * (For now, we'll implement a simple check; in production, use Redis/Cache).
      */
     private function getMessagesInLastMinute(WidgetSession $session): int
     {
         // Simplified: assume 1 message if last message was within the last minute
         // In production, track per-second timestamps in cache
         $lastMinute = time() - 60;
+
         return $session->getLastMessage() >= $lastMinute ? 1 : 0;
     }
 
     /**
-     * Cleanup expired sessions (run via cron)
+     * Cleanup expired sessions (run via cron).
      */
     public function cleanupExpiredSessions(): int
     {
         $deleted = $this->sessionRepository->deleteExpiredSessions();
-        
+
         $this->logger->info('Cleaned up expired widget sessions', [
-            'deleted_count' => $deleted
+            'deleted_count' => $deleted,
         ]);
 
         return $deleted;
     }
 
     /**
-     * Get session statistics for a widget
+     * Get session statistics for a widget.
      */
     public function getWidgetStats(string $widgetId): array
     {
         return [
             'active_sessions' => $this->sessionRepository->countActiveSessionsByWidget($widgetId),
-            'total_messages' => $this->sessionRepository->getTotalMessageCountByWidget($widgetId)
+            'total_messages' => $this->sessionRepository->getTotalMessageCountByWidget($widgetId),
         ];
     }
 }
-

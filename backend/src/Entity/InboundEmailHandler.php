@@ -2,12 +2,12 @@
 
 namespace App\Entity;
 
-use Doctrine\ORM\Mapping as ORM;
 use App\Repository\InboundEmailHandlerRepository;
+use Doctrine\ORM\Mapping as ORM;
 
 /**
- * Inbound Email Handler Entity
- * 
+ * Inbound Email Handler Entity.
+ *
  * Stores IMAP/POP3 configuration for email routing tool.
  * Each handler belongs to a user and contains departments for AI-based routing.
  */
@@ -99,6 +99,7 @@ class InboundEmailHandler
     public function setUserId(int $userId): self
     {
         $this->userId = $userId;
+
         return $this;
     }
 
@@ -110,6 +111,7 @@ class InboundEmailHandler
     public function setName(string $name): self
     {
         $this->name = $name;
+
         return $this;
     }
 
@@ -121,6 +123,7 @@ class InboundEmailHandler
     public function setMailServer(string $mailServer): self
     {
         $this->mailServer = $mailServer;
+
         return $this;
     }
 
@@ -132,6 +135,7 @@ class InboundEmailHandler
     public function setPort(int $port): self
     {
         $this->port = $port;
+
         return $this;
     }
 
@@ -143,6 +147,7 @@ class InboundEmailHandler
     public function setProtocol(string $protocol): self
     {
         $this->protocol = $protocol;
+
         return $this;
     }
 
@@ -154,6 +159,7 @@ class InboundEmailHandler
     public function setSecurity(string $security): self
     {
         $this->security = $security;
+
         return $this;
     }
 
@@ -165,11 +171,12 @@ class InboundEmailHandler
     public function setUsername(string $username): self
     {
         $this->username = $username;
+
         return $this;
     }
 
     /**
-     * Get encrypted password (for storage)
+     * Get encrypted password (for storage).
      */
     public function getPassword(): string
     {
@@ -178,29 +185,31 @@ class InboundEmailHandler
 
     /**
      * Set encrypted password (for storage)
-     * Use setDecryptedPassword() to set plaintext password
+     * Use setDecryptedPassword() to set plaintext password.
      */
     public function setPassword(string $password): self
     {
         $this->password = $password;
+
         return $this;
     }
 
     /**
      * Get decrypted password
-     * Note: Requires EncryptionService - use in Service layer
+     * Note: Requires EncryptionService - use in Service layer.
      */
     public function getDecryptedPassword(\App\Service\EncryptionService $encryptionService): string
     {
         if (empty($this->password)) {
             return '';
         }
+
         return $encryptionService->decrypt($this->password);
     }
 
     /**
      * Set password from plaintext (encrypts automatically)
-     * Note: Requires EncryptionService - use in Service layer
+     * Note: Requires EncryptionService - use in Service layer.
      */
     public function setDecryptedPassword(string $plaintext, \App\Service\EncryptionService $encryptionService): self
     {
@@ -209,6 +218,7 @@ class InboundEmailHandler
         } else {
             $this->password = $encryptionService->encrypt($plaintext);
         }
+
         return $this;
     }
 
@@ -220,6 +230,7 @@ class InboundEmailHandler
     public function setCheckInterval(int $checkInterval): self
     {
         $this->checkInterval = $checkInterval;
+
         return $this;
     }
 
@@ -231,6 +242,7 @@ class InboundEmailHandler
     public function setDeleteAfter(bool $deleteAfter): self
     {
         $this->deleteAfter = $deleteAfter;
+
         return $this;
     }
 
@@ -243,6 +255,7 @@ class InboundEmailHandler
     {
         $this->status = $status;
         $this->updated = date('YmdHis');
+
         return $this;
     }
 
@@ -255,6 +268,7 @@ class InboundEmailHandler
     {
         $this->departments = $departments;
         $this->updated = date('YmdHis');
+
         return $this;
     }
 
@@ -266,6 +280,7 @@ class InboundEmailHandler
     public function setLastChecked(?string $lastChecked): self
     {
         $this->lastChecked = $lastChecked;
+
         return $this;
     }
 
@@ -282,6 +297,7 @@ class InboundEmailHandler
     public function setUpdated(string $updated): self
     {
         $this->updated = $updated;
+
         return $this;
     }
 
@@ -293,11 +309,12 @@ class InboundEmailHandler
     public function setConfig(?array $config): self
     {
         $this->config = $config;
+
         return $this;
     }
 
     /**
-     * Set SMTP credentials for email forwarding (encrypts password)
+     * Set SMTP credentials for email forwarding (encrypts password).
      */
     public function setSmtpCredentials(
         string $smtpServer,
@@ -305,7 +322,7 @@ class InboundEmailHandler
         string $smtpUsername,
         string $smtpPassword,
         \App\Service\EncryptionService $encryptionService,
-        string $smtpSecurity = 'SSL/TLS'
+        string $smtpSecurity = 'SSL/TLS',
     ): self {
         $config = $this->config ?? [];
         $config['smtp'] = [
@@ -313,15 +330,16 @@ class InboundEmailHandler
             'port' => $smtpPort,
             'username' => $smtpUsername,
             'password' => empty($smtpPassword) ? '' : $encryptionService->encrypt($smtpPassword),
-            'security' => $smtpSecurity
+            'security' => $smtpSecurity,
         ];
         $this->config = $config;
         $this->updated = date('YmdHis');
+
         return $this;
     }
 
     /**
-     * Get SMTP credentials (decrypts password)
+     * Get SMTP credentials (decrypts password).
      */
     public function getSmtpCredentials(\App\Service\EncryptionService $encryptionService): ?array
     {
@@ -330,17 +348,18 @@ class InboundEmailHandler
         }
 
         $smtp = $this->config['smtp'];
+
         return [
             'server' => $smtp['server'] ?? '',
             'port' => $smtp['port'] ?? 587,
             'username' => $smtp['username'] ?? '',
             'password' => empty($smtp['password']) ? '' : $encryptionService->decrypt($smtp['password']),
-            'security' => $smtp['security'] ?? 'SSL/TLS'
+            'security' => $smtp['security'] ?? 'SSL/TLS',
         ];
     }
 
     /**
-     * Check if SMTP credentials are configured
+     * Check if SMTP credentials are configured.
      */
     public function hasSmtpCredentials(): bool
     {
@@ -348,7 +367,7 @@ class InboundEmailHandler
     }
 
     /**
-     * Set email filter configuration
+     * Set email filter configuration.
      */
     public function setEmailFilter(string $mode, ?string $fromDate = null, ?string $toDate = null): self
     {
@@ -356,15 +375,16 @@ class InboundEmailHandler
         $config['email_filter'] = [
             'mode' => $mode, // 'new' or 'historical'
             'from_date' => $fromDate,
-            'to_date' => $toDate
+            'to_date' => $toDate,
         ];
         $this->config = $config;
         $this->updated = date('YmdHis');
+
         return $this;
     }
 
     /**
-     * Get email filter configuration
+     * Get email filter configuration.
      */
     public function getEmailFilter(): array
     {
@@ -372,7 +392,7 @@ class InboundEmailHandler
             return [
                 'mode' => 'new',
                 'from_date' => null,
-                'to_date' => null
+                'to_date' => null,
             ];
         }
 
@@ -380,21 +400,22 @@ class InboundEmailHandler
     }
 
     /**
-     * Check if handler should process historical emails
+     * Check if handler should process historical emails.
      */
     public function shouldProcessHistoricalEmails(): bool
     {
         $filter = $this->getEmailFilter();
-        return $filter['mode'] === 'historical';
+
+        return 'historical' === $filter['mode'];
     }
 
     /**
-     * Update timestamp on modification
+     * Update timestamp on modification.
      */
     public function touch(): self
     {
         $this->updated = date('YmdHis');
+
         return $this;
     }
 }
-

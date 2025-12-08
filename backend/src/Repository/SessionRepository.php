@@ -17,7 +17,7 @@ class SessionRepository extends ServiceEntityRepository
     }
 
     /**
-     * Findet Session by Token
+     * Findet Session by Token.
      */
     public function findByToken(string $token): ?Session
     {
@@ -25,7 +25,7 @@ class SessionRepository extends ServiceEntityRepository
     }
 
     /**
-     * Findet aktive Session (nicht expired)
+     * Findet aktive Session (nicht expired).
      */
     public function findActiveByToken(string $token): ?Session
     {
@@ -39,7 +39,7 @@ class SessionRepository extends ServiceEntityRepository
     }
 
     /**
-     * Löscht abgelaufene Sessions
+     * Löscht abgelaufene Sessions.
      */
     public function deleteExpired(): int
     {
@@ -52,27 +52,26 @@ class SessionRepository extends ServiceEntityRepository
     }
 
     /**
-     * Speichert eine Session
+     * Speichert eine Session.
      */
     public function save(Session $session, bool $flush = true): void
     {
         $this->getEntityManager()->persist($session);
-        
+
         if ($flush) {
             $this->getEntityManager()->flush();
         }
     }
 
     /**
-     * Löscht eine Session
+     * Löscht eine Session.
      */
     public function remove(Session $session, bool $flush = true): void
     {
         $this->getEntityManager()->remove($session);
-        
+
         if ($flush) {
             $this->getEntityManager()->flush();
         }
     }
 }
-

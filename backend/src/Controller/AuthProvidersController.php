@@ -2,10 +2,10 @@
 
 namespace App\Controller;
 
+use OpenApi\Attributes as OA;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\Routing\Annotation\Route;
-use OpenApi\Attributes as OA;
 
 #[Route('/api/v1/auth')]
 class AuthProvidersController extends AbstractController
@@ -14,8 +14,9 @@ class AuthProvidersController extends AbstractController
         private ?string $googleClientId,
         private ?string $githubClientId,
         private ?string $oidcClientId,
-        private ?string $oidcDiscoveryUrl
-    ) {}
+        private ?string $oidcDiscoveryUrl,
+    ) {
+    }
 
     #[Route('/providers', name: 'auth_providers', methods: ['GET'])]
     #[OA\Get(
@@ -35,10 +36,10 @@ class AuthProvidersController extends AbstractController
                         properties: [
                             new OA\Property(property: 'id', type: 'string', example: 'google'),
                             new OA\Property(property: 'name', type: 'string', example: 'Google'),
-                            new OA\Property(property: 'enabled', type: 'boolean', example: true)
+                            new OA\Property(property: 'enabled', type: 'boolean', example: true),
                         ]
                     )
-                )
+                ),
             ]
         )
     )]
@@ -48,28 +49,27 @@ class AuthProvidersController extends AbstractController
             [
                 'id' => 'google',
                 'name' => 'Google',
-                'enabled' => !empty($this->googleClientId) && $this->googleClientId !== 'your-google-client-id',
-                'icon' => 'google'
+                'enabled' => !empty($this->googleClientId) && 'your-google-client-id' !== $this->googleClientId,
+                'icon' => 'google',
             ],
             [
                 'id' => 'github',
                 'name' => 'GitHub',
-                'enabled' => !empty($this->githubClientId) && $this->githubClientId !== 'your-github-client-id',
-                'icon' => 'github'
+                'enabled' => !empty($this->githubClientId) && 'your-github-client-id' !== $this->githubClientId,
+                'icon' => 'github',
             ],
             [
                 'id' => 'keycloak',
                 'name' => 'Keycloak',
-                'enabled' => !empty($this->oidcClientId) && 
-                            !empty($this->oidcDiscoveryUrl) &&
-                            $this->oidcClientId !== 'your-oidc-client-id',
-                'icon' => 'key'
-            ]
+                'enabled' => !empty($this->oidcClientId)
+                            && !empty($this->oidcDiscoveryUrl)
+                            && 'your-oidc-client-id' !== $this->oidcClientId,
+                'icon' => 'key',
+            ],
         ];
 
         return $this->json([
-            'providers' => array_values(array_filter($providers, fn($p) => $p['enabled']))
+            'providers' => array_values(array_filter($providers, fn ($p) => $p['enabled'])),
         ]);
     }
 }
-

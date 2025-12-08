@@ -127,7 +127,7 @@ import {
   UserGroupIcon,
   ClockIcon
 } from '@heroicons/vue/24/outline'
-import type { SavedMailHandler } from '@/mocks/mail'
+import type { SavedMailHandler } from '@/services/api/inboundEmailHandlersApi'
 
 interface Props {
   handlers: SavedMailHandler[]

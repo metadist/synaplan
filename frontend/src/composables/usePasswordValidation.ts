@@ -1,6 +1,4 @@
 // synaplan-ui/src/composables/usePasswordValidation.ts
-import { computed } from 'vue'
-
 export interface PasswordValidation {
   isValid: boolean
   errors: string[]

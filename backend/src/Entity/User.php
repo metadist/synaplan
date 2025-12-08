@@ -2,8 +2,8 @@
 
 namespace App\Entity;
 
-use Doctrine\ORM\Mapping as ORM;
 use App\Repository\UserRepository;
+use Doctrine\ORM\Mapping as ORM;
 use Symfony\Component\Security\Core\User\PasswordAuthenticatedUserInterface;
 use Symfony\Component\Security\Core\User\UserInterface;
 
@@ -46,7 +46,7 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
 
     #[ORM\Column(name: 'BPAYMENTDETAILS', type: 'json')]
     private array $paymentDetails = [];
-    
+
     // Subscription wird via BUSERLEVEL + BPAYMENTDETAILS JSON gesteuert
     // BUSERLEVEL: NEW, PRO, TEAM, BUSINESS, ADMIN
     // BPAYMENTDETAILS: {subscription_id, status, starts, ends, period, stripe_customer_id, stripe_subscription_id}
@@ -64,6 +64,7 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     public function setCreated(string $created): self
     {
         $this->created = $created;
+
         return $this;
     }
 
@@ -75,6 +76,7 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     public function setType(string $type): self
     {
         $this->type = $type;
+
         return $this;
     }
 
@@ -86,6 +88,7 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     public function setMail(string $mail): self
     {
         $this->mail = $mail;
+
         return $this;
     }
 
@@ -97,6 +100,7 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     public function setPw(?string $pw): self
     {
         $this->pw = $pw;
+
         return $this;
     }
 
@@ -108,6 +112,7 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     public function setProviderId(string $providerId): self
     {
         $this->providerId = $providerId;
+
         return $this;
     }
 
@@ -119,6 +124,7 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     public function setUserLevel(string $userLevel): self
     {
         $this->userLevel = $userLevel;
+
         return $this;
     }
 
@@ -130,6 +136,7 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     public function setEmailVerified(bool $emailVerified): self
     {
         $this->emailVerified = $emailVerified;
+
         return $this;
     }
 
@@ -141,6 +148,7 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     public function setUserDetails(array $userDetails): self
     {
         $this->userDetails = $userDetails;
+
         return $this;
     }
 
@@ -152,6 +160,7 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     public function setPaymentDetails(array $paymentDetails): self
     {
         $this->paymentDetails = $paymentDetails;
+
         return $this;
     }
 
@@ -165,19 +174,20 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     {
         // Map user level to roles
         $roles = ['ROLE_USER'];
-        
-        if ($this->userLevel === 'ADMIN') {
+
+        if ('ADMIN' === $this->userLevel) {
             $roles[] = 'ROLE_ADMIN';
             $roles[] = 'ROLE_PRO';
             $roles[] = 'ROLE_BUSINESS';
+
             return array_unique($roles);
         }
-        
+
         if (in_array($this->userLevel, ['PRO', 'TEAM', 'BUSINESS'])) {
             $roles[] = 'ROLE_PRO';
         }
-        
-        if ($this->userLevel === 'BUSINESS') {
+
+        if ('BUSINESS' === $this->userLevel) {
             $roles[] = 'ROLE_BUSINESS';
         }
 
@@ -206,15 +216,17 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     public function setSubscriptionData(array $data): self
     {
         $this->paymentDetails['subscription'] = $data;
+
         return $this;
     }
 
     public function hasActiveSubscription(): bool
     {
         $sub = $this->getSubscriptionData();
-        return isset($sub['status']) 
-            && $sub['status'] === 'active' 
-            && isset($sub['ends']) 
+
+        return isset($sub['status'])
+            && 'active' === $sub['status']
+            && isset($sub['ends'])
             && $sub['ends'] > time();
     }
 
@@ -229,123 +241,124 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     }
 
     /**
-     * Check if user is admin
+     * Check if user is admin.
      */
     public function isAdmin(): bool
     {
-        return $this->userLevel === 'ADMIN';
+        return 'ADMIN' === $this->userLevel;
     }
 
     /**
-     * Get effective rate limiting level
-     * 
+     * Get effective rate limiting level.
+     *
      * Logic:
      * - ADMIN: Unlimited usage, no rate limits
      * - ANONYMOUS: Only for non-logged-in users (widget, unlinked WhatsApp/Email)
      * - NEW: Default for all logged-in users without active subscription
      * - PRO/TEAM/BUSINESS: Users with active paid subscription
-     * 
+     *
      * Note: Phone verification is NOT required for logged-in web users.
      *       Phone verification only affects WhatsApp/Email channel linking.
      */
     public function getRateLimitLevel(): string
     {
         // Admins have no rate limits
-        if ($this->userLevel === 'ADMIN') {
+        if ('ADMIN' === $this->userLevel) {
             return 'ADMIN';
         }
-        
+
         // If user is logged in via web (has email), they are at least NEW
         // ANONYMOUS is only for widget/API users without authentication
-        
+
         // If userLevel is set to PRO, TEAM, or BUSINESS directly (e.g., via fixtures or admin panel)
         // use that level even without active subscription
         if (in_array($this->userLevel, ['PRO', 'TEAM', 'BUSINESS'])) {
             return $this->userLevel;
         }
-        
+
         // Check if subscription is active
         if ($this->hasActiveSubscription()) {
             return $this->userLevel; // PRO, TEAM, BUSINESS from subscription
         }
-        
+
         // If explicitly set to ANONYMOUS (e.g., for email-based anonymous users), return that
-        if ($this->userLevel === 'ANONYMOUS') {
+        if ('ANONYMOUS' === $this->userLevel) {
             return 'ANONYMOUS';
         }
-        
+
         // Default to NEW for all logged-in users
         // (Phone verification is only for WhatsApp/Email linking, not for web users)
         return 'NEW';
     }
 
     /**
-     * Check if user has verified phone number
+     * Check if user has verified phone number.
      */
     public function hasVerifiedPhone(): bool
     {
         $details = $this->getUserDetails();
+
         return !empty($details['phone_number']) && !empty($details['phone_verified_at']);
     }
 
     /**
-     * Get verified phone number
+     * Get verified phone number.
      */
     public function getPhoneNumber(): ?string
     {
         $details = $this->getUserDetails();
+
         return $details['phone_number'] ?? null;
     }
 
     /**
      * Check if user is using external authentication (OAuth, OIDC)
-     * External users cannot change their password locally
-     * 
+     * External users cannot change their password locally.
+     *
      * Note: BINTYPE is always 'WEB' for web-based logins
      * BPROVIDERID determines the actual authentication provider
      */
     public function isExternalAuth(): bool
     {
         // Check provider ID instead of type
-        return $this->providerId !== 'local' && $this->providerId !== '';
+        return 'local' !== $this->providerId && '' !== $this->providerId;
     }
 
     /**
      * Check if user can change password
-     * Only local users with passwords can change their password
+     * Only local users with passwords can change their password.
      */
     public function canChangePassword(): bool
     {
         // Only local provider users with a password can change it
-        return $this->providerId === 'local' && !empty($this->pw);
+        return 'local' === $this->providerId && !empty($this->pw);
     }
 
     /**
      * Get authentication provider name for display
-     * Based on BPROVIDERID, not BINTYPE
+     * Based on BPROVIDERID, not BINTYPE.
      */
     public function getAuthProviderName(): string
     {
-        return match($this->providerId) {
+        return match ($this->providerId) {
             'google' => 'Google',
             'github' => 'GitHub',
             'keycloak' => 'Keycloak/OIDC',
             'local' => 'Email/Password',
-            default => ucfirst($this->providerId) ?: 'Unknown'
+            default => ucfirst($this->providerId) ?: 'Unknown',
         };
     }
 
     /**
      * Get user's preferred language/locale
-     * Returns 'de', 'en', etc. for email translations
+     * Returns 'de', 'en', etc. for email translations.
      */
     public function getLocale(): string
     {
         $details = $this->getUserDetails();
         $language = $details['language'] ?? 'en';
-        
+
         // Ensure we return a valid locale code
         return in_array($language, ['de', 'en', 'fr', 'es'], true) ? $language : 'en';
     }
 }
-

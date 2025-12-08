@@ -12,7 +12,7 @@ use Symfony\Contracts\HttpClient\ResponseInterface;
 
 /**
  * Unit tests for WhatsAppService
- * Tests Meta WhatsApp Business API integration
+ * Tests Meta WhatsApp Business API integration.
  */
 class WhatsAppServiceTest extends TestCase
 {
@@ -77,8 +77,8 @@ class WhatsAppServiceTest extends TestCase
         $response = $this->createMock(ResponseInterface::class);
         $response->method('toArray')->willReturn([
             'messages' => [
-                ['id' => 'wamid.test123']
-            ]
+                ['id' => 'wamid.test123'],
+            ],
         ]);
 
         $this->httpClient
@@ -88,10 +88,10 @@ class WhatsAppServiceTest extends TestCase
                 'POST',
                 $this->stringContains('/messages'),
                 $this->callback(function ($options) {
-                    return isset($options['json']['type']) 
-                        && $options['json']['type'] === 'text'
+                    return isset($options['json']['type'])
+                        && 'text' === $options['json']['type']
                         && isset($options['json']['text']['body'])
-                        && $options['json']['text']['body'] === 'Hello World';
+                        && 'Hello World' === $options['json']['text']['body'];
                 })
             )
             ->willReturn($response);
@@ -145,7 +145,7 @@ class WhatsAppServiceTest extends TestCase
         $response->method('toArray')->willReturn([
             'url' => 'https://example.com/media/file.jpg',
             'mime_type' => 'image/jpeg',
-            'sha256' => 'abc123'
+            'sha256' => 'abc123',
         ]);
 
         $this->httpClient
@@ -156,7 +156,7 @@ class WhatsAppServiceTest extends TestCase
                 $this->stringContains('/media123'),
                 $this->callback(function ($options) {
                     return isset($options['headers']['Authorization'])
-                        && $options['headers']['Authorization'] === 'Bearer test_token';
+                        && 'Bearer test_token' === $options['headers']['Authorization'];
                 })
             )
             ->willReturn($response);
@@ -189,7 +189,7 @@ class WhatsAppServiceTest extends TestCase
     {
         $response = $this->createMock(ResponseInterface::class);
         $response->method('toArray')->willReturn([
-            'success' => true
+            'success' => true,
         ]);
 
         $this->httpClient
@@ -200,11 +200,11 @@ class WhatsAppServiceTest extends TestCase
                 $this->stringContains('/messages'),
                 $this->callback(function ($options) {
                     return isset($options['json']['messaging_product'])
-                        && $options['json']['messaging_product'] === 'whatsapp'
+                        && 'whatsapp' === $options['json']['messaging_product']
                         && isset($options['json']['status'])
-                        && $options['json']['status'] === 'read'
+                        && 'read' === $options['json']['status']
                         && isset($options['json']['message_id'])
-                        && $options['json']['message_id'] === 'wamid.test123';
+                        && 'wamid.test123' === $options['json']['message_id'];
                 })
             )
             ->willReturn($response);
@@ -236,7 +236,7 @@ class WhatsAppServiceTest extends TestCase
     {
         $payload = json_encode(['test' => 'data']);
         $secret = 'test_secret';
-        $validSignature = 'sha256=' . hash_hmac('sha256', $payload, $secret);
+        $validSignature = 'sha256='.hash_hmac('sha256', $payload, $secret);
 
         $result = $this->service->verifyWebhookSignature($payload, $validSignature, $secret);
 
@@ -258,7 +258,7 @@ class WhatsAppServiceTest extends TestCase
     {
         $response = $this->createMock(ResponseInterface::class);
         $response->method('toArray')->willReturn([
-            'messages' => [['id' => 'wamid.media123']]
+            'messages' => [['id' => 'wamid.media123']],
         ]);
 
         $this->httpClient
@@ -269,7 +269,7 @@ class WhatsAppServiceTest extends TestCase
                 $this->stringContains('/messages'),
                 $this->callback(function ($options) {
                     return isset($options['json']['type'])
-                        && $options['json']['type'] === 'image'
+                        && 'image' === $options['json']['type']
                         && isset($options['json']['image']['link']);
                 })
             )
@@ -326,4 +326,3 @@ class WhatsAppServiceTest extends TestCase
         $this->assertNull($result);
     }
 }
-

@@ -17,7 +17,7 @@ class RagDocumentRepository extends ServiceEntityRepository
     }
 
     /**
-     * Findet RAG-Dokumente für einen User
+     * Findet RAG-Dokumente für einen User.
      */
     public function findByUser(int $userId, int $limit = 100): array
     {
@@ -31,7 +31,7 @@ class RagDocumentRepository extends ServiceEntityRepository
     }
 
     /**
-     * Findet RAG-Dokumente nach GroupKey
+     * Findet RAG-Dokumente nach GroupKey.
      */
     public function findByGroupKey(string $groupKey): array
     {
@@ -44,8 +44,8 @@ class RagDocumentRepository extends ServiceEntityRepository
     }
 
     /**
-     * Vector-Search (Similarity Search)
-     * 
+     * Vector-Search (Similarity Search).
+     *
      * Hinweis: Für MariaDB 11.7+ mit VECTOR-Type würde man hier
      * VEC_DISTANCE verwenden. Aktuell als JSON gespeichert.
      */
@@ -53,24 +53,24 @@ class RagDocumentRepository extends ServiceEntityRepository
     {
         // Simplified version - in production würde man hier
         // MariaDB's VEC_DISTANCE Function nutzen mit Custom DQL Function
-        
+
         return $this->createQueryBuilder('r')
             ->where('r.userId = :userId')
             ->setParameter('userId', $userId)
             ->setMaxResults($limit)
             ->getQuery()
             ->getResult();
-        
+
         // TODO: Implement with Custom DQL Function VEC_DISTANCE
-        // SELECT * FROM BRAG 
-        // WHERE BUID = :userId 
+        // SELECT * FROM BRAG
+        // WHERE BUID = :userId
         // AND VEC_DISTANCE(BEMBED, VEC_FromText(:vector)) < :threshold
         // ORDER BY VEC_DISTANCE(BEMBED, VEC_FromText(:vector)) ASC
         // LIMIT :limit
     }
 
     /**
-     * Löscht RAG-Dokumente nach GroupKey
+     * Löscht RAG-Dokumente nach GroupKey.
      */
     public function deleteByGroupKey(string $groupKey): int
     {
@@ -83,27 +83,26 @@ class RagDocumentRepository extends ServiceEntityRepository
     }
 
     /**
-     * Speichert RAG-Dokument
+     * Speichert RAG-Dokument.
      */
     public function save(RagDocument $ragDocument, bool $flush = true): void
     {
         $this->getEntityManager()->persist($ragDocument);
-        
+
         if ($flush) {
             $this->getEntityManager()->flush();
         }
     }
 
     /**
-     * Löscht RAG-Dokument
+     * Löscht RAG-Dokument.
      */
     public function remove(RagDocument $ragDocument, bool $flush = true): void
     {
         $this->getEntityManager()->remove($ragDocument);
-        
+
         if ($flush) {
             $this->getEntityManager()->flush();
         }
     }
 }
-

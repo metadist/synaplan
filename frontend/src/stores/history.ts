@@ -256,6 +256,10 @@ export const useHistoryStore = defineStore('history', () => {
     }
   }
 
+  const removeMessage = (id: string) => {
+    messages.value = messages.value.filter(m => m.id !== id)
+  }
+
   const markSuperseded = (id: string) => {
     const message = messages.value.find(m => m.id === id)
     if (message) {
@@ -393,6 +397,7 @@ export const useHistoryStore = defineStore('history', () => {
     updateStreamingMessage,
     finishStreamingMessage,
     markSuperseded,
+    removeMessage,
     clear,
     clearHistory: clear,
     loadMessages,

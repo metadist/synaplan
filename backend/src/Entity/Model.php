@@ -2,8 +2,8 @@
 
 namespace App\Entity;
 
-use Doctrine\ORM\Mapping as ORM;
 use App\Repository\ModelRepository;
+use Doctrine\ORM\Mapping as ORM;
 
 #[ORM\Entity(repositoryClass: ModelRepository::class)]
 #[ORM\Table(name: 'BMODELS')]
@@ -74,6 +74,7 @@ class Model
     public function setService(string $service): self
     {
         $this->service = $service;
+
         return $this;
     }
 
@@ -85,6 +86,7 @@ class Model
     public function setName(string $name): self
     {
         $this->name = $name;
+
         return $this;
     }
 
@@ -96,6 +98,7 @@ class Model
     public function setTag(string $tag): self
     {
         $this->tag = $tag;
+
         return $this;
     }
 
@@ -107,6 +110,7 @@ class Model
     public function setProviderId(string $providerId): self
     {
         $this->providerId = $providerId;
+
         return $this;
     }
 
@@ -118,6 +122,7 @@ class Model
     public function setSelectable(int $selectable): self
     {
         $this->selectable = $selectable;
+
         return $this;
     }
 
@@ -129,6 +134,7 @@ class Model
     public function setPriceIn(float $priceIn): self
     {
         $this->priceIn = $priceIn;
+
         return $this;
     }
 
@@ -140,6 +146,7 @@ class Model
     public function setInUnit(string $inUnit): self
     {
         $this->inUnit = $inUnit;
+
         return $this;
     }
 
@@ -151,6 +158,7 @@ class Model
     public function setPriceOut(float $priceOut): self
     {
         $this->priceOut = $priceOut;
+
         return $this;
     }
 
@@ -162,6 +170,7 @@ class Model
     public function setOutUnit(string $outUnit): self
     {
         $this->outUnit = $outUnit;
+
         return $this;
     }
 
@@ -173,6 +182,7 @@ class Model
     public function setQuality(float $quality): self
     {
         $this->quality = $quality;
+
         return $this;
     }
 
@@ -184,6 +194,7 @@ class Model
     public function setRating(float $rating): self
     {
         $this->rating = $rating;
+
         return $this;
     }
 
@@ -195,6 +206,7 @@ class Model
     public function setIsDefault(int $isDefault): self
     {
         $this->isDefault = $isDefault;
+
         return $this;
     }
 
@@ -206,6 +218,7 @@ class Model
     public function setJson(array $json): self
     {
         $this->json = $json;
+
         return $this;
     }
 
@@ -217,6 +230,7 @@ class Model
     public function setActive(int $active): self
     {
         $this->active = $active;
+
         return $this;
     }
 
@@ -228,21 +242,22 @@ class Model
     public function setDescription(?string $description): self
     {
         $this->description = $description;
+
         return $this;
     }
 
     /**
-     * Check if this is a system model that cannot be changed by users
+     * Check if this is a system model that cannot be changed by users.
      */
     public function isSystemModel(): bool
     {
         // System models haben BISDEFAULT=1 oder spezielle JSON-Flag
-        return $this->isDefault === 1 || ($this->json['is_system'] ?? false);
+        return 1 === $this->isDefault || ($this->json['is_system'] ?? false);
     }
 
     /**
-     * Get model features from JSON
-     * 
+     * Get model features from JSON.
+     *
      * @return array Features like ['reasoning', 'vision', etc.]
      */
     public function getFeatures(): array
@@ -251,14 +266,12 @@ class Model
     }
 
     /**
-     * Check if model has a specific feature
-     * 
+     * Check if model has a specific feature.
+     *
      * @param string $feature Feature name (e.g. 'reasoning', 'vision')
-     * @return bool
      */
     public function hasFeature(string $feature): bool
     {
         return in_array($feature, $this->getFeatures(), true);
     }
 }
-

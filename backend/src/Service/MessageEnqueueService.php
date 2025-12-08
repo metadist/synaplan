@@ -10,28 +10,28 @@ use Psr\Log\LoggerInterface;
 use Symfony\Component\Messenger\MessageBusInterface;
 
 /**
- * Service zum Enqueuen von Messages für async Processing
+ * Service zum Enqueuen von Messages für async Processing.
  */
 class MessageEnqueueService
 {
     public function __construct(
         private EntityManagerInterface $em,
         private MessageBusInterface $messageBus,
-        private LoggerInterface $logger
-    ) {}
+        private LoggerInterface $logger,
+    ) {
+    }
 
     /**
-     * Erstellt Message und queued sie für async Processing
-     * 
-     * @param User $user
-     * @param string $text
+     * Erstellt Message und queued sie für async Processing.
+     *
      * @param array $options Optionale Parameter (files, reasoning, etc.)
+     *
      * @return array ['tracking_id' => ..., 'message_id' => ...]
      */
     public function enqueueMessage(User $user, string $text, array $options = []): array
     {
         $trackingId = $options['tracking_id'] ?? time();
-        
+
         // Create message entity
         $message = new Message();
         $message->setUserId($user->getId());
@@ -55,7 +55,7 @@ class MessageEnqueueService
         $this->logger->info('📨 Message enqueued', [
             'message_id' => $message->getId(),
             'tracking_id' => $trackingId,
-            'user_id' => $user->getId()
+            'user_id' => $user->getId(),
         ]);
 
         // Dispatch to queue
@@ -76,12 +76,12 @@ class MessageEnqueueService
     }
 
     /**
-     * Holt Status einer Message
+     * Holt Status einer Message.
      */
     public function getMessageStatus(int $messageId): ?array
     {
         $message = $this->em->getRepository(Message::class)->find($messageId);
-        
+
         if (!$message) {
             return null;
         }
@@ -90,7 +90,7 @@ class MessageEnqueueService
         $responseMessage = $this->em->getRepository(Message::class)->findOneBy([
             'userId' => $message->getUserId(),
             'trackingId' => $message->getTrackingId(),
-            'direction' => 'OUT'
+            'direction' => 'OUT',
         ]);
 
         return [
@@ -103,4 +103,3 @@ class MessageEnqueueService
         ];
     }
 }
-

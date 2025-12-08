@@ -98,9 +98,10 @@ import { useAiConfigStore } from '@/stores/aiConfig'
 import { useAuthStore } from '@/stores/auth'
 import { useLimitCheck } from '@/composables/useLimitCheck'
 import { chatApi } from '@/services/api'
-import { mockModelOptions, type ModelOption } from '@/mocks/aiModels'
+import type { ModelOption } from '@/composables/useModelSelection'
 import { parseAIResponse } from '@/utils/responseParser'
 import { normalizeMediaUrl } from '@/utils/urlHelper'
+import { httpClient } from '@/services/api/httpClient'
 
 const { t } = useI18n()
 const { showLimitModal, limitData, checkAndShowLimit, closeLimitModal } = useLimitCheck()
@@ -694,14 +695,14 @@ const streamAIResponse = async (userMessage: string, options?: { includeReasonin
                 }
                 
                 message.files.push(fileData)
-                
+
                 console.log('📄 File attached to message:', message.files)
-                
+
                 // Replace JSON content or special markers with translated message
-                const hasJsonOrMarker = message.parts.length === 0 || 
+                const hasJsonOrMarker = message.parts.length === 0 ||
                     (message.parts[0].type === 'code' && message.parts[0].content?.includes('BFILEPATH')) ||
                     (message.parts[0].type === 'text' && message.parts[0].content?.includes('__FILE_GENERATED__'))
-                
+
                 if (hasJsonOrMarker) {
                   // Use translation with filename parameter
                   const translatedMessage = t('message.fileGenerated', { filename: data.generatedFile.filename })
@@ -711,23 +712,26 @@ const streamAIResponse = async (userMessage: string, options?: { includeReasonin
                   }]
                   console.log('📄 Set translated message:', translatedMessage)
                 }
-                
+
                 // Force Vue reactivity with multiple strategies
                 nextTick(() => {
                   // Strategy 1: Update the message object with a new id to force key-based re-render
                   const messageIndex = historyStore.messages.findIndex(m => m.id === message.id)
                   if (messageIndex !== -1) {
                     // Create completely new message object
+                    // FIXME: This entire block is cargo-cult reactivity code - message is already a store reference,
+                    // Vue 3 Proxy detects mutations automatically. The ternary is unnecessary (files already mutated above),
+                    // and spreading parts/files just wastes CPU creating shallow copies of already-mutated arrays.
                     const updatedMessage = {
                       ...message,
-                      files: [...message.files], // New array reference
-                      parts: [...message.parts], // New parts array
-                      timestamp: new Date(message.timestamp) // Force timestamp update
+                      files: message.files ? [...message.files] : undefined,
+                      parts: [...message.parts],
+                      timestamp: new Date(message.timestamp)
                     }
-                    
+
                     // Replace in store
                     historyStore.messages.splice(messageIndex, 1, updatedMessage)
-                    
+
                     console.log('📄 Message updated with new references')
                   }
                 })
@@ -1008,19 +1012,10 @@ async function saveCancelledMessageToBackend(
   metadata?: { provider?: string, model?: string, topic?: string }
 ) {
   console.log('📡 saveCancelledMessageToBackend called', { trackId, chatId, contentLength: content.length, messageId, metadata })
-  
+
   try {
-    const token = localStorage.getItem('auth_token')
-    const url = `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'}/api/v1/messages/save-cancelled`
-    
-    console.log('📡 Sending request to:', url)
-    
-    const response = await fetch(url, {
+    const data = await httpClient<any>('/api/v1/messages/save-cancelled', {
       method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      },
       body: JSON.stringify({
         trackId,
         chatId,
@@ -1030,102 +1025,43 @@ async function saveCancelledMessageToBackend(
         topic: metadata?.topic
       })
     })
-    
-    console.log('📡 Response status:', response.status)
-    
-    if (response.ok) {
-      const data = await response.json()
-      console.log('✅ Cancelled message saved to backend:', data)
-      
-      // Update the message with backend message ID and metadata so the footer buttons appear
-      const message = historyStore.messages.find(m => m.id === messageId)
-      if (message && data.messageId) {
-        message.backendMessageId = data.messageId
-        
-        // Update metadata if provided by backend
-        if (data.topic) {
-          message.topic = data.topic
-        }
-        if (data.provider) {
-          message.provider = data.provider
-        }
-        if (data.model) {
-          message.modelLabel = data.model
-        }
-        
-        // Set aiModels object for proper display of model badges
-        if (data.provider && data.model) {
-          message.aiModels = {
-            chat: {
-              provider: data.provider,
-              model: data.model,
-              model_id: null // We don't have the model_id from cancelled message
-            }
-          }
-        }
-        
-        console.log('✅ Updated message with metadata:', { 
-          backendMessageId: data.messageId,
-          topic: data.topic,
-          provider: data.provider,
-          model: data.model,
-          aiModels: message.aiModels
-        })
+
+    console.log('✅ Cancelled message saved to backend:', data)
+
+    // Update the message with backend message ID and metadata so the footer buttons appear
+    const message = historyStore.messages.find(m => m.id === messageId)
+    if (message && data.messageId) {
+      message.backendMessageId = data.messageId
+
+      // Update metadata if provided by backend
+      if (data.topic) {
+        message.topic = data.topic
       }
-      
-      // ALSO: Update the user message with tool metadata if it's a command
-      // Find the last user message before the current streaming message (which is the one that triggered this response)
-      const messages = historyStore.messages
-      const currentIndex = messages.findIndex(m => m.id === messageId)
-      let userMessage: any = null
-      
-      // Search backwards from current message to find the most recent user message
-      if (currentIndex >= 0) {
-        for (let i = currentIndex - 1; i >= 0; i--) {
-          if (messages[i].role === 'user') {
-            userMessage = messages[i]
-            break
+      if (data.provider) {
+        message.provider = data.provider
+      }
+      if (data.model) {
+        message.modelLabel = data.model
+      }
+
+      // Set aiModels object for proper display of model badges
+      if (data.provider && data.model) {
+        message.aiModels = {
+          chat: {
+            provider: data.provider,
+            model: data.model,
+            model_id: null // We don't have the model_id from cancelled message
           }
         }
       }
-      
-      if (userMessage && data.incomingMessageId && data.incomingTopic) {
-        userMessage.backendMessageId = data.incomingMessageId
-        userMessage.topic = data.incomingTopic
-        
-        // Reconstruct tool metadata from topic if it's a tool command
-        if (data.incomingTopic.startsWith('tools:')) {
-          const cmd = data.incomingTopic.replace('tools:', '')
-          const toolMap: Record<string, { label: string; icon: string }> = {
-            'search': { label: 'Web Search', icon: 'mdi:web' },
-            'pic': { label: 'Image Generation', icon: 'mdi:image' },
-            'vid': { label: 'Video Generation', icon: 'mdi:video' }
-          }
-          
-          if (toolMap[cmd]) {
-            userMessage.tool = { command: cmd, ...toolMap[cmd] }
-            
-            // Also ensure command prefix is removed from display
-            if (userMessage.parts.length > 0 && userMessage.parts[0].type === 'text' && userMessage.parts[0].content) {
-              const content = userMessage.parts[0].content
-              const commandMatch = content.match(/^\/(\w+)\s+(.*)$/)
-              if (commandMatch && commandMatch[1] === cmd) {
-                userMessage.parts[0] = { ...userMessage.parts[0], content: commandMatch[2].trim() }
-              }
-            }
-            
-            console.log('✅ Reconstructed tool metadata for user message:', {
-              command: cmd,
-              tool: userMessage.tool,
-              content: userMessage.parts[0]?.content,
-              originalContent: content
-            })
-          }
-        }
-      }
-    } else {
-      const errorText = await response.text()
-      console.warn('⚠️ Failed to save cancelled message:', response.status, errorText)
+
+      console.log('✅ Updated message with metadata:', {
+        backendMessageId: data.messageId,
+        topic: data.topic,
+        provider: data.provider,
+        model: data.model,
+        aiModels: message.aiModels
+      })
     }
   } catch (error) {
     console.error('❌ Error saving cancelled message:', error)
@@ -1194,7 +1130,7 @@ const handleRegenerate = async (message: Message, modelOption: ModelOption) => {
         .filter(part => part.type === 'text')
         .map(part => part.content || '')
         .join('\n')
-      
+
       // Re-send the user message with the selected model
       // This will trigger normal streaming flow
       await handleSendMessage(content, { modelId: modelOption.id })

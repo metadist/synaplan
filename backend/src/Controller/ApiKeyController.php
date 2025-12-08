@@ -14,20 +14,21 @@ use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\CurrentUser;
 
 /**
- * API Key Management
- * 
+ * API Key Management.
+ *
  * Allows users to create, list, and revoke API keys for external integrations
  */
 #[Route('/api/v1/apikeys', name: 'api_keys_')]
 class ApiKeyController extends AbstractController
 {
     public function __construct(
-        private ApiKeyRepository $apiKeyRepository
-    ) {}
+        private ApiKeyRepository $apiKeyRepository,
+    ) {
+    }
 
     /**
-     * List all API keys for current user
-     * 
+     * List all API keys for current user.
+     *
      * GET /api/v1/apikeys
      */
     #[Route('', name: 'list', methods: ['GET'])]
@@ -53,14 +54,14 @@ class ApiKeyController extends AbstractController
                                     new OA\Property(property: 'status', type: 'string', enum: ['active', 'revoked']),
                                     new OA\Property(property: 'scopes', type: 'array', items: new OA\Items(type: 'string')),
                                     new OA\Property(property: 'last_used', type: 'string', format: 'date-time', nullable: true),
-                                    new OA\Property(property: 'created', type: 'string', format: 'date-time')
+                                    new OA\Property(property: 'created', type: 'string', format: 'date-time'),
                                 ]
                             )
-                        )
+                        ),
                     ]
                 )
             ),
-            new OA\Response(response: 401, description: 'Not authenticated')
+            new OA\Response(response: 401, description: 'Not authenticated'),
         ]
     )]
     public function list(#[CurrentUser] ?User $user): JsonResponse
@@ -77,19 +78,19 @@ class ApiKeyController extends AbstractController
                 return [
                     'id' => $key->getId(),
                     'name' => $key->getName(),
-                    'key_prefix' => substr($key->getKey(), 0, 8) . '...',
+                    'key_prefix' => substr($key->getKey(), 0, 8).'...',
                     'status' => $key->getStatus(),
                     'scopes' => $key->getScopes(),
                     'last_used' => $key->getLastUsed(),
-                    'created' => $key->getCreated()
+                    'created' => $key->getCreated(),
                 ];
-            }, $apiKeys)
+            }, $apiKeys),
         ]);
     }
 
     /**
-     * Create new API key
-     * 
+     * Create new API key.
+     *
      * POST /api/v1/apikeys
      * Body: {
      *   "name": "Email Integration",
@@ -111,7 +112,7 @@ class ApiKeyController extends AbstractController
                         type: 'array',
                         items: new OA\Items(type: 'string'),
                         example: ['webhooks:email', 'webhooks:whatsapp']
-                    )
+                    ),
                 ]
             )
         ),
@@ -132,19 +133,19 @@ class ApiKeyController extends AbstractController
                                 new OA\Property(property: 'key', type: 'string', description: 'Full API key - only shown once!'),
                                 new OA\Property(property: 'status', type: 'string'),
                                 new OA\Property(property: 'scopes', type: 'array', items: new OA\Items(type: 'string')),
-                                new OA\Property(property: 'created', type: 'string', format: 'date-time')
+                                new OA\Property(property: 'created', type: 'string', format: 'date-time'),
                             ]
-                        )
+                        ),
                     ]
                 )
             ),
             new OA\Response(response: 400, description: 'Invalid input'),
-            new OA\Response(response: 401, description: 'Not authenticated')
+            new OA\Response(response: 401, description: 'Not authenticated'),
         ]
     )]
     public function create(
         Request $request,
-        #[CurrentUser] ?User $user
+        #[CurrentUser] ?User $user,
     ): JsonResponse {
         if (!$user) {
             return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
@@ -155,13 +156,13 @@ class ApiKeyController extends AbstractController
         if (empty($data['name'])) {
             return $this->json([
                 'success' => false,
-                'error' => 'Name is required'
+                'error' => 'Name is required',
             ], Response::HTTP_BAD_REQUEST);
         }
 
         // Generate secure API key (max 64 chars total)
         // sk_ (3) + 58 hex chars = 61 chars (fits in VARCHAR(64))
-        $apiKeyValue = 'sk_' . bin2hex(random_bytes(29));
+        $apiKeyValue = 'sk_'.bin2hex(random_bytes(29));
 
         $apiKey = new ApiKey();
         $apiKey->setOwner($user);
@@ -179,21 +180,21 @@ class ApiKeyController extends AbstractController
                 'name' => $apiKey->getName(),
                 'key' => $apiKeyValue, // Only shown once!
                 'scopes' => $apiKey->getScopes(),
-                'created' => $apiKey->getCreated()
+                'created' => $apiKey->getCreated(),
             ],
-            'message' => 'API key created successfully. Store it securely - it will not be shown again!'
+            'message' => 'API key created successfully. Store it securely - it will not be shown again!',
         ], Response::HTTP_CREATED);
     }
 
     /**
-     * Revoke (delete) API key
-     * 
+     * Revoke (delete) API key.
+     *
      * DELETE /api/v1/apikeys/{id}
      */
     #[Route('/{id}', name: 'revoke', methods: ['DELETE'])]
     public function revoke(
         int $id,
-        #[CurrentUser] ?User $user
+        #[CurrentUser] ?User $user,
     ): JsonResponse {
         if (!$user) {
             return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
@@ -204,7 +205,7 @@ class ApiKeyController extends AbstractController
         if (!$apiKey) {
             return $this->json([
                 'success' => false,
-                'error' => 'API key not found'
+                'error' => 'API key not found',
             ], Response::HTTP_NOT_FOUND);
         }
 
@@ -212,7 +213,7 @@ class ApiKeyController extends AbstractController
         if ($apiKey->getOwnerId() !== $user->getId()) {
             return $this->json([
                 'success' => false,
-                'error' => 'Access denied'
+                'error' => 'Access denied',
             ], Response::HTTP_FORBIDDEN);
         }
 
@@ -220,13 +221,13 @@ class ApiKeyController extends AbstractController
 
         return $this->json([
             'success' => true,
-            'message' => 'API key revoked successfully'
+            'message' => 'API key revoked successfully',
         ]);
     }
 
     /**
-     * Update API key (e.g., deactivate)
-     * 
+     * Update API key (e.g., deactivate).
+     *
      * PATCH /api/v1/apikeys/{id}
      * Body: { "status": "inactive", "scopes": [...] }
      */
@@ -234,7 +235,7 @@ class ApiKeyController extends AbstractController
     public function update(
         int $id,
         Request $request,
-        #[CurrentUser] ?User $user
+        #[CurrentUser] ?User $user,
     ): JsonResponse {
         if (!$user) {
             return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
@@ -245,7 +246,7 @@ class ApiKeyController extends AbstractController
         if (!$apiKey) {
             return $this->json([
                 'success' => false,
-                'error' => 'API key not found'
+                'error' => 'API key not found',
             ], Response::HTTP_NOT_FOUND);
         }
 
@@ -253,7 +254,7 @@ class ApiKeyController extends AbstractController
         if ($apiKey->getOwnerId() !== $user->getId()) {
             return $this->json([
                 'success' => false,
-                'error' => 'Access denied'
+                'error' => 'Access denied',
             ], Response::HTTP_FORBIDDEN);
         }
 
@@ -263,7 +264,7 @@ class ApiKeyController extends AbstractController
             if (!in_array($data['status'], ['active', 'inactive'])) {
                 return $this->json([
                     'success' => false,
-                    'error' => 'Invalid status. Must be: active, inactive'
+                    'error' => 'Invalid status. Must be: active, inactive',
                 ], Response::HTTP_BAD_REQUEST);
             }
             $apiKey->setStatus($data['status']);
@@ -284,12 +285,11 @@ class ApiKeyController extends AbstractController
             'api_key' => [
                 'id' => $apiKey->getId(),
                 'name' => $apiKey->getName(),
-                'key_prefix' => substr($apiKey->getKey(), 0, 8) . '...',
+                'key_prefix' => substr($apiKey->getKey(), 0, 8).'...',
                 'status' => $apiKey->getStatus(),
                 'scopes' => $apiKey->getScopes(),
-                'last_used' => $apiKey->getLastUsed()
-            ]
+                'last_used' => $apiKey->getLastUsed(),
+            ],
         ]);
     }
 }
-

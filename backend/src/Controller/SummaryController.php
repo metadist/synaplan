@@ -3,6 +3,7 @@
 namespace App\Controller;
 
 use App\AI\Service\AiFacade;
+use App\Entity\User;
 use App\Repository\PromptRepository;
 use App\Service\ModelConfigService;
 use OpenApi\Attributes as OA;
@@ -13,7 +14,6 @@ use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\CurrentUser;
-use App\Entity\User;
 
 #[Route('/api/v1/summary', name: 'api_summary_')]
 #[OA\Tag(name: 'Summary')]
@@ -23,8 +23,9 @@ class SummaryController extends AbstractController
         private AiFacade $aiFacade,
         private PromptRepository $promptRepository,
         private ModelConfigService $modelConfigService,
-        private LoggerInterface $logger
-    ) {}
+        private LoggerInterface $logger,
+    ) {
+    }
 
     #[Route('/generate', name: 'generate', methods: ['POST'])]
     #[OA\Post(
@@ -82,7 +83,7 @@ class SummaryController extends AbstractController
                     ),
                     example: ['main-ideas', 'key-facts'],
                     description: 'Areas to emphasize in the summary'
-                )
+                ),
             ]
         )
     )]
@@ -102,9 +103,9 @@ class SummaryController extends AbstractController
                         new OA\Property(property: 'compression_ratio', type: 'number', format: 'float', example: 0.05),
                         new OA\Property(property: 'processing_time_ms', type: 'integer', example: 1500),
                         new OA\Property(property: 'model', type: 'string', example: 'gpt-4'),
-                        new OA\Property(property: 'provider', type: 'string', example: 'openai')
+                        new OA\Property(property: 'provider', type: 'string', example: 'openai'),
                     ]
-                )
+                ),
             ]
         )
     )]
@@ -113,7 +114,7 @@ class SummaryController extends AbstractController
     #[OA\Response(response: 500, description: 'Summary generation failed')]
     public function generate(
         Request $request,
-        #[CurrentUser] ?User $user
+        #[CurrentUser] ?User $user,
     ): JsonResponse {
         if (!$user) {
             return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
@@ -126,7 +127,7 @@ class SummaryController extends AbstractController
         if (!isset($data['text']) || empty(trim($data['text']))) {
             return $this->json([
                 'success' => false,
-                'error' => 'Document text is required'
+                'error' => 'Document text is required',
             ], Response::HTTP_BAD_REQUEST);
         }
 
@@ -143,7 +144,7 @@ class SummaryController extends AbstractController
         if (!in_array($summaryType, $validTypes, true)) {
             return $this->json([
                 'success' => false,
-                'error' => 'Invalid summary type. Must be: ' . implode(', ', $validTypes)
+                'error' => 'Invalid summary type. Must be: '.implode(', ', $validTypes),
             ], Response::HTTP_BAD_REQUEST);
         }
 
@@ -152,24 +153,24 @@ class SummaryController extends AbstractController
         if (!in_array($length, $validLengths, true)) {
             return $this->json([
                 'success' => false,
-                'error' => 'Invalid length. Must be: ' . implode(', ', $validLengths)
+                'error' => 'Invalid length. Must be: '.implode(', ', $validLengths),
             ], Response::HTTP_BAD_REQUEST);
         }
 
         // Get word count for length specification
-        $targetWordCount = match($length) {
+        $targetWordCount = match ($length) {
             'short' => '50-150',
             'medium' => '200-500',
             'long' => '500-1000',
-            'custom' => (string)($customLength ?? 300),
-            default => '200-500'
+            'custom' => (string) ($customLength ?? 300),
+            default => '200-500',
         };
 
         // Get user's default chat model configuration
         $provider = null;
         $modelName = null;
         $modelId = null;
-        
+
         try {
             $modelId = $this->modelConfigService->getDefaultModel('CHAT', $user->getId());
             if ($modelId) {
@@ -179,7 +180,7 @@ class SummaryController extends AbstractController
         } catch (\Exception $e) {
             $this->logger->warning('Could not get default chat model, will use provider default', [
                 'user_id' => $user->getId(),
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ]);
         }
 
@@ -192,7 +193,7 @@ class SummaryController extends AbstractController
             'focus_areas' => implode(', ', $focusAreas),
             'model_id' => $modelId,
             'provider' => $provider,
-            'model' => $modelName
+            'model' => $modelName,
         ]);
 
         try {
@@ -200,14 +201,15 @@ class SummaryController extends AbstractController
             $systemPrompt = $this->promptRepository->findOneBy([
                 'topic' => 'docsummary',
                 'language' => 'en',
-                'ownerId' => 0
+                'ownerId' => 0,
             ]);
 
             if (!$systemPrompt) {
                 $this->logger->error('Doc summary prompt not found in database');
+
                 return $this->json([
                     'success' => false,
-                    'error' => 'Summary service not configured. Please load fixtures.'
+                    'error' => 'Summary service not configured. Please load fixtures.',
                 ], Response::HTTP_INTERNAL_SERVER_ERROR);
             }
 
@@ -216,26 +218,26 @@ class SummaryController extends AbstractController
             $configText .= "- Summary Type: {$summaryType}\n";
             $configText .= "- Target Length: {$targetWordCount} words\n";
             $configText .= "- Output Language: {$outputLanguage}\n";
-            $configText .= "- Focus Areas: " . implode(', ', $focusAreas) . "\n\n";
+            $configText .= '- Focus Areas: '.implode(', ', $focusAreas)."\n\n";
             $configText .= "Document to summarize:\n\n{$text}";
 
             // Build messages array for AI
             $messages = [
                 [
                     'role' => 'system',
-                    'content' => $systemPrompt->getPrompt()
+                    'content' => $systemPrompt->getPrompt(),
                 ],
                 [
                     'role' => 'user',
-                    'content' => $configText
-                ]
+                    'content' => $configText,
+                ],
             ];
 
             // Build AI options
             $aiOptions = [
-                'temperature' => 0.5 // Lower temperature for more consistent summaries
+                'temperature' => 0.5, // Lower temperature for more consistent summaries
             ];
-            
+
             // Add model configuration if available
             if ($provider) {
                 $aiOptions['provider'] = $provider;
@@ -252,12 +254,12 @@ class SummaryController extends AbstractController
             );
 
             $summary = trim($response['content']);
-            $processingTime = (int)((microtime(true) - $startTime) * 1000);
+            $processingTime = (int) ((microtime(true) - $startTime) * 1000);
 
             // Calculate statistics
             $originalWordCount = str_word_count($text);
             $summaryWordCount = str_word_count($summary);
-            $compressionRatio = $originalWordCount > 0 
+            $compressionRatio = $originalWordCount > 0
                 ? round($summaryWordCount / $originalWordCount, 3)
                 : 0;
 
@@ -268,7 +270,7 @@ class SummaryController extends AbstractController
                 'compression_ratio' => $compressionRatio,
                 'processing_time_ms' => $processingTime,
                 'provider' => $response['provider'],
-                'model' => $response['model']
+                'model' => $response['model'],
             ]);
 
             return $this->json([
@@ -285,23 +287,21 @@ class SummaryController extends AbstractController
                         'summary_type' => $summaryType,
                         'length' => $length,
                         'output_language' => $outputLanguage,
-                        'focus_areas' => $focusAreas
-                    ]
-                ]
+                        'focus_areas' => $focusAreas,
+                    ],
+                ],
             ]);
-
         } catch (\Throwable $e) {
             $this->logger->error('Summary generation failed', [
                 'user_id' => $user->getId(),
                 'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
+                'trace' => $e->getTraceAsString(),
             ]);
 
             return $this->json([
                 'success' => false,
-                'error' => 'Failed to generate summary: ' . $e->getMessage()
+                'error' => 'Failed to generate summary: '.$e->getMessage(),
             ], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
 }
-

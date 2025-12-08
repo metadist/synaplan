@@ -7,7 +7,7 @@ use Doctrine\Bundle\FixturesBundle\Fixture;
 use Doctrine\Persistence\ObjectManager;
 
 /**
- * Loads system prompts from BPROMPTS table
+ * Loads system prompts from BPROMPTS table.
  */
 class PromptFixtures extends Fixture
 {
@@ -19,63 +19,63 @@ class PromptFixtures extends Fixture
                 'language' => 'en',
                 'topic' => 'general',
                 'shortDescription' => 'All requests by users go here by default. Send the user question here for text creation, poems, health tips, programming or coding examples, travel infos and the like.',
-                'prompt' => $this->getGeneralPrompt()
+                'prompt' => $this->getGeneralPrompt(),
             ],
             [
                 'ownerId' => 0,
                 'language' => 'en',
                 'topic' => 'tools:sort',
                 'shortDescription' => 'Define the intention of the user with every request.  If it fits the previous requests of the last requests, keep the topic going.  If not, change it accordingly. Answers only in JSON.',
-                'prompt' => $this->getSortPrompt()
+                'prompt' => $this->getSortPrompt(),
             ],
             [
                 'ownerId' => 0,
                 'language' => 'en',
                 'topic' => 'analyzefile',
                 'shortDescription' => 'The user asks to analyze any file - handles PDF, DOCX, XLSX, PPTX, TXT and more. Only direct here if a file is attached and BFILE is set.',
-                'prompt' => $this->getAnalyzeFilePrompt()
+                'prompt' => $this->getAnalyzeFilePrompt(),
             ],
             [
                 'ownerId' => 0,
                 'language' => 'en',
                 'topic' => 'docsummary',
                 'shortDescription' => 'The user asks for document summarization with specific options (abstractive, extractive, bullet-points). Direct here when user wants a summary of text or document content.',
-                'prompt' => $this->getDocSummaryPrompt()
+                'prompt' => $this->getDocSummaryPrompt(),
             ],
             [
                 'ownerId' => 0,
                 'language' => 'en',
                 'topic' => 'mediamaker',
                 'shortDescription' => 'The user asks for generation of an image, video or audio/speech. Examples: "create an image", "make a video", "generate a picture", "read this aloud", "text to speech", "convert to audio", "make a voice". User wants to CREATE visual or audio media, not analyze it. This handles the connection to media generation AIs like DALL-E, Stable Diffusion, TTS, etc.',
-                'prompt' => $this->getMediaMakerPrompt()
+                'prompt' => $this->getMediaMakerPrompt(),
             ],
             [
                 'ownerId' => 0,
                 'language' => 'en',
                 'topic' => 'tools:mediamaker_audio_extract',
                 'shortDescription' => 'Extract only the literal text that should be spoken for audio/TTS requests.',
-                'prompt' => $this->getMediaMakerAudioExtractPrompt()
+                'prompt' => $this->getMediaMakerAudioExtractPrompt(),
             ],
             [
                 'ownerId' => 0,
                 'language' => 'en',
                 'topic' => 'officemaker',
                 'shortDescription' => 'The user asks for the generation of an Excel, Powerpoint or Word document. Not for any other format. This prompt can only handle the generation of ONE document with a clear prompt.',
-                'prompt' => $this->getOfficeMakerPrompt()
+                'prompt' => $this->getOfficeMakerPrompt(),
             ],
             [
                 'ownerId' => 0,
                 'language' => 'en',
                 'topic' => 'tools:enhance',
                 'shortDescription' => 'Improves and enhances user messages for better clarity and completeness while keeping the same intent and language.',
-                'prompt' => $this->getEnhancePrompt()
+                'prompt' => $this->getEnhancePrompt(),
             ],
             [
                 'ownerId' => 0,
                 'language' => 'en',
                 'topic' => 'tools:search',
                 'shortDescription' => 'Generates optimized search queries from user questions for web search APIs.',
-                'prompt' => $this->getSearchQueryPrompt()
+                'prompt' => $this->getSearchQueryPrompt(),
             ],
         ];
 
@@ -86,7 +86,7 @@ class PromptFixtures extends Fixture
             $prompt->setTopic($data['topic']);
             $prompt->setShortDescription($data['shortDescription']);
             $prompt->setPrompt($data['prompt']);
-            
+
             $manager->persist($prompt);
         }
 
@@ -467,4 +467,3 @@ You are a helpful assistant that creates high-quality, accurate document summari
 PROMPT;
     }
 }
-

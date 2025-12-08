@@ -2,19 +2,17 @@
 
 namespace App\Service;
 
+use App\AI\Service\AiFacade;
 use App\Entity\InboundEmailHandler;
 use App\Repository\InboundEmailHandlerRepository;
 use App\Repository\PromptRepository;
-use App\AI\Service\AiFacade;
-use App\Service\EncryptionService;
 use Psr\Log\LoggerInterface;
-use Symfony\Component\Mailer\MailerInterface;
 use Symfony\Component\Mailer\Transport;
 use Symfony\Component\Mime\Email;
 
 /**
- * Inbound Email Handler Service
- * 
+ * Inbound Email Handler Service.
+ *
  * Handles IMAP/POP3 email fetching and AI-based routing to departments.
  * This is a TOOL that allows users to automatically sort incoming emails.
  */
@@ -25,58 +23,62 @@ class InboundEmailHandlerService
         private PromptRepository $promptRepository,
         private AiFacade $aiFacade,
         private EncryptionService $encryptionService,
-        private LoggerInterface $logger
-    ) {}
+        private LoggerInterface $logger,
+    ) {
+    }
 
     /**
-     * Test IMAP/POP3 connection
+     * Test IMAP/POP3 connection.
      */
     public function testConnection(InboundEmailHandler $handler): array
     {
         // Check if IMAP extension is available
         if (!function_exists('imap_open')) {
             $this->logger->error('IMAP extension not available');
+
             return [
                 'success' => false,
-                'message' => 'IMAP extension is not installed. Please install php-imap extension.'
+                'message' => 'IMAP extension is not installed. Please install php-imap extension.',
             ];
         }
 
         try {
             $connection = $this->connectImap($handler);
-            
+
             if ($connection) {
                 imap_close($connection);
+
                 return [
                     'success' => true,
-                    'message' => 'Connection successful'
+                    'message' => 'Connection successful',
                 ];
             }
-            
+
             return [
                 'success' => false,
-                'message' => 'Failed to connect'
+                'message' => 'Failed to connect',
             ];
         } catch (\Exception $e) {
             $this->logger->error('IMAP connection test failed', [
                 'handler_id' => $handler->getId(),
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ]);
+
             return [
                 'success' => false,
-                'message' => $e->getMessage()
+                'message' => $e->getMessage(),
             ];
         }
     }
 
     /**
-     * Connect to IMAP/POP3 server
+     * Connect to IMAP/POP3 server.
      */
     private function connectImap(InboundEmailHandler $handler): ?\IMAP\Connection
     {
         $server = $this->buildServerString($handler);
         $password = $handler->getDecryptedPassword($this->encryptionService);
-        
+
         $connection = @imap_open(
             $server,
             $handler->getUsername(),
@@ -86,14 +88,14 @@ class InboundEmailHandlerService
 
         if (!$connection) {
             $errors = imap_errors();
-            throw new \Exception('IMAP connection failed: ' . implode(', ', $errors ?: ['Unknown error']));
+            throw new \Exception('IMAP connection failed: '.implode(', ', $errors ?: ['Unknown error']));
         }
 
         return $connection;
     }
 
     /**
-     * Build IMAP server connection string
+     * Build IMAP server connection string.
      */
     private function buildServerString(InboundEmailHandler $handler): string
     {
@@ -103,86 +105,90 @@ class InboundEmailHandlerService
         $security = $handler->getSecurity();
 
         // Build connection string: {server:port/protocol/security}
-        $securityFlag = match($security) {
+        $securityFlag = match ($security) {
             'SSL/TLS' => 'ssl',
             'STARTTLS' => 'tls',
-            default => 'notls'
+            default => 'notls',
         };
 
         return sprintf('{%s:%d/%s/%s}INBOX', $server, $port, $protocol, $securityFlag);
     }
 
     /**
-     * Route email to department using AI
+     * Route email to department using AI.
      */
     public function routeEmailToDepartment(InboundEmailHandler $handler, string $subject, string $body): ?string
     {
         $departments = $handler->getDepartments();
-        
+
         if (empty($departments)) {
             $this->logger->warning('No departments configured for handler', [
-                'handler_id' => $handler->getId()
+                'handler_id' => $handler->getId(),
             ]);
+
             return $this->getDefaultDepartment($departments);
         }
 
         // Get mail handler prompt
         $prompt = $this->promptRepository->findByTopic('tools:mailhandler', 0, 'en');
-        
+
         if (!$prompt) {
             $this->logger->error('Mail handler prompt not found');
+
             return $this->getDefaultDepartment($departments);
         }
 
         // Build target list for prompt
         $targetList = $this->buildTargetList($departments);
-        
+
         // Replace [TARGETLIST] in prompt
         $promptText = str_replace('[TARGETLIST]', $targetList, $prompt->getPrompt());
-        
+
         // Add email content
-        $fullPrompt = $promptText . "\n\nSubject: " . $subject . "\n\nBody:\n" . $body;
+        $fullPrompt = $promptText."\n\nSubject: ".$subject."\n\nBody:\n".$body;
 
         try {
             // Call AI to route email
             $response = $this->aiFacade->chat(
                 messages: [
-                    ['role' => 'user', 'content' => $fullPrompt]
+                    ['role' => 'user', 'content' => $fullPrompt],
                 ],
                 userId: $handler->getUserId(),
                 options: [] // Use default model
             );
 
             $routedEmail = trim($response['content'] ?? '');
-            
+
             // Validate that routed email is in departments list
             if ($this->isValidDepartmentEmail($routedEmail, $departments)) {
                 $this->logger->info('Email routed to department', [
                     'handler_id' => $handler->getId(),
                     'routed_email' => $routedEmail,
-                    'subject' => substr($subject, 0, 50)
+                    'subject' => substr($subject, 0, 50),
                 ]);
+
                 return $routedEmail;
             }
 
             // Fallback to default
             $this->logger->warning('AI routed to invalid email, using default', [
                 'handler_id' => $handler->getId(),
-                'routed_email' => $routedEmail
+                'routed_email' => $routedEmail,
             ]);
-            return $this->getDefaultDepartment($departments);
 
+            return $this->getDefaultDepartment($departments);
         } catch (\Exception $e) {
             $this->logger->error('AI routing failed', [
                 'handler_id' => $handler->getId(),
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ]);
+
             return $this->getDefaultDepartment($departments);
         }
     }
 
     /**
-     * Build target list string for AI prompt
+     * Build target list string for AI prompt.
      */
     private function buildTargetList(array $departments): string
     {
@@ -196,11 +202,12 @@ class InboundEmailHandlerService
                 $default
             );
         }
+
         return implode("\n\n", $list);
     }
 
     /**
-     * Get default department email
+     * Get default department email.
      */
     private function getDefaultDepartment(array $departments): ?string
     {
@@ -209,17 +216,17 @@ class InboundEmailHandlerService
                 return $dept['email'] ?? null;
             }
         }
-        
+
         // If no default, return first department
         if (!empty($departments)) {
             return $departments[0]['email'] ?? null;
         }
-        
+
         return null;
     }
 
     /**
-     * Validate that email is in departments list
+     * Validate that email is in departments list.
      */
     private function isValidDepartmentEmail(string $email, array $departments): bool
     {
@@ -228,11 +235,12 @@ class InboundEmailHandlerService
                 return true;
             }
         }
+
         return false;
     }
 
     /**
-     * Fetch and process emails for a handler
+     * Fetch and process emails for a handler.
      */
     public function processHandler(InboundEmailHandler $handler): array
     {
@@ -241,29 +249,31 @@ class InboundEmailHandlerService
 
         try {
             $connection = $this->connectImap($handler);
-            
+
             if (!$connection) {
                 $handler->setStatus('error');
                 $handler->touch();
+
                 // Note: Need EntityManager to flush - will be handled by caller
                 return [
                     'success' => false,
                     'processed' => 0,
-                    'errors' => ['Failed to connect to mail server']
+                    'errors' => ['Failed to connect to mail server'],
                 ];
             }
 
             // Get unread messages
             $messages = imap_search($connection, 'UNSEEN');
-            
+
             if (!$messages) {
                 imap_close($connection);
                 $handler->setLastChecked(date('YmdHis'));
                 $handler->setStatus('active');
+
                 return [
                     'success' => true,
                     'processed' => 0,
-                    'errors' => []
+                    'errors' => [],
                 ];
             }
 
@@ -271,40 +281,39 @@ class InboundEmailHandlerService
                 try {
                     $header = imap_headerinfo($connection, $msgNumber);
                     $body = imap_body($connection, $msgNumber);
-                    
+
                     $subject = $header->subject ?? '(no subject)';
-                    $from = $header->from[0]->mailbox . '@' . $header->from[0]->host;
-                    
+                    $from = $header->from[0]->mailbox.'@'.$header->from[0]->host;
+
                     // Route email to department
                     $routedEmail = $this->routeEmailToDepartment($handler, $subject, $body);
-                    
+
                     if ($routedEmail) {
                         // Forward email to routed department using SMTP
                         $this->forwardEmail($handler, $from, $routedEmail, $subject, $body);
-                        
+
                         $this->logger->info('Email processed and forwarded', [
                             'handler_id' => $handler->getId(),
                             'from' => $from,
                             'subject' => $subject,
-                            'routed_to' => $routedEmail
+                            'routed_to' => $routedEmail,
                         ]);
                     }
-                    
+
                     // Mark as read (or delete if configured)
                     if ($handler->isDeleteAfter()) {
                         imap_delete($connection, $msgNumber);
                     } else {
                         imap_setflag_full($connection, $msgNumber, '\\Seen');
                     }
-                    
-                    $processed++;
-                    
+
+                    ++$processed;
                 } catch (\Exception $e) {
-                    $errors[] = "Message {$msgNumber}: " . $e->getMessage();
+                    $errors[] = "Message {$msgNumber}: ".$e->getMessage();
                     $this->logger->error('Failed to process email', [
                         'handler_id' => $handler->getId(),
                         'message_number' => $msgNumber,
-                        'error' => $e->getMessage()
+                        'error' => $e->getMessage(),
                     ]);
                 }
             }
@@ -314,55 +323,55 @@ class InboundEmailHandlerService
             }
 
             imap_close($connection);
-            
+
             $handler->setLastChecked(date('YmdHis'));
             $handler->setStatus('active');
-            
+
             return [
                 'success' => true,
                 'processed' => $processed,
-                'errors' => $errors
+                'errors' => $errors,
             ];
-
         } catch (\Exception $e) {
             $handler->setStatus('error');
             $this->logger->error('Handler processing failed', [
                 'handler_id' => $handler->getId(),
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ]);
-            
+
             return [
                 'success' => false,
                 'processed' => $processed,
-                'errors' => [$e->getMessage()]
+                'errors' => [$e->getMessage()],
             ];
         }
     }
 
     /**
-     * Forward email to department using handler's SMTP credentials
+     * Forward email to department using handler's SMTP credentials.
      */
     private function forwardEmail(
         InboundEmailHandler $handler,
         string $fromEmail,
         string $toEmail,
         string $subject,
-        string $body
+        string $body,
     ): void {
         // Get SMTP credentials (decrypted)
         $smtpConfig = $handler->getSmtpCredentials($this->encryptionService);
-        
+
         if (!$smtpConfig) {
             $this->logger->warning('No SMTP credentials configured for forwarding', [
-                'handler_id' => $handler->getId()
+                'handler_id' => $handler->getId(),
             ]);
+
             return;
         }
 
         try {
             // Build DSN for Symfony Mailer Transport
             $dsn = $this->buildSmtpDsn($smtpConfig);
-            
+
             // Create transport from DSN
             $transport = Transport::fromDsn($dsn);
             $mailer = new \Symfony\Component\Mailer\Mailer($transport);
@@ -372,7 +381,7 @@ class InboundEmailHandlerService
                 ->from($smtpConfig['username'])
                 ->to($toEmail)
                 ->replyTo($fromEmail)
-                ->subject('Fwd: ' . $subject)
+                ->subject('Fwd: '.$subject)
                 ->text($body);
 
             // Send email
@@ -382,28 +391,27 @@ class InboundEmailHandlerService
                 'handler_id' => $handler->getId(),
                 'from' => $fromEmail,
                 'to' => $toEmail,
-                'subject' => $subject
+                'subject' => $subject,
             ]);
-
         } catch (\Exception $e) {
             $this->logger->error('Failed to forward email', [
                 'handler_id' => $handler->getId(),
                 'error' => $e->getMessage(),
-                'to' => $toEmail
+                'to' => $toEmail,
             ]);
             throw $e;
         }
     }
 
     /**
-     * Build SMTP DSN from config
+     * Build SMTP DSN from config.
      */
     private function buildSmtpDsn(array $smtpConfig): string
     {
-        $scheme = match($smtpConfig['security']) {
+        $scheme = match ($smtpConfig['security']) {
             'SSL/TLS' => 'smtps',
             'STARTTLS' => 'smtp',
-            default => 'smtp'
+            default => 'smtp',
         };
 
         return sprintf(
@@ -417,7 +425,7 @@ class InboundEmailHandlerService
     }
 
     /**
-     * Process all active handlers
+     * Process all active handlers.
      */
     public function processAllHandlers(): array
     {
@@ -431,4 +439,3 @@ class InboundEmailHandlerService
         return $results;
     }
 }
-

@@ -140,24 +140,12 @@ class PromptsApi {
     formData.append('files[]', file)
     formData.append('group_key', `TASKPROMPT:${topic}`)
     formData.append('process_level', 'vectorize')
-    
-    // Use httpClient which handles auth headers automatically
-    const backendUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000'
-    const token = localStorage.getItem('token')
-    
-    const response = await fetch(`${backendUrl}/api/v1/files/upload`, {
+
+    // httpClient automatically detects FormData and omits Content-Type header
+    await httpClient('/api/v1/files/upload', {
       method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${token}`
-        // DO NOT set Content-Type for FormData - browser sets it automatically with boundary
-      },
       body: formData
     })
-    
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({ error: response.statusText }))
-      throw new Error(errorData.error || `Upload failed: ${response.statusText}`)
-    }
   }
   
   /**

@@ -5,7 +5,7 @@ namespace App\AI\Interface;
 interface ProviderMetadataInterface
 {
     /**
-     * Provider-Name: 'anthropic', 'openai', 'ollama', 'test'
+     * Provider-Name: 'anthropic', 'openai', 'ollama', 'test'.
      */
     public function getName(): string;
 
@@ -15,23 +15,23 @@ interface ProviderMetadataInterface
     public function getDisplayName(): string;
 
     /**
-     * Short description for UI status page
+     * Short description for UI status page.
      */
     public function getDescription(): string;
 
     /**
-     * Unterstützte Capabilities: ['chat', 'vision', 'embedding', ...]
+     * Unterstützte Capabilities: ['chat', 'vision', 'embedding', ...].
      */
     public function getCapabilities(): array;
 
     /**
-     * Default-Modelle pro Capability
+     * Default-Modelle pro Capability.
      */
     public function getDefaultModels(): array;
 
     /**
      * Provider-Status (Health-Check)
-     * Returns: ['healthy' => bool, 'error' => string|null]
+     * Returns: ['healthy' => bool, 'error' => string|null].
      */
     public function getStatus(): array;
 
@@ -42,8 +42,7 @@ interface ProviderMetadataInterface
 
     /**
      * Get environment variables required for this provider
-     * Returns: ['ENV_VAR_NAME' => ['required' => bool, 'hint' => string]]
+     * Returns: ['ENV_VAR_NAME' => ['required' => bool, 'hint' => string]].
      */
     public function getRequiredEnvVars(): array;
 }
-

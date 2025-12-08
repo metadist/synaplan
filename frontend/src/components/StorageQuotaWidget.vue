@@ -68,11 +68,8 @@
 import { ref, computed, onMounted } from 'vue'
 import { Icon } from '@iconify/vue'
 import filesService from '@/services/filesService'
-import { useI18n } from 'vue-i18n'
 
-const { t } = useI18n()
-
-const emit = defineEmits<{
+defineEmits<{
   upgrade: []
 }>()
 
@@ -84,14 +81,16 @@ const percentage = computed(() => {
   return Math.min(100, stats.value.storage.percentage)
 })
 
+const planLabels = {
+  NEW: 'Free',
+  PRO: 'Pro',
+  TEAM: 'Team',
+  BUSINESS: 'Business'
+} as const
+
 const planName = computed(() => {
-  const level = stats.value?.user_level || 'NEW'
-  return {
-    'NEW': 'Free',
-    'PRO': 'Pro',
-    'TEAM': 'Team',
-    'BUSINESS': 'Business'
-  }[level] || level
+  const level = (stats.value?.user_level as keyof typeof planLabels | undefined) ?? 'NEW'
+  return planLabels[level] ?? level
 })
 
 const storageIcon = computed(() => {

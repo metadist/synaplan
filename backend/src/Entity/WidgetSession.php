@@ -60,6 +60,7 @@ class WidgetSession
     public function setWidgetId(string $widgetId): self
     {
         $this->widgetId = $widgetId;
+
         return $this;
     }
 
@@ -71,6 +72,7 @@ class WidgetSession
     public function setSessionId(string $sessionId): self
     {
         $this->sessionId = $sessionId;
+
         return $this;
     }
 
@@ -82,12 +84,14 @@ class WidgetSession
     public function setMessageCount(int $messageCount): self
     {
         $this->messageCount = $messageCount;
+
         return $this;
     }
 
     public function incrementMessageCount(): self
     {
-        $this->messageCount++;
+        ++$this->messageCount;
+
         return $this;
     }
 
@@ -99,12 +103,14 @@ class WidgetSession
     public function setFileCount(int $fileCount): self
     {
         $this->fileCount = $fileCount;
+
         return $this;
     }
 
     public function incrementFileCount(): self
     {
-        $this->fileCount++;
+        ++$this->fileCount;
+
         return $this;
     }
 
@@ -117,6 +123,7 @@ class WidgetSession
     {
         $this->lastMessage = $lastMessage;
         $this->expires = $lastMessage + 86400; // Extend expiry by 24h
+
         return $this;
     }
 
@@ -133,6 +140,7 @@ class WidgetSession
     public function setChatId(?int $chatId): self
     {
         $this->chatId = $chatId;
+
         return $this;
     }
 
@@ -144,6 +152,7 @@ class WidgetSession
     public function setCreated(int $created): self
     {
         $this->created = $created;
+
         return $this;
     }
 
@@ -155,6 +164,7 @@ class WidgetSession
     public function setExpires(int $expires): self
     {
         $this->expires = $expires;
+
         return $this;
     }
 
@@ -164,7 +174,7 @@ class WidgetSession
     }
 
     /**
-     * Get messages sent in the last minute
+     * Get messages sent in the last minute.
      */
     public function getMessagesInLastMinute(): int
     {
@@ -173,4 +183,3 @@ class WidgetSession
         return 0;
     }
 }
-

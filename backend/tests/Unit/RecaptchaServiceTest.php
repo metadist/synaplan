@@ -5,8 +5,6 @@ namespace App\Tests\Unit;
 use App\Service\RecaptchaService;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
-use ReCaptcha\ReCaptcha;
-use ReCaptcha\Response as ReCaptchaResponse;
 
 class RecaptchaServiceTest extends TestCase
 {
@@ -27,7 +25,7 @@ class RecaptchaServiceTest extends TestCase
         );
 
         $this->assertFalse($service->isEnabled());
-        
+
         // Verify should return true when disabled (dev mode)
         $result = $service->verify('fake_token', 'login', '127.0.0.1');
         $this->assertTrue($result);
@@ -43,7 +41,7 @@ class RecaptchaServiceTest extends TestCase
         );
 
         $this->assertFalse($service->isEnabled());
-        
+
         // Should still pass verification when disabled
         $result = $service->verify('fake_token', 'register', '127.0.0.1');
         $this->assertTrue($result);
@@ -100,7 +98,7 @@ class RecaptchaServiceTest extends TestCase
             ->with('reCAPTCHA verification skipped (disabled)');
 
         $result = $service->verify('any_token', 'any_action', '1.2.3.4');
-        
+
         $this->assertTrue($result);
     }
 
@@ -183,4 +181,3 @@ class RecaptchaServiceTest extends TestCase
         $this->assertFalse($service->isEnabled());
     }
 }
-

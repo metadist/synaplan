@@ -8,7 +8,7 @@ use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
 
 /**
- * Integration tests for UserRepository
+ * Integration tests for UserRepository.
  */
 class UserRepositoryTest extends KernelTestCase
 {
@@ -18,12 +18,12 @@ class UserRepositoryTest extends KernelTestCase
     protected function setUp(): void
     {
         parent::setUp();
-        
+
         $kernel = self::bootKernel();
         $this->em = $kernel->getContainer()
             ->get('doctrine')
             ->getManager();
-        
+
         $this->repository = $this->em->getRepository(User::class);
     }
 
@@ -36,7 +36,7 @@ class UserRepositoryTest extends KernelTestCase
     {
         // Find existing test user from fixtures or create one
         $users = $this->repository->findAll();
-        
+
         if (empty($users)) {
             $this->markTestSkipped('No users in database for testing');
         }
@@ -53,7 +53,7 @@ class UserRepositoryTest extends KernelTestCase
 
     public function testFindByMailReturnsNullWhenNotExists(): void
     {
-        $found = $this->repository->findOneBy(['mail' => 'nonexistent_' . time() . '@test.com']);
+        $found = $this->repository->findOneBy(['mail' => 'nonexistent_'.time().'@test.com']);
 
         $this->assertNull($found);
     }
@@ -103,7 +103,7 @@ class UserRepositoryTest extends KernelTestCase
     public function testUserHasRequiredFields(): void
     {
         $users = $this->repository->findAll();
-        
+
         if (empty($users)) {
             $this->markTestSkipped('No users in database for testing');
         }
@@ -134,4 +134,3 @@ class UserRepositoryTest extends KernelTestCase
         $this->assertLessThanOrEqual($limit, count($users));
     }
 }
-

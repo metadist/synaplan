@@ -45,6 +45,7 @@ export interface FileItem {
   uploaded_date: string
   message_id: number | null
   is_attached: boolean
+  group_key?: string
 }
 
 export interface FileListResponse {
@@ -179,6 +180,8 @@ export const getFileContent = async (fileId: number): Promise<{
   filename: string
   file_path: string
   file_type: string
+  file_size?: number
+  mime?: string
   extracted_text: string
   status: string
   uploaded_at: number
@@ -189,6 +192,8 @@ export const getFileContent = async (fileId: number): Promise<{
     filename: string
     file_path: string
     file_type: string
+    file_size?: number
+    mime?: string
     extracted_text: string
     status: string
     uploaded_at: number
@@ -204,20 +209,11 @@ export const getFileContent = async (fileId: number): Promise<{
  * @param filename Original filename for download
  */
 export const downloadFile = async (fileId: number, filename: string): Promise<void> => {
-  // We need to use fetch directly for file downloads
-  const token = localStorage.getItem('auth_token')
-  const response = await fetch(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'}/api/v1/files/${fileId}/download`, {
-    headers: {
-      'Authorization': `Bearer ${token}`
-    }
+  const blob = await httpClient<Blob>(`/api/v1/files/${fileId}/download`, {
+    responseType: 'blob'
   })
-  
-  if (!response.ok) {
-    throw new Error(`Download failed: ${response.statusText}`)
-  }
-  
+
   // Create blob and trigger download
-  const blob = await response.blob()
   const url = window.URL.createObjectURL(blob)
   const a = document.createElement('a')
   a.href = url

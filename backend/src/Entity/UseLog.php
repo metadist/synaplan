@@ -73,6 +73,7 @@ class UseLog
     public function setUserId(int $userId): self
     {
         $this->userId = $userId;
+
         return $this;
     }
 
@@ -87,6 +88,7 @@ class UseLog
         if ($user) {
             $this->userId = $user->getId();
         }
+
         return $this;
     }
 
@@ -98,6 +100,7 @@ class UseLog
     public function setUnixTimestamp(int $unixTimestamp): self
     {
         $this->unixTimestamp = $unixTimestamp;
+
         return $this;
     }
 
@@ -109,6 +112,7 @@ class UseLog
     public function setAction(string $action): self
     {
         $this->action = $action;
+
         return $this;
     }
 
@@ -120,6 +124,7 @@ class UseLog
     public function setProvider(string $provider): self
     {
         $this->provider = $provider;
+
         return $this;
     }
 
@@ -131,6 +136,7 @@ class UseLog
     public function setModel(string $model): self
     {
         $this->model = $model;
+
         return $this;
     }
 
@@ -142,6 +148,7 @@ class UseLog
     public function setTokens(int $tokens): self
     {
         $this->tokens = $tokens;
+
         return $this;
     }
 
@@ -153,6 +160,7 @@ class UseLog
     public function setCost(string $cost): self
     {
         $this->cost = $cost;
+
         return $this;
     }
 
@@ -164,6 +172,7 @@ class UseLog
     public function setLatency(int $latency): self
     {
         $this->latency = $latency;
+
         return $this;
     }
 
@@ -175,6 +184,7 @@ class UseLog
     public function setStatus(string $status): self
     {
         $this->status = $status;
+
         return $this;
     }
 
@@ -186,6 +196,7 @@ class UseLog
     public function setError(string $error): self
     {
         $this->error = $error;
+
         return $this;
     }
 
@@ -197,7 +208,7 @@ class UseLog
     public function setMetadata(array $metadata): self
     {
         $this->metadata = $metadata;
+
         return $this;
     }
 }
-

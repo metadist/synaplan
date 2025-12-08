@@ -184,6 +184,7 @@ import {
   ChevronDownIcon,
   ChevronUpIcon
 } from '@heroicons/vue/24/outline'
+import { useConfigStore } from '@/stores/config'
 
 interface OpenAPISpec {
   info?: {
@@ -253,11 +254,10 @@ const loadApiSpec = async () => {
   try {
     loading.value = true
     error.value = null
-    
+
     // Fetch OpenAPI JSON from backend
-    const env = import.meta.env as any
-    const baseUrl = env.VITE_API_BASE_URL || 'http://localhost:8000'
-    const response = await fetch(`${baseUrl}/api/doc.json`)
+    const config = useConfigStore()
+    const response = await fetch(`${config.apiBaseUrl}/doc.json`)
     
     if (!response.ok) {
       throw new Error(`Failed to load API documentation: ${response.statusText}`)
@@ -379,24 +379,6 @@ const getTypeString = (schema: any): string => {
     return schema.$ref.split('/').pop() || 'object'
   }
   return 'object'
-}
-
-const formatRequestBody = (requestBody: any): string => {
-  if (!requestBody?.content) return ''
-  
-  const jsonContent = requestBody.content['application/json']
-  if (!jsonContent?.schema) return ''
-  
-  return JSON.stringify(formatSchema(jsonContent.schema), null, 2)
-}
-
-const formatResponseContent = (content: any): string => {
-  if (!content) return ''
-  
-  const jsonContent = content['application/json']
-  if (!jsonContent?.schema) return ''
-  
-  return JSON.stringify(formatSchema(jsonContent.schema), null, 2)
 }
 
 const formatSchema = (schema: any): any => {

@@ -163,12 +163,14 @@ import { useAuth } from '../composables/useAuth'
 import { useRecaptcha } from '../composables/useRecaptcha'
 import { validateEmail } from '../composables/usePasswordValidation'
 import Button from '../components/Button.vue'
+import { useConfigStore } from '@/stores/config'
 
 const router = useRouter()
 const route = useRoute()
 const { locale } = useI18n()
 const themeStore = useTheme()
 const { getToken: getReCaptchaToken } = useRecaptcha()
+const config = useConfigStore()
 
 const isDark = computed(() => {
   if (themeStore.theme.value === 'dark') return true
@@ -176,7 +178,7 @@ const isDark = computed(() => {
   return matchMedia('(prefers-color-scheme: dark)').matches
 })
 
-const logoSrc = computed(() => isDark.value ? '/synaplan-light.svg' : '/synaplan-dark.svg')
+const logoSrc = computed(() => `${import.meta.env.BASE_URL}${isDark.value ? 'synaplan-light.svg' : 'synaplan-dark.svg'}`)
 
 const email = ref('')
 const password = ref('')
@@ -218,8 +220,7 @@ const socialProviders = ref<SocialProvider[]>([])
 // Load available social providers
 const loadSocialProviders = async () => {
   try {
-    const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'
-    const response = await fetch(`${apiBaseUrl}/api/v1/auth/providers`)
+    const response = await fetch(`${config.appBaseUrl}/api/v1/auth/providers`)
     const data = await response.json()
     socialProviders.value = data.providers || []
   } catch (e) {
@@ -268,14 +269,11 @@ const handleLogin = async () => {
 }
 
 const handleSocialLogin = (provider: string) => {
-  // Get API base URL
-  const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'
-  
   // Redirect to backend OAuth endpoint
-  const oauthUrl = `${apiBaseUrl}/api/v1/auth/${provider}/login`
-  
+  const oauthUrl = `${config.appBaseUrl}/api/v1/auth/${provider}/login`
+
   console.log(`Redirecting to ${provider} OAuth:`, oauthUrl)
-  
+
   // Full page redirect to OAuth provider
   window.location.href = oauthUrl
 }

@@ -2,11 +2,11 @@
 
 namespace App\Tests\Unit;
 
-use App\Service\ModelConfigService;
-use App\Repository\ConfigRepository;
-use App\Repository\ModelRepository;
 use App\Entity\Config;
 use App\Entity\Model;
+use App\Repository\ConfigRepository;
+use App\Repository\ModelRepository;
+use App\Service\ModelConfigService;
 use PHPUnit\Framework\TestCase;
 use Psr\Cache\CacheItemInterface;
 use Psr\Cache\CacheItemPoolInterface;
@@ -72,12 +72,14 @@ class ModelConfigServiceTest extends TestCase
         $this->configRepository
             ->expects($this->exactly(2))
             ->method('findByOwnerGroupAndSetting')
-            ->willReturnCallback(function($ownerId, $group, $setting) use ($expectedProvider) {
-                if ($ownerId === 0) {
+            ->willReturnCallback(function ($ownerId, $group, $setting) use ($expectedProvider) {
+                if (0 === $ownerId) {
                     $config = $this->createMock(Config::class);
                     $config->method('getValue')->willReturn($expectedProvider);
+
                     return $config;
                 }
+
                 return null;
             });
 
@@ -134,7 +136,7 @@ class ModelConfigServiceTest extends TestCase
 
         // Mock user-specific config
         $config = $this->createMock(Config::class);
-        $config->method('getValue')->willReturn((string)$expectedModelId);
+        $config->method('getValue')->willReturn((string) $expectedModelId);
 
         $this->configRepository
             ->expects($this->once())
@@ -159,15 +161,16 @@ class ModelConfigServiceTest extends TestCase
 
         // Mock no user config, but global config exists
         $globalConfig = $this->createMock(Config::class);
-        $globalConfig->method('getValue')->willReturn((string)$expectedModelId);
+        $globalConfig->method('getValue')->willReturn((string) $expectedModelId);
 
         $this->configRepository
             ->expects($this->exactly(2))
             ->method('findOneBy')
-            ->willReturnCallback(function($criteria) use ($globalConfig) {
-                if ($criteria['ownerId'] === 0) {
+            ->willReturnCallback(function ($criteria) use ($globalConfig) {
+                if (0 === $criteria['ownerId']) {
                     return $globalConfig;
                 }
+
                 return null;
             });
 
@@ -290,9 +293,9 @@ class ModelConfigServiceTest extends TestCase
         $this->configRepository
             ->expects($this->once())
             ->method('save')
-            ->with($this->callback(function($config) use ($userId, $provider) {
-                return $config instanceof Config &&
-                       $config->getValue() === $provider;
+            ->with($this->callback(function ($config) use ($provider) {
+                return $config instanceof Config
+                       && $config->getValue() === $provider;
             }));
 
         $this->cache
@@ -341,9 +344,14 @@ class ModelConfigServiceTest extends TestCase
 
         $this->configRepository
             ->method('findByOwnerGroupAndSetting')
-            ->willReturnCallback(function($ownerId, $group, $setting) use ($chatConfig, $visionConfig) {
-                if (str_contains($setting, 'chat')) return $chatConfig;
-                if (str_contains($setting, 'vision')) return $visionConfig;
+            ->willReturnCallback(function ($ownerId, $group, $setting) use ($chatConfig, $visionConfig) {
+                if (str_contains($setting, 'chat')) {
+                    return $chatConfig;
+                }
+                if (str_contains($setting, 'vision')) {
+                    return $visionConfig;
+                }
+
                 return null;
             });
 
@@ -355,4 +363,3 @@ class ModelConfigServiceTest extends TestCase
         $this->assertEquals('openai', $result['chat']['provider']);
     }
 }
-

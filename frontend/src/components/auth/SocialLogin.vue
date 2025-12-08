@@ -35,12 +35,14 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { useConfigStore } from '@/stores/config'
 
 const { t } = useI18n()
 const loading = ref(false)
 const error = ref<string | null>(null)
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'
+const config = useConfigStore()
+const API_BASE_URL = config.appBaseUrl
 
 const loginWithGoogle = () => {
   try {

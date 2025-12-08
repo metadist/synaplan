@@ -47,8 +47,9 @@ class ProfileController extends AbstractController
         private MessageRepository $messageRepository,
         private EmailVerificationAttemptRepository $emailVerificationAttemptRepository,
         private FileRepository $fileRepository,
-        private InboundEmailHandlerRepository $inboundEmailHandlerRepository
-    ) {}
+        private InboundEmailHandlerRepository $inboundEmailHandlerRepository,
+    ) {
+    }
 
     #[Route('', name: 'get', methods: ['GET'])]
     #[OA\Get(
@@ -82,9 +83,9 @@ class ProfileController extends AbstractController
                         new OA\Property(property: 'timezone', type: 'string', example: 'Europe/Berlin'),
                         new OA\Property(property: 'invoiceEmail', type: 'string', example: 'billing@example.com'),
                         new OA\Property(property: 'emailKeyword', type: 'string', nullable: true, example: 'myproject'),
-                        new OA\Property(property: 'personalEmailAddress', type: 'string', example: 'smart+myproject@synaplan.com')
+                        new OA\Property(property: 'personalEmailAddress', type: 'string', example: 'smart+myproject@synaplan.com'),
                     ]
-                )
+                ),
             ]
         )
     )]
@@ -103,16 +104,16 @@ class ProfileController extends AbstractController
         $externalAuthInfo = null;
         if ($user->isExternalAuth()) {
             $type = $user->getType();
-            $lastLoginKey = match($type) {
+            $lastLoginKey = match ($type) {
                 'GOOGLE' => 'google_last_login',
                 'GITHUB' => 'github_last_login',
                 'OIDC' => 'oidc_last_login',
-                default => null
+                default => null,
             };
-            
+
             if ($lastLoginKey && isset($details[$lastLoginKey])) {
                 $externalAuthInfo = [
-                    'lastLogin' => $details[$lastLoginKey]
+                    'lastLogin' => $details[$lastLoginKey],
                 ];
             }
         }
@@ -139,8 +140,8 @@ class ProfileController extends AbstractController
                 'authProvider' => $user->getAuthProviderName(),
                 'isExternalAuth' => $user->isExternalAuth(),
                 'externalAuthInfo' => $externalAuthInfo,
-                'isAdmin' => $user->isAdmin()
-            ]
+                'isAdmin' => $user->isAdmin(),
+            ],
         ]);
     }
 
@@ -168,7 +169,7 @@ class ProfileController extends AbstractController
                 new OA\Property(property: 'language', type: 'string', example: 'en'),
                 new OA\Property(property: 'timezone', type: 'string', example: 'Europe/Berlin'),
                 new OA\Property(property: 'invoiceEmail', type: 'string', example: 'billing@example.com'),
-                new OA\Property(property: 'emailKeyword', type: 'string', nullable: true, example: 'myproject')
+                new OA\Property(property: 'emailKeyword', type: 'string', nullable: true, example: 'myproject'),
             ]
         )
     )]
@@ -178,7 +179,7 @@ class ProfileController extends AbstractController
         content: new OA\JsonContent(
             properties: [
                 new OA\Property(property: 'success', type: 'boolean', example: true),
-                new OA\Property(property: 'message', type: 'string', example: 'Profile updated successfully')
+                new OA\Property(property: 'message', type: 'string', example: 'Profile updated successfully'),
             ]
         )
     )]
@@ -186,7 +187,7 @@ class ProfileController extends AbstractController
     #[OA\Response(response: 400, description: 'Invalid JSON')]
     public function updateProfile(
         Request $request,
-        #[CurrentUser] ?User $user
+        #[CurrentUser] ?User $user,
     ): JsonResponse {
         if (!$user) {
             return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
@@ -204,7 +205,7 @@ class ProfileController extends AbstractController
         // Update allowed fields
         $allowedFields = [
             'firstName', 'lastName', 'phone', 'companyName', 'vatId',
-            'street', 'zipCode', 'city', 'country', 'language', 'timezone', 'invoiceEmail'
+            'street', 'zipCode', 'city', 'country', 'language', 'timezone', 'invoiceEmail',
         ];
 
         foreach ($allowedFields as $field) {
@@ -216,7 +217,7 @@ class ProfileController extends AbstractController
         // Handle email keyword separately (uses EmailChatService)
         if (isset($data['emailKeyword'])) {
             $keyword = $data['emailKeyword'];
-            if (empty($keyword) || trim($keyword) === '') {
+            if (empty($keyword) || '' === trim($keyword)) {
                 // Remove keyword if empty
                 $details['email_keyword'] = null;
                 $user->setUserDetails($details);
@@ -225,7 +226,7 @@ class ProfileController extends AbstractController
                     $this->emailChatService->setUserEmailKeyword($user, $keyword);
                 } catch (\InvalidArgumentException $e) {
                     return $this->json([
-                        'error' => 'Invalid email keyword format. Only lowercase letters, numbers, hyphens, and underscores are allowed.'
+                        'error' => 'Invalid email keyword format. Only lowercase letters, numbers, hyphens, and underscores are allowed.',
                     ], Response::HTTP_BAD_REQUEST);
                 }
             }
@@ -238,7 +239,7 @@ class ProfileController extends AbstractController
 
         return $this->json([
             'success' => true,
-            'message' => 'Profile updated successfully'
+            'message' => 'Profile updated successfully',
         ]);
     }
 
@@ -256,7 +257,7 @@ class ProfileController extends AbstractController
             required: ['currentPassword', 'newPassword'],
             properties: [
                 new OA\Property(property: 'currentPassword', type: 'string', format: 'password', example: 'OldPass123!'),
-                new OA\Property(property: 'newPassword', type: 'string', format: 'password', example: 'NewSecurePass123!')
+                new OA\Property(property: 'newPassword', type: 'string', format: 'password', example: 'NewSecurePass123!'),
             ]
         )
     )]
@@ -266,7 +267,7 @@ class ProfileController extends AbstractController
         content: new OA\JsonContent(
             properties: [
                 new OA\Property(property: 'success', type: 'boolean', example: true),
-                new OA\Property(property: 'message', type: 'string', example: 'Password changed successfully')
+                new OA\Property(property: 'message', type: 'string', example: 'Password changed successfully'),
             ]
         )
     )]
@@ -275,7 +276,7 @@ class ProfileController extends AbstractController
     #[OA\Response(response: 400, description: 'Invalid password format or missing fields')]
     public function changePassword(
         Request $request,
-        #[CurrentUser] ?User $user
+        #[CurrentUser] ?User $user,
     ): JsonResponse {
         if (!$user) {
             return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
@@ -284,8 +285,9 @@ class ProfileController extends AbstractController
         // Block password change for external authentication users (OAuth, OIDC)
         if (!$user->canChangePassword()) {
             $provider = $user->getAuthProviderName();
+
             return $this->json([
-                'error' => "Password cannot be changed for {$provider} accounts. Please manage your password through {$provider}."
+                'error' => "Password cannot be changed for {$provider} accounts. Please manage your password through {$provider}.",
             ], Response::HTTP_FORBIDDEN);
         }
 
@@ -296,27 +298,27 @@ class ProfileController extends AbstractController
 
         if (empty($currentPassword) || empty($newPassword)) {
             return $this->json([
-                'error' => 'Current password and new password required'
+                'error' => 'Current password and new password required',
             ], Response::HTTP_BAD_REQUEST);
         }
 
         // Verify current password
         if (!$this->passwordHasher->isPasswordValid($user, $currentPassword)) {
             return $this->json([
-                'error' => 'Current password is incorrect'
+                'error' => 'Current password is incorrect',
             ], Response::HTTP_FORBIDDEN);
         }
 
         // Validate new password
         if (strlen($newPassword) < 8) {
             return $this->json([
-                'error' => 'New password must be at least 8 characters'
+                'error' => 'New password must be at least 8 characters',
             ], Response::HTTP_BAD_REQUEST);
         }
 
         if (!preg_match('/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/', $newPassword)) {
             return $this->json([
-                'error' => 'Password must contain at least one uppercase letter, one lowercase letter, and one number'
+                'error' => 'Password must contain at least one uppercase letter, one lowercase letter, and one number',
             ], Response::HTTP_BAD_REQUEST);
         }
 
@@ -328,7 +330,7 @@ class ProfileController extends AbstractController
 
         return $this->json([
             'success' => true,
-            'message' => 'Password changed successfully'
+            'message' => 'Password changed successfully',
         ]);
     }
 
@@ -347,7 +349,7 @@ class ProfileController extends AbstractController
             properties: [
                 new OA\Property(property: 'success', type: 'boolean', example: true),
                 new OA\Property(property: 'keyword', type: 'string', nullable: true, example: 'myproject'),
-                new OA\Property(property: 'emailAddress', type: 'string', example: 'smart+myproject@synaplan.com')
+                new OA\Property(property: 'emailAddress', type: 'string', example: 'smart+myproject@synaplan.com'),
             ]
         )
     )]
@@ -364,7 +366,7 @@ class ProfileController extends AbstractController
         return $this->json([
             'success' => true,
             'keyword' => $keyword,
-            'emailAddress' => $emailAddress
+            'emailAddress' => $emailAddress,
         ]);
     }
 
@@ -381,7 +383,7 @@ class ProfileController extends AbstractController
         content: new OA\JsonContent(
             required: ['keyword'],
             properties: [
-                new OA\Property(property: 'keyword', type: 'string', example: 'myproject', description: 'Keyword (lowercase letters, numbers, hyphens, underscores only). Empty string to remove.')
+                new OA\Property(property: 'keyword', type: 'string', example: 'myproject', description: 'Keyword (lowercase letters, numbers, hyphens, underscores only). Empty string to remove.'),
             ]
         )
     )]
@@ -393,7 +395,7 @@ class ProfileController extends AbstractController
                 new OA\Property(property: 'success', type: 'boolean', example: true),
                 new OA\Property(property: 'message', type: 'string', example: 'Email keyword updated successfully'),
                 new OA\Property(property: 'keyword', type: 'string', nullable: true, example: 'myproject'),
-                new OA\Property(property: 'emailAddress', type: 'string', example: 'smart+myproject@synaplan.com')
+                new OA\Property(property: 'emailAddress', type: 'string', example: 'smart+myproject@synaplan.com'),
             ]
         )
     )]
@@ -401,7 +403,7 @@ class ProfileController extends AbstractController
     #[OA\Response(response: 400, description: 'Invalid keyword format')]
     public function setEmailKeyword(
         Request $request,
-        #[CurrentUser] ?User $user
+        #[CurrentUser] ?User $user,
     ): JsonResponse {
         if (!$user) {
             return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
@@ -426,7 +428,7 @@ class ProfileController extends AbstractController
                 'success' => true,
                 'message' => 'Email keyword removed successfully',
                 'keyword' => null,
-                'emailAddress' => $this->emailChatService->getUserPersonalEmailAddress($user)
+                'emailAddress' => $this->emailChatService->getUserPersonalEmailAddress($user),
             ]);
         }
 
@@ -438,11 +440,11 @@ class ProfileController extends AbstractController
                 'success' => true,
                 'message' => 'Email keyword updated successfully',
                 'keyword' => $keyword,
-                'emailAddress' => $emailAddress
+                'emailAddress' => $emailAddress,
             ]);
         } catch (\InvalidArgumentException $e) {
             return $this->json([
-                'error' => 'Invalid keyword format. Only lowercase letters, numbers, hyphens, and underscores are allowed.'
+                'error' => 'Invalid keyword format. Only lowercase letters, numbers, hyphens, and underscores are allowed.',
             ], Response::HTTP_BAD_REQUEST);
         }
     }
@@ -460,7 +462,7 @@ class ProfileController extends AbstractController
         content: new OA\JsonContent(
             required: ['password'],
             properties: [
-                new OA\Property(property: 'password', type: 'string', format: 'password', example: 'CurrentPassword123!', description: 'Current password for confirmation')
+                new OA\Property(property: 'password', type: 'string', format: 'password', example: 'CurrentPassword123!', description: 'Current password for confirmation'),
             ]
         )
     )]
@@ -470,7 +472,7 @@ class ProfileController extends AbstractController
         content: new OA\JsonContent(
             properties: [
                 new OA\Property(property: 'success', type: 'boolean', example: true),
-                new OA\Property(property: 'message', type: 'string', example: 'Account deleted successfully')
+                new OA\Property(property: 'message', type: 'string', example: 'Account deleted successfully'),
             ]
         )
     )]
@@ -479,7 +481,7 @@ class ProfileController extends AbstractController
     #[OA\Response(response: 400, description: 'Password required')]
     public function deleteAccount(
         Request $request,
-        #[CurrentUser] ?User $user
+        #[CurrentUser] ?User $user,
     ): JsonResponse {
         if (!$user) {
             return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
@@ -490,7 +492,7 @@ class ProfileController extends AbstractController
 
         if (empty($password)) {
             return $this->json([
-                'error' => 'Password confirmation required'
+                'error' => 'Password confirmation required',
             ], Response::HTTP_BAD_REQUEST);
         }
 
@@ -502,14 +504,15 @@ class ProfileController extends AbstractController
             $this->logger->warning('External auth user deleted account', [
                 'user_id' => $user->getId(),
                 'email' => $user->getMail(),
-                'provider' => $user->getAuthProviderName()
+                'provider' => $user->getAuthProviderName(),
             ]);
         } else {
             // Verify password for local auth users
             if (!$this->passwordHasher->isPasswordValid($user, $password)) {
                 usleep(100000); // Timing attack prevention
+
                 return $this->json([
-                    'error' => 'Incorrect password'
+                    'error' => 'Incorrect password',
                 ], Response::HTTP_FORBIDDEN);
             }
         }
@@ -518,14 +521,14 @@ class ProfileController extends AbstractController
         $this->logger->info('User account deletion initiated', [
             'user_id' => $user->getId(),
             'email' => $user->getMail(),
-            'type' => $user->getType()
+            'type' => $user->getType(),
         ]);
 
         $userId = $user->getId();
 
         try {
             // Delete all related entities to avoid foreign key constraint violations
-            
+
             // 1. Delete verification tokens
             $verificationTokens = $this->verificationTokenRepository->findBy(['userId' => $userId]);
             foreach ($verificationTokens as $token) {
@@ -605,24 +608,23 @@ class ProfileController extends AbstractController
 
             $this->logger->info('User account and all related data deleted successfully', [
                 'user_id' => $userId,
-                'email' => $user->getMail()
+                'email' => $user->getMail(),
             ]);
 
             return $this->json([
                 'success' => true,
-                'message' => 'Account deleted successfully'
+                'message' => 'Account deleted successfully',
             ]);
         } catch (\Exception $e) {
             $this->logger->error('Failed to delete user account', [
                 'user_id' => $userId,
                 'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
+                'trace' => $e->getTraceAsString(),
             ]);
 
             return $this->json([
-                'error' => 'Failed to delete account. Please contact support.'
+                'error' => 'Failed to delete account. Please contact support.',
             ], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
 }
-
