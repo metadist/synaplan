@@ -3,7 +3,6 @@
 namespace App\Tests\Controller;
 
 use App\Entity\User;
-use App\Repository\UserRepository;
 use App\Tests\Trait\AuthenticatedTestTrait;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
 
@@ -15,29 +14,51 @@ class FileServeControllerTest extends WebTestCase
     use AuthenticatedTestTrait;
 
     private $client;
+    private $em;
+    private $user;
     private string $authToken;
-    private int $userId;
     private string $testFilePath;
 
     protected function setUp(): void
     {
-        parent::setUp();
-
+        self::ensureKernelShutdown();
         $this->client = static::createClient();
+        $this->em = $this->client->getContainer()->get('doctrine')->getManager();
 
-        // Get test user and authenticate using TokenService
-        $userRepository = $this->client->getContainer()->get(UserRepository::class);
-        $user = $userRepository->findOneBy(['mail' => 'demo@synaplan.com']);
+        // Use fixture user demo@synaplan.com
+        $this->user = $this->em->getRepository(User::class)->findOneBy(['mail' => 'demo@synaplan.com']);
 
-        if (!$user) {
+        if (!$this->user) {
             $this->markTestSkipped('Test user demo@synaplan.com not found. Run fixtures first.');
         }
 
-        $this->userId = $user->getId();
-        $this->authToken = $this->authenticateClient($this->client, $user);
+        // Generate access token using TokenService
+        $this->authToken = $this->authenticateClient($this->client, $this->user);
 
         // Upload test file and get path
         $this->testFilePath = $this->uploadAndGetPath();
+    }
+
+    protected function tearDown(): void
+    {
+        if ($this->user) {
+            // Get a fresh entity manager if the current one is closed
+            if (!$this->em || !$this->em->isOpen()) {
+                self::bootKernel();
+                $this->em = self::getContainer()->get('doctrine')->getManager();
+            }
+
+            // Remove uploaded files only (keep fixture user)
+            $files = $this->em->getRepository(\App\Entity\File::class)
+                ->findBy(['userId' => $this->user->getId()]);
+            foreach ($files as $file) {
+                $this->em->remove($file);
+            }
+            $this->em->flush();
+        }
+
+        static::ensureKernelShutdown();
+        parent::tearDown();
     }
 
     private function uploadAndGetPath(): string

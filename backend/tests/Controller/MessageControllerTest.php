@@ -30,16 +30,12 @@ class MessageControllerTest extends WebTestCase
         $this->client = static::createClient();
         $this->em = $this->client->getContainer()->get('doctrine')->getManager();
 
-        // Create test user
-        $this->user = new User();
-        $this->user->setMail('test@example.com');
-        $this->user->setPw(password_hash('testpass', PASSWORD_BCRYPT));
-        $this->user->setUserLevel('PRO');
-        $this->user->setProviderId('test-provider');
-        $this->user->setCreated(date('YmdHis'));
+        // Use fixture user demo@synaplan.com (PRO level)
+        $this->user = $this->em->getRepository(User::class)->findOneBy(['mail' => 'demo@synaplan.com']);
 
-        $this->em->persist($this->user);
-        $this->em->flush();
+        if (!$this->user) {
+            $this->markTestSkipped('Test user demo@synaplan.com not found. Run fixtures first.');
+        }
 
         // Configure test user to use 'test' AI provider
         $modelConfigService = $this->client->getContainer()->get(\App\Service\ModelConfigService::class);
@@ -51,7 +47,7 @@ class MessageControllerTest extends WebTestCase
 
     protected function tearDown(): void
     {
-        // Cleanup: Remove test data
+        // Cleanup: Remove test data (but keep fixture user)
         if ($this->user) {
             // Get a fresh entity manager if the current one is closed
             if (!$this->em || !$this->em->isOpen()) {
@@ -85,7 +81,7 @@ class MessageControllerTest extends WebTestCase
                 }
             }
 
-            // Remove Config entries (model preferences)
+            // Remove Config entries (model preferences) - keep fixture configs
             $configIds = array_map(
                 fn ($c) => $c->getId(),
                 $this->em->getRepository(\App\Entity\Config::class)->findBy(['ownerId' => $userId])
@@ -99,12 +95,7 @@ class MessageControllerTest extends WebTestCase
 
             $this->em->flush();
 
-            // Now safe to remove test user (find again if detached)
-            $user = $this->em->find(User::class, $userId);
-            if ($user) {
-                $this->em->remove($user);
-            }
-            $this->em->flush();
+            // Do NOT remove fixture user - it will be reused across tests
         }
 
         // Ensure kernel is shutdown for next test
