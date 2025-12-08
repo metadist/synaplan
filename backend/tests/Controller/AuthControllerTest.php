@@ -179,7 +179,7 @@ class AuthControllerTest extends WebTestCase
         // Verify auth cookies are set
         $response = $this->client->getResponse();
         $cookies = $response->headers->getCookies();
-        $cookieNames = array_map(fn($cookie) => $cookie->getName(), $cookies);
+        $cookieNames = array_map(fn ($cookie) => $cookie->getName(), $cookies);
         $this->assertContains('access_token', $cookieNames);
         $this->assertContains('refresh_token', $cookieNames);
     }

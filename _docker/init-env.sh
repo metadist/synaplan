@@ -18,14 +18,6 @@ DATABASE_WRITE_URL=mysql://synaplan_user:synaplan_password@db:3306/synaplan?serv
 DATABASE_READ_URL=mysql://synaplan_user:synaplan_password@db:3306/synaplan?serverVersion=11.8&charset=utf8mb4
 ###< doctrine/doctrine-bundle ###
 
-###> symfony/messenger ###
-MESSENGER_TRANSPORT_DSN=redis://redis:6379/messages
-###< symfony/messenger ###
-
-###> redis ###
-REDIS_URL=redis://redis:6379
-###< redis ###
-
 ###> AI Providers ###
 OLLAMA_BASE_URL=http://ollama:11434
 TIKA_BASE_URL=http://tika:9998
@@ -38,12 +30,6 @@ OPENAI_API_KEY=
 GROQ_API_KEY=
 GOOGLE_GEMINI_API_KEY=
 ###< External AI API Keys ###
-
-###> lexik/jwt-authentication-bundle ###
-JWT_SECRET_KEY=%kernel.project_dir%/config/jwt/private.pem
-JWT_PUBLIC_KEY=%kernel.project_dir%/config/jwt/public.pem
-JWT_PASSPHRASE=change_me_in_production
-###< lexik/jwt-authentication-bundle ###
 EOF
     echo "✅ backend/.env.docker created"
 else

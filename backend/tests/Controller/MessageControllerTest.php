@@ -63,7 +63,7 @@ class MessageControllerTest extends WebTestCase
 
             // Collect IDs first, then remove by re-fetching
             $messageIds = array_map(
-                fn($m) => $m->getId(),
+                fn ($m) => $m->getId(),
                 $this->em->getRepository(Message::class)->findBy(['userId' => $userId])
             );
             foreach ($messageIds as $id) {
@@ -75,7 +75,7 @@ class MessageControllerTest extends WebTestCase
 
             // Remove UseLog entries (rate limit tracking)
             $useLogIds = array_map(
-                fn($u) => $u->getId(),
+                fn ($u) => $u->getId(),
                 $this->em->getRepository(\App\Entity\UseLog::class)->findBy(['userId' => $userId])
             );
             foreach ($useLogIds as $id) {
@@ -87,7 +87,7 @@ class MessageControllerTest extends WebTestCase
 
             // Remove Config entries (model preferences)
             $configIds = array_map(
-                fn($c) => $c->getId(),
+                fn ($c) => $c->getId(),
                 $this->em->getRepository(\App\Entity\Config::class)->findBy(['ownerId' => $userId])
             );
             foreach ($configIds as $id) {

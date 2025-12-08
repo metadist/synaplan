@@ -86,13 +86,3 @@ cache-clear: ## Clear Symfony cache
 cache-clear-test: ## Clear test cache
 	docker compose -f ../docker-compose.test.yml exec -T app_test php bin/console cache:clear --env=test
 
-## JWT Keys
-jwt-generate: ## Generate JWT keys (passphrase from .env JWT_PASSPHRASE)
-	@mkdir -p config/jwt
-	@JWT_PASS=$$(grep JWT_PASSPHRASE .env | cut -d '=' -f2); \
-	openssl genrsa -aes256 -passout pass:$$JWT_PASS -out config/jwt/private.pem 4096 && \
-	openssl rsa -in config/jwt/private.pem -passin pass:$$JWT_PASS -pubout -out config/jwt/public.pem && \
-	chmod 600 config/jwt/private.pem && \
-	chmod 644 config/jwt/public.pem && \
-	echo "✅ JWT keys generated with passphrase from .env"
-
