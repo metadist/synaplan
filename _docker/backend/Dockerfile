@@ -4,7 +4,7 @@ FROM dunglas/frankenphp:php8.3-bookworm
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
-    git curl unzip \
+    git curl unzip jq \
     libpng-dev libonig-dev libxml2-dev libzip-dev \
     libfreetype6-dev libjpeg62-turbo-dev libwebp-dev \
     libsodium-dev libffi-dev \
@@ -50,8 +50,16 @@ COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 # Copy application
 COPY backend/ .
 
-# Install dependencies including dev dependencies for first build
-RUN composer install --prefer-dist --no-interaction --optimize-autoloader --no-scripts --ignore-platform-req=ext-redis
+# Install dependencies with production optimizations
+# Flags explained:
+# --no-dev: Skip dev dependencies (phpunit, fixtures, etc.) for smaller image
+# --no-scripts: Skip post-install scripts (cache:clear requires runtime env vars like APP_URL)
+# --optimize-autoloader: Generate optimized PSR-4 class maps
+# --classmap-authoritative: Never scan filesystem for classes (all classes are in composer.json)
+#   This is safe for Symfony apps where all classes are autoloaded via composer
+#   Provides significant performance improvement by eliminating file_exists() calls
+# Cache is cleared on container startup anyway via docker-entrypoint.sh
+RUN composer install --prefer-dist --no-interaction --no-dev --no-scripts --optimize-autoloader --classmap-authoritative --ignore-platform-req=ext-redis
 
 # Set proper permissions for www-data (uid:gid = 33:33)
 RUN mkdir -p /var/www/backend/var/cache /var/www/backend/var/log /var/www/backend/var/uploads /var/www/backend/var/whisper /var/www/backend/public/up && \
