@@ -4,11 +4,12 @@ namespace App\Controller;
 
 use App\Entity\User;
 use App\Repository\UserRepository;
+use App\Service\TokenService;
 use Doctrine\ORM\EntityManagerInterface;
-use Lexik\Bundle\JWTAuthenticationBundle\Services\JWTTokenManagerInterface;
 use OpenApi\Attributes as OA;
 use Psr\Log\LoggerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+use Symfony\Component\HttpFoundation\RedirectResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Annotation\Route;
@@ -25,7 +26,7 @@ class GoogleAuthController extends AbstractController
         private HttpClientInterface $httpClient,
         private UserRepository $userRepository,
         private EntityManagerInterface $em,
-        private JWTTokenManagerInterface $jwtManager,
+        private TokenService $tokenService,
         private LoggerInterface $logger,
         private string $googleClientId,
         private string $googleClientSecret,
@@ -58,8 +59,8 @@ class GoogleAuthController extends AbstractController
             'response_type' => 'code',
             'scope' => 'openid email profile',
             'state' => $state,
-            'access_type' => 'offline', // Request refresh token
-            'prompt' => 'consent', // Force consent to get refresh token
+            'access_type' => 'offline',
+            'prompt' => 'consent',
         ];
 
         $authUrl = self::GOOGLE_AUTH_URL.'?'.http_build_query($params);
@@ -80,7 +81,7 @@ class GoogleAuthController extends AbstractController
     )]
     #[OA\Response(
         response: 302,
-        description: 'Redirects to frontend with JWT token or error'
+        description: 'Redirects to frontend with auth cookies set'
     )]
     public function callback(Request $request): Response
     {
@@ -95,20 +96,24 @@ class GoogleAuthController extends AbstractController
                 'stored_state' => $storedState,
             ]);
 
-            return $this->json([
-                'success' => false,
+            $errorUrl = $this->frontendUrl.'/auth/callback?'.http_build_query([
                 'error' => 'Invalid state parameter',
-            ], Response::HTTP_BAD_REQUEST);
+                'provider' => 'google',
+            ]);
+
+            return $this->redirect($errorUrl);
         }
 
         // Clear stored state
         $request->getSession()->remove('google_oauth_state');
 
         if (!$code) {
-            return $this->json([
-                'success' => false,
+            $errorUrl = $this->frontendUrl.'/auth/callback?'.http_build_query([
                 'error' => 'Authorization code not received',
-            ], Response::HTTP_BAD_REQUEST);
+                'provider' => 'google',
+            ]);
+
+            return $this->redirect($errorUrl);
         }
 
         try {
@@ -124,18 +129,17 @@ class GoogleAuthController extends AbstractController
             ]);
 
             $tokenData = $tokenResponse->toArray();
-            $accessToken = $tokenData['access_token'] ?? null;
-            $refreshToken = $tokenData['refresh_token'] ?? null;
-            $expiresIn = $tokenData['expires_in'] ?? 3600;
+            $googleAccessToken = $tokenData['access_token'] ?? null;
+            $googleRefreshToken = $tokenData['refresh_token'] ?? null;
 
-            if (!$accessToken) {
+            if (!$googleAccessToken) {
                 throw new \Exception('Access token not received from Google');
             }
 
             // Fetch user info from Google
             $userInfoResponse = $this->httpClient->request('GET', self::GOOGLE_USERINFO_URL, [
                 'headers' => [
-                    'Authorization' => 'Bearer '.$accessToken,
+                    'Authorization' => 'Bearer '.$googleAccessToken,
                 ],
             ]);
 
@@ -147,55 +151,35 @@ class GoogleAuthController extends AbstractController
             ]);
 
             // Find or create user
-            try {
-                $user = $this->findOrCreateUser($userInfo, $refreshToken);
-                $this->logger->info('User found/created successfully', [
-                    'user_id' => $user->getId(),
-                    'email' => $user->getMail(),
-                ]);
-            } catch (\Exception $e) {
-                $this->logger->error('Failed to find/create user', [
-                    'error' => $e->getMessage(),
-                    'file' => $e->getFile(),
-                    'line' => $e->getLine(),
-                ]);
-                throw $e;
-            }
+            $user = $this->findOrCreateUser($userInfo, $googleRefreshToken);
 
-            // Generate JWT token for our app
-            try {
-                $jwtToken = $this->jwtManager->create($user);
-                $this->logger->info('JWT token created successfully');
-            } catch (\Exception $e) {
-                $this->logger->error('Failed to create JWT token', [
-                    'error' => $e->getMessage(),
-                    'user_id' => $user->getId(),
-                ]);
-                throw $e;
-            }
+            // Generate our tokens
+            $accessToken = $this->tokenService->generateAccessToken($user);
+            $refreshToken = $this->tokenService->generateRefreshToken($user, $request->getClientIp());
 
-            // Redirect to frontend with token
+            // Create redirect response with cookies
             $callbackUrl = $this->frontendUrl.'/auth/callback?'.http_build_query([
-                'token' => $jwtToken,
+                'success' => 'true',
                 'provider' => 'google',
-                'isAdmin' => $user->isAdmin(),
             ]);
 
-            $this->logger->info('Google OAuth successful, redirecting to frontend', [
+            $response = new RedirectResponse($callbackUrl);
+
+            // Add auth cookies
+            $this->tokenService->addAuthCookies($response, $accessToken, $refreshToken);
+
+            $this->logger->info('Google OAuth successful, redirecting with cookies', [
                 'user_id' => $user->getId(),
                 'email' => $user->getMail(),
             ]);
 
-            return $this->redirect($callbackUrl);
+            return $response;
         } catch (\Exception $e) {
-            $this->logger->error('Google OAuth callback error [FINAL]', [
+            $this->logger->error('Google OAuth callback error', [
                 'error' => $e->getMessage(),
-                'file' => $e->getFile(),
-                'line' => $e->getLine(),
                 'trace' => substr($e->getTraceAsString(), 0, 1000),
             ]);
 
-            // Redirect to frontend with error
             $errorUrl = $this->frontendUrl.'/auth/callback?'.http_build_query([
                 'error' => 'Failed to authenticate with Google',
                 'provider' => 'google',
@@ -231,13 +215,13 @@ class GoogleAuthController extends AbstractController
             // Create new user
             $user = new User();
             $user->setMail($email);
-            $user->setType('WEB'); // Always WEB for web-based logins
-            $user->setProviderId('google'); // Provider tracked here
+            $user->setType('WEB');
+            $user->setProviderId('google');
             $user->setUserLevel('NEW');
-            $user->setEmailVerified(true); // OAuth users are pre-verified
+            $user->setEmailVerified(true);
             $user->setCreated(date('Y-m-d H:i:s'));
-            $user->setUserDetails([]); // Initialize with empty array
-            $user->setPaymentDetails([]); // Initialize with empty array
+            $user->setUserDetails([]);
+            $user->setPaymentDetails([]);
 
             $this->logger->info('Creating new user from Google OAuth', [
                 'email' => $email,
@@ -253,7 +237,6 @@ class GoogleAuthController extends AbstractController
         $userDetails['google_refresh_token'] = $refreshToken;
         $userDetails['google_last_login'] = (new \DateTime())->format('Y-m-d H:i:s');
 
-        // Update name if provided (store in userDetails)
         if (isset($userInfo['given_name'])) {
             $userDetails['first_name'] = $userInfo['given_name'];
         }
@@ -266,7 +249,6 @@ class GoogleAuthController extends AbstractController
 
         $user->setUserDetails($userDetails);
 
-        // Verify email if user logged in via Google (OAuth emails are trusted)
         if (!$user->isEmailVerified() && ($userInfo['verified_email'] ?? false)) {
             $user->setEmailVerified(true);
         }

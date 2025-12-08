@@ -51,8 +51,12 @@
               :search-results="message.searchResults"
               :ai-models="message.aiModels"
               :web-search="message.webSearch"
+              :status="message.status"
+              :error-type="message.errorType"
+              :error-data="message.errorData"
               @regenerate="handleRegenerate(message, $event)"
               @again="handleAgain"
+              @retry="handleRetryMessage(message, $event)"
             />
           </template>
         </div>
@@ -767,7 +771,24 @@ const streamAIResponse = async (userMessage: string, options?: { includeReasonin
 
             // Handle rate limit errors with modal
             if (errorMsg.toLowerCase().includes('rate limit')) {
+              // Remove the empty assistant message
               historyStore.removeMessage(messageId)
+              
+              // Find and mark the previous user message as rate_limited (don't delete it!)
+              const userMessages = historyStore.messages.filter(m => m.role === 'user')
+              const lastUserMessage = userMessages[userMessages.length - 1]
+              if (lastUserMessage) {
+                historyStore.setMessageStatus(lastUserMessage.id, 'rate_limited', 'rate_limit', {
+                  limitType: data.limit_type || 'lifetime',
+                  actionType: data.action_type || 'MESSAGES',
+                  used: data.used || 0,
+                  limit: data.limit || 0,
+                  remaining: data.remaining || 0,
+                  resetAt: data.reset_at || null,
+                  userLevel: data.user_level || authStore.user?.level || 'NEW'
+                })
+              }
+              
               checkAndShowLimit({
                 allowed: false,
                 limitType: data.limit_type || 'lifetime',
@@ -779,6 +800,11 @@ const streamAIResponse = async (userMessage: string, options?: { includeReasonin
                 userLevel: data.user_level || authStore.user?.level || 'NEW',
                 phoneVerified: data.phone_verified || false
               })
+              
+              // Clean up streaming resources
+              streamingAbortController = null
+              stopStreamingFn = null
+              currentTrackId = undefined
               return
             }
             
@@ -1101,5 +1127,16 @@ const handleRegenerate = async (message: Message, modelOption: ModelOption) => {
       await handleSendMessage(content, { modelId: modelOption.id })
     }
   }
+}
+
+// Handle retry for rate-limited messages
+const handleRetryMessage = async (message: Message, content: string) => {
+  console.log('🔄 Retrying message:', content.substring(0, 50) + '...')
+  
+  // Clear the error status on the message
+  historyStore.clearMessageError(message.id)
+  
+  // Stream the AI response (don't add new user message, it already exists)
+  await streamAIResponse(content)
 }
 </script>

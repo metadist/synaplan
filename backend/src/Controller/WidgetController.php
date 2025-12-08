@@ -415,4 +415,88 @@ class WidgetController extends AbstractController
             'stats' => $stats,
         ]);
     }
+
+    /**
+     * Upload widget icon.
+     */
+    #[Route('/{widgetId}/upload-icon', name: 'upload_icon', methods: ['POST'])]
+    #[OA\Post(
+        path: '/api/v1/widgets/{widgetId}/upload-icon',
+        summary: 'Upload widget button icon',
+        security: [['Bearer' => []]],
+        tags: ['Widgets']
+    )]
+    public function uploadIcon(string $widgetId, Request $request, #[CurrentUser] ?User $user): JsonResponse
+    {
+        if (!$user) {
+            return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
+        }
+
+        $widget = $this->widgetRepository->findByWidgetId($widgetId);
+
+        if (!$widget) {
+            return $this->json(['error' => 'Widget not found'], Response::HTTP_NOT_FOUND);
+        }
+
+        if ($widget->getOwnerId() !== $user->getId()) {
+            return $this->json(['error' => 'Access denied'], Response::HTTP_FORBIDDEN);
+        }
+
+        $uploadedFile = $request->files->get('icon');
+
+        if (!$uploadedFile) {
+            return $this->json(['error' => 'No file uploaded'], Response::HTTP_BAD_REQUEST);
+        }
+
+        // Validate file type
+        $allowedMimes = ['image/svg+xml', 'image/png', 'image/jpeg', 'image/gif', 'image/webp'];
+        if (!in_array($uploadedFile->getMimeType(), $allowedMimes)) {
+            return $this->json(['error' => 'Invalid file type. Only SVG, PNG, JPG, GIF, and WebP are allowed.'], Response::HTTP_BAD_REQUEST);
+        }
+
+        // Validate file size (max 500KB)
+        if ($uploadedFile->getSize() > 500 * 1024) {
+            return $this->json(['error' => 'File too large. Maximum size is 500KB.'], Response::HTTP_BAD_REQUEST);
+        }
+
+        try {
+            // Create upload directory if it doesn't exist
+            $uploadDir = $this->getParameter('kernel.project_dir').'/public/uploads/widget-icons';
+            if (!is_dir($uploadDir)) {
+                mkdir($uploadDir, 0755, true);
+            }
+
+            // Generate unique filename
+            $extension = $uploadedFile->guessExtension() ?? 'png';
+            $filename = uniqid('icon_').'_'.time().'.'.$extension;
+
+            // Move file to upload directory
+            $uploadedFile->move($uploadDir, $filename);
+
+            // Generate public URL
+            $baseUrl = $request->getSchemeAndHttpHost();
+            $iconUrl = $baseUrl.'/uploads/widget-icons/'.$filename;
+
+            $this->logger->info('Widget icon uploaded', [
+                'widget_id' => $widgetId,
+                'filename' => $filename,
+                'url' => $iconUrl,
+            ]);
+
+            return $this->json([
+                'success' => true,
+                'iconUrl' => $iconUrl,
+                'filename' => $filename,
+            ]);
+        } catch (\Exception $e) {
+            $this->logger->error('Failed to upload widget icon', [
+                'widget_id' => $widgetId,
+                'error' => $e->getMessage(),
+            ]);
+
+            return $this->json([
+                'error' => 'Failed to upload icon: '.$e->getMessage(),
+            ], Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
+    }
 }

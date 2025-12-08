@@ -487,6 +487,42 @@
           </div>
         </div>
       </div>
+      
+      <!-- Rate Limit Error Banner for User Messages -->
+      <div 
+        v-if="role === 'user' && status === 'rate_limited'"
+        class="mt-2 surface-card border border-amber-500/30 rounded-xl p-4 fade-in"
+      >
+        <div class="flex items-start gap-3">
+          <div class="w-10 h-10 rounded-full bg-amber-500/10 flex items-center justify-center flex-shrink-0">
+            <Icon icon="mdi:clock-alert-outline" class="w-5 h-5 text-amber-500" />
+          </div>
+          <div class="flex-1 min-w-0">
+            <div class="font-semibold txt-primary text-sm mb-1">
+              {{ $t('limitReached.messageBlocked') }}
+            </div>
+            <div class="text-xs txt-secondary mb-3">
+              {{ $t('limitReached.messageBlockedDesc', { action: errorData?.actionType || 'MESSAGES' }) }}
+            </div>
+            <div class="flex flex-wrap gap-2">
+              <button
+                @click="$router.push('/subscription')"
+                class="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold bg-gradient-to-r from-amber-500 to-orange-500 text-white hover:shadow-lg transition-all"
+              >
+                <Icon icon="mdi:crown" class="w-4 h-4" />
+                {{ $t('limitReached.upgradeNow') }}
+              </button>
+              <button
+                @click="handleRetry"
+                class="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium surface-chip txt-primary hover:bg-black/5 dark:hover:bg-white/10 transition-colors"
+              >
+                <Icon icon="mdi:refresh" class="w-4 h-4" />
+                {{ $t('limitReached.retryLater') }}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
       </div>
     </div>
 
@@ -551,6 +587,18 @@ interface Props {
     query?: string
     resultsCount?: number
   } | null // Web search metadata
+  // Status for failed/pending messages
+  status?: 'sent' | 'failed' | 'rate_limited'
+  errorType?: 'rate_limit' | 'connection' | 'unknown'
+  errorData?: {
+    limitType?: string
+    actionType?: string
+    used?: number
+    limit?: number
+    remaining?: number
+    resetAt?: number | null
+    userLevel?: string
+  }
 }
 
 const props = defineProps<Props>()
@@ -702,6 +750,7 @@ const formattedTime = computed(() => {
 const emit = defineEmits<{
   regenerate: [model: ModelOption]
   again: [backendMessageId: number, modelId?: number]
+  retry: [messageContent: string]
 }>()
 
 const router = useRouter()
@@ -742,6 +791,19 @@ const showModelDetails = (modelType?: 'chat' | 'sorting') => {
     router.push({ path: '/config/ai-models', query: { highlight: 'SORT' } })
   } else {
     router.push('/config/ai-models')
+  }
+}
+
+// Handle retry for rate-limited messages
+const handleRetry = () => {
+  // Extract text content from message
+  const textContent = props.parts
+    .filter(p => p.type === 'text')
+    .map(p => p.content || '')
+    .join('\n')
+  
+  if (textContent) {
+    emit('retry', textContent)
   }
 }
 
@@ -860,3 +922,20 @@ onUnmounted(() => {
 })
 
 </script>
+
+<style scoped>
+.fade-in {
+  animation: fadeIn 0.3s ease-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+</style>

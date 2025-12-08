@@ -23,6 +23,8 @@ export interface WidgetConfig {
   position?: 'bottom-left' | 'bottom-right' | 'top-left' | 'top-right'
   primaryColor?: string
   iconColor?: string
+  buttonIcon?: string
+  buttonIconUrl?: string
   defaultTheme?: 'light' | 'dark'
   autoOpen?: boolean
   autoMessage?: string
@@ -401,5 +403,35 @@ export async function uploadWidgetFile(
     body: formData,
     skipAuth: true
   })
+}
+
+/**
+ * Upload widget button icon
+ */
+export async function uploadWidgetIcon(
+  widgetId: string,
+  file: File
+): Promise<{
+  success: boolean
+  iconUrl: string
+  filename: string
+}> {
+  const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000'
+  
+  const formData = new FormData()
+  formData.append('icon', file)
+
+  const response = await fetch(`${apiUrl}/api/v1/widgets/${widgetId}/upload-icon`, {
+    method: 'POST',
+    credentials: 'include', // Use cookies for auth
+    body: formData
+  })
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ error: 'Upload failed' }))
+    throw new Error(error.error || `HTTP ${response.status}`)
+  }
+
+  return await response.json()
 }
 

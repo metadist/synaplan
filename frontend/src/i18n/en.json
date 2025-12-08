@@ -211,7 +211,10 @@
     "dragDropDesc": "Upload a document to extract and summarize its content",
     "supportedFormats": "Supported formats",
     "maxSize": "Max size",
-    "orPasteText": "or paste text directly"
+    "orPasteText": "or paste text directly",
+    "uploadingFile": "Uploading and extracting text...",
+    "uploadingFileDesc": "Please wait while we process your file",
+    "selectFromExisting": "Select from previously uploaded files"
   },
   "mail": {
     "title": "Mail Handler Configuration",
@@ -365,7 +368,8 @@
     "next": "Next",
     "previous": "Previous",
     "delete": "Delete",
-    "download": "Download"
+    "download": "Download",
+    "removeFile": "Remove file"
   },
   "fileSelection": {
     "title": "Select or Upload Files",
@@ -633,7 +637,10 @@
     },
     "upgradeNow": "Upgrade Now",
     "verifyPhone": "Verify Phone Number",
-    "footerNote": "Questions? Contact our support team."
+    "footerNote": "Questions? Contact our support team.",
+    "messageBlocked": "Message could not be sent",
+    "messageBlockedDesc": "You've reached your {action} limit. Upgrade your plan or wait for the limit to reset.",
+    "retryLater": "Retry"
   },
   "subscription": {
     "title": "Subscription Plans",
@@ -647,6 +654,9 @@
     "cancelPlan": "Cancel Subscription",
     "recommended": "Recommended",
     "selectPlan": "Select Plan",
+    "upgrade": "Upgrade",
+    "includedInCurrent": "Included in your plan",
+    "highestPlan": "You have the highest plan available!",
     "processing": "Processing...",
     "perMonth": "month",
     "perYear": "year",
@@ -662,6 +672,10 @@
       "statusActive": "Active",
       "statusCanceled": "Canceled",
       "statusPastDue": "Past Due",
+      "statusIncomplete": "Incomplete",
+      "statusTrialing": "Trialing",
+      "statusUnpaid": "Unpaid",
+      "statusPaused": "Paused",
       "nextBilling": "Next Billing Date",
       "cancelDate": "Cancels on",
       "billingPortal": "Billing Portal",
@@ -695,6 +709,24 @@
       "whiteLabel": "White-label Widgets",
       "dedicatedSupport": "Dedicated Support",
       "slaGuarantee": "SLA Guarantee"
+    },
+    "success": {
+      "title": "Payment Successful!",
+      "description": "Your subscription has been activated. Thank you for upgrading!",
+      "newPlan": "Your new plan",
+      "startUsing": "Start Using Your Plan",
+      "activating": "Activating Your Plan...",
+      "activatingDesc": "Please wait while we activate your subscription.",
+      "almostDone": "Almost Done!",
+      "processing": "Your payment was successful, but we're still processing your subscription.",
+      "retry": "Retry Activation",
+      "continueAnyway": "Continue Anyway"
+    },
+    "cancel": {
+      "title": "Payment Cancelled",
+      "description": "Your payment was cancelled. No charges were made.",
+      "tryAgain": "Try Again",
+      "backToPlans": "Back to Plans"
     }
   },
   "common": {
@@ -944,7 +976,25 @@
     "deleteSuccess": "Widget deleted successfully",
     "deleteTitle": "Delete Widget?",
     "deleteDescription": "Are you sure you want to delete \"{name}\"? This action cannot be undone.",
-    "deleteConfirm": "Delete"
+    "deleteConfirm": "Delete",
+    "buttonIcon": "Button Icon",
+    "customIcon": "Custom Icon Upload",
+    "uploadIcon": "Upload Custom Icon",
+    "changeIcon": "Change Icon",
+    "customIconActive": "Custom icon active",
+    "customIconHint": "Supported formats: SVG, PNG, JPG, GIF, WebP (max 500KB)",
+    "iconTooLarge": "Icon file is too large. Maximum size is 500KB.",
+    "invalidIconType": "Invalid file type. Only SVG, PNG, JPG, GIF, and WebP are allowed.",
+    "iconUploadSuccess": "Icon uploaded successfully",
+    "iconUploadFailed": "Icon upload failed",
+    "icons": {
+      "chat": "Chat",
+      "headset": "Headset",
+      "help": "Help",
+      "robot": "Robot",
+      "message": "Message",
+      "support": "Support"
+    }
   },
   "profile": {
     "title": "Profile Settings",

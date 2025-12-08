@@ -53,8 +53,8 @@
             <label class="block text-sm font-medium txt-primary mb-2">
               {{ $t('files.selectFiles') }}
             </label>
-            <div class="flex items-center gap-3">
-              <label class="px-4 py-2 rounded-lg border border-light-border/30 dark:border-dark-border/20 txt-primary hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer" data-testid="btn-select-files">
+            <div class="mb-3">
+              <label class="px-4 py-2 rounded-lg border border-light-border/30 dark:border-dark-border/20 txt-primary hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer inline-flex items-center gap-2" data-testid="btn-select-files">
                 <input
                   type="file"
                   multiple
@@ -63,12 +63,33 @@
                   @change="handleFileSelect"
                   data-testid="input-files"
                 />
+                <CloudArrowUpIcon class="w-5 h-5" />
                 {{ $t('files.selectFilesButton') }}
               </label>
-              <span class="txt-secondary text-sm">
-                {{ selectedFiles.length > 0 ? `${selectedFiles.length} ${$t('files.files')}` : $t('files.noFileSelected') }}
-              </span>
             </div>
+
+            <!-- Selected Files List -->
+            <div v-if="selectedFiles.length > 0" class="space-y-2 mb-3">
+              <div
+                v-for="(file, index) in selectedFiles"
+                :key="index"
+                class="flex items-center gap-3 p-3 rounded-lg border border-light-border/30 dark:border-dark-border/20 bg-black/[0.02] dark:bg-white/[0.02]"
+              >
+                <Icon :icon="getFileIcon(file.name)" class="w-5 h-5 txt-secondary" />
+                <div class="flex-1 min-w-0">
+                  <p class="text-sm txt-primary truncate">{{ file.name }}</p>
+                  <p class="text-xs txt-secondary">{{ formatFileSize(file.size) }}</p>
+                </div>
+                <button
+                  @click="removeSelectedFile(index)"
+                  class="p-1.5 rounded-lg hover:bg-red-500/10 transition-colors"
+                  :aria-label="$t('files.removeFile')"
+                >
+                  <XMarkIcon class="w-4 h-4 text-red-500" />
+                </button>
+              </div>
+            </div>
+
             <p class="text-xs txt-secondary mt-2">
               {{ $t('files.supportedFormats') }}
             </p>
@@ -400,7 +421,8 @@ import { Icon } from '@iconify/vue'
 import {
   CloudArrowUpIcon,
   TrashIcon,
-  ArrowDownTrayIcon
+  ArrowDownTrayIcon,
+  XMarkIcon
 } from '@heroicons/vue/24/outline'
 import filesService, { type FileItem } from '@/services/filesService'
 import { useNotification } from '@/composables/useNotification'
@@ -460,6 +482,32 @@ const handleFileSelect = (event: Event) => {
   if (target.files) {
     selectedFiles.value = Array.from(target.files)
   }
+}
+
+const removeSelectedFile = (index: number) => {
+  selectedFiles.value.splice(index, 1)
+}
+
+const getFileIcon = (filename: string): string => {
+  const ext = filename.split('.').pop()?.toLowerCase() || ''
+  
+  const iconMap: Record<string, string> = {
+    'pdf': 'heroicons:document-text',
+    'docx': 'heroicons:document-text',
+    'doc': 'heroicons:document-text',
+    'txt': 'heroicons:document-text',
+    'jpg': 'heroicons:photo',
+    'jpeg': 'heroicons:photo',
+    'png': 'heroicons:photo',
+    'gif': 'heroicons:photo',
+    'webp': 'heroicons:photo',
+    'mp3': 'heroicons:musical-note',
+    'mp4': 'heroicons:film',
+    'xlsx': 'heroicons:table-cells',
+    'csv': 'heroicons:table-cells'
+  }
+  
+  return iconMap[ext] || 'heroicons:document'
 }
 
 const uploadFiles = async () => {

@@ -53,6 +53,12 @@ services:
             - { name: 'app.ai.chat' }
             - { name: 'app.ai.embedding' }
 
+    App\AI\Provider\TritonProvider:
+        arguments:
+            $serverUrl: '%env(string:default::TRITON_SERVER_URL)%'
+        tags:
+            - { name: 'app.ai.chat' }
+
     App\AI\Provider\GroqProvider:
         arguments:
             $apiKey: '%env(GROQ_API_KEY)%'
@@ -181,6 +187,14 @@ services:
             $appUrl: '%env(APP_URL)%'
             $frontendUrl: '%env(FRONTEND_URL)%'
     
+    # OIDC Token Service for Keycloak integration
+    App\Service\OidcTokenService:
+        arguments:
+            $appEnv: '%env(APP_ENV)%'
+            $oidcClientId: '%env(OIDC_CLIENT_ID)%'
+            $oidcClientSecret: '%env(OIDC_CLIENT_SECRET)%'
+            $oidcDiscoveryUrl: '%env(OIDC_DISCOVERY_URL)%'
+
     # Keycloak OIDC OAuth Controller
     App\Controller\KeycloakAuthController:
         arguments:
@@ -190,7 +204,7 @@ services:
             $appUrl: '%env(APP_URL)%'
             $frontendUrl: '%env(FRONTEND_URL)%'
     
-    # Stripe Payment Controllers
+    # Stripe Payment Controllers (with rate limiting via cache)
     App\Controller\SubscriptionController:
         arguments:
             $stripeSecretKey: '%env(STRIPE_SECRET_KEY)%'
@@ -198,10 +212,16 @@ services:
             $stripePriceTeam: '%env(STRIPE_PRICE_TEAM)%'
             $stripePriceBusiness: '%env(STRIPE_PRICE_BUSINESS)%'
             $frontendUrl: '%env(FRONTEND_URL)%'
+            $cache: '@cache.app'
     
     App\Controller\StripeWebhookController:
         arguments:
             $stripeWebhookSecret: '%env(STRIPE_WEBHOOK_SECRET)%'
+            $stripeSecretKey: '%env(STRIPE_SECRET_KEY)%'
+            $stripePricePro: '%env(STRIPE_PRICE_PRO)%'
+            $stripePriceTeam: '%env(STRIPE_PRICE_TEAM)%'
+            $stripePriceBusiness: '%env(STRIPE_PRICE_BUSINESS)%'
+            $cache: '@cache.app'
     
     # Auth Providers Controller (returns enabled providers)
     App\Controller\AuthProvidersController:
@@ -211,15 +231,10 @@ services:
             $oidcClientId: '%env(string:default::OIDC_CLIENT_ID)%'
             $oidcDiscoveryUrl: '%env(string:default::OIDC_DISCOVERY_URL)%'
 
-    App\Controller\OidcRefreshController:
+    # Token Service (Access/Refresh Tokens)
+    App\Service\TokenService:
         arguments:
-            $oidcClientId: '%env(string:default::OIDC_CLIENT_ID)%'
-            $oidcClientSecret: '%env(string:default::OIDC_CLIENT_SECRET)%'
-            $oidcDiscoveryUrl: '%env(string:default::OIDC_DISCOVERY_URL)%'
-            $googleClientId: '%env(string:default::GOOGLE_CLIENT_ID)%'
-            $googleClientSecret: '%env(string:default::GOOGLE_CLIENT_SECRET)%'
-            $githubClientId: '%env(string:default::GITHUB_CLIENT_ID)%'
-            $githubClientSecret: '%env(string:default::GITHUB_CLIENT_SECRET)%'
+            $appEnv: '%kernel.environment%'
 
     # reCAPTCHA Service
     App\Service\RecaptchaService:

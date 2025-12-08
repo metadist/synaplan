@@ -1,4 +1,3 @@
-
 ###> symfony/framework-bundle ###
 /.env.local
 /.env.local.php
@@ -40,10 +39,5 @@ coverage/
 # Temp files
 env.example.txt
 README_SETUP.md
-
-###> lexik/jwt-authentication-bundle ###
-/config/jwt/*.pem
-###< lexik/jwt-authentication-bundle ###
-
 public/uploads/*
 public/widget.js

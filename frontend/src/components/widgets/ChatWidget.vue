@@ -3,31 +3,46 @@
     :class="[isPreview ? 'absolute' : 'fixed', 'z-[9999]', positionClass]"
     data-testid="comp-chat-widget"
   >
-    <!-- Chat Button -->
+    <!-- Chat Button - absolute positioned to avoid layout shift -->
     <Transition
       enter-active-class="transition-all duration-300 ease-out"
       enter-from-class="scale-0 opacity-0"
       enter-to-class="scale-100 opacity-100"
-      leave-active-class="transition-all duration-200 ease-in"
+      leave-active-class="transition-all duration-150 ease-in"
       leave-from-class="scale-100 opacity-100"
       leave-to-class="scale-0 opacity-0"
     >
-      <button
+      <div
         v-if="!isOpen"
-        @click="toggleChat"
-        :style="{ backgroundColor: primaryColor }"
-        class="w-16 h-16 rounded-full shadow-2xl hover:scale-110 transition-transform flex items-center justify-center group"
-        aria-label="Open chat"
-        data-testid="btn-open"
+        class="absolute bottom-0 right-0"
       >
-        <ChatBubbleLeftRightIcon :style="{ color: iconColor }" class="w-8 h-8" />
-        <span
-          v-if="unreadCount > 0"
-          class="absolute -top-1 -right-1 w-6 h-6 bg-red-500 text-white text-xs font-bold rounded-full flex items-center justify-center"
+        <button
+          @click="toggleChat"
+          :style="{ backgroundColor: primaryColor }"
+          class="w-16 h-16 rounded-full shadow-2xl hover:scale-110 transition-transform flex items-center justify-center group"
+          aria-label="Open chat"
+          data-testid="btn-open"
         >
-          {{ unreadCount }}
-        </span>
-      </button>
+          <img 
+            v-if="buttonIconUrl" 
+            :src="buttonIconUrl" 
+            alt="Chat" 
+            class="w-9 h-9 object-contain"
+          />
+          <component 
+            v-else
+            :is="getButtonIconComponent" 
+            :style="{ color: iconColor }" 
+            class="w-8 h-8" 
+          />
+          <span
+            v-if="unreadCount > 0"
+            class="absolute -top-1 -right-1 w-6 h-6 bg-red-500 text-white text-xs font-bold rounded-full flex items-center justify-center"
+          >
+            {{ unreadCount }}
+          </span>
+        </button>
+      </div>
     </Transition>
 
     <!-- Chat Window -->
@@ -332,8 +347,11 @@ interface Props {
   widgetId: string
   primaryColor?: string
   iconColor?: string
+  buttonIcon?: string
+  buttonIconUrl?: string
   position?: 'bottom-left' | 'bottom-right' | 'top-left' | 'top-right'
   autoOpen?: boolean
+  openImmediately?: boolean
   autoMessage?: string
   messageLimit?: number
   maxFileSize?: number
@@ -348,6 +366,7 @@ interface Props {
 const props = withDefaults(defineProps<Props>(), {
   primaryColor: '#007bff',
   iconColor: '#ffffff',
+  buttonIcon: 'chat',
   position: 'bottom-right',
   autoOpen: false,
   autoMessage: 'Hello! How can I help you today?',
@@ -372,6 +391,18 @@ interface Message {
 const isOpen = ref(false)
 const widgetTheme = ref<'light' | 'dark'>(props.defaultTheme)
 const inputMessage = ref('')
+
+// Get button icon component based on buttonIcon prop
+const getButtonIconComponent = computed(() => {
+  // If custom icon URL is provided, it will be handled by img tag in template
+  if (props.buttonIconUrl) {
+    return null
+  }
+  
+  // For now, always return ChatBubbleLeftRightIcon
+  // In the full implementation, we would map buttonIcon values to different components
+  return ChatBubbleLeftRightIcon
+})
 const selectedFile = ref<File | null>(null)
 const fileSizeError = ref(false)
 const messages = ref<Message[]>([])
@@ -1128,7 +1159,13 @@ watch(chatId, (newChatId) => {
 })
 
 // Auto-open
-if (props.autoOpen) {
+if (props.openImmediately) {
+  // Open immediately when loaded from loader button
+  nextTick(() => {
+    openChat()
+  })
+} else if (props.autoOpen) {
+  // Regular auto-open with delay
   setTimeout(() => {
     openChat()
   }, 3000)

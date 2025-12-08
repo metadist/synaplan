@@ -145,6 +145,8 @@ class WidgetService
         $position = $config['position'] ?? 'bottom-right';
         $primaryColor = $config['primaryColor'] ?? '#007bff';
         $iconColor = $config['iconColor'] ?? '#ffffff';
+        $buttonIcon = $config['buttonIcon'] ?? 'chat';
+        $buttonIconUrl = $config['buttonIconUrl'] ?? '';
         $theme = $config['defaultTheme'] ?? 'light';
         $autoOpen = $config['autoOpen'] ?? false;
         $autoOpenStr = $autoOpen ? 'true' : 'false';
@@ -155,15 +157,27 @@ class WidgetService
         $fileUploadLimit = (int) ($config['fileUploadLimit'] ?? 3);
         $allowFileUploadStr = $allowFileUpload ? 'true' : 'false';
 
+        // Build icon config
+        $iconConfig = $buttonIconUrl
+            ? "buttonIconUrl: '{$buttonIconUrl}',"
+            : "buttonIcon: '{$buttonIcon}',";
+
         return <<<HTML
-<!-- Synaplan Chat Widget -->
-<script src="{$baseUrl}/widget.js"></script>
+<!-- Synaplan Chat Widget (Optimized) -->
+<!-- 1. Load Vue.js from CDN (cached across sites) -->
+<script src="https://cdn.jsdelivr.net/npm/vue@3/dist/vue.global.prod.js"></script>
+
+<!-- 2. Load Synaplan Widget Loader (only 5.8 KB - loads chat on-demand) -->
+<script src="{$baseUrl}/widget-loader.js"></script>
+
+<!-- 3. Initialize Widget -->
 <script>
   SynaplanWidget.init({
     widgetId: '{$widgetId}',
     position: '{$position}',
     primaryColor: '{$primaryColor}',
     iconColor: '{$iconColor}',
+    {$iconConfig}
     defaultTheme: '{$theme}',
     autoOpen: {$autoOpenStr},
     autoMessage: '{$autoMessage}',
@@ -233,6 +247,8 @@ HTML;
             'position' => 'bottom-right',
             'primaryColor' => '#007bff',
             'iconColor' => '#ffffff',
+            'buttonIcon' => 'chat',
+            'buttonIconUrl' => null,
             'defaultTheme' => 'light',
             'autoOpen' => false,
             'autoMessage' => 'Hello! How can I help you today?',
@@ -262,6 +278,24 @@ HTML;
         }
         if (!preg_match('/^#[0-9A-Fa-f]{6}$/', $config['iconColor'])) {
             $config['iconColor'] = '#ffffff';
+        }
+
+        // Validate button icon
+        $validIcons = ['chat', 'headset', 'help', 'robot', 'message', 'support', 'custom'];
+        if (!isset($config['buttonIcon']) || !in_array($config['buttonIcon'], $validIcons)) {
+            $config['buttonIcon'] = 'chat';
+        }
+
+        // Validate custom icon URL (if provided)
+        if (isset($config['buttonIconUrl']) && is_string($config['buttonIconUrl']) && '' !== $config['buttonIconUrl']) {
+            // Allow data URLs for embedded images or HTTP(S) URLs
+            if (!str_starts_with($config['buttonIconUrl'], 'data:image/')
+                && !str_starts_with($config['buttonIconUrl'], 'http://')
+                && !str_starts_with($config['buttonIconUrl'], 'https://')) {
+                $config['buttonIconUrl'] = null;
+            }
+        } else {
+            $config['buttonIconUrl'] = null;
         }
 
         // Validate theme

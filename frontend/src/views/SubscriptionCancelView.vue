@@ -19,10 +19,10 @@
             View Plans
           </button>
           <button
-            @click="router.push('/chat')"
+            @click="router.push('/')"
             class="btn-secondary px-6 py-3 rounded-lg font-semibold"
           >
-            Back to Chat
+            Back to Home
           </button>
         </div>
       </div>

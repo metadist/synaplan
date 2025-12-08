@@ -158,10 +158,10 @@
        @dragleave.prevent="isDragging = false"
        @drop.prevent="handleDrop"
        :class="[
-         'border-2 border-dashed rounded-lg p-8 transition-colors text-center cursor-pointer mb-4',
-         isDragging ? 'border-[var(--brand)] bg-[var(--brand)]/5' : 'border-light-border/50 dark:border-dark-border/30 hover:border-[var(--brand)]/50'
+         'border-2 border-dashed rounded-lg p-8 transition-colors text-center mb-4',
+         isUploadingFile ? 'border-[var(--brand)] bg-[var(--brand)]/5 cursor-wait' : isDragging ? 'border-[var(--brand)] bg-[var(--brand)]/5 cursor-pointer' : 'border-light-border/50 dark:border-dark-border/30 hover:border-[var(--brand)]/50 cursor-pointer'
        ]"
-       @click="triggerFileInput"
+       @click="!isUploadingFile && triggerFileInput()"
        data-testid="section-upload"
      >
        <input
@@ -171,13 +171,33 @@
          @change="handleFileSelect"
          class="hidden"
          data-testid="input-file"
+         :disabled="isUploadingFile"
        />
-        <CloudArrowUpIcon class="w-12 h-12 mx-auto mb-3 txt-secondary" />
-        <p class="txt-primary font-medium mb-1">{{ $t('summary.dragDropTitle') }}</p>
-        <p class="text-sm txt-secondary mb-3">{{ $t('summary.dragDropDesc') }}</p>
-        <p class="text-xs txt-secondary">
-          {{ $t('summary.supportedFormats') }}: PDF, DOCX, TXT • {{ $t('summary.maxSize') }}: 10MB
-        </p>
+        <div v-if="isUploadingFile" class="flex flex-col items-center">
+          <div class="animate-spin h-12 w-12 border-4 border-[var(--brand)] border-t-transparent rounded-full mb-3"></div>
+          <p class="txt-primary font-medium mb-1">{{ $t('summary.uploadingFile') }}</p>
+          <p class="text-sm txt-secondary">{{ $t('summary.uploadingFileDesc') }}</p>
+        </div>
+        <div v-else>
+          <CloudArrowUpIcon class="w-12 h-12 mx-auto mb-3 txt-secondary" />
+          <p class="txt-primary font-medium mb-1">{{ $t('summary.dragDropTitle') }}</p>
+          <p class="text-sm txt-secondary mb-3">{{ $t('summary.dragDropDesc') }}</p>
+          <p class="text-xs txt-secondary">
+            {{ $t('summary.supportedFormats') }}: PDF, DOCX, TXT • {{ $t('summary.maxSize') }}: 10MB
+          </p>
+        </div>
+      </div>
+
+      <!-- Select from Existing Files -->
+      <div class="mb-4">
+        <button
+          @click="openFileSelection"
+          :disabled="isUploadingFile"
+          class="w-full px-4 py-3 rounded-lg border-2 border-light-border/30 dark:border-dark-border/20 hover:border-[var(--brand)]/50 transition-colors txt-primary hover:bg-black/5 dark:hover:bg-white/5 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          <DocumentTextIcon class="w-5 h-5" />
+          {{ $t('summary.selectFromExisting') }}
+        </button>
       </div>
 
       <div class="relative mb-4">
@@ -287,6 +307,13 @@
     <p class="text-xs txt-secondary text-center">
       {{ $t('summary.processingNote') }}
     </p>
+
+    <!-- File Selection Modal -->
+    <FileSelectionModal
+      :visible="fileSelectionModalVisible"
+      @close="fileSelectionModalVisible = false"
+      @select="handleFilesSelected"
+    />
   </div>
 </template>
 
@@ -311,6 +338,8 @@ import {
   focusAreaOptions 
 } from '@/mocks/summaries'
 import { useNotification } from '@/composables/useNotification'
+import { uploadFiles, getFileContent, type FileItem } from '@/services/filesService'
+import FileSelectionModal from '@/components/FileSelectionModal.vue'
 
 interface Props {
   isGenerating?: boolean
@@ -347,8 +376,10 @@ const originalDocumentText = ref('') // Track original text for change detection
 const isDragging = ref(false)
 const fileInput = ref<HTMLInputElement | null>(null)
 const hasGeneratedSummary = ref(false)
+const isUploadingFile = ref(false)
+const fileSelectionModalVisible = ref(false)
 
-const { warning } = useNotification()
+const { warning, error, success } = useNotification()
 
 const characterCount = computed(() => documentText.value.length)
 const wordCount = computed(() => {
@@ -409,17 +440,65 @@ const handleDrop = (event: DragEvent) => {
   }
 }
 
-const handleFile = (file: File) => {
+const handleFile = async (file: File) => {
   // Check file size (10MB max)
   if (file.size > 10 * 1024 * 1024) {
     warning('File size exceeds 10MB limit')
     return
   }
 
-  // TODO: Handle file upload/parsing
-  console.log('File selected:', file.name)
-  // In production, this would upload and extract text
-  documentText.value = `[File uploaded: ${file.name}]\n\nPaste the extracted text here or wait for automatic extraction...`
+  // Validate file type
+  const allowedTypes = [
+    'application/pdf',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document', // .docx
+    'application/msword', // .doc
+    'text/plain'
+  ]
+  
+  if (!allowedTypes.includes(file.type) && !file.name.match(/\.(pdf|docx|doc|txt)$/i)) {
+    warning('Unsupported file type. Please upload PDF, DOCX, DOC, or TXT files.')
+    return
+  }
+
+  try {
+    isUploadingFile.value = true
+    
+    // Upload file using the Files API with extraction
+    const uploadResult = await uploadFiles({
+      files: [file],
+      groupKey: 'DOC_SUMMARY',
+      processLevel: 'extract' // Only extract text, no vectorization needed for summary
+    })
+    
+    if (uploadResult.success && uploadResult.files.length > 0) {
+      const uploadedFile = uploadResult.files[0]
+      
+      // Get file content to retrieve extracted text
+      const fileContent = await getFileContent(uploadedFile.id)
+      
+      if (fileContent.extracted_text) {
+        documentText.value = fileContent.extracted_text
+        success(`File "${file.name}" uploaded and text extracted successfully!`)
+        
+        // Reset the generated summary flag since we have new text
+        hasGeneratedSummary.value = false
+        originalDocumentText.value = ''
+      } else {
+        warning('File uploaded but no text could be extracted.')
+      }
+    } else {
+      error('Failed to extract text from file. Please try again.')
+    }
+  } catch (err: any) {
+    console.error('File upload error:', err)
+    error(err?.message || 'Failed to upload file. Please try again.')
+  } finally {
+    isUploadingFile.value = false
+    // Reset file input
+    if (fileInput.value) {
+      fileInput.value.value = ''
+    }
+  }
 }
 
 const clearForm = () => {
@@ -452,6 +531,50 @@ const handleButtonClick = () => {
     generateSummary()
   } else {
     showSummary()
+  }
+}
+
+const openFileSelection = () => {
+  fileSelectionModalVisible.value = true
+}
+
+const handleFilesSelected = async (selectedFiles: FileItem[]) => {
+  if (selectedFiles.length === 0) return
+
+  try {
+    isUploadingFile.value = true
+    
+    // Get extracted text from all selected files
+    const textPromises = selectedFiles.map(file => getFileContent(file.id))
+    const fileContents = await Promise.all(textPromises)
+    
+    // Combine extracted text from all files
+    const combinedText = fileContents
+      .map(content => {
+        if (content.extracted_text) {
+          return `=== ${content.filename} ===\n\n${content.extracted_text}`
+        }
+        return ''
+      })
+      .filter(text => text.length > 0)
+      .join('\n\n---\n\n')
+    
+    if (combinedText) {
+      documentText.value = combinedText
+      success(`${selectedFiles.length} file(s) loaded successfully!`)
+      
+      // Reset the generated summary flag since we have new text
+      hasGeneratedSummary.value = false
+      originalDocumentText.value = ''
+    } else {
+      warning('No text could be extracted from selected files.')
+    }
+  } catch (err: any) {
+    console.error('Failed to load file content:', err)
+    error(err?.message || 'Failed to load files. Please try again.')
+  } finally {
+    isUploadingFile.value = false
+    fileSelectionModalVisible.value = false
   }
 }
 </script>

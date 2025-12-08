@@ -17,29 +17,14 @@ export interface DefaultModelConfig {
 const config = useConfigStore()
 const API_BASE_URL = config.apiBaseUrl
 const API_TIMEOUT = import.meta.env.VITE_API_TIMEOUT || 30000
-const AUTH_TOKEN_KEY = import.meta.env.VITE_AUTH_TOKEN_KEY || 'auth_token'
-const REFRESH_TOKEN_KEY = import.meta.env.VITE_REFRESH_TOKEN_KEY || 'refresh_token'
 const CSRF_HEADER = import.meta.env.VITE_CSRF_HEADER_NAME || 'X-CSRF-Token'
 
-// Token management
-let isRefreshing = false
-let refreshSubscribers: ((token: string) => void)[] = []
-
-const onTokenRefreshed = (token: string) => {
-  refreshSubscribers.forEach(callback => callback(token))
-  refreshSubscribers = []
-}
-
-const addRefreshSubscriber = (callback: (token: string) => void) => {
-  refreshSubscribers.push(callback)
-}
-
-// HTTP client with auth & CSRF
+// HTTP client with cookie-based auth
+// Note: For most use cases, prefer using @/services/api/httpClient instead
 async function httpClient<T>(
   endpoint: string,
   options: RequestInit = {}
 ): Promise<T> {
-  const token = localStorage.getItem(AUTH_TOKEN_KEY)
   const csrfToken = sessionStorage.getItem('csrf_token')
   
   const headers: Record<string, string> = {}
@@ -55,11 +40,6 @@ async function httpClient<T>(
     Object.assign(headers, options.headers)
   }
 
-  // Add auth token
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`
-  }
-
   // Add CSRF token for state-changing operations
   if (csrfToken && ['POST', 'PUT', 'PATCH', 'DELETE'].includes(options.method || 'GET')) {
     headers[CSRF_HEADER] = csrfToken
@@ -72,14 +52,17 @@ async function httpClient<T>(
     const response = await fetch(`${API_BASE_URL}${endpoint}`, {
       ...options,
       headers,
+      credentials: 'include', // Use HttpOnly cookies for auth
       signal: controller.signal,
     })
 
     clearTimeout(timeoutId)
 
-    // Handle 401 - Token expired
-    if (response.status === 401 && token && !isRefreshing) {
-      return handleTokenRefresh(endpoint, options)
+    // 401 handling: With cookie-based auth, token refresh is automatic via httpClient
+    // If we get 401 here, redirect to login
+    if (response.status === 401) {
+      window.location.href = '/login?reason=session_expired'
+      throw new Error('Session expired')
     }
 
     if (!response.ok) {
@@ -103,59 +86,8 @@ async function httpClient<T>(
   }
 }
 
-// Token refresh logic
-async function handleTokenRefresh<T>(
-  endpoint: string,
-  options: RequestInit
-): Promise<T> {
-  if (!isRefreshing) {
-    isRefreshing = true
-    
-    try {
-      const refreshToken = localStorage.getItem(REFRESH_TOKEN_KEY)
-      if (!refreshToken) {
-        throw new Error('No refresh token')
-      }
-
-      // Call refresh endpoint
-      const response = await fetch(`${API_BASE_URL}/auth/refresh`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ refreshToken })
-      })
-
-      if (!response.ok) {
-        throw new Error('Token refresh failed')
-      }
-
-      const { token: newToken, refreshToken: newRefreshToken } = await response.json()
-      
-      localStorage.setItem(AUTH_TOKEN_KEY, newToken)
-      if (newRefreshToken) {
-        localStorage.setItem(REFRESH_TOKEN_KEY, newRefreshToken)
-      }
-
-      isRefreshing = false
-      onTokenRefreshed(newToken)
-
-      // Retry original request
-      return httpClient(endpoint, options)
-    } catch (error) {
-      isRefreshing = false
-      localStorage.removeItem(AUTH_TOKEN_KEY)
-      localStorage.removeItem(REFRESH_TOKEN_KEY)
-      window.location.href = '/login'
-      throw error
-    }
-  } else {
-    // Wait for token refresh to complete
-    return new Promise((resolve) => {
-      addRefreshSubscriber(() => {
-        resolve(httpClient(endpoint, options))
-      })
-    })
-  }
-}
+// Note: Token refresh is handled automatically by @/services/api/httpClient
+// This file's httpClient is kept for legacy compatibility but will use cookie-based auth
 
 // Check if mock data is enabled
 const useMockData = import.meta.env.VITE_ENABLE_MOCK_DATA === 'true'
@@ -255,34 +187,42 @@ export const apiService = {
       return () => {}
     }
 
-    // Get token for SSE
-    const token = localStorage.getItem('auth_token')
-    const headers: Record<string, string> = {}
-    if (token) {
-      headers['Authorization'] = `Bearer ${token}`
-    }
+    // Use chatApi for SSE streaming (it handles cookie-based auth)
+    // This is a legacy function - prefer using chatApi.streamMessage directly
+    let eventSource: EventSource | null = null
 
-    // Note: EventSource doesn't support headers directly, need to use fetch + streaming
-    // For now, use query param or implement custom SSE with fetch
-    const eventSource = new EventSource(
-      `${API_BASE_URL}/messages/stream?userId=${userId}&message=${encodeURIComponent(message)}&trackId=${trackId || ''}`
-    )
+    // Get SSE token from auth endpoint (EventSource can't send cookies)
+    fetch(`${API_BASE_URL}/auth/token`, { credentials: 'include' })
+      .then(res => res.json())
+      .then(({ token }) => {
+        if (!token) {
+          onUpdate({ status: 'error', error: 'Authentication required' })
+          return
+        }
 
-    eventSource.onmessage = (event) => {
-      const data = JSON.parse(event.data)
-      onUpdate(data)
-      
-      if (data.status === 'complete' || data.status === 'error') {
-        eventSource.close()
-      }
-    }
+        eventSource = new EventSource(
+          `${API_BASE_URL}/messages/stream?userId=${userId}&message=${encodeURIComponent(message)}&trackId=${trackId || ''}&token=${token}`
+        )
 
-    eventSource.onerror = () => {
-      eventSource.close()
-      onUpdate({ status: 'error', error: 'Connection lost' })
-    }
+        eventSource.onmessage = (event) => {
+          const data = JSON.parse(event.data)
+          onUpdate(data)
+          
+          if (data.status === 'complete' || data.status === 'error') {
+            eventSource?.close()
+          }
+        }
 
-    return () => eventSource.close()
+        eventSource.onerror = () => {
+          eventSource?.close()
+          onUpdate({ status: 'error', error: 'Connection lost' })
+        }
+      })
+      .catch(() => {
+        onUpdate({ status: 'error', error: 'Failed to authenticate' })
+      })
+
+    return () => eventSource?.close()
   }
 }
 

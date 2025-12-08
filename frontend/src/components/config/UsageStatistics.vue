@@ -206,6 +206,7 @@ import { ref, onMounted } from 'vue'
 import { getUsageStats, downloadUsageExport, type UsageStats } from '@/api/usageApi'
 import { useNotification } from '@/composables/useNotification'
 import { useI18n } from 'vue-i18n'
+import { authService } from '@/services/authService'
 
 const { success, error: showError } = useNotification()
 const { t } = useI18n()
@@ -220,9 +221,8 @@ const loadStats = async () => {
     loading.value = true
     error.value = null
     
-    // Check if user is authenticated
-    const token = localStorage.getItem('auth_token')
-    if (!token) {
+    // Check if user is authenticated (user info in memory, not localStorage)
+    if (!authService.isAuthenticated()) {
       error.value = 'Not authenticated. Please log in to view statistics.'
       loading.value = false
       return

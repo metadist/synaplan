@@ -1,13 +1,6 @@
 <template>
   <div class="space-y-6" data-testid="page-api-documentation">
-    <div class="mb-8" data-testid="section-header">
-      <h1 class="text-2xl font-semibold txt-primary mb-2">
-        {{ $t('config.apiDocumentation.title') }}
-      </h1>
-      <p class="txt-secondary">
-        {{ $t('config.apiDocumentation.description') }}
-      </p>
-    </div>
+
 
     <div v-if="loading" class="surface-card p-8 text-center">
       <p class="txt-secondary">{{ $t('config.apiDocumentation.loading') }}</p>
@@ -184,7 +177,6 @@ import {
   ChevronDownIcon,
   ChevronUpIcon
 } from '@heroicons/vue/24/outline'
-import { useConfigStore } from '@/stores/config'
 
 interface OpenAPISpec {
   info?: {
@@ -256,8 +248,7 @@ const loadApiSpec = async () => {
     error.value = null
 
     // Fetch OpenAPI JSON from backend
-    const config = useConfigStore()
-    const response = await fetch(`${config.apiBaseUrl}/doc.json`)
+    const response = await fetch('/api/doc.json', { credentials: 'include' })
     
     if (!response.ok) {
       throw new Error(`Failed to load API documentation: ${response.statusText}`)

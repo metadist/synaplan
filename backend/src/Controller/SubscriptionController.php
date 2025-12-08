@@ -3,8 +3,10 @@
 namespace App\Controller;
 
 use App\Entity\User;
+use App\Repository\UserRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use OpenApi\Attributes as OA;
+use Psr\Cache\CacheItemPoolInterface;
 use Psr\Log\LoggerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -16,14 +18,23 @@ use Symfony\Component\Security\Http\Attribute\CurrentUser;
 /**
  * Subscription Management Controller
  * Handles subscription plans and Stripe checkout.
+ *
+ * Security:
+ * - Rate limiting on checkout (prevents abuse)
+ * - Authentication required for checkout/portal
  */
 #[Route('/api/v1/subscription')]
 #[OA\Tag(name: 'Subscription')]
 class SubscriptionController extends AbstractController
 {
+    private const CHECKOUT_RATE_LIMIT_WINDOW = 60; // 1 minute
+    private const CHECKOUT_RATE_LIMIT_MAX = 20; // max 20 checkout attempts per minute per user
+
     public function __construct(
         private EntityManagerInterface $em,
+        private UserRepository $userRepository,
         private LoggerInterface $logger,
+        private CacheItemPoolInterface $cache,
         private string $stripeSecretKey,
         private string $stripePricePro,
         private string $stripePriceTeam,
@@ -40,7 +51,8 @@ class SubscriptionController extends AbstractController
         return !empty($this->stripeSecretKey)
             && 'your_stripe_secret_key_here' !== $this->stripeSecretKey
             && !empty($this->stripePricePro)
-            && 'price_xxx' !== $this->stripePricePro;
+            && 'price_xxx' !== $this->stripePricePro
+            && 'price_pro' !== $this->stripePricePro;
     }
 
     /**
@@ -75,7 +87,7 @@ class SubscriptionController extends AbstractController
             [
                 'id' => 'PRO',
                 'name' => 'Pro',
-                'stripePriceId' => $this->stripePricePro,
+                'stripePriceId' => $this->isStripeConfigured() ? $this->stripePricePro : null,
                 'price' => 19.99,
                 'currency' => 'EUR',
                 'interval' => 'month',
@@ -90,7 +102,7 @@ class SubscriptionController extends AbstractController
             [
                 'id' => 'TEAM',
                 'name' => 'Team',
-                'stripePriceId' => $this->stripePriceTeam,
+                'stripePriceId' => $this->isStripeConfigured() ? $this->stripePriceTeam : null,
                 'price' => 49.99,
                 'currency' => 'EUR',
                 'interval' => 'month',
@@ -106,7 +118,7 @@ class SubscriptionController extends AbstractController
             [
                 'id' => 'BUSINESS',
                 'name' => 'Business',
-                'stripePriceId' => $this->stripePriceBusiness,
+                'stripePriceId' => $this->isStripeConfigured() ? $this->stripePriceBusiness : null,
                 'price' => 99.99,
                 'currency' => 'EUR',
                 'interval' => 'month',
@@ -158,6 +170,7 @@ class SubscriptionController extends AbstractController
         )
     )]
     #[OA\Response(response: 400, description: 'Invalid plan')]
+    #[OA\Response(response: 429, description: 'Rate limit exceeded')]
     #[OA\Response(response: 503, description: 'Stripe not configured')]
     public function createCheckoutSession(
         Request $request,
@@ -165,6 +178,18 @@ class SubscriptionController extends AbstractController
     ): JsonResponse {
         if (!$user) {
             return $this->json(['error' => 'Authentication required'], Response::HTTP_UNAUTHORIZED);
+        }
+
+        // Rate limiting check
+        if (!$this->checkCheckoutRateLimit($user)) {
+            $this->logger->warning('Checkout rate limit exceeded', [
+                'user_id' => $user->getId(),
+            ]);
+
+            return $this->json([
+                'error' => 'Too many checkout attempts. Please wait a minute and try again.',
+                'code' => 'RATE_LIMIT_EXCEEDED',
+            ], Response::HTTP_TOO_MANY_REQUESTS);
         }
 
         // Check if Stripe is configured
@@ -198,6 +223,7 @@ class SubscriptionController extends AbstractController
             $customerId = $this->getOrCreateStripeCustomer($user);
 
             // Create checkout session
+            // Note: Can't use both 'customer' and 'customer_email' - Stripe only allows one
             $session = \Stripe\Checkout\Session::create([
                 'customer' => $customerId,
                 'payment_method_types' => ['card', 'sepa_debit'],
@@ -213,6 +239,12 @@ class SubscriptionController extends AbstractController
                     'user_id' => $user->getId(),
                     'plan' => $planId,
                 ],
+                'subscription_data' => [
+                    'metadata' => [
+                        'user_id' => $user->getId(),
+                        'plan' => $planId,
+                    ],
+                ],
             ]);
 
             $this->logger->info('Stripe checkout session created', [
@@ -225,6 +257,24 @@ class SubscriptionController extends AbstractController
                 'sessionId' => $session->id,
                 'url' => $session->url,
             ]);
+        } catch (\Stripe\Exception\ApiErrorException $e) {
+            $this->logger->error('Stripe API error during checkout', [
+                'user_id' => $user->getId(),
+                'error' => $e->getMessage(),
+                'stripe_code' => $e->getStripeCode(),
+                'stripe_param' => $e->getError()?->param ?? null,
+            ]);
+
+            // In dev mode, show the actual error for debugging
+            $errorMessage = 'Payment service error. Please try again later.';
+            if ('dev' === $_ENV['APP_ENV']) {
+                $errorMessage = $e->getMessage();
+            }
+
+            return $this->json([
+                'error' => $errorMessage,
+                'stripe_code' => $e->getStripeCode(),
+            ], Response::HTTP_SERVICE_UNAVAILABLE);
         } catch (\Exception $e) {
             $this->logger->error('Failed to create checkout session', [
                 'user_id' => $user->getId(),
@@ -282,7 +332,158 @@ class SubscriptionController extends AbstractController
             'nextBilling' => $subscription['subscription_end'] ?? null,
             'cancelAt' => $subscription['cancel_at'] ?? null,
             'stripeSubscriptionId' => $subscription['stripe_subscription_id'] ?? null,
+            'paymentFailed' => $subscription['payment_failed'] ?? false,
         ]);
+    }
+
+    /**
+     * Sync subscription status from Stripe.
+     * Useful when webhooks fail or for manual resync.
+     */
+    #[Route('/sync', name: 'subscription_sync', methods: ['POST'])]
+    #[OA\Post(
+        path: '/api/v1/subscription/sync',
+        summary: 'Sync subscription status from Stripe',
+        security: [['Bearer' => []]],
+        tags: ['Subscription']
+    )]
+    #[OA\Response(
+        response: 200,
+        description: 'Subscription synced',
+        content: new OA\JsonContent(
+            properties: [
+                new OA\Property(property: 'success', type: 'boolean'),
+                new OA\Property(property: 'level', type: 'string'),
+                new OA\Property(property: 'status', type: 'string'),
+            ]
+        )
+    )]
+    public function syncFromStripe(
+        #[CurrentUser] ?User $user,
+    ): JsonResponse {
+        if (!$user) {
+            return $this->json(['error' => 'Authentication required'], Response::HTTP_UNAUTHORIZED);
+        }
+
+        if (!$this->isStripeConfigured()) {
+            return $this->json([
+                'error' => 'Subscription service is currently unavailable.',
+                'code' => 'STRIPE_NOT_CONFIGURED',
+            ], Response::HTTP_SERVICE_UNAVAILABLE);
+        }
+
+        $customerId = $user->getStripeCustomerId();
+        if (!$customerId) {
+            return $this->json([
+                'success' => true,
+                'level' => 'NEW',
+                'status' => 'no_customer',
+                'message' => 'No Stripe customer found',
+            ]);
+        }
+
+        try {
+            \Stripe\Stripe::setApiKey($this->stripeSecretKey);
+
+            // Get all active subscriptions for this customer
+            $subscriptions = \Stripe\Subscription::all([
+                'customer' => $customerId,
+                'status' => 'active',
+                'limit' => 10,
+            ]);
+
+            if (empty($subscriptions->data)) {
+                // No active subscriptions - downgrade to NEW
+                $user->setUserLevel('NEW');
+                $paymentDetails = $user->getPaymentDetails();
+                if (isset($paymentDetails['subscription'])) {
+                    $paymentDetails['subscription']['status'] = 'canceled';
+                }
+                $user->setPaymentDetails($paymentDetails);
+                $this->em->flush();
+
+                return $this->json([
+                    'success' => true,
+                    'level' => 'NEW',
+                    'status' => 'no_active_subscription',
+                    'message' => 'No active subscription found in Stripe',
+                ]);
+            }
+
+            // Find the highest tier subscription
+            $highestLevel = 'NEW';
+            $activeSubscription = null;
+            $levelPriority = ['NEW' => 0, 'PRO' => 1, 'TEAM' => 2, 'BUSINESS' => 3];
+
+            foreach ($subscriptions->data as $sub) {
+                $priceId = $sub->items->data[0]->price->id ?? null;
+                $level = $this->mapPriceIdToLevel($priceId);
+
+                if (($levelPriority[$level] ?? 0) > ($levelPriority[$highestLevel] ?? 0)) {
+                    $highestLevel = $level;
+                    $activeSubscription = $sub;
+                }
+            }
+
+            // Update user with the highest tier
+            $user->setUserLevel($highestLevel);
+
+            $paymentDetails = $user->getPaymentDetails();
+            $paymentDetails['subscription'] = [
+                'stripe_subscription_id' => $activeSubscription->id,
+                'status' => $activeSubscription->status,
+                'subscription_start' => $activeSubscription->current_period_start,
+                'subscription_end' => $activeSubscription->current_period_end,
+                'plan' => $highestLevel,
+                'cancel_at_period_end' => $activeSubscription->cancel_at_period_end ?? false,
+            ];
+            if ($activeSubscription->cancel_at) {
+                $paymentDetails['subscription']['cancel_at'] = $activeSubscription->cancel_at;
+            }
+            $user->setPaymentDetails($paymentDetails);
+
+            $this->em->flush();
+
+            $this->logger->info('Subscription synced from Stripe', [
+                'user_id' => $user->getId(),
+                'level' => $highestLevel,
+                'subscription_id' => $activeSubscription->id,
+            ]);
+
+            return $this->json([
+                'success' => true,
+                'level' => $highestLevel,
+                'status' => $activeSubscription->status,
+                'subscriptionId' => $activeSubscription->id,
+                'message' => 'Subscription synced successfully',
+            ]);
+        } catch (\Stripe\Exception\ApiErrorException $e) {
+            $this->logger->error('Stripe API error during sync', [
+                'user_id' => $user->getId(),
+                'error' => $e->getMessage(),
+            ]);
+
+            return $this->json([
+                'error' => 'Failed to sync from Stripe: '.$e->getMessage(),
+            ], Response::HTTP_SERVICE_UNAVAILABLE);
+        }
+    }
+
+    /**
+     * Map Stripe price ID to user level.
+     */
+    private function mapPriceIdToLevel(?string $priceId): string
+    {
+        if (!$priceId) {
+            return 'NEW';
+        }
+
+        return match ($priceId) {
+            $this->stripePricePro => 'PRO',
+            $this->stripePriceTeam => 'TEAM',
+            $this->stripePriceBusiness => 'BUSINESS',
+            default => 'NEW',
+        };
     }
 
     /**
@@ -321,8 +522,8 @@ class SubscriptionController extends AbstractController
         try {
             \Stripe\Stripe::setApiKey($this->stripeSecretKey);
 
-            $paymentDetails = $user->getPaymentDetails();
-            $customerId = $paymentDetails['stripe_customer_id'] ?? null;
+            // Get customer ID from paymentDetails JSON
+            $customerId = $user->getStripeCustomerId();
 
             if (!$customerId) {
                 return $this->json(['error' => 'No active subscription found'], Response::HTTP_NOT_FOUND);
@@ -342,6 +543,15 @@ class SubscriptionController extends AbstractController
             return $this->json([
                 'url' => $session->url,
             ]);
+        } catch (\Stripe\Exception\ApiErrorException $e) {
+            $this->logger->error('Stripe API error during portal creation', [
+                'user_id' => $user->getId(),
+                'error' => $e->getMessage(),
+            ]);
+
+            return $this->json([
+                'error' => 'Payment service error. Please try again later.',
+            ], Response::HTTP_SERVICE_UNAVAILABLE);
         } catch (\Exception $e) {
             $this->logger->error('Failed to create portal session', [
                 'user_id' => $user->getId(),
@@ -353,19 +563,129 @@ class SubscriptionController extends AbstractController
     }
 
     /**
+     * Cancel subscription.
+     */
+    #[Route('/cancel', name: 'subscription_cancel', methods: ['POST'])]
+    #[OA\Post(
+        path: '/api/v1/subscription/cancel',
+        summary: 'Cancel current subscription',
+        security: [['Bearer' => []]],
+        tags: ['Subscription']
+    )]
+    #[OA\Response(response: 200, description: 'Subscription cancelled')]
+    #[OA\Response(response: 404, description: 'No active subscription')]
+    public function cancelSubscription(
+        #[CurrentUser] ?User $user,
+    ): JsonResponse {
+        if (!$user) {
+            return $this->json(['error' => 'Authentication required'], Response::HTTP_UNAUTHORIZED);
+        }
+
+        if (!$this->isStripeConfigured()) {
+            return $this->json([
+                'error' => 'Subscription service is currently unavailable.',
+            ], Response::HTTP_SERVICE_UNAVAILABLE);
+        }
+
+        $paymentDetails = $user->getPaymentDetails();
+        $subscriptionId = $paymentDetails['subscription']['stripe_subscription_id'] ?? null;
+
+        if (!$subscriptionId) {
+            return $this->json(['error' => 'No active subscription found'], Response::HTTP_NOT_FOUND);
+        }
+
+        try {
+            \Stripe\Stripe::setApiKey($this->stripeSecretKey);
+
+            // Cancel at period end (user keeps access until end of billing period)
+            $subscription = \Stripe\Subscription::update($subscriptionId, [
+                'cancel_at_period_end' => true,
+            ]);
+
+            $paymentDetails['subscription']['cancel_at'] = $subscription->cancel_at;
+            $paymentDetails['subscription']['status'] = 'canceling';
+            $user->setPaymentDetails($paymentDetails);
+            $this->em->flush();
+
+            $this->logger->info('Subscription cancellation scheduled', [
+                'user_id' => $user->getId(),
+                'subscription_id' => $subscriptionId,
+                'cancel_at' => $subscription->cancel_at,
+            ]);
+
+            return $this->json([
+                'success' => true,
+                'message' => 'Your subscription will be cancelled at the end of the current billing period.',
+                'cancelAt' => $subscription->cancel_at,
+            ]);
+        } catch (\Stripe\Exception\ApiErrorException $e) {
+            $this->logger->error('Stripe API error during cancellation', [
+                'user_id' => $user->getId(),
+                'error' => $e->getMessage(),
+            ]);
+
+            return $this->json([
+                'error' => 'Failed to cancel subscription. Please try again or contact support.',
+            ], Response::HTTP_SERVICE_UNAVAILABLE);
+        }
+    }
+
+    /**
+     * Rate limiting for checkout endpoint.
+     */
+    private function checkCheckoutRateLimit(User $user): bool
+    {
+        $cacheKey = 'checkout_rate_'.$user->getId();
+
+        $item = $this->cache->getItem($cacheKey);
+
+        if (!$item->isHit()) {
+            $item->set(1);
+            $item->expiresAfter(self::CHECKOUT_RATE_LIMIT_WINDOW);
+            $this->cache->save($item);
+
+            return true;
+        }
+
+        $count = $item->get();
+        if ($count >= self::CHECKOUT_RATE_LIMIT_MAX) {
+            return false;
+        }
+
+        $item->set($count + 1);
+        $this->cache->save($item);
+
+        return true;
+    }
+
+    /**
      * Get or create Stripe customer for user.
      */
     private function getOrCreateStripeCustomer(User $user): string
     {
-        $paymentDetails = $user->getPaymentDetails();
-        $customerId = $paymentDetails['stripe_customer_id'] ?? null;
+        \Stripe\Stripe::setApiKey($this->stripeSecretKey);
+
+        // Check if customer ID exists in paymentDetails JSON
+        $customerId = $user->getStripeCustomerId();
 
         if ($customerId) {
-            return $customerId;
+            // Verify customer still exists in Stripe (may have been deleted or wrong account)
+            try {
+                \Stripe\Customer::retrieve($customerId);
+
+                return $customerId;
+            } catch (\Stripe\Exception\InvalidRequestException $e) {
+                // Customer doesn't exist anymore - clear it and create new one
+                $this->logger->warning('Stripe customer not found, creating new one', [
+                    'user_id' => $user->getId(),
+                    'old_customer_id' => $customerId,
+                    'error' => $e->getMessage(),
+                ]);
+                $customerId = null;
+            }
         }
 
         // Create new Stripe customer
-        \Stripe\Stripe::setApiKey($this->stripeSecretKey);
         $customer = \Stripe\Customer::create([
             'email' => $user->getMail(),
             'metadata' => [
@@ -373,108 +693,15 @@ class SubscriptionController extends AbstractController
             ],
         ]);
 
-        // Save customer ID
-        $paymentDetails['stripe_customer_id'] = $customer->id;
-        $user->setPaymentDetails($paymentDetails);
+        // Save customer ID to paymentDetails JSON
+        $user->setStripeCustomerId($customer->id);
         $this->em->flush();
+
+        $this->logger->info('Stripe customer created', [
+            'user_id' => $user->getId(),
+            'stripe_customer_id' => $customer->id,
+        ]);
 
         return $customer->id;
-    }
-
-    private function handleSubscriptionCreated($subscription): void
-    {
-        $user = $this->getUserByStripeCustomer($subscription->customer);
-        if (!$user) {
-            return;
-        }
-
-        $priceId = $subscription->items->data[0]->price->id ?? null;
-        $userLevel = match ($priceId) {
-            $this->stripePricePro => 'PRO',
-            $this->stripePriceTeam => 'TEAM',
-            $this->stripePriceBusiness => 'BUSINESS',
-            default => 'NEW',
-        };
-
-        $user->setUserLevel($userLevel);
-
-        $paymentDetails = $user->getPaymentDetails();
-        $paymentDetails['subscription'] = [
-            'stripe_subscription_id' => $subscription->id,
-            'status' => $subscription->status,
-            'subscription_start' => $subscription->current_period_start,
-            'subscription_end' => $subscription->current_period_end,
-            'plan' => $userLevel,
-        ];
-        $user->setPaymentDetails($paymentDetails);
-
-        $this->em->flush();
-    }
-
-    private function handleSubscriptionUpdated($subscription): void
-    {
-        $user = $this->getUserByStripeCustomer($subscription->customer);
-        if (!$user) {
-            return;
-        }
-
-        $paymentDetails = $user->getPaymentDetails();
-        $paymentDetails['subscription']['status'] = $subscription->status;
-        $paymentDetails['subscription']['subscription_end'] = $subscription->current_period_end;
-        $user->setPaymentDetails($paymentDetails);
-
-        $this->em->flush();
-    }
-
-    private function handleSubscriptionDeleted($subscription): void
-    {
-        $user = $this->getUserByStripeCustomer($subscription->customer);
-        if (!$user) {
-            return;
-        }
-
-        $user->setUserLevel('NEW');
-
-        $paymentDetails = $user->getPaymentDetails();
-        $paymentDetails['subscription']['status'] = 'canceled';
-        $user->setPaymentDetails($paymentDetails);
-
-        $this->em->flush();
-    }
-
-    private function handlePaymentSucceeded($invoice): void
-    {
-        $this->logger->info('Payment succeeded', [
-            'invoice_id' => $invoice->id,
-            'amount' => $invoice->amount_paid,
-        ]);
-    }
-
-    private function handlePaymentFailed($invoice): void
-    {
-        $user = $this->getUserByStripeCustomer($invoice->customer);
-        if (!$user) {
-            return;
-        }
-
-        $this->logger->warning('Payment failed', [
-            'user_id' => $user->getId(),
-            'invoice_id' => $invoice->id,
-        ]);
-    }
-
-    private function getUserByStripeCustomer(string $customerId): ?User
-    {
-        $userRepo = $this->em->getRepository(User::class);
-        $users = $userRepo->findAll();
-
-        foreach ($users as $user) {
-            $details = $user->getPaymentDetails();
-            if (isset($details['stripe_customer_id']) && $details['stripe_customer_id'] === $customerId) {
-                return $user;
-            }
-        }
-
-        return null;
     }
 }

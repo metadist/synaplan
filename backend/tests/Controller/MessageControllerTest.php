@@ -6,6 +6,8 @@ namespace App\Tests\Controller;
 
 use App\Entity\Message;
 use App\Entity\User;
+use App\Service\TokenService;
+use App\Tests\Trait\AuthenticatedTestTrait;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
 use Symfony\Component\HttpFoundation\Response;
 
@@ -15,6 +17,8 @@ use Symfony\Component\HttpFoundation\Response;
  */
 class MessageControllerTest extends WebTestCase
 {
+    use AuthenticatedTestTrait;
+
     private $client;
     private $em;
     private $user;
@@ -41,8 +45,8 @@ class MessageControllerTest extends WebTestCase
         $modelConfigService = $this->client->getContainer()->get(\App\Service\ModelConfigService::class);
         $modelConfigService->setDefaultProvider($this->user->getId(), 'chat', 'test');
 
-        // Generate JWT token for authentication
-        $this->token = $this->generateJwtToken($this->user);
+        // Generate access token using TokenService
+        $this->token = $this->authenticateClient($this->client, $this->user);
     }
 
     protected function tearDown(): void
@@ -85,16 +89,10 @@ class MessageControllerTest extends WebTestCase
         parent::tearDown();
     }
 
-    private function generateJwtToken(User $user): string
-    {
-        $jwtManager = $this->client->getContainer()->get('lexik_jwt_authentication.jwt_manager');
-
-        return $jwtManager->create($user);
-    }
-
     public function testSendMessageWithoutAuth(): void
     {
-        $this->client->request(
+        $client = static::createClient();
+        $client->request(
             'POST',
             '/api/v1/messages/send',
             [],
@@ -156,7 +154,8 @@ class MessageControllerTest extends WebTestCase
 
     public function testGetHistoryWithoutAuth(): void
     {
-        $this->client->request('GET', '/api/v1/messages/history');
+        $client = static::createClient();
+        $client->request('GET', '/api/v1/messages/history');
 
         $this->assertResponseStatusCodeSame(Response::HTTP_UNAUTHORIZED);
     }
@@ -260,7 +259,8 @@ class MessageControllerTest extends WebTestCase
 
     public function testEnhanceWithoutAuth(): void
     {
-        $this->client->request(
+        $client = static::createClient();
+        $client->request(
             'POST',
             '/api/v1/messages/enhance',
             [],
@@ -317,7 +317,8 @@ class MessageControllerTest extends WebTestCase
 
     public function testAgainWithoutAuth(): void
     {
-        $this->client->request(
+        $client = static::createClient();
+        $client->request(
             'POST',
             '/api/v1/messages/again',
             [],
@@ -350,7 +351,8 @@ class MessageControllerTest extends WebTestCase
 
     public function testEnqueueWithoutAuth(): void
     {
-        $this->client->request(
+        $client = static::createClient();
+        $client->request(
             'POST',
             '/api/v1/messages/enqueue',
             [],

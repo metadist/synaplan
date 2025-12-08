@@ -21,6 +21,7 @@ backend/var/log/*
 backend/vendor
 backend/.env.local
 backend/.env.docker
+!backend/.env.example
 
 # Frontend excludes
 frontend/node_modules

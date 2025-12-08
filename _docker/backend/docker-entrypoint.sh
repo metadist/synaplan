@@ -59,11 +59,6 @@ fi
 chown -R www-data:www-data var/ public/up/ 2>/dev/null || true
 chmod -R 775 var/ public/up/ 2>/dev/null || true
 
-# Generate JWT keys if they don't exist
-echo "🔑 Checking JWT keys..."
-php bin/console lexik:jwt:generate-keypair --skip-if-exists
-echo "✅ JWT keys ready!"
-
 # Wait for database to be ready
 echo "⏳ Waiting for database connection..."
 until php bin/console dbal:run-sql "SELECT 1" > /dev/null 2>&1; do

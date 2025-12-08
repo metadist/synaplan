@@ -4,11 +4,15 @@ namespace App\Tests\Controller;
 
 use App\Entity\Chat;
 use App\Entity\User;
+use App\Service\TokenService;
+use App\Tests\Trait\AuthenticatedTestTrait;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
 
 class StreamControllerTest extends WebTestCase
 {
+    use AuthenticatedTestTrait;
+
     private KernelBrowser $client;
     private ?string $token = null;
 
@@ -31,9 +35,8 @@ class StreamControllerTest extends WebTestCase
             $this->fail('Test user not found');
         }
 
-        // Generate JWT token manually for testing
-        $jwtManager = static::getContainer()->get('lexik_jwt_authentication.jwt_manager');
-        $this->token = $jwtManager->create($user);
+        // Generate access token using TokenService
+        $this->token = $this->authenticateClient($this->client, $user);
 
         return $this->token;
     }
@@ -56,7 +59,8 @@ class StreamControllerTest extends WebTestCase
 
     public function testStreamRequiresAuthentication(): void
     {
-        $this->client->request('GET', '/api/v1/messages/stream', [
+        $client = static::createClient();
+        $client->request('GET', '/api/v1/messages/stream', [
             'message' => 'Test',
             'chatId' => 1,
         ]);

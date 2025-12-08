@@ -214,6 +214,60 @@
     "saveChanges": "Änderungen speichern",
     "cancel": "Abbrechen"
   },
+  "summary": {
+    "title": "Zusammenfassungskonfiguration",
+    "description": "Dies erstellt einen Prompt für das konfigurierte KI-Modell, um den übermittelten Text zusammenzufassen.",
+    "summaryType": "Zusammenfassungstyp:",
+    "summaryTypeHelp": "Art der zu generierenden Zusammenfassung",
+    "length": "Länge:",
+    "lengthHelp": "Gewünschte Länge der Zusammenfassung",
+    "customLength": "Benutzerdefinierte Länge:",
+    "customLengthHelp": "Anzahl der Wörter (50-2000)",
+    "outputLanguage": "Ausgabesprache:",
+    "outputLanguageHelp": "Sprache für die Zusammenfassung",
+    "focusAreas": "Schwerpunktbereiche:",
+    "focusAreasHelp": "Wähle worauf in der Zusammenfassung fokussiert werden soll",
+    "documentInput": "Dokumenteingabe",
+    "inputMethod": "Eingabemethode:",
+    "textInput": "Texteingabe",
+    "documentText": "Dokumenttext:",
+    "documentTextPlaceholder": "Füge deinen Dokumenttext hier ein...",
+    "charactersCount": "{count} Zeichen | {words} Wörter | {tokens} geschätzte Tokens",
+    "generateSummary": "Zusammenfassung generieren",
+    "generating": "Generiere...",
+    "showSummary": "Zusammenfassung anzeigen",
+    "regenerateSummary": "Zusammenfassung neu generieren",
+    "usingModel": "Verwendetes KI-Modell",
+    "loadingModel": "Lädt...",
+    "clearForm": "Formular zurücksetzen",
+    "processingNote": "Die Verarbeitung großer Dokumente kann mehrere Minuten dauern. Bitte habe Geduld.",
+    "quickPresets": "Schnelle Voreinstellungen",
+    "presets": {
+      "invoice": {
+        "title": "Rechnung",
+        "desc": "Optimiert für Finanzdokumente"
+      },
+      "contract": {
+        "title": "Vertrag",
+        "desc": "Fokus auf Bedingungen und Konditionen"
+      },
+      "generic": {
+        "title": "Allgemein",
+        "desc": "Ausgewogen für alle Dokumenttypen"
+      }
+    },
+    "dragDropTitle": "Datei hier ablegen oder klicken zum Durchsuchen",
+    "dragDropDesc": "Lade ein Dokument hoch, um dessen Inhalt zu extrahieren und zusammenzufassen",
+    "supportedFormats": "Unterstützte Formate",
+    "maxSize": "Max. Größe",
+    "orPasteText": "oder Text direkt einfügen",
+    "uploadingFile": "Lade hoch und extrahiere Text...",
+    "uploadingFileDesc": "Bitte warte, während wir deine Datei verarbeiten",
+    "selectFromExisting": "Aus bereits hochgeladenen Dateien auswählen",
+    "fileUploadSuccess": "Datei \"{filename}\" erfolgreich hochgeladen und Text extrahiert!",
+    "fileExtractionFailed": "Datei hochgeladen, aber kein Text konnte extrahiert werden.",
+    "fileUploadFailed": "Fehler beim Hochladen der Datei. Bitte versuche es erneut."
+  },
   "processing": {
     "started": "Starte Verarbeitung...",
     "startedTitle": "Verarbeite deine Nachricht",
@@ -449,7 +503,10 @@
     },
     "upgradeNow": "Jetzt Upgraden",
     "verifyPhone": "Telefonnummer Verifizieren",
-    "footerNote": "Fragen? Kontaktieren Sie unser Support-Team."
+    "footerNote": "Fragen? Kontaktieren Sie unser Support-Team.",
+    "messageBlocked": "Nachricht konnte nicht gesendet werden",
+    "messageBlockedDesc": "Du hast dein {action}-Limit erreicht. Upgrade deinen Plan oder warte bis das Limit zurückgesetzt wird.",
+    "retryLater": "Erneut versuchen"
   },
   "subscription": {
     "title": "Abonnements",
@@ -463,6 +520,9 @@
     "cancelPlan": "Abo kündigen",
     "recommended": "Empfohlen",
     "selectPlan": "Plan wählen",
+    "upgrade": "Upgraden",
+    "includedInCurrent": "In deinem Plan enthalten",
+    "highestPlan": "Du hast bereits den höchsten Plan!",
     "processing": "Wird verarbeitet...",
     "perMonth": "Monat",
     "perYear": "Jahr",
@@ -478,6 +538,10 @@
       "statusActive": "Aktiv",
       "statusCanceled": "Gekündigt",
       "statusPastDue": "Zahlung überfällig",
+      "statusIncomplete": "Unvollständig",
+      "statusTrialing": "Testphase",
+      "statusUnpaid": "Unbezahlt",
+      "statusPaused": "Pausiert",
       "nextBilling": "Nächstes Abrechnungsdatum",
       "cancelDate": "Kündigung zum",
       "billingPortal": "Rechnungsportal",
@@ -511,6 +575,24 @@
       "whiteLabel": "White-label Widgets",
       "dedicatedSupport": "Dedizierter Support",
       "slaGuarantee": "SLA-Garantie"
+    },
+    "success": {
+      "title": "Zahlung erfolgreich!",
+      "description": "Dein Abonnement wurde aktiviert. Vielen Dank für das Upgrade!",
+      "newPlan": "Dein neuer Plan",
+      "startUsing": "Plan jetzt nutzen",
+      "activating": "Plan wird aktiviert...",
+      "activatingDesc": "Bitte warte, während wir dein Abonnement aktivieren.",
+      "almostDone": "Fast fertig!",
+      "processing": "Deine Zahlung war erfolgreich, aber wir verarbeiten noch dein Abonnement.",
+      "retry": "Erneut versuchen",
+      "continueAnyway": "Trotzdem fortfahren"
+    },
+    "cancel": {
+      "title": "Zahlung abgebrochen",
+      "description": "Deine Zahlung wurde abgebrochen. Es wurden keine Kosten berechnet.",
+      "tryAgain": "Erneut versuchen",
+      "backToPlans": "Zurück zu den Plänen"
     }
   },
   "common": {
@@ -724,6 +806,26 @@
     "filterToDate": "Bis Datum",
     "recommended": "Empfohlen",
     "proOnly": "PRO+"
+  },
+  "widgets": {
+    "buttonIcon": "Button-Icon",
+    "customIcon": "Eigenes Icon hochladen",
+    "uploadIcon": "Eigenes Icon hochladen",
+    "changeIcon": "Icon ändern",
+    "customIconActive": "Eigenes Icon aktiv",
+    "customIconHint": "Unterstützte Formate: SVG, PNG, JPG, GIF, WebP (max 500KB)",
+    "iconTooLarge": "Icon-Datei ist zu groß. Maximale Größe ist 500KB.",
+    "invalidIconType": "Ungültiger Dateityp. Nur SVG, PNG, JPG, GIF und WebP sind erlaubt.",
+    "iconUploadSuccess": "Icon erfolgreich hochgeladen",
+    "iconUploadFailed": "Icon-Upload fehlgeschlagen",
+    "icons": {
+      "chat": "Chat",
+      "headset": "Headset",
+      "help": "Hilfe",
+      "robot": "Roboter",
+      "message": "Nachricht",
+      "support": "Support"
+    }
   },
   "auth": {
     "login": "Anmelden",

@@ -3,12 +3,13 @@ import { ref } from 'vue'
 import { normalizeMediaUrl } from '@/utils/urlHelper'
 import { extractBTextPayload } from '@/utils/jsonResponse'
 import type { AgainData } from '@/types/ai-models'
+import { authService } from '@/services/authService'
 
 // Helper function to check authentication and redirect if needed
+// Uses authService which holds user info in memory (not localStorage)
 function checkAuthOrRedirect(): boolean {
-  const token = localStorage.getItem('auth_token')
-  if (!token) {
-    console.warn('🔒 No auth token found - redirecting to login')
+  if (!authService.isAuthenticated()) {
+    console.warn('🔒 Not authenticated - redirecting to login')
     window.location.href = '/login?reason=session_expired'
     return false
   }
@@ -59,6 +60,18 @@ export interface Message {
   originalMessageId?: number
   backendMessageId?: number
   files?: MessageFile[] // Attached files
+  // Status for failed/pending messages
+  status?: 'sent' | 'failed' | 'rate_limited'
+  errorType?: 'rate_limit' | 'connection' | 'unknown'
+  errorData?: {
+    limitType?: string
+    actionType?: string
+    used?: number
+    limit?: number
+    remaining?: number
+    resetAt?: number | null
+    userLevel?: string
+  }
   searchResults?: Array<{
     title: string
     url: string
@@ -250,11 +263,29 @@ export const useHistoryStore = defineStore('history', () => {
   }
 
   const removeMessage = (id: string) => {
-    messages.value = messages.value.filter(m => m.id !== id)
+    messages.value = messages.value.filter((m: Message) => m.id !== id)
+  }
+
+  const setMessageStatus = (id: string, status: 'sent' | 'failed' | 'rate_limited', errorType?: 'rate_limit' | 'connection' | 'unknown', errorData?: Message['errorData']) => {
+    const message = messages.value.find((m: Message) => m.id === id)
+    if (message) {
+      message.status = status
+      message.errorType = errorType
+      message.errorData = errorData
+    }
+  }
+
+  const clearMessageError = (id: string) => {
+    const message = messages.value.find((m: Message) => m.id === id)
+    if (message) {
+      message.status = 'sent'
+      message.errorType = undefined
+      message.errorData = undefined
+    }
   }
 
   const markSuperseded = (id: string) => {
-    const message = messages.value.find(m => m.id === id)
+    const message = messages.value.find((m: Message) => m.id === id)
     if (message) {
       message.isSuperseded = true
     }
@@ -365,6 +396,8 @@ export const useHistoryStore = defineStore('history', () => {
     finishStreamingMessage,
     markSuperseded,
     removeMessage,
+    setMessageStatus,
+    clearMessageError,
     clear,
     clearHistory: clear,
     loadMessages,

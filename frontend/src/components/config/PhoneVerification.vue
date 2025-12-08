@@ -174,7 +174,6 @@ const verificationPending = ref(false)
 const requesting = ref(false)
 const confirming = ref(false)
 
-const AUTH_TOKEN_KEY = import.meta.env.VITE_AUTH_TOKEN_KEY || 'auth_token'
 const config = useConfigStore()
 const API_BASE = config.appBaseUrl
 
@@ -183,18 +182,13 @@ const buildHeaders = (withJson = false) => {
   if (withJson) {
     headers['Content-Type'] = 'application/json'
   }
-
-  const token = localStorage.getItem(AUTH_TOKEN_KEY)
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`
-  }
-
+  // No Authorization header needed - using HttpOnly cookies
   return headers
 }
 
 const requestWithFallback = async (path: string, options: RequestInit = {}) => {
   const url = `${API_BASE}${path}`
-  const response = await fetch(url, options)
+  const response = await fetch(url, { ...options, credentials: 'include' })
 
   const contentType = response.headers.get('content-type') ?? ''
   const isJson = contentType.includes('application/json')

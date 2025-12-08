@@ -2,14 +2,15 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { httpClient } from '@/services/api/httpClient'
 import { useConfigStore } from '@/stores/config'
+import { authService } from '@/services/authService'
 
 const ACTIVE_CHAT_STORAGE_KEY = 'synaplan_active_chat_id'
 
 // Helper function to check authentication and redirect if needed
+// Uses authService which holds user info in memory (not localStorage)
 function checkAuthOrRedirect(): boolean {
-  const token = localStorage.getItem('auth_token')
-  if (!token) {
-    console.warn('🔒 No auth token found - redirecting to login')
+  if (!authService.isAuthenticated()) {
+    console.warn('🔒 Not authenticated - redirecting to login')
     window.location.href = '/login?reason=session_expired'
     return false
   }
