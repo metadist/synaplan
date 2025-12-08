@@ -603,7 +603,7 @@ const selectIcon = async (iconValue: string) => {
         config: {
           ...formData.value.config,
           buttonIcon: iconValue,
-          buttonIconUrl: null
+          buttonIconUrl: undefined
         }
       })
     } catch (err: any) {
@@ -691,7 +691,7 @@ const removeCustomIcon = async () => {
     await widgetsApi.updateWidget(props.widget.widgetId, {
       config: {
         ...formData.value.config,
-        buttonIconUrl: null,
+        buttonIconUrl: undefined,
         buttonIcon: 'chat'
       }
     })

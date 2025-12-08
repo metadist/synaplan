@@ -179,7 +179,6 @@ const hasActivePlan = computed(() => {
 
 // Plan hierarchy for upgrade logic (ADMIN is special - unlimited, not a purchasable plan)
 const planHierarchy = ['NEW', 'PRO', 'TEAM', 'BUSINESS', 'ADMIN']
-const purchasablePlans = ['PRO', 'TEAM', 'BUSINESS']
 
 const isHighestPlan = computed(() => {
   return currentLevel.value === 'BUSINESS' || currentLevel.value === 'ADMIN'

@@ -22,7 +22,7 @@ interface HttpClientOptions extends RequestInit {
 
 // Track if we're currently refreshing
 let isRefreshing = false
-let refreshPromise: Promise<boolean> | null = null
+let refreshPromise: Promise<RefreshResult> | null = null
 
 /**
  * Refresh result - indicates if refresh was successful and if OIDC session expired

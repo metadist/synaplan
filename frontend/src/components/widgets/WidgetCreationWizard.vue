@@ -669,6 +669,8 @@ const formData = ref<WidgetFormData>({
     position: 'bottom-right',
     primaryColor: '#007bff',
     iconColor: '#ffffff',
+    buttonIcon: 'chat',
+    buttonIconUrl: '',
     defaultTheme: 'light',
     autoOpen: false,
     autoMessage: 'Hello! How can I help you today?',

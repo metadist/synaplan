@@ -67,7 +67,6 @@
 
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, watch } from 'vue'
-import { useAuthStore } from '../stores/auth'
 import { useConfigStore } from '@/stores/config'
 
 interface Props {
@@ -76,7 +75,6 @@ interface Props {
 }
 
 const props = defineProps<Props>()
-const authStore = useAuthStore()
 const config = useConfigStore()
 
 const isFullscreen = ref(false)
@@ -91,15 +89,12 @@ const loadImage = async () => {
       return
     }
 
-    // Internal API URLs need authentication
+    // Internal API URLs need authentication via cookies
     const fullUrl = props.url.startsWith('/') ? `${config.appBaseUrl}${props.url}` : props.url
 
-    const token = authStore.token
     const response = await fetch(fullUrl, {
       method: 'GET',
-      headers: token ? {
-        'Authorization': `Bearer ${token}`
-      } : {}
+      credentials: 'include'
     })
 
     if (!response.ok) {
