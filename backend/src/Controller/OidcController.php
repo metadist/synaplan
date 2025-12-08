@@ -59,7 +59,7 @@ class OidcController extends AbstractController
 
         return $this->json([
             'success' => true,
-            'discovery_url' => rtrim($discoveryUrl, '/') . '/.well-known/openid-configuration',
+            'discovery_url' => rtrim($discoveryUrl, '/').'/.well-known/openid-configuration',
             'issuer' => $discoveryUrl,
             'client_id' => $clientId,
             // Client secret is NEVER exposed!

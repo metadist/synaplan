@@ -25,7 +25,7 @@ class GRPCInferenceServiceClient extends BaseStub
     public function ModelStreamInfer(
         ModelInferRequest $argument,
         array $metadata = [],
-        array $options = []
+        array $options = [],
     ) {
         return $this->_serverStreamRequest(
             '/inference.GRPCInferenceService/ModelStreamInfer',

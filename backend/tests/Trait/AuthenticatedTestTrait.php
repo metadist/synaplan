@@ -11,7 +11,7 @@ use Symfony\Component\BrowserKit\Cookie;
 
 /**
  * Trait for authenticated test requests.
- * 
+ *
  * Provides helper methods to authenticate test requests using
  * the new cookie-based token system.
  */
@@ -24,9 +24,9 @@ trait AuthenticatedTestTrait
     {
         /** @var TokenService $tokenService */
         $tokenService = static::getContainer()->get(TokenService::class);
-        
+
         $accessToken = $tokenService->generateAccessToken($user);
-        
+
         // Set the access token as a cookie on the client
         $client->getCookieJar()->set(new Cookie(
             TokenService::ACCESS_COOKIE,
@@ -35,7 +35,7 @@ trait AuthenticatedTestTrait
             '/',
             'localhost'
         ));
-        
+
         return $accessToken;
     }
 
@@ -51,15 +51,14 @@ trait AuthenticatedTestTrait
         array $parameters = [],
         array $files = [],
         array $server = [],
-        ?string $content = null
+        ?string $content = null,
     ): void {
-        $server['HTTP_AUTHORIZATION'] = 'Bearer ' . $accessToken;
-        
-        if ($content !== null && !isset($server['CONTENT_TYPE'])) {
+        $server['HTTP_AUTHORIZATION'] = 'Bearer '.$accessToken;
+
+        if (null !== $content && !isset($server['CONTENT_TYPE'])) {
             $server['CONTENT_TYPE'] = 'application/json';
         }
-        
+
         $client->request($method, $uri, $parameters, $files, $server, $content);
     }
 }
-

@@ -232,8 +232,8 @@ class SubscriptionController extends AbstractController
                     'quantity' => 1,
                 ]],
                 'mode' => 'subscription',
-                'success_url' => $this->frontendUrl . '/subscription/success?session_id={CHECKOUT_SESSION_ID}',
-                'cancel_url' => $this->frontendUrl . '/subscription/cancel',
+                'success_url' => $this->frontendUrl.'/subscription/success?session_id={CHECKOUT_SESSION_ID}',
+                'cancel_url' => $this->frontendUrl.'/subscription/cancel',
                 'client_reference_id' => (string) $user->getId(),
                 'metadata' => [
                     'user_id' => $user->getId(),
@@ -418,7 +418,7 @@ class SubscriptionController extends AbstractController
             foreach ($subscriptions->data as $sub) {
                 $priceId = $sub->items->data[0]->price->id ?? null;
                 $level = $this->mapPriceIdToLevel($priceId);
-                
+
                 if (($levelPriority[$level] ?? 0) > ($levelPriority[$highestLevel] ?? 0)) {
                     $highestLevel = $level;
                     $activeSubscription = $sub;
@@ -427,7 +427,7 @@ class SubscriptionController extends AbstractController
 
             // Update user with the highest tier
             $user->setUserLevel($highestLevel);
-            
+
             $paymentDetails = $user->getPaymentDetails();
             $paymentDetails['subscription'] = [
                 'stripe_subscription_id' => $activeSubscription->id,
@@ -441,7 +441,7 @@ class SubscriptionController extends AbstractController
                 $paymentDetails['subscription']['cancel_at'] = $activeSubscription->cancel_at;
             }
             $user->setPaymentDetails($paymentDetails);
-            
+
             $this->em->flush();
 
             $this->logger->info('Subscription synced from Stripe', [
@@ -464,7 +464,7 @@ class SubscriptionController extends AbstractController
             ]);
 
             return $this->json([
-                'error' => 'Failed to sync from Stripe: ' . $e->getMessage(),
+                'error' => 'Failed to sync from Stripe: '.$e->getMessage(),
             ], Response::HTTP_SERVICE_UNAVAILABLE);
         }
     }
@@ -532,7 +532,7 @@ class SubscriptionController extends AbstractController
             // Create portal session
             $session = \Stripe\BillingPortal\Session::create([
                 'customer' => $customerId,
-                'return_url' => $this->frontendUrl . '/subscription',
+                'return_url' => $this->frontendUrl.'/subscription',
             ]);
 
             $this->logger->info('Stripe portal session created', [
@@ -635,7 +635,7 @@ class SubscriptionController extends AbstractController
      */
     private function checkCheckoutRateLimit(User $user): bool
     {
-        $cacheKey = 'checkout_rate_' . $user->getId();
+        $cacheKey = 'checkout_rate_'.$user->getId();
 
         $item = $this->cache->getItem($cacheKey);
 

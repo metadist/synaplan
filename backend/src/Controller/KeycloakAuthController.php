@@ -55,7 +55,7 @@ class KeycloakAuthController extends AbstractController
         try {
             $discovery = $this->getDiscoveryConfig();
 
-            $redirectUri = $this->appUrl . '/api/v1/auth/keycloak/callback';
+            $redirectUri = $this->appUrl.'/api/v1/auth/keycloak/callback';
             $state = bin2hex(random_bytes(16));
 
             $request->getSession()->set('keycloak_oauth_state', $state);
@@ -68,7 +68,7 @@ class KeycloakAuthController extends AbstractController
                 'state' => $state,
             ];
 
-            $authUrl = $discovery['authorization_endpoint'] . '?' . http_build_query($params);
+            $authUrl = $discovery['authorization_endpoint'].'?'.http_build_query($params);
 
             $this->logger->info('Keycloak OAuth login initiated', [
                 'redirect_uri' => $redirectUri,
@@ -80,7 +80,7 @@ class KeycloakAuthController extends AbstractController
                 'error' => $e->getMessage(),
             ]);
 
-            return $this->redirect($this->frontendUrl . '/auth/callback?' . http_build_query([
+            return $this->redirect($this->frontendUrl.'/auth/callback?'.http_build_query([
                 'error' => 'Failed to initiate Keycloak login',
                 'provider' => 'keycloak',
             ]));
@@ -102,7 +102,8 @@ class KeycloakAuthController extends AbstractController
         // Validate state (CSRF protection)
         if (!$state || $state !== $storedState) {
             $this->logger->error('Keycloak OAuth state mismatch');
-            return $this->redirect($this->frontendUrl . '/auth/callback?' . http_build_query([
+
+            return $this->redirect($this->frontendUrl.'/auth/callback?'.http_build_query([
                 'error' => 'Invalid state parameter',
                 'provider' => 'keycloak',
             ]));
@@ -111,7 +112,7 @@ class KeycloakAuthController extends AbstractController
         $request->getSession()->remove('keycloak_oauth_state');
 
         if (!$code) {
-            return $this->redirect($this->frontendUrl . '/auth/callback?' . http_build_query([
+            return $this->redirect($this->frontendUrl.'/auth/callback?'.http_build_query([
                 'error' => 'Authorization code not received',
                 'provider' => 'keycloak',
             ]));
@@ -126,7 +127,7 @@ class KeycloakAuthController extends AbstractController
                     'code' => $code,
                     'client_id' => $this->oidcClientId,
                     'client_secret' => $this->oidcClientSecret,
-                    'redirect_uri' => $this->appUrl . '/api/v1/auth/keycloak/callback',
+                    'redirect_uri' => $this->appUrl.'/api/v1/auth/keycloak/callback',
                     'grant_type' => 'authorization_code',
                 ],
             ]);
@@ -143,7 +144,7 @@ class KeycloakAuthController extends AbstractController
             // Fetch user info from Keycloak
             $userInfoResponse = $this->httpClient->request('GET', $discovery['userinfo_endpoint'], [
                 'headers' => [
-                    'Authorization' => 'Bearer ' . $accessToken,
+                    'Authorization' => 'Bearer '.$accessToken,
                 ],
             ]);
 
@@ -158,7 +159,7 @@ class KeycloakAuthController extends AbstractController
             $user = $this->findOrCreateUser($userInfo, $refreshToken);
 
             // Create redirect response
-            $callbackUrl = $this->frontendUrl . '/auth/callback?' . http_build_query([
+            $callbackUrl = $this->frontendUrl.'/auth/callback?'.http_build_query([
                 'success' => 'true',
                 'provider' => 'keycloak',
             ]);
@@ -190,7 +191,7 @@ class KeycloakAuthController extends AbstractController
                 'error' => $e->getMessage(),
             ]);
 
-            return $this->redirect($this->frontendUrl . '/auth/callback?' . http_build_query([
+            return $this->redirect($this->frontendUrl.'/auth/callback?'.http_build_query([
                 'error' => 'Failed to authenticate with Keycloak',
                 'provider' => 'keycloak',
             ]));
@@ -199,10 +200,11 @@ class KeycloakAuthController extends AbstractController
 
     private function getDiscoveryConfig(): array
     {
-        $discoveryEndpoint = rtrim($this->oidcDiscoveryUrl, '/') . '/.well-known/openid-configuration';
+        $discoveryEndpoint = rtrim($this->oidcDiscoveryUrl, '/').'/.well-known/openid-configuration';
 
         try {
             $response = $this->httpClient->request('GET', $discoveryEndpoint);
+
             return $response->toArray();
         } catch (\Exception $e) {
             $this->logger->error('Failed to load Keycloak discovery config', [
@@ -242,10 +244,7 @@ class KeycloakAuthController extends AbstractController
 
         if ($user) {
             if ('keycloak' !== $user->getProviderId()) {
-                throw new \Exception(sprintf(
-                    'This email is already registered using %s. Please use the same login method.',
-                    $user->getAuthProviderName()
-                ));
+                throw new \Exception(sprintf('This email is already registered using %s. Please use the same login method.', $user->getAuthProviderName()));
             }
 
             $this->logger->info('Existing Keycloak user logging in', [
@@ -254,7 +253,7 @@ class KeycloakAuthController extends AbstractController
         } else {
             // Create new user
             $user = new User();
-            $user->setMail($email ?? $username . '@keycloak.local');
+            $user->setMail($email ?? $username.'@keycloak.local');
             $user->setType('WEB');
             $user->setProviderId('keycloak');
             $user->setUserLevel('NEW');

@@ -63,7 +63,7 @@ class TokenService
     {
         // Revoke any existing refresh tokens for this user (single session)
         // Or keep multiple for multi-device support - for now, keep multiple
-        
+
         $token = $this->tokenRepository->createToken(
             $user,
             self::TYPE_REFRESH,
@@ -100,7 +100,7 @@ class TokenService
         }
 
         // Check type
-        if (!isset($payload['type']) || $payload['type'] !== self::TYPE_ACCESS) {
+        if (!isset($payload['type']) || self::TYPE_ACCESS !== $payload['type']) {
             return null;
         }
 
@@ -116,6 +116,7 @@ class TokenService
 
         if (!$token) {
             $this->logger->warning('Invalid refresh token attempt');
+
             return null;
         }
 
@@ -168,6 +169,7 @@ class TokenService
                 'user_id' => $token->getUserId(),
                 'token_id' => $token->getId(),
             ]);
+
             return true;
         }
 
@@ -191,7 +193,7 @@ class TokenService
         $count = 0;
         foreach ($tokens as $token) {
             $this->tokenRepository->markAsUsed($token);
-            $count++;
+            ++$count;
         }
 
         $this->logger->info('All user tokens revoked', [
@@ -300,7 +302,7 @@ class TokenService
         $json = json_encode($payload, JSON_THROW_ON_ERROR);
         $signature = $this->sign($json);
 
-        return base64_encode($json) . '.' . $signature;
+        return base64_encode($json).'.'.$signature;
     }
 
     /**
@@ -309,7 +311,7 @@ class TokenService
     private function decodeToken(string $token): ?array
     {
         $parts = explode('.', $token);
-        if (count($parts) !== 2) {
+        if (2 !== count($parts)) {
             return null;
         }
 
@@ -323,6 +325,7 @@ class TokenService
         // Verify signature
         if (!hash_equals($this->sign($json), $signature)) {
             $this->logger->warning('Invalid token signature');
+
             return null;
         }
 
@@ -339,7 +342,7 @@ class TokenService
     private function sign(string $data): string
     {
         $secret = $_ENV['APP_SECRET'] ?? 'default_secret_change_me';
+
         return hash_hmac('sha256', $data, $secret);
     }
 }
-

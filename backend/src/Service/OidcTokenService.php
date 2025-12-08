@@ -49,7 +49,7 @@ class OidcTokenService
         string $accessToken,
         string $refreshToken,
         int $expiresIn,
-        string $provider = 'keycloak'
+        string $provider = 'keycloak',
     ): Response {
         // Access token cookie (shorter lifetime based on token expiry)
         $accessExpiry = time() + min($expiresIn, 3600); // Max 1 hour
@@ -84,7 +84,7 @@ class OidcTokenService
     {
         try {
             $discovery = $this->getDiscoveryConfig($provider);
-            
+
             $response = $this->httpClient->request('POST', $discovery['token_endpoint'], [
                 'body' => [
                     'grant_type' => 'refresh_token',
@@ -94,11 +94,12 @@ class OidcTokenService
                 ],
             ]);
 
-            if ($response->getStatusCode() !== 200) {
+            if (200 !== $response->getStatusCode()) {
                 $this->logger->warning('OIDC token refresh failed', [
                     'status' => $response->getStatusCode(),
                     'provider' => $provider,
                 ]);
+
                 return null;
             }
 
@@ -120,6 +121,7 @@ class OidcTokenService
                 'error' => $e->getMessage(),
                 'provider' => $provider,
             ]);
+
             return null;
         }
     }
@@ -131,14 +133,14 @@ class OidcTokenService
     {
         try {
             $discovery = $this->getDiscoveryConfig($provider);
-            
+
             $response = $this->httpClient->request('GET', $discovery['userinfo_endpoint'], [
                 'headers' => [
-                    'Authorization' => 'Bearer ' . $accessToken,
+                    'Authorization' => 'Bearer '.$accessToken,
                 ],
             ]);
 
-            if ($response->getStatusCode() !== 200) {
+            if (200 !== $response->getStatusCode()) {
                 return null;
             }
 
@@ -147,6 +149,7 @@ class OidcTokenService
             $this->logger->debug('OIDC token validation failed', [
                 'error' => $e->getMessage(),
             ]);
+
             return null;
         }
     }
@@ -157,7 +160,7 @@ class OidcTokenService
     public function getUserFromOidcToken(string $accessToken, string $provider = 'keycloak'): ?User
     {
         $userInfo = $this->validateOidcToken($accessToken, $provider);
-        
+
         if (!$userInfo || !isset($userInfo['sub'])) {
             return null;
         }
@@ -165,11 +168,11 @@ class OidcTokenService
         // Efficient query: Find user by OIDC sub in JSON column
         $sub = $userInfo['sub'];
         $sql = "SELECT BID FROM BUSER WHERE JSON_UNQUOTE(JSON_EXTRACT(BUSERDETAILS, '$.oidc_sub')) = :sub LIMIT 1";
-        
+
         try {
             $result = $this->connection->executeQuery($sql, ['sub' => $sub]);
             $row = $result->fetchAssociative();
-            
+
             if ($row && isset($row['BID'])) {
                 return $this->userRepository->find($row['BID']);
             }
@@ -205,11 +208,11 @@ class OidcTokenService
     private function getDiscoveryConfig(string $provider): array
     {
         // Return cached config if available
-        if ($this->discoveryCache !== null) {
+        if (null !== $this->discoveryCache) {
             return $this->discoveryCache;
         }
 
-        $discoveryEndpoint = rtrim($this->oidcDiscoveryUrl, '/') . '/.well-known/openid-configuration';
+        $discoveryEndpoint = rtrim($this->oidcDiscoveryUrl, '/').'/.well-known/openid-configuration';
 
         try {
             $response = $this->httpClient->request('GET', $discoveryEndpoint);
@@ -246,4 +249,3 @@ class OidcTokenService
             ->withSameSite($isProduction ? Cookie::SAMESITE_STRICT : Cookie::SAMESITE_LAX);
     }
 }
-

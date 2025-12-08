@@ -30,7 +30,7 @@ class UserRepository extends ServiceEntityRepository
     {
         return $this->createQueryBuilder('u')
             ->where('u.paymentDetails LIKE :customerId')
-            ->setParameter('customerId', '%"stripe_customer_id":"' . $stripeCustomerId . '"%')
+            ->setParameter('customerId', '%"stripe_customer_id":"'.$stripeCustomerId.'"%')
             ->setMaxResults(1)
             ->getQuery()
             ->getOneOrNullResult();

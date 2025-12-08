@@ -417,7 +417,7 @@ class WidgetController extends AbstractController
     }
 
     /**
-     * Upload widget icon
+     * Upload widget icon.
      */
     #[Route('/{widgetId}/upload-icon', name: 'upload_icon', methods: ['POST'])]
     #[OA\Post(
@@ -461,42 +461,41 @@ class WidgetController extends AbstractController
 
         try {
             // Create upload directory if it doesn't exist
-            $uploadDir = $this->getParameter('kernel.project_dir') . '/public/uploads/widget-icons';
+            $uploadDir = $this->getParameter('kernel.project_dir').'/public/uploads/widget-icons';
             if (!is_dir($uploadDir)) {
                 mkdir($uploadDir, 0755, true);
             }
 
             // Generate unique filename
             $extension = $uploadedFile->guessExtension() ?? 'png';
-            $filename = uniqid('icon_') . '_' . time() . '.' . $extension;
-            
+            $filename = uniqid('icon_').'_'.time().'.'.$extension;
+
             // Move file to upload directory
             $uploadedFile->move($uploadDir, $filename);
 
             // Generate public URL
             $baseUrl = $request->getSchemeAndHttpHost();
-            $iconUrl = $baseUrl . '/uploads/widget-icons/' . $filename;
+            $iconUrl = $baseUrl.'/uploads/widget-icons/'.$filename;
 
             $this->logger->info('Widget icon uploaded', [
                 'widget_id' => $widgetId,
                 'filename' => $filename,
-                'url' => $iconUrl
+                'url' => $iconUrl,
             ]);
 
             return $this->json([
                 'success' => true,
                 'iconUrl' => $iconUrl,
-                'filename' => $filename
+                'filename' => $filename,
             ]);
-
         } catch (\Exception $e) {
             $this->logger->error('Failed to upload widget icon', [
                 'widget_id' => $widgetId,
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ]);
 
             return $this->json([
-                'error' => 'Failed to upload icon: ' . $e->getMessage()
+                'error' => 'Failed to upload icon: '.$e->getMessage(),
             ], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }

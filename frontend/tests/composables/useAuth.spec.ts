@@ -1,11 +1,11 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
 import { useAuth } from '@/composables/useAuth'
+import { useAuthStore } from '@/stores/auth'
 
 describe('useAuth', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
-    localStorage.clear()
     // Reset fetch mock
     vi.restoreAllMocks()
   })
@@ -17,12 +17,11 @@ describe('useAuth', () => {
   })
 
   it('should login successfully', async () => {
-    // Mock successful login response
+    // Mock successful login response (cookie-based - no token in response body)
     global.fetch = vi.fn(() =>
       Promise.resolve({
         ok: true,
         json: () => Promise.resolve({
-          token: 'test-token-123',
           user: { id: 1, email: 'test@example.com', level: 'PRO' }
         })
       })
@@ -34,10 +33,14 @@ describe('useAuth', () => {
     expect(result).toBe(true)
     expect(isAuthenticated.value).toBe(true)
     expect(user.value?.email).toBe('test@example.com')
-    expect(localStorage.getItem('auth_token')).toBeTruthy()
+    // Note: Tokens are now stored in HttpOnly cookies, not localStorage
   })
 
   it('should logout and clear state', async () => {
+    // Set up initial auth state via store
+    const authStore = useAuthStore()
+    authStore.user = { id: 1, email: 'test@example.com', level: 'PRO' }
+
     // Mock logout response
     global.fetch = vi.fn(() =>
       Promise.resolve({
@@ -48,35 +51,43 @@ describe('useAuth', () => {
 
     const { logout, isAuthenticated, user } = useAuth()
 
-    // Set up initial auth state
-    localStorage.setItem('auth_token', 'test-token')
-    localStorage.setItem('auth_user', JSON.stringify({ id: 1, email: 'test@example.com' }))
+    // Verify initial state
+    expect(isAuthenticated.value).toBe(true)
 
     await logout()
 
     expect(isAuthenticated.value).toBe(false)
     expect(user.value).toBe(null)
-    expect(localStorage.getItem('auth_token')).toBe(null)
+    // Note: Cookies are cleared by backend, not frontend
   })
 
-  it('should detect existing token on checkAuth', () => {
-    // Note: This test validates that checkAuth loads from localStorage
-    // The actual token validation via API is tested in integration tests
+  it('should expose auth state from store', () => {
+    // Set up auth state via store directly
+    const authStore = useAuthStore()
+    authStore.user = { id: 1, email: 'test@example.com', level: 'PRO' }
 
-    // Manually set localStorage (simulating a returning user)
-    localStorage.setItem('auth_token', 'existing-token')
-    localStorage.setItem('auth_user', JSON.stringify({ id: 1, email: 'test@example.com', level: 'PRO' }))
+    const { isAuthenticated, user, userLevel, isPro } = useAuth()
 
-    // Verify token and user are loaded from localStorage
-    expect(localStorage.getItem('auth_token')).toBe('existing-token')
-    expect(JSON.parse(localStorage.getItem('auth_user') || '{}')).toEqual({
-      id: 1,
-      email: 'test@example.com',
-      level: 'PRO'
-    })
+    expect(isAuthenticated.value).toBe(true)
+    expect(user.value?.email).toBe('test@example.com')
+    expect(userLevel.value).toBe('PRO')
+    expect(isPro.value).toBe(true)
+  })
 
-    // This test is primarily checking localStorage persistence
-    // Full checkAuth with API validation is covered by integration tests
+  it('should handle login failure', async () => {
+    // Mock failed login response
+    global.fetch = vi.fn(() =>
+      Promise.resolve({
+        ok: false,
+        status: 401,
+        json: () => Promise.resolve({ error: 'Invalid credentials' })
+      })
+    ) as any
+
+    const { login, isAuthenticated, error } = useAuth()
+    const result = await login('test@example.com', 'wrongpassword')
+
+    expect(result).toBe(false)
+    expect(isAuthenticated.value).toBe(false)
   })
 })
-

@@ -155,7 +155,7 @@ class StripeWebhookController extends AbstractController
     private function checkRateLimit(Request $request): bool
     {
         $ip = $request->getClientIp() ?? 'unknown';
-        $cacheKey = 'stripe_webhook_rate_' . md5($ip);
+        $cacheKey = 'stripe_webhook_rate_'.md5($ip);
 
         $item = $this->cache->getItem($cacheKey);
 
@@ -183,7 +183,7 @@ class StripeWebhookController extends AbstractController
      */
     private function isEventProcessed(string $eventId): bool
     {
-        $cacheKey = 'stripe_event_' . $eventId;
+        $cacheKey = 'stripe_event_'.$eventId;
         $item = $this->cache->getItem($cacheKey);
 
         return $item->isHit();
@@ -194,7 +194,7 @@ class StripeWebhookController extends AbstractController
      */
     private function markEventProcessed(string $eventId): void
     {
-        $cacheKey = 'stripe_event_' . $eventId;
+        $cacheKey = 'stripe_event_'.$eventId;
         $item = $this->cache->getItem($cacheKey);
         $item->set(time());
         $item->expiresAfter(self::IDEMPOTENCY_TTL);
@@ -336,6 +336,7 @@ class StripeWebhookController extends AbstractController
                 'updated_subscription_id' => $subscription->id,
                 'current_subscription_id' => $currentSubscriptionId,
             ]);
+
             return true;
         }
 
@@ -357,7 +358,7 @@ class StripeWebhookController extends AbstractController
         $paymentDetails['subscription']['status'] = $subscription->status;
         $paymentDetails['subscription']['subscription_end'] = $subscription->current_period_end;
         $paymentDetails['subscription']['plan'] = $newLevel;
-        
+
         // Track cancellation at period end (user canceled but still has access until period ends)
         $paymentDetails['subscription']['cancel_at_period_end'] = $subscription->cancel_at_period_end ?? false;
         if ($subscription->cancel_at_period_end) {

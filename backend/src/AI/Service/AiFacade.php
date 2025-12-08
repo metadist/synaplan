@@ -36,6 +36,7 @@ class AiFacade
                     }
                 }
             }
+
             return $message;
         }, $messages);
     }
@@ -53,6 +54,7 @@ class AiFacade
                 $arr[$key] = $this->sanitizeNestedArray($value);
             }
         }
+
         return $arr;
     }
 
