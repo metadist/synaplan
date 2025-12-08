@@ -79,6 +79,12 @@ security:
         # Legacy widget.php endpoint (compatibility layer)
         - { path: ^/widget\.php, roles: PUBLIC_ACCESS }
         
+        # Legacy api.php endpoint (WordPress wizard compatibility)
+        - { path: ^/api\.php, roles: PUBLIC_ACCESS }
+        
+        # WordPress integration endpoints (public for plugin onboarding)
+        - { path: ^/api/v1/integrations/wordpress, roles: PUBLIC_ACCESS }
+        
         # Webhook endpoints (email webhook is public, WhatsApp requires verification)
         - { path: ^/api/v1/webhooks/email, roles: PUBLIC_ACCESS }
         - { path: ^/api/v1/webhooks/whatsapp, roles: PUBLIC_ACCESS }

@@ -32,6 +32,9 @@
 		path('/up/*') ||
 		path('/api/*') ||
 		path('/api.php') ||
+		path('/widget.php') ||
+		path('/widget-loader.js') ||
+		path('/widget-full.js') ||
 		({env.APP_ENV} == 'dev' && (path('/_profiler/*') || path('/_wdt/*') || path('/_error/*')))
 	`
 	route @backend {

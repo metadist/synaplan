@@ -388,7 +388,7 @@ interface Message {
   timestamp: Date
 }
 
-const isOpen = ref(false)
+const isOpen = ref(props.openImmediately ?? false)
 const widgetTheme = ref<'light' | 'dark'>(props.defaultTheme)
 const inputMessage = ref('')
 

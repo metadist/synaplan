@@ -25,6 +25,7 @@ interface WidgetConfig {
   iconColor?: string
   defaultTheme?: 'light' | 'dark'
   autoOpen?: boolean
+  openImmediately?: boolean
   autoMessage?: string
   apiUrl?: string
   messageLimit?: number
@@ -76,6 +77,7 @@ class SynaplanWidget {
       iconColor: '#ffffff',
       defaultTheme: 'light',
       autoOpen: false,
+      openImmediately: false,
       autoMessage: 'Hello! How can I help you today?',
       messageLimit: 50,
       maxFileSize: 10,
@@ -197,6 +199,7 @@ class SynaplanWidget {
       iconColor: this.config.iconColor,
       defaultTheme: this.config.defaultTheme,
       autoOpen: this.config.autoOpen,
+      openImmediately: this.config.openImmediately,
       autoMessage: this.config.autoMessage,
       messageLimit: this.config.messageLimit,
       maxFileSize: this.config.maxFileSize,

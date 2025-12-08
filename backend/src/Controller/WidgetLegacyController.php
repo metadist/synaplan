@@ -160,9 +160,9 @@ class WidgetLegacyController extends AbstractController
     // Legacy widget.php compatibility layer
     console.log('Synaplan Widget: Loading via legacy widget.php endpoint (uid parameter is deprecated)');
     
-    // Load the modern widget script
+    // Load the modern widget loader script
     var script = document.createElement('script');
-    script.src = '{$apiBaseUrl}/widget.js';
+    script.src = '{$apiBaseUrl}/widget-loader.js';
     script.async = true;
     script.onload = function() {
         // Initialize widget when script is loaded

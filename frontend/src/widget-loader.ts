@@ -231,14 +231,10 @@ class SynaplanWidgetLoader {
     }
 
     try {
-      // Check if Vue is available
+      // Load Vue.js from CDN if not already available
       if (!(window as any).Vue) {
-        console.error('Synaplan Widget: Vue.js is required. Please include: <script src="https://cdn.jsdelivr.net/npm/vue@3/dist/vue.global.prod.js"></script>')
-        if (this.button) {
-          this.button.innerHTML = this.getIconContent()
-        }
-        this.fullWidgetLoading = false
-        return
+        console.log('Synaplan Widget: Loading Vue.js from CDN...')
+        await this.loadScript('https://cdn.jsdelivr.net/npm/vue@3/dist/vue.global.prod.js')
       }
 
       console.log('Loading Synaplan Widget Full...')
@@ -260,8 +256,7 @@ class SynaplanWidgetLoader {
         
         // Wait a moment for the script to execute
         setTimeout(() => {
-          const FullWidget = (window as any).SynaplanWidgetFull
-          console.log('SynaplanWidgetFull available:', !!FullWidget)
+          const FullWidget = (window as any).SynaplanWidget
           
           if (FullWidget && typeof FullWidget.init === 'function') {
             // Set openImmediately to true so the chat opens right away
@@ -269,13 +264,17 @@ class SynaplanWidgetLoader {
               ...this.config!,
               openImmediately: true
             }
-            console.log('Initializing with config:', configWithOpenImmediately)
             FullWidget.init(configWithOpenImmediately)
-            
             this.fullWidgetLoaded = true
-            console.log('Synaplan Widget initialized successfully')
+            
+            // Dispatch open event as backup to ensure chat opens
+            setTimeout(() => {
+              window.dispatchEvent(new CustomEvent('synaplan-widget-open', {
+                detail: { widgetId: this.config?.widgetId }
+              }))
+            }, 200)
           } else {
-            console.error('SynaplanWidgetFull not found or init method missing')
+            console.error('SynaplanWidget not found or init method missing')
             // Recreate button if full widget failed
             this.fullWidgetLoading = false
             this.createButton()
@@ -307,6 +306,17 @@ class SynaplanWidgetLoader {
       this.button.remove()
       this.button = null
     }
+  }
+
+  private loadScript(src: string): Promise<void> {
+    return new Promise((resolve, reject) => {
+      const script = document.createElement('script')
+      script.src = src
+      script.type = 'text/javascript'
+      script.onload = () => resolve()
+      script.onerror = (error) => reject(error)
+      document.head.appendChild(script)
+    })
   }
 }
 
