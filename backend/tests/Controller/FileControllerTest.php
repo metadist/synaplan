@@ -4,11 +4,15 @@ namespace App\Tests\Controller;
 
 use App\Entity\User;
 use App\Repository\UserRepository;
+use App\Service\TokenService;
+use App\Tests\Trait\AuthenticatedTestTrait;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
 use Symfony\Component\HttpFoundation\File\UploadedFile;
 
 class FileControllerTest extends WebTestCase
 {
+    use AuthenticatedTestTrait;
+
     private $client;
     private User $testUser;
     private string $authToken;
@@ -25,17 +29,8 @@ class FileControllerTest extends WebTestCase
             $this->markTestSkipped('Test user not found. Run fixtures first.');
         }
 
-        // Login to get JWT token
-        $this->client->request('POST', '/api/v1/auth/login', [], [], [
-            'CONTENT_TYPE' => 'application/json',
-        ], json_encode([
-            'email' => 'admin@synaplan.com',
-            'password' => 'admin123',
-        ]));
-
-        $response = $this->client->getResponse();
-        $data = json_decode($response->getContent(), true);
-        $this->authToken = $data['token'] ?? '';
+        // Generate access token using TokenService
+        $this->authToken = $this->authenticateClient($this->client, $this->testUser);
     }
 
     public function testUploadSingleTextFile(): void
@@ -145,16 +140,17 @@ class FileControllerTest extends WebTestCase
 
     public function testUploadWithoutAuthentication(): void
     {
+        $client = static::createClient();
         $testFile = $this->createTestFile('test.txt', 'content');
         $uploadedFile = new UploadedFile($testFile, 'test.txt', 'text/plain', null, true);
 
-        $this->client->request('POST', '/api/v1/files/upload', [
+        $client->request('POST', '/api/v1/files/upload', [
             'group_key' => 'TEST',
         ], [
             'files' => [$uploadedFile],
         ]);
 
-        $response = $this->client->getResponse();
+        $response = $client->getResponse();
         $this->assertEquals(401, $response->getStatusCode());
     }
 

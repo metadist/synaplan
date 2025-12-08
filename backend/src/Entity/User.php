@@ -237,7 +237,15 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
 
     public function getStripeCustomerId(): ?string
     {
-        return $this->getSubscriptionData()['stripe_customer_id'] ?? null;
+        // stripe_customer_id is stored in paymentDetails JSON
+        return $this->paymentDetails['stripe_customer_id'] ?? null;
+    }
+
+    public function setStripeCustomerId(?string $stripeCustomerId): self
+    {
+        $this->paymentDetails['stripe_customer_id'] = $stripeCustomerId;
+
+        return $this;
     }
 
     /**

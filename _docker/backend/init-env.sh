@@ -7,7 +7,7 @@ echo "🔧 Checking environment files..."
 create_env_from_example() {
     local ENV_FILE=$1
     local EXAMPLE_FILE=$2
-    
+
     if [ ! -f "$ENV_FILE" ]; then
         if [ -f "$EXAMPLE_FILE" ]; then
             echo "📝 Creating $ENV_FILE from $EXAMPLE_FILE..."

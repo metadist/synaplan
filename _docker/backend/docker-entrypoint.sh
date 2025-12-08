@@ -6,6 +6,39 @@ echo "🚀 Starting Synaplan Backend..."
 # Initialize environment configuration
 /usr/local/bin/init-env.sh
 
+# Build DATABASE URLs from environment variables if not already set
+# Fallback for deployments that provide DB credentials as separate env vars
+if [ -z "${DATABASE_WRITE_URL:-}" ] && [ -n "${DB_HOST:-}" ]; then
+    # URL-encode the password to handle special characters (using jq)
+    DB_PASSWORD_ENCODED=$(printf %s "${DB_PASSWORD:-}" | jq -sRr @uri)
+    export DATABASE_WRITE_URL="mysql://${DB_USER:-synaplan}:${DB_PASSWORD_ENCODED}@${DB_HOST}:${DB_PORT:-3306}/${DB_NAME:-synaplan}?serverVersion=${DB_SERVER_VERSION:-11.8}&charset=utf8mb4"
+    export DATABASE_READ_URL="${DATABASE_WRITE_URL}"
+    echo "✅ Built DATABASE URLs from environment variables"
+fi
+
+# Run additional startup scripts from docker-entrypoint.d (if any)
+# Useful for dev environments to mount custom initialization scripts
+if [ -d "/docker-entrypoint.d" ]; then
+    # Check if directory has any files (avoid empty glob expansion)
+    if compgen -G "/docker-entrypoint.d/*" > /dev/null; then
+        echo "🔧 Running additional startup scripts from /docker-entrypoint.d/..."
+        for f in /docker-entrypoint.d/*; do
+            # Additional safety: verify the file is owned by root and not world-writable
+            if [ ! -O "$f" ] || [ -k "$f" ]; then
+                echo "   ⚠️  Skipping unsafe file: $(basename "$f") (not owned by current user or has sticky bit)"
+                continue
+            fi
+            if [ -x "$f" ]; then
+                echo "   Executing: $(basename "$f")"
+                "$f"
+            elif [ -f "$f" ]; then
+                echo "   ⚠️  Skipping non-executable: $(basename "$f")"
+            fi
+        done
+        echo "✅ Additional startup scripts completed"
+    fi
+fi
+
 if [ -z "${GROQ_API_KEY:-}" ]; then
 cat <<'EOM'
 =====================================================================
@@ -14,24 +47,6 @@ cat <<'EOM'
 💥  and put it into backend/.env (GROQ_API_KEY=...) to unlock them!
 =====================================================================
 EOM
-fi
-
-# Update Composer dependencies if composer.json changed (handles bind mounts)
-echo "📦 Checking Composer dependencies..."
-if [ -f "composer.json" ]; then
-    # Check if vendor exists and is writable
-    if [ ! -d "vendor" ] || [ ! -w "vendor" ]; then
-        echo "⚙️  Installing Composer dependencies..."
-        composer install --no-interaction --prefer-dist --optimize-autoloader --no-scripts --ignore-platform-req=ext-redis
-        chown -R www-data:www-data vendor/ var/ 2>/dev/null || true
-    else
-        # Quick check if dependencies are up to date
-        composer check-platform-reqs --ignore-platform-req=ext-redis > /dev/null 2>&1 || {
-            echo "⚙️  Updating Composer dependencies..."
-            composer install --no-interaction --prefer-dist --optimize-autoloader --no-scripts --ignore-platform-req=ext-redis
-        }
-    fi
-    echo "✅ Composer dependencies ready!"
 fi
 
 # Ensure upload directory is available before permissions are fixed
@@ -43,11 +58,6 @@ fi
 # Ensure proper permissions
 chown -R www-data:www-data var/ public/up/ 2>/dev/null || true
 chmod -R 775 var/ public/up/ 2>/dev/null || true
-
-# Generate JWT keys if they don't exist
-echo "🔑 Checking JWT keys..."
-php bin/console lexik:jwt:generate-keypair --skip-if-exists
-echo "✅ JWT keys ready!"
 
 # Wait for database to be ready
 echo "⏳ Waiting for database connection..."

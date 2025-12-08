@@ -13,7 +13,7 @@ doctrine:
                 use_savepoints: true
                 mapping_types:
                     vector: vector
-                
+
             read:
                 url: '%env(resolve:DATABASE_READ_URL)%'
                 driver: 'pdo_mysql'

@@ -254,9 +254,12 @@ const navItems = computed<NavItem[]>(() => {
 
   items.push({ path: '/statistics', label: 'Statistics', icon: ChartBarIcon })
 
-  // Upgrade - only for non-pro users
-  if (!authStore.isPro) {
-    items.push({ path: '/subscription', label: 'Upgrade', icon: SparklesIcon, isUpgrade: true })
+  // Subscription - show for all users (different label based on level)
+  // Admin users don't need this as they have unlimited access
+  if (!authStore.isAdmin) {
+    const subscriptionLabel = authStore.isPro ? 'Subscription' : 'Upgrade'
+    const isUpgradeStyle = !authStore.isPro
+    items.push({ path: '/subscription', label: subscriptionLabel, icon: SparklesIcon, isUpgrade: isUpgradeStyle })
   }
 
   // Admin panel - only for admins

@@ -2,11 +2,16 @@
 
 namespace App\Tests\Integration\Controller;
 
+use App\Entity\User;
+use App\Service\TokenService;
+use App\Tests\Trait\AuthenticatedTestTrait;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
 use Symfony\Component\HttpFoundation\Response;
 
 class InboundEmailHandlerControllerTest extends WebTestCase
 {
+    use AuthenticatedTestTrait;
+
     private $client;
     private $token;
 
@@ -14,19 +19,15 @@ class InboundEmailHandlerControllerTest extends WebTestCase
     {
         $this->client = static::createClient();
 
-        // Login to get JWT token
-        $this->client->request('POST', '/api/v1/auth/login', [], [], [
-            'CONTENT_TYPE' => 'application/json',
-        ], json_encode([
-            'email' => 'admin@synaplan.com',
-            'password' => 'admin123',
-        ]));
+        // Find test user and authenticate using TokenService
+        $userRepository = static::getContainer()->get('doctrine')->getRepository(User::class);
+        $user = $userRepository->findOneBy(['mail' => 'admin@synaplan.com']);
 
-        $response = $this->client->getResponse();
-        $data = json_decode($response->getContent(), true);
-        $this->token = $data['token'] ?? null;
+        if (!$user) {
+            $this->markTestSkipped('Test user admin@synaplan.com not found. Run fixtures first.');
+        }
 
-        $this->assertNotNull($this->token, 'Failed to obtain JWT token');
+        $this->token = $this->authenticateClient($this->client, $user);
     }
 
     public function testCreateHandlerWithSMTPAndEmailFilter(): void

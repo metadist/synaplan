@@ -9,11 +9,15 @@ nelmio_api_doc:
               description: Local development server
         components:
             securitySchemes:
+                CookieAuth:
+                    type: apiKey
+                    in: cookie
+                    name: access_token
+                    description: 'HttpOnly cookie-based authentication. Tokens are set automatically on login.'
                 Bearer:
                     type: http
                     scheme: bearer
-                    bearerFormat: JWT
-                    description: 'JWT Authorization header using the Bearer scheme. Example: "Authorization: Bearer {token}"'
+                    description: 'Bearer token for SSE connections. Get token from /api/v1/auth/token endpoint.'
     areas:
         path_patterns:
             - ^/api(?!/doc$) # Accepts all routes except /api/doc

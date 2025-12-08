@@ -503,7 +503,10 @@
     },
     "upgradeNow": "Jetzt Upgraden",
     "verifyPhone": "Telefonnummer Verifizieren",
-    "footerNote": "Fragen? Kontaktieren Sie unser Support-Team."
+    "footerNote": "Fragen? Kontaktieren Sie unser Support-Team.",
+    "messageBlocked": "Nachricht konnte nicht gesendet werden",
+    "messageBlockedDesc": "Du hast dein {action}-Limit erreicht. Upgrade deinen Plan oder warte bis das Limit zurückgesetzt wird.",
+    "retryLater": "Erneut versuchen"
   },
   "subscription": {
     "title": "Abonnements",
@@ -517,6 +520,9 @@
     "cancelPlan": "Abo kündigen",
     "recommended": "Empfohlen",
     "selectPlan": "Plan wählen",
+    "upgrade": "Upgraden",
+    "includedInCurrent": "In deinem Plan enthalten",
+    "highestPlan": "Du hast bereits den höchsten Plan!",
     "processing": "Wird verarbeitet...",
     "perMonth": "Monat",
     "perYear": "Jahr",
@@ -532,6 +538,10 @@
       "statusActive": "Aktiv",
       "statusCanceled": "Gekündigt",
       "statusPastDue": "Zahlung überfällig",
+      "statusIncomplete": "Unvollständig",
+      "statusTrialing": "Testphase",
+      "statusUnpaid": "Unbezahlt",
+      "statusPaused": "Pausiert",
       "nextBilling": "Nächstes Abrechnungsdatum",
       "cancelDate": "Kündigung zum",
       "billingPortal": "Rechnungsportal",
@@ -565,6 +575,24 @@
       "whiteLabel": "White-label Widgets",
       "dedicatedSupport": "Dedizierter Support",
       "slaGuarantee": "SLA-Garantie"
+    },
+    "success": {
+      "title": "Zahlung erfolgreich!",
+      "description": "Dein Abonnement wurde aktiviert. Vielen Dank für das Upgrade!",
+      "newPlan": "Dein neuer Plan",
+      "startUsing": "Plan jetzt nutzen",
+      "activating": "Plan wird aktiviert...",
+      "activatingDesc": "Bitte warte, während wir dein Abonnement aktivieren.",
+      "almostDone": "Fast fertig!",
+      "processing": "Deine Zahlung war erfolgreich, aber wir verarbeiten noch dein Abonnement.",
+      "retry": "Erneut versuchen",
+      "continueAnyway": "Trotzdem fortfahren"
+    },
+    "cancel": {
+      "title": "Zahlung abgebrochen",
+      "description": "Deine Zahlung wurde abgebrochen. Es wurden keine Kosten berechnet.",
+      "tryAgain": "Erneut versuchen",
+      "backToPlans": "Zurück zu den Plänen"
     }
   },
   "common": {

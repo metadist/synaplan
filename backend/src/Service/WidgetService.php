@@ -158,7 +158,7 @@ class WidgetService
         $allowFileUploadStr = $allowFileUpload ? 'true' : 'false';
 
         // Build icon config
-        $iconConfig = $buttonIconUrl 
+        $iconConfig = $buttonIconUrl
             ? "buttonIconUrl: '{$buttonIconUrl}',"
             : "buttonIcon: '{$buttonIcon}',";
 
@@ -287,11 +287,11 @@ HTML;
         }
 
         // Validate custom icon URL (if provided)
-        if (isset($config['buttonIconUrl']) && is_string($config['buttonIconUrl']) && $config['buttonIconUrl'] !== '') {
+        if (isset($config['buttonIconUrl']) && is_string($config['buttonIconUrl']) && '' !== $config['buttonIconUrl']) {
             // Allow data URLs for embedded images or HTTP(S) URLs
-            if (!str_starts_with($config['buttonIconUrl'], 'data:image/') && 
-                !str_starts_with($config['buttonIconUrl'], 'http://') && 
-                !str_starts_with($config['buttonIconUrl'], 'https://')) {
+            if (!str_starts_with($config['buttonIconUrl'], 'data:image/')
+                && !str_starts_with($config['buttonIconUrl'], 'http://')
+                && !str_starts_with($config['buttonIconUrl'], 'https://')) {
                 $config['buttonIconUrl'] = null;
             }
         } else {

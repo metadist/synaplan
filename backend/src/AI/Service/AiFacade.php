@@ -18,6 +18,47 @@ class AiFacade
     }
 
     /**
+     * Sanitize UTF-8 in messages to prevent encoding errors.
+     */
+    private function sanitizeMessages(array $messages): array
+    {
+        return array_map(function ($message) {
+            if (is_array($message)) {
+                foreach ($message as $key => $value) {
+                    if (is_string($value)) {
+                        // Remove invalid UTF-8 characters
+                        $message[$key] = mb_convert_encoding($value, 'UTF-8', 'UTF-8');
+                        // Remove null bytes and other problematic characters
+                        $message[$key] = preg_replace('/[\x00-\x08\x0B\x0C\x0E-\x1F]/', '', $message[$key]);
+                    } elseif (is_array($value)) {
+                        // Handle nested arrays (e.g., for vision messages with image_url)
+                        $message[$key] = $this->sanitizeNestedArray($value);
+                    }
+                }
+            }
+
+            return $message;
+        }, $messages);
+    }
+
+    /**
+     * Recursively sanitize nested arrays.
+     */
+    private function sanitizeNestedArray(array $arr): array
+    {
+        foreach ($arr as $key => $value) {
+            if (is_string($value)) {
+                $arr[$key] = mb_convert_encoding($value, 'UTF-8', 'UTF-8');
+                $arr[$key] = preg_replace('/[\x00-\x08\x0B\x0C\x0E-\x1F]/', '', $arr[$key]);
+            } elseif (is_array($value)) {
+                $arr[$key] = $this->sanitizeNestedArray($value);
+            }
+        }
+
+        return $arr;
+    }
+
+    /**
      * Chat: Messages-Array or simple prompt.
      *
      * @param array|string $messages Messages array oder einfacher string prompt
@@ -41,6 +82,9 @@ class AiFacade
         if (is_string($messages)) {
             $messages = [['role' => 'user', 'content' => $messages]];
         }
+
+        // Sanitize UTF-8 to prevent encoding errors
+        $messages = $this->sanitizeMessages($messages);
 
         $this->logger->info('AI chat request', [
             'provider' => $provider->getName(),
@@ -98,6 +142,9 @@ class AiFacade
         if (is_string($messages)) {
             $messages = [['role' => 'user', 'content' => $messages]];
         }
+
+        // Sanitize UTF-8 to prevent encoding errors
+        $messages = $this->sanitizeMessages($messages);
 
         $this->logger->info('🔵 AiFacade: Starting chat stream', [
             'provider' => $provider->getName(),

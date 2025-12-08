@@ -12,6 +12,7 @@ services:
     volumes:
       - ./_docker/frontend/docker-entrypoint.sh:/usr/local/bin/docker-entrypoint.sh:ro
       - ./_docker/frontend/init-env.sh:/usr/local/bin/init-env.sh:ro
+      - ./_devextras/frontend/docker-entrypoint.d:/docker-entrypoint.d:ro
 
       - ./frontend:/app
        # Anonymous volume to prevent host node_modules from being mounted (avoids platform-specific binary conflicts)
@@ -39,6 +40,7 @@ services:
       - ./frontend/dist:/var/www/frontend:ro
       - ./_docker/backend/Caddyfile:/etc/caddy/Caddyfile:ro
       - whisper_models:/var/www/backend/var/whisper:ro
+      - ./_devextras/backend/docker-entrypoint.d:/docker-entrypoint.d:ro
     environment:
       APP_ENV: dev
       APP_SECRET: change_me_in_production_12345678901234567890
@@ -47,6 +49,7 @@ services:
       DATABASE_WRITE_URL: mysql://synaplan_user:synaplan_password@db:3306/synaplan?serverVersion=11.8&charset=utf8mb4
       DATABASE_READ_URL: mysql://synaplan_user:synaplan_password@db:3306/synaplan?serverVersion=11.8&charset=utf8mb4
       OLLAMA_BASE_URL: http://ollama:11434
+      TRITON_SERVER_URL: ${TRITON_SERVER_URL:-}
       TIKA_BASE_URL: http://tika:9998
       AI_DEFAULT_PROVIDER: ollama
       # JWT Configuration
@@ -70,13 +73,8 @@ services:
       RECAPTCHA_SITE_KEY: ${RECAPTCHA_SITE_KEY:-}
       RECAPTCHA_SECRET_KEY: ${RECAPTCHA_SECRET_KEY:-}
       RECAPTCHA_ENABLED: ${RECAPTCHA_ENABLED:-false}
-      # Stripe Payment Integration (optional)
-      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
-      STRIPE_PUBLISHABLE_KEY: ${STRIPE_PUBLISHABLE_KEY:-}
-      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
-      STRIPE_PRICE_PRO: ${STRIPE_PRICE_PRO:-price_pro}
-      STRIPE_PRICE_TEAM: ${STRIPE_PRICE_TEAM:-price_team}
-      STRIPE_PRICE_BUSINESS: ${STRIPE_PRICE_BUSINESS:-price_business}
+      # Stripe Payment Integration - loaded from backend/.env via env_file
+      # (STRIPE_SECRET_KEY, STRIPE_PUBLISHABLE_KEY, STRIPE_WEBHOOK_SECRET, STRIPE_PRICE_*)
       # OAuth Social Login Providers (loaded from backend/.env via env_file)
     depends_on:
       db:

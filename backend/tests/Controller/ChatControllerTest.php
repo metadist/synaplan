@@ -6,6 +6,8 @@ namespace App\Tests\Controller;
 
 use App\Entity\Chat;
 use App\Entity\User;
+use App\Service\TokenService;
+use App\Tests\Trait\AuthenticatedTestTrait;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
 use Symfony\Component\HttpFoundation\Response;
 
@@ -15,6 +17,8 @@ use Symfony\Component\HttpFoundation\Response;
  */
 class ChatControllerTest extends WebTestCase
 {
+    use AuthenticatedTestTrait;
+
     private $client;
     private $em;
     private $user;
@@ -36,9 +40,8 @@ class ChatControllerTest extends WebTestCase
         $this->em->persist($this->user);
         $this->em->flush();
 
-        // Generate JWT token
-        $jwtManager = static::getContainer()->get('lexik_jwt_authentication.jwt_manager');
-        $this->token = $jwtManager->create($this->user);
+        // Generate access token using TokenService
+        $this->token = $this->authenticateClient($this->client, $this->user);
     }
 
     protected function tearDown(): void
@@ -63,7 +66,9 @@ class ChatControllerTest extends WebTestCase
 
     public function testListChatsWithoutAuth(): void
     {
-        $this->client->request('GET', '/api/v1/chats');
+        // Create new client without auth cookies
+        $client = static::createClient();
+        $client->request('GET', '/api/v1/chats');
 
         $this->assertResponseStatusCodeSame(Response::HTTP_UNAUTHORIZED);
     }
@@ -75,9 +80,7 @@ class ChatControllerTest extends WebTestCase
             '/api/v1/chats',
             [],
             [],
-            [
-                'HTTP_AUTHORIZATION' => 'Bearer '.$this->token,
-            ]
+            ['HTTP_AUTHORIZATION' => 'Bearer '.$this->token]
         );
 
         $this->assertResponseIsSuccessful();
@@ -92,7 +95,8 @@ class ChatControllerTest extends WebTestCase
 
     public function testCreateChatWithoutAuth(): void
     {
-        $this->client->request(
+        $client = static::createClient();
+        $client->request(
             'POST',
             '/api/v1/chats',
             [],
@@ -177,9 +181,7 @@ class ChatControllerTest extends WebTestCase
             '/api/v1/chats',
             [],
             [],
-            [
-                'HTTP_AUTHORIZATION' => 'Bearer '.$this->token,
-            ]
+            ['HTTP_AUTHORIZATION' => 'Bearer '.$this->token]
         );
 
         $this->assertResponseIsSuccessful();
@@ -200,7 +202,8 @@ class ChatControllerTest extends WebTestCase
 
     public function testGetChatByIdWithoutAuth(): void
     {
-        $this->client->request('GET', '/api/v1/chats/1');
+        $client = static::createClient();
+        $client->request('GET', '/api/v1/chats/1');
 
         $this->assertResponseStatusCodeSame(Response::HTTP_UNAUTHORIZED);
     }
@@ -212,9 +215,7 @@ class ChatControllerTest extends WebTestCase
             '/api/v1/chats/99999',
             [],
             [],
-            [
-                'HTTP_AUTHORIZATION' => 'Bearer '.$this->token,
-            ]
+            ['HTTP_AUTHORIZATION' => 'Bearer '.$this->token]
         );
 
         $this->assertResponseStatusCodeSame(Response::HTTP_NOT_FOUND);
@@ -237,9 +238,7 @@ class ChatControllerTest extends WebTestCase
             '/api/v1/chats/'.$chat->getId(),
             [],
             [],
-            [
-                'HTTP_AUTHORIZATION' => 'Bearer '.$this->token,
-            ]
+            ['HTTP_AUTHORIZATION' => 'Bearer '.$this->token]
         );
 
         $this->assertResponseIsSuccessful();
@@ -280,9 +279,7 @@ class ChatControllerTest extends WebTestCase
             '/api/v1/chats/'.$chat->getId(),
             [],
             [],
-            [
-                'HTTP_AUTHORIZATION' => 'Bearer '.$this->token,
-            ]
+            ['HTTP_AUTHORIZATION' => 'Bearer '.$this->token]
         );
 
         // Should return 403 Forbidden or 404 Not Found
@@ -300,7 +297,8 @@ class ChatControllerTest extends WebTestCase
 
     public function testUpdateChatWithoutAuth(): void
     {
-        $this->client->request(
+        $client = static::createClient();
+        $client->request(
             'PATCH',
             '/api/v1/chats/1',
             [],
@@ -368,7 +366,8 @@ class ChatControllerTest extends WebTestCase
 
     public function testDeleteChatWithoutAuth(): void
     {
-        $this->client->request('DELETE', '/api/v1/chats/1');
+        $client = static::createClient();
+        $client->request('DELETE', '/api/v1/chats/1');
 
         $this->assertResponseStatusCodeSame(Response::HTTP_UNAUTHORIZED);
     }
@@ -380,9 +379,7 @@ class ChatControllerTest extends WebTestCase
             '/api/v1/chats/99999',
             [],
             [],
-            [
-                'HTTP_AUTHORIZATION' => 'Bearer '.$this->token,
-            ]
+            ['HTTP_AUTHORIZATION' => 'Bearer '.$this->token]
         );
 
         $this->assertResponseStatusCodeSame(Response::HTTP_NOT_FOUND);
@@ -407,9 +404,7 @@ class ChatControllerTest extends WebTestCase
             '/api/v1/chats/'.$chatId,
             [],
             [],
-            [
-                'HTTP_AUTHORIZATION' => 'Bearer '.$this->token,
-            ]
+            ['HTTP_AUTHORIZATION' => 'Bearer '.$this->token]
         );
 
         $this->assertResponseIsSuccessful();

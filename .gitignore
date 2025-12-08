@@ -3,6 +3,7 @@
 .env.docker
 .env.local
 .env.*.local
+.cursorignore
 
 .fixtures_loaded
 

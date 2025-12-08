@@ -1,7 +1,8 @@
 <!-- OAuth Callback Handler Component -->
+<!-- With cookie-based auth, tokens are set automatically by the redirect -->
 <template>
   <div class="min-h-screen bg-light-bg dark:bg-dark-bg flex items-center justify-center px-4 relative overflow-hidden">
-    <!-- Background decoration (same as LoginView) -->
+    <!-- Background decoration -->
     <div class="absolute inset-0 overflow-hidden pointer-events-none">
       <div class="absolute top-0 left-1/4 w-96 h-96 bg-primary/5 dark:bg-primary/10 rounded-full blur-3xl animate-float"></div>
       <div class="absolute bottom-0 right-1/4 w-96 h-96 bg-primary/5 dark:bg-primary/10 rounded-full blur-3xl animate-float-delayed"></div>
@@ -69,6 +70,7 @@ const error = ref<string | null>(null)
 const providerName = computed(() => {
   if (provider.value === 'google') return 'Google'
   if (provider.value === 'github') return 'GitHub'
+  if (provider.value === 'keycloak') return 'Keycloak'
   return provider.value
 })
 
@@ -80,62 +82,54 @@ onMounted(async () => {
   try {
     // Parse URL parameters
     const urlParams = new URLSearchParams(window.location.search)
-    const token = urlParams.get('token')
+    const successParam = urlParams.get('success')
     const providerParam = urlParams.get('provider')
     const errorParam = urlParams.get('error')
-    const isAdminParam = urlParams.get('isAdmin')
 
     provider.value = providerParam
 
-    console.log('🔐 OAuth Callback - URL Params:', {
-      hasToken: !!token,
-      tokenLength: token?.length,
-      tokenPreview: token ? token.substring(0, 50) + '...' : null,
+    console.log('🔐 OAuth Callback:', {
+      success: successParam,
       provider: providerParam,
       error: errorParam,
-      isAdmin: isAdminParam,
-      fullURL: window.location.href
     })
 
+    // Check for error in URL params
     if (errorParam) {
-      // Decode error message from URL
       error.value = decodeURIComponent(errorParam)
       return
     }
 
-    if (!token) {
-      console.error('❌ No token found in URL params')
-      error.value = t('auth.socialLoginError')
-      return
-    }
-
-    console.log('✅ Token found, storing in localStorage')
-    // Store JWT token in localStorage first
-    localStorage.setItem('auth_token', token)
-
-    // Set token in auth store
-    authStore.token = token
-
-    console.log('✅ Token set in auth store, refreshing user')
-    
-    // Small delay to ensure token is fully stored before making API calls
-    await new Promise(resolve => setTimeout(resolve, 100))
-
-    // Fetch user info with the new token
-    try {
-      await authStore.refreshUser()
+    // With cookie-based auth, cookies are already set by the redirect
+    // We just need to verify the session and fetch user info
+    if (successParam === 'true') {
+      console.log('✅ OAuth success indicated, verifying session...')
       
-      console.log('✅ User refreshed successfully, redirecting to home')
-      // Redirect to home after successful authentication
-      setTimeout(() => {
-        router.push('/')
-      }, 500)
-    } catch (e: any) {
-      console.error('❌ Failed to fetch user after OAuth:', e)
+      try {
+        // Use the OAuth callback handler which fetches user from /me
+        const result = await authStore.handleOAuthCallback()
+        
+        if (result) {
+          console.log('✅ Session verified, redirecting to home')
+          // Clear URL params for clean history
+          window.history.replaceState({}, document.title, '/auth/callback')
+          
+          // Redirect to home
+          setTimeout(() => {
+            router.push('/')
+          }, 500)
+        } else {
+          console.error('❌ Session verification failed')
+          error.value = t('auth.socialLoginError')
+        }
+      } catch (e: any) {
+        console.error('❌ Failed to verify session after OAuth:', e)
+        error.value = t('auth.socialLoginError')
+      }
+    } else {
+      // No success param and no error - something went wrong
+      console.error('❌ OAuth callback without success or error')
       error.value = t('auth.socialLoginError')
-      // Clear invalid token
-      localStorage.removeItem('auth_token')
-      authStore.token = null
     }
 
   } catch (e: any) {
@@ -146,7 +140,6 @@ onMounted(async () => {
 </script>
 
 <style scoped>
-/* Animations matching LoginView */
 @keyframes float {
   0%, 100% { transform: translateY(0px); }
   50% { transform: translateY(-20px); }
@@ -165,4 +158,3 @@ onMounted(async () => {
   animation: float-delayed 8s ease-in-out infinite;
 }
 </style>
-

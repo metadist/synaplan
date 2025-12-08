@@ -9,7 +9,7 @@ use Psr\Log\LoggerInterface;
 /**
  * Service für Rate Limiting basierend auf User-Level und Scope.
  *
- * Verwendet Redis Cache für schnelle Zugriffe und RateLimitConfig für Limits
+ * Verwendet Filesystem Cache und RateLimitConfig für Limits
  */
 class RateLimiterService
 {

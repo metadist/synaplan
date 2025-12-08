@@ -9,9 +9,10 @@ use App\Repository\EmailVerificationAttemptRepository;
 use App\Repository\UserRepository;
 use App\Repository\VerificationTokenRepository;
 use App\Service\InternalEmailService;
+use App\Service\OidcTokenService;
 use App\Service\RecaptchaService;
+use App\Service\TokenService;
 use Doctrine\ORM\EntityManagerInterface;
-use Lexik\Bundle\JWTAuthenticationBundle\Services\JWTTokenManagerInterface;
 use OpenApi\Attributes as OA;
 use Psr\Log\LoggerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -37,7 +38,8 @@ class AuthController extends AbstractController
         private EmailVerificationAttemptRepository $attemptRepository,
         private EntityManagerInterface $em,
         private UserPasswordHasherInterface $passwordHasher,
-        private JWTTokenManagerInterface $jwtManager,
+        private TokenService $tokenService,
+        private OidcTokenService $oidcTokenService,
         private InternalEmailService $internalEmailService,
         private RecaptchaService $recaptchaService,
         private ValidatorInterface $validator,
@@ -93,13 +95,11 @@ class AuthController extends AbstractController
 
         if ($existingUser) {
             // Security: Don't reveal that email is already registered
-            // Log attempt but return generic success message
             $this->logger->warning('Registration attempt with existing email', [
                 'email' => $dto->email,
                 'ip' => $request->getClientIp(),
             ]);
 
-            // Return generic success message (same as for new registrations)
             return $this->json([
                 'success' => true,
                 'message' => 'If this email is not already registered, you will receive a verification email shortly.',
@@ -122,7 +122,7 @@ class AuthController extends AbstractController
         // Generate verification token
         $token = $this->tokenRepository->createToken($user, 'email_verification', 86400); // 24h
 
-        // Send verification email with user's preferred language
+        // Send verification email
         try {
             $this->internalEmailService->sendVerificationEmail(
                 $user->getMail(),
@@ -148,7 +148,7 @@ class AuthController extends AbstractController
     #[OA\Post(
         path: '/api/v1/auth/login',
         summary: 'User login',
-        description: 'Authenticate user and receive JWT token',
+        description: 'Authenticate user and receive auth cookies (HttpOnly)',
         tags: ['Authentication']
     )]
     #[OA\RequestBody(
@@ -158,27 +158,28 @@ class AuthController extends AbstractController
             properties: [
                 new OA\Property(property: 'email', type: 'string', format: 'email', example: 'user@example.com'),
                 new OA\Property(property: 'password', type: 'string', format: 'password', example: 'SecurePass123!'),
-                new OA\Property(property: 'recaptchaToken', type: 'string', description: 'Google reCAPTCHA v3 token (required in production)', example: '03AGdBq27...'),
+                new OA\Property(property: 'recaptchaToken', type: 'string', description: 'Google reCAPTCHA v3 token', example: '03AGdBq27...'),
             ]
         )
     )]
     #[OA\Response(
         response: 200,
-        description: 'Login successful',
+        description: 'Login successful - cookies set',
         content: new OA\JsonContent(
             properties: [
-                new OA\Property(property: 'token', type: 'string', example: 'eyJ0eXAiOiJKV1QiLCJhbGc...'),
+                new OA\Property(property: 'success', type: 'boolean', example: true),
                 new OA\Property(property: 'user', type: 'object', properties: [
                     new OA\Property(property: 'id', type: 'integer', example: 123),
                     new OA\Property(property: 'email', type: 'string', example: 'user@example.com'),
-                    new OA\Property(property: 'email_verified', type: 'boolean', example: true),
+                    new OA\Property(property: 'level', type: 'string', example: 'NEW'),
+                    new OA\Property(property: 'isAdmin', type: 'boolean', example: false),
                 ]),
             ]
         )
     )]
     #[OA\Response(response: 401, description: 'Invalid credentials')]
-    #[OA\Response(response: 403, description: 'Email not verified')]
-    public function login(Request $request): JsonResponse
+    #[OA\Response(response: 403, description: 'Email not verified or external auth required')]
+    public function login(Request $request): Response
     {
         $data = json_decode($request->getContent(), true);
         $email = $data['email'] ?? '';
@@ -204,7 +205,7 @@ class AuthController extends AbstractController
             return $this->json(['error' => 'Invalid credentials'], Response::HTTP_UNAUTHORIZED);
         }
 
-        // Check if user registered with external auth (Google, GitHub, Keycloak, Mail)
+        // Check if user registered with external auth (Google, GitHub, Keycloak)
         if ($user->isExternalAuth()) {
             $this->logger->warning('Login attempt with password for external auth user', [
                 'email' => $email,
@@ -235,13 +236,15 @@ class AuthController extends AbstractController
             ], Response::HTTP_FORBIDDEN);
         }
 
-        $token = $this->jwtManager->create($user);
+        // Generate tokens
+        $accessToken = $this->tokenService->generateAccessToken($user);
+        $refreshToken = $this->tokenService->generateRefreshToken($user, $request->getClientIp());
 
         $this->logger->info('User logged in', ['user_id' => $user->getId()]);
 
-        return $this->json([
+        // Create response with cookies
+        $response = new JsonResponse([
             'success' => true,
-            'token' => $token,
             'user' => [
                 'id' => $user->getId(),
                 'email' => $user->getMail(),
@@ -250,6 +253,191 @@ class AuthController extends AbstractController
                 'isAdmin' => $user->isAdmin(),
             ],
         ]);
+
+        // Add HttpOnly cookies
+        return $this->tokenService->addAuthCookies($response, $accessToken, $refreshToken);
+    }
+
+    #[Route('/refresh', name: 'refresh', methods: ['POST'])]
+    #[OA\Post(
+        path: '/api/v1/auth/refresh',
+        summary: 'Refresh access token',
+        description: 'Use refresh token cookie to get a new access token. For OIDC users, refreshes against the identity provider.',
+        tags: ['Authentication']
+    )]
+    #[OA\Response(
+        response: 200,
+        description: 'Token refreshed - new access token cookie set',
+        content: new OA\JsonContent(
+            properties: [
+                new OA\Property(property: 'success', type: 'boolean', example: true),
+            ]
+        )
+    )]
+    #[OA\Response(response: 401, description: 'Invalid or expired refresh token')]
+    public function refresh(Request $request): Response
+    {
+        // Check if this is an OIDC user (has OIDC refresh token cookie)
+        $oidcRefreshToken = $request->cookies->get(OidcTokenService::OIDC_REFRESH_COOKIE);
+        $oidcProvider = $request->cookies->get(OidcTokenService::OIDC_PROVIDER_COOKIE);
+
+        if ($oidcRefreshToken && $oidcProvider) {
+            // OIDC user - refresh against the identity provider (Keycloak)
+            return $this->refreshOidcTokens($request, $oidcRefreshToken, $oidcProvider);
+        }
+
+        // Regular user - use our internal refresh token
+        $refreshTokenString = $request->cookies->get(TokenService::REFRESH_COOKIE);
+
+        if (!$refreshTokenString) {
+            return $this->json([
+                'error' => 'No refresh token',
+                'code' => 'NO_REFRESH_TOKEN',
+            ], Response::HTTP_UNAUTHORIZED);
+        }
+
+        $result = $this->tokenService->refreshTokens($refreshTokenString);
+
+        if (!$result) {
+            $response = new JsonResponse([
+                'error' => 'Invalid or expired refresh token',
+                'code' => 'INVALID_REFRESH_TOKEN',
+            ], Response::HTTP_UNAUTHORIZED);
+
+            return $this->tokenService->clearAuthCookies($response);
+        }
+
+        $this->logger->info('Token refreshed', ['user_id' => $result['user']->getId()]);
+
+        $response = new JsonResponse([
+            'success' => true,
+            'user' => [
+                'id' => $result['user']->getId(),
+                'email' => $result['user']->getMail(),
+                'level' => $result['user']->getUserLevel(),
+                'emailVerified' => $result['user']->isEmailVerified(),
+                'isAdmin' => $result['user']->isAdmin(),
+            ],
+        ]);
+
+        $response->headers->setCookie(
+            $this->tokenService->createAccessCookie($result['access_token'])
+        );
+
+        return $response;
+    }
+
+    /**
+     * Refresh OIDC tokens against identity provider (Keycloak).
+     * If Keycloak rejects the refresh (user logged out), session is terminated.
+     */
+    private function refreshOidcTokens(Request $request, string $oidcRefreshToken, string $provider): Response
+    {
+        $newTokens = $this->oidcTokenService->refreshOidcTokens($oidcRefreshToken, $provider);
+
+        if (!$newTokens) {
+            // Keycloak rejected the refresh - user was logged out from Keycloak
+            $this->logger->info('OIDC refresh rejected - user logged out from provider', [
+                'provider' => $provider,
+            ]);
+
+            $response = new JsonResponse([
+                'error' => 'Session expired',
+                'code' => 'OIDC_SESSION_EXPIRED',
+                'message' => 'Your session has expired. Please log in again.',
+            ], Response::HTTP_UNAUTHORIZED);
+
+            // Clear all auth cookies
+            $this->tokenService->clearAuthCookies($response);
+            $this->oidcTokenService->clearOidcCookies($response);
+
+            return $response;
+        }
+
+        // Get user from the new access token
+        $user = $this->oidcTokenService->getUserFromOidcToken($newTokens['access_token'], $provider);
+
+        if (!$user) {
+            $response = new JsonResponse([
+                'error' => 'User not found',
+                'code' => 'USER_NOT_FOUND',
+            ], Response::HTTP_UNAUTHORIZED);
+
+            $this->tokenService->clearAuthCookies($response);
+            $this->oidcTokenService->clearOidcCookies($response);
+
+            return $response;
+        }
+
+        $this->logger->info('OIDC tokens refreshed', [
+            'user_id' => $user->getId(),
+            'provider' => $provider,
+        ]);
+
+        $response = new JsonResponse([
+            'success' => true,
+            'user' => [
+                'id' => $user->getId(),
+                'email' => $user->getMail(),
+                'level' => $user->getUserLevel(),
+                'emailVerified' => $user->isEmailVerified(),
+                'isAdmin' => $user->isAdmin(),
+            ],
+        ]);
+
+        // Update OIDC tokens
+        $this->oidcTokenService->storeOidcTokens(
+            $response,
+            $newTokens['access_token'],
+            $newTokens['refresh_token'],
+            $newTokens['expires_in'],
+            $provider
+        );
+
+        // Also update our internal tokens
+        $appAccessToken = $this->tokenService->generateAccessToken($user);
+        $response->headers->setCookie(
+            $this->tokenService->createAccessCookie($appAccessToken)
+        );
+
+        return $response;
+    }
+
+    #[Route('/logout', name: 'logout', methods: ['POST'])]
+    #[OA\Post(
+        path: '/api/v1/auth/logout',
+        summary: 'Logout user',
+        description: 'Revoke refresh token and clear auth cookies',
+        tags: ['Authentication']
+    )]
+    #[OA\Response(
+        response: 200,
+        description: 'Logged out successfully',
+        content: new OA\JsonContent(
+            properties: [
+                new OA\Property(property: 'success', type: 'boolean', example: true),
+                new OA\Property(property: 'message', type: 'string', example: 'Logged out'),
+            ]
+        )
+    )]
+    public function logout(Request $request): Response
+    {
+        $refreshTokenString = $request->cookies->get(TokenService::REFRESH_COOKIE);
+
+        // Revoke refresh token in DB
+        if ($refreshTokenString) {
+            $this->tokenService->revokeRefreshToken($refreshTokenString);
+        }
+
+        $this->logger->info('User logged out');
+
+        // Clear cookies
+        $response = new JsonResponse([
+            'success' => true,
+            'message' => 'Logged out',
+        ]);
+
+        return $this->tokenService->clearAuthCookies($response);
     }
 
     #[Route('/verify-email', name: 'verify_email', methods: ['POST'])]
@@ -273,7 +461,7 @@ class AuthController extends AbstractController
         $this->tokenRepository->markAsUsed($token);
         $this->em->flush();
 
-        // Send welcome email with user's preferred language
+        // Send welcome email
         try {
             $details = $user->getUserDetails();
             $userName = trim(($details['first_name'] ?? '').' '.($details['last_name'] ?? ''));
@@ -311,16 +499,14 @@ class AuthController extends AbstractController
         $user = $this->userRepository->findOneBy(['mail' => $email]);
 
         if (!$user) {
-            // Don't reveal if user exists
             return $this->json([
                 'success' => true,
                 'message' => 'If email exists, reset instructions sent',
             ]);
         }
 
-        // Block password reset for external auth users (OAuth, OIDC)
+        // Block password reset for external auth users
         if (!$user->canChangePassword()) {
-            // Don't reveal user exists or auth method - just return success
             return $this->json([
                 'success' => true,
                 'message' => 'If email exists, reset instructions sent',
@@ -359,7 +545,6 @@ class AuthController extends AbstractController
             return $this->json(['error' => 'Token and password required'], Response::HTTP_BAD_REQUEST);
         }
 
-        // Validate password
         if (strlen($newPassword) < 8) {
             return $this->json(['error' => 'Password must be at least 8 characters'], Response::HTTP_BAD_REQUEST);
         }
@@ -372,7 +557,6 @@ class AuthController extends AbstractController
 
         $user = $token->getUser();
 
-        // Block password reset for external auth users
         if (!$user->canChangePassword()) {
             $provider = $user->getAuthProviderName();
 
@@ -384,6 +568,9 @@ class AuthController extends AbstractController
         $user->setPw($this->passwordHasher->hashPassword($user, $newPassword));
         $this->tokenRepository->markAsUsed($token);
         $this->em->flush();
+
+        // Revoke all existing refresh tokens (force re-login)
+        $this->tokenService->revokeAllUserTokens($user);
 
         $this->logger->info('Password reset', ['user_id' => $user->getId()]);
 
@@ -403,17 +590,15 @@ class AuthController extends AbstractController
             return $this->json(['error' => 'Email required'], Response::HTTP_BAD_REQUEST);
         }
 
-        // ALWAYS check rate limiting first (prevent spam with any email)
+        // Check rate limiting
         $attempt = $this->attemptRepository->findByEmail($email);
 
         if (!$attempt) {
-            // First attempt - create tracking
             $attempt = new EmailVerificationAttempt();
             $attempt->setEmail($email);
             $attempt->setIpAddress($request->getClientIp());
             $this->em->persist($attempt);
         } else {
-            // Check if can resend (applies to ALL requests, not just valid users)
             if (!$attempt->canResend($this->resendCooldownMinutes, $this->maxResendAttempts)) {
                 $remainingAttempts = $attempt->getRemainingAttempts($this->maxResendAttempts);
 
@@ -425,7 +610,7 @@ class AuthController extends AbstractController
 
                     return $this->json([
                         'error' => 'Maximum verification attempts reached',
-                        'message' => 'You have reached the maximum number of verification email requests. Please contact support if you need assistance.',
+                        'message' => 'You have reached the maximum number of verification email requests. Please contact support.',
                         'maxAttemptsReached' => true,
                     ], Response::HTTP_TOO_MANY_REQUESTS);
                 }
@@ -441,35 +626,24 @@ class AuthController extends AbstractController
                 ], Response::HTTP_TOO_MANY_REQUESTS);
             }
 
-            // Increment attempts
             $attempt->incrementAttempts();
         }
 
-        // NOW check if user exists and is unverified
         $user = $this->userRepository->findOneBy(['mail' => $email]);
 
-        // User doesn't exist or is already verified - increment attempt but return generic message
         if (!$user || $user->isEmailVerified()) {
-            // Save attempt tracking even for invalid requests
             try {
                 $this->em->flush();
             } catch (\Exception $e) {
                 $this->logger->error('Failed to save rate limit attempt', ['error' => $e->getMessage()]);
             }
 
-            $this->logger->info('Resend verification requested for non-existent or verified user', [
-                'email' => $email,
-                'ip' => $request->getClientIp(),
-            ]);
-
-            // Security: Don't reveal if user exists or is verified
             return $this->json([
                 'success' => true,
                 'message' => 'If your email is registered and unverified, you will receive a verification email.',
             ]);
         }
 
-        // User exists and is unverified - create token and send email
         try {
             $token = $this->tokenRepository->createToken($user, 'email_verification', 86400);
             $this->internalEmailService->sendVerificationEmail(
@@ -478,7 +652,6 @@ class AuthController extends AbstractController
                 $user->getLocale()
             );
 
-            // Only flush after successful email send
             $this->em->flush();
 
             $this->logger->info('Verification email sent successfully', [
@@ -526,9 +699,62 @@ class AuthController extends AbstractController
         ]);
     }
 
-    #[Route('/logout', name: 'logout', methods: ['POST'])]
-    public function logout(): JsonResponse
+    #[Route('/token', name: 'get_token', methods: ['GET'])]
+    #[OA\Get(
+        path: '/api/v1/auth/token',
+        summary: 'Get current access token',
+        description: 'Returns the current access token for SSE/EventSource (which cannot send cookies)',
+        tags: ['Authentication']
+    )]
+    #[OA\Response(
+        response: 200,
+        description: 'Access token returned',
+        content: new OA\JsonContent(
+            properties: [
+                new OA\Property(property: 'token', type: 'string', example: 'eyJ...'),
+            ]
+        )
+    )]
+    public function getToken(Request $request, #[CurrentUser] ?User $user): JsonResponse
     {
-        return $this->json(['success' => true, 'message' => 'Logged out']);
+        if (!$user) {
+            return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
+        }
+
+        // Generate a fresh access token for SSE usage
+        $accessToken = $this->tokenService->generateAccessToken($user);
+
+        return $this->json([
+            'token' => $accessToken,
+        ]);
+    }
+
+    #[Route('/revoke-all', name: 'revoke_all', methods: ['POST'])]
+    #[OA\Post(
+        path: '/api/v1/auth/revoke-all',
+        summary: 'Revoke all sessions',
+        description: 'Logout from all devices by revoking all refresh tokens',
+        tags: ['Authentication']
+    )]
+    public function revokeAll(#[CurrentUser] ?User $user): Response
+    {
+        if (!$user) {
+            return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
+        }
+
+        $count = $this->tokenService->revokeAllUserTokens($user);
+
+        $this->logger->info('All sessions revoked', [
+            'user_id' => $user->getId(),
+            'sessions_revoked' => $count,
+        ]);
+
+        $response = new JsonResponse([
+            'success' => true,
+            'message' => "Logged out from {$count} session(s)",
+            'sessions_revoked' => $count,
+        ]);
+
+        return $this->tokenService->clearAuthCookies($response);
     }
 }

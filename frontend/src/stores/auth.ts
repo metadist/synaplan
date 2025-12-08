@@ -1,4 +1,5 @@
 // synaplan-ui/src/stores/auth.ts
+// Cookie-based authentication store
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { authService } from '@/services/authService'
@@ -10,17 +11,24 @@ export interface User {
   roles?: string[]
   created?: string
   isAdmin?: boolean
+  emailVerified?: boolean
 }
+
+// Promise that resolves when initial auth check is complete
+let authReadyResolve: (() => void) | null = null
+export const authReady = new Promise<void>((resolve) => {
+  authReadyResolve = resolve
+})
 
 export const useAuthStore = defineStore('auth', () => {
   // State
   const user = ref<User | null>(null)
-  const token = ref<string | null>(null)
   const loading = ref(false)
   const error = ref<string | null>(null)
+  const initialized = ref(false)
 
   // Computed
-  const isAuthenticated = computed(() => !!token.value && !!user.value)
+  const isAuthenticated = computed(() => !!user.value)
   const userLevel = computed(() => user.value?.level || 'NEW')
   const isPro = computed(() => ['PRO', 'TEAM', 'BUSINESS'].includes(userLevel.value))
   const isAdmin = computed(() => user.value?.isAdmin === true || user.value?.level === 'ADMIN')
@@ -34,7 +42,6 @@ export const useAuthStore = defineStore('auth', () => {
       const result = await authService.login(email, password, recaptchaToken)
       
       if (result.success) {
-        token.value = authService.getToken()
         user.value = authService.getUser().value
         return true
       } else {
@@ -57,8 +64,6 @@ export const useAuthStore = defineStore('auth', () => {
       const result = await authService.register(email, password, recaptchaToken)
       
       if (result.success) {
-        token.value = authService.getToken()
-        user.value = authService.getUser().value
         return true
       } else {
         error.value = result.error || 'Registration failed'
@@ -78,7 +83,6 @@ export const useAuthStore = defineStore('auth', () => {
     try {
       await authService.logout()
     } finally {
-      token.value = null
       user.value = null
       loading.value = false
       error.value = null
@@ -86,41 +90,91 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   async function refreshUser(): Promise<void> {
-    if (!token.value) return
-
     loading.value = true
     try {
       const currentUser = await authService.getCurrentUser()
       if (currentUser) {
         user.value = currentUser
       } else {
-        // Token invalid, logout
-        await logout()
+        // Session invalid
+        user.value = null
       }
     } catch (err) {
       console.error('Failed to refresh user:', err)
-      await logout()
+      user.value = null
     } finally {
       loading.value = false
     }
   }
 
   async function checkAuth(): Promise<void> {
-    const storedToken = localStorage.getItem('auth_token')
-    const storedUser = localStorage.getItem('auth_user')
-
-    if (storedToken && storedUser && storedUser !== 'undefined' && storedUser !== 'null') {
-      token.value = storedToken
-      try {
-        user.value = JSON.parse(storedUser)
-        // Verify token is still valid
-        await refreshUser()
-      } catch (err) {
-        console.error('Failed to parse stored user:', err)
-        localStorage.removeItem('auth_user')
-        localStorage.removeItem('auth_token')
-        await logout()
+    if (initialized.value) return
+    
+    try {
+      loading.value = true
+      const currentUser = await authService.getCurrentUser()
+      if (currentUser) {
+        user.value = currentUser
       }
+    } catch (err) {
+      // Not authenticated, that's fine
+      user.value = null
+    } finally {
+      loading.value = false
+      initialized.value = true
+      // Signal that auth check is complete
+      if (authReadyResolve) {
+        authReadyResolve()
+        authReadyResolve = null
+      }
+    }
+  }
+
+  /**
+   * Handle OAuth callback - user just returned from OAuth provider
+   */
+  async function handleOAuthCallback(): Promise<boolean> {
+    loading.value = true
+    error.value = null
+
+    try {
+      const result = await authService.handleOAuthCallback()
+      
+      if (result.success) {
+        user.value = authService.getUser().value
+        initialized.value = true
+        // Also resolve authReady if not already done
+        if (authReadyResolve) {
+          authReadyResolve()
+          authReadyResolve = null
+        }
+        return true
+      } else {
+        error.value = result.error || 'OAuth login failed'
+        return false
+      }
+    } catch (err) {
+      error.value = 'OAuth callback failed'
+      return false
+    } finally {
+      loading.value = false
+    }
+  }
+
+  /**
+   * Revoke all sessions (logout everywhere)
+   */
+  async function revokeAllSessions(): Promise<{ success: boolean; sessionsRevoked?: number }> {
+    loading.value = true
+    
+    try {
+      const result = await authService.revokeAllSessions()
+      if (result.success) {
+        user.value = null
+      }
+      return result
+    } finally {
+      loading.value = false
     }
   }
 
@@ -128,23 +182,20 @@ export const useAuthStore = defineStore('auth', () => {
     error.value = null
   }
 
-  // Reset store to initial state (for $reset compatibility)
+  // Reset store to initial state
   function $reset(): void {
     user.value = null
-    token.value = null
     loading.value = false
     error.value = null
+    initialized.value = false
   }
-
-  // Initialize on store creation
-  checkAuth()
 
   return {
     // State
     user,
-    token,
     loading,
     error,
+    initialized,
     // Computed
     isAuthenticated,
     userLevel,
@@ -156,8 +207,9 @@ export const useAuthStore = defineStore('auth', () => {
     logout,
     refreshUser,
     checkAuth,
+    handleOAuthCallback,
+    revokeAllSessions,
     clearError,
     $reset,
   }
 })
-
