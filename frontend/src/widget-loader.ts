@@ -256,7 +256,7 @@ class SynaplanWidgetLoader {
         
         // Wait a moment for the script to execute
         setTimeout(() => {
-          const FullWidget = (window as any).SynaplanWidget
+          const FullWidget = window.SynaplanWidget
           
           if (FullWidget && typeof FullWidget.init === 'function') {
             // Set openImmediately to true so the chat opens right away
