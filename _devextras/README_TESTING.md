@@ -4,7 +4,7 @@
 
 ### 1. Start Test Infrastructure
 ```bash
-# Start only basic test services (DB + Redis)
+# Start basic test services (DB)
 docker compose -f docker-compose.test.yml up -d
 
 # OR: Start with integration services (Ollama, Tika)
@@ -42,7 +42,6 @@ docker compose -f docker-compose.test.yml down -v
 ### Services
 - **app_test**: Symfony app (Port 8001)
 - **db_test**: MariaDB test database (Port 3308)
-- **redis_test**: Redis cache (Port 6381)
 - **ollama_test**: Ollama AI (Port 11436) - Only with `--profile integration`
 - **tika_test**: Apache Tika (Port 9997) - Only with `--profile integration`
 
@@ -58,7 +57,6 @@ All test configuration is in `.env.test` (committed to git, no secrets).
 ### Parallel Execution
 Test infrastructure runs on different ports, so you can run tests while the dev environment is running:
 - Dev DB: `3307` → Test DB: `3308`
-- Dev Redis: `6380` → Test Redis: `6381`
 - Dev App: `8000` → Test App: `8001`
 
 ## CI/CD Integration

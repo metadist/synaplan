@@ -11,9 +11,7 @@ services:
       - "5173:5173"
     volumes:
       - ./_docker/frontend/docker-entrypoint.sh:/usr/local/bin/docker-entrypoint.sh:ro
-      - ./_docker/frontend/init-env.sh:/usr/local/bin/init-env.sh:ro
       - ./_devextras/frontend/docker-entrypoint.d:/docker-entrypoint.d:ro
-
       - ./frontend:/app
        # Anonymous volume to prevent host node_modules from being mounted (avoids platform-specific binary conflicts)
       - /app/node_modules
@@ -30,15 +28,17 @@ services:
       context: .
       dockerfile: _docker/backend/Dockerfile
     container_name: synaplan-backend
-    # Note: .env file is optional - will be auto-created from .env.example on first start
+    # Optional: Load extra config from backend/.env (for API keys, etc.)
     env_file:
-      - backend/.env
+      - path: backend/.env
+        required: false
     ports:
       - "8000:80"
     volumes:
       - ./backend:/var/www/backend
       - ./frontend/dist:/var/www/frontend:ro
       - ./_docker/backend/Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./_docker/backend/docker-entrypoint.sh:/usr/local/bin/docker-entrypoint.sh:ro
       - whisper_models:/var/www/backend/var/whisper:ro
       - ./_devextras/backend/docker-entrypoint.d:/docker-entrypoint.d:ro
     environment:
@@ -52,10 +52,8 @@ services:
       TRITON_SERVER_URL: ${TRITON_SERVER_URL:-}
       TIKA_BASE_URL: http://tika:9998
       AI_DEFAULT_PROVIDER: ollama
-      # JWT Configuration
-      JWT_SECRET_KEY: '%kernel.project_dir%/config/jwt/private.pem'
-      JWT_PUBLIC_KEY: '%kernel.project_dir%/config/jwt/public.pem'
-      JWT_PASSPHRASE: 'change_me_in_production'
+      # Token Configuration
+      TOKEN_SECRET: 'change_me_in_production_use_openssl_rand_hex_32'
       # Mailer (Mailhog for development)
       MAILER_DSN: smtp://mailhog:1025
       # External API Keys loaded from backend/.env via env_file

@@ -30,16 +30,12 @@ class MessageControllerTest extends WebTestCase
         $this->client = static::createClient();
         $this->em = $this->client->getContainer()->get('doctrine')->getManager();
 
-        // Create test user
-        $this->user = new User();
-        $this->user->setMail('test@example.com');
-        $this->user->setPw(password_hash('testpass', PASSWORD_BCRYPT));
-        $this->user->setUserLevel('PRO');
-        $this->user->setProviderId('test-provider');
-        $this->user->setCreated(date('YmdHis'));
+        // Use fixture user demo@synaplan.com (PRO level)
+        $this->user = $this->em->getRepository(User::class)->findOneBy(['mail' => 'demo@synaplan.com']);
 
-        $this->em->persist($this->user);
-        $this->em->flush();
+        if (!$this->user) {
+            $this->markTestSkipped('Test user demo@synaplan.com not found. Run fixtures first.');
+        }
 
         // Configure test user to use 'test' AI provider
         $modelConfigService = $this->client->getContainer()->get(\App\Service\ModelConfigService::class);
@@ -51,36 +47,55 @@ class MessageControllerTest extends WebTestCase
 
     protected function tearDown(): void
     {
-        // Cleanup: Remove test data
-        if ($this->em && $this->user) {
+        // Cleanup: Remove test data (but keep fixture user)
+        if ($this->user) {
+            // Get a fresh entity manager if the current one is closed
+            if (!$this->em || !$this->em->isOpen()) {
+                self::bootKernel();
+                $this->em = self::getContainer()->get('doctrine')->getManager();
+            }
+
             $userId = $this->user->getId();
 
-            // Remove test messages
-            $messages = $this->em->getRepository(Message::class)
-                ->findBy(['userId' => $userId]);
-            foreach ($messages as $message) {
-                $this->em->remove($message);
+            // Collect IDs first, then remove by re-fetching
+            $messageIds = array_map(
+                fn ($m) => $m->getId(),
+                $this->em->getRepository(Message::class)->findBy(['userId' => $userId])
+            );
+            foreach ($messageIds as $id) {
+                $message = $this->em->find(Message::class, $id);
+                if ($message) {
+                    $this->em->remove($message);
+                }
             }
 
             // Remove UseLog entries (rate limit tracking)
-            $useLogs = $this->em->getRepository(\App\Entity\UseLog::class)
-                ->findBy(['userId' => $userId]);
-            foreach ($useLogs as $useLog) {
-                $this->em->remove($useLog);
+            $useLogIds = array_map(
+                fn ($u) => $u->getId(),
+                $this->em->getRepository(\App\Entity\UseLog::class)->findBy(['userId' => $userId])
+            );
+            foreach ($useLogIds as $id) {
+                $useLog = $this->em->find(\App\Entity\UseLog::class, $id);
+                if ($useLog) {
+                    $this->em->remove($useLog);
+                }
             }
 
-            // Remove Config entries (model preferences)
-            $configs = $this->em->getRepository(\App\Entity\Config::class)
-                ->findBy(['ownerId' => $userId]);
-            foreach ($configs as $config) {
-                $this->em->remove($config);
+            // Remove all Config entries (model preferences) (including fixture configs)
+            $configIds = array_map(
+                fn ($c) => $c->getId(),
+                $this->em->getRepository(\App\Entity\Config::class)->findBy(['ownerId' => $userId])
+            );
+            foreach ($configIds as $id) {
+                $config = $this->em->find(\App\Entity\Config::class, $id);
+                if ($config) {
+                    $this->em->remove($config);
+                }
             }
 
             $this->em->flush();
 
-            // Now safe to remove test user
-            $this->em->remove($this->user);
-            $this->em->flush();
+            // Do NOT remove fixture user - it will be reused across tests
         }
 
         // Ensure kernel is shutdown for next test
@@ -91,6 +106,7 @@ class MessageControllerTest extends WebTestCase
 
     public function testSendMessageWithoutAuth(): void
     {
+        self::ensureKernelShutdown();
         $client = static::createClient();
         $client->request(
             'POST',
@@ -154,6 +170,7 @@ class MessageControllerTest extends WebTestCase
 
     public function testGetHistoryWithoutAuth(): void
     {
+        self::ensureKernelShutdown();
         $client = static::createClient();
         $client->request('GET', '/api/v1/messages/history');
 
@@ -259,6 +276,7 @@ class MessageControllerTest extends WebTestCase
 
     public function testEnhanceWithoutAuth(): void
     {
+        self::ensureKernelShutdown();
         $client = static::createClient();
         $client->request(
             'POST',
@@ -317,6 +335,7 @@ class MessageControllerTest extends WebTestCase
 
     public function testAgainWithoutAuth(): void
     {
+        self::ensureKernelShutdown();
         $client = static::createClient();
         $client->request(
             'POST',
@@ -351,6 +370,7 @@ class MessageControllerTest extends WebTestCase
 
     public function testEnqueueWithoutAuth(): void
     {
+        self::ensureKernelShutdown();
         $client = static::createClient();
         $client->request(
             'POST',

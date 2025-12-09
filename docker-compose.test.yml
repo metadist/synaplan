@@ -9,25 +9,23 @@ services:
       - "8001:80"
     volumes:
       - ./backend:/var/www/backend
+      - ./_docker/backend/docker-entrypoint.sh:/usr/local/bin/docker-entrypoint.sh:ro
     environment:
       APP_ENV: test
       APP_SECRET: test_secret_not_for_production
-      DATABASE_WRITE_URL: mysql://synaplan_test:synaplan_test@db_test:3306/synaplan_test?serverVersion=11.8&charset=utf8mb4
-      DATABASE_READ_URL: mysql://synaplan_test:synaplan_test@db_test:3306/synaplan_test?serverVersion=11.8&charset=utf8mb4
-      REDIS_URL: redis://redis_test:6379
-      MESSENGER_TRANSPORT_DSN: redis://redis_test:6379/messages
+      DATABASE_WRITE_URL: mysql://synaplan_test:synaplan_test@db_test:3306/synaplan?serverVersion=11.8&charset=utf8mb4
+      DATABASE_READ_URL: mysql://synaplan_test:synaplan_test@db_test:3306/synaplan?serverVersion=11.8&charset=utf8mb4
       OLLAMA_BASE_URL: http://ollama_test:11434
       TIKA_BASE_URL: http://tika_test:9998
       AI_DEFAULT_PROVIDER: test
       MAILER_DSN: null://null
       AUTO_DOWNLOAD_MODELS: "false"
-      JWT_SECRET_KEY: "%kernel.project_dir%/config/jwt/private.pem"
-      JWT_PUBLIC_KEY: "%kernel.project_dir%/config/jwt/public.pem"
-      JWT_PASSPHRASE: "test_passphrase"
+      TOKEN_SECRET: "test_token_secret"
+      OIDC_CLIENT_ID: "test_client_id"
+      OIDC_CLIENT_SECRET: "test_client_secret"
+      OIDC_DISCOVERY_URL: "https://test.example.com"
     depends_on:
       db_test:
-        condition: service_healthy
-      redis_test:
         condition: service_healthy
     restart: "no"
     networks:
@@ -53,22 +51,6 @@ services:
       timeout: 5s
       retries: 5
       start_period: 30s
-    restart: "no"
-    networks:
-      - synaplan-test-network
-
-  # Redis Test Cache & Queue
-  redis_test:
-    image: redis:7-alpine
-    container_name: synaplan-redis-test
-    command: redis-server --save "" --appendonly no --maxmemory 128mb --maxmemory-policy allkeys-lru
-    ports:
-      - "6381:6379"
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 5s
-      timeout: 3s
-      retries: 5
     restart: "no"
     networks:
       - synaplan-test-network

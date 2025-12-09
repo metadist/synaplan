@@ -2,6 +2,8 @@
 
 namespace App\Tests\Controller;
 
+use App\Entity\User;
+use App\Tests\Trait\AuthenticatedTestTrait;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
 
 /**
@@ -9,31 +11,54 @@ use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
  */
 class FileServeControllerTest extends WebTestCase
 {
+    use AuthenticatedTestTrait;
+
     private $client;
+    private $em;
+    private $user;
     private string $authToken;
-    private int $userId;
     private string $testFilePath;
 
     protected function setUp(): void
     {
-        parent::setUp();
-
-        // Login
+        self::ensureKernelShutdown();
         $this->client = static::createClient();
-        $this->client->request('POST', '/api/v1/auth/login', [], [], [
-            'CONTENT_TYPE' => 'application/json',
-        ], json_encode([
-            'email' => 'demo@synaplan.com',
-            'password' => 'demo123',
-        ]));
+        $this->em = $this->client->getContainer()->get('doctrine')->getManager();
 
-        $response = $this->client->getResponse();
-        $data = json_decode($response->getContent(), true);
-        $this->authToken = $data['token'];
-        $this->userId = $data['user']['id'];
+        // Use fixture user demo@synaplan.com
+        $this->user = $this->em->getRepository(User::class)->findOneBy(['mail' => 'demo@synaplan.com']);
+
+        if (!$this->user) {
+            $this->markTestSkipped('Test user demo@synaplan.com not found. Run fixtures first.');
+        }
+
+        // Generate access token using TokenService
+        $this->authToken = $this->authenticateClient($this->client, $this->user);
 
         // Upload test file and get path
         $this->testFilePath = $this->uploadAndGetPath();
+    }
+
+    protected function tearDown(): void
+    {
+        if ($this->user) {
+            // Get a fresh entity manager if the current one is closed
+            if (!$this->em || !$this->em->isOpen()) {
+                self::bootKernel();
+                $this->em = self::getContainer()->get('doctrine')->getManager();
+            }
+
+            // Remove uploaded files only (keep fixture user)
+            $files = $this->em->getRepository(\App\Entity\File::class)
+                ->findBy(['userId' => $this->user->getId()]);
+            foreach ($files as $file) {
+                $this->em->remove($file);
+            }
+            $this->em->flush();
+        }
+
+        static::ensureKernelShutdown();
+        parent::tearDown();
     }
 
     private function uploadAndGetPath(): string

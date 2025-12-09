@@ -19,10 +19,11 @@ class FileControllerTest extends WebTestCase
 
     protected function setUp(): void
     {
+        self::ensureKernelShutdown();
         $this->client = static::createClient();
 
         // Get test user and authenticate
-        $userRepository = static::getContainer()->get(UserRepository::class);
+        $userRepository = $this->client->getContainer()->get(UserRepository::class);
         $this->testUser = $userRepository->findOneBy(['mail' => 'admin@synaplan.com']);
 
         if (!$this->testUser) {
@@ -140,6 +141,7 @@ class FileControllerTest extends WebTestCase
 
     public function testUploadWithoutAuthentication(): void
     {
+        self::ensureKernelShutdown();
         $client = static::createClient();
         $testFile = $this->createTestFile('test.txt', 'content');
         $uploadedFile = new UploadedFile($testFile, 'test.txt', 'text/plain', null, true);

@@ -17,6 +17,7 @@ class RagControllerTest extends WebTestCase
 
     protected function setUp(): void
     {
+        self::ensureKernelShutdown();
         $this->client = static::createClient();
     }
 
@@ -26,7 +27,7 @@ class RagControllerTest extends WebTestCase
             return $this->token;
         }
 
-        $userRepository = static::getContainer()->get('doctrine')->getRepository(User::class);
+        $userRepository = $this->client->getContainer()->get('doctrine')->getRepository(User::class);
         $user = $userRepository->findOneBy(['mail' => 'admin@synaplan.com']);
 
         if (!$user) {
@@ -41,6 +42,7 @@ class RagControllerTest extends WebTestCase
 
     public function testSearchRequiresAuthentication(): void
     {
+        self::ensureKernelShutdown();
         $client = static::createClient();
         $client->jsonRequest('POST', '/api/v1/rag/search', [
             'query' => 'test query',
@@ -113,6 +115,7 @@ class RagControllerTest extends WebTestCase
 
     public function testFindSimilarRequiresAuthentication(): void
     {
+        self::ensureKernelShutdown();
         $client = static::createClient();
         $client->request('GET', '/api/v1/rag/similar/1');
 
@@ -160,6 +163,7 @@ class RagControllerTest extends WebTestCase
 
     public function testStatsRequiresAuthentication(): void
     {
+        self::ensureKernelShutdown();
         $client = static::createClient();
         $client->request('GET', '/api/v1/rag/stats');
 

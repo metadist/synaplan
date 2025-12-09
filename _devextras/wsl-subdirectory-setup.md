@@ -94,9 +94,6 @@ FRONTEND_URL=http://localhost/synaplan/frontend
 DATABASE_WRITE_URL=mysql://synaplan:password@127.0.0.1:3306/synaplan?serverVersion=11.8&charset=utf8mb4
 DATABASE_READ_URL=mysql://synaplan:password@127.0.0.1:3306/synaplan?serverVersion=11.8&charset=utf8mb4
 
-# Messenger (use Redis if available, or Doctrine)
-MESSENGER_TRANSPORT_DSN=redis://127.0.0.1:6379
-
 # AI Services (adjust hosts as needed)
 OLLAMA_BASE_URL=http://127.0.0.1:11434
 TIKA_BASE_URL=http://127.0.0.1:9998

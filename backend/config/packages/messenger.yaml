@@ -5,12 +5,7 @@ framework:
         transports:
             # High Priority: AI Processing
             async_ai_high:
-                dsn: '%env(MESSENGER_TRANSPORT_DSN)%'
-                options:
-                    stream: 'messenger_ai_high'
-                    group: 'ai_workers'
-                    consumer: 'worker_ai'
-                    stream_max_entries: 10000
+                dsn: 'doctrine://default?queue_name=async_ai_high'
                 retry_strategy:
                     max_retries: 3
                     delay: 1000
@@ -19,22 +14,14 @@ framework:
 
             # Medium Priority: File Extraction
             async_extract:
-                dsn: '%env(MESSENGER_TRANSPORT_DSN)%'
-                options:
-                    stream: 'messenger_extract'
-                    group: 'extract_workers'
-                    consumer: 'worker_extract'
+                dsn: 'doctrine://default?queue_name=async_extract'
                 retry_strategy:
                     max_retries: 2
                     delay: 2000
 
             # Low Priority: Indexing
             async_index:
-                dsn: '%env(MESSENGER_TRANSPORT_DSN)%'
-                options:
-                    stream: 'messenger_index'
-                    group: 'index_workers'
-                    consumer: 'worker_index'
+                dsn: 'doctrine://default?queue_name=async_index'
                 retry_strategy:
                     max_retries: 5
                     delay: 5000

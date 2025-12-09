@@ -23,7 +23,7 @@ trait AuthenticatedTestTrait
     protected function authenticateClient(KernelBrowser $client, User $user): string
     {
         /** @var TokenService $tokenService */
-        $tokenService = static::getContainer()->get(TokenService::class);
+        $tokenService = $client->getContainer()->get(TokenService::class);
 
         $accessToken = $tokenService->generateAccessToken($user);
 
