@@ -283,6 +283,13 @@ Example files provided:
 - `backend/.env.docker.example` (reference)
 - `frontend/.env.docker.example` (reference)
 
+### Required Configuration for Production
+
+**`SYNAPLAN_URL`** (backend/.env): The publicly accessible URL where Synaplan is hosted
+- Development: `http://localhost:8000`
+- Production: `https://app.synaplan.com`
+- Used for: Widget embed code generation, public URLs, CORS configuration
+
 ## 🛠️ Development
 
 ```bash
@@ -319,6 +326,7 @@ AUTO_DOWNLOAD_MODELS=false docker compose up -d
 ## ✨ Features
 
 - ✅ **AI Chat**: Multiple providers (Ollama, OpenAI, Anthropic, Groq, Gemini)
+- ✅ **Embeddable Chat Widget**: Add AI chat to any website with a single script tag
 - ✅ **RAG System**: Semantic search with MariaDB VECTOR + bge-m3 embeddings (1024 dim)
 - ✅ **Document Processing**: PDF, Word, Excel, Images (Tika + OCR)
 - ✅ **Audio Transcription**: Whisper.cpp integration
@@ -327,6 +335,47 @@ AUTO_DOWNLOAD_MODELS=false docker compose up -d
 - ✅ **Security**: Private files by default, secure sharing with tokens
 - ✅ **Multi-user**: Role-based access with JWT authentication
 - ✅ **Responsive UI**: Vue.js 3 + TypeScript + Tailwind CSS
+
+## 💬 Embeddable Chat Widget
+
+Synaplan includes a production-ready chat widget that can be embedded on any website:
+
+### Features
+- **ES Module with Code-Splitting**: Loads only what's needed, when needed
+- **Lazy Loading**: Button loads first, chat loads on click
+- **Automatic Configuration**: Fetches widget settings from server
+- **Customizable**: Colors, icons, position, themes, auto-messages
+- **Smart API Detection**: Automatically detects the correct API URL from script source
+- **CORS-ready**: Designed to work across domains
+
+### Usage Example
+```html
+<script type="module">
+  import SynaplanWidget from 'https://app.synaplan.com/widget.js'
+
+  SynaplanWidget.init({
+    widgetId: 'wdg_abc123',
+    position: 'bottom-right',
+    primaryColor: '#007bff',
+    lazy: true
+  })
+</script>
+```
+
+### Widget Management
+- Create widgets in the web interface (Widgets section)
+- Configure appearance, behavior, and limits
+- Domain whitelisting for security
+- Rate limiting per subscription level
+- Copy embed code directly from UI
+
+### Building Widgets (Development)
+```bash
+cd frontend
+npm run build:widget    # Builds widget to dist-widget/
+```
+
+The widget build is automatically included in CI/CD and Docker images.
 
 ## 📄 License
 
