@@ -19,6 +19,7 @@ class AuthControllerTest extends WebTestCase
 
     protected function setUp(): void
     {
+        self::ensureKernelShutdown();
         $this->client = static::createClient();
         $this->em = static::getContainer()->get('doctrine')->getManager();
     }

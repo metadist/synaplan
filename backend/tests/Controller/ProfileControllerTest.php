@@ -24,6 +24,7 @@ class ProfileControllerTest extends WebTestCase
 
     protected function setUp(): void
     {
+        self::ensureKernelShutdown();
         $this->client = static::createClient();
         $this->em = static::getContainer()->get('doctrine')->getManager();
 
@@ -60,6 +61,7 @@ class ProfileControllerTest extends WebTestCase
 
     public function testGetProfileWithoutAuth(): void
     {
+        self::ensureKernelShutdown();
         $client = static::createClient();
         $client->request('GET', '/api/v1/profile');
 
@@ -94,6 +96,7 @@ class ProfileControllerTest extends WebTestCase
 
     public function testUpdateProfileWithoutAuth(): void
     {
+        self::ensureKernelShutdown();
         $client = static::createClient();
         $client->request(
             'PUT',
@@ -162,6 +165,7 @@ class ProfileControllerTest extends WebTestCase
 
     public function testChangePasswordWithoutAuth(): void
     {
+        self::ensureKernelShutdown();
         $client = static::createClient();
         $client->request(
             'PUT',

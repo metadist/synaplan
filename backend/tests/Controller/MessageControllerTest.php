@@ -91,6 +91,7 @@ class MessageControllerTest extends WebTestCase
 
     public function testSendMessageWithoutAuth(): void
     {
+        self::ensureKernelShutdown();
         $client = static::createClient();
         $client->request(
             'POST',
@@ -154,6 +155,7 @@ class MessageControllerTest extends WebTestCase
 
     public function testGetHistoryWithoutAuth(): void
     {
+        self::ensureKernelShutdown();
         $client = static::createClient();
         $client->request('GET', '/api/v1/messages/history');
 
@@ -259,6 +261,7 @@ class MessageControllerTest extends WebTestCase
 
     public function testEnhanceWithoutAuth(): void
     {
+        self::ensureKernelShutdown();
         $client = static::createClient();
         $client->request(
             'POST',
@@ -317,6 +320,7 @@ class MessageControllerTest extends WebTestCase
 
     public function testAgainWithoutAuth(): void
     {
+        self::ensureKernelShutdown();
         $client = static::createClient();
         $client->request(
             'POST',
@@ -351,6 +355,7 @@ class MessageControllerTest extends WebTestCase
 
     public function testEnqueueWithoutAuth(): void
     {
+        self::ensureKernelShutdown();
         $client = static::createClient();
         $client->request(
             'POST',

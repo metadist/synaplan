@@ -18,6 +18,7 @@ class StreamControllerTest extends WebTestCase
 
     protected function setUp(): void
     {
+        self::ensureKernelShutdown();
         $this->client = static::createClient();
     }
 
@@ -59,6 +60,7 @@ class StreamControllerTest extends WebTestCase
 
     public function testStreamRequiresAuthentication(): void
     {
+        self::ensureKernelShutdown();
         $client = static::createClient();
         $client->request('GET', '/api/v1/messages/stream', [
             'message' => 'Test',
