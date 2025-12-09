@@ -40,8 +40,13 @@ backend/vendor/
 # Frontend cache & build
 node_modules/
 frontend/dist/
+frontend/dist-widget/*.js
 frontend/.vite/
 *.tsbuildinfo
+
+# Compiled widget files (generated at build time)
+backend/public/widget-loader.js
+backend/public/widget-full.js
 
 # Test artifacts
 *.cache
