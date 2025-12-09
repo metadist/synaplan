@@ -593,6 +593,10 @@ interface Props {
     query?: string
     resultsCount?: number
   } | null // Web search metadata
+  tool?: {
+    icon: string
+    label: string
+  } | null // Tool metadata (e.g., web search, file generation)
   // Status for failed/pending messages
   status?: 'sent' | 'failed' | 'rate_limited'
   errorType?: 'rate_limit' | 'connection' | 'unknown'
