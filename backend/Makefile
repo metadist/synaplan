@@ -1,10 +1,10 @@
-.PHONY: help dev-up dev-down test-up test-down test test-unit test-integration migrate-test fixtures-test clean lint format phpstan
+.PHONY: help lint format phpstan audit deps migrate fixtures schema-update schema-diff console cache-clear shell test
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-20s\033[0m %s\n", $$1, $$2}'
 
 ## Code Quality
-lint: ## Check code formatting
+lint: ## Check code formatting (PSR-12)
 	docker compose -f ../docker-compose.yml exec -T backend composer lint
 
 format: ## Fix code formatting
@@ -13,76 +13,41 @@ format: ## Fix code formatting
 phpstan: ## Run static analysis
 	docker compose -f ../docker-compose.yml exec -T backend composer phpstan
 
-## Development Environment
-dev-up: ## Start dev environment
-	docker compose -f ../docker-compose.yml up -d
+audit: ## Run security audit
+	docker compose -f ../docker-compose.yml exec -T backend composer audit
 
-dev-down: ## Stop dev environment
-	docker compose -f ../docker-compose.yml down
-
-dev-logs: ## Show dev logs
-	docker compose -f ../docker-compose.yml logs -f backend
-
-dev-shell: ## Open shell in dev container
-	docker compose -f ../docker-compose.yml exec backend bash
-
-## Test Environment
-test-up: ## Start test infrastructure (basic)
-	docker compose -f ../docker-compose.test.yml up -d
-
-test-up-full: ## Start test infrastructure with integration services
-	docker compose -f ../docker-compose.test.yml --profile integration up -d
-
-test-down: ## Stop test infrastructure
-	docker compose -f ../docker-compose.test.yml down
-
-test-clean: ## Stop test infrastructure and remove volumes
-	docker compose -f ../docker-compose.test.yml down -v
-
-## Testing
-test: test-up ## Run all tests
-	$(MAKE) migrate-test
-	$(MAKE) fixtures-test
-	docker compose -f ../docker-compose.test.yml exec -T app_test php bin/phpunit
-	$(MAKE) test-down
-
-test-unit: test-up ## Run unit tests only
-	$(MAKE) migrate-test
-	$(MAKE) fixtures-test
-	docker compose -f ../docker-compose.test.yml exec -T app_test php bin/phpunit --testsuite unit
-	$(MAKE) test-down
-
-test-integration: test-up-full ## Run integration tests
-	$(MAKE) migrate-test
-	$(MAKE) fixtures-test
-	docker compose -f ../docker-compose.test.yml exec -T app_test php bin/phpunit --testsuite integration
-	$(MAKE) test-down
-
-test-watch: test-up migrate-test ## Run tests in watch mode
-	docker compose -f ../docker-compose.test.yml exec app_test php bin/phpunit --watch
+## Dependencies
+deps: ## Install composer dependencies
+	docker compose -f ../docker-compose.yml exec -T backend composer install
 
 ## Database
-migrate: ## Run dev migrations
+migrate: ## Run migrations
 	docker compose -f ../docker-compose.yml exec -T backend php bin/console doctrine:migrations:migrate --no-interaction
 
-migrate-test: ## Run test migrations and schema setup
-	docker compose -f ../docker-compose.test.yml exec -T app_test php bin/console doctrine:migrations:migrate --no-interaction --allow-no-migration --env=test
-	docker compose -f ../docker-compose.test.yml exec -T app_test php bin/console doctrine:schema:update --force --env=test
-
-fixtures: ## Load dev fixtures
+fixtures: ## Load fixtures
 	docker compose -f ../docker-compose.yml exec -T backend php bin/console doctrine:fixtures:load --no-interaction
 
-fixtures-test: ## Load test fixtures
-	docker compose -f ../docker-compose.test.yml exec -T app_test php bin/console doctrine:fixtures:load --no-interaction --env=test
+schema-update: ## Update database schema (dev only!)
+	docker compose -f ../docker-compose.yml exec -T backend php bin/console doctrine:schema:update --force
 
-## Cleanup
-clean: ## Clean all containers and volumes
-	docker compose -f ../docker-compose.yml down -v
-	docker compose -f ../docker-compose.test.yml down -v
+schema-diff: ## Show schema differences
+	docker compose -f ../docker-compose.yml exec -T backend php bin/console doctrine:schema:update --dump-sql
+
+## Symfony Console
+console: ## Open Symfony console (pass args: make console -- list)
+	docker compose -f ../docker-compose.yml exec backend php bin/console $(filter-out $@,$(MAKECMDGOALS))
+
+## Utilities
+shell: ## Open bash shell in backend container
+	docker compose -f ../docker-compose.yml exec backend bash
 
 cache-clear: ## Clear Symfony cache
 	docker compose -f ../docker-compose.yml exec -T backend php bin/console cache:clear
 
-cache-clear-test: ## Clear test cache
-	docker compose -f ../docker-compose.test.yml exec -T app_test php bin/console cache:clear --env=test
+test: ## Run all PHPUnit tests
+	docker compose -f ../docker-compose.yml exec -T backend php bin/phpunit
+
+# Allow passing arguments to console target
+%:
+	@:
 
