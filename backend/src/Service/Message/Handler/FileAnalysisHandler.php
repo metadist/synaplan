@@ -3,6 +3,7 @@
 namespace App\Service\Message\Handler;
 
 use App\AI\Service\AiFacade;
+use App\Entity\File;
 use App\Entity\Message;
 use App\Service\ModelConfigService;
 use Psr\Log\LoggerInterface;
@@ -11,11 +12,15 @@ use Symfony\Component\DependencyInjection\Attribute\AutoconfigureTag;
 /**
  * File Analysis Handler.
  *
- * Handles file analysis requests (image-to-text, document analysis) using Vision AI
+ * Handles file analysis requests:
+ * - For documents (PDF, DOCX, etc.) with pre-extracted text: Uses Chat AI
+ * - For images without extracted text: Uses Vision AI
  */
 #[AutoconfigureTag('app.message.handler')]
 class FileAnalysisHandler implements MessageHandlerInterface
 {
+    private const IMAGE_EXTENSIONS = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'tiff', 'svg'];
+
     public function __construct(
         private AiFacade $aiFacade,
         private ModelConfigService $modelConfigService,
@@ -40,127 +45,38 @@ class FileAnalysisHandler implements MessageHandlerInterface
     ): array {
         $this->notify($progressCallback, 'analyzing', 'Analyzing file...');
 
-        $topic = $classification['topic'] ?? 'analyzefile';
-        $language = $classification['language'] ?? 'en';
-
-        // For Vision API: Use user's text directly as the prompt
-        // The DB prompt for "analyzefile" is designed for prompt improvement, not vision analysis
         $userPrompt = $message->getText();
 
-        if (!empty($userPrompt)) {
-            $analysisPrompt = $userPrompt;
-        } else {
-            // Default fallback if no user prompt
-            $analysisPrompt = 'Please extract all text content from this image. Provide only the extracted text without any additional commentary or analysis.';
-        }
+        // Get file info
+        $fileInfo = $this->getFileInfo($message);
 
-        // Get the image file path
-        $imagePath = $this->getImagePath($message);
-
-        if (!$imagePath) {
-            $this->logger->error('FileAnalysisHandler: No image file found', [
+        if (!$fileInfo) {
+            $this->logger->error('FileAnalysisHandler: No file found', [
                 'message_id' => $message->getId(),
-                'file_path' => $message->getFilePath(),
-                'file_flag' => $message->getFile(),
             ]);
 
             return [
-                'content' => 'No image file was provided for analysis. Please upload an image and try again.',
-                'metadata' => ['error' => 'no_image'],
+                'content' => 'No file was provided for analysis. Please upload a file and try again.',
+                'metadata' => ['error' => 'no_file'],
             ];
         }
 
-        // Check if file actually exists
-        $fullImagePath = $this->uploadDir.'/'.$imagePath;
-        if (!file_exists($fullImagePath)) {
-            $this->logger->error('FileAnalysisHandler: Image file not found on disk', [
-                'relative_path' => $imagePath,
-                'full_path' => $fullImagePath,
-                'upload_dir' => $this->uploadDir,
-            ]);
-
-            return [
-                'content' => "Image file not found at: {$imagePath}\nPlease ensure the file was uploaded correctly.",
-                'metadata' => ['error' => 'file_not_found', 'path' => $imagePath],
-            ];
-        }
-
-        $this->logger->info('FileAnalysisHandler: Analyzing image', [
-            'image_path' => $imagePath,
-            'full_path' => $fullImagePath,
-            'file_exists' => true,
-            'file_size' => filesize($fullImagePath),
-            'prompt' => substr($analysisPrompt, 0, 100),
-            'user_id' => $message->getUserId(),
+        $this->logger->info('FileAnalysisHandler: Processing file', [
+            'file_id' => $fileInfo['id'],
+            'file_name' => $fileInfo['name'],
+            'file_type' => $fileInfo['type'],
+            'has_extracted_text' => !empty($fileInfo['text']),
+            'extracted_text_length' => strlen($fileInfo['text'] ?? ''),
+            'is_image' => $fileInfo['is_image'],
         ]);
 
-        // Determine model to use
-        $modelId = null;
-        $provider = null;
-        $modelName = null;
-
-        if (isset($classification['model_id']) && $classification['model_id']) {
-            $modelId = $classification['model_id'];
-            $this->logger->info('FileAnalysisHandler: Using user-selected model', [
-                'model_id' => $modelId,
-            ]);
+        // Decision: Use Chat AI for documents with extracted text, Vision AI for images
+        if (!$fileInfo['is_image'] && !empty($fileInfo['text'])) {
+            // Document with pre-extracted text → Use Chat Model
+            return $this->handleWithChatModel($message, $fileInfo, $userPrompt, $classification, $progressCallback);
         } else {
-            $modelId = $this->modelConfigService->getDefaultModel('PIC2TEXT', $message->getUserId());
-            $this->logger->info('FileAnalysisHandler: Using DB default model', [
-                'model_id' => $modelId,
-                'user_id' => $message->getUserId(),
-            ]);
-        }
-
-        if ($modelId) {
-            $provider = $this->modelConfigService->getProviderForModel($modelId);
-            $modelName = $this->modelConfigService->getModelName($modelId);
-
-            $this->logger->info('FileAnalysisHandler: Resolved model', [
-                'model_id' => $modelId,
-                'provider' => $provider,
-                'model' => $modelName,
-            ]);
-        }
-
-        try {
-            // Use Vision AI to analyze the image
-            $result = $this->aiFacade->analyzeImage(
-                $imagePath,
-                $analysisPrompt,
-                $message->getUserId(),
-                [
-                    'provider' => $provider,
-                    'model' => $modelName,
-                    'max_tokens' => 4000, // Allow longer responses for text extraction
-                ]
-            );
-
-            $this->notify($progressCallback, 'analyzing', 'Analysis complete.');
-
-            return [
-                'content' => $result['content'],
-                'metadata' => [
-                    'provider' => $result['provider'] ?? 'unknown',
-                    'model' => $result['model'] ?? 'unknown',
-                    'model_id' => $modelId,
-                    'analyzed_file' => $imagePath,
-                ],
-            ];
-        } catch (\Exception $e) {
-            $this->logger->error('FileAnalysisHandler: Analysis failed', [
-                'error' => $e->getMessage(),
-                'image_path' => $imagePath,
-            ]);
-
-            return [
-                'content' => 'Image analysis failed: '.$e->getMessage(),
-                'metadata' => [
-                    'error' => $e->getMessage(),
-                    'provider' => $provider,
-                    'model' => $modelName,
-                ],
-            ];
+            // Image or document without text → Use Vision Model
+            return $this->handleWithVisionModel($message, $fileInfo, $userPrompt, $classification, $progressCallback);
         }
     }
 
@@ -177,126 +93,205 @@ class FileAnalysisHandler implements MessageHandlerInterface
     ): array {
         $this->notify($progressCallback, 'analyzing', 'Analyzing file...');
 
-        $topic = $classification['topic'] ?? 'analyzefile';
-        $language = $classification['language'] ?? 'en';
-
-        // For Vision API: Use user's text directly as the prompt
-        // The DB prompt for "analyzefile" is designed for prompt improvement, not vision analysis
         $userPrompt = $message->getText();
 
-        if (!empty($userPrompt)) {
-            $analysisPrompt = $userPrompt;
-        } else {
-            // Default fallback if no user prompt
-            $analysisPrompt = 'Please extract all text content from this image. Provide only the extracted text without any additional commentary or analysis.';
-        }
+        // Get file info
+        $fileInfo = $this->getFileInfo($message);
 
-        // Get the image file path
-        $imagePath = $this->getImagePath($message);
-
-        if (!$imagePath) {
-            $this->logger->error('FileAnalysisHandler: No image file found', [
+        if (!$fileInfo) {
+            $this->logger->error('FileAnalysisHandler: No file found (streaming)', [
                 'message_id' => $message->getId(),
-                'file_path' => $message->getFilePath(),
-                'file_flag' => $message->getFile(),
             ]);
 
-            $streamCallback('No image file was provided for analysis. Please upload an image and try again.');
+            $streamCallback('No file was provided for analysis. Please upload a file and try again.');
 
             return [
-                'metadata' => ['error' => 'no_image'],
+                'metadata' => ['error' => 'no_file'],
             ];
         }
 
-        // Check if file actually exists
-        $fullImagePath = $this->uploadDir.'/'.$imagePath;
-        if (!file_exists($fullImagePath)) {
-            $this->logger->error('FileAnalysisHandler: Image file not found on disk (streaming)', [
-                'relative_path' => $imagePath,
-                'full_path' => $fullImagePath,
-                'upload_dir' => $this->uploadDir,
-            ]);
-
-            $streamCallback("Image file not found at: {$imagePath}\nPlease ensure the file was uploaded correctly.");
-
-            return [
-                'metadata' => ['error' => 'file_not_found', 'path' => $imagePath],
-            ];
-        }
-
-        $this->logger->info('FileAnalysisHandler: Analyzing image (streaming)', [
-            'image_path' => $imagePath,
-            'full_path' => $fullImagePath,
-            'file_exists' => true,
-            'file_size' => filesize($fullImagePath),
-            'prompt' => substr($analysisPrompt, 0, 100),
-            'user_id' => $message->getUserId(),
+        $this->logger->info('FileAnalysisHandler: Processing file (streaming)', [
+            'file_id' => $fileInfo['id'],
+            'file_name' => $fileInfo['name'],
+            'file_type' => $fileInfo['type'],
+            'has_extracted_text' => !empty($fileInfo['text']),
+            'extracted_text_length' => strlen($fileInfo['text'] ?? ''),
+            'is_image' => $fileInfo['is_image'],
         ]);
 
-        // Determine model to use
-        $modelId = null;
+        // Decision: Use Chat AI for documents with extracted text, Vision AI for images
+        if (!$fileInfo['is_image'] && !empty($fileInfo['text'])) {
+            // Document with pre-extracted text → Use Chat Model with streaming
+            return $this->handleStreamWithChatModel($message, $fileInfo, $userPrompt, $classification, $streamCallback, $progressCallback, $options);
+        } else {
+            // Image or document without text → Use Vision Model (non-streaming, then output)
+            return $this->handleStreamWithVisionModel($message, $fileInfo, $userPrompt, $classification, $streamCallback, $progressCallback);
+        }
+    }
+
+    /**
+     * Handle document with pre-extracted text using Chat Model.
+     */
+    private function handleWithChatModel(
+        Message $message,
+        array $fileInfo,
+        string $userPrompt,
+        array $classification,
+        ?callable $progressCallback,
+    ): array {
+        $this->notify($progressCallback, 'generating', 'Analyzing document content...');
+
+        // Build context with extracted file content
+        $systemPrompt = "You are analyzing a document. The user has uploaded a file and wants to know about its contents.\n\n";
+        $systemPrompt .= "=== FILE INFORMATION ===\n";
+        $systemPrompt .= "Filename: {$fileInfo['name']}\n";
+        $systemPrompt .= "Type: {$fileInfo['type']}\n\n";
+        $systemPrompt .= "=== EXTRACTED CONTENT ===\n";
+        $systemPrompt .= $fileInfo['text']."\n";
+        $systemPrompt .= "=== END OF CONTENT ===\n\n";
+        $systemPrompt .= 'Answer the user\'s question about this document. If they ask what\'s in the file, summarize the key points.';
+
+        $finalPrompt = !empty($userPrompt) ? $userPrompt : 'What is in this document? Please summarize the content.';
+
+        // Get Chat model (not Vision model!)
+        $modelId = $classification['model_id'] ?? $this->modelConfigService->getDefaultModel('CHAT', $message->getUserId());
         $provider = null;
         $modelName = null;
-
-        if (isset($classification['model_id']) && $classification['model_id']) {
-            $modelId = $classification['model_id'];
-            $this->logger->info('FileAnalysisHandler: Using user-selected model', [
-                'model_id' => $modelId,
-            ]);
-        } else {
-            $modelId = $this->modelConfigService->getDefaultModel('PIC2TEXT', $message->getUserId());
-            $this->logger->info('FileAnalysisHandler: Using DB default model', [
-                'model_id' => $modelId,
-                'user_id' => $message->getUserId(),
-            ]);
-        }
 
         if ($modelId) {
             $provider = $this->modelConfigService->getProviderForModel($modelId);
             $modelName = $this->modelConfigService->getModelName($modelId);
-
-            $this->logger->info('FileAnalysisHandler: Resolved model', [
-                'model_id' => $modelId,
-                'provider' => $provider,
-                'model' => $modelName,
-            ]);
         }
 
+        $this->logger->info('FileAnalysisHandler: Using Chat model for document', [
+            'model_id' => $modelId,
+            'provider' => $provider,
+            'model' => $modelName,
+        ]);
+
         try {
-            // Use Vision AI to analyze the image
-            // Note: analyzeImage doesn't support streaming yet, so we'll get the full result and stream it
-            $result = $this->aiFacade->analyzeImage(
-                $imagePath,
-                $analysisPrompt,
+            $messages = [
+                ['role' => 'system', 'content' => $systemPrompt],
+                ['role' => 'user', 'content' => $finalPrompt],
+            ];
+
+            $result = $this->aiFacade->chat(
+                $messages,
                 $message->getUserId(),
                 [
                     'provider' => $provider,
                     'model' => $modelName,
-                    'max_tokens' => 4000, // Allow longer responses for text extraction
+                    'max_tokens' => 4000,
                 ]
             );
 
-            // Stream the result
-            $streamCallback($result['content']);
-
-            $this->notify($progressCallback, 'analyzing', 'Analysis complete.');
+            $this->notify($progressCallback, 'complete', 'Analysis complete.');
 
             return [
+                'content' => $result['content'],
                 'metadata' => [
-                    'provider' => $result['provider'] ?? 'unknown',
-                    'model' => $result['model'] ?? 'unknown',
+                    'provider' => $result['provider'] ?? $provider ?? 'unknown',
+                    'model' => $result['model'] ?? $modelName ?? 'unknown',
                     'model_id' => $modelId,
-                    'analyzed_file' => $imagePath,
+                    'analyzed_file' => $fileInfo['name'],
+                    'analysis_type' => 'chat_with_extracted_text',
                 ],
             ];
         } catch (\Exception $e) {
-            $this->logger->error('FileAnalysisHandler: Analysis failed', [
+            $this->logger->error('FileAnalysisHandler: Chat analysis failed', [
                 'error' => $e->getMessage(),
-                'image_path' => $imagePath,
+                'file' => $fileInfo['name'],
             ]);
 
-            $errorMessage = 'Image analysis failed: '.$e->getMessage();
-            $streamCallback($errorMessage);
+            return [
+                'content' => 'Document analysis failed: '.$e->getMessage(),
+                'metadata' => [
+                    'error' => $e->getMessage(),
+                    'provider' => $provider,
+                    'model' => $modelName,
+                ],
+            ];
+        }
+    }
+
+    /**
+     * Handle document with streaming using Chat Model.
+     */
+    private function handleStreamWithChatModel(
+        Message $message,
+        array $fileInfo,
+        string $userPrompt,
+        array $classification,
+        callable $streamCallback,
+        ?callable $progressCallback,
+        array $options,
+    ): array {
+        $this->notify($progressCallback, 'generating', 'Analyzing document content...');
+
+        // Build context with extracted file content
+        $systemPrompt = "You are analyzing a document. The user has uploaded a file and wants to know about its contents.\n\n";
+        $systemPrompt .= "=== FILE INFORMATION ===\n";
+        $systemPrompt .= "Filename: {$fileInfo['name']}\n";
+        $systemPrompt .= "Type: {$fileInfo['type']}\n\n";
+        $systemPrompt .= "=== EXTRACTED CONTENT ===\n";
+        $systemPrompt .= $fileInfo['text']."\n";
+        $systemPrompt .= "=== END OF CONTENT ===\n\n";
+        $systemPrompt .= 'Answer the user\'s question about this document. If they ask what\'s in the file, summarize the key points.';
+
+        $finalPrompt = !empty($userPrompt) ? $userPrompt : 'What is in this document? Please summarize the content.';
+
+        // Get Chat model (not Vision model!)
+        $modelId = $classification['model_id'] ?? $this->modelConfigService->getDefaultModel('CHAT', $message->getUserId());
+        $provider = null;
+        $modelName = null;
+
+        if ($modelId) {
+            $provider = $this->modelConfigService->getProviderForModel($modelId);
+            $modelName = $this->modelConfigService->getModelName($modelId);
+        }
+
+        $this->logger->info('FileAnalysisHandler: Using Chat model for document (streaming)', [
+            'model_id' => $modelId,
+            'provider' => $provider,
+            'model' => $modelName,
+        ]);
+
+        try {
+            $messages = [
+                ['role' => 'system', 'content' => $systemPrompt],
+                ['role' => 'user', 'content' => $finalPrompt],
+            ];
+
+            // Use streaming chat
+            $result = $this->aiFacade->chatStream(
+                $messages,
+                $streamCallback,
+                $message->getUserId(),
+                [
+                    'provider' => $provider,
+                    'model' => $modelName,
+                    'max_tokens' => 4000,
+                ]
+            );
+
+            $this->notify($progressCallback, 'complete', 'Analysis complete.');
+
+            return [
+                'metadata' => [
+                    'provider' => $result['provider'] ?? $provider ?? 'unknown',
+                    'model' => $result['model'] ?? $modelName ?? 'unknown',
+                    'model_id' => $modelId,
+                    'analyzed_file' => $fileInfo['name'],
+                    'analysis_type' => 'chat_with_extracted_text',
+                ],
+            ];
+        } catch (\Exception $e) {
+            $this->logger->error('FileAnalysisHandler: Chat streaming analysis failed', [
+                'error' => $e->getMessage(),
+                'file' => $fileInfo['name'],
+            ]);
+
+            $streamCallback('Document analysis failed: '.$e->getMessage());
 
             return [
                 'metadata' => [
@@ -309,67 +304,163 @@ class FileAnalysisHandler implements MessageHandlerInterface
     }
 
     /**
-     * Get the image file path from the message.
+     * Handle image using Vision Model.
      */
-    private function getImagePath(Message $message): ?string
-    {
-        $this->logger->info('FileAnalysisHandler: Getting image path', [
-            'message_id' => $message->getId(),
-            'legacy_file_path' => $message->getFilePath(),
-            'legacy_file_flag' => $message->getFile(),
-            'files_collection_count' => $message->getFiles()->count(),
+    private function handleWithVisionModel(
+        Message $message,
+        array $fileInfo,
+        string $userPrompt,
+        array $classification,
+        ?callable $progressCallback,
+    ): array {
+        $this->notify($progressCallback, 'analyzing', 'Analyzing image...');
+
+        $analysisPrompt = !empty($userPrompt) ? $userPrompt : 'Please describe this image in detail.';
+
+        // Check if file exists
+        $fullPath = $this->uploadDir.'/'.$fileInfo['path'];
+        if (!file_exists($fullPath)) {
+            $this->logger->error('FileAnalysisHandler: File not found on disk', [
+                'path' => $fileInfo['path'],
+                'full_path' => $fullPath,
+            ]);
+
+            return [
+                'content' => "File not found: {$fileInfo['name']}",
+                'metadata' => ['error' => 'file_not_found'],
+            ];
+        }
+
+        // Get Vision model (PIC2TEXT)
+        $modelId = $classification['model_id'] ?? $this->modelConfigService->getDefaultModel('PIC2TEXT', $message->getUserId());
+        $provider = null;
+        $modelName = null;
+
+        if ($modelId) {
+            $provider = $this->modelConfigService->getProviderForModel($modelId);
+            $modelName = $this->modelConfigService->getModelName($modelId);
+        }
+
+        $this->logger->info('FileAnalysisHandler: Using Vision model for image', [
+            'model_id' => $modelId,
+            'provider' => $provider,
+            'model' => $modelName,
         ]);
 
-        // Check for files in the new MessageFiles relation FIRST
+        try {
+            $result = $this->aiFacade->analyzeImage(
+                $fileInfo['path'],
+                $analysisPrompt,
+                $message->getUserId(),
+                [
+                    'provider' => $provider,
+                    'model' => $modelName,
+                    'max_tokens' => 4000,
+                ]
+            );
+
+            $this->notify($progressCallback, 'complete', 'Analysis complete.');
+
+            return [
+                'content' => $result['content'],
+                'metadata' => [
+                    'provider' => $result['provider'] ?? 'unknown',
+                    'model' => $result['model'] ?? 'unknown',
+                    'model_id' => $modelId,
+                    'analyzed_file' => $fileInfo['name'],
+                    'analysis_type' => 'vision',
+                ],
+            ];
+        } catch (\Exception $e) {
+            $this->logger->error('FileAnalysisHandler: Vision analysis failed', [
+                'error' => $e->getMessage(),
+                'file' => $fileInfo['name'],
+            ]);
+
+            return [
+                'content' => 'Image analysis failed: '.$e->getMessage(),
+                'metadata' => [
+                    'error' => $e->getMessage(),
+                    'provider' => $provider,
+                    'model' => $modelName,
+                ],
+            ];
+        }
+    }
+
+    /**
+     * Handle image with streaming using Vision Model.
+     */
+    private function handleStreamWithVisionModel(
+        Message $message,
+        array $fileInfo,
+        string $userPrompt,
+        array $classification,
+        callable $streamCallback,
+        ?callable $progressCallback,
+    ): array {
+        // Vision AI doesn't support streaming, so get full result and output it
+        $result = $this->handleWithVisionModel($message, $fileInfo, $userPrompt, $classification, $progressCallback);
+
+        if (isset($result['content'])) {
+            $streamCallback($result['content']);
+        }
+
+        return [
+            'metadata' => $result['metadata'] ?? [],
+        ];
+    }
+
+    /**
+     * Get file information from message.
+     */
+    private function getFileInfo(Message $message): ?array
+    {
+        // Check for files in the MessageFiles relation
         $files = $message->getFiles();
         if ($files->count() > 0) {
+            /** @var File $file */
             $file = $files->first();
-            $fileRelativePath = $file->getFilePath();
 
-            $this->logger->info('FileAnalysisHandler: Found file in collection', [
-                'file_id' => $file->getId(),
-                'file_path' => $fileRelativePath,
-                'file_type' => $file->getFileType(),
-                'file_name' => $file->getFileName(),
-            ]);
+            $fileType = strtolower($file->getFileType());
+            $isImage = in_array($fileType, self::IMAGE_EXTENSIONS, true);
 
-            // The path should already be relative (e.g., "uploads/user_123/file.jpg")
-            // But just in case, handle various formats
-            if (str_starts_with($fileRelativePath, 'uploads/')) {
-                // Already in correct format
-                return $fileRelativePath;
-            } elseif (str_contains($fileRelativePath, '/uploads/')) {
-                // Absolute path, extract relative part
-                return 'uploads/'.substr($fileRelativePath, strpos($fileRelativePath, '/uploads/') + 9);
-            } else {
-                // Assume it's just the filename, return as-is
-                return $fileRelativePath;
+            // Normalize path
+            $filePath = $file->getFilePath();
+            if (!str_starts_with($filePath, 'uploads/') && str_contains($filePath, '/uploads/')) {
+                $filePath = 'uploads/'.substr($filePath, strpos($filePath, '/uploads/') + 9);
             }
+
+            return [
+                'id' => $file->getId(),
+                'name' => $file->getFileName(),
+                'type' => $file->getFileType(),
+                'path' => $filePath,
+                'text' => $file->getFileText(), // Pre-extracted text!
+                'is_image' => $isImage,
+            ];
         }
 
-        // Fallback: Check for legacy file path in message
+        // Legacy: Check for file path in message
         $filePath = $message->getFilePath();
-
         if ($filePath) {
-            $this->logger->info('FileAnalysisHandler: Using legacy file path', [
-                'file_path' => $filePath,
-            ]);
+            $extension = strtolower(pathinfo($filePath, PATHINFO_EXTENSION));
+            $isImage = in_array($extension, self::IMAGE_EXTENSIONS, true);
 
-            // Handle various path formats
-            if (str_starts_with($filePath, 'uploads/')) {
-                return $filePath;
-            } elseif (str_contains($filePath, '/uploads/')) {
-                return 'uploads/'.substr($filePath, strpos($filePath, '/uploads/') + 9);
-            } elseif (str_starts_with($filePath, '/')) {
-                // Absolute path without 'uploads', just take filename
-                return 'uploads/'.basename($filePath);
-            } else {
-                // Relative path or filename
-                return $filePath;
+            // Normalize path
+            if (!str_starts_with($filePath, 'uploads/') && str_contains($filePath, '/uploads/')) {
+                $filePath = 'uploads/'.substr($filePath, strpos($filePath, '/uploads/') + 9);
             }
-        }
 
-        $this->logger->warning('FileAnalysisHandler: No file path found in message');
+            return [
+                'id' => null,
+                'name' => basename($filePath),
+                'type' => $extension,
+                'path' => $filePath,
+                'text' => '', // No pre-extracted text for legacy
+                'is_image' => $isImage,
+            ];
+        }
 
         return null;
     }
