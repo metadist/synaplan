@@ -164,10 +164,15 @@ class AuthControllerTest extends WebTestCase
 
         $responseData = json_decode($this->client->getResponse()->getContent(), true);
 
-        $this->assertArrayHasKey('token', $responseData);
+        // Login now uses HttpOnly cookies, not token in response body
+        $this->assertArrayHasKey('success', $responseData);
+        $this->assertTrue($responseData['success']);
         $this->assertArrayHasKey('user', $responseData);
-        $this->assertNotEmpty($responseData['token']);
         $this->assertEquals('logintest@test.com', $responseData['user']['email']);
+
+        // Verify auth cookies were set
+        $cookies = $this->client->getCookieJar();
+        $this->assertNotNull($cookies->get('access_token'), 'Access token cookie should be set');
     }
 
     public function testLoginWithInvalidPassword(): void

@@ -2,6 +2,9 @@
 
 namespace App\Tests\Controller;
 
+use App\Entity\User;
+use App\Repository\UserRepository;
+use App\Tests\Trait\AuthenticatedTestTrait;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
 
 /**
@@ -9,9 +12,11 @@ use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
  */
 class FileServeControllerTest extends WebTestCase
 {
+    use AuthenticatedTestTrait;
+
     private $client;
     private ?string $authToken = null;
-    private ?int $userId = null;
+    private ?User $testUser = null;
     private ?string $testFilePath = null;
 
     protected function setUp(): void
@@ -19,24 +24,18 @@ class FileServeControllerTest extends WebTestCase
         parent::setUp();
         self::ensureKernelShutdown();
 
-        // Login
         $this->client = static::createClient();
-        $this->client->request('POST', '/api/v1/auth/login', [], [], [
-            'CONTENT_TYPE' => 'application/json',
-        ], json_encode([
-            'email' => 'demo@synaplan.com',
-            'password' => 'demo123',
-        ]));
 
-        $response = $this->client->getResponse();
-        $data = json_decode($response->getContent(), true);
+        // Get test user and authenticate using cookie-based auth
+        $userRepository = static::getContainer()->get(UserRepository::class);
+        $this->testUser = $userRepository->findOneBy(['mail' => 'admin@synaplan.com']);
 
-        if (!isset($data['token']) || !isset($data['user']['id'])) {
-            $this->markTestSkipped('Login failed - demo user not available in test environment');
+        if (!$this->testUser) {
+            $this->markTestSkipped('Test user admin@synaplan.com not found. Run fixtures first.');
         }
 
-        $this->authToken = $data['token'];
-        $this->userId = $data['user']['id'];
+        // Generate access token and set cookies
+        $this->authToken = $this->authenticateClient($this->client, $this->testUser);
 
         // Upload test file and get path
         $this->testFilePath = $this->uploadAndGetPath();
@@ -91,9 +90,12 @@ class FileServeControllerTest extends WebTestCase
 
     public function testServePrivateFileWithoutAuth(): void
     {
-        $this->client->request('GET', '/up/'.$this->testFilePath);
+        // Create a new client without auth
+        self::ensureKernelShutdown();
+        $client = static::createClient();
+        $client->request('GET', '/up/'.$this->testFilePath);
 
-        $response = $this->client->getResponse();
+        $response = $client->getResponse();
         $this->assertEquals(401, $response->getStatusCode());
     }
 
@@ -108,10 +110,12 @@ class FileServeControllerTest extends WebTestCase
             'HTTP_AUTHORIZATION' => 'Bearer '.$this->authToken,
         ], json_encode(['expiry_days' => 7]));
 
-        // Access without auth should now work
-        $this->client->request('GET', '/up/'.$this->testFilePath);
+        // Create new client without auth - access should now work
+        self::ensureKernelShutdown();
+        $client = static::createClient();
+        $client->request('GET', '/up/'.$this->testFilePath);
 
-        $response = $this->client->getResponse();
+        $response = $client->getResponse();
         $this->assertEquals(200, $response->getStatusCode());
     }
 
@@ -135,10 +139,12 @@ class FileServeControllerTest extends WebTestCase
             'HTTP_AUTHORIZATION' => 'Bearer '.$this->authToken,
         ], json_encode(['expiry_days' => 0]));
 
-        // Get file
-        $this->client->request('GET', '/up/'.$this->testFilePath);
+        // Get file with new client
+        self::ensureKernelShutdown();
+        $client = static::createClient();
+        $client->request('GET', '/up/'.$this->testFilePath);
 
-        $response = $this->client->getResponse();
+        $response = $client->getResponse();
         $this->assertEquals(200, $response->getStatusCode());
         $this->assertStringContainsString('public', $response->headers->get('Cache-Control') ?? '');
     }
