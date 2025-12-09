@@ -1,9 +1,9 @@
 /**
  * Synaplan Widget Loader (Lightweight)
- * 
+ *
  * This small loader script only creates the floating button.
  * The full chat widget is loaded on-demand when the user clicks the button.
- * 
+ *
  * Usage:
  * <script src="https://cdn.jsdelivr.net/npm/vue@3/dist/vue.global.prod.js"></script>
  * <script src="https://your-domain.com/widget-loader.js"></script>
@@ -15,6 +15,8 @@
  *   });
  * </script>
  */
+
+import { detectApiUrl } from './widget-utils'
 
 interface WidgetConfig {
   widgetId: string
@@ -57,7 +59,7 @@ class SynaplanWidgetLoader {
       messageLimit: 50,
       maxFileSize: 10,
       widgetTitle: 'Chat Support',
-      apiUrl: (window as any).__SYNAPLAN_API_URL__ || 'http://localhost:8000',
+      apiUrl: detectApiUrl(),
       allowFileUpload: false,
       fileUploadLimit: 3,
       ...config

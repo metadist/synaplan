@@ -184,8 +184,7 @@ class WidgetService
     messageLimit: {$messageLimit},
     maxFileSize: {$maxFileSize},
     allowFileUpload: {$allowFileUploadStr},
-    fileUploadLimit: {$fileUploadLimit},
-    apiUrl: '{$baseUrl}'
+    fileUploadLimit: {$fileUploadLimit}
   });
 </script>
 HTML;

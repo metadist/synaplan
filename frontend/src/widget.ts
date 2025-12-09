@@ -2,6 +2,7 @@ import { createApp } from 'vue'
 import ChatWidget from './components/widgets/ChatWidget.vue'
 import { i18n } from './i18n'
 import widgetStyles from './style.css?inline'
+import { detectApiUrl } from './widget-utils'
 
 const STYLE_ID = 'synaplan-widget-styles'
 
@@ -64,12 +65,6 @@ class SynaplanWidget {
       return
     }
 
-    // Derive API base URL from widget.js location
-    // e.g., https://api.synaplan.com/static/widget.js -> https://api.synaplan.com/static
-    const scriptUrl = new URL(import.meta.url)
-    const basePath = scriptUrl.pathname.replace(/\/[^\/]+$/, '') // Remove filename
-    const defaultApiUrl = `${scriptUrl.origin}${basePath}`
-
     this.config = {
       position: 'bottom-right',
       primaryColor: '#007bff',
@@ -81,7 +76,7 @@ class SynaplanWidget {
       maxFileSize: 10,
       widgetTitle: 'Chat Support',
       isPreview: false,
-      apiUrl: defaultApiUrl,
+      apiUrl: detectApiUrl(),
       allowedDomains: [],
       allowFileUpload: false,
       fileUploadLimit: 3,
