@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Controller;
 
+use App\Entity\Token;
 use App\Entity\User;
 use App\Entity\VerificationToken;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
@@ -26,22 +27,34 @@ class AuthControllerTest extends WebTestCase
 
     protected function tearDown(): void
     {
+        // Boot fresh kernel to get valid entity manager (old one may be stale)
+        self::ensureKernelShutdown();
+        $client = static::createClient();
+        $em = $client->getContainer()->get('doctrine')->getManager();
+
         // Cleanup test users
         $testEmails = ['newuser@test.com', 'logintest@test.com'];
         foreach ($testEmails as $email) {
-            $user = $this->em->getRepository(User::class)->findOneBy(['mail' => $email]);
+            $user = $em->getRepository(User::class)->findOneBy(['mail' => $email]);
             if ($user) {
                 // Remove verification tokens
-                $tokens = $this->em->getRepository(VerificationToken::class)
+                $verificationTokens = $em->getRepository(VerificationToken::class)
                     ->findBy(['userId' => $user->getId()]);
-                foreach ($tokens as $token) {
-                    $this->em->remove($token);
+                foreach ($verificationTokens as $token) {
+                    $em->remove($token);
                 }
 
-                $this->em->remove($user);
+                // Remove refresh tokens (BTOKENS table)
+                $refreshTokens = $em->getRepository(Token::class)
+                    ->findBy(['userId' => $user->getId()]);
+                foreach ($refreshTokens as $token) {
+                    $em->remove($token);
+                }
+
+                $em->remove($user);
             }
         }
-        $this->em->flush();
+        $em->flush();
 
         static::ensureKernelShutdown();
         parent::tearDown();

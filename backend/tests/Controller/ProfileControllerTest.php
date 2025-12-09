@@ -50,9 +50,21 @@ class ProfileControllerTest extends WebTestCase
 
     protected function tearDown(): void
     {
-        if ($this->em && $this->user) {
-            $this->em->remove($this->user);
-            $this->em->flush();
+        // Get fresh entity manager (old one may be stale after ensureKernelShutdown in tests)
+        if ($this->user) {
+            $userId = $this->user->getId();
+
+            // Boot fresh kernel to get valid entity manager
+            self::ensureKernelShutdown();
+            $client = static::createClient();
+            $em = $client->getContainer()->get('doctrine')->getManager();
+
+            // Re-fetch user to avoid detached entity error
+            $user = $em->getRepository(User::class)->find($userId);
+            if ($user) {
+                $em->remove($user);
+                $em->flush();
+            }
         }
 
         static::ensureKernelShutdown();

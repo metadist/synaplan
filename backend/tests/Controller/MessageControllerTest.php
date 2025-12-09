@@ -51,36 +51,44 @@ class MessageControllerTest extends WebTestCase
 
     protected function tearDown(): void
     {
-        // Cleanup: Remove test data
-        if ($this->em && $this->user) {
+        // Get fresh entity manager (old one may be stale after ensureKernelShutdown in tests)
+        if ($this->user) {
             $userId = $this->user->getId();
 
+            // Boot fresh kernel to get valid entity manager
+            self::ensureKernelShutdown();
+            $client = static::createClient();
+            $em = $client->getContainer()->get('doctrine')->getManager();
+
             // Remove test messages
-            $messages = $this->em->getRepository(Message::class)
+            $messages = $em->getRepository(Message::class)
                 ->findBy(['userId' => $userId]);
             foreach ($messages as $message) {
-                $this->em->remove($message);
+                $em->remove($message);
             }
 
             // Remove UseLog entries (rate limit tracking)
-            $useLogs = $this->em->getRepository(\App\Entity\UseLog::class)
+            $useLogs = $em->getRepository(\App\Entity\UseLog::class)
                 ->findBy(['userId' => $userId]);
             foreach ($useLogs as $useLog) {
-                $this->em->remove($useLog);
+                $em->remove($useLog);
             }
 
             // Remove Config entries (model preferences)
-            $configs = $this->em->getRepository(\App\Entity\Config::class)
+            $configs = $em->getRepository(\App\Entity\Config::class)
                 ->findBy(['ownerId' => $userId]);
             foreach ($configs as $config) {
-                $this->em->remove($config);
+                $em->remove($config);
             }
 
-            $this->em->flush();
+            $em->flush();
 
-            // Now safe to remove test user
-            $this->em->remove($this->user);
-            $this->em->flush();
+            // Now safe to remove test user (re-fetch to avoid detached entity)
+            $user = $em->getRepository(User::class)->find($userId);
+            if ($user) {
+                $em->remove($user);
+                $em->flush();
+            }
         }
 
         // Ensure kernel is shutdown for next test

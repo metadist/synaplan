@@ -47,18 +47,29 @@ class ChatControllerTest extends WebTestCase
 
     protected function tearDown(): void
     {
-        if ($this->em && $this->user) {
+        // Get fresh entity manager (old one may be stale after ensureKernelShutdown in tests)
+        if ($this->user) {
+            $userId = $this->user->getId();
+
+            // Boot fresh kernel to get valid entity manager
+            self::ensureKernelShutdown();
+            $client = static::createClient();
+            $em = $client->getContainer()->get('doctrine')->getManager();
+
             // Cleanup: Remove test chats
-            $chats = $this->em->getRepository(Chat::class)
-                ->findBy(['userId' => $this->user->getId()]);
+            $chats = $em->getRepository(Chat::class)
+                ->findBy(['userId' => $userId]);
 
             foreach ($chats as $chat) {
-                $this->em->remove($chat);
+                $em->remove($chat);
             }
 
-            // Remove test user
-            $this->em->remove($this->user);
-            $this->em->flush();
+            // Re-fetch user to avoid detached entity error
+            $user = $em->getRepository(User::class)->find($userId);
+            if ($user) {
+                $em->remove($user);
+                $em->flush();
+            }
         }
 
         static::ensureKernelShutdown();
