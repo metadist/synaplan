@@ -26,7 +26,7 @@ class ProfileControllerTest extends WebTestCase
     {
         self::ensureKernelShutdown();
         $this->client = static::createClient();
-        $this->em = static::getContainer()->get('doctrine')->getManager();
+        $this->em = $this->client->getContainer()->get('doctrine')->getManager();
 
         // Create test user (local auth, not OAuth)
         $this->user = new User();
@@ -50,20 +50,18 @@ class ProfileControllerTest extends WebTestCase
 
     protected function tearDown(): void
     {
-        // Get fresh entity manager (old one may be stale after ensureKernelShutdown in tests)
         if ($this->user) {
-            $userId = $this->user->getId();
+            // Get a fresh entity manager if the current one is closed
+            if (!$this->em || !$this->em->isOpen()) {
+                self::bootKernel();
+                $this->em = self::getContainer()->get('doctrine')->getManager();
+            }
 
-            // Boot fresh kernel to get valid entity manager
-            self::ensureKernelShutdown();
-            $client = static::createClient();
-            $em = $client->getContainer()->get('doctrine')->getManager();
-
-            // Re-fetch user to avoid detached entity error
-            $user = $em->getRepository(User::class)->find($userId);
+            // Find the user again if it's detached
+            $user = $this->em->find(User::class, $this->user->getId());
             if ($user) {
-                $em->remove($user);
-                $em->flush();
+                $this->em->remove($user);
+                $this->em->flush();
             }
         }
 

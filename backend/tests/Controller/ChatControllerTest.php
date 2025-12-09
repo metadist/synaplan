@@ -28,7 +28,7 @@ class ChatControllerTest extends WebTestCase
     {
         self::ensureKernelShutdown();
         $this->client = static::createClient();
-        $this->em = static::getContainer()->get('doctrine')->getManager();
+        $this->em = $this->client->getContainer()->get('doctrine')->getManager();
 
         // Create test user
         $this->user = new User();
@@ -47,29 +47,27 @@ class ChatControllerTest extends WebTestCase
 
     protected function tearDown(): void
     {
-        // Get fresh entity manager (old one may be stale after ensureKernelShutdown in tests)
         if ($this->user) {
-            $userId = $this->user->getId();
-
-            // Boot fresh kernel to get valid entity manager
-            self::ensureKernelShutdown();
-            $client = static::createClient();
-            $em = $client->getContainer()->get('doctrine')->getManager();
+            // Get a fresh entity manager if the current one is closed
+            if (!$this->em || !$this->em->isOpen()) {
+                self::bootKernel();
+                $this->em = self::getContainer()->get('doctrine')->getManager();
+            }
 
             // Cleanup: Remove test chats
-            $chats = $em->getRepository(Chat::class)
-                ->findBy(['userId' => $userId]);
+            $chats = $this->em->getRepository(Chat::class)
+                ->findBy(['userId' => $this->user->getId()]);
 
             foreach ($chats as $chat) {
-                $em->remove($chat);
+                $this->em->remove($chat);
             }
 
-            // Re-fetch user to avoid detached entity error
-            $user = $em->getRepository(User::class)->find($userId);
+            // Remove test user (find again if detached)
+            $user = $this->em->find(User::class, $this->user->getId());
             if ($user) {
-                $em->remove($user);
-                $em->flush();
+                $this->em->remove($user);
             }
+            $this->em->flush();
         }
 
         static::ensureKernelShutdown();

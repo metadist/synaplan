@@ -175,13 +175,6 @@ DATABASE_WRITE_URL=mysql://synaplan:password@127.0.0.1:3306/synaplan?serverVersi
 DATABASE_READ_URL=mysql://synaplan:password@127.0.0.1:3306/synaplan?serverVersion=11.8&charset=utf8mb4
 
 # -----------------------------------------------------------------------------
-# JWT Authentication (REQUIRED - keys generated in step 10)
-# -----------------------------------------------------------------------------
-JWT_SECRET_KEY=%kernel.project_dir%/config/jwt/private.pem
-JWT_PUBLIC_KEY=%kernel.project_dir%/config/jwt/public.pem
-JWT_PASSPHRASE=
-
-# -----------------------------------------------------------------------------
 # AI Services (REQUIRED - at minimum set OLLAMA_BASE_URL)
 # -----------------------------------------------------------------------------
 OLLAMA_BASE_URL=http://127.0.0.1:11434
@@ -191,11 +184,6 @@ AUTO_DOWNLOAD_MODELS=false
 # =============================================================================
 # OPTIONAL SETTINGS
 # =============================================================================
-
-# -----------------------------------------------------------------------------
-# Message Queue (recommended: Redis)
-# -----------------------------------------------------------------------------
-MESSENGER_TRANSPORT_DSN=redis://127.0.0.1:6379
 
 # -----------------------------------------------------------------------------
 # Document Processing
@@ -247,25 +235,7 @@ cd /wwwroot/synaplan/backend
 composer install --no-dev --optimize-autoloader
 ```
 
-### Step 2: Generate JWT keys (CRITICAL)
-
-The JWT keypair command requires env vars to be set first, so generate manually:
-
-```bash
-cd /wwwroot/synaplan/backend
-mkdir -p config/jwt
-openssl genrsa -out config/jwt/private.pem 4096
-openssl rsa -pubout -in config/jwt/private.pem -out config/jwt/public.pem
-```
-
-**CRITICAL: Set permissions so PHP-FPM (www-data) can read the keys:**
-```bash
-chmod 644 config/jwt/private.pem config/jwt/public.pem
-```
-
-> ⚠️ **Common Error:** If you see `Signature key does not exist or is not readable`, the permissions are wrong. Run `chmod 644 config/jwt/*.pem`.
-
-### Step 3: Create database and user
+### Step 2: Create database and user
 
 ```sql
 -- Run in MySQL/MariaDB as root:
@@ -275,7 +245,7 @@ GRANT ALL PRIVILEGES ON synaplan.* TO 'synaplan'@'localhost';
 FLUSH PRIVILEGES;
 ```
 
-### Step 4: Create database schema
+### Step 3: Create database schema
 
 > **Note:** This project uses schema creation, not migrations. The migrations folder is empty.
 
@@ -289,7 +259,7 @@ php bin/console doctrine:schema:create --no-interaction
 php bin/console doctrine:schema:update --force
 ```
 
-### Step 5: Load initial data (fixtures)
+### Step 4: Load initial data (fixtures)
 
 Load the demo users, AI models, rate limits, and system configuration:
 
@@ -316,16 +286,11 @@ It also loads:
 > php bin/console doctrine:fixtures:load --append --no-interaction
 > ```
 
-### Step 6: Clear cache and set permissions
+### Step 5: Clear cache and set permissions
 ```bash
 php bin/console cache:clear
-sudo chown -R www-data:www-data var config/jwt
+sudo chown -R www-data:www-data var
 sudo chmod -R 775 var
-```
-
-### Step 7: Setup message transports (if using Redis)
-```bash
-php bin/console messenger:setup-transports --no-interaction
 ```
 
 ---
@@ -534,8 +499,6 @@ Tail logs: `journalctl -u synaplan-messenger.service -f`
 
 | Error | Cause | Solution |
 |-------|-------|----------|
-| `Environment variable not found: "JWT_SECRET_KEY"` | JWT env vars not set | Add JWT_SECRET_KEY, JWT_PUBLIC_KEY, JWT_PASSPHRASE to `.env` |
-| `Signature key does not exist or is not readable` | JWT key permissions | `chmod 644 config/jwt/*.pem` |
 | `Environment variable not found: "OLLAMA_BASE_URL"` | Missing AI config | Add `OLLAMA_BASE_URL=http://127.0.0.1:11434` to `.env` |
 | `FCGI: attempt to connect to Unix domain socket failed` | Wrong PHP-FPM socket path | Check socket: `ls /run/php/` and update Apache config |
 | `503 Service Unavailable` | PHP-FPM not running | `sudo systemctl start php8.4-fpm` |
@@ -609,7 +572,6 @@ The codebase requires **no code changes** between environments—only `.env` fil
 |---------|-------------|---------------------|
 | Ollama | `http://127.0.0.1:11434` | `OLLAMA_BASE_URL` |
 | Apache Tika | `http://127.0.0.1:9998` | `TIKA_BASE_URL` |
-| Redis | `redis://127.0.0.1:6379` | `MESSENGER_TRANSPORT_DSN` |
 | MariaDB/MySQL | `127.0.0.1:3306` | `DATABASE_WRITE_URL`, `DATABASE_READ_URL` |
 
 ---

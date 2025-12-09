@@ -27,7 +27,7 @@ class RagControllerTest extends WebTestCase
             return $this->token;
         }
 
-        $userRepository = static::getContainer()->get('doctrine')->getRepository(User::class);
+        $userRepository = $this->client->getContainer()->get('doctrine')->getRepository(User::class);
         $user = $userRepository->findOneBy(['mail' => 'admin@synaplan.com']);
 
         if (!$user) {

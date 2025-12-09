@@ -3,7 +3,6 @@
 namespace App\Tests\Controller;
 
 use App\Entity\User;
-use App\Repository\UserRepository;
 use App\Tests\Trait\AuthenticatedTestTrait;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
 
@@ -15,30 +14,51 @@ class FileServeControllerTest extends WebTestCase
     use AuthenticatedTestTrait;
 
     private $client;
-    private ?string $authToken = null;
-    private ?User $testUser = null;
-    private ?string $testFilePath = null;
+    private $em;
+    private $user;
+    private string $authToken;
+    private string $testFilePath;
 
     protected function setUp(): void
     {
-        parent::setUp();
         self::ensureKernelShutdown();
-
         $this->client = static::createClient();
+        $this->em = $this->client->getContainer()->get('doctrine')->getManager();
 
-        // Get test user and authenticate using cookie-based auth
-        $userRepository = static::getContainer()->get(UserRepository::class);
-        $this->testUser = $userRepository->findOneBy(['mail' => 'admin@synaplan.com']);
+        // Use fixture user demo@synaplan.com
+        $this->user = $this->em->getRepository(User::class)->findOneBy(['mail' => 'demo@synaplan.com']);
 
-        if (!$this->testUser) {
-            $this->markTestSkipped('Test user admin@synaplan.com not found. Run fixtures first.');
+        if (!$this->user) {
+            $this->markTestSkipped('Test user demo@synaplan.com not found. Run fixtures first.');
         }
 
-        // Generate access token and set cookies
-        $this->authToken = $this->authenticateClient($this->client, $this->testUser);
+        // Generate access token using TokenService
+        $this->authToken = $this->authenticateClient($this->client, $this->user);
 
         // Upload test file and get path
         $this->testFilePath = $this->uploadAndGetPath();
+    }
+
+    protected function tearDown(): void
+    {
+        if ($this->user) {
+            // Get a fresh entity manager if the current one is closed
+            if (!$this->em || !$this->em->isOpen()) {
+                self::bootKernel();
+                $this->em = self::getContainer()->get('doctrine')->getManager();
+            }
+
+            // Remove uploaded files only (keep fixture user)
+            $files = $this->em->getRepository(\App\Entity\File::class)
+                ->findBy(['userId' => $this->user->getId()]);
+            foreach ($files as $file) {
+                $this->em->remove($file);
+            }
+            $this->em->flush();
+        }
+
+        static::ensureKernelShutdown();
+        parent::tearDown();
     }
 
     private function uploadAndGetPath(): string
@@ -90,12 +110,9 @@ class FileServeControllerTest extends WebTestCase
 
     public function testServePrivateFileWithoutAuth(): void
     {
-        // Create a new client without auth
-        self::ensureKernelShutdown();
-        $client = static::createClient();
-        $client->request('GET', '/up/'.$this->testFilePath);
+        $this->client->request('GET', '/up/'.$this->testFilePath);
 
-        $response = $client->getResponse();
+        $response = $this->client->getResponse();
         $this->assertEquals(401, $response->getStatusCode());
     }
 
@@ -110,12 +127,10 @@ class FileServeControllerTest extends WebTestCase
             'HTTP_AUTHORIZATION' => 'Bearer '.$this->authToken,
         ], json_encode(['expiry_days' => 7]));
 
-        // Create new client without auth - access should now work
-        self::ensureKernelShutdown();
-        $client = static::createClient();
-        $client->request('GET', '/up/'.$this->testFilePath);
+        // Access without auth should now work
+        $this->client->request('GET', '/up/'.$this->testFilePath);
 
-        $response = $client->getResponse();
+        $response = $this->client->getResponse();
         $this->assertEquals(200, $response->getStatusCode());
     }
 
@@ -139,12 +154,10 @@ class FileServeControllerTest extends WebTestCase
             'HTTP_AUTHORIZATION' => 'Bearer '.$this->authToken,
         ], json_encode(['expiry_days' => 0]));
 
-        // Get file with new client
-        self::ensureKernelShutdown();
-        $client = static::createClient();
-        $client->request('GET', '/up/'.$this->testFilePath);
+        // Get file
+        $this->client->request('GET', '/up/'.$this->testFilePath);
 
-        $response = $client->getResponse();
+        $response = $this->client->getResponse();
         $this->assertEquals(200, $response->getStatusCode());
         $this->assertStringContainsString('public', $response->headers->get('Cache-Control') ?? '');
     }

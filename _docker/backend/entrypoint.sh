@@ -13,7 +13,6 @@ if [ ! -f "/var/www/backend/.env" ]; then
 APP_ENV=dev
 APP_SECRET=change_me_in_production_12345678901234567890
 DATABASE_URL=mysql://synaplan_user:synaplan_password@db:3306/synaplan?serverVersion=11.8&charset=utf8mb4
-MESSENGER_TRANSPORT_DSN=doctrine://default
 EOF
         echo "✅ Minimal .env created"
     fi

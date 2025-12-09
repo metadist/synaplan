@@ -20,41 +20,35 @@ class AuthControllerTest extends WebTestCase
 
     protected function setUp(): void
     {
-        self::ensureKernelShutdown();
         $this->client = static::createClient();
-        $this->em = static::getContainer()->get('doctrine')->getManager();
+        $this->em = $this->client->getContainer()->get('doctrine')->getManager();
     }
 
     protected function tearDown(): void
     {
-        // Boot fresh kernel to get valid entity manager (old one may be stale)
-        self::ensureKernelShutdown();
-        $client = static::createClient();
-        $em = $client->getContainer()->get('doctrine')->getManager();
-
         // Cleanup test users
-        $testEmails = ['newuser@test.com', 'logintest@test.com'];
+        $testEmails = ['newuser@test.com', 'logintest@test.com', 'logintest2@test.com', 'unverified@test.com', 'existing@test.com'];
         foreach ($testEmails as $email) {
-            $user = $em->getRepository(User::class)->findOneBy(['mail' => $email]);
+            $user = $this->em->getRepository(User::class)->findOneBy(['mail' => $email]);
             if ($user) {
+                // Remove auth tokens (BTOKENS table)
+                $authTokens = $this->em->getRepository(Token::class)
+                    ->findBy(['userId' => $user->getId()]);
+                foreach ($authTokens as $token) {
+                    $this->em->remove($token);
+                }
+
                 // Remove verification tokens
-                $verificationTokens = $em->getRepository(VerificationToken::class)
+                $verificationTokens = $this->em->getRepository(VerificationToken::class)
                     ->findBy(['userId' => $user->getId()]);
                 foreach ($verificationTokens as $token) {
-                    $em->remove($token);
+                    $this->em->remove($token);
                 }
 
-                // Remove refresh tokens (BTOKENS table)
-                $refreshTokens = $em->getRepository(Token::class)
-                    ->findBy(['userId' => $user->getId()]);
-                foreach ($refreshTokens as $token) {
-                    $em->remove($token);
-                }
-
-                $em->remove($user);
+                $this->em->remove($user);
             }
         }
-        $em->flush();
+        $this->em->flush();
 
         static::ensureKernelShutdown();
         parent::tearDown();
@@ -177,15 +171,17 @@ class AuthControllerTest extends WebTestCase
 
         $responseData = json_decode($this->client->getResponse()->getContent(), true);
 
-        // Login now uses HttpOnly cookies, not token in response body
         $this->assertArrayHasKey('success', $responseData);
         $this->assertTrue($responseData['success']);
         $this->assertArrayHasKey('user', $responseData);
         $this->assertEquals('logintest@test.com', $responseData['user']['email']);
 
-        // Verify auth cookies were set
-        $cookies = $this->client->getCookieJar();
-        $this->assertNotNull($cookies->get('access_token'), 'Access token cookie should be set');
+        // Verify auth cookies are set
+        $response = $this->client->getResponse();
+        $cookies = $response->headers->getCookies();
+        $cookieNames = array_map(fn ($cookie) => $cookie->getName(), $cookies);
+        $this->assertContains('access_token', $cookieNames);
+        $this->assertContains('refresh_token', $cookieNames);
     }
 
     public function testLoginWithInvalidPassword(): void
