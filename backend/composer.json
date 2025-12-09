@@ -103,6 +103,7 @@
         ],
         "lint": "php-cs-fixer check --diff",
         "lint:fix": "php-cs-fixer fix",
+        "phpstan": "phpstan analyse",
         "proto:generate": [
             "protoc --php_out=src/Grpc/Triton --grpc_out=src/Grpc/Triton --plugin=protoc-gen-grpc=$(which grpc_php_plugin) --proto_path=proto/triton proto/triton/grpc_service.proto proto/triton/model_config.proto"
         ],
@@ -123,6 +124,7 @@
         "doctrine/doctrine-fixtures-bundle": "^4.3.1",
         "friendsofphp/php-cs-fixer": "^3.91.3",
         "phpstan/phpstan": "^2.1.33",
+        "phpstan/phpstan-doctrine": "^2.0",
         "phpunit/phpunit": "^12.5.2",
         "symfony/browser-kit": "7.3.*",
         "symfony/css-selector": "7.3.*",
