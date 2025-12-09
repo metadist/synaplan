@@ -3,6 +3,13 @@ set -euo pipefail
 
 echo "🚀 Starting Synaplan Frontend..."
 
+# Install npm dependencies if node_modules is empty or doesn't exist
+if [ ! -d "/app/node_modules" ] || [ -z "$(ls -A /app/node_modules 2>/dev/null)" ]; then
+    echo "🔧 Installing npm dependencies..."
+    npm ci
+    echo "✅ npm dependencies installed"
+fi
+
 # Run additional startup scripts from docker-entrypoint.d (if any)
 # Useful for dev environments to mount custom initialization scripts
 if [ -d "/docker-entrypoint.d" ]; then
