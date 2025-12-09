@@ -59,7 +59,7 @@ function buildTimestampPlugin(mode: string): Plugin {
  *
  * Watch Mode Configuration:
  * - Use --watch CLI flag for development (configured in docker-compose.yml)
- * - Polling configuration below is needed for Docker bind mounts
+ * - Polling configuration enabled when --watch flag detected
  * - See: https://vite.dev/config/build-options#build-watch
  */
 export default defineConfig(({ mode }) => ({
@@ -78,7 +78,9 @@ export default defineConfig(({ mode }) => ({
     // Watch configuration for Docker bind mounts (activated via --watch CLI flag)
     // https://vite.dev/config/build-options#build-watch
     // https://rollupjs.org/configuration-options/#watch
-    watch: {
+    // Note: Using process.argv check because Vite doesn't expose watch mode in defineConfig callback
+    // See: https://github.com/vitejs/vite/discussions/7565
+    watch: process.argv.includes('--watch') || process.argv.includes('-w') ? {
       include: 'src/**',
       exclude: ['node_modules/**', 'dist-widget/**'],
       // Chokidar options for file system polling in Docker
@@ -90,7 +92,7 @@ export default defineConfig(({ mode }) => ({
           pollInterval: 100
         }
       }
-    },
+    } : null,
 
     rollupOptions: {
       preserveEntrySignatures: 'strict',
