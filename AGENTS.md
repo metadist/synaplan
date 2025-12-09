@@ -184,6 +184,7 @@ The project uses `.editorconfig` to enforce consistent formatting across all fil
 - Readonly properties when possible
 - Final classes by default
 - Import statements (`use`) sorted lexicographically (alphabetically)
+- No spaces around string concatenation operator (`.`) - use `$a.$b` not `$a . $b`
 - PHPStan level 5 compliance (static analysis must pass)
 
 **Example:**
