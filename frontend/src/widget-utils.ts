@@ -1,18 +1,22 @@
 /**
- * Shared utilities for Synaplan Widget scripts
+ * Widget utility functions
  */
 
 /**
- * Detects the API base URL from the script's import.meta.url
- *
- * Example:
- *   https://app.synaplan.com/widget.js -> https://app.synaplan.com
- *   https://example.com/synaplan/widget-loader.js -> https://example.com/synaplan
- *
- * @returns The detected API base URL (origin + path without filename)
+ * Detects the API URL from the current script location
+ * Handles both entry point (foo.com/widget.js) and chunk (foo.com/chunks/widget-hash.js)
  */
 export function detectApiUrl(): string {
   const url = new URL(import.meta.url)
-  const basePath = url.pathname.replace(/\/[^\/]+$/, '') // Remove filename
-  return `${url.origin}${basePath}`
+  let pathname = url.pathname
+
+  // If we're in a chunks/ directory, go up one level
+  if (pathname.includes('/chunks/')) {
+    pathname = pathname.substring(0, pathname.indexOf('/chunks/'))
+  } else {
+    // Otherwise just remove the filename
+    pathname = pathname.replace(/\/[^\/]+$/, '')
+  }
+
+  return `${url.origin}${pathname}`
 }

@@ -95,6 +95,9 @@ RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 # Copy built frontend (built externally in CI, empty in dev)
 COPY frontend/dist /var/www/frontend
 
+# Copy built widgets (built externally in CI, empty in dev)
+COPY frontend/dist-widget /var/www/widgets
+
 # Copy Caddyfile for production routing (API vs SPA)
 COPY _docker/backend/Caddyfile /etc/caddy/Caddyfile
 
