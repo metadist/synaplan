@@ -7,11 +7,16 @@ const projectRoot = fileURLToPath(new URL('.', import.meta.url))
 
 /**
  * Plugin to create .gitkeep file in output directory after build
+ * Only runs in development mode (when NODE_ENV !== 'production')
  */
 export function gitkeepPlugin(): Plugin {
+  const isDev = process.env.NODE_ENV !== 'production'
+
   return {
     name: 'gitkeep',
     async writeBundle(options) {
+      if (!isDev) return
+
       const fs = await import('fs/promises')
       const path = await import('path')
 
