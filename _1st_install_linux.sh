@@ -6,7 +6,7 @@ cd "$REPO_ROOT"
 
 echo ""
 echo "╔═══════════════════════════════════════════════════════════════╗"
-echo "║           🚀 Synaplan First-Time Setup                        ║"
+echo "║           🚀 Synaplan First Installation                      ║"
 echo "╚═══════════════════════════════════════════════════════════════╝"
 echo ""
 
