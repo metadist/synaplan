@@ -306,3 +306,8 @@ services:
             $minChunkSize: 100
 
     App\Service\File\VectorizationService: ~
+
+    # Monolog Formatter Factory (for env-based log format switching)
+    App\Service\MonologFormatterFactory:
+        arguments:
+            $logFormat: '%env(default:default_log_format:LOG_FORMAT)%'
