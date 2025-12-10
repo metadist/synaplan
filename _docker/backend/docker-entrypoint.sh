@@ -84,12 +84,9 @@ until php bin/console dbal:run-sql "SELECT 1" > /dev/null 2>&1; do
 done
 echo "✅ Database is ready!"
 
-# Run migrations
-echo "🔄 Running database migrations..."
-php bin/console doctrine:migrations:migrate --no-interaction --allow-no-migration || {
-    echo "⚠️  Migrations failed, trying schema update..."
-    php bin/console doctrine:schema:update --force
-}
+# Run database schema update (until we have proper migrations)
+echo "🔄 Running database schema update..."
+php bin/console doctrine:schema:update --force
 echo "✅ Database schema ready!"
 
 # Load fixtures on first run (dev/test only)
