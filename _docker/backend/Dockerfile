@@ -11,12 +11,18 @@ RUN apt-get update && apt-get install -y \
     ghostscript imagemagick libmagickwand-dev poppler-utils \
     build-essential cmake pkg-config \
     libopenblas-dev liblapack-dev gfortran \
-    protobuf-compiler \
     ffmpeg libavcodec-extra libavformat-dev libavutil-dev \
     libswscale-dev libavfilter-dev libswresample-dev \
     libx264-dev libx265-dev libvpx-dev libmp3lame-dev libopus-dev \
     libc-client-dev libkrb5-dev \
     && rm -rf /var/lib/apt/lists/*
+
+# Install protoc (pinned version for consistent proto generation)
+ENV PROTOC_VERSION=33.2
+RUN curl -Lo /tmp/protoc.zip "https://github.com/protocolbuffers/protobuf/releases/download/v${PROTOC_VERSION}/protoc-${PROTOC_VERSION}-linux-x86_64.zip" \
+    && unzip -q /tmp/protoc.zip -d /usr/local \
+    && chmod +x /usr/local/bin/protoc \
+    && rm /tmp/protoc.zip
 
 WORKDIR /var/www/backend
 
