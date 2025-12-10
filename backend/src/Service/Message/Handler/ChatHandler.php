@@ -526,7 +526,13 @@ class ChatHandler implements MessageHandlerInterface
         }
 
         // Thread Messages hinzufügen (letzte N Messages)
+        // IMPORTANT: Exclude the current message from the thread to avoid duplicates
         foreach ($thread as $msg) {
+            // Skip if this is the current message (already added at the end)
+            if ($msg->getId() === $currentMessage->getId()) {
+                continue;
+            }
+
             $role = 'IN' === $msg->getDirection() ? 'user' : 'assistant';
             $content = $msg->getText();
 
