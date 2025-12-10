@@ -197,9 +197,9 @@ echo "✅ Cache ready!"
 # Start FrankenPHP
 echo ""
 echo "🎉 Backend ready! Starting FrankenPHP..."
-echo "   🌐 Frontend: http://localhost:8000"
-echo "   🌐 API: http://localhost:8000/api"
-echo "   📚 Swagger: http://localhost:8000/api/doc"
+echo "   🌐 Frontend: ${APP_URL}"
+echo "   🌐 API: ${APP_URL}/api"
+echo "   📚 Swagger: ${APP_URL}/api/doc"
 echo ""
 
 exec frankenphp run --config /etc/caddy/Caddyfile
