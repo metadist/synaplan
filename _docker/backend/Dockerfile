@@ -18,6 +18,7 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Install protoc (pinned version for consistent proto generation)
+# This version is also used in CI (.github/workflows/ci.yml extracts it via grep)
 ENV PROTOC_VERSION=33.2
 RUN curl -Lo /tmp/protoc.zip "https://github.com/protocolbuffers/protobuf/releases/download/v${PROTOC_VERSION}/protoc-${PROTOC_VERSION}-linux-x86_64.zip" \
     && unzip -q /tmp/protoc.zip -d /usr/local \
