@@ -74,7 +74,7 @@ Frontend and widget assets are added to the backend docker image in CI builds an
 # Code quality
 make -C backend lint                  # Check PSR-12 formatting
 make -C backend format                # Fix formatting
-make -C backend phpstan    # Static analysis
+make -C backend phpstan               # Static analysis
 make -C backend audit                 # Security audit
 
 # Testing
@@ -115,6 +115,8 @@ make -C frontend deps
 
 Use conventional commits and pull request titles.
 Use GitHub CLI (gh) to access pull request information like reviews and ci logs.
+Don't add your attribution.
+
 
 ```bash
 # Create feature branch
@@ -184,6 +186,8 @@ The project uses `.editorconfig` to enforce consistent formatting across all fil
 - Readonly properties when possible
 - Final classes by default
 - Import statements (`use`) sorted lexicographically (alphabetically)
+- No spaces around string concatenation operator (`.`) - use `$a.$b` not `$a . $b`
+- PHPStan level 5 compliance (static analysis must pass)
 
 **Example:**
 ```php
@@ -336,6 +340,7 @@ You can put the component in braces, e.g. `feat(frontend): add loading spinner f
 ### CI Requirements
 All checks must pass:
 - ✅ PHP code formatting (PSR-12)
+- ✅ PHPStan static analysis
 - ✅ Backend tests (PHPUnit)
 - ✅ Frontend type check
 - ✅ Frontend tests (Vitest)

@@ -96,6 +96,10 @@ jobs:
         working-directory: backend
         run: composer audit || true
 
+      - name: Run PHPStan
+        working-directory: backend
+        run: composer phpstan
+
       - name: Setup database schema
         working-directory: backend
         run: |

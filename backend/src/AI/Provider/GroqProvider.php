@@ -179,7 +179,6 @@ class GroqProvider implements ChatProviderInterface, VisionProviderInterface
                 ++$chunkCount;
 
                 // Handle reasoning content (for models with structured reasoning like OpenAI o1)
-                // @phpstan-ignore-next-line - Groq API response structure varies by model
                 if (isset($response->choices[0]->delta->reasoning_content)) {
                     $reasoningContent = $response->choices[0]->delta->reasoning_content;
 
