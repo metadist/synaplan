@@ -16,7 +16,7 @@ class MonologFormatterFactory
     public function createFormatter(): FormatterInterface
     {
         return match ($this->logFormat) {
-            'line' => (function() {
+            'line' => (function () {
                 $formatter = new LineFormatter(
                     format: "[%datetime%] %channel%.%level_name%: %message% %context% %extra%\n",
                     dateFormat: 'Y-m-d H:i:s',
@@ -25,6 +25,7 @@ class MonologFormatterFactory
                 );
                 $formatter->allowInlineLineBreaks(true);
                 $formatter->includeStacktraces(true);
+
                 return $formatter;
             })(),
             default => new JsonFormatter(
