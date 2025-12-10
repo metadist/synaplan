@@ -215,11 +215,13 @@ class StreamController extends AbstractController
         ]);
 
         // Check rate limit BEFORE starting the stream (not widget mode)
-        // This allows returning a proper JSON error that the frontend can handle
+        // Send as SSE event so EventSource can parse it (EventSource cannot read JSON error responses)
+        $rateLimitError = null;
         if (!$isWidgetMode) {
             $rateLimitCheck = $this->rateLimitService->checkLimit($user, 'MESSAGES');
             if (!$rateLimitCheck['allowed']) {
-                return $this->json([
+                $rateLimitError = [
+                    'status' => 'error',
                     'error' => 'Rate limit exceeded',
                     'limit_type' => $rateLimitCheck['limit_type'] ?? 'lifetime',
                     'action_type' => 'MESSAGES',
@@ -229,7 +231,7 @@ class StreamController extends AbstractController
                     'reset_at' => $rateLimitCheck['reset_at'] ?? null,
                     'user_level' => $user->getUserLevel(),
                     'phone_verified' => $user->isEmailVerified(),
-                ], Response::HTTP_TOO_MANY_REQUESTS);
+                ];
             }
         }
 
@@ -240,7 +242,7 @@ class StreamController extends AbstractController
         $response->headers->set('X-Accel-Buffering', 'no');
         $response->headers->set('Connection', 'keep-alive');
 
-        $response->setCallback(function () use ($user, $messageText, $trackId, $chatId, $includeReasoning, $webSearch, $modelId, $fileIdArray, $isWidgetMode, $fixedTaskPromptTopic, $widgetSession) {
+        $response->setCallback(function () use ($user, $messageText, $trackId, $chatId, $includeReasoning, $webSearch, $modelId, $fileIdArray, $isWidgetMode, $fixedTaskPromptTopic, $widgetSession, $rateLimitError) {
             // Disable output buffering
             while (ob_get_level()) {
                 ob_end_clean();
@@ -249,6 +251,14 @@ class StreamController extends AbstractController
             set_time_limit(0);
             // Stop execution when client disconnects
             ignore_user_abort(false);
+
+            // If rate limit was exceeded, send error as SSE event and return immediately
+            // This prevents the user message from being saved when rate limited
+            if ($rateLimitError) {
+                $this->sendSSE('message', $rateLimitError);
+
+                return;
+            }
 
             try {
                 // Load chat
