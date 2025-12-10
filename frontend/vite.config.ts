@@ -1,9 +1,32 @@
-import { defineConfig, loadEnv } from 'vite'
+import { defineConfig, loadEnv, Plugin } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import { fileURLToPath, URL } from 'node:url'
 import { resolve } from 'path'
 
 const projectRoot = fileURLToPath(new URL('.', import.meta.url))
+
+/**
+ * Plugin to create .gitkeep file in output directory after build
+ */
+export function gitkeepPlugin(): Plugin {
+  return {
+    name: 'gitkeep',
+    async closeBundle() {
+      const fs = await import('fs/promises')
+      const path = await import('path')
+
+      // Get outDir from Vite config (defaults to 'dist')
+      const outDir = (this as any).environment?.config?.build?.outDir || 'dist'
+      const gitkeepPath = path.join(outDir, '.gitkeep')
+
+      try {
+        await fs.writeFile(gitkeepPath, '', 'utf8')
+      } catch (error) {
+        console.warn('Failed to create .gitkeep:', error)
+      }
+    }
+  }
+}
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
@@ -12,7 +35,11 @@ export default defineConfig(({ mode }) => {
 
   return {
     base: basePath,
-    plugins: [vue()],
+    plugins: [vue(), gitkeepPlugin()],
+    build: {
+      outDir: 'dist',
+      emptyOutDir: true,
+    },
     resolve: {
       alias: {
         '@': fileURLToPath(new URL('./src', import.meta.url))

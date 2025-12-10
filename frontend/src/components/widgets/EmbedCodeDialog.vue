@@ -146,6 +146,7 @@ import { useNotification } from '@/composables/useNotification'
 interface Props {
   widget: Widget
   embedCode: string
+  legacyEmbedCode?: string
   wordpressShortcode: string
 }
 
@@ -158,6 +159,7 @@ const config = useConfigStore()
 const { success } = useNotification()
 
 const copiedHTML = ref(false)
+const copiedLegacy = ref(false)
 const copiedWP = ref(false)
 
 /**
@@ -170,6 +172,9 @@ const copyToClipboard = async (text: string, type: string) => {
     if (type === 'HTML') {
       copiedHTML.value = true
       setTimeout(() => { copiedHTML.value = false }, 2000)
+    } else if (type === 'Legacy') {
+      copiedLegacy.value = true
+      setTimeout(() => { copiedLegacy.value = false }, 2000)
     } else {
       copiedWP.value = true
       setTimeout(() => { copiedWP.value = false }, 2000)

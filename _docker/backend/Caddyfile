@@ -88,6 +88,7 @@
 		path('/up/*') ||
 		path('/api/*') ||
 		path('/api.php') ||
+		path('/widget.php') ||
 		({env.APP_ENV} == 'dev' && (path('/_profiler/*') || path('/_wdt/*') || path('/_error/*')))
 	`
 	handle @backend_php {

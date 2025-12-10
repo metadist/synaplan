@@ -416,7 +416,7 @@
 
   /* Tools-Dropdown (drop-up) */
   .dropdown-up{
-    position:absolute; bottom:calc(100% + .5rem); z-index:40;
+    position:absolute; bottom:calc(100% + .5rem); z-index:100;
     background: var(--bg-chip); border-radius:.75rem;
     box-shadow: inset 0 0 0 1px rgb(212 212 212 / .4), 0 8px 24px rgb(0 0 0 / .18);
     padding:.5rem; transform-origin:bottom left; animation: dropup .12s ease-out;

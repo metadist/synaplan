@@ -134,6 +134,14 @@ class WidgetService
     }
 
     /**
+     * List all widgets for a user by user ID.
+     */
+    public function getWidgetsByUserId(int $userId): array
+    {
+        return $this->widgetRepository->findByOwnerId($userId);
+    }
+
+    /**
      * Generate embed code for a widget.
      */
     public function generateEmbedCode(Widget $widget, string $baseUrl): string
