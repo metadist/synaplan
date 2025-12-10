@@ -1,6 +1,78 @@
 parameters:
 	ignoreErrors:
 		-
+			message: '#^Static method Google\\Protobuf\\Internal\\GPBUtil\:\:checkEnum\(\) invoked with 2 parameters, 1 required\.$#'
+			identifier: arguments.count
+			count: 2
+			path: lib/grpc/Inference/BatchInput.php
+
+		-
+			message: '#^Static method Google\\Protobuf\\Internal\\GPBUtil\:\:checkEnum\(\) invoked with 2 parameters, 1 required\.$#'
+			identifier: arguments.count
+			count: 1
+			path: lib/grpc/Inference/BatchOutput.php
+
+		-
+			message: '#^Static method Google\\Protobuf\\Internal\\GPBUtil\:\:checkEnum\(\) invoked with 2 parameters, 1 required\.$#'
+			identifier: arguments.count
+			count: 2
+			path: lib/grpc/Inference/ModelInput.php
+
+		-
+			message: '#^Static method Google\\Protobuf\\Internal\\GPBUtil\:\:checkEnum\(\) invoked with 2 parameters, 1 required\.$#'
+			identifier: arguments.count
+			count: 1
+			path: lib/grpc/Inference/ModelInstanceGroup.php
+
+		-
+			message: '#^Static method Google\\Protobuf\\Internal\\GPBUtil\:\:checkEnum\(\) invoked with 2 parameters, 1 required\.$#'
+			identifier: arguments.count
+			count: 1
+			path: lib/grpc/Inference/ModelInstanceGroup/SecondaryDevice.php
+
+		-
+			message: '#^Static method Google\\Protobuf\\Internal\\GPBUtil\:\:checkEnum\(\) invoked with 2 parameters, 1 required\.$#'
+			identifier: arguments.count
+			count: 1
+			path: lib/grpc/Inference/ModelOptimizationPolicy.php
+
+		-
+			message: '#^Static method Google\\Protobuf\\Internal\\GPBUtil\:\:checkEnum\(\) invoked with 2 parameters, 1 required\.$#'
+			identifier: arguments.count
+			count: 1
+			path: lib/grpc/Inference/ModelOutput.php
+
+		-
+			message: '#^Static method Google\\Protobuf\\Internal\\GPBUtil\:\:checkEnum\(\) invoked with 2 parameters, 1 required\.$#'
+			identifier: arguments.count
+			count: 1
+			path: lib/grpc/Inference/ModelQueuePolicy.php
+
+		-
+			message: '#^Static method Google\\Protobuf\\Internal\\GPBUtil\:\:checkEnum\(\) invoked with 2 parameters, 1 required\.$#'
+			identifier: arguments.count
+			count: 2
+			path: lib/grpc/Inference/ModelSequenceBatching/Control.php
+
+		-
+			message: '#^Static method Google\\Protobuf\\Internal\\GPBUtil\:\:checkEnum\(\) invoked with 2 parameters, 1 required\.$#'
+			identifier: arguments.count
+			count: 1
+			path: lib/grpc/Inference/ModelSequenceBatching/InitialState.php
+
+		-
+			message: '#^Static method Google\\Protobuf\\Internal\\GPBUtil\:\:checkEnum\(\) invoked with 2 parameters, 1 required\.$#'
+			identifier: arguments.count
+			count: 1
+			path: lib/grpc/Inference/ModelSequenceBatching/State.php
+
+		-
+			message: '#^Static method Google\\Protobuf\\Internal\\GPBUtil\:\:checkEnum\(\) invoked with 2 parameters, 1 required\.$#'
+			identifier: arguments.count
+			count: 1
+			path: lib/grpc/Inference/ModelWarmup/Input.php
+
+		-
 			message: '#^Offset ''model'' on non\-empty\-array on left side of \?\? always exists and is not nullable\.$#'
 			identifier: nullCoalesce.offset
 			count: 2
@@ -257,78 +329,6 @@ parameters:
 			identifier: method.notFound
 			count: 1
 			path: src/DataFixtures/ModelFixtures.php
-
-		-
-			message: '#^Static method Google\\Protobuf\\Internal\\GPBUtil\:\:checkEnum\(\) invoked with 2 parameters, 1 required\.$#'
-			identifier: arguments.count
-			count: 2
-			path: lib/grpc/Inference/BatchInput.php
-
-		-
-			message: '#^Static method Google\\Protobuf\\Internal\\GPBUtil\:\:checkEnum\(\) invoked with 2 parameters, 1 required\.$#'
-			identifier: arguments.count
-			count: 1
-			path: lib/grpc/Inference/BatchOutput.php
-
-		-
-			message: '#^Static method Google\\Protobuf\\Internal\\GPBUtil\:\:checkEnum\(\) invoked with 2 parameters, 1 required\.$#'
-			identifier: arguments.count
-			count: 2
-			path: lib/grpc/Inference/ModelInput.php
-
-		-
-			message: '#^Static method Google\\Protobuf\\Internal\\GPBUtil\:\:checkEnum\(\) invoked with 2 parameters, 1 required\.$#'
-			identifier: arguments.count
-			count: 1
-			path: lib/grpc/Inference/ModelInstanceGroup.php
-
-		-
-			message: '#^Static method Google\\Protobuf\\Internal\\GPBUtil\:\:checkEnum\(\) invoked with 2 parameters, 1 required\.$#'
-			identifier: arguments.count
-			count: 1
-			path: lib/grpc/Inference/ModelInstanceGroup/SecondaryDevice.php
-
-		-
-			message: '#^Static method Google\\Protobuf\\Internal\\GPBUtil\:\:checkEnum\(\) invoked with 2 parameters, 1 required\.$#'
-			identifier: arguments.count
-			count: 1
-			path: lib/grpc/Inference/ModelOptimizationPolicy.php
-
-		-
-			message: '#^Static method Google\\Protobuf\\Internal\\GPBUtil\:\:checkEnum\(\) invoked with 2 parameters, 1 required\.$#'
-			identifier: arguments.count
-			count: 1
-			path: lib/grpc/Inference/ModelOutput.php
-
-		-
-			message: '#^Static method Google\\Protobuf\\Internal\\GPBUtil\:\:checkEnum\(\) invoked with 2 parameters, 1 required\.$#'
-			identifier: arguments.count
-			count: 1
-			path: lib/grpc/Inference/ModelQueuePolicy.php
-
-		-
-			message: '#^Static method Google\\Protobuf\\Internal\\GPBUtil\:\:checkEnum\(\) invoked with 2 parameters, 1 required\.$#'
-			identifier: arguments.count
-			count: 2
-			path: lib/grpc/Inference/ModelSequenceBatching/Control.php
-
-		-
-			message: '#^Static method Google\\Protobuf\\Internal\\GPBUtil\:\:checkEnum\(\) invoked with 2 parameters, 1 required\.$#'
-			identifier: arguments.count
-			count: 1
-			path: lib/grpc/Inference/ModelSequenceBatching/InitialState.php
-
-		-
-			message: '#^Static method Google\\Protobuf\\Internal\\GPBUtil\:\:checkEnum\(\) invoked with 2 parameters, 1 required\.$#'
-			identifier: arguments.count
-			count: 1
-			path: lib/grpc/Inference/ModelSequenceBatching/State.php
-
-		-
-			message: '#^Static method Google\\Protobuf\\Internal\\GPBUtil\:\:checkEnum\(\) invoked with 2 parameters, 1 required\.$#'
-			identifier: arguments.count
-			count: 1
-			path: lib/grpc/Inference/ModelWarmup/Input.php
 
 		-
 			message: '#^Call to an undefined method App\\Entity\\Message\:\:getTrackId\(\)\.$#'
