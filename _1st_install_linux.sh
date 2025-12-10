@@ -105,6 +105,31 @@ fi
 
 docker compose up -d
 
+if [ "$USE_GROQ" -eq 1 ]; then
+    echo ""
+    echo "═══════════════════ Configuring Groq Defaults ═══════════════════"
+    echo ""
+    READY=0
+    echo "⏳ Waiting for backend console availability..."
+    for _ in {1..30}; do
+        if docker compose exec backend php bin/console about >/dev/null 2>&1; then
+            READY=1
+            break
+        fi
+        sleep 2
+    done
+
+    if [ "$READY" -eq 1 ]; then
+        echo "⚙️ Switching defaults to Groq llama-3.3-70b-versatile..."
+        docker compose exec backend php bin/console dbal:run-sql "UPDATE BCONFIG SET BVALUE='9' WHERE BGROUP='DEFAULTMODEL' AND BSETTING IN ('CHAT','SORT')"
+        docker compose exec backend php bin/console dbal:run-sql "UPDATE BCONFIG SET BVALUE='groq' WHERE BOWNERID=0 AND BGROUP='ai' AND BSETTING='default_chat_provider'"
+    else
+        echo "⚠️ Backend console did not become ready; run these commands once it is:"
+        echo "  docker compose exec backend php bin/console dbal:run-sql \"UPDATE BCONFIG SET BVALUE='9' WHERE BGROUP='DEFAULTMODEL' AND BSETTING IN ('CHAT','SORT')\""
+        echo "  docker compose exec backend php bin/console dbal:run-sql \"UPDATE BCONFIG SET BVALUE='groq' WHERE BOWNERID=0 AND BGROUP='ai' AND BSETTING='default_chat_provider'\""
+    fi
+fi
+
 # =============================================================================
 # Done!
 # =============================================================================
