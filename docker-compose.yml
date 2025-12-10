@@ -38,6 +38,7 @@ services:
   # Symfony PHP Backend
   # Serves both API and production frontend from frontend/dist
   backend:
+    image: ghcr.io/metadist/synaplan:latest
     build:
       context: .
       dockerfile: _docker/backend/Dockerfile
