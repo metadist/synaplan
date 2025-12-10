@@ -370,15 +370,15 @@ class WidgetController extends AbstractController
             return $this->json(['error' => 'Access denied'], Response::HTTP_FORBIDDEN);
         }
 
-        $baseUrl = $request->getSchemeAndHttpHost();
-        $embedCode = $this->widgetService->generateEmbedCode($widget, $baseUrl);
+        $baseUrl = $this->getParameter('synaplan_url');
+        $embedCode = $this->widgetService->generateEmbedCode($widget, rtrim($baseUrl, '/'));
         $wordpressShortcode = $this->widgetService->generateWordPressShortcode($widget);
 
         return $this->json([
             'success' => true,
             'embedCode' => $embedCode,
             'wordpressShortcode' => $wordpressShortcode,
-            'widgetUrl' => $baseUrl.'/widget.js',
+            'widgetUrl' => rtrim($baseUrl, '/').'/widget.js',
         ]);
     }
 

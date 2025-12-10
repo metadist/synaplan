@@ -37,7 +37,6 @@ services:
     container_name: synaplan-db-test
     command: --max-allowed-packet=256M --innodb-buffer-pool-size=256M
     environment:
-      # Symfony adds '_test' suffix, so we create both databases
       MYSQL_DATABASE: synaplan_test
       MYSQL_USER: synaplan_test
       MYSQL_PASSWORD: synaplan_test

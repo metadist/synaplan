@@ -10,11 +10,6 @@ if [ -d "/docker-entrypoint.d" ]; then
     if compgen -G "/docker-entrypoint.d/*" > /dev/null; then
         echo "🔧 Running additional startup scripts from /docker-entrypoint.d/..."
         for f in /docker-entrypoint.d/*; do
-            # Additional safety: verify the file is owned by root and not world-writable
-            if [ ! -O "$f" ] || [ -k "$f" ]; then
-                echo "   ⚠️  Skipping unsafe file: $(basename "$f") (not owned by current user or has sticky bit)"
-                continue
-            fi
             if [ -x "$f" ]; then
                 echo "   Executing: $(basename "$f")"
                 "$f"

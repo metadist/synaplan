@@ -152,44 +152,38 @@ class WidgetLegacyController extends AbstractController
         $autoMessage = addslashes($autoMessage);
 
         // Generate JavaScript loader that initializes the modern widget
-        // This mimics the old widget.php behavior while using the new widget.js
+        // This mimics the old widget.php behavior while using the new ES module widget.js
         $javascript = <<<JS
 (function() {
     'use strict';
-    
+
     // Legacy widget.php compatibility layer
     console.log('Synaplan Widget: Loading via legacy widget.php endpoint (uid parameter is deprecated)');
-    
-    // Load the modern widget loader script
+
+    // Load the modern widget as ES module
     var script = document.createElement('script');
-    script.src = '{$apiBaseUrl}/widget-loader.js';
-    script.async = true;
-    script.onload = function() {
-        // Initialize widget when script is loaded
-        if (window.SynaplanWidget) {
-            window.SynaplanWidget.init({
-                widgetId: '{$actualWidgetId}',
-                position: '{$position}',
-                primaryColor: '{$primaryColor}',
-                iconColor: '{$iconColor}',
-                defaultTheme: '{$theme}',
-                autoOpen: {$autoOpenStr},
-                autoMessage: '{$autoMessage}',
-                messageLimit: {$messageLimit},
-                maxFileSize: {$maxFileSize},
-                allowFileUpload: {$allowFileUploadStr},
-                fileUploadLimit: {$fileUploadLimit},
-                apiUrl: '{$apiBaseUrl}',
-                mode: '{$mode}'
-            });
-        } else {
-            console.error('Synaplan Widget: Failed to initialize - SynaplanWidget not found');
-        }
-    };
-    script.onerror = function() {
-        console.error('Synaplan Widget: Failed to load widget script from ' + script.src);
-    };
-    
+    script.type = 'module';
+    script.textContent = `
+        import SynaplanWidget from '{$apiBaseUrl}/widget.js';
+        SynaplanWidget.init({
+            widgetId: '{$actualWidgetId}',
+            position: '{$position}',
+            primaryColor: '{$primaryColor}',
+            iconColor: '{$iconColor}',
+            defaultTheme: '{$theme}',
+            autoOpen: {$autoOpenStr},
+            autoMessage: '{$autoMessage}',
+            messageLimit: {$messageLimit},
+            maxFileSize: {$maxFileSize},
+            allowFileUpload: {$allowFileUploadStr},
+            fileUploadLimit: {$fileUploadLimit},
+            apiUrl: '{$apiBaseUrl}',
+            lazy: false
+        }).catch(err => {
+            console.error('Synaplan Widget: Failed to initialize', err);
+        });
+    `;
+
     // Add script to page
     document.head.appendChild(script);
 })();

@@ -298,12 +298,19 @@
               :style="canSend ? { backgroundColor: primaryColor } : {}"
               :class="[
                 'w-10 h-10 rounded-lg transition-all flex items-center justify-center',
-                canSend ? 'hover:scale-110 shadow-lg' : 'bg-gray-300 dark:bg-gray-600 cursor-not-allowed'
+                canSend ? 'hover:scale-110 shadow-lg' : 'bg-gray-200 dark:bg-gray-600 cursor-not-allowed'
               ]"
               :aria-label="$t('widget.send')"
               data-testid="btn-send"
             >
-              <PaperAirplaneIcon :class="['w-5 h-5', canSend ? 'text-white' : 'text-gray-500']" />
+              <span class="shrink-0">
+                <PaperAirplaneIcon
+                  :class="[
+                    'w-5 h-5',
+                    canSend ? 'text-white' : 'text-gray-400'
+                  ]"
+                />
+              </span>
             </button>
           </div>
         </div>
@@ -330,8 +337,8 @@ import { ref, computed, watch, nextTick, onMounted, onBeforeUnmount } from 'vue'
 import {
   ChatBubbleLeftRightIcon,
   XMarkIcon,
-  PaperAirplaneIcon,
   PaperClipIcon,
+  PaperAirplaneIcon,
   DocumentIcon,
   SunIcon,
   MoonIcon,
@@ -339,6 +346,7 @@ import {
   XCircleIcon,
   ArrowPathIcon
 } from '@heroicons/vue/24/outline'
+
 import { uploadWidgetFile, sendWidgetMessage } from '@/services/api/widgetsApi'
 import { useI18n } from 'vue-i18n'
 import { parseAIResponse } from '@/utils/responseParser'
@@ -388,7 +396,7 @@ interface Message {
   timestamp: Date
 }
 
-const isOpen = ref(props.openImmediately ?? false)
+const isOpen = ref(false)
 const widgetTheme = ref<'light' | 'dark'>(props.defaultTheme)
 const inputMessage = ref('')
 
