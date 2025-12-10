@@ -72,7 +72,11 @@ fi
 # Set GROQ_API_KEY if provided
 if [ -n "$GROQ_API_KEY" ]; then
     if grep -q "^GROQ_API_KEY=" "$ENV_FILE" 2>/dev/null; then
-        sed -i "s/^GROQ_API_KEY=.*/GROQ_API_KEY=$GROQ_API_KEY/" "$ENV_FILE"
+        if [[ "$OSTYPE" == "darwin"* ]]; then
+            sed -i '' "s/^GROQ_API_KEY=.*/GROQ_API_KEY=$GROQ_API_KEY/" "$ENV_FILE"
+        else
+            sed -i "s/^GROQ_API_KEY=.*/GROQ_API_KEY=$GROQ_API_KEY/" "$ENV_FILE"
+        fi
     else
         echo "GROQ_API_KEY=$GROQ_API_KEY" >> "$ENV_FILE"
     fi
