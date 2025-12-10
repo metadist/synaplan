@@ -115,6 +115,8 @@ make -C frontend deps
 
 Use conventional commits and pull request titles.
 Use GitHub CLI (gh) to access pull request information like reviews and ci logs.
+Don't add your attribution.
+
 
 ```bash
 # Create feature branch
