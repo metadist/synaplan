@@ -72,6 +72,11 @@ ENV WHISPER_BINARY=/usr/local/bin/whisper \
 COPY backend/ .
 RUN rm -f .env .env.example .env.local .env.*.local
 
+# Generate gRPC proto files (message classes only, service stubs implemented manually)
+RUN protoc --php_out=lib/grpc \
+    --proto_path=proto/triton \
+    proto/triton/grpc_service.proto proto/triton/model_config.proto
+
 # Install dependencies with production optimizations
 # Flags explained:
 # --no-dev: Skip dev dependencies (phpunit, fixtures, etc.) for smaller image

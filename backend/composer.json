@@ -71,8 +71,8 @@
     "autoload": {
         "psr-4": {
             "App\\": "src/",
-            "Inference\\": "src/Grpc/Triton/Inference/",
-            "GPBMetadata\\": "src/Grpc/Triton/GPBMetadata/"
+            "Inference\\": "lib/grpc/Inference/",
+            "GPBMetadata\\": "lib/grpc/GPBMetadata/"
         }
     },
     "autoload-dev": {
@@ -96,19 +96,18 @@
             "assets:install %PUBLIC_DIR%": "symfony-cmd"
         },
         "post-install-cmd": [
+            "@proto:generate",
             "@auto-scripts"
         ],
         "post-update-cmd": [
+            "@proto:generate",
             "@auto-scripts"
         ],
         "lint": "php-cs-fixer check --diff",
         "lint:fix": "php-cs-fixer fix",
         "phpstan": "phpstan analyse",
         "proto:generate": [
-            "protoc --php_out=src/Grpc/Triton --grpc_out=src/Grpc/Triton --plugin=protoc-gen-grpc=$(which grpc_php_plugin) --proto_path=proto/triton proto/triton/grpc_service.proto proto/triton/model_config.proto"
-        ],
-        "proto:generate-simple": [
-            "protoc --php_out=src/Grpc/Triton --proto_path=proto/triton proto/triton/grpc_service.proto proto/triton/model_config.proto"
+            "protoc --php_out=lib/grpc --proto_path=proto/triton proto/triton/grpc_service.proto proto/triton/model_config.proto"
         ]
     },
     "conflict": {
