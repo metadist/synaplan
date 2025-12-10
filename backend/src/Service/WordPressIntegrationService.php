@@ -274,9 +274,6 @@ class WordPressIntegrationService
 
         $processedFiles = [];
         foreach ($files as $file) {
-            if (!$file instanceof UploadedFile) {
-                continue;
-            }
             $processedFiles[] = $this->step3UploadFile($userId, $file);
         }
 

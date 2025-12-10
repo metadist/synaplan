@@ -5,9 +5,6 @@ namespace App\Controller;
 use App\Entity\Message;
 use App\Repository\MessageRepository;
 use App\Repository\UserRepository;
-use App\Service\File\FileProcessor;
-use App\Service\File\FileStorageService;
-use App\Service\File\VectorizationService;
 use App\Service\InternalEmailService;
 use App\Service\Message\InferenceRouter;
 use App\Service\Message\MessageClassifier;
@@ -41,9 +38,6 @@ class LegacyApiController extends AbstractController
         private WidgetService $widgetService,
         private PromptService $promptService,
         private InternalEmailService $emailService,
-        private FileStorageService $fileStorageService,
-        private FileProcessor $fileProcessor,
-        private VectorizationService $vectorizationService,
         private LoggerInterface $logger,
     ) {
     }
