@@ -3,6 +3,23 @@ set -euo pipefail
 
 echo "🚀 Starting Synaplan Backend..."
 
+# Source .env file if it exists
+if [ -f /var/www/backend/.env ]; then
+    echo "📄 Loading environment from .env file..."
+    set -a  # automatically export all variables
+    source /var/www/backend/.env
+    set +a
+fi
+
+# Validate required environment variables
+if [ -z "${APP_URL:-}" ]; then
+    echo "❌ ERROR: APP_URL is not set!"
+    echo "   APP_URL is required for the application to work correctly."
+    echo "   Please set it in your environment or .env file."
+    echo "   Example: APP_URL=https://synaplan.example.com"
+    exit 1
+fi
+
 # Build DATABASE URLs from environment variables if not already set
 # Fallback for deployments that provide DB credentials as separate env vars
 if [ -z "${DATABASE_WRITE_URL:-}" ] && [ -n "${DB_HOST:-}" ]; then
