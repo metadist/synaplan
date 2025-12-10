@@ -23,7 +23,6 @@ class MonologFormatterFactory
                     allowInlineLineBreaks: true,
                     ignoreEmptyContextAndExtra: false
                 );
-                $formatter->allowInlineLineBreaks(true);
                 $formatter->includeStacktraces(true);
 
                 return $formatter;

@@ -13,12 +13,12 @@ when@prod: &prod_config
 when@dev:
     <<: *prod_config
 
-services:
-    # The formatter - created by factory based on LOG_FORMAT env var
-    app.monolog_formatter:
-        class: Monolog\Formatter\FormatterInterface
-        factory: ['@App\Service\MonologFormatterFactory', 'createFormatter']
-
-parameters:
-    env(LOG_FORMAT): ''
-    default_log_format: 'json'
+when@test:
+    monolog:
+        handlers:
+            main:
+                type: stream
+                path: php://stderr
+                level: error
+                formatter: app.monolog_formatter
+                process_psr_3_messages: false
