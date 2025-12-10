@@ -113,10 +113,22 @@ make -C frontend deps
 
 ### Git Operations
 
+**⚠️ CRITICAL: NEVER ADD ATTRIBUTION TO COMMITS ⚠️**
+
 Use conventional commits and pull request titles.
 Use GitHub CLI (gh) to access pull request information like reviews and ci logs.
-Don't add your attribution.
 
+**Commit Message Rules:**
+- ✅ Use conventional commit format (feat:, fix:, refactor:, etc.)
+- ✅ Write clear, concise commit messages
+- ❌ **NEVER ADD** attribution footers like "Generated with Claude Code" or "Co-Authored-By: Claude"
+- ❌ **NO** AI assistant signatures or credits in commit messages
+
+**Commit Checklist:**
+- [ ] Conventional commit format used
+- [ ] Code linted (`make lint`)
+- [ ] Tests passing (`make test`)
+- [ ] **NO attribution footer added**
 
 ```bash
 # Create feature branch
@@ -126,7 +138,7 @@ git checkout -b feat/your-feature-name
 make lint                  # Check backend + frontend
 make test                  # Run all tests
 
-# Commit with conventional format
+# Commit with conventional format (NO ATTRIBUTION!)
 git commit -m "feat: add new feature"
 git commit -m "fix: resolve bug"
 git commit -m "refactor: improve code structure"
@@ -462,6 +474,7 @@ cd frontend && npm run test -- --watch
 - Modifying Caddyfile routing logic
 
 ### ❌ Never Do
+- **Add attribution to commit messages** (NO "Generated with Claude Code", NO "Co-Authored-By: Claude")
 - Commit secrets, API keys, or credentials
 - Use `VITE_API_URL` environment variable (removed from codebase)
 - Use `VITE_*` env vars for runtime configuration (build-time only, we need runtime config)
