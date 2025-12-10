@@ -262,73 +262,73 @@ parameters:
 			message: '#^Static method Google\\Protobuf\\Internal\\GPBUtil\:\:checkEnum\(\) invoked with 2 parameters, 1 required\.$#'
 			identifier: arguments.count
 			count: 2
-			path: src/Grpc/Triton/Inference/BatchInput.php
+			path: lib/grpc/Inference/BatchInput.php
 
 		-
 			message: '#^Static method Google\\Protobuf\\Internal\\GPBUtil\:\:checkEnum\(\) invoked with 2 parameters, 1 required\.$#'
 			identifier: arguments.count
 			count: 1
-			path: src/Grpc/Triton/Inference/BatchOutput.php
+			path: lib/grpc/Inference/BatchOutput.php
 
 		-
 			message: '#^Static method Google\\Protobuf\\Internal\\GPBUtil\:\:checkEnum\(\) invoked with 2 parameters, 1 required\.$#'
 			identifier: arguments.count
 			count: 2
-			path: src/Grpc/Triton/Inference/ModelInput.php
+			path: lib/grpc/Inference/ModelInput.php
 
 		-
 			message: '#^Static method Google\\Protobuf\\Internal\\GPBUtil\:\:checkEnum\(\) invoked with 2 parameters, 1 required\.$#'
 			identifier: arguments.count
 			count: 1
-			path: src/Grpc/Triton/Inference/ModelInstanceGroup.php
+			path: lib/grpc/Inference/ModelInstanceGroup.php
 
 		-
 			message: '#^Static method Google\\Protobuf\\Internal\\GPBUtil\:\:checkEnum\(\) invoked with 2 parameters, 1 required\.$#'
 			identifier: arguments.count
 			count: 1
-			path: src/Grpc/Triton/Inference/ModelInstanceGroup/SecondaryDevice.php
+			path: lib/grpc/Inference/ModelInstanceGroup/SecondaryDevice.php
 
 		-
 			message: '#^Static method Google\\Protobuf\\Internal\\GPBUtil\:\:checkEnum\(\) invoked with 2 parameters, 1 required\.$#'
 			identifier: arguments.count
 			count: 1
-			path: src/Grpc/Triton/Inference/ModelOptimizationPolicy.php
+			path: lib/grpc/Inference/ModelOptimizationPolicy.php
 
 		-
 			message: '#^Static method Google\\Protobuf\\Internal\\GPBUtil\:\:checkEnum\(\) invoked with 2 parameters, 1 required\.$#'
 			identifier: arguments.count
 			count: 1
-			path: src/Grpc/Triton/Inference/ModelOutput.php
+			path: lib/grpc/Inference/ModelOutput.php
 
 		-
 			message: '#^Static method Google\\Protobuf\\Internal\\GPBUtil\:\:checkEnum\(\) invoked with 2 parameters, 1 required\.$#'
 			identifier: arguments.count
 			count: 1
-			path: src/Grpc/Triton/Inference/ModelQueuePolicy.php
+			path: lib/grpc/Inference/ModelQueuePolicy.php
 
 		-
 			message: '#^Static method Google\\Protobuf\\Internal\\GPBUtil\:\:checkEnum\(\) invoked with 2 parameters, 1 required\.$#'
 			identifier: arguments.count
 			count: 2
-			path: src/Grpc/Triton/Inference/ModelSequenceBatching/Control.php
+			path: lib/grpc/Inference/ModelSequenceBatching/Control.php
 
 		-
 			message: '#^Static method Google\\Protobuf\\Internal\\GPBUtil\:\:checkEnum\(\) invoked with 2 parameters, 1 required\.$#'
 			identifier: arguments.count
 			count: 1
-			path: src/Grpc/Triton/Inference/ModelSequenceBatching/InitialState.php
+			path: lib/grpc/Inference/ModelSequenceBatching/InitialState.php
 
 		-
 			message: '#^Static method Google\\Protobuf\\Internal\\GPBUtil\:\:checkEnum\(\) invoked with 2 parameters, 1 required\.$#'
 			identifier: arguments.count
 			count: 1
-			path: src/Grpc/Triton/Inference/ModelSequenceBatching/State.php
+			path: lib/grpc/Inference/ModelSequenceBatching/State.php
 
 		-
 			message: '#^Static method Google\\Protobuf\\Internal\\GPBUtil\:\:checkEnum\(\) invoked with 2 parameters, 1 required\.$#'
 			identifier: arguments.count
 			count: 1
-			path: src/Grpc/Triton/Inference/ModelWarmup/Input.php
+			path: lib/grpc/Inference/ModelWarmup/Input.php
 
 		-
 			message: '#^Call to an undefined method App\\Entity\\Message\:\:getTrackId\(\)\.$#'
