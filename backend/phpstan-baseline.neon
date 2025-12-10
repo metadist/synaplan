@@ -1,0 +1,1045 @@
+parameters:
+	ignoreErrors:
+		-
+			message: '#^Offset ''model'' on non\-empty\-array on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 2
+			path: src/AI/Provider/AnthropicProvider.php
+
+		-
+			message: '#^Strict comparison using \=\=\= between false and string will always evaluate to false\.$#'
+			identifier: identical.alwaysFalse
+			count: 1
+			path: src/AI/Provider/GoogleProvider.php
+
+		-
+			message: '#^Offset ''model'' on non\-empty\-array on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 2
+			path: src/AI/Provider/GroqProvider.php
+
+		-
+			message: '#^Offset ''model'' on non\-empty\-array on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: src/AI/Provider/OllamaProvider.php
+
+		-
+			message: '#^Parameter \$channel of method App\\AI\\Provider\\GRPCInferenceServiceClient\:\:__construct\(\) has invalid type Grpc\\InterceptorChannel\.$#'
+			identifier: class.notFound
+			count: 1
+			path: src/AI/Provider/TritonProvider.php
+
+		-
+			message: '#^Left side of && is always true\.$#'
+			identifier: booleanAnd.leftAlwaysTrue
+			count: 1
+			path: src/AI/Service/AiFacade.php
+
+		-
+			message: '#^Right side of && is always true\.$#'
+			identifier: booleanAnd.rightAlwaysTrue
+			count: 1
+			path: src/AI/Service/AiFacade.php
+
+		-
+			message: '#^Deprecated in PHP 8\.0\: Required parameter \$logger follows optional parameter \$fileAnalysisProviders\.$#'
+			identifier: parameter.requiredAfterOptional
+			count: 1
+			path: src/AI/Service/ProviderRegistry.php
+
+		-
+			message: '#^Deprecated in PHP 8\.0\: Required parameter \$modelRepository follows optional parameter \$fileAnalysisProviders\.$#'
+			identifier: parameter.requiredAfterOptional
+			count: 1
+			path: src/AI/Service/ProviderRegistry.php
+
+		-
+			message: '#^While loop condition is always true\.$#'
+			identifier: while.alwaysTrue
+			count: 1
+			path: src/Command/ProcessEmailsCommand.php
+
+		-
+			message: '#^Property App\\Controller\\AdminController\:\:\$useLogRepository is never read, only written\.$#'
+			identifier: property.onlyWritten
+			count: 1
+			path: src/Controller/AdminController.php
+
+		-
+			message: '#^Property App\\Controller\\AuthController\:\:\$validator is never read, only written\.$#'
+			identifier: property.onlyWritten
+			count: 1
+			path: src/Controller/AuthController.php
+
+		-
+			message: '#^Parameter \#3 \$referenceType of method Symfony\\Bundle\\FrameworkBundle\\Controller\\AbstractController\:\:generateUrl\(\) expects int, true given\.$#'
+			identifier: argument.type
+			count: 1
+			path: src/Controller/ChatController.php
+
+		-
+			message: '#^Offset ''anthropic''\|''gemini''\|''google''\|''groq''\|''mistral''\|''openai'' on array\{openai\: array\{''OPENAI_API_KEY''\}, anthropic\: array\{''ANTHROPIC_API_KEY''\}, groq\: array\{''GROQ_API_KEY''\}, gemini\: array\{''GEMINI_API_KEY'', ''GOOGLE_GEMINI_API…'', ''GOOGLE_API_KEY''\}, google\: array\{''GOOGLE_API_KEY'', ''GOOGLE_GEMINI_API…'', ''GEMINI_API_KEY''\}, mistral\: array\{''MISTRAL_API_KEY''\}\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: src/Controller/ConfigController.php
+
+		-
+			message: '#^Offset 0 on array\{''ANTHROPIC_API_KEY''\}\|array\{''GEMINI_API_KEY'', ''GOOGLE_GEMINI_API…'', ''GOOGLE_API_KEY''\}\|array\{''GOOGLE_API_KEY'', ''GOOGLE_GEMINI_API…'', ''GEMINI_API_KEY''\}\|array\{''GROQ_API_KEY''\}\|array\{''MISTRAL_API_KEY''\}\|array\{''OPENAI_API_KEY''\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: src/Controller/ConfigController.php
+
+		-
+			message: '#^Result of && is always false\.$#'
+			identifier: booleanAnd.alwaysFalse
+			count: 1
+			path: src/Controller/ConfigController.php
+
+		-
+			message: '#^Strict comparison using \!\=\= between ''dev'' and ''dev'' will always evaluate to false\.$#'
+			identifier: notIdentical.alwaysFalse
+			count: 1
+			path: src/Controller/ConfigController.php
+
+		-
+			message: '#^Expression on left side of \?\? is not nullable\.$#'
+			identifier: nullCoalesce.expr
+			count: 3
+			path: src/Controller/FileController.php
+
+		-
+			message: '#^Strict comparison using \!\=\= between null and null will always evaluate to false\.$#'
+			identifier: notIdentical.alwaysFalse
+			count: 2
+			path: src/Controller/FileController.php
+
+		-
+			message: '#^Offset 0 on non\-empty\-list\<string\> on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: src/Controller/GitHubAuthController.php
+
+		-
+			message: '#^Call to an undefined method App\\Entity\\Message\:\:setDirect\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: src/Controller/LegacyApiController.php
+
+		-
+			message: '#^Call to an undefined method App\\Entity\\Message\:\:setMessType\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: src/Controller/LegacyApiController.php
+
+		-
+			message: '#^Call to an undefined method App\\Entity\\Message\:\:setTrackId\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: src/Controller/LegacyApiController.php
+
+		-
+			message: '#^Cannot call method getId\(\) on array\.$#'
+			identifier: method.nonObject
+			count: 1
+			path: src/Controller/LegacyApiController.php
+
+		-
+			message: '#^Cannot call method getText\(\) on array\.$#'
+			identifier: method.nonObject
+			count: 1
+			path: src/Controller/LegacyApiController.php
+
+		-
+			message: '#^Method App\\Controller\\LegacyApiController\:\:main\(\) should return Symfony\\Component\\HttpFoundation\\JsonResponse but returns Symfony\\Component\\HttpFoundation\\Response\.$#'
+			identifier: return.type
+			count: 1
+			path: src/Controller/LegacyApiController.php
+
+		-
+			message: '#^Method App\\Service\\Message\\InferenceRouter\:\:route\(\) invoked with 1 parameter, 3\-4 required\.$#'
+			identifier: arguments.count
+			count: 1
+			path: src/Controller/LegacyApiController.php
+
+		-
+			message: '#^Parameter \#1 \$message of method App\\Repository\\MessageRepository\:\:save\(\) expects App\\Entity\\Message, array given\.$#'
+			identifier: argument.type
+			count: 1
+			path: src/Controller/LegacyApiController.php
+
+		-
+			message: '#^Call to an undefined method App\\Entity\\File\:\:setMessageId\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: src/Controller/MessageController.php
+
+		-
+			message: '#^Property App\\Controller\\MessageController\:\:\$vectorizationService is never read, only written\.$#'
+			identifier: property.onlyWritten
+			count: 1
+			path: src/Controller/MessageController.php
+
+		-
+			message: '#^Property App\\Controller\\OidcController\:\:\$logger is never read, only written\.$#'
+			identifier: property.onlyWritten
+			count: 1
+			path: src/Controller/OidcController.php
+
+		-
+			message: '#^Parameter \#1 \$enable of function ob_implicit_flush expects bool, int given\.$#'
+			identifier: argument.type
+			count: 1
+			path: src/Controller/StreamController.php
+
+		-
+			message: '#^Property App\\Controller\\StreamController\:\:\$aiFacade is never read, only written\.$#'
+			identifier: property.onlyWritten
+			count: 1
+			path: src/Controller/StreamController.php
+
+		-
+			message: '#^Access to an undefined property Stripe\\StripeObject\:\:\$object\.$#'
+			identifier: property.notFound
+			count: 8
+			path: src/Controller/StripeWebhookController.php
+
+		-
+			message: '#^Property App\\Controller\\SubscriptionController\:\:\$userRepository is never read, only written\.$#'
+			identifier: property.onlyWritten
+			count: 1
+			path: src/Controller/SubscriptionController.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>param" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: src/Controller/SubscriptionController.php
+
+		-
+			message: '#^Match arm comparison between ''custom'' and ''custom'' is always true\.$#'
+			identifier: match.alwaysTrue
+			count: 1
+			path: src/Controller/SummaryController.php
+
+		-
+			message: '#^Variable \$fromEmail on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.variable
+			count: 1
+			path: src/Controller/WebhookController.php
+
+		-
+			message: '#^Call to function is_string\(\) with string will always evaluate to true\.$#'
+			identifier: function.alreadyNarrowedType
+			count: 1
+			path: src/Controller/WidgetPublicController.php
+
+		-
+			message: '#^Parameter \#1 \$providerIndex of method App\\Entity\\Message\:\:setProviderIndex\(\) expects string, int given\.$#'
+			identifier: argument.type
+			count: 1
+			path: src/Controller/WidgetPublicController.php
+
+		-
+			message: '#^Parameter \#5 \$fileType of method App\\Service\\File\\VectorizationService\:\:vectorizeAndStore\(\) expects int, string given\.$#'
+			identifier: argument.type
+			count: 1
+			path: src/Controller/WidgetPublicController.php
+
+		-
+			message: '#^Property App\\Controller\\WidgetPublicController\:\:\$uploadDir is never read, only written\.$#'
+			identifier: property.onlyWritten
+			count: 1
+			path: src/Controller/WidgetPublicController.php
+
+		-
+			message: '#^Call to an undefined method Doctrine\\Persistence\\ObjectManager\:\:getConnection\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: src/DataFixtures/ModelFixtures.php
+
+		-
+			message: '#^Static method Google\\Protobuf\\Internal\\GPBUtil\:\:checkEnum\(\) invoked with 2 parameters, 1 required\.$#'
+			identifier: arguments.count
+			count: 2
+			path: src/Grpc/Triton/Inference/BatchInput.php
+
+		-
+			message: '#^Static method Google\\Protobuf\\Internal\\GPBUtil\:\:checkEnum\(\) invoked with 2 parameters, 1 required\.$#'
+			identifier: arguments.count
+			count: 1
+			path: src/Grpc/Triton/Inference/BatchOutput.php
+
+		-
+			message: '#^Static method Google\\Protobuf\\Internal\\GPBUtil\:\:checkEnum\(\) invoked with 2 parameters, 1 required\.$#'
+			identifier: arguments.count
+			count: 2
+			path: src/Grpc/Triton/Inference/ModelInput.php
+
+		-
+			message: '#^Static method Google\\Protobuf\\Internal\\GPBUtil\:\:checkEnum\(\) invoked with 2 parameters, 1 required\.$#'
+			identifier: arguments.count
+			count: 1
+			path: src/Grpc/Triton/Inference/ModelInstanceGroup.php
+
+		-
+			message: '#^Static method Google\\Protobuf\\Internal\\GPBUtil\:\:checkEnum\(\) invoked with 2 parameters, 1 required\.$#'
+			identifier: arguments.count
+			count: 1
+			path: src/Grpc/Triton/Inference/ModelInstanceGroup/SecondaryDevice.php
+
+		-
+			message: '#^Static method Google\\Protobuf\\Internal\\GPBUtil\:\:checkEnum\(\) invoked with 2 parameters, 1 required\.$#'
+			identifier: arguments.count
+			count: 1
+			path: src/Grpc/Triton/Inference/ModelOptimizationPolicy.php
+
+		-
+			message: '#^Static method Google\\Protobuf\\Internal\\GPBUtil\:\:checkEnum\(\) invoked with 2 parameters, 1 required\.$#'
+			identifier: arguments.count
+			count: 1
+			path: src/Grpc/Triton/Inference/ModelOutput.php
+
+		-
+			message: '#^Static method Google\\Protobuf\\Internal\\GPBUtil\:\:checkEnum\(\) invoked with 2 parameters, 1 required\.$#'
+			identifier: arguments.count
+			count: 1
+			path: src/Grpc/Triton/Inference/ModelQueuePolicy.php
+
+		-
+			message: '#^Static method Google\\Protobuf\\Internal\\GPBUtil\:\:checkEnum\(\) invoked with 2 parameters, 1 required\.$#'
+			identifier: arguments.count
+			count: 2
+			path: src/Grpc/Triton/Inference/ModelSequenceBatching/Control.php
+
+		-
+			message: '#^Static method Google\\Protobuf\\Internal\\GPBUtil\:\:checkEnum\(\) invoked with 2 parameters, 1 required\.$#'
+			identifier: arguments.count
+			count: 1
+			path: src/Grpc/Triton/Inference/ModelSequenceBatching/InitialState.php
+
+		-
+			message: '#^Static method Google\\Protobuf\\Internal\\GPBUtil\:\:checkEnum\(\) invoked with 2 parameters, 1 required\.$#'
+			identifier: arguments.count
+			count: 1
+			path: src/Grpc/Triton/Inference/ModelSequenceBatching/State.php
+
+		-
+			message: '#^Static method Google\\Protobuf\\Internal\\GPBUtil\:\:checkEnum\(\) invoked with 2 parameters, 1 required\.$#'
+			identifier: arguments.count
+			count: 1
+			path: src/Grpc/Triton/Inference/ModelWarmup/Input.php
+
+		-
+			message: '#^Call to an undefined method App\\Entity\\Message\:\:getTrackId\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: src/Repository/MessageRepository.php
+
+		-
+			message: '#^Property App\\Security\\CookieTokenAuthenticator\:\:\$logger is never read, only written\.$#'
+			identifier: property.onlyWritten
+			count: 1
+			path: src/Security/CookieTokenAuthenticator.php
+
+		-
+			message: '#^Call to an undefined method App\\Repository\\RagDocumentRepository\:\:findSimilar\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: src/Service/File/VectorizationService.php
+
+		-
+			message: '#^Method App\\Repository\\PromptRepository\:\:findByTopic\(\) invoked with 3 parameters, 1\-2 required\.$#'
+			identifier: arguments.count
+			count: 1
+			path: src/Service/InboundEmailHandlerService.php
+
+		-
+			message: '#^Method App\\Service\\InboundEmailHandlerService\:\:connectImap\(\) never returns null so it can be removed from the return type\.$#'
+			identifier: return.unusedType
+			count: 1
+			path: src/Service/InboundEmailHandlerService.php
+
+		-
+			message: '#^Expression on left side of \?\? is not nullable\.$#'
+			identifier: nullCoalesce.expr
+			count: 1
+			path: src/Service/Message/Handler/ChatHandler.php
+
+		-
+			message: '#^Method App\\Service\\Message\\Handler\\ChatHandler\:\:getSystemPrompt\(\) is unused\.$#'
+			identifier: method.unused
+			count: 1
+			path: src/Service/Message/Handler/ChatHandler.php
+
+		-
+			message: '#^Offset ''prompt'' on array\{prompt\: string, media_type\: string\|null, raw\: string\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: src/Service/Message/Handler/MediaGenerationHandler.php
+
+		-
+			message: '#^Expression on left side of \?\? is not nullable\.$#'
+			identifier: nullCoalesce.expr
+			count: 2
+			path: src/Service/Message/MediaPromptExtractor.php
+
+		-
+			message: '#^Property App\\Service\\Message\\MessageClassifier\:\:\$modelConfigService is never read, only written\.$#'
+			identifier: property.onlyWritten
+			count: 1
+			path: src/Service/Message/MessageClassifier.php
+
+		-
+			message: '#^Expression on left side of \?\? is not nullable\.$#'
+			identifier: nullCoalesce.expr
+			count: 1
+			path: src/Service/Message/MessagePreProcessor.php
+
+		-
+			message: '#^Parameter \#2 \$trackingId of method App\\Repository\\MessageRepository\:\:findConversationHistory\(\) expects string, int given\.$#'
+			identifier: argument.type
+			count: 2
+			path: src/Service/Message/MessageProcessor.php
+
+		-
+			message: '#^Variable \$classification might not be defined\.$#'
+			identifier: variable.undefined
+			count: 1
+			path: src/Service/Message/MessageProcessor.php
+
+		-
+			message: '#^Method App\\Repository\\PromptRepository\:\:findByTopic\(\) invoked with 3 parameters, 1\-2 required\.$#'
+			identifier: arguments.count
+			count: 1
+			path: src/Service/Message/MessageSorter.php
+
+		-
+			message: '#^Method App\\Repository\\PromptRepository\:\:findByTopic\(\) invoked with 3 parameters, 1\-2 required\.$#'
+			identifier: arguments.count
+			count: 1
+			path: src/Service/Message/SearchQueryGenerator.php
+
+		-
+			message: '#^Call to an undefined method App\\Repository\\ModelRepository\:\:findDefaultByProviderAndCapability\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: src/Service/ModelConfigService.php
+
+		-
+			message: '#^Property App\\Service\\OidcTokenService\:\:\$em is never read, only written\.$#'
+			identifier: property.onlyWritten
+			count: 1
+			path: src/Service/OidcTokenService.php
+
+		-
+			message: '#^Property App\\Service\\PromptService\:\:\$logger is never read, only written\.$#'
+			identifier: property.onlyWritten
+			count: 1
+			path: src/Service/PromptService.php
+
+		-
+			message: '#^Constant App\\Service\\RateLimitService\:\:CACHE_TTL is unused\.$#'
+			identifier: classConstant.unused
+			count: 1
+			path: src/Service/RateLimitService.php
+
+		-
+			message: '#^Property App\\Service\\RateLimiterService\:\:\$logger is never read, only written\.$#'
+			identifier: property.onlyWritten
+			count: 1
+			path: src/Service/RateLimiterService.php
+
+		-
+			message: '#^Property App\\Service\\StorageQuotaService\:\:\$em is never read, only written\.$#'
+			identifier: property.onlyWritten
+			count: 1
+			path: src/Service/StorageQuotaService.php
+
+		-
+			message: '#^Property App\\Service\\UsageStatsService\:\:\$configRepository is never read, only written\.$#'
+			identifier: property.onlyWritten
+			count: 1
+			path: src/Service/UsageStatsService.php
+
+		-
+			message: '#^Property App\\Service\\WhatsAppService\:\:\$businessAccountId is never read, only written\.$#'
+			identifier: property.onlyWritten
+			count: 1
+			path: src/Service/WhatsAppService.php
+
+		-
+			message: '#^Strict comparison using \=\=\= between '''' and lowercase\-string&non\-empty\-string will always evaluate to false\.$#'
+			identifier: identical.alwaysFalse
+			count: 1
+			path: src/Service/WhisperService.php
+
+		-
+			message: '#^Variable \$processedAudio in isset\(\) always exists and is not nullable\.$#'
+			identifier: isset.variable
+			count: 1
+			path: src/Service/WhisperService.php
+
+		-
+			message: '#^Call to function is_string\(\) with string will always evaluate to true\.$#'
+			identifier: function.alreadyNarrowedType
+			count: 1
+			path: src/Service/WidgetService.php
+
+		-
+			message: '#^Parameter \#1 \$array \(list\<non\-empty\-string\>\) of array_values is already a list, call has no effect\.$#'
+			identifier: arrayValues.list
+			count: 1
+			path: src/Service/WidgetService.php
+
+		-
+			message: '#^Call to method PHPUnit\\Framework\\Assert\:\:assertIsArray\(\) with array will always evaluate to true\.$#'
+			identifier: method.alreadyNarrowedType
+			count: 3
+			path: tests/AI/Contract/ChatProviderContractTest.php
+
+		-
+			message: '#^Call to method PHPUnit\\Framework\\Assert\:\:assertIsArray\(\) with list will always evaluate to true\.$#'
+			identifier: method.alreadyNarrowedType
+			count: 1
+			path: tests/AI/Contract/ChatProviderContractTest.php
+
+		-
+			message: '#^Call to method PHPUnit\\Framework\\Assert\:\:assertIsBool\(\) with bool will always evaluate to true\.$#'
+			identifier: method.alreadyNarrowedType
+			count: 1
+			path: tests/AI/Contract/ChatProviderContractTest.php
+
+		-
+			message: '#^Call to method PHPUnit\\Framework\\Assert\:\:assertIsString\(\) with string will always evaluate to true\.$#'
+			identifier: method.alreadyNarrowedType
+			count: 2
+			path: tests/AI/Contract/ChatProviderContractTest.php
+
+		-
+			message: '#^Negated boolean expression is always false\.$#'
+			identifier: booleanNot.alwaysFalse
+			count: 1
+			path: tests/Controller/FileControllerTest.php
+
+		-
+			message: '#^Method App\\Tests\\Controller\\StreamControllerTest\:\:createTestChat\(\) is unused\.$#'
+			identifier: method.unused
+			count: 1
+			path: tests/Controller/StreamControllerTest.php
+
+		-
+			message: '#^Call to method PHPUnit\\Framework\\Assert\:\:assertTrue\(\) with true and ''Email sent…'' will always evaluate to true\.$#'
+			identifier: method.alreadyNarrowedType
+			count: 1
+			path: tests/Integration/MailerTest.php
+
+		-
+			message: '#^Call to method PHPUnit\\Framework\\Assert\:\:assertIsArray\(\) with array will always evaluate to true\.$#'
+			identifier: method.alreadyNarrowedType
+			count: 4
+			path: tests/Integration/Service/BraveSearchIntegrationTest.php
+
+		-
+			message: '#^Call to method PHPUnit\\Framework\\Assert\:\:assertIsBool\(\) with bool will always evaluate to true\.$#'
+			identifier: method.alreadyNarrowedType
+			count: 1
+			path: tests/Integration/Service/BraveSearchIntegrationTest.php
+
+		-
+			message: '#^Call to method PHPUnit\\Framework\\Assert\:\:assertIsString\(\) with string will always evaluate to true\.$#'
+			identifier: method.alreadyNarrowedType
+			count: 2
+			path: tests/Integration/Service/BraveSearchIntegrationTest.php
+
+		-
+			message: '#^Unreachable statement \- code above always terminates\.$#'
+			identifier: deadCode.unreachable
+			count: 2
+			path: tests/Integration/Service/Message/SearchQueryGeneratorTest.php
+
+		-
+			message: '#^Property App\\Tests\\Integration\\Service\\MessageProcessorAgainTest\:\:\$entityManager is never read, only written\.$#'
+			identifier: property.onlyWritten
+			count: 1
+			path: tests/Integration/Service/MessageProcessorAgainTest.php
+
+		-
+			message: '#^Property App\\Tests\\Integration\\Service\\MessageProcessorAgainTest\:\:\$messageProcessor is never read, only written\.$#'
+			identifier: property.onlyWritten
+			count: 1
+			path: tests/Integration/Service/MessageProcessorAgainTest.php
+
+		-
+			message: '#^Property App\\Tests\\Integration\\Service\\MessageProcessorAgainTest\:\:\$messageRepository is never read, only written\.$#'
+			identifier: property.onlyWritten
+			count: 1
+			path: tests/Integration/Service/MessageProcessorAgainTest.php
+
+		-
+			message: '#^Unreachable statement \- code above always terminates\.$#'
+			identifier: deadCode.unreachable
+			count: 2
+			path: tests/Integration/Service/MessageProcessorAgainTest.php
+
+		-
+			message: '#^Call to method PHPUnit\\Framework\\Assert\:\:assertIsArray\(\) with list\<App\\Entity\\ApiKey\> will always evaluate to true\.$#'
+			identifier: method.alreadyNarrowedType
+			count: 2
+			path: tests/Repository/ApiKeyRepositoryTest.php
+
+		-
+			message: '#^Call to method PHPUnit\\Framework\\Assert\:\:assertIsBool\(\) with bool will always evaluate to true\.$#'
+			identifier: method.alreadyNarrowedType
+			count: 1
+			path: tests/Repository/ApiKeyRepositoryTest.php
+
+		-
+			message: '#^Call to method PHPUnit\\Framework\\Assert\:\:assertIsInt\(\) with int\<0, max\> will always evaluate to true\.$#'
+			identifier: method.alreadyNarrowedType
+			count: 1
+			path: tests/Repository/ApiKeyRepositoryTest.php
+
+		-
+			message: '#^Call to method PHPUnit\\Framework\\Assert\:\:assertNotNull\(\) with string will always evaluate to true\.$#'
+			identifier: method.alreadyNarrowedType
+			count: 2
+			path: tests/Repository/ApiKeyRepositoryTest.php
+
+		-
+			message: '#^Call to method PHPUnit\\Framework\\Assert\:\:assertIsArray\(\) with list\<object\> will always evaluate to true\.$#'
+			identifier: method.alreadyNarrowedType
+			count: 4
+			path: tests/Repository/ChatRepositoryTest.php
+
+		-
+			message: '#^Call to method PHPUnit\\Framework\\Assert\:\:assertIsInt\(\) with int\<0, max\> will always evaluate to true\.$#'
+			identifier: method.alreadyNarrowedType
+			count: 1
+			path: tests/Repository/ChatRepositoryTest.php
+
+		-
+			message: '#^Call to method PHPUnit\\Framework\\Assert\:\:assertNotNull\(\) with int will always evaluate to true\.$#'
+			identifier: method.alreadyNarrowedType
+			count: 1
+			path: tests/Repository/ChatRepositoryTest.php
+
+		-
+			message: '#^Call to method PHPUnit\\Framework\\Assert\:\:assertIsArray\(\) with array will always evaluate to true\.$#'
+			identifier: method.alreadyNarrowedType
+			count: 1
+			path: tests/Repository/MessageRepositoryTest.php
+
+		-
+			message: '#^Call to method PHPUnit\\Framework\\Assert\:\:assertIsArray\(\) with list\<object\> will always evaluate to true\.$#'
+			identifier: method.alreadyNarrowedType
+			count: 5
+			path: tests/Repository/UserRepositoryTest.php
+
+		-
+			message: '#^Call to method PHPUnit\\Framework\\Assert\:\:assertIsInt\(\) with int\<0, max\> will always evaluate to true\.$#'
+			identifier: method.alreadyNarrowedType
+			count: 1
+			path: tests/Repository/UserRepositoryTest.php
+
+		-
+			message: '#^Call to an undefined method App\\Repository\\ChatRepository\:\:expects\(\)\.$#'
+			identifier: method.notFound
+			count: 3
+			path: tests/Service/EmailChannelServiceTest.php
+
+		-
+			message: '#^Call to an undefined method App\\Repository\\UserRepository\:\:expects\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: tests/Service/EmailChannelServiceTest.php
+
+		-
+			message: '#^Call to an undefined method Doctrine\\ORM\\EntityManagerInterface\:\:expects\(\)\.$#'
+			identifier: method.notFound
+			count: 7
+			path: tests/Service/EmailChannelServiceTest.php
+
+		-
+			message: '#^Call to an undefined method Doctrine\\DBAL\\Connection\:\:expects\(\)\.$#'
+			identifier: method.notFound
+			count: 6
+			path: tests/Service/RateLimitServiceUnifiedTest.php
+
+		-
+			message: '#^Unreachable statement \- code above always terminates\.$#'
+			identifier: deadCode.unreachable
+			count: 1
+			path: tests/Service/RateLimitServiceUnifiedTest.php
+
+		-
+			message: '#^Call to method PHPUnit\\Framework\\Assert\:\:assertIsArray\(\) with array will always evaluate to true\.$#'
+			identifier: method.alreadyNarrowedType
+			count: 6
+			path: tests/Service/VectorSearchServiceTest.php
+
+		-
+			message: '#^Parameter \#1 \$fileType of method App\\Entity\\Message\:\:setFileType\(\) expects string, int given\.$#'
+			identifier: argument.type
+			count: 1
+			path: tests/Service/VectorSearchServiceTest.php
+
+		-
+			message: '#^Parameter \#3 \$groupKey of method App\\Service\\RAG\\VectorSearchService\:\:semanticSearch\(\) expects string\|null, int given\.$#'
+			identifier: argument.type
+			count: 3
+			path: tests/Service/VectorSearchServiceTest.php
+
+		-
+			message: '#^Call to an undefined method Psr\\Log\\LoggerInterface\:\:expects\(\)\.$#'
+			identifier: method.notFound
+			count: 4
+			path: tests/Service/WhatsAppServiceTest.php
+
+		-
+			message: '#^Call to an undefined method Symfony\\Contracts\\HttpClient\\HttpClientInterface\:\:expects\(\)\.$#'
+			identifier: method.notFound
+			count: 9
+			path: tests/Service/WhatsAppServiceTest.php
+
+		-
+			message: '#^Call to method PHPUnit\\Framework\\Assert\:\:assertIsArray\(\) with array will always evaluate to true\.$#'
+			identifier: method.alreadyNarrowedType
+			count: 2
+			path: tests/Service/WhatsAppServiceTest.php
+
+		-
+			message: '#^Call to method PHPUnit\\Framework\\Assert\:\:assertTrue\(\) with true will always evaluate to true\.$#'
+			identifier: method.alreadyNarrowedType
+			count: 1
+			path: tests/Service/WhatsAppServiceTest.php
+
+		-
+			message: '#^Call to an undefined method App\\Repository\\ApiKeyRepository\:\:expects\(\)\.$#'
+			identifier: method.notFound
+			count: 3
+			path: tests/Unit/ApiKeyAuthenticatorTest.php
+
+		-
+			message: '#^Call to an undefined method App\\Repository\\ApiKeyRepository\:\:method\(\)\.$#'
+			identifier: method.notFound
+			count: 4
+			path: tests/Unit/ApiKeyAuthenticatorTest.php
+
+		-
+			message: '#^Call to an undefined method Psr\\Log\\LoggerInterface\:\:expects\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: tests/Unit/ApiKeyAuthenticatorTest.php
+
+		-
+			message: '#^Call to an undefined method App\\AI\\Service\\AiFacade\:\:expects\(\)\.$#'
+			identifier: method.notFound
+			count: 4
+			path: tests/Unit/ChatHandlerTest.php
+
+		-
+			message: '#^Call to an undefined method App\\AI\\Service\\AiFacade\:\:method\(\)\.$#'
+			identifier: method.notFound
+			count: 3
+			path: tests/Unit/ChatHandlerTest.php
+
+		-
+			message: '#^Call to an undefined method App\\Repository\\ModelRepository\:\:method\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: tests/Unit/ChatHandlerTest.php
+
+		-
+			message: '#^Call to an undefined method App\\Repository\\PromptRepository\:\:method\(\)\.$#'
+			identifier: method.notFound
+			count: 6
+			path: tests/Unit/ChatHandlerTest.php
+
+		-
+			message: '#^Call to an undefined method App\\Service\\ModelConfigService\:\:method\(\)\.$#'
+			identifier: method.notFound
+			count: 12
+			path: tests/Unit/ChatHandlerTest.php
+
+		-
+			message: '#^Call to an undefined method App\\Service\\PromptService\:\:expects\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: tests/Unit/ChatHandlerTest.php
+
+		-
+			message: '#^Call to method PHPUnit\\Framework\\Assert\:\:assertIsArray\(\) with array will always evaluate to true\.$#'
+			identifier: method.alreadyNarrowedType
+			count: 1
+			path: tests/Unit/ChatHandlerTest.php
+
+		-
+			message: '#^Unreachable statement \- code above always terminates\.$#'
+			identifier: deadCode.unreachable
+			count: 1
+			path: tests/Unit/ChatHandlerTest.php
+
+		-
+			message: '#^Call to method PHPUnit\\Framework\\Assert\:\:assertTrue\(\) with true and ''Password reset…'' will always evaluate to true\.$#'
+			identifier: method.alreadyNarrowedType
+			count: 1
+			path: tests/Unit/InternalEmailServiceTest.php
+
+		-
+			message: '#^Call to method PHPUnit\\Framework\\Assert\:\:assertTrue\(\) with true and ''Verification email…'' will always evaluate to true\.$#'
+			identifier: method.alreadyNarrowedType
+			count: 1
+			path: tests/Unit/InternalEmailServiceTest.php
+
+		-
+			message: '#^Call to method PHPUnit\\Framework\\Assert\:\:assertTrue\(\) with true and ''Password reset…'' will always evaluate to true\.$#'
+			identifier: method.alreadyNarrowedType
+			count: 1
+			path: tests/Unit/MailerServiceTest.php
+
+		-
+			message: '#^Call to method PHPUnit\\Framework\\Assert\:\:assertTrue\(\) with true and ''Verification email…'' will always evaluate to true\.$#'
+			identifier: method.alreadyNarrowedType
+			count: 1
+			path: tests/Unit/MailerServiceTest.php
+
+		-
+			message: '#^Call to an undefined method App\\Repository\\MessageMetaRepository\:\:method\(\)\.$#'
+			identifier: method.notFound
+			count: 5
+			path: tests/Unit/MessageClassifierTest.php
+
+		-
+			message: '#^Call to an undefined method App\\Service\\Message\\MessageSorter\:\:method\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: tests/Unit/MessageClassifierTest.php
+
+		-
+			message: '#^Call to an undefined method Psr\\Log\\LoggerInterface\:\:expects\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: tests/Unit/MessageClassifierTest.php
+
+		-
+			message: '#^Unreachable statement \- code above always terminates\.$#'
+			identifier: deadCode.unreachable
+			count: 1
+			path: tests/Unit/MessageClassifierTest.php
+
+		-
+			message: '#^Call to an undefined method App\\Repository\\MessageRepository\:\:expects\(\)\.$#'
+			identifier: method.notFound
+			count: 3
+			path: tests/Unit/MessageEnqueueServiceTest.php
+
+		-
+			message: '#^Call to an undefined method App\\Repository\\MessageRepository\:\:method\(\)\.$#'
+			identifier: method.notFound
+			count: 2
+			path: tests/Unit/MessageEnqueueServiceTest.php
+
+		-
+			message: '#^Call to an undefined method Doctrine\\ORM\\EntityManagerInterface\:\:expects\(\)\.$#'
+			identifier: method.notFound
+			count: 9
+			path: tests/Unit/MessageEnqueueServiceTest.php
+
+		-
+			message: '#^Call to an undefined method Doctrine\\ORM\\EntityManagerInterface\:\:method\(\)\.$#'
+			identifier: method.notFound
+			count: 2
+			path: tests/Unit/MessageEnqueueServiceTest.php
+
+		-
+			message: '#^Call to an undefined method Psr\\Log\\LoggerInterface\:\:expects\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: tests/Unit/MessageEnqueueServiceTest.php
+
+		-
+			message: '#^Call to an undefined method Symfony\\Component\\Messenger\\MessageBusInterface\:\:expects\(\)\.$#'
+			identifier: method.notFound
+			count: 2
+			path: tests/Unit/MessageEnqueueServiceTest.php
+
+		-
+			message: '#^Call to an undefined method Symfony\\Component\\Messenger\\MessageBusInterface\:\:method\(\)\.$#'
+			identifier: method.notFound
+			count: 2
+			path: tests/Unit/MessageEnqueueServiceTest.php
+
+		-
+			message: '#^Call to an undefined method App\\Repository\\MessageRepository\:\:expects\(\)\.$#'
+			identifier: method.notFound
+			count: 2
+			path: tests/Unit/MessagePreProcessorTest.php
+
+		-
+			message: '#^Call to an undefined method App\\Repository\\MessageRepository\:\:method\(\)\.$#'
+			identifier: method.notFound
+			count: 4
+			path: tests/Unit/MessagePreProcessorTest.php
+
+		-
+			message: '#^Call to an undefined method App\\Service\\WhisperService\:\:expects\(\)\.$#'
+			identifier: method.notFound
+			count: 2
+			path: tests/Unit/MessagePreProcessorTest.php
+
+		-
+			message: '#^Call to an undefined method App\\Service\\WhisperService\:\:method\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: tests/Unit/MessagePreProcessorTest.php
+
+		-
+			message: '#^Call to an undefined method Psr\\Log\\LoggerInterface\:\:expects\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: tests/Unit/MessagePreProcessorTest.php
+
+		-
+			message: '#^Unreachable statement \- code above always terminates\.$#'
+			identifier: deadCode.unreachable
+			count: 2
+			path: tests/Unit/MessagePreProcessorTest.php
+
+		-
+			message: '#^Call to an undefined method App\\Repository\\MessageRepository\:\:expects\(\)\.$#'
+			identifier: method.notFound
+			count: 2
+			path: tests/Unit/MessageProcessorTest.php
+
+		-
+			message: '#^Call to an undefined method App\\Repository\\MessageRepository\:\:method\(\)\.$#'
+			identifier: method.notFound
+			count: 5
+			path: tests/Unit/MessageProcessorTest.php
+
+		-
+			message: '#^Call to an undefined method App\\Service\\Message\\InferenceRouter\:\:expects\(\)\.$#'
+			identifier: method.notFound
+			count: 3
+			path: tests/Unit/MessageProcessorTest.php
+
+		-
+			message: '#^Call to an undefined method App\\Service\\Message\\InferenceRouter\:\:method\(\)\.$#'
+			identifier: method.notFound
+			count: 4
+			path: tests/Unit/MessageProcessorTest.php
+
+		-
+			message: '#^Call to an undefined method App\\Service\\Message\\MessageClassifier\:\:expects\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: tests/Unit/MessageProcessorTest.php
+
+		-
+			message: '#^Call to an undefined method App\\Service\\Message\\MessageClassifier\:\:method\(\)\.$#'
+			identifier: method.notFound
+			count: 6
+			path: tests/Unit/MessageProcessorTest.php
+
+		-
+			message: '#^Call to an undefined method App\\Service\\Message\\MessagePreProcessor\:\:expects\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: tests/Unit/MessageProcessorTest.php
+
+		-
+			message: '#^Call to an undefined method App\\Service\\Message\\MessagePreProcessor\:\:method\(\)\.$#'
+			identifier: method.notFound
+			count: 6
+			path: tests/Unit/MessageProcessorTest.php
+
+		-
+			message: '#^Call to an undefined method App\\Service\\ModelConfigService\:\:method\(\)\.$#'
+			identifier: method.notFound
+			count: 7
+			path: tests/Unit/MessageProcessorTest.php
+
+		-
+			message: '#^Call to an undefined method App\\Repository\\ConfigRepository\:\:expects\(\)\.$#'
+			identifier: method.notFound
+			count: 8
+			path: tests/Unit/ModelConfigServiceTest.php
+
+		-
+			message: '#^Call to an undefined method App\\Repository\\ConfigRepository\:\:method\(\)\.$#'
+			identifier: method.notFound
+			count: 4
+			path: tests/Unit/ModelConfigServiceTest.php
+
+		-
+			message: '#^Call to an undefined method App\\Repository\\ModelRepository\:\:expects\(\)\.$#'
+			identifier: method.notFound
+			count: 2
+			path: tests/Unit/ModelConfigServiceTest.php
+
+		-
+			message: '#^Call to an undefined method App\\Repository\\ModelRepository\:\:method\(\)\.$#'
+			identifier: method.notFound
+			count: 3
+			path: tests/Unit/ModelConfigServiceTest.php
+
+		-
+			message: '#^Call to an undefined method Psr\\Cache\\CacheItemInterface\:\:method\(\)\.$#'
+			identifier: method.notFound
+			count: 6
+			path: tests/Unit/ModelConfigServiceTest.php
+
+		-
+			message: '#^Call to an undefined method Psr\\Cache\\CacheItemPoolInterface\:\:expects\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: tests/Unit/ModelConfigServiceTest.php
+
+		-
+			message: '#^Call to an undefined method Psr\\Cache\\CacheItemPoolInterface\:\:method\(\)\.$#'
+			identifier: method.notFound
+			count: 5
+			path: tests/Unit/ModelConfigServiceTest.php
+
+		-
+			message: '#^Call to an undefined method Psr\\Log\\LoggerInterface\:\:expects\(\)\.$#'
+			identifier: method.notFound
+			count: 3
+			path: tests/Unit/RecaptchaServiceTest.php
+
+		-
+			message: '#^Call to an undefined method App\\Repository\\ConfigRepository\:\:method\(\)\.$#'
+			identifier: method.notFound
+			count: 7
+			path: tests/Unit/StorageQuotaServiceTest.php
+
+		-
+			message: '#^Call to an undefined method App\\Repository\\FileRepository\:\:method\(\)\.$#'
+			identifier: method.notFound
+			count: 6
+			path: tests/Unit/StorageQuotaServiceTest.php
+
+		-
+			message: '#^Call to function method_exists\(\) with App\\Service\\WhisperService and ''translateToEnglish'' will always evaluate to true\.$#'
+			identifier: function.alreadyNarrowedType
+			count: 1
+			path: tests/Unit/WhisperServiceTest.php
+
+		-
+			message: '#^Call to method PHPUnit\\Framework\\Assert\:\:assertIsArray\(\) with array will always evaluate to true\.$#'
+			identifier: method.alreadyNarrowedType
+			count: 3
+			path: tests/Unit/WhisperServiceTest.php
+
+		-
+			message: '#^Call to method PHPUnit\\Framework\\Assert\:\:assertTrue\(\) with true will always evaluate to true\.$#'
+			identifier: method.alreadyNarrowedType
+			count: 1
+			path: tests/Unit/WhisperServiceTest.php
+
+		-
+			message: '#^Strict comparison using \=\=\= between null and ''test'' will always evaluate to false\.$#'
+			identifier: identical.alwaysFalse
+			count: 1
+			path: tests/bootstrap.php

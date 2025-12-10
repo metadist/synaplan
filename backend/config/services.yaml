@@ -3,6 +3,9 @@ parameters:
     recaptcha_enabled_default: false
     recaptcha_min_score_default: 0.5
 
+    # Synaplan public URL
+    synaplan_url: '%env(SYNAPLAN_URL)%'
+
 services:
     _defaults:
         autowire: true

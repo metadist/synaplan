@@ -11,14 +11,26 @@ services:
       - "5173:5173"
     volumes:
       - ./_docker/frontend/docker-entrypoint.sh:/usr/local/bin/docker-entrypoint.sh:ro
-      - ./_docker/frontend/init-env.sh:/usr/local/bin/init-env.sh:ro
       - ./_devextras/frontend/docker-entrypoint.d:/docker-entrypoint.d:ro
-
       - ./frontend:/app
        # Anonymous volume to prevent host node_modules from being mounted (avoids platform-specific binary conflicts)
       - /app/node_modules
     depends_on:
       - backend
+    restart: unless-stopped
+    networks:
+      - synaplan-network
+
+  # Widget Build Watcher (dev only)
+  frontend-widgets:
+    image: node:22
+    container_name: synaplan-frontend-widgets
+    working_dir: /app
+    command: sh -c "npm ci && npm run build:widget -- --watch"
+    volumes:
+      - ./frontend:/app
+      # Anonymous volume to prevent host node_modules from being mounted
+      - /app/node_modules
     restart: unless-stopped
     networks:
       - synaplan-network
@@ -30,15 +42,18 @@ services:
       context: .
       dockerfile: _docker/backend/Dockerfile
     container_name: synaplan-backend
-    # Note: .env file is optional - will be auto-created from .env.example on first start
+    # Optional: Load extra config from backend/.env (for API keys, etc.)
     env_file:
-      - backend/.env
+      - path: backend/.env
+        required: false
     ports:
       - "8000:80"
     volumes:
       - ./backend:/var/www/backend
       - ./frontend/dist:/var/www/frontend:ro
+      - ./frontend/dist-widget:/var/www/widgets
       - ./_docker/backend/Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./_docker/backend/docker-entrypoint.sh:/usr/local/bin/docker-entrypoint.sh:ro
       - whisper_models:/var/www/backend/var/whisper:ro
       - ./_devextras/backend/docker-entrypoint.d:/docker-entrypoint.d:ro
     environment:
@@ -46,16 +61,15 @@ services:
       APP_SECRET: change_me_in_production_12345678901234567890
       APP_URL: http://localhost:8000
       FRONTEND_URL: http://localhost:5173
+      SYNAPLAN_URL: http://localhost:8000
       DATABASE_WRITE_URL: mysql://synaplan_user:synaplan_password@db:3306/synaplan?serverVersion=11.8&charset=utf8mb4
       DATABASE_READ_URL: mysql://synaplan_user:synaplan_password@db:3306/synaplan?serverVersion=11.8&charset=utf8mb4
       OLLAMA_BASE_URL: http://ollama:11434
       TRITON_SERVER_URL: ${TRITON_SERVER_URL:-}
       TIKA_BASE_URL: http://tika:9998
       AI_DEFAULT_PROVIDER: ollama
-      # JWT Configuration
-      JWT_SECRET_KEY: '%kernel.project_dir%/config/jwt/private.pem'
-      JWT_PUBLIC_KEY: '%kernel.project_dir%/config/jwt/public.pem'
-      JWT_PASSPHRASE: 'change_me_in_production'
+      # Token Configuration
+      TOKEN_SECRET: 'change_me_in_production_use_openssl_rand_hex_32'
       # Mailer (Mailhog for development)
       MAILER_DSN: smtp://mailhog:1025
       # External API Keys loaded from backend/.env via env_file

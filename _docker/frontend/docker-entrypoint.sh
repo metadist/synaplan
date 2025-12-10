@@ -17,11 +17,6 @@ if [ -d "/docker-entrypoint.d" ]; then
     if compgen -G "/docker-entrypoint.d/*" > /dev/null; then
         echo ":wrench: Running additional startup scripts from /docker-entrypoint.d/..."
         for f in /docker-entrypoint.d/*; do
-            # Additional safety: verify the file is owned by root and not world-writable
-            if [ ! -O "$f" ] || [ -k "$f" ]; then
-                echo "   :warning:  Skipping unsafe file: $(basename "$f") (not owned by current user or has sticky bit)"
-                continue
-            fi
             if [ -x "$f" ]; then
                 echo "   Executing: $(basename "$f")"
                 "$f"
@@ -33,8 +28,5 @@ if [ -d "/docker-entrypoint.d" ]; then
     fi
 fi
 
-# Initialize environment files
-/usr/local/bin/init-env.sh
-
-echo ":rocket: Starting development server..."
+echo "🚀 Starting development server..."
 exec npm run dev -- --host 0.0.0.0

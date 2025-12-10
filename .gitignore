@@ -40,6 +40,7 @@ backend/vendor/
 # Frontend cache & build
 node_modules/
 frontend/dist/
+frontend/dist-widget/
 frontend/.vite/
 *.tsbuildinfo
 

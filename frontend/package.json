@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "npm run check:types && vite build",
-    "build:widget": "vite build --mode widget && node ./scripts/copy-widget-bundle.mjs",
+    "build:widget": "vite build --config vite.config.widget.ts",
     "check:types": "vue-tsc -b --noEmit",
     "preview": "vite preview",
     "test": "vitest",

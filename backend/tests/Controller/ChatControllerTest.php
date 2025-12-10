@@ -26,8 +26,9 @@ class ChatControllerTest extends WebTestCase
 
     protected function setUp(): void
     {
+        self::ensureKernelShutdown();
         $this->client = static::createClient();
-        $this->em = static::getContainer()->get('doctrine')->getManager();
+        $this->em = $this->client->getContainer()->get('doctrine')->getManager();
 
         // Create test user
         $this->user = new User();
@@ -46,7 +47,13 @@ class ChatControllerTest extends WebTestCase
 
     protected function tearDown(): void
     {
-        if ($this->em && $this->user) {
+        if ($this->user) {
+            // Get a fresh entity manager if the current one is closed
+            if (!$this->em || !$this->em->isOpen()) {
+                self::bootKernel();
+                $this->em = self::getContainer()->get('doctrine')->getManager();
+            }
+
             // Cleanup: Remove test chats
             $chats = $this->em->getRepository(Chat::class)
                 ->findBy(['userId' => $this->user->getId()]);
@@ -55,8 +62,11 @@ class ChatControllerTest extends WebTestCase
                 $this->em->remove($chat);
             }
 
-            // Remove test user
-            $this->em->remove($this->user);
+            // Remove test user (find again if detached)
+            $user = $this->em->find(User::class, $this->user->getId());
+            if ($user) {
+                $this->em->remove($user);
+            }
             $this->em->flush();
         }
 
@@ -67,6 +77,7 @@ class ChatControllerTest extends WebTestCase
     public function testListChatsWithoutAuth(): void
     {
         // Create new client without auth cookies
+        self::ensureKernelShutdown();
         $client = static::createClient();
         $client->request('GET', '/api/v1/chats');
 
@@ -95,6 +106,7 @@ class ChatControllerTest extends WebTestCase
 
     public function testCreateChatWithoutAuth(): void
     {
+        self::ensureKernelShutdown();
         $client = static::createClient();
         $client->request(
             'POST',
@@ -202,6 +214,7 @@ class ChatControllerTest extends WebTestCase
 
     public function testGetChatByIdWithoutAuth(): void
     {
+        self::ensureKernelShutdown();
         $client = static::createClient();
         $client->request('GET', '/api/v1/chats/1');
 
@@ -297,6 +310,7 @@ class ChatControllerTest extends WebTestCase
 
     public function testUpdateChatWithoutAuth(): void
     {
+        self::ensureKernelShutdown();
         $client = static::createClient();
         $client->request(
             'PATCH',
@@ -366,6 +380,7 @@ class ChatControllerTest extends WebTestCase
 
     public function testDeleteChatWithoutAuth(): void
     {
+        self::ensureKernelShutdown();
         $client = static::createClient();
         $client->request('DELETE', '/api/v1/chats/1');
 

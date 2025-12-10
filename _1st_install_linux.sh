@@ -63,7 +63,12 @@ if [ "$AI_CHOICE" != "1" ]; then
     cp backend/.env.example "$ENV_FILE"
   fi
   if grep -q "^GROQ_API_KEY=" "$ENV_FILE"; then
-    sed -i "s/^GROQ_API_KEY=.*/GROQ_API_KEY=$GROQ_API_KEY/" "$ENV_FILE"
+    # macOS sed requires empty string after -i, Linux doesn't need it
+    if [[ "$OSTYPE" == "darwin"* ]]; then
+      sed -i '' "s/^GROQ_API_KEY=.*/GROQ_API_KEY=$GROQ_API_KEY/" "$ENV_FILE"
+    else
+      sed -i "s/^GROQ_API_KEY=.*/GROQ_API_KEY=$GROQ_API_KEY/" "$ENV_FILE"
+    fi
   else
     printf "\nGROQ_API_KEY=%s\n" "$GROQ_API_KEY" >> "$ENV_FILE"
   fi

@@ -19,30 +19,87 @@
 	# Cache static assets from frontend
 	@static_assets {
 		path *.css *.js *.jpg *.jpeg *.png *.gif *.ico *.svg *.woff *.woff2 *.ttf *.eot *.webp
+		not path /widget.js
 	}
 	header @static_assets {
 		Cache-Control "public, max-age=31536000, immutable"
 	}
 
-	# Backend routes (handled by PHP in /var/www/backend/public)
+	# Widget chunks can be cached aggressively (they have hashes in filenames)
+	@widget_chunks {
+		path /chunks/*
+	}
+	header @widget_chunks {
+		Cache-Control "public, max-age=31536000, immutable"
+	}
+
+	# Widget entry point should not be cached at all
+	@widget_entry {
+		path /widget.js
+	}
+	header @widget_entry {
+		Cache-Control "no-cache, no-store, must-revalidate"
+		Pragma "no-cache"
+		Expires "0"
+	}
+
+	# Widgets first (to catch widget.js, chunks/*, etc.)
+	@widget_file {
+		file {
+			root /var/www/widgets
+			try_files {path}
+		}
+	}
+	handle @widget_file {
+		# CORS for widget files
+		header Access-Control-Allow-Origin "*"
+		root * /var/www/widgets
+		file_server
+	}
+
+	# Frontend files second (static files from frontend build)
+	@frontend_file {
+		file {
+			root /var/www/frontend
+			try_files {path}
+		}
+	}
+	handle @frontend_file {
+		root * /var/www/frontend
+		file_server
+	}
+
+	# Backend static files third (bundles, uploads, etc.)
+	@backend_file {
+		path /bundles/* /uploads/*
+		file {
+			root /var/www/backend/public
+			try_files {path}
+		}
+	}
+	handle @backend_file {
+		root * /var/www/backend/public
+		file_server
+	}
+
+	# Backend PHP routes last (API, dynamic routes)
 	# Dev routes (_profiler, _wdt, _error) only when APP_ENV=dev
-	@backend expression `
-		path('/bundles/*') ||
-		path('/uploads/*') ||
+	@backend_php expression `
 		path('/up/*') ||
 		path('/api/*') ||
 		path('/api.php') ||
+		path('/widget.php') ||
 		({env.APP_ENV} == 'dev' && (path('/_profiler/*') || path('/_wdt/*') || path('/_error/*')))
 	`
-	route @backend {
+	handle @backend_php {
 		root * /var/www/backend/public
 		php_server
 	}
 
-	# Everything else: serve from frontend dist
-	route {
+	# Fallback to frontend SPA (index.html)
+	handle {
 		root * /var/www/frontend
-		try_files {path} /index.html
+		rewrite * /index.html
 		file_server
 	}
 }

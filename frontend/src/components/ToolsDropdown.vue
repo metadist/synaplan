@@ -23,10 +23,10 @@
         ref="itemRefs"
         :class="[
           'dropdown-item',
-          isToolActive('web-search') && 'dropdown-item--active',
+          isToolActive('search') && 'dropdown-item--active',
           isToolDisabled('web-search') && 'opacity-60'
         ]"
-        @click="selectTool('web-search')"
+        @click="selectToolCommand('web-search', 'search')"
         @keydown.down.prevent="focusNext"
         @keydown.up.prevent="focusPrevious"
         type="button"
@@ -55,7 +55,7 @@
         </div>
         <Transition name="check-fade">
           <CheckIcon 
-            v-if="isToolActive('web-search')" 
+            v-if="isToolActive('search')" 
             class="w-5 h-5 flex-shrink-0 text-[var(--brand)]"
           />
         </Transition>
@@ -66,10 +66,10 @@
         ref="itemRefs"
         :class="[
           'dropdown-item',
-          isToolActive('image-gen') && 'dropdown-item--active',
+          isToolActive('pic') && 'dropdown-item--active',
           isToolDisabled('image-gen') && 'opacity-60'
         ]"
-        @click="selectTool('image-gen')"
+        @click="selectToolCommand('image-gen', 'pic')"
         @keydown.down.prevent="focusNext"
         @keydown.up.prevent="focusPrevious"
         type="button"
@@ -98,98 +98,77 @@
         </div>
         <Transition name="check-fade">
           <CheckIcon 
-            v-if="isToolActive('image-gen')" 
+            v-if="isToolActive('pic')" 
             class="w-5 h-5 flex-shrink-0 text-[var(--brand)]"
           />
         </Transition>
       </button>
 
-      <!-- Code Interpreter Tool -->
+      <!-- Video Generation Tool -->
       <button
         ref="itemRefs"
         :class="[
           'dropdown-item',
-          isToolActive('code-interpreter') && 'dropdown-item--active'
+          isToolActive('vid') && 'dropdown-item--active'
         ]"
-        @click="selectTool('code-interpreter')"
+        @click="selectToolCommand('video-gen', 'vid')"
         @keydown.down.prevent="focusNext"
         @keydown.up.prevent="focusPrevious"
         type="button"
-        data-testid="btn-tool-code-interpreter"
+        data-testid="btn-tool-video-gen"
       >
-        <Icon icon="mdi:code-braces" class="w-5 h-5 flex-shrink-0" />
+        <Icon icon="mdi:video" class="w-5 h-5 flex-shrink-0" />
         <div class="flex-1 min-w-0">
-          <div class="text-sm font-medium">{{ $t('chatInput.tools.codeInterpreter') }}</div>
-          <div class="text-xs txt-secondary">{{ $t('chatInput.tools.codeInterpreterDesc') }}</div>
+          <div class="flex items-center gap-2">
+            <span class="text-sm font-medium">{{ $t('chatInput.tools.videoGen') }}</span>
+            <span 
+              v-if="!isLoadingFeatures" 
+              class="text-xs px-2 py-0.5 rounded-full bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200"
+            >
+              Ready
+            </span>
+          </div>
+          <div class="text-xs txt-secondary">{{ $t('chatInput.tools.videoGenDesc') }}</div>
         </div>
         <Transition name="check-fade">
           <CheckIcon 
-            v-if="isToolActive('code-interpreter')" 
+            v-if="isToolActive('vid')" 
             class="w-5 h-5 flex-shrink-0 text-[var(--brand)]"
           />
         </Transition>
-      </button>
-
-      <div class="border-t border-light-border dark:border-dark-border my-1"></div>
-
-      <!-- Slash Commands -->
-      <button
-        v-for="cmd in availableCommands"
-        :key="cmd.name"
-        ref="itemRefs"
-        class="dropdown-item flex items-center justify-between"
-        @click="selectCommand(cmd)"
-        @keydown.down.prevent="focusNext"
-        @keydown.up.prevent="focusPrevious"
-        type="button"
-      >
-        <code class="font-mono text-sm txt-primary">{{ cmd.usage }}</code>
-        <span class="text-xs txt-secondary text-right ml-auto">{{ cmd.description }}</span>
       </button>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
+import { ref, onMounted, onBeforeUnmount } from 'vue'
 import { WrenchScrewdriverIcon, ChevronUpIcon, CheckIcon } from '@heroicons/vue/24/outline'
 import { Icon } from '@iconify/vue'
-import { commandsData as commands, type Command } from '@/stores/commands'
+import { type Command, useCommandsStore } from '@/stores/commands'
 import { getFeaturesStatus, type Feature } from '@/services/featuresService'
 import { useRouter } from 'vue-router'
 
-interface Tool {
-  id: string
-  name: string
-  icon: string
-}
-
 interface Props {
-  activeTools?: Tool[]
+  activeCommand?: string | null
 }
 
 const props = defineProps<Props>()
 
 const emit = defineEmits<{
-  select: [toolId: string]
-  remove: [toolId: string]
   insertCommand: [command: Command]
 }>()
 
 const router = useRouter()
+const commandsStore = useCommandsStore()
 const isOpen = ref(false)
 const itemRefs = ref<HTMLElement[]>([])
 const dropdownRef = ref<HTMLElement | null>(null)
 const featuresStatus = ref<Record<string, Feature>>({})
 const isLoadingFeatures = ref(true)
 
-// Filter commands to show only the most useful ones for the tools menu
-const availableCommands = computed(() => {
-  return commands
-})
-
-const isToolActive = (toolId: string): boolean => {
-  return props.activeTools?.some(t => t.id === toolId) ?? false
+const isToolActive = (commandName: string): boolean => {
+  return props.activeCommand === commandName
 }
 
 const isToolDisabled = (toolId: string): boolean => {
@@ -225,7 +204,7 @@ const closeDropdown = () => {
   isOpen.value = false
 }
 
-const selectTool = (toolId: string) => {
+const selectToolCommand = (toolId: string, commandName: string) => {
   const feature = featuresStatus.value[toolId]
   
   // If feature is disabled, navigate to setup instructions instead
@@ -238,16 +217,13 @@ const selectTool = (toolId: string) => {
     return
   }
   
-  // Emit select event (toggle tool on/off)
-  emit('select', toolId)
+  // Get the command from the store and emit it
+  const command = commandsStore.getCommand(commandName)
+  if (command) {
+    emit('insertCommand', command)
+  }
   
-  // Don't close dropdown - allow multi-select
-  // closeDropdown()
-}
-
-const selectCommand = (cmd: Command) => {
-  // Emit event to insert command into input
-  emit('insertCommand', cmd)
+  // Close dropdown after selection
   closeDropdown()
 }
 

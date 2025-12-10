@@ -50,6 +50,7 @@ export interface UpdateWidgetRequest {
 export interface EmbedCodeResponse {
   success: boolean
   embedCode: string
+  legacyEmbedCode?: string
   wordpressShortcode: string
   widgetUrl: string
 }
@@ -416,8 +417,9 @@ export async function uploadWidgetIcon(
   iconUrl: string
   filename: string
 }> {
-  const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000'
-  
+  const config = useConfigStore()
+  const apiUrl = config.apiBaseUrl
+
   const formData = new FormData()
   formData.append('icon', file)
 

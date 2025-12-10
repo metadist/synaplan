@@ -4,6 +4,7 @@
 /.env.*.local
 # Note: .env.test is NOT ignored (committed for CI/CD)
 /config/secrets/prod/prod.decrypt.private.php
+/config/jwt/
 /public/bundles/
 /var/
 /vendor/

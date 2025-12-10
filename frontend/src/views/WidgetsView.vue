@@ -144,6 +144,7 @@
       v-if="showEmbedModal && embedWidget"
       :widget="embedWidget"
       :embed-code="embedCode"
+      :legacy-embed-code="legacyEmbedCode"
       :wordpress-shortcode="wordpressShortcode"
       @close="showEmbedModal = false"
       data-testid="comp-embed-dialog"
@@ -174,6 +175,7 @@ const currentWidget = ref<widgetsApi.Widget | null>(null)
 const showEmbedModal = ref(false)
 const embedWidget = ref<widgetsApi.Widget | null>(null)
 const embedCode = ref('')
+const legacyEmbedCode = ref('')
 const wordpressShortcode = ref('')
 
 /**
@@ -257,6 +259,7 @@ const showEmbed = async (widget: widgetsApi.Widget) => {
     const data = await widgetsApi.getEmbedCode(widget.widgetId)
     embedWidget.value = widget
     embedCode.value = data.embedCode
+    legacyEmbedCode.value = data.legacyEmbedCode || ''
     wordpressShortcode.value = data.wordpressShortcode
     showEmbedModal.value = true
   } catch (err: any) {

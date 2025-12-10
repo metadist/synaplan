@@ -134,6 +134,14 @@ class WidgetService
     }
 
     /**
+     * List all widgets for a user by user ID.
+     */
+    public function getWidgetsByUserId(int $userId): array
+    {
+        return $this->widgetRepository->findByOwnerId($userId);
+    }
+
+    /**
      * Generate embed code for a widget.
      */
     public function generateEmbedCode(Widget $widget, string $baseUrl): string
@@ -163,15 +171,10 @@ class WidgetService
             : "buttonIcon: '{$buttonIcon}',";
 
         return <<<HTML
-<!-- Synaplan Chat Widget (Optimized) -->
-<!-- 1. Load Vue.js from CDN (cached across sites) -->
-<script src="https://cdn.jsdelivr.net/npm/vue@3/dist/vue.global.prod.js"></script>
+<!-- Synaplan Chat Widget (ES Module with Auto Code-Splitting) -->
+<script type="module">
+  import SynaplanWidget from '{$baseUrl}/widget.js'
 
-<!-- 2. Load Synaplan Widget Loader (only 5.8 KB - loads chat on-demand) -->
-<script src="{$baseUrl}/widget-loader.js"></script>
-
-<!-- 3. Initialize Widget -->
-<script>
   SynaplanWidget.init({
     widgetId: '{$widgetId}',
     position: '{$position}',
@@ -185,8 +188,8 @@ class WidgetService
     maxFileSize: {$maxFileSize},
     allowFileUpload: {$allowFileUploadStr},
     fileUploadLimit: {$fileUploadLimit},
-    apiUrl: '{$baseUrl}'
-  });
+    lazy: true  // Load chat on button click (set to false for immediate load)
+  })
 </script>
 HTML;
     }

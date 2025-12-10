@@ -47,8 +47,30 @@ RUN mkdir -p /var/www/uploads && chmod 777 /var/www/uploads && \
 # Install Composer
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
-# Copy application
+# Set default environment variables for paths and constants
+# These are baked into the image since they reference local filesystem paths
+ENV WHISPER_BINARY=/usr/local/bin/whisper \
+    WHISPER_MODELS_PATH=/var/www/backend/var/whisper \
+    WHISPER_DEFAULT_MODEL=base \
+    WHISPER_ENABLED=true \
+    FFMPEG_BINARY=/usr/bin/ffmpeg \
+    BRAVE_SEARCH_API_URL=https://api.search.brave.com/res/v1 \
+    BRAVE_SEARCH_ENABLED=false \
+    BRAVE_SEARCH_COUNT=10 \
+    BRAVE_SEARCH_COUNTRY=us \
+    BRAVE_SEARCH_SEARCH_LANG=en \
+    TIKA_TIMEOUT_MS=30000 \
+    TIKA_RETRIES=2 \
+    TIKA_RETRY_BACKOFF_MS=1000 \
+    TIKA_MIN_LENGTH=10 \
+    TIKA_MIN_ENTROPY=3.0 \
+    RASTERIZE_DPI=150 \
+    RASTERIZE_PAGE_CAP=10 \
+    RASTERIZE_TIMEOUT_MS=30000
+
+# Copy application (exclude .env files - use environment variables instead)
 COPY backend/ .
+RUN rm -f .env .env.example .env.local .env.*.local
 
 # Install dependencies with production optimizations
 # Flags explained:
@@ -68,11 +90,13 @@ RUN mkdir -p /var/www/backend/var/cache /var/www/backend/var/log /var/www/backen
 
 # Copy and setup entrypoint scripts
 COPY _docker/backend/docker-entrypoint.sh /usr/local/bin/
-COPY _docker/backend/init-env.sh /usr/local/bin/
-RUN chmod +x /usr/local/bin/docker-entrypoint.sh /usr/local/bin/init-env.sh
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
 # Copy built frontend (built externally in CI, empty in dev)
 COPY frontend/dist /var/www/frontend
+
+# Copy built widgets (built externally in CI, empty in dev)
+COPY frontend/dist-widget /var/www/widgets
 
 # Copy Caddyfile for production routing (API vs SPA)
 COPY _docker/backend/Caddyfile /etc/caddy/Caddyfile

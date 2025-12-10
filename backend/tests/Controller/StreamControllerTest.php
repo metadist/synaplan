@@ -18,6 +18,7 @@ class StreamControllerTest extends WebTestCase
 
     protected function setUp(): void
     {
+        self::ensureKernelShutdown();
         $this->client = static::createClient();
     }
 
@@ -28,7 +29,7 @@ class StreamControllerTest extends WebTestCase
         }
 
         // Find test user
-        $userRepository = static::getContainer()->get('doctrine')->getRepository(User::class);
+        $userRepository = $this->client->getContainer()->get('doctrine')->getRepository(User::class);
         $user = $userRepository->findOneBy(['mail' => 'admin@synaplan.com']);
 
         if (!$user) {
@@ -43,7 +44,7 @@ class StreamControllerTest extends WebTestCase
 
     private function createTestChat(): Chat
     {
-        $em = static::getContainer()->get('doctrine')->getManager();
+        $em = $this->client->getContainer()->get('doctrine')->getManager();
         $userRepository = $em->getRepository(User::class);
         $user = $userRepository->findOneBy(['mail' => 'admin@synaplan.com']);
 
@@ -59,6 +60,7 @@ class StreamControllerTest extends WebTestCase
 
     public function testStreamRequiresAuthentication(): void
     {
+        self::ensureKernelShutdown();
         $client = static::createClient();
         $client->request('GET', '/api/v1/messages/stream', [
             'message' => 'Test',

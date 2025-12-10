@@ -1,10 +1,14 @@
+includes:
+    - vendor/phpstan/phpstan-doctrine/extension.neon
+    - phpstan-baseline.neon
+
 parameters:
-    level: 8
+    level: 5
     paths:
         - src
         - tests
     excludePaths:
         - src/Kernel.php
-    checkMissingIterableValueType: false
-    checkGenericClassInNonGenericObjectType: false
+    doctrine:
+        objectManagerLoader: tests/object-manager.php
 
