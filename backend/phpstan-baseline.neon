@@ -103,18 +103,6 @@ parameters:
 			path: src/AI/Provider/TritonProvider.php
 
 		-
-			message: '#^Left side of && is always true\.$#'
-			identifier: booleanAnd.leftAlwaysTrue
-			count: 1
-			path: src/AI/Service/AiFacade.php
-
-		-
-			message: '#^Right side of && is always true\.$#'
-			identifier: booleanAnd.rightAlwaysTrue
-			count: 1
-			path: src/AI/Service/AiFacade.php
-
-		-
 			message: '#^Deprecated in PHP 8\.0\: Required parameter \$logger follows optional parameter \$fileAnalysisProviders\.$#'
 			identifier: parameter.requiredAfterOptional
 			count: 1
