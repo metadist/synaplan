@@ -171,7 +171,7 @@ class TritonProvider implements ChatProviderInterface
             ]);
 
             $prompt = $this->buildPrompt($messages);
-            $answer = $this->streamInference($prompt, $maxTokens, false, $model);
+            $answer = $this->streamInference($prompt, $model, $maxTokens, false);
 
             return $answer;
         } catch (\Exception $e) {
@@ -204,7 +204,7 @@ class TritonProvider implements ChatProviderInterface
             ]);
 
             $prompt = $this->buildPrompt($messages);
-            $request = $this->createInferRequest($prompt, $maxTokens, $model);
+            $request = $this->createInferRequest($prompt, $model, $maxTokens);
 
             $call = $this->client->ModelStreamInfer($request);
 
@@ -340,7 +340,7 @@ class TritonProvider implements ChatProviderInterface
     /**
      * Create a Triton inference request.
      */
-    private function createInferRequest(string $prompt, int $maxTokens = 4096, string $modelName): ModelInferRequest
+    private function createInferRequest(string $prompt, string $modelName, int $maxTokens = 4096): ModelInferRequest
     {
         // Text input tensor
         $textInput = new InferInputTensor();
@@ -382,12 +382,12 @@ class TritonProvider implements ChatProviderInterface
     /**
      * Non-streaming inference (collects all output).
      */
-    private function streamInference(string $prompt, int $maxTokens = 4096, bool $stream = true, string $modelName): string
+    private function streamInference(string $prompt, string $modelName, int $maxTokens = 4096, bool $stream = true): string
     {
         $answer = '';
 
         try {
-            $request = $this->createInferRequest($prompt, $maxTokens, $modelName);
+            $request = $this->createInferRequest($prompt, $modelName, $maxTokens);
             $call = $this->client->ModelStreamInfer($request);
 
             foreach ($call->responses() as $response) {

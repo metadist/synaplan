@@ -29,6 +29,8 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
 #[Route('/api/v1/auth/keycloak')]
 class KeycloakAuthController extends AbstractController
 {
+    private string $appEnv;
+
     public function __construct(
         private HttpClientInterface $httpClient,
         private UserRepository $userRepository,
@@ -42,6 +44,7 @@ class KeycloakAuthController extends AbstractController
         private string $appUrl,
         private string $frontendUrl,
     ) {
+        $this->appEnv = $_ENV['APP_ENV'] ?? 'prod';
     }
 
     #[Route('/login', name: 'keycloak_auth_login', methods: ['GET'])]
@@ -86,7 +89,7 @@ class KeycloakAuthController extends AbstractController
             ];
 
             // In debug mode, include full stack trace
-            if ($this->appEnv === 'dev' || $this->appEnv === 'development') {
+            if ('dev' === $this->appEnv) {
                 $errorDetails['trace'] = $e->getTraceAsString();
             }
 
@@ -209,7 +212,7 @@ class KeycloakAuthController extends AbstractController
             ];
 
             // In debug mode, include full stack trace
-            if ($this->appEnv === 'dev' || $this->appEnv === 'development') {
+            if ('dev' === $this->appEnv) {
                 $errorDetails['trace'] = $e->getTraceAsString();
             }
 
@@ -242,7 +245,7 @@ class KeycloakAuthController extends AbstractController
             ];
 
             // In debug mode, include full stack trace
-            if ($this->appEnv === 'dev' || $this->appEnv === 'development') {
+            if ('dev' === $this->appEnv) {
                 $errorDetails['trace'] = $e->getTraceAsString();
             }
 
