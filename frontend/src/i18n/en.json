@@ -103,6 +103,9 @@
     "thinking": "Thinking",
     "reasoningNotSupported": "Your current chat model does not support reasoning. Please select a reasoning-capable model (GPT-5, o3, DeepSeek-R1) in AI Config → Models.",
     "voice": "Start voice",
+    "dropFiles": "Drop files here",
+    "dropFilesHint": "Images, documents, audio files...",
+    "filesPasted": "{count} file(s) pasted | {count} file(s) pasted",
     "send": "Send message",
     "share": "Share",
     "tools": {

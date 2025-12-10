@@ -1,5 +1,9 @@
 <template>
-  <div class="sticky bottom-0 bg-chat-input-area pb-[env(safe-area-inset-bottom)]" data-testid="comp-chat-input">
+  <div 
+    class="sticky bottom-0 bg-chat-input-area pb-[env(safe-area-inset-bottom)]" 
+    data-testid="comp-chat-input"
+    @paste="handlePaste"
+  >
     <div class="max-w-4xl mx-auto px-4 py-4">
       <!-- Active Command and File Display (above input) -->
       <div v-if="activeCommand || uploadedFiles.length > 0" class="mb-3 flex flex-wrap gap-2">
@@ -471,6 +475,43 @@ const handleDrop = async (event: DragEvent) => {
   }
 }
 
+// Clipboard paste handler for images and files
+const handlePaste = async (event: ClipboardEvent) => {
+  const items = event.clipboardData?.items
+  if (!items) return
+
+  const filesToUpload: File[] = []
+
+  for (const item of items) {
+    // Handle pasted images (screenshots, copied images)
+    if (item.type.startsWith('image/')) {
+      const file = item.getAsFile()
+      if (file) {
+        // Generate a meaningful filename for pasted images
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5)
+        const extension = item.type.split('/')[1] || 'png'
+        const namedFile = new File([file], `pasted-image-${timestamp}.${extension}`, { type: file.type })
+        filesToUpload.push(namedFile)
+      }
+    }
+    // Handle pasted files (from file manager)
+    else if (item.kind === 'file') {
+      const file = item.getAsFile()
+      if (file) {
+        filesToUpload.push(file)
+      }
+    }
+  }
+
+  if (filesToUpload.length > 0) {
+    // Prevent default paste behavior for files/images
+    event.preventDefault()
+    await uploadFiles(filesToUpload)
+    success(t('chatInput.filesPasted', { count: filesToUpload.length }))
+  }
+  // If no files, let the default paste behavior handle text
+}
+
 const uploadFiles = async (files: File[]) => {
   uploading.value = true
   
@@ -675,11 +716,13 @@ const toggleEnhance = async () => {
   }
 }
 
-// Expose textarea ref for parent component (auto-focus)
+// Expose textarea ref and uploadFiles for parent component
 // ATTENTION: needs to be typed when using vue-tsc -b
 defineExpose<{
   textareaRef: Ref<InstanceType<typeof Textarea> | null>
+  uploadFiles: (files: File[]) => Promise<void>
 }>({
-  textareaRef
+  textareaRef,
+  uploadFiles
 })
 </script>

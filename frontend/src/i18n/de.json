@@ -93,7 +93,10 @@
     "stop": "Stoppen",
     "enhance": "Verbessern",
     "thinking": "Denken",
-    "reasoningNotSupported": "Dein aktuelles Chat-Modell unterstützt kein Reasoning. Bitte wähle ein Reasoning-fähiges Modell (GPT-5, o3, DeepSeek-R1) in der KI-Konfiguration → Modelle."
+    "reasoningNotSupported": "Dein aktuelles Chat-Modell unterstützt kein Reasoning. Bitte wähle ein Reasoning-fähiges Modell (GPT-5, o3, DeepSeek-R1) in der KI-Konfiguration → Modelle.",
+    "dropFiles": "Dateien hier ablegen",
+    "dropFilesHint": "Bilder, Dokumente, Audiodateien...",
+    "filesPasted": "{count} Datei(en) eingefügt | {count} Datei(en) eingefügt"
   },
   "login": {
     "title": "Anmelden",
