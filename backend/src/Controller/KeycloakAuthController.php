@@ -76,9 +76,21 @@ class KeycloakAuthController extends AbstractController
 
             return $this->redirect($authUrl);
         } catch (\Exception $e) {
-            $this->logger->error('Keycloak login initiation failed', [
+            // Log detailed error information for debugging
+            $errorDetails = [
                 'error' => $e->getMessage(),
-            ]);
+                'exception_class' => get_class($e),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+                'code' => $e->getCode(),
+            ];
+
+            // In debug mode, include full stack trace
+            if ($this->appEnv === 'dev' || $this->appEnv === 'development') {
+                $errorDetails['trace'] = $e->getTraceAsString();
+            }
+
+            $this->logger->error('Keycloak login initiation failed', $errorDetails);
 
             return $this->redirect($this->frontendUrl.'/auth/callback?'.http_build_query([
                 'error' => 'Failed to initiate Keycloak login',
@@ -187,9 +199,21 @@ class KeycloakAuthController extends AbstractController
 
             return $response;
         } catch (\Exception $e) {
-            $this->logger->error('Keycloak OAuth callback error', [
+            // Log detailed error information for debugging
+            $errorDetails = [
                 'error' => $e->getMessage(),
-            ]);
+                'exception_class' => get_class($e),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+                'code' => $e->getCode(),
+            ];
+
+            // In debug mode, include full stack trace
+            if ($this->appEnv === 'dev' || $this->appEnv === 'development') {
+                $errorDetails['trace'] = $e->getTraceAsString();
+            }
+
+            $this->logger->error('Keycloak OAuth callback error', $errorDetails);
 
             return $this->redirect($this->frontendUrl.'/auth/callback?'.http_build_query([
                 'error' => 'Failed to authenticate with Keycloak',
@@ -207,9 +231,22 @@ class KeycloakAuthController extends AbstractController
 
             return $response->toArray();
         } catch (\Exception $e) {
-            $this->logger->error('Failed to load Keycloak discovery config', [
+            // Log detailed error information for debugging
+            $errorDetails = [
                 'error' => $e->getMessage(),
-            ]);
+                'exception_class' => get_class($e),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+                'code' => $e->getCode(),
+                'discovery_endpoint' => $discoveryEndpoint,
+            ];
+
+            // In debug mode, include full stack trace
+            if ($this->appEnv === 'dev' || $this->appEnv === 'development') {
+                $errorDetails['trace'] = $e->getTraceAsString();
+            }
+
+            $this->logger->error('Failed to load Keycloak discovery config', $errorDetails);
             throw new \Exception('Failed to load OIDC discovery configuration');
         }
     }
