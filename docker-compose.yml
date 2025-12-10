@@ -6,6 +6,7 @@ services:
     working_dir: /app
     entrypoint: ["/usr/local/bin/docker-entrypoint.sh"]
     environment:
+      NODE_ENV: development
       BACKEND_URL: http://backend
     ports:
       - "5173:5173"
@@ -27,6 +28,8 @@ services:
     container_name: synaplan-frontend-widgets
     working_dir: /app
     command: sh -c "npm ci && npm run build:widget -- --watch"
+    environment:
+      NODE_ENV: development
     volumes:
       - ./frontend:/app
       # Anonymous volume to prevent host node_modules from being mounted
@@ -38,6 +41,7 @@ services:
   # Symfony PHP Backend
   # Serves both API and production frontend from frontend/dist
   backend:
+    image: ghcr.io/metadist/synaplan:latest
     build:
       context: .
       dockerfile: _docker/backend/Dockerfile

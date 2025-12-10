@@ -39,8 +39,10 @@ backend/vendor/
 
 # Frontend cache & build
 node_modules/
-frontend/dist/
-frontend/dist-widget/
+frontend/dist/*
+!frontend/dist/.gitkeep
+frontend/dist-widget/*
+!frontend/dist-widget/.gitkeep
 frontend/.vite/
 *.tsbuildinfo
 

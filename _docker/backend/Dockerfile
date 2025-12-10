@@ -39,10 +39,12 @@ RUN install-php-extensions \
 
 # PHP Configuration
 RUN mkdir -p /var/www/uploads && chmod 777 /var/www/uploads && \
-    printf "upload_max_filesize=128M\npost_max_size=128M\nmax_file_uploads=50\nmemory_limit=512M\nupload_tmp_dir=/var/www/uploads\nsys_temp_dir=/var/www/uploads\n" \
+    printf "upload_max_filesize=512M\npost_max_size=512M\nmax_file_uploads=50\nmemory_limit=512M\nupload_tmp_dir=/var/www/uploads\nsys_temp_dir=/var/www/uploads\nmax_execution_time=300\n" \
     > /usr/local/etc/php/conf.d/uploads.ini && \
     printf "opcache.enable=1\nopcache.memory_consumption=256\nopcache.max_accelerated_files=20000\n" \
-    > /usr/local/etc/php/conf.d/opcache.ini
+    > /usr/local/etc/php/conf.d/opcache.ini && \
+    printf "display_errors=Off\ndisplay_startup_errors=Off\nlog_errors=On\nerror_reporting=E_ALL & ~E_DEPRECATED & ~E_STRICT\n" \
+    > /usr/local/etc/php/conf.d/production.ini
 
 # Install Composer
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
