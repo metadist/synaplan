@@ -1,30 +1,23 @@
 #!/bin/bash
 set -euo pipefail
 
-echo ":rocket: Starting Synaplan Frontend..."
-
-# Install npm dependencies if node_modules is empty or doesn't exist
-if [ ! -d "/app/node_modules" ] || [ -z "$(ls -A /app/node_modules 2>/dev/null)" ]; then
-    echo ":wrench: Installing npm dependencies..."
-    npm ci
-    echo ":white_check_mark: npm dependencies installed"
-fi
+echo "🚀 Starting Synaplan Frontend..."
 
 # Run additional startup scripts from docker-entrypoint.d (if any)
 # Useful for dev environments to mount custom initialization scripts
 if [ -d "/docker-entrypoint.d" ]; then
     # Check if directory has any files (avoid empty glob expansion)
     if compgen -G "/docker-entrypoint.d/*" > /dev/null; then
-        echo ":wrench: Running additional startup scripts from /docker-entrypoint.d/..."
+        echo "🔧 Running additional startup scripts from /docker-entrypoint.d/..."
         for f in /docker-entrypoint.d/*; do
             if [ -x "$f" ]; then
                 echo "   Executing: $(basename "$f")"
                 "$f"
             elif [ -f "$f" ]; then
-                echo "   :warning:  Skipping non-executable: $(basename "$f")"
+                echo "   ⚠️  Skipping non-executable: $(basename "$f")"
             fi
         done
-        echo ":white_check_mark: Additional startup scripts completed"
+        echo "✅ Additional startup scripts completed"
     fi
 fi
 
