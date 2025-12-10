@@ -123,7 +123,7 @@ if [ "$APP_ENV" = "dev" ] || [ "$APP_ENV" = "test" ]; then
 fi
 
 # Ollama model downloads (optional, only if AUTO_DOWNLOAD_MODELS=true)
-if [ -n "$OLLAMA_BASE_URL" ] && [ "$AUTO_DOWNLOAD_MODELS" = "true" ]; then
+if [ -n "${OLLAMA_BASE_URL:-}" ] && [ "${AUTO_DOWNLOAD_MODELS:-false}" = "true" ]; then
     echo ""
     echo "🤖 AUTO_DOWNLOAD_MODELS=true - Starting AI model downloads in background..."
 
