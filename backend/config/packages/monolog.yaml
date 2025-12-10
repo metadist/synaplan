@@ -1,0 +1,24 @@
+# Default: JSON formatter for structured logging with context
+# To use human-readable format, set LOG_FORMAT env var to: line, or json (default)
+when@prod: &prod_config
+    monolog:
+        handlers:
+            main:
+                type: stream
+                path: php://stderr
+                level: debug
+                formatter: app.monolog_formatter
+                process_psr_3_messages: false
+
+when@dev:
+    <<: *prod_config
+
+when@test:
+    monolog:
+        handlers:
+            main:
+                type: stream
+                path: php://stderr
+                level: error
+                formatter: app.monolog_formatter
+                process_psr_3_messages: false
