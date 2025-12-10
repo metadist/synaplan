@@ -11,16 +11,17 @@ const projectRoot = fileURLToPath(new URL('.', import.meta.url))
 export function gitkeepPlugin(): Plugin {
   return {
     name: 'gitkeep',
-    async closeBundle() {
+    async writeBundle(options) {
       const fs = await import('fs/promises')
       const path = await import('path')
 
-      // Get outDir from Vite config (defaults to 'dist')
-      const outDir = (this as any).environment?.config?.build?.outDir || 'dist'
+      // Get outDir from writeBundle options
+      const outDir = options.dir || 'dist'
       const gitkeepPath = path.join(outDir, '.gitkeep')
 
       try {
         await fs.writeFile(gitkeepPath, '', 'utf8')
+        console.log(`✓ Created ${gitkeepPath}`)
       } catch (error) {
         console.warn('Failed to create .gitkeep:', error)
       }
