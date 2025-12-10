@@ -11,12 +11,19 @@ RUN apt-get update && apt-get install -y \
     ghostscript imagemagick libmagickwand-dev poppler-utils \
     build-essential cmake pkg-config \
     libopenblas-dev liblapack-dev gfortran \
-    protobuf-compiler \
     ffmpeg libavcodec-extra libavformat-dev libavutil-dev \
     libswscale-dev libavfilter-dev libswresample-dev \
     libx264-dev libx265-dev libvpx-dev libmp3lame-dev libopus-dev \
     libc-client-dev libkrb5-dev \
     && rm -rf /var/lib/apt/lists/*
+
+# Install protoc (pinned version for consistent proto generation)
+# This version is also used in CI (.github/workflows/ci.yml extracts it via grep)
+ENV PROTOC_VERSION=33.2
+RUN curl -Lo /tmp/protoc.zip "https://github.com/protocolbuffers/protobuf/releases/download/v${PROTOC_VERSION}/protoc-${PROTOC_VERSION}-linux-x86_64.zip" \
+    && unzip -q /tmp/protoc.zip -d /usr/local \
+    && chmod +x /usr/local/bin/protoc \
+    && rm /tmp/protoc.zip
 
 WORKDIR /var/www/backend
 
@@ -39,10 +46,12 @@ RUN install-php-extensions \
 
 # PHP Configuration
 RUN mkdir -p /var/www/uploads && chmod 777 /var/www/uploads && \
-    printf "upload_max_filesize=128M\npost_max_size=128M\nmax_file_uploads=50\nmemory_limit=512M\nupload_tmp_dir=/var/www/uploads\nsys_temp_dir=/var/www/uploads\n" \
+    printf "upload_max_filesize=512M\npost_max_size=512M\nmax_file_uploads=50\nmemory_limit=512M\nupload_tmp_dir=/var/www/uploads\nsys_temp_dir=/var/www/uploads\nmax_execution_time=300\n" \
     > /usr/local/etc/php/conf.d/uploads.ini && \
     printf "opcache.enable=1\nopcache.memory_consumption=256\nopcache.max_accelerated_files=20000\n" \
-    > /usr/local/etc/php/conf.d/opcache.ini
+    > /usr/local/etc/php/conf.d/opcache.ini && \
+    printf "display_errors=Off\ndisplay_startup_errors=Off\nlog_errors=On\nerror_reporting=E_ALL & ~E_DEPRECATED & ~E_STRICT\n" \
+    > /usr/local/etc/php/conf.d/production.ini
 
 # Install Composer
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
@@ -72,10 +81,13 @@ ENV WHISPER_BINARY=/usr/local/bin/whisper \
 COPY backend/ .
 RUN rm -f .env .env.example .env.local .env.*.local
 
+# Generate gRPC proto files using composer script (single source of truth)
+RUN composer proto:generate
+
 # Install dependencies with production optimizations
 # Flags explained:
 # --no-dev: Skip dev dependencies (phpunit, fixtures, etc.) for smaller image
-# --no-scripts: Skip post-install scripts (cache:clear requires runtime env vars like APP_URL)
+# --no-scripts: Skip post-install scripts (cache:clear requires runtime DB connection)
 # --optimize-autoloader: Generate optimized PSR-4 class maps
 # --classmap-authoritative: Never scan filesystem for classes (all classes are in composer.json)
 #   This is safe for Symfony apps where all classes are autoloaded via composer

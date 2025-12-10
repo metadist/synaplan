@@ -4,165 +4,147 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$REPO_ROOT"
 
+echo ""
+echo "╔═══════════════════════════════════════════════════════════════╗"
+echo "║           🚀 Synaplan First Installation                      ║"
+echo "╚═══════════════════════════════════════════════════════════════╝"
+echo ""
+
+# =============================================================================
+# Check Docker
+# =============================================================================
 MIN_DOCKER_MAJOR=24
 
-function require_cmd() {
-  local cmd="$1"
-  local msg="$2"
-  if ! command -v "$cmd" >/dev/null 2>&1; then
-    echo "❌ $msg" >&2
+if ! command -v docker >/dev/null 2>&1; then
+    echo "❌ Docker is required. Install it from https://docs.docker.com/get-docker/"
     exit 1
-  fi
-}
-
-require_cmd docker "Docker is required. Install it from https://docs.docker.com/get-docker/ and rerun this script."
-
-DOCKER_VERSION=$(docker version --format '{{.Server.Version}}' 2>/dev/null || true)
-if [ -z "$DOCKER_VERSION" ]; then
-  DOCKER_VERSION=$(docker --version 2>/dev/null | awk '{print $3}' | tr -d ',')
 fi
+
+DOCKER_VERSION=$(docker version --format '{{.Server.Version}}' 2>/dev/null || docker --version 2>/dev/null | awk '{print $3}' | tr -d ',')
 DOCKER_MAJOR=${DOCKER_VERSION%%.*}
-if [ -z "$DOCKER_MAJOR" ]; then
-  echo "❌ Unable to detect Docker version. Update Docker and retry." >&2
-  exit 1
-fi
-if [ "$DOCKER_MAJOR" -lt "$MIN_DOCKER_MAJOR" ]; then
-  echo "❌ Docker $MIN_DOCKER_MAJOR.x or newer is required (found $DOCKER_VERSION)." >&2
-  exit 1
+
+if [ -z "$DOCKER_MAJOR" ] || [ "$DOCKER_MAJOR" -lt "$MIN_DOCKER_MAJOR" ]; then
+    echo "❌ Docker $MIN_DOCKER_MAJOR.x or newer is required (found ${DOCKER_VERSION:-unknown})."
+    exit 1
 fi
 
-docker compose version >/dev/null 2>&1 || {
-  echo "❌ Docker Compose plugin is missing. Update Docker Desktop/Engine to get 'docker compose'." >&2
-  exit 1
-}
+if ! docker compose version >/dev/null 2>&1; then
+    echo "❌ Docker Compose plugin is missing. Update Docker to get 'docker compose'."
+    exit 1
+fi
 
-echo "✅ Docker $(docker --version | cut -d' ' -f3 | tr -d ',') detected"
-echo "✅ Docker Compose $(docker compose version | head -n1)"
+echo "✅ Docker $(docker --version | cut -d' ' -f3 | tr -d ',')"
 
+# =============================================================================
+# AI Provider Setup
+# =============================================================================
 echo ""
-echo "================ AI Provider Setup ================"
-echo "1) Local Ollama (gpt-oss:20b + bge-m3) - requires ~24GB GPU RAM"
-echo "2) Groq Cloud API (recommended, super fast + free tier)"
+echo "═══════════════════ AI Provider Setup ═══════════════════"
+echo ""
+echo "  1) Local Ollama (bge-m3 + gpt-oss:20b) - needs ~24GB GPU RAM"
+echo "  2) Groq Cloud API (recommended - fast & free tier)"
+echo ""
 read -rp "Select provider [1/2, default=2]: " AI_CHOICE
 AI_CHOICE=${AI_CHOICE:-2}
 
 USE_GROQ=0
+GROQ_API_KEY=""
 if [ "$AI_CHOICE" != "1" ]; then
-  USE_GROQ=1
-  echo ""
-  echo "Great choice! Grab a free API key at https://console.groq.com/keys"
-  while :; do
-    read -rp "Enter your GROQ_API_KEY: " GROQ_API_KEY
-    if [ -n "$GROQ_API_KEY" ]; then
-      break
-    fi
-    echo "Key cannot be empty. Please try again."
-  done
-  ENV_FILE="backend/.env"
-  if [ ! -f "$ENV_FILE" ]; then
-    cp backend/.env.example "$ENV_FILE"
-  fi
-  if grep -q "^GROQ_API_KEY=" "$ENV_FILE"; then
-    # macOS sed requires empty string after -i, Linux doesn't need it
-    if [[ "$OSTYPE" == "darwin"* ]]; then
-      sed -i '' "s/^GROQ_API_KEY=.*/GROQ_API_KEY=$GROQ_API_KEY/" "$ENV_FILE"
-    else
-      sed -i "s/^GROQ_API_KEY=.*/GROQ_API_KEY=$GROQ_API_KEY/" "$ENV_FILE"
-    fi
-  else
-    printf "\nGROQ_API_KEY=%s\n" "$GROQ_API_KEY" >> "$ENV_FILE"
-  fi
-  echo "✅ GROQ_API_KEY stored in $ENV_FILE"
+    USE_GROQ=1
+    echo ""
+    echo "Great! Get a free API key at: https://console.groq.com/keys"
+    echo ""
+    while :; do
+        read -rp "Enter your GROQ_API_KEY: " GROQ_API_KEY
+        [ -n "$GROQ_API_KEY" ] && break
+        echo "Key cannot be empty."
+    done
 fi
 
-echo ""
-echo "📦 Pulling containers (this may take a minute)..."
-docker compose pull
+# =============================================================================
+# Create backend/.env if needed
+# =============================================================================
+ENV_FILE="backend/.env"
+if [ ! -f "$ENV_FILE" ]; then
+    cp backend/.env.example "$ENV_FILE" 2>/dev/null || touch "$ENV_FILE"
+fi
 
-# Stop any running containers to ensure clean start with new env vars
+# Set GROQ_API_KEY if provided
+if [ -n "$GROQ_API_KEY" ]; then
+    if grep -q "^GROQ_API_KEY=" "$ENV_FILE" 2>/dev/null; then
+        if [[ "$OSTYPE" == "darwin"* ]]; then
+            sed -i '' "s/^GROQ_API_KEY=.*/GROQ_API_KEY=$GROQ_API_KEY/" "$ENV_FILE"
+        else
+            sed -i "s/^GROQ_API_KEY=.*/GROQ_API_KEY=$GROQ_API_KEY/" "$ENV_FILE"
+        fi
+    else
+        echo "GROQ_API_KEY=$GROQ_API_KEY" >> "$ENV_FILE"
+    fi
+    echo "✅ GROQ_API_KEY saved to $ENV_FILE"
+fi
+
+# =============================================================================
+# Start Docker Compose
+# =============================================================================
+echo ""
+echo "═══════════════════ Starting Services ═══════════════════"
+echo ""
+
+# Stop any existing containers
 docker compose down 2>/dev/null || true
 
+# Set environment for this run
+export AUTO_DOWNLOAD_MODELS=true
 if [ "$USE_GROQ" -eq 1 ]; then
-  echo "🚀 Starting stack (Groq cloud mode - only downloading bge-m3 locally)..."
-  export AUTO_DOWNLOAD_MODELS=true
-  export ENABLE_LOCAL_GPT_OSS=false
-  docker compose up -d
+    export ENABLE_LOCAL_GPT_OSS=false
+    echo "🚀 Starting with Groq Cloud (downloading bge-m3 for embeddings)..."
 else
-  echo "🚀 Starting stack (Auto-download of gpt-oss:20b and bge-m3 enabled)..."
-  export AUTO_DOWNLOAD_MODELS=true
-  export ENABLE_LOCAL_GPT_OSS=true
-  docker compose up -d
+    export ENABLE_LOCAL_GPT_OSS=true
+    echo "🚀 Starting with local Ollama (downloading bge-m3 + gpt-oss:20b)..."
 fi
 
-echo ""
+docker compose up -d
+
 if [ "$USE_GROQ" -eq 1 ]; then
-  echo "📡 Tracking Ollama model download (bge-m3 for RAG)..."
-else
-  echo "📡 Tracking Ollama model downloads (gpt-oss:20b + bge-m3)..."
-fi
-echo "⏳ Waiting for backend to start model downloads..."
-set +e
-set +u
-set +o pipefail
+    echo ""
+    echo "═══════════════════ Configuring Groq Defaults ═══════════════════"
+    echo ""
+    READY=0
+    echo "⏳ Waiting for backend console availability..."
+    for _ in {1..30}; do
+        if docker compose exec backend php bin/console about >/dev/null 2>&1; then
+            READY=1
+            break
+        fi
+        sleep 2
+    done
 
-# Wait up to 5 minutes for model downloads
-# Use a simpler approach: just wait for the completion message with a timeout
-RESULT=1
-SECONDS=0
-while [ $SECONDS -lt 300 ]; do
-  if docker compose logs backend 2>&1 | grep -q "\[Background\] 🎉 Model downloads completed!"; then
-    RESULT=0
-    # Show a summary of what was downloaded
-    docker compose logs backend 2>&1 | grep "\[Background\]" | grep -E "(Downloading|downloaded|completed)" | tail -n 5
-    break
-  fi
-  printf "."
-  sleep 3
-done
-echo ""
-set -e
-set -u
-set -o pipefail
-
-if [ "$RESULT" -eq 124 ]; then
-  echo ""
-  echo "⚠️ Timeout waiting for model downloads (5 min). Downloads may still be running."
-  echo "   Check progress with: docker compose logs -f backend | grep Background"
-elif [ "$RESULT" -ne 0 ]; then
-  echo ""
-  echo "⚠️ Could not confirm model download completion. Check 'docker compose logs backend'."
-else
-  echo "✅ Required Ollama models downloaded."
+    if [ "$READY" -eq 1 ]; then
+        echo "⚙️ Switching defaults to Groq llama-3.3-70b-versatile..."
+        docker compose exec backend php bin/console dbal:run-sql "UPDATE BCONFIG SET BVALUE='9' WHERE BGROUP='DEFAULTMODEL' AND BSETTING IN ('CHAT','SORT')"
+        docker compose exec backend php bin/console dbal:run-sql "UPDATE BCONFIG SET BVALUE='groq' WHERE BOWNERID=0 AND BGROUP='ai' AND BSETTING='default_chat_provider'"
+    else
+        echo "⚠️ Backend console did not become ready; run these commands once it is:"
+        echo "  docker compose exec backend php bin/console dbal:run-sql \"UPDATE BCONFIG SET BVALUE='9' WHERE BGROUP='DEFAULTMODEL' AND BSETTING IN ('CHAT','SORT')\""
+        echo "  docker compose exec backend php bin/console dbal:run-sql \"UPDATE BCONFIG SET BVALUE='groq' WHERE BOWNERID=0 AND BGROUP='ai' AND BSETTING='default_chat_provider'\""
+    fi
 fi
 
+# =============================================================================
+# Done!
+# =============================================================================
 echo ""
-echo "⏳ Waiting for backend console availability..."
-READY=0
-for i in $(seq 1 30); do
-  if docker compose exec backend php bin/console about >/dev/null 2>&1; then
-    READY=1
-    break
-  fi
-  sleep 2
-done
-
-if [ "$READY" -eq 1 ]; then
-  echo "🧱 Updating database schema..."
-  docker compose exec backend php bin/console doctrine:schema:update --force --complete
-  echo "🌱 Loading fixtures..."
-  docker compose exec backend php bin/console doctrine:fixtures:load --no-interaction
-  if [ "$USE_GROQ" -eq 1 ]; then
-    echo "⚙️ Switching defaults to Groq llama-3.3-70b-versatile..."
-    docker compose exec backend php bin/console dbal:run-sql \
-      'UPDATE BCONFIG SET BVALUE="9" WHERE BGROUP="DEFAULTMODEL" AND BSETTING IN ("CHAT","SORT")'
-    docker compose exec backend php bin/console dbal:run-sql \
-      'UPDATE BCONFIG SET BVALUE="groq" WHERE BOWNERID=0 AND BGROUP="ai" AND BSETTING="default_chat_provider"'
-  fi
-else
-  echo "⚠️ Backend console did not become ready; please run doctrine:schema:update and fixtures manually."
-fi
-
+echo "╔═══════════════════════════════════════════════════════════════╗"
+echo "║  ✅ Setup complete!                                           ║"
+echo "╠═══════════════════════════════════════════════════════════════╣"
+echo "║                                                               ║"
+echo "║  🌐 Frontend: http://localhost:5173                           ║"
+echo "║  🔧 Backend:  http://localhost:8000                           ║"
+echo "║                                                               ║"
+echo "║  👤 Login:    admin@synaplan.com / admin123                   ║"
+echo "║                                                               ║"
+echo "║  ⏳ First startup takes ~1-2 minutes for database setup       ║"
+echo "║     Watch progress: docker compose logs -f backend            ║"
+echo "║                                                               ║"
+echo "╚═══════════════════════════════════════════════════════════════╝"
 echo ""
-echo "🎉 Setup complete! Logins: admin@synaplan.com / admin123"
-echo "👉 Next time, you can simply run 'docker compose up -d'"
-echo "🌐 Frontend URL: http://localhost:5173"

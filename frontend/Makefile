@@ -5,22 +5,22 @@ help: ## Show this help
 
 ## Building
 build: ## Build frontend and widget
-	npm run build
-	npm run build:widget
+	docker compose -f ../docker-compose.yml exec -T frontend npm run build
+	docker compose -f ../docker-compose.yml exec -T frontend npm run build:widget
 
 build-widget: ## Build widget only
-	npm run build:widget
+	docker compose -f ../docker-compose.yml exec -T frontend npm run build:widget
 
 ## Testing & Type Checking
 lint: ## TypeScript type checking (alias for check-types)
-	npm run check:types
+	docker compose -f ../docker-compose.yml exec -T frontend npm run check:types
 
 check-types: ## TypeScript type checking
-	npm run check:types
+	docker compose -f ../docker-compose.yml exec -T frontend npm run check:types
 
 test: ## Run tests
-	npm run test
+	docker compose -f ../docker-compose.yml exec -T frontend npm run test
 
 ## Dependencies
 deps: ## Install npm dependencies
-	npm ci
+	docker compose -f ../docker-compose.yml exec -T frontend npm ci

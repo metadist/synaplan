@@ -7,20 +7,26 @@ const projectRoot = fileURLToPath(new URL('.', import.meta.url))
 
 /**
  * Plugin to create .gitkeep file in output directory after build
+ * Only runs in development mode (when NODE_ENV !== 'production')
  */
 export function gitkeepPlugin(): Plugin {
+  const isDev = process.env.NODE_ENV !== 'production'
+
   return {
     name: 'gitkeep',
-    async closeBundle() {
+    async writeBundle(options) {
+      if (!isDev) return
+
       const fs = await import('fs/promises')
       const path = await import('path')
 
-      // Get outDir from Vite config (defaults to 'dist')
-      const outDir = (this as any).environment?.config?.build?.outDir || 'dist'
+      // Get outDir from writeBundle options
+      const outDir = options.dir || 'dist'
       const gitkeepPath = path.join(outDir, '.gitkeep')
 
       try {
         await fs.writeFile(gitkeepPath, '', 'utf8')
+        console.log(`✓ Created ${gitkeepPath}`)
       } catch (error) {
         console.warn('Failed to create .gitkeep:', error)
       }

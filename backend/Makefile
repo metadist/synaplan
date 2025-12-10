@@ -1,4 +1,4 @@
-.PHONY: help lint format phpstan audit deps migrate fixtures schema-update schema-diff console cache-clear shell test
+.PHONY: help lint format phpstan phpstan-baseline audit deps migrate fixtures schema-update schema-diff console cache-clear shell test
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-20s\033[0m %s\n", $$1, $$2}'
@@ -12,6 +12,9 @@ format: ## Fix code formatting
 
 phpstan: ## Run static analysis
 	docker compose -f ../docker-compose.yml exec -T backend composer phpstan
+
+phpstan-baseline: ## Regenerate PHPStan baseline
+	docker compose -f ../docker-compose.yml exec -T backend vendor/bin/phpstan analyse --generate-baseline
 
 audit: ## Run security audit
 	docker compose -f ../docker-compose.yml exec -T backend composer audit
