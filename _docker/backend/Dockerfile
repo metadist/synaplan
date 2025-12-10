@@ -72,15 +72,13 @@ ENV WHISPER_BINARY=/usr/local/bin/whisper \
 COPY backend/ .
 RUN rm -f .env .env.example .env.local .env.*.local
 
-# Generate gRPC proto files (message classes only, service stubs implemented manually)
-RUN protoc --php_out=lib/grpc \
-    --proto_path=proto/triton \
-    proto/triton/grpc_service.proto proto/triton/model_config.proto
+# Generate gRPC proto files using composer script (single source of truth)
+RUN composer proto:generate
 
 # Install dependencies with production optimizations
 # Flags explained:
 # --no-dev: Skip dev dependencies (phpunit, fixtures, etc.) for smaller image
-# --no-scripts: Skip post-install scripts (cache:clear requires runtime env vars like APP_URL)
+# --no-scripts: Skip post-install scripts (cache:clear requires runtime DB connection)
 # --optimize-autoloader: Generate optimized PSR-4 class maps
 # --classmap-authoritative: Never scan filesystem for classes (all classes are in composer.json)
 #   This is safe for Symfony apps where all classes are autoloaded via composer
