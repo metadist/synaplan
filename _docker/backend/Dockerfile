@@ -73,7 +73,7 @@ COPY backend/ .
 RUN rm -f .env .env.example .env.local .env.*.local
 
 # Generate gRPC proto files using composer script (single source of truth)
-RUN composer proto:generate
+RUN mkdir -p lib/grpc && composer proto:generate
 
 # Install dependencies with production optimizations
 # Flags explained:
