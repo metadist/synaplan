@@ -96,19 +96,22 @@ make -C backend deps
 ```
 
 ### Frontend (Vue/TypeScript)
+
+**Note:** All frontend commands run inside Docker (via `docker compose exec frontend`).
+
 ```bash
 # Building
 # This is for production builds, usually we use the dev server at http://localhost:5173
-make -C frontend build                 # Build everything (app + widget)
+make -C frontend build         # Build everything (app + widget) in Docker
 # This should usually happen automatically via the frontend-widgets docker-compose service
-make -C frontend build-widget  # Build widget only
+make -C frontend build-widget  # Build widget only in Docker
 
 # Testing & Type Checking
-make -C frontend lint                  # Check types
-make -C frontend test                  # Run all tests
+make -C frontend lint          # Check types in Docker
+make -C frontend test          # Run all tests in Docker
 
 # Dependencies
-make -C frontend deps
+make -C frontend deps          # Install npm dependencies in Docker
 ```
 
 ### Git Operations
