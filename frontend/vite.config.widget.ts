@@ -2,6 +2,7 @@ import { defineConfig, Plugin } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import { fileURLToPath } from 'node:url'
 import { resolve } from 'path'
+import { gitkeepPlugin } from './vite.config'
 
 /**
  * Plugin to generate buildInfo.json for build verification (dev only)
@@ -63,7 +64,7 @@ function buildTimestampPlugin(mode: string): Plugin {
  * - See: https://vite.dev/config/build-options#build-watch
  */
 export default defineConfig(({ mode }) => ({
-  plugins: [vue(), buildTimestampPlugin(mode)],
+  plugins: [vue(), gitkeepPlugin(), buildTimestampPlugin(mode)],
 
   // Use relative base for chunks to be resolved relative to widget.js location
   base: './',

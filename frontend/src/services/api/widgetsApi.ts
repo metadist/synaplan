@@ -50,6 +50,7 @@ export interface UpdateWidgetRequest {
 export interface EmbedCodeResponse {
   success: boolean
   embedCode: string
+  legacyEmbedCode?: string
   wordpressShortcode: string
   widgetUrl: string
 }
