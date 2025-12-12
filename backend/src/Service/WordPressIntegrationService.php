@@ -64,10 +64,33 @@ class WordPressIntegrationService
 
         $this->verifyWordPressSite($verificationUrl, $verificationToken);
 
-        if ($this->userRepository->findByEmail($email)) {
-            throw new \RuntimeException('An account with this email already exists');
+        // Check if user already exists
+        $existingUser = $this->userRepository->findByEmail($email);
+
+        if ($existingUser) {
+            // User already exists - update WordPress verification details and continue
+            $this->logger->debug('WordPress wizard: Reusing existing user', [
+                'user_id' => $existingUser->getId(),
+            ]);
+
+            $userDetails = $existingUser->getUserDetails();
+            $userDetails['wordpress_verified'] = true;
+            $userDetails['wordpress_site'] = $siteUrl;
+            $existingUser->setUserDetails($userDetails);
+            $this->em->flush();
+
+            return [
+                'success' => true,
+                'data' => [
+                    'user_id' => $existingUser->getId(),
+                    'email' => $existingUser->getMail(),
+                    'site_verified' => true,
+                    'existing_user' => true,
+                ],
+            ];
         }
 
+        // Create new user
         $user = new User();
         $user->setMail($email);
         $user->setPw(password_hash($password, PASSWORD_BCRYPT));
@@ -103,6 +126,26 @@ class WordPressIntegrationService
     {
         $user = $this->requireUser($userId);
 
+        // Check if user already has a WordPress Plugin API key
+        $existingApiKeys = $this->apiKeyRepository->findBy(['ownerId' => $userId, 'status' => 'active']);
+        foreach ($existingApiKeys as $existingKey) {
+            if ($existingKey->getName() === 'WordPress Plugin') {
+                $this->logger->debug('WordPress wizard: Reusing existing API key', [
+                    'user_id' => $userId,
+                ]);
+
+                return [
+                    'success' => true,
+                    'data' => [
+                        'user_id' => $userId,
+                        'api_key' => $existingKey->getKey(),
+                        'existing_key' => true,
+                    ],
+                ];
+            }
+        }
+
+        // Create new API key
         $apiKey = new ApiKey();
         $apiKey->setOwner($user);
         $apiKey->setOwnerId($userId);
@@ -266,7 +309,39 @@ class WordPressIntegrationService
             'allowedDomains' => $domain ? [$domain] : [],
         ];
 
-        $widget = $this->widgetService->createWidget($user, $name, $promptTopic, $config);
+        // Check if user already has a widget (for WordPress users, reuse existing)
+        $existingWidgets = $this->widgetService->getWidgetsByUserId($userId);
+
+        if (!empty($existingWidgets)) {
+            // Update the first widget
+            $widget = $existingWidgets[0];
+            $this->widgetService->updateWidget($widget, $config);
+
+            $this->logger->debug('WordPress wizard: Updated existing widget', [
+                'user_id' => $userId,
+                'widget_id' => $widget->getWidgetId(),
+            ]);
+        } else {
+            // Create new widget with fixed widgetId "1" for WordPress compatibility
+            try {
+                $widget = $this->widgetService->createWidget($user, $name, $promptTopic, $config);
+
+                // Override the auto-generated widgetId with "1" for WordPress plugin compatibility
+                $widget->setWidgetId('1');
+                $this->em->flush();
+
+                $this->logger->info('WordPress wizard: Widget created', [
+                    'user_id' => $userId,
+                    'widget_id' => $widget->getWidgetId(),
+                ]);
+            } catch (\Throwable $e) {
+                $this->logger->error('WordPress wizard: Widget creation failed', [
+                    'user_id' => $userId,
+                    'error' => $e->getMessage(),
+                ]);
+                throw $e;
+            }
+        }
 
         return [
             'success' => true,
@@ -325,16 +400,21 @@ class WordPressIntegrationService
             $response = $this->httpClient->request('POST', $verificationUrl, [
                 'body' => ['token' => $token],
                 'headers' => ['Accept' => 'application/json'],
+                'timeout' => 10,
             ]);
             $status = $response->getStatusCode();
             $data = $response->toArray(false);
-        } catch (\Throwable $e) {
-            $this->logger->error('WordPress verification failed', ['error' => $e->getMessage()]);
-            throw new \RuntimeException('WordPress site verification failed: '.$e->getMessage());
-        }
 
-        if (200 !== $status || empty($data['verified'])) {
-            throw new \RuntimeException('WordPress site could not be verified');
+            if (200 !== $status || empty($data['verified'])) {
+                throw new \RuntimeException('WordPress site could not be verified (invalid response)');
+            }
+        } catch (\Throwable $e) {
+            $this->logger->error('WordPress site verification failed', [
+                'error' => $e->getMessage(),
+                'url' => $verificationUrl,
+            ]);
+
+            throw new \RuntimeException('WordPress site verification failed: '.$e->getMessage());
         }
     }
 
