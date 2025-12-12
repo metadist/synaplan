@@ -372,7 +372,9 @@
     "previous": "Previous",
     "delete": "Delete",
     "download": "Download",
-    "removeFile": "Remove file"
+    "removeFile": "Remove file",
+    "dropFiles": "Drop files here to upload",
+    "dropFilesHint": "Release to add files to the upload queue"
   },
   "fileSelection": {
     "title": "Select or Upload Files",

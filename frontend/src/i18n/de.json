@@ -688,7 +688,9 @@
     "next": "Weiter",
     "previous": "Zurück",
     "delete": "Löschen",
-    "download": "Herunterladen"
+    "download": "Herunterladen",
+    "dropFiles": "Dateien hier ablegen zum Hochladen",
+    "dropFilesHint": "Loslassen, um Dateien zur Upload-Warteschlange hinzuzufügen"
   },
   "fileSelection": {
     "title": "Dateien auswählen oder hochladen",
