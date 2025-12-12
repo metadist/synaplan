@@ -7,9 +7,9 @@ parameters:
     paths:
         - src
         - tests
+        - lib/grpc
     excludePaths:
         - src/Kernel.php
-        - lib/grpc
     doctrine:
         objectManagerLoader: tests/object-manager.php
 
