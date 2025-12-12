@@ -40,6 +40,7 @@ class SubscriptionController extends AbstractController
         private string $stripePriceTeam,
         private string $stripePriceBusiness,
         private string $frontendUrl,
+        private string $stripePaymentMethods,
     ) {
     }
 
@@ -224,9 +225,10 @@ class SubscriptionController extends AbstractController
 
             // Create checkout session
             // Note: Can't use both 'customer' and 'customer_email' - Stripe only allows one
+            $paymentMethods = array_filter(array_map('trim', explode(',', $this->stripePaymentMethods)));
             $session = \Stripe\Checkout\Session::create([
                 'customer' => $customerId,
-                'payment_method_types' => ['card', 'sepa_debit'],
+                'payment_method_types' => $paymentMethods,
                 'line_items' => [[
                     'price' => $priceId,
                     'quantity' => 1,

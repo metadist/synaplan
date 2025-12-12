@@ -3,6 +3,7 @@
 namespace App\Controller;
 
 use App\AI\Service\ProviderRegistry;
+use App\Service\WhisperService;
 use OpenApi\Attributes as OA;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -15,7 +16,7 @@ class HealthController extends AbstractController
     #[OA\Get(
         path: '/api/health',
         summary: 'Health check endpoint',
-        description: 'Returns system health status and available AI providers',
+        description: 'Returns system health status, AI providers, and Whisper.cpp availability',
         tags: ['Health']
     )]
     #[OA\Response(
@@ -40,20 +41,36 @@ class HealthController extends AbstractController
                         'ollama' => ['available' => true, 'message' => null],
                     ]
                 ),
+                new OA\Property(
+                    property: 'whisper',
+                    type: 'object',
+                    properties: [
+                        new OA\Property(property: 'available', type: 'boolean'),
+                        new OA\Property(property: 'models', type: 'array', items: new OA\Items(type: 'string')),
+                    ]
+                ),
             ]
         )
     )]
-    public function health(ProviderRegistry $registry): JsonResponse
+    public function health(ProviderRegistry $registry, WhisperService $whisperService): JsonResponse
     {
         $providers = [];
         foreach ($registry->getAllProviders() as $provider) {
             $providers[$provider->getName()] = $provider->getStatus();
         }
 
+        // Check Whisper.cpp availability
+        $whisperAvailable = $whisperService->isAvailable();
+        $whisperModels = $whisperAvailable ? $whisperService->getAvailableModels() : [];
+
         return $this->json([
             'status' => 'ok',
             'timestamp' => time(),
             'providers' => $providers,
+            'whisper' => [
+                'available' => $whisperAvailable,
+                'models' => $whisperModels,
+            ],
         ]);
     }
 }

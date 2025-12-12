@@ -130,20 +130,20 @@ services:
     App\Service\Message\MessageClassifier: ~
     App\Service\Message\InferenceRouter: ~
     App\Service\Message\MessageProcessor: ~
-    
+
     # Message Handlers
     App\Service\Message\Handler\ChatHandler:
         arguments:
             $uploadDir: '%kernel.project_dir%/var/uploads'
         tags:
             - { name: 'app.message.handler' }
-    
+
     App\Service\Message\Handler\MediaGenerationHandler:
         arguments:
             $uploadDir: '%kernel.project_dir%/var/uploads'
         tags:
             - { name: 'app.message.handler' }
-    
+
     App\Service\Message\Handler\FileAnalysisHandler:
         arguments:
             $uploadDir: '%kernel.project_dir%/var/uploads'
@@ -186,14 +186,14 @@ services:
             $googleClientSecret: '%env(GOOGLE_CLIENT_SECRET)%'
             $appUrl: '%env(APP_URL)%'
             $frontendUrl: '%env(FRONTEND_URL)%'
-    
+
     App\Controller\GitHubAuthController:
         arguments:
             $githubClientId: '%env(GITHUB_CLIENT_ID)%'
             $githubClientSecret: '%env(GITHUB_CLIENT_SECRET)%'
             $appUrl: '%env(APP_URL)%'
             $frontendUrl: '%env(FRONTEND_URL)%'
-    
+
     # OIDC Token Service for Keycloak integration
     App\Service\OidcTokenService:
         arguments:
@@ -210,7 +210,7 @@ services:
             $oidcDiscoveryUrl: '%env(OIDC_DISCOVERY_URL)%'
             $appUrl: '%env(APP_URL)%'
             $frontendUrl: '%env(FRONTEND_URL)%'
-    
+
     # Stripe Payment Controllers (with rate limiting via cache)
     App\Controller\SubscriptionController:
         arguments:
@@ -219,8 +219,9 @@ services:
             $stripePriceTeam: '%env(STRIPE_PRICE_TEAM)%'
             $stripePriceBusiness: '%env(STRIPE_PRICE_BUSINESS)%'
             $frontendUrl: '%env(FRONTEND_URL)%'
+            $stripePaymentMethods: '%env(STRIPE_PAYMENT_METHODS)%'
             $cache: '@cache.app'
-    
+
     App\Controller\StripeWebhookController:
         arguments:
             $stripeWebhookSecret: '%env(STRIPE_WEBHOOK_SECRET)%'
@@ -229,7 +230,7 @@ services:
             $stripePriceTeam: '%env(STRIPE_PRICE_TEAM)%'
             $stripePriceBusiness: '%env(STRIPE_PRICE_BUSINESS)%'
             $cache: '@cache.app'
-    
+
     # Auth Providers Controller (returns enabled providers)
     App\Controller\AuthProvidersController:
         arguments:
@@ -265,19 +266,19 @@ services:
     App\Service\File\FileStorageService:
         arguments:
             $uploadDir: '%kernel.project_dir%/var/uploads'
-    
+
     App\Controller\FileController:
         arguments:
             $uploadDir: '%kernel.project_dir%/var/uploads'
-    
+
     App\Controller\StreamController:
         arguments:
             $uploadDir: '%kernel.project_dir%/var/uploads'
-    
+
     App\Controller\FileServeController:
         arguments:
             $uploadDir: '%kernel.project_dir%/var/uploads'
-    
+
     App\Controller\StaticUploadController:
         arguments:
             $uploadDir: '%kernel.project_dir%/var/uploads'
