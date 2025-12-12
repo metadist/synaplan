@@ -440,6 +440,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, nextTick } from 'vue'
+import { useI18n } from 'vue-i18n'
 import MainLayout from '@/components/MainLayout.vue'
 import FileContentModal from '@/components/FileContentModal.vue'
 import ShareModal from '@/components/ShareModal.vue'
@@ -455,6 +456,7 @@ import {
 import filesService, { type FileItem } from '@/services/filesService'
 import { useNotification } from '@/composables/useNotification'
 
+const { t } = useI18n()
 const { success: showSuccess, error: showError, info: showInfo } = useNotification()
 
 const storageWidget = ref<InstanceType<typeof StorageQuotaWidget> | null>(null)

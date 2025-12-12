@@ -1,6 +1,6 @@
 <template>
-  <div 
-    class="sticky bottom-0 bg-chat-input-area pb-[env(safe-area-inset-bottom)]" 
+  <div
+    class="sticky bottom-0 bg-chat-input-area pb-[env(safe-area-inset-bottom)]"
     data-testid="comp-chat-input"
     @paste="handlePaste"
   >
@@ -13,9 +13,9 @@
           :key="'file-' + index"
           class="flex items-center gap-2 px-3 py-2 surface-chip rounded-lg"
         >
-          <Icon 
-            :icon="getFileIcon(file.file_type || file.name || '')" 
-            class="w-4 h-4" 
+          <Icon
+            :icon="getFileIcon(file.file_type || file.name || '')"
+            class="w-4 h-4"
           />
           <span class="text-sm txt-secondary">{{ file.filename || file.name }}</span>
           <span v-if="file.processing" class="text-xs txt-muted">(processing...)</span>
@@ -46,7 +46,7 @@
         </button>
       </div>
 
-      <div 
+      <div
         class="relative surface-card"
         @dragover.prevent="handleDragOver"
         @dragleave.prevent="handleDragLeave"
@@ -119,10 +119,10 @@
             :aria-label="$t('chatInput.voice')"
             data-testid="btn-chat-voice"
           >
-            <Icon 
-              v-if="isRecording" 
-              icon="mdi:stop" 
-              class="w-5 h-5 text-white" 
+            <Icon
+              v-if="isRecording"
+              icon="mdi:stop"
+              class="w-5 h-5 text-white"
             />
             <MicrophoneIcon v-else class="w-5 h-5" />
           </button>
@@ -146,7 +146,7 @@
 
       <!-- Main controls - always visible below input -->
       <div class="mt-3 flex items-center gap-2" data-testid="section-chat-secondary-actions">
-        <ToolsDropdown 
+        <ToolsDropdown
           :active-command="activeCommand"
           @insert-command="handleInsertCommand"
           class="flex-shrink-0"
@@ -273,25 +273,25 @@ const canSend = computed(() => {
   const hasMessage = trimmedMessage.length > 0
   const hasFiles = uploadedFiles.value.length > 0
   const filesReady = uploadedFiles.value.every(f => !f.processing)
-  
+
   // Prevent sending if only a command is present (e.g., just "/pic" without arguments)
   const isOnlyCommand = trimmedMessage.startsWith('/') && !trimmedMessage.includes(' ')
   if (isOnlyCommand && !hasFiles) {
     return false
   }
-  
+
   return (hasMessage || hasFiles) && filesReady && !uploading.value
 })
 
 const supportsReasoning = computed(() => {
   // Get the configured default model
   const currentModel = aiConfigStore.getCurrentModel('CHAT')
-  
+
   // If no model yet (store still loading), return false (button will be disabled)
   if (!currentModel) {
     return false
   }
-  
+
   // Check if model has reasoning capability
   return currentModel.features?.includes('reasoning') ?? false
 })
@@ -310,7 +310,7 @@ watch(message, (newValue) => {
     // Only show palette if no space (still typing command) or only command without args
     const hasSpace = newValue.includes(' ')
     const parsed = parseCommand(newValue)
-    
+
     if (parsed) {
       activeCommand.value = parsed.command
       // Hide palette if user has started typing arguments (command + space)
@@ -323,12 +323,12 @@ watch(message, (newValue) => {
     paletteVisible.value = false
     activeCommand.value = null
   }
-  
+
   // Auto-disable enhance if message has been edited (differs from enhanced version)
   if (enhanceEnabled.value && enhancedMessage.value) {
     const currentText = newValue.trim()
     const enhancedText = enhancedMessage.value.trim()
-    
+
     // If message is empty (deleted) or differs from enhanced version, disable enhance
     if (!currentText || currentText !== enhancedText) {
       enhanceEnabled.value = false
@@ -346,11 +346,11 @@ const sendMessage = () => {
 
   if (canSend.value) {
     const hasWebSearch = activeCommand.value === 'search'
-    
+
     // Send the full message with command to backend (it needs it for /pic and /vid)
     // The UI cleanup will happen in ChatView before adding to history
     const messageToSend = message.value
-    
+
     const options = {
       includeReasoning: thinkingEnabled.value,
       webSearch: hasWebSearch,
@@ -374,7 +374,7 @@ const toggleThinking = () => {
     warning(t('chatInput.reasoningNotSupported'))
     return
   }
-  
+
   thinkingEnabled.value = !thinkingEnabled.value
 }
 
@@ -510,7 +510,7 @@ const handlePaste = async (event: ClipboardEvent) => {
       await uploadFiles(filesToUpload)
       success(t('chatInput.filesPasted', { count: filesToUpload.length }))
     } catch (err) {
-      error(t('chatInput.uploadError'))
+      showError(t('chatInput.uploadError'))
     }
   }
   // If no files, let the default paste behavior handle text
@@ -518,7 +518,7 @@ const handlePaste = async (event: ClipboardEvent) => {
 
 const uploadFiles = async (files: File[]) => {
   uploading.value = true
-  
+
   for (const file of files) {
     // Add to UI immediately as "processing"
     const tempFile: UploadedFile = {
@@ -529,11 +529,11 @@ const uploadFiles = async (files: File[]) => {
       processing: true
     }
     uploadedFiles.value.push(tempFile)
-    
+
     try {
       // Upload to backend (PreProcessor extracts content automatically)
       const result = await chatApi.uploadChatFile(file)
-      
+
       // Update with real file_id
       const index = uploadedFiles.value.findIndex(f => f.name === file.name && f.processing)
       if (index !== -1) {
@@ -544,19 +544,19 @@ const uploadFiles = async (files: File[]) => {
           processing: false
         }
       }
-      
+
       // For audio files, show transcription info if available
       if (result.text) {
         const preview = result.text.substring(0, 50) + (result.text.length > 50 ? '...' : '')
         const languageInfo = result.language ? ` (${result.language})` : ''
         success(`🎙️ Audio transcribed${languageInfo}: "${preview}"`)
       }
-      
+
       console.log('✅ File uploaded and processed:', result)
     } catch (err: any) {
       console.error('❌ File upload failed:', err)
       showError(`File upload failed: ${err.message}`)
-      
+
       // Remove from list
       const index = uploadedFiles.value.findIndex(f => f.name === file.name)
       if (index !== -1) {
@@ -564,7 +564,7 @@ const uploadFiles = async (files: File[]) => {
       }
     }
   }
-  
+
   uploading.value = false
 }
 
@@ -617,27 +617,27 @@ const toggleRecording = async () => {
 
 const transcribeAudio = async (audioBlob: Blob) => {
   uploading.value = true
-  
+
   try {
     // Upload for transcription (WhisperCPP on backend)
     const result = await chatApi.transcribeAudio(audioBlob)
-    
+
     // CRITICAL: Add transcribed text directly to message input!
     if (result.text) {
       // Insert text with space separator if there's existing text
       message.value += (message.value ? ' ' : '') + result.text
-      
+
       // Show success notification with preview
       const preview = result.text.substring(0, 50) + (result.text.length > 50 ? '...' : '')
       const languageInfo = result.language ? ` (${result.language})` : ''
       success(`🎙️ Transcribed${languageInfo}: "${preview}"`)
-    
+
       console.log('✅ Audio transcribed:', {
         text_length: result.text.length,
         language: result.language,
         duration: result.duration
       })
-      
+
       // Focus textarea for immediate editing
       nextTick(() => {
         textareaRef.value?.focus()
@@ -684,12 +684,12 @@ const toggleEnhance = async () => {
     // If message was deleted or edited, don't restore
     const currentText = message.value.trim()
     const enhancedText = enhancedMessage.value.trim()
-    
+
     // Only restore if message still matches enhanced version (not empty, not edited)
     if (currentText && currentText === enhancedText) {
       message.value = originalMessage.value
     }
-    
+
     originalMessage.value = ''
     enhancedMessage.value = ''
     enhanceEnabled.value = false
