@@ -5,7 +5,6 @@ namespace App\Tests\Integration;
 use App\Service\WhisperService;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
-use Symfony\Component\Process\Process;
 
 /**
  * Integration tests for WhisperService.
@@ -66,7 +65,6 @@ class WhisperServiceIntegrationTest extends TestCase
     {
         $formats = $this->service->getSupportedFormats();
 
-        $this->assertIsArray($formats);
         $this->assertNotEmpty($formats);
 
         // Verify critical formats
@@ -91,7 +89,6 @@ class WhisperServiceIntegrationTest extends TestCase
 
         $models = $this->service->getAvailableModels();
 
-        $this->assertIsArray($models);
         // At minimum, 'base' model should exist in test environment
         $this->assertContains('base', $models, 'Base model should be available');
     }
@@ -109,7 +106,7 @@ class WhisperServiceIntegrationTest extends TestCase
         }
 
         // This is a slow test, so we'll skip it in quick test runs
-        if (getenv('QUICK_TESTS') === 'true') {
+        if ('true' === getenv('QUICK_TESTS')) {
             $this->markTestSkipped('Skipping slow integration test in quick mode');
         }
 
@@ -118,8 +115,6 @@ class WhisperServiceIntegrationTest extends TestCase
                 'model' => 'base',
                 'threads' => 2,
             ]);
-
-            $this->assertIsArray($result);
             $this->assertArrayHasKey('text', $result);
             $this->assertArrayHasKey('language', $result);
             $this->assertArrayHasKey('duration', $result);
@@ -156,7 +151,7 @@ class WhisperServiceIntegrationTest extends TestCase
             $this->markTestSkipped('Whisper is not available in this environment');
         }
 
-        if (getenv('QUICK_TESTS') === 'true') {
+        if ('true' === getenv('QUICK_TESTS')) {
             $this->markTestSkipped('Skipping slow integration test in quick mode');
         }
 
@@ -190,14 +185,13 @@ class WhisperServiceIntegrationTest extends TestCase
             $this->markTestSkipped('Whisper is not available in this environment');
         }
 
-        if (getenv('QUICK_TESTS') === 'true') {
+        if ('true' === getenv('QUICK_TESTS')) {
             $this->markTestSkipped('Skipping slow integration test in quick mode');
         }
 
         try {
             $result = $this->service->translateToEnglish($this->testAudioFile, ['model' => 'base']);
 
-            $this->assertIsArray($result);
             $this->assertArrayHasKey('text', $result);
             $this->assertIsString($result['text']);
         } catch (\RuntimeException $e) {

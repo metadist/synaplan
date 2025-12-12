@@ -98,7 +98,6 @@ class WhisperServiceTest extends TestCase
 
         $formats = $service->getSupportedFormats();
 
-        $this->assertIsArray($formats);
         $this->assertContains('mp3', $formats);
         $this->assertContains('wav', $formats);
         $this->assertContains('ogg', $formats);
