@@ -1,11 +1,39 @@
 <template>
   <MainLayout>
-    <div class="min-h-screen bg-chat p-4 md:p-8 overflow-y-auto scroll-thin" data-testid="page-files-upload">
+    <div
+      class="min-h-screen bg-chat p-4 md:p-8 overflow-y-auto scroll-thin"
+      data-testid="page-files-upload"
+    >
       <div class="max-w-7xl mx-auto space-y-6">
         <!-- Storage Quota Widget -->
         <StorageQuotaWidget ref="storageWidget" @upgrade="handleUpgrade" />
-        
-        <div class="surface-card p-6" data-testid="section-upload-form">
+
+        <div
+          class="surface-card p-6 relative"
+          data-testid="section-upload-form"
+          @dragenter.prevent="handleDragEnter"
+          @dragover.prevent="handleDragOver"
+          @dragleave="handleDragLeave"
+          @drop.prevent="handleDrop"
+        >
+          <!-- Drag & Drop Overlay -->
+          <Transition name="fade">
+            <div
+              v-if="isDragging"
+              class="absolute inset-0 z-50 flex items-center justify-center bg-primary/10 dark:bg-primary/20 backdrop-blur-sm border-4 border-dashed border-primary rounded-lg pointer-events-none"
+            >
+              <div class="flex flex-col items-center gap-4 p-8 surface-card rounded-xl shadow-2xl">
+                <div class="w-20 h-20 rounded-full bg-primary/20 flex items-center justify-center animate-bounce">
+                  <Icon icon="mdi:cloud-upload" class="w-10 h-10 text-primary" />
+                </div>
+                <div class="text-center">
+                  <p class="text-xl font-bold txt-primary mb-1">{{ $t('files.dropFiles') }}</p>
+                  <p class="text-sm txt-secondary">{{ $t('files.dropFilesHint') }}</p>
+                </div>
+              </div>
+            </div>
+          </Transition>
+
           <h1 class="text-2xl font-semibold txt-primary mb-6 flex items-center gap-2">
             <CloudArrowUpIcon class="w-6 h-6 text-[var(--brand)]" />
             {{ $t('files.uploadTitle') }}
@@ -94,7 +122,7 @@
               {{ $t('files.supportedFormats') }}
             </p>
             <p class="text-sm alert-info mt-3">
-              <strong class="alert-info-text">{{ $t('files.autoProcessingTitle') }}:</strong> 
+              <strong class="alert-info-text">{{ $t('files.autoProcessingTitle') }}:</strong>
               <span class="alert-info-text">{{ $t('files.autoProcessingInfo') }}</span>
             </p>
           </div>
@@ -412,6 +440,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, nextTick } from 'vue'
+import { useI18n } from 'vue-i18n'
 import MainLayout from '@/components/MainLayout.vue'
 import FileContentModal from '@/components/FileContentModal.vue'
 import ShareModal from '@/components/ShareModal.vue'
@@ -427,6 +456,7 @@ import {
 import filesService, { type FileItem } from '@/services/filesService'
 import { useNotification } from '@/composables/useNotification'
 
+const { t } = useI18n()
 const { success: showSuccess, error: showError, info: showInfo } = useNotification()
 
 const storageWidget = ref<InstanceType<typeof StorageQuotaWidget> | null>(null)
@@ -443,6 +473,10 @@ const currentPage = ref(1)
 const itemsPerPage = 10
 const isUploading = ref(false)
 const isLoading = ref(false)
+
+// Drag & Drop state
+const isDragging = ref(false)
+const dragCounter = ref(0)
 
 // GroupKey management
 const fileGroupKeys = ref<Record<number, { groupKey: string | null; isVectorized: boolean; chunks: number; status: string }>>({})
@@ -473,7 +507,7 @@ const totalPages = computed(() => {
 const paginatedFiles = computed(() => files.value)
 
 const allSelected = computed(() => {
-  return paginatedFiles.value.length > 0 && 
+  return paginatedFiles.value.length > 0 &&
          paginatedFiles.value.every(file => selectedFileIds.value.includes(file.id))
 })
 
@@ -488,9 +522,44 @@ const removeSelectedFile = (index: number) => {
   selectedFiles.value.splice(index, 1)
 }
 
+// Drag & Drop handlers
+const handleDragEnter = (event: DragEvent) => {
+  // Check if dragging files
+  if (event.dataTransfer?.types.includes('Files')) {
+    dragCounter.value++
+    isDragging.value = true
+  }
+}
+
+const handleDragOver = (event: DragEvent) => {
+  // Just prevent default to allow drop, don't change state here
+  event.preventDefault()
+}
+
+const handleDragLeave = (_event: DragEvent) => {
+  dragCounter.value--
+  // Only hide overlay when truly leaving the area
+  if (dragCounter.value <= 0) {
+    dragCounter.value = 0
+    isDragging.value = false
+  }
+}
+
+const handleDrop = async (event: DragEvent) => {
+  dragCounter.value = 0
+  isDragging.value = false
+
+  const files = event.dataTransfer?.files
+  if (files && files.length > 0) {
+    // Add dropped files to selectedFiles array
+    selectedFiles.value = [...selectedFiles.value, ...Array.from(files)]
+    showSuccess(t('files.filesAddedToQueue', { count: files.length }))
+  }
+}
+
 const getFileIcon = (filename: string): string => {
   const ext = filename.split('.').pop()?.toLowerCase() || ''
-  
+
   const iconMap: Record<string, string> = {
     'pdf': 'heroicons:document-text',
     'docx': 'heroicons:document-text',
@@ -506,7 +575,7 @@ const getFileIcon = (filename: string): string => {
     'xlsx': 'heroicons:table-cells',
     'csv': 'heroicons:table-cells'
   }
-  
+
   return iconMap[ext] || 'heroicons:document'
 }
 
@@ -517,9 +586,9 @@ const uploadFiles = async () => {
   }
 
   const groupKey = selectedGroup.value || groupKeyword.value || 'DEFAULT'
-  
+
   isUploading.value = true
-  
+
   try {
     const result = await filesService.uploadFiles({
       files: selectedFiles.value,
@@ -529,7 +598,7 @@ const uploadFiles = async () => {
 
     if (result.success) {
       showSuccess(`Successfully uploaded ${result.files.length} file(s)`)
-      
+
       // Show processing details
       result.files.forEach(file => {
         const details = `${file.filename}: ${file.extracted_text_length} chars extracted, ${file.chunks_created || 0} chunks created`
@@ -568,7 +637,7 @@ const handleUpgrade = () => {
 
 const loadFiles = async (page = currentPage.value) => {
   isLoading.value = true
-  
+
   try {
     const response = await filesService.listFiles(
       filterGroup.value || undefined,
@@ -579,12 +648,12 @@ const loadFiles = async (page = currentPage.value) => {
     files.value = response.files
     totalCount.value = response.pagination.total
     currentPage.value = response.pagination.page
-    
+
     // Load groupKeys for all loaded files
     await loadAllFileGroupKeys()
   } catch (error: any) {
     console.error('Failed to load files:', error)
-    
+
     // Handle 401 (not authenticated) gracefully
     if (error.message && error.message.includes('401')) {
       // Silently fail - router should redirect to login
@@ -603,7 +672,7 @@ const loadFileGroups = async () => {
     fileGroups.value = await filesService.getFileGroups()
   } catch (error: any) {
     console.error('Failed to load file groups:', error)
-    
+
     // Handle 401 (not authenticated) gracefully
     if (error.message && error.message.includes('401')) {
       // Silently fail - router should redirect to login
@@ -652,7 +721,7 @@ const deleteSelected = async () => {
 
   try {
     const results = await filesService.deleteMultipleFiles(selectedFileIds.value)
-    
+
     const successCount = results.filter(r => r.success).length
     const failCount = results.filter(r => !r.success).length
 
@@ -683,7 +752,7 @@ const deleteFile = (fileId: number) => {
 
 const confirmDelete = async () => {
   if (!fileToDelete.value) return
-  
+
   try {
     await filesService.deleteFile(fileToDelete.value)
     showSuccess('File deleted successfully')
@@ -822,12 +891,12 @@ const saveGroupKey = async (fileId: number) => {
   try {
     await filesService.updateFileGroupKey(fileId, tempGroupKey.value.trim())
     showSuccess('GroupKey updated successfully!')
-    
+
     // Reload the groupKey for this file
     await loadFileGroupKey(fileId)
-    
+
     cancelEditGroupKey()
-    
+
     // Reload file groups to update the dropdown
     await loadFileGroups()
   } catch (err: any) {
@@ -841,17 +910,17 @@ const saveGroupKey = async (fileId: number) => {
  */
 const reVectorize = async (fileId: number) => {
   const groupKey = tempGroupKey.value || 'DEFAULT'
-  
+
   try {
     showInfo('Re-vectorizing file... This may take a moment.')
-    
+
     const result = await filesService.reVectorizeFile(fileId, groupKey)
-    
+
     showSuccess(`File re-vectorized! Created ${result.chunksCreated} chunks from ${result.extractedTextLength} characters.`)
-    
+
     // Reload the groupKey for this file
     await loadFileGroupKey(fileId)
-    
+
     // Reload file groups
     await loadFileGroups()
   } catch (err: any) {
@@ -867,3 +936,15 @@ onMounted(async () => {
   await loadAllFileGroupKeys()
 })
 </script>
+
+<style scoped>
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.2s ease;
+}
+
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+}
+</style>

@@ -30,10 +30,18 @@ class WidgetService
      */
     public function createWidget(User $owner, string $name, string $taskPromptTopic, array $config = []): Widget
     {
-        // Validate task prompt exists
+        // Validate task prompt exists (check user-specific first, then default)
         $prompt = $this->promptRepository->findByTopic($taskPromptTopic, $owner->getId());
         if (!$prompt) {
-            throw new \InvalidArgumentException('Task prompt not found: '.$taskPromptTopic);
+            // Try default prompt (BOWNERID = 0)
+            $prompt = $this->promptRepository->findByTopic($taskPromptTopic, 0);
+            if (!$prompt) {
+                throw new \InvalidArgumentException('Task prompt not found: '.$taskPromptTopic);
+            }
+            $this->logger->info('Using default prompt for widget', [
+                'prompt_topic' => $taskPromptTopic,
+                'owner_id' => $owner->getId(),
+            ]);
         }
 
         $widget = new Widget();
@@ -62,34 +70,17 @@ class WidgetService
     public function updateWidget(Widget $widget, array $config): void
     {
         $currentConfig = $widget->getConfig();
-
-        $this->logger->info('🔧 WidgetService::updateWidget', [
-            'widget_id' => $widget->getWidgetId(),
-            'current_config' => $currentConfig,
-            'incoming_config' => $config,
-        ]);
-
         $mergedConfig = array_replace($currentConfig, $config);
-
-        $this->logger->info('🔧 After merge', [
-            'merged_config' => $mergedConfig,
-        ]);
-
         $sanitizedConfig = $this->sanitizeConfig($mergedConfig);
-
-        $this->logger->info('🔧 After sanitize', [
-            'sanitized_config' => $sanitizedConfig,
-            'allowedDomains' => $sanitizedConfig['allowedDomains'] ?? [],
-        ]);
 
         $widget->setConfig($sanitizedConfig);
         $widget->setAllowedDomains($sanitizedConfig['allowedDomains'] ?? []);
         $widget->touch();
         $this->em->flush();
 
-        $this->logger->info('Widget updated', [
+        $this->logger->debug('Widget configuration updated', [
             'widget_id' => $widget->getWidgetId(),
-            'final_allowedDomains' => $widget->getAllowedDomains(),
+            'allowed_domains' => $widget->getAllowedDomains(),
         ]);
     }
 

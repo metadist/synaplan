@@ -64,10 +64,33 @@ class WordPressIntegrationService
 
         $this->verifyWordPressSite($verificationUrl, $verificationToken);
 
-        if ($this->userRepository->findByEmail($email)) {
-            throw new \RuntimeException('An account with this email already exists');
+        // Check if user already exists
+        $existingUser = $this->userRepository->findByEmail($email);
+
+        if ($existingUser) {
+            // User already exists - update WordPress verification details and continue
+            $this->logger->debug('WordPress wizard: Reusing existing user', [
+                'user_id' => $existingUser->getId(),
+            ]);
+
+            $userDetails = $existingUser->getUserDetails();
+            $userDetails['wordpress_verified'] = true;
+            $userDetails['wordpress_site'] = $siteUrl;
+            $existingUser->setUserDetails($userDetails);
+            $this->em->flush();
+
+            return [
+                'success' => true,
+                'data' => [
+                    'user_id' => $existingUser->getId(),
+                    'email' => $existingUser->getMail(),
+                    'site_verified' => true,
+                    'existing_user' => true,
+                ],
+            ];
         }
 
+        // Create new user
         $user = new User();
         $user->setMail($email);
         $user->setPw(password_hash($password, PASSWORD_BCRYPT));
@@ -103,6 +126,26 @@ class WordPressIntegrationService
     {
         $user = $this->requireUser($userId);
 
+        // Check if user already has a WordPress Plugin API key
+        $existingApiKeys = $this->apiKeyRepository->findBy(['ownerId' => $userId, 'status' => 'active']);
+        foreach ($existingApiKeys as $existingKey) {
+            if ('WordPress Plugin' === $existingKey->getName()) {
+                $this->logger->debug('WordPress wizard: Reusing existing API key', [
+                    'user_id' => $userId,
+                ]);
+
+                return [
+                    'success' => true,
+                    'data' => [
+                        'user_id' => $userId,
+                        'api_key' => $existingKey->getKey(),
+                        'existing_key' => true,
+                    ],
+                ];
+            }
+        }
+
+        // Create new API key
         $apiKey = new ApiKey();
         $apiKey->setOwner($user);
         $apiKey->setOwnerId($userId);
@@ -226,29 +269,79 @@ class WordPressIntegrationService
     {
         $user = $this->requireUser($userId);
 
-        $name = trim((string) ($payload['widget_name'] ?? 'WordPress Chat Widget'));
-        $promptTopic = trim((string) ($payload['task_prompt_topic'] ?? 'general'));
-        $siteUrl = trim((string) ($payload['site_url'] ?? ''));
+        // Support both camelCase (legacy WordPress plugin) and snake_case (new API) parameters
+        $name = trim((string) ($payload['widget_name'] ?? $payload['widgetName'] ?? 'WordPress Chat Widget'));
+        $promptTopic = trim((string) (
+            $payload['task_prompt_topic'] ??
+            $payload['widgetPrompt'] ?? // WordPress plugin uses this
+            $payload['prompt'] ?? // Alternative
+            'general'
+        ));
+
+        // Get site_url from payload or fallback to user details
+        $siteUrl = trim((string) ($payload['site_url'] ?? $payload['siteUrl'] ?? ''));
+        if (empty($siteUrl)) {
+            $userDetails = $user->getUserDetails();
+            $siteUrl = $userDetails['wordpress_site'] ?? '';
+        }
         $domain = $this->extractHostFromUrl($siteUrl);
 
+        // Extract integration type (support both naming conventions)
+        $integrationType = $payload['integration_type'] ?? $payload['integrationType'] ?? 'floating-button';
+
         $config = [
-            'position' => $payload['position'] ?? 'bottom-right',
-            'primaryColor' => $payload['primary_color'] ?? '#007bff',
-            'iconColor' => $payload['icon_color'] ?? '#ffffff',
-            'defaultTheme' => $payload['default_theme'] ?? 'light',
-            'autoOpen' => (bool) ($payload['auto_open'] ?? false),
-            'autoMessage' => $payload['auto_message'] ?? 'Hello! How can I help you today?',
-            'allowFileUpload' => (bool) ($payload['allow_file_upload'] ?? false),
-            'fileUploadLimit' => (int) ($payload['file_upload_limit'] ?? 3),
-            'messageLimit' => (int) ($payload['message_limit'] ?? 50),
-            'maxFileSize' => (int) ($payload['max_file_size'] ?? 10),
-            'integrationType' => $payload['integration_type'] ?? 'floating-button',
-            'inlinePlaceholder' => $payload['inline_placeholder'] ?? 'Ask me anything...',
-            'inlineButtonText' => $payload['inline_button_text'] ?? 'Ask',
+            'position' => $payload['position'] ?? $payload['widgetPosition'] ?? 'bottom-right',
+            'primaryColor' => $payload['primary_color'] ?? $payload['widgetColor'] ?? '#007bff',
+            'iconColor' => $payload['icon_color'] ?? $payload['widgetIconColor'] ?? '#ffffff',
+            'defaultTheme' => $payload['default_theme'] ?? $payload['defaultTheme'] ?? 'light',
+            'autoOpen' => (bool) ($payload['auto_open'] ?? $payload['autoOpen'] ?? false),
+            'autoMessage' => $payload['auto_message'] ?? $payload['autoMessage'] ?? 'Hello! How can I help you today?',
+            'allowFileUpload' => (bool) ($payload['allow_file_upload'] ?? $payload['allowFileUpload'] ?? false),
+            'fileUploadLimit' => (int) ($payload['file_upload_limit'] ?? $payload['fileUploadLimit'] ?? 3),
+            'messageLimit' => (int) ($payload['message_limit'] ?? $payload['messageLimit'] ?? 50),
+            'maxFileSize' => (int) ($payload['max_file_size'] ?? $payload['maxFileSize'] ?? 10),
+            'integrationType' => $integrationType,
+            'inlinePlaceholder' => $payload['inline_placeholder'] ?? $payload['inlinePlaceholder'] ?? 'Ask me anything...',
+            'inlineButtonText' => $payload['inline_button_text'] ?? $payload['inlineButtonText'] ?? 'Ask',
+            'inlineFontSize' => (int) ($payload['inline_font_size'] ?? $payload['inlineFontSize'] ?? 16),
+            'inlineTextColor' => $payload['inline_text_color'] ?? $payload['inlineTextColor'] ?? '#212529',
+            'inlineBorderRadius' => (int) ($payload['inline_border_radius'] ?? $payload['inlineBorderRadius'] ?? 8),
             'allowedDomains' => $domain ? [$domain] : [],
         ];
 
-        $widget = $this->widgetService->createWidget($user, $name, $promptTopic, $config);
+        // Check if user already has a widget (for WordPress users, reuse existing)
+        $existingWidgets = $this->widgetService->getWidgetsByUserId($userId);
+
+        if (!empty($existingWidgets)) {
+            // Update the first widget
+            $widget = $existingWidgets[0];
+            $this->widgetService->updateWidget($widget, $config);
+
+            $this->logger->debug('WordPress wizard: Updated existing widget', [
+                'user_id' => $userId,
+                'widget_id' => $widget->getWidgetId(),
+            ]);
+        } else {
+            // Create new widget with fixed widgetId "1" for WordPress compatibility
+            try {
+                $widget = $this->widgetService->createWidget($user, $name, $promptTopic, $config);
+
+                // Override the auto-generated widgetId with "1" for WordPress plugin compatibility
+                $widget->setWidgetId('1');
+                $this->em->flush();
+
+                $this->logger->info('WordPress wizard: Widget created', [
+                    'user_id' => $userId,
+                    'widget_id' => $widget->getWidgetId(),
+                ]);
+            } catch (\Throwable $e) {
+                $this->logger->error('WordPress wizard: Widget creation failed', [
+                    'user_id' => $userId,
+                    'error' => $e->getMessage(),
+                ]);
+                throw $e;
+            }
+        }
 
         return [
             'success' => true,
@@ -301,16 +394,21 @@ class WordPressIntegrationService
             $response = $this->httpClient->request('POST', $verificationUrl, [
                 'body' => ['token' => $token],
                 'headers' => ['Accept' => 'application/json'],
+                'timeout' => 10,
             ]);
             $status = $response->getStatusCode();
             $data = $response->toArray(false);
-        } catch (\Throwable $e) {
-            $this->logger->error('WordPress verification failed', ['error' => $e->getMessage()]);
-            throw new \RuntimeException('WordPress site verification failed: '.$e->getMessage());
-        }
 
-        if (200 !== $status || empty($data['verified'])) {
-            throw new \RuntimeException('WordPress site could not be verified');
+            if (200 !== $status || empty($data['verified'])) {
+                throw new \RuntimeException('WordPress site could not be verified (invalid response)');
+            }
+        } catch (\Throwable $e) {
+            $this->logger->error('WordPress site verification failed', [
+                'error' => $e->getMessage(),
+                'url' => $verificationUrl,
+            ]);
+
+            throw new \RuntimeException('WordPress site verification failed: '.$e->getMessage());
         }
     }
 

@@ -103,6 +103,9 @@
     "thinking": "Thinking",
     "reasoningNotSupported": "Your current chat model does not support reasoning. Please select a reasoning-capable model (GPT-5, o3, DeepSeek-R1) in AI Config → Models.",
     "voice": "Start voice",
+    "dropFiles": "Drop files here",
+    "dropFilesHint": "Images, documents, audio files...",
+    "filesPasted": "{count} file pasted | {count} files pasted",
     "send": "Send message",
     "share": "Share",
     "tools": {
@@ -369,7 +372,10 @@
     "previous": "Previous",
     "delete": "Delete",
     "download": "Download",
-    "removeFile": "Remove file"
+    "removeFile": "Remove file",
+    "dropFiles": "Drop files here to upload",
+    "dropFilesHint": "Release to add files to the upload queue",
+    "filesAddedToQueue": "{count} file added - ready to upload | {count} files added - ready to upload"
   },
   "fileSelection": {
     "title": "Select or Upload Files",

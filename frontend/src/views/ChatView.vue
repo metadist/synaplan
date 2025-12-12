@@ -3,7 +3,32 @@
     <template #header>
     </template>
 
-    <div class="flex flex-col h-full" data-testid="page-chat">
+    <div 
+      class="flex flex-col h-full relative" 
+      data-testid="page-chat"
+      @dragenter.prevent="handleDragEnter"
+      @dragover.prevent="handleDragOver"
+      @dragleave="handleDragLeave"
+      @drop.prevent="handleDrop"
+    >
+      <!-- Drag & Drop Overlay - covers entire chat area -->
+      <Transition name="fade">
+        <div 
+          v-if="isDragging" 
+          class="absolute inset-0 z-50 flex items-center justify-center bg-primary/10 dark:bg-primary/20 backdrop-blur-sm border-2 border-dashed border-primary rounded-lg pointer-events-none"
+        >
+          <div class="flex flex-col items-center gap-3 p-6 surface-card rounded-xl shadow-lg">
+            <div class="w-16 h-16 rounded-full bg-primary/20 flex items-center justify-center">
+              <Icon icon="mdi:cloud-upload" class="w-8 h-8 text-primary" />
+            </div>
+            <div class="text-center">
+              <p class="text-lg font-semibold txt-primary">{{ $t('chatInput.dropFiles') }}</p>
+              <p class="text-sm txt-secondary mt-1">{{ $t('chatInput.dropFilesHint') }}</p>
+            </div>
+          </div>
+        </div>
+      </Transition>
+
       <div ref="chatContainer" class="flex-1 overflow-y-auto bg-chat" @scroll="handleScroll" data-testid="section-messages">
         <div class="max-w-4xl mx-auto py-6">
           <!-- Loading indicator for infinite scroll -->
@@ -90,6 +115,7 @@
 <script setup lang="ts">
 import { ref, computed, nextTick, watch, onMounted, onBeforeUnmount } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { Icon } from '@iconify/vue'
 import MainLayout from '@/components/MainLayout.vue'
 import ChatInput from '@/components/ChatInput.vue'
 import ChatMessage from '@/components/ChatMessage.vue'
@@ -112,6 +138,8 @@ const { showLimitModal, limitData, checkAndShowLimit, closeLimitModal } = useLim
 const chatContainer = ref<HTMLElement | null>(null)
 const chatInputRef = ref<InstanceType<typeof ChatInput> | null>(null)
 const autoScroll = ref(true)
+const isDragging = ref(false)
+const dragCounter = ref(0)
 const historyStore = useHistoryStore()
 const chatsStore = useChatsStore()
 const modelsStore = useModelsStore()
@@ -258,6 +286,38 @@ const scrollToBottom = () => {
         chatContainer.value.scrollTop = chatContainer.value.scrollHeight
       }
     })
+  }
+}
+
+// Drag & Drop handlers for file upload
+const handleDragEnter = (event: DragEvent) => {
+  // Check if dragging files
+  if (event.dataTransfer?.types.includes('Files')) {
+    dragCounter.value++
+    isDragging.value = true
+  }
+}
+
+const handleDragOver = (event: DragEvent) => {
+  // Just prevent default to allow drop, don't change state here
+  event.preventDefault()
+}
+
+const handleDragLeave = (_event: DragEvent) => {
+  dragCounter.value--
+  // Only hide overlay when truly leaving the area
+  if (dragCounter.value <= 0) {
+    dragCounter.value = 0
+    isDragging.value = false
+  }
+}
+
+const handleDrop = async (event: DragEvent) => {
+  dragCounter.value = 0
+  isDragging.value = false
+  const files = event.dataTransfer?.files
+  if (files && files.length > 0 && chatInputRef.value) {
+    await chatInputRef.value.uploadFiles(Array.from(files))
   }
 }
 
@@ -1174,3 +1234,16 @@ const handleRetryMessage = async (message: Message, content: string) => {
   await streamAIResponse(content)
 }
 </script>
+
+<style scoped>
+/* Fade transition for drag overlay */
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.2s ease;
+}
+
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+}
+</style>
