@@ -6,6 +6,10 @@ parameters:
     # Synaplan public URL
     synaplan_url: '%env(SYNAPLAN_URL)%'
 
+    # Logging
+    env(LOG_FORMAT): ''
+    default_log_format: 'json'
+
 services:
     _defaults:
         autowire: true
@@ -306,3 +310,13 @@ services:
             $minChunkSize: 100
 
     App\Service\File\VectorizationService: ~
+
+    # Monolog Formatter Factory (for env-based log format switching)
+    App\Service\MonologFormatterFactory:
+        arguments:
+            $logFormat: '%env(default:default_log_format:LOG_FORMAT)%'
+
+    # Monolog formatter service created by factory
+    app.monolog_formatter:
+        class: Monolog\Formatter\FormatterInterface
+        factory: ['@App\Service\MonologFormatterFactory', 'createFormatter']

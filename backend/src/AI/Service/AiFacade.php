@@ -250,16 +250,16 @@ class AiFacade
     {
         $providerWasExplicit = array_key_exists('provider', $options);
         $requestedProvider = $options['provider'] ?? $this->modelConfig->getDefaultProvider($userId, 'pic2text');
-        $requestedProvider = $requestedProvider ?: 'test';
-        $normalizedRequested = strtolower($requestedProvider);
+        // Don't default to 'test' - let real providers be tried first via fallback logic
+        $normalizedRequested = $requestedProvider ? strtolower($requestedProvider) : null;
 
         $candidates = [];
 
         // Prefer explicitly requested provider first (unless it is the dummy test provider)
-        if ($providerWasExplicit && $requestedProvider) {
+        if ($providerWasExplicit && $requestedProvider && 'test' !== $normalizedRequested) {
             $candidates[] = [
                 'name' => $requestedProvider,
-                'requireCapability' => 'test' !== $normalizedRequested,
+                'requireCapability' => true,
             ];
         } elseif ($requestedProvider && 'test' !== $normalizedRequested) {
             $candidates[] = [
@@ -274,7 +274,7 @@ class AiFacade
             'options' => $options,
         ]);
 
-        // Add all available real providers next
+        // Add all available real providers next (ALWAYS - even if a provider was requested)
         $fallbackRequireCapability = true;
         $fallbackProviders = $this->registry->getAvailableProviders('vision', includeTest: false, requireCapability: true);
 
@@ -299,9 +299,12 @@ class AiFacade
             ];
         }
 
-        // Always keep TestProvider as last resort
-        $existingProviders = array_map(fn ($c) => strtolower($c['name']), $candidates);
-        if (!in_array('test', $existingProviders, true)) {
+        // Only add TestProvider as last resort if NO real providers are available
+        // TestProvider should NEVER be used in production for actual file analysis
+        if (empty($candidates)) {
+            $this->logger->warning('AI vision: No real providers available, falling back to TestProvider (development only)', [
+                'user_id' => $userId,
+            ]);
             $candidates[] = [
                 'name' => 'test',
                 'requireCapability' => false,

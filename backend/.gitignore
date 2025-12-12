@@ -42,3 +42,6 @@ env.example.txt
 README_SETUP.md
 public/uploads/*
 public/widget.js
+
+# gRPC generated files (generated via composer proto:generate)
+/lib/grpc/

@@ -131,54 +131,13 @@ export const chatApi = {
         }
 
         const url = `${baseUrl}&token=${token}`
-
-        // First, do a preflight check to catch HTTP errors (like 429 rate limit)
-        // before opening EventSource (which can't read HTTP status codes)
-        const response = await fetch(url, { 
-          method: 'GET', 
-          headers: { 'Accept': 'text/event-stream' }, 
-          credentials: 'include' 
-        })
-
-        if (!response.ok) {
-          // Try to parse the error response
-          const contentType = response.headers.get('content-type')
-          if (contentType?.includes('application/json')) {
-            const errorData = await response.json()
-            console.error('🚫 Stream preflight error:', response.status, errorData)
-            
-            // Handle rate limit error specially
-            if (response.status === 429 || errorData.error?.toLowerCase().includes('rate limit')) {
-              onUpdate({
-                status: 'error',
-                error: 'Rate limit exceeded',
-                limit_type: errorData.limit_type || 'lifetime',
-                action_type: errorData.action_type || 'MESSAGES',
-                limit: errorData.limit,
-                used: errorData.used,
-                remaining: errorData.remaining,
-                reset_at: errorData.reset_at,
-                user_level: errorData.user_level,
-                phone_verified: errorData.phone_verified
-              })
-              return
-            }
-            
-            onUpdate({ status: 'error', error: errorData.error || 'Request failed' })
-            return
-          }
-          
-          onUpdate({ status: 'error', error: `HTTP Error: ${response.status}` })
-          return
-        }
-        
-        // Response is OK, but we already consumed it with fetch
-        // Abort this response and open EventSource
-        response.body?.cancel()
         
         if (isStopped) return
         
-        // Now open the actual EventSource
+        // Open EventSource directly - no preflight check!
+        // The preflight fetch was causing duplicate messages because it triggered
+        // the backend to save the user message, and then EventSource did it again.
+        // Rate limit errors are now handled via SSE error events from backend.
         eventSource = new EventSource(url)
         
         eventSource.onopen = () => {
@@ -248,80 +207,6 @@ export const chatApi = {
     // Return cleanup function that sets the stop flag and closes connection
     return () => {
       console.log('🛑 Closing EventSource and setting stop flag')
-      isStopped = true
-      eventSource?.close()
-    }
-  },
-
-  // Legacy streamMessage that doesn't use preflight check (for reference)
-  streamMessageLegacy(
-    userId: number,
-    message: string,
-    trackId: number | undefined,
-    chatId: number,
-    onUpdate: (data: any) => void,
-    includeReasoning: boolean = false,
-    webSearch: boolean = false,
-    modelId?: number,
-    fileIds?: number[]
-  ): () => void {
-    const paramsObj: Record<string, string> = {
-      message,
-      chatId: chatId.toString(),
-      userId: userId.toString()
-    }
-    if (trackId) paramsObj.trackId = trackId.toString()
-    if (includeReasoning) paramsObj.reasoning = '1'
-    if (webSearch) paramsObj.webSearch = '1'
-    if (modelId) paramsObj.modelId = modelId.toString()
-    if (fileIds && fileIds.length > 0) paramsObj.fileIds = fileIds.join(',')
-    const params = new URLSearchParams(paramsObj)
-    const baseUrl = `${API_BASE_URL}/api/v1/messages/stream?${params}`
-
-    let eventSource: EventSource | null = null
-    let completionReceived = false
-    let isStopped = false
-
-    getSseToken().then((token) => {
-      if (isStopped || !token) {
-        onUpdate({ status: 'error', error: 'Authentication required' })
-        return
-      }
-
-      const url = `${baseUrl}&token=${token}`
-      eventSource = new EventSource(url)
-
-      eventSource.onopen = () => {
-        console.log('✅ SSE connection opened (legacy)')
-      }
-
-      eventSource.onmessage = (event) => {
-        if (isStopped) return
-        try {
-          const data = JSON.parse(event.data)
-          onUpdate(data)
-          if (data.status === 'complete' || data.status === 'error') {
-            completionReceived = true
-            eventSource?.close()
-          }
-        } catch (error) {
-          console.error('Failed to parse SSE data:', error)
-        }
-      }
-
-      eventSource.onerror = () => {
-        if (isStopped || completionReceived) {
-          eventSource?.close()
-          return
-        }
-        if (eventSource?.readyState === EventSource.CLOSED) {
-          onUpdate({ status: 'complete', message: 'Response complete', metadata: {} })
-        }
-        eventSource?.close()
-      }
-    })
-
-    return () => {
       isStopped = true
       eventSource?.close()
     }
