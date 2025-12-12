@@ -388,7 +388,7 @@ class ConfigController extends AbstractController
 
     /**
      * Get status of all features and services (Web Search, AI Providers, Processing Services, etc.)
-     * Only available in development mode.
+     * Available for admins in all environments.
      */
     #[Route('/features', name: 'features_status', methods: ['GET'])]
     public function getFeaturesStatus(#[CurrentUser] ?User $user): JsonResponse
@@ -397,13 +397,15 @@ class ConfigController extends AbstractController
             return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
         }
 
-        // Only allow in development mode
-        $env = $_ENV['APP_ENV'] ?? 'prod';
-        if ('dev' !== $env) {
-            return $this->json(['error' => 'Feature only available in development mode'], Response::HTTP_FORBIDDEN);
+        // Only allow for admins
+        if (!in_array('ROLE_ADMIN', $user->getRoles())) {
+            return $this->json(['error' => 'Admin access required'], Response::HTTP_FORBIDDEN);
         }
 
         $features = [];
+
+        // Get environment for test provider filtering
+        $env = $_ENV['APP_ENV'] ?? 'prod';
 
         // ========== AI Features ==========
 

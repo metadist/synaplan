@@ -151,18 +151,6 @@ parameters:
 			path: src/Controller/ConfigController.php
 
 		-
-			message: '#^Result of && is always false\.$#'
-			identifier: booleanAnd.alwaysFalse
-			count: 1
-			path: src/Controller/ConfigController.php
-
-		-
-			message: '#^Strict comparison using \!\=\= between ''dev'' and ''dev'' will always evaluate to false\.$#'
-			identifier: notIdentical.alwaysFalse
-			count: 1
-			path: src/Controller/ConfigController.php
-
-		-
 			message: '#^Expression on left side of \?\? is not nullable\.$#'
 			identifier: nullCoalesce.expr
 			count: 3
