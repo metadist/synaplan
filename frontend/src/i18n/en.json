@@ -105,7 +105,7 @@
     "voice": "Start voice",
     "dropFiles": "Drop files here",
     "dropFilesHint": "Images, documents, audio files...",
-    "filesPasted": "{count} file(s) pasted | {count} file(s) pasted",
+    "filesPasted": "{count} file pasted | {count} files pasted",
     "send": "Send message",
     "share": "Share",
     "tools": {
@@ -374,7 +374,8 @@
     "download": "Download",
     "removeFile": "Remove file",
     "dropFiles": "Drop files here to upload",
-    "dropFilesHint": "Release to add files to the upload queue"
+    "dropFilesHint": "Release to add files to the upload queue",
+    "filesAddedToQueue": "{count} file added - ready to upload | {count} files added - ready to upload"
   },
   "fileSelection": {
     "title": "Select or Upload Files",

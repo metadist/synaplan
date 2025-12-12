@@ -374,13 +374,7 @@ class WordPressIntegrationService
             $this->step4EnableFileSearch($userId);
         }
 
-        // Ensure site_url is passed to step5 for domain whitelist
-        $widgetPayload = $payload;
-        if (empty($widgetPayload['site_url']) && !empty($payload['site_url'])) {
-            $widgetPayload['site_url'] = $payload['site_url'];
-        }
-
-        $step5 = $this->step5SaveWidget($userId, $widgetPayload);
+        $step5 = $this->step5SaveWidget($userId, $payload);
 
         return [
             'success' => true,

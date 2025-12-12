@@ -506,8 +506,12 @@ const handlePaste = async (event: ClipboardEvent) => {
   if (filesToUpload.length > 0) {
     // Prevent default paste behavior for files/images
     event.preventDefault()
-    await uploadFiles(filesToUpload)
-    success(t('chatInput.filesPasted', { count: filesToUpload.length }))
+    try {
+      await uploadFiles(filesToUpload)
+      success(t('chatInput.filesPasted', { count: filesToUpload.length }))
+    } catch (err) {
+      error(t('chatInput.uploadError'))
+    }
   }
   // If no files, let the default paste behavior handle text
 }

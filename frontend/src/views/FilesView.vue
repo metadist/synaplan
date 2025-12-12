@@ -551,7 +551,7 @@ const handleDrop = async (event: DragEvent) => {
   if (files && files.length > 0) {
     // Add dropped files to selectedFiles array
     selectedFiles.value = [...selectedFiles.value, ...Array.from(files)]
-    showSuccess(`${files.length} file(s) added - ready to upload`)
+    showSuccess(t('files.filesAddedToQueue', { count: files.length }))
   }
 }
 
