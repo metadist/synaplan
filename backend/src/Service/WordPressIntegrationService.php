@@ -226,25 +226,43 @@ class WordPressIntegrationService
     {
         $user = $this->requireUser($userId);
 
-        $name = trim((string) ($payload['widget_name'] ?? 'WordPress Chat Widget'));
-        $promptTopic = trim((string) ($payload['task_prompt_topic'] ?? 'general'));
-        $siteUrl = trim((string) ($payload['site_url'] ?? ''));
+        // Support both camelCase (legacy WordPress plugin) and snake_case (new API) parameters
+        $name = trim((string) ($payload['widget_name'] ?? $payload['widgetName'] ?? 'WordPress Chat Widget'));
+        $promptTopic = trim((string) (
+            $payload['task_prompt_topic'] ??
+            $payload['widgetPrompt'] ?? // WordPress plugin uses this
+            $payload['prompt'] ?? // Alternative
+            'general'
+        ));
+
+        // Get site_url from payload or fallback to user details
+        $siteUrl = trim((string) ($payload['site_url'] ?? $payload['siteUrl'] ?? ''));
+        if (empty($siteUrl)) {
+            $userDetails = $user->getUserDetails();
+            $siteUrl = $userDetails['wordpress_site'] ?? '';
+        }
         $domain = $this->extractHostFromUrl($siteUrl);
 
+        // Extract integration type (support both naming conventions)
+        $integrationType = $payload['integration_type'] ?? $payload['integrationType'] ?? 'floating-button';
+
         $config = [
-            'position' => $payload['position'] ?? 'bottom-right',
-            'primaryColor' => $payload['primary_color'] ?? '#007bff',
-            'iconColor' => $payload['icon_color'] ?? '#ffffff',
-            'defaultTheme' => $payload['default_theme'] ?? 'light',
-            'autoOpen' => (bool) ($payload['auto_open'] ?? false),
-            'autoMessage' => $payload['auto_message'] ?? 'Hello! How can I help you today?',
-            'allowFileUpload' => (bool) ($payload['allow_file_upload'] ?? false),
-            'fileUploadLimit' => (int) ($payload['file_upload_limit'] ?? 3),
-            'messageLimit' => (int) ($payload['message_limit'] ?? 50),
-            'maxFileSize' => (int) ($payload['max_file_size'] ?? 10),
-            'integrationType' => $payload['integration_type'] ?? 'floating-button',
-            'inlinePlaceholder' => $payload['inline_placeholder'] ?? 'Ask me anything...',
-            'inlineButtonText' => $payload['inline_button_text'] ?? 'Ask',
+            'position' => $payload['position'] ?? $payload['widgetPosition'] ?? 'bottom-right',
+            'primaryColor' => $payload['primary_color'] ?? $payload['widgetColor'] ?? '#007bff',
+            'iconColor' => $payload['icon_color'] ?? $payload['widgetIconColor'] ?? '#ffffff',
+            'defaultTheme' => $payload['default_theme'] ?? $payload['defaultTheme'] ?? 'light',
+            'autoOpen' => (bool) ($payload['auto_open'] ?? $payload['autoOpen'] ?? false),
+            'autoMessage' => $payload['auto_message'] ?? $payload['autoMessage'] ?? 'Hello! How can I help you today?',
+            'allowFileUpload' => (bool) ($payload['allow_file_upload'] ?? $payload['allowFileUpload'] ?? false),
+            'fileUploadLimit' => (int) ($payload['file_upload_limit'] ?? $payload['fileUploadLimit'] ?? 3),
+            'messageLimit' => (int) ($payload['message_limit'] ?? $payload['messageLimit'] ?? 50),
+            'maxFileSize' => (int) ($payload['max_file_size'] ?? $payload['maxFileSize'] ?? 10),
+            'integrationType' => $integrationType,
+            'inlinePlaceholder' => $payload['inline_placeholder'] ?? $payload['inlinePlaceholder'] ?? 'Ask me anything...',
+            'inlineButtonText' => $payload['inline_button_text'] ?? $payload['inlineButtonText'] ?? 'Ask',
+            'inlineFontSize' => (int) ($payload['inline_font_size'] ?? $payload['inlineFontSize'] ?? 16),
+            'inlineTextColor' => $payload['inline_text_color'] ?? $payload['inlineTextColor'] ?? '#212529',
+            'inlineBorderRadius' => (int) ($payload['inline_border_radius'] ?? $payload['inlineBorderRadius'] ?? 8),
             'allowedDomains' => $domain ? [$domain] : [],
         ];
 
@@ -281,7 +299,13 @@ class WordPressIntegrationService
             $this->step4EnableFileSearch($userId);
         }
 
-        $step5 = $this->step5SaveWidget($userId, $payload);
+        // Ensure site_url is passed to step5 for domain whitelist
+        $widgetPayload = $payload;
+        if (empty($widgetPayload['site_url']) && !empty($payload['site_url'])) {
+            $widgetPayload['site_url'] = $payload['site_url'];
+        }
+
+        $step5 = $this->step5SaveWidget($userId, $widgetPayload);
 
         return [
             'success' => true,
