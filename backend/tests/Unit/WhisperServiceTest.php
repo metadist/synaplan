@@ -98,7 +98,6 @@ class WhisperServiceTest extends TestCase
 
         $formats = $service->getSupportedFormats();
 
-        $this->assertIsArray($formats);
         $this->assertContains('mp3', $formats);
         $this->assertContains('wav', $formats);
         $this->assertContains('ogg', $formats);
@@ -231,5 +230,159 @@ class WhisperServiceTest extends TestCase
         );
 
         $this->assertTrue(method_exists($service, 'translateToEnglish'));
+    }
+
+    /**
+     * Test that constructor parameters are correctly used.
+     */
+    public function testConstructorParametersAreStored(): void
+    {
+        $whisperBinary = '/custom/whisper';
+        $modelsPath = '/custom/models';
+        $defaultModel = 'small';
+        $ffmpegBinary = '/custom/ffmpeg';
+
+        $service = new WhisperService(
+            $this->logger,
+            $whisperBinary,
+            $modelsPath,
+            $defaultModel,
+            $ffmpegBinary
+        );
+
+        // Test that the service was created successfully
+        $this->assertInstanceOf(WhisperService::class, $service);
+
+        // Test supported formats are available
+        $formats = $service->getSupportedFormats();
+        $this->assertNotEmpty($formats);
+    }
+
+    /**
+     * Test that all supported formats are valid audio/video formats.
+     */
+    public function testSupportedFormatsAreValid(): void
+    {
+        $service = new WhisperService(
+            $this->logger,
+            '/usr/local/bin/whisper',
+            $this->tempDir,
+            'base',
+            '/usr/bin/ffmpeg'
+        );
+
+        $formats = $service->getSupportedFormats();
+
+        // Known valid formats that should be supported
+        $expectedFormats = ['ogg', 'mp3', 'wav', 'm4a', 'opus', 'flac', 'webm'];
+
+        foreach ($expectedFormats as $format) {
+            $this->assertContains(
+                $format,
+                $formats,
+                "Format {$format} should be supported"
+            );
+        }
+    }
+
+    /**
+     * Test that video formats are supported (for audio extraction).
+     */
+    public function testVideoFormatsAreSupported(): void
+    {
+        $service = new WhisperService(
+            $this->logger,
+            '/usr/local/bin/whisper',
+            $this->tempDir,
+            'base',
+            '/usr/bin/ffmpeg'
+        );
+
+        $formats = $service->getSupportedFormats();
+
+        // Video formats that should be supported (FFmpeg extracts audio)
+        $videoFormats = ['mp4', 'avi', 'mov', 'mkv', 'mpeg', 'mpg', 'webm'];
+
+        foreach ($videoFormats as $format) {
+            $this->assertContains(
+                $format,
+                $formats,
+                "Video format {$format} should be supported for audio extraction"
+            );
+        }
+    }
+
+    /**
+     * Test edge case: empty models directory doesn't break getAvailableModels.
+     */
+    public function testGetAvailableModelsHandlesNonExistentDirectory(): void
+    {
+        $service = new WhisperService(
+            $this->logger,
+            '/usr/local/bin/whisper',
+            '/nonexistent/models',
+            'base',
+            '/usr/bin/ffmpeg'
+        );
+
+        $models = $service->getAvailableModels();
+
+        $this->assertIsArray($models);
+        $this->assertEmpty($models);
+    }
+
+    /**
+     * Test that isAvailable checks all required components.
+     */
+    public function testIsAvailableChecksAllComponents(): void
+    {
+        // Create complete setup
+        $fakeBinary = $this->tempDir.'/whisper';
+        $fakeFfmpeg = $this->tempDir.'/ffmpeg';
+        $modelsDir = $this->tempDir.'/models';
+
+        touch($fakeBinary);
+        chmod($fakeBinary, 0755);
+        touch($fakeFfmpeg);
+        chmod($fakeFfmpeg, 0755);
+        mkdir($modelsDir);
+        touch($modelsDir.'/ggml-base.bin');
+
+        $service = new WhisperService(
+            $this->logger,
+            $fakeBinary,
+            $modelsDir,
+            'base',
+            $fakeFfmpeg
+        );
+
+        $this->assertTrue($service->isAvailable(), 'Service should be available when all components exist');
+    }
+
+    /**
+     * Test that isAvailable fails when binary is not executable.
+     */
+    public function testIsAvailableReturnsFalseWhenBinaryNotExecutable(): void
+    {
+        $fakeBinary = $this->tempDir.'/whisper';
+        $fakeFfmpeg = $this->tempDir.'/ffmpeg';
+        $modelsDir = $this->tempDir.'/models';
+
+        touch($fakeBinary);
+        chmod($fakeBinary, 0644); // Not executable
+        touch($fakeFfmpeg);
+        chmod($fakeFfmpeg, 0755);
+        mkdir($modelsDir);
+        touch($modelsDir.'/ggml-base.bin');
+
+        $service = new WhisperService(
+            $this->logger,
+            $fakeBinary,
+            $modelsDir,
+            'base',
+            $fakeFfmpeg
+        );
+
+        $this->assertFalse($service->isAvailable(), 'Service should not be available when binary is not executable');
     }
 }

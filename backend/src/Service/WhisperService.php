@@ -62,6 +62,9 @@ class WhisperService
             'command' => implode(' ', $command),
         ]);
 
+        // Whisper writes output to <input>.txt file when using --output-txt
+        $outputTxtFile = $processedAudio.'.txt';
+
         try {
             $process = new Process($command);
             $process->setTimeout(600); // 10 minutes max
@@ -71,11 +74,24 @@ class WhisperService
                 throw new ProcessFailedException($process);
             }
 
-            $output = $process->getOutput();
             $errorOutput = $process->getErrorOutput();
 
-            // Parse whisper output
-            $result = $this->parseWhisperOutput($output, $errorOutput);
+            // Read transcription from .txt file (whisper writes to <input>.txt)
+            $transcribedText = '';
+            if (file_exists($outputTxtFile)) {
+                $transcribedText = file_get_contents($outputTxtFile);
+                $this->logger->debug('WhisperService: Read transcription from file', [
+                    'file' => $outputTxtFile,
+                    'size' => strlen($transcribedText),
+                ]);
+            } else {
+                $this->logger->warning('WhisperService: Output txt file not found', [
+                    'expected' => $outputTxtFile,
+                ]);
+            }
+
+            // Parse whisper output (text from file, language from stderr)
+            $result = $this->parseWhisperOutput($transcribedText, $errorOutput);
 
             $duration = microtime(true) - $startTime;
 
@@ -107,9 +123,13 @@ class WhisperService
 
             throw new \RuntimeException('Audio transcription failed: '.$e->getMessage(), 0, $e);
         } finally {
-            // Cleanup temp file
+            // Cleanup temp files
             if (isset($processedAudio) && $processedAudio !== $audioPath && file_exists($processedAudio)) {
                 unlink($processedAudio);
+            }
+            // Cleanup whisper output txt file
+            if (file_exists($outputTxtFile)) {
+                unlink($outputTxtFile);
             }
         }
     }
