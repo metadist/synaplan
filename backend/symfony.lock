@@ -226,6 +226,18 @@
             "config/packages/messenger.yaml"
         ]
     },
+    "symfony/monolog-bundle": {
+        "version": "4.0",
+        "recipe": {
+            "repo": "github.com/symfony/recipes",
+            "branch": "main",
+            "version": "3.7",
+            "ref": "1b9efb10c54cb51c713a9391c9300ff8bceda459"
+        },
+        "files": [
+            "config/packages/monolog.yaml"
+        ]
+    },
     "symfony/property-info": {
         "version": "7.3",
         "recipe": {

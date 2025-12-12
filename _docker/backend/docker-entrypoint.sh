@@ -3,6 +3,23 @@ set -euo pipefail
 
 echo "🚀 Starting Synaplan Backend..."
 
+# Source .env file if it exists
+if [ -f /var/www/backend/.env ]; then
+    echo "📄 Loading environment from .env file..."
+    set -a  # automatically export all variables
+    source /var/www/backend/.env
+    set +a
+fi
+
+# Validate required environment variables
+if [ -z "${APP_URL:-}" ]; then
+    echo "❌ ERROR: APP_URL is not set!"
+    echo "   APP_URL is required for the application to work correctly."
+    echo "   Please set it in your environment or .env file."
+    echo "   Example: APP_URL=https://synaplan.example.com"
+    exit 1
+fi
+
 # Build DATABASE URLs from environment variables if not already set
 # Fallback for deployments that provide DB credentials as separate env vars
 if [ -z "${DATABASE_WRITE_URL:-}" ] && [ -n "${DB_HOST:-}" ]; then
@@ -67,12 +84,9 @@ until php bin/console dbal:run-sql "SELECT 1" > /dev/null 2>&1; do
 done
 echo "✅ Database is ready!"
 
-# Run migrations
-echo "🔄 Running database migrations..."
-php bin/console doctrine:migrations:migrate --no-interaction --allow-no-migration || {
-    echo "⚠️  Migrations failed, trying schema update..."
-    php bin/console doctrine:schema:update --force
-}
+# Run database schema update (until we have proper migrations)
+echo "🔄 Running database schema update..."
+php bin/console doctrine:schema:update --force
 echo "✅ Database schema ready!"
 
 # Load fixtures on first run (dev/test only)
@@ -123,7 +137,7 @@ if [ "$APP_ENV" = "dev" ] || [ "$APP_ENV" = "test" ]; then
 fi
 
 # Ollama model downloads (optional, only if AUTO_DOWNLOAD_MODELS=true)
-if [ -n "$OLLAMA_BASE_URL" ] && [ "$AUTO_DOWNLOAD_MODELS" = "true" ]; then
+if [ -n "${OLLAMA_BASE_URL:-}" ] && [ "${AUTO_DOWNLOAD_MODELS:-false}" = "true" ]; then
     echo ""
     echo "🤖 AUTO_DOWNLOAD_MODELS=true - Starting AI model downloads in background..."
 
@@ -197,9 +211,9 @@ echo "✅ Cache ready!"
 # Start FrankenPHP
 echo ""
 echo "🎉 Backend ready! Starting FrankenPHP..."
-echo "   🌐 Frontend: http://localhost:8000"
-echo "   🌐 API: http://localhost:8000/api"
-echo "   📚 Swagger: http://localhost:8000/api/doc"
+echo "   🌐 Frontend: ${APP_URL}"
+echo "   🌐 API: ${APP_URL}/api"
+echo "   📚 Swagger: ${APP_URL}/api/doc"
 echo ""
 
 exec frankenphp run --config /etc/caddy/Caddyfile
