@@ -129,7 +129,7 @@ class WordPressIntegrationService
         // Check if user already has a WordPress Plugin API key
         $existingApiKeys = $this->apiKeyRepository->findBy(['ownerId' => $userId, 'status' => 'active']);
         foreach ($existingApiKeys as $existingKey) {
-            if ($existingKey->getName() === 'WordPress Plugin') {
+            if ('WordPress Plugin' === $existingKey->getName()) {
                 $this->logger->debug('WordPress wizard: Reusing existing API key', [
                     'user_id' => $userId,
                 ]);
