@@ -324,8 +324,15 @@ final class AdminModelsController extends AbstractController
             return $this->json(['error' => 'sql is required'], Response::HTTP_BAD_REQUEST);
         }
 
+        $allowDelete = (bool) ($data['allowDelete'] ?? false);
+
         try {
-            $result = $this->modelsService->applyImportSql($sql);
+            $result = $this->modelsService->applyImportSql(
+                $sql,
+                $allowDelete,
+                $user->getId(),
+                $request->getClientIp()
+            );
 
             return $this->json([
                 'success' => true,

@@ -45,7 +45,7 @@ final class AdminModelUpdateRequest
     public ?string $service = null;
 
     #[Assert\Length(min: 1, max: 24)]
-    #[Assert\Choice(choices: self::ALLOWED_TAGS, normalizer: 'strtolower', message: 'Invalid tag')]
+    #[Assert\Choice(choices: self::ALLOWED_TAGS, message: 'Invalid tag')]
     public ?string $tag = null;
 
     #[Assert\Length(min: 1, max: 96)]

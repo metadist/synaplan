@@ -188,9 +188,9 @@ final readonly class AdminModelsService
     /**
      * @return array{applied: int, statements: string[]}
      */
-    public function applyImportSql(string $sql): array
+    public function applyImportSql(string $sql, bool $allowDelete, int $adminUserId, ?string $ip = null): array
     {
-        return $this->importService->applySql($sql);
+        return $this->importService->applySql($sql, $allowDelete, $adminUserId, $ip);
     }
 
     /**

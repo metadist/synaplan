@@ -14,7 +14,7 @@ use Symfony\Component\Validator\Constraints as Assert;
 final class AdminModelCreateRequest
 {
     /**
-     * @var string Capability tag (lowercase)
+     * @var string[] Capability tag (lowercase)
      */
     private const ALLOWED_TAGS = [
         'chat',
@@ -29,7 +29,7 @@ final class AdminModelCreateRequest
     ];
 
     /**
-     * @var string Pricing unit identifiers
+     * @var string[] Pricing unit identifiers
      */
     private const ALLOWED_UNITS = [
         'per1M',
@@ -46,7 +46,7 @@ final class AdminModelCreateRequest
     public string $service = '';
 
     #[Assert\NotBlank(normalizer: 'trim', message: 'Tag is required')]
-    #[Assert\Choice(choices: self::ALLOWED_TAGS, normalizer: 'strtolower', message: 'Invalid tag')]
+    #[Assert\Choice(choices: self::ALLOWED_TAGS, message: 'Invalid tag')]
     #[Assert\Length(max: 24)]
     public string $tag = '';
 
