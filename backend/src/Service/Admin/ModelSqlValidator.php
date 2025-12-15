@@ -117,5 +117,3 @@ final class ModelSqlValidator
         return ['statements' => $statements, 'errors' => []];
     }
 }
-
-

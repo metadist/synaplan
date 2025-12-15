@@ -194,5 +194,3 @@ Return a minimal set of statements (only the changes needed).
 PROMPT;
     }
 }
-
-

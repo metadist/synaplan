@@ -92,7 +92,7 @@ final class AdminModelsController extends AbstractController
             ->setRating((float) ($data['rating'] ?? 0.5));
 
         if (array_key_exists('description', $data)) {
-            $model->setDescription($data['description'] !== null ? (string) $data['description'] : null);
+            $model->setDescription(null !== $data['description'] ? (string) $data['description'] : null);
         }
         if (isset($data['json']) && is_array($data['json'])) {
             $model->setJson($data['json']);
@@ -171,7 +171,7 @@ final class AdminModelsController extends AbstractController
             $model->setRating((float) $data['rating']);
         }
         if (array_key_exists('description', $data)) {
-            $model->setDescription($data['description'] !== null ? (string) $data['description'] : null);
+            $model->setDescription(null !== $data['description'] ? (string) $data['description'] : null);
         }
         if (array_key_exists('json', $data) && is_array($data['json'])) {
             $model->setJson($data['json']);
@@ -309,5 +309,3 @@ final class AdminModelsController extends AbstractController
         ];
     }
 }
-
-

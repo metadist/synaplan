@@ -41,9 +41,7 @@ SQL;
     public function testRejectsOtherTables(): void
     {
         $v = new ModelSqlValidator();
-        $res = $v->validateAndSplit("DELETE FROM USERS WHERE 1=1;");
+        $res = $v->validateAndSplit('DELETE FROM USERS WHERE 1=1;');
         self::assertNotEmpty($res['errors']);
     }
 }
-
-
