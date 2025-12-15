@@ -127,9 +127,6 @@ final readonly class ModelImportService
         $models = $this->modelRepository->findAll();
         $out = [];
         foreach ($models as $m) {
-            if (!$m instanceof Model) {
-                continue;
-            }
             $out[] = [
                 'service' => $m->getService(),
                 'tag' => $m->getTag(),

@@ -100,7 +100,7 @@ final class ModelSqlValidator
 
             // Column allowlist check (best-effort): if we see "B<WORD>" tokens, they must be allowed.
             preg_match_all('/\bB[A-Z0-9_]+\b/i', $stmtTrim, $matches);
-            $tokens = array_unique(array_map('strtoupper', $matches[0] ?? []));
+            $tokens = array_unique(array_map('strtoupper', $matches[0]));
             foreach ($tokens as $token) {
                 if (!in_array($token, self::ALLOWED_COLUMNS, true) && 'BMODELS' !== $token) {
                     $errors[] = sprintf('Statement %d uses disallowed column/token: %s', $idx + 1, $token);
