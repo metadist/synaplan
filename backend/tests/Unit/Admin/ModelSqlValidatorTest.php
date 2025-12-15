@@ -18,7 +18,7 @@ UPDATE BMODELS SET BPRICEIN=1.23 WHERE BSERVICE='OpenAI' AND BTAG='chat' AND BPR
 DELETE FROM BMODELS WHERE BSERVICE='OpenAI' AND BTAG='chat' AND BPROVID='old';
 SQL;
 
-        $res = $v->validateAndSplit($sql);
+        $res = $v->validateAndSplit($sql, allowDelete: true);
         self::assertSame([], $res['errors']);
         self::assertCount(3, $res['statements']);
     }
