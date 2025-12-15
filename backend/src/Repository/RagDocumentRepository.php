@@ -98,6 +98,41 @@ class RagDocumentRepository extends ServiceEntityRepository
     }
 
     /**
+     * Gibt alle eindeutigen GroupKeys für einen User zurück mit Anzahl der Dateien.
+     *
+     * Nur RAG-Dokumente mit existierenden Dateien werden gezählt (verwaiste RAG-Dokumente werden ignoriert).
+     * BMID kann auf BFILES.BID (für standalone files) oder BMESSAGES.BID (für message attachments) verweisen.
+     *
+     * @return array Array von ['groupKey' => string, 'count' => int]
+     */
+    public function findDistinctGroupKeysByUser(int $userId): array
+    {
+        $conn = $this->getEntityManager()->getConnection();
+
+        // SQL Query: Gruppiere nach BGROUPKEY und zähle eindeutige BMID (Dateien)
+        // UNION Query um sowohl BFILES als auch BMESSAGES zu berücksichtigen
+        // BMID kann auf BFILES.BID (für standalone files) oder BMESSAGES.BID (für message attachments) verweisen
+        $sql = '
+            SELECT
+                r.BGROUPKEY as groupKey,
+                COUNT(DISTINCT r.BMID) as count
+            FROM BRAG r
+            WHERE r.BUID = :userId
+                AND (
+                    r.BMID IN (SELECT BID FROM BFILES WHERE BUID = :userId)
+                    OR r.BMID IN (SELECT BID FROM BMESSAGES WHERE BUID = :userId)
+                )
+            GROUP BY r.BGROUPKEY
+            ORDER BY r.BGROUPKEY ASC
+        ';
+
+        $stmt = $conn->prepare($sql);
+        $result = $stmt->executeQuery(['userId' => $userId]);
+
+        return $result->fetchAllAssociative();
+    }
+
+    /**
      * Speichert RAG-Dokument.
      */
     public function save(RagDocument $ragDocument, bool $flush = true): void

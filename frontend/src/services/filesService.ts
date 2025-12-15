@@ -145,28 +145,13 @@ export const deleteMultipleFiles = async (
 }
 
 /**
- * Get file groups (aggregated from existing files)
- * 
- * This extracts unique group_key values from the user's files
+ * Get file groups (unique group keys with file counts from RAG documents)
  * 
  * @returns Array of group names with file counts
  */
 export const getFileGroups = async (): Promise<Array<{ name: string; count: number }>> => {
-  // Get all files (first page with high limit to get all groups)
-  const response = await listFiles(undefined, 1, 1000)
-  
-  // Aggregate by group_key
-  const groupMap = new Map<string, number>()
-  
-  response.files.forEach(file => {
-    if (file.group_key) {
-      groupMap.set(file.group_key, (groupMap.get(file.group_key) || 0) + 1)
-    }
-  })
-  
-  return Array.from(groupMap.entries())
-    .map(([name, count]) => ({ name, count }))
-    .sort((a, b) => a.name.localeCompare(b.name))
+  const response = await api.get<{ success: boolean; groups: Array<{ name: string; count: number }> }>('/api/v1/files/groups')
+  return response.data.groups
 }
 
 /**

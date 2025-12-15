@@ -468,6 +468,52 @@ class FileController extends AbstractController
     }
 
     /**
+     * Get all file groups (unique group keys with file counts).
+     *
+     * GET /api/v1/files/groups
+     */
+    #[Route('/groups', name: 'groups', methods: ['GET'])]
+    public function getFileGroups(
+        #[CurrentUser] ?User $user,
+    ): JsonResponse {
+        if (!$user) {
+            return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
+        }
+
+        try {
+            $groups = $this->ragDocumentRepository->findDistinctGroupKeysByUser($user->getId());
+
+            $this->logger->debug('FileController: Retrieved file groups', [
+                'user_id' => $user->getId(),
+                'groups_count' => count($groups),
+                'groups' => $groups,
+            ]);
+
+            // Transform to expected format
+            $groupsData = array_map(function ($row) {
+                return [
+                    'name' => $row['groupKey'],
+                    'count' => (int) $row['count'],
+                ];
+            }, $groups);
+
+            return $this->json([
+                'success' => true,
+                'groups' => $groupsData,
+            ]);
+        } catch (\Exception $e) {
+            $this->logger->error('FileController: Failed to get file groups', [
+                'user_id' => $user->getId(),
+                'error' => $e->getMessage(),
+            ]);
+
+            return $this->json([
+                'error' => 'Failed to load file groups',
+            ], Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    /**
      * Delete file.
      *
      * DELETE /api/v1/files/{id}

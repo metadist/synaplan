@@ -270,7 +270,8 @@
                         type="text"
                         class="px-2 py-1 text-xs rounded border border-[var(--brand)] focus:outline-none focus:ring-1 focus:ring-[var(--brand)] bg-transparent txt-primary"
                         placeholder="GroupKey"
-                        ref="groupKeyInput"
+                        :data-group-key-input="file.id"
+                        :ref="el => { if (el && editingGroupKey === file.id) groupKeyInput = el as HTMLInputElement }"
                       />
                       <button
                         @click="saveGroupKey(file.id)"
@@ -937,7 +938,13 @@ const startEditGroupKey = async (fileId: number, currentGroupKey: string | null)
   editingGroupKey.value = fileId
   tempGroupKey.value = currentGroupKey || ''
   await nextTick()
-  groupKeyInput.value?.focus()
+  // Find the input element for this specific file
+  const inputElement = document.querySelector(`[data-group-key-input="${fileId}"]`) as HTMLInputElement
+  if (inputElement) {
+    inputElement.focus()
+  } else if (groupKeyInput.value) {
+    groupKeyInput.value.focus()
+  }
 }
 
 /**
