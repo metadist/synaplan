@@ -91,15 +91,23 @@ final readonly class ModelImportService
      *
      * @return array{applied: int, statements: string[]}
      */
-    public function applySql(string $sql): array
+    public function applySql(string $sql, bool $allowDelete, int $adminUserId, ?string $ip = null): array
     {
-        $validated = $this->validator->validateAndSplit($sql);
+        $validated = $this->validator->validateAndSplit($sql, $allowDelete);
         if (!empty($validated['errors'])) {
             throw new \InvalidArgumentException('Invalid SQL: '.implode(' | ', $validated['errors']));
         }
 
         $statements = $validated['statements'];
         $applied = 0;
+
+        $this->logger->warning('Admin model import SQL apply requested', [
+            'admin_user_id' => $adminUserId,
+            'ip' => $ip,
+            'allow_delete' => $allowDelete,
+            'statement_count' => count($statements),
+            'sql_sha256' => hash('sha256', $sql),
+        ]);
 
         $this->connection->beginTransaction();
         try {
@@ -110,8 +118,26 @@ final readonly class ModelImportService
             $this->connection->commit();
         } catch (\Throwable $e) {
             $this->connection->rollBack();
+            $this->logger->error('Admin model import SQL apply failed', [
+                'admin_user_id' => $adminUserId,
+                'ip' => $ip,
+                'allow_delete' => $allowDelete,
+                'applied' => $applied,
+                'statement_count' => count($statements),
+                'sql_sha256' => hash('sha256', $sql),
+                'error' => $e->getMessage(),
+            ]);
             throw $e;
         }
+
+        $this->logger->warning('Admin model import SQL applied', [
+            'admin_user_id' => $adminUserId,
+            'ip' => $ip,
+            'allow_delete' => $allowDelete,
+            'applied' => $applied,
+            'statement_count' => count($statements),
+            'sql_sha256' => hash('sha256', $sql),
+        ]);
 
         return [
             'applied' => $applied,
