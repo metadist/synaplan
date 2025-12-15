@@ -110,7 +110,8 @@
                 </div>
                 <button
                   @click="removeSelectedFile(index)"
-                  class="p-1.5 rounded-lg hover:bg-red-500/10 transition-colors"
+                  :disabled="isUploading"
+                  class="p-1.5 rounded-lg hover:bg-red-500/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent"
                   :aria-label="$t('files.removeFile')"
                 >
                   <XMarkIcon class="w-4 h-4 text-red-500" />
@@ -519,6 +520,9 @@ const handleFileSelect = (event: Event) => {
 }
 
 const removeSelectedFile = (index: number) => {
+  if (isUploading.value) {
+    return
+  }
   selectedFiles.value.splice(index, 1)
 }
 
