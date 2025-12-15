@@ -14,7 +14,7 @@ This file documents the implementation added for an **administrator-only** AI mo
 
 ### New endpoints (admin-only)
 
-All endpoints require an authenticated user with `isAdmin() === true`:
+All endpoints require authentication and admin privileges (checked via `#[IsGranted('ROLE_ADMIN')]` or manual `$user->isAdmin()` check):
 
 - **List**: `GET /api/v1/admin/models`
 - **Create**: `POST /api/v1/admin/models`
@@ -24,6 +24,8 @@ All endpoints require an authenticated user with `isAdmin() === true`:
 - **Import apply**: `POST /api/v1/admin/models/import/apply`
 
 Implementation: `backend/src/Controller/AdminModelsController.php`
+
+Request/response validation uses DTOs: `AdminModelCreateRequest`, `AdminModelUpdateRequest`
 
 ### AI model used for import
 

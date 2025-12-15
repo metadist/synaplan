@@ -67,6 +67,7 @@ export interface AdminImportPreviewResponse {
 
 export interface AdminImportApplyRequest {
   sql: string
+  allowDelete?: boolean
 }
 
 export interface AdminImportApplyResponse {
