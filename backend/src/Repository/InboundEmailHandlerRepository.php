@@ -72,15 +72,25 @@ class InboundEmailHandlerRepository extends ServiceEntityRepository
      */
     public function findHandlersToCheck(): array
     {
-        $now = time();
+        // Use native SQL because Doctrine DQL doesn't support UNIX_TIMESTAMP and STR_TO_DATE
+        $sql = 'SELECT * FROM BINBOUNDEMAILHANDLER
+                WHERE BSTATUS = :status
+                AND (BLASTCHECKED IS NULL
+                     OR (UNIX_TIMESTAMP(STR_TO_DATE(BLASTCHECKED, "%Y%m%d%H%i%s")) + (BCHECKINTERVAL * 60)) <= UNIX_TIMESTAMP())';
 
-        return $this->createQueryBuilder('h')
-            ->where('h.status = :status')
-            ->setParameter('status', 'active')
-            ->andWhere('(h.lastChecked IS NULL OR (UNIX_TIMESTAMP(STR_TO_DATE(h.lastChecked, :format)) + (h.checkInterval * 60)) <= :now)')
-            ->setParameter('format', '%Y%m%d%H%i%s')
-            ->setParameter('now', $now)
-            ->getQuery()
-            ->getResult();
+        $conn = $this->getEntityManager()->getConnection();
+        $stmt = $conn->prepare($sql);
+        $result = $stmt->executeQuery(['status' => 'active']);
+
+        $handlers = [];
+        foreach ($result->fetchAllAssociative() as $row) {
+            // Convert database row to entity
+            $handler = $this->find($row['BID']);
+            if ($handler) {
+                $handlers[] = $handler;
+            }
+        }
+
+        return $handlers;
     }
 }

@@ -77,6 +77,13 @@ class PromptFixtures extends Fixture
                 'shortDescription' => 'Generates optimized search queries from user questions for web search APIs.',
                 'prompt' => $this->getSearchQueryPrompt(),
             ],
+            [
+                'ownerId' => 0,
+                'language' => 'en',
+                'topic' => 'tools:mailhandler',
+                'shortDescription' => 'Routes incoming emails to appropriate departments using AI-based analysis. Used by IMAP/POP3 mail handlers.',
+                'prompt' => $this->getMailHandlerPrompt(),
+            ],
         ];
 
         foreach ($prompts as $data) {
@@ -132,7 +139,7 @@ PROMPT;
 Define the intention of the user with every request. You will have the history,
 but put your focus on the new message.
 
-If it fits the previous requests of the last few minutes, keep the topic going. 
+If it fits the previous requests of the last few minutes, keep the topic going.
 If not, change it accordingly. Only in the JSON field.
 
 Put answers only in JSON, please.
@@ -141,9 +148,9 @@ Put answers only in JSON, please.
 
 You are an assistant of assistants. You sort user requests by setting JSON values only.
 
-You receive messages (as JSON objects) from random users around the world. 
-If there is a signature in the BTEXT field, use it as a hint to classify 
-the message and the sender. 
+You receive messages (as JSON objects) from random users around the world.
+If there is a signature in the BTEXT field, use it as a hint to classify
+the message and the sender.
 
 If there is an attachment, the description is in the BFILETEXT field.
 
@@ -153,7 +160,7 @@ Your tasks in every new message are to:
 
 1. Detect the user's language (BLANG) in the BTEXT field, if possible. Use a 2-letter language code. Use any language, you can understand. Leave BLANG as is, if you cannot detect the language.
 
-2. Classify the user's message into one of these BTOPIC categories **and only those**. The most common is "general". 
+2. Classify the user's message into one of these BTOPIC categories **and only those**. The most common is "general".
 This is the list, use only this:
 
 [DYNAMICLIST]
@@ -180,17 +187,17 @@ You must respond with the **same JSON object as received**, modifying only:
 * "BLANG": [LANGLIST]
 * "BWEBSEARCH": 0 | 1
 
-If you cannot define the language from the text, leave "BLANG" as "en".  
-If you cannot define the topic, leave "BTOPIC" as "general".  
+If you cannot define the language from the text, leave "BLANG" as "en".
+If you cannot define the topic, leave "BTOPIC" as "general".
 If BTEXT is empty, but BFILETEXT is set, use BFILETEXT primarily to define the topic.
 
 **Always classify each new user message independently, but look at the previous messages to define the topic. Prefer the actual BTEXT.**
 
 If the user changes topics mid-conversation, update BTOPIC to match the new topic in your next response.
 
-Do not change any other fields. 
-Do not add any new fields beyond BTOPIC, BLANG, and BWEBSEARCH. 
-Do not add any additional text beyond the JSON. 
+Do not change any other fields.
+Do not add any new fields beyond BTOPIC, BLANG, and BWEBSEARCH.
+Do not add any additional text beyond the JSON.
 **Do not answer the question of the user.**
 Only send the JSON object.
 
@@ -434,7 +441,7 @@ The configuration will be provided in the request and may include:
    - long: 500-1000 words
    - custom: Specific word count as requested
 
-3. **Output Language**: 
+3. **Output Language**:
    - Deliver the summary in the requested language
    - Maintain accuracy while adapting to target language conventions
 
@@ -464,6 +471,74 @@ Provide ONLY the summary text in the requested format and language.
 Do not include meta-commentary, explanations, or notes about the summarization process.
 
 You are a helpful assistant that creates high-quality, accurate document summaries.
+PROMPT;
+    }
+
+    private function getMailHandlerPrompt(): string
+    {
+        return <<<'PROMPT'
+# Mail Handler Routing Prompt
+
+## Purpose
+You are a precise email router. You will receive a list of target departments (each with an email address and description) and an incoming email (Subject and Body). Your task is to select exactly ONE department email that best matches the incoming message.
+
+## Target Departments
+The system will inject the department list here:
+
+[TARGETLIST]
+
+## Decision Rules
+- Read the incoming message (Subject and Body) carefully
+- Compare the message intent with each department's description
+- Prefer semantic similarity and intent alignment over simple keyword matching
+- If multiple departments seem appropriate or you're uncertain, choose the one marked "Default: yes"
+- If nothing clearly matches, always choose the "Default: yes" department
+- NEVER invent or modify an email address
+- ONLY choose an email that appears in the Target Departments list above
+
+## Output Requirements (CRITICAL)
+- Output EXACTLY ONE LINE containing ONLY the selected email address
+- Do NOT include:
+  - Explanations or reasoning
+  - Labels like "Selected:" or "Email:"
+  - JSON formatting
+  - Quotes or markdown
+  - Multiple options
+  - Any additional text
+
+## Examples
+
+**Example 1:**
+Target Departments:
+- Email: support@company.com
+  Description: General customer support and help requests
+  Default: yes
+- Email: sales@company.com
+  Description: Sales inquiries, quotes, pricing questions
+  Default: no
+
+Subject: Need help with login
+Body: I can't access my account
+
+Correct Output:
+support@company.com
+
+**Example 2:**
+Target Departments:
+- Email: info@company.com
+  Description: General inquiries
+  Default: yes
+- Email: tech@company.com
+  Description: Technical issues, bugs, errors
+  Default: no
+
+Subject: Error 500 on checkout
+Body: Getting server error when trying to pay
+
+Correct Output:
+tech@company.com
+
+Now you will receive the incoming email. Analyze it and output ONLY the selected email address.
 PROMPT;
     }
 }
