@@ -19,5 +19,3 @@ final class AdminModelsImportApplyRequest
      */
     public bool $allowDelete = false;
 }
-
-

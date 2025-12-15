@@ -87,5 +87,3 @@ final class AdminModelCreateRequest
     #[Assert\Type(type: 'array', message: 'json must be an object')]
     public ?array $json = null;
 }
-
-
