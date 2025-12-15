@@ -560,9 +560,11 @@ import UsageChart from '@/components/admin/UsageChart.vue'
 import { adminApi, type AdminUser, type SystemPrompt, type UsageStats, type SystemOverview, type RegistrationAnalytics } from '@/services/api/adminApi'
 import { useAuthStore } from '@/stores/auth'
 import { useI18n } from 'vue-i18n'
+import { useNotification } from '@/composables/useNotification'
 
 const { t } = useI18n()
 const authStore = useAuthStore()
+const { success, error: showError } = useNotification()
 
 type TabId = 'overview' | 'users' | 'prompts' | 'usage'
 interface AdminTab {
@@ -721,8 +723,10 @@ async function updateUserLevel(userId: number, newLevel: string) {
     if (user) {
       user.level = newLevel
     }
+    success(t('admin.users.levelUpdated', { level: newLevel }))
   } catch (error) {
     console.error('Failed to update user level:', error)
+    showError(error instanceof Error ? error.message : t('admin.users.levelUpdateFailed'))
   }
 }
 

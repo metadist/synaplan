@@ -52,7 +52,9 @@
       "searchPlaceholder": "Search by email...",
       "noUsers": "No users found",
       "deleteConfirmTitle": "Delete User?",
-      "deleteConfirmDesc": "Are you sure you want to delete {email}? This action cannot be undone."
+      "deleteConfirmDesc": "Are you sure you want to delete {email}? This action cannot be undone.",
+      "levelUpdated": "User level updated to {level}",
+      "levelUpdateFailed": "Failed to update user level"
     },
     "prompts": {
       "shortDesc": "Short Description",

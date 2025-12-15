@@ -48,7 +48,9 @@
       "searchPlaceholder": "Nach E-Mail suchen...",
       "noUsers": "Keine Benutzer gefunden",
       "deleteConfirmTitle": "Benutzer löschen?",
-      "deleteConfirmDesc": "Möchtest du {email} wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden."
+      "deleteConfirmDesc": "Möchtest du {email} wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden.",
+      "levelUpdated": "Benutzer-Level auf {level} aktualisiert",
+      "levelUpdateFailed": "Fehler beim Aktualisieren des Benutzer-Levels"
     },
     "prompts": {
       "shortDesc": "Kurzbeschreibung",
