@@ -48,7 +48,7 @@ class WebhookController extends AbstractController
             required: ['from', 'to', 'body'],
             properties: [
                 new OA\Property(property: 'from', type: 'string', format: 'email', example: 'user@example.com'),
-                new OA\Property(property: 'to', type: 'string', format: 'email', example: 'smart@synaplan.com', description: 'Can include keyword: smart+keyword@synaplan.com'),
+                new OA\Property(property: 'to', type: 'string', format: 'email', example: 'smart@synaplan.net', description: 'Can include keyword: smart+keyword@synaplan.net'),
                 new OA\Property(property: 'subject', type: 'string', example: 'Question about AI'),
                 new OA\Property(property: 'body', type: 'string', example: 'What is machine learning?'),
                 new OA\Property(property: 'message_id', type: 'string', example: 'external-msg-123'),
@@ -108,7 +108,7 @@ class WebhookController extends AbstractController
         $messageId = $data['message_id'] ?? null;
         $inReplyTo = $data['in_reply_to'] ?? null;
 
-        // Parse keyword from to-address (smart+keyword@synaplan.com)
+        // Parse keyword from to-address (smart+keyword@synaplan.net)
         $keyword = $this->emailChatService->parseEmailKeyword($toEmail);
 
         $this->logger->info('Email webhook received', [

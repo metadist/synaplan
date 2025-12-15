@@ -13,14 +13,14 @@ use Psr\Log\LoggerInterface;
  * Email Chat Service.
  *
  * Handles email-based chat system:
- * - smart@synaplan.com (general chat)
- * - smart+keyword@synaplan.com (specific chat context)
+ * - smart@synaplan.net (general chat)
+ * - smart+keyword@synaplan.net (specific chat context)
  *
  * This is a TOOL that allows users to chat via email.
  */
 class EmailChatService
 {
-    private const BASE_EMAIL = 'smart@synaplan.com';
+    private const BASE_EMAIL = 'smart@synaplan.net';
     private const MAX_ANONYMOUS_EMAILS_PER_HOUR = 10;
 
     public function __construct(
@@ -33,15 +33,16 @@ class EmailChatService
 
     /**
      * Parse email address to extract keyword
-     * smart@synaplan.com -> null
-     * smart+keyword@synaplan.com -> 'keyword'.
+     * smart@synaplan.net -> null
+     * smart+keyword@synaplan.net -> 'keyword'.
      */
     public function parseEmailKeyword(string $toEmail): ?string
     {
         $toEmail = strtolower(trim($toEmail));
 
-        // Check if email matches pattern: smart+keyword@synaplan.com
-        if (preg_match('/^smart\+([a-z0-9\-_]+)@synaplan\.com$/i', $toEmail, $matches)) {
+        // Check if email matches pattern: smart+keyword@synaplan.net
+        // Accept legacy synaplan.com as well (incoming emails may still be configured that way).
+        if (preg_match('/^smart\+([a-z0-9\-_]+)@synaplan\.(?:net|com)$/i', $toEmail, $matches)) {
             return $matches[1];
         }
 
@@ -127,7 +128,7 @@ class EmailChatService
     /**
      * Find or create chat context for email thread.
      *
-     * @param string|null $keyword      From smart+keyword@synaplan.com
+     * @param string|null $keyword      From smart+keyword@synaplan.net
      * @param string|null $emailSubject Email subject (for thread detection)
      * @param string|null $inReplyTo    In-Reply-To header (for threading)
      */
@@ -202,7 +203,7 @@ class EmailChatService
     }
 
     /**
-     * Get user's email keyword (for smart+keyword@synaplan.com).
+     * Get user's email keyword (for smart+keyword@synaplan.net).
      */
     public function getUserEmailKeyword(User $user): ?string
     {
@@ -242,7 +243,7 @@ class EmailChatService
         $keyword = $this->getUserEmailKeyword($user);
 
         if ($keyword) {
-            return "smart+{$keyword}@synaplan.com";
+            return "smart+{$keyword}@synaplan.net";
         }
 
         return self::BASE_EMAIL;

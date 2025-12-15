@@ -186,10 +186,10 @@ WhatsApp User → Meta Webhook → /api/v1/webhooks/whatsapp
 SynaPlan supports email-based AI conversations with smart chat context management.
 
 ### Email Addresses:
-- **General**: `smart@synaplan.com` - Creates general chat conversation
-- **Keyword-based**: `smart+keyword@synaplan.com` - Creates dedicated chat context
-  - Example: `smart+project@synaplan.com` for project discussions
-  - Example: `smart+support@synaplan.com` for support tickets
+- **General**: `smart@synaplan.net` - Creates general chat conversation
+- **Keyword-based**: `smart+keyword@synaplan.net` - Creates dedicated chat context
+  - Example: `smart+project@synaplan.net` for project discussions
+  - Example: `smart+support@synaplan.net` for support tickets
 
 ### Features:
 - ✅ **Automatic User Detection**: Registered users get their own rate limits
@@ -203,7 +203,7 @@ SynaPlan supports email-based AI conversations with smart chat context managemen
 
 ### How It Works:
 ```
-User sends email to smart@synaplan.com
+User sends email to smart@synaplan.net
   → System checks if email is registered user
   → If yes: Use user's rate limits
   → If no: Create anonymous user with ANONYMOUS limits

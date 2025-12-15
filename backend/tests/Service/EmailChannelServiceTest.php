@@ -36,19 +36,19 @@ class EmailChannelServiceTest extends TestCase
 
     public function testParseEmailKeywordWithKeyword(): void
     {
-        $result = $this->service->parseEmailKeyword('smart+project@synaplan.com');
+        $result = $this->service->parseEmailKeyword('smart+project@synaplan.net');
         $this->assertEquals('project', $result);
     }
 
     public function testParseEmailKeywordWithComplexKeyword(): void
     {
-        $result = $this->service->parseEmailKeyword('smart+test-123@synaplan.com');
+        $result = $this->service->parseEmailKeyword('smart+test-123@synaplan.net');
         $this->assertEquals('test-123', $result);
     }
 
     public function testParseEmailKeywordWithoutKeyword(): void
     {
-        $result = $this->service->parseEmailKeyword('smart@synaplan.com');
+        $result = $this->service->parseEmailKeyword('smart@synaplan.net');
         $this->assertNull($result);
     }
 
@@ -240,7 +240,7 @@ class EmailChannelServiceTest extends TestCase
             ->willReturn(['email_keyword' => 'myproject']);
 
         $email = $this->service->getUserPersonalEmailAddress($user);
-        $this->assertEquals('smart+myproject@synaplan.com', $email);
+        $this->assertEquals('smart+myproject@synaplan.net', $email);
     }
 
     public function testGetUserPersonalEmailAddressWithoutKeyword(): void
@@ -250,6 +250,6 @@ class EmailChannelServiceTest extends TestCase
             ->willReturn([]);
 
         $email = $this->service->getUserPersonalEmailAddress($user);
-        $this->assertEquals('smart@synaplan.com', $email);
+        $this->assertEquals('smart@synaplan.net', $email);
     }
 }
