@@ -47,24 +47,24 @@
               </span>
             </button>
             <div class="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none">
-              <GroqIcon 
+              <GroqIcon
                 v-if="getSelectedModelService(capability as Capability).toLowerCase().includes('groq')"
-                :size="16" 
-                class-name="txt-primary" 
+                :size="16"
+                class-name="txt-primary"
               />
-              <Icon 
+              <Icon
                 v-else
-                :icon="getProviderIcon(getSelectedModelService(capability as Capability))" 
-                class="w-4 h-4" 
+                :icon="getProviderIcon(getSelectedModelService(capability as Capability))"
+                class="w-4 h-4"
               />
             </div>
-            <ChevronDownIcon 
+            <ChevronDownIcon
               :class="[
                 'absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 txt-secondary pointer-events-none transition-transform',
                 openDropdown === capability && 'rotate-180'
-              ]" 
+              ]"
             />
-            
+
             <!-- Custom Dropdown -->
             <div
               v-if="openDropdown === capability"
@@ -89,15 +89,15 @@
                 ]"
                 data-testid="btn-model-option"
               >
-                <GroqIcon 
+                <GroqIcon
                   v-if="model.service.toLowerCase().includes('groq')"
-                  :size="20" 
-                  class-name="flex-shrink-0" 
+                  :size="20"
+                  class-name="flex-shrink-0"
                 />
-                <Icon 
+                <Icon
                   v-else
-                  :icon="getProviderIcon(model.service)" 
-                  class="w-5 h-5 flex-shrink-0" 
+                  :icon="getProviderIcon(model.service)"
+                  class="w-5 h-5 flex-shrink-0"
                 />
                 <div class="flex-1 min-w-0 text-left">
                   <div class="font-medium truncate">{{ model.name }}</div>
@@ -177,7 +177,8 @@
               v-for="model in filteredModels"
               :key="model.id"
               class="border-b border-light-border/10 dark:border-dark-border/10 hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
-            data-testid="item-model">
+              data-testid="item-model"
+            >
               <td class="py-3 px-2 sm:px-3">
                 <span class="pill text-xs">{{ model.id }}</span>
               </td>
@@ -186,15 +187,15 @@
               </td>
               <td class="py-3 px-2 sm:px-3">
                 <div class="flex items-center gap-2">
-                  <GroqIcon 
+                  <GroqIcon
                     v-if="model.service.toLowerCase().includes('groq')"
-                    :size="16" 
-                    class-name="flex-shrink-0" 
+                    :size="16"
+                    class-name="flex-shrink-0"
                   />
-                  <Icon 
+                  <Icon
                     v-else
-                    :icon="getProviderIcon(model.service)" 
-                    class="w-4 h-4 flex-shrink-0" 
+                    :icon="getProviderIcon(model.service)"
+                    class="w-4 h-4 flex-shrink-0"
                   />
                   <span
                     :class="[
@@ -217,30 +218,35 @@
         </table>
       </div>
     </div>
+
+    <AIModelsAdminPanel v-if="authStore.isAdmin" />
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import {
+  ChevronDownIcon,
   CpuChipIcon,
-  InformationCircleIcon,
-  LockClosedIcon,
   FunnelIcon,
+  InformationCircleIcon,
   ListBulletIcon,
-  ChevronDownIcon
+  LockClosedIcon
 } from '@heroicons/vue/24/outline'
 import { Icon } from '@iconify/vue'
-import { getModels, getDefaultModels, saveDefaultModels, checkModelAvailability } from '@/services/api/configApi'
-import type { AIModel, Capability } from '@/types/ai-models'
-import { serviceColors } from '@/mocks/aiModels'
-import { getProviderIcon } from '@/utils/providerIcons'
-import { useNotification } from '@/composables/useNotification'
+import AIModelsAdminPanel from '@/components/config/AIModelsAdminPanel.vue'
 import GroqIcon from '@/components/icons/GroqIcon.vue'
+import { useNotification } from '@/composables/useNotification'
+import { serviceColors } from '@/mocks/aiModels'
+import { getModels, getDefaultModels, saveDefaultModels, checkModelAvailability } from '@/services/api/configApi'
+import { useAuthStore } from '@/stores/auth'
+import type { AIModel, Capability } from '@/types/ai-models'
+import { getProviderIcon } from '@/utils/providerIcons'
 
 type ModelsData = Partial<Record<Capability, AIModel[]>>
 
+const authStore = useAuthStore()
 const route = useRoute()
 const purposeLabels: Record<Capability, string> = {
   SORT: 'Message Sorting',
@@ -281,44 +287,44 @@ const normalizeHighlight = (highlight: string): Capability | 'ALL' | null => {
   // Direct match
   if (highlight === 'ALL') return 'ALL'
   if (highlight in purposeLabels) return highlight as Capability
-  
+
   // Alias mapping (URL-friendly names to actual capability names)
   const aliasMap: Record<string, Capability> = {
-    'SORTING': 'SORT',
-    'CHAT': 'CHAT',
-    'EMBEDDING': 'VECTORIZE',
-    'VECTORIZATION': 'VECTORIZE',
-    'VISION': 'PIC2TEXT',
-    'IMAGE': 'TEXT2PIC',
-    'VIDEO': 'TEXT2VID',
-    'TRANSCRIPTION': 'SOUND2TEXT',
-    'TTS': 'TEXT2SOUND',
-    'VOICE': 'TEXT2SOUND',
-    'ANALYSIS': 'ANALYZE'
+    SORTING: 'SORT',
+    CHAT: 'CHAT',
+    EMBEDDING: 'VECTORIZE',
+    VECTORIZATION: 'VECTORIZE',
+    VISION: 'PIC2TEXT',
+    IMAGE: 'TEXT2PIC',
+    VIDEO: 'TEXT2VID',
+    TRANSCRIPTION: 'SOUND2TEXT',
+    TTS: 'TEXT2SOUND',
+    VOICE: 'TEXT2SOUND',
+    ANALYSIS: 'ANALYZE'
   }
-  
+
   return aliasMap[highlight] || null
 }
 
 onMounted(async () => {
   await loadData()
   document.addEventListener('click', handleClickOutside)
-  
+
   // Check for highlight query parameter
   const highlightParam = route.query.highlight as string | undefined
   if (!highlightParam) return
-  
+
   const highlight = normalizeHighlight(highlightParam)
   if (!highlight) return
-  
+
   if (highlight === 'ALL') {
     // Highlight all model dropdowns
     highlightedCapability.value = 'ALL'
-    
+
     // Scroll to the top of the config section
     await nextTick()
     window.scrollTo({ top: 0, behavior: 'smooth' })
-    
+
     // Remove highlight after 4 seconds (longer for multiple items)
     setTimeout(() => {
       highlightedCapability.value = null
@@ -327,7 +333,7 @@ onMounted(async () => {
     // Highlight specific capability
     selectedPurpose.value = highlight
     highlightedCapability.value = highlight
-    
+
     // Wait for DOM update and scroll to the highlighted field
     await nextTick()
     scrollToCapability(highlight)
@@ -343,23 +349,23 @@ watch(
   () => route.query.highlight as string | string[] | undefined,
   async (newHighlightParam) => {
     if (!newHighlightParam || typeof newHighlightParam !== 'string') return
-    
+
     const newHighlight = normalizeHighlight(newHighlightParam)
     if (!newHighlight) return
-    
+
     if (newHighlight === 'ALL') {
       highlightedCapability.value = 'ALL'
-      
+
       await nextTick()
       window.scrollTo({ top: 0, behavior: 'smooth' })
-      
+
       setTimeout(() => {
         highlightedCapability.value = null
       }, 4000)
     } else {
       selectedPurpose.value = newHighlight
       highlightedCapability.value = newHighlight
-      
+
       await nextTick()
       scrollToCapability(newHighlight)
     }
@@ -369,14 +375,14 @@ watch(
 const scrollToCapability = (capability: Capability) => {
   // Use ref to find the container element
   const element = capabilityRefs.value[capability]
-  
+
   if (element) {
     // Scroll to the container element
     element.scrollIntoView({ behavior: 'smooth', block: 'center' })
-    
+
     // Set highlighted state (will trigger visual highlight via :class)
     highlightedCapability.value = capability
-    
+
     // Remove highlight after 3 seconds
     setTimeout(() => {
       highlightedCapability.value = null
@@ -399,7 +405,7 @@ const loadData = async () => {
     if (defaultsRes.success) {
       const mergedDefaults: Record<Capability, number | null> = {
         ...defaultConfig.value,
-        ...defaultsRes.defaults as Partial<Record<Capability, number | null>>
+        ...(defaultsRes.defaults as Partial<Record<Capability, number | null>>)
       }
       defaultConfig.value = mergedDefaults
       originalConfig.value = { ...mergedDefaults }
@@ -446,12 +452,12 @@ const toggleDropdown = (capability: Capability) => {
 const selectModel = async (capability: Capability, modelId: number | null) => {
   openDropdown.value = null
   defaultConfig.value[capability] = modelId
-  
+
   // Check availability if a model was selected
   if (modelId !== null) {
     try {
       const check = await checkModelAvailability(modelId)
-      
+
       if (!check.available) {
         if (check.setup_required) {
           warning(`Setup required: ${check.message}`)
@@ -463,7 +469,7 @@ const selectModel = async (capability: Capability, modelId: number | null) => {
       console.error('Failed to check model availability:', error)
     }
   }
-  
+
   // Auto-save after selection
   await saveConfiguration()
 }
@@ -504,7 +510,7 @@ const saveConfiguration = async () => {
     }
 
     const response = await saveDefaultModels({ defaults })
-    
+
     if (response.success) {
       originalConfig.value = { ...defaultConfig.value }
       success('Configuration saved successfully!')
@@ -516,6 +522,6 @@ const saveConfiguration = async () => {
     saving.value = false
   }
 }
-
-
 </script>
+
+
