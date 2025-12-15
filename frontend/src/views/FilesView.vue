@@ -425,7 +425,7 @@
       @unshared="handleUnshared"
     />
 
-    <!-- Confirm Delete Dialog -->
+    <!-- Confirm Delete Dialog (Single File) -->
     <ConfirmDialog
       :is-open="isConfirmOpen"
       title="Delete File"
@@ -436,6 +436,62 @@
       @confirm="confirmDelete"
       @cancel="cancelDelete"
     />
+
+    <!-- Confirm Delete Selected Dialog (Multiple Files) -->
+    <Teleport to="body">
+      <Transition name="dialog-fade">
+        <div
+          v-if="isDeleteSelectedOpen"
+          class="fixed inset-0 z-50 flex items-center justify-center p-4"
+          @click.self="cancelDeleteSelected"
+          data-testid="modal-delete-selected-root"
+        >
+          <!-- Backdrop -->
+          <div class="absolute inset-0 bg-black/50 dark:bg-black/70 backdrop-blur-sm" data-testid="modal-delete-selected-backdrop"></div>
+
+          <!-- Dialog -->
+          <div
+            class="relative surface-card rounded-xl shadow-2xl max-w-md w-full p-6 space-y-4 animate-scale-in"
+            role="dialog"
+            aria-modal="true"
+            data-testid="modal-delete-selected"
+          >
+            <!-- Icon and Title -->
+            <div class="flex items-center gap-3">
+              <div class="flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center bg-red-500/10 text-red-500">
+                <ExclamationTriangleIcon class="w-6 h-6" />
+              </div>
+              <h3 class="text-lg font-semibold txt-primary">
+                {{ $t('files.deleteSelectedConfirmTitle') }}
+              </h3>
+            </div>
+
+            <!-- Message -->
+            <p class="txt-secondary text-sm leading-relaxed">
+              {{ $t('files.deleteSelectedConfirmMessage', { count: selectedFileIds.length }) }}
+            </p>
+
+            <!-- Actions -->
+            <div class="flex gap-3 justify-end pt-2">
+              <button
+                @click="cancelDeleteSelected"
+                class="px-4 py-2 rounded-lg border border-light-border/30 dark:border-dark-border/20 txt-secondary hover:bg-black/5 dark:hover:bg-white/5 transition-all text-sm font-medium"
+                data-testid="btn-delete-selected-cancel"
+              >
+                {{ $t('common.cancel') }}
+              </button>
+              <button
+                @click="confirmDeleteSelected"
+                class="px-4 py-2 rounded-lg bg-red-500 hover:bg-red-600 text-white text-sm font-medium transition-all"
+                data-testid="btn-delete-selected-confirm"
+              >
+                {{ $t('common.delete') }}
+              </button>
+            </div>
+          </div>
+        </div>
+      </Transition>
+    </Teleport>
   </MainLayout>
 </template>
 
@@ -452,7 +508,8 @@ import {
   CloudArrowUpIcon,
   TrashIcon,
   ArrowDownTrayIcon,
-  XMarkIcon
+  XMarkIcon,
+  ExclamationTriangleIcon
 } from '@heroicons/vue/24/outline'
 import filesService, { type FileItem } from '@/services/filesService'
 import { useNotification } from '@/composables/useNotification'
@@ -497,6 +554,7 @@ const shareFileName = ref('')
 // Confirm dialog state
 const isConfirmOpen = ref(false)
 const fileToDelete = ref<number | null>(null)
+const isDeleteSelectedOpen = ref(false)
 const totalCount = ref(0)
 
 const filteredFiles = computed(() => files.value)
@@ -716,12 +774,13 @@ const toggleSelectAll = () => {
   }
 }
 
-const deleteSelected = async () => {
+const deleteSelected = () => {
   if (selectedFileIds.value.length === 0) return
+  isDeleteSelectedOpen.value = true
+}
 
-  if (!confirm(`Delete ${selectedFileIds.value.length} selected file(s)?`)) {
-    return
-  }
+const confirmDeleteSelected = async () => {
+  if (selectedFileIds.value.length === 0) return
 
   try {
     const results = await filesService.deleteMultipleFiles(selectedFileIds.value)
@@ -746,7 +805,13 @@ const deleteSelected = async () => {
   } catch (error) {
     console.error('Delete error:', error)
     showError('Failed to delete files')
+  } finally {
+    isDeleteSelectedOpen.value = false
   }
+}
+
+const cancelDeleteSelected = () => {
+  isDeleteSelectedOpen.value = false
 }
 
 const deleteFile = (fileId: number) => {
@@ -950,5 +1015,30 @@ onMounted(async () => {
 .fade-enter-from,
 .fade-leave-to {
   opacity: 0;
+}
+
+.dialog-fade-enter-active,
+.dialog-fade-leave-active {
+  transition: opacity 0.2s ease;
+}
+
+.dialog-fade-enter-from,
+.dialog-fade-leave-to {
+  opacity: 0;
+}
+
+.animate-scale-in {
+  animation: scale-in 0.2s ease-out;
+}
+
+@keyframes scale-in {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
 }
 </style>

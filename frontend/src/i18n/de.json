@@ -683,6 +683,8 @@
     "attachedToMessage": "Diese Datei ist an eine Nachricht angehängt",
     "standaloneFile": "Diese Datei ist eigenständig (nicht an eine Nachricht angehängt)",
     "deleteSelected": "Ausgewählte löschen",
+    "deleteSelectedConfirmTitle": "Ausgewählte Dateien löschen?",
+    "deleteSelectedConfirmMessage": "Möchten Sie wirklich {count} ausgewählte Datei(en) löschen? Diese Aktion kann nicht rückgängig gemacht werden und die Dateien werden dauerhaft gelöscht.",
     "noFiles": "Noch keine Dateien hochgeladen",
     "page": "Seite",
     "showing": "Anzeige",
