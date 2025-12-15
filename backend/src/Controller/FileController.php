@@ -428,14 +428,27 @@ class FileController extends AbstractController
         // Build query for MessageFiles
         $qb = $this->fileRepository->createQueryBuilder('mf')
             ->where('mf.userId = :userId')
-            ->setParameter('userId', $user->getId())
-            ->orderBy('mf.createdAt', 'DESC');
+            ->setParameter('userId', $user->getId());
+
+        // If group_key filter is provided, join with BRAG table
+        if ($groupKey) {
+            $qb->innerJoin(
+                \App\Entity\RagDocument::class,
+                'r',
+                'WITH',
+                'r.messageId = mf.id AND r.userId = :userId AND r.groupKey = :groupKey'
+            )
+            ->setParameter('groupKey', $groupKey);
+        }
+
+        $qb->orderBy('mf.createdAt', 'DESC');
 
         // Get total count
-        $totalCount = (clone $qb)->select('COUNT(mf.id)')->getQuery()->getSingleScalarResult();
+        $totalCount = (clone $qb)->select('COUNT(DISTINCT mf.id)')->getQuery()->getSingleScalarResult();
 
         // Get paginated results
-        $messageFiles = $qb->setFirstResult($offset)
+        $messageFiles = $qb->select('DISTINCT mf')
+                          ->setFirstResult($offset)
                           ->setMaxResults($limit)
                           ->getQuery()
                           ->getResult();
