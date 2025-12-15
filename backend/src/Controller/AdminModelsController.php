@@ -4,13 +4,10 @@ declare(strict_types=1);
 
 namespace App\Controller;
 
-use App\Entity\Model;
 use App\Entity\User;
-use App\Repository\ConfigRepository;
-use App\Repository\ModelRepository;
-use App\Service\Admin\ModelImportService;
-use App\Service\Admin\ModelSqlValidator;
-use Doctrine\ORM\EntityManagerInterface;
+use App\Service\Admin\AdminModelsService;
+use App\Service\Admin\ModelConflictException;
+use App\Service\Admin\ModelNotFoundException;
 use OpenApi\Attributes as OA;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -24,30 +21,77 @@ use Symfony\Component\Security\Http\Attribute\CurrentUser;
 final class AdminModelsController extends AbstractController
 {
     public function __construct(
-        private readonly EntityManagerInterface $em,
-        private readonly ModelRepository $modelRepository,
-        private readonly ConfigRepository $configRepository,
-        private readonly ModelImportService $importService,
-        private readonly ModelSqlValidator $sqlValidator,
+        private readonly AdminModelsService $modelsService,
     ) {
     }
 
     #[Route('', name: 'admin_models_list', methods: ['GET'])]
+    #[OA\Get(
+        path: '/api/v1/admin/models',
+        summary: 'List all AI models',
+        description: 'Get a list of all configured AI models (admin only)',
+        security: [['Bearer' => []]],
+        tags: ['Admin Models']
+    )]
+    #[OA\Response(
+        response: 200,
+        description: 'List of models',
+        content: new OA\JsonContent(
+            properties: [
+                new OA\Property(property: 'success', type: 'boolean'),
+                new OA\Property(property: 'models', type: 'array', items: new OA\Items(ref: '#/components/schemas/Model')),
+            ]
+        )
+    )]
+    #[OA\Response(response: 403, description: 'Admin access required')]
     public function list(#[CurrentUser] ?User $user): JsonResponse
     {
         if (!$user || !$user->isAdmin()) {
             return $this->json(['error' => 'Admin access required'], Response::HTTP_FORBIDDEN);
         }
 
-        $models = $this->modelRepository->findBy([], ['id' => 'ASC']);
+        $models = $this->modelsService->listModels();
 
         return $this->json([
             'success' => true,
-            'models' => array_map([$this, 'serializeModel'], $models),
+            'models' => array_map([$this->modelsService, 'serializeModel'], $models),
         ]);
     }
 
     #[Route('', name: 'admin_models_create', methods: ['POST'])]
+    #[OA\Post(
+        path: '/api/v1/admin/models',
+        summary: 'Create a new AI model',
+        description: 'Create a new AI model configuration (admin only)',
+        security: [['Bearer' => []]],
+        tags: ['Admin Models']
+    )]
+    #[OA\RequestBody(
+        required: true,
+        content: new OA\JsonContent(
+            required: ['service', 'tag', 'providerId', 'name'],
+            properties: [
+                new OA\Property(property: 'service', type: 'string', example: 'OpenAI'),
+                new OA\Property(property: 'tag', type: 'string', example: 'chat'),
+                new OA\Property(property: 'providerId', type: 'string', example: 'gpt-4o'),
+                new OA\Property(property: 'name', type: 'string', example: 'GPT-4o'),
+                new OA\Property(property: 'selectable', type: 'integer', example: 1),
+                new OA\Property(property: 'active', type: 'integer', example: 1),
+                new OA\Property(property: 'priceIn', type: 'number', format: 'float', example: 2.5),
+                new OA\Property(property: 'inUnit', type: 'string', example: 'per1M'),
+                new OA\Property(property: 'priceOut', type: 'number', format: 'float', example: 10.0),
+                new OA\Property(property: 'outUnit', type: 'string', example: 'per1M'),
+                new OA\Property(property: 'quality', type: 'number', format: 'float', example: 9.0),
+                new OA\Property(property: 'rating', type: 'number', format: 'float', example: 0.9),
+                new OA\Property(property: 'description', type: 'string', nullable: true),
+                new OA\Property(property: 'json', type: 'object', nullable: true),
+            ]
+        )
+    )]
+    #[OA\Response(response: 201, description: 'Model created')]
+    #[OA\Response(response: 400, description: 'Invalid input')]
+    #[OA\Response(response: 403, description: 'Admin access required')]
+    #[OA\Response(response: 409, description: 'Model already exists')]
     public function create(Request $request, #[CurrentUser] ?User $user): JsonResponse
     {
         if (!$user || !$user->isAdmin()) {
@@ -59,65 +103,57 @@ final class AdminModelsController extends AbstractController
             return $this->json(['error' => 'Invalid JSON'], Response::HTTP_BAD_REQUEST);
         }
 
-        $service = trim((string) ($data['service'] ?? ''));
-        $tag = strtolower(trim((string) ($data['tag'] ?? '')));
-        $providerId = trim((string) ($data['providerId'] ?? ''));
-        $name = trim((string) ($data['name'] ?? ''));
+        try {
+            $model = $this->modelsService->createModel($data);
 
-        if ('' === $service || '' === $tag || '' === $providerId || '' === $name) {
-            return $this->json(['error' => 'Missing required fields: service, tag, providerId, name'], Response::HTTP_BAD_REQUEST);
+            return $this->json([
+                'success' => true,
+                'model' => $this->modelsService->serializeModel($model),
+            ], Response::HTTP_CREATED);
+        } catch (\InvalidArgumentException $e) {
+            return $this->json(['error' => $e->getMessage()], Response::HTTP_BAD_REQUEST);
+        } catch (ModelConflictException $e) {
+            return $this->json(['error' => $e->getMessage()], Response::HTTP_CONFLICT);
         }
-
-        $existing = $this->modelRepository->findOneBy([
-            'service' => $service,
-            'tag' => $tag,
-            'providerId' => $providerId,
-        ]);
-        if ($existing) {
-            return $this->json(['error' => 'Model already exists for (service+tag+providerId)'], Response::HTTP_CONFLICT);
-        }
-
-        $model = (new Model())
-            ->setService($service)
-            ->setTag($tag)
-            ->setProviderId($providerId)
-            ->setName($name)
-            ->setSelectable((int) ($data['selectable'] ?? 1))
-            ->setActive((int) ($data['active'] ?? 1))
-            ->setPriceIn((float) ($data['priceIn'] ?? 0.0))
-            ->setInUnit((string) ($data['inUnit'] ?? 'per1M'))
-            ->setPriceOut((float) ($data['priceOut'] ?? 0.0))
-            ->setOutUnit((string) ($data['outUnit'] ?? 'per1M'))
-            ->setQuality((float) ($data['quality'] ?? 7.0))
-            ->setRating((float) ($data['rating'] ?? 0.5));
-
-        if (array_key_exists('description', $data)) {
-            $model->setDescription(null !== $data['description'] ? (string) $data['description'] : null);
-        }
-        if (isset($data['json']) && is_array($data['json'])) {
-            $model->setJson($data['json']);
-        }
-
-        $this->em->persist($model);
-        $this->em->flush();
-
-        return $this->json([
-            'success' => true,
-            'model' => $this->serializeModel($model),
-        ], Response::HTTP_CREATED);
     }
 
     #[Route('/{id}', name: 'admin_models_update', methods: ['PATCH'])]
+    #[OA\Patch(
+        path: '/api/v1/admin/models/{id}',
+        summary: 'Update an AI model',
+        description: 'Update an existing AI model configuration (admin only)',
+        security: [['Bearer' => []]],
+        tags: ['Admin Models']
+    )]
+    #[OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'integer'))]
+    #[OA\RequestBody(
+        required: true,
+        content: new OA\JsonContent(
+            properties: [
+                new OA\Property(property: 'service', type: 'string'),
+                new OA\Property(property: 'tag', type: 'string'),
+                new OA\Property(property: 'providerId', type: 'string'),
+                new OA\Property(property: 'name', type: 'string'),
+                new OA\Property(property: 'selectable', type: 'integer'),
+                new OA\Property(property: 'active', type: 'integer'),
+                new OA\Property(property: 'priceIn', type: 'number', format: 'float'),
+                new OA\Property(property: 'priceOut', type: 'number', format: 'float'),
+                new OA\Property(property: 'quality', type: 'number', format: 'float'),
+                new OA\Property(property: 'rating', type: 'number', format: 'float'),
+                new OA\Property(property: 'description', type: 'string', nullable: true),
+                new OA\Property(property: 'json', type: 'object', nullable: true),
+            ]
+        )
+    )]
+    #[OA\Response(response: 200, description: 'Model updated')]
+    #[OA\Response(response: 400, description: 'Invalid input')]
+    #[OA\Response(response: 403, description: 'Admin access required')]
+    #[OA\Response(response: 404, description: 'Model not found')]
+    #[OA\Response(response: 409, description: 'Conflict with existing model')]
     public function update(int $id, Request $request, #[CurrentUser] ?User $user): JsonResponse
     {
         if (!$user || !$user->isAdmin()) {
             return $this->json(['error' => 'Admin access required'], Response::HTTP_FORBIDDEN);
-        }
-
-        /** @var Model|null $model */
-        $model = $this->modelRepository->find($id);
-        if (!$model) {
-            return $this->json(['error' => 'Model not found'], Response::HTTP_NOT_FOUND);
         }
 
         $data = json_decode($request->getContent(), true);
@@ -125,97 +161,89 @@ final class AdminModelsController extends AbstractController
             return $this->json(['error' => 'Invalid JSON'], Response::HTTP_BAD_REQUEST);
         }
 
-        // Allow editing of the unique key fields, but check for conflicts.
-        $newService = array_key_exists('service', $data) ? trim((string) $data['service']) : $model->getService();
-        $newTag = array_key_exists('tag', $data) ? strtolower(trim((string) $data['tag'])) : $model->getTag();
-        $newProviderId = array_key_exists('providerId', $data) ? trim((string) $data['providerId']) : $model->getProviderId();
+        try {
+            $model = $this->modelsService->updateModel($id, $data);
 
-        $conflict = $this->modelRepository->findOneBy([
-            'service' => $newService,
-            'tag' => $newTag,
-            'providerId' => $newProviderId,
-        ]);
-        if ($conflict && $conflict->getId() !== $model->getId()) {
-            return $this->json(['error' => 'Another model already exists for (service+tag+providerId)'], Response::HTTP_CONFLICT);
+            return $this->json([
+                'success' => true,
+                'model' => $this->modelsService->serializeModel($model),
+            ]);
+        } catch (ModelNotFoundException $e) {
+            return $this->json(['error' => $e->getMessage()], Response::HTTP_NOT_FOUND);
+        } catch (ModelConflictException $e) {
+            return $this->json(['error' => $e->getMessage()], Response::HTTP_CONFLICT);
         }
-
-        $model->setService($newService);
-        $model->setTag($newTag);
-        $model->setProviderId($newProviderId);
-
-        if (array_key_exists('name', $data)) {
-            $model->setName((string) $data['name']);
-        }
-        if (array_key_exists('selectable', $data)) {
-            $model->setSelectable((int) $data['selectable']);
-        }
-        if (array_key_exists('active', $data)) {
-            $model->setActive((int) $data['active']);
-        }
-        if (array_key_exists('priceIn', $data)) {
-            $model->setPriceIn((float) $data['priceIn']);
-        }
-        if (array_key_exists('inUnit', $data)) {
-            $model->setInUnit((string) $data['inUnit']);
-        }
-        if (array_key_exists('priceOut', $data)) {
-            $model->setPriceOut((float) $data['priceOut']);
-        }
-        if (array_key_exists('outUnit', $data)) {
-            $model->setOutUnit((string) $data['outUnit']);
-        }
-        if (array_key_exists('quality', $data)) {
-            $model->setQuality((float) $data['quality']);
-        }
-        if (array_key_exists('rating', $data)) {
-            $model->setRating((float) $data['rating']);
-        }
-        if (array_key_exists('description', $data)) {
-            $model->setDescription(null !== $data['description'] ? (string) $data['description'] : null);
-        }
-        if (array_key_exists('json', $data) && is_array($data['json'])) {
-            $model->setJson($data['json']);
-        }
-
-        $this->em->flush();
-
-        return $this->json([
-            'success' => true,
-            'model' => $this->serializeModel($model),
-        ]);
     }
 
     #[Route('/{id}', name: 'admin_models_delete', methods: ['DELETE'])]
+    #[OA\Delete(
+        path: '/api/v1/admin/models/{id}',
+        summary: 'Delete an AI model',
+        description: 'Delete an AI model configuration (admin only)',
+        security: [['Bearer' => []]],
+        tags: ['Admin Models']
+    )]
+    #[OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'integer'))]
+    #[OA\Response(response: 200, description: 'Model deleted')]
+    #[OA\Response(response: 403, description: 'Admin access required')]
+    #[OA\Response(response: 404, description: 'Model not found')]
+    #[OA\Response(response: 409, description: 'Model is still in use')]
     public function delete(int $id, #[CurrentUser] ?User $user): JsonResponse
     {
         if (!$user || !$user->isAdmin()) {
             return $this->json(['error' => 'Admin access required'], Response::HTTP_FORBIDDEN);
         }
 
-        /** @var Model|null $model */
-        $model = $this->modelRepository->find($id);
-        if (!$model) {
-            return $this->json(['error' => 'Model not found'], Response::HTTP_NOT_FOUND);
+        try {
+            $this->modelsService->deleteModel($id);
+
+            return $this->json(['success' => true]);
+        } catch (ModelNotFoundException $e) {
+            return $this->json(['error' => $e->getMessage()], Response::HTTP_NOT_FOUND);
+        } catch (ModelConflictException $e) {
+            return $this->json(['error' => $e->getMessage()], Response::HTTP_CONFLICT);
         }
-
-        // Prevent deleting models that are still referenced by DEFAULTMODEL configs
-        $usageCount = $this->configRepository->count([
-            'group' => 'DEFAULTMODEL',
-            'value' => (string) $id,
-        ]);
-        if ($usageCount > 0) {
-            return $this->json([
-                'error' => 'Model is referenced by DEFAULTMODEL configuration. Change defaults first before deleting.',
-            ], Response::HTTP_CONFLICT);
-        }
-
-        $this->em->remove($model);
-        $this->em->flush();
-
-        return $this->json(['success' => true]);
     }
 
     #[Route('/import/preview', name: 'admin_models_import_preview', methods: ['POST'])]
+    #[OA\Post(
+        path: '/api/v1/admin/models/import/preview',
+        summary: 'Preview AI-generated model import SQL',
+        description: 'Generate SQL statements for importing/updating models from pricing pages (admin only)',
+        security: [['Bearer' => []]],
+        tags: ['Admin Models']
+    )]
+    #[OA\RequestBody(
+        required: true,
+        content: new OA\JsonContent(
+            properties: [
+                new OA\Property(property: 'urls', type: 'array', items: new OA\Items(type: 'string'), example: ['https://openai.com/pricing']),
+                new OA\Property(property: 'textDump', type: 'string', example: 'Model pricing info...'),
+                new OA\Property(property: 'allowDelete', type: 'boolean', example: false),
+            ]
+        )
+    )]
+    #[OA\Response(
+        response: 200,
+        description: 'SQL preview generated',
+        content: new OA\JsonContent(
+            properties: [
+                new OA\Property(property: 'success', type: 'boolean'),
+                new OA\Property(property: 'sql', type: 'string'),
+                new OA\Property(property: 'ai', type: 'object', properties: [
+                    new OA\Property(property: 'provider', type: 'string'),
+                    new OA\Property(property: 'model', type: 'string'),
+                ]),
+                new OA\Property(property: 'validation', type: 'object', properties: [
+                    new OA\Property(property: 'ok', type: 'boolean'),
+                    new OA\Property(property: 'errors', type: 'array', items: new OA\Items(type: 'string')),
+                    new OA\Property(property: 'statements', type: 'array', items: new OA\Items(type: 'string')),
+                ]),
+            ]
+        )
+    )]
+    #[OA\Response(response: 400, description: 'Invalid input')]
+    #[OA\Response(response: 403, description: 'Admin access required')]
     public function importPreview(Request $request, #[CurrentUser] ?User $user): JsonResponse
     {
         if (!$user || !$user->isAdmin()) {
@@ -228,33 +256,58 @@ final class AdminModelsController extends AbstractController
         }
 
         $urls = $data['urls'] ?? [];
-        $textDump = (string) ($data['textDump'] ?? '');
-        $allowDelete = (bool) ($data['allowDelete'] ?? false);
-
         if (!is_array($urls)) {
             return $this->json(['error' => 'urls must be an array'], Response::HTTP_BAD_REQUEST);
         }
 
-        $preview = $this->importService->generateSqlPreview($user->getId(), $urls, $textDump, $allowDelete);
-
-        $validated = $this->sqlValidator->validateAndSplit($preview['sql']);
+        $result = $this->modelsService->generateImportPreview(
+            $user->getId(),
+            $urls,
+            (string) ($data['textDump'] ?? ''),
+            (bool) ($data['allowDelete'] ?? false)
+        );
 
         return $this->json([
             'success' => true,
-            'sql' => $preview['sql'],
+            'sql' => $result['sql'],
             'ai' => [
-                'provider' => $preview['provider'],
-                'model' => $preview['model'],
+                'provider' => $result['provider'],
+                'model' => $result['model'],
             ],
-            'validation' => [
-                'ok' => empty($validated['errors']),
-                'errors' => $validated['errors'],
-                'statements' => $validated['statements'],
-            ],
+            'validation' => $result['validation'],
         ]);
     }
 
     #[Route('/import/apply', name: 'admin_models_import_apply', methods: ['POST'])]
+    #[OA\Post(
+        path: '/api/v1/admin/models/import/apply',
+        summary: 'Apply model import SQL',
+        description: 'Execute validated SQL statements to import/update models (admin only)',
+        security: [['Bearer' => []]],
+        tags: ['Admin Models']
+    )]
+    #[OA\RequestBody(
+        required: true,
+        content: new OA\JsonContent(
+            required: ['sql'],
+            properties: [
+                new OA\Property(property: 'sql', type: 'string', example: 'INSERT INTO BMODELS ...'),
+            ]
+        )
+    )]
+    #[OA\Response(
+        response: 200,
+        description: 'SQL applied successfully',
+        content: new OA\JsonContent(
+            properties: [
+                new OA\Property(property: 'success', type: 'boolean'),
+                new OA\Property(property: 'applied', type: 'integer'),
+                new OA\Property(property: 'statements', type: 'array', items: new OA\Items(type: 'string')),
+            ]
+        )
+    )]
+    #[OA\Response(response: 400, description: 'Invalid SQL')]
+    #[OA\Response(response: 403, description: 'Admin access required')]
     public function importApply(Request $request, #[CurrentUser] ?User $user): JsonResponse
     {
         if (!$user || !$user->isAdmin()) {
@@ -272,40 +325,15 @@ final class AdminModelsController extends AbstractController
         }
 
         try {
-            $result = $this->importService->applySql($sql);
+            $result = $this->modelsService->applyImportSql($sql);
+
+            return $this->json([
+                'success' => true,
+                'applied' => $result['applied'],
+                'statements' => $result['statements'],
+            ]);
         } catch (\InvalidArgumentException $e) {
             return $this->json(['error' => $e->getMessage()], Response::HTTP_BAD_REQUEST);
         }
-
-        return $this->json([
-            'success' => true,
-            'applied' => $result['applied'],
-            'statements' => $result['statements'],
-        ]);
-    }
-
-    /**
-     * @return array<string, mixed>
-     */
-    private function serializeModel(Model $model): array
-    {
-        return [
-            'id' => $model->getId(),
-            'service' => $model->getService(),
-            'tag' => $model->getTag(),
-            'providerId' => $model->getProviderId(),
-            'name' => $model->getName(),
-            'selectable' => $model->getSelectable(),
-            'active' => $model->getActive(),
-            'priceIn' => $model->getPriceIn(),
-            'inUnit' => $model->getInUnit(),
-            'priceOut' => $model->getPriceOut(),
-            'outUnit' => $model->getOutUnit(),
-            'quality' => $model->getQuality(),
-            'rating' => $model->getRating(),
-            'description' => $model->getDescription(),
-            'json' => $model->getJson(),
-            'isSystemModel' => $model->isSystemModel(),
-        ];
     }
 }

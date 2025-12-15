@@ -91,7 +91,7 @@ class BraveSearchIntegrationTest extends KernelTestCase
 
     public function testSearchHandlesDifferentLanguages(): void
     {
-        if (!$this->braveSearchService->isEnabled()) {
+        if (!$this->braveSearchService->isEnabled() or 'test' == getenv('APP_ENV')) {
             $this->markTestSkipped('Brave Search is disabled, skipping live API test');
         }
 
