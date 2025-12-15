@@ -7,6 +7,7 @@ use App\Entity\Message;
 use App\Entity\User;
 use App\Repository\FileRepository;
 use App\Repository\MessageRepository;
+use App\Repository\RagDocumentRepository;
 use App\Service\File\FileProcessor;
 use App\Service\File\FileStorageService;
 use App\Service\File\VectorizationService;
@@ -34,6 +35,7 @@ class FileController extends AbstractController
         private StorageQuotaService $storageQuotaService,
         private MessageRepository $messageRepository,
         private FileRepository $fileRepository,
+        private RagDocumentRepository $ragDocumentRepository,
         private EntityManagerInterface $em,
         private LoggerInterface $logger,
         private string $uploadDir,
@@ -484,6 +486,17 @@ class FileController extends AbstractController
         if (!$messageFile || $messageFile->getUserId() !== $user->getId()) {
             return $this->json(['error' => 'File not found'], Response::HTTP_NOT_FOUND);
         }
+
+        $fileId = $messageFile->getId();
+
+        // Delete RAG embeddings first (before deleting the file entity)
+        $deletedChunks = $this->ragDocumentRepository->deleteByMessageId($fileId);
+
+        $this->logger->info('FileController: Deleted RAG embeddings for file', [
+            'file_id' => $fileId,
+            'user_id' => $user->getId(),
+            'chunks_deleted' => $deletedChunks,
+        ]);
 
         // Delete physical file
         if ($messageFile->getFilePath()) {

@@ -83,6 +83,21 @@ class RagDocumentRepository extends ServiceEntityRepository
     }
 
     /**
+     * Löscht RAG-Dokumente nach MessageId/FileId.
+     *
+     * BMID kann sowohl auf BMESSAGES.BID als auch auf BFILES.BID verweisen.
+     */
+    public function deleteByMessageId(int $messageId): int
+    {
+        return $this->createQueryBuilder('r')
+            ->delete()
+            ->where('r.messageId = :messageId')
+            ->setParameter('messageId', $messageId)
+            ->getQuery()
+            ->execute();
+    }
+
+    /**
      * Speichert RAG-Dokument.
      */
     public function save(RagDocument $ragDocument, bool $flush = true): void
