@@ -28,13 +28,17 @@ RUN curl -Lo /tmp/protoc.zip "https://github.com/protocolbuffers/protobuf/releas
 WORKDIR /var/www/backend
 
 # Install whisper.cpp
+# Using v1.7.4 - newer versions have better cross-platform SIMD support
+# Note: In 1.6+ the binary is 'whisper-cli' (was 'main') and 'whisper-quantize' (was 'quantize')
+# GGML_NATIVE=OFF disables -mcpu=native which fails under QEMU emulation (Apple Silicon -> x86_64)
 RUN cd /tmp && \
     git clone https://github.com/ggerganov/whisper.cpp.git && \
     cd whisper.cpp && \
-    git checkout v1.5.4 && \
-    make -j$(nproc) || make -j1 && \
-    cp main /usr/local/bin/whisper && \
-    cp quantize /usr/local/bin/whisper-quantize && \
+    git checkout v1.7.4 && \
+    cmake -B build -DCMAKE_BUILD_TYPE=Release -DGGML_NATIVE=OFF && \
+    cmake --build build --config Release -j$(nproc) && \
+    cp build/bin/whisper-cli /usr/local/bin/whisper && \
+    cp build/bin/quantize /usr/local/bin/whisper-quantize && \
     chmod +x /usr/local/bin/whisper* && \
     cd / && rm -rf /tmp/whisper.cpp
 
