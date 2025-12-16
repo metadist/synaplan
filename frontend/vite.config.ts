@@ -30,7 +30,7 @@ export function gitkeepPlugin(): Plugin {
       } catch (error) {
         console.warn('Failed to create .gitkeep:', error)
       }
-    }
+    },
   }
 }
 
@@ -48,16 +48,16 @@ export default defineConfig(({ mode }) => {
     },
     resolve: {
       alias: {
-        '@': fileURLToPath(new URL('./src', import.meta.url))
-      }
+        '@': fileURLToPath(new URL('./src', import.meta.url)),
+      },
     },
     server: {
       proxy: {
         '/api': {
           target: backendUrl,
           changeOrigin: true,
-        }
-      }
+        },
+      },
     },
     test: {
       globals: true,

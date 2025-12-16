@@ -21,9 +21,10 @@ describe('useAuth', () => {
     global.fetch = vi.fn(() =>
       Promise.resolve({
         ok: true,
-        json: () => Promise.resolve({
-          user: { id: 1, email: 'test@example.com', level: 'PRO' }
-        })
+        json: () =>
+          Promise.resolve({
+            user: { id: 1, email: 'test@example.com', level: 'PRO' },
+          }),
       })
     ) as any
 
@@ -45,7 +46,7 @@ describe('useAuth', () => {
     global.fetch = vi.fn(() =>
       Promise.resolve({
         ok: true,
-        json: () => Promise.resolve({})
+        json: () => Promise.resolve({}),
       })
     ) as any
 
@@ -80,7 +81,7 @@ describe('useAuth', () => {
       Promise.resolve({
         ok: false,
         status: 401,
-        json: () => Promise.resolve({ error: 'Invalid credentials' })
+        json: () => Promise.resolve({ error: 'Invalid credentials' }),
       })
     ) as any
 

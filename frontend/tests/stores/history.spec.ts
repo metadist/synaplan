@@ -14,9 +14,9 @@ describe('History Store', () => {
 
   it('should add a message', () => {
     const store = useHistoryStore()
-    
+
     store.addMessage('user', [{ type: 'text', content: 'Hello' }])
-    
+
     expect(store.messages).toHaveLength(1)
     expect(store.messages[0].role).toBe('user')
     expect(store.messages[0].parts[0].content).toBe('Hello')
@@ -26,16 +26,16 @@ describe('History Store', () => {
     const store = useHistoryStore()
     store.addMessage('user', [{ type: 'text', content: 'Hello' }])
     store.addMessage('assistant', [{ type: 'text', content: 'Hi' }])
-    
+
     store.clear()
     expect(store.messages).toEqual([])
   })
 
   it('should add streaming message', () => {
     const store = useHistoryStore()
-    
+
     const id = store.addStreamingMessage('assistant', 'openai', 'GPT-4')
-    
+
     expect(store.messages).toHaveLength(1)
     expect(store.messages[0].isStreaming).toBe(true)
     expect(store.messages[0].id).toBe(id)
@@ -44,9 +44,9 @@ describe('History Store', () => {
   it('should update streaming message', () => {
     const store = useHistoryStore()
     const id = store.addStreamingMessage('assistant')
-    
+
     store.updateStreamingMessage(id, 'Hello')
-    
+
     expect(store.messages[0].parts[0].content).toBe('Hello')
     expect(store.messages[0].isStreaming).toBe(true)
   })
@@ -54,9 +54,9 @@ describe('History Store', () => {
   it('should finish streaming message', () => {
     const store = useHistoryStore()
     const id = store.addStreamingMessage('assistant')
-    
+
     store.finishStreamingMessage(id)
-    
+
     expect(store.messages[0].isStreaming).toBe(false)
   })
 
@@ -64,10 +64,9 @@ describe('History Store', () => {
     const store = useHistoryStore()
     store.addMessage('assistant', [{ type: 'text', content: 'Old response' }])
     const messageId = store.messages[0].id
-    
+
     store.markSuperseded(messageId)
-    
+
     expect(store.messages[0].isSuperseded).toBe(true)
   })
 })
-

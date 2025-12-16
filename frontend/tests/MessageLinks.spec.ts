@@ -82,7 +82,7 @@ describe('MessageLinks', () => {
     })
 
     const links = wrapper.findAll('a')
-    links.forEach(link => {
+    links.forEach((link) => {
       expect(link.attributes('target')).toBe('_blank')
       expect(link.attributes('rel')).toBe('noopener noreferrer')
     })

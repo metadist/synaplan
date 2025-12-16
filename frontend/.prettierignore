@@ -1,0 +1,15 @@
+# Dependencies
+node_modules/
+
+# Build outputs
+dist/
+dist-widget/
+
+# Generated files
+src/generated/
+
+# Lock files
+package-lock.json
+
+# Coverage reports
+coverage/
