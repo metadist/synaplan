@@ -587,13 +587,10 @@ Schemas are automatically generated during:
 When you modify OpenAPI annotations in PHP controllers, regenerate the frontend schemas:
 
 ```bash
-# Option 1: Inside frontend container (recommended)
-docker compose exec frontend npm run generate:schemas
-
-# Option 2: Via make
+# Regenerate schemas (recommended)
 make -C frontend generate-schemas
 
-# Option 3: Restart frontend container (auto-generates on startup)
+# Alternative: Restart frontend container (auto-generates on startup)
 docker compose restart frontend
 ```
 
