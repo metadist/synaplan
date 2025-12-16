@@ -16,13 +16,13 @@ export interface ModelOption {
 /**
  * Composable for model selection logic
  * Provides unified model selection for Again functionality
- * 
+ *
  * Now generates againData in frontend based on message files and available models:
  * - For images: Uses TEXT2PIC models
- * - For videos: Uses TEXT2VID models  
+ * - For videos: Uses TEXT2VID models
  * - For audio: Uses TEXT2SOUND models
  * - Otherwise: Uses CHAT models
- * 
+ *
  * Round-Robin: Recommends next model in BRANKING-sorted list (not the current one)
  */
 export function useModelSelection(
@@ -42,7 +42,7 @@ export function useModelSelection(
     const tagSources: Array<string | undefined> = [
       againData?.value?.tag ?? undefined,
       againData?.value?.predictedNext?.tag ?? undefined,
-      againData?.value?.eligible?.[0]?.tag ?? undefined
+      againData?.value?.eligible?.[0]?.tag ?? undefined,
     ]
 
     for (const tag of tagSources) {
@@ -79,7 +79,7 @@ export function useModelSelection(
     if (file.type?.startsWith('image/')) return 'image'
     if (file.type?.startsWith('video/')) return 'video'
     if (file.type?.startsWith('audio/')) return 'audio'
-    
+
     return 'chat'
   })
 
@@ -88,10 +88,14 @@ export function useModelSelection(
    */
   const modelTag = computed((): Capability => {
     switch (mediaType.value) {
-      case 'image': return 'TEXT2PIC'
-      case 'video': return 'TEXT2VID'
-      case 'audio': return 'TEXT2SOUND'
-      default: return 'CHAT'
+      case 'image':
+        return 'TEXT2PIC'
+      case 'video':
+        return 'TEXT2VID'
+      case 'audio':
+        return 'TEXT2SOUND'
+      default:
+        return 'CHAT'
     }
   })
 
@@ -102,7 +106,8 @@ export function useModelSelection(
   const currentModelId = computed((): number | null => {
     const backendCurrentModelId =
       againData?.value?.currentModelId ??
-      ((againData?.value as unknown as { current_model_id?: number | null })?.current_model_id ?? null)
+      (againData?.value as unknown as { current_model_id?: number | null })?.current_model_id ??
+      null
 
     if (typeof backendCurrentModelId === 'number' && backendCurrentModelId > 0) {
       return backendCurrentModelId
@@ -115,9 +120,10 @@ export function useModelSelection(
     // Search across ALL model tags to find current model
     for (const models of Object.values(aiConfigStore.models)) {
       if (!models) continue
-      const found = models.find((m: AIModel) =>
-        m.service.toLowerCase() === currentProvider.value?.toLowerCase() &&
-        m.name.toLowerCase() === currentModelName.value?.toLowerCase()
+      const found = models.find(
+        (m: AIModel) =>
+          m.service.toLowerCase() === currentProvider.value?.toLowerCase() &&
+          m.name.toLowerCase() === currentModelName.value?.toLowerCase()
       )
       if (found) {
         return found.id
@@ -135,14 +141,14 @@ export function useModelSelection(
   const modelOptions = computed((): ModelOption[] => {
     const tag = modelTag.value
     const models = aiConfigStore.models[tag] || []
-    
+
     console.log('🔍 useModelSelection:', {
       mediaType: mediaType.value,
       modelTag: tag,
       filesCount: files?.value?.length || 0,
-      availableModelsForTag: models.length
+      availableModelsForTag: models.length,
     })
-    
+
     if (models.length === 0) {
       console.warn('⚠️ No models available for tag:', tag)
       return []
@@ -157,7 +163,7 @@ export function useModelSelection(
         id: model.id,
         quality: model.quality,
         rating: model.rating,
-        description: model.description
+        description: model.description,
       }))
   })
 
@@ -176,8 +182,7 @@ export function useModelSelection(
       const modelLower = currentModelName.value.toLowerCase()
       const byName = options.findIndex(
         (m: ModelOption) =>
-          m.provider.toLowerCase() === providerLower &&
-          m.model.toLowerCase() === modelLower
+          m.provider.toLowerCase() === providerLower && m.model.toLowerCase() === modelLower
       )
       if (byName !== -1) return byName
     }
@@ -242,7 +247,6 @@ export function useModelSelection(
     formatModelLabel,
     hasModels,
     currentModelId,
-    mediaType
+    mediaType,
   }
 }
-

@@ -30,7 +30,11 @@ export class AudioRecorder {
   /**
    * Check if recording is supported and microphone is available
    */
-  async checkSupport(): Promise<{ supported: boolean; hasDevices: boolean; error?: AudioRecorderError }> {
+  async checkSupport(): Promise<{
+    supported: boolean
+    hasDevices: boolean
+    error?: AudioRecorderError
+  }> {
     try {
       // Check if MediaRecorder API is supported
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
@@ -41,8 +45,9 @@ export class AudioRecorder {
             type: 'not_supported',
             name: 'NotSupported',
             message: 'MediaDevices API not available',
-            userMessage: '🚫 Your browser does not support audio recording. Please use a modern browser like Chrome, Firefox, or Edge.'
-          }
+            userMessage:
+              '🚫 Your browser does not support audio recording. Please use a modern browser like Chrome, Firefox, or Edge.',
+          },
         }
       }
 
@@ -54,19 +59,21 @@ export class AudioRecorder {
             type: 'not_supported',
             name: 'NotSupported',
             message: 'MediaRecorder not available',
-            userMessage: '🚫 Recording is not supported by your browser.'
-          }
+            userMessage: '🚫 Recording is not supported by your browser.',
+          },
         }
       }
 
       // Try to enumerate devices (this might require permission in some browsers)
       try {
         const devices = await navigator.mediaDevices.enumerateDevices()
-        const audioInputs = devices.filter(device => device.kind === 'audioinput')
-        
+        const audioInputs = devices.filter((device) => device.kind === 'audioinput')
+
         console.log('🎤 Available audio input devices:', audioInputs.length)
         audioInputs.forEach((device, i) => {
-          console.log(`  ${i + 1}. ${device.label || 'Microphone ' + (i + 1)} (${device.deviceId.substring(0, 8)}...)`)
+          console.log(
+            `  ${i + 1}. ${device.label || 'Microphone ' + (i + 1)} (${device.deviceId.substring(0, 8)}...)`
+          )
         })
 
         if (audioInputs.length === 0) {
@@ -77,8 +84,9 @@ export class AudioRecorder {
               type: 'not_found',
               name: 'NoDevices',
               message: 'No audio input devices found',
-              userMessage: '🎤 No microphone detected. Please connect a microphone and refresh the page.\n\n💡 Note: On WSL2/Linux, audio devices might not be accessible from the browser.'
-            }
+              userMessage:
+                '🎤 No microphone detected. Please connect a microphone and refresh the page.\n\n💡 Note: On WSL2/Linux, audio devices might not be accessible from the browser.',
+            },
           }
         }
 
@@ -92,7 +100,7 @@ export class AudioRecorder {
       return {
         supported: false,
         hasDevices: false,
-        error: this.parseError(err)
+        error: this.parseError(err),
       }
     }
   }
@@ -113,12 +121,15 @@ export class AudioRecorder {
         audio: {
           echoCancellation: true,
           noiseSuppression: true,
-          autoGainControl: true
-        }
+          autoGainControl: true,
+        },
       })
 
       console.log('✅ Microphone access granted!')
-      console.log('   Tracks:', this.stream.getAudioTracks().map(t => `${t.label} (${t.kind})`))
+      console.log(
+        '   Tracks:',
+        this.stream.getAudioTracks().map((t) => `${t.label} (${t.kind})`)
+      )
 
       // Find best supported MIME type
       const mimeType = this.getBestMimeType()
@@ -126,7 +137,7 @@ export class AudioRecorder {
 
       // Create MediaRecorder
       this.mediaRecorder = new MediaRecorder(this.stream, {
-        mimeType: mimeType || undefined
+        mimeType: mimeType || undefined,
       })
 
       this.audioChunks = []
@@ -138,17 +149,17 @@ export class AudioRecorder {
       }
 
       this.mediaRecorder.onstop = () => {
-        const audioBlob = new Blob(this.audioChunks, { 
-          type: mimeType || 'audio/webm' 
+        const audioBlob = new Blob(this.audioChunks, {
+          type: mimeType || 'audio/webm',
         })
         console.log('🎵 Recording stopped. Size:', audioBlob.size, 'bytes')
-        
+
         if (this.options.onDataAvailable) {
           this.options.onDataAvailable(audioBlob)
         }
-        
+
         this.cleanup()
-        
+
         if (this.options.onStop) {
           this.options.onStop()
         }
@@ -173,7 +184,7 @@ export class AudioRecorder {
     } catch (err: any) {
       console.error('❌ Recording failed:', err)
       this.cleanup()
-      
+
       const error = this.parseError(err)
       if (this.options.onError) {
         this.options.onError(error)
@@ -207,7 +218,7 @@ export class AudioRecorder {
    */
   private cleanup(): void {
     if (this.stream) {
-      this.stream.getTracks().forEach(track => {
+      this.stream.getTracks().forEach((track) => {
         track.stop()
         console.log('🛑 Stopped track:', track.label)
       })
@@ -227,7 +238,7 @@ export class AudioRecorder {
       'audio/ogg;codecs=opus',
       'audio/ogg',
       'audio/mp4',
-      'audio/mpeg'
+      'audio/mpeg',
     ]
 
     for (const type of types) {
@@ -252,7 +263,8 @@ export class AudioRecorder {
         type: 'permission',
         name,
         message,
-        userMessage: '🔒 Microphone permission denied. Please allow microphone access in your browser settings and refresh the page.'
+        userMessage:
+          '🔒 Microphone permission denied. Please allow microphone access in your browser settings and refresh the page.',
       }
     }
 
@@ -262,7 +274,8 @@ export class AudioRecorder {
         type: 'not_found',
         name,
         message,
-        userMessage: '🎤 No microphone found. Please connect a microphone and try again.\n\n💡 Note: On WSL2/Linux, audio devices might not be accessible from the browser. Try accessing from Windows host.'
+        userMessage:
+          '🎤 No microphone found. Please connect a microphone and try again.\n\n💡 Note: On WSL2/Linux, audio devices might not be accessible from the browser. Try accessing from Windows host.',
       }
     }
 
@@ -272,7 +285,8 @@ export class AudioRecorder {
         type: 'in_use',
         name,
         message,
-        userMessage: '⚠️ Microphone is already in use by another application. Please close other apps using the microphone and try again.'
+        userMessage:
+          '⚠️ Microphone is already in use by another application. Please close other apps using the microphone and try again.',
       }
     }
 
@@ -282,7 +296,7 @@ export class AudioRecorder {
         type: 'unknown',
         name,
         message,
-        userMessage: '⚠️ Microphone access was aborted. Please try again.'
+        userMessage: '⚠️ Microphone access was aborted. Please try again.',
       }
     }
 
@@ -292,7 +306,8 @@ export class AudioRecorder {
         type: 'permission',
         name,
         message,
-        userMessage: '🔒 Microphone access blocked by security settings. Please use HTTPS or allow microphone in browser settings.'
+        userMessage:
+          '🔒 Microphone access blocked by security settings. Please use HTTPS or allow microphone in browser settings.',
       }
     }
 
@@ -301,8 +316,7 @@ export class AudioRecorder {
       type: 'unknown',
       name,
       message,
-      userMessage: `⚠️ Microphone error: ${name}\n${message}`
+      userMessage: `⚠️ Microphone error: ${name}\n${message}`,
     }
   }
 }
-

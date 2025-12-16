@@ -7,13 +7,13 @@
           <p class="txt-secondary">{{ $t('profile.subtitle') }}</p>
         </div>
 
-        <form @submit.prevent="handleSave" class="space-y-6" data-testid="comp-profile-form">
+        <form class="space-y-6" data-testid="comp-profile-form" @submit.prevent="handleSave">
           <section class="surface-card rounded-lg p-6" data-testid="section-personal">
             <h2 class="text-xl font-semibold txt-primary mb-6 flex items-center gap-2">
               <Icon icon="mdi:account" class="w-5 h-5" />
               {{ $t('profile.personalInfo.title') }}
             </h2>
-            
+
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div data-testid="field-first-name">
                 <label class="block txt-primary font-medium mb-2">
@@ -85,7 +85,7 @@
               {{ $t('profile.companyInfo.title') }}
             </h2>
             <p class="txt-secondary text-sm mb-6">{{ $t('profile.companyInfo.subtitle') }}</p>
-            
+
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div data-testid="field-company-name">
                 <label class="block txt-primary font-medium mb-2">
@@ -120,7 +120,7 @@
               <Icon icon="mdi:map-marker" class="w-5 h-5" />
               {{ $t('profile.billingAddress.title') }}
             </h2>
-            
+
             <div class="grid grid-cols-1 gap-6" data-testid="group-address">
               <div data-testid="field-street">
                 <label class="block txt-primary font-medium mb-2">
@@ -185,7 +185,7 @@
               <Icon icon="mdi:cog" class="w-5 h-5" />
               {{ $t('profile.accountSettings.title') }}
             </h2>
-            
+
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div data-testid="field-language">
                 <label class="block txt-primary font-medium mb-2">
@@ -237,17 +237,16 @@
               <Icon icon="mdi:lock" class="w-5 h-5" />
               {{ $t('profile.changePassword.title') }}
             </h2>
-            
+
             <!-- External Auth Warning -->
             <div v-if="isExternalAuth" class="mb-6 info-box-blue">
               <div class="flex items-start gap-3">
                 <Icon icon="mdi:shield-check" class="w-6 h-6 info-box-blue-icon flex-shrink-0" />
                 <div class="flex-1">
-                  <p class="text-sm info-box-blue-title mb-1">
-                    🔒 Managed by {{ authProvider }}
-                  </p>
+                  <p class="text-sm info-box-blue-title mb-1">🔒 Managed by {{ authProvider }}</p>
                   <p class="text-sm info-box-blue-text mb-2">
-                    You're using {{ authProvider }} to sign in. Password management is handled through {{ authProvider }}.
+                    You're using {{ authProvider }} to sign in. Password management is handled
+                    through {{ authProvider }}.
                   </p>
                   <p v-if="externalAuthLastLogin" class="text-xs info-box-blue-text">
                     Last authenticated: {{ externalAuthLastLogin }}
@@ -255,9 +254,11 @@
                 </div>
               </div>
             </div>
-            
-            <p v-else class="txt-secondary text-sm mb-6">{{ $t('profile.changePassword.subtitle') }}</p>
-            
+
+            <p v-else class="txt-secondary text-sm mb-6">
+              {{ $t('profile.changePassword.subtitle') }}
+            </p>
+
             <div v-if="canChangePassword" class="grid grid-cols-1 gap-6 max-w-2xl">
               <div data-testid="field-current-password">
                 <label class="block txt-primary font-medium mb-2">
@@ -283,7 +284,9 @@
                   :placeholder="$t('profile.changePassword.newPasswordPlaceholder')"
                   data-testid="input-new-password"
                 />
-                <p class="txt-secondary text-sm mt-1">{{ $t('profile.changePassword.newPasswordHint') }}</p>
+                <p class="txt-secondary text-sm mt-1">
+                  {{ $t('profile.changePassword.newPasswordHint') }}
+                </p>
               </div>
 
               <div data-testid="field-confirm-password">
@@ -297,28 +300,41 @@
                   :placeholder="$t('profile.changePassword.confirmPasswordPlaceholder')"
                   data-testid="input-confirm-password"
                 />
-                <p class="txt-secondary text-sm mt-1">{{ $t('profile.changePassword.confirmPasswordHint') }}</p>
+                <p class="txt-secondary text-sm mt-1">
+                  {{ $t('profile.changePassword.confirmPasswordHint') }}
+                </p>
               </div>
             </div>
           </section>
 
           <div class="info-box-blue" data-testid="section-privacy-notice">
             <p class="text-sm info-box-blue-text flex items-start gap-2">
-              <Icon icon="mdi:information" class="w-5 h-5 info-box-blue-icon flex-shrink-0 mt-0.5" />
+              <Icon
+                icon="mdi:information"
+                class="w-5 h-5 info-box-blue-icon flex-shrink-0 mt-0.5"
+              />
               <span>{{ $t('profile.privacyNotice') }}</span>
             </p>
           </div>
 
           <!-- Danger Zone -->
-          <section class="surface-card rounded-lg p-6 border-2 border-red-200 dark:border-red-800/50" data-testid="section-danger-zone">
-            <h2 class="text-xl font-semibold text-red-600 dark:text-red-400 mb-2 flex items-center gap-2">
+          <section
+            class="surface-card rounded-lg p-6 border-2 border-red-200 dark:border-red-800/50"
+            data-testid="section-danger-zone"
+          >
+            <h2
+              class="text-xl font-semibold text-red-600 dark:text-red-400 mb-2 flex items-center gap-2"
+            >
               <Icon icon="mdi:alert" class="w-5 h-5" />
               {{ $t('profile.dangerZone.title') }}
             </h2>
             <p class="txt-secondary text-sm mb-6">{{ $t('profile.dangerZone.subtitle') }}</p>
-            
+
             <div class="flex items-start gap-4 info-box-red">
-              <Icon icon="mdi:account-remove" class="w-6 h-6 info-box-red-icon flex-shrink-0 mt-0.5" />
+              <Icon
+                icon="mdi:account-remove"
+                class="w-6 h-6 info-box-red-icon flex-shrink-0 mt-0.5"
+              />
               <div class="flex-1">
                 <h3 class="info-box-red-title mb-1">
                   {{ $t('profile.dangerZone.deleteAccount') }}
@@ -327,10 +343,10 @@
                   {{ $t('profile.dangerZone.deleteAccountDesc') }}
                 </p>
                 <button
-                  @click="showDeleteModal = true"
                   type="button"
                   class="btn-danger px-4 py-2 rounded-lg text-sm font-medium"
                   data-testid="btn-delete-account"
+                  @click="showDeleteModal = true"
                 >
                   {{ $t('profile.dangerZone.deleteButton') }}
                 </button>
@@ -343,33 +359,37 @@
       </div>
     </div>
 
-    <UnsavedChangesBar
-      :show="hasUnsavedChanges"
-      @save="handleSave"
-      @discard="handleDiscard"
-    />
+    <UnsavedChangesBar :show="hasUnsavedChanges" @save="handleSave" @discard="handleDiscard" />
 
     <!-- Delete Account Modal -->
     <Teleport to="body">
       <div
         v-if="showDeleteModal"
         class="fixed inset-0 bg-black/50 dark:bg-black/70 flex items-center justify-center z-50 px-4"
-        @click.self="showDeleteModal = false"
         data-testid="modal-delete-account"
+        @click.self="showDeleteModal = false"
       >
         <div class="surface-card max-w-lg w-full p-6 space-y-6 animate-scale-in">
           <!-- Header -->
           <div class="text-center">
-            <div class="w-16 h-16 mx-auto mb-4 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center">
+            <div
+              class="w-16 h-16 mx-auto mb-4 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center"
+            >
               <Icon icon="mdi:alert-circle" class="w-10 h-10 text-red-600 dark:text-red-400" />
             </div>
-            <h2 class="text-2xl font-bold txt-primary mb-2">{{ $t('profile.deleteAccountModal.title') }}</h2>
-            <p class="text-sm text-red-600 dark:text-red-400 font-medium">{{ $t('profile.deleteAccountModal.warning') }}</p>
+            <h2 class="text-2xl font-bold txt-primary mb-2">
+              {{ $t('profile.deleteAccountModal.title') }}
+            </h2>
+            <p class="text-sm text-red-600 dark:text-red-400 font-medium">
+              {{ $t('profile.deleteAccountModal.warning') }}
+            </p>
           </div>
 
           <!-- Consequences List -->
           <div class="info-box-red">
-            <p class="text-sm info-box-red-title mb-3">{{ $t('profile.deleteAccountModal.consequences') }}</p>
+            <p class="text-sm info-box-red-title mb-3">
+              {{ $t('profile.deleteAccountModal.consequences') }}
+            </p>
             <ul class="space-y-2 text-sm info-box-red-text">
               <li class="flex items-start gap-2">
                 <Icon icon="mdi:close-circle" class="w-4 h-4 flex-shrink-0 mt-0.5" />
@@ -423,20 +443,20 @@
           <!-- Actions -->
           <div class="flex gap-3 pt-2">
             <button
-              @click="showDeleteModal = false"
               type="button"
               class="flex-1 btn-secondary py-2.5 rounded-lg font-medium"
               :disabled="deletingAccount"
               data-testid="btn-cancel-delete"
+              @click="showDeleteModal = false"
             >
               {{ $t('profile.deleteAccountModal.cancelButton') }}
             </button>
             <button
-              @click="handleDeleteAccount"
               type="button"
               class="flex-1 btn-danger py-2.5 rounded-lg font-medium"
               :disabled="deletingAccount || !canConfirmDelete"
               data-testid="btn-confirm-delete"
+              @click="handleDeleteAccount"
             >
               <span v-if="deletingAccount">{{ $t('profile.deleteAccountModal.deleting') }}</span>
               <span v-else>{{ $t('profile.deleteAccountModal.deleteButton') }}</span>
@@ -477,7 +497,7 @@ const formData = ref<UserProfile>({
   country: 'DE',
   language: 'en',
   timezone: 'Europe/Berlin',
-  invoiceEmail: ''
+  invoiceEmail: '',
 })
 const originalData = ref<UserProfile>({ ...formData.value })
 const passwordData = ref({
@@ -511,7 +531,7 @@ let cleanupGuard: (() => void) | undefined
 
 onMounted(async () => {
   cleanupGuard = setupNavigationGuard()
-  
+
   // Load profile from backend
   try {
     loading.value = true
@@ -519,13 +539,13 @@ onMounted(async () => {
     if (response.success && response.profile) {
       Object.assign(formData.value, response.profile)
       originalData.value = { ...formData.value }
-      
+
       // Set auth info
       canChangePassword.value = response.profile.canChangePassword ?? true
       authProvider.value = response.profile.authProvider ?? 'Email/Password'
       isExternalAuth.value = response.profile.isExternalAuth ?? false
       externalAuthLastLogin.value = response.profile.externalAuthInfo?.lastLogin ?? null
-      
+
       // Sync isAdmin to auth store if needed
       if (response.profile.isAdmin !== undefined && authStore.user) {
         authStore.user.isAdmin = response.profile.isAdmin
@@ -558,16 +578,16 @@ const handleSave = saveChanges(async () => {
 
   try {
     loading.value = true
-    
+
     // Update profile
     await profileApi.updateProfile(formData.value)
-    
+
     // Change password if provided and allowed
     if (canChangePassword.value && passwordData.value.current && passwordData.value.new) {
       await profileApi.changePassword(passwordData.value.current, passwordData.value.new)
       passwordData.value = { current: '', new: '', confirm: '' }
     }
-    
+
     success('Profile updated successfully')
     originalData.value = { ...formData.value }
   } catch (err: any) {
@@ -588,18 +608,17 @@ const handleDeleteAccount = async () => {
 
   try {
     deletingAccount.value = true
-    
-    const payload = isExternalAuth.value 
+
+    const payload = isExternalAuth.value
       ? { password: 'EXTERNAL_AUTH_DELETE' } // Special marker for external auth
       : { password: deleteConfirmPassword.value }
-    
+
     await profileApi.deleteAccount(payload.password)
-    
+
     // Clear auth and redirect to login
     await authStore.logout()
     showDeleteModal.value = false
     router.push('/login')
-    
   } catch (err: any) {
     error(err.message || 'Failed to delete account')
   } finally {

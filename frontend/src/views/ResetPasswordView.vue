@@ -1,5 +1,8 @@
 <template>
-  <div class="min-h-screen bg-light-bg dark:bg-dark-bg flex items-center justify-center px-4 py-12" data-testid="page-reset-password">
+  <div
+    class="min-h-screen bg-light-bg dark:bg-dark-bg flex items-center justify-center px-4 py-12"
+    data-testid="page-reset-password"
+  >
     <div class="w-full max-w-md">
       <div class="text-center mb-8">
         <img :src="logoSrc" alt="synaplan" class="h-12 mx-auto mb-6" />
@@ -9,7 +12,7 @@
 
       <div class="surface-card p-8" data-testid="section-reset-card">
         <div v-if="!success" data-testid="section-reset-form">
-          <form @submit.prevent="handleReset" class="space-y-5" data-testid="form-reset-password">
+          <form class="space-y-5" data-testid="form-reset-password" @submit.prevent="handleReset">
             <div data-testid="field-new-password">
               <label for="password" class="block text-sm font-medium txt-primary mb-2">
                 New Password
@@ -25,7 +28,13 @@
                 data-testid="input-new-password"
               />
               <div v-if="passwordErrors.length > 0" class="mt-2 space-y-1">
-                <p v-for="err in passwordErrors" :key="err" class="text-xs text-red-600 dark:text-red-400">• {{ err }}</p>
+                <p
+                  v-for="err in passwordErrors"
+                  :key="err"
+                  class="text-xs text-red-600 dark:text-red-400"
+                >
+                  • {{ err }}
+                </p>
               </div>
             </div>
 
@@ -42,7 +51,11 @@
                 placeholder="Confirm new password"
                 data-testid="input-confirm-password"
               />
-              <p v-if="password && confirmPassword && password !== confirmPassword" class="text-sm text-yellow-600 dark:text-yellow-400 mt-1" data-testid="text-password-mismatch">
+              <p
+                v-if="password && confirmPassword && password !== confirmPassword"
+                class="text-sm text-yellow-600 dark:text-yellow-400 mt-1"
+                data-testid="text-password-mismatch"
+              >
                 Passwords do not match
               </p>
             </div>
@@ -64,14 +77,30 @@
         </div>
 
         <div v-else class="text-center py-8" data-testid="section-reset-success">
-          <div class="w-16 h-16 bg-green-100 dark:bg-green-900/20 rounded-full flex items-center justify-center mx-auto mb-4">
-            <svg class="w-8 h-8 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+          <div
+            class="w-16 h-16 bg-green-100 dark:bg-green-900/20 rounded-full flex items-center justify-center mx-auto mb-4"
+          >
+            <svg
+              class="w-8 h-8 text-green-600 dark:text-green-400"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M5 13l4 4L19 7"
+              ></path>
             </svg>
           </div>
           <h2 class="text-2xl font-bold txt-primary mb-2">Password Reset!</h2>
           <p class="txt-secondary mb-6">Your password has been successfully reset.</p>
-          <router-link to="/login" class="btn-primary px-6 py-3 rounded-lg inline-block" data-testid="link-reset-login">
+          <router-link
+            to="/login"
+            class="btn-primary px-6 py-3 rounded-lg inline-block"
+            data-testid="link-reset-login"
+          >
             Go to Login
           </router-link>
         </div>
@@ -98,7 +127,9 @@ const isDark = computed(() => {
   return matchMedia('(prefers-color-scheme: dark)').matches
 })
 
-const logoSrc = computed(() => `${import.meta.env.BASE_URL}${isDark.value ? 'synaplan-light.svg' : 'synaplan-dark.svg'}`)
+const logoSrc = computed(
+  () => `${import.meta.env.BASE_URL}${isDark.value ? 'synaplan-light.svg' : 'synaplan-dark.svg'}`
+)
 
 const password = ref('')
 const confirmPassword = ref('')
@@ -109,7 +140,7 @@ const passwordErrors = ref<string[]>([])
 const token = ref('')
 
 onMounted(() => {
-  token.value = route.query.token as string || ''
+  token.value = (route.query.token as string) || ''
   if (!token.value) {
     error.value = 'Invalid or missing reset token'
   }

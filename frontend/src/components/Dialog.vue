@@ -4,11 +4,14 @@
       <div
         v-if="dialog.isOpen"
         class="fixed inset-0 z-50 flex items-center justify-center p-4"
-        @click.self="handleBackdropClick"
         data-testid="modal-dialog-root"
+        @click.self="handleBackdropClick"
       >
         <!-- Backdrop -->
-        <div class="absolute inset-0 bg-black/50 dark:bg-black/70 backdrop-blur-sm" data-testid="modal-dialog-backdrop"></div>
+        <div
+          class="absolute inset-0 bg-black/50 dark:bg-black/70 backdrop-blur-sm"
+          data-testid="modal-dialog-backdrop"
+        ></div>
 
         <!-- Dialog -->
         <div
@@ -25,8 +28,8 @@
                 dialog.danger
                   ? 'bg-red-500/10 text-red-500'
                   : dialog.type === 'confirm'
-                  ? 'bg-blue-500/10 text-blue-500'
-                  : 'bg-[var(--brand)]/10 text-[var(--brand)]'
+                    ? 'bg-blue-500/10 text-blue-500'
+                    : 'bg-[var(--brand)]/10 text-[var(--brand)]',
               ]"
             >
               <ExclamationTriangleIcon v-if="dialog.danger" class="w-6 h-6" />
@@ -48,35 +51,33 @@
           <!-- Input for prompt -->
           <input
             v-if="dialog.type === 'prompt'"
+            ref="inputRef"
             v-model="inputValue"
             type="text"
             :placeholder="dialog.placeholder"
             class="w-full px-4 py-2.5 rounded-lg border border-light-border/30 dark:border-dark-border/20 surface-card txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] transition-all"
+            data-testid="input-dialog-prompt"
             @keydown.enter="handleConfirm"
             @keydown.esc="handleCancel"
-            ref="inputRef"
-            data-testid="input-dialog-prompt"
           />
 
           <!-- Actions -->
           <div class="flex gap-3 justify-end pt-2">
             <button
               v-if="dialog.type !== 'alert'"
-              @click="handleCancel"
               class="px-4 py-2 rounded-lg border border-light-border/30 dark:border-dark-border/20 txt-secondary hover:bg-black/5 dark:hover:bg-white/5 transition-all text-sm font-medium"
               data-testid="btn-dialog-cancel"
+              @click="handleCancel"
             >
               {{ dialog.cancelText }}
             </button>
             <button
-              @click="handleConfirm"
               :class="[
                 'px-4 py-2 rounded-lg text-sm font-medium transition-all',
-                dialog.danger
-                  ? 'bg-red-500 hover:bg-red-600 text-white'
-                  : 'btn-primary'
+                dialog.danger ? 'bg-red-500 hover:bg-red-600 text-white' : 'btn-primary',
               ]"
               data-testid="btn-dialog-confirm"
+              @click="handleConfirm"
             >
               {{ dialog.confirmText }}
             </button>
@@ -93,7 +94,7 @@ import { useDialog } from '@/composables/useDialog'
 import {
   ExclamationTriangleIcon,
   QuestionMarkCircleIcon,
-  InformationCircleIcon
+  InformationCircleIcon,
 } from '@heroicons/vue/24/outline'
 
 const { dialog, close } = useDialog()
@@ -101,15 +102,18 @@ const inputValue = ref('')
 const inputRef = ref<HTMLInputElement>()
 
 // Reset input value when dialog opens
-watch(() => dialog.value.isOpen, async (isOpen) => {
-  if (isOpen) {
-    inputValue.value = dialog.value.defaultValue || ''
-    if (dialog.value.type === 'prompt') {
-      await nextTick()
-      inputRef.value?.focus()
+watch(
+  () => dialog.value.isOpen,
+  async (isOpen) => {
+    if (isOpen) {
+      inputValue.value = dialog.value.defaultValue || ''
+      if (dialog.value.type === 'prompt') {
+        await nextTick()
+        inputRef.value?.focus()
+      }
     }
   }
-})
+)
 
 const handleConfirm = () => {
   if (dialog.value.resolve) {

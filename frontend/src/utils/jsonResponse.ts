@@ -83,7 +83,7 @@ export function extractBTextPayload(content: string): ParsedBTextResult {
       return {
         text: textValue,
         data,
-        remainder: remainder || undefined
+        remainder: remainder || undefined,
       }
     }
     return { data, remainder: remainder || undefined }
@@ -92,4 +92,3 @@ export function extractBTextPayload(content: string): ParsedBTextResult {
     return {}
   }
 }
-

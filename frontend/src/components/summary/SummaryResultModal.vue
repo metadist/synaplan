@@ -11,7 +11,9 @@
           @click.stop
         >
           <!-- Header -->
-          <div class="flex items-center justify-between p-6 border-b border-light-border/10 dark:border-dark-border/10">
+          <div
+            class="flex items-center justify-between p-6 border-b border-light-border/10 dark:border-dark-border/10"
+          >
             <div class="flex-1 min-w-0">
               <h2 class="text-2xl font-semibold txt-primary flex items-center gap-2">
                 <SparklesIcon class="w-6 h-6 text-[var(--brand)]" />
@@ -24,9 +26,9 @@
               </div>
             </div>
             <button
-              @click="close"
               class="ml-4 p-2 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 transition-colors txt-secondary hover:txt-primary"
               aria-label="Close"
+              @click="close"
             >
               <XMarkIcon class="w-6 h-6" />
             </button>
@@ -36,19 +38,35 @@
           <div class="flex-1 overflow-y-auto p-6 scroll-thin">
             <div v-if="summary" class="space-y-6">
               <!-- Thinking Block (Optional) -->
-              <div v-if="parsedContent.thinking" class="surface-card rounded-lg border-2 border-light-border/20 dark:border-dark-border/10">
+              <div
+                v-if="parsedContent.thinking"
+                class="surface-card rounded-lg border-2 border-light-border/20 dark:border-dark-border/10"
+              >
                 <button
-                  @click="showThinking = !showThinking"
                   class="w-full flex items-center justify-between p-4 text-left hover:bg-black/5 dark:hover:bg-white/5 transition-colors rounded-lg"
+                  @click="showThinking = !showThinking"
                 >
                   <div class="flex items-center gap-2">
-                    <svg class="w-5 h-5 txt-secondary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                    <svg
+                      class="w-5 h-5 txt-secondary"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        stroke-width="2"
+                        d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"
+                      />
                     </svg>
                     <span class="font-medium txt-primary">Thinking Process</span>
                     <span class="text-xs txt-secondary">(AI reasoning - not included in copy)</span>
                   </div>
-                  <component :is="showThinking ? ChevronUpIcon : ChevronDownIcon" class="w-5 h-5 txt-secondary" />
+                  <component
+                    :is="showThinking ? ChevronUpIcon : ChevronDownIcon"
+                    class="w-5 h-5 txt-secondary"
+                  />
                 </button>
                 <Transition
                   enter-active-class="transition-all duration-300 ease-out"
@@ -59,39 +77,55 @@
                   leave-to-class="opacity-0 max-h-0"
                 >
                   <div v-if="showThinking" class="px-4 pb-4 overflow-hidden">
-                    <div class="surface-elevated rounded-lg p-4 text-sm txt-secondary font-mono whitespace-pre-wrap leading-relaxed">{{ parsedContent.thinking }}</div>
+                    <div
+                      class="surface-elevated rounded-lg p-4 text-sm txt-secondary font-mono whitespace-pre-wrap leading-relaxed"
+                    >
+                      {{ parsedContent.thinking }}
+                    </div>
                   </div>
                 </Transition>
               </div>
 
               <!-- Summary Text (Markdown formatted) -->
               <div class="surface-elevated rounded-lg p-6">
-                <div 
-                  v-html="formattedSummary" 
+                <div
                   class="prose prose-sm max-w-none txt-primary leading-relaxed"
+                  v-html="formattedSummary"
                 ></div>
               </div>
 
               <!-- Statistics -->
               <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div class="text-center p-4 surface-card rounded-lg border border-light-border/10 dark:border-dark-border/10">
+                <div
+                  class="text-center p-4 surface-card rounded-lg border border-light-border/10 dark:border-dark-border/10"
+                >
                   <p class="text-xs txt-secondary mb-2">Original</p>
                   <p class="text-2xl font-bold txt-primary">{{ metadata?.original_length || 0 }}</p>
                   <p class="text-xs txt-secondary mt-1">words</p>
                 </div>
-                <div class="text-center p-4 surface-card rounded-lg border border-light-border/10 dark:border-dark-border/10">
+                <div
+                  class="text-center p-4 surface-card rounded-lg border border-light-border/10 dark:border-dark-border/10"
+                >
                   <p class="text-xs txt-secondary mb-2">Summary</p>
                   <p class="text-2xl font-bold txt-primary">{{ metadata?.summary_length || 0 }}</p>
                   <p class="text-xs txt-secondary mt-1">words</p>
                 </div>
-                <div class="text-center p-4 surface-card rounded-lg border border-light-border/10 dark:border-dark-border/10">
+                <div
+                  class="text-center p-4 surface-card rounded-lg border border-light-border/10 dark:border-dark-border/10"
+                >
                   <p class="text-xs txt-secondary mb-2">Compression</p>
-                  <p class="text-2xl font-bold text-[var(--brand)]">{{ ((metadata?.compression_ratio || 0) * 100).toFixed(1) }}%</p>
+                  <p class="text-2xl font-bold text-[var(--brand)]">
+                    {{ ((metadata?.compression_ratio || 0) * 100).toFixed(1) }}%
+                  </p>
                   <p class="text-xs txt-secondary mt-1">ratio</p>
                 </div>
-                <div class="text-center p-4 surface-card rounded-lg border border-light-border/10 dark:border-dark-border/10">
+                <div
+                  class="text-center p-4 surface-card rounded-lg border border-light-border/10 dark:border-dark-border/10"
+                >
                   <p class="text-xs txt-secondary mb-2">Processing Time</p>
-                  <p class="text-2xl font-bold txt-primary">{{ ((metadata?.processing_time_ms || 0) / 1000).toFixed(1) }}s</p>
+                  <p class="text-2xl font-bold txt-primary">
+                    {{ ((metadata?.processing_time_ms || 0) / 1000).toFixed(1) }}s
+                  </p>
                   <p class="text-xs txt-secondary mt-1">{{ metadata?.model || 'N/A' }}</p>
                 </div>
               </div>
@@ -114,7 +148,9 @@
                   </div>
                   <div>
                     <span class="txt-secondary">Focus:</span>
-                    <span class="txt-primary ml-2 font-medium">{{ config?.focusAreas?.join(', ') }}</span>
+                    <span class="txt-primary ml-2 font-medium">{{
+                      config?.focusAreas?.join(', ')
+                    }}</span>
                   </div>
                 </div>
               </div>
@@ -122,22 +158,24 @@
           </div>
 
           <!-- Footer -->
-          <div class="flex items-center justify-between gap-3 p-6 border-t border-light-border/10 dark:border-dark-border/10">
+          <div
+            class="flex items-center justify-between gap-3 p-6 border-t border-light-border/10 dark:border-dark-border/10"
+          >
             <button
-              @click="copyToClipboard"
               class="px-4 py-2 rounded-lg flex items-center gap-2 transition-colors border border-light-border/30 dark:border-dark-border/20 txt-primary hover:bg-black/5 dark:hover:bg-white/5"
+              @click="copyToClipboard"
             >
               <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"
+                />
               </svg>
               Copy Summary
             </button>
-            <button
-              @click="close"
-              class="btn-primary px-6 py-2 rounded-lg"
-            >
-              Close
-            </button>
+            <button class="btn-primary px-6 py-2 rounded-lg" @click="close">Close</button>
           </div>
         </div>
       </div>
@@ -171,16 +209,16 @@ const showThinking = ref(false)
 // Parse thinking block from summary
 const parsedContent = computed(() => {
   if (!props.summary) return { thinking: null, content: '' }
-  
+
   // Extract <think>...</think> block
   const thinkMatch = props.summary.match(/<think>([\s\S]*?)<\/think>/i)
-  
+
   if (thinkMatch) {
     const thinking = thinkMatch[1].trim()
     const content = props.summary.replace(/<think>[\s\S]*?<\/think>/i, '').trim()
     return { thinking, content }
   }
-  
+
   return { thinking: null, content: props.summary }
 })
 
@@ -196,8 +234,14 @@ function applyInlineFormatting(text: string): string {
     .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
     .replace(/\*(.*?)\*/g, '<em>$1</em>')
     .replace(/~~(.+?)~~/g, '<del>$1</del>')
-    .replace(/`([^`]+)`/g, '<code class="surface-chip px-1.5 py-0.5 text-sm font-mono rounded">$1</code>')
-    .replace(/\[(.+?)\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2" class="underline text-[var(--brand)]" target="_blank" rel="noopener noreferrer">$1</a>')
+    .replace(
+      /`([^`]+)`/g,
+      '<code class="surface-chip px-1.5 py-0.5 text-sm font-mono rounded">$1</code>'
+    )
+    .replace(
+      /\[(.+?)\]\((https?:\/\/[^\s)]+)\)/g,
+      '<a href="$2" class="underline text-[var(--brand)]" target="_blank" rel="noopener noreferrer">$1</a>'
+    )
 }
 
 const formattedSummary = computed(() => {
@@ -232,7 +276,9 @@ const formattedSummary = computed(() => {
   let processedContent = content.replace(/```(\w+)?\n([\s\S]*?)```/g, (_, lang, code) => {
     const language = lang || 'text'
     const placeholder = `__CODEBLOCK_${codeBlocks.length}__`
-    codeBlocks.push(`<pre class="surface-chip p-4 overflow-x-auto my-3 rounded-lg"><code class="language-${language} text-sm">${escapeHtml(code.trim())}</code></pre>`)
+    codeBlocks.push(
+      `<pre class="surface-chip p-4 overflow-x-auto my-3 rounded-lg"><code class="language-${language} text-sm">${escapeHtml(code.trim())}</code></pre>`
+    )
     return placeholder
   })
 
@@ -255,8 +301,11 @@ const formattedSummary = computed(() => {
       closeBlockquoteIfNeeded()
       const level = headingMatch[1].length
       const content = applyInlineFormatting(escapeHtml(headingMatch[2]))
-      const sizeClass = level === 1 ? 'text-2xl' : level === 2 ? 'text-xl' : level === 3 ? 'text-lg' : 'text-base'
-      htmlParts.push(`<h${level} class="font-semibold ${sizeClass} mt-4 mb-2">${content}</h${level}>`)
+      const sizeClass =
+        level === 1 ? 'text-2xl' : level === 2 ? 'text-xl' : level === 3 ? 'text-lg' : 'text-base'
+      htmlParts.push(
+        `<h${level} class="font-semibold ${sizeClass} mt-4 mb-2">${content}</h${level}>`
+      )
       continue
     }
 
@@ -265,7 +314,9 @@ const formattedSummary = computed(() => {
       closeListIfNeeded()
       if (!inBlockquote) {
         inBlockquote = true
-        htmlParts.push('<blockquote style="border-left: 4px solid var(--brand); padding-left: 12px; padding-top: 4px; padding-bottom: 4px; margin-top: 8px; margin-bottom: 8px; font-style: italic; opacity: 0.8;">')
+        htmlParts.push(
+          '<blockquote style="border-left: 4px solid var(--brand); padding-left: 12px; padding-top: 4px; padding-bottom: 4px; margin-top: 8px; margin-bottom: 8px; font-style: italic; opacity: 0.8;">'
+        )
       }
       const quoteContent = trimmed.substring(2)
       htmlParts.push(`<p>${applyInlineFormatting(escapeHtml(quoteContent))}</p>`)
@@ -368,4 +419,3 @@ const copyToClipboard = async () => {
   transform: scale(0.95);
 }
 </style>
-

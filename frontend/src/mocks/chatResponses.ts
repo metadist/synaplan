@@ -31,10 +31,14 @@ const responses: Record<string, string> = {
 export function mockChatResponse(message: string): ChatResponse {
   let response = responses.default
   const lowerMsg = message.toLowerCase()
-  
+
   if (lowerMsg.includes('hello') || lowerMsg.includes('hi')) {
     response = responses.hello
-  } else if (lowerMsg.includes('image') || lowerMsg.includes('picture') || lowerMsg.includes('bild')) {
+  } else if (
+    lowerMsg.includes('image') ||
+    lowerMsg.includes('picture') ||
+    lowerMsg.includes('bild')
+  ) {
     response = responses.image
   } else if (lowerMsg.includes('code') || lowerMsg.includes('function')) {
     response = responses.code
@@ -53,9 +57,9 @@ export function mockChatResponse(message: string): ChatResponse {
       tokens: {
         prompt: Math.floor(message.length / 4),
         completion: Math.floor(response.length / 4),
-        total: Math.floor((message.length + response.length) / 4)
-      }
-    }
+        total: Math.floor((message.length + response.length) / 4),
+      },
+    },
   }
 }
 
@@ -63,12 +67,16 @@ export function mockStreamingResponse(message: string, callback: (data: any) => 
   const steps = [
     { status: 'created', messageId: 12345, timestamp: Date.now() },
     { status: 'pre_processing', message: 'Processing message...', timestamp: Date.now() },
-    { status: 'classified', classification: { topic: 'GENERAL', language: 'EN', intent: 'chat' }, timestamp: Date.now() },
+    {
+      status: 'classified',
+      classification: { topic: 'GENERAL', language: 'EN', intent: 'chat' },
+      timestamp: Date.now(),
+    },
     { status: 'generating', message: 'Generating response...', timestamp: Date.now() },
   ]
 
   const fullResponse = mockChatResponse(message)
-  
+
   let index = 0
   const interval = setInterval(() => {
     if (index < steps.length) {
@@ -79,9 +87,8 @@ export function mockStreamingResponse(message: string, callback: (data: any) => 
       callback({
         status: 'complete',
         ...fullResponse,
-        timestamp: Date.now()
+        timestamp: Date.now(),
       })
     }
   }, 200)
 }
-

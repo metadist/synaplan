@@ -1,6 +1,9 @@
 <template>
   <Teleport to="body">
-    <div class="fixed top-4 right-4 z-[9999] flex flex-col gap-3 pointer-events-none" data-testid="comp-notification-container">
+    <div
+      class="fixed top-4 right-4 z-[9999] flex flex-col gap-3 pointer-events-none"
+      data-testid="comp-notification-container"
+    >
       <TransitionGroup
         name="notification"
         tag="div"
@@ -12,10 +15,7 @@
           :key="notification.id"
           class="pointer-events-auto"
         >
-          <NotificationItem
-            :notification="notification"
-            @close="remove(notification.id)"
-          />
+          <NotificationItem :notification="notification" @close="remove(notification.id)" />
         </div>
       </TransitionGroup>
     </div>
@@ -52,4 +52,3 @@ const { notifications, remove } = useNotification()
   transition: transform 0.3s ease;
 }
 </style>
-

@@ -16,36 +16,41 @@ export interface SortingCategory {
 
 export const mockSortingPrompt: SortingPromptData = {
   id: 1,
-  description: 'The preprocessor handles the incoming message. It gets the message as a JSON object and returns a JSON object.',
+  description:
+    'The preprocessor handles the incoming message. It gets the message as a JSON object and returns a JSON object.',
   tasks: 'You are an assistant of assistants. You sort user requests by setting JSON values only.',
   categories: [
     {
       name: 'mediamaker',
-      description: 'The user asks for generation of images, videos or sounds (or just one). Not for any other file types. The user wants an image, video or an audio file. Direct the request here. This handles the connection to media generation AIs.',
-      type: 'default'
+      description:
+        'The user asks for generation of images, videos or sounds (or just one). Not for any other file types. The user wants an image, video or an audio file. Direct the request here. This handles the connection to media generation AIs.',
+      type: 'default',
     },
     {
       name: 'general',
-      description: 'All requests by users go here by default. Send the user question here for text creation, poems, health tips, programming or coding examples, travel infos and the like.',
-      type: 'default'
+      description:
+        'All requests by users go here by default. Send the user question here for text creation, poems, health tips, programming or coding examples, travel infos and the like.',
+      type: 'default',
     },
     {
       name: 'analyzefile',
-      description: 'The user asks to analyze any type of document file — including PDF, Word (DOC/DOCX), Excel (XLS/XLSX), PowerPoint (PPT/PPTX), TXT, images, and similar. Only direct here if a file is attached and BFILE is set.',
-      type: 'custom'
+      description:
+        'The user asks to analyze any type of document file — including PDF, Word (DOC/DOCX), Excel (XLS/XLSX), PowerPoint (PPT/PPTX), TXT, images, and similar. Only direct here if a file is attached and BFILE is set.',
+      type: 'custom',
     },
     {
       name: 'officemaker',
-      description: 'The user asks for the generation of an Excel, Powerpoint or Word document. Not for any other format. This prompt can only handle the generation of ONE document with a clear prompt.',
-      type: 'default'
-    }
+      description:
+        'The user asks for the generation of an Excel, Powerpoint or Word document. Not for any other format. This prompt can only handle the generation of ONE document with a clear prompt.',
+      type: 'default',
+    },
   ],
   instructions: [
-    'Detect the user\'s language (BLANG) in the BTEXT field, if possible. Use a 2-letter language code. Use any language, you can understand. Leave BLANG as is, if you cannot detect the language.',
-    'Classify the user\'s message into one of these BTOPIC categories and only those',
+    "Detect the user's language (BLANG) in the BTEXT field, if possible. Use a 2-letter language code. Use any language, you can understand. Leave BLANG as is, if you cannot detect the language.",
+    "Classify the user's message into one of these BTOPIC categories and only those",
     'Handle topic changes in a multi-turn conversation',
     'If there is an attachment, the description is in the BFILETEXT field',
-    'If there is a file, but no BTEXT, set the BTEXT to "Comment on this file text: [summarize]" and summarize the content of BFILETEXT'
+    'If there is a file, but no BTEXT, set the BTEXT to "Comment on this file text: [summarize]" and summarize the content of BFILETEXT',
   ],
   promptContent: `# Set BTOPIC and Tools in JSON
 Define the intention of the user with every request. You will have the history, but put your focus on the new message.
@@ -89,6 +94,5 @@ Your tasks in every new message are to:
   "BLANG": "en",
   "BTEXT": "Please help me to translate this message to Spanish.",
   "BFILETEXT": "Hello, this text was extracted from the sound file."
-}`
+}`,
 }
-

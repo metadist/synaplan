@@ -11,55 +11,55 @@ const router = createRouter({
       path: '/login',
       name: 'login',
       component: () => import('../views/LoginView.vue'),
-      meta: { requiresAuth: false, public: true }
+      meta: { requiresAuth: false, public: true },
     },
     {
       path: '/register',
       name: 'register',
       component: () => import('../views/RegisterView.vue'),
-      meta: { requiresAuth: false, public: true }
+      meta: { requiresAuth: false, public: true },
     },
     {
       path: '/forgot-password',
       name: 'forgot-password',
       component: () => import('../views/ForgotPasswordView.vue'),
-      meta: { requiresAuth: false, public: true }
+      meta: { requiresAuth: false, public: true },
     },
     {
       path: '/reset-password',
       name: 'reset-password',
       component: () => import('../views/ResetPasswordView.vue'),
-      meta: { requiresAuth: false, public: true }
+      meta: { requiresAuth: false, public: true },
     },
     {
       path: '/verify-email',
       name: 'verify-email',
       component: () => import('../views/VerifyEmailView.vue'),
-      meta: { requiresAuth: false, public: true }
+      meta: { requiresAuth: false, public: true },
     },
     {
       path: '/verify-email-callback',
       name: 'verify-email-callback',
       component: () => import('../views/VerifyEmailCallbackView.vue'),
-      meta: { requiresAuth: false, public: true }
+      meta: { requiresAuth: false, public: true },
     },
     {
       path: '/email-verified',
       name: 'email-verified',
       component: () => import('../views/EmailVerifiedView.vue'),
-      meta: { requiresAuth: false, public: true }
+      meta: { requiresAuth: false, public: true },
     },
     {
       path: '/auth/callback',
       name: 'oauth-callback',
       component: () => import('../components/auth/OAuthCallback.vue'),
-      meta: { requiresAuth: false, public: true }
+      meta: { requiresAuth: false, public: true },
     },
     {
       path: '/shared/:token',
       name: 'shared-chat',
       component: () => import('../views/SharedChatView.vue'),
-      meta: { requiresAuth: false, public: true }
+      meta: { requiresAuth: false, public: true },
     },
 
     // Error pages (always accessible)
@@ -67,13 +67,13 @@ const router = createRouter({
       path: '/error',
       name: 'error',
       component: () => import('../views/ErrorView.vue'),
-      meta: { requiresAuth: false }
+      meta: { requiresAuth: false },
     },
     {
       path: '/loading',
       name: 'loading',
       component: LoadingView,
-      meta: { requiresAuth: false }
+      meta: { requiresAuth: false },
     },
 
     // Protected routes (require authentication)
@@ -81,150 +81,150 @@ const router = createRouter({
       path: '/',
       name: 'chat',
       component: () => import('../views/ChatView.vue'),
-      meta: { requiresAuth: true }
+      meta: { requiresAuth: true },
     },
     {
       path: '/tools',
       redirect: '/tools/introduction',
-      meta: { requiresAuth: true }
+      meta: { requiresAuth: true },
     },
-        {
-          path: '/tools/introduction',
-          name: 'tools-introduction',
-          component: () => import('../views/ToolsView.vue'),
-          meta: { requiresAuth: true, helpId: 'tools.introduction' }
-        },
-        {
-          path: '/tools/chat-widget',
-          name: 'tools-chat-widget',
-          component: () => import('../views/WidgetsView.vue'),
-          meta: { requiresAuth: true, helpId: 'tools.chatWidget' }
-        },
-        {
-          path: '/tools/doc-summary',
-          name: 'tools-doc-summary',
-          component: () => import('../views/ToolsView.vue'),
-          meta: { requiresAuth: true, helpId: 'tools.docSummary' }
-        },
-        {
-          path: '/tools/mail-handler',
-          name: 'tools-mail-handler',
-          component: () => import('../views/ToolsView.vue'),
-          meta: { requiresAuth: true, helpId: 'tools.mailHandler' }
-        },
+    {
+      path: '/tools/introduction',
+      name: 'tools-introduction',
+      component: () => import('../views/ToolsView.vue'),
+      meta: { requiresAuth: true, helpId: 'tools.introduction' },
+    },
+    {
+      path: '/tools/chat-widget',
+      name: 'tools-chat-widget',
+      component: () => import('../views/WidgetsView.vue'),
+      meta: { requiresAuth: true, helpId: 'tools.chatWidget' },
+    },
+    {
+      path: '/tools/doc-summary',
+      name: 'tools-doc-summary',
+      component: () => import('../views/ToolsView.vue'),
+      meta: { requiresAuth: true, helpId: 'tools.docSummary' },
+    },
+    {
+      path: '/tools/mail-handler',
+      name: 'tools-mail-handler',
+      component: () => import('../views/ToolsView.vue'),
+      meta: { requiresAuth: true, helpId: 'tools.mailHandler' },
+    },
     {
       path: '/files',
       name: 'files',
       component: () => import('../views/FilesView.vue'),
-      meta: { requiresAuth: true }
+      meta: { requiresAuth: true },
     },
     {
       path: '/rag',
       name: 'rag',
       component: () => import('../views/RagSearchView.vue'),
-      meta: { requiresAuth: true }
+      meta: { requiresAuth: true },
     },
     {
       path: '/config',
       redirect: '/config/inbound',
-      meta: { requiresAuth: true }
+      meta: { requiresAuth: true },
     },
     {
       path: '/config/inbound',
       name: 'config-inbound',
       component: () => import('../views/ConfigView.vue'),
-      meta: { requiresAuth: true }
+      meta: { requiresAuth: true },
     },
     {
       path: '/config/ai-models',
       name: 'config-ai-models',
       component: () => import('../views/ConfigView.vue'),
-      meta: { requiresAuth: true }
+      meta: { requiresAuth: true },
     },
     {
       path: '/config/task-prompts',
       name: 'config-task-prompts',
       component: () => import('../views/ConfigView.vue'),
-      meta: { requiresAuth: true }
+      meta: { requiresAuth: true },
     },
     {
       path: '/config/sorting-prompt',
       name: 'config-sorting-prompt',
       component: () => import('../views/ConfigView.vue'),
-      meta: { requiresAuth: true }
+      meta: { requiresAuth: true },
     },
     {
       path: '/config/api-keys',
       name: 'config-api-keys',
       component: () => import('../views/ConfigView.vue'),
-      meta: { requiresAuth: true }
+      meta: { requiresAuth: true },
     },
     {
       path: '/config/api-documentation',
       name: 'config-api-documentation',
       component: () => import('../views/ConfigView.vue'),
-      meta: { requiresAuth: true }
+      meta: { requiresAuth: true },
     },
     {
       path: '/statistics',
       name: 'statistics',
       component: () => import('../views/StatisticsView.vue'),
-      meta: { requiresAuth: true }
+      meta: { requiresAuth: true },
     },
     {
       path: '/settings',
       name: 'settings',
       component: () => import('../views/SettingsView.vue'),
-      meta: { requiresAuth: true }
+      meta: { requiresAuth: true },
     },
     {
       path: '/testv',
       name: 'test',
       component: () => import('../views/TestView.vue'),
-      meta: { requiresAuth: false } // Test page accessible without auth
+      meta: { requiresAuth: false }, // Test page accessible without auth
     },
     {
       path: '/profile',
       name: 'profile',
       component: () => import('../views/ProfileView.vue'),
-      meta: { requiresAuth: true }
+      meta: { requiresAuth: true },
     },
     {
       path: '/admin',
       name: 'admin',
       component: () => import('../views/AdminView.vue'),
-      meta: { requiresAuth: true, requiresAdmin: true }
+      meta: { requiresAuth: true, requiresAdmin: true },
     },
     {
       path: '/admin/features',
       name: 'admin-features',
       component: () => import('../views/FeatureStatusView.vue'),
-      meta: { requiresAuth: true, requiresAdmin: true }
+      meta: { requiresAuth: true, requiresAdmin: true },
     },
     {
       path: '/subscription',
       name: 'subscription',
       component: () => import('../views/SubscriptionView.vue'),
-      meta: { requiresAuth: true }
+      meta: { requiresAuth: true },
     },
     {
       path: '/subscription/success',
       name: 'subscription-success',
       component: () => import('../views/SubscriptionSuccessView.vue'),
-      meta: { requiresAuth: true }
+      meta: { requiresAuth: true },
     },
     {
       path: '/subscription/cancel',
       name: 'subscription-cancel',
       component: () => import('../views/SubscriptionCancelView.vue'),
-      meta: { requiresAuth: true }
+      meta: { requiresAuth: true },
     },
     // 404 - Must be last
     {
       path: '/:pathMatch(.*)*',
       name: 'not-found',
       component: () => import('../views/NotFoundView.vue'),
-      meta: { requiresAuth: false }
+      meta: { requiresAuth: false },
     },
   ],
 })
@@ -246,7 +246,7 @@ function detectRedirectLoop(targetPath: string): boolean {
   redirectHistory.push({ path: targetPath, time: now })
 
   // Check for loop (same path repeated too many times)
-  const recentToLogin = redirectHistory.filter(r => r.path.startsWith('/login')).length
+  const recentToLogin = redirectHistory.filter((r) => r.path.startsWith('/login')).length
   if (recentToLogin >= MAX_REDIRECTS_IN_WINDOW) {
     console.error('🔄 Redirect loop detected! Stopping redirect chain.')
     return true
@@ -268,9 +268,7 @@ router.beforeEach(async (to, from, next) => {
   try {
     await Promise.race([
       authReady,
-      new Promise((_, reject) =>
-        setTimeout(() => reject(new Error('Auth check timeout')), 10000)
-      )
+      new Promise((_, reject) => setTimeout(() => reject(new Error('Auth check timeout')), 10000)),
     ])
   } catch (err) {
     console.error('Auth initialization failed:', err)
@@ -308,7 +306,7 @@ router.beforeEach(async (to, from, next) => {
     console.warn('🔒 Protected route accessed without auth - redirecting to login')
     next({
       name: 'login',
-      query: { redirect: to.fullPath, reason: 'auth_required' }
+      query: { redirect: to.fullPath, reason: 'auth_required' },
     })
   } else if (requiresAdminAccess && !isAdmin.value) {
     // Admin route without admin privileges
@@ -336,7 +334,7 @@ router.onError((error) => {
   } else {
     router.push({
       name: 'error',
-      params: { error: error.message }
+      params: { error: error.message },
     })
   }
 })

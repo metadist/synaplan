@@ -7,7 +7,9 @@
       </h2>
 
       <div v-if="loading" class="text-center py-8" data-testid="section-loading">
-        <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-[var(--brand)]"></div>
+        <div
+          class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-[var(--brand)]"
+        ></div>
         <p class="mt-2 txt-secondary">Loading models...</p>
       </div>
 
@@ -15,15 +17,26 @@
         <div
           v-for="(label, capability) in purposeLabels"
           :key="capability"
-          :ref="(el: any) => { if (el) capabilityRefs[capability as Capability] = el as HTMLElement }"
+          :ref="
+            (el: any) => {
+              if (el) capabilityRefs[capability as Capability] = el as HTMLElement
+            }
+          "
           class="space-y-2 transition-all duration-300"
-          :class="(highlightedCapability === capability || highlightedCapability === 'ALL') ? 'ring-4 ring-[var(--brand)] ring-offset-4 rounded-xl p-3 bg-[var(--brand)]/5' : ''"
+          :class="
+            highlightedCapability === capability || highlightedCapability === 'ALL'
+              ? 'ring-4 ring-[var(--brand)] ring-offset-4 rounded-xl p-3 bg-[var(--brand)]/5'
+              : ''
+          "
           data-testid="item-capability"
         >
           <label class="flex flex-wrap items-center gap-2 text-sm font-semibold txt-primary">
             <CpuChipIcon class="w-4 h-4 text-[var(--brand)]" />
             <span class="flex-1 min-w-0">{{ label }}</span>
-            <div v-if="isSystemModel(capability)" class="flex items-center gap-1 px-2 py-0.5 rounded-full bg-yellow-500/10 border border-yellow-500/30">
+            <div
+              v-if="isSystemModel(capability)"
+              class="flex items-center gap-1 px-2 py-0.5 rounded-full bg-yellow-500/10 border border-yellow-500/30"
+            >
               <LockClosedIcon class="w-3 h-3 text-yellow-500" />
               <span class="text-xs font-medium text-yellow-500">System</span>
             </div>
@@ -31,16 +44,16 @@
           <div class="relative">
             <button
               type="button"
-              @click="toggleDropdown(capability as Capability)"
               :disabled="isSystemModel(capability)"
               :class="[
                 'w-full px-4 py-3 pl-10 pr-10 rounded-lg surface-card border txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] transition-all text-left',
                 isSystemModel(capability)
                   ? 'border-yellow-500/30 bg-yellow-500/5 cursor-not-allowed opacity-75'
                   : 'border-light-border/30 dark:border-dark-border/20 hover:border-[var(--brand)]/50',
-                openDropdown === capability && 'ring-2 ring-[var(--brand)]'
+                openDropdown === capability && 'ring-2 ring-[var(--brand)]',
               ]"
               data-testid="btn-model-dropdown"
+              @click="toggleDropdown(capability as Capability)"
             >
               <span class="block truncate">
                 {{ getSelectedModelLabel(capability as Capability) }}
@@ -48,7 +61,11 @@
             </button>
             <div class="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none">
               <GroqIcon
-                v-if="getSelectedModelService(capability as Capability).toLowerCase().includes('groq')"
+                v-if="
+                  getSelectedModelService(capability as Capability)
+                    .toLowerCase()
+                    .includes('groq')
+                "
                 :size="16"
                 class-name="txt-primary"
               />
@@ -61,7 +78,7 @@
             <ChevronDownIcon
               :class="[
                 'absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 txt-secondary pointer-events-none transition-transform',
-                openDropdown === capability && 'rotate-180'
+                openDropdown === capability && 'rotate-180',
               ]"
             />
 
@@ -72,9 +89,9 @@
             >
               <button
                 type="button"
-                @click="selectModel(capability as Capability, null)"
                 class="dropdown-item w-full"
                 data-testid="btn-model-option"
+                @click="selectModel(capability as Capability, null)"
               >
                 <span class="txt-secondary italic">-- Select Model --</span>
               </button>
@@ -82,23 +99,19 @@
                 v-for="model in getModelsByPurpose(capability as Capability)"
                 :key="model.id"
                 type="button"
-                @click="selectModel(capability as Capability, model.id)"
                 :class="[
                   'dropdown-item w-full',
-                  defaultConfig[capability as Capability] === model.id && 'dropdown-item--active'
+                  defaultConfig[capability as Capability] === model.id && 'dropdown-item--active',
                 ]"
                 data-testid="btn-model-option"
+                @click="selectModel(capability as Capability, model.id)"
               >
                 <GroqIcon
                   v-if="model.service.toLowerCase().includes('groq')"
                   :size="20"
                   class-name="flex-shrink-0"
                 />
-                <Icon
-                  v-else
-                  :icon="getProviderIcon(model.service)"
-                  class="w-5 h-5 flex-shrink-0"
-                />
+                <Icon v-else :icon="getProviderIcon(model.service)" class="w-5 h-5 flex-shrink-0" />
                 <div class="flex-1 min-w-0 text-left">
                   <div class="font-medium truncate">{{ model.name }}</div>
                   <div class="text-xs txt-secondary truncate">{{ model.service }}</div>
@@ -109,9 +122,14 @@
         </div>
       </div>
 
-      <div class="mt-4 flex items-start gap-2 p-3 rounded-lg bg-blue-500/5 border border-blue-500/20">
+      <div
+        class="mt-4 flex items-start gap-2 p-3 rounded-lg bg-blue-500/5 border border-blue-500/20"
+      >
         <InformationCircleIcon class="w-5 h-5 text-blue-500 flex-shrink-0 mt-0.5" />
-        <span class="text-sm txt-primary">System models are automatically locked and cannot be changed. These are core models required for specific functionality.</span>
+        <span class="text-sm txt-primary"
+          >System models are automatically locked and cannot be changed. These are core models
+          required for specific functionality.</span
+        >
       </div>
     </div>
 
@@ -123,28 +141,28 @@
 
       <div class="flex flex-wrap gap-2">
         <button
-          @click="selectedPurpose = null"
           :class="[
             'px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-medium transition-all whitespace-nowrap',
             selectedPurpose === null
               ? 'bg-[var(--brand)] text-white'
-              : 'border border-light-border/30 dark:border-dark-border/20 txt-secondary hover:bg-black/5 dark:hover:bg-white/5'
+              : 'border border-light-border/30 dark:border-dark-border/20 txt-secondary hover:bg-black/5 dark:hover:bg-white/5',
           ]"
           data-testid="btn-filter-all"
+          @click="selectedPurpose = null"
         >
           All Models
         </button>
         <button
           v-for="capability in Object.keys(purposeLabels)"
           :key="capability"
-          @click="selectedPurpose = capability as Capability"
           :class="[
             'px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-medium transition-all whitespace-nowrap',
             selectedPurpose === capability
               ? 'bg-[var(--brand)] text-white'
-              : 'border border-light-border/30 dark:border-dark-border/20 txt-secondary hover:bg-black/5 dark:hover:bg-white/5'
+              : 'border border-light-border/30 dark:border-dark-border/20 txt-secondary hover:bg-black/5 dark:hover:bg-white/5',
           ]"
           data-testid="btn-filter"
+          @click="selectedPurpose = capability as Capability"
         >
           {{ capability }}
         </button>
@@ -157,7 +175,11 @@
         Available Models
       </h2>
 
-      <div v-if="filteredModels.length === 0" class="text-center py-12 txt-secondary" data-testid="section-models-empty">
+      <div
+        v-if="filteredModels.length === 0"
+        class="text-center py-12 txt-secondary"
+        data-testid="section-models-empty"
+      >
         No models available for this purpose
       </div>
 
@@ -165,11 +187,31 @@
         <table class="w-full min-w-[640px]">
           <thead>
             <tr class="border-b-2 border-light-border/30 dark:border-dark-border/20">
-              <th class="text-left py-3 px-2 sm:px-3 txt-secondary text-xs font-semibold uppercase tracking-wide">ID</th>
-              <th class="text-left py-3 px-2 sm:px-3 txt-secondary text-xs font-semibold uppercase tracking-wide">Purpose</th>
-              <th class="text-left py-3 px-2 sm:px-3 txt-secondary text-xs font-semibold uppercase tracking-wide">Service</th>
-              <th class="text-left py-3 px-2 sm:px-3 txt-secondary text-xs font-semibold uppercase tracking-wide hidden md:table-cell">Name</th>
-              <th class="text-left py-3 px-2 sm:px-3 txt-secondary text-xs font-semibold uppercase tracking-wide hidden lg:table-cell">Description</th>
+              <th
+                class="text-left py-3 px-2 sm:px-3 txt-secondary text-xs font-semibold uppercase tracking-wide"
+              >
+                ID
+              </th>
+              <th
+                class="text-left py-3 px-2 sm:px-3 txt-secondary text-xs font-semibold uppercase tracking-wide"
+              >
+                Purpose
+              </th>
+              <th
+                class="text-left py-3 px-2 sm:px-3 txt-secondary text-xs font-semibold uppercase tracking-wide"
+              >
+                Service
+              </th>
+              <th
+                class="text-left py-3 px-2 sm:px-3 txt-secondary text-xs font-semibold uppercase tracking-wide hidden md:table-cell"
+              >
+                Name
+              </th>
+              <th
+                class="text-left py-3 px-2 sm:px-3 txt-secondary text-xs font-semibold uppercase tracking-wide hidden lg:table-cell"
+              >
+                Description
+              </th>
             </tr>
           </thead>
           <tbody>
@@ -200,7 +242,7 @@
                   <span
                     :class="[
                       'px-2 sm:px-3 py-1 rounded-full text-xs font-medium text-white',
-                      serviceColors[model.service] || 'bg-gray-500'
+                      serviceColors[model.service] || 'bg-gray-500',
                     ]"
                   >
                     {{ model.service }}
@@ -232,14 +274,19 @@ import {
   FunnelIcon,
   InformationCircleIcon,
   ListBulletIcon,
-  LockClosedIcon
+  LockClosedIcon,
 } from '@heroicons/vue/24/outline'
 import { Icon } from '@iconify/vue'
 import AIModelsAdminPanel from '@/components/config/AIModelsAdminPanel.vue'
 import GroqIcon from '@/components/icons/GroqIcon.vue'
 import { useNotification } from '@/composables/useNotification'
 import { serviceColors } from '@/mocks/aiModels'
-import { getModels, getDefaultModels, saveDefaultModels, checkModelAvailability } from '@/services/api/configApi'
+import {
+  getModels,
+  getDefaultModels,
+  saveDefaultModels,
+  checkModelAvailability,
+} from '@/services/api/configApi'
 import { useAuthStore } from '@/stores/auth'
 import type { AIModel, Capability } from '@/types/ai-models'
 import { getProviderIcon } from '@/utils/providerIcons'
@@ -257,7 +304,7 @@ const purposeLabels: Record<Capability, string> = {
   TEXT2VID: 'Video Generation (Text → Video)',
   SOUND2TEXT: 'Speech-to-Text',
   TEXT2SOUND: 'Text-to-Speech',
-  ANALYZE: 'File Analysis'
+  ANALYZE: 'File Analysis',
 }
 
 const loading = ref(false)
@@ -272,12 +319,14 @@ const defaultConfig = ref<Record<Capability, number | null>>({
   TEXT2VID: null,
   SOUND2TEXT: null,
   TEXT2SOUND: null,
-  ANALYZE: null
+  ANALYZE: null,
 })
 const originalConfig = ref<Record<Capability, number | null>>({ ...defaultConfig.value })
 const selectedPurpose = ref<Capability | null>(null)
 const highlightedCapability = ref<Capability | 'ALL' | null>(null)
-const capabilityRefs = ref<Record<Capability, HTMLElement | null>>({} as Record<Capability, HTMLElement | null>)
+const capabilityRefs = ref<Record<Capability, HTMLElement | null>>(
+  {} as Record<Capability, HTMLElement | null>
+)
 const openDropdown = ref<Capability | null>(null)
 
 const { success, error: showError, warning } = useNotification()
@@ -300,7 +349,7 @@ const normalizeHighlight = (highlight: string): Capability | 'ALL' | null => {
     TRANSCRIPTION: 'SOUND2TEXT',
     TTS: 'TEXT2SOUND',
     VOICE: 'TEXT2SOUND',
-    ANALYSIS: 'ANALYZE'
+    ANALYSIS: 'ANALYZE',
   }
 
   return aliasMap[highlight] || null
@@ -393,10 +442,7 @@ const scrollToCapability = (capability: Capability) => {
 const loadData = async () => {
   loading.value = true
   try {
-    const [modelsRes, defaultsRes] = await Promise.all([
-      getModels(),
-      getDefaultModels()
-    ])
+    const [modelsRes, defaultsRes] = await Promise.all([getModels(), getDefaultModels()])
 
     if (modelsRes.success) {
       availableModels.value = modelsRes.models
@@ -405,7 +451,7 @@ const loadData = async () => {
     if (defaultsRes.success) {
       const mergedDefaults: Record<Capability, number | null> = {
         ...defaultConfig.value,
-        ...(defaultsRes.defaults as Partial<Record<Capability, number | null>>)
+        ...(defaultsRes.defaults as Partial<Record<Capability, number | null>>),
       }
       defaultConfig.value = mergedDefaults
       originalConfig.value = { ...mergedDefaults }
@@ -424,14 +470,14 @@ const getModelsByPurpose = (purpose: Capability): AIModel[] => {
 const isSystemModel = (purpose: string): boolean => {
   const models = getModelsByPurpose(purpose as Capability)
   const selectedModelId = defaultConfig.value[purpose as Capability]
-  const selectedModel = models.find(m => m.id === selectedModelId)
+  const selectedModel = models.find((m) => m.id === selectedModelId)
   return selectedModel?.isSystemModel || false
 }
 
 const getSelectedModelService = (purpose: Capability): string => {
   const models = getModelsByPurpose(purpose)
   const selectedModelId = defaultConfig.value[purpose]
-  const selectedModel = models.find(m => m.id === selectedModelId)
+  const selectedModel = models.find((m) => m.id === selectedModelId)
   return selectedModel?.service || 'unknown'
 }
 
@@ -439,7 +485,7 @@ const getSelectedModelLabel = (purpose: Capability): string => {
   const models = getModelsByPurpose(purpose)
   const selectedModelId = defaultConfig.value[purpose]
   if (!selectedModelId) return '-- Select Model --'
-  const selectedModel = models.find(m => m.id === selectedModelId)
+  const selectedModel = models.find((m) => m.id === selectedModelId)
   if (!selectedModel) return '-- Select Model --'
   return `${selectedModel.providerId || selectedModel.name} (${selectedModel.service})`
 }
@@ -484,7 +530,7 @@ const handleClickOutside = (event: MouseEvent) => {
 const allModels = computed(() => {
   const all: Array<AIModel & { purpose: Capability }> = []
   for (const [cap, models] of Object.entries(availableModels.value)) {
-    models.forEach(model => {
+    models.forEach((model) => {
       all.push({ ...model, purpose: cap as Capability })
     })
   }
@@ -495,7 +541,7 @@ const filteredModels = computed(() => {
   if (selectedPurpose.value === null) {
     return allModels.value
   }
-  return allModels.value.filter(model => model.purpose === selectedPurpose.value)
+  return allModels.value.filter((model) => model.purpose === selectedPurpose.value)
 })
 
 const saveConfiguration = async () => {
@@ -523,5 +569,3 @@ const saveConfiguration = async () => {
   }
 }
 </script>
-
-

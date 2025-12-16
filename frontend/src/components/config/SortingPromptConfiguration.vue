@@ -9,8 +9,8 @@
       </p>
       <p class="text-sm txt-secondary">
         See the
-        <router-link 
-          to="/config/task-prompts" 
+        <router-link
+          to="/config/task-prompts"
           class="text-[var(--brand)] hover:underline font-medium"
         >
           Prompt Editor
@@ -24,14 +24,14 @@
         <button
           v-for="tab in tabs"
           :key="tab.id"
-          @click="activeTab = tab.id"
           :class="[
             'px-6 py-3 text-sm font-medium transition-colors relative',
             activeTab === tab.id
               ? 'txt-primary bg-[var(--brand)]/5 border-b-2 border-[var(--brand)]'
-              : 'txt-secondary hover:bg-black/5 dark:hover:bg-white/5'
+              : 'txt-secondary hover:bg-black/5 dark:hover:bg-white/5',
           ]"
           data-testid="btn-tab"
+          @click="activeTab = tab.id"
         >
           {{ tab.label }}
         </button>
@@ -48,7 +48,8 @@
                 {{ $t('config.sortingPrompt.mainDescription') }}
               </p>
               <p class="txt-secondary text-sm italic">
-                If it fits the previous requests of the last few minutes, keep the topic going. If not, change it accordingly. Only in the JSON field.
+                If it fits the previous requests of the last few minutes, keep the topic going. If
+                not, change it accordingly. Only in the JSON field.
               </p>
               <p class="txt-secondary text-sm font-medium mt-2">
                 Put answers only in JSON, please.
@@ -63,7 +64,9 @@
                 {{ sortingPrompt.tasks }}
               </p>
               <p class="txt-secondary text-sm mb-4">
-                You receive messages (as JSON objects) from random users around the world. If there is a signature in the BTEXT field, use it as a hint to classify the message and the sender.
+                You receive messages (as JSON objects) from random users around the world. If there
+                is a signature in the BTEXT field, use it as a hint to classify the message and the
+                sender.
               </p>
               <p class="txt-secondary text-sm mb-4">
                 If there is an attachment, the description is in the BFILETEXT field.
@@ -85,7 +88,10 @@
                 <li class="flex gap-3">
                   <span class="font-semibold txt-primary">2.</span>
                   <div>
-                    <p class="mb-3">{{ sortingPrompt.instructions[1] }}. The most common is "general". This is the list, use only this:</p>
+                    <p class="mb-3">
+                      {{ sortingPrompt.instructions[1] }}. The most common is "general". This is the
+                      list, use only this:
+                    </p>
                     <ul class="space-y-3 ml-4">
                       <li
                         v-for="category in sortingPrompt.categories"
@@ -94,7 +100,9 @@
                       >
                         <div class="flex items-center gap-2 mb-1">
                           <span class="font-semibold txt-primary">{{ category.name }}</span>
-                          <span v-if="category.type === 'default'" class="text-xs txt-secondary">(default)</span>
+                          <span v-if="category.type === 'default'" class="text-xs txt-secondary"
+                            >(default)</span
+                          >
                           <span v-else class="text-xs text-purple-500">(custom)</span>
                         </div>
                         <p class="text-sm txt-secondary">{{ category.description }}</p>
@@ -126,9 +134,9 @@
                 {{ $t('config.sortingPrompt.tabSource') }}
               </h3>
               <button
-                @click="editMode = !editMode"
                 class="px-4 py-2 rounded-lg border border-[var(--brand)] text-[var(--brand)] hover:bg-[var(--brand)]/10 transition-colors text-sm"
                 data-testid="btn-toggle-mode"
+                @click="editMode = !editMode"
               >
                 <PencilIcon v-if="!editMode" class="w-4 h-4 inline mr-1" />
                 <EyeIcon v-else class="w-4 h-4 inline mr-1" />
@@ -136,8 +144,14 @@
               </button>
             </div>
 
-            <div v-if="!editMode" class="surface-chip p-6 rounded border border-light-border/30 dark:border-dark-border/20" data-testid="section-prompt-preview">
-              <pre class="whitespace-pre-wrap font-mono text-xs txt-primary leading-relaxed">{{ sortingPrompt.promptContent }}</pre>
+            <div
+              v-if="!editMode"
+              class="surface-chip p-6 rounded border border-light-border/30 dark:border-dark-border/20"
+              data-testid="section-prompt-preview"
+            >
+              <pre class="whitespace-pre-wrap font-mono text-xs txt-primary leading-relaxed">{{
+                sortingPrompt.promptContent
+              }}</pre>
             </div>
 
             <textarea
@@ -150,17 +164,17 @@
 
             <div v-if="editMode" class="flex gap-3">
               <button
-                @click="savePrompt"
                 class="btn-primary px-6 py-2.5 rounded-lg flex items-center gap-2"
                 data-testid="btn-save"
+                @click="savePrompt"
               >
                 <CheckIcon class="w-5 h-5" />
                 {{ $t('config.sortingPrompt.savePrompt') }}
               </button>
               <button
-                @click="resetPrompt"
                 class="px-6 py-2.5 rounded-lg border border-light-border/30 dark:border-dark-border/20 txt-primary hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
                 data-testid="btn-reset"
+                @click="resetPrompt"
               >
                 {{ $t('config.sortingPrompt.resetPrompt') }}
               </button>
@@ -185,7 +199,9 @@
               </p>
             </div>
 
-            <div class="bg-black/90 dark:bg-black/50 rounded-lg p-4 font-mono text-sm text-green-400 overflow-x-auto">
+            <div
+              class="bg-black/90 dark:bg-black/50 rounded-lg p-4 font-mono text-sm text-green-400 overflow-x-auto"
+            >
               <pre>{{ sortingPrompt.jsonExample }}</pre>
             </div>
 
@@ -204,12 +220,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import { 
-  PencilIcon, 
-  EyeIcon, 
-  CheckIcon,
-  InformationCircleIcon
-} from '@heroicons/vue/24/outline'
+import { PencilIcon, EyeIcon, CheckIcon, InformationCircleIcon } from '@heroicons/vue/24/outline'
 import { mockSortingPrompt } from '@/mocks/sortingPrompt'
 import type { SortingPromptData } from '@/mocks/sortingPrompt'
 
@@ -221,7 +232,7 @@ const originalPrompt = ref<SortingPromptData>({ ...mockSortingPrompt })
 const tabs = [
   { id: 'rendered', label: 'Rendered Result' },
   { id: 'source', label: 'Prompt Source' },
-  { id: 'json', label: 'JSON Object' }
+  { id: 'json', label: 'JSON Object' },
 ]
 
 const loadSortingPrompt = async () => {
@@ -244,4 +255,3 @@ onMounted(() => {
   loadSortingPrompt()
 })
 </script>
-

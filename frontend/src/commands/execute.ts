@@ -9,10 +9,9 @@ export function processCommand(input: string): { command: string; args: string[]
   if (!parsed) {
     return null
   }
-  
+
   return {
     command: parsed.command,
-    args: parsed.args
+    args: parsed.args,
   }
 }
-

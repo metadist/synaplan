@@ -43,42 +43,41 @@ export interface EmailKeywordResponse {
 export const profileApi = {
   async getProfile(): Promise<ProfileResponse> {
     return httpClient<ProfileResponse>('/api/v1/profile', {
-      method: 'GET'
+      method: 'GET',
     })
   },
 
   async updateProfile(profileData: Partial<Profile>): Promise<any> {
     return httpClient<any>('/api/v1/profile', {
       method: 'PUT',
-      body: JSON.stringify(profileData)
+      body: JSON.stringify(profileData),
     })
   },
 
   async changePassword(currentPassword: string, newPassword: string): Promise<any> {
     return httpClient<any>('/api/v1/profile/password', {
       method: 'PUT',
-      body: JSON.stringify({ currentPassword, newPassword })
+      body: JSON.stringify({ currentPassword, newPassword }),
     })
   },
 
   async getEmailKeyword(): Promise<EmailKeywordResponse> {
     return httpClient<EmailKeywordResponse>('/api/v1/profile/email-keyword', {
-      method: 'GET'
+      method: 'GET',
     })
   },
 
   async setEmailKeyword(keyword: string): Promise<EmailKeywordResponse> {
     return httpClient<EmailKeywordResponse>('/api/v1/profile/email-keyword', {
       method: 'PUT',
-      body: JSON.stringify({ keyword })
+      body: JSON.stringify({ keyword }),
     })
   },
 
   async deleteAccount(password: string): Promise<any> {
     return httpClient<any>('/api/v1/profile', {
       method: 'DELETE',
-      body: JSON.stringify({ password })
+      body: JSON.stringify({ password }),
     })
-  }
+  },
 }
-

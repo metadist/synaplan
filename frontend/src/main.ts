@@ -17,14 +17,14 @@ const recaptchaEnabled = import.meta.env.VITE_RECAPTCHA_ENABLED === 'true'
 const recaptchaSiteKey = import.meta.env.VITE_RECAPTCHA_SITE_KEY
 
 if (recaptchaEnabled && recaptchaSiteKey && recaptchaSiteKey !== 'your_site_key_here') {
-  app.use(VueReCaptcha, { 
+  app.use(VueReCaptcha, {
     siteKey: recaptchaSiteKey,
     loaderOptions: {
       autoHideBadge: false,
       explicitRenderParameters: {
-        badge: 'bottomright'
-      }
-    }
+        badge: 'bottomright',
+      },
+    },
   })
   console.log('✅ reCAPTCHA v3 enabled')
 } else {

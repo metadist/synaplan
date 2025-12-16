@@ -14,7 +14,7 @@ export function useAuth() {
     userLevel: computed(() => authStore.userLevel),
     isPro: computed(() => authStore.isPro),
     isAdmin: computed(() => authStore.isAdmin),
-    
+
     // Actions
     login: authStore.login,
     register: authStore.register,

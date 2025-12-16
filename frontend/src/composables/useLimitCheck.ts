@@ -34,7 +34,6 @@ export function useLimitCheck() {
     showLimitModal,
     limitData,
     checkAndShowLimit,
-    closeLimitModal
+    closeLimitModal,
   }
 }
-

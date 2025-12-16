@@ -1,25 +1,25 @@
 /**
  * Help Content
- * 
+ *
  * Contains help documentation and guides for the application
  */
 
 export interface HelpSection {
-  id: string;
-  title: string;
-  content: string;
-  category: 'general' | 'features' | 'account' | 'api' | 'troubleshooting';
+  id: string
+  title: string
+  content: string
+  category: 'general' | 'features' | 'account' | 'api' | 'troubleshooting'
 }
 
 export interface HelpStep {
-  title: string;
-  content: string;
-  selector?: string;
+  title: string
+  content: string
+  selector?: string
 }
 
 export interface HelpContent extends HelpSection {
-  description?: string;
-  steps?: HelpStep[];
+  description?: string
+  steps?: HelpStep[]
 }
 
 export const helpContent: HelpContent[] = [
@@ -32,7 +32,7 @@ export const helpContent: HelpContent[] = [
       analyze documents, and automate workflows. Start by creating a new chat or 
       uploading documents for analysis.
     `,
-    category: 'general'
+    category: 'general',
   },
   {
     id: 'navigation',
@@ -44,7 +44,7 @@ export const helpContent: HelpContent[] = [
       - Statistics: View usage statistics
       - Settings: Configure your account
     `,
-    category: 'general'
+    category: 'general',
   },
 
   // Features
@@ -56,7 +56,7 @@ export const helpContent: HelpContent[] = [
       You can select different models, share chats, and organize conversations.
       Use @ to mention specific context or # for topics.
     `,
-    category: 'features'
+    category: 'features',
   },
   {
     id: 'model-selection',
@@ -69,7 +69,7 @@ export const helpContent: HelpContent[] = [
       
       Each model has different capabilities and pricing.
     `,
-    category: 'features'
+    category: 'features',
   },
   {
     id: 'file-upload',
@@ -79,7 +79,7 @@ export const helpContent: HelpContent[] = [
       Supported formats: PDF, DOCX, TXT, PNG, JPG, and more.
       Maximum file size: 10MB per file.
     `,
-    category: 'features'
+    category: 'features',
   },
   {
     id: 'chat-sharing',
@@ -89,7 +89,7 @@ export const helpContent: HelpContent[] = [
       You'll get a public link that anyone can view (read-only).
       You can disable sharing at any time.
     `,
-    category: 'features'
+    category: 'features',
   },
 
   // Account
@@ -104,7 +104,7 @@ export const helpContent: HelpContent[] = [
       - API keys for integrations
       - Usage limits and subscriptions
     `,
-    category: 'account'
+    category: 'account',
   },
   {
     id: 'api-keys',
@@ -114,7 +114,7 @@ export const helpContent: HelpContent[] = [
       Each key can have specific permissions (scopes) for security.
       Keep your API keys secure and don't share them publicly.
     `,
-    category: 'account'
+    category: 'account',
   },
   {
     id: 'usage-limits',
@@ -127,7 +127,7 @@ export const helpContent: HelpContent[] = [
       
       Check your current usage in the Statistics page.
     `,
-    category: 'account'
+    category: 'account',
   },
 
   // API
@@ -139,7 +139,7 @@ export const helpContent: HelpContent[] = [
       information about all available endpoints, authentication,
       and integration examples.
     `,
-    category: 'api'
+    category: 'api',
   },
   {
     id: 'webhooks',
@@ -151,7 +151,7 @@ export const helpContent: HelpContent[] = [
       - File processing status
       - Usage limit warnings
     `,
-    category: 'api'
+    category: 'api',
   },
 
   // Troubleshooting
@@ -166,7 +166,7 @@ export const helpContent: HelpContent[] = [
       4. Check usage limits haven't been exceeded
       5. Contact support if the issue persists
     `,
-    category: 'troubleshooting'
+    category: 'troubleshooting',
   },
   {
     id: 'rate-limits',
@@ -178,7 +178,7 @@ export const helpContent: HelpContent[] = [
       - Optimize your API usage
       - Implement caching in your application
     `,
-    category: 'troubleshooting'
+    category: 'troubleshooting',
   },
   {
     id: 'error-messages',
@@ -190,33 +190,34 @@ export const helpContent: HelpContent[] = [
       - 500 Server Error: Try again or contact support
       - 404 Not Found: Check the resource URL
     `,
-    category: 'troubleshooting'
-  }
-];
+    category: 'troubleshooting',
+  },
+]
 
 /**
  * Get help content by ID
  */
 export function getHelpById(id: string): HelpContent | undefined {
-  return helpContent.find(section => section.id === id);
+  return helpContent.find((section) => section.id === id)
 }
 
 /**
  * Get help content by category
  */
 export function getHelpByCategory(category: HelpSection['category']): HelpContent[] {
-  return helpContent.filter(section => section.category === category);
+  return helpContent.filter((section) => section.category === category)
 }
 
 /**
  * Search help content
  */
 export function searchHelp(query: string): HelpContent[] {
-  const lowercaseQuery = query.toLowerCase();
-  return helpContent.filter(section => 
-    section.title.toLowerCase().includes(lowercaseQuery) ||
-    section.content.toLowerCase().includes(lowercaseQuery)
-  );
+  const lowercaseQuery = query.toLowerCase()
+  return helpContent.filter(
+    (section) =>
+      section.title.toLowerCase().includes(lowercaseQuery) ||
+      section.content.toLowerCase().includes(lowercaseQuery)
+  )
 }
 
 /**
@@ -228,6 +229,6 @@ export function getHelpCategories(): Array<{ key: HelpSection['category']; label
     { key: 'features', label: 'Features' },
     { key: 'account', label: 'Account' },
     { key: 'api', label: 'API' },
-    { key: 'troubleshooting', label: 'Troubleshooting' }
-  ];
+    { key: 'troubleshooting', label: 'Troubleshooting' },
+  ]
 }

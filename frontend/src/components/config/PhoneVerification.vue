@@ -1,7 +1,10 @@
 <template>
   <div class="surface-card p-6 space-y-6" data-testid="section-phone-verification">
     <!-- Header -->
-    <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between" data-testid="section-header">
+    <div
+      class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between"
+      data-testid="section-header"
+    >
       <div>
         <h3 class="text-lg font-semibold txt-primary flex items-center gap-2">
           <DevicePhoneMobileIcon class="w-5 h-5 text-green-500" />
@@ -12,21 +15,30 @@
         </p>
       </div>
 
-      <span
-        class="pill text-xs w-fit"
-        :class="status?.verified ? 'pill--active' : 'pill--warning'"
-      >
-        {{ status?.verified ? $t('config.phoneVerification.statusVerified') : $t('config.phoneVerification.statusNotVerified') }}
+      <span class="pill text-xs w-fit" :class="status?.verified ? 'pill--active' : 'pill--warning'">
+        {{
+          status?.verified
+            ? $t('config.phoneVerification.statusVerified')
+            : $t('config.phoneVerification.statusNotVerified')
+        }}
       </span>
     </div>
 
     <!-- Loading -->
-    <div v-if="loading" class="flex items-center justify-center py-8 rounded-lg surface-chip" data-testid="section-loading">
+    <div
+      v-if="loading"
+      class="flex items-center justify-center py-8 rounded-lg surface-chip"
+      data-testid="section-loading"
+    >
       <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-brand"></div>
     </div>
 
     <!-- Error -->
-    <div v-if="error" class="surface-card p-4 border border-red-500/50 rounded-lg bg-red-500/5" data-testid="alert-error">
+    <div
+      v-if="error"
+      class="surface-card p-4 border border-red-500/50 rounded-lg bg-red-500/5"
+      data-testid="alert-error"
+    >
       <p class="text-sm text-red-600 dark:text-red-400">{{ error }}</p>
     </div>
 
@@ -51,14 +63,25 @@
         </div>
 
         <button
-          @click="requestVerification"
           :disabled="!phoneNumber.trim() || requesting"
           class="btn-primary px-6 py-3 rounded-lg font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
           data-testid="btn-send"
+          @click="requestVerification"
         >
           <svg v-if="requesting" class="animate-spin h-5 w-5" fill="none" viewBox="0 0 24 24">
-            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            <circle
+              class="opacity-25"
+              cx="12"
+              cy="12"
+              r="10"
+              stroke="currentColor"
+              stroke-width="4"
+            ></circle>
+            <path
+              class="opacity-75"
+              fill="currentColor"
+              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+            ></path>
           </svg>
           {{ requesting ? $t('common.sending') : $t('config.phoneVerification.sendCode') }}
         </button>
@@ -82,39 +105,50 @@
             maxlength="6"
             :placeholder="$t('config.phoneVerification.codePlaceholder')"
             class="w-full px-4 py-3 rounded-lg surface-chip txt-primary border border-light-border focus:border-brand focus:ring-2 focus:ring-brand/20 transition-colors text-center text-2xl font-mono tracking-widest"
-            @input="formatCode"
             data-testid="input-code"
+            @input="formatCode"
           />
         </div>
 
         <div class="flex gap-3">
           <button
-            @click="confirmVerification"
             :disabled="verificationCode.length !== 6 || confirming"
             class="flex-1 btn-primary px-6 py-3 rounded-lg font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             data-testid="btn-verify"
+            @click="confirmVerification"
           >
             <svg v-if="confirming" class="animate-spin h-5 w-5" fill="none" viewBox="0 0 24 24">
-              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              <circle
+                class="opacity-25"
+                cx="12"
+                cy="12"
+                r="10"
+                stroke="currentColor"
+                stroke-width="4"
+              ></circle>
+              <path
+                class="opacity-75"
+                fill="currentColor"
+                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+              ></path>
             </svg>
             {{ $t('config.phoneVerification.verify') }}
           </button>
 
           <button
-            @click="cancelVerification"
             class="surface-chip px-6 py-3 rounded-lg font-medium txt-primary hover:bg-black/5 dark:hover:bg-white/10 transition-colors"
             data-testid="btn-cancel"
+            @click="cancelVerification"
           >
             {{ $t('common.cancel') }}
           </button>
         </div>
 
         <button
-          @click="requestVerification"
           :disabled="requesting"
           class="w-full text-sm txt-secondary hover:txt-primary transition-colors"
           data-testid="btn-resend"
+          @click="requestVerification"
         >
           {{ $t('config.phoneVerification.resendCode') }}
         </button>
@@ -125,8 +159,16 @@
     <div v-else-if="status?.verified" class="space-y-4" data-testid="section-verified">
       <div class="surface-card p-4 border-l-4 border-green-500">
         <div class="flex items-start gap-3">
-          <svg class="w-6 h-6 text-green-600 dark:text-green-400 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
-            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
+          <svg
+            class="w-6 h-6 text-green-600 dark:text-green-400 flex-shrink-0 mt-0.5"
+            fill="currentColor"
+            viewBox="0 0 20 20"
+          >
+            <path
+              fill-rule="evenodd"
+              d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+              clip-rule="evenodd"
+            />
           </svg>
           <div class="flex-1">
             <h3 class="text-sm font-semibold txt-primary mb-1">
@@ -136,16 +178,18 @@
               {{ status.phone_number }}
             </p>
             <p class="text-xs txt-secondary mt-2">
-              {{ $t('config.phoneVerification.verifiedAt', { date: formatDate(status.verified_at) }) }}
+              {{
+                $t('config.phoneVerification.verifiedAt', { date: formatDate(status.verified_at) })
+              }}
             </p>
           </div>
         </div>
       </div>
 
       <button
-        @click="removeVerification"
         class="w-full surface-chip px-4 py-3 rounded-lg font-medium text-red-600 dark:text-red-400 hover:bg-red-500/10 transition-colors"
         data-testid="btn-remove"
+        @click="removeVerification"
       >
         {{ $t('config.phoneVerification.removePhone') }}
       </button>
@@ -219,7 +263,7 @@ const loadStatus = async () => {
     error.value = null
 
     const { response, payload } = await requestWithFallback('/api/v1/user/verify-phone/status', {
-      headers: buildHeaders()
+      headers: buildHeaders(),
     })
 
     if (!response.ok) {
@@ -233,7 +277,6 @@ const loadStatus = async () => {
     if (data?.phone_number) {
       phoneNumber.value = data.phone_number
     }
-
   } catch (err: any) {
     console.error('Failed to load phone verification status:', err)
     error.value = isNetworkError(err)
@@ -254,7 +297,7 @@ const requestVerification = async () => {
     const { response, payload } = await requestWithFallback('/api/v1/user/verify-phone/request', {
       method: 'POST',
       headers: buildHeaders(true),
-      body: JSON.stringify({ phone_number: phoneNumber.value })
+      body: JSON.stringify({ phone_number: phoneNumber.value }),
     })
 
     if (!response.ok) {
@@ -263,7 +306,6 @@ const requestVerification = async () => {
 
     verificationPending.value = true
     success(t('config.phoneVerification.codeSentSuccess'))
-
   } catch (err: any) {
     console.error('Failed to request verification:', err)
     const message = isNetworkError(err)
@@ -286,7 +328,7 @@ const confirmVerification = async () => {
     const { response, payload } = await requestWithFallback('/api/v1/user/verify-phone/confirm', {
       method: 'POST',
       headers: buildHeaders(true),
-      body: JSON.stringify({ code: verificationCode.value })
+      body: JSON.stringify({ code: verificationCode.value }),
     })
 
     if (!response.ok) {
@@ -297,7 +339,6 @@ const confirmVerification = async () => {
     verificationPending.value = false
     verificationCode.value = ''
     await loadStatus()
-
   } catch (err: any) {
     console.error('Failed to confirm verification:', err)
     const message = isNetworkError(err)
@@ -322,7 +363,7 @@ const removeVerification = async () => {
     message: t('config.phoneVerification.confirmRemove'),
     confirmText: t('common.delete'),
     cancelText: t('common.cancel'),
-    danger: true
+    danger: true,
   })
 
   if (!confirmed) return
@@ -333,7 +374,7 @@ const removeVerification = async () => {
 
     const { response, payload } = await requestWithFallback('/api/v1/user/verify-phone', {
       method: 'DELETE',
-      headers: buildHeaders()
+      headers: buildHeaders(),
     })
 
     if (!response.ok) {
@@ -342,7 +383,6 @@ const removeVerification = async () => {
 
     success(t('config.phoneVerification.removedSuccess'))
     await loadStatus()
-
   } catch (err: any) {
     console.error('Failed to remove phone verification:', err)
     const message = isNetworkError(err)

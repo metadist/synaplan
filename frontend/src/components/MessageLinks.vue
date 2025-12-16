@@ -12,7 +12,10 @@
         <div class="flex-1 min-w-0">
           <div class="flex items-center gap-2 mb-1">
             <h4 class="text-sm font-medium txt-primary truncate">{{ item.title }}</h4>
-            <span v-if="item.host" class="text-xs txt-secondary surface-card px-2 py-0.5 rounded flex-shrink-0">
+            <span
+              v-if="item.host"
+              class="text-xs txt-secondary surface-card px-2 py-0.5 rounded flex-shrink-0"
+            >
               {{ item.host }}
             </span>
           </div>

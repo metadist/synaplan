@@ -3,8 +3,12 @@
     <div class="max-w-2xl w-full text-center" data-testid="section-card">
       <!-- Error Icon -->
       <div class="mb-8 relative" data-testid="section-icon">
-        <div class="inline-flex items-center justify-center w-32 h-32 rounded-full bg-gradient-to-br from-red-500/10 to-orange-500/10 relative">
-          <div class="absolute inset-0 rounded-full bg-gradient-to-br from-red-500/20 to-orange-500/20 animate-ping"></div>
+        <div
+          class="inline-flex items-center justify-center w-32 h-32 rounded-full bg-gradient-to-br from-red-500/10 to-orange-500/10 relative"
+        >
+          <div
+            class="absolute inset-0 rounded-full bg-gradient-to-br from-red-500/20 to-orange-500/20 animate-ping"
+          ></div>
           <ExclamationTriangleIcon class="w-16 h-16 text-red-500 relative z-10" />
         </div>
       </div>
@@ -20,7 +24,11 @@
       </div>
 
       <!-- Error Details (if provided) -->
-      <div v-if="effectiveError" class="surface-card p-6 rounded-xl mb-8 text-left" data-testid="section-error-details">
+      <div
+        v-if="effectiveError"
+        class="surface-card p-6 rounded-xl mb-8 text-left"
+        data-testid="section-error-details"
+      >
         <div class="flex items-start gap-3 mb-4">
           <CodeBracketIcon class="w-5 h-5 txt-secondary flex-shrink-0 mt-0.5" />
           <div class="flex-1">
@@ -28,11 +36,15 @@
               {{ $t('error.details') }}
             </h3>
             <div class="space-y-2">
-              <div v-if="effectiveError.message" class="text-sm txt-secondary font-mono bg-black/5 dark:bg-white/5 p-3 rounded">
+              <div
+                v-if="effectiveError.message"
+                class="text-sm txt-secondary font-mono bg-black/5 dark:bg-white/5 p-3 rounded"
+              >
                 {{ effectiveError.message }}
               </div>
               <div v-if="effectiveError.statusCode" class="text-xs txt-secondary">
-                <span class="font-semibold">{{ $t('error.statusCode') }}:</span> {{ effectiveError.statusCode }}
+                <span class="font-semibold">{{ $t('error.statusCode') }}:</span>
+                {{ effectiveError.statusCode }}
               </div>
             </div>
           </div>
@@ -40,10 +52,12 @@
 
         <button
           v-if="showStack && props.error?.stack"
-          @click="stackExpanded = !stackExpanded"
           class="text-xs txt-secondary hover:txt-primary flex items-center gap-1 transition-colors"
+          @click="stackExpanded = !stackExpanded"
         >
-          <ChevronRightIcon :class="['w-4 h-4 transition-transform', stackExpanded && 'rotate-90']" />
+          <ChevronRightIcon
+            :class="['w-4 h-4 transition-transform', stackExpanded && 'rotate-90']"
+          />
           {{ stackExpanded ? $t('error.hideStack') : $t('error.showStack') }}
         </button>
 
@@ -56,17 +70,23 @@
           leave-to-class="max-h-0 opacity-0"
         >
           <div v-if="stackExpanded && props.error?.stack" class="mt-3 overflow-hidden">
-            <pre class="text-xs txt-secondary font-mono bg-black/5 dark:bg-white/5 p-3 rounded overflow-x-auto max-h-[300px] overflow-y-auto scroll-thin">{{ props.error.stack }}</pre>
+            <pre
+              class="text-xs txt-secondary font-mono bg-black/5 dark:bg-white/5 p-3 rounded overflow-x-auto max-h-[300px] overflow-y-auto scroll-thin"
+              >{{ props.error.stack }}</pre
+            >
           </div>
         </Transition>
       </div>
 
       <!-- Actions -->
-      <div class="flex flex-col sm:flex-row items-center justify-center gap-4 mb-8" data-testid="section-actions">
+      <div
+        class="flex flex-col sm:flex-row items-center justify-center gap-4 mb-8"
+        data-testid="section-actions"
+      >
         <button
-          @click="handleReload"
           class="btn-primary px-8 py-3 rounded-lg font-semibold flex items-center gap-2 min-w-[200px] justify-center"
           data-testid="btn-reload"
+          @click="handleReload"
         >
           <ArrowPathIcon class="w-5 h-5" />
           {{ $t('error.reload') }}
@@ -84,7 +104,9 @@
       <!-- Support Info -->
       <div class="surface-card p-6 rounded-xl" data-testid="section-support">
         <div class="flex items-start gap-4">
-          <div class="w-10 h-10 rounded-full bg-blue-500/10 flex items-center justify-center flex-shrink-0">
+          <div
+            class="w-10 h-10 rounded-full bg-blue-500/10 flex items-center justify-center flex-shrink-0"
+          >
             <ChatBubbleLeftRightIcon class="w-5 h-5 text-blue-500" />
           </div>
           <div class="text-left flex-1">
@@ -95,10 +117,10 @@
               {{ $t('error.contactSupport') }}
             </p>
             <button
-              @click="copyErrorInfo"
               class="text-sm font-medium hover:text-[var(--brand)] transition-colors flex items-center gap-2"
               style="color: var(--brand)"
               data-testid="btn-copy-error"
+              @click="copyErrorInfo"
             >
               <ClipboardDocumentIcon class="w-4 h-4" />
               {{ copied ? $t('error.copied') : $t('error.copyError') }}
@@ -120,7 +142,7 @@ import {
   CodeBracketIcon,
   ChevronRightIcon,
   ChatBubbleLeftRightIcon,
-  ClipboardDocumentIcon
+  ClipboardDocumentIcon,
 } from '@heroicons/vue/24/outline'
 
 interface Props {
@@ -133,7 +155,7 @@ interface Props {
 }
 
 const props = withDefaults(defineProps<Props>(), {
-  showStack: import.meta.env.VITE_SHOW_ERROR_STACK === 'true'
+  showStack: import.meta.env.VITE_SHOW_ERROR_STACK === 'true',
 })
 
 const route = useRoute()
@@ -146,14 +168,16 @@ const isAuthTimeout = computed(() => route.query.reason === 'auth_timeout')
 const effectiveError = computed(() => {
   if (isRedirectLoop.value) {
     return {
-      message: 'A redirect loop was detected. This usually happens when authentication state is inconsistent. Please clear your browser cookies and try again.',
-      statusCode: 508
+      message:
+        'A redirect loop was detected. This usually happens when authentication state is inconsistent. Please clear your browser cookies and try again.',
+      statusCode: 508,
     }
   }
   if (isAuthTimeout.value) {
     return {
-      message: 'Authentication check timed out. The server may be unavailable. Please try again later.',
-      statusCode: 504
+      message:
+        'Authentication check timed out. The server may be unavailable. Please try again later.',
+      statusCode: 504,
     }
   }
   return props.error
@@ -172,7 +196,7 @@ const copyErrorInfo = async () => {
     statusCode: effectiveError.value?.statusCode || 500,
     timestamp: new Date().toISOString(),
     userAgent: navigator.userAgent,
-    url: window.location.href
+    url: window.location.href,
   }
 
   try {
@@ -186,4 +210,3 @@ const copyErrorInfo = async () => {
   }
 }
 </script>
-

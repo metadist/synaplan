@@ -144,6 +144,14 @@ jobs:
         working-directory: frontend
         run: npm ci
 
+      - name: Check code formatting
+        working-directory: frontend
+        run: npm run format:check
+
+      - name: Lint code
+        working-directory: frontend
+        run: npm run lint
+
       - name: Type check
         working-directory: frontend
         run: npm run check:types

@@ -15,7 +15,8 @@ export const mockImages = [
 
 export const mockVideo = {
   url: 'https://www.w3schools.com/html/mov_bbb.mp4',
-  poster: 'https://images.pexels.com/photos/1595385/pexels-photo-1595385.jpeg?auto=compress&cs=tinysrgb&w=800',
+  poster:
+    'https://images.pexels.com/photos/1595385/pexels-photo-1595385.jpeg?auto=compress&cs=tinysrgb&w=800',
 }
 
 export const mockLinks = [
@@ -54,15 +55,18 @@ export const mockLinks = [
 export const mockDocs = [
   {
     filename: 'components/ChatInput.vue',
-    snippet: 'Component for handling user input in the chat interface. Supports text input, attachments, and command detection.',
+    snippet:
+      'Component for handling user input in the chat interface. Supports text input, attachments, and command detection.',
   },
   {
     filename: 'stores/commands.ts',
-    snippet: 'Command registry and state management. Contains all available slash commands with validation logic.',
+    snippet:
+      'Command registry and state management. Contains all available slash commands with validation logic.',
   },
   {
     filename: 'README.md',
-    snippet: 'Project documentation including setup instructions, available features, and development guidelines.',
+    snippet:
+      'Project documentation including setup instructions, available features, and development guidelines.',
   },
 ]
 

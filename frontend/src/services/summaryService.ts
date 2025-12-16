@@ -12,11 +12,11 @@ export interface SummaryConfig {
   focusAreas: FocusArea[]
 }
 
-export type FocusArea = 
-  | 'main-ideas' 
-  | 'key-facts' 
-  | 'conclusions' 
-  | 'action-items' 
+export type FocusArea =
+  | 'main-ideas'
+  | 'key-facts'
+  | 'conclusions'
+  | 'action-items'
   | 'numbers-dates'
 
 export interface SummaryRequest {
@@ -57,7 +57,7 @@ export const generateSummary = async (request: SummaryRequest): Promise<SummaryR
   try {
     const response = await httpClient<SummaryResponse>('/api/v1/summary/generate', {
       method: 'POST',
-      body: JSON.stringify(request)
+      body: JSON.stringify(request),
     })
 
     return response
@@ -68,6 +68,5 @@ export const generateSummary = async (request: SummaryRequest): Promise<SummaryR
 }
 
 export default {
-  generateSummary
+  generateSummary,
 }
-

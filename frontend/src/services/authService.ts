@@ -17,7 +17,11 @@ export const authService = {
   /**
    * Login User - cookies are set by backend
    */
-  async login(email: string, password: string, recaptchaToken?: string): Promise<{ success: boolean; error?: string }> {
+  async login(
+    email: string,
+    password: string,
+    recaptchaToken?: string
+  ): Promise<{ success: boolean; error?: string }> {
     try {
       const response = await fetch(`${API_BASE_URL}/api/v1/auth/login`, {
         method: 'POST',
@@ -47,7 +51,11 @@ export const authService = {
   /**
    * Register User
    */
-  async register(email: string, password: string, recaptchaToken?: string): Promise<{ success: boolean; error?: string }> {
+  async register(
+    email: string,
+    password: string,
+    recaptchaToken?: string
+  ): Promise<{ success: boolean; error?: string }> {
     try {
       const response = await fetch(`${API_BASE_URL}/api/v1/auth/register`, {
         method: 'POST',
@@ -136,7 +144,7 @@ export const authService = {
 
     isRefreshing.value = true
     refreshPromise = this._doRefresh()
-    
+
     try {
       return await refreshPromise
     } finally {
@@ -160,7 +168,7 @@ export const authService = {
       }
 
       const data = await response.json()
-      
+
       // Update user info if provided (memory only)
       if (data.user) {
         user.value = data.user
@@ -204,11 +212,11 @@ export const authService = {
     try {
       // Just fetch current user - cookies were set by OAuth redirect
       const currentUser = await this.getCurrentUser()
-      
+
       if (currentUser) {
         return { success: true }
       }
-      
+
       return { success: false, error: 'Failed to get user after OAuth' }
     } catch (error) {
       console.error('OAuth callback error:', error)
@@ -231,7 +239,7 @@ export const authService = {
       }
 
       const data = await response.json()
-      
+
       // Clear local state (memory only)
       user.value = null
 

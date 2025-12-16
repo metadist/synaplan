@@ -50,4 +50,3 @@ export async function isFeatureEnabled(featureId: string): Promise<boolean> {
     return false
   }
 }
-

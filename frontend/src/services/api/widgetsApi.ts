@@ -31,7 +31,7 @@ export interface WidgetConfig {
   messageLimit?: number
   maxFileSize?: number
   allowedDomains?: string[]
-  allowFileUpload?: boolean  // NEW: Enable/disable file upload
+  allowFileUpload?: boolean // NEW: Enable/disable file upload
   fileUploadLimit?: number
 }
 
@@ -59,12 +59,9 @@ export interface EmbedCodeResponse {
  * List all widgets for current user
  */
 export async function listWidgets(): Promise<Widget[]> {
-  const data = await httpClient<{ success: boolean; widgets: Widget[] }>(
-    '/api/v1/widgets',
-    {
-      method: 'GET'
-    }
-  )
+  const data = await httpClient<{ success: boolean; widgets: Widget[] }>('/api/v1/widgets', {
+    method: 'GET',
+  })
   return data.widgets
 }
 
@@ -72,13 +69,10 @@ export async function listWidgets(): Promise<Widget[]> {
  * Create new widget
  */
 export async function createWidget(request: CreateWidgetRequest): Promise<Widget> {
-  const data = await httpClient<{ success: boolean; widget: Widget }>(
-    '/api/v1/widgets',
-    {
-      method: 'POST',
-      body: JSON.stringify(request)
-    }
-  )
+  const data = await httpClient<{ success: boolean; widget: Widget }>('/api/v1/widgets', {
+    method: 'POST',
+    body: JSON.stringify(request),
+  })
   return data.widget
 }
 
@@ -89,7 +83,7 @@ export async function getWidget(widgetId: string): Promise<Widget> {
   const data = await httpClient<{ success: boolean; widget: Widget }>(
     `/api/v1/widgets/${widgetId}`,
     {
-      method: 'GET'
+      method: 'GET',
     }
   )
   return data.widget
@@ -98,47 +92,35 @@ export async function getWidget(widgetId: string): Promise<Widget> {
 /**
  * Update widget
  */
-export async function updateWidget(
-  widgetId: string,
-  request: UpdateWidgetRequest
-): Promise<void> {
+export async function updateWidget(widgetId: string, request: UpdateWidgetRequest): Promise<void> {
   console.log('🔧 widgetsApi.updateWidget called:', {
     widgetId,
     request,
-    allowedDomains: request.config?.allowedDomains
+    allowedDomains: request.config?.allowedDomains,
   })
-  
-  await httpClient<{ success: boolean }>(
-    `/api/v1/widgets/${widgetId}`,
-    {
-      method: 'PUT',
-      body: JSON.stringify(request)
-    }
-  )
+
+  await httpClient<{ success: boolean }>(`/api/v1/widgets/${widgetId}`, {
+    method: 'PUT',
+    body: JSON.stringify(request),
+  })
 }
 
 /**
  * Delete widget
  */
 export async function deleteWidget(widgetId: string): Promise<void> {
-  await httpClient<{ success: boolean }>(
-    `/api/v1/widgets/${widgetId}`,
-    {
-      method: 'DELETE'
-    }
-  )
+  await httpClient<{ success: boolean }>(`/api/v1/widgets/${widgetId}`, {
+    method: 'DELETE',
+  })
 }
 
 /**
  * Get embed code for widget
  */
 export async function getEmbedCode(widgetId: string): Promise<EmbedCodeResponse> {
-  return await httpClient<EmbedCodeResponse>(
-    `/api/v1/widgets/${widgetId}/embed`,
-    {
-      method: 'GET'
-    }
-  )
+  return await httpClient<EmbedCodeResponse>(`/api/v1/widgets/${widgetId}/embed`, {
+    method: 'GET',
+  })
 }
 
 /**
@@ -151,7 +133,7 @@ export async function getWidgetStats(widgetId: string): Promise<{
   const data = await httpClient<{ success: boolean; stats: any }>(
     `/api/v1/widgets/${widgetId}/stats`,
     {
-      method: 'GET'
+      method: 'GET',
     }
   )
   return data.stats
@@ -184,13 +166,7 @@ export async function sendWidgetMessage(
   sessionId: string,
   options: SendWidgetMessageOptions = {}
 ): Promise<SendWidgetMessageResult> {
-  const {
-    chatId,
-    fileIds,
-    apiUrl: apiUrlOverride,
-    headers: extraHeaders,
-    onStatus
-  } = options
+  const { chatId, fileIds, apiUrl: apiUrlOverride, headers: extraHeaders, onStatus } = options
 
   const config = useConfigStore()
   const apiUrl = apiUrlOverride ?? config.apiBaseUrl
@@ -199,13 +175,15 @@ export async function sendWidgetMessage(
     'Content-Type': 'application/json',
     Accept: 'text/event-stream',
     'X-Widget-Session': sessionId,
-    ...(typeof window !== 'undefined' && window.location?.host ? { 'X-Widget-Host': window.location.host } : {}),
-    ...(extraHeaders ?? {})
+    ...(typeof window !== 'undefined' && window.location?.host
+      ? { 'X-Widget-Host': window.location.host }
+      : {}),
+    ...(extraHeaders ?? {}),
   }
 
   const payload: Record<string, unknown> = {
     sessionId,
-    text
+    text,
   }
 
   if (typeof chatId === 'number') {
@@ -219,7 +197,7 @@ export async function sendWidgetMessage(
   const response = await fetch(`${apiUrl}/api/v1/widget/${widgetId}/message`, {
     method: 'POST',
     headers,
-    body: JSON.stringify(payload)
+    body: JSON.stringify(payload),
   })
 
   if (!response.ok) {
@@ -249,8 +227,8 @@ export async function sendWidgetMessage(
   const processEvent = async (eventChunk: string) => {
     const lines = eventChunk.split('\n')
     const dataLines = lines
-      .filter(line => line.startsWith('data:'))
-      .map(line => line.slice(5).trim())
+      .filter((line) => line.startsWith('data:'))
+      .map((line) => line.slice(5).trim())
       .filter(Boolean)
 
     if (dataLines.length === 0) {
@@ -302,9 +280,10 @@ export async function sendWidgetMessage(
     }
   }
 
-  const reader = response.body && typeof response.body.getReader === 'function'
-    ? response.body.getReader()
-    : null
+  const reader =
+    response.body && typeof response.body.getReader === 'function'
+      ? response.body.getReader()
+      : null
 
   if (reader) {
     try {
@@ -360,7 +339,7 @@ export async function sendWidgetMessage(
     chatId: finalChatId,
     metadata,
     remainingUploads,
-    text: aggregatedText
+    text: aggregatedText,
   }
 }
 
@@ -399,10 +378,12 @@ export async function uploadWidgetFile(
     method: 'POST',
     headers: {
       'X-Widget-Session': sessionId,
-      ...(typeof window !== 'undefined' && window.location?.host ? { 'X-Widget-Host': window.location.host } : {})
+      ...(typeof window !== 'undefined' && window.location?.host
+        ? { 'X-Widget-Host': window.location.host }
+        : {}),
     },
     body: formData,
-    skipAuth: true
+    skipAuth: true,
   })
 }
 
@@ -426,7 +407,7 @@ export async function uploadWidgetIcon(
   const response = await fetch(`${apiUrl}/api/v1/widgets/${widgetId}/upload-icon`, {
     method: 'POST',
     credentials: 'include', // Use cookies for auth
-    body: formData
+    body: formData,
   })
 
   if (!response.ok) {
@@ -436,4 +417,3 @@ export async function uploadWidgetIcon(
 
   return await response.json()
 }
-

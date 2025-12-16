@@ -28,8 +28,8 @@ export const mockTools: Tool[] = [
       {
         command: '/chat [text]',
         description: 'Start a chat conversation with the provided text',
-      }
-    ]
+      },
+    ],
   },
   {
     id: 'doc-summary',
@@ -43,9 +43,9 @@ export const mockTools: Tool[] = [
       {
         command: '/docs [text]',
         description: 'Searches your uploads for the specified text',
-        parameters: 'Local Search, Multiple Formats'
-      }
-    ]
+        parameters: 'Local Search, Multiple Formats',
+      },
+    ],
   },
   {
     id: 'mail-handler',
@@ -59,8 +59,7 @@ export const mockTools: Tool[] = [
       {
         command: '/mail [action]',
         description: 'Handle mail operations like send, read, or organize',
-      }
-    ]
-  }
+      },
+    ],
+  },
 ]
-

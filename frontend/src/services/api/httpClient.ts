@@ -164,7 +164,13 @@ async function handleAuthFailure(): Promise<never> {
 }
 
 async function httpClient<T>(endpoint: string, options: HttpClientOptions = {}): Promise<T> {
-  const { params, skipAuth = false, responseType = 'json', _isRetry = false, ...fetchOptions } = options
+  const {
+    params,
+    skipAuth = false,
+    responseType = 'json',
+    _isRetry = false,
+    ...fetchOptions
+  } = options
 
   let url = `${API_BASE_URL}${endpoint}`
 
@@ -187,9 +193,10 @@ async function httpClient<T>(endpoint: string, options: HttpClientOptions = {}):
   console.log('🌐 httpClient request:', {
     url,
     method: fetchOptions.method || 'GET',
-    bodyPreview: fetchOptions.body && !(fetchOptions.body instanceof FormData)
-      ? JSON.parse(fetchOptions.body as string)
-      : null
+    bodyPreview:
+      fetchOptions.body && !(fetchOptions.body instanceof FormData)
+        ? JSON.parse(fetchOptions.body as string)
+        : null,
   })
 
   const response = await fetch(url, {
@@ -202,7 +209,7 @@ async function httpClient<T>(endpoint: string, options: HttpClientOptions = {}):
     url,
     status: response.status,
     statusText: response.statusText,
-    ok: response.ok
+    ok: response.ok,
   })
 
   if (!response.ok) {
