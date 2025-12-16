@@ -7,4 +7,3 @@
   },
   "include": ["tests/**/*.ts", "tests/**/*.tsx", "src/**/*.ts", "src/**/*.vue"]
 }
-

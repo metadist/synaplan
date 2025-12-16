@@ -47,4 +47,3 @@ describe('Provider Icons Utility', () => {
     expect(getProviderIcon('AnThRoPiC')).toBe('simple-icons:anthropic')
   })
 })
-

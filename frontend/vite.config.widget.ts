@@ -33,7 +33,7 @@ function buildTimestampPlugin(mode: string): Plugin {
         timestamp: buildTimestamp,
         hash: buildHash,
         date: new Date(buildTimestamp).toLocaleString(),
-        env: mode
+        env: mode,
       }
 
       const fs = await import('fs/promises')
@@ -47,7 +47,7 @@ function buildTimestampPlugin(mode: string): Plugin {
       } catch (error) {
         console.error(`Failed to write buildInfo.json:`, error)
       }
-    }
+    },
   }
 }
 
@@ -71,8 +71,8 @@ export default defineConfig(({ mode }) => ({
 
   resolve: {
     alias: {
-      '@': fileURLToPath(new URL('./src', import.meta.url))
-    }
+      '@': fileURLToPath(new URL('./src', import.meta.url)),
+    },
   },
 
   build: {
@@ -81,31 +81,34 @@ export default defineConfig(({ mode }) => ({
     // https://rollupjs.org/configuration-options/#watch
     // Note: Using process.argv check because Vite doesn't expose watch mode in defineConfig callback
     // See: https://github.com/vitejs/vite/discussions/7565
-    watch: process.argv.includes('--watch') || process.argv.includes('-w') ? {
-      include: 'src/**',
-      exclude: ['node_modules/**', 'dist-widget/**'],
-      // Chokidar options for file system polling in Docker
-      chokidar: {
-        usePolling: true,
-        interval: 1000,
-        awaitWriteFinish: {
-          stabilityThreshold: 100,
-          pollInterval: 100
-        }
-      }
-    } : null,
+    watch:
+      process.argv.includes('--watch') || process.argv.includes('-w')
+        ? {
+            include: 'src/**',
+            exclude: ['node_modules/**', 'dist-widget/**'],
+            // Chokidar options for file system polling in Docker
+            chokidar: {
+              usePolling: true,
+              interval: 1000,
+              awaitWriteFinish: {
+                stabilityThreshold: 100,
+                pollInterval: 100,
+              },
+            },
+          }
+        : null,
 
     rollupOptions: {
       preserveEntrySignatures: 'strict',
       input: {
-        widget: resolve(__dirname, 'src/widget.ts')
+        widget: resolve(__dirname, 'src/widget.ts'),
       },
       output: {
         format: 'es',
         entryFileNames: '[name].js',
         chunkFileNames: 'chunks/[name]-[hash].js',
-        assetFileNames: 'assets/[name]-[hash][extname]'
-      }
+        assetFileNames: 'assets/[name]-[hash][extname]',
+      },
     },
 
     outDir: 'dist-widget',
@@ -114,9 +117,9 @@ export default defineConfig(({ mode }) => ({
     terserOptions: {
       compress: {
         drop_console: false, // Keep console for debugging widget issues
-        passes: 2
-      }
+        passes: 2,
+      },
     },
-    sourcemap: false
-  }
+    sourcemap: false,
+  },
 }))

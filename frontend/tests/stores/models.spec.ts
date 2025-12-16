@@ -11,7 +11,7 @@ describe('Models Store', () => {
 
   it('should initialize with default values', () => {
     const store = useModelsStore()
-    
+
     expect(store.selectedProvider).toBe('openai')
     expect(store.selectedModel).toBe('gpt-4')
     expect(store.availableModels).toEqual([])
@@ -20,9 +20,9 @@ describe('Models Store', () => {
 
   it('should update selected model', () => {
     const store = useModelsStore()
-    
+
     store.setModel('anthropic', 'claude-3')
-    
+
     expect(store.selectedProvider).toBe('anthropic')
     expect(store.selectedModel).toBe('claude-3')
   })
@@ -30,8 +30,24 @@ describe('Models Store', () => {
   it('should set chat models', () => {
     const store = useModelsStore()
     const testModels: ModelOption[] = [
-      { provider: 'openai', model: 'gpt-4', label: 'GPT-4', id: 1, quality: 90, rating: 95, description: null },
-      { provider: 'anthropic', model: 'claude-3', label: 'Claude 3', id: 2, quality: 85, rating: 90, description: null },
+      {
+        provider: 'openai',
+        model: 'gpt-4',
+        label: 'GPT-4',
+        id: 1,
+        quality: 90,
+        rating: 95,
+        description: null,
+      },
+      {
+        provider: 'anthropic',
+        model: 'claude-3',
+        label: 'Claude 3',
+        id: 2,
+        quality: 85,
+        rating: 90,
+        description: null,
+      },
     ]
 
     store.setChatModels(testModels)
@@ -43,12 +59,17 @@ describe('Models Store', () => {
     const store = useModelsStore()
     const testModels: AIModel[] = [
       { id: 1, purpose: 'CHAT', service: 'OpenAI', name: 'gpt-4', description: 'GPT-4 model' },
-      { id: 2, purpose: 'CHAT', service: 'Anthropic', name: 'claude-3', description: 'Claude 3 model' },
+      {
+        id: 2,
+        purpose: 'CHAT',
+        service: 'Anthropic',
+        name: 'claude-3',
+        description: 'Claude 3 model',
+      },
     ]
-    
+
     store.setAvailableModels(testModels)
-    
+
     expect(store.availableModels).toEqual(testModels)
   })
 })
-
