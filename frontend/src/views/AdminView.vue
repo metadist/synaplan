@@ -751,17 +751,25 @@ async function loadUsers() {
       itemsPerPage.value,
       userSearch.value
     )
-    console.log('📊 Users API response:', response)
+    if (import.meta.env.DEV) {
+      console.log('📊 Users API response:', response)
+    }
     if (response && response.users) {
       users.value = response.users
       totalUsers.value = response.total
-      console.log('✅ Users loaded:', users.value.length)
+      if (import.meta.env.DEV) {
+        console.log('✅ Users loaded:', users.value.length)
+      }
     } else {
-      console.error('❌ Invalid response structure:', response)
+      if (import.meta.env.DEV) {
+        console.error('❌ Invalid response structure:', response)
+      }
       showError('Invalid response from server')
     }
   } catch (error) {
-    console.error('Failed to load users:', error)
+    if (import.meta.env.DEV) {
+      console.error('Failed to load users:', error)
+    }
     showError(error instanceof Error ? error.message : 'Failed to load users')
   } finally {
     usersLoading.value = false

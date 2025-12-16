@@ -80,17 +80,10 @@ export const adminApi = {
     if (search) {
       params.append('search', search)
     }
-    try {
-      const response = await httpClient(`/api/v1/admin/users?${params}`, {
-        schema: GetAdminGetUsersResponseSchema,
-      })
-      return response as GetAdminUsersResponse
-    } catch (error) {
-      // If schema validation fails, try without schema validation
-      console.warn('Schema validation failed, trying without schema:', error)
-      const response = await httpClient<GetAdminUsersResponse>(`/api/v1/admin/users?${params}`)
-      return response
-    }
+    const response = await httpClient(`/api/v1/admin/users?${params}`, {
+      schema: GetAdminGetUsersResponseSchema,
+    })
+    return response as GetAdminUsersResponse
   },
 
   async updateUserLevel(
