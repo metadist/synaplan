@@ -26,7 +26,7 @@ export const mockWhatsAppChannels: WhatsAppChannel[] = [
 ]
 
 export const mockEmailChannels: EmailChannel[] = [
-  { id: '1', email: 'smart@synaplan.com', handling: 'default handling' }
+  { id: '1', email: 'smart@synaplan.net', handling: 'default handling' }
 ]
 
 export const mockAPIConfig: APIConfig = {
@@ -40,5 +40,5 @@ export const mockWidgetConfig: WidgetConfig = {
 }
 
 export const emailKeywordBase = 'smart+'
-export const emailKeywordDomain = '@synaplan.com'
+export const emailKeywordDomain = '@synaplan.net'
 

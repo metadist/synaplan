@@ -3,6 +3,7 @@
 namespace App\Tests\Integration\Service;
 
 use App\Service\Search\BraveSearchService;
+use PHPUnit\Framework\Attributes\Group;
 use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
 
 /**
@@ -10,6 +11,9 @@ use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
  *
  * These tests verify the search functionality works correctly
  * with different configurations.
+ *
+ * Tests marked with #[Group('live-api')] hit real external APIs
+ * and may fail due to rate limits or network issues.
  */
 class BraveSearchIntegrationTest extends KernelTestCase
 {
@@ -59,6 +63,7 @@ class BraveSearchIntegrationTest extends KernelTestCase
         $this->braveSearchService->search('');
     }
 
+    #[Group('live-api')]
     public function testSearchWithCustomOptions(): void
     {
         if (!$this->braveSearchService->isEnabled()) {
@@ -89,6 +94,7 @@ class BraveSearchIntegrationTest extends KernelTestCase
         }
     }
 
+    #[Group('live-api')]
     public function testSearchHandlesDifferentLanguages(): void
     {
         if (!$this->braveSearchService->isEnabled()) {
@@ -166,6 +172,7 @@ class BraveSearchIntegrationTest extends KernelTestCase
         $this->assertStringContainsString('empty query', $formatted);
     }
 
+    #[Group('live-api')]
     public function testLanguageAndCountryNormalization(): void
     {
         if (!$this->braveSearchService->isEnabled()) {
@@ -201,6 +208,7 @@ class BraveSearchIntegrationTest extends KernelTestCase
         }
     }
 
+    #[Group('live-api')]
     public function testInvalidLanguageCodeFallback(): void
     {
         if (!$this->braveSearchService->isEnabled()) {
