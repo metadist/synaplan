@@ -1,17 +1,11 @@
 // Admin API service
 import { httpClient } from './httpClient'
+import { GetAdminGetUsersResponseSchema } from '@/generated/api-schemas'
+import { z } from 'zod'
 
-export interface AdminUser {
-  id: number
-  email: string
-  level: string
-  type: string
-  providerId: string
-  emailVerified: boolean
-  created: string
-  isAdmin: boolean
-  locale: string
-}
+export const AdminUserSchema = GetAdminGetUsersResponseSchema.shape.users.element
+export type AdminUser = z.infer<typeof AdminUserSchema>
+export type GetAdminUsersResponse = z.infer<typeof GetAdminGetUsersResponseSchema>
 
 export interface SystemPrompt {
   id: number
@@ -67,11 +61,7 @@ export interface RegistrationAnalytics {
 }
 
 export const adminApi = {
-  async getUsers(
-    page = 1,
-    limit = 50,
-    search = ''
-  ): Promise<{ users: AdminUser[]; total: number; page: number; limit: number }> {
+  async getUsers(page = 1, limit = 50, search = ''): Promise<GetAdminUsersResponse> {
     const params = new URLSearchParams({
       page: page.toString(),
       limit: limit.toString(),
@@ -79,9 +69,9 @@ export const adminApi = {
     if (search) {
       params.append('search', search)
     }
-    return httpClient<{ users: AdminUser[]; total: number; page: number; limit: number }>(
-      `/api/v1/admin/users?${params}`
-    )
+    return httpClient(`/api/v1/admin/users?${params}`, {
+      schema: GetAdminGetUsersResponseSchema
+    })
   },
 
   async updateUserLevel(

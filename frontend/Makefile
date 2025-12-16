@@ -1,4 +1,4 @@
-.PHONY: help lint format check-types test deps build build-widget
+.PHONY: help lint format check-types test deps build build-widget generate-schemas
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-20s\033[0m %s\n", $$1, $$2}'
@@ -22,6 +22,10 @@ build: ## Build frontend and widget
 
 build-widget: ## Build widget only
 	docker compose -f ../docker-compose.yml exec -T frontend npm run build:widget
+
+## Code Generation
+generate-schemas: ## Generate Zod schemas from OpenAPI spec
+	docker compose -f ../docker-compose.yml exec -T frontend npm run generate:schemas
 
 ## Testing
 test: ## Run tests
