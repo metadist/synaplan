@@ -1,7 +1,19 @@
-.PHONY: help lint test deps build build-widget check-types
+.PHONY: help lint format check-types test deps build build-widget
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-20s\033[0m %s\n", $$1, $$2}'
+
+## Code Quality
+lint: ## Check code formatting and linting
+	docker compose -f ../docker-compose.yml exec frontend npm run format:check
+	docker compose -f ../docker-compose.yml exec frontend npm run lint
+
+format: ## Fix code formatting and linting
+	docker compose -f ../docker-compose.yml exec frontend npm run format
+	docker compose -f ../docker-compose.yml exec frontend npm run lint:fix
+
+check-types: ## TypeScript type checking
+	docker compose -f ../docker-compose.yml exec -T frontend npm run check:types
 
 ## Building
 build: ## Build frontend and widget
@@ -11,13 +23,7 @@ build: ## Build frontend and widget
 build-widget: ## Build widget only
 	docker compose -f ../docker-compose.yml exec -T frontend npm run build:widget
 
-## Testing & Type Checking
-lint: ## TypeScript type checking (alias for check-types)
-	docker compose -f ../docker-compose.yml exec -T frontend npm run check:types
-
-check-types: ## TypeScript type checking
-	docker compose -f ../docker-compose.yml exec -T frontend npm run check:types
-
+## Testing
 test: ## Run tests
 	docker compose -f ../docker-compose.yml exec -T frontend npm run test
 
