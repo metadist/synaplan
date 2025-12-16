@@ -38,8 +38,32 @@ final class AdminModelsController extends AbstractController
         description: 'List of models',
         content: new OA\JsonContent(
             properties: [
-                new OA\Property(property: 'success', type: 'boolean'),
-                new OA\Property(property: 'models', type: 'array', items: new OA\Items(ref: '#/components/schemas/Model')),
+                new OA\Property(property: 'success', type: 'boolean', example: true),
+                new OA\Property(
+                    property: 'models',
+                    type: 'array',
+                    items: new OA\Items(
+                        type: 'object',
+                        properties: [
+                            new OA\Property(property: 'id', type: 'integer', example: 1),
+                            new OA\Property(property: 'service', type: 'string', example: 'OpenAI'),
+                            new OA\Property(property: 'tag', type: 'string', example: 'chat'),
+                            new OA\Property(property: 'providerId', type: 'string', example: 'gpt-4o'),
+                            new OA\Property(property: 'name', type: 'string', example: 'GPT-4o'),
+                            new OA\Property(property: 'selectable', type: 'integer', example: 1),
+                            new OA\Property(property: 'active', type: 'integer', example: 1),
+                            new OA\Property(property: 'priceIn', type: 'number', format: 'float', example: 2.5),
+                            new OA\Property(property: 'inUnit', type: 'string', example: 'per1M'),
+                            new OA\Property(property: 'priceOut', type: 'number', format: 'float', example: 10.0),
+                            new OA\Property(property: 'outUnit', type: 'string', example: 'per1M'),
+                            new OA\Property(property: 'quality', type: 'number', format: 'float', example: 9.0),
+                            new OA\Property(property: 'rating', type: 'number', format: 'float', example: 0.9),
+                            new OA\Property(property: 'description', type: 'string', nullable: true, example: 'Advanced language model'),
+                            new OA\Property(property: 'json', type: 'object', nullable: true),
+                            new OA\Property(property: 'isSystemModel', type: 'boolean', example: false),
+                        ]
+                    )
+                ),
             ]
         )
     )]

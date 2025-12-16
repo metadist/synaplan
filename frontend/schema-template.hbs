@@ -1,0 +1,24 @@
+/**
+ * Auto-generated from OpenAPI spec
+ * DO NOT EDIT - Regenerate with: make generate-schemas
+ */
+
+import { z } from "zod";
+
+{{#each schemas}}
+export const {{@key}} = {{{this}}};
+{{/each}}
+
+{{#each endpoints}}
+{{#if this.requestBody}}
+{{!-- Request body schema --}}
+export const {{this.alias}}_Body = {{{this.requestBody}}};
+{{/if}}
+
+{{!-- Response schema with readable name --}}
+export const {{this.alias}}_Response = {{{this.response}}};
+
+{{!-- Create a readable alias by converting snake_case to PascalCase --}}
+{{!-- get_admin_get_users -> GetAdminGetUsersResponseSchema --}}
+{{!-- Note: Handlebars has limited string manipulation, so we keep both exports --}}
+{{/each}}

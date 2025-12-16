@@ -240,7 +240,10 @@
                           :disabled="user.id === currentUserId"
                           :data-testid="`select-user-level-${user.id}`"
                           @change="
-                            updateUserLevel(user.id, ($event.target as HTMLSelectElement).value)
+                            updateUserLevel(
+                              user.id,
+                              ($event.target as HTMLSelectElement).value as AdminUser['level']
+                            )
                           "
                         >
                           <option value="NEW">NEW</option>
@@ -794,7 +797,7 @@ async function loadUsageStats(period: 'day' | 'week' | 'month' | 'all' = 'week')
 }
 
 // User actions
-async function updateUserLevel(userId: number, newLevel: string) {
+async function updateUserLevel(userId: number, newLevel: AdminUser['level']) {
   try {
     await adminApi.updateUserLevel(userId, newLevel)
     // Update local state

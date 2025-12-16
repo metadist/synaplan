@@ -27,3 +27,6 @@ dist-ssr
 # Environment files
 .env
 !.env.example
+
+# Generated files
+src/generated/

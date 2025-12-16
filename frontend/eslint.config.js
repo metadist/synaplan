@@ -38,11 +38,12 @@ export default [
       'no-useless-escape': 'warn',
       'no-undef': 'off', // TypeScript handles this better
       'no-loss-of-precision': 'warn',
+      'no-redeclare': 'warn', // Allow function overloads
     },
   },
   // Node.js config files (vite, tailwind, etc.)
   {
-    files: ['*.config.{js,ts,mjs,cjs}', '*.setup.{js,ts}'],
+    files: ['*.config.{js,ts,mjs,cjs}', '*.setup.{js,ts}', 'scripts/**/*.{js,ts}'],
     languageOptions: {
       parser: typescriptParser,
       parserOptions: {

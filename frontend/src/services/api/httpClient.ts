@@ -4,13 +4,14 @@
  */
 
 import { useConfigStore } from '@/stores/config'
+import type { z } from 'zod'
 
 const config = useConfigStore()
 const API_BASE_URL = config.apiBaseUrl
 
 type ResponseType = 'json' | 'blob' | 'text' | 'arrayBuffer'
 
-interface HttpClientOptions extends RequestInit {
+interface HttpClientOptions<S extends z.Schema | undefined = undefined> extends RequestInit {
   params?: Record<string, string>
   /** Skip auto-refresh on 401 (for auth endpoints) */
   skipAuth?: boolean
@@ -18,6 +19,8 @@ interface HttpClientOptions extends RequestInit {
   responseType?: ResponseType
   /** Skip retry on 401 (internal use) */
   _isRetry?: boolean
+  /** Zod schema for response validation */
+  schema?: S
 }
 
 // Track if we're currently refreshing
@@ -163,14 +166,36 @@ async function handleAuthFailure(): Promise<never> {
   throw new Error('Authentication required')
 }
 
-async function httpClient<T>(endpoint: string, options: HttpClientOptions = {}): Promise<T> {
+// Overload: with schema
+async function httpClient<S extends z.Schema>(
+  endpoint: string,
+  options: HttpClientOptions<S> & { schema: S }
+): Promise<z.infer<S>>
+
+// Overload: without schema (legacy)
+async function httpClient<T = unknown>(
+  endpoint: string,
+  options?: HttpClientOptions<undefined>
+): Promise<T>
+
+// Implementation
+async function httpClient<T = unknown, S extends z.Schema | undefined = undefined>(
+  endpoint: string,
+  options: HttpClientOptions<S> = {}
+): Promise<T | z.infer<NonNullable<S>>> {
   const {
     params,
     skipAuth = false,
     responseType = 'json',
     _isRetry = false,
+    schema,
     ...fetchOptions
   } = options
+
+  // Validate schema usage
+  if (schema && responseType !== 'json') {
+    throw new Error('Schema validation can only be used with responseType: "json"')
+  }
 
   let url = `${API_BASE_URL}${endpoint}`
 
@@ -228,7 +253,8 @@ async function httpClient<T>(endpoint: string, options: HttpClientOptions = {}):
       if (refreshResult.success) {
         // Retry the original request
         console.log('🔄 Retrying request after token refresh')
-        return httpClient<T>(endpoint, { ...options, _isRetry: true })
+        // @ts-expect-error - Recursive call with same types
+        return httpClient(endpoint, { ...options, _isRetry: true })
       }
 
       // Refresh failed - logout
@@ -251,17 +277,34 @@ async function httpClient<T>(endpoint: string, options: HttpClientOptions = {}):
   }
 
   // Parse response based on requested type
+  let data: any
   switch (responseType) {
     case 'blob':
-      return response.blob() as Promise<T>
+      data = await response.blob()
+      break
     case 'text':
-      return response.text() as Promise<T>
+      data = await response.text()
+      break
     case 'arrayBuffer':
-      return response.arrayBuffer() as Promise<T>
+      data = await response.arrayBuffer()
+      break
     case 'json':
     default:
-      return response.json()
+      data = await response.json()
+      break
   }
+
+  // Validate with schema if provided
+  if (schema && responseType === 'json') {
+    try {
+      return schema.parse(data) as z.output<NonNullable<S>>
+    } catch (error) {
+      console.error('Schema validation failed for endpoint:', endpoint)
+      throw new Error('Invalid API response format')
+    }
+  }
+
+  return data as T
 }
 
 export { httpClient, API_BASE_URL }
