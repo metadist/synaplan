@@ -12,9 +12,12 @@ const skipFetch = process.argv.includes('--skip-fetch')
 if (!skipFetch) {
   // Step 1: Generate schemas using openapi-zod-client
   console.log('🔄 Generating schemas from OpenAPI spec...')
-  execSync('openapi-zod-client http://backend/api/doc.json -o src/generated/api-schemas.ts --template schema-template.hbs', {
-    stdio: 'inherit'
-  })
+  execSync(
+    'openapi-zod-client http://backend/api/doc.json -o src/generated/api-schemas.ts --template schema-template.hbs',
+    {
+      stdio: 'inherit',
+    }
+  )
 }
 
 // Step 2: Read the generated file
@@ -36,7 +39,7 @@ console.log('✨ Creating readable aliases...')
 function toPascalCase(str) {
   return str
     .split('_')
-    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
     .join('')
 }
 

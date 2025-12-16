@@ -56,9 +56,9 @@ const handleClick = () => {
 ### `ref()` – Einzelne reaktive Werte
 
 ```typescript
-const count = ref(0)        // Erstelle reaktiven Wert
-count.value++               // Ändern (WICHTIG: .value!)
-console.log(count.value)    // Lesen
+const count = ref(0) // Erstelle reaktiven Wert
+count.value++ // Ändern (WICHTIG: .value!)
+console.log(count.value) // Lesen
 ```
 
 ```vue
@@ -97,6 +97,7 @@ watch(searchQuery, (newValue, oldValue) => {
 ## 🔀 Routing – Navigation zwischen Seiten
 
 **`src/router/index.ts`**
+
 ```typescript
 {
   path: '/tools/chat-widget',
@@ -107,6 +108,7 @@ watch(searchQuery, (newValue, oldValue) => {
 ```
 
 **In Komponenten navigieren:**
+
 ```typescript
 import { useRouter } from 'vue-router'
 
@@ -118,12 +120,13 @@ router.push({ name: 'tools-chat-widget' })
 ```
 
 **Aktuelle Route lesen:**
+
 ```typescript
 import { useRoute } from 'vue-router'
 
 const route = useRoute()
-console.log(route.path)      // '/tools/chat-widget'
-console.log(route.meta)      // { requiresAuth: true, ... }
+console.log(route.path) // '/tools/chat-widget'
+console.log(route.meta) // { requiresAuth: true, ... }
 ```
 
 ---
@@ -131,6 +134,7 @@ console.log(route.meta)      // { requiresAuth: true, ... }
 ## 🌍 i18n – Mehrsprachigkeit
 
 **`src/i18n/en.json`**
+
 ```json
 {
   "mail": {
@@ -141,6 +145,7 @@ console.log(route.meta)      // { requiresAuth: true, ... }
 ```
 
 **In Komponenten verwenden:**
+
 ```vue
 <template>
   <h1>{{ $t('mail.title') }}</h1>
@@ -151,7 +156,7 @@ console.log(route.meta)      // { requiresAuth: true, ... }
 import { useI18n } from 'vue-i18n'
 
 const { t } = useI18n()
-const title = t('mail.title')  // Im Script: t() statt $t()
+const title = t('mail.title') // Im Script: t() statt $t()
 </script>
 ```
 
@@ -163,19 +168,21 @@ const title = t('mail.title')  // Im Script: t() statt $t()
 Daten, die von mehreren Komponenten genutzt werden.
 
 **Beispiel: `src/stores/sidebar.ts`**
+
 ```typescript
 export const useSidebarStore = defineStore('sidebar', () => {
   const isOpen = ref(true)
-  
+
   function toggle() {
     isOpen.value = !isOpen.value
   }
-  
+
   return { isOpen, toggle }
 })
 ```
 
 **In Komponente nutzen:**
+
 ```typescript
 import { useSidebarStore } from '@/stores/sidebar'
 
@@ -196,27 +203,29 @@ sidebarStore.toggle()
 Eine Funktion, die Vue-Features (ref, computed, watch) nutzt und in mehreren Komponenten verwendet werden kann.
 
 **Beispiel: `src/composables/useHelp.ts`**
+
 ```typescript
 export function useHelp() {
   const isHelpOpen = ref(false)
-  
+
   function openHelp() {
     isHelpOpen.value = true
   }
-  
+
   function closeHelp() {
     isHelpOpen.value = false
   }
-  
+
   return {
     isHelpOpen,
     openHelp,
-    closeHelp
+    closeHelp,
   }
 }
 ```
 
 **Verwendung:**
+
 ```typescript
 const { isHelpOpen, openHelp, closeHelp } = useHelp()
 ```
@@ -233,7 +242,7 @@ const { isHelpOpen, openHelp, closeHelp } = useHelp()
   <div class="p-6 rounded-lg border">
     <h1 class="text-2xl font-semibold mb-4">Titel</h1>
   </div>
-  
+
   <!-- Projekt-eigene Tokens (siehe style.css) -->
   <div class="surface-card txt-primary">
     <button class="btn-primary">Speichern</button>
@@ -255,11 +264,13 @@ const { isHelpOpen, openHelp, closeHelp } = useHelp()
 ### Props (Parent → Child)
 
 **Parent-Komponente:**
+
 ```vue
 <MailHandlerList :handlers="mailHandlers" />
 ```
 
 **Child-Komponente (`MailHandlerList.vue`):**
+
 ```typescript
 interface Props {
   handlers: SavedMailHandler[]
@@ -273,6 +284,7 @@ const props = defineProps<Props>()
 ### Emits (Child → Parent)
 
 **Child-Komponente:**
+
 ```typescript
 const emit = defineEmits<{
   save: [config: MailConfig]
@@ -285,11 +297,9 @@ emit('cancel')
 ```
 
 **Parent-Komponente:**
+
 ```vue
-<MailHandlerConfiguration 
-  @save="handleSave"
-  @cancel="handleCancel"
-/>
+<MailHandlerConfiguration @save="handleSave" @cancel="handleCancel" />
 ```
 
 ---
@@ -297,6 +307,7 @@ emit('cancel')
 ## 🎯 Beispiel-Flow: Mail Handler
 
 ### 1. **View** (`ToolsView.vue`)
+
 ```typescript
 // State
 const mailHandlers = ref<SavedMailHandler[]>(mockMailHandlers)
@@ -317,29 +328,22 @@ const saveMailHandler = (name: string, config: MailConfig) => {
 ```vue
 <template>
   <!-- Liste anzeigen -->
-  <MailHandlerList 
-    v-if="!showEditor"
-    :handlers="mailHandlers"
-    @create="createMailHandler"
-  />
-  
+  <MailHandlerList v-if="!showEditor" :handlers="mailHandlers" @create="createMailHandler" />
+
   <!-- Editor anzeigen -->
-  <MailHandlerConfiguration
-    v-else
-    @save="saveMailHandler"
-    @cancel="showEditor = false"
-  />
+  <MailHandlerConfiguration v-else @save="saveMailHandler" @cancel="showEditor = false" />
 </template>
 ```
 
 ### 2. **Liste** (`MailHandlerList.vue`)
+
 ```vue
 <template>
   <div v-for="handler in handlers" :key="handler.id">
     <h3>{{ handler.name }}</h3>
     <button @click="$emit('edit', handler)">Bearbeiten</button>
   </div>
-  
+
   <button @click="$emit('create')">Neu erstellen</button>
 </template>
 
@@ -357,6 +361,7 @@ defineEmits<{
 ```
 
 ### 3. **Editor** (`MailHandlerConfiguration.vue`)
+
 ```vue
 <template>
   <input v-model="config.mailServer" />
@@ -385,12 +390,14 @@ const save = () => {
 ## 🎪 Direktiven – Spezial-Attribute
 
 ### `v-if` / `v-else` – Bedingtes Rendering
+
 ```vue
 <div v-if="isLoggedIn">Willkommen!</div>
 <div v-else>Bitte einloggen</div>
 ```
 
 ### `v-for` – Listen rendern
+
 ```vue
 <div v-for="item in items" :key="item.id">
   {{ item.name }}
@@ -398,22 +405,22 @@ const save = () => {
 ```
 
 ### `v-model` – 2-Wege-Binding
+
 ```vue
 <input v-model="username" />
 <!-- Äquivalent zu: -->
-<input 
-  :value="username" 
-  @input="username = $event.target.value"
-/>
+<input :value="username" @input="username = $event.target.value" />
 ```
 
 ### `@click` / `@input` – Event-Handler
+
 ```vue
 <button @click="handleClick">Klick</button>
 <input @input="handleInput" />
 ```
 
 ### `:class` – Dynamische Klassen
+
 ```vue
 <div :class="{ 'bg-green-500': isActive, 'bg-red-500': !isActive }">
   Status
@@ -449,11 +456,12 @@ onUnmounted(() => {
 ## 🎯 TypeScript-Grundlagen
 
 ### Interfaces (Typen definieren)
+
 ```typescript
 interface MailConfig {
   mailServer: string
   port: number
-  protocol: 'IMAP' | 'POP3'  // Nur diese Werte erlaubt
+  protocol: 'IMAP' | 'POP3' // Nur diese Werte erlaubt
   deleteAfter: boolean
 }
 
@@ -462,11 +470,12 @@ const config: MailConfig = {
   mailServer: 'mail.example.com',
   port: 993,
   protocol: 'IMAP',
-  deleteAfter: false
+  deleteAfter: false,
 }
 ```
 
 ### Generics
+
 ```typescript
 // Array mit spezifischem Typ
 const handlers = ref<SavedMailHandler[]>([])
@@ -480,6 +489,7 @@ const currentHandler = ref<SavedMailHandler | undefined>(undefined)
 ## 📋 Typische Patterns im Projekt
 
 ### 1. **List + Editor Pattern** (z.B. Widgets, Mail Handlers)
+
 ```typescript
 // Liste anzeigen oder Editor?
 const showEditor = ref(false)
@@ -487,12 +497,12 @@ const currentItem = ref<Item | undefined>(undefined)
 
 const createItem = () => {
   showEditor.value = true
-  currentItem.value = undefined  // Neu erstellen
+  currentItem.value = undefined // Neu erstellen
 }
 
 const editItem = (item: Item) => {
   showEditor.value = true
-  currentItem.value = item  // Bearbeiten
+  currentItem.value = item // Bearbeiten
 }
 
 const saveItem = () => {
@@ -502,6 +512,7 @@ const saveItem = () => {
 ```
 
 ### 2. **Wizard/Steps Pattern** (z.B. Mail Handler)
+
 ```typescript
 const currentStep = ref(0)
 const steps = ['connection', 'departments', 'test']
@@ -520,6 +531,7 @@ const prevStep = () => {
 ```
 
 ### 3. **Loading States**
+
 ```typescript
 const isLoading = ref(false)
 const testResult = ref<{ success: boolean; message: string } | null>(null)
@@ -527,9 +539,9 @@ const testResult = ref<{ success: boolean; message: string } | null>(null)
 const testConnection = async () => {
   isLoading.value = true
   testResult.value = null
-  
-  await new Promise(resolve => setTimeout(resolve, 2000))
-  
+
+  await new Promise((resolve) => setTimeout(resolve, 2000))
+
   testResult.value = { success: true, message: 'Connected!' }
   isLoading.value = false
 }
@@ -540,6 +552,7 @@ const testConnection = async () => {
 ## 🎨 Help System – Konkretes Beispiel
 
 ### 1. **Help Content** (`src/data/helpContent.ts`)
+
 ```typescript
 export const helpContent = {
   'tools.docSummary': {
@@ -557,6 +570,7 @@ export const helpContent = {
 ```
 
 ### 2. **Elemente markieren** (`SummaryConfiguration.vue`)
+
 ```vue
 <div data-help="presets">
   <!-- Diese Box wird im Help-Modus hervorgehoben -->
@@ -564,15 +578,17 @@ export const helpContent = {
 ```
 
 ### 3. **Help öffnen** (`HelpButton.vue`)
+
 ```typescript
 const { openHelp } = useHelp()
 
 const handleClick = () => {
-  openHelp()  // Startet Tour
+  openHelp() // Startet Tour
 }
 ```
 
 ### 4. **Tour anzeigen** (`HelpTour.vue`)
+
 ```typescript
 // Aktueller Schritt
 const currentStepIndex = ref(0)
@@ -603,11 +619,13 @@ const updateHighlight = () => {
 ```
 
 ### 2. **Dev-Server starten**
+
 ```bash
 npm run dev
 ```
 
 ### 3. **App öffnen**
+
 ```
 http://localhost:5173
 ```
@@ -616,17 +634,17 @@ http://localhost:5173
 
 ## 🎓 Wichtige Konzepte nochmal
 
-| Konzept | Zweck | Beispiel |
-|---------|-------|----------|
-| **ref()** | Reaktive Variable | `const count = ref(0)` |
-| **computed()** | Berechneter Wert | `const total = computed(() => a + b)` |
-| **watch()** | Auf Änderung reagieren | `watch(value, () => {...})` |
-| **Props** | Daten von Parent zu Child | `<Child :data="myData" />` |
-| **Emits** | Events von Child zu Parent | `emit('save', data)` |
-| **Store** | Globaler State | `useSidebarStore()` |
-| **Composable** | Wiederverwendbare Logik | `useHelp()` |
-| **Router** | Navigation | `router.push('/page')` |
-| **i18n** | Übersetzungen | `$t('mail.title')` |
+| Konzept        | Zweck                      | Beispiel                              |
+| -------------- | -------------------------- | ------------------------------------- |
+| **ref()**      | Reaktive Variable          | `const count = ref(0)`                |
+| **computed()** | Berechneter Wert           | `const total = computed(() => a + b)` |
+| **watch()**    | Auf Änderung reagieren     | `watch(value, () => {...})`           |
+| **Props**      | Daten von Parent zu Child  | `<Child :data="myData" />`            |
+| **Emits**      | Events von Child zu Parent | `emit('save', data)`                  |
+| **Store**      | Globaler State             | `useSidebarStore()`                   |
+| **Composable** | Wiederverwendbare Logik    | `useHelp()`                           |
+| **Router**     | Navigation                 | `router.push('/page')`                |
+| **i18n**       | Übersetzungen              | `$t('mail.title')`                    |
 
 ---
 
@@ -641,4 +659,3 @@ http://localhost:5173
 ---
 
 **Fragen? Schau dir die existierenden Komponenten an – sie folgen alle diesen Patterns!** 🚀
-
