@@ -10,7 +10,7 @@
     >
       <!-- Header -->
       <div
-        class="sticky top-0 surface-card border-b border-light-border/30 dark:border-dark-border/20 px-6 py-4 flex items-center justify-between"
+        class="sticky top-0 z-10 surface-card border-b border-light-border/30 dark:border-dark-border/20 px-6 py-4 flex items-center justify-between"
         data-testid="section-header"
       >
         <div>

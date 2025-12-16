@@ -1,12 +1,12 @@
 <template>
   <div class="space-y-4">
-    <div class="flex items-center justify-between">
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
       <div>
         <h2 class="text-xl font-semibold txt-primary">{{ $t('mail.savedHandlers') }}</h2>
         <p class="text-sm txt-secondary mt-1">{{ $t('mail.savedHandlersDesc') }}</p>
       </div>
       <button
-        class="btn-primary px-4 py-2 rounded-lg flex items-center gap-2"
+        class="btn-primary px-4 py-2 rounded-lg flex items-center gap-2 w-full sm:w-auto"
         @click="$emit('create')"
       >
         <PlusIcon class="w-5 h-5" />

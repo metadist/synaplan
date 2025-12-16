@@ -13,8 +13,8 @@
       </div>
 
       <!-- Prompt Selector with New Button -->
-      <div class="flex items-start gap-3">
-        <div class="flex-1">
+      <div class="flex flex-col sm:flex-row sm:items-start gap-3">
+        <div class="flex-1 w-full">
           <label class="block text-sm font-semibold txt-primary mb-2 flex items-center gap-2">
             <Icon icon="heroicons:list-bullet" class="w-4 h-4" />
             {{ $t('config.taskPrompts.selectPrompt') }}
@@ -37,9 +37,9 @@
         </div>
 
         <!-- New Prompt Button -->
-        <div class="pt-7">
+        <div class="pt-0 sm:pt-7 w-full sm:w-auto">
           <button
-            class="px-5 py-3 rounded-lg bg-[var(--brand)] text-white hover:bg-[var(--brand)]/90 transition-colors font-medium text-sm flex items-center gap-2 whitespace-nowrap"
+            class="w-full sm:w-auto px-5 py-3 rounded-lg bg-[var(--brand)] text-white hover:bg-[var(--brand)]/90 transition-colors font-medium text-sm flex items-center justify-center gap-2 whitespace-nowrap"
             data-testid="btn-create-prompt"
             @click="showCreateModal = true"
           >
@@ -652,10 +652,10 @@
 
           <!-- Modal Actions -->
           <div
-            class="flex items-center gap-3 pt-4 border-t border-light-border/30 dark:border-dark-border/20"
+            class="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 pt-4 border-t border-light-border/30 dark:border-dark-border/20"
           >
             <button
-              class="flex-1 px-6 py-3 rounded-lg border border-light-border/30 dark:border-dark-border/20 txt-primary hover:bg-light-border/10 dark:hover:bg-dark-border/10 transition-colors font-medium"
+              class="w-full sm:flex-1 px-6 py-3 rounded-lg border border-light-border/30 dark:border-dark-border/20 txt-primary hover:bg-light-border/10 dark:hover:bg-dark-border/10 transition-colors font-medium"
               data-testid="btn-cancel-create"
               @click="showCreateModal = false"
             >
@@ -663,7 +663,7 @@
             </button>
             <button
               :disabled="!canCreatePrompt"
-              class="flex-1 px-6 py-3 rounded-lg bg-[var(--brand)] text-white hover:bg-[var(--brand)]/90 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              class="w-full sm:flex-1 px-6 py-3 rounded-lg bg-[var(--brand)] text-white hover:bg-[var(--brand)]/90 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               :title="
                 hasTemplateText
                   ? 'Please customize the template text before creating'

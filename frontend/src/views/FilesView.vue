@@ -316,13 +316,13 @@
                   <td class="py-3 px-3">
                     <div v-if="editingGroupKey === file.id" class="flex items-center gap-2">
                       <input
-                        v-model="tempGroupKey"
                         :ref="
                           (el) => {
                             if (el && editingGroupKey === file.id)
                               groupKeyInput = el as HTMLInputElement
                           }
                         "
+                        v-model="tempGroupKey"
                         type="text"
                         class="px-2 py-1 text-xs rounded border border-[var(--brand)] focus:outline-none focus:ring-1 focus:ring-[var(--brand)] bg-transparent txt-primary"
                         placeholder="GroupKey"
