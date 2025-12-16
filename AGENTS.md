@@ -5,6 +5,21 @@ description: AI-powered knowledge management system with RAG, chat widgets, and 
 
 # Synaplan Development Guide for AI Agents
 
+## ⚠️ CRITICAL MERGE RULES - READ FIRST ⚠️
+
+**NEVER blindly accept one version during merge conflicts.**
+
+When resolving merge conflicts:
+1. **ALWAYS manually merge both sides** - understand what each side adds/changes
+2. **NEVER use `git checkout --ours` or `git checkout --theirs`** for code files
+3. **Read and understand BOTH versions** before resolving
+4. **Preserve ALL functionality** from both branches unless explicitly instructed otherwise
+5. **If unsure, ASK** - throwing away code is worse than asking for clarification
+
+Example: If HEAD has auth failure loop detection and theirs has schema validation, the merged version MUST have BOTH features, not just one.
+
+**This is non-negotiable. Violating this rule causes data loss and broken functionality.**
+
 ## Project Overview
 
 Synaplan is a full-stack AI knowledge management platform with:
