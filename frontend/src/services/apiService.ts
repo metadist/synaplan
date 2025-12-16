@@ -103,14 +103,14 @@ async function httpClient<T = unknown, S extends z.Schema | undefined = undefine
     // Validate with schema if provided
     if (schema) {
       try {
-        return schema.parse(data)
+        return schema.parse(data) as z.output<NonNullable<S>>
       } catch (error) {
         console.error('Schema validation failed:', error)
         throw error
       }
     }
 
-    return data
+    return data as T
   } catch (error: any) {
     if (error.name === 'AbortError') {
       throw new Error('Request timeout')
