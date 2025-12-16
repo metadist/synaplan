@@ -14,7 +14,7 @@
         <DevicePhoneMobileIcon class="w-5 h-5 text-green-500" />
         {{ $t('config.inbound.whatsappChannels') }}
       </h3>
-      
+
       <div class="space-y-3">
         <div
           v-for="channel in whatsappChannels"
@@ -68,12 +68,17 @@
             />
             <span class="txt-primary">{{ emailKeywordDomain }}</span>
           </div>
-          <div v-if="emailKeyword && personalEmailAddress" class="mt-3 p-3 bg-blue-500/10 border border-blue-500/30 rounded-lg">
+          <div
+            v-if="emailKeyword && personalEmailAddress"
+            class="mt-3 p-3 bg-blue-500/10 border border-blue-500/30 rounded-lg"
+          >
             <p class="text-sm txt-primary">
               <CheckCircleIcon class="w-5 h-5 text-blue-500 inline mr-2" />
               <i18n-t keypath="config.inbound.yourEmailAddress" tag="span">
                 <template #email>
-                  <span class="font-medium font-mono text-blue-600 dark:text-blue-400">{{ personalEmailAddress }}</span>
+                  <span class="font-medium font-mono text-blue-600 dark:text-blue-400">{{
+                    personalEmailAddress
+                  }}</span>
                 </template>
               </i18n-t>
             </p>
@@ -96,7 +101,7 @@
       <p class="txt-secondary mb-4">
         {{ $t('config.inbound.apiDescription') }}
       </p>
-      
+
       <div class="p-4 bg-blue-500/10 border border-blue-500/30 rounded-lg">
         <p class="text-sm txt-primary mb-3">
           {{ $t('config.inbound.apiDocumentationInfo') }}
@@ -115,9 +120,9 @@
 
     <UnsavedChangesBar
       :show="hasUnsavedChanges"
+      data-testid="comp-unsaved-bar"
       @save="handleSave"
       @discard="handleDiscard"
-      data-testid="comp-unsaved-bar"
     />
   </div>
 </template>
@@ -128,7 +133,7 @@ import {
   DevicePhoneMobileIcon,
   EnvelopeIcon,
   CommandLineIcon,
-  CheckCircleIcon
+  CheckCircleIcon,
 } from '@heroicons/vue/24/outline'
 import UnsavedChangesBar from '@/components/UnsavedChangesBar.vue'
 import PhoneVerification from '@/components/config/PhoneVerification.vue'
@@ -137,7 +142,7 @@ import {
   mockEmailChannels,
   mockAPIConfig,
   emailKeywordBase,
-  emailKeywordDomain
+  emailKeywordDomain,
 } from '@/mocks/config'
 import { useUnsavedChanges } from '@/composables/useUnsavedChanges'
 import { useNotification } from '@/composables/useNotification'
@@ -150,7 +155,7 @@ const formData = ref({
   emailChannels: mockEmailChannels,
   apiConfig: mockAPIConfig,
   emailKeyword: '',
-  personalEmailAddress: ''
+  personalEmailAddress: '',
 })
 
 const originalData = ref({
@@ -158,7 +163,7 @@ const originalData = ref({
   emailChannels: mockEmailChannels,
   apiConfig: mockAPIConfig,
   emailKeyword: '',
-  personalEmailAddress: ''
+  personalEmailAddress: '',
 })
 
 // Computed refs for template access
@@ -166,7 +171,7 @@ const whatsappChannels = computed(() => formData.value.whatsappChannels)
 const emailChannels = computed(() => formData.value.emailChannels)
 const emailKeyword = computed({
   get: () => formData.value.emailKeyword,
-  set: (val: string) => formData.value.emailKeyword = val
+  set: (val: string) => (formData.value.emailKeyword = val),
 })
 const personalEmailAddress = computed(() => formData.value.personalEmailAddress)
 
@@ -206,7 +211,7 @@ const handleSave = saveChanges(async () => {
     // Save email keyword
     const keywordToSave = formData.value.emailKeyword.trim()
     const response = await profileApi.setEmailKeyword(keywordToSave)
-    
+
     if (response.success) {
       formData.value.emailKeyword = response.keyword || ''
       formData.value.personalEmailAddress = response.emailAddress
@@ -215,7 +220,8 @@ const handleSave = saveChanges(async () => {
       success('Email keyword saved successfully')
     }
   } catch (err: any) {
-    const errorMessage = err?.response?.data?.error || err?.message || 'Failed to save email keyword'
+    const errorMessage =
+      err?.response?.data?.error || err?.message || 'Failed to save email keyword'
     error(errorMessage)
     throw err // Re-throw to prevent hasUnsavedChanges from being cleared
   }
@@ -225,4 +231,3 @@ const handleDiscard = () => {
   discardChanges()
 }
 </script>
-

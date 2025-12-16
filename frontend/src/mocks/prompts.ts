@@ -9,14 +9,21 @@ export interface TaskPrompt {
   isDefault: boolean
 }
 
-export type AvailableTool = 'internet-search' | 'files-search' | 'url-screenshot' | 'image-generation' | 'video-generation'
+export type AvailableTool =
+  | 'internet-search'
+  | 'files-search'
+  | 'url-screenshot'
+  | 'image-generation'
+  | 'video-generation'
 
 export const mockTaskPrompts: TaskPrompt[] = [
   {
     id: 'default-mediamaker',
     name: '(default) mediamaker - The user asks for generation of ...',
-    description: 'The user asks for generation of images, videos or sounds (or just one). Not for any other file types. The user wants an image, video or an audio file. Direct the request here. This handles the connection to media generation AIs.',
-    rules: 'The user asks for generation of images, videos or sounds (or just one). Not for any other file types. The user wants an image, video or an audio file. Direct the request here. This handles the connection to media generation AIs.',
+    description:
+      'The user asks for generation of images, videos or sounds (or just one). Not for any other file types. The user wants an image, video or an audio file. Direct the request here. This handles the connection to media generation AIs.',
+    rules:
+      'The user asks for generation of images, videos or sounds (or just one). Not for any other file types. The user wants an image, video or an audio file. Direct the request here. This handles the connection to media generation AIs.',
     aiModel: 'AUTOMATED - Tries to define the best model for the task on SYNAPLAN [System Model]',
     availableTools: ['internet-search'],
     content: `# Media generation
@@ -31,7 +38,7 @@ The incoming object does look like:
   "BTOPIC": "mediamaker"
 }
 \`\`\``,
-    isDefault: true
+    isDefault: true,
   },
   {
     id: 'default-general',
@@ -42,7 +49,7 @@ The incoming object does look like:
     availableTools: ['internet-search', 'files-search', 'url-screenshot'],
     content: `# General Assistant
 You are a helpful AI assistant. Respond to user queries professionally and accurately.`,
-    isDefault: true
+    isDefault: true,
   },
   {
     id: 'custom-analyzefile',
@@ -53,7 +60,7 @@ You are a helpful AI assistant. Respond to user queries professionally and accur
     availableTools: ['files-search'],
     content: `# File Analysis
 Analyze the provided file and give detailed insights.`,
-    isDefault: false
+    isDefault: false,
   },
   {
     id: 'default-officemaker',
@@ -64,8 +71,8 @@ Analyze the provided file and give detailed insights.`,
     availableTools: [],
     content: `# Office Document Generation
 Generate professional office documents based on user requirements.`,
-    isDefault: true
-  }
+    isDefault: true,
+  },
 ]
 
 export const availableToolsList = [
@@ -73,6 +80,5 @@ export const availableToolsList = [
   { value: 'files-search', label: 'Files Search' },
   { value: 'url-screenshot', label: 'URL Screenshot' },
   { value: 'image-generation', label: 'Image Generation' },
-  { value: 'video-generation', label: 'Video Generation' }
+  { value: 'video-generation', label: 'Video Generation' },
 ]
-

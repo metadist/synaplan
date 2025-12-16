@@ -21,7 +21,7 @@ const dialog = ref<DialogState>({
   isOpen: false,
   title: '',
   message: '',
-  type: 'confirm'
+  type: 'confirm',
 })
 
 export const useDialog = () => {
@@ -36,7 +36,7 @@ export const useDialog = () => {
         resolve: (value: boolean) => {
           dialog.value.isOpen = false
           resolve(value)
-        }
+        },
       }
     })
   }
@@ -52,7 +52,7 @@ export const useDialog = () => {
         resolve: (value: string | null) => {
           dialog.value.isOpen = false
           resolve(value)
-        }
+        },
       }
     })
   }
@@ -67,7 +67,7 @@ export const useDialog = () => {
         resolve: () => {
           dialog.value.isOpen = false
           resolve()
-        }
+        },
       }
     })
   }
@@ -88,7 +88,6 @@ export const useDialog = () => {
     confirm,
     prompt,
     alert,
-    close
+    close,
   }
 }
-

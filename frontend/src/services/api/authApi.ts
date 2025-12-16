@@ -8,26 +8,26 @@ export const authApi = {
   async login(email: string, password: string): Promise<any> {
     return httpClient<any>('/api/v1/auth/login', {
       method: 'POST',
-      body: JSON.stringify({ email, password })
+      body: JSON.stringify({ email, password }),
     })
   },
 
   async register(email: string, password: string): Promise<any> {
     return httpClient<any>('/api/v1/auth/register', {
       method: 'POST',
-      body: JSON.stringify({ email, password })
+      body: JSON.stringify({ email, password }),
     })
   },
 
   async logout(): Promise<any> {
     return httpClient<any>('/api/v1/auth/logout', {
-      method: 'POST'
+      method: 'POST',
     })
   },
 
   async getCurrentUser(): Promise<any> {
     return httpClient<any>('/api/v1/auth/me', {
-      method: 'GET'
+      method: 'GET',
     })
   },
 
@@ -35,7 +35,7 @@ export const authApi = {
     return httpClient<any>('/api/v1/auth/verify-email', {
       method: 'POST',
       body: JSON.stringify({ token }),
-      skipAuth: true
+      skipAuth: true,
     })
   },
 
@@ -43,7 +43,7 @@ export const authApi = {
     return httpClient<any>('/api/v1/auth/resend-verification', {
       method: 'POST',
       body: JSON.stringify({ email }),
-      skipAuth: true
+      skipAuth: true,
     })
   },
 
@@ -51,7 +51,7 @@ export const authApi = {
     return httpClient<any>('/api/v1/auth/forgot-password', {
       method: 'POST',
       body: JSON.stringify({ email }),
-      skipAuth: true
+      skipAuth: true,
     })
   },
 
@@ -60,8 +60,7 @@ export const authApi = {
     return httpClient<any>('/api/v1/auth/reset-password', {
       method: 'POST',
       body: JSON.stringify({ token, password }),
-      skipAuth: true
+      skipAuth: true,
     })
-  }
+  },
 }
-

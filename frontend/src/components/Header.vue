@@ -3,10 +3,10 @@
     <div class="flex items-center justify-between px-6 py-4" data-testid="section-header-bar">
       <div class="flex items-center gap-3 flex-1" data-testid="section-header-left">
         <button
-          @click="sidebarStore.toggleMobile()"
           class="md:hidden icon-ghost h-[44px] min-w-[44px] flex items-center justify-center rounded-lg"
           aria-label="Toggle sidebar"
           data-testid="btn-sidebar-toggle"
+          @click="sidebarStore.toggleMobile()"
         >
           <Bars3Icon class="w-6 h-6" />
         </button>
@@ -16,24 +16,28 @@
       <div class="flex items-center gap-3" data-testid="section-header-actions">
         <!-- Mode Switcher -->
         <button
-          @click="appModeStore.toggleMode()"
           class="dropdown-trigger"
           :title="appModeStore.isEasyMode ? 'Switch to Advanced Mode' : 'Switch to Easy Mode'"
           data-testid="btn-mode-toggle"
+          @click="appModeStore.toggleMode()"
         >
           <AdjustmentsHorizontalIcon class="w-5 h-5" />
-          <span class="hidden md:inline text-sm font-medium">{{ appModeStore.isEasyMode ? 'Easy' : 'Advanced' }}</span>
+          <span class="hidden md:inline text-sm font-medium">{{
+            appModeStore.isEasyMode ? 'Easy' : 'Advanced'
+          }}</span>
         </button>
 
         <div ref="langSelectorRef" class="relative isolate" data-testid="section-language-selector">
           <button
-            @click="isLangOpen = !isLangOpen"
             class="dropdown-trigger"
             aria-label="Select language"
             data-testid="btn-language-toggle"
+            @click="isLangOpen = !isLangOpen"
           >
             <GlobeAltIcon class="w-5 h-5" />
-            <span class="hidden md:inline text-sm font-medium">{{ selectedLanguage.toUpperCase() }}</span>
+            <span class="hidden md:inline text-sm font-medium">{{
+              selectedLanguage.toUpperCase()
+            }}</span>
           </button>
 
           <div
@@ -45,14 +49,12 @@
             <button
               v-for="lang in languages"
               :key="lang.value"
-              @click="selectLanguage(lang.value)"
               role="menuitem"
               :class="[
                 'dropdown-item',
-                selectedLanguage === lang.value
-                  ? 'dropdown-item--active'
-                  : '',
+                selectedLanguage === lang.value ? 'dropdown-item--active' : '',
               ]"
+              @click="selectLanguage(lang.value)"
             >
               {{ lang.label }}
             </button>
@@ -60,10 +62,10 @@
         </div>
 
         <button
-          @click="cycleTheme"
           :aria-label="themeLabel"
           class="icon-ghost h-[44px] min-w-[44px] flex items-center justify-center rounded-lg"
           data-testid="btn-theme-toggle"
+          @click="cycleTheme"
         >
           <SunIcon v-if="themeStore.theme.value === 'light'" class="w-5 h-5" />
           <MoonIcon v-else class="w-5 h-5" />
@@ -75,7 +77,13 @@
 
 <script setup lang="ts">
 import { computed, ref, onMounted, onBeforeUnmount } from 'vue'
-import { SunIcon, MoonIcon, GlobeAltIcon, Bars3Icon, AdjustmentsHorizontalIcon } from '@heroicons/vue/24/outline'
+import {
+  SunIcon,
+  MoonIcon,
+  GlobeAltIcon,
+  Bars3Icon,
+  AdjustmentsHorizontalIcon,
+} from '@heroicons/vue/24/outline'
 import { useTheme } from '../composables/useTheme'
 import { useSidebarStore } from '../stores/sidebar'
 import { useAppModeStore } from '../stores/appMode'
@@ -121,7 +129,7 @@ const cycleTheme = () => {
 
 const handleClickOutside = (event: MouseEvent) => {
   if (!isLangOpen.value) return
-  
+
   const target = event.target as HTMLElement
   if (langSelectorRef.value && !langSelectorRef.value.contains(target)) {
     isLangOpen.value = false

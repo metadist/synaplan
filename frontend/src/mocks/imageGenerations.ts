@@ -23,8 +23,8 @@ export const mockImageGenerations: ImageGeneration[] = [
     metadata: {
       size: '1024x768',
       quality: 'hd',
-      style: 'natural'
-    }
+      style: 'natural',
+    },
   },
   {
     id: 2,
@@ -36,8 +36,8 @@ export const mockImageGenerations: ImageGeneration[] = [
     metadata: {
       size: '1024x768',
       quality: 'standard',
-      style: 'cinematic'
-    }
+      style: 'cinematic',
+    },
   },
   {
     id: 3,
@@ -48,9 +48,9 @@ export const mockImageGenerations: ImageGeneration[] = [
     createdAt: new Date(Date.now() - 10800000),
     metadata: {
       size: '1024x768',
-      quality: 'standard'
-    }
-  }
+      quality: 'standard',
+    },
+  },
 ]
 
 export function mockGenerateImage(prompt: string): Promise<ImageGeneration> {
@@ -65,10 +65,9 @@ export function mockGenerateImage(prompt: string): Promise<ImageGeneration> {
         createdAt: new Date(),
         metadata: {
           size: '1024x768',
-          quality: 'standard'
-        }
+          quality: 'standard',
+        },
       })
     }, 1500)
   })
 }
-

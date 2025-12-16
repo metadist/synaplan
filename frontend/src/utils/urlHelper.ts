@@ -19,4 +19,3 @@ export function normalizeMediaUrl(url: string | undefined | null): string {
 
   return `${config.appBaseUrl}${normalizedPath}`
 }
-

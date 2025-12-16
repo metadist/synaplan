@@ -761,7 +761,7 @@ class FileController extends AbstractController
         int $id,
         Request $request,
         #[CurrentUser] ?User $user,
-        \App\Repository\RagDocumentRepository $ragRepository,
+        RagDocumentRepository $ragRepository,
     ): JsonResponse {
         if (!$user) {
             return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
@@ -854,7 +854,7 @@ class FileController extends AbstractController
         int $id,
         Request $request,
         #[CurrentUser] ?User $user,
-        \App\Repository\RagDocumentRepository $ragRepository,
+        RagDocumentRepository $ragRepository,
     ): JsonResponse {
         if (!$user) {
             return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
@@ -1015,7 +1015,7 @@ class FileController extends AbstractController
     public function getGroupKey(
         int $id,
         #[CurrentUser] ?User $user,
-        \App\Repository\RagDocumentRepository $ragRepository,
+        RagDocumentRepository $ragRepository,
     ): JsonResponse {
         if (!$user) {
             return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);

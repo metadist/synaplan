@@ -16,6 +16,14 @@ git clone <repository-url>
 cd synaplan-dev
 ```
 
+**Line Endings:** This project enforces LF (Unix-style) line endings via `.gitattributes`, so all platforms will automatically use LF regardless of their Git configuration. If you cloned before this was added, you may need to refresh your working copy:
+
+```bash
+# Only if you experience line ending issues after pulling
+git rm --cached -r .
+git reset --hard
+```
+
 Run the first-install script for your platform (it verifies Docker, lets you pick your AI provider, and handles all bootstrapping):
 
 ```bash

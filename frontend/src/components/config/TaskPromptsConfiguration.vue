@@ -21,16 +21,12 @@
           </label>
           <select
             v-model="selectedPromptId"
-            @change="onPromptSelect"
             class="w-full px-4 py-3 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] transition-all"
             data-testid="input-prompt-select"
+            @change="onPromptSelect"
           >
             <option :value="null" disabled>Select a task prompt...</option>
-            <option
-              v-for="prompt in prompts"
-              :key="prompt.id"
-              :value="prompt.id"
-            >
+            <option v-for="prompt in prompts" :key="prompt.id" :value="prompt.id">
               {{ prompt.name }}
             </option>
           </select>
@@ -39,13 +35,13 @@
             {{ $t('config.taskPrompts.selectPromptHelp') }}
           </p>
         </div>
-        
+
         <!-- New Prompt Button -->
         <div class="pt-7">
           <button
-            @click="showCreateModal = true"
             class="px-5 py-3 rounded-lg bg-[var(--brand)] text-white hover:bg-[var(--brand)]/90 transition-colors font-medium text-sm flex items-center gap-2 whitespace-nowrap"
             data-testid="btn-create-prompt"
+            @click="showCreateModal = true"
           >
             <Icon icon="heroicons:plus-circle" class="w-5 h-5" />
             {{ $t('config.taskPrompts.createNew') }}
@@ -65,12 +61,20 @@
 
         <div class="space-y-5">
           <!-- System Prompt Badge (if default) -->
-          <div v-if="currentPrompt.isDefault" class="p-3 bg-blue-500/10 border border-blue-500/30 rounded-lg">
+          <div
+            v-if="currentPrompt.isDefault"
+            class="p-3 bg-blue-500/10 border border-blue-500/30 rounded-lg"
+          >
             <div class="flex items-center gap-2">
               <Icon icon="heroicons:lock-closed" class="w-5 h-5 text-blue-600 dark:text-blue-400" />
               <div>
-                <p class="text-sm font-medium text-blue-600 dark:text-blue-400">System Prompt (Read-Only)</p>
-                <p class="text-xs text-blue-600/70 dark:text-blue-400/70">This is a default system prompt and cannot be edited. Create a custom prompt to override it.</p>
+                <p class="text-sm font-medium text-blue-600 dark:text-blue-400">
+                  System Prompt (Read-Only)
+                </p>
+                <p class="text-xs text-blue-600/70 dark:text-blue-400/70">
+                  This is a default system prompt and cannot be edited. Create a custom prompt to
+                  override it.
+                </p>
               </div>
             </div>
           </div>
@@ -92,21 +96,23 @@
           </div>
 
           <!-- AI Model Selection -->
-        <div>
+          <div>
             <label class="block text-sm font-semibold txt-primary mb-2 flex items-center gap-2">
               <Icon icon="heroicons:cpu-chip" class="w-4 h-4" />
-            {{ $t('config.taskPrompts.aiModel') }}
-          </label>
-          <select
+              {{ $t('config.taskPrompts.aiModel') }}
+            </label>
+            <select
               v-model="formData.aiModel"
               :disabled="currentPrompt.isDefault"
-            class="w-full px-4 py-3 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] disabled:opacity-50 disabled:cursor-not-allowed"
-            data-testid="input-ai-model"
-          >
-            <option value="AUTOMATED - Tries to define the best model for the task on SYNAPLAN [System Model]">
+              class="w-full px-4 py-3 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] disabled:opacity-50 disabled:cursor-not-allowed"
+              data-testid="input-ai-model"
+            >
+              <option
+                value="AUTOMATED - Tries to define the best model for the task on SYNAPLAN [System Model]"
+              >
                 ✨ {{ $t('config.taskPrompts.automated') }}
-            </option>
-              
+              </option>
+
               <!-- Grouped Models by Capability -->
               <template v-if="!loadingModels && groupedModels.length > 0">
                 <optgroup
@@ -114,74 +120,77 @@
                   :key="group.capability"
                   :label="group.label"
                 >
-            <option
+                  <option
                     v-for="model in group.models"
-              :key="model.id"
-              :value="`${model.name} (${model.service})`"
-            >
-              {{ model.name }} ({{ model.service }})
+                    :key="model.id"
+                    :value="`${model.name} (${model.service})`"
+                  >
+                    {{ model.name }} ({{ model.service }})
                     <template v-if="model.rating">⭐ {{ model.rating.toFixed(1) }}</template>
-            </option>
+                  </option>
                 </optgroup>
               </template>
-              
+
               <!-- Loading state -->
               <option v-if="loadingModels" disabled>Loading models...</option>
-          </select>
+            </select>
             <p class="text-xs txt-secondary mt-1.5 flex items-center gap-1">
               <Icon icon="heroicons:information-circle" class="w-3.5 h-3.5" />
-            {{ $t('config.taskPrompts.aiModelHelp') }}
-          </p>
-        </div>
+              {{ $t('config.taskPrompts.aiModelHelp') }}
+            </p>
+          </div>
 
           <!-- Available Tools -->
-        <div>
+          <div>
             <label class="block text-sm font-semibold txt-primary mb-3 flex items-center gap-2">
               <Icon icon="heroicons:wrench-screwdriver" class="w-4 h-4" />
-            {{ $t('config.taskPrompts.availableTools') }}
-          </label>
+              {{ $t('config.taskPrompts.availableTools') }}
+            </label>
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <label
+              <label
                 v-for="tool in availableTools"
-              :key="tool.value"
+                :key="tool.value"
                 class="flex items-center gap-3 p-3 rounded-lg surface-chip cursor-pointer hover:bg-[var(--brand)]/5 transition-colors"
                 data-testid="item-tool"
-            >
-              <input
+              >
+                <input
                   v-model="formData.availableTools"
-                type="checkbox"
-                :value="tool.value"
-                :disabled="currentPrompt.isDefault"
-                class="w-5 h-5 rounded border-light-border/30 dark:border-dark-border/20 text-[var(--brand)] focus:ring-2 focus:ring-[var(--brand)] disabled:opacity-50 disabled:cursor-not-allowed"
-              />
+                  type="checkbox"
+                  :value="tool.value"
+                  :disabled="currentPrompt.isDefault"
+                  class="w-5 h-5 rounded border-light-border/30 dark:border-dark-border/20 text-[var(--brand)] focus:ring-2 focus:ring-[var(--brand)] disabled:opacity-50 disabled:cursor-not-allowed"
+                />
                 <Icon :icon="tool.icon" class="w-5 h-5 txt-secondary" />
-              <span class="text-sm txt-primary">{{ tool.label }}</span>
-            </label>
+                <span class="text-sm txt-primary">{{ tool.label }}</span>
+              </label>
+            </div>
           </div>
         </div>
       </div>
-    </div>
 
       <!-- Prompt Content Card -->
-    <div class="surface-card p-6" data-testid="section-prompt-content">
+      <div class="surface-card p-6" data-testid="section-prompt-content">
         <div class="flex items-center justify-between mb-4">
           <h3 class="text-lg font-semibold txt-primary flex items-center gap-2">
             <Icon icon="heroicons:code-bracket" class="w-5 h-5 text-[var(--brand)]" />
-        {{ $t('config.taskPrompts.promptContent') }}
-      </h3>
+            {{ $t('config.taskPrompts.promptContent') }}
+          </h3>
 
           <!-- Markdown Toolbar -->
-          <div v-if="!currentPrompt.isDefault" class="flex items-center gap-1 p-1 surface-chip rounded-lg">
-          <button
+          <div
+            v-if="!currentPrompt.isDefault"
+            class="flex items-center gap-1 p-1 surface-chip rounded-lg"
+          >
+            <button
               v-for="tool in markdownTools"
               :key="tool.label"
-              @click="insertMarkdown(tool.before, tool.after)"
               class="p-2 rounded hover:bg-[var(--brand)]/10 txt-secondary hover:txt-primary transition-colors"
               :title="tool.label"
               data-testid="btn-markdown-tool"
+              @click="insertMarkdown(tool.before, tool.after)"
             >
               <Icon :icon="tool.icon" class="w-4 h-4" />
-          </button>
+            </button>
           </div>
         </div>
 
@@ -194,7 +203,7 @@
           :placeholder="$t('config.taskPrompts.contentPlaceholder')"
           data-testid="input-content"
         />
-        
+
         <p class="text-xs txt-secondary mt-2 flex items-center gap-1">
           <Icon icon="heroicons:information-circle" class="w-3.5 h-3.5" />
           {{ $t('config.taskPrompts.contentHelp') }}
@@ -202,7 +211,11 @@
       </div>
 
       <!-- Knowledge Base Files Card -->
-      <div v-if="!currentPrompt.isDefault" class="surface-card p-6" data-testid="section-knowledge-base">
+      <div
+        v-if="!currentPrompt.isDefault"
+        class="surface-card p-6"
+        data-testid="section-knowledge-base"
+      >
         <div class="flex items-center justify-between mb-4">
           <div>
             <h3 class="text-lg font-semibold txt-primary flex items-center gap-2">
@@ -238,7 +251,11 @@
           </div>
 
           <!-- Linked Files List -->
-          <div v-if="promptFiles.length > 0" class="space-y-2 p-3 surface-chip rounded-lg max-h-[250px] overflow-y-auto" data-testid="section-linked-files">
+          <div
+            v-if="promptFiles.length > 0"
+            class="space-y-2 p-3 surface-chip rounded-lg max-h-[250px] overflow-y-auto"
+            data-testid="section-linked-files"
+          >
             <div
               v-for="file in promptFiles"
               :key="file.messageId"
@@ -246,31 +263,43 @@
               data-testid="item-linked-file"
             >
               <div class="flex items-center gap-2.5 flex-1 min-w-0">
-                <Icon icon="heroicons:check-circle" class="w-5 h-5 text-green-600 dark:text-green-400 flex-shrink-0" />
+                <Icon
+                  icon="heroicons:check-circle"
+                  class="w-5 h-5 text-green-600 dark:text-green-400 flex-shrink-0"
+                />
                 <div class="flex-1 min-w-0">
                   <p class="text-sm font-medium txt-primary truncate">{{ file.fileName }}</p>
                   <p class="text-xs text-green-600/70 dark:text-green-400/70">
-                    {{ file.chunks }} chunks • 
+                    {{ file.chunks }} chunks •
                     {{ file.uploadedAt ? formatDate(file.uploadedAt) : 'Unknown date' }}
                   </p>
                 </div>
               </div>
               <button
-                @click="handleDeleteFile(file.messageId)"
                 :disabled="loading"
                 class="w-7 h-7 rounded-lg hover:bg-red-500/10 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
                 title="Unlink file from this prompt"
                 data-testid="btn-unlink"
+                @click="handleDeleteFile(file.messageId)"
               >
                 <Icon icon="heroicons:x-mark" class="w-4 h-4 text-red-500" />
               </button>
             </div>
           </div>
-          
-          <div v-else class="text-center py-6 surface-chip rounded-lg border-2 border-dashed border-light-border/30 dark:border-dark-border/20" data-testid="section-linked-empty">
-            <Icon icon="heroicons:folder-open" class="w-10 h-10 mx-auto mb-2 txt-secondary opacity-30" />
+
+          <div
+            v-else
+            class="text-center py-6 surface-chip rounded-lg border-2 border-dashed border-light-border/30 dark:border-dark-border/20"
+            data-testid="section-linked-empty"
+          >
+            <Icon
+              icon="heroicons:folder-open"
+              class="w-10 h-10 mx-auto mb-2 txt-secondary opacity-30"
+            />
             <p class="text-sm txt-secondary">No files linked yet</p>
-            <p class="text-xs txt-secondary mt-1">Link files below to add them to this prompt's knowledge base</p>
+            <p class="text-xs txt-secondary mt-1">
+              Link files below to add them to this prompt's knowledge base
+            </p>
           </div>
         </div>
 
@@ -283,25 +312,39 @@
 
           <!-- Search Filter -->
           <div class="relative">
-            <Icon icon="heroicons:magnifying-glass" class="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 txt-secondary" />
+            <Icon
+              icon="heroicons:magnifying-glass"
+              class="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 txt-secondary"
+            />
             <input
               v-model="availableFilesSearch"
-              @input="loadAvailableFiles"
               type="text"
               placeholder="Search files by name..."
               class="w-full pl-10 pr-4 py-2.5 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
               data-testid="input-file-search"
+              @input="loadAvailableFiles"
             />
           </div>
 
           <!-- Loading -->
-          <div v-if="loadingAvailableFiles" class="text-center py-8" data-testid="section-files-loading">
-            <Icon icon="heroicons:arrow-path" class="w-8 h-8 mx-auto mb-2 txt-secondary animate-spin" />
+          <div
+            v-if="loadingAvailableFiles"
+            class="text-center py-8"
+            data-testid="section-files-loading"
+          >
+            <Icon
+              icon="heroicons:arrow-path"
+              class="w-8 h-8 mx-auto mb-2 txt-secondary animate-spin"
+            />
             <p class="text-sm txt-secondary">Loading files...</p>
           </div>
 
           <!-- Available Files List -->
-          <div v-else-if="availableFiles.length > 0" class="space-y-2 max-h-[300px] overflow-y-auto" data-testid="section-available-files">
+          <div
+            v-else-if="availableFiles.length > 0"
+            class="space-y-2 max-h-[300px] overflow-y-auto"
+            data-testid="section-available-files"
+          >
             <div
               v-for="file in availableFiles"
               :key="file.messageId"
@@ -315,25 +358,26 @@
                   <p class="text-xs txt-secondary">
                     {{ file.chunks }} chunks
                     <template v-if="file.currentGroupKey !== 'DEFAULT'">
-                      • Currently linked to: <span class="font-mono">{{ file.currentGroupKey }}</span>
+                      • Currently linked to:
+                      <span class="font-mono">{{ file.currentGroupKey }}</span>
                     </template>
                   </p>
                 </div>
               </div>
               <button
-                @click="handleLinkFile(file.messageId)"
                 :disabled="loading || isFileLinked(file.messageId)"
                 :class="[
                   'px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2',
                   isFileLinked(file.messageId)
                     ? 'bg-green-500/10 text-green-600 dark:text-green-400 cursor-default'
-                    : 'bg-[var(--brand)]/10 text-[var(--brand)] hover:bg-[var(--brand)]/20'
+                    : 'bg-[var(--brand)]/10 text-[var(--brand)] hover:bg-[var(--brand)]/20',
                 ]"
                 data-testid="btn-link-file"
+                @click="handleLinkFile(file.messageId)"
               >
-                <Icon 
-                  :icon="isFileLinked(file.messageId) ? 'heroicons:check-circle' : 'heroicons:link'" 
-                  class="w-4 h-4" 
+                <Icon
+                  :icon="isFileLinked(file.messageId) ? 'heroicons:check-circle' : 'heroicons:link'"
+                  class="w-4 h-4"
                 />
                 {{ isFileLinked(file.messageId) ? 'Linked' : 'Link' }}
               </button>
@@ -342,26 +386,39 @@
 
           <!-- Empty State -->
           <div v-else class="text-center py-8" data-testid="section-files-empty">
-            <Icon icon="heroicons:document-magnifying-glass" class="w-12 h-12 mx-auto mb-2 txt-secondary opacity-30" />
+            <Icon
+              icon="heroicons:document-magnifying-glass"
+              class="w-12 h-12 mx-auto mb-2 txt-secondary opacity-30"
+            />
             <p class="text-sm txt-secondary">
-              {{ availableFilesSearch ? 'No files found matching your search' : 'No vectorized files available. Upload files in the Files page first.' }}
+              {{
+                availableFilesSearch
+                  ? 'No files found matching your search'
+                  : 'No vectorized files available. Upload files in the Files page first.'
+              }}
             </p>
           </div>
         </div>
       </div>
 
       <!-- Delete Prompt (only for custom prompts) -->
-      <div v-if="!currentPrompt.isDefault" class="surface-card p-6 border-2 border-red-500/20" data-testid="section-danger">
-        <h3 class="text-lg font-semibold text-red-600 dark:text-red-400 mb-2 flex items-center gap-2">
+      <div
+        v-if="!currentPrompt.isDefault"
+        class="surface-card p-6 border-2 border-red-500/20"
+        data-testid="section-danger"
+      >
+        <h3
+          class="text-lg font-semibold text-red-600 dark:text-red-400 mb-2 flex items-center gap-2"
+        >
           <Icon icon="heroicons:trash" class="w-5 h-5" />
           {{ $t('config.taskPrompts.dangerZone') }}
         </h3>
         <p class="text-sm txt-secondary mb-4">{{ $t('config.taskPrompts.deleteWarning') }}</p>
         <button
-          @click="handleDelete"
           :disabled="loading"
           class="btn-secondary px-6 py-2.5 rounded-lg text-red-600 dark:text-red-400 hover:bg-red-500/10 border-red-500/30 font-medium flex items-center gap-2"
           data-testid="btn-delete"
+          @click="handleDelete"
         >
           <Icon icon="heroicons:trash" class="w-5 h-5" />
           {{ $t('config.taskPrompts.deletePrompt') }}
@@ -369,8 +426,14 @@
       </div>
     </template>
     <template v-else>
-      <div class="surface-card p-10 text-center rounded-lg" data-testid="section-no-prompt-selected">
-        <Icon icon="heroicons:cursor-arrow-ripple" class="w-12 h-12 mx-auto mb-4 txt-secondary opacity-50" />
+      <div
+        class="surface-card p-10 text-center rounded-lg"
+        data-testid="section-no-prompt-selected"
+      >
+        <Icon
+          icon="heroicons:cursor-arrow-ripple"
+          class="w-12 h-12 mx-auto mb-4 txt-secondary opacity-50"
+        />
         <h3 class="text-lg font-semibold txt-primary mb-2">
           {{ $t('config.taskPrompts.selectPromptTitle') }}
         </h3>
@@ -387,17 +450,20 @@
       data-testid="modal-task-prompt-create"
       @click.self="showCreateModal = false"
     >
-      <div class="surface-card p-6 rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto" data-testid="section-create-modal">
+      <div
+        class="surface-card p-6 rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto"
+        data-testid="section-create-modal"
+      >
         <div class="flex items-center justify-between mb-6">
           <h3 class="text-xl font-semibold txt-primary flex items-center gap-2">
             <Icon icon="heroicons:plus-circle" class="w-6 h-6 text-[var(--brand)]" />
             {{ $t('config.taskPrompts.createNew') }}
           </h3>
           <button
-            @click="showCreateModal = false"
             class="p-2 rounded-lg hover:bg-light-border/10 dark:hover:bg-dark-border/10 transition-colors"
             title="Close"
             data-testid="btn-close"
+            @click="showCreateModal = false"
           >
             <Icon icon="heroicons:x-mark" class="w-5 h-5 txt-secondary" />
           </button>
@@ -407,10 +473,10 @@
           <!-- Load Template Button -->
           <div v-if="newPromptContent === '' && newPromptRules === ''" class="flex justify-end">
             <button
-              @click="loadTemplates"
               class="text-xs px-3 py-1.5 rounded-lg bg-[var(--brand)]/10 text-[var(--brand)] hover:bg-[var(--brand)]/20 transition-colors flex items-center gap-1.5"
               title="Load template text"
               data-testid="btn-load-template"
+              @click="loadTemplates"
             >
               <Icon icon="heroicons:document-duplicate" class="w-3.5 h-3.5" />
               Load Template
@@ -477,20 +543,28 @@
               :placeholder="PROMPT_CONTENT_TEMPLATE"
               data-testid="input-new-content"
             ></textarea>
-            <p v-if="hasTemplateText" class="text-xs text-amber-600 dark:text-amber-400 mt-1.5 flex items-center gap-1">
+            <p
+              v-if="hasTemplateText"
+              class="text-xs text-amber-600 dark:text-amber-400 mt-1.5 flex items-center gap-1"
+            >
               <Icon icon="heroicons:exclamation-triangle" class="w-3.5 h-3.5" />
-              Please customize the template text (remove all [PLACEHOLDER] values) before creating the prompt.
+              Please customize the template text (remove all [PLACEHOLDER] values) before creating
+              the prompt.
             </p>
           </div>
 
           <!-- Optional: Link Files to New Prompt -->
-          <div class="border-t border-light-border/30 dark:border-dark-border/20 pt-4" data-testid="section-new-files">
+          <div
+            class="border-t border-light-border/30 dark:border-dark-border/20 pt-4"
+            data-testid="section-new-files"
+          >
             <label class="block text-sm font-semibold txt-primary mb-2 flex items-center gap-2">
               <Icon icon="heroicons:document-plus" class="w-4 h-4" />
               Knowledge Base Files (Optional)
             </label>
             <p class="text-xs txt-secondary mb-3">
-              Link vectorized files to provide context for this prompt. Files can be linked to multiple prompts.
+              Link vectorized files to provide context for this prompt. Files can be linked to
+              multiple prompts.
             </p>
 
             <!-- Search for files -->
@@ -505,8 +579,14 @@
             </div>
 
             <!-- Selected files for new prompt -->
-            <div v-if="newPromptSelectedFiles.length > 0" class="mb-3 space-y-1.5" data-testid="section-new-selected-files">
-              <p class="text-xs font-medium txt-primary">Selected ({{ newPromptSelectedFiles.length }}):</p>
+            <div
+              v-if="newPromptSelectedFiles.length > 0"
+              class="mb-3 space-y-1.5"
+              data-testid="section-new-selected-files"
+            >
+              <p class="text-xs font-medium txt-primary">
+                Selected ({{ newPromptSelectedFiles.length }}):
+              </p>
               <div class="space-y-1">
                 <div
                   v-for="fileId in newPromptSelectedFiles"
@@ -515,13 +595,13 @@
                   data-testid="item-new-selected-file"
                 >
                   <span class="txt-primary flex-1 min-w-0 truncate">
-                    {{ availableFiles.find(f => f.messageId === fileId)?.fileName || 'Unknown' }}
+                    {{ availableFiles.find((f) => f.messageId === fileId)?.fileName || 'Unknown' }}
                   </span>
                   <button
-                    @click="removeFileFromNewPrompt(fileId)"
                     class="ml-2 text-red-500 hover:text-red-600"
                     title="Remove"
                     data-testid="btn-remove-selected-file"
+                    @click="removeFileFromNewPrompt(fileId)"
                   >
                     <Icon icon="heroicons:x-mark" class="w-3.5 h-3.5" />
                   </button>
@@ -530,20 +610,26 @@
             </div>
 
             <!-- Available files list -->
-            <div class="max-h-[200px] overflow-y-auto space-y-1" data-testid="section-new-available-files">
+            <div
+              class="max-h-[200px] overflow-y-auto space-y-1"
+              data-testid="section-new-available-files"
+            >
               <div
                 v-for="file in filteredNewPromptFiles"
                 :key="file.messageId"
-                @click="toggleFileForNewPrompt(file.messageId)"
                 class="flex items-center justify-between p-2 surface-chip rounded hover:bg-light-border/10 dark:hover:bg-dark-border/10 cursor-pointer transition-colors text-xs"
                 :class="{ 'bg-[var(--brand)]/10': newPromptSelectedFiles.includes(file.messageId) }"
                 data-testid="item-new-file"
+                @click="toggleFileForNewPrompt(file.messageId)"
               >
                 <div class="flex-1 min-w-0">
                   <p class="txt-primary font-medium truncate">{{ file.fileName }}</p>
                   <p class="txt-secondary text-[10px]">
                     {{ file.chunks }} chunks
-                    <span v-if="file.currentGroupKey" class="ml-1 text-amber-600 dark:text-amber-400">
+                    <span
+                      v-if="file.currentGroupKey"
+                      class="ml-1 text-amber-600 dark:text-amber-400"
+                    >
                       (Used in: {{ file.currentGroupKey }})
                     </span>
                   </p>
@@ -554,27 +640,37 @@
                   class="w-4 h-4 text-[var(--brand)] flex-shrink-0 ml-2"
                 />
               </div>
-              <div v-if="filteredNewPromptFiles.length === 0" class="text-center py-4 txt-secondary text-xs" data-testid="section-new-files-empty">
+              <div
+                v-if="filteredNewPromptFiles.length === 0"
+                class="text-center py-4 txt-secondary text-xs"
+                data-testid="section-new-files-empty"
+              >
                 {{ newPromptFilesSearch ? 'No files found' : 'No vectorized files available' }}
               </div>
             </div>
           </div>
 
           <!-- Modal Actions -->
-          <div class="flex items-center gap-3 pt-4 border-t border-light-border/30 dark:border-dark-border/20">
+          <div
+            class="flex items-center gap-3 pt-4 border-t border-light-border/30 dark:border-dark-border/20"
+          >
             <button
-              @click="showCreateModal = false"
               class="flex-1 px-6 py-3 rounded-lg border border-light-border/30 dark:border-dark-border/20 txt-primary hover:bg-light-border/10 dark:hover:bg-dark-border/10 transition-colors font-medium"
               data-testid="btn-cancel-create"
+              @click="showCreateModal = false"
             >
               Cancel
             </button>
             <button
-              @click="handleCreateNew"
               :disabled="!canCreatePrompt"
               class="flex-1 px-6 py-3 rounded-lg bg-[var(--brand)] text-white hover:bg-[var(--brand)]/90 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-              :title="hasTemplateText ? 'Please customize the template text before creating' : 'Create new prompt'"
+              :title="
+                hasTemplateText
+                  ? 'Please customize the template text before creating'
+                  : 'Create new prompt'
+              "
               data-testid="btn-confirm-create"
+              @click="handleCreateNew"
             >
               <Icon icon="heroicons:plus-circle" class="w-5 h-5" />
               {{ $t('config.taskPrompts.createButton') }}
@@ -587,9 +683,9 @@
     <!-- Unsaved Changes Bar -->
     <UnsavedChangesBar
       :show="hasUnsavedChanges"
+      data-testid="comp-unsaved-bar"
       @save="handleSave"
       @discard="handleDiscard"
-      data-testid="comp-unsaved-bar"
     />
   </div>
 </template>
@@ -597,7 +693,12 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { Icon } from '@iconify/vue'
-import { promptsApi, type TaskPrompt as ApiTaskPrompt, type PromptFile, type AvailableFile } from '@/services/api/promptsApi'
+import {
+  promptsApi,
+  type TaskPrompt as ApiTaskPrompt,
+  type PromptFile,
+  type AvailableFile,
+} from '@/services/api/promptsApi'
 import { configApi } from '@/services/api/configApi'
 import type { AIModel, Capability } from '@/types/ai-models'
 import { useNotification } from '@/composables/useNotification'
@@ -606,7 +707,8 @@ import { useDialog } from '@/composables/useDialog'
 import UnsavedChangesBar from '@/components/UnsavedChangesBar.vue'
 
 // Template texts for new prompt creation
-const SELECTION_RULES_TEMPLATE = 'When the user mentions [TOPIC_NAME] or asks about [SPECIFIC_KEYWORDS], route to this prompt.'
+const SELECTION_RULES_TEMPLATE =
+  'When the user mentions [TOPIC_NAME] or asks about [SPECIFIC_KEYWORDS], route to this prompt.'
 const PROMPT_CONTENT_TEMPLATE = `You are an AI assistant specialized in [YOUR_SPECIALTY].
 
 Your primary goal is to [DESCRIBE_THE_MAIN_OBJECTIVE].
@@ -673,13 +775,13 @@ const loadingModels = ref(false)
 const availableTools: ToolOption[] = [
   { value: 'internet-search', label: 'Internet Search', icon: 'heroicons:magnifying-glass' },
   { value: 'files-search', label: 'Files Search', icon: 'heroicons:document-magnifying-glass' },
-  { value: 'url-screenshot', label: 'URL Screenshot', icon: 'heroicons:camera' }
+  { value: 'url-screenshot', label: 'URL Screenshot', icon: 'heroicons:camera' },
 ]
 
 // Group models by capability for dropdown
 const groupedModels = computed(() => {
   const groups: { label: string; models: AIModel[]; capability: Capability }[] = []
-  
+
   const capabilityLabels: Record<Capability, string> = {
     CHAT: 'Chat & General AI',
     SORT: 'Message Sorting',
@@ -689,44 +791,58 @@ const groupedModels = computed(() => {
     SOUND2TEXT: 'Speech-to-Text',
     PIC2TEXT: 'Vision (Image Analysis)',
     VECTORIZE: 'Embedding / RAG',
-    ANALYZE: 'File Analysis'
+    ANALYZE: 'File Analysis',
   }
 
   // Order of capabilities in dropdown
-  const orderedCapabilities: Capability[] = ['CHAT', 'TEXT2PIC', 'TEXT2VID', 'TEXT2SOUND', 'SOUND2TEXT', 'PIC2TEXT', 'ANALYZE', 'VECTORIZE', 'SORT']
-  
-  orderedCapabilities.forEach(capability => {
+  const orderedCapabilities: Capability[] = [
+    'CHAT',
+    'TEXT2PIC',
+    'TEXT2VID',
+    'TEXT2SOUND',
+    'SOUND2TEXT',
+    'PIC2TEXT',
+    'ANALYZE',
+    'VECTORIZE',
+    'SORT',
+  ]
+
+  orderedCapabilities.forEach((capability) => {
     if (allModels.value[capability] && allModels.value[capability].length > 0) {
       groups.push({
         label: capabilityLabels[capability] || capability,
         models: allModels.value[capability],
-        capability
+        capability,
       })
     }
   })
-  
+
   return groups
 })
 
 // Check if template texts are still present (user must customize them)
 const hasTemplateText = computed(() => {
-  const rulesHasTemplate = newPromptRules.value.includes('[TOPIC_NAME]') || 
-                          newPromptRules.value.includes('[SPECIFIC_KEYWORDS]')
-  const contentHasTemplate = newPromptContent.value.includes('[YOUR_SPECIALTY]') || 
-                            newPromptContent.value.includes('[DESCRIBE_THE_MAIN_OBJECTIVE]') ||
-                            newPromptContent.value.includes('[GUIDELINE_') ||
-                            newPromptContent.value.includes('[INSTRUCTION_') ||
-                            newPromptContent.value.includes('[IMPORTANT_REMINDER]')
+  const rulesHasTemplate =
+    newPromptRules.value.includes('[TOPIC_NAME]') ||
+    newPromptRules.value.includes('[SPECIFIC_KEYWORDS]')
+  const contentHasTemplate =
+    newPromptContent.value.includes('[YOUR_SPECIALTY]') ||
+    newPromptContent.value.includes('[DESCRIBE_THE_MAIN_OBJECTIVE]') ||
+    newPromptContent.value.includes('[GUIDELINE_') ||
+    newPromptContent.value.includes('[INSTRUCTION_') ||
+    newPromptContent.value.includes('[IMPORTANT_REMINDER]')
   return rulesHasTemplate || contentHasTemplate
 })
 
 // Check if create button should be enabled
 const canCreatePrompt = computed(() => {
-  return !loading.value && 
-         newPromptName.value.trim() !== '' && 
-         newPromptTopic.value.trim() !== '' && 
-         newPromptContent.value.trim() !== '' && 
-         !hasTemplateText.value
+  return (
+    !loading.value &&
+    newPromptName.value.trim() !== '' &&
+    newPromptTopic.value.trim() !== '' &&
+    newPromptContent.value.trim() !== '' &&
+    !hasTemplateText.value
+  )
 })
 
 // Filtered files for new prompt creation
@@ -735,9 +851,10 @@ const filteredNewPromptFiles = computed(() => {
     return availableFiles.value
   }
   const search = newPromptFilesSearch.value.toLowerCase()
-  return availableFiles.value.filter(file => 
-    file.fileName.toLowerCase().includes(search) ||
-    (file.currentGroupKey && file.currentGroupKey.toLowerCase().includes(search))
+  return availableFiles.value.filter(
+    (file) =>
+      file.fileName.toLowerCase().includes(search) ||
+      (file.currentGroupKey && file.currentGroupKey.toLowerCase().includes(search))
   )
 })
 
@@ -781,15 +898,16 @@ const loadAIModels = async () => {
 const loadPrompts = async () => {
   loading.value = true
   error.value = null
-  
+
   try {
     const data = await promptsApi.getPrompts('en')
-    prompts.value = data.map(p => {
+    prompts.value = data.map((p) => {
       // Parse metadata from backend
       const metadata = p.metadata || {}
-      
+
       // Determine AI Model string from metadata.aiModel (ID)
-      let aiModelString = 'AUTOMATED - Tries to define the best model for the task on SYNAPLAN [System Model]'
+      let aiModelString =
+        'AUTOMATED - Tries to define the best model for the task on SYNAPLAN [System Model]'
       if (metadata.aiModel && metadata.aiModel > 0) {
         // Find model by ID in all capabilities
         let foundModel = null
@@ -803,22 +921,22 @@ const loadPrompts = async () => {
           aiModelString = `${foundModel.name} (${foundModel.service})`
         }
       }
-      
+
       // Parse available tools from metadata (tool_* keys)
       const availableTools: string[] = []
       if (metadata.tool_internet_search) availableTools.push('internet-search')
       if (metadata.tool_files_search) availableTools.push('files-search')
       if (metadata.tool_url_screenshot) availableTools.push('url-screenshot')
-      
+
       return {
         ...p,
         content: p.prompt,
         rules: p.selectionRules || p.shortDescription,
         aiModel: aiModelString,
-        availableTools
+        availableTools,
       }
     })
-    
+
     // Don't auto-select any prompt - let user choose or use URL parameter
   } catch (err: any) {
     const errorMessage = err.message || 'Failed to load prompts'
@@ -833,17 +951,17 @@ const loadPrompts = async () => {
  * Load selected prompt
  */
 const loadPrompt = () => {
-  const prompt = prompts.value.find(p => p.id === selectedPromptId.value)
+  const prompt = prompts.value.find((p) => p.id === selectedPromptId.value)
   if (prompt) {
     currentPrompt.value = { ...prompt }
     formData.value = {
       rules: prompt.rules,
       aiModel: prompt.aiModel,
       availableTools: prompt.availableTools,
-      content: prompt.content
+      content: prompt.content,
     }
     originalData.value = { ...formData.value }
-    
+
     // Load files for this prompt
     loadPromptFiles()
   }
@@ -859,9 +977,9 @@ const onPromptSelect = async () => {
       message: 'You have unsaved changes. Do you want to discard them?',
       confirmText: 'Discard',
       cancelText: 'Cancel',
-      danger: true
+      danger: true,
     })
-    
+
     if (!confirmed) {
       selectedPromptId.value = currentPrompt.value?.id || null
       return
@@ -876,19 +994,15 @@ const onPromptSelect = async () => {
 const insertMarkdown = (before: string, after: string) => {
   const textarea = contentTextarea.value
   if (!textarea || !formData.value.content) return
-  
+
   const start = textarea.selectionStart
   const end = textarea.selectionEnd
   const text = formData.value.content
   const selectedText = text.substring(start, end)
-  
+
   formData.value.content =
-    text.substring(0, start) +
-    before +
-    selectedText +
-    after +
-    text.substring(end)
-  
+    text.substring(0, start) + before + selectedText + after + text.substring(end)
+
   setTimeout(() => {
     textarea.focus()
     textarea.setSelectionRange(start + before.length, end + before.length)
@@ -900,13 +1014,16 @@ const insertMarkdown = (before: string, after: string) => {
  */
 const handleSave = saveChanges(async () => {
   if (!currentPrompt.value) return
-  
+
   try {
     // Build metadata object
     const metadata: Record<string, any> = {}
-    
+
     // Parse AI Model from dropdown string back to ID (for SAVE)
-    if (formData.value.aiModel !== 'AUTOMATED - Tries to define the best model for the task on SYNAPLAN [System Model]') {
+    if (
+      formData.value.aiModel !==
+      'AUTOMATED - Tries to define the best model for the task on SYNAPLAN [System Model]'
+    ) {
       const selectedModelString = formData.value.aiModel
       // Find model by ID in all capabilities
       let foundModel = null
@@ -922,13 +1039,15 @@ const handleSave = saveChanges(async () => {
     } else {
       metadata.aiModel = -1 // AUTOMATED
     }
-    
+
     // Set tool flags (for SAVE)
-    metadata.tool_internet_search = (formData.value.availableTools || []).includes('internet-search')
+    metadata.tool_internet_search = (formData.value.availableTools || []).includes(
+      'internet-search'
+    )
     metadata.tool_files_search = (formData.value.availableTools || []).includes('files-search')
     metadata.tool_url_screenshot = (formData.value.availableTools || []).includes('url-screenshot')
-    
-    // If it's a system prompt (isDefault=true and no user override), 
+
+    // If it's a system prompt (isDefault=true and no user override),
     // we need to CREATE a user override instead of UPDATE
     if (currentPrompt.value.isDefault && !currentPrompt.value.isUserOverride) {
       // Create user override
@@ -938,11 +1057,11 @@ const handleSave = saveChanges(async () => {
         prompt: formData.value.content || '',
         language: currentPrompt.value.language || 'en',
         selectionRules: formData.value.rules || null,
-        metadata
+        metadata,
       })
-      
+
       // Update local state - replace system prompt with user override
-      const index = prompts.value.findIndex(p => p.id === currentPrompt.value!.id)
+      const index = prompts.value.findIndex((p) => p.id === currentPrompt.value!.id)
       if (index !== -1) {
         prompts.value[index] = {
           ...newPrompt,
@@ -950,13 +1069,13 @@ const handleSave = saveChanges(async () => {
           rules: newPrompt.selectionRules || newPrompt.shortDescription,
           aiModel: formData.value.aiModel,
           availableTools: formData.value.availableTools,
-          isUserOverride: true
+          isUserOverride: true,
         }
         currentPrompt.value = { ...prompts.value[index] }
         selectedPromptId.value = newPrompt.id
         originalData.value = { ...formData.value }
       }
-      
+
       success('User override created successfully!')
     } else {
       // Update existing user prompt
@@ -964,28 +1083,28 @@ const handleSave = saveChanges(async () => {
         shortDescription: currentPrompt.value.shortDescription, // Keep original name
         prompt: formData.value.content || '',
         selectionRules: formData.value.rules || null,
-        metadata
+        metadata,
       })
-      
+
       // Update local state
-      const index = prompts.value.findIndex(p => p.id === currentPrompt.value!.id)
+      const index = prompts.value.findIndex((p) => p.id === currentPrompt.value!.id)
       if (index !== -1) {
         prompts.value[index] = {
           ...updated,
           content: updated.prompt,
           rules: updated.selectionRules || updated.shortDescription,
           aiModel: formData.value.aiModel,
-          availableTools: formData.value.availableTools
+          availableTools: formData.value.availableTools,
         }
         currentPrompt.value = { ...prompts.value[index] }
         originalData.value = { ...formData.value }
       }
-      
+
       success('Prompt updated successfully!')
     }
   } catch (err: any) {
     let errorMessage = err.message || 'Failed to save prompt'
-    
+
     // Handle specific errors
     if (errorMessage.includes('Validation failed')) {
       errorMessage = 'Validation failed. Please check all fields and try again.'
@@ -994,7 +1113,7 @@ const handleSave = saveChanges(async () => {
     } else if (errorMessage.includes('Access denied')) {
       errorMessage = 'You do not have permission to modify this prompt.'
     }
-    
+
     showError(errorMessage)
     throw err
   }
@@ -1014,14 +1133,14 @@ const loadTemplates = () => {
   // Get the topic name from input (convert to readable format)
   const topicName = newPromptTopic.value.trim()
   const displayName = newPromptName.value.trim()
-  
+
   // Replace placeholders in Selection Rules
   let rules = SELECTION_RULES_TEMPLATE
   if (topicName) {
     rules = rules.replace(/\[TOPIC_NAME\]/g, displayName || topicName)
     rules = rules.replace(/\[SPECIFIC_KEYWORDS\]/g, topicName.replace(/-/g, ' '))
   }
-  
+
   // Replace placeholders in Prompt Content
   let content = PROMPT_CONTENT_TEMPLATE
   if (displayName || topicName) {
@@ -1029,7 +1148,7 @@ const loadTemplates = () => {
     content = content.replace(/\[YOUR_SPECIALTY\]/g, specialty)
     content = content.replace(/\[TOPIC_NAME\]/g, specialty)
   }
-  
+
   newPromptRules.value = rules
   newPromptContent.value = content
 }
@@ -1060,52 +1179,59 @@ const removeFileFromNewPrompt = (fileId: number) => {
  * Create a new custom prompt
  */
 const handleCreateNew = async () => {
-  if (!newPromptName.value.trim() || !newPromptTopic.value.trim() || !newPromptContent.value.trim() || loading.value) {
+  if (
+    !newPromptName.value.trim() ||
+    !newPromptTopic.value.trim() ||
+    !newPromptContent.value.trim() ||
+    loading.value
+  ) {
     showError('Please enter topic, name, and prompt content')
     return
   }
-  
+
   // Check if template text is still present
   if (hasTemplateText.value) {
     showError('Please customize the template text before creating the prompt')
     return
   }
-  
+
   loading.value = true
-  
+
   try {
     // Build metadata object
     const metadata: Record<string, any> = {}
-    
+
     // For new prompts created via modal, we use defaults since AI Model/Tools are not in the modal
     // User can edit these after creation
     metadata.aiModel = -1 // AUTOMATED by default
     metadata.tool_internet_search = true // Enable by default
     metadata.tool_files_search = true // Enable by default
     metadata.tool_url_screenshot = false // Disable by default
-    
+
     const requestPayload = {
       topic: newPromptTopic.value.trim().toLowerCase().replace(/\s+/g, '-'),
       shortDescription: newPromptName.value.trim(),
       prompt: newPromptContent.value.trim(),
       language: 'en',
       selectionRules: newPromptRules.value.trim() || null,
-      metadata
+      metadata,
     }
-    
+
     console.log('🔵 Creating prompt with payload:', requestPayload)
-    
+
     const newPrompt = await promptsApi.createPrompt(requestPayload)
-    
+
     // Add to local state
     const mappedPrompt: TaskPrompt = {
       ...newPrompt,
       content: newPrompt.prompt,
       rules: newPrompt.selectionRules || newPrompt.shortDescription,
-      aiModel: formData.value.aiModel || 'AUTOMATED - Tries to define the best model for the task on SYNAPLAN [System Model]',
-      availableTools: formData.value.availableTools || []
+      aiModel:
+        formData.value.aiModel ||
+        'AUTOMATED - Tries to define the best model for the task on SYNAPLAN [System Model]',
+      availableTools: formData.value.availableTools || [],
     }
-    
+
     prompts.value.push(mappedPrompt)
     selectedPromptId.value = newPrompt.id
     currentPrompt.value = { ...mappedPrompt }
@@ -1113,17 +1239,19 @@ const handleCreateNew = async () => {
       rules: mappedPrompt.rules,
       aiModel: mappedPrompt.aiModel,
       availableTools: mappedPrompt.availableTools,
-      content: mappedPrompt.content
+      content: mappedPrompt.content,
     }
     originalData.value = { ...formData.value }
-    
+
     // Link selected files to the new prompt (if any)
     if (newPromptSelectedFiles.value.length > 0) {
       try {
         for (const fileId of newPromptSelectedFiles.value) {
           await promptsApi.linkFileToPrompt(newPrompt.topic, fileId)
         }
-        success(`Custom prompt created successfully with ${newPromptSelectedFiles.value.length} file(s) linked!`)
+        success(
+          `Custom prompt created successfully with ${newPromptSelectedFiles.value.length} file(s) linked!`
+        )
       } catch (linkErr: any) {
         console.error('Failed to link files:', linkErr)
         success('Custom prompt created successfully, but some files could not be linked.')
@@ -1131,7 +1259,7 @@ const handleCreateNew = async () => {
     } else {
       success('Custom prompt created successfully!')
     }
-    
+
     // Clear form
     newPromptName.value = ''
     newPromptTopic.value = ''
@@ -1139,15 +1267,15 @@ const handleCreateNew = async () => {
     newPromptRules.value = ''
     newPromptSelectedFiles.value = []
     newPromptFilesSearch.value = ''
-    
+
     // Close modal
     showCreateModal.value = false
-    
+
     // Reload files for the new prompt
     await loadPromptFiles()
   } catch (err: any) {
     let errorMessage = err.message || 'Failed to create prompt'
-    
+
     // Handle specific errors
     if (errorMessage.includes('already have a prompt with this topic')) {
       errorMessage = 'A prompt with this topic already exists. Please choose a different topic.'
@@ -1156,7 +1284,7 @@ const handleCreateNew = async () => {
     } else if (errorMessage.includes('Missing required fields')) {
       errorMessage = 'Please fill in all required fields: Topic, Name, and Prompt Content.'
     }
-    
+
     showError(errorMessage)
   } finally {
     loading.value = false
@@ -1170,24 +1298,24 @@ const handleDelete = async () => {
   if (!currentPrompt.value || currentPrompt.value.isDefault || loading.value) {
     return
   }
-  
+
   const confirmed = await dialog.confirm({
     title: 'Delete Prompt',
     message: `Are you sure you want to delete "${currentPrompt.value.name}"? This action cannot be undone.`,
     confirmText: 'Delete',
     cancelText: 'Cancel',
-    danger: true
+    danger: true,
   })
-  
+
   if (!confirmed) return
-  
+
   loading.value = true
-  
+
   try {
     await promptsApi.deletePrompt(currentPrompt.value.id)
-    
+
     // Remove from local state
-    const index = prompts.value.findIndex(p => p.id === currentPrompt.value!.id)
+    const index = prompts.value.findIndex((p) => p.id === currentPrompt.value!.id)
     if (index !== -1) {
       prompts.value.splice(index, 1)
       if (prompts.value.length > 0) {
@@ -1198,7 +1326,7 @@ const handleDelete = async () => {
         currentPrompt.value = null
       }
     }
-    
+
     success('Prompt deleted successfully!')
   } catch (err: any) {
     const errorMessage = err.message || 'Failed to delete prompt'
@@ -1216,7 +1344,7 @@ const loadPromptFiles = async () => {
     promptFiles.value = []
     return
   }
-  
+
   try {
     promptFiles.value = await promptsApi.getPromptFiles(currentPrompt.value.topic)
   } catch (err: any) {
@@ -1230,21 +1358,22 @@ const loadPromptFiles = async () => {
  */
 const handleDeleteFile = async (messageId: number) => {
   if (!currentPrompt.value?.topic) return
-  
+
   const confirmed = await dialog.confirm({
     title: 'Delete File',
-    message: 'Are you sure you want to remove this file from the knowledge base? This action cannot be undone.',
+    message:
+      'Are you sure you want to remove this file from the knowledge base? This action cannot be undone.',
     confirmText: 'Delete',
     cancelText: 'Cancel',
-    danger: true
+    danger: true,
   })
-  
+
   if (!confirmed) return
-  
+
   try {
     await promptsApi.deletePromptFile(currentPrompt.value.topic, messageId)
     success('File removed from knowledge base')
-    
+
     // Reload files list
     await loadPromptFiles()
   } catch (err: any) {
@@ -1260,7 +1389,7 @@ const formatDate = (dateString: string): string => {
   const date = new Date(dateString)
   const now = new Date()
   const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000)
-  
+
   if (diffInSeconds < 60) return 'Just now'
   if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)}m ago`
   if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)}h ago`
@@ -1287,7 +1416,7 @@ const loadAvailableFiles = async () => {
  * Check if file is already linked to current prompt
  */
 const isFileLinked = (messageId: number): boolean => {
-  return promptFiles.value.some(f => f.messageId === messageId)
+  return promptFiles.value.some((f) => f.messageId === messageId)
 }
 
 /**
@@ -1295,16 +1424,13 @@ const isFileLinked = (messageId: number): boolean => {
  */
 const handleLinkFile = async (messageId: number) => {
   if (!currentPrompt.value?.topic) return
-  
+
   try {
     await promptsApi.linkFileToPrompt(currentPrompt.value.topic, messageId)
     success('File linked successfully!')
-    
+
     // Reload both lists
-    await Promise.all([
-      loadPromptFiles(),
-      loadAvailableFiles()
-    ])
+    await Promise.all([loadPromptFiles(), loadAvailableFiles()])
   } catch (err: any) {
     const errorMessage = err.message || 'Failed to link file'
     showError(errorMessage)
@@ -1316,13 +1442,13 @@ onMounted(() => {
   Promise.all([
     loadAIModels(),
     loadPrompts(),
-    loadAvailableFiles() // Load available files on mount
+    loadAvailableFiles(), // Load available files on mount
   ]).then(() => {
     // Check if there's a topic query parameter to auto-select
     const urlParams = new URLSearchParams(window.location.search)
     const topicParam = urlParams.get('topic')
     if (topicParam) {
-      const prompt = prompts.value.find(p => p.topic === topicParam)
+      const prompt = prompts.value.find((p) => p.topic === topicParam)
       if (prompt) {
         selectedPromptId.value = prompt.id
         loadPrompt()

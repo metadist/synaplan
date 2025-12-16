@@ -61,35 +61,35 @@ export interface FileListResponse {
 
 /**
  * Upload files with processing
- * 
+ *
  * @param options Upload options with files and processing level
  * @returns Upload response with file details
  */
 export const uploadFiles = async (options: UploadFileOptions): Promise<UploadResponse> => {
   const formData = new FormData()
-  
+
   // Add files
-  options.files.forEach(file => {
+  options.files.forEach((file) => {
     formData.append('files[]', file)
   })
-  
+
   // Add optional parameters
   if (options.groupKey) {
     formData.append('group_key', options.groupKey)
   }
-  
+
   if (options.processLevel) {
     formData.append('process_level', options.processLevel)
   }
-  
+
   const response = await api.post<UploadResponse>('/api/v1/files/upload', formData)
-  
+
   return response.data
 }
 
 /**
  * List user's files with optional filtering
- * 
+ *
  * @param groupKey Optional filter by group
  * @param page Page number (default: 1)
  * @param limit Items per page (default: 50)
@@ -102,65 +102,72 @@ export const listFiles = async (
 ): Promise<FileListResponse> => {
   const params: Record<string, string | number> = {
     page,
-    limit
+    limit,
   }
-  
+
   if (groupKey) {
     params.group_key = groupKey
   }
-  
+
   const response = await api.get<FileListResponse>('/api/v1/files', { params })
   return response.data
 }
 
 /**
  * Delete a file
- * 
+ *
  * @param fileId File ID to delete
  * @returns Success response
  */
-export const deleteFile = async (fileId: number): Promise<{ success: boolean; message: string }> => {
-  const response = await api.delete<{ success: boolean; message: string }>(`/api/v1/files/${fileId}`)
+export const deleteFile = async (
+  fileId: number
+): Promise<{ success: boolean; message: string }> => {
+  const response = await api.delete<{ success: boolean; message: string }>(
+    `/api/v1/files/${fileId}`
+  )
   return response.data
 }
 
 /**
  * Delete multiple files
- * 
+ *
  * @param fileIds Array of file IDs to delete
  * @returns Array of results
  */
 export const deleteMultipleFiles = async (
   fileIds: number[]
 ): Promise<Array<{ fileId: number; success: boolean; error?: string }>> => {
-  const results = await Promise.allSettled(
-    fileIds.map(id => deleteFile(id))
-  )
-  
+  const results = await Promise.allSettled(fileIds.map((id) => deleteFile(id)))
+
   return results.map((result, index) => ({
     fileId: fileIds[index],
     success: result.status === 'fulfilled',
-    error: result.status === 'rejected' ? String(result.reason) : undefined
+    error: result.status === 'rejected' ? String(result.reason) : undefined,
   }))
 }
 
 /**
  * Get file groups (unique group keys with file counts from RAG documents)
- * 
+ *
  * @returns Array of group names with file counts
  */
 export const getFileGroups = async (): Promise<Array<{ name: string; count: number }>> => {
-  const response = await api.get<{ success: boolean; groups: Array<{ name: string; count: number }> }>('/api/v1/files/groups')
+  const response = await api.get<{
+    success: boolean
+    groups: Array<{ name: string; count: number }>
+  }>('/api/v1/files/groups')
   return response.data.groups
 }
 
 /**
  * Get file content/text
- * 
+ *
  * @param fileId File ID
  * @returns File content details
  */
-export const getFileContent = async (fileId: number): Promise<{
+export const getFileContent = async (
+  fileId: number
+): Promise<{
   id: number
   filename: string
   file_path: string
@@ -189,13 +196,13 @@ export const getFileContent = async (fileId: number): Promise<{
 
 /**
  * Download a file
- * 
+ *
  * @param fileId File ID
  * @param filename Original filename for download
  */
 export const downloadFile = async (fileId: number, filename: string): Promise<void> => {
   const blob = await httpClient<Blob>(`/api/v1/files/${fileId}/download`, {
-    responseType: 'blob'
+    responseType: 'blob',
   })
 
   // Create blob and trigger download
@@ -211,7 +218,7 @@ export const downloadFile = async (fileId: number, filename: string): Promise<vo
 
 /**
  * Make file public and generate share link
- * 
+ *
  * @param fileId File ID
  * @param expiryDays Days until expiry (default: 7, 0 = never)
  * @returns Share info
@@ -238,10 +245,12 @@ export const shareFile = async (
 
 /**
  * Revoke public access to file
- * 
+ *
  * @param fileId File ID
  */
-export const unshareFile = async (fileId: number): Promise<{ success: boolean; message: string }> => {
+export const unshareFile = async (
+  fileId: number
+): Promise<{ success: boolean; message: string }> => {
   const response = await api.delete<{ success: boolean; message: string }>(
     `/api/v1/files/${fileId}/share`
   )
@@ -250,7 +259,7 @@ export const unshareFile = async (fileId: number): Promise<{ success: boolean; m
 
 /**
  * Get share info for file
- * 
+ *
  * @param fileId File ID
  */
 export const getShareInfo = async (
@@ -327,7 +336,10 @@ export async function getFileGroupKey(fileId: number): Promise<{
 /**
  * Update groupKey for a file
  */
-export async function updateFileGroupKey(fileId: number, groupKey: string): Promise<{
+export async function updateFileGroupKey(
+  fileId: number,
+  groupKey: string
+): Promise<{
   success: boolean
   chunksUpdated: number
   message: string
@@ -338,7 +350,7 @@ export async function updateFileGroupKey(fileId: number, groupKey: string): Prom
     message: string
   }>(`/api/v1/files/${fileId}/group-key`, {
     method: 'PUT',
-    body: JSON.stringify({ groupKey })
+    body: JSON.stringify({ groupKey }),
   })
   return response
 }
@@ -346,7 +358,10 @@ export async function updateFileGroupKey(fileId: number, groupKey: string): Prom
 /**
  * Re-vectorize a file
  */
-export async function reVectorizeFile(fileId: number, groupKey?: string): Promise<{
+export async function reVectorizeFile(
+  fileId: number,
+  groupKey?: string
+): Promise<{
   success: boolean
   chunksCreated: number
   extractedTextLength: number
@@ -361,7 +376,7 @@ export async function reVectorizeFile(fileId: number, groupKey?: string): Promis
     message: string
   }>(`/api/v1/files/${fileId}/re-vectorize`, {
     method: 'POST',
-    body: JSON.stringify({ groupKey: groupKey || 'DEFAULT' })
+    body: JSON.stringify({ groupKey: groupKey || 'DEFAULT' }),
   })
   return response
 }
@@ -380,6 +395,5 @@ export default {
   getStorageStats,
   getFileGroupKey,
   updateFileGroupKey,
-  reVectorizeFile
+  reVectorizeFile,
 }
-

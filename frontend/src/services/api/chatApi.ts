@@ -35,11 +35,14 @@ async function getSseToken(): Promise<string | null> {
 
       const data = await response.json()
       cachedSseToken = data.token
-      
+
       // Token expires in 5 min, refresh after 4 min
-      setTimeout(() => {
-        cachedSseToken = null
-      }, 4 * 60 * 1000)
+      setTimeout(
+        () => {
+          cachedSseToken = null
+        },
+        4 * 60 * 1000
+      )
 
       return cachedSseToken
     } catch (error) {
@@ -65,21 +68,21 @@ export const chatApi = {
     // Mock data temporarily disabled - direct backend communication
     return httpClient<any>('/api/v1/messages/send', {
       method: 'POST',
-      body: JSON.stringify({ userId, message, trackId })
+      body: JSON.stringify({ userId, message, trackId }),
     })
   },
 
   async getConversations(userId: number): Promise<any> {
     // Mock data temporarily disabled - direct backend communication
     return httpClient<any>(`/api/v1/conversations/${userId}`, {
-      method: 'GET'
+      method: 'GET',
     })
   },
 
   async getMessages(conversationId: number): Promise<any> {
     // Mock data temporarily disabled - direct backend communication
     return httpClient<any>(`/api/v1/conversations/${conversationId}/messages`, {
-      method: 'GET'
+      method: 'GET',
     })
   },
 
@@ -98,19 +101,19 @@ export const chatApi = {
     const paramsObj: Record<string, string> = {
       message,
       chatId: chatId.toString(),
-      userId: userId.toString()
+      userId: userId.toString(),
     }
-    
+
     if (trackId) paramsObj.trackId = trackId.toString()
     if (includeReasoning) paramsObj.reasoning = '1'
     if (webSearch) paramsObj.webSearch = '1'
     if (modelId) paramsObj.modelId = modelId.toString()
-    
+
     // Multiple fileIds as comma-separated list
     if (fileIds && fileIds.length > 0) {
       paramsObj.fileIds = fileIds.join(',')
     }
-    
+
     const params = new URLSearchParams(paramsObj)
     const baseUrl = `${API_BASE_URL}/api/v1/messages/stream?${params}`
 
@@ -122,7 +125,7 @@ export const chatApi = {
     ;(async () => {
       try {
         if (isStopped) return
-        
+
         const token = await getSseToken()
         if (!token) {
           console.error('🚫 No SSE token available')
@@ -131,15 +134,15 @@ export const chatApi = {
         }
 
         const url = `${baseUrl}&token=${token}`
-        
+
         if (isStopped) return
-        
+
         // Open EventSource directly - no preflight check!
         // The preflight fetch was causing duplicate messages because it triggered
         // the backend to save the user message, and then EventSource did it again.
         // Rate limit errors are now handled via SSE error events from backend.
         eventSource = new EventSource(url)
-        
+
         eventSource.onopen = () => {
           console.log('✅ SSE connection opened')
         }
@@ -150,12 +153,12 @@ export const chatApi = {
             console.log('⏹️ Ignoring SSE event - stream was stopped')
             return
           }
-          
+
           try {
             const data = JSON.parse(event.data)
             completionReceived = data.status === 'complete'
             onUpdate(data)
-            
+
             // Close connection on completion
             if (data.status === 'complete') {
               eventSource?.close()
@@ -173,24 +176,32 @@ export const chatApi = {
             console.log('⏹️ Ignoring SSE error - stream was stopped')
             return
           }
-          
-          console.log('SSE error event received, readyState:', eventSource?.readyState, 'completionReceived:', completionReceived)
-          
+
+          console.log(
+            'SSE error event received, readyState:',
+            eventSource?.readyState,
+            'completionReceived:',
+            completionReceived
+          )
+
           // If we already received completion, this is just normal stream end
           if (completionReceived) {
             console.log('✅ Stream ended after completion (normal)')
             eventSource?.close()
             return
           }
-          
+
           // SSE CLOSED (2) or CONNECTING (0) - Connection closed by server
-          if (eventSource?.readyState === EventSource.CLOSED || eventSource?.readyState === EventSource.CONNECTING) {
+          if (
+            eventSource?.readyState === EventSource.CLOSED ||
+            eventSource?.readyState === EventSource.CONNECTING
+          ) {
             console.log('⚠️ SSE connection closed by server (treating as completion)')
             eventSource?.close()
             onUpdate({ status: 'complete', message: 'Response complete', metadata: {} })
             return
           }
-          
+
           // SSE OPEN (1) - Only treat as error if still open and something went wrong
           if (eventSource?.readyState === EventSource.OPEN) {
             console.error('❌ SSE connection error during active stream')
@@ -223,13 +234,13 @@ export const chatApi = {
   async enhanceMessage(text: string): Promise<{ original: string; enhanced: string }> {
     return httpClient<{ original: string; enhanced: string }>('/api/v1/messages/enhance', {
       method: 'POST',
-      body: JSON.stringify({ text })
+      body: JSON.stringify({ text }),
     })
   },
 
   async getChatMessages(chatId: number, offset = 0, limit = 50): Promise<any> {
     return httpClient<any>(`/api/v1/chats/${chatId}/messages?offset=${offset}&limit=${limit}`, {
-      method: 'GET'
+      method: 'GET',
     })
   },
 
@@ -253,7 +264,7 @@ export const chatApi = {
 
     return httpClient<any>('/api/v1/messages/upload-file', {
       method: 'POST',
-      body: formData
+      body: formData,
     })
   },
 
@@ -261,7 +272,10 @@ export const chatApi = {
    * Upload audio for transcription with WhisperCPP
    * Returns transcribed text that can be inserted into chat input
    */
-  async transcribeAudio(audioBlob: Blob, filename = 'recording.webm'): Promise<{
+  async transcribeAudio(
+    audioBlob: Blob,
+    filename = 'recording.webm'
+  ): Promise<{
     success: boolean
     file_id: number
     filename: string
@@ -274,7 +288,7 @@ export const chatApi = {
 
     return httpClient<any>('/api/v1/messages/upload-file', {
       method: 'POST',
-      body: formData
+      body: formData,
     })
   },
 
@@ -284,15 +298,18 @@ export const chatApi = {
   async stopStream(trackId?: number): Promise<{ success: boolean; message: string }> {
     console.log('📡 chatApi.stopStream called with trackId:', trackId)
     try {
-      const result = await httpClient<{ success: boolean; message: string }>('/api/v1/messages/stop-stream', {
-        method: 'POST',
-        body: JSON.stringify({ trackId })
-      })
+      const result = await httpClient<{ success: boolean; message: string }>(
+        '/api/v1/messages/stop-stream',
+        {
+          method: 'POST',
+          body: JSON.stringify({ trackId }),
+        }
+      )
       console.log('📡 chatApi.stopStream response:', result)
       return result
     } catch (error) {
       console.error('📡 chatApi.stopStream error:', error)
       throw error
     }
-  }
+  },
 }

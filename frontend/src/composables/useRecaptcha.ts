@@ -3,11 +3,12 @@ import { useReCaptcha } from 'vue-recaptcha-v3'
 export const useRecaptcha = () => {
   const recaptchaEnabled = import.meta.env.VITE_RECAPTCHA_ENABLED === 'true'
   const recaptchaSiteKey = import.meta.env.VITE_RECAPTCHA_SITE_KEY
-  
+
   // Only use reCAPTCHA instance if it's enabled and configured
-  const recaptchaInstance = recaptchaEnabled && recaptchaSiteKey && recaptchaSiteKey !== 'your_site_key_here' 
-    ? useReCaptcha()
-    : null
+  const recaptchaInstance =
+    recaptchaEnabled && recaptchaSiteKey && recaptchaSiteKey !== 'your_site_key_here'
+      ? useReCaptcha()
+      : null
 
   /**
    * Get reCAPTCHA token for action
@@ -34,7 +35,6 @@ export const useRecaptcha = () => {
 
   return {
     isEnabled: recaptchaEnabled,
-    getToken
+    getToken,
   }
 }
-

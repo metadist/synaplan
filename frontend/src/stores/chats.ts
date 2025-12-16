@@ -43,13 +43,14 @@ export const useChatsStore = defineStore('chats', () => {
   const loading = ref(false)
   const error = ref<string | null>(null)
 
-  const normalizeChat = (chat: any): Chat => ({
-    ...chat,
-    widgetSession: chat.widgetSession ?? null
-  } as Chat)
+  const normalizeChat = (chat: any): Chat =>
+    ({
+      ...chat,
+      widgetSession: chat.widgetSession ?? null,
+    }) as Chat
 
   const activeChat = computed(() => {
-    return chats.value.find(c => c.id === activeChatId.value) || null
+    return chats.value.find((c) => c.id === activeChatId.value) || null
   })
 
   function readActiveChatId(): number | null {
@@ -86,7 +87,7 @@ export const useChatsStore = defineStore('chats', () => {
 
   function ensureValidActiveChat() {
     const candidateId = activeChatId.value ?? readActiveChatId()
-    if (candidateId && chats.value.some(chat => chat.id === candidateId)) {
+    if (candidateId && chats.value.some((chat) => chat.id === candidateId)) {
       updateActiveChatSelection(candidateId)
       return
     }
@@ -125,7 +126,7 @@ export const useChatsStore = defineStore('chats', () => {
     try {
       const data = await httpClient<{ success: boolean; chat: any }>('/api/v1/chats', {
         method: 'POST',
-        body: JSON.stringify({ title })
+        body: JSON.stringify({ title }),
       })
 
       const newChat = normalizeChat(data.chat)
@@ -149,10 +150,10 @@ export const useChatsStore = defineStore('chats', () => {
     try {
       await httpClient(`/api/v1/chats/${chatId}`, {
         method: 'PATCH',
-        body: JSON.stringify({ title })
+        body: JSON.stringify({ title }),
       })
 
-      const chat = chats.value.find(c => c.id === chatId)
+      const chat = chats.value.find((c) => c.id === chatId)
       if (chat) {
         chat.title = title
       }
@@ -167,10 +168,10 @@ export const useChatsStore = defineStore('chats', () => {
 
     try {
       await httpClient(`/api/v1/chats/${chatId}`, {
-        method: 'DELETE'
+        method: 'DELETE',
       })
 
-      chats.value = chats.value.filter(c => c.id !== chatId)
+      chats.value = chats.value.filter((c) => c.id !== chatId)
 
       // Select another chat if the deleted one was active
       if (activeChatId.value === chatId) {
@@ -186,13 +187,18 @@ export const useChatsStore = defineStore('chats', () => {
     if (!checkAuthOrRedirect()) return null
 
     try {
-      const data = await httpClient<{ success: boolean; shareToken: string; isShared: boolean; shareUrl: string }>(`/api/v1/chats/${chatId}/share`, {
+      const data = await httpClient<{
+        success: boolean
+        shareToken: string
+        isShared: boolean
+        shareUrl: string
+      }>(`/api/v1/chats/${chatId}/share`, {
         method: 'POST',
-        body: JSON.stringify({ enable })
+        body: JSON.stringify({ enable }),
       })
 
       // Update chat in store
-      const chat = chats.value.find(c => c.id === chatId)
+      const chat = chats.value.find((c) => c.id === chatId)
       if (chat) {
         chat.isShared = data.isShared
       }
@@ -201,7 +207,7 @@ export const useChatsStore = defineStore('chats', () => {
         success: data.success,
         shareToken: data.shareToken,
         isShared: data.isShared,
-        shareUrl: data.shareUrl
+        shareUrl: data.shareUrl,
       }
     } catch (err: any) {
       error.value = err.message || 'Failed to share chat'
@@ -224,7 +230,7 @@ export const useChatsStore = defineStore('chats', () => {
         shareToken: data.chat.shareToken || null,
         shareUrl: data.chat.shareToken
           ? `${config.appBaseUrl}/shared/${data.chat.shareToken}`
-          : null
+          : null,
       }
     } catch (err: any) {
       error.value = err.message || 'Failed to get share info'
@@ -257,7 +263,6 @@ export const useChatsStore = defineStore('chats', () => {
     shareChat,
     getShareInfo,
     setActiveChat,
-    $reset
+    $reset,
   }
 })
-

@@ -1,6 +1,9 @@
 <template>
   <MainLayout>
-    <div class="min-h-screen bg-chat p-4 md:p-8 overflow-y-auto scroll-thin" data-testid="page-config">
+    <div
+      class="min-h-screen bg-chat p-4 md:p-8 overflow-y-auto scroll-thin"
+      data-testid="page-config"
+    >
       <div class="max-w-7xl mx-auto" data-testid="section-config">
         <div v-if="currentPage === 'inbound'" data-testid="section-inbound">
           <InboundConfiguration />
@@ -22,7 +25,10 @@
           <APIKeysConfiguration />
         </div>
 
-        <div v-else-if="currentPage === 'api-documentation'" data-testid="section-api-documentation">
+        <div
+          v-else-if="currentPage === 'api-documentation'"
+          data-testid="section-api-documentation"
+        >
           <ApiDocumentation />
         </div>
       </div>
@@ -54,4 +60,3 @@ const currentPage = computed(() => {
   return 'inbound'
 })
 </script>
-

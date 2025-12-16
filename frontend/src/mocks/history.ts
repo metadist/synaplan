@@ -21,4 +21,3 @@ export const mockHistoryItems: HistoryItem[] = [
     timestamp: '2025030161344',
   },
 ]
-

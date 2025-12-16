@@ -4,15 +4,12 @@ import { useNotification } from './useNotification'
 import { useDialog } from './useDialog'
 import { useI18n } from 'vue-i18n'
 
-export function useUnsavedChanges<T>(
-  formData: Ref<T>,
-  originalData: Ref<T>
-) {
+export function useUnsavedChanges<T>(formData: Ref<T>, originalData: Ref<T>) {
   const router = useRouter()
   const { success } = useNotification()
   const dialog = useDialog()
   const { t } = useI18n()
-  
+
   const hasUnsavedChanges = ref(false)
 
   // Watch for changes in form data
@@ -30,11 +27,11 @@ export function useUnsavedChanges<T>(
       try {
         await saveCallback()
         originalData.value = JSON.parse(JSON.stringify(formData.value))
-        
+
         // Delay before hiding to show success state
-        await new Promise(resolve => setTimeout(resolve, 300))
+        await new Promise((resolve) => setTimeout(resolve, 300))
         hasUnsavedChanges.value = false
-        
+
         // Show success notification after bar is hidden
         setTimeout(() => {
           success(t('unsavedChanges.saved'))
@@ -60,7 +57,7 @@ export function useUnsavedChanges<T>(
         message: t('unsavedChanges.confirmLeave'),
         confirmText: t('common.leave'),
         cancelText: t('common.stay'),
-        danger: true
+        danger: true,
       })
     }
     return true
@@ -98,7 +95,6 @@ export function useUnsavedChanges<T>(
     hasUnsavedChanges,
     saveChanges,
     discardChanges,
-    setupNavigationGuard
+    setupNavigationGuard,
   }
 }
-

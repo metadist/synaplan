@@ -34,7 +34,7 @@ export const mockLatestFiles: FileItem[] = [
     direction: 'received',
     timestamp: new Date('2025-09-30T15:42:00'),
     description: 'was steht in dieser pdf?',
-    user: 'mediamaker'
+    user: 'mediamaker',
   },
   {
     id: '2',
@@ -43,7 +43,7 @@ export const mockLatestFiles: FileItem[] = [
     direction: 'sent',
     timestamp: new Date('2025-09-30T15:39:00'),
     description: '/pic generiere ein bild von einem hund [Again-1759246783]',
-    user: 'mediamaker'
+    user: 'mediamaker',
   },
   {
     id: '3',
@@ -51,8 +51,9 @@ export const mockLatestFiles: FileItem[] = [
     type: 'image',
     direction: 'sent',
     timestamp: new Date('2025-09-30T15:09:00'),
-    description: '/pic Erzeuge ein hochauflösendes, fotorealistisches Bild eines freundlichen Golden Retrievers, der ...',
-    user: 'mediamaker'
+    description:
+      '/pic Erzeuge ein hochauflösendes, fotorealistisches Bild eines freundlichen Golden Retrievers, der ...',
+    user: 'mediamaker',
   },
   {
     id: '4',
@@ -61,7 +62,7 @@ export const mockLatestFiles: FileItem[] = [
     direction: 'received',
     timestamp: new Date('2025-09-30T15:03:00'),
     description: 'worum geht es in dieser file?fasse es zusammen detailiert',
-    user: 'mediamaker'
+    user: 'mediamaker',
   },
   {
     id: '5',
@@ -70,7 +71,7 @@ export const mockLatestFiles: FileItem[] = [
     direction: 'received',
     timestamp: new Date('2025-09-30T14:56:00'),
     description: 'worum gehts in dieser file',
-    user: 'general'
+    user: 'general',
   },
   {
     id: '6',
@@ -79,7 +80,6 @@ export const mockLatestFiles: FileItem[] = [
     direction: 'received',
     timestamp: new Date('2025-09-30T14:54:00'),
     description: 'analysiere diese file',
-    user: 'general'
+    user: 'general',
   },
 ]
-

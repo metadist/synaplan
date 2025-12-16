@@ -2,7 +2,9 @@
   <div class="my-3 p-4 surface-chip" data-testid="section-message-link">
     <div class="space-y-3">
       <div>
-        <h4 class="text-sm font-medium txt-primary mb-2">{{ $t('commands.loginLinkGenerated') }}</h4>
+        <h4 class="text-sm font-medium txt-primary mb-2">
+          {{ $t('commands.loginLinkGenerated') }}
+        </h4>
         <a
           :href="url"
           target="_blank"
@@ -13,9 +15,7 @@
           {{ url }}
         </a>
       </div>
-      <div class="text-xs txt-secondary">
-        {{ $t('commands.expiresAt') }}: {{ formattedExpiry }}
-      </div>
+      <div class="text-xs txt-secondary">{{ $t('commands.expiresAt') }}: {{ formattedExpiry }}</div>
     </div>
   </div>
 </template>

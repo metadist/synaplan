@@ -21,7 +21,6 @@ const URL_REGEX = /https?:\/\/[^\s<>"{}|\\^`\[\]]+/g
 const MARKDOWN_LINK_REGEX = /\[([^\]]+)\]\(([^)]+)\)/g
 const CODE_BLOCK_REGEX = /```(\w+)?\n([\s\S]*?)```/g
 
-
 export function parseAIResponse(content: string): ParsedResponse {
   const parts: ParsedResponsePart[] = []
   let hasLinks = false
@@ -52,9 +51,9 @@ export function parseAIResponse(content: string): ParsedResponse {
       start: codeMatch.index,
       end: codeMatch.index + codeMatch[0].length,
       language,
-      code
+      code,
     })
-    
+
     if (language === 'json') {
       hasJson = true
     }
@@ -67,7 +66,7 @@ export function parseAIResponse(content: string): ParsedResponse {
   // Parse content, handling code blocks
   for (let i = 0; i < codeBlocks.length; i++) {
     const block = codeBlocks[i]
-    
+
     // Add text before code block
     if (block.start > lastIndex) {
       const textContent = content.slice(lastIndex, block.start)
@@ -78,7 +77,7 @@ export function parseAIResponse(content: string): ParsedResponse {
     parts.push({
       type: block.language === 'json' ? 'json' : 'code',
       content: block.code,
-      language: block.language
+      language: block.language,
     })
 
     lastIndex = block.end
@@ -91,21 +90,21 @@ export function parseAIResponse(content: string): ParsedResponse {
   }
 
   // Check if we found links in the text
-  hasLinks = parts.some(p => p.type === 'link' || p.type === 'links')
+  hasLinks = parts.some((p) => p.type === 'link' || p.type === 'links')
 
   return {
     parts,
     hasLinks,
     hasCode,
     hasJson,
-    jsonPayload
+    jsonPayload,
   }
 }
 
 function parseTextContent(text: string, parts: ParsedResponsePart[]) {
   // Extract all links (both markdown and plain URLs)
   const links: Array<{ url: string; title: string; position: number }> = []
-  
+
   // Find markdown links
   let mdLinkMatch: RegExpExecArray | null
   const markdownLinkRegex = /\[([^\]]+)\]\(([^)]+)\)/g
@@ -113,7 +112,7 @@ function parseTextContent(text: string, parts: ParsedResponsePart[]) {
     links.push({
       title: mdLinkMatch[1],
       url: mdLinkMatch[2],
-      position: mdLinkMatch.index
+      position: mdLinkMatch.index,
     })
   }
 
@@ -124,16 +123,15 @@ function parseTextContent(text: string, parts: ParsedResponsePart[]) {
     const currentMatch = urlMatch
     const matchIndex = currentMatch.index ?? 0
     // Check if this URL is part of a markdown link
-    const isInMarkdown = links.some(l => 
-      matchIndex >= l.position && 
-      matchIndex < l.position + l.title.length + l.url.length + 4
+    const isInMarkdown = links.some(
+      (l) => matchIndex >= l.position && matchIndex < l.position + l.title.length + l.url.length + 4
     )
-    
+
     if (!isInMarkdown) {
       links.push({
         url: currentMatch[0],
         title: currentMatch[0],
-        position: matchIndex
+        position: matchIndex,
       })
     }
   }
@@ -145,7 +143,7 @@ function parseTextContent(text: string, parts: ParsedResponsePart[]) {
     if (textBeforeLinks) {
       parts.push({
         type: 'text',
-        content: textBeforeLinks
+        content: textBeforeLinks,
       })
     }
 
@@ -153,11 +151,11 @@ function parseTextContent(text: string, parts: ParsedResponsePart[]) {
     parts.push({
       type: 'links',
       content: '',
-      links: links.map(l => ({
+      links: links.map((l) => ({
         url: l.url,
         title: l.title,
-        description: extractLinkDescription(text, l.position)
-      }))
+        description: extractLinkDescription(text, l.position),
+      })),
     })
 
     // Add remaining text after links
@@ -166,21 +164,21 @@ function parseTextContent(text: string, parts: ParsedResponsePart[]) {
     if (textAfterLinks) {
       parts.push({
         type: 'text',
-        content: textAfterLinks
+        content: textAfterLinks,
       })
     }
   } else if (links.length > 0) {
     // Few links, keep them inline
     parts.push({
       type: 'text',
-      content: text
+      content: text,
     })
   } else {
     // No links, just text
     if (text.trim()) {
       parts.push({
         type: 'text',
-        content: text.trim()
+        content: text.trim(),
       })
     }
   }
@@ -195,13 +193,13 @@ function extractLinkDescription(text: string, linkPosition: number): string | un
 
 export function extractLinks(content: string): Array<{ url: string; title: string }> {
   const links: Array<{ url: string; title: string }> = []
-  
+
   // Extract markdown links
   let match
   while ((match = MARKDOWN_LINK_REGEX.exec(content)) !== null) {
     links.push({
       title: match[1],
-      url: match[2]
+      url: match[2],
     })
   }
 
@@ -209,10 +207,10 @@ export function extractLinks(content: string): Array<{ url: string; title: strin
   const urlMatches = content.match(URL_REGEX) || []
   for (const url of urlMatches) {
     // Skip if already in markdown links
-    if (!links.some(l => l.url === url)) {
+    if (!links.some((l) => l.url === url)) {
       links.push({
         title: url,
-        url
+        url,
       })
     }
   }
@@ -224,4 +222,3 @@ export function hasWebSearchResults(content: string): boolean {
   const links = extractLinks(content)
   return links.length >= 3
 }
-

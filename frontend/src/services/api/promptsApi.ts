@@ -53,7 +53,7 @@ class PromptsApi {
     const data = await httpClient<{ success: boolean; prompts: TaskPrompt[] }>(
       `/api/v1/prompts?language=${language}`,
       {
-        method: 'GET'
+        method: 'GET',
       }
     )
     return data.prompts
@@ -66,7 +66,7 @@ class PromptsApi {
     const data = await httpClient<{ success: boolean; prompt: TaskPrompt }>(
       `/api/v1/prompts/${id}`,
       {
-        method: 'GET'
+        method: 'GET',
       }
     )
     return data.prompt
@@ -78,13 +78,10 @@ class PromptsApi {
   async createPrompt(request: CreatePromptRequest): Promise<TaskPrompt> {
     console.log('📤 promptsApi.createPrompt called with:', request)
     try {
-      const data = await httpClient<{ success: boolean; prompt: TaskPrompt }>(
-        '/api/v1/prompts',
-        {
-          method: 'POST',
-          body: JSON.stringify(request)
-        }
-      )
+      const data = await httpClient<{ success: boolean; prompt: TaskPrompt }>('/api/v1/prompts', {
+        method: 'POST',
+        body: JSON.stringify(request),
+      })
       console.log('✅ promptsApi.createPrompt response:', data)
       return data.prompt
     } catch (error) {
@@ -101,7 +98,7 @@ class PromptsApi {
       `/api/v1/prompts/${id}`,
       {
         method: 'PUT',
-        body: JSON.stringify(request)
+        body: JSON.stringify(request),
       }
     )
     return data.prompt
@@ -111,14 +108,11 @@ class PromptsApi {
    * Delete a user-specific prompt
    */
   async deletePrompt(id: number): Promise<void> {
-    await httpClient<{ success: boolean; message: string }>(
-      `/api/v1/prompts/${id}`,
-      {
-        method: 'DELETE'
-      }
-    )
+    await httpClient<{ success: boolean; message: string }>(`/api/v1/prompts/${id}`, {
+      method: 'DELETE',
+    })
   }
-  
+
   /**
    * Get files associated with a task prompt
    */
@@ -126,12 +120,12 @@ class PromptsApi {
     const data = await httpClient<{ success: boolean; files: PromptFile[]; groupKey: string }>(
       `/api/v1/prompts/${topic}/files`,
       {
-        method: 'GET'
+        method: 'GET',
       }
     )
     return data.files
   }
-  
+
   /**
    * Upload file for task prompt
    */
@@ -144,10 +138,10 @@ class PromptsApi {
     // httpClient automatically detects FormData and omits Content-Type header
     await httpClient('/api/v1/files/upload', {
       method: 'POST',
-      body: formData
+      body: formData,
     })
   }
-  
+
   /**
    * Delete file from task prompt
    */
@@ -155,11 +149,11 @@ class PromptsApi {
     await httpClient<{ success: boolean; chunksDeleted: number }>(
       `/api/v1/prompts/${topic}/files/${messageId}`,
       {
-        method: 'DELETE'
+        method: 'DELETE',
       }
     )
   }
-  
+
   /**
    * Get all available files (vectorized) for linking
    */
@@ -168,12 +162,12 @@ class PromptsApi {
     const data = await httpClient<{ success: boolean; files: AvailableFile[] }>(
       `/api/v1/prompts/available-files${params}`,
       {
-        method: 'GET'
+        method: 'GET',
       }
     )
     return data.files
   }
-  
+
   /**
    * Link existing file to task prompt
    */
@@ -182,7 +176,7 @@ class PromptsApi {
       `/api/v1/prompts/${topic}/files/link`,
       {
         method: 'POST',
-        body: JSON.stringify({ messageId })
+        body: JSON.stringify({ messageId }),
       }
     )
   }
@@ -195,4 +189,3 @@ class PromptsApi {
 }
 
 export const promptsApi = new PromptsApi()
-

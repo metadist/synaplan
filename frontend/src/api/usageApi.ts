@@ -11,25 +11,34 @@ export interface UsageStats {
     expires_at: number | null
     stripe_customer_id: string | null
   }
-  usage: Record<string, {
-    used: number
-    limit: number
-    remaining: number
-    allowed: boolean
-    resets_at: number | null
-    type: string
-  }>
+  usage: Record<
+    string,
+    {
+      used: number
+      limit: number
+      remaining: number
+      allowed: boolean
+      resets_at: number | null
+      type: string
+    }
+  >
   limits: Record<string, number>
   remaining: Record<string, number>
   breakdown: {
-    by_source: Record<string, {
-      total: number
-      actions: Record<string, number>
-    }>
-    by_time: Record<string, {
-      total: number
-      actions: Record<string, number>
-    }>
+    by_source: Record<
+      string,
+      {
+        total: number
+        actions: Record<string, number>
+      }
+    >
+    by_time: Record<
+      string,
+      {
+        total: number
+        actions: Record<string, number>
+      }
+    >
   }
   recent_usage: Array<{
     timestamp: number
@@ -52,7 +61,7 @@ interface UsageResponse {
 
 export async function getUsageStats(): Promise<UsageStats> {
   const data = await httpClient<UsageResponse>('/api/v1/usage/stats', {
-    method: 'GET'
+    method: 'GET',
   })
   return data.data
 }
@@ -64,16 +73,16 @@ export async function getUsageStats(): Promise<UsageStats> {
 export async function getExportCsvUrl(sinceTimestamp?: number): Promise<string> {
   const config = useConfigStore()
   const basePath = config.apiBaseUrl || '/api'
-  
+
   // Fetch SSE token for URL-based auth (needed for direct links)
   const tokenResponse = await fetch(`${basePath}/v1/auth/token`, {
-    credentials: 'include'
+    credentials: 'include',
   })
-  
+
   if (!tokenResponse.ok) {
     throw new Error('Authentication required')
   }
-  
+
   const { token } = await tokenResponse.json()
   let url = `${basePath}/v1/usage/export?token=${token}`
 
@@ -93,7 +102,7 @@ export async function downloadUsageExport(sinceTimestamp?: number): Promise<void
   const blob = await httpClient<Blob>('/api/v1/usage/export', {
     method: 'GET',
     params,
-    responseType: 'blob'
+    responseType: 'blob',
   })
 
   const downloadUrl = window.URL.createObjectURL(blob)
@@ -105,4 +114,3 @@ export async function downloadUsageExport(sinceTimestamp?: number): Promise<void
   document.body.removeChild(link)
   window.URL.revokeObjectURL(downloadUrl)
 }
-
