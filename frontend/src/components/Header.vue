@@ -1,5 +1,5 @@
 <template>
-  <header class="bg-header" data-testid="comp-app-header">
+  <header class="bg-header relative z-50" data-testid="comp-app-header">
     <div class="flex items-center justify-between px-6 py-4" data-testid="section-header-bar">
       <div class="flex items-center gap-3 flex-1" data-testid="section-header-left">
         <button
