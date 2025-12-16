@@ -2,6 +2,7 @@
 
 namespace App\Service;
 
+use App\Service\Email\SmartEmailHelper;
 use Psr\Log\LoggerInterface;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 
@@ -209,13 +210,10 @@ class InboundEmailService
     }
 
     /**
-     * Check if email destination is valid (smart@synaplan.net or smart+keyword@synaplan.net).
-     * Accept legacy synaplan.com too.
+     * Check if email destination is a valid smart address.
      */
     private function isValidDestination(string $email): bool
     {
-        $email = strtolower(trim($email));
-
-        return 1 === preg_match('/^smart(\+[a-z0-9\-_]+)?@synaplan\.(?:net|com)$/i', $email);
+        return SmartEmailHelper::isValidSmartAddress($email);
     }
 }

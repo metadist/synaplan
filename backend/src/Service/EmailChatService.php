@@ -6,6 +6,7 @@ use App\Entity\Chat;
 use App\Entity\User;
 use App\Repository\ChatRepository;
 use App\Repository\UserRepository;
+use App\Service\Email\SmartEmailHelper;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 
@@ -20,7 +21,6 @@ use Psr\Log\LoggerInterface;
  */
 class EmailChatService
 {
-    private const BASE_EMAIL = 'smart@synaplan.net';
     private const MAX_ANONYMOUS_EMAILS_PER_HOUR = 10;
 
     public function __construct(
@@ -38,15 +38,7 @@ class EmailChatService
      */
     public function parseEmailKeyword(string $toEmail): ?string
     {
-        $toEmail = strtolower(trim($toEmail));
-
-        // Check if email matches pattern: smart+keyword@synaplan.net
-        // Accept legacy synaplan.com as well (incoming emails may still be configured that way).
-        if (preg_match('/^smart\+([a-z0-9\-_]+)@synaplan\.(?:net|com)$/i', $toEmail, $matches)) {
-            return $matches[1];
-        }
-
-        return null;
+        return SmartEmailHelper::extractKeyword($toEmail);
     }
 
     /**
@@ -240,12 +232,6 @@ class EmailChatService
      */
     public function getUserPersonalEmailAddress(User $user): string
     {
-        $keyword = $this->getUserEmailKeyword($user);
-
-        if ($keyword) {
-            return "smart+{$keyword}@synaplan.net";
-        }
-
-        return self::BASE_EMAIL;
+        return SmartEmailHelper::buildAddress($this->getUserEmailKeyword($user));
     }
 }

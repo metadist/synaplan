@@ -145,21 +145,17 @@ async function handleAuthFailure(): Promise<never> {
   chatsStore.$reset()
 
   // Use Vue Router instead of window.location.href to avoid full page reload loops
+  // Support subfolder deployments via BASE_URL (from vite.config base option)
+  const loginPath = `${import.meta.env.BASE_URL}login`.replace('//', '/')
+
   try {
     const { default: router } = await import('@/router')
-
-    // Only redirect if not already on login page
-    if (!window.location.pathname.startsWith('/login')) {
-      router.push({
-        name: 'login',
-        query: { reason: 'session_expired' }
-      })
+    if (!window.location.pathname.startsWith(loginPath)) {
+      router.push({ name: 'login', query: { reason: 'session_expired' } })
     }
   } catch {
-    // Fallback to window.location only if router import fails
-    // But check we're not already on login to prevent loops
-    if (!window.location.pathname.startsWith('/login')) {
-      window.location.href = '/login?reason=session_expired'
+    if (!window.location.pathname.startsWith(loginPath)) {
+      window.location.href = `${loginPath}?reason=session_expired`
     }
   }
 
