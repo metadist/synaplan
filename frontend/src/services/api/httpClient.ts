@@ -297,14 +297,14 @@ async function httpClient<T = unknown, S extends z.Schema | undefined = undefine
   // Validate with schema if provided
   if (schema && responseType === 'json') {
     try {
-      return schema.parse(data) as T | z.infer<NonNullable<S>>
+      return schema.parse(data)
     } catch (error) {
-      console.error('Schema validation failed:', error)
-      throw error
+      console.error('Schema validation failed for endpoint:', endpoint)
+      throw new Error('Invalid API response format')
     }
   }
 
-  return data as T | z.infer<NonNullable<S>>
+  return data
 }
 
 export { httpClient, API_BASE_URL }
