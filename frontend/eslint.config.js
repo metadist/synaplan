@@ -43,7 +43,7 @@ export default [
   },
   // Node.js config files (vite, tailwind, etc.)
   {
-    files: ['*.config.{js,ts,mjs,cjs}', '*.setup.{js,ts}', 'scripts/**/*.{js,ts}'],
+    files: ['*.config.{js,ts,mjs,cjs}', '*.setup.{js,ts}', 'scripts/**/*.{js,ts,mjs,cjs}'],
     languageOptions: {
       parser: typescriptParser,
       parserOptions: {
