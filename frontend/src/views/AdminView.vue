@@ -236,15 +236,15 @@
                       <td class="py-3 px-4">
                         <select
                           :value="user.level"
+                          class="px-3 py-1.5 rounded-lg bg-chat border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:ring-2 focus:ring-[var(--brand)] focus:outline-none"
+                          :disabled="user.id === currentUserId"
+                          :data-testid="`select-user-level-${user.id}`"
                           @change="
                             updateUserLevel(
                               user.id,
                               ($event.target as HTMLSelectElement).value as AdminUser['level']
                             )
                           "
-                          class="px-3 py-1.5 rounded-lg bg-chat border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:ring-2 focus:ring-[var(--brand)] focus:outline-none"
-                          :disabled="user.id === currentUserId"
-                          :data-testid="`select-user-level-${user.id}`"
                         >
                           <option value="NEW">NEW</option>
                           <option value="PRO">PRO</option>

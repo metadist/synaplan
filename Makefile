@@ -12,8 +12,9 @@ lint: ## Check code quality (backend PSR-12 + frontend types)
 	$(MAKE) -C backend lint
 	$(MAKE) -C frontend lint
 
-format: ## Fix code formatting (backend only)
+format: ## Fix code formatting (backend + frontend)
 	$(MAKE) -C backend format
+	$(MAKE) -C frontend format
 
 test: ## Run all tests (backend + frontend)
 	$(MAKE) -C backend test
