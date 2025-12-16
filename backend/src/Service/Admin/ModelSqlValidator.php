@@ -80,9 +80,21 @@ final class ModelSqlValidator
                 continue;
             }
 
-            // Must target BMODELS only
+            // Must target BMODELS only (single-table DML)
+            // Reject multi-table syntax: UPDATE t1, t2 / DELETE FROM t1, t2 / DELETE FROM t1 USING t2
             if (!preg_match('/\b(INTO|UPDATE|FROM)\s+`?BMODELS`?\b/i', $stmtTrim)) {
                 $errors[] = sprintf('Statement %d must target table BMODELS', $idx + 1);
+                continue;
+            }
+
+            // Detect multi-table DML (comma after table name or USING clause)
+            // e.g. "DELETE FROM BMODELS, USERS" or "UPDATE BMODELS, USERS SET" or "DELETE FROM BMODELS USING USERS"
+            if (preg_match('/\b(INTO|UPDATE|FROM)\s+`?BMODELS`?\s*,/i', $stmtTrim)) {
+                $errors[] = sprintf('Statement %d must not reference multiple tables', $idx + 1);
+                continue;
+            }
+            if (preg_match('/\bUSING\b/i', $stmtTrim)) {
+                $errors[] = sprintf('Statement %d must not use USING clause', $idx + 1);
                 continue;
             }
 

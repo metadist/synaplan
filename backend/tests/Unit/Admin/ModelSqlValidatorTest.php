@@ -44,4 +44,35 @@ SQL;
         $res = $v->validateAndSplit('DELETE FROM USERS WHERE 1=1;');
         self::assertNotEmpty($res['errors']);
     }
+
+    public function testRejectsMultiTableDelete(): void
+    {
+        $v = new ModelSqlValidator();
+        $res = $v->validateAndSplit("DELETE FROM BMODELS, USERS WHERE BSERVICE='x' AND BTAG='y' AND BPROVID='z';", allowDelete: true);
+        self::assertNotEmpty($res['errors']);
+        self::assertStringContainsString('multiple tables', implode(' ', $res['errors']));
+    }
+
+    public function testRejectsMultiTableUpdate(): void
+    {
+        $v = new ModelSqlValidator();
+        $res = $v->validateAndSplit("UPDATE BMODELS, USERS SET BPRICEIN=1 WHERE BSERVICE='x' AND BTAG='y' AND BPROVID='z';");
+        self::assertNotEmpty($res['errors']);
+        self::assertStringContainsString('multiple tables', implode(' ', $res['errors']));
+    }
+
+    public function testRejectsDeleteWithUsing(): void
+    {
+        $v = new ModelSqlValidator();
+        $res = $v->validateAndSplit("DELETE FROM BMODELS USING BMODELS JOIN USERS WHERE BSERVICE='x' AND BTAG='y' AND BPROVID='z';", allowDelete: true);
+        self::assertNotEmpty($res['errors']);
+    }
+
+    public function testRejectsJoin(): void
+    {
+        $v = new ModelSqlValidator();
+        $res = $v->validateAndSplit("UPDATE BMODELS JOIN USERS ON 1=1 SET BPRICEIN=1 WHERE BSERVICE='x' AND BTAG='y' AND BPROVID='z';");
+        self::assertNotEmpty($res['errors']);
+        self::assertStringContainsString('other tables', implode(' ', $res['errors']));
+    }
 }

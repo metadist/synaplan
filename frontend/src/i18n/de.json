@@ -381,7 +381,8 @@
         "failedLoad": "Laden der Admin-Modelle fehlgeschlagen",
         "failedCreate": "Modell erstellen fehlgeschlagen",
         "failedSave": "Modell speichern fehlgeschlagen",
-        "failedDelete": "Modell löschen fehlgeschlagen"
+        "failedDelete": "Modell löschen fehlgeschlagen",
+        "requiredFields": "Alle Felder sind erforderlich: Service, Tag, Provider-ID, Name"
       }
     },
     "taskPrompts": {

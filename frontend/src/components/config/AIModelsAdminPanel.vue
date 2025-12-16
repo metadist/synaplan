@@ -286,15 +286,19 @@ async function loadModels() {
 }
 
 async function createModel() {
+  const service = newModel.value.service.trim()
+  const tag = newModel.value.tag.trim()
+  const providerId = newModel.value.providerId.trim()
+  const name = newModel.value.name.trim()
+
+  if (!service || !tag || !providerId || !name) {
+    showError(t('config.aiModels.admin.requiredFields'))
+    return
+  }
+
   createLoading.value = true
   try {
-    const payload = {
-      service: newModel.value.service.trim(),
-      tag: newModel.value.tag.trim(),
-      providerId: newModel.value.providerId.trim(),
-      name: newModel.value.name.trim(),
-    }
-    await adminModelsApi.create(payload)
+    await adminModelsApi.create({ service, tag, providerId, name })
     success(t('config.aiModels.admin.modelCreated'))
     newModel.value = { service: '', tag: '', providerId: '', name: '' }
     await loadModels()

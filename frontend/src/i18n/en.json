@@ -498,7 +498,8 @@
         "failedLoad": "Failed to load admin models",
         "failedCreate": "Failed to create model",
         "failedSave": "Failed to save model",
-        "failedDelete": "Failed to delete model"
+        "failedDelete": "Failed to delete model",
+        "requiredFields": "All fields are required: Service, Tag, Provider ID, Name"
       }
     },
     "taskPrompts": {
