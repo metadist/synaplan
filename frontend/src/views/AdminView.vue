@@ -236,12 +236,15 @@
                       <td class="py-3 px-4">
                         <select
                           :value="user.level"
+                          @change="
+                            updateUserLevel(
+                              user.id,
+                              ($event.target as HTMLSelectElement).value as AdminUser['level']
+                            )
+                          "
                           class="px-3 py-1.5 rounded-lg bg-chat border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:ring-2 focus:ring-[var(--brand)] focus:outline-none"
                           :disabled="user.id === currentUserId"
                           :data-testid="`select-user-level-${user.id}`"
-                          @change="
-                            updateUserLevel(user.id, ($event.target as HTMLSelectElement).value)
-                          "
                         >
                           <option value="NEW">NEW</option>
                           <option value="PRO">PRO</option>
@@ -794,7 +797,7 @@ async function loadUsageStats(period: 'day' | 'week' | 'month' | 'all' = 'week')
 }
 
 // User actions
-async function updateUserLevel(userId: number, newLevel: string) {
+async function updateUserLevel(userId: number, newLevel: AdminUser['level']) {
   try {
     await adminApi.updateUserLevel(userId, newLevel)
     // Update local state

@@ -70,7 +70,7 @@ export const adminApi = {
       params.append('search', search)
     }
     return httpClient(`/api/v1/admin/users?${params}`, {
-      schema: GetAdminGetUsersResponseSchema
+      schema: GetAdminGetUsersResponseSchema,
     })
   },
 

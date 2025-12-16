@@ -1,5 +1,6 @@
 import type { AIModel } from '@/stores/models'
 import { useConfigStore } from '@/stores/config'
+import type { z } from 'zod'
 
 export interface DefaultModelConfig {
   chat: string
@@ -19,9 +20,32 @@ const API_BASE_URL = config.apiBaseUrl
 const API_TIMEOUT = import.meta.env.VITE_API_TIMEOUT || 30000
 const CSRF_HEADER = import.meta.env.VITE_CSRF_HEADER_NAME || 'X-CSRF-Token'
 
+interface ApiHttpClientOptions<S extends z.Schema | undefined = undefined> extends RequestInit {
+  /** Zod schema for response validation */
+  schema?: S
+}
+
 // HTTP client with cookie-based auth
 // Note: For most use cases, prefer using @/services/api/httpClient instead
-async function httpClient<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
+
+// Overload: with schema
+async function httpClient<S extends z.Schema>(
+  endpoint: string,
+  options: ApiHttpClientOptions<S> & { schema: S }
+): Promise<z.infer<S>>
+
+// Overload: without schema (legacy)
+async function httpClient<T = unknown>(
+  endpoint: string,
+  options?: ApiHttpClientOptions<undefined>
+): Promise<T>
+
+// Implementation
+async function httpClient<T = unknown, S extends z.Schema | undefined = undefined>(
+  endpoint: string,
+  options: ApiHttpClientOptions<S> = {}
+): Promise<T | z.infer<NonNullable<S>>> {
+  const { schema, ...requestOptions } = options
   const csrfToken = sessionStorage.getItem('csrf_token')
 
   const headers: Record<string, string> = {}
@@ -47,7 +71,7 @@ async function httpClient<T>(endpoint: string, options: RequestInit = {}): Promi
 
   try {
     const response = await fetch(`${API_BASE_URL}${endpoint}`, {
-      ...options,
+      ...requestOptions,
       headers,
       credentials: 'include', // Use HttpOnly cookies for auth
       signal: controller.signal,
@@ -74,7 +98,19 @@ async function httpClient<T>(endpoint: string, options: RequestInit = {}): Promi
       sessionStorage.setItem('csrf_token', newCsrfToken)
     }
 
-    return await response.json()
+    const data = await response.json()
+
+    // Validate with schema if provided
+    if (schema) {
+      try {
+        return schema.parse(data) as T | z.infer<NonNullable<S>>
+      } catch (error) {
+        console.error('Schema validation failed:', error)
+        throw error
+      }
+    }
+
+    return data as T | z.infer<NonNullable<S>>
   } catch (error: any) {
     if (error.name === 'AbortError') {
       throw new Error('Request timeout')

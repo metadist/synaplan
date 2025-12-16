@@ -21,7 +21,14 @@ if (!skipFetch) {
 const filePath = 'src/generated/api-schemas.ts'
 let content = readFileSync(filePath, 'utf-8')
 
-// Step 3: Add readable aliases
+// Step 3: Fix Zod v4 compatibility issues
+console.log('🔧 Fixing Zod v4 compatibility...')
+
+// Fix z.record() - Zod v4 requires keyType and valueType
+// Replace: z.record(valueSchema) with z.record(z.string(), valueSchema)
+content = content.replace(/z\.record\(\s*\n/g, 'z.record(z.string(), \n')
+
+// Step 4: Add readable aliases
 console.log('✨ Creating readable aliases...')
 
 // Convert snake_case to PascalCase
