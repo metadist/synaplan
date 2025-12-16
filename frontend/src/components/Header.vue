@@ -25,7 +25,7 @@
           <span class="hidden md:inline text-sm font-medium">{{ appModeStore.isEasyMode ? 'Easy' : 'Advanced' }}</span>
         </button>
 
-        <div class="relative isolate" data-testid="section-language-selector">
+        <div ref="langSelectorRef" class="relative isolate" data-testid="section-language-selector">
           <button
             @click="isLangOpen = !isLangOpen"
             class="dropdown-trigger"
@@ -86,6 +86,7 @@ const sidebarStore = useSidebarStore()
 const appModeStore = useAppModeStore()
 const { locale } = useI18n()
 const isLangOpen = ref(false)
+const langSelectorRef = ref<HTMLElement | null>(null)
 
 const languages = [
   { value: 'en', label: 'EN' },
@@ -119,9 +120,10 @@ const cycleTheme = () => {
 }
 
 const handleClickOutside = (event: MouseEvent) => {
+  if (!isLangOpen.value) return
+  
   const target = event.target as HTMLElement
-  const container = target.closest('.relative')
-  if (isLangOpen.value && (!container || !container.contains(event.target as Node))) {
+  if (langSelectorRef.value && !langSelectorRef.value.contains(target)) {
     isLangOpen.value = false
   }
 }
