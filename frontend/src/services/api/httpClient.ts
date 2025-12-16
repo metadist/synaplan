@@ -24,12 +24,47 @@ interface HttpClientOptions extends RequestInit {
 let isRefreshing = false
 let refreshPromise: Promise<RefreshResult> | null = null
 
+// Track auth failures to prevent redirect loops
+let authFailureCount = 0
+let lastAuthFailureTime = 0
+const AUTH_FAILURE_WINDOW_MS = 5000 // 5 second window
+const MAX_AUTH_FAILURES_IN_WINDOW = 2
+
 /**
  * Refresh result - indicates if refresh was successful and if OIDC session expired
  */
 interface RefreshResult {
   success: boolean
   oidcSessionExpired?: boolean
+}
+
+/**
+ * Check if we're in a potential auth failure loop
+ */
+function isInAuthFailureLoop(): boolean {
+  const now = Date.now()
+
+  // Reset counter if outside window
+  if (now - lastAuthFailureTime > AUTH_FAILURE_WINDOW_MS) {
+    authFailureCount = 0
+  }
+
+  return authFailureCount >= MAX_AUTH_FAILURES_IN_WINDOW
+}
+
+/**
+ * Record an auth failure for loop detection
+ */
+function recordAuthFailure(): void {
+  const now = Date.now()
+
+  // Reset counter if outside window
+  if (now - lastAuthFailureTime > AUTH_FAILURE_WINDOW_MS) {
+    authFailureCount = 0
+  }
+
+  authFailureCount++
+  lastAuthFailureTime = now
 }
 
 /**
@@ -52,6 +87,8 @@ async function refreshAccessToken(): Promise<RefreshResult> {
 
       if (response.ok) {
         console.log('🔄 Token refreshed successfully')
+        // Reset failure counter on success
+        authFailureCount = 0
         return { success: true }
       }
 
@@ -81,11 +118,19 @@ async function refreshAccessToken(): Promise<RefreshResult> {
 }
 
 /**
- * Handle authentication failure - logout and redirect
+ * Handle authentication failure - clear state and redirect using router (not full page reload)
  */
 async function handleAuthFailure(): Promise<never> {
   console.warn('🔒 Authentication failed - logging out user')
 
+  // Record this failure for loop detection
+  recordAuthFailure()
+
+  // Check for loop before redirecting
+  if (isInAuthFailureLoop()) {
+    console.error('🛑 Auth failure loop detected - not redirecting')
+    throw new Error('Authentication failed (loop detected)')
+  }
 
   const { useAuthStore } = await import('@/stores/auth')
   const { useHistoryStore } = await import('@/stores/history')
@@ -99,11 +144,23 @@ async function handleAuthFailure(): Promise<never> {
   historyStore.clear()
   chatsStore.$reset()
 
-  // Redirect to login
-  window.location.href = '/login?reason=session_expired'
+  // Use Vue Router instead of window.location.href to avoid full page reload loops
+  // Support subfolder deployments via BASE_URL (from vite.config base option)
+  const loginPath = `${import.meta.env.BASE_URL}login`.replace('//', '/')
 
-  // Return never-resolving promise
-  return new Promise(() => {})
+  try {
+    const { default: router } = await import('@/router')
+    if (!window.location.pathname.startsWith(loginPath)) {
+      router.push({ name: 'login', query: { reason: 'session_expired' } })
+    }
+  } catch {
+    if (!window.location.pathname.startsWith(loginPath)) {
+      window.location.href = `${loginPath}?reason=session_expired`
+    }
+  }
+
+  // Throw error to stop the request chain
+  throw new Error('Authentication required')
 }
 
 async function httpClient<T>(endpoint: string, options: HttpClientOptions = {}): Promise<T> {
@@ -126,12 +183,12 @@ async function httpClient<T>(endpoint: string, options: HttpClientOptions = {}):
   }
 
   // No Authorization header needed - using HttpOnly cookies
-  
+
   console.log('🌐 httpClient request:', {
     url,
     method: fetchOptions.method || 'GET',
-    bodyPreview: fetchOptions.body && !(fetchOptions.body instanceof FormData) 
-      ? JSON.parse(fetchOptions.body as string) 
+    bodyPreview: fetchOptions.body && !(fetchOptions.body instanceof FormData)
+      ? JSON.parse(fetchOptions.body as string)
       : null
   })
 
@@ -152,21 +209,21 @@ async function httpClient<T>(endpoint: string, options: HttpClientOptions = {}):
     // Handle 401 - try to refresh token
     if (response.status === 401 && !skipAuth && !_isRetry) {
       console.log('🔄 Got 401, attempting token refresh...')
-      
+
       const refreshResult = await refreshAccessToken()
-      
+
       // If OIDC session expired (user logged out from Keycloak), immediately logout
       if (refreshResult.oidcSessionExpired) {
         console.log('🔒 OIDC provider invalidated session')
         return handleAuthFailure()
       }
-      
+
       if (refreshResult.success) {
         // Retry the original request
         console.log('🔄 Retrying request after token refresh')
         return httpClient<T>(endpoint, { ...options, _isRetry: true })
       }
-      
+
       // Refresh failed - logout
       return handleAuthFailure()
     }

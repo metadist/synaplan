@@ -83,7 +83,7 @@ class ProfileController extends AbstractController
                         new OA\Property(property: 'timezone', type: 'string', example: 'Europe/Berlin'),
                         new OA\Property(property: 'invoiceEmail', type: 'string', example: 'billing@example.com'),
                         new OA\Property(property: 'emailKeyword', type: 'string', nullable: true, example: 'myproject'),
-                        new OA\Property(property: 'personalEmailAddress', type: 'string', example: 'smart+myproject@synaplan.com'),
+                        new OA\Property(property: 'personalEmailAddress', type: 'string', example: 'smart+myproject@synaplan.net'),
                     ]
                 ),
             ]
@@ -338,7 +338,7 @@ class ProfileController extends AbstractController
     #[OA\Get(
         path: '/api/v1/profile/email-keyword',
         summary: 'Get user email keyword',
-        description: 'Returns the user\'s email keyword for smart+keyword@synaplan.com',
+        description: 'Returns the user\'s email keyword for smart+keyword@synaplan.net',
         security: [['Bearer' => []]],
         tags: ['Profile']
     )]
@@ -349,7 +349,7 @@ class ProfileController extends AbstractController
             properties: [
                 new OA\Property(property: 'success', type: 'boolean', example: true),
                 new OA\Property(property: 'keyword', type: 'string', nullable: true, example: 'myproject'),
-                new OA\Property(property: 'emailAddress', type: 'string', example: 'smart+myproject@synaplan.com'),
+                new OA\Property(property: 'emailAddress', type: 'string', example: 'smart+myproject@synaplan.net'),
             ]
         )
     )]
@@ -374,7 +374,7 @@ class ProfileController extends AbstractController
     #[OA\Put(
         path: '/api/v1/profile/email-keyword',
         summary: 'Set user email keyword',
-        description: 'Set or update the user\'s email keyword for smart+keyword@synaplan.com',
+        description: 'Set or update the user\'s email keyword for smart+keyword@synaplan.net',
         security: [['Bearer' => []]],
         tags: ['Profile']
     )]
@@ -395,7 +395,7 @@ class ProfileController extends AbstractController
                 new OA\Property(property: 'success', type: 'boolean', example: true),
                 new OA\Property(property: 'message', type: 'string', example: 'Email keyword updated successfully'),
                 new OA\Property(property: 'keyword', type: 'string', nullable: true, example: 'myproject'),
-                new OA\Property(property: 'emailAddress', type: 'string', example: 'smart+myproject@synaplan.com'),
+                new OA\Property(property: 'emailAddress', type: 'string', example: 'smart+myproject@synaplan.net'),
             ]
         )
     )]

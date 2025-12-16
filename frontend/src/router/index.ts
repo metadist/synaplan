@@ -61,7 +61,7 @@ const router = createRouter({
       component: () => import('../views/SharedChatView.vue'),
       meta: { requiresAuth: false, public: true }
     },
-    
+
     // Error pages (always accessible)
     {
       path: '/error',
@@ -75,7 +75,7 @@ const router = createRouter({
       component: LoadingView,
       meta: { requiresAuth: false }
     },
-    
+
     // Protected routes (require authentication)
     {
       path: '/',
@@ -229,12 +229,65 @@ const router = createRouter({
   ],
 })
 
+// Loop detection: track recent redirects to prevent infinite loops
+const redirectHistory: { path: string; time: number }[] = []
+const LOOP_WINDOW_MS = 3000 // 3 second window
+const MAX_REDIRECTS_IN_WINDOW = 3 // Max redirects allowed in window
+
+function detectRedirectLoop(targetPath: string): boolean {
+  const now = Date.now()
+
+  // Clean old entries
+  while (redirectHistory.length > 0 && now - redirectHistory[0].time > LOOP_WINDOW_MS) {
+    redirectHistory.shift()
+  }
+
+  // Add current redirect
+  redirectHistory.push({ path: targetPath, time: now })
+
+  // Check for loop (same path repeated too many times)
+  const recentToLogin = redirectHistory.filter(r => r.path.startsWith('/login')).length
+  if (recentToLogin >= MAX_REDIRECTS_IN_WINDOW) {
+    console.error('🔄 Redirect loop detected! Stopping redirect chain.')
+    return true
+  }
+
+  return false
+}
+
 // Global navigation guard for authentication
 // With cookie-based auth, we wait for auth check then verify session
-router.beforeEach(async (to, _from, next) => {
-  // Wait for initial auth check to complete (validates cookies via /me)
-  await authReady
-  
+router.beforeEach(async (to, from, next) => {
+  // Skip guard for error page to prevent loops
+  if (to.name === 'error') {
+    next()
+    return
+  }
+
+  // Wait for initial auth check with timeout to prevent hanging
+  try {
+    await Promise.race([
+      authReady,
+      new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('Auth check timeout')), 10000)
+      )
+    ])
+  } catch (err) {
+    console.error('Auth initialization failed:', err)
+    // If auth check times out, allow navigation to public routes only
+    if (to.meta.public || to.meta.requiresAuth === false) {
+      next()
+      return
+    }
+    // For protected routes, redirect to login
+    if (!detectRedirectLoop('/login')) {
+      next({ name: 'login', query: { reason: 'auth_timeout' } })
+    } else {
+      next({ name: 'error' })
+    }
+    return
+  }
+
   const { isAuthenticated, isAdmin } = useAuth()
   const requiresAuth = to.meta.requiresAuth !== false // Default to true
   const requiresAdminAccess = to.meta.requiresAdmin === true
@@ -243,6 +296,15 @@ router.beforeEach(async (to, _from, next) => {
   const authenticated = isAuthenticated.value
 
   if (requiresAuth && !authenticated) {
+    // Check for redirect loop before redirecting
+    const targetPath = `/login?redirect=${encodeURIComponent(to.fullPath)}&reason=auth_required`
+    if (detectRedirectLoop(targetPath)) {
+      console.error('🛑 Breaking redirect loop - staying on current page')
+      // Break the loop by going to error page or just proceeding
+      next({ name: 'error', query: { reason: 'redirect_loop' } })
+      return
+    }
+
     console.warn('🔒 Protected route accessed without auth - redirecting to login')
     next({
       name: 'login',
@@ -252,7 +314,12 @@ router.beforeEach(async (to, _from, next) => {
     // Admin route without admin privileges
     next({ name: 'chat' })
   } else if (isPublicRoute && isAuthenticated.value && to.name === 'login') {
-    // Already logged in, redirect to home
+    // Already logged in, redirect to home (but check for loops)
+    if (from.name === 'chat' || detectRedirectLoop('/')) {
+      // Prevent ping-pong between login and chat
+      next()
+      return
+    }
     next({ name: 'chat' })
   } else {
     next()
@@ -262,7 +329,7 @@ router.beforeEach(async (to, _from, next) => {
 // Global error handler for lazy-loaded components
 router.onError((error) => {
   console.error('Router error:', error)
-  
+
   // Handle chunk load failures (e.g., after deployment)
   if (error.message.includes('Failed to fetch dynamically imported module')) {
     window.location.reload()

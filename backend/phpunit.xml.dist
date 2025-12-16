@@ -40,6 +40,12 @@
         </testsuite>
     </testsuites>
 
+    <groups>
+        <exclude>
+            <group>live-api</group>
+        </exclude>
+    </groups>
+
     <source ignoreSuppressionOfDeprecations="true"
             ignoreIndirectDeprecations="true"
             restrictNotices="true"
