@@ -44,7 +44,9 @@ export const getDefaultModels = async (): Promise<DefaultsResponse> => {
 /**
  * Save default model configuration
  */
-export const saveDefaultModels = async (defaults: SaveDefaultsRequest): Promise<{ success: boolean; message: string }> => {
+export const saveDefaultModels = async (
+  defaults: SaveDefaultsRequest
+): Promise<{ success: boolean; message: string }> => {
   return httpClient<{ success: boolean; message: string }>('/api/v1/config/models/defaults', {
     method: 'POST',
     body: JSON.stringify(defaults),
@@ -62,6 +64,5 @@ export const configApi = {
   getModels,
   getDefaultModels,
   saveDefaultModels,
-  checkModelAvailability
+  checkModelAvailability,
 }
-

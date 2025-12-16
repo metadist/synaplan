@@ -12,4 +12,3 @@ import { useHelp } from '@/composables/useHelp'
 
 const { isEnabled, isOpen, currentHelp, openHelp, closeHelp } = useHelp()
 </script>
-

@@ -411,9 +411,9 @@
         "parameters": "Parameters",
         "requestBody": "Request Body",
         "responses": "Responses",
-          "authentication": "Authentication"
-        },
-        "exampleCurl": "Example:",
+        "authentication": "Authentication"
+      },
+      "exampleCurl": "Example:",
       "widgetDescription": "To activate the widget, please enter your domain name like \"yourdomain.net\" in the field below.",
       "domainPlaceholder": "yourdomain.net",
       "activateWidget": "Activate Widget",
@@ -1287,4 +1287,3 @@
     }
   }
 }
-

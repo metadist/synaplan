@@ -13,17 +13,14 @@
           :key="'file-' + index"
           class="flex items-center gap-2 px-3 py-2 surface-chip rounded-lg"
         >
-          <Icon
-            :icon="getFileIcon(file.file_type || file.name || '')"
-            class="w-4 h-4"
-          />
+          <Icon :icon="getFileIcon(file.file_type || file.name || '')" class="w-4 h-4" />
           <span class="text-sm txt-secondary">{{ file.filename || file.name }}</span>
           <span v-if="file.processing" class="text-xs txt-muted">(processing...)</span>
           <button
-            @click="removeFile(index)"
             class="icon-ghost p-0 min-w-0 w-auto h-auto"
             aria-label="Remove file"
             :disabled="file.processing"
+            @click="removeFile(index)"
           >
             <XMarkIcon class="w-4 h-4" />
           </button>
@@ -32,13 +29,15 @@
         <!-- Active Command -->
         <button
           v-if="activeCommand"
-          @click="clearCommand"
           type="button"
           :class="[
             'pill text-xs flex items-center gap-2',
-            isCommandValid ? 'pill--active' : 'bg-orange-500/10 border-orange-500/30 text-orange-600 dark:text-orange-400'
+            isCommandValid
+              ? 'pill--active'
+              : 'bg-orange-500/10 border-orange-500/30 text-orange-600 dark:text-orange-400',
           ]"
           data-testid="btn-chat-command-clear"
+          @click="clearCommand"
         >
           <Icon :icon="commandIcon" class="w-4 h-4" />
           <span class="font-mono font-semibold">/{{ activeCommand }}</span>
@@ -48,11 +47,11 @@
 
       <div
         class="relative surface-card"
+        :class="{ 'ring-2 ring-primary': isDragging }"
+        data-testid="comp-chat-input-shell"
         @dragover.prevent="handleDragOver"
         @dragleave.prevent="handleDragLeave"
         @drop.prevent="handleDrop"
-        :class="{ 'ring-2 ring-primary': isDragging }"
-        data-testid="comp-chat-input-shell"
       >
         <!-- Command Palette (outside overflow container) -->
         <CommandPalette
@@ -72,25 +71,28 @@
               v-model="message"
               :placeholder="isMobile ? 'Message...' : $t('chatInput.placeholder')"
               :rows="1"
+              class="flex-1"
+              data-testid="input-chat-message"
               @keydown="handleKeyDown"
               @keydown.enter.exact.prevent="sendMessage"
               @focus="isFocused = true"
               @blur="isFocused = false"
-              class="flex-1"
-              data-testid="input-chat-message"
             />
           </div>
         </div>
 
         <!-- Fixed file upload button (positioned absolutely) -->
-        <div class="absolute bottom-2 left-3 md:left-4 pointer-events-none" data-testid="section-chat-attachments">
+        <div
+          class="absolute bottom-2 left-3 md:left-4 pointer-events-none"
+          data-testid="section-chat-attachments"
+        >
           <button
-            @click="triggerFileUpload"
             type="button"
             class="icon-ghost h-[44px] min-w-[44px] flex items-center justify-center rounded-xl pointer-events-auto"
             :aria-label="$t('chatInput.attach')"
             :disabled="uploading"
             data-testid="btn-chat-attach"
+            @click="triggerFileUpload"
           >
             <Icon v-if="uploading" icon="mdi:loading" class="w-5 h-5 animate-spin" />
             <PlusIcon v-else class="w-5 h-5" />
@@ -100,43 +102,42 @@
             ref="fileInputRef"
             type="file"
             multiple
-            @change="handleFileSelect"
             class="hidden"
             accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.txt,.xlsx,.xls,.pptx,.ppt"
             data-testid="input-chat-file"
+            @change="handleFileSelect"
           />
         </div>
 
         <!-- Fixed action buttons (positioned absolutely) -->
-        <div class="absolute bottom-2 right-3 md:right-4 flex items-center gap-2 pointer-events-none" data-testid="section-chat-primary-actions">
+        <div
+          class="absolute bottom-2 right-3 md:right-4 flex items-center gap-2 pointer-events-none"
+          data-testid="section-chat-primary-actions"
+        >
           <button
-            @click="toggleRecording"
             type="button"
             :class="[
               'h-[44px] min-w-[44px] flex items-center justify-center rounded-xl pointer-events-auto',
-              isRecording ? 'bg-red-500 hover:bg-red-600' : 'icon-ghost'
+              isRecording ? 'bg-red-500 hover:bg-red-600' : 'icon-ghost',
             ]"
             :aria-label="$t('chatInput.voice')"
             data-testid="btn-chat-voice"
+            @click="toggleRecording"
           >
-            <Icon
-              v-if="isRecording"
-              icon="mdi:stop"
-              class="w-5 h-5 text-white"
-            />
+            <Icon v-if="isRecording" icon="mdi:stop" class="w-5 h-5 text-white" />
             <MicrophoneIcon v-else class="w-5 h-5" />
           </button>
 
           <button
-            @click="isStreaming ? emit('stop') : sendMessage()"
             type="button"
             :disabled="!isStreaming && !canSend"
             :class="[
               'h-[44px] min-w-[44px] flex items-center justify-center btn-primary pointer-events-auto transition-all',
-              isStreaming ? 'rounded' : 'rounded-xl'
+              isStreaming ? 'rounded' : 'rounded-xl',
             ]"
             :aria-label="isStreaming ? 'Stop' : $t('chatInput.send')"
             data-testid="btn-chat-send"
+            @click="isStreaming ? emit('stop') : sendMessage()"
           >
             <div v-if="isStreaming" class="w-4 h-4 bg-white rounded-sm"></div>
             <PaperAirplaneIcon v-else class="w-5 h-5" />
@@ -148,38 +149,42 @@
       <div class="mt-3 flex items-center gap-2" data-testid="section-chat-secondary-actions">
         <ToolsDropdown
           :active-command="activeCommand"
-          @insert-command="handleInsertCommand"
           class="flex-shrink-0"
+          @insert-command="handleInsertCommand"
         />
         <button
-          @click="toggleEnhance"
           type="button"
           :class="[
             'pill flex-shrink-0',
             enhanceLoading && 'pill--loading',
-            enhanceEnabled && 'pill--active'
+            enhanceEnabled && 'pill--active',
           ]"
           :disabled="enhanceLoading"
           :aria-label="$t('chatInput.enhance')"
           data-testid="btn-chat-enhance"
+          @click="toggleEnhance"
         >
           <SparklesIcon class="w-4 h-4 md:w-5 md:h-5" />
-          <span class="text-xs md:text-sm font-medium hidden sm:inline">{{ $t('chatInput.enhance') }}</span>
+          <span class="text-xs md:text-sm font-medium hidden sm:inline">{{
+            $t('chatInput.enhance')
+          }}</span>
         </button>
         <button
-          @click="toggleThinking"
           type="button"
           :disabled="!supportsReasoning"
           :class="[
             'pill flex-shrink-0',
             thinkingEnabled && 'pill--active',
-            !supportsReasoning && 'opacity-50 cursor-not-allowed'
+            !supportsReasoning && 'opacity-50 cursor-not-allowed',
           ]"
           :aria-label="$t('chatInput.thinking')"
           data-testid="btn-chat-thinking"
+          @click="toggleThinking"
         >
           <Icon icon="mdi:brain" class="w-4 h-4 md:w-5 md:h-5" />
-          <span class="text-xs md:text-sm font-medium hidden sm:inline">{{ $t('chatInput.thinking') }}</span>
+          <span class="text-xs md:text-sm font-medium hidden sm:inline">{{
+            $t('chatInput.thinking')
+          }}</span>
         </button>
       </div>
     </div>
@@ -195,7 +200,13 @@
 
 <script setup lang="ts">
 import { ref, computed, watch, nextTick, type Ref } from 'vue'
-import { PaperAirplaneIcon, XMarkIcon, SparklesIcon, MicrophoneIcon, PlusIcon } from '@heroicons/vue/24/outline'
+import {
+  PaperAirplaneIcon,
+  XMarkIcon,
+  SparklesIcon,
+  MicrophoneIcon,
+  PlusIcon,
+} from '@heroicons/vue/24/outline'
 import { Icon } from '@iconify/vue'
 import Textarea from './Textarea.vue'
 import CommandPalette from './CommandPalette.vue'
@@ -251,7 +262,10 @@ const { warning, error: showError, success } = useNotification()
 const { t } = useI18n()
 
 const emit = defineEmits<{
-  send: [message: string, options?: { includeReasoning?: boolean; webSearch?: boolean; fileIds?: number[] }]
+  send: [
+    message: string,
+    options?: { includeReasoning?: boolean; webSearch?: boolean; fileIds?: number[] },
+  ]
   stop: []
 }>()
 
@@ -259,12 +273,12 @@ const commandsStore = useCommandsStore()
 
 const isCommandValid = computed(() => {
   if (!activeCommand.value) return false
-  return commandsStore.commands.some(cmd => cmd.name === activeCommand.value)
+  return commandsStore.commands.some((cmd) => cmd.name === activeCommand.value)
 })
 
 const commandIcon = computed(() => {
   if (!activeCommand.value) return 'mdi:help-circle'
-  const cmd = commandsStore.commands.find(c => c.name === activeCommand.value)
+  const cmd = commandsStore.commands.find((c) => c.name === activeCommand.value)
   return cmd?.icon || 'mdi:help-circle'
 })
 
@@ -272,7 +286,7 @@ const canSend = computed(() => {
   const trimmedMessage = message.value.trim()
   const hasMessage = trimmedMessage.length > 0
   const hasFiles = uploadedFiles.value.length > 0
-  const filesReady = uploadedFiles.value.every(f => !f.processing)
+  const filesReady = uploadedFiles.value.every((f) => !f.processing)
 
   // Prevent sending if only a command is present (e.g., just "/pic" without arguments)
   const isOnlyCommand = trimmedMessage.startsWith('/') && !trimmedMessage.includes(' ')
@@ -297,46 +311,54 @@ const supportsReasoning = computed(() => {
 })
 
 // Auto-enable thinking when switching to a reasoning-capable model
-watch(supportsReasoning, (newValue) => {
-  if (newValue) {
-    thinkingEnabled.value = true
-  } else {
-    thinkingEnabled.value = false
-  }
-}, { immediate: true })
-
-watch(message, (newValue) => {
-  if (newValue.startsWith('/')) {
-    // Only show palette if no space (still typing command) or only command without args
-    const hasSpace = newValue.includes(' ')
-    const parsed = parseCommand(newValue)
-
-    if (parsed) {
-      activeCommand.value = parsed.command
-      // Hide palette if user has started typing arguments (command + space)
-      paletteVisible.value = !hasSpace || parsed.args.length === 0
+watch(
+  supportsReasoning,
+  (newValue) => {
+    if (newValue) {
+      thinkingEnabled.value = true
     } else {
+      thinkingEnabled.value = false
+    }
+  },
+  { immediate: true }
+)
+
+watch(
+  message,
+  (newValue) => {
+    if (newValue.startsWith('/')) {
+      // Only show palette if no space (still typing command) or only command without args
+      const hasSpace = newValue.includes(' ')
+      const parsed = parseCommand(newValue)
+
+      if (parsed) {
+        activeCommand.value = parsed.command
+        // Hide palette if user has started typing arguments (command + space)
+        paletteVisible.value = !hasSpace || parsed.args.length === 0
+      } else {
+        activeCommand.value = null
+        paletteVisible.value = true
+      }
+    } else {
+      paletteVisible.value = false
       activeCommand.value = null
-      paletteVisible.value = true
     }
-  } else {
-    paletteVisible.value = false
-    activeCommand.value = null
-  }
 
-  // Auto-disable enhance if message has been edited (differs from enhanced version)
-  if (enhanceEnabled.value && enhancedMessage.value) {
-    const currentText = newValue.trim()
-    const enhancedText = enhancedMessage.value.trim()
+    // Auto-disable enhance if message has been edited (differs from enhanced version)
+    if (enhanceEnabled.value && enhancedMessage.value) {
+      const currentText = newValue.trim()
+      const enhancedText = enhancedMessage.value.trim()
 
-    // If message is empty (deleted) or differs from enhanced version, disable enhance
-    if (!currentText || currentText !== enhancedText) {
-      enhanceEnabled.value = false
-      originalMessage.value = ''
-      enhancedMessage.value = ''
+      // If message is empty (deleted) or differs from enhanced version, disable enhance
+      if (!currentText || currentText !== enhancedText) {
+        enhanceEnabled.value = false
+        originalMessage.value = ''
+        enhancedMessage.value = ''
+      }
     }
-  }
-}, { immediate: false })
+  },
+  { immediate: false }
+)
 
 const sendMessage = () => {
   if (isStreaming.value) {
@@ -354,7 +376,7 @@ const sendMessage = () => {
     const options = {
       includeReasoning: thinkingEnabled.value,
       webSearch: hasWebSearch,
-      fileIds: uploadedFiles.value.filter(f => !f.processing).map(f => f.file_id)
+      fileIds: uploadedFiles.value.filter((f) => !f.processing).map((f) => f.file_id),
     }
     emit('send', messageToSend, options)
     message.value = ''
@@ -438,12 +460,12 @@ const triggerFileUpload = () => {
 
 const handleFilesSelected = async (selectedFiles: FileItem[]) => {
   // Add selected files to uploadedFiles
-  selectedFiles.forEach(file => {
+  selectedFiles.forEach((file) => {
     uploadedFiles.value.push({
       file_id: file.id,
       filename: file.filename,
       file_type: file.file_type,
-      processing: false
+      processing: false,
     })
   })
   success(`${selectedFiles.length} file(s) attached`)
@@ -490,7 +512,9 @@ const handlePaste = async (event: ClipboardEvent) => {
         // Generate a meaningful filename for pasted images
         const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5)
         const extension = item.type.split('/')[1] || 'png'
-        const namedFile = new File([file], `pasted-image-${timestamp}.${extension}`, { type: file.type })
+        const namedFile = new File([file], `pasted-image-${timestamp}.${extension}`, {
+          type: file.type,
+        })
         filesToUpload.push(namedFile)
       }
     }
@@ -526,7 +550,7 @@ const uploadFiles = async (files: File[]) => {
       filename: file.name,
       file_type: file.name.split('.').pop() || 'unknown',
       name: file.name,
-      processing: true
+      processing: true,
     }
     uploadedFiles.value.push(tempFile)
 
@@ -535,13 +559,13 @@ const uploadFiles = async (files: File[]) => {
       const result = await chatApi.uploadChatFile(file)
 
       // Update with real file_id
-      const index = uploadedFiles.value.findIndex(f => f.name === file.name && f.processing)
+      const index = uploadedFiles.value.findIndex((f) => f.name === file.name && f.processing)
       if (index !== -1) {
         uploadedFiles.value[index] = {
           file_id: result.file_id,
           filename: result.filename,
           file_type: result.file_type,
-          processing: false
+          processing: false,
         }
       }
 
@@ -558,7 +582,7 @@ const uploadFiles = async (files: File[]) => {
       showError(`File upload failed: ${err.message}`)
 
       // Remove from list
-      const index = uploadedFiles.value.findIndex(f => f.name === file.name)
+      const index = uploadedFiles.value.findIndex((f) => f.name === file.name)
       if (index !== -1) {
         uploadedFiles.value.splice(index, 1)
       }
@@ -593,7 +617,7 @@ const toggleRecording = async () => {
           console.error('❌ Recording error:', error)
           showError(error.userMessage)
           isRecording.value = false
-        }
+        },
       })
 
       // Check support first (with detailed diagnostics)
@@ -635,7 +659,7 @@ const transcribeAudio = async (audioBlob: Blob) => {
       console.log('✅ Audio transcribed:', {
         text_length: result.text.length,
         language: result.language,
-        duration: result.duration
+        duration: result.duration,
       })
 
       // Focus textarea for immediate editing
@@ -666,7 +690,6 @@ const getFileIcon = (fileType: string): string => {
   if (['txt'].includes(ext)) return 'mdi:file-document'
   return 'mdi:file'
 }
-
 
 const updateIsMobile = () => {
   isMobile.value = window.innerWidth < 768
@@ -727,6 +750,6 @@ defineExpose<{
   uploadFiles: (files: File[]) => Promise<void>
 }>({
   textareaRef,
-  uploadFiles
+  uploadFiles,
 })
 </script>

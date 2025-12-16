@@ -21,7 +21,7 @@ export const mockFiles: FileItem[] = [
     group: null,
     details: 'Instances:[{"prompt":"generate on video van e',
     uploaded: '20250902168456',
-    type: 'video'
+    type: 'video',
   },
   {
     id: 1834,
@@ -30,7 +30,7 @@ export const mockFiles: FileItem[] = [
     group: 'DEFAULT',
     details: 'The image I see is completely blank and white. The',
     uploaded: '20250905123611',
-    type: 'image'
+    type: 'image',
   },
   {
     id: 2129,
@@ -39,7 +39,7 @@ export const mockFiles: FileItem[] = [
     group: 'DEFAULT',
     details: 'The image depicts a whiteboard with a list of term',
     uploaded: '20250909135528',
-    type: 'image'
+    type: 'image',
   },
   {
     id: 2133,
@@ -48,7 +48,7 @@ export const mockFiles: FileItem[] = [
     group: null,
     details: '',
     uploaded: '20250909154109',
-    type: 'document'
+    type: 'document',
   },
   {
     id: 2139,
@@ -57,7 +57,7 @@ export const mockFiles: FileItem[] = [
     group: null,
     details: '',
     uploaded: '20250909154140',
-    type: 'document'
+    type: 'document',
   },
   {
     id: 2145,
@@ -66,7 +66,7 @@ export const mockFiles: FileItem[] = [
     group: null,
     details: '',
     uploaded: '20250909154150',
-    type: 'document'
+    type: 'document',
   },
   {
     id: 2475,
@@ -75,7 +75,7 @@ export const mockFiles: FileItem[] = [
     group: null,
     details: 'OK: OpenAI Image',
     uploaded: '20250915205649',
-    type: 'image'
+    type: 'image',
   },
   {
     id: 2517,
@@ -84,7 +84,7 @@ export const mockFiles: FileItem[] = [
     group: null,
     details: '',
     uploaded: '20250916140921',
-    type: 'audio'
+    type: 'audio',
   },
   {
     id: 2617,
@@ -93,7 +93,7 @@ export const mockFiles: FileItem[] = [
     group: 'DEFAULT',
     details: 'uber die Besitzubertragung eines Riesling-Rebsto',
     uploaded: '20250919172848',
-    type: 'document'
+    type: 'document',
   },
   {
     id: 2623,
@@ -102,26 +102,15 @@ export const mockFiles: FileItem[] = [
     group: 'DEFAULT',
     details: 'uber die Besitzubertragung eines Riesling-Rebsto',
     uploaded: '20250919173141',
-    type: 'document'
-  }
+    type: 'document',
+  },
 ]
 
 export const mockFileGroups: FileGroup[] = [
   { name: 'DEFAULT', count: 15 },
   { name: 'Project A', count: 8 },
   { name: 'Marketing', count: 12 },
-  { name: 'Research', count: 5 }
+  { name: 'Research', count: 5 },
 ]
 
-export const supportedFileTypes = [
-  'PDF',
-  'DOCX',
-  'TXT',
-  'JPG',
-  'PNG',
-  'MP3',
-  'MP4',
-  'XLSX',
-  'CSV'
-]
-
+export const supportedFileTypes = ['PDF', 'DOCX', 'TXT', 'JPG', 'PNG', 'MP3', 'MP4', 'XLSX', 'CSV']

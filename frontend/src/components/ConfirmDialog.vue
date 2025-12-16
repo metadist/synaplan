@@ -4,13 +4,13 @@
       <div
         v-if="isOpen"
         class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm"
-        @click.self="cancel"
         data-testid="modal-confirm-root"
+        @click.self="cancel"
       >
         <div
           class="surface-card max-w-md w-full rounded-xl shadow-2xl overflow-hidden"
-          @click.stop
           data-testid="modal-confirm"
+          @click.stop
         >
           <!-- Header -->
           <div class="p-6 border-b border-light-border/10 dark:border-dark-border/10">
@@ -20,7 +20,7 @@
                 :class="{
                   'bg-red-500/10': variant === 'danger',
                   'bg-yellow-500/10': variant === 'warning',
-                  'bg-blue-500/10': variant === 'info'
+                  'bg-blue-500/10': variant === 'info',
                 }"
               >
                 <svg
@@ -76,23 +76,25 @@
           </div>
 
           <!-- Footer -->
-          <div class="flex items-center justify-end gap-3 p-6 border-t border-light-border/10 dark:border-dark-border/10">
-           <button
-              @click="cancel"
+          <div
+            class="flex items-center justify-end gap-3 p-6 border-t border-light-border/10 dark:border-dark-border/10"
+          >
+            <button
               class="px-6 py-2 rounded-lg border border-light-border/30 dark:border-dark-border/20 txt-primary hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
               data-testid="btn-confirm-cancel"
+              @click="cancel"
             >
               {{ cancelText }}
             </button>
             <button
-              @click="confirm"
               class="px-6 py-2 rounded-lg transition-colors"
               :class="{
                 'bg-red-500 hover:bg-red-600 text-white': variant === 'danger',
                 'bg-yellow-500 hover:bg-yellow-600 text-white': variant === 'warning',
-                'btn-primary': variant === 'info'
+                'btn-primary': variant === 'info',
               }"
               data-testid="btn-confirm-accept"
+              @click="confirm"
             >
               {{ confirmText }}
             </button>
@@ -120,7 +122,7 @@ const props = withDefaults(defineProps<Props>(), {
   message: 'Are you sure?',
   confirmText: 'Confirm',
   cancelText: 'Cancel',
-  variant: 'danger'
+  variant: 'danger',
 })
 
 const emit = defineEmits<{

@@ -7,10 +7,10 @@
         </h1>
       </div>
       <button
-        @click="$emit('cancel')"
         class="p-2 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 transition-colors txt-secondary hover:txt-primary"
         :aria-label="$t('widget.closeEditor')"
         data-testid="btn-close"
+        @click="$emit('cancel')"
       >
         <XMarkIcon class="w-5 h-5" />
       </button>
@@ -36,18 +36,16 @@
     <!-- Step Indicator -->
     <div class="surface-card p-6" data-testid="section-stepper">
       <div class="flex items-center justify-between">
-        <div
-          v-for="(step, index) in steps"
-          :key="index"
-          class="flex items-center flex-1"
-        >
+        <div v-for="(step, index) in steps" :key="index" class="flex items-center flex-1">
           <div class="flex items-center gap-3">
             <div
               :class="[
                 'w-10 h-10 rounded-full flex items-center justify-center font-semibold',
-                currentStep > index ? 'bg-green-500 text-white' :
-                currentStep === index ? 'bg-[var(--brand)] text-white' :
-                'bg-light-border/30 dark:bg-dark-border/20 txt-secondary'
+                currentStep > index
+                  ? 'bg-green-500 text-white'
+                  : currentStep === index
+                    ? 'bg-[var(--brand)] text-white'
+                    : 'bg-light-border/30 dark:bg-dark-border/20 txt-secondary',
               ]"
             >
               <CheckIcon v-if="currentStep > index" class="w-5 h-5" />
@@ -58,7 +56,10 @@
               <p class="text-xs txt-secondary">{{ $t(`mail.steps.${step}.desc`) }}</p>
             </div>
           </div>
-          <div v-if="index < steps.length - 1" class="flex-1 h-0.5 mx-4 bg-light-border/30 dark:bg-dark-border/20"></div>
+          <div
+            v-if="index < steps.length - 1"
+            class="flex-1 h-0.5 mx-4 bg-light-border/30 dark:bg-dark-border/20"
+          ></div>
         </div>
       </div>
     </div>
@@ -112,11 +113,7 @@
             class="w-full px-4 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
             data-testid="input-protocol"
           >
-            <option
-              v-for="option in protocolOptions"
-              :key="option.value"
-              :value="option.value"
-            >
+            <option v-for="option in protocolOptions" :key="option.value" :value="option.value">
               {{ option.label }}
             </option>
           </select>
@@ -134,11 +131,7 @@
             class="w-full px-4 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
             data-testid="input-security"
           >
-            <option
-              v-for="option in securityOptions"
-              :key="option.value"
-              :value="option.value"
-            >
+            <option v-for="option in securityOptions" :key="option.value" :value="option.value">
               {{ option.label }}
             </option>
           </select>
@@ -222,10 +215,10 @@
 
       <div class="flex gap-3 mt-6">
         <button
-          @click="testConnection"
           :disabled="isTestingConnection"
           class="px-4 py-2 rounded-lg border border-[var(--brand)] text-[var(--brand)] hover:bg-[var(--brand)]/10 transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
           data-testid="btn-test"
+          @click="testConnection"
         >
           <BoltIcon v-if="!isTestingConnection" class="w-4 h-4" />
           <svg
@@ -235,15 +228,26 @@
             fill="none"
             viewBox="0 0 24 24"
           >
-            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
-            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/>
+            <circle
+              class="opacity-25"
+              cx="12"
+              cy="12"
+              r="10"
+              stroke="currentColor"
+              stroke-width="4"
+            />
+            <path
+              class="opacity-75"
+              fill="currentColor"
+              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+            />
           </svg>
           {{ isTestingConnection ? $t('mail.testing') : $t('mail.testConnection') }}
         </button>
         <button
-          @click="showHelp"
           class="px-4 py-2 rounded-lg border border-light-border/30 dark:border-dark-border/20 txt-primary hover:bg-black/5 dark:hover:bg-white/5 transition-colors flex items-center gap-2"
           data-testid="btn-help"
+          @click="showHelp"
         >
           <QuestionMarkCircleIcon class="w-4 h-4" />
           {{ $t('mail.connectionHelp') }}
@@ -265,18 +269,16 @@
             'mt-4 p-4 rounded-lg border flex items-start gap-3',
             testResult.success
               ? 'bg-green-500/10 border-green-500/30'
-              : 'bg-red-500/10 border-red-500/30'
+              : 'bg-red-500/10 border-red-500/30',
           ]"
         >
-          <CheckCircleIcon v-if="testResult.success" class="w-5 h-5 text-green-500 flex-shrink-0 mt-0.5" />
+          <CheckCircleIcon
+            v-if="testResult.success"
+            class="w-5 h-5 text-green-500 flex-shrink-0 mt-0.5"
+          />
           <XCircleIcon v-else class="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
           <div>
-            <p
-              :class="[
-                'font-medium',
-                testResult.success ? 'text-green-500' : 'text-red-500'
-              ]"
-            >
+            <p :class="['font-medium', testResult.success ? 'text-green-500' : 'text-red-500']">
               {{ testResult.success ? $t('mail.testSuccess') : $t('mail.testFailed') }}
             </p>
             <p class="text-sm txt-secondary mt-1">{{ testResult.message }}</p>
@@ -401,13 +403,17 @@
 
       <div class="space-y-4">
         <!-- Option 1: New emails only (default) -->
-        <label 
+        <label
           class="flex items-start p-4 rounded-lg border cursor-pointer transition-all hover:shadow-md"
-          :class="emailFilter.mode === 'new' ? 'border-[var(--brand)] bg-[var(--brand)]/5' : 'border-light-border/30 dark:border-dark-border/20'"
+          :class="
+            emailFilter.mode === 'new'
+              ? 'border-[var(--brand)] bg-[var(--brand)]/5'
+              : 'border-light-border/30 dark:border-dark-border/20'
+          "
         >
           <input
-            type="radio"
             v-model="emailFilter.mode"
+            type="radio"
             value="new"
             class="mt-1 w-4 h-4 text-[var(--brand)] focus:ring-[var(--brand)]"
             data-testid="input-filter-new"
@@ -422,16 +428,18 @@
         </label>
 
         <!-- Option 2: Historical emails (PRO+) -->
-        <label 
+        <label
           class="flex items-start p-4 rounded-lg border cursor-pointer transition-all"
           :class="[
-            emailFilter.mode === 'historical' ? 'border-[var(--brand)] bg-[var(--brand)]/5' : 'border-light-border/30 dark:border-dark-border/20',
-            !isPro ? 'opacity-50 cursor-not-allowed' : 'hover:shadow-md'
+            emailFilter.mode === 'historical'
+              ? 'border-[var(--brand)] bg-[var(--brand)]/5'
+              : 'border-light-border/30 dark:border-dark-border/20',
+            !isPro ? 'opacity-50 cursor-not-allowed' : 'hover:shadow-md',
           ]"
         >
           <input
-            type="radio"
             v-model="emailFilter.mode"
+            type="radio"
             value="historical"
             :disabled="!isPro"
             class="mt-1 w-4 h-4 text-[var(--brand)] focus:ring-[var(--brand)]"
@@ -445,16 +453,19 @@
             <p class="text-sm txt-secondary mt-1">
               {{ $t('mail.filterHistoricalHelp') }}
             </p>
-            
+
             <!-- Date range inputs (only show if historical is selected and user is PRO) -->
-            <div v-if="emailFilter.mode === 'historical' && isPro" class="mt-4 grid grid-cols-2 gap-3">
+            <div
+              v-if="emailFilter.mode === 'historical' && isPro"
+              class="mt-4 grid grid-cols-2 gap-3"
+            >
               <div>
                 <label class="block text-xs font-medium txt-primary mb-1">
                   {{ $t('mail.filterFromDate') }}
                 </label>
                 <input
-                  type="datetime-local"
                   v-model="emailFilter.fromDate"
+                  type="datetime-local"
                   class="w-full px-3 py-2 text-sm rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
                   data-testid="input-from-date"
                 />
@@ -464,8 +475,8 @@
                   {{ $t('mail.filterToDate') }}
                 </label>
                 <input
-                  type="datetime-local"
                   v-model="emailFilter.toDate"
+                  type="datetime-local"
                   class="w-full px-3 py-2 text-sm rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
                   data-testid="input-to-date"
                 />
@@ -477,7 +488,11 @@
     </div>
 
     <!-- Step 2: Departments -->
-    <div v-else-if="currentStep === 1" class="surface-card p-6" data-testid="section-step-departments">
+    <div
+      v-else-if="currentStep === 1"
+      class="surface-card p-6"
+      data-testid="section-step-departments"
+    >
       <h3 class="text-lg font-semibold txt-primary mb-2 flex items-center gap-2">
         <UserGroupIcon class="w-5 h-5" />
         {{ $t('mail.departments') }}
@@ -504,7 +519,9 @@
         >
           <div class="flex items-center justify-between mb-4">
             <div class="flex items-center gap-2">
-              <span class="text-sm font-medium txt-secondary">{{ $t('mail.department') }} {{ departments.indexOf(dept) + 1 }}</span>
+              <span class="text-sm font-medium txt-secondary"
+                >{{ $t('mail.department') }} {{ departments.indexOf(dept) + 1 }}</span
+              >
               <span
                 v-if="dept.isDefault"
                 class="px-2 py-0.5 bg-[var(--brand)]/10 text-[var(--brand)] text-xs font-medium rounded-full"
@@ -513,10 +530,10 @@
               </span>
             </div>
             <button
-              @click="removeDepartment(dept.id)"
               class="icon-ghost icon-ghost--danger"
               :aria-label="$t('mail.removeDepartment')"
               data-testid="btn-remove"
+              @click="removeDepartment(dept.id)"
             >
               <TrashIcon class="w-4 h-4" />
             </button>
@@ -527,40 +544,42 @@
               <label class="block text-sm font-medium txt-primary mb-2">
                 {{ $t('mail.emailAddress') }}
               </label>
-             <input
-               v-model="dept.email"
-               type="email"
-               class="w-full px-4 py-2.5 rounded-lg bg-transparent border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)] transition-all"
-               :placeholder="$t('mail.emailAddressPlaceholder')"
-               data-testid="input-dept-email"
-             />
+              <input
+                v-model="dept.email"
+                type="email"
+                class="w-full px-4 py-2.5 rounded-lg bg-transparent border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)] transition-all"
+                :placeholder="$t('mail.emailAddressPlaceholder')"
+                data-testid="input-dept-email"
+              />
             </div>
 
             <div>
               <label class="block text-sm font-medium txt-primary mb-2">
                 {{ $t('mail.rulesForwarding') }}
               </label>
-             <input
-               v-model="dept.rules"
-               type="text"
-               class="w-full px-4 py-2.5 rounded-lg bg-transparent border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)] transition-all"
-               :placeholder="$t('mail.rulesPlaceholder')"
-               data-testid="input-dept-rules"
-             />
+              <input
+                v-model="dept.rules"
+                type="text"
+                class="w-full px-4 py-2.5 rounded-lg bg-transparent border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)] transition-all"
+                :placeholder="$t('mail.rulesPlaceholder')"
+                data-testid="input-dept-rules"
+              />
             </div>
           </div>
 
           <div class="mt-4 pt-4 border-t border-light-border/20 dark:border-dark-border/10">
             <label class="flex items-center gap-2 cursor-pointer group">
-             <input
-               :checked="dept.isDefault"
-               @change="setDefault(dept.id)"
-               type="radio"
-               name="default-dept"
-               class="w-4 h-4 text-[var(--brand)] focus:ring-2 focus:ring-[var(--brand)]"
-               data-testid="input-dept-default"
-             />
-              <span class="text-sm txt-secondary group-hover:txt-primary transition-colors">{{ $t('mail.setAsDefault') }}</span>
+              <input
+                :checked="dept.isDefault"
+                type="radio"
+                name="default-dept"
+                class="w-4 h-4 text-[var(--brand)] focus:ring-2 focus:ring-[var(--brand)]"
+                data-testid="input-dept-default"
+                @change="setDefault(dept.id)"
+              />
+              <span class="text-sm txt-secondary group-hover:txt-primary transition-colors">{{
+                $t('mail.setAsDefault')
+              }}</span>
             </label>
           </div>
         </div>
@@ -568,18 +587,18 @@
 
       <div class="flex gap-3 mt-6">
         <button
-          @click="addDepartment"
           :disabled="departments.length >= 10"
           class="px-4 py-2 rounded-lg border border-[var(--brand)] text-[var(--brand)] hover:bg-[var(--brand)]/10 transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
           data-testid="btn-add"
+          @click="addDepartment"
         >
           <PlusIcon class="w-4 h-4" />
           {{ $t('mail.addDepartment') }}
         </button>
         <button
-          @click="resetToDefault"
           class="px-4 py-2 rounded-lg border border-light-border/30 dark:border-dark-border/20 txt-primary hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
           data-testid="btn-reset"
+          @click="resetToDefault"
         >
           {{ $t('mail.resetToDefault') }}
         </button>
@@ -597,7 +616,9 @@
       </p>
 
       <div class="space-y-4">
-        <div class="bg-light-border/10 dark:bg-dark-border/10 rounded-lg p-4 border border-light-border/30 dark:border-dark-border/20">
+        <div
+          class="bg-light-border/10 dark:bg-dark-border/10 rounded-lg p-4 border border-light-border/30 dark:border-dark-border/20"
+        >
           <h4 class="font-medium txt-primary mb-2">{{ $t('mail.connectionSummary') }}</h4>
           <div class="grid grid-cols-2 gap-2 text-sm">
             <div class="txt-secondary">{{ $t('mail.mailServer') }}:</div>
@@ -612,10 +633,10 @@
         </div>
 
         <button
-          @click="testConnection"
           :disabled="isTestingConnection"
           class="w-full px-6 py-3 rounded-lg bg-green-500 text-white hover:bg-green-600 transition-colors flex items-center justify-center gap-2 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
           data-testid="btn-run-test"
+          @click="testConnection"
         >
           <svg
             v-if="isTestingConnection"
@@ -624,8 +645,19 @@
             fill="none"
             viewBox="0 0 24 24"
           >
-            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            <circle
+              class="opacity-25"
+              cx="12"
+              cy="12"
+              r="10"
+              stroke="currentColor"
+              stroke-width="4"
+            ></circle>
+            <path
+              class="opacity-75"
+              fill="currentColor"
+              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+            ></path>
           </svg>
           <BoltIcon v-else class="w-5 h-5" />
           {{ isTestingConnection ? $t('mail.testing') : $t('mail.runTest') }}
@@ -646,16 +678,19 @@
               'p-4 rounded-lg border flex items-start gap-3',
               testResult.success
                 ? 'bg-green-500/10 border-green-500/30'
-                : 'bg-red-500/10 border-red-500/30'
+                : 'bg-red-500/10 border-red-500/30',
             ]"
           >
-            <CheckCircleIcon v-if="testResult.success" class="w-5 h-5 text-green-500 flex-shrink-0 mt-0.5" />
+            <CheckCircleIcon
+              v-if="testResult.success"
+              class="w-5 h-5 text-green-500 flex-shrink-0 mt-0.5"
+            />
             <XCircleIcon v-else class="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
             <div>
               <p
                 :class="[
                   'font-medium text-sm',
-                  testResult.success ? 'text-green-500' : 'text-red-500'
+                  testResult.success ? 'text-green-500' : 'text-red-500',
                 ]"
               >
                 {{ testResult.success ? $t('mail.testSuccess') : $t('mail.testFailed') }}
@@ -671,9 +706,9 @@
     <div class="flex gap-3 justify-between" data-testid="section-navigation">
       <button
         v-if="currentStep > 0"
-        @click="prevStep"
         class="px-6 py-2 rounded-lg border border-light-border/30 dark:border-dark-border/20 txt-primary hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
         data-testid="btn-prev"
+        @click="prevStep"
       >
         {{ $t('mail.previous') }}
       </button>
@@ -682,19 +717,19 @@
       <div class="flex gap-3">
         <button
           v-if="currentStep < steps.length - 1"
-        @click="nextStep"
-        :disabled="(currentStep === 0 && !isStep1Valid) || (currentStep === 1 && !isStep2Valid)"
-        class="btn-primary px-6 py-2 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
-        data-testid="btn-next"
-      >
+          :disabled="(currentStep === 0 && !isStep1Valid) || (currentStep === 1 && !isStep2Valid)"
+          class="btn-primary px-6 py-2 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
+          data-testid="btn-next"
+          @click="nextStep"
+        >
           {{ $t('mail.next') }}
         </button>
         <button
           v-else
-        @click="saveConfiguration"
-        class="btn-primary px-6 py-2 rounded-lg flex items-center gap-2"
-        data-testid="btn-save"
-      >
+          class="btn-primary px-6 py-2 rounded-lg flex items-center gap-2"
+          data-testid="btn-save"
+          @click="saveConfiguration"
+        >
           <CheckIcon class="w-4 h-4" />
           {{ $t('mail.saveConfiguration') }}
         </button>
@@ -718,14 +753,18 @@ import {
   CheckCircleIcon,
   XCircleIcon,
   PaperAirplaneIcon,
-  FunnelIcon
+  FunnelIcon,
 } from '@heroicons/vue/24/outline'
-import type { MailConfig, Department, SavedMailHandler } from '@/services/api/inboundEmailHandlersApi'
+import type {
+  MailConfig,
+  Department,
+  SavedMailHandler,
+} from '@/services/api/inboundEmailHandlersApi'
 import {
   defaultMailConfig,
   protocolOptions,
   securityOptions,
-  checkIntervalOptions
+  checkIntervalOptions,
 } from '@/mocks/mail'
 import { inboundEmailHandlersApi } from '@/services/api/inboundEmailHandlersApi'
 import { useAuth } from '@/composables/useAuth'
@@ -754,7 +793,13 @@ interface EmailFilter {
 }
 
 const emit = defineEmits<{
-  save: [name: string, config: MailConfig, departments: Department[], smtpConfig: SmtpConfig, emailFilter: EmailFilter]
+  save: [
+    name: string,
+    config: MailConfig,
+    departments: Department[],
+    smtpConfig: SmtpConfig,
+    emailFilter: EmailFilter,
+  ]
   cancel: []
 }>()
 
@@ -772,45 +817,62 @@ const smtpConfig = ref<SmtpConfig>({
   smtpPort: 587,
   smtpSecurity: 'STARTTLS',
   smtpUsername: '',
-  smtpPassword: ''
+  smtpPassword: '',
 })
 
 // Email Filter Configuration
 const emailFilter = ref<EmailFilter>({
   mode: 'new', // Default: only new emails
   fromDate: undefined,
-  toDate: undefined
+  toDate: undefined,
 })
 
 // Watch for mode change - reset dates if switching to 'new'
-watch(() => emailFilter.value.mode, (newMode) => {
-  if (newMode === 'new') {
-    emailFilter.value.fromDate = undefined
-    emailFilter.value.toDate = undefined
+watch(
+  () => emailFilter.value.mode,
+  (newMode) => {
+    if (newMode === 'new') {
+      emailFilter.value.fromDate = undefined
+      emailFilter.value.toDate = undefined
+    }
   }
-})
+)
 
 // Initialize if editing
-watch(() => props.handler, (handler) => {
-  if (handler) {
-    handlerName.value = handler.name
-    config.value = { ...handler.config }
-    departments.value = [...handler.departments]
-  }
-}, { immediate: true })
+watch(
+  () => props.handler,
+  (handler) => {
+    if (handler) {
+      handlerName.value = handler.name
+      config.value = { ...handler.config }
+      departments.value = [...handler.departments]
+    }
+  },
+  { immediate: true }
+)
 
 // Validation for each step
 const isStep1Valid = computed(() => {
-  const basicValid = !!(config.value.mailServer && config.value.port && config.value.username && config.value.password)
-  
+  const basicValid = !!(
+    config.value.mailServer &&
+    config.value.port &&
+    config.value.username &&
+    config.value.password
+  )
+
   // SMTP is now required for forwarding
-  const smtpValid = !!(smtpConfig.value.smtpServer && smtpConfig.value.smtpPort && smtpConfig.value.smtpUsername && smtpConfig.value.smtpPassword)
-  
+  const smtpValid = !!(
+    smtpConfig.value.smtpServer &&
+    smtpConfig.value.smtpPort &&
+    smtpConfig.value.smtpUsername &&
+    smtpConfig.value.smtpPassword
+  )
+
   return basicValid && smtpValid
 })
 
 const isStep2Valid = computed(() => {
-  return departments.value.length > 0 && departments.value.every(d => d.email && d.rules)
+  return departments.value.length > 0 && departments.value.every((d) => d.email && d.rules)
 })
 
 const nextStep = () => {
@@ -831,13 +893,13 @@ const addDepartment = () => {
       id: Date.now().toString(),
       email: '',
       rules: '',
-      isDefault: departments.value.length === 0
+      isDefault: departments.value.length === 0,
     })
   }
 }
 
 const removeDepartment = (id: string) => {
-  const index = departments.value.findIndex(d => d.id === id)
+  const index = departments.value.findIndex((d) => d.id === id)
   if (index !== -1) {
     const wasDefault = departments.value[index].isDefault
     departments.value.splice(index, 1)
@@ -848,7 +910,7 @@ const removeDepartment = (id: string) => {
 }
 
 const setDefault = (id: string) => {
-  departments.value.forEach(d => {
+  departments.value.forEach((d) => {
     d.isDefault = d.id === id
   })
 }
@@ -862,24 +924,24 @@ const testConnection = async () => {
   if (!props.handlerId) {
     testResult.value = {
       success: false,
-      message: 'Please save the handler first before testing the connection.'
+      message: 'Please save the handler first before testing the connection.',
     }
     return
   }
 
   isTestingConnection.value = true
   testResult.value = null
-  
+
   try {
     const result = await inboundEmailHandlersApi.testConnection(props.handlerId)
     testResult.value = {
       success: result.success,
-      message: result.message
+      message: result.message,
     }
   } catch (error: any) {
     testResult.value = {
       success: false,
-      message: error.message || 'Failed to test connection'
+      message: error.message || 'Failed to test connection',
     }
   } finally {
     isTestingConnection.value = false
@@ -894,9 +956,15 @@ const saveConfiguration = () => {
   if (!handlerName.value.trim()) {
     handlerName.value = `Mail Handler ${Date.now()}`
   }
-  
+
   // SMTP config and email filter are always required
-  emit('save', handlerName.value, config.value, departments.value, smtpConfig.value, emailFilter.value)
+  emit(
+    'save',
+    handlerName.value,
+    config.value,
+    departments.value,
+    smtpConfig.value,
+    emailFilter.value
+  )
 }
 </script>
-

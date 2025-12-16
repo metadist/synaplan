@@ -5,32 +5,34 @@
         <Icon icon="mdi:chart-line" class="w-5 h-5" />
         {{ $t('admin.analytics.registrations') }}
       </h3>
-      
+
       <!-- Filters -->
       <div class="flex gap-2 flex-wrap">
         <!-- Chart Type Toggle -->
-        <div class="flex gap-1 bg-chat rounded-lg p-1 border border-light-border/30 dark:border-dark-border/20">
+        <div
+          class="flex gap-1 bg-chat rounded-lg p-1 border border-light-border/30 dark:border-dark-border/20"
+        >
           <button
-            @click="chartType = 'line'"
             :class="[
               'px-3 py-1.5 rounded text-xs font-medium transition-all',
-              chartType === 'line' 
-                ? 'bg-[var(--brand)] text-white' 
-                : 'txt-secondary hover:txt-primary'
+              chartType === 'line'
+                ? 'bg-[var(--brand)] text-white'
+                : 'txt-secondary hover:txt-primary',
             ]"
             data-testid="btn-chart-type-line"
+            @click="chartType = 'line'"
           >
             <Icon icon="mdi:chart-line" class="w-4 h-4" />
           </button>
           <button
-            @click="chartType = 'bar'"
             :class="[
               'px-3 py-1.5 rounded text-xs font-medium transition-all',
-              chartType === 'bar' 
-                ? 'bg-[var(--brand)] text-white' 
-                : 'txt-secondary hover:txt-primary'
+              chartType === 'bar'
+                ? 'bg-[var(--brand)] text-white'
+                : 'txt-secondary hover:txt-primary',
             ]"
             data-testid="btn-chart-type-bar"
+            @click="chartType = 'bar'"
           >
             <Icon icon="mdi:chart-bar" class="w-4 h-4" />
           </button>
@@ -38,9 +40,9 @@
 
         <select
           v-model="period"
-          @change="$emit('update:period', period)"
           class="px-3 py-1.5 rounded-lg bg-chat border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:ring-2 focus:ring-[var(--brand)] focus:outline-none"
           data-testid="select-period"
+          @change="$emit('update:period', period)"
         >
           <option value="7d">{{ $t('admin.analytics.period.7d') }}</option>
           <option value="30d">{{ $t('admin.analytics.period.30d') }}</option>
@@ -48,12 +50,12 @@
           <option value="1y">{{ $t('admin.analytics.period.1y') }}</option>
           <option value="all">{{ $t('admin.analytics.period.all') }}</option>
         </select>
-        
+
         <select
           v-model="groupBy"
-          @change="$emit('update:groupBy', groupBy)"
           class="px-3 py-1.5 rounded-lg bg-chat border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:ring-2 focus:ring-[var(--brand)] focus:outline-none"
           data-testid="select-group-by"
+          @change="$emit('update:groupBy', groupBy)"
         >
           <option value="day">{{ $t('admin.analytics.groupBy.day') }}</option>
           <option value="week">{{ $t('admin.analytics.groupBy.week') }}</option>
@@ -79,7 +81,9 @@
           class="w-3 h-3 rounded-full"
           :style="{ backgroundColor: getProviderColor(provider) }"
         ></div>
-        <span class="text-sm txt-secondary">{{ provider }}: <strong class="txt-primary">{{ count }}</strong></span>
+        <span class="text-sm txt-secondary"
+          >{{ provider }}: <strong class="txt-primary">{{ count }}</strong></span
+        >
       </div>
     </div>
   </div>
@@ -102,12 +106,22 @@ import {
   Filler,
   type ChartOptions,
   type ChartData,
-  type ChartDataset
+  type ChartDataset,
 } from 'chart.js'
 import type { RegistrationAnalytics } from '@/services/api/adminApi'
 
 // Register Chart.js components
-ChartJS.register(CategoryScale, LinearScale, BarElement, LineElement, PointElement, Title, Tooltip, Legend, Filler)
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  BarElement,
+  LineElement,
+  PointElement,
+  Title,
+  Tooltip,
+  Legend,
+  Filler
+)
 
 interface Props {
   data: RegistrationAnalytics
@@ -117,7 +131,7 @@ interface Props {
 
 const props = withDefaults(defineProps<Props>(), {
   initialPeriod: '30d',
-  initialGroupBy: 'day'
+  initialGroupBy: 'day',
 })
 
 defineEmits<{
@@ -131,12 +145,12 @@ const chartType = ref<'line' | 'bar'>('line')
 
 // Provider colors
 const providerColors: Record<string, string> = {
-  'local': '#3b82f6',
-  'google': '#ea4335',
-  'github': '#24292e',
-  'keycloak': '#008aaa',
-  'email': '#10b981',
-  'whatsapp': '#25d366',
+  local: '#3b82f6',
+  google: '#ea4335',
+  github: '#24292e',
+  keycloak: '#008aaa',
+  email: '#10b981',
+  whatsapp: '#25d366',
 }
 
 const getProviderColor = (provider: string) => {
@@ -145,48 +159,48 @@ const getProviderColor = (provider: string) => {
 
 const providers = computed(() => {
   const set = new Set<string>()
-  props.data.timeline.forEach(item => {
-    Object.keys(item.byProvider).forEach(p => set.add(p))
+  props.data.timeline.forEach((item) => {
+    Object.keys(item.byProvider).forEach((p) => set.add(p))
   })
   return Array.from(set)
 })
 
 const createLineDatasets = (): ChartDataset<'line'>[] =>
-  providers.value.map(provider => {
+  providers.value.map((provider) => {
     const color = getProviderColor(provider)
     return {
       label: provider,
-      data: props.data.timeline.map(item => item.byProvider[provider] || 0),
+      data: props.data.timeline.map((item) => item.byProvider[provider] || 0),
       backgroundColor: `${color}33`,
       borderColor: color,
       borderWidth: 2,
       fill: true,
       tension: 0.4,
-      type: 'line'
+      type: 'line',
     } satisfies ChartDataset<'line'>
   })
 
 const createBarDatasets = (): ChartDataset<'bar'>[] =>
-  providers.value.map(provider => {
+  providers.value.map((provider) => {
     const color = getProviderColor(provider)
     return {
       label: provider,
-      data: props.data.timeline.map(item => item.byProvider[provider] || 0),
+      data: props.data.timeline.map((item) => item.byProvider[provider] || 0),
       backgroundColor: color,
       borderColor: color,
       borderWidth: 0,
-      type: 'bar'
+      type: 'bar',
     } satisfies ChartDataset<'bar'>
   })
 
 const lineChartData = computed<ChartData<'line'>>(() => ({
-  labels: props.data.timeline.map(item => formatLabel(item.date)),
-  datasets: createLineDatasets()
+  labels: props.data.timeline.map((item) => formatLabel(item.date)),
+  datasets: createLineDatasets(),
 }))
 
 const barChartData = computed<ChartData<'bar'>>(() => ({
-  labels: props.data.timeline.map(item => formatLabel(item.date)),
-  datasets: createBarDatasets()
+  labels: props.data.timeline.map((item) => formatLabel(item.date)),
+  datasets: createBarDatasets(),
 }))
 
 const lineChartOptions = computed<ChartOptions<'line'>>(() => ({
@@ -203,7 +217,7 @@ const lineChartOptions = computed<ChartOptions<'line'>>(() => ({
     tooltip: {
       mode: 'index',
       intersect: false,
-    }
+    },
   },
   scales: {
     x: {
@@ -212,7 +226,7 @@ const lineChartOptions = computed<ChartOptions<'line'>>(() => ({
       },
       ticks: {
         color: 'rgb(156, 163, 175)',
-      }
+      },
     },
     y: {
       beginAtZero: true,
@@ -222,9 +236,9 @@ const lineChartOptions = computed<ChartOptions<'line'>>(() => ({
       },
       grid: {
         color: 'rgba(156, 163, 175, 0.1)',
-      }
-    }
-  }
+      },
+    },
+  },
 }))
 
 const barChartOptions = computed<ChartOptions<'bar'>>(() => ({
@@ -241,7 +255,7 @@ const barChartOptions = computed<ChartOptions<'bar'>>(() => ({
     tooltip: {
       mode: 'index',
       intersect: false,
-    }
+    },
   },
   scales: {
     x: {
@@ -251,7 +265,7 @@ const barChartOptions = computed<ChartOptions<'bar'>>(() => ({
       },
       ticks: {
         color: 'rgb(156, 163, 175)',
-      }
+      },
     },
     y: {
       stacked: true,
@@ -262,9 +276,9 @@ const barChartOptions = computed<ChartOptions<'bar'>>(() => ({
       },
       grid: {
         color: 'rgba(156, 163, 175, 0.1)',
-      }
-    }
-  }
+      },
+    },
+  },
 }))
 
 const formatLabel = (dateStr: string) => {
@@ -280,4 +294,3 @@ const formatLabel = (dateStr: string) => {
   }
 }
 </script>
-

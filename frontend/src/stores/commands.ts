@@ -36,19 +36,17 @@ export const commandsData: Command[] = [
 
 export const useCommandsStore = defineStore('commands', () => {
   const commands = ref<Command[]>(commandsData)
-  
-  const recentCommands = ref<string[]>(
-    JSON.parse(localStorage.getItem('recentCommands') || '[]')
-  )
+
+  const recentCommands = ref<string[]>(JSON.parse(localStorage.getItem('recentCommands') || '[]'))
 
   const addRecentCommand = (command: string) => {
-    const filtered = recentCommands.value.filter(c => c !== command)
+    const filtered = recentCommands.value.filter((c) => c !== command)
     recentCommands.value = [command, ...filtered].slice(0, 10)
     localStorage.setItem('recentCommands', JSON.stringify(recentCommands.value))
   }
 
   const getCommand = (name: string): Command | undefined => {
-    return commands.value.find(c => c.name === name)
+    return commands.value.find((c) => c.name === name)
   }
 
   return {

@@ -11,8 +11,8 @@
     <div
       v-if="visible"
       class="fixed inset-0 bg-black/30 z-[59] md:hidden"
-      @click="emit('close')"
       data-testid="backdrop-command-palette"
+      @click="emit('close')"
     />
   </Transition>
 
@@ -29,51 +29,58 @@
       v-if="visible"
       class="fixed bottom-0 left-0 right-0 md:bottom-32 md:left-1/2 md:-translate-x-1/2 md:w-[720px] md:max-w-[92vw] surface-card border-t md:border border-light-border/30 dark:border-dark-border/30 md:rounded-xl z-[60] h-[85vh] md:h-auto md:max-h-[70vh] flex flex-col"
       role="menu"
-      @click.stop
       data-testid="comp-command-palette"
+      @click.stop
     >
       <!-- Header -->
-      <div class="flex-shrink-0 px-4 py-3 border-b border-light-border/20 dark:border-dark-border/20 bg-black/5 dark:bg-white/5">
+      <div
+        class="flex-shrink-0 px-4 py-3 border-b border-light-border/20 dark:border-dark-border/20 bg-black/5 dark:bg-white/5"
+      >
         <p class="text-xs txt-secondary flex flex-wrap gap-x-3 gap-y-1.5">
           <span class="flex items-center gap-1.5">
-            <kbd class="px-1.5 py-0.5 text-xs font-mono bg-black/10 dark:bg-white/10 rounded">↑</kbd>
-            <kbd class="px-1.5 py-0.5 text-xs font-mono bg-black/10 dark:bg-white/10 rounded">↓</kbd>
+            <kbd class="px-1.5 py-0.5 text-xs font-mono bg-black/10 dark:bg-white/10 rounded"
+              >↑</kbd
+            >
+            <kbd class="px-1.5 py-0.5 text-xs font-mono bg-black/10 dark:bg-white/10 rounded"
+              >↓</kbd
+            >
             <span class="ml-0.5">{{ $t('commands.navigate') }}</span>
           </span>
           <span class="flex items-center gap-1.5">
-            <kbd class="px-1.5 py-0.5 text-xs font-mono bg-black/10 dark:bg-white/10 rounded">Enter</kbd>
+            <kbd class="px-1.5 py-0.5 text-xs font-mono bg-black/10 dark:bg-white/10 rounded"
+              >Enter</kbd
+            >
             <span class="ml-0.5">{{ $t('commands.select') }}</span>
           </span>
           <span class="flex items-center gap-1.5">
-            <kbd class="px-1.5 py-0.5 text-xs font-mono bg-black/10 dark:bg-white/10 rounded">Esc</kbd>
+            <kbd class="px-1.5 py-0.5 text-xs font-mono bg-black/10 dark:bg-white/10 rounded"
+              >Esc</kbd
+            >
             <span class="ml-0.5">{{ $t('commands.close') }}</span>
           </span>
         </p>
       </div>
 
       <!-- Content -->
-      <div 
-        v-if="filteredCommands.length === 0" 
+      <div
+        v-if="filteredCommands.length === 0"
         class="flex-1 flex items-center justify-center px-4 py-6 text-sm txt-secondary"
       >
         {{ $t('commands.noResults') }}
       </div>
-      <div 
-        v-else 
-        class="flex-1 overflow-y-auto scroll-thin py-1"
-      >
+      <div v-else class="flex-1 overflow-y-auto scroll-thin py-1">
         <button
           v-for="(cmd, index) in filteredCommands"
           :key="cmd.name"
-          :ref="el => setItemRef(el, index)"
-          @click="selectCommand(cmd)"
-          @mouseenter="selectedIndex = index"
+          :ref="(el) => setItemRef(el, index)"
           :class="[
             'dropdown-item w-full text-left',
-            selectedIndex === index && 'dropdown-item--active'
+            selectedIndex === index && 'dropdown-item--active',
           ]"
           role="menuitem"
           type="button"
+          @click="selectCommand(cmd)"
+          @mouseenter="selectedIndex = index"
         >
           <div class="flex items-start gap-3 min-w-0">
             <Icon :icon="cmd.icon" class="w-5 h-5 flex-shrink-0 text-[var(--brand)]" />
@@ -118,26 +125,30 @@ const setItemRef = (el: any, index: number) => {
 
 const filteredCommands = computed(() => {
   const allCommands = commandsStore.commands
-  
+
   const query = props.query.toLowerCase().replace(/^\//, '').trim()
-  
+
   if (!query) {
     return allCommands
   }
 
-  return allCommands.filter(cmd =>
-    cmd.name.toLowerCase().includes(query) ||
-    cmd.description.toLowerCase().includes(query) ||
-    cmd.usage.toLowerCase().includes(query)
+  return allCommands.filter(
+    (cmd) =>
+      cmd.name.toLowerCase().includes(query) ||
+      cmd.description.toLowerCase().includes(query) ||
+      cmd.usage.toLowerCase().includes(query)
   )
 })
 
-watch(() => props.visible, (visible) => {
-  if (visible) {
-    selectedIndex.value = 0
-    itemRefs.value = []
+watch(
+  () => props.visible,
+  (visible) => {
+    if (visible) {
+      selectedIndex.value = 0
+      itemRefs.value = []
+    }
   }
-})
+)
 
 watch(filteredCommands, () => {
   selectedIndex.value = 0

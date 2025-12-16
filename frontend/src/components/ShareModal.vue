@@ -4,20 +4,28 @@
       <div
         v-if="isOpen"
         class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
-        @click.self="close"
         data-testid="modal-share-root"
+        @click.self="close"
       >
-        <div class="surface-elevated w-full max-w-2xl p-6 m-4 max-h-[90vh] overflow-y-auto" data-testid="modal-share">
+        <div
+          class="surface-elevated w-full max-w-2xl p-6 m-4 max-h-[90vh] overflow-y-auto"
+          data-testid="modal-share"
+        >
           <!-- Header -->
           <div class="flex items-center justify-between mb-6">
             <h2 class="text-2xl font-bold txt-primary">Share File</h2>
             <button
-              @click="close"
               class="p-2 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 transition-colors txt-secondary"
               data-testid="btn-file-share-close"
+              @click="close"
             >
               <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M6 18L18 6M6 6l12 12"
+                />
               </svg>
             </button>
           </div>
@@ -32,8 +40,18 @@
             <!-- File Info -->
             <div class="mb-6 p-4 rounded-lg bg-black/5 dark:bg-white/5">
               <div class="flex items-center gap-3">
-                <svg class="w-8 h-8 text-[var(--brand)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                <svg
+                  class="w-8 h-8 text-[var(--brand)]"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="2"
+                    d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                  />
                 </svg>
                 <div class="flex-1 min-w-0">
                   <div class="font-medium txt-primary truncate">{{ filename }}</div>
@@ -45,26 +63,25 @@
             <!-- Not Public Yet -->
             <div v-if="!shareInfo?.is_public" class="space-y-4">
               <p class="txt-secondary">
-                This file is currently <span class="font-semibold text-[var(--brand)]">private</span>. 
-                Make it public to generate a shareable link.
+                This file is currently
+                <span class="font-semibold text-[var(--brand)]">private</span>. Make it public to
+                generate a shareable link.
               </p>
 
               <!-- Expiry Selector -->
               <div>
-                <label class="block text-sm font-medium txt-primary mb-2">
-                  Link expires in
-                </label>
+                <label class="block text-sm font-medium txt-primary mb-2"> Link expires in </label>
                 <div class="grid grid-cols-2 gap-3">
                   <button
                     v-for="option in expiryOptions"
                     :key="option.value"
-                    @click="selectedExpiry = option.value"
                     :class="[
                       'p-3 rounded-lg border-2 transition-all text-left',
                       selectedExpiry === option.value
                         ? 'border-[var(--brand)] bg-[var(--brand)]/10'
-                        : 'border-light-border dark:border-dark-border hover:border-[var(--brand)]/50'
+                        : 'border-light-border dark:border-dark-border hover:border-[var(--brand)]/50',
                     ]"
+                    @click="selectedExpiry = option.value"
                   >
                     <div class="font-medium txt-primary">{{ option.label }}</div>
                     <div class="text-sm txt-secondary">{{ option.description }}</div>
@@ -74,10 +91,10 @@
 
               <!-- Make Public Button -->
               <button
-                @click="makePublic"
                 :disabled="sharing"
                 class="btn-primary w-full py-3 rounded-lg font-medium disabled:opacity-50"
                 data-testid="btn-file-share-make-public"
+                @click="makePublic"
               >
                 <span v-if="sharing">Generating link...</span>
                 <span v-else>Make Public & Generate Link</span>
@@ -88,7 +105,12 @@
             <div v-else class="space-y-4">
               <div class="flex items-center gap-2 text-green-600 dark:text-green-400">
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="2"
+                    d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+                  />
                 </svg>
                 <span class="font-semibold">File is public</span>
               </div>
@@ -97,39 +119,59 @@
               <div class="p-4 rounded-lg bg-black/5 dark:bg-white/5 space-y-3">
                 <div class="flex items-center justify-between">
                   <span class="text-sm font-medium txt-secondary">Public Link</span>
-                 <button
-                    @click="copyLink"
+                  <button
                     class="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 transition-colors txt-primary text-sm"
                     data-testid="btn-file-share-copy"
+                    @click="copyLink"
                   >
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                      <path
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        stroke-width="2"
+                        d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"
+                      />
                     </svg>
                     {{ copied ? 'Copied!' : 'Copy' }}
                   </button>
                 </div>
-                <div class="p-3 rounded bg-white dark:bg-black/20 font-mono text-sm break-all txt-primary">
+                <div
+                  class="p-3 rounded bg-white dark:bg-black/20 font-mono text-sm break-all txt-primary"
+                >
                   {{ fullShareUrl }}
                 </div>
               </div>
 
               <!-- Expiry Info -->
               <div v-if="shareInfo?.expires_at" class="text-sm txt-secondary">
-                <svg class="w-4 h-4 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                <svg
+                  class="w-4 h-4 inline mr-1"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="2"
+                    d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+                  />
                 </svg>
                 Expires: {{ formatDate(shareInfo.expires_at) }}
-                <span v-if="shareInfo.is_expired" class="ml-2 text-red-600 dark:text-red-400 font-semibold">
+                <span
+                  v-if="shareInfo.is_expired"
+                  class="ml-2 text-red-600 dark:text-red-400 font-semibold"
+                >
                   (Expired)
                 </span>
               </div>
 
               <!-- Revoke Button -->
               <button
-                @click="revoke"
                 :disabled="revoking"
                 class="w-full py-2 rounded-lg border border-red-500 text-red-600 dark:text-red-400 hover:bg-red-500/10 transition-colors disabled:opacity-50"
                 data-testid="btn-file-share-revoke"
+                @click="revoke"
               >
                 <span v-if="revoking">Revoking...</span>
                 <span v-else>Revoke Public Access</span>
@@ -158,7 +200,7 @@ interface Props {
 }
 
 const props = withDefaults(defineProps<Props>(), {
-  filename: 'Unknown file'
+  filename: 'Unknown file',
 })
 
 const emit = defineEmits<{
@@ -184,7 +226,7 @@ const expiryOptions = [
   { value: 7, label: '7 Days', description: 'Expires in a week' },
   { value: 30, label: '30 Days', description: 'Expires in a month' },
   { value: 90, label: '90 Days', description: 'Expires in 3 months' },
-  { value: 0, label: 'Never', description: 'No expiration' }
+  { value: 0, label: 'Never', description: 'No expiration' },
 ]
 
 const fullShareUrl = computed(() => {
@@ -192,16 +234,19 @@ const fullShareUrl = computed(() => {
   return config.appBaseUrl + shareInfo.value.share_url
 })
 
-watch(() => props.isOpen, async (open) => {
-  if (open && props.fileId) {
-    await loadShareInfo()
+watch(
+  () => props.isOpen,
+  async (open) => {
+    if (open && props.fileId) {
+      await loadShareInfo()
+    }
+    copied.value = false
   }
-  copied.value = false
-})
+)
 
 const loadShareInfo = async () => {
   if (!props.fileId) return
-  
+
   loading.value = true
   try {
     shareInfo.value = await filesService.getShareInfo(props.fileId)
@@ -215,7 +260,7 @@ const loadShareInfo = async () => {
 
 const makePublic = async () => {
   if (!props.fileId) return
-  
+
   sharing.value = true
   try {
     const result = await filesService.shareFile(props.fileId, selectedExpiry.value)
@@ -224,7 +269,7 @@ const makePublic = async () => {
       share_url: result.share_url,
       share_token: result.share_token,
       expires_at: result.expires_at,
-      is_expired: false
+      is_expired: false,
     }
     showSuccess('File is now public!')
     emit('shared')
@@ -238,7 +283,7 @@ const makePublic = async () => {
 
 const revoke = async () => {
   if (!props.fileId) return
-  
+
   revoking.value = true
   try {
     await filesService.unshareFile(props.fileId)
@@ -247,7 +292,7 @@ const revoke = async () => {
       share_url: null,
       share_token: null,
       expires_at: null,
-      is_expired: false
+      is_expired: false,
     }
     showSuccess('Public access revoked')
     emit('unshared')

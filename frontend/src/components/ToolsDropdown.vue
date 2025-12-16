@@ -1,22 +1,24 @@
 <template>
   <div ref="dropdownRef" class="relative" data-testid="comp-tools-dropdown">
     <button
-      @click="toggleOpen"
       type="button"
       :class="['pill', isOpen && 'pill--active']"
       :aria-label="$t('chatInput.tools.label')"
-      @keydown.escape="closeDropdown"
       data-testid="btn-tools-toggle"
+      @click="toggleOpen"
+      @keydown.escape="closeDropdown"
     >
       <WrenchScrewdriverIcon class="w-4 h-4 md:w-5 md:h-5" />
-      <span class="text-xs md:text-sm font-medium hidden sm:inline">{{ $t('chatInput.tools.label') }}</span>
+      <span class="text-xs md:text-sm font-medium hidden sm:inline">{{
+        $t('chatInput.tools.label')
+      }}</span>
       <ChevronUpIcon class="w-4 h-4" />
     </button>
     <div
       v-if="isOpen"
       class="dropdown-up left-0 w-[calc(100vw-2rem)] sm:w-80 max-h-[60vh] overflow-y-auto scroll-thin"
-      @keydown.escape="closeDropdown"
       data-testid="dropdown-tools-panel"
+      @keydown.escape="closeDropdown"
     >
       <!-- Web Search Tool -->
       <button
@@ -24,38 +26,42 @@
         :class="[
           'dropdown-item',
           isToolActive('search') && 'dropdown-item--active',
-          isToolDisabled('web-search') && 'opacity-60'
+          isToolDisabled('web-search') && 'opacity-60',
         ]"
+        type="button"
+        data-testid="btn-tool-web-search"
         @click="selectToolCommand('web-search', 'search')"
         @keydown.down.prevent="focusNext"
         @keydown.up.prevent="focusPrevious"
-        type="button"
-        data-testid="btn-tool-web-search"
       >
         <Icon icon="mdi:web" class="w-5 h-5 flex-shrink-0" />
         <div class="flex-1 min-w-0">
           <div class="flex items-center gap-2">
             <span class="text-sm font-medium">{{ $t('chatInput.tools.webSearch') }}</span>
-            <span 
-              v-if="isToolDisabled('web-search')" 
+            <span
+              v-if="isToolDisabled('web-search')"
               class="text-xs px-2 py-0.5 rounded-full bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-200"
             >
               Setup Required
             </span>
-            <span 
-              v-else-if="!isLoadingFeatures" 
+            <span
+              v-else-if="!isLoadingFeatures"
               class="text-xs px-2 py-0.5 rounded-full bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200"
             >
               Ready
             </span>
           </div>
           <div class="text-xs txt-secondary">
-            {{ isToolDisabled('web-search') ? getToolMessage('web-search') : $t('chatInput.tools.webSearchDesc') }}
+            {{
+              isToolDisabled('web-search')
+                ? getToolMessage('web-search')
+                : $t('chatInput.tools.webSearchDesc')
+            }}
           </div>
         </div>
         <Transition name="check-fade">
-          <CheckIcon 
-            v-if="isToolActive('search')" 
+          <CheckIcon
+            v-if="isToolActive('search')"
             class="w-5 h-5 flex-shrink-0 text-[var(--brand)]"
           />
         </Transition>
@@ -67,62 +73,60 @@
         :class="[
           'dropdown-item',
           isToolActive('pic') && 'dropdown-item--active',
-          isToolDisabled('image-gen') && 'opacity-60'
+          isToolDisabled('image-gen') && 'opacity-60',
         ]"
+        type="button"
+        data-testid="btn-tool-image-gen"
         @click="selectToolCommand('image-gen', 'pic')"
         @keydown.down.prevent="focusNext"
         @keydown.up.prevent="focusPrevious"
-        type="button"
-        data-testid="btn-tool-image-gen"
       >
         <Icon icon="mdi:image" class="w-5 h-5 flex-shrink-0" />
         <div class="flex-1 min-w-0">
           <div class="flex items-center gap-2">
             <span class="text-sm font-medium">{{ $t('chatInput.tools.imageGen') }}</span>
-            <span 
-              v-if="isToolDisabled('image-gen')" 
+            <span
+              v-if="isToolDisabled('image-gen')"
               class="text-xs px-2 py-0.5 rounded-full bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-200"
             >
               Setup Required
             </span>
-            <span 
-              v-else-if="!isLoadingFeatures" 
+            <span
+              v-else-if="!isLoadingFeatures"
               class="text-xs px-2 py-0.5 rounded-full bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200"
             >
               Ready
             </span>
           </div>
           <div class="text-xs txt-secondary">
-            {{ isToolDisabled('image-gen') ? getToolMessage('image-gen') : $t('chatInput.tools.imageGenDesc') }}
+            {{
+              isToolDisabled('image-gen')
+                ? getToolMessage('image-gen')
+                : $t('chatInput.tools.imageGenDesc')
+            }}
           </div>
         </div>
         <Transition name="check-fade">
-          <CheckIcon 
-            v-if="isToolActive('pic')" 
-            class="w-5 h-5 flex-shrink-0 text-[var(--brand)]"
-          />
+          <CheckIcon v-if="isToolActive('pic')" class="w-5 h-5 flex-shrink-0 text-[var(--brand)]" />
         </Transition>
       </button>
 
       <!-- Video Generation Tool -->
       <button
         ref="itemRefs"
-        :class="[
-          'dropdown-item',
-          isToolActive('vid') && 'dropdown-item--active'
-        ]"
+        :class="['dropdown-item', isToolActive('vid') && 'dropdown-item--active']"
+        type="button"
+        data-testid="btn-tool-video-gen"
         @click="selectToolCommand('video-gen', 'vid')"
         @keydown.down.prevent="focusNext"
         @keydown.up.prevent="focusPrevious"
-        type="button"
-        data-testid="btn-tool-video-gen"
       >
         <Icon icon="mdi:video" class="w-5 h-5 flex-shrink-0" />
         <div class="flex-1 min-w-0">
           <div class="flex items-center gap-2">
             <span class="text-sm font-medium">{{ $t('chatInput.tools.videoGen') }}</span>
-            <span 
-              v-if="!isLoadingFeatures" 
+            <span
+              v-if="!isLoadingFeatures"
               class="text-xs px-2 py-0.5 rounded-full bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200"
             >
               Ready
@@ -131,10 +135,7 @@
           <div class="text-xs txt-secondary">{{ $t('chatInput.tools.videoGenDesc') }}</div>
         </div>
         <Transition name="check-fade">
-          <CheckIcon 
-            v-if="isToolActive('vid')" 
-            class="w-5 h-5 flex-shrink-0 text-[var(--brand)]"
-          />
+          <CheckIcon v-if="isToolActive('vid')" class="w-5 h-5 flex-shrink-0 text-[var(--brand)]" />
         </Transition>
       </button>
     </div>
@@ -206,35 +207,35 @@ const closeDropdown = () => {
 
 const selectToolCommand = (toolId: string, commandName: string) => {
   const feature = featuresStatus.value[toolId]
-  
+
   // If feature is disabled, navigate to setup instructions instead
   if (feature && !feature.enabled && feature.setup_required) {
-    router.push({ 
-      path: '/settings', 
-      query: { tab: 'features', feature: toolId } 
+    router.push({
+      path: '/settings',
+      query: { tab: 'features', feature: toolId },
     })
     closeDropdown()
     return
   }
-  
+
   // Get the command from the store and emit it
   const command = commandsStore.getCommand(commandName)
   if (command) {
     emit('insertCommand', command)
   }
-  
+
   // Close dropdown after selection
   closeDropdown()
 }
 
 const focusNext = () => {
-  const currentIndex = itemRefs.value.findIndex(el => el === document.activeElement)
+  const currentIndex = itemRefs.value.findIndex((el) => el === document.activeElement)
   const nextIndex = (currentIndex + 1) % itemRefs.value.length
   itemRefs.value[nextIndex]?.focus()
 }
 
 const focusPrevious = () => {
-  const currentIndex = itemRefs.value.findIndex(el => el === document.activeElement)
+  const currentIndex = itemRefs.value.findIndex((el) => el === document.activeElement)
   const prevIndex = currentIndex <= 0 ? itemRefs.value.length - 1 : currentIndex - 1
   itemRefs.value[prevIndex]?.focus()
 }
@@ -242,19 +243,21 @@ const focusPrevious = () => {
 const handleClickOutside = (e: MouseEvent) => {
   const target = e.target as HTMLElement
   if (!isOpen.value) return
-  
+
   // Check if click is inside the dropdown container
   if (dropdownRef.value && dropdownRef.value.contains(target)) {
     return
   }
-  
+
   // Check if click is on chat-related elements (input, messages area, etc.)
-  const chatElements = target.closest('[data-testid="comp-chat-input"], [data-testid="section-messages"], [data-testid="input-chat-message"], [data-testid="comp-chat-input-shell"]')
+  const chatElements = target.closest(
+    '[data-testid="comp-chat-input"], [data-testid="section-messages"], [data-testid="input-chat-message"], [data-testid="comp-chat-input-shell"]'
+  )
   if (chatElements) {
     closeDropdown()
     return
   }
-  
+
   // Close if click is outside dropdown
   closeDropdown()
 }

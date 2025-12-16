@@ -1,6 +1,6 @@
 export const getProviderIcon = (provider: string): string => {
   const providerLower = provider.toLowerCase()
-  
+
   if (providerLower.includes('openai')) {
     return 'simple-icons:openai'
   } else if (providerLower.includes('anthropic')) {
@@ -26,7 +26,6 @@ export const getProviderIcon = (provider: string): string => {
   } else if (providerLower.includes('mistral')) {
     return 'simple-icons:mistral'
   }
-  
+
   return 'mdi:robot'
 }
-

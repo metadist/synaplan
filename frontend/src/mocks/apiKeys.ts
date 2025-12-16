@@ -16,7 +16,7 @@ export const mockAPIKeys: APIKey[] = [
     status: 'active',
     created: new Date('2024-01-15'),
     lastUsed: new Date('2025-03-10'),
-    usageCount: 1247
+    usageCount: 1247,
   },
   {
     id: '2',
@@ -25,7 +25,7 @@ export const mockAPIKeys: APIKey[] = [
     status: 'active',
     created: new Date('2024-02-20'),
     lastUsed: new Date('2025-03-12'),
-    usageCount: 5632
+    usageCount: 5632,
   },
   {
     id: '3',
@@ -34,7 +34,6 @@ export const mockAPIKeys: APIKey[] = [
     status: 'inactive',
     created: new Date('2024-03-05'),
     lastUsed: new Date('2025-02-28'),
-    usageCount: 892
-  }
+    usageCount: 892,
+  },
 ]
-

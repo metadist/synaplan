@@ -12,28 +12,25 @@
       leave-from-class="scale-100 opacity-100"
       leave-to-class="scale-0 opacity-0"
     >
-      <div
-        v-if="!isOpen"
-        class="absolute bottom-0 right-0"
-      >
+      <div v-if="!isOpen" class="absolute bottom-0 right-0">
         <button
-          @click="toggleChat"
           :style="{ backgroundColor: primaryColor }"
           class="w-16 h-16 rounded-full shadow-2xl hover:scale-110 transition-transform flex items-center justify-center group"
           aria-label="Open chat"
           data-testid="btn-open"
+          @click="toggleChat"
         >
-          <img 
-            v-if="buttonIconUrl" 
-            :src="buttonIconUrl" 
-            alt="Chat" 
+          <img
+            v-if="buttonIconUrl"
+            :src="buttonIconUrl"
+            alt="Chat"
             class="w-9 h-9 object-contain"
           />
-          <component 
+          <component
+            :is="getButtonIconComponent"
             v-else
-            :is="getButtonIconComponent" 
-            :style="{ color: iconColor }" 
-            class="w-8 h-8" 
+            :style="{ color: iconColor }"
+            class="w-8 h-8"
           />
           <span
             v-if="unreadCount > 0"
@@ -59,7 +56,7 @@
         :class="['flex flex-col overflow-hidden shadow-2xl', ...chatWindowClasses]"
         :style="{
           backgroundColor: widgetTheme === 'dark' ? '#1a1a1a' : '#ffffff',
-          ...chatWindowStyle
+          ...chatWindowStyle,
         }"
         data-testid="section-chat-window"
       >
@@ -68,7 +65,7 @@
           :style="{ backgroundColor: primaryColor }"
           class="flex items-center justify-between px-4 py-3"
           :class="{
-            'pt-[calc(env(safe-area-inset-top,0px)+12px)]': isMobile && !isPreview
+            'pt-[calc(env(safe-area-inset-top,0px)+12px)]': isMobile && !isPreview,
           }"
         >
           <div class="flex items-center gap-3">
@@ -82,27 +79,27 @@
           </div>
           <div class="flex items-center gap-2">
             <button
-              @click="startNewConversation"
               class="w-8 h-8 rounded-lg bg-white/10 hover:bg-white/20 transition-colors flex items-center justify-center"
               aria-label="Start new chat"
               data-testid="btn-new"
+              @click="startNewConversation"
             >
               <ArrowPathIcon class="w-5 h-5 text-white" />
             </button>
             <button
-              @click="toggleTheme"
               class="w-8 h-8 rounded-lg bg-white/10 hover:bg-white/20 transition-colors flex items-center justify-center"
               :aria-label="widgetTheme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'"
               data-testid="btn-theme"
+              @click="toggleTheme"
             >
               <SunIcon v-if="widgetTheme === 'dark'" class="w-5 h-5 text-white" />
               <MoonIcon v-else class="w-5 h-5 text-white" />
             </button>
             <button
-              @click="toggleChat"
               class="w-8 h-8 rounded-lg bg-white/10 hover:bg-white/20 transition-colors flex items-center justify-center"
               aria-label="Close chat"
               data-testid="btn-close"
+              @click="toggleChat"
             >
               <XMarkIcon class="w-5 h-5 text-white" />
             </button>
@@ -114,26 +111,22 @@
           ref="messagesContainer"
           class="flex-1 overflow-y-auto p-4 space-y-3"
           :style="{
-            backgroundColor: widgetTheme === 'dark' ? '#1a1a1a' : '#ffffff'
+            backgroundColor: widgetTheme === 'dark' ? '#1a1a1a' : '#ffffff',
           }"
           data-testid="section-messages"
         >
           <div
             v-for="message in messages"
             :key="message.id"
-            :class="[
-              'flex',
-              message.role === 'user' ? 'justify-end' : 'justify-start'
-            ]"
+            :class="['flex', message.role === 'user' ? 'justify-end' : 'justify-start']"
           >
             <div
-              :class="[
-                'max-w-[80%] rounded-2xl px-4 py-2',
-                message.role === 'user' ? '' : ''
-              ]"
-              :style="message.role === 'user' 
-                ? { backgroundColor: primaryColor, color: iconColor }
-                : { backgroundColor: widgetTheme === 'dark' ? '#2a2a2a' : '#f3f4f6' }"
+              :class="['max-w-[80%] rounded-2xl px-4 py-2', message.role === 'user' ? '' : '']"
+              :style="
+                message.role === 'user'
+                  ? { backgroundColor: primaryColor, color: iconColor }
+                  : { backgroundColor: widgetTheme === 'dark' ? '#2a2a2a' : '#f3f4f6' }
+              "
             >
               <template v-if="message.type === 'text'">
                 <div
@@ -152,20 +145,54 @@
                 <p
                   v-else
                   class="text-sm whitespace-pre-wrap break-words"
-                  :style="{ color: message.role === 'user' ? iconColor : (widgetTheme === 'dark' ? '#e5e5e5' : '#1f2937') }"
+                  :style="{
+                    color:
+                      message.role === 'user'
+                        ? iconColor
+                        : widgetTheme === 'dark'
+                          ? '#e5e5e5'
+                          : '#1f2937',
+                  }"
                   v-html="renderMessageContent(message.content)"
                 />
               </template>
               <div v-else-if="message.type === 'file'" class="flex items-center gap-2">
-                <DocumentIcon class="w-5 h-5" :style="{ color: message.role === 'user' ? iconColor : (widgetTheme === 'dark' ? '#e5e5e5' : '#1f2937') }" />
-                <span class="text-sm" :style="{ color: message.role === 'user' ? iconColor : (widgetTheme === 'dark' ? '#e5e5e5' : '#1f2937') }">
+                <DocumentIcon
+                  class="w-5 h-5"
+                  :style="{
+                    color:
+                      message.role === 'user'
+                        ? iconColor
+                        : widgetTheme === 'dark'
+                          ? '#e5e5e5'
+                          : '#1f2937',
+                  }"
+                />
+                <span
+                  class="text-sm"
+                  :style="{
+                    color:
+                      message.role === 'user'
+                        ? iconColor
+                        : widgetTheme === 'dark'
+                          ? '#e5e5e5'
+                          : '#1f2937',
+                  }"
+                >
                   {{ message.fileName }}
                 </span>
               </div>
               <p
                 v-if="message.timestamp"
                 class="text-xs mt-1 opacity-70"
-                :style="{ color: message.role === 'user' ? iconColor : (widgetTheme === 'dark' ? '#9ca3af' : '#6b7280') }"
+                :style="{
+                  color:
+                    message.role === 'user'
+                      ? iconColor
+                      : widgetTheme === 'dark'
+                        ? '#9ca3af'
+                        : '#6b7280',
+                }"
               >
                 {{ formatTime(message.timestamp) }}
               </p>
@@ -173,18 +200,32 @@
           </div>
 
           <div v-if="isTyping" class="flex justify-start">
-            <div class="rounded-2xl px-4 py-3" :style="{ backgroundColor: widgetTheme === 'dark' ? '#2a2a2a' : '#f3f4f6' }">
+            <div
+              class="rounded-2xl px-4 py-3"
+              :style="{ backgroundColor: widgetTheme === 'dark' ? '#2a2a2a' : '#f3f4f6' }"
+            >
               <div class="flex gap-1">
-                <div class="w-2 h-2 rounded-full bg-[var(--brand)] animate-bounce" style="animation-delay: 0ms"></div>
-                <div class="w-2 h-2 rounded-full bg-[var(--brand)] animate-bounce" style="animation-delay: 150ms"></div>
-                <div class="w-2 h-2 rounded-full bg-[var(--brand)] animate-bounce" style="animation-delay: 300ms"></div>
+                <div
+                  class="w-2 h-2 rounded-full bg-[var(--brand)] animate-bounce"
+                  style="animation-delay: 0ms"
+                ></div>
+                <div
+                  class="w-2 h-2 rounded-full bg-[var(--brand)] animate-bounce"
+                  style="animation-delay: 150ms"
+                ></div>
+                <div
+                  class="w-2 h-2 rounded-full bg-[var(--brand)] animate-bounce"
+                  style="animation-delay: 300ms"
+                ></div>
               </div>
             </div>
           </div>
 
           <!-- Limit Warning -->
           <div v-if="showLimitWarning" class="flex justify-center">
-            <div class="bg-orange-500/10 border border-orange-500/30 rounded-xl px-4 py-3 max-w-[90%]">
+            <div
+              class="bg-orange-500/10 border border-orange-500/30 rounded-xl px-4 py-3 max-w-[90%]"
+            >
               <div class="flex items-start gap-2">
                 <ExclamationTriangleIcon class="w-5 h-5 text-orange-500 flex-shrink-0 mt-0.5" />
                 <div>
@@ -217,14 +258,20 @@
           :style="{ borderColor: widgetTheme === 'dark' ? '#333' : '#e5e7eb' }"
           data-testid="section-input"
         >
-          <div v-if="fileUploadError" class="mb-2 p-2 bg-red-500/10 border border-red-500/30 rounded-lg">
+          <div
+            v-if="fileUploadError"
+            class="mb-2 p-2 bg-red-500/10 border border-red-500/30 rounded-lg"
+          >
             <div class="flex items-start gap-2">
               <XCircleIcon class="w-4 h-4 text-red-500 flex-shrink-0 mt-0.5" />
               <p class="text-xs text-red-600 dark:text-red-400">{{ fileUploadError }}</p>
             </div>
           </div>
 
-          <div v-if="allowFileUploads && fileLimitReached" class="mb-2 p-2 bg-amber-500/10 border border-amber-500/30 rounded-lg">
+          <div
+            v-if="allowFileUploads && fileLimitReached"
+            class="mb-2 p-2 bg-amber-500/10 border border-amber-500/30 rounded-lg"
+          >
             <div class="flex items-start gap-2">
               <ExclamationTriangleIcon class="w-4 h-4 text-amber-500 flex-shrink-0 mt-0.5" />
               <p class="text-xs text-amber-600 dark:text-amber-400">
@@ -233,21 +280,39 @@
             </div>
           </div>
 
-          <div v-if="selectedFile" class="mb-2 flex items-center gap-2 p-2 rounded-lg" :style="{ backgroundColor: widgetTheme === 'dark' ? '#2a2a2a' : '#f3f4f6' }">
-            <DocumentIcon class="w-5 h-5" :style="{ color: widgetTheme === 'dark' ? '#9ca3af' : '#6b7280' }" />
-            <span class="text-sm flex-1 truncate" :style="{ color: widgetTheme === 'dark' ? '#e5e5e5' : '#1f2937' }">{{ selectedFile.name }}</span>
-            <span class="text-xs" :style="{ color: widgetTheme === 'dark' ? '#9ca3af' : '#6b7280' }">{{ formatFileSize(selectedFile.size) }}</span>
+          <div
+            v-if="selectedFile"
+            class="mb-2 flex items-center gap-2 p-2 rounded-lg"
+            :style="{ backgroundColor: widgetTheme === 'dark' ? '#2a2a2a' : '#f3f4f6' }"
+          >
+            <DocumentIcon
+              class="w-5 h-5"
+              :style="{ color: widgetTheme === 'dark' ? '#9ca3af' : '#6b7280' }"
+            />
+            <span
+              class="text-sm flex-1 truncate"
+              :style="{ color: widgetTheme === 'dark' ? '#e5e5e5' : '#1f2937' }"
+              >{{ selectedFile.name }}</span
+            >
+            <span
+              class="text-xs"
+              :style="{ color: widgetTheme === 'dark' ? '#9ca3af' : '#6b7280' }"
+              >{{ formatFileSize(selectedFile.size) }}</span
+            >
             <button
-              @click="removeFile"
               class="w-6 h-6 rounded hover:bg-black/10 dark:hover:bg-white/10 flex items-center justify-center"
               data-testid="btn-remove-file"
+              @click="removeFile"
             >
               <XMarkIcon class="w-4 h-4 txt-secondary" />
             </button>
           </div>
 
           <!-- File Size Error -->
-          <div v-if="fileSizeError" class="mb-2 p-2 bg-red-500/10 border border-red-500/30 rounded-lg">
+          <div
+            v-if="fileSizeError"
+            class="mb-2 p-2 bg-red-500/10 border border-red-500/30 rounded-lg"
+          >
             <div class="flex items-start gap-2">
               <ExclamationTriangleIcon class="w-4 h-4 text-red-500 flex-shrink-0 mt-0.5" />
               <p class="text-xs text-red-600 dark:text-red-400">
@@ -258,29 +323,33 @@
 
           <div class="flex items-end gap-2">
             <template v-if="allowFileUploads">
-             <input
-               ref="fileInput"
-               type="file"
-               @change="handleFileSelect"
-               accept="image/*,.pdf,.doc,.docx,.txt"
-               class="hidden"
-               data-testid="input-file"
-             />
-             <button
-               @click="fileInput?.click()"
-               :disabled="limitReached || fileLimitReached"
-               class="w-10 h-10 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 transition-colors flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
-               :aria-label="$t('widget.attachFile')"
-               data-testid="btn-attach"
-             >
-                <PaperClipIcon class="w-5 h-5" :style="{ color: widgetTheme === 'dark' ? '#9ca3af' : '#6b7280' }" />
+              <input
+                ref="fileInput"
+                type="file"
+                accept="image/*,.pdf,.doc,.docx,.txt"
+                class="hidden"
+                data-testid="input-file"
+                @change="handleFileSelect"
+              />
+              <button
+                :disabled="limitReached || fileLimitReached"
+                class="w-10 h-10 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 transition-colors flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
+                :aria-label="$t('widget.attachFile')"
+                data-testid="btn-attach"
+                @click="fileInput?.click()"
+              >
+                <PaperClipIcon
+                  class="w-5 h-5"
+                  :style="{ color: widgetTheme === 'dark' ? '#9ca3af' : '#6b7280' }"
+                />
               </button>
             </template>
             <textarea
               v-model="inputMessage"
-              @keydown.enter.exact.prevent="sendMessage"
               :disabled="limitReached"
-              :placeholder="limitReached ? $t('widget.limitReachedPlaceholder') : $t('widget.placeholder')"
+              :placeholder="
+                limitReached ? $t('widget.limitReachedPlaceholder') : $t('widget.placeholder')
+              "
               rows="1"
               class="flex-1 px-4 py-2 rounded-lg resize-none focus:outline-none focus:ring-2 disabled:opacity-50 disabled:cursor-not-allowed"
               :style="{
@@ -288,28 +357,26 @@
                 color: widgetTheme === 'dark' ? '#e5e5e5' : '#1f2937',
                 borderColor: primaryColor,
                 maxHeight: '120px',
-                minHeight: '40px'
+                minHeight: '40px',
               }"
               data-testid="input-message"
+              @keydown.enter.exact.prevent="sendMessage"
             />
             <button
-              @click="sendMessage"
               :disabled="!canSend"
               :style="canSend ? { backgroundColor: primaryColor } : {}"
               :class="[
                 'w-10 h-10 rounded-lg transition-all flex items-center justify-center',
-                canSend ? 'hover:scale-110 shadow-lg' : 'bg-gray-200 dark:bg-gray-600 cursor-not-allowed'
+                canSend
+                  ? 'hover:scale-110 shadow-lg'
+                  : 'bg-gray-200 dark:bg-gray-600 cursor-not-allowed',
               ]"
               :aria-label="$t('widget.send')"
               data-testid="btn-send"
+              @click="sendMessage"
             >
               <span class="shrink-0">
-                <PaperAirplaneIcon
-                  :class="[
-                    'w-5 h-5',
-                    canSend ? 'text-white' : 'text-gray-400'
-                  ]"
-                />
+                <PaperAirplaneIcon :class="['w-5 h-5', canSend ? 'text-white' : 'text-gray-400']" />
               </span>
             </button>
           </div>
@@ -319,7 +386,7 @@
         <div
           class="px-4 py-2 text-center border-t"
           :class="{
-            'pb-[calc(env(safe-area-inset-bottom,0px)+12px)]': isMobile && !isPreview
+            'pb-[calc(env(safe-area-inset-bottom,0px)+12px)]': isMobile && !isPreview,
           }"
           :style="{ borderColor: widgetTheme === 'dark' ? '#333' : '#e5e7eb' }"
         >
@@ -344,7 +411,7 @@ import {
   MoonIcon,
   ExclamationTriangleIcon,
   XCircleIcon,
-  ArrowPathIcon
+  ArrowPathIcon,
 } from '@heroicons/vue/24/outline'
 
 import { uploadWidgetFile, sendWidgetMessage } from '@/services/api/widgetsApi'
@@ -384,7 +451,7 @@ const props = withDefaults(defineProps<Props>(), {
   isPreview: false,
   widgetTitle: '',
   allowFileUpload: false,
-  fileUploadLimit: 3
+  fileUploadLimit: 3,
 })
 
 interface Message {
@@ -406,7 +473,7 @@ const getButtonIconComponent = computed(() => {
   if (props.buttonIconUrl) {
     return null
   }
-  
+
   // For now, always return ChatBubbleLeftRightIcon
   // In the full implementation, we would map buttonIcon values to different components
   return ChatBubbleLeftRightIcon
@@ -458,23 +525,22 @@ const chatWindowStyle = computed(() => {
   if (isMobile.value && !props.isPreview) {
     return {
       width: '100vw',
-      height: '100vh'
+      height: '100vh',
     }
   }
 
   return {
     width: props.isPreview ? 'min(100%, 380px)' : 'min(90vw, 420px)',
-    height: props.isPreview ? 'min(80vh, 520px)' : 'min(80vh, 640px)'
+    height: props.isPreview ? 'min(80vh, 520px)' : 'min(80vh, 640px)',
   }
 })
-
 
 const positionClass = computed(() => {
   const positions = {
     'bottom-left': 'bottom-6 left-6',
     'bottom-right': 'bottom-6 right-6',
     'top-left': 'top-6 left-6',
-    'top-right': 'top-6 right-6'
+    'top-right': 'top-6 right-6',
   }
   return positions[props.position]
 })
@@ -548,7 +614,7 @@ const handleFileSelect = (event: Event) => {
     target.value = ''
     return
   }
-  
+
   if (file) {
     const fileSizeMB = file.size / (1024 * 1024)
     if (fileSizeMB > props.maxFileSize) {
@@ -588,7 +654,11 @@ const sendMessage = async () => {
       uploadingFile.value = true
       fileUploadError.value = null
 
-      const uploadResult = await uploadWidgetFile(props.widgetId, sessionId.value, selectedFile.value)
+      const uploadResult = await uploadWidgetFile(
+        props.widgetId,
+        sessionId.value,
+        selectedFile.value
+      )
 
       fileIds.push(uploadResult.file.id)
       fileUploadCount.value += 1
@@ -599,7 +669,7 @@ const sendMessage = async () => {
         type: 'file',
         content: selectedFile.value.name,
         fileName: selectedFile.value.name,
-        timestamp: new Date()
+        timestamp: new Date(),
       })
 
       selectedFile.value = null
@@ -631,7 +701,7 @@ const sendMessage = async () => {
     role: 'user',
     type: 'text',
     content: userMessage,
-    timestamp: new Date()
+    timestamp: new Date(),
   })
   messageCount.value++
 
@@ -651,31 +721,26 @@ const sendMessage = async () => {
     role: 'assistant',
     type: 'text',
     content: '',
-    timestamp: new Date()
+    timestamp: new Date(),
   })
 
   try {
-    const result = await sendWidgetMessage(
-      props.widgetId,
-      userMessage,
-      sessionId.value,
-      {
-        chatId: chatId.value ?? undefined,
-        fileIds,
-        apiUrl: props.apiUrl,
-        onChunk: async (chunk: string) => {
-          if (!chunk) return
-          if (isTyping.value) {
-            isTyping.value = false
-          }
-          const lastMessage = messages.value[messages.value.length - 1]
-          if (lastMessage && lastMessage.id === assistantMessageId) {
-            lastMessage.content += chunk
-            await scrollToBottom()
-          }
+    const result = await sendWidgetMessage(props.widgetId, userMessage, sessionId.value, {
+      chatId: chatId.value ?? undefined,
+      fileIds,
+      apiUrl: props.apiUrl,
+      onChunk: async (chunk: string) => {
+        if (!chunk) return
+        if (isTyping.value) {
+          isTyping.value = false
         }
-      }
-    )
+        const lastMessage = messages.value[messages.value.length - 1]
+        if (lastMessage && lastMessage.id === assistantMessageId) {
+          lastMessage.content += chunk
+          await scrollToBottom()
+        }
+      },
+    })
 
     if (result.chatId && result.chatId > 0) {
       chatId.value = result.chatId
@@ -714,14 +779,18 @@ const sendMessage = async () => {
     isTyping.value = false
   } catch (error) {
     console.error('Failed to send message:', error)
-    const lastMessage = messages.value.find(m => m.id === assistantMessageId)
+    const lastMessage = messages.value.find((m) => m.id === assistantMessageId)
     let recovered = false
 
     if (!props.isPreview) {
       try {
         await loadConversationHistory(true)
         const latestMessage = messages.value[messages.value.length - 1]
-        if (latestMessage && latestMessage.role === 'assistant' && latestMessage.content.trim().length > 0) {
+        if (
+          latestMessage &&
+          latestMessage.role === 'assistant' &&
+          latestMessage.content.trim().length > 0
+        ) {
           recovered = true
         }
       } catch (historyError) {
@@ -733,7 +802,7 @@ const sendMessage = async () => {
       if (lastMessage && lastMessage.content.trim().length > 0) {
         isTyping.value = false
       } else {
-        const lastMessageIndex = messages.value.findIndex(m => m.id === assistantMessageId)
+        const lastMessageIndex = messages.value.findIndex((m) => m.id === assistantMessageId)
         if (lastMessageIndex !== -1) {
           messages.value.splice(lastMessageIndex, 1)
         }
@@ -754,13 +823,13 @@ const addBotMessage = (text: string) => {
     role: 'assistant',
     type: 'text',
     content: text,
-    timestamp: new Date()
+    timestamp: new Date(),
   })
-  
+
   if (!isOpen.value) {
     unreadCount.value++
   }
-  
+
   scrollToBottom()
 }
 
@@ -836,12 +905,14 @@ const startNewConversation = () => {
     ensureAutoMessage()
   }
 
-  window.dispatchEvent(new CustomEvent('synaplan-widget-session-changed', {
-    detail: {
-      widgetId: props.widgetId,
-      sessionId: newSessionId
-    }
-  }))
+  window.dispatchEvent(
+    new CustomEvent('synaplan-widget-session-changed', {
+      detail: {
+        widgetId: props.widgetId,
+        sessionId: newSessionId,
+      },
+    })
+  )
 
   loadConversationHistory()
 }
@@ -875,14 +946,14 @@ const normalizeServerMessage = (raw: any): Message => {
   if (typeof content === 'string') {
     const parsed = parseAIResponse(content)
     const textParts = parsed.parts
-      .filter(part => part.type === 'text' && part.content)
-      .map(part => part.content.trim())
+      .filter((part) => part.type === 'text' && part.content)
+      .map((part) => part.content.trim())
       .filter(Boolean)
 
     if (textParts.length > 0) {
       content = textParts.join('\n\n')
     } else if (parsed.parts.length > 0) {
-      content = parsed.parts.map(part => part.content).join('\n\n')
+      content = parsed.parts.map((part) => part.content).join('\n\n')
     }
   }
 
@@ -894,7 +965,7 @@ const normalizeServerMessage = (raw: any): Message => {
     role,
     type: 'text',
     content,
-    timestamp: new Date(timestampSeconds * 1000)
+    timestamp: new Date(timestampSeconds * 1000),
   }
 }
 
@@ -922,9 +993,12 @@ const loadConversationHistory = async (force = false) => {
 
   try {
     const params = new URLSearchParams({ sessionId: sessionId.value })
-    const response = await fetch(`${props.apiUrl}/api/v1/widget/${props.widgetId}/history?${params.toString()}`, {
-      headers: buildWidgetHeaders(false)
-    })
+    const response = await fetch(
+      `${props.apiUrl}/api/v1/widget/${props.widgetId}/history?${params.toString()}`,
+      {
+        headers: buildWidgetHeaders(false),
+      }
+    )
 
     if (!response.ok) {
       throw new Error(`History request failed with status ${response.status}`)
@@ -979,8 +1053,14 @@ const applyInlineFormatting = (text: string): string => {
     .replace(/(\*\*|__)(.+?)\1/g, '<strong>$2</strong>')
     .replace(/(\*|_)(.+?)\1/g, '<em>$2</em>')
     .replace(/~~(.+?)~~/g, '<del>$1</del>')
-    .replace(/`([^`]+)`/g, '<code class="px-1 py-0.5 rounded bg-black/10 dark:bg-white/10 text-xs">$1</code>')
-    .replace(/\[(.+?)\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2" class="underline" target="_blank" rel="noopener noreferrer">$1</a>')
+    .replace(
+      /`([^`]+)`/g,
+      '<code class="px-1 py-0.5 rounded bg-black/10 dark:bg-white/10 text-xs">$1</code>'
+    )
+    .replace(
+      /\[(.+?)\]\((https?:\/\/[^\s)]+)\)/g,
+      '<a href="$2" class="underline" target="_blank" rel="noopener noreferrer">$1</a>'
+    )
 }
 
 const renderMessageContent = (value: string): string => {
@@ -991,12 +1071,17 @@ const renderMessageContent = (value: string): string => {
   // First handle code blocks
   let content = value
   const codeBlocks: string[] = []
-  content = content.replace(/```(\w+)?\n([\s\S]*?)```/g, (_: string, lang: string, code: string) => {
-    const language = lang || 'text'
-    const placeholder = `__CODEBLOCK_${codeBlocks.length}__`
-    codeBlocks.push(`<pre class="bg-black/5 dark:bg-white/5 p-3 rounded-lg overflow-x-auto my-2"><code class="language-${language} text-xs font-mono">${escapeHtml(code.trim())}</code></pre>`)
-    return placeholder
-  })
+  content = content.replace(
+    /```(\w+)?\n([\s\S]*?)```/g,
+    (_: string, lang: string, code: string) => {
+      const language = lang || 'text'
+      const placeholder = `__CODEBLOCK_${codeBlocks.length}__`
+      codeBlocks.push(
+        `<pre class="bg-black/5 dark:bg-white/5 p-3 rounded-lg overflow-x-auto my-2"><code class="language-${language} text-xs font-mono">${escapeHtml(code.trim())}</code></pre>`
+      )
+      return placeholder
+    }
+  )
 
   const lines = content.split(/\r?\n/)
   const htmlParts: string[] = []
@@ -1037,11 +1122,13 @@ const renderMessageContent = (value: string): string => {
 
     // Check for blockquote
     if (trimmed.startsWith('> ')) {
-      if (inList) htmlParts.push('</ul>'), inList = false
-      if (inOrderedList) htmlParts.push('</ol>'), inOrderedList = false
+      if (inList) (htmlParts.push('</ul>'), (inList = false))
+      if (inOrderedList) (htmlParts.push('</ol>'), (inOrderedList = false))
       if (!inBlockquote) {
         inBlockquote = true
-        htmlParts.push('<blockquote class="border-l-4 pl-3 py-1 my-2 italic rounded-r" style="border-color: #6b7280; background-color: #f3f4f6; color: #1f2937;">')
+        htmlParts.push(
+          '<blockquote class="border-l-4 pl-3 py-1 my-2 italic rounded-r" style="border-color: #6b7280; background-color: #f3f4f6; color: #1f2937;">'
+        )
       }
       const quoteContent = applyInlineFormatting(escapeHtml(trimmed.substring(2)))
       htmlParts.push(`<p class="mb-1">${quoteContent}</p>`)
@@ -1063,8 +1150,8 @@ const renderMessageContent = (value: string): string => {
 
     // Unordered list
     if (/^[-*]\s+/.test(trimmed)) {
-      if (inOrderedList) htmlParts.push('</ol>'), inOrderedList = false
-      if (inBlockquote) htmlParts.push('</blockquote>'), inBlockquote = false
+      if (inOrderedList) (htmlParts.push('</ol>'), (inOrderedList = false))
+      if (inBlockquote) (htmlParts.push('</blockquote>'), (inBlockquote = false))
       if (!inList) {
         inList = true
         htmlParts.push('<ul class="list-disc pl-5 space-y-1 my-2">')
@@ -1078,8 +1165,8 @@ const renderMessageContent = (value: string): string => {
     // Ordered list
     const orderedMatch = trimmed.match(/^(\d+)\.\s+(.*)$/)
     if (orderedMatch) {
-      if (inList) htmlParts.push('</ul>'), inList = false
-      if (inBlockquote) htmlParts.push('</blockquote>'), inBlockquote = false
+      if (inList) (htmlParts.push('</ul>'), (inList = false))
+      if (inBlockquote) (htmlParts.push('</blockquote>'), (inBlockquote = false))
       if (!inOrderedList) {
         inOrderedList = true
         htmlParts.push('<ol class="list-decimal pl-5 space-y-1 my-2">')
@@ -1096,12 +1183,12 @@ const renderMessageContent = (value: string): string => {
 
   closeListIfNeeded()
   let result = htmlParts.join('')
-  
+
   // Restore code blocks
   codeBlocks.forEach((block, index) => {
     result = result.replace(`__CODEBLOCK_${index}__`, block)
   })
-  
+
   return result
 }
 
@@ -1197,4 +1284,3 @@ function buildWidgetHeaders(includeContentType = true) {
   return headers
 }
 </script>
-

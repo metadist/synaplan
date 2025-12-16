@@ -10,7 +10,7 @@ export const useSidebarStore = defineStore('sidebar', () => {
   // Disclosure state for chat groups
   const chatDisclosure = ref({
     my: localStorage.getItem('sidebar-disclosure-my') !== 'false',
-    widget: localStorage.getItem('sidebar-disclosure-widget') === 'true'
+    widget: localStorage.getItem('sidebar-disclosure-widget') === 'true',
   })
 
   watch(isCollapsed, (value) => {
@@ -21,13 +21,19 @@ export const useSidebarStore = defineStore('sidebar', () => {
     localStorage.setItem('sidebar-show-chats', String(value))
   })
 
-  watch(() => chatDisclosure.value.my, (value) => {
-    localStorage.setItem('sidebar-disclosure-my', String(value))
-  })
+  watch(
+    () => chatDisclosure.value.my,
+    (value) => {
+      localStorage.setItem('sidebar-disclosure-my', String(value))
+    }
+  )
 
-  watch(() => chatDisclosure.value.widget, (value) => {
-    localStorage.setItem('sidebar-disclosure-widget', String(value))
-  })
+  watch(
+    () => chatDisclosure.value.widget,
+    (value) => {
+      localStorage.setItem('sidebar-disclosure-widget', String(value))
+    }
+  )
 
   const toggle = () => {
     isOpen.value = !isOpen.value

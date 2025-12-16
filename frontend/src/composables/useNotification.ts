@@ -10,22 +10,18 @@ export interface Notification {
 const notifications = ref<Notification[]>([])
 
 export const useNotification = () => {
-  const notify = (
-    type: Notification['type'],
-    message: string,
-    duration: number = 5000
-  ) => {
+  const notify = (type: Notification['type'], message: string, duration: number = 5000) => {
     const id = `notification-${Date.now()}-${Math.random()}`
-    
+
     const notification: Notification = {
       id,
       type,
       message,
-      duration
+      duration,
     }
-    
+
     notifications.value.push(notification)
-    
+
     if (duration > 0) {
       setTimeout(() => {
         remove(id)
@@ -50,7 +46,7 @@ export const useNotification = () => {
   }
 
   const remove = (id: string) => {
-    const index = notifications.value.findIndex(n => n.id === id)
+    const index = notifications.value.findIndex((n) => n.id === id)
     if (index !== -1) {
       notifications.value.splice(index, 1)
     }
@@ -63,7 +59,6 @@ export const useNotification = () => {
     error,
     warning,
     info,
-    remove
+    remove,
   }
 }
-

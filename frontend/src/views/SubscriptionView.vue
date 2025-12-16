@@ -2,7 +2,6 @@
   <MainLayout data-testid="page-subscription">
     <div class="min-h-screen bg-chat p-4 md:p-8 overflow-y-auto scroll-thin">
       <div class="max-w-6xl mx-auto space-y-8">
-        
         <!-- Loading State -->
         <div v-if="loading" class="text-center py-12">
           <Icon icon="mdi:loading" class="w-8 h-8 animate-spin mx-auto txt-secondary" />
@@ -13,7 +12,9 @@
           <!-- Header -->
           <div class="text-center mb-12">
             <h1 class="text-4xl font-bold txt-primary mb-3">
-              {{ hasActivePlan ? $t('subscription.manage.title') : $t('subscription.chooseYourPlan') }}
+              {{
+                hasActivePlan ? $t('subscription.manage.title') : $t('subscription.chooseYourPlan')
+              }}
             </h1>
             <p class="txt-secondary text-lg">
               {{ hasActivePlan ? $t('subscription.manage.subtitle') : $t('subscription.subtitle') }}
@@ -27,32 +28,48 @@
                 <Icon icon="mdi:crown" class="w-10 h-10 text-yellow-500" />
                 <div>
                   <div class="flex items-center gap-3 mb-1 flex-wrap">
-                    <span class="text-lg font-bold txt-primary">{{ $t('subscription.manage.currentPlanLabel') }}</span>
-                    <span :class="getLevelBadgeClass(currentLevel || 'NEW')">{{ currentLevel }}</span>
-                    <span v-if="subscriptionStatus?.hasSubscription" :class="getStatusBadgeClass(subscriptionStatus.status || 'active')">
+                    <span class="text-lg font-bold txt-primary">{{
+                      $t('subscription.manage.currentPlanLabel')
+                    }}</span>
+                    <span :class="getLevelBadgeClass(currentLevel || 'NEW')">{{
+                      currentLevel
+                    }}</span>
+                    <span
+                      v-if="subscriptionStatus?.hasSubscription"
+                      :class="getStatusBadgeClass(subscriptionStatus.status || 'active')"
+                    >
                       {{ getStatusText(subscriptionStatus.status || 'active') }}
                     </span>
                   </div>
                   <p v-if="subscriptionStatus?.cancelAt" class="text-amber-500 text-sm font-medium">
                     <Icon icon="mdi:alert" class="w-4 h-4 inline mr-1" />
-                    {{ $t('subscription.manage.cancelDate') }}: {{ formatDate(subscriptionStatus.cancelAt) }}
+                    {{ $t('subscription.manage.cancelDate') }}:
+                    {{ formatDate(subscriptionStatus.cancelAt) }}
                   </p>
                   <p v-else-if="subscriptionStatus?.nextBilling" class="txt-secondary text-sm">
-                    {{ $t('subscription.manage.nextBilling') }}: {{ formatDate(subscriptionStatus.nextBilling) }}
+                    {{ $t('subscription.manage.nextBilling') }}:
+                    {{ formatDate(subscriptionStatus.nextBilling) }}
                   </p>
-                  <p v-if="isHighestPlan && !subscriptionStatus?.cancelAt" class="txt-secondary text-sm mt-1">
+                  <p
+                    v-if="isHighestPlan && !subscriptionStatus?.cancelAt"
+                    class="txt-secondary text-sm mt-1"
+                  >
                     {{ $t('subscription.highestPlan') }}
                   </p>
                 </div>
               </div>
               <button
                 v-if="subscriptionStatus?.hasSubscription"
-                @click="openBillingPortal"
                 :disabled="isProcessing || !stripeConfigured"
                 class="btn-secondary px-4 py-2 rounded-lg text-sm font-medium"
                 data-testid="btn-open-portal"
+                @click="openBillingPortal"
               >
-                <Icon v-if="isProcessing" icon="mdi:loading" class="w-4 h-4 animate-spin inline mr-2" />
+                <Icon
+                  v-if="isProcessing"
+                  icon="mdi:loading"
+                  class="w-4 h-4 animate-spin inline mr-2"
+                />
                 {{ $t('subscription.manage.openPortal') }}
               </button>
             </div>
@@ -63,7 +80,9 @@
             <div class="flex items-start gap-3">
               <Icon icon="mdi:alert-circle" class="w-6 h-6 flex-shrink-0" />
               <div>
-                <p class="font-semibold alert-warning-text mb-2">{{ $t('subscription.unavailable') }}</p>
+                <p class="font-semibold alert-warning-text mb-2">
+                  {{ $t('subscription.unavailable') }}
+                </p>
                 <p class="text-sm alert-warning-text">{{ $t('subscription.unavailableDesc') }}</p>
               </div>
             </div>
@@ -76,9 +95,11 @@
               :key="plan.id"
               class="surface-card rounded-xl p-8 flex flex-col transition-shadow"
               :class="[
-                plan.id === 'TEAM' && !isCurrentPlan(plan.id) ? 'border-2 border-[var(--brand)] relative hover:shadow-xl' : '',
+                plan.id === 'TEAM' && !isCurrentPlan(plan.id)
+                  ? 'border-2 border-[var(--brand)] relative hover:shadow-xl'
+                  : '',
                 isCurrentPlan(plan.id) ? 'ring-2 ring-green-500 relative' : 'hover:shadow-xl',
-                isLowerPlan(plan.id) ? 'opacity-60' : ''
+                isLowerPlan(plan.id) ? 'opacity-60' : '',
               ]"
               data-testid="card-plan"
             >
@@ -99,10 +120,14 @@
 
               <!-- Plan Header -->
               <div class="mb-6">
-                <h3 class="text-2xl font-bold txt-primary mb-2">{{ $t(`subscription.plans.${plan.id.toLowerCase()}`) }}</h3>
+                <h3 class="text-2xl font-bold txt-primary mb-2">
+                  {{ $t(`subscription.plans.${plan.id.toLowerCase()}`) }}
+                </h3>
                 <div class="flex items-baseline gap-1">
                   <span class="text-4xl font-bold txt-primary">€{{ plan.price }}</span>
-                  <span class="txt-secondary">/{{ $t(`subscription.per${capitalize(plan.interval)}`) }}</span>
+                  <span class="txt-secondary"
+                    >/{{ $t(`subscription.per${capitalize(plan.interval)}`) }}</span
+                  >
                 </div>
               </div>
 
@@ -113,7 +138,10 @@
                   :key="index"
                   class="flex items-start gap-3"
                 >
-                  <Icon icon="mdi:check-circle" class="w-5 h-5 text-green-500 flex-shrink-0 mt-0.5" />
+                  <Icon
+                    icon="mdi:check-circle"
+                    class="w-5 h-5 text-green-500 flex-shrink-0 mt-0.5"
+                  />
                   <span class="txt-secondary text-sm">{{ feature }}</span>
                 </li>
               </ul>
@@ -136,17 +164,23 @@
               </button>
               <button
                 v-else
-                @click="selectPlan(plan.id)"
                 :disabled="isProcessing"
                 :class="[
                   'w-full py-3 rounded-lg font-semibold transition-all',
                   plan.id === 'TEAM'
                     ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white hover:shadow-lg'
-                    : 'btn-primary'
+                    : 'btn-primary',
                 ]"
                 :data-testid="`btn-select-${plan.id.toLowerCase()}`"
+                @click="selectPlan(plan.id)"
               >
-                {{ isProcessing ? $t('subscription.processing') : (hasActivePlan ? $t('subscription.upgrade') : $t('subscription.selectPlan')) }}
+                {{
+                  isProcessing
+                    ? $t('subscription.processing')
+                    : hasActivePlan
+                      ? $t('subscription.upgrade')
+                      : $t('subscription.selectPlan')
+                }}
               </button>
             </div>
           </div>
@@ -160,7 +194,11 @@
 import { ref, computed, onMounted } from 'vue'
 import { Icon } from '@iconify/vue'
 import { useI18n } from 'vue-i18n'
-import { subscriptionApi, type SubscriptionPlan, type SubscriptionStatus } from '@/services/api/subscriptionApi'
+import {
+  subscriptionApi,
+  type SubscriptionPlan,
+  type SubscriptionStatus,
+} from '@/services/api/subscriptionApi'
 import { useAuthStore } from '@/stores/auth'
 import MainLayout from '@/components/MainLayout.vue'
 
@@ -229,14 +267,17 @@ async function selectPlan(planId: string) {
     window.location.href = response.url
   } catch (error: any) {
     console.error('Failed to create checkout session:', error)
-    
+
     // Show user-friendly error
-    if (error.message?.includes('unavailable') || error.message?.includes('STRIPE_NOT_CONFIGURED')) {
+    if (
+      error.message?.includes('unavailable') ||
+      error.message?.includes('STRIPE_NOT_CONFIGURED')
+    ) {
       alert(t('subscription.serviceNotConfigured'))
     } else {
       alert(t('subscription.checkoutFailed'))
     }
-    
+
     isProcessing.value = false
   }
 }
@@ -261,21 +302,21 @@ async function openBillingPortal() {
 
 function getLevelBadgeClass(level: string): string {
   const classes: Record<string, string> = {
-    'NEW': 'badge-level badge-new',
-    'PRO': 'badge-level badge-pro',
-    'TEAM': 'badge-level badge-team',
-    'BUSINESS': 'badge-level badge-business',
-    'ADMIN': 'badge-level badge-admin',
+    NEW: 'badge-level badge-new',
+    PRO: 'badge-level badge-pro',
+    TEAM: 'badge-level badge-team',
+    BUSINESS: 'badge-level badge-business',
+    ADMIN: 'badge-level badge-admin',
   }
   return classes[level] || classes['NEW']
 }
 
 function getStatusBadgeClass(status: string): string {
   const classes: Record<string, string> = {
-    'active': 'badge-level badge-business',
-    'canceled': 'badge-level badge-new',
-    'past_due': 'badge-level badge-admin',
-    'trialing': 'badge-level badge-pro',
+    active: 'badge-level badge-business',
+    canceled: 'badge-level badge-new',
+    past_due: 'badge-level badge-admin',
+    trialing: 'badge-level badge-pro',
   }
   return classes[status] || classes['active']
 }
@@ -290,10 +331,12 @@ function capitalize(str: string): string {
 
 function formatDate(timestamp: string | number): string {
   try {
-    const date = typeof timestamp === 'number' 
-      ? new Date(timestamp * 1000) 
-      : new Date(timestamp)
-    return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    const date = typeof timestamp === 'number' ? new Date(timestamp * 1000) : new Date(timestamp)
+    return (
+      date.toLocaleDateString() +
+      ' ' +
+      date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    )
   } catch {
     return String(timestamp)
   }

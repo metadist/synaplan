@@ -37,16 +37,16 @@ const sendMessage = async () => {
     const response = await fetch('/api/v1/messages', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ text: 'Hello' })
+      body: JSON.stringify({ text: 'Hello' }),
     })
 
     if (response.status === 429) {
       // Rate limit exceeded
       const data = await response.json()
-      
+
       checkAndShowLimit({
         allowed: false,
         limitType: data.limit_type || 'lifetime',
@@ -56,7 +56,7 @@ const sendMessage = async () => {
         remaining: 0,
         resetTime: data.reset_at || null,
         userLevel: data.user_level || 'NEW',
-        phoneVerified: data.phone_verified || false
+        phoneVerified: data.phone_verified || false,
       })
       return
     }
@@ -100,25 +100,31 @@ When rate limit is exceeded (429 status):
 ## Scenarios
 
 ### 1. NEW User (Lifetime Limit)
+
 - Shows: "Free Limit Reached"
 - No reset time
 - Shows upgrade benefits
 - Shows "Upgrade Now" button
 
 ### 2. ANONYMOUS User (Not Phone Verified)
+
 - Shows: "Free Limit Reached"
 - No reset time
 - Shows "Verify Phone Number" button
 - Shows "Upgrade Now" button
 
 ### 3. PRO/TEAM/BUSINESS (Hourly Limit)
+
 - Shows: "Hourly Limit Reached"
 - Shows reset time (e.g., "Resets in 1h 25m")
 - Shows "Upgrade Now" button (for higher tier)
 
 ### 4. PRO/TEAM/BUSINESS (Monthly Limit)
+
 - Shows: "Monthly Limit Reached"
 - Shows reset time (e.g., "Resets in 5d 3h")
 - Shows "Upgrade Now" button
+
 ```
 
+```

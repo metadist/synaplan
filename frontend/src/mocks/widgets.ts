@@ -31,21 +31,21 @@ export const mockWidgets: Widget[] = []
 export const integrationTypes = [
   { value: 'floating-button', label: 'Floating Button' },
   { value: 'inline', label: 'Inline Embed' },
-  { value: 'fullpage', label: 'Full Page' }
+  { value: 'fullpage', label: 'Full Page' },
 ]
 
 export const positions = [
   { value: 'bottom-right', label: 'Bottom Right' },
   { value: 'bottom-left', label: 'Bottom Left' },
   { value: 'top-right', label: 'Top Right' },
-  { value: 'top-left', label: 'Top Left' }
+  { value: 'top-left', label: 'Top Left' },
 ]
 
 export const aiPrompts = [
   { value: 'general', label: '(default) general' },
   { value: 'support', label: 'Customer Support' },
   { value: 'sales', label: 'Sales Assistant' },
-  { value: 'technical', label: 'Technical Help' }
+  { value: 'technical', label: 'Technical Help' },
 ]
 
 export const generateEmbedCode = (widgetId: string, userId: string): string => {
@@ -54,4 +54,3 @@ script.src = 'https://app.synaplan.com/widget.php?uid=${userId}&widgetid=${widge
 script.async = true;
 document.head.appendChild(script);`
 }
-

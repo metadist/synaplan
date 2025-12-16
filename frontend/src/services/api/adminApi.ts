@@ -67,7 +67,11 @@ export interface RegistrationAnalytics {
 }
 
 export const adminApi = {
-  async getUsers(page = 1, limit = 50, search = ''): Promise<{ users: AdminUser[]; total: number; page: number; limit: number }> {
+  async getUsers(
+    page = 1,
+    limit = 50,
+    search = ''
+  ): Promise<{ users: AdminUser[]; total: number; page: number; limit: number }> {
     const params = new URLSearchParams({
       page: page.toString(),
       limit: limit.toString(),
@@ -80,35 +84,38 @@ export const adminApi = {
     )
   },
 
-  async updateUserLevel(userId: number, level: string): Promise<{ success: boolean; user: AdminUser }> {
+  async updateUserLevel(
+    userId: number,
+    level: string
+  ): Promise<{ success: boolean; user: AdminUser }> {
     return httpClient<{ success: boolean; user: AdminUser }>(
       `/api/v1/admin/users/${userId}/level`,
       {
         method: 'PATCH',
-        body: JSON.stringify({ level })
+        body: JSON.stringify({ level }),
       }
     )
   },
 
   async deleteUser(userId: number): Promise<{ success: boolean; message: string }> {
-    return httpClient<{ success: boolean; message: string }>(
-      `/api/v1/admin/users/${userId}`,
-      {
-        method: 'DELETE'
-      }
-    )
+    return httpClient<{ success: boolean; message: string }>(`/api/v1/admin/users/${userId}`, {
+      method: 'DELETE',
+    })
   },
 
   async getSystemPrompts(): Promise<{ prompts: SystemPrompt[] }> {
     return httpClient<{ prompts: SystemPrompt[] }>('/api/v1/admin/prompts')
   },
 
-  async updatePrompt(promptId: number, data: Partial<SystemPrompt>): Promise<{ success: boolean; prompt: SystemPrompt }> {
+  async updatePrompt(
+    promptId: number,
+    data: Partial<SystemPrompt>
+  ): Promise<{ success: boolean; prompt: SystemPrompt }> {
     return httpClient<{ success: boolean; prompt: SystemPrompt }>(
       `/api/v1/admin/prompts/${promptId}`,
       {
         method: 'PATCH',
-        body: JSON.stringify(data)
+        body: JSON.stringify(data),
       }
     )
   },
@@ -121,8 +128,12 @@ export const adminApi = {
     return httpClient<SystemOverview>('/api/v1/admin/overview')
   },
 
-  async getRegistrationAnalytics(period: '7d' | '30d' | '90d' | '1y' | 'all' = '30d', groupBy: 'day' | 'week' | 'month' = 'day'): Promise<RegistrationAnalytics> {
-    return httpClient<RegistrationAnalytics>(`/api/v1/admin/analytics/registrations?period=${period}&groupBy=${groupBy}`)
-  }
+  async getRegistrationAnalytics(
+    period: '7d' | '30d' | '90d' | '1y' | 'all' = '30d',
+    groupBy: 'day' | 'week' | 'month' = 'day'
+  ): Promise<RegistrationAnalytics> {
+    return httpClient<RegistrationAnalytics>(
+      `/api/v1/admin/analytics/registrations?period=${period}&groupBy=${groupBy}`
+    )
+  },
 }
-

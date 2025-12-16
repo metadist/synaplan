@@ -1,5 +1,8 @@
 <template>
-  <div class="storage-quota-widget surface-card rounded-lg p-4 border border-light-border/30 dark:border-dark-border/20" data-testid="widget-storage-quota">
+  <div
+    class="storage-quota-widget surface-card rounded-lg p-4 border border-light-border/30 dark:border-dark-border/20"
+    data-testid="widget-storage-quota"
+  >
     <!-- Header -->
     <div class="flex items-center justify-between mb-3">
       <div>
@@ -8,10 +11,7 @@
           {{ $t('storage.plan') }}: <span class="font-medium txt-brand">{{ planName }}</span>
         </p>
       </div>
-      <Icon 
-        :icon="storageIcon" 
-        :class="['w-6 h-6', storageIconColor]"
-      />
+      <Icon :icon="storageIcon" :class="['w-6 h-6', storageIconColor]" />
     </div>
 
     <!-- Progress Bar -->
@@ -21,11 +21,8 @@
         <span>{{ stats?.storage.limit_formatted || '100 MB' }}</span>
       </div>
       <div class="h-2 bg-black/10 dark:bg-white/10 rounded-full overflow-hidden">
-        <div 
-          :class="[
-            'h-full transition-all duration-300 rounded-full',
-            progressBarColor
-          ]"
+        <div
+          :class="['h-full transition-all duration-300 rounded-full', progressBarColor]"
           :style="{ width: `${percentage}%` }"
         ></div>
       </div>
@@ -44,19 +41,23 @@
     </div>
 
     <!-- Warning/Upgrade Message -->
-    <div v-if="percentage > 80" class="mt-3 p-2 rounded-lg bg-orange-500/10 dark:bg-orange-500/20 border border-orange-500/30 dark:border-orange-500/40">
+    <div
+      v-if="percentage > 80"
+      class="mt-3 p-2 rounded-lg bg-orange-500/10 dark:bg-orange-500/20 border border-orange-500/30 dark:border-orange-500/40"
+    >
       <p class="text-xs text-orange-600 dark:text-orange-400">
         <Icon icon="mdi:alert" class="inline w-4 h-4 mr-1" />
-        {{ percentage >= 100 
-          ? $t('storage.limitReached') 
-          : $t('storage.almostFull', { remaining: stats?.storage.remaining_formatted }) 
+        {{
+          percentage >= 100
+            ? $t('storage.limitReached')
+            : $t('storage.almostFull', { remaining: stats?.storage.remaining_formatted })
         }}
       </p>
-      <button 
+      <button
         v-if="stats?.user_level === 'NEW'"
-        @click="$emit('upgrade')"
         class="mt-2 w-full btn-primary text-xs py-1.5 px-3 rounded"
         data-testid="btn-storage-upgrade"
+        @click="$emit('upgrade')"
       >
         {{ $t('storage.upgradePlan') }}
       </button>
@@ -85,7 +86,7 @@ const planLabels = {
   NEW: 'Free',
   PRO: 'Pro',
   TEAM: 'Team',
-  BUSINESS: 'Business'
+  BUSINESS: 'Business',
 } as const
 
 const planName = computed(() => {
@@ -129,7 +130,6 @@ onMounted(() => {
 
 // Expose refresh method for parent component
 defineExpose({
-  refresh: loadStats
+  refresh: loadStats,
 })
 </script>
-

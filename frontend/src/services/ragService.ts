@@ -50,9 +50,9 @@ export const search = async (params: RagSearchRequest): Promise<RagSearchRespons
     query: params.query,
     limit: params.limit || 10,
     min_score: params.min_score || 0.5,
-    group_key: params.group_key || null
+    group_key: params.group_key || null,
   })
-  
+
   return response.data
 }
 
@@ -80,6 +80,5 @@ export const findSimilar = async (
 export default {
   search,
   getStats,
-  findSimilar
+  findSimilar,
 }
-

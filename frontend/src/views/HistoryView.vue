@@ -36,9 +36,7 @@
           <p class="text-sm txt-secondary mb-2">
             {{ $t('history.dateRange') }}
           </p>
-          <p class="text-sm font-medium txt-primary">
-            Invalid Date - Invalid Date
-          </p>
+          <p class="text-sm font-medium txt-primary">Invalid Date - Invalid Date</p>
         </div>
       </div>
 
@@ -100,7 +98,10 @@
         </div>
       </div>
 
-      <div class="space-y-4 max-h-[600px] overflow-y-auto scroll-thin" data-testid="section-history-list">
+      <div
+        class="space-y-4 max-h-[600px] overflow-y-auto scroll-thin"
+        data-testid="section-history-list"
+      >
         <div
           v-for="item in historyItems"
           :key="item.id"
@@ -112,9 +113,7 @@
               <span class="surface-chip px-3 py-1 text-xs font-medium txt-primary">
                 User Request
               </span>
-              <span class="surface-chip px-3 py-1 text-xs font-medium txt-primary">
-                general
-              </span>
+              <span class="surface-chip px-3 py-1 text-xs font-medium txt-primary"> general </span>
             </div>
             <span class="text-xs txt-secondary">
               {{ item.timestamp }}
@@ -125,9 +124,7 @@
             {{ item.content }}
           </p>
 
-          <Button variant="secondary" size="sm">
-            Load AI Answer
-          </Button>
+          <Button variant="secondary" size="sm"> Load AI Answer </Button>
         </div>
       </div>
     </div>
@@ -136,7 +133,12 @@
 
 <script setup lang="ts">
 import { ref } from 'vue'
-import { ArrowUturnLeftIcon, FunnelIcon, MagnifyingGlassIcon, XMarkIcon } from '@heroicons/vue/24/outline'
+import {
+  ArrowUturnLeftIcon,
+  FunnelIcon,
+  MagnifyingGlassIcon,
+  XMarkIcon,
+} from '@heroicons/vue/24/outline'
 import MainLayout from '../components/MainLayout.vue'
 import Button from '../components/Button.vue'
 import Select from '../components/Select.vue'

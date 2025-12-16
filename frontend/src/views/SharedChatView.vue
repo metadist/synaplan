@@ -1,21 +1,33 @@
 <template>
   <div class="min-h-screen bg-chat" data-testid="page-shared-chat">
-
     <!-- Header -->
-    <header class="sticky top-0 z-10 backdrop-blur-lg bg-surface/80 border-b border-light-border dark:border-dark-border" data-testid="section-header">
+    <header
+      class="sticky top-0 z-10 backdrop-blur-lg bg-surface/80 border-b border-light-border dark:border-dark-border"
+      data-testid="section-header"
+    >
       <div class="max-w-4xl mx-auto px-4 py-4">
         <div class="flex items-center justify-between">
           <div class="flex items-center gap-3">
-            <svg class="w-8 h-8 text-[var(--brand)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+            <svg
+              class="w-8 h-8 text-[var(--brand)]"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
+              />
             </svg>
             <div>
               <h1 class="text-xl font-bold txt-primary">{{ chat?.title || 'Shared Chat' }}</h1>
               <p class="text-sm txt-secondary">Shared conversation via Synaplan AI</p>
             </div>
           </div>
-          <a 
-            href="https://synaplan.com" 
+          <a
+            href="https://synaplan.com"
             target="_blank"
             class="btn-primary px-4 py-2 rounded-lg text-sm font-medium"
             data-testid="btn-try-synaplan"
@@ -29,7 +41,9 @@
     <!-- Loading State -->
     <div v-if="loading" class="flex justify-center items-center py-20" data-testid="state-loading">
       <div class="text-center">
-        <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-[var(--brand)] mx-auto mb-4"></div>
+        <div
+          class="animate-spin rounded-full h-12 w-12 border-b-2 border-[var(--brand)] mx-auto mb-4"
+        ></div>
         <p class="txt-secondary">Loading chat...</p>
       </div>
     </div>
@@ -37,15 +51,22 @@
     <!-- Error State -->
     <div v-else-if="error" class="max-w-4xl mx-auto px-4 py-20" data-testid="state-error">
       <div class="text-center">
-        <svg class="w-16 h-16 text-red-500 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+        <svg
+          class="w-16 h-16 text-red-500 mx-auto mb-4"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+          />
         </svg>
         <h2 class="text-2xl font-bold txt-primary mb-2">Chat Not Found</h2>
         <p class="txt-secondary mb-6">This chat doesn't exist or is no longer shared publicly.</p>
-        <a 
-          href="https://synaplan.com" 
-          class="btn-primary px-6 py-3 rounded-lg inline-block"
-        >
+        <a href="https://synaplan.com" class="btn-primary px-6 py-3 rounded-lg inline-block">
           Visit Synaplan
         </a>
       </div>
@@ -54,16 +75,33 @@
     <!-- Chat Content -->
     <main v-else class="max-w-4xl mx-auto px-4 py-8" data-testid="section-chat-content">
       <!-- Chat Info Banner -->
-      <div class="mb-8 p-6 rounded-lg bg-[var(--brand)]/10 border border-[var(--brand)]/20" data-testid="section-info-banner">
+      <div
+        class="mb-8 p-6 rounded-lg bg-[var(--brand)]/10 border border-[var(--brand)]/20"
+        data-testid="section-info-banner"
+      >
         <div class="flex items-start gap-4">
-          <svg class="w-6 h-6 text-[var(--brand)] mt-1 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          <svg
+            class="w-6 h-6 text-[var(--brand)] mt-1 flex-shrink-0"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+            />
           </svg>
           <div class="flex-1">
             <h3 class="font-semibold txt-primary mb-1">This is a shared conversation</h3>
             <p class="text-sm txt-secondary">
-              This chat was shared publicly and can be found by search engines like Google. 
-              <a href="https://synaplan.com" target="_blank" class="text-[var(--brand)] hover:underline">
+              This chat was shared publicly and can be found by search engines like Google.
+              <a
+                href="https://synaplan.com"
+                target="_blank"
+                class="text-[var(--brand)] hover:underline"
+              >
                 Create your own AI-powered conversations
               </a>
             </p>
@@ -73,8 +111,8 @@
 
       <!-- Messages -->
       <div class="space-y-6" data-testid="section-messages">
-        <div 
-          v-for="message in messages" 
+        <div
+          v-for="message in messages"
           :key="message.id"
           class="flex gap-4"
           :class="message.direction === 'IN' ? 'flex-row' : 'flex-row-reverse'"
@@ -82,40 +120,50 @@
         >
           <!-- Avatar -->
           <div class="flex-shrink-0">
-            <div 
+            <div
               class="w-10 h-10 rounded-full flex items-center justify-center"
-              :class="message.direction === 'IN' 
-                ? 'bg-gray-200 dark:bg-gray-700' 
-                : 'bg-[var(--brand)]'
+              :class="
+                message.direction === 'IN' ? 'bg-gray-200 dark:bg-gray-700' : 'bg-[var(--brand)]'
               "
             >
-              <svg 
-                v-if="message.direction === 'IN'" 
-                class="w-6 h-6 txt-secondary" 
-                fill="none" 
-                stroke="currentColor" 
+              <svg
+                v-if="message.direction === 'IN'"
+                class="w-6 h-6 txt-secondary"
+                fill="none"
+                stroke="currentColor"
                 viewBox="0 0 24 24"
               >
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
+                />
               </svg>
-              <svg 
-                v-else 
-                class="w-6 h-6 text-white" 
-                fill="none" 
-                stroke="currentColor" 
+              <svg
+                v-else
+                class="w-6 h-6 text-white"
+                fill="none"
+                stroke="currentColor"
                 viewBox="0 0 24 24"
               >
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"
+                />
               </svg>
             </div>
           </div>
-          
+
           <!-- Message Content -->
-          <div 
+          <div
             class="flex-1 max-w-2xl p-4 rounded-lg"
-            :class="message.direction === 'IN' 
-              ? 'surface-card' 
-              : 'bg-[var(--brand)]/10 border border-[var(--brand)]/20'
+            :class="
+              message.direction === 'IN'
+                ? 'surface-card'
+                : 'bg-[var(--brand)]/10 border border-[var(--brand)]/20'
             "
           >
             <div class="flex items-baseline justify-between mb-2">
@@ -126,27 +174,34 @@
                 {{ formatDate(message.timestamp) }}
               </span>
             </div>
-            <div class="txt-primary whitespace-pre-wrap break-words" v-html="formatMessageText(message.text)"></div>
-            
+            <div
+              class="txt-primary whitespace-pre-wrap break-words"
+              v-html="formatMessageText(message.text)"
+            ></div>
+
             <!-- File attachments (images, videos) -->
             <div v-if="message.file" class="mt-3">
-              <MessageImage 
-                v-if="message.file.type === 'image'" 
-                :url="message.file.path" 
-                :alt="message.text || 'Generated image'" 
+              <MessageImage
+                v-if="message.file.type === 'image'"
+                :url="message.file.path"
+                :alt="message.text || 'Generated image'"
               />
-              <MessageVideo 
-                v-if="message.file.type === 'video'" 
-                :url="message.file.path" 
-              />
+              <MessageVideo v-if="message.file.type === 'video'" :url="message.file.path" />
             </div>
-            
+
             <!-- Topic Badge -->
             <div v-if="message.topic" class="mt-3 flex items-center gap-2 flex-wrap">
-              <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium" style="background-color: #1e40af; color: white;">
+              <span
+                class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium"
+                style="background-color: #1e40af; color: white"
+              >
                 {{ message.topic }}
               </span>
-              <span v-if="message.language" class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium" style="background-color: #4b5563; color: white;">
+              <span
+                v-if="message.language"
+                class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium"
+                style="background-color: #4b5563; color: white"
+              >
                 {{ message.language }}
               </span>
             </div>
@@ -155,20 +210,25 @@
       </div>
 
       <!-- Footer CTA -->
-      <div class="mt-12 p-8 rounded-lg bg-gradient-to-r from-[var(--brand)]/10 to-purple-500/10 border border-[var(--brand)]/20 text-center">
-        <h3 class="text-2xl font-bold txt-primary mb-3">Want to create your own AI conversations?</h3>
+      <div
+        class="mt-12 p-8 rounded-lg bg-gradient-to-r from-[var(--brand)]/10 to-purple-500/10 border border-[var(--brand)]/20 text-center"
+      >
+        <h3 class="text-2xl font-bold txt-primary mb-3">
+          Want to create your own AI conversations?
+        </h3>
         <p class="txt-secondary mb-6 max-w-2xl mx-auto">
-          Synaplan AI helps you build intelligent chatbots, automate workflows, and create amazing AI-powered experiences.
+          Synaplan AI helps you build intelligent chatbots, automate workflows, and create amazing
+          AI-powered experiences.
         </p>
         <div class="flex gap-4 justify-center">
-          <a 
-            href="https://synaplan.com/register" 
+          <a
+            href="https://synaplan.com/register"
             class="btn-primary px-6 py-3 rounded-lg font-medium inline-block"
           >
             Get Started Free
           </a>
-          <a 
-            href="https://synaplan.com" 
+          <a
+            href="https://synaplan.com"
             class="px-6 py-3 rounded-lg border border-light-border dark:border-dark-border hover-surface transition-colors font-medium inline-block"
           >
             Learn More
@@ -181,13 +241,17 @@
     <footer class="mt-20 border-t border-light-border dark:border-dark-border py-8">
       <div class="max-w-4xl mx-auto px-4 text-center txt-secondary text-sm">
         <p>
-          Powered by 
-          <a href="https://synaplan.com" target="_blank" class="text-[var(--brand)] hover:underline font-medium">
+          Powered by
+          <a
+            href="https://synaplan.com"
+            target="_blank"
+            class="text-[var(--brand)] hover:underline font-medium"
+          >
             Synaplan AI
           </a>
-          · 
+          ·
           <a href="https://synaplan.com/privacy" target="_blank" class="hover:underline">Privacy</a>
-          · 
+          ·
           <a href="https://synaplan.com/terms" target="_blank" class="hover:underline">Terms</a>
         </p>
       </div>
@@ -235,7 +299,7 @@ const pageTitle = computed(() => {
 
 const pageDescription = computed(() => {
   if (!messages.value.length) return 'A shared conversation powered by Synaplan AI'
-  const firstMessage = messages.value.find(m => m.direction === 'IN')?.text || ''
+  const firstMessage = messages.value.find((m) => m.direction === 'IN')?.text || ''
   return firstMessage.substring(0, 160) + (firstMessage.length > 160 ? '...' : '')
 })
 
@@ -247,30 +311,30 @@ const currentUrl = computed(() => {
 const updateMetaTags = () => {
   // Title
   document.title = pageTitle.value
-  
+
   // Meta Description
   updateOrCreateMeta('name', 'description', pageDescription.value)
-  
+
   // Open Graph
   updateOrCreateMeta('property', 'og:type', 'website')
   updateOrCreateMeta('property', 'og:url', currentUrl.value)
   updateOrCreateMeta('property', 'og:title', pageTitle.value)
   updateOrCreateMeta('property', 'og:description', pageDescription.value)
   updateOrCreateMeta('property', 'og:site_name', 'Synaplan AI')
-  
+
   // Twitter
   updateOrCreateMeta('property', 'twitter:card', 'summary_large_image')
   updateOrCreateMeta('property', 'twitter:url', currentUrl.value)
   updateOrCreateMeta('property', 'twitter:title', pageTitle.value)
   updateOrCreateMeta('property', 'twitter:description', pageDescription.value)
-  
+
   // SEO
   updateOrCreateMeta('name', 'robots', 'index, follow')
   updateOrCreateMeta('name', 'googlebot', 'index, follow')
-  
+
   // Canonical
   updateOrCreateLink('canonical', currentUrl.value)
-  
+
   // JSON-LD Structured Data
   if (chat.value && messages.value.length > 0) {
     updateStructuredData()
@@ -304,18 +368,18 @@ const updateStructuredData = () => {
     script.setAttribute('type', 'application/ld+json')
     document.head.appendChild(script)
   }
-  
+
   script.textContent = JSON.stringify({
     '@context': 'https://schema.org',
     '@type': 'Conversation',
-    'name': chat.value?.title,
-    'description': pageDescription.value,
-    'datePublished': chat.value?.createdAt,
-    'author': {
+    name: chat.value?.title,
+    description: pageDescription.value,
+    datePublished: chat.value?.createdAt,
+    author: {
       '@type': 'Organization',
-      'name': 'Synaplan AI'
+      name: 'Synaplan AI',
     },
-    'commentCount': messages.value.length
+    commentCount: messages.value.length,
   })
 }
 
@@ -336,7 +400,7 @@ onMounted(async () => {
 
   try {
     const data = await httpClient<any>(`/api/v1/chats/shared/${token}`, {
-      skipAuth: true
+      skipAuth: true,
     })
 
     if (!data.success) {
@@ -368,7 +432,9 @@ const formatMessageText = (text: string): string => {
   const codeBlocks: string[] = []
   let content = text.replace(/```(\w+)?\n([\s\S]*?)```/g, (_, _lang, code) => {
     const placeholder = `__CODEBLOCK_${codeBlocks.length}__`
-    codeBlocks.push(`<pre class="bg-black/5 dark:bg-white/5 p-3 rounded-lg overflow-x-auto my-2"><code class="text-xs font-mono">${escapeHtml(code.trim())}</code></pre>`)
+    codeBlocks.push(
+      `<pre class="bg-black/5 dark:bg-white/5 p-3 rounded-lg overflow-x-auto my-2"><code class="text-xs font-mono">${escapeHtml(code.trim())}</code></pre>`
+    )
     return placeholder
   })
 
@@ -385,29 +451,30 @@ const formatMessageText = (text: string): string => {
 
     // Empty line
     if (trimmed === '') {
-      if (inList) html += '</ul>', inList = false
-      if (inOrderedList) html += '</ol>', inOrderedList = false
-      if (inBlockquote) html += '</blockquote>', inBlockquote = false
+      if (inList) ((html += '</ul>'), (inList = false))
+      if (inOrderedList) ((html += '</ol>'), (inOrderedList = false))
+      if (inBlockquote) ((html += '</blockquote>'), (inBlockquote = false))
       html += '<br>'
       continue
     }
 
     // Horizontal rule
     if (trimmed === '---' || trimmed === '***') {
-      if (inList) html += '</ul>', inList = false
-      if (inOrderedList) html += '</ol>', inOrderedList = false
-      if (inBlockquote) html += '</blockquote>', inBlockquote = false
+      if (inList) ((html += '</ul>'), (inList = false))
+      if (inOrderedList) ((html += '</ol>'), (inOrderedList = false))
+      if (inBlockquote) ((html += '</blockquote>'), (inBlockquote = false))
       html += '<hr class="my-3 border-t border-gray-300 dark:border-gray-600">'
       continue
     }
 
     // Blockquote
     if (trimmed.startsWith('> ')) {
-      if (inList) html += '</ul>', inList = false
-      if (inOrderedList) html += '</ol>', inOrderedList = false
+      if (inList) ((html += '</ul>'), (inList = false))
+      if (inOrderedList) ((html += '</ol>'), (inOrderedList = false))
       if (!inBlockquote) {
         inBlockquote = true
-        html += '<blockquote class="border-l-4 pl-3 py-1 my-2 italic rounded-r" style="border-color: #6b7280; background-color: #f3f4f6; color: #1f2937;">'
+        html +=
+          '<blockquote class="border-l-4 pl-3 py-1 my-2 italic rounded-r" style="border-color: #6b7280; background-color: #f3f4f6; color: #1f2937;">'
       }
       html += `<p class="mb-1">${formatInline(trimmed.substring(2))}</p>`
       continue
@@ -419,18 +486,25 @@ const formatMessageText = (text: string): string => {
     // Headers
     const headingMatch = trimmed.match(/^(#{1,6})\s+(.*)$/)
     if (headingMatch) {
-      if (inList) html += '</ul>', inList = false
-      if (inOrderedList) html += '</ol>', inOrderedList = false
+      if (inList) ((html += '</ul>'), (inList = false))
+      if (inOrderedList) ((html += '</ol>'), (inOrderedList = false))
       const level = headingMatch[1].length
-      const headingClasses = ['text-2xl font-bold mt-4', 'text-xl font-bold mt-3', 'text-lg font-semibold mt-2', 'text-base font-semibold mt-2', 'text-sm font-semibold mt-1', 'text-sm font-medium mt-1']
+      const headingClasses = [
+        'text-2xl font-bold mt-4',
+        'text-xl font-bold mt-3',
+        'text-lg font-semibold mt-2',
+        'text-base font-semibold mt-2',
+        'text-sm font-semibold mt-1',
+        'text-sm font-medium mt-1',
+      ]
       html += `<h${level} class="${headingClasses[level - 1] || headingClasses[5]}">${formatInline(headingMatch[2])}</h${level}>`
       continue
     }
 
     // Unordered list
     if (/^[-*]\s+/.test(trimmed)) {
-      if (inOrderedList) html += '</ol>', inOrderedList = false
-      if (inBlockquote) html += '</blockquote>', inBlockquote = false
+      if (inOrderedList) ((html += '</ol>'), (inOrderedList = false))
+      if (inBlockquote) ((html += '</blockquote>'), (inBlockquote = false))
       if (!inList) {
         inList = true
         html += '<ul class="list-disc pl-5 space-y-1 my-2">'
@@ -442,8 +516,8 @@ const formatMessageText = (text: string): string => {
     // Ordered list
     const orderedMatch = trimmed.match(/^(\d+)\.\s+(.*)$/)
     if (orderedMatch) {
-      if (inList) html += '</ul>', inList = false
-      if (inBlockquote) html += '</blockquote>', inBlockquote = false
+      if (inList) ((html += '</ul>'), (inList = false))
+      if (inBlockquote) ((html += '</blockquote>'), (inBlockquote = false))
       if (!inOrderedList) {
         inOrderedList = true
         html += '<ol class="list-decimal pl-5 space-y-1 my-2">'
@@ -453,9 +527,9 @@ const formatMessageText = (text: string): string => {
     }
 
     // Regular paragraph
-    if (inList) html += '</ul>', inList = false
-    if (inOrderedList) html += '</ol>', inOrderedList = false
-    if (inBlockquote) html += '</blockquote>', inBlockquote = false
+    if (inList) ((html += '</ul>'), (inList = false))
+    if (inOrderedList) ((html += '</ol>'), (inOrderedList = false))
+    if (inBlockquote) ((html += '</blockquote>'), (inBlockquote = false))
     html += `<p class="mb-2">${formatInline(line)}</p>`
   }
 
@@ -473,14 +547,22 @@ const formatMessageText = (text: string): string => {
 }
 
 const formatInline = (text: string): string => {
-  return text
-    // Links [text](url)
-    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer" class="text-blue-600 dark:text-blue-400 hover:underline">$1</a>')
-    // Inline code
-    .replace(/`([^`]+)`/g, '<code class="px-1 py-0.5 rounded bg-black/10 dark:bg-white/10 font-mono text-sm">$1</code>')
-    // Bold
-    .replace(/\*\*([^*]+)\*\*/g, '<strong class="font-semibold">$1</strong>')
-    // Italic
-    .replace(/\*([^*]+)\*/g, '<em class="italic">$1</em>')
+  return (
+    text
+      // Links [text](url)
+      .replace(
+        /\[([^\]]+)\]\(([^)]+)\)/g,
+        '<a href="$2" target="_blank" rel="noopener noreferrer" class="text-blue-600 dark:text-blue-400 hover:underline">$1</a>'
+      )
+      // Inline code
+      .replace(
+        /`([^`]+)`/g,
+        '<code class="px-1 py-0.5 rounded bg-black/10 dark:bg-white/10 font-mono text-sm">$1</code>'
+      )
+      // Bold
+      .replace(/\*\*([^*]+)\*\*/g, '<strong class="font-semibold">$1</strong>')
+      // Italic
+      .replace(/\*([^*]+)\*/g, '<em class="italic">$1</em>')
+  )
 }
 </script>

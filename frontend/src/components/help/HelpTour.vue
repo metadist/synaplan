@@ -10,15 +10,15 @@
     >
       <div v-if="show && currentStepData" class="fixed inset-0 z-50" data-testid="modal-help-tour">
         <!-- Backdrop with spotlight -->
-        <div 
+        <div
           class="absolute inset-0 bg-black transition-opacity duration-300 pointer-events-auto"
           :style="{ opacity: 0.7 }"
-          @click="onBackdropClick"
           data-testid="modal-backdrop"
+          @click="onBackdropClick"
         ></div>
-        
+
         <!-- Spotlight cutout -->
-        <div 
+        <div
           v-if="highlightedElement"
           class="absolute border-4 border-[var(--brand)] rounded-lg transition-all duration-300 pointer-events-none shadow-2xl"
           :style="spotlightStyle"
@@ -34,16 +34,18 @@
         >
           <div class="flex items-start justify-between mb-3">
             <div class="flex items-center gap-2">
-              <div class="w-8 h-8 rounded-full bg-[var(--brand)] text-white flex items-center justify-center font-semibold text-sm">
+              <div
+                class="w-8 h-8 rounded-full bg-[var(--brand)] text-white flex items-center justify-center font-semibold text-sm"
+              >
                 {{ currentStepIndex + 1 }}
               </div>
               <h3 class="text-lg font-semibold txt-primary">{{ currentStepData.title }}</h3>
             </div>
             <button
-              @click="$emit('close')"
               class="w-8 h-8 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 transition-colors txt-secondary hover:txt-primary"
               :aria-label="$t('help.close')"
               data-testid="btn-close"
+              @click="$emit('close')"
             >
               <XMarkIcon class="w-5 h-5 mx-auto" />
             </button>
@@ -52,31 +54,29 @@
           <p class="txt-secondary mb-4 text-sm leading-relaxed">{{ currentStepData.content }}</p>
 
           <div class="flex items-center justify-between">
-            <div class="text-xs txt-secondary">
-              {{ currentStepIndex + 1 }} / {{ steps.length }}
-            </div>
+            <div class="text-xs txt-secondary">{{ currentStepIndex + 1 }} / {{ steps.length }}</div>
             <div class="flex gap-2">
               <button
                 v-if="currentStepIndex > 0"
-                @click="prevStep"
                 class="px-4 py-2 rounded-lg border border-light-border/30 dark:border-dark-border/20 txt-primary hover:bg-black/5 dark:hover:bg-white/5 transition-colors text-sm"
                 data-testid="btn-prev"
+                @click="prevStep"
               >
                 {{ $t('mail.previous') }}
               </button>
               <button
                 v-if="currentStepIndex < steps.length - 1"
-                @click="nextStep"
                 class="btn-primary px-5 py-2 rounded-lg text-sm font-medium"
                 data-testid="btn-next"
+                @click="nextStep"
               >
                 {{ $t('mail.next') }}
               </button>
               <button
                 v-else
-                @click="finish"
                 class="btn-primary px-5 py-2 rounded-lg text-sm font-medium"
                 data-testid="btn-finish"
+                @click="finish"
               >
                 {{ $t('help.gotIt') }}
               </button>
@@ -197,21 +197,27 @@ const finish = () => {
   emit('close')
 }
 
-watch(() => props.show, (newVal) => {
-  if (newVal) {
-    currentStepIndex.value = 0
-    updateHighlight()
-  } else {
-    highlightedElement.value = null
+watch(
+  () => props.show,
+  (newVal) => {
+    if (newVal) {
+      currentStepIndex.value = 0
+      updateHighlight()
+    } else {
+      highlightedElement.value = null
+    }
   }
-})
+)
 
-watch(() => props.steps, () => {
-  if (props.show) {
-    currentStepIndex.value = 0
-    updateHighlight()
+watch(
+  () => props.steps,
+  () => {
+    if (props.show) {
+      currentStepIndex.value = 0
+      updateHighlight()
+    }
   }
-})
+)
 
 onMounted(() => {
   if (props.show) {
@@ -219,4 +225,3 @@ onMounted(() => {
   }
 })
 </script>
-

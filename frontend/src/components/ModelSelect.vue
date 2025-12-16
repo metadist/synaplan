@@ -1,19 +1,19 @@
 <template>
   <div class="relative isolate" data-testid="comp-model-select">
     <button
-      @click="isOpen = !isOpen"
       class="dropdown-trigger"
       data-testid="btn-model-select-toggle"
+      @click="isOpen = !isOpen"
     >
-      <GroqIcon 
+      <GroqIcon
         v-if="modelsStore.selectedProvider.toLowerCase().includes('groq')"
-        :size="20" 
-        class-name="flex-shrink-0" 
+        :size="20"
+        class-name="flex-shrink-0"
       />
-      <Icon 
+      <Icon
         v-else
-        :icon="getProviderIcon(modelsStore.selectedProvider)" 
-        class="w-4 h-4 md:w-5 md:h-5" 
+        :icon="getProviderIcon(modelsStore.selectedProvider)"
+        class="w-4 h-4 md:w-5 md:h-5"
       />
       <span class="text-xs md:text-sm font-medium hidden sm:inline">{{ currentLabel }}</span>
       <ChevronDownIcon class="w-4 h-4" />
@@ -28,25 +28,22 @@
       <button
         v-for="option in modelOptions"
         :key="`${option.provider}-${option.model}`"
-        @click="selectModel(option)"
         role="menuitem"
         :class="[
           'dropdown-item',
-          modelsStore.selectedProvider === option.provider && modelsStore.selectedModel === option.model
+          modelsStore.selectedProvider === option.provider &&
+          modelsStore.selectedModel === option.model
             ? 'dropdown-item--active'
             : '',
         ]"
+        @click="selectModel(option)"
       >
-        <GroqIcon 
+        <GroqIcon
           v-if="option.provider.toLowerCase().includes('groq')"
-          :size="20" 
-          class-name="flex-shrink-0" 
+          :size="20"
+          class-name="flex-shrink-0"
         />
-        <Icon 
-          v-else
-          :icon="getProviderIcon(option.provider)" 
-          class="w-5 h-5 flex-shrink-0" 
-        />
+        <Icon v-else :icon="getProviderIcon(option.provider)" class="w-5 h-5 flex-shrink-0" />
         <div class="flex-1 min-w-0">
           <div class="text-sm font-medium">{{ option.label }}</div>
           <div class="text-xs txt-secondary">{{ option.provider }}</div>
@@ -77,14 +74,13 @@ const defaultModelOptions = [
 ]
 
 const modelOptions = computed(() => {
-  return modelsStore.chatModels.length > 0 
-    ? modelsStore.chatModels 
-    : defaultModelOptions
+  return modelsStore.chatModels.length > 0 ? modelsStore.chatModels : defaultModelOptions
 })
 
 const currentLabel = computed(() => {
   const current = modelOptions.value.find(
-    (opt) => opt.provider === modelsStore.selectedProvider && opt.model === modelsStore.selectedModel
+    (opt) =>
+      opt.provider === modelsStore.selectedProvider && opt.model === modelsStore.selectedModel
   )
   return current ? current.label : 'Model'
 })
