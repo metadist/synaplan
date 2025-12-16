@@ -53,7 +53,7 @@
                 type="email"
                 required
                 class="w-full px-4 py-3 rounded-lg surface-chip txt-primary placeholder:txt-secondary focus:outline-none focus:ring-2 focus:ring-[var(--brand)] transition-colors border-0"
-                :placeholder="$t('auth.emailPlaceholder')"
+                :placeholder="emailPlaceholder"
                 data-testid="input-email"
               />
             </div>
@@ -153,11 +153,11 @@
 import { ref, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { SunIcon, MoonIcon, ArrowLeftIcon } from '@heroicons/vue/24/outline'
-import { useTheme } from '../composables/useTheme'
+import { useTheme } from '@/composables/useTheme'
 import { authApi } from '@/services/api'
-import Button from '../components/Button.vue'
+import Button from '@/components/Button.vue'
 
-const { locale } = useI18n()
+const { locale, t } = useI18n()
 const themeStore = useTheme()
 
 const isDark = computed(() => {
@@ -166,9 +166,15 @@ const isDark = computed(() => {
   return matchMedia('(prefers-color-scheme: dark)').matches
 })
 
-const logoSrc = computed(
-  () => `${import.meta.env.BASE_URL}${isDark.value ? 'synaplan-light.svg' : 'synaplan-dark.svg'}`
-)
+const logoSrc = computed(() => {
+  const baseUrl = import.meta.env.BASE_URL || '/'
+  return `${baseUrl}${isDark.value ? 'synaplan-light.svg' : 'synaplan-dark.svg'}`
+})
+
+const emailPlaceholder = computed(() => {
+  // Combine prefix and suffix with @ to avoid vue-i18n interpreting @ as linked message syntax
+  return `${t('auth.emailPlaceholderPrefix')}@${t('auth.emailPlaceholderSuffix')}`
+})
 
 const email = ref('')
 const emailSent = ref(false)

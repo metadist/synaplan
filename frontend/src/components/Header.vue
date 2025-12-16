@@ -1,5 +1,5 @@
 <template>
-  <header class="bg-header" data-testid="comp-app-header">
+  <header class="bg-header relative z-50" data-testid="comp-app-header">
     <div class="flex items-center justify-between px-6 py-4" data-testid="section-header-bar">
       <div class="flex items-center gap-3 flex-1" data-testid="section-header-left">
         <button
@@ -27,7 +27,7 @@
           }}</span>
         </button>
 
-        <div class="relative isolate" data-testid="section-language-selector">
+        <div ref="langSelectorRef" class="relative isolate" data-testid="section-language-selector">
           <button
             class="dropdown-trigger"
             aria-label="Select language"
@@ -94,6 +94,7 @@ const sidebarStore = useSidebarStore()
 const appModeStore = useAppModeStore()
 const { locale } = useI18n()
 const isLangOpen = ref(false)
+const langSelectorRef = ref<HTMLElement | null>(null)
 
 const languages = [
   { value: 'en', label: 'EN' },
@@ -127,9 +128,10 @@ const cycleTheme = () => {
 }
 
 const handleClickOutside = (event: MouseEvent) => {
+  if (!isLangOpen.value) return
+
   const target = event.target as HTMLElement
-  const container = target.closest('.relative')
-  if (isLangOpen.value && (!container || !container.contains(event.target as Node))) {
+  if (langSelectorRef.value && !langSelectorRef.value.contains(target)) {
     isLangOpen.value = false
   }
 }

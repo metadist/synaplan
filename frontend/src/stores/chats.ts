@@ -171,11 +171,15 @@ export const useChatsStore = defineStore('chats', () => {
         method: 'DELETE',
       })
 
+      const wasActiveChat = activeChatId.value === chatId
       chats.value = chats.value.filter((c) => c.id !== chatId)
 
-      // Select another chat if the deleted one was active
-      if (activeChatId.value === chatId) {
-        updateActiveChatSelection(chats.value.length > 0 ? chats.value[0].id : null)
+      // If the deleted chat was active and it was the last chat, create a new one
+      if (wasActiveChat && chats.value.length === 0) {
+        await createChat()
+      } else if (wasActiveChat && chats.value.length > 0) {
+        // Select another chat if the deleted one was active
+        updateActiveChatSelection(chats.value[0].id)
       }
     } catch (err: any) {
       error.value = err.message || 'Failed to delete chat'

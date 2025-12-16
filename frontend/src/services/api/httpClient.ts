@@ -4,7 +4,7 @@
  */
 
 import { useConfigStore } from '@/stores/config'
-import type { z } from 'zod'
+import { z } from 'zod'
 
 const config = useConfigStore()
 const API_BASE_URL = config.apiBaseUrl
@@ -300,6 +300,16 @@ async function httpClient<T = unknown, S extends z.Schema | undefined = undefine
       return schema.parse(data) as z.output<NonNullable<S>>
     } catch (error) {
       console.error('Schema validation failed for endpoint:', endpoint)
+      console.error('Response data:', data)
+      console.error('Validation error:', error)
+      if (error instanceof z.ZodError) {
+        const zodError = error
+        const errors = zodError.issues || []
+        console.error('Zod errors:', errors)
+        throw new Error(
+          `Invalid API response format: ${errors.map((e) => `${e.path.join('.')}: ${e.message}`).join(', ')}`
+        )
+      }
       throw new Error('Invalid API response format')
     }
   }

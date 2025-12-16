@@ -232,11 +232,14 @@
     </div>
 
     <!-- Actions Row -->
-    <div class="flex items-center justify-between gap-3" data-testid="section-actions">
+    <div
+      class="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3"
+      data-testid="section-actions"
+    >
       <!-- Current Chat Model Display -->
       <router-link
         to="/config/ai-models?highlight=CHAT"
-        class="flex items-center gap-2 px-3 py-2 rounded-lg surface-elevated border border-light-border/30 dark:border-dark-border/20 hover:border-[var(--brand)] transition-all group"
+        class="flex items-center gap-2 px-3 py-2 rounded-lg surface-elevated border border-light-border/30 dark:border-dark-border/20 hover:border-[var(--brand)] transition-all group w-full sm:w-auto"
       >
         <svg
           class="w-4 h-4 txt-secondary group-hover:text-[var(--brand)] transition-colors flex-shrink-0"
@@ -284,7 +287,7 @@
       </router-link>
 
       <!-- Action Buttons -->
-      <div class="flex gap-2">
+      <div class="flex gap-2 w-full sm:w-auto">
         <button
           class="px-4 py-2 rounded-lg border border-light-border/30 dark:border-dark-border/20 txt-primary hover:bg-black/5 dark:hover:bg-white/5 transition-colors flex items-center gap-2"
           data-testid="btn-clear"

@@ -538,16 +538,6 @@
                       <div class="text-sm font-medium">{{ option.label }}</div>
                       <div class="text-xs txt-secondary">{{ option.provider }}</div>
                     </div>
-                    <span
-                      v-if="
-                        selectedModel &&
-                        selectedModel.model === option.model &&
-                        selectedModel.provider === option.provider
-                      "
-                      class="ml-2 text-[10px] uppercase tracking-wide text-brand font-semibold"
-                    >
-                      Aktiv
-                    </span>
                   </button>
                 </div>
               </Transition>

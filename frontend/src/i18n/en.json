@@ -6,7 +6,9 @@
     "tools": "Tools",
     "files": "Files & RAG",
     "config": "AI Config",
-    "statistics": "Statistics"
+    "statistics": "Statistics",
+    "notFound": "The chat no longer exists",
+    "notFoundDesc": "This chat has been deleted and is no longer available."
   },
   "admin": {
     "title": "Admin Panel",
@@ -52,7 +54,9 @@
       "searchPlaceholder": "Search by email...",
       "noUsers": "No users found",
       "deleteConfirmTitle": "Delete User?",
-      "deleteConfirmDesc": "Are you sure you want to delete {email}? This action cannot be undone."
+      "deleteConfirmDesc": "Are you sure you want to delete {email}? This action cannot be undone.",
+      "levelUpdated": "User level updated to {level}",
+      "levelUpdateFailed": "Failed to update user level"
     },
     "prompts": {
       "shortDesc": "Short Description",
@@ -364,6 +368,8 @@
     "attachedToMessage": "This file is attached to a message",
     "standaloneFile": "This file is standalone (not attached to any message)",
     "deleteSelected": "Delete Selected",
+    "deleteSelectedConfirmTitle": "Delete Selected Files?",
+    "deleteSelectedConfirmMessage": "Are you sure you want to delete {count} selected file(s)? This action cannot be undone and the files will be permanently deleted.",
     "noFiles": "No files uploaded yet",
     "page": "Page",
     "showing": "Showing",
@@ -829,7 +835,8 @@
     "login": "Login",
     "register": "Register",
     "email": "Email",
-    "emailPlaceholder": "your@email.com",
+    "emailPlaceholderPrefix": "your",
+    "emailPlaceholderSuffix": "email.com",
     "password": "Password",
     "confirmPassword": "Confirm Password",
     "passwordMismatch": "Passwords do not match",

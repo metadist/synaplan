@@ -240,10 +240,7 @@
                           :disabled="user.id === currentUserId"
                           :data-testid="`select-user-level-${user.id}`"
                           @change="
-                            updateUserLevel(
-                              user.id,
-                              ($event.target as HTMLSelectElement).value as AdminUser['level']
-                            )
+                            updateUserLevel(user.id, ($event.target as HTMLSelectElement).value)
                           "
                         >
                           <option value="NEW">NEW</option>
@@ -637,9 +634,11 @@ import {
 } from '@/services/api/adminApi'
 import { useAuthStore } from '@/stores/auth'
 import { useI18n } from 'vue-i18n'
+import { useNotification } from '@/composables/useNotification'
 
 const { t } = useI18n()
 const authStore = useAuthStore()
+const { success, error: showError } = useNotification()
 
 type TabId = 'overview' | 'users' | 'prompts' | 'usage'
 interface AdminTab {
@@ -752,10 +751,26 @@ async function loadUsers() {
       itemsPerPage.value,
       userSearch.value
     )
-    users.value = response.users
-    totalUsers.value = response.total
+    if (import.meta.env.DEV) {
+      console.log('📊 Users API response:', response)
+    }
+    if (response && response.users) {
+      users.value = response.users
+      totalUsers.value = response.total
+      if (import.meta.env.DEV) {
+        console.log('✅ Users loaded:', users.value.length)
+      }
+    } else {
+      if (import.meta.env.DEV) {
+        console.error('❌ Invalid response structure:', response)
+      }
+      showError('Invalid response from server')
+    }
   } catch (error) {
-    console.error('Failed to load users:', error)
+    if (import.meta.env.DEV) {
+      console.error('Failed to load users:', error)
+    }
+    showError(error instanceof Error ? error.message : 'Failed to load users')
   } finally {
     usersLoading.value = false
   }
@@ -797,16 +812,18 @@ async function loadUsageStats(period: 'day' | 'week' | 'month' | 'all' = 'week')
 }
 
 // User actions
-async function updateUserLevel(userId: number, newLevel: AdminUser['level']) {
+async function updateUserLevel(userId: number, newLevel: string) {
   try {
     await adminApi.updateUserLevel(userId, newLevel)
     // Update local state
     const user = users.value.find((u: AdminUser) => u.id === userId)
     if (user) {
-      user.level = newLevel
+      user.level = newLevel as 'NEW' | 'PRO' | 'TEAM' | 'BUSINESS' | 'ADMIN'
     }
+    success(t('admin.users.levelUpdated', { level: newLevel }))
   } catch (error) {
     console.error('Failed to update user level:', error)
+    showError(error instanceof Error ? error.message : t('admin.users.levelUpdateFailed'))
   }
 }
 

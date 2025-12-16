@@ -149,6 +149,7 @@ import { useModelsStore } from '@/stores/models'
 import { useAiConfigStore } from '@/stores/aiConfig'
 import { useAuthStore } from '@/stores/auth'
 import { useLimitCheck } from '@/composables/useLimitCheck'
+import { useNotification } from '@/composables/useNotification'
 import { chatApi } from '@/services/api'
 import type { ModelOption } from '@/composables/useModelSelection'
 import { parseAIResponse } from '@/utils/responseParser'
@@ -157,6 +158,7 @@ import { httpClient } from '@/services/api/httpClient'
 
 const { t } = useI18n()
 const { showLimitModal, limitData, checkAndShowLimit, closeLimitModal } = useLimitCheck()
+const { error: showErrorToast } = useNotification()
 
 const chatContainer = ref<HTMLElement | null>(null)
 const chatInputRef = ref<InstanceType<typeof ChatInput> | null>(null)
@@ -929,6 +931,24 @@ const streamAIResponse = async (
             console.error('Error:', errorMsg, data)
             processingStatus.value = ''
             processingMetadata.value = {}
+
+            // Handle chat not found errors with toast notification
+            if (
+              errorMsg.toLowerCase().includes('chat not found') ||
+              errorMsg.toLowerCase().includes('access denied')
+            ) {
+              // Remove the empty assistant message
+              historyStore.removeMessage(messageId)
+
+              // Show toast notification
+              showErrorToast(t('chat.notFound'), 5000)
+
+              // Clean up streaming resources
+              streamingAbortController = null
+              stopStreamingFn = null
+              currentTrackId = undefined
+              return
+            }
 
             // Handle rate limit errors with modal
             if (errorMsg.toLowerCase().includes('rate limit')) {

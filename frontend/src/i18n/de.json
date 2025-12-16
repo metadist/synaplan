@@ -2,7 +2,9 @@
   "welcome": "Willkommen bei Synaplan",
   "chat": {
     "title": "Chat",
-    "newChat": "Neuer Chat"
+    "newChat": "Neuer Chat",
+    "notFound": "Der Chat existiert nicht mehr",
+    "notFoundDesc": "Dieser Chat wurde gelöscht und ist nicht mehr verfügbar."
   },
   "admin": {
     "title": "Admin-Panel",
@@ -48,7 +50,9 @@
       "searchPlaceholder": "Nach E-Mail suchen...",
       "noUsers": "Keine Benutzer gefunden",
       "deleteConfirmTitle": "Benutzer löschen?",
-      "deleteConfirmDesc": "Möchtest du {email} wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden."
+      "deleteConfirmDesc": "Möchtest du {email} wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden.",
+      "levelUpdated": "Benutzer-Level auf {level} aktualisiert",
+      "levelUpdateFailed": "Fehler beim Aktualisieren des Benutzer-Levels"
     },
     "prompts": {
       "shortDesc": "Kurzbeschreibung",
@@ -738,6 +742,8 @@
     "attachedToMessage": "Diese Datei ist an eine Nachricht angehängt",
     "standaloneFile": "Diese Datei ist eigenständig (nicht an eine Nachricht angehängt)",
     "deleteSelected": "Ausgewählte löschen",
+    "deleteSelectedConfirmTitle": "Ausgewählte Dateien löschen?",
+    "deleteSelectedConfirmMessage": "Möchten Sie wirklich {count} ausgewählte Datei(en) löschen? Diese Aktion kann nicht rückgängig gemacht werden und die Dateien werden dauerhaft gelöscht.",
     "noFiles": "Noch keine Dateien hochgeladen",
     "page": "Seite",
     "showing": "Anzeige",
@@ -894,7 +900,8 @@
     "login": "Anmelden",
     "register": "Registrieren",
     "email": "E-Mail",
-    "emailPlaceholder": "deine@email.de",
+    "emailPlaceholderPrefix": "deine",
+    "emailPlaceholderSuffix": "email.de",
     "password": "Passwort",
     "confirmPassword": "Passwort bestätigen",
     "passwordMismatch": "Passwörter stimmen nicht überein",

@@ -46,18 +46,18 @@
         {{ $t('config.apiKeys.description') }}
       </p>
 
-      <div class="flex gap-3">
+      <div class="flex flex-col sm:flex-row gap-3">
         <input
           v-model="newKeyName"
           type="text"
           :placeholder="$t('config.apiKeys.namePlaceholder')"
-          class="flex-1 px-4 py-2.5 rounded surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+          class="w-full sm:flex-1 px-4 py-2.5 rounded surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
           data-testid="input-key-name"
           @keypress.enter="createAPIKey"
         />
         <button
           :disabled="!newKeyName.trim() || loading"
-          class="btn-primary px-6 py-2.5 rounded flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+          class="w-full sm:w-auto btn-primary px-6 py-2.5 rounded flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
           data-testid="btn-create"
           @click="createAPIKey"
         >
