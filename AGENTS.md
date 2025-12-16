@@ -523,6 +523,86 @@ const response = await fetch('/api/v1/widgets', { ... })
 
 The client is rather limited, but please prompt the user how it should be extended to fit the new use case.
 
+**Zod Schema Validation (Required):**
+All HTTP requests in the frontend **MUST** use Zod schema validation for type safety and runtime validation:
+
+```typescript
+import { httpClient } from '@/services/api/httpClient'
+import { GetWidgetResponseSchema } from '@/generated/api-schemas'
+import { z } from 'zod'
+
+// Prefer using auto-generated schemas from OpenAPI annotations
+type Widget = z.infer<typeof GetWidgetResponseSchema>
+
+// Use generated schema with httpClient
+const widget = await httpClient('/api/v1/widgets/123', {
+  schema: GetWidgetResponseSchema
+})
+// widget is now typed as Widget and validated at runtime
+```
+
+**Benefits:**
+- Type safety: Types are inferred from schemas (single source of truth)
+- Runtime validation: Catches API contract violations immediately
+- Better error messages: Zod provides detailed validation errors
+- Maintainability: Schema changes automatically update types
+- Auto-generated: Schemas are automatically generated from backend OpenAPI annotations
+
+**OpenAPI Annotations (Backend):**
+When creating or modifying API endpoints, write **detailed OpenAPI annotations** in PHP controllers.
+This enables automatic generation of type-safe Zod schemas for the frontend:
+
+```php
+#[OA\Response(
+    response: 200,
+    description: 'Widget details',
+    content: new OA\JsonContent(
+        required: ['id', 'widgetId', 'name', 'config', 'isActive'],
+        properties: [
+            new OA\Property(property: 'id', type: 'integer', example: 123),
+            new OA\Property(property: 'widgetId', type: 'string', example: 'wgt_abc123'),
+            new OA\Property(property: 'name', type: 'string', example: 'Support Chat'),
+            new OA\Property(
+                property: 'config',
+                type: 'object',
+                required: ['primaryColor'],
+                properties: [
+                    new OA\Property(property: 'primaryColor', type: 'string', example: '#007bff'),
+                ]
+            ),
+            new OA\Property(property: 'isActive', type: 'boolean', example: true),
+        ]
+    )
+)]
+```
+
+Schemas are automatically generated during:
+- Dev container startup (waits for backend to be ready)
+- Frontend build (pre-build hook)
+- CI pipeline (from OpenAPI artifact)
+- Manual: `npm run generate:schemas` in frontend/
+
+**Updating Frontend Schemas After Backend Changes:**
+
+When you modify OpenAPI annotations in PHP controllers, regenerate the frontend schemas:
+
+```bash
+# Option 1: Inside frontend container (recommended)
+docker compose exec frontend npm run generate:schemas
+
+# Option 2: Via make
+make -C frontend generate-schemas
+
+# Option 3: Restart frontend container (auto-generates on startup)
+docker compose restart frontend
+```
+
+The generation script:
+1. Fetches OpenAPI spec from `http://backend/api/doc.json`
+2. Generates Zod schemas to `src/generated/api-schemas.ts`
+3. Fixes Zod v4 compatibility issues
+4. Creates readable PascalCase aliases (e.g., `GetWidgetResponseSchema`)
+
 ### Error Handling (Backend)
 ```php
 try {
