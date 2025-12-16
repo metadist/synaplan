@@ -2,7 +2,9 @@
   "welcome": "Willkommen bei Synaplan",
   "chat": {
     "title": "Chat",
-    "newChat": "Neuer Chat"
+    "newChat": "Neuer Chat",
+    "notFound": "Der Chat existiert nicht mehr",
+    "notFoundDesc": "Dieser Chat wurde gelöscht und ist nicht mehr verfügbar."
   },
   "admin": {
     "title": "Admin-Panel",

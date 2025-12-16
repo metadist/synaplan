@@ -6,7 +6,9 @@
     "tools": "Tools",
     "files": "Files & RAG",
     "config": "AI Config",
-    "statistics": "Statistics"
+    "statistics": "Statistics",
+    "notFound": "The chat no longer exists",
+    "notFoundDesc": "This chat has been deleted and is no longer available."
   },
   "admin": {
     "title": "Admin Panel",
