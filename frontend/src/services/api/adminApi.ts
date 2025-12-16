@@ -4,14 +4,16 @@ import { GetAdminGetUsersResponseSchema } from '@/generated/api-schemas'
 import { z } from 'zod'
 
 // Create a more flexible schema that accepts datetime strings with or without offset
-const FlexibleAdminUserSchema = GetAdminGetUsersResponseSchema.shape.users.element.extend({
-  created: z.string(), // Accept any string for created date
+const originalUserSchema = GetAdminGetUsersResponseSchema.shape.users.element
+// Use omit to remove the strict datetime field, then extend with a flexible string field
+const FlexibleAdminUserSchema = originalUserSchema.omit({ created: true }).extend({
+  created: z.string(), // Accept any string for created date (more flexible than datetime format)
 })
 
 export const AdminUserSchema = FlexibleAdminUserSchema
 export type AdminUser = z.infer<typeof AdminUserSchema>
 
-// Create a flexible response schema
+// Create a flexible response schema that uses the flexible user schema
 const FlexibleGetAdminUsersResponseSchema = GetAdminGetUsersResponseSchema.extend({
   users: z.array(FlexibleAdminUserSchema),
 })
@@ -81,9 +83,9 @@ export const adminApi = {
       params.append('search', search)
     }
     const response = await httpClient(`/api/v1/admin/users?${params}`, {
-      schema: GetAdminGetUsersResponseSchema,
+      schema: FlexibleGetAdminUsersResponseSchema,
     })
-    return response as GetAdminUsersResponse
+    return response
   },
 
   async updateUserLevel(
