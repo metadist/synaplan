@@ -167,7 +167,7 @@ class WhatsAppServiceTest extends TestCase
             )
             ->willReturn($response);
 
-        $result = $this->service->getMediaUrl('media123');
+        $result = $this->service->getMediaUrl('media123', $this->testPhoneNumberId);
 
         // getMediaUrl returns just the URL string, not an array
         $this->assertIsString($result);
@@ -186,7 +186,7 @@ class WhatsAppServiceTest extends TestCase
             ->method('error')
             ->with('Failed to get WhatsApp media URL', $this->anything());
 
-        $result = $this->service->getMediaUrl('invalid_media_id');
+        $result = $this->service->getMediaUrl('invalid_media_id', $this->testPhoneNumberId);
 
         $this->assertNull($result);
     }
@@ -295,25 +295,28 @@ class WhatsAppServiceTest extends TestCase
 
     public function testDownloadMediaSuccess(): void
     {
-        $response = $this->createMock(ResponseInterface::class);
-        $response->method('getStatusCode')->willReturn(200);
-        $response->method('getContent')->willReturn('binary_image_data');
+        // Mock getMediaUrl call
+        $getMediaResponse = $this->createMock(ResponseInterface::class);
+        $getMediaResponse->method('getStatusCode')->willReturn(200);
+        $getMediaResponse->method('toArray')->willReturn(['url' => 'https://example.com/media/file.jpg']);
+
+        // Mock download call
+        $downloadResponse = $this->createMock(ResponseInterface::class);
+        $downloadResponse->method('getContent')->willReturn('binary_image_data');
+        $downloadResponse->method('getHeaders')->willReturn(['content-type' => ['image/jpeg']]);
 
         $this->httpClient
-            ->expects($this->once())
+            ->expects($this->exactly(2))
             ->method('request')
-            ->with(
-                'GET',
-                'https://example.com/media/file.jpg',
-                $this->callback(function ($options) {
-                    return isset($options['headers']['Authorization']);
-                })
-            )
-            ->willReturn($response);
+            ->willReturnOnConsecutiveCalls($getMediaResponse, $downloadResponse);
 
-        $result = $this->service->downloadMedia('https://example.com/media/file.jpg');
+        $result = $this->service->downloadMedia('media123', $this->testPhoneNumberId);
 
-        $this->assertEquals('binary_image_data', $result);
+        // downloadMedia now returns an array with file info
+        $this->assertIsArray($result);
+        $this->assertArrayHasKey('file_path', $result);
+        $this->assertArrayHasKey('file_type', $result);
+        $this->assertEquals('jpg', $result['file_type']);
     }
 
     public function testDownloadMediaFailure(): void
@@ -327,7 +330,7 @@ class WhatsAppServiceTest extends TestCase
             ->expects($this->once())
             ->method('error');
 
-        $result = $this->service->downloadMedia('https://example.com/media/file.jpg');
+        $result = $this->service->downloadMedia('media123', $this->testPhoneNumberId);
 
         $this->assertNull($result);
     }
