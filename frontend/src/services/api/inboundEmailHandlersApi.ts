@@ -20,6 +20,17 @@ export interface BackendMailHandler {
   deleteAfter: boolean
   status: 'active' | 'inactive' | 'error'
   departments: Department[]
+  smtpConfig?: {
+    server: string
+    port: number
+    username: string
+    password: string // Always '••••••••' from backend
+    security: 'SSL/TLS' | 'STARTTLS' | 'None'
+  } | null
+  emailFilter?: {
+    mode: 'new' | 'historical'
+    fromDate: string | null
+  } | null
   lastChecked: string | null // YmdHis format
   created: string // YmdHis format
   updated: string // YmdHis format
@@ -43,12 +54,27 @@ export interface MailConfig {
   deleteAfter: boolean
 }
 
+export interface SmtpConfig {
+  smtpServer: string
+  smtpPort: number
+  smtpSecurity: 'STARTTLS' | 'SSL/TLS' | 'None'
+  smtpUsername: string
+  smtpPassword: string
+}
+
+export interface EmailFilterConfig {
+  mode: 'new' | 'historical'
+  fromDate?: string | null
+}
+
 export interface SavedMailHandler {
   id: string
   name: string
   config: MailConfig
   departments: Department[]
   status: 'active' | 'inactive' | 'error'
+  smtpConfig?: SmtpConfig
+  emailFilter?: EmailFilterConfig
   lastTested?: Date
   createdAt: Date
   updatedAt: Date
@@ -74,7 +100,6 @@ export interface CreateHandlerRequest {
   // Email filter settings
   emailFilterMode: 'new' | 'historical'
   emailFilterFromDate?: string | null
-  emailFilterToDate?: string | null
 }
 
 export interface UpdateHandlerRequest {
@@ -98,7 +123,6 @@ export interface UpdateHandlerRequest {
   // Email filter settings
   emailFilterMode?: 'new' | 'historical'
   emailFilterFromDate?: string | null
-  emailFilterToDate?: string | null
 }
 
 /**
@@ -125,6 +149,21 @@ function convertBackendToFrontend(backend: BackendMailHandler): SavedMailHandler
       isDefault: dept.isDefault,
     })),
     status: backend.status,
+    smtpConfig: backend.smtpConfig
+      ? {
+          smtpServer: backend.smtpConfig.server,
+          smtpPort: backend.smtpConfig.port,
+          smtpSecurity: backend.smtpConfig.security,
+          smtpUsername: backend.smtpConfig.username,
+          smtpPassword: backend.smtpConfig.password, // Already masked
+        }
+      : undefined,
+    emailFilter: backend.emailFilter
+      ? {
+          mode: backend.emailFilter.mode,
+          fromDate: backend.emailFilter.fromDate,
+        }
+      : undefined,
     lastTested: backend.lastChecked ? parseDate(backend.lastChecked) : undefined,
     createdAt: parseDate(backend.created),
     updatedAt: parseDate(backend.updated),
@@ -216,6 +255,35 @@ export const inboundEmailHandlersApi = {
     return httpClient<{ success: boolean; message: string }>(
       `/api/v1/inbound-email-handlers/${id}/test`,
       { method: 'POST' }
+    )
+  },
+
+  /**
+   * Bulk update handler status
+   */
+  async bulkUpdateStatus(
+    handlerIds: string[],
+    status: 'active' | 'inactive'
+  ): Promise<{ success: boolean; updated: number }> {
+    return httpClient<{ success: boolean; updated: number }>(
+      '/api/v1/inbound-email-handlers/bulk-update-status',
+      {
+        method: 'POST',
+        body: JSON.stringify({ handlerIds, status }),
+      }
+    )
+  },
+
+  /**
+   * Bulk delete handlers
+   */
+  async bulkDelete(handlerIds: string[]): Promise<{ success: boolean; deleted: number }> {
+    return httpClient<{ success: boolean; deleted: number }>(
+      '/api/v1/inbound-email-handlers/bulk-delete',
+      {
+        method: 'POST',
+        body: JSON.stringify({ handlerIds }),
+      }
     )
   },
 }

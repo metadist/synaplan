@@ -140,15 +140,15 @@ class InboundEmailHandlerController extends AbstractController
         $handler->setDecryptedPassword($data['password'], $this->encryptionService);
         $handler->setCheckInterval($data['checkInterval'] ?? 10);
         $handler->setDeleteAfter($data['deleteAfter'] ?? false);
-        $handler->setStatus('inactive'); // Start as inactive until tested
+        $handler->setStatus('active'); // Start as active by default
         $handler->setDepartments($data['departments']);
 
         // SMTP credentials for forwarding (optional, encrypted)
         if (isset($data['smtpServer']) && isset($data['smtpUsername']) && isset($data['smtpPassword'])) {
             $handler->setSmtpCredentials(
-                $data['smtpServer'],
+                trim($data['smtpServer']),
                 $data['smtpPort'] ?? 587,
-                $data['smtpUsername'],
+                trim($data['smtpUsername']), // Trim to avoid encoding issues
                 $data['smtpPassword'],
                 $this->encryptionService,
                 $data['smtpSecurity'] ?? 'STARTTLS'
@@ -159,7 +159,7 @@ class InboundEmailHandlerController extends AbstractController
         $emailFilterMode = $data['emailFilterMode'] ?? 'new';
 
         // PRO+ required for historical emails
-        if ('historical' === $emailFilterMode && !in_array($user->getUserLevel(), ['PRO', 'TEAM', 'BUSINESS'])) {
+        if ('historical' === $emailFilterMode && !in_array($user->getUserLevel(), ['PRO', 'TEAM', 'BUSINESS', 'ADMIN'])) {
             return $this->json([
                 'success' => false,
                 'error' => 'Historical email processing is only available for PRO users and above',
@@ -168,8 +168,7 @@ class InboundEmailHandlerController extends AbstractController
 
         $handler->setEmailFilter(
             $emailFilterMode,
-            $data['emailFilterFromDate'] ?? null,
-            $data['emailFilterToDate'] ?? null
+            $data['emailFilterFromDate'] ?? null
         );
 
         $this->em->persist($handler);
@@ -250,9 +249,9 @@ class InboundEmailHandlerController extends AbstractController
         // Update SMTP credentials for forwarding (optional, encrypted)
         if (isset($data['smtpServer']) && isset($data['smtpUsername']) && isset($data['smtpPassword'])) {
             $handler->setSmtpCredentials(
-                $data['smtpServer'],
+                trim($data['smtpServer']),
                 $data['smtpPort'] ?? 587,
-                $data['smtpUsername'],
+                trim($data['smtpUsername']), // Trim to avoid encoding issues
                 $data['smtpPassword'],
                 $this->encryptionService,
                 $data['smtpSecurity'] ?? 'STARTTLS'
@@ -262,7 +261,7 @@ class InboundEmailHandlerController extends AbstractController
         // Update email filter configuration
         if (isset($data['emailFilterMode'])) {
             // PRO+ required for historical emails
-            if ('historical' === $data['emailFilterMode'] && !in_array($user->getUserLevel(), ['PRO', 'TEAM', 'BUSINESS'])) {
+            if ('historical' === $data['emailFilterMode'] && !in_array($user->getUserLevel(), ['PRO', 'TEAM', 'BUSINESS', 'ADMIN'])) {
                 return $this->json([
                     'success' => false,
                     'error' => 'Historical email processing is only available for PRO users and above',
@@ -271,8 +270,7 @@ class InboundEmailHandlerController extends AbstractController
 
             $handler->setEmailFilter(
                 $data['emailFilterMode'],
-                $data['emailFilterFromDate'] ?? null,
-                $data['emailFilterToDate'] ?? null
+                $data['emailFilterFromDate'] ?? null
             );
         }
 
@@ -300,6 +298,25 @@ class InboundEmailHandlerController extends AbstractController
         security: [['Bearer' => []]],
         tags: ['Inbound Email Handlers']
     )]
+    #[OA\Parameter(
+        name: 'id',
+        in: 'path',
+        description: 'Handler ID',
+        required: true,
+        schema: new OA\Schema(type: 'integer')
+    )]
+    #[OA\Response(
+        response: 200,
+        description: 'Handler deleted successfully',
+        content: new OA\JsonContent(
+            properties: [
+                new OA\Property(property: 'success', type: 'boolean', example: true),
+                new OA\Property(property: 'message', type: 'string', example: 'Handler deleted'),
+            ]
+        )
+    )]
+    #[OA\Response(response: 404, description: 'Handler not found')]
+    #[OA\Response(response: 401, description: 'Not authenticated')]
     public function delete(int $id, #[CurrentUser] ?User $user): JsonResponse
     {
         if (!$user) {
@@ -330,15 +347,36 @@ class InboundEmailHandlerController extends AbstractController
     }
 
     /**
-     * Test IMAP connection.
+     * Test connection (both IMAP and SMTP).
      */
     #[Route('/{id}/test', name: 'test', methods: ['POST'])]
     #[OA\Post(
         path: '/api/v1/inbound-email-handlers/{id}/test',
-        summary: 'Test IMAP connection for handler',
+        summary: 'Test email handler connection',
+        description: 'Tests both IMAP and SMTP connection and updates handler status',
         security: [['Bearer' => []]],
         tags: ['Inbound Email Handlers']
     )]
+    #[OA\Parameter(
+        name: 'id',
+        in: 'path',
+        description: 'Handler ID',
+        required: true,
+        schema: new OA\Schema(type: 'integer')
+    )]
+    #[OA\Response(
+        response: 200,
+        description: 'Connection test result',
+        content: new OA\JsonContent(
+            properties: [
+                new OA\Property(property: 'success', type: 'boolean', example: true),
+                new OA\Property(property: 'message', type: 'string', example: 'Connection successful'),
+            ]
+        )
+    )]
+    #[OA\Response(response: 404, description: 'Handler not found')]
+    #[OA\Response(response: 401, description: 'Not authenticated')]
+    #[OA\Response(response: 500, description: 'Connection test failed')]
     public function test(int $id, #[CurrentUser] ?User $user): JsonResponse
     {
         if (!$user) {
@@ -389,6 +427,29 @@ class InboundEmailHandlerController extends AbstractController
      */
     private function serializeHandler(InboundEmailHandler $handler): array
     {
+        $config = $handler->getConfig() ?? [];
+
+        // Extract SMTP config (mask password)
+        $smtpConfig = null;
+        if (isset($config['smtp'])) {
+            $smtpConfig = [
+                'server' => $config['smtp']['server'] ?? '',
+                'port' => $config['smtp']['port'] ?? 587,
+                'username' => $config['smtp']['username'] ?? '',
+                'password' => '••••••••', // Never expose password
+                'security' => $config['smtp']['security'] ?? 'STARTTLS',
+            ];
+        }
+
+        // Extract email filter config
+        $emailFilter = null;
+        if (isset($config['email_filter'])) {
+            $emailFilter = [
+                'mode' => $config['email_filter']['mode'] ?? 'new',
+                'fromDate' => $config['email_filter']['from_date'] ?? null,
+            ];
+        }
+
         return [
             'id' => $handler->getId(),
             'name' => $handler->getName(),
@@ -402,9 +463,145 @@ class InboundEmailHandlerController extends AbstractController
             'deleteAfter' => $handler->isDeleteAfter(),
             'status' => $handler->getStatus(),
             'departments' => $handler->getDepartments(),
+            'smtpConfig' => $smtpConfig,
+            'emailFilter' => $emailFilter,
             'lastChecked' => $handler->getLastChecked(),
             'created' => $handler->getCreated(),
             'updated' => $handler->getUpdated(),
         ];
+    }
+
+    /**
+     * Bulk update handler status (activate/deactivate multiple handlers).
+     */
+    #[Route('/bulk-update-status', name: 'bulk_update_status', methods: ['POST'])]
+    #[OA\Post(
+        path: '/api/v1/inbound-email-handlers/bulk-update-status',
+        summary: 'Bulk update handler status',
+        description: 'Activate or deactivate multiple email handlers at once',
+        security: [['Bearer' => []]],
+        tags: ['Inbound Email Handlers']
+    )]
+    #[OA\RequestBody(
+        required: true,
+        content: new OA\JsonContent(
+            required: ['handlerIds', 'status'],
+            properties: [
+                new OA\Property(
+                    property: 'handlerIds',
+                    type: 'array',
+                    items: new OA\Items(type: 'integer'),
+                    example: [1, 2, 3]
+                ),
+                new OA\Property(
+                    property: 'status',
+                    type: 'string',
+                    enum: ['active', 'inactive'],
+                    example: 'active'
+                ),
+            ]
+        )
+    )]
+    #[OA\Response(
+        response: 200,
+        description: 'Handlers updated successfully',
+        content: new OA\JsonContent(
+            properties: [
+                new OA\Property(property: 'success', type: 'boolean', example: true),
+                new OA\Property(property: 'updated', type: 'integer', example: 3),
+            ]
+        )
+    )]
+    #[OA\Response(response: 400, description: 'Invalid parameters')]
+    #[OA\Response(response: 401, description: 'Not authenticated')]
+    public function bulkUpdateStatus(Request $request): JsonResponse
+    {
+        /** @var User $user */
+        $user = $this->getUser();
+
+        $data = json_decode($request->getContent(), true);
+        $handlerIds = $data['handlerIds'] ?? [];
+        $status = $data['status'] ?? null;
+
+        if (empty($handlerIds) || !in_array($status, ['active', 'inactive'])) {
+            return $this->json(['success' => false, 'error' => 'Invalid parameters'], Response::HTTP_BAD_REQUEST);
+        }
+
+        $updated = 0;
+        foreach ($handlerIds as $handlerId) {
+            $handler = $this->handlerRepository->findOneBy(['id' => $handlerId, 'userId' => $user->getId()]);
+            if ($handler) {
+                $handler->setStatus($status);
+                $handler->touch();
+                ++$updated;
+            }
+        }
+
+        $this->em->flush();
+
+        return $this->json(['success' => true, 'updated' => $updated]);
+    }
+
+    /**
+     * Bulk delete handlers (delete multiple handlers at once).
+     */
+    #[Route('/bulk-delete', name: 'bulk_delete', methods: ['POST'])]
+    #[OA\Post(
+        path: '/api/v1/inbound-email-handlers/bulk-delete',
+        summary: 'Bulk delete handlers',
+        description: 'Delete multiple email handlers at once',
+        security: [['Bearer' => []]],
+        tags: ['Inbound Email Handlers']
+    )]
+    #[OA\RequestBody(
+        required: true,
+        content: new OA\JsonContent(
+            required: ['handlerIds'],
+            properties: [
+                new OA\Property(
+                    property: 'handlerIds',
+                    type: 'array',
+                    items: new OA\Items(type: 'integer'),
+                    example: [1, 2, 3]
+                ),
+            ]
+        )
+    )]
+    #[OA\Response(
+        response: 200,
+        description: 'Handlers deleted successfully',
+        content: new OA\JsonContent(
+            properties: [
+                new OA\Property(property: 'success', type: 'boolean', example: true),
+                new OA\Property(property: 'deleted', type: 'integer', example: 3),
+            ]
+        )
+    )]
+    #[OA\Response(response: 400, description: 'Invalid parameters')]
+    #[OA\Response(response: 401, description: 'Not authenticated')]
+    public function bulkDelete(Request $request): JsonResponse
+    {
+        /** @var User $user */
+        $user = $this->getUser();
+
+        $data = json_decode($request->getContent(), true);
+        $handlerIds = $data['handlerIds'] ?? [];
+
+        if (empty($handlerIds)) {
+            return $this->json(['success' => false, 'error' => 'Invalid parameters'], Response::HTTP_BAD_REQUEST);
+        }
+
+        $deleted = 0;
+        foreach ($handlerIds as $handlerId) {
+            $handler = $this->handlerRepository->findOneBy(['id' => $handlerId, 'userId' => $user->getId()]);
+            if ($handler) {
+                $this->em->remove($handler);
+                ++$deleted;
+            }
+        }
+
+        $this->em->flush();
+
+        return $this->json(['success' => true, 'deleted' => $deleted]);
     }
 }

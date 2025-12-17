@@ -268,6 +268,8 @@
             @create="createMailHandler"
             @edit="editMailHandler"
             @delete="deleteMailHandler"
+            @bulk-update-status="bulkUpdateHandlerStatus"
+            @bulk-delete="bulkDeleteHandlers"
           />
           <MailHandlerConfiguration
             v-else
@@ -296,6 +298,7 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
 import { useRoute } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import { useConfigStore } from '@/stores/config'
 import MainLayout from '@/components/MainLayout.vue'
 import WidgetList from '@/components/widgets/WidgetList.vue'
@@ -334,12 +337,15 @@ import { inboundEmailHandlersApi } from '@/services/api/inboundEmailHandlersApi'
 import * as summaryService from '@/services/summaryService'
 import type { SummaryResponse } from '@/services/summaryService'
 import { useNotification } from '@/composables/useNotification'
+import { useDialog } from '@/composables/useDialog'
 
 const route = useRoute()
+const { t } = useI18n()
 const config = useConfigStore()
 const commandsStore = useCommandsStore()
 const aiConfigStore = useAiConfigStore()
-const { success, error: showError } = useNotification()
+const { success, error: showError, warning: showWarning } = useNotification()
+const dialog = useDialog()
 const expandedCommands = ref<string[]>([])
 const widgets = ref<Widget[]>(mockWidgets)
 const showWidgetEditor = ref(false)
@@ -693,7 +699,8 @@ const saveMailHandler = async (
   config: MailConfig,
   departments: Department[],
   smtpConfig: any,
-  emailFilter: any
+  emailFilter: any,
+  isActive: boolean
 ) => {
   try {
     // Validate that SMTP config is provided
@@ -714,21 +721,46 @@ const saveMailHandler = async (
       protocol: config.protocol,
       security: config.security,
       username: config.username,
-      password: config.password, // Will be encrypted by backend
       checkInterval: config.checkInterval,
       deleteAfter: config.deleteAfter,
       departments,
+      status: isActive ? 'active' : 'inactive',
       // SMTP credentials (required)
       smtpServer: smtpConfig.smtpServer,
       smtpPort: smtpConfig.smtpPort,
       smtpSecurity: smtpConfig.smtpSecurity,
       smtpUsername: smtpConfig.smtpUsername,
-      smtpPassword: smtpConfig.smtpPassword, // Will be encrypted by backend
       // Email filter settings
       emailFilterMode: emailFilter.mode || 'new',
       emailFilterFromDate: emailFilter.fromDate || null,
-      emailFilterToDate: emailFilter.toDate || null,
     }
+
+    // Only include passwords if they were changed (not the masked value)
+    // For CREATE: passwords are required
+    // For UPDATE: only send if changed (not '••••••••')
+    if (!currentMailHandlerId.value) {
+      // Creating new handler - passwords are required
+      if (!config.password || config.password === '••••••••') {
+        showError('IMAP/POP3 password is required for new handlers')
+        return
+      }
+      if (!smtpConfig.smtpPassword || smtpConfig.smtpPassword === '••••••••') {
+        showError('SMTP password is required for new handlers')
+        return
+      }
+      payload.password = config.password
+      payload.smtpPassword = smtpConfig.smtpPassword
+    } else {
+      // Updating existing handler - only send passwords if they were changed
+      if (config.password && config.password !== '••••••••') {
+        payload.password = config.password
+      }
+      if (smtpConfig.smtpPassword && smtpConfig.smtpPassword !== '••••••••') {
+        payload.smtpPassword = smtpConfig.smtpPassword
+      }
+    }
+
+    let savedHandlerId = currentMailHandlerId.value
 
     if (currentMailHandlerId.value) {
       // Update existing
@@ -743,7 +775,23 @@ const saveMailHandler = async (
       // Create new
       const newHandler = await inboundEmailHandlersApi.create(payload)
       mailHandlers.value.push(newHandler)
+      savedHandlerId = newHandler.id
       success('Mail handler created successfully!')
+    }
+
+    // Automatic connection test after save
+    try {
+      const testResult = await inboundEmailHandlersApi.testConnection(savedHandlerId)
+
+      if (testResult.success) {
+        // Refresh handler list to get updated status
+        await loadMailHandlers()
+      } else {
+        showWarning(t('mail.connectionTestWarning') + ': ' + testResult.message)
+      }
+    } catch (error: any) {
+      console.error('Connection test failed:', error)
+      showWarning(t('mail.handlerSavedTestFailed'))
     }
 
     cancelMailHandlerEdit()
@@ -754,17 +802,27 @@ const saveMailHandler = async (
 }
 
 const deleteMailHandler = async (handlerId: string) => {
-  if (!confirm('Are you sure you want to delete this mail handler?')) {
+  const handler = mailHandlers.value.find((h) => h.id === handlerId)
+
+  const confirmed = await dialog.confirm({
+    title: t('mail.deleteHandlerConfirmTitle'),
+    message: t('mail.deleteHandlerConfirmMessage', { name: handler?.name || 'this handler' }),
+    danger: true,
+    confirmText: t('common.delete'),
+    cancelText: t('common.cancel'),
+  })
+
+  if (!confirmed) {
     return
   }
 
   try {
     await inboundEmailHandlersApi.delete(handlerId)
     mailHandlers.value = mailHandlers.value.filter((h) => h.id !== handlerId)
-    success('Mail handler deleted successfully!')
+    success(t('mail.handlerDeleted'))
   } catch (error: any) {
     console.error('Failed to delete mail handler:', error)
-    showError(error.message || 'Failed to delete mail handler')
+    showError(error.message || t('mail.deleteFailed'))
   }
 }
 
@@ -772,5 +830,50 @@ const cancelMailHandlerEdit = () => {
   showMailHandlerEditor.value = false
   currentMailHandler.value = undefined
   currentMailHandlerId.value = ''
+}
+
+const bulkUpdateHandlerStatus = async (handlerIds: string[], status: 'active' | 'inactive') => {
+  try {
+    await inboundEmailHandlersApi.bulkUpdateStatus(handlerIds, status)
+
+    // Update local state
+    mailHandlers.value = mailHandlers.value.map((handler) => {
+      if (handlerIds.includes(handler.id)) {
+        return { ...handler, status }
+      }
+      return handler
+    })
+
+    success(t('mail.bulkUpdateSuccess', { count: handlerIds.length }))
+  } catch (error: any) {
+    console.error('Failed to bulk update handlers:', error)
+    showError(error.message || t('mail.bulkUpdateFailed'))
+  }
+}
+
+const bulkDeleteHandlers = async (handlerIds: string[]) => {
+  const confirmed = await dialog.confirm({
+    title: t('mail.bulkDeleteConfirmTitle'),
+    message: t('mail.bulkDeleteConfirmMessage', { count: handlerIds.length }),
+    danger: true,
+    confirmText: t('common.delete'),
+    cancelText: t('common.cancel'),
+  })
+
+  if (!confirmed) {
+    return
+  }
+
+  try {
+    await inboundEmailHandlersApi.bulkDelete(handlerIds)
+
+    // Remove from local state
+    mailHandlers.value = mailHandlers.value.filter((h) => !handlerIds.includes(h.id))
+
+    success(t('mail.bulkDeleteSuccess', { count: handlerIds.length }))
+  } catch (error: any) {
+    console.error('Failed to bulk delete handlers:', error)
+    showError(error.message || t('mail.bulkDeleteFailed'))
+  }
 }
 </script>

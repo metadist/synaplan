@@ -72,6 +72,137 @@ class InboundEmailHandlerService
     }
 
     /**
+     * Build IMAP search criteria based on handler's email filter config.
+     * Uses combination of UNSEEN flag + timestamp for robust duplicate prevention.
+     */
+    private function buildSearchCriteria(InboundEmailHandler $handler): string
+    {
+        $emailFilter = $handler->getEmailFilter();
+        $mode = $emailFilter['mode'] ?? 'new';
+
+        // Mode: new - Only fetch unseen emails since last successful check
+        if ('new' === $mode) {
+            // Use last successful check timestamp to avoid re-processing
+            $lastChecked = $handler->getLastChecked();
+            if ($lastChecked) {
+                $sinceDate = \DateTime::createFromFormat('YmdHis', $lastChecked);
+                if ($sinceDate) {
+                    // UNSEEN + SINCE last check = robust duplicate prevention
+                    return 'UNSEEN SINCE "'.date('d M Y', $sinceDate->getTimestamp()).'"';
+                }
+            }
+
+            return 'UNSEEN';
+        }
+
+        // Mode: historical - Fetch emails from a specific date onwards
+        // IMPORTANT: Always use UNSEEN to prevent re-processing forwarded emails
+        if ('historical' === $mode) {
+            $fromDate = $emailFilter['from_date'] ?? null;
+
+            // For historical mode: Use either fromDate or lastChecked (whichever is later)
+            // This ensures we don't re-process emails from previous runs
+            $searchDate = null;
+
+            if ($fromDate) {
+                $searchDate = strtotime($fromDate);
+            }
+
+            $lastChecked = $handler->getLastChecked();
+            if ($lastChecked) {
+                $lastCheckedDate = \DateTime::createFromFormat('YmdHis', $lastChecked);
+                if ($lastCheckedDate) {
+                    $lastCheckedTimestamp = $lastCheckedDate->getTimestamp();
+                    // Use the LATER date to avoid re-processing
+                    $searchDate = $searchDate ? max($searchDate, $lastCheckedTimestamp) : $lastCheckedTimestamp;
+                }
+            }
+
+            if ($searchDate) {
+                return 'UNSEEN SINCE "'.date('d M Y', $searchDate).'"';
+            }
+
+            // If no date specified, fetch only unseen
+            return 'UNSEEN';
+        }
+
+        // Fallback
+        return 'UNSEEN';
+    }
+
+    /**
+     * Extract clean email body from IMAP message.
+     * Handles multipart MIME messages and extracts text/plain or text/html.
+     */
+    private function extractEmailBody($connection, int $msgNumber): string
+    {
+        $structure = imap_fetchstructure($connection, $msgNumber);
+
+        // Single part message (not multipart)
+        if (!isset($structure->parts)) {
+            $body = imap_body($connection, $msgNumber);
+
+            // Decode based on encoding
+            return $this->decodeEmailBody($body, $structure->encoding ?? 0);
+        }
+
+        // Multipart message - extract text/plain or text/html
+        $textPlain = '';
+        $textHtml = '';
+
+        foreach ($structure->parts as $partNumber => $part) {
+            $partBody = imap_fetchbody($connection, $msgNumber, (string) ($partNumber + 1));
+
+            // Check MIME type
+            $mimeType = $this->getMimeType($part);
+
+            if ('text/plain' === $mimeType) {
+                $textPlain = $this->decodeEmailBody($partBody, $part->encoding ?? 0);
+            } elseif ('text/html' === $mimeType) {
+                $textHtml = $this->decodeEmailBody($partBody, $part->encoding ?? 0);
+            }
+        }
+
+        // Prefer plain text, fallback to HTML (stripped)
+        if (!empty($textPlain)) {
+            return $textPlain;
+        }
+
+        if (!empty($textHtml)) {
+            return strip_tags($textHtml);
+        }
+
+        // Fallback: return raw body
+        return imap_body($connection, $msgNumber);
+    }
+
+    /**
+     * Get MIME type from IMAP body part.
+     */
+    private function getMimeType(object $part): string
+    {
+        $primaryType = ['text', 'multipart', 'message', 'application', 'audio', 'image', 'video', 'other'];
+        $type = $primaryType[$part->type] ?? 'text';
+        $subtype = strtolower($part->subtype ?? 'plain');
+
+        return $type.'/'.$subtype;
+    }
+
+    /**
+     * Decode email body based on encoding.
+     */
+    private function decodeEmailBody(string $body, int $encoding): string
+    {
+        return match ($encoding) {
+            1 => imap_8bit($body),           // 8BIT
+            2 => imap_binary($body),         // BINARY
+            3 => base64_decode($body),       // BASE64
+            4 => quoted_printable_decode($body), // QUOTED-PRINTABLE
+            default => $body,                // 7BIT or OTHER
+        };
+    }
+
+    /**
      * Connect to IMAP/POP3 server.
      */
     private function connectImap(InboundEmailHandler $handler): ?\IMAP\Connection
@@ -83,7 +214,7 @@ class InboundEmailHandlerService
             $server,
             $handler->getUsername(),
             $password,
-            OP_HALFOPEN
+            0
         );
 
         if (!$connection) {
@@ -154,7 +285,7 @@ class InboundEmailHandlerService
                     ['role' => 'user', 'content' => $fullPrompt],
                 ],
                 userId: $handler->getUserId(),
-                options: [] // Use default model
+                options: ['model' => null] // Use default model from user config
             );
 
             $routedEmail = trim($response['content'] ?? '');
@@ -262,8 +393,9 @@ class InboundEmailHandlerService
                 ];
             }
 
-            // Get unread messages
-            $messages = imap_search($connection, 'UNSEEN');
+            // Build search criteria based on email filter
+            $searchCriteria = $this->buildSearchCriteria($handler);
+            $messages = imap_search($connection, $searchCriteria);
 
             if (!$messages) {
                 imap_close($connection);
@@ -280,7 +412,7 @@ class InboundEmailHandlerService
             foreach ($messages as $msgNumber) {
                 try {
                     $header = imap_headerinfo($connection, $msgNumber);
-                    $body = imap_body($connection, $msgNumber);
+                    $body = $this->extractEmailBody($connection, $msgNumber);
 
                     $subject = $header->subject ?? '(no subject)';
                     $from = $header->from[0]->mailbox.'@'.$header->from[0]->host;
@@ -414,10 +546,13 @@ class InboundEmailHandlerService
             default => 'smtp',
         };
 
+        // Trim username to avoid encoding issues with trailing spaces
+        $username = trim($smtpConfig['username']);
+
         return sprintf(
             '%s://%s:%s@%s:%d',
             $scheme,
-            urlencode($smtpConfig['username']),
+            urlencode($username),
             urlencode($smtpConfig['password']),
             $smtpConfig['server'],
             $smtpConfig['port']

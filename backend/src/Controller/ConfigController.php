@@ -454,9 +454,9 @@ class ConfigController extends AbstractController
         $providersMetadata = $this->providerRegistry->getProvidersMetadata();
 
         foreach ($providersMetadata as $providerName => $providerData) {
-            // Skip test provider in production
+            // Skip test provider in production (only show in dev mode)
             if ('test' === $providerName && 'dev' !== $env) {
-                continue;
+                continue; // @phpstan-ignore-line (env is dynamic at runtime)
             }
 
             // Get model count from database for this provider

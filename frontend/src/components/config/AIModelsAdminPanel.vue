@@ -352,9 +352,11 @@
 import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useNotification } from '@/composables/useNotification'
+import { useDialog } from '@/composables/useDialog'
 import { adminModelsApi, type AdminModel } from '@/services/api/adminModelsApi'
 
 const { t } = useI18n()
+const dialog = useDialog()
 
 interface NewModel {
   service: string
@@ -505,17 +507,23 @@ async function saveModel(m: AdminModel) {
 }
 
 async function deleteModel(m: AdminModel) {
-  if (
-    !confirm(
-      t('config.aiModels.admin.deleteConfirm', {
-        id: m.id,
-        service: m.service,
-        tag: m.tag,
-        providerId: m.providerId,
-      })
-    )
-  )
+  const confirmed = await dialog.confirm({
+    title: t('config.aiModels.admin.deleteModelTitle'),
+    message: t('config.aiModels.admin.deleteConfirm', {
+      id: m.id,
+      service: m.service,
+      tag: m.tag,
+      providerId: m.providerId,
+    }),
+    danger: true,
+    confirmText: t('common.delete'),
+    cancelText: t('common.cancel'),
+  })
+
+  if (!confirmed) {
     return
+  }
+
   rowDeletingId.value = m.id
   try {
     await adminModelsApi.delete(m.id)

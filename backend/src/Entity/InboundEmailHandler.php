@@ -75,7 +75,7 @@ class InboundEmailHandler
     // Additional config (JSON) - includes SMTP credentials + email filter settings
     // Format: {
     //   "smtp": {"server": "smtp.gmail.com", "port": 587, "username": "user@gmail.com", "password": "encrypted..."},
-    //   "email_filter": {"mode": "new", "from_date": null, "to_date": null}
+    //   "email_filter": {"mode": "new", "from_date": null}
     // }
     #[ORM\Column(name: 'BCONFIG', type: 'json', nullable: true)]
     private ?array $config = null;
@@ -369,13 +369,12 @@ class InboundEmailHandler
     /**
      * Set email filter configuration.
      */
-    public function setEmailFilter(string $mode, ?string $fromDate = null, ?string $toDate = null): self
+    public function setEmailFilter(string $mode, ?string $fromDate = null): self
     {
         $config = $this->config ?? [];
         $config['email_filter'] = [
             'mode' => $mode, // 'new' or 'historical'
             'from_date' => $fromDate,
-            'to_date' => $toDate,
         ];
         $this->config = $config;
         $this->updated = date('YmdHis');
@@ -392,7 +391,6 @@ class InboundEmailHandler
             return [
                 'mode' => 'new',
                 'from_date' => null,
-                'to_date' => null,
             ];
         }
 
