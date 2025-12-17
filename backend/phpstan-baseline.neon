@@ -451,12 +451,6 @@ parameters:
 			path: src/Service/UsageStatsService.php
 
 		-
-			message: '#^Property App\\Service\\WhatsAppService\:\:\$businessAccountId is never read, only written\.$#'
-			identifier: property.onlyWritten
-			count: 1
-			path: src/Service/WhatsAppService.php
-
-		-
 			message: '#^Strict comparison using \=\=\= between '''' and lowercase\-string&non\-empty\-string will always evaluate to false\.$#'
 			identifier: identical.alwaysFalse
 			count: 1
