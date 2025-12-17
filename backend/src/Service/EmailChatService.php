@@ -118,6 +118,87 @@ class EmailChatService
     }
 
     /**
+     * Find or create user from WhatsApp phone number.
+     * Similar to email, but uses phone number as identifier.
+     */
+    public function findOrCreateUserFromPhone(string $phoneNumber): array
+    {
+        $phoneNumber = preg_replace('/[^0-9+]/', '', $phoneNumber);
+
+        // Check if user with verified phone exists
+        $sql = "SELECT BID FROM BUSER WHERE JSON_EXTRACT(BUSERDETAILS, '$.phone_verification.phone_number') = :phone AND JSON_EXTRACT(BUSERDETAILS, '$.phone_verification.verified') = true LIMIT 1";
+        $stmt = $this->em->getConnection()->prepare($sql);
+        $result = $stmt->executeQuery(['phone' => $phoneNumber]);
+        $userId = $result->fetchOne();
+
+        if ($userId) {
+            $user = $this->userRepository->find($userId);
+            if ($user) {
+                return [
+                    'user' => $user,
+                    'is_anonymous' => false,
+                ];
+            }
+        }
+
+        // Check if anonymous user with this phone exists
+        $sql = "SELECT BID FROM BUSER WHERE JSON_EXTRACT(BUSERDETAILS, '$.anonymous_phone') = :phone LIMIT 1";
+        $stmt = $this->em->getConnection()->prepare($sql);
+        $result = $stmt->executeQuery(['phone' => $phoneNumber]);
+        $userId = $result->fetchOne();
+
+        if ($userId) {
+            $user = $this->userRepository->find($userId);
+            if ($user) {
+                return [
+                    'user' => $user,
+                    'is_anonymous' => true,
+                ];
+            }
+        }
+
+        // Check spam protection via usage tracking
+        if ($this->isSpamming($phoneNumber)) {
+            return [
+                'user' => null,
+                'is_anonymous' => true,
+                'error' => 'Too many requests. Please try again later.',
+            ];
+        }
+
+        // Create new anonymous WhatsApp user
+        $anonymousUser = new User();
+        $anonymousUser->setMail('whatsapp_'.bin2hex(random_bytes(8)).'@synaplan.local');
+        $anonymousUser->setPw(null); // No password for anonymous users
+        $anonymousUser->setType('WHATSAPP'); // WhatsApp-based anonymous user
+        $anonymousUser->setProviderId('whatsapp'); // Identify as WhatsApp-based
+        $anonymousUser->setUserLevel('ANONYMOUS'); // Anonymous users get ANONYMOUS rate limits
+
+        $details = [
+            'anonymous_phone' => $phoneNumber,
+            'firstName' => 'WhatsApp User',
+            'lastName' => '',
+            'created_via' => 'whatsapp',
+            'original_phone' => $phoneNumber,
+        ];
+        $anonymousUser->setUserDetails($details);
+
+        $this->em->persist($anonymousUser);
+        $this->em->flush();
+
+        $this->logger->info('Created anonymous user from WhatsApp', [
+            'phone' => $phoneNumber,
+            'user_id' => $anonymousUser->getId(),
+        ]);
+
+        return [
+            'user' => $anonymousUser,
+            'is_anonymous' => true,
+            'created' => true,
+        ];
+    }
+
+    /**
      * Find or create chat context for email thread.
      *
      * @param string|null $keyword      From smart+keyword@synaplan.net

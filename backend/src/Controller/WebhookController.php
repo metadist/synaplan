@@ -304,18 +304,37 @@ class WebhookController extends AbstractController
      *
      * POST /api/v1/webhooks/whatsapp
      *
-     * Receives messages from Meta WhatsApp Business API
+     * Receives messages from Meta WhatsApp Business API.
+     * No authentication required - users are automatically found/created based on phone number.
+     * Anonymous users get ANONYMOUS rate limits until they verify their phone.
      * https://developers.facebook.com/docs/whatsapp/cloud-api/webhooks/payload-examples
      */
     #[Route('/whatsapp', name: 'whatsapp', methods: ['POST'])]
-    public function whatsapp(
-        Request $request,
-        #[CurrentUser] ?User $user,
-    ): JsonResponse {
-        if (!$user) {
-            return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
-        }
-
+    #[OA\Post(
+        path: '/api/v1/webhooks/whatsapp',
+        summary: 'WhatsApp webhook endpoint',
+        description: 'Handles incoming WhatsApp messages. No authentication required - anonymous users allowed.',
+        tags: ['Webhooks']
+    )]
+    #[OA\Response(
+        response: 200,
+        description: 'WhatsApp message processed successfully',
+        content: new OA\JsonContent(
+            properties: [
+                new OA\Property(property: 'success', type: 'boolean', example: true),
+                new OA\Property(property: 'processed', type: 'integer', example: 1),
+                new OA\Property(
+                    property: 'responses',
+                    type: 'array',
+                    items: new OA\Items(type: 'object')
+                ),
+            ]
+        )
+    )]
+    #[OA\Response(response: 400, description: 'Invalid webhook payload')]
+    #[OA\Response(response: 429, description: 'Rate limit exceeded')]
+    public function whatsapp(Request $request): JsonResponse
+    {
         $data = json_decode($request->getContent(), true);
 
         if (!$data || !isset($data['entry'])) {
@@ -343,6 +362,25 @@ class WebhookController extends AbstractController
                     }
 
                     foreach ($value['messages'] as $incomingMsg) {
+                        // Find or create user from phone number (anonymous users allowed)
+                        $from = $incomingMsg['from'];
+                        $userResult = $this->emailChatService->findOrCreateUserFromPhone($from);
+
+                        if (isset($userResult['error'])) {
+                            $this->logger->warning('WhatsApp message rejected', [
+                                'phone' => $from,
+                                'reason' => $userResult['error'],
+                            ]);
+
+                            $responses[] = [
+                                'success' => false,
+                                'phone' => $from,
+                                'error' => $userResult['error'],
+                            ];
+                            continue;
+                        }
+
+                        $user = $userResult['user'];
                         $responses[] = $this->processWhatsAppMessage($incomingMsg, $value, $user);
                     }
                 }
@@ -355,13 +393,14 @@ class WebhookController extends AbstractController
             ]);
         } catch (\Exception $e) {
             $this->logger->error('WhatsApp webhook processing failed', [
-                'user_id' => $user->getId(),
                 'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
             ]);
 
             return $this->json([
                 'success' => false,
                 'error' => 'Internal error processing WhatsApp message',
+                'details' => 'dev' === $_ENV['APP_ENV'] ? $e->getMessage() : null,
             ], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
@@ -420,6 +459,17 @@ class WebhookController extends AbstractController
         switch ($type) {
             case 'text':
                 $messageText = $incomingMsg['text']['body'];
+
+                // Check if this is a verification code (5 chars, uppercase letters + numbers)
+                $trimmedText = trim(strtoupper($messageText));
+                if (preg_match('/^[A-Z0-9]{5}$/', $trimmedText)) {
+                    $verificationResult = $this->handleVerificationCode($trimmedText, $from, $phoneNumberId, $messageId);
+                    if (null !== $verificationResult) {
+                        // Verification was handled, return early
+                        return $verificationResult;
+                    }
+                    // If null, continue with normal message processing (code not found or invalid)
+                }
                 break;
             case 'image':
                 $mediaId = $incomingMsg['image']['id'];
@@ -645,5 +695,131 @@ class WebhookController extends AbstractController
                 'error' => 'Internal error',
             ], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
+    }
+
+    /**
+     * Handle verification code sent via WhatsApp.
+     * Returns array if code is found and processed, null if not a verification code.
+     */
+    private function handleVerificationCode(string $code, string $fromPhone, string $phoneNumberId, string $messageId): ?array
+    {
+        $this->logger->info('Potential verification code received', [
+            'code' => $code,
+            'from_phone' => $fromPhone,
+            'phone_number_id' => $phoneNumberId,
+        ]);
+
+        // Format phone number consistently
+        $fromPhone = preg_replace('/[^0-9+]/', '', $fromPhone);
+
+        // Find user with pending verification for this code
+        $qb = $this->em->createQueryBuilder();
+        $qb->select('u')
+            ->from(User::class, 'u')
+            ->where($qb->expr()->like('u.userDetails', ':codePattern'))
+            ->setParameter('codePattern', '%"code":"'.$code.'"%');
+
+        $users = $qb->getQuery()->getResult();
+
+        foreach ($users as $user) {
+            $userDetails = $user->getUserDetails();
+            $verification = $userDetails['phone_verification'] ?? null;
+
+            if (!$verification) {
+                continue;
+            }
+
+            // Check if code matches
+            if ($verification['code'] !== $code) {
+                continue;
+            }
+
+            // Check if phone number matches
+            if ($verification['phone_number'] !== $fromPhone) {
+                $this->logger->warning('Verification code sent from wrong phone number', [
+                    'code' => $code,
+                    'expected_phone' => $verification['phone_number'],
+                    'actual_phone' => $fromPhone,
+                    'user_id' => $user->getId(),
+                ]);
+
+                $errorMessage = "❌ *Verification Failed*\n\nThis code was requested for a different phone number.\n\nPlease use the phone number you entered on the website.";
+                $this->whatsAppService->sendMessage($fromPhone, $errorMessage, $phoneNumberId);
+
+                return [
+                    'success' => false,
+                    'message_id' => $messageId,
+                    'error' => 'Phone number mismatch',
+                ];
+            }
+
+            // Check if code is expired (5 minutes)
+            $expiresAt = $verification['expires_at'] ?? 0;
+            if (time() > $expiresAt) {
+                $this->logger->warning('Verification code expired', [
+                    'code' => $code,
+                    'expired_at' => $expiresAt,
+                    'current_time' => time(),
+                    'user_id' => $user->getId(),
+                ]);
+
+                $expiredMessage = "❌ *Verification Code Expired*\n\nYour verification code has expired. Please request a new code on the website.\n\nCodes are valid for 5 minutes only.";
+                $this->whatsAppService->sendMessage($fromPhone, $expiredMessage, $phoneNumberId);
+
+                // Clean up expired verification
+                unset($userDetails['phone_verification']);
+                $user->setUserDetails($userDetails);
+                $this->em->flush();
+
+                return [
+                    'success' => false,
+                    'message_id' => $messageId,
+                    'error' => 'Code expired',
+                ];
+            }
+
+            // Verification successful!
+            $this->logger->info('Phone verification successful', [
+                'code' => $code,
+                'user_id' => $user->getId(),
+                'phone' => $fromPhone,
+            ]);
+
+            // Update user: set phone number, verified status, and upgrade user level
+            $userDetails['phone_number'] = $fromPhone;
+            $userDetails['phone_verified_at'] = time();
+            unset($userDetails['phone_verification']); // Remove pending verification
+
+            // Upgrade user level if ANONYMOUS
+            if ('ANONYMOUS' === $user->getUserLevel()) {
+                $user->setUserLevel('NEW');
+                $this->logger->info('User upgraded from ANONYMOUS to NEW after verification', [
+                    'user_id' => $user->getId(),
+                ]);
+            }
+
+            $user->setUserDetails($userDetails);
+            $this->em->flush();
+
+            // Send success message
+            $successMessage = "✅ *Phone Verification Successful!*\n\nYour phone number has been verified.\n\nYou now have access to:\n• 50 messages per month\n• 5 images\n• 2 videos\n\nThank you for using SynaPlan!";
+            $this->whatsAppService->sendMessage($fromPhone, $successMessage, $phoneNumberId);
+
+            return [
+                'success' => true,
+                'message_id' => $messageId,
+                'verified' => true,
+                'user_id' => $user->getId(),
+            ];
+        }
+
+        // Code not found or doesn't match any user
+        $this->logger->debug('Verification code not found in database', [
+            'code' => $code,
+            'from_phone' => $fromPhone,
+        ]);
+
+        // Return null to continue with normal message processing
+        return null;
     }
 }

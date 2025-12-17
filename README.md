@@ -173,21 +173,22 @@ WHATSAPP_ENABLED=true
 3. AI processes and responds → Reply sent **from Number A** automatically
 4. Different user sends to **Number B** → Reply sent **from Number B** automatically
 
-### Phone Verification (Required):
-Users must verify their phone number via WhatsApp to unlock full features:
-- **ANONYMOUS** (not verified): 10 messages, 2 images (very limited)
-- **NEW** (verified): 50 messages, 5 images, 2 videos
-- **PRO/TEAM/BUSINESS**: Full subscription limits
+### Anonymous Usage & Phone Verification:
+**No verification required!** Users can immediately use the AI via WhatsApp:
+- 🆓 **Anonymous Users** (no verification): Can use AI with ANONYMOUS rate limits (10 messages, 2 images)
+- ✨ **Verified Users** (optional): Higher rate limits after phone verification (50 messages, 5 images, 2 videos)
+- 💎 **PRO/TEAM/BUSINESS** (subscribers): Full subscription limits
 
-Verification Flow:
-1. User sends a WhatsApp message to any of your numbers first
-2. User enters phone number in web interface to request verification
-3. System automatically uses the same number for sending the 6-digit code
-4. User confirms code
-5. Phone linked to account → full access unlocked
-6. User can remove link anytime
+**How it works:**
+1. User sends a WhatsApp message → System automatically creates anonymous account
+2. AI responds immediately, no setup needed
+3. *(Optional)* User can verify phone later for higher limits
 
-**Note**: Users must initiate WhatsApp contact before requesting phone verification, so the system knows which number to use.
+**Optional Verification Flow:**
+1. User enters phone number in web interface to request verification
+2. System automatically uses the last contacted number for sending the 6-digit code
+3. User confirms code → Phone linked to account → higher rate limits unlocked
+4. User can remove link anytime
 
 ### Supported Features:
 - ✅ Text Messages (send & receive)
