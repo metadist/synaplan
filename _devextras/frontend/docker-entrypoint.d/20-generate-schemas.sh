@@ -22,6 +22,9 @@ if [ "$BACKEND_READY" = false ]; then
   exit 1
 fi
 
+# Ensure generated directory exists
+mkdir -p src/generated
+
 # Generate schemas
 if npm run generate:schemas; then
   echo "✅ [dev] Zod schemas generated successfully"

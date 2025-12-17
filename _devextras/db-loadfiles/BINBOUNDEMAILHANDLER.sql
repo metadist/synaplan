@@ -17,40 +17,44 @@
 /*M!100616 SET @OLD_NOTE_VERBOSITY=@@NOTE_VERBOSITY, NOTE_VERBOSITY=0 */;
 
 --
--- Table structure for table `BRAG`
+-- Table structure for table `BINBOUNDEMAILHANDLER`
 --
 
-DROP TABLE IF EXISTS `BRAG`;
+DROP TABLE IF EXISTS `BINBOUNDEMAILHANDLER`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8mb4 */;
-CREATE TABLE `BRAG` (
+CREATE TABLE `BINBOUNDEMAILHANDLER` (
   `BID` bigint(20) NOT NULL AUTO_INCREMENT,
-  `BUID` bigint(20) NOT NULL,
-  `BMID` bigint(20) NOT NULL,
-  `BGROUPKEY` varchar(64) NOT NULL,
-  `BTYPE` int(11) NOT NULL,
-  `BSTART` int(11) NOT NULL,
-  `BEND` int(11) NOT NULL,
-  `BTEXT` longtext NOT NULL,
-  `BEMBED` vector(1024) NOT NULL COMMENT '(DC2Type:vector)',
-  `BCREATED` bigint(20) NOT NULL,
+  `BUSERID` bigint(20) NOT NULL,
+  `BNAME` varchar(255) NOT NULL,
+  `BMAILSERVER` varchar(255) NOT NULL,
+  `BPORT` int(11) NOT NULL,
+  `BPROTOCOL` varchar(10) NOT NULL,
+  `BSECURITY` varchar(20) NOT NULL,
+  `BUSERNAME` varchar(255) NOT NULL,
+  `BPASSWORD` longtext NOT NULL,
+  `BCHECKINTERVAL` int(11) NOT NULL,
+  `BDELETEAFTER` tinyint(1) NOT NULL DEFAULT 0,
+  `BSTATUS` varchar(20) NOT NULL DEFAULT 'inactive',
+  `BDEPARTMENTS` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL CHECK (json_valid(`BDEPARTMENTS`)),
+  `BLASTCHECKED` varchar(20) DEFAULT NULL,
+  `BCREATED` varchar(20) NOT NULL,
+  `BUPDATED` varchar(20) NOT NULL,
+  `BCONFIG` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin DEFAULT NULL CHECK (json_valid(`BCONFIG`)),
   PRIMARY KEY (`BID`),
-  KEY `idx_rag_user` (`BUID`),
-  KEY `idx_rag_message` (`BMID`),
-  KEY `idx_rag_group` (`BGROUPKEY`),
-  KEY `idx_rag_type` (`BTYPE`),
-  CONSTRAINT `FK_7EBB1F032A24D234` FOREIGN KEY (`BUID`) REFERENCES `BUSER` (`BID`)
+  KEY `idx_user` (`BUSERID`),
+  KEY `idx_status` (`BSTATUS`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
--- Dumping data for table `BRAG`
+-- Dumping data for table `BINBOUNDEMAILHANDLER`
 --
 
-LOCK TABLES `BRAG` WRITE;
-/*!40000 ALTER TABLE `BRAG` DISABLE KEYS */;
+LOCK TABLES `BINBOUNDEMAILHANDLER` WRITE;
+/*!40000 ALTER TABLE `BINBOUNDEMAILHANDLER` DISABLE KEYS */;
 set autocommit=0;
-/*!40000 ALTER TABLE `BRAG` ENABLE KEYS */;
+/*!40000 ALTER TABLE `BINBOUNDEMAILHANDLER` ENABLE KEYS */;
 UNLOCK TABLES;
 commit;
 /*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
@@ -63,4 +67,4 @@ commit;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*M!100616 SET NOTE_VERBOSITY=@OLD_NOTE_VERBOSITY */;
 
--- Dump completed on 2025-12-17  9:37:28
+-- Dump completed on 2025-12-17  9:37:26

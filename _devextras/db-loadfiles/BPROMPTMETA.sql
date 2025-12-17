@@ -1,9 +1,9 @@
 /*M!999999\- enable the sandbox mode */ 
--- MariaDB dump 10.19-11.7.2-MariaDB, for debian-linux-gnu (x86_64)
+-- MariaDB dump 10.19-11.8.2-MariaDB, for debian-linux-gnu (x86_64)
 --
--- Host: localhost    Database: synadb
+-- Host: localhost    Database: synaplan
 -- ------------------------------------------------------
--- Server version	11.7.2-MariaDB-ubu2404
+-- Server version	11.8.2-MariaDB-ubu2404
 
 /*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;
 /*!40101 SET @OLD_CHARACTER_SET_RESULTS=@@CHARACTER_SET_RESULTS */;
@@ -25,13 +25,15 @@ DROP TABLE IF EXISTS `BPROMPTMETA`;
 /*!40101 SET character_set_client = utf8mb4 */;
 CREATE TABLE `BPROMPTMETA` (
   `BID` bigint(20) NOT NULL AUTO_INCREMENT,
-  `BPROMPTID` bigint(20) NOT NULL COMMENT 'Reference to BPROMPTS.BID',
-  `BTOKEN` varchar(64) NOT NULL COMMENT 'Meta data key',
-  `BVALUE` varchar(128) NOT NULL COMMENT 'Meta data value',
+  `BPROMPTID` bigint(20) NOT NULL,
+  `BMETAKEY` varchar(64) NOT NULL,
+  `BMETAVALUE` longtext NOT NULL,
+  `BCREATED` bigint(20) NOT NULL,
   PRIMARY KEY (`BID`),
-  KEY `BPROMPTID` (`BPROMPTID`),
-  KEY `BTOKEN` (`BTOKEN`)
-) ENGINE=InnoDB AUTO_INCREMENT=77 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+  KEY `idx_promptmeta_prompt` (`BPROMPTID`),
+  KEY `idx_promptmeta_key` (`BMETAKEY`),
+  CONSTRAINT `FK_D44C7DE359DEE83D` FOREIGN KEY (`BPROMPTID`) REFERENCES `BPROMPTS` (`BID`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -40,44 +42,10 @@ CREATE TABLE `BPROMPTMETA` (
 
 LOCK TABLES `BPROMPTMETA` WRITE;
 /*!40000 ALTER TABLE `BPROMPTMETA` DISABLE KEYS */;
-INSERT INTO `BPROMPTMETA` VALUES
-(11,135,'aiModel','-1'),
-(12,135,'tool_internet','0'),
-(13,135,'tool_files','0'),
-(14,135,'tool_screenshot','0'),
-(15,135,'tool_transfer','0'),
-(16,136,'aiModel','-1'),
-(17,136,'tool_internet','0'),
-(18,136,'tool_files','0'),
-(19,136,'tool_screenshot','0'),
-(20,136,'tool_transfer','0'),
-(26,137,'aiModel','57'),
-(27,137,'tool_internet','1'),
-(28,137,'tool_files','0'),
-(29,137,'tool_screenshot','0'),
-(30,137,'tool_transfer','0'),
-(31,138,'aiModel','57'),
-(32,138,'tool_internet','1'),
-(33,138,'tool_files','1'),
-(34,138,'tool_screenshot','0'),
-(35,138,'tool_transfer','0'),
-(36,139,'aiModel','-1'),
-(37,139,'tool_internet','0'),
-(38,139,'tool_files','0'),
-(39,139,'tool_screenshot','0'),
-(40,139,'tool_transfer','0'),
-(46,141,'aiModel','-1'),
-(47,141,'tool_internet','0'),
-(48,141,'tool_files','0'),
-(49,141,'tool_screenshot','0'),
-(50,141,'tool_transfer','0'),
-(72,144,'aiModel','69'),
-(73,144,'tool_internet','0'),
-(74,144,'tool_files','0'),
-(75,144,'tool_screenshot','0'),
-(76,144,'tool_transfer','0');
+set autocommit=0;
 /*!40000 ALTER TABLE `BPROMPTMETA` ENABLE KEYS */;
 UNLOCK TABLES;
+commit;
 /*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
 
 /*!40101 SET SQL_MODE=@OLD_SQL_MODE */;
@@ -88,4 +56,4 @@ UNLOCK TABLES;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*M!100616 SET NOTE_VERBOSITY=@OLD_NOTE_VERBOSITY */;
 
--- Dump completed on 2025-08-05 15:19:30
+-- Dump completed on 2025-12-17  9:37:27

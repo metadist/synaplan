@@ -1,45 +1,62 @@
--- Rate Limiting Configuration using existing BCONFIG table
--- SIMPLIFIED: NEW = lifetime totals (no reset), PAID = hourly + monthly
--- Pattern: BGROUP = 'RATELIMITS_[LEVEL]', BSETTING = '[TYPE]_[TIMEFRAME]', BVALUE = limit
+/*M!999999\- enable the sandbox mode */ 
+-- MariaDB dump 10.19-11.8.2-MariaDB, for debian-linux-gnu (x86_64)
+--
+-- Host: localhost    Database: synaplan
+-- ------------------------------------------------------
+-- Server version	11.8.2-MariaDB-ubu2404
 
-DELETE FROM BCONFIG WHERE BGROUP LIKE 'RATELIMITS_%' AND BOWNERID = 0;
-DELETE FROM BCONFIG WHERE BGROUP = 'SYSTEM_FLAGS' AND BOWNERID = 0;
+/*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;
+/*!40101 SET @OLD_CHARACTER_SET_RESULTS=@@CHARACTER_SET_RESULTS */;
+/*!40101 SET @OLD_COLLATION_CONNECTION=@@COLLATION_CONNECTION */;
+/*!40101 SET NAMES utf8mb4 */;
+/*!40103 SET @OLD_TIME_ZONE=@@TIME_ZONE */;
+/*!40103 SET TIME_ZONE='+00:00' */;
+/*!40014 SET @OLD_UNIQUE_CHECKS=@@UNIQUE_CHECKS, UNIQUE_CHECKS=0 */;
+/*!40014 SET @OLD_FOREIGN_KEY_CHECKS=@@FOREIGN_KEY_CHECKS, FOREIGN_KEY_CHECKS=0 */;
+/*!40101 SET @OLD_SQL_MODE=@@SQL_MODE, SQL_MODE='NO_AUTO_VALUE_ON_ZERO' */;
+/*M!100616 SET @OLD_NOTE_VERBOSITY=@@NOTE_VERBOSITY, NOTE_VERBOSITY=0 */;
 
--- NEW User Limits (LIFETIME TOTALS - NEVER RESET)
-INSERT INTO `BCONFIG` (`BOWNERID`, `BGROUP`, `BSETTING`, `BVALUE`) VALUES
-(0, 'RATELIMITS_NEW', 'MESSAGES_TOTAL', '50'),       -- 50 messages total (lifetime)
-(0, 'RATELIMITS_NEW', 'IMAGES_TOTAL', '5'),          -- 5 images total (lifetime)
-(0, 'RATELIMITS_NEW', 'VIDEOS_TOTAL', '2'),          -- 2 videos total (lifetime)
-(0, 'RATELIMITS_NEW', 'AUDIOS_TOTAL', '3'),          -- 3 audio files total (lifetime)
-(0, 'RATELIMITS_NEW', 'FILE_ANALYSIS_TOTAL', '10'),  -- 10 file analyses total (lifetime)
+--
+-- Table structure for table `BRATELIMITS_CONFIG`
+--
 
--- Pro Level Limits (HOURLY + MONTHLY)
-(0, 'RATELIMITS_PRO', 'MESSAGES_HOURLY', '100'),     -- 100 messages per hour
-(0, 'RATELIMITS_PRO', 'MESSAGES_MONTHLY', '5000'),   -- 5000 messages per month
-(0, 'RATELIMITS_PRO', 'IMAGES_MONTHLY', '50'),       -- 50 images per month
-(0, 'RATELIMITS_PRO', 'VIDEOS_MONTHLY', '10'),       -- 10 videos per month
-(0, 'RATELIMITS_PRO', 'AUDIOS_MONTHLY', '20'),       -- 20 audio files per month
-(0, 'RATELIMITS_PRO', 'FILE_ANALYSIS_MONTHLY', '200'), -- 200 file analyses per month
+DROP TABLE IF EXISTS `BRATELIMITS_CONFIG`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8mb4 */;
+CREATE TABLE `BRATELIMITS_CONFIG` (
+  `BID` bigint(20) NOT NULL AUTO_INCREMENT,
+  `BSCOPE` varchar(64) NOT NULL,
+  `BPLAN` varchar(32) NOT NULL,
+  `BLIMIT` int(11) NOT NULL,
+  `BWINDOW` int(11) NOT NULL,
+  `BDESCRIPTION` longtext NOT NULL,
+  `BCREATED` bigint(20) NOT NULL,
+  `BUPDATED` bigint(20) NOT NULL,
+  PRIMARY KEY (`BID`),
+  UNIQUE KEY `unique_scope_plan` (`BSCOPE`,`BPLAN`),
+  KEY `idx_ratelimit_scope` (`BSCOPE`),
+  KEY `idx_ratelimit_plan` (`BPLAN`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
 
--- Team Level Limits (HOURLY + MONTHLY)
-(0, 'RATELIMITS_TEAM', 'MESSAGES_HOURLY', '300'),    -- 300 messages per hour
-(0, 'RATELIMITS_TEAM', 'MESSAGES_MONTHLY', '15000'), -- 15k messages per month
-(0, 'RATELIMITS_TEAM', 'IMAGES_MONTHLY', '200'),     -- 200 images per month
-(0, 'RATELIMITS_TEAM', 'VIDEOS_MONTHLY', '50'),      -- 50 videos per month
-(0, 'RATELIMITS_TEAM', 'AUDIOS_MONTHLY', '100'),     -- 100 audio files per month
-(0, 'RATELIMITS_TEAM', 'FILE_ANALYSIS_MONTHLY', '1000'), -- 1000 file analyses per month
+--
+-- Dumping data for table `BRATELIMITS_CONFIG`
+--
 
--- Business Level Limits (HOURLY + MONTHLY)
-(0, 'RATELIMITS_BUSINESS', 'MESSAGES_HOURLY', '1000'), -- 1000 messages per hour
-(0, 'RATELIMITS_BUSINESS', 'MESSAGES_MONTHLY', '50000'), -- 50k messages per month
-(0, 'RATELIMITS_BUSINESS', 'IMAGES_MONTHLY', '1000'),  -- 1000 images per month
-(0, 'RATELIMITS_BUSINESS', 'VIDEOS_MONTHLY', '200'),   -- 200 videos per month
-(0, 'RATELIMITS_BUSINESS', 'AUDIOS_MONTHLY', '500'),   -- 500 audio files per month
-(0, 'RATELIMITS_BUSINESS', 'FILE_ANALYSIS_MONTHLY', '5000'), -- 5000 file analyses per month
+LOCK TABLES `BRATELIMITS_CONFIG` WRITE;
+/*!40000 ALTER TABLE `BRATELIMITS_CONFIG` DISABLE KEYS */;
+set autocommit=0;
+/*!40000 ALTER TABLE `BRATELIMITS_CONFIG` ENABLE KEYS */;
+UNLOCK TABLES;
+commit;
+/*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
 
--- Widget/Anonymous User Limits (inherit from widget owner's plan)
--- Note: Widget users use the widget owner's rate limits, no separate limits needed
+/*!40101 SET SQL_MODE=@OLD_SQL_MODE */;
+/*!40014 SET FOREIGN_KEY_CHECKS=@OLD_FOREIGN_KEY_CHECKS */;
+/*!40014 SET UNIQUE_CHECKS=@OLD_UNIQUE_CHECKS */;
+/*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
+/*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;
+/*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
+/*M!100616 SET NOTE_VERBOSITY=@OLD_NOTE_VERBOSITY */;
 
--- Feature Flags for Smart Rate Limiting
-(0, 'SYSTEM_FLAGS', 'SMART_RATE_LIMITING_ENABLED', '1'),
-(0, 'SYSTEM_FLAGS', 'RATE_LIMITING_DEBUG_MODE', '0');
+-- Dump completed on 2025-12-17  9:37:28

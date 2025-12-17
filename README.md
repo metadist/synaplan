@@ -13,7 +13,7 @@ AI-powered knowledge management with chat, document processing, and RAG (Retriev
 
 ```bash
 git clone <repository-url>
-cd synaplan-dev
+cd synaplan
 ```
 
 **Line Endings:** This project enforces LF (Unix-style) line endings via `.gitattributes`, so all platforms will automatically use LF regardless of their Git configuration. If you cloned before this was added, you may need to refresh your working copy:
@@ -47,26 +47,27 @@ docker compose up -d
 - ✅ Generates JWT keypair for authentication
 - ✅ Creates database schema (migrations)
 - ✅ Loads test users and fixtures (if database is empty)
-- ✅ Pulls the local `gpt-oss:20b` chat model and `bge-m3` embedding model with live progress (unless disabled)
+- ✅ Pulls `bge-m3` embedding model (always needed for RAG)
+- ✅ Pulls `gpt-oss:20b` chat model only if Local Ollama option selected
 - ✅ Ensures the schema + fixtures are applied (runs `doctrine:schema:update` + fixtures once)
 - ✅ Starts all services
-- ✅ **System ready in ~40 seconds!**
+- ✅ **System ready in ~1-2 minutes!**
 
-**First startup takes ~40 seconds** because:
-- Database initialization: ~5s
-- Schema creation: ~2s
-- Fixtures loading: ~3s
-- Cache warming: ~2s
-- Total: ~40s (one-time setup)
+**First startup takes ~1-2 minutes** because:
+- Database initialization and health checks: ~10s
+- Schema creation and migrations: ~5s
+- Fixtures loading: ~5s
+- Cache warming and service startup: ~10s
+- Groq configuration (if selected): ~5s
 
-**Subsequent restarts take ~15 seconds** (no fixtures needed).
+**Subsequent restarts take ~15-30 seconds** (no fixtures needed).
 
 **AI Model Download Behavior:**
 
 `./_1st_install_linux.sh` (or `_1st_install_win.bat`) guides you through one of two options:
 
 1. **Local Ollama** – downloads `gpt-oss:20b` (chat) + `bge-m3` (vector) so the stack runs fully offline (needs ~24 GB VRAM).
-2. **Groq Cloud (recommended)** – prompts for your free `GROQ_API_KEY`, writes it to `backend/.env`, switches all defaults to Groq’s `llama-3.3-70b-versatile`, and skips the heavy local downloads.
+2. **Groq Cloud (recommended)** – prompts for your free `GROQ_API_KEY`, writes it to `backend/.env`, switches all defaults to Groq's `llama-3.3-70b-versatile`, and only downloads `bge-m3` for local embeddings (much smaller/faster).
 
 Progress (downloads or schema work) streams directly in the script output, so you always know what’s happening.
 
@@ -74,10 +75,10 @@ Progress (downloads or schema work) streams directly in the script output, so yo
 ```bash
 ./_1st_install_linux.sh      # or _1st_install_win.bat
 ```
-- ⚡ **Fast startup** for services (~40s) while downloads (if Ollama) or migrations (if Groq) run in the background
-- 📦 **Progress shown live** in the script (tailing `backend` logs)
+- ⚡ **Fast startup** for services (~1-2 min) while downloads (if Ollama) or migrations (if Groq) run
+- 📦 **Progress shown live** in the script output
 - ✅ **AI chat + RAG ready** as soon as the selected provider is configured
-- 💡 **Best for**: Development/prod setups that either have local GPU (option 1) or prefer Groq’s hosted models (option 2)
+- 💡 **Best for**: Development/prod setups that either have local GPU (option 1) or prefer Groq's hosted models (option 2)
 
 **Option 2: On-demand Downloads**
 ```bash
@@ -282,10 +283,10 @@ synaplan-dev/
 ## ⚙️ Environment Configuration
 
 Environment files are auto-generated on first start:
-- `backend/.env.local` (auto-created by backend container, only if not exists)
+- `backend/.env` (created from `.env.example` by install script, stores API keys)
 - `frontend/.env.docker` (auto-created by frontend container)
 
-**Note:** `.env.local` is never overwritten. To reset: delete the file and restart container.
+**Note:** `backend/.env` is never overwritten if it exists. To reset: delete the file and run the install script again.
 
 Example files provided:
 - `backend/.env.docker.example` (reference)
@@ -322,9 +323,9 @@ docker compose exec frontend npm install <package>
 
 ## 🤖 AI Models
 
-- **gpt-oss:20b (Ollama)** – Pulled automatically by the first-install script (or any `docker compose up -d` with `AUTO_DOWNLOAD_MODELS=true`) so local chat is ready without extra steps. Progress prints as `[Background] [gpt-oss:20b] ...`.
-- **bge-m3 (Ollama)** – Pulled alongside `gpt-oss:20b` during the first-install script so vector search works immediately; progress lines look like `[Background] [bge-m3] ...`.
-- **All cloud models (Groq, OpenAI, etc.)** – Instantly available once their respective API keys are set.
+- **bge-m3 (Ollama)** – Always pulled during install (required for RAG/vector search). This is a small embedding model (~1.5GB).
+- **gpt-oss:20b (Ollama)** – Only pulled if "Local Ollama" option selected during install. Large model (~12GB) for local chat without API keys.
+- **All cloud models (Groq, OpenAI, etc.)** – Instantly available once their respective API keys are set. Groq is recommended (free tier, fast).
 
 Disable the auto download by running:
 ```bash

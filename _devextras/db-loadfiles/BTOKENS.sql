@@ -1,9 +1,9 @@
 /*M!999999\- enable the sandbox mode */ 
--- MariaDB dump 10.19-11.7.2-MariaDB, for debian-linux-gnu (x86_64)
+-- MariaDB dump 10.19-11.8.2-MariaDB, for debian-linux-gnu (x86_64)
 --
--- Host: localhost    Database: synadb
+-- Host: localhost    Database: synaplan
 -- ------------------------------------------------------
--- Server version	11.7.2-MariaDB-ubu2404
+-- Server version	11.8.2-MariaDB-ubu2404
 
 /*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;
 /*!40101 SET @OLD_CHARACTER_SET_RESULTS=@@CHARACTER_SET_RESULTS */;
@@ -25,12 +25,22 @@ DROP TABLE IF EXISTS `BTOKENS`;
 /*!40101 SET character_set_client = utf8mb4 */;
 CREATE TABLE `BTOKENS` (
   `BID` bigint(20) NOT NULL AUTO_INCREMENT,
-  `BOWNERID` bigint(20) NOT NULL DEFAULT 0,
-  `BNAME` varchar(96) NOT NULL DEFAULT '',
-  `BTOKEN` text NOT NULL DEFAULT '',
+  `BUSERID` bigint(20) NOT NULL,
+  `BTOKEN` varchar(255) NOT NULL,
+  `BTYPE` varchar(32) NOT NULL,
+  `BCREATED` bigint(20) NOT NULL,
+  `BEXPIRES` bigint(20) NOT NULL,
+  `BUSED` tinyint(1) NOT NULL DEFAULT 0,
+  `BUSEDDATE` bigint(20) DEFAULT NULL,
+  `BIPADDRESS` varchar(45) NOT NULL DEFAULT '',
   PRIMARY KEY (`BID`),
-  KEY `BOWNERID` (`BOWNERID`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+  UNIQUE KEY `UNIQ_A598CC859D139E52` (`BTOKEN`),
+  KEY `idx_token_user` (`BUSERID`),
+  KEY `idx_token_token` (`BTOKEN`),
+  KEY `idx_token_type` (`BTYPE`),
+  KEY `idx_token_expires` (`BEXPIRES`),
+  CONSTRAINT `FK_A598CC85FEF0B465` FOREIGN KEY (`BUSERID`) REFERENCES `BUSER` (`BID`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -39,8 +49,10 @@ CREATE TABLE `BTOKENS` (
 
 LOCK TABLES `BTOKENS` WRITE;
 /*!40000 ALTER TABLE `BTOKENS` DISABLE KEYS */;
+set autocommit=0;
 /*!40000 ALTER TABLE `BTOKENS` ENABLE KEYS */;
 UNLOCK TABLES;
+commit;
 /*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
 
 /*!40101 SET SQL_MODE=@OLD_SQL_MODE */;
@@ -51,4 +63,4 @@ UNLOCK TABLES;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*M!100616 SET NOTE_VERBOSITY=@OLD_NOTE_VERBOSITY */;
 
--- Dump completed on 2025-08-05 15:19:31
+-- Dump completed on 2025-12-17  9:37:29
