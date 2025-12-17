@@ -861,7 +861,7 @@ watch(
       if (handler.emailFilter) {
         emailFilter.value = {
           mode: handler.emailFilter.mode,
-          fromDate: handler.emailFilter.fromDate,
+          fromDate: handler.emailFilter.fromDate ?? undefined,
         }
       }
     }
