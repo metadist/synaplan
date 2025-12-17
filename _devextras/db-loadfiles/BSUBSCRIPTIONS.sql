@@ -1,25 +1,62 @@
--- Subscription Plans and Pricing Configuration
--- Defines available subscription tiers and their pricing
+/*M!999999\- enable the sandbox mode */ 
+-- MariaDB dump 10.19-11.8.2-MariaDB, for debian-linux-gnu (x86_64)
+--
+-- Host: localhost    Database: synaplan
+-- ------------------------------------------------------
+-- Server version	11.8.2-MariaDB-ubu2404
+
+/*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;
+/*!40101 SET @OLD_CHARACTER_SET_RESULTS=@@CHARACTER_SET_RESULTS */;
+/*!40101 SET @OLD_COLLATION_CONNECTION=@@COLLATION_CONNECTION */;
+/*!40101 SET NAMES utf8mb4 */;
+/*!40103 SET @OLD_TIME_ZONE=@@TIME_ZONE */;
+/*!40103 SET TIME_ZONE='+00:00' */;
+/*!40014 SET @OLD_UNIQUE_CHECKS=@@UNIQUE_CHECKS, UNIQUE_CHECKS=0 */;
+/*!40014 SET @OLD_FOREIGN_KEY_CHECKS=@@FOREIGN_KEY_CHECKS, FOREIGN_KEY_CHECKS=0 */;
+/*!40101 SET @OLD_SQL_MODE=@@SQL_MODE, SQL_MODE='NO_AUTO_VALUE_ON_ZERO' */;
+/*M!100616 SET @OLD_NOTE_VERBOSITY=@@NOTE_VERBOSITY, NOTE_VERBOSITY=0 */;
+
+--
+-- Table structure for table `BSUBSCRIPTIONS`
+--
 
 DROP TABLE IF EXISTS `BSUBSCRIPTIONS`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8mb4 */;
 CREATE TABLE `BSUBSCRIPTIONS` (
   `BID` bigint(20) NOT NULL AUTO_INCREMENT,
   `BNAME` varchar(64) NOT NULL,
-  `BLEVEL` varchar(32) NOT NULL COMMENT 'Rate limiting level: NEW, PRO, TEAM, BUSINESS',
-  `BPRICE_MONTHLY` decimal(10,2) NOT NULL COMMENT 'Monthly price in EUR',
-  `BPRICE_YEARLY` decimal(10,2) NOT NULL COMMENT 'Yearly price in EUR', 
-  `BDESCRIPTION` text NOT NULL,
+  `BLEVEL` varchar(32) NOT NULL,
+  `BPRICE_MONTHLY` decimal(10,2) NOT NULL,
+  `BPRICE_YEARLY` decimal(10,2) NOT NULL,
+  `BDESCRIPTION` longtext NOT NULL,
   `BACTIVE` tinyint(1) NOT NULL DEFAULT 1,
-  `BSTRIPE_MONTHLY_ID` varchar(128) DEFAULT NULL COMMENT 'Stripe price ID for monthly',
-  `BSTRIPE_YEARLY_ID` varchar(128) DEFAULT NULL COMMENT 'Stripe price ID for yearly',
+  `BSTRIPE_MONTHLY_ID` varchar(128) DEFAULT NULL,
+  `BSTRIPE_YEARLY_ID` varchar(128) DEFAULT NULL,
   PRIMARY KEY (`BID`),
   KEY `BLEVEL` (`BLEVEL`),
   KEY `BACTIVE` (`BACTIVE`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_uca1400_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
 
--- Subscription Plans Data
-INSERT INTO `BSUBSCRIPTIONS` (`BID`, `BNAME`, `BLEVEL`, `BPRICE_MONTHLY`, `BPRICE_YEARLY`, `BDESCRIPTION`, `BACTIVE`, `BSTRIPE_MONTHLY_ID`, `BSTRIPE_YEARLY_ID`) VALUES
-(1, 'Free Plan', 'NEW', 0.00, 0.00, 'Basic free tier with limited usage', 1, NULL, NULL),
-(2, 'Pro Plan', 'PRO', 19.95, 199.50, 'Professional plan with increased limits', 1, 'price_stripe_pro_monthly', 'price_stripe_pro_yearly'),
-(3, 'Team Plan', 'TEAM', 49.95, 499.50, 'Team collaboration with higher limits', 1, 'price_stripe_team_monthly', 'price_stripe_team_yearly'),
-(4, 'Business Plan', 'BUSINESS', 99.95, 999.50, 'Enterprise-grade with maximum limits', 1, 'price_stripe_business_monthly', 'price_stripe_business_yearly');
+--
+-- Dumping data for table `BSUBSCRIPTIONS`
+--
+
+LOCK TABLES `BSUBSCRIPTIONS` WRITE;
+/*!40000 ALTER TABLE `BSUBSCRIPTIONS` DISABLE KEYS */;
+set autocommit=0;
+/*!40000 ALTER TABLE `BSUBSCRIPTIONS` ENABLE KEYS */;
+UNLOCK TABLES;
+commit;
+/*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
+
+/*!40101 SET SQL_MODE=@OLD_SQL_MODE */;
+/*!40014 SET FOREIGN_KEY_CHECKS=@OLD_FOREIGN_KEY_CHECKS */;
+/*!40014 SET UNIQUE_CHECKS=@OLD_UNIQUE_CHECKS */;
+/*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
+/*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;
+/*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
+/*M!100616 SET NOTE_VERBOSITY=@OLD_NOTE_VERBOSITY */;
+
+-- Dump completed on 2025-12-17  9:37:28
