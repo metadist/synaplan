@@ -31,7 +31,8 @@ class WhatsAppServiceTest extends TestCase
             $this->httpClient,
             $this->logger,
             'test_token',
-            true
+            true,
+            '/tmp/test_uploads' // Test uploads directory
         );
     }
 
@@ -46,7 +47,8 @@ class WhatsAppServiceTest extends TestCase
             $this->httpClient,
             $this->logger,
             'test_token',
-            false // disabled
+            false, // disabled
+            '/tmp/test_uploads'
         );
 
         $this->assertFalse($service->isAvailable());
@@ -58,7 +60,8 @@ class WhatsAppServiceTest extends TestCase
             $this->httpClient,
             $this->logger,
             'test_token',
-            false
+            false,
+            '/tmp/test_uploads'
         );
 
         $this->expectException(\RuntimeException::class);
@@ -224,7 +227,8 @@ class WhatsAppServiceTest extends TestCase
             $this->httpClient,
             $this->logger,
             'test_token',
-            false
+            false,
+            '/tmp/test_uploads'
         );
 
         $this->expectException(\RuntimeException::class);

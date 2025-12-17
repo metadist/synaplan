@@ -21,6 +21,7 @@ class WhatsAppService
         private LoggerInterface $logger,
         string $whatsappAccessToken,
         bool $whatsappEnabled,
+        private string $uploadsDir,
     ) {
         $this->accessToken = $whatsappAccessToken;
         $this->enabled = $whatsappEnabled;
@@ -326,10 +327,14 @@ class WhatsAppService
     /**
      * Get media URL from media ID.
      */
-    public function getMediaUrl(string $mediaId): ?string
+    public function getMediaUrl(string $mediaId, string $phoneNumberId): ?string
     {
         if (!$this->isAvailable()) {
             return null;
+        }
+
+        if (empty($phoneNumberId)) {
+            throw new \InvalidArgumentException('Phone Number ID is required for getting media URL.');
         }
 
         $url = sprintf(
@@ -351,6 +356,7 @@ class WhatsAppService
         } catch (\Exception $e) {
             $this->logger->error('Failed to get WhatsApp media URL', [
                 'media_id' => $mediaId,
+                'phone_number_id' => $phoneNumberId,
                 'error' => $e->getMessage(),
             ]);
 
@@ -359,29 +365,103 @@ class WhatsAppService
     }
 
     /**
-     * Download media from WhatsApp.
+     * Download media from WhatsApp and save locally.
+     * Returns array with file_path and file_type.
      */
-    public function downloadMedia(string $mediaUrl): ?string
+    public function downloadMedia(string $mediaId, string $phoneNumberId): ?array
     {
         if (!$this->isAvailable()) {
             return null;
         }
 
+        if (empty($phoneNumberId)) {
+            throw new \InvalidArgumentException('Phone Number ID is required for downloading media.');
+        }
+
         try {
+            // First get the media URL
+            $mediaUrl = $this->getMediaUrl($mediaId, $phoneNumberId);
+            if (!$mediaUrl) {
+                return null;
+            }
+
+            // Download the media
             $response = $this->httpClient->request('GET', $mediaUrl, [
                 'headers' => [
                     'Authorization' => 'Bearer '.$this->accessToken,
                 ],
             ]);
 
-            return $response->getContent();
+            $content = $response->getContent();
+            $contentType = $response->getHeaders()['content-type'][0] ?? 'application/octet-stream';
+
+            // Determine file extension from content type
+            $extension = $this->getExtensionFromMimeType($contentType);
+
+            // Generate unique filename
+            $filename = 'whatsapp_'.time().'_'.bin2hex(random_bytes(8)).'.'.$extension;
+            $relativePath = 'whatsapp/'.$filename;
+            $fullPath = $this->uploadsDir.'/'.$relativePath;
+
+            // Create directory if it doesn't exist
+            $dir = dirname($fullPath);
+            if (!is_dir($dir)) {
+                mkdir($dir, 0775, true);
+            }
+
+            // Save file
+            file_put_contents($fullPath, $content);
+
+            $this->logger->info('WhatsApp media downloaded and saved', [
+                'media_id' => $mediaId,
+                'file_path' => $relativePath,
+                'size' => strlen($content),
+                'mime_type' => $contentType,
+            ]);
+
+            return [
+                'file_path' => $relativePath,
+                'file_type' => $extension,
+                'mime_type' => $contentType,
+                'size' => strlen($content),
+            ];
         } catch (\Exception $e) {
             $this->logger->error('Failed to download WhatsApp media', [
-                'url' => $mediaUrl,
+                'media_id' => $mediaId,
+                'phone_number_id' => $phoneNumberId,
                 'error' => $e->getMessage(),
             ]);
 
             return null;
         }
+    }
+
+    /**
+     * Get file extension from MIME type.
+     */
+    private function getExtensionFromMimeType(string $mimeType): string
+    {
+        $mimeMap = [
+            'image/jpeg' => 'jpg',
+            'image/png' => 'png',
+            'image/gif' => 'gif',
+            'image/webp' => 'webp',
+            'audio/ogg' => 'ogg',
+            'audio/mpeg' => 'mp3',
+            'audio/mp4' => 'm4a',
+            'audio/amr' => 'amr',
+            'audio/opus' => 'opus',
+            'video/mp4' => 'mp4',
+            'video/3gpp' => '3gp',
+            'application/pdf' => 'pdf',
+            'application/vnd.ms-powerpoint' => 'ppt',
+            'application/msword' => 'doc',
+            'application/vnd.ms-excel' => 'xls',
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.document' => 'docx',
+            'application/vnd.openxmlformats-officedocument.presentationml.presentation' => 'pptx',
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' => 'xlsx',
+        ];
+
+        return $mimeMap[$mimeType] ?? 'bin';
     }
 }

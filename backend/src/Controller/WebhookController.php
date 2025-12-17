@@ -527,13 +527,43 @@ class WebhookController extends AbstractController
         if ($mediaId) {
             $message->setMeta('media_id', $mediaId);
 
-            // Get media URL from WhatsApp API if not provided
-            if (!$mediaUrl) {
-                $mediaUrl = $this->whatsAppService->getMediaUrl($mediaId);
-            }
+            // Download and process media file
+            try {
+                $this->logger->info('Downloading WhatsApp media', [
+                    'media_id' => $mediaId,
+                    'type' => $type,
+                ]);
 
-            if ($mediaUrl) {
-                $message->setMeta('media_url', $mediaUrl);
+                // Get media URL if not provided
+                if (!$mediaUrl) {
+                    $mediaUrl = $this->whatsAppService->getMediaUrl($mediaId, $phoneNumberId);
+                }
+
+                if ($mediaUrl) {
+                    $message->setMeta('media_url', $mediaUrl);
+
+                    // Download media file
+                    $downloadResult = $this->whatsAppService->downloadMedia($mediaId, $phoneNumberId);
+
+                    if ($downloadResult && !empty($downloadResult['file_path'])) {
+                        // Set file info on message so PreProcessor can process it
+                        $message->setFile(1);
+                        $message->setFilePath($downloadResult['file_path']);
+                        $message->setFileType($downloadResult['file_type'] ?? $type);
+
+                        $this->logger->info('WhatsApp media downloaded successfully', [
+                            'media_id' => $mediaId,
+                            'file_path' => $downloadResult['file_path'],
+                            'file_type' => $downloadResult['file_type'] ?? $type,
+                        ]);
+                    }
+                }
+            } catch (\Exception $e) {
+                $this->logger->error('Failed to download WhatsApp media', [
+                    'media_id' => $mediaId,
+                    'error' => $e->getMessage(),
+                ]);
+                // Continue processing even if media download fails
             }
         }
 
@@ -546,6 +576,7 @@ class WebhookController extends AbstractController
         $this->whatsAppService->markAsRead($messageId, $phoneNumberId);
 
         // Process message through pipeline (PreProcessor -> Classifier -> Processor)
+        // PreProcessor will now extract text from audio, PDFs, and analyze images
         $result = $this->messageProcessor->process($message);
 
         if (!$result['success']) {
