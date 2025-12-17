@@ -113,6 +113,7 @@ services:
         arguments:
             $whatsappAccessToken: '%env(WHATSAPP_ACCESS_TOKEN)%'
             $whatsappEnabled: '%env(bool:WHATSAPP_ENABLED)%'
+            $uploadsDir: '%kernel.project_dir%/var/uploads'
 
     # Webhook Controller - Bind WhatsApp Verify Token
     App\Controller\WebhookController:
