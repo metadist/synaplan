@@ -83,11 +83,85 @@ class PhoneVerificationController extends AbstractController
         // Format phone number (remove spaces, dashes, etc.)
         $phoneNumber = preg_replace('/[^0-9+]/', '', $phoneNumber);
 
+        // Check rate limiting
+        $userDetails = $user->getUserDetails();
+        $rateLimitData = $userDetails['verification_rate_limit'] ?? null;
+
+        $now = time();
+
+        // Check if user is in cooldown period (5 minutes after 5 attempts)
+        if ($rateLimitData && isset($rateLimitData['cooldown_until'])) {
+            if ($now < $rateLimitData['cooldown_until']) {
+                $remainingSeconds = $rateLimitData['cooldown_until'] - $now;
+
+                return $this->json([
+                    'success' => false,
+                    'error' => 'Too many verification attempts. Please wait before trying again.',
+                    'cooldown_remaining' => $remainingSeconds,
+                    'rate_limited' => true,
+                ], Response::HTTP_TOO_MANY_REQUESTS);
+            }
+            // Cooldown expired, reset counters
+            $rateLimitData = null;
+        }
+
+        // Check if last request was less than 30 seconds ago
+        if ($rateLimitData && isset($rateLimitData['last_request_at'])) {
+            $timeSinceLastRequest = $now - $rateLimitData['last_request_at'];
+            if ($timeSinceLastRequest < 30) {
+                $remainingSeconds = 30 - $timeSinceLastRequest;
+
+                return $this->json([
+                    'success' => false,
+                    'error' => 'Please wait before generating a new code.',
+                    'retry_after' => $remainingSeconds,
+                    'rate_limited' => true,
+                ], Response::HTTP_TOO_MANY_REQUESTS);
+            }
+        }
+
+        // Initialize or update rate limit data
+        if (!$rateLimitData) {
+            $rateLimitData = [
+                'count' => 0,
+                'last_request_at' => 0,
+                'cooldown_until' => null,
+            ];
+        }
+
+        // Increment counter
+        ++$rateLimitData['count'];
+        $rateLimitData['last_request_at'] = $now;
+
+        // Check if user has reached the limit (5 attempts)
+        if ($rateLimitData['count'] >= 5) {
+            $rateLimitData['cooldown_until'] = $now + 300; // 5 minutes cooldown
+            $rateLimitData['count'] = 0; // Reset counter for next window
+
+            $userDetails['verification_rate_limit'] = $rateLimitData;
+            $user->setUserDetails($userDetails);
+            $this->em->flush();
+
+            $this->logger->warning('User hit verification rate limit', [
+                'user_id' => $user->getId(),
+                'cooldown_until' => $rateLimitData['cooldown_until'],
+            ]);
+
+            return $this->json([
+                'success' => false,
+                'error' => 'Maximum verification attempts reached. Please wait 5 minutes before trying again.',
+                'cooldown_remaining' => 300,
+                'rate_limited' => true,
+            ], Response::HTTP_TOO_MANY_REQUESTS);
+        }
+
+        // Save rate limit data
+        $userDetails['verification_rate_limit'] = $rateLimitData;
+
         // Generate unique verification code (5 characters: uppercase letters + numbers)
         $verificationCode = $this->generateUniqueVerificationCode();
 
         // Store in user details JSON
-        $userDetails = $user->getUserDetails();
         $userDetails['phone_verification'] = [
             'phone_number' => $phoneNumber,
             'code' => $verificationCode,
@@ -114,6 +188,10 @@ class PhoneVerificationController extends AbstractController
             'phone_number' => $phoneNumber,
             'verification_code' => $verificationCode,
             'expires_at' => time() + 300,
+            'rate_limit' => [
+                'attempts_remaining' => 5 - $rateLimitData['count'],
+                'retry_after' => 30,
+            ],
         ]);
     }
 
@@ -285,6 +363,22 @@ class PhoneVerificationController extends AbstractController
         $phoneNumber = $userDetails['phone_number'] ?? null;
         $verifiedAt = $userDetails['phone_verified_at'] ?? null;
         $pendingVerification = $userDetails['phone_verification'] ?? null;
+
+        // Check if pending verification has expired and clean it up
+        if ($pendingVerification) {
+            $expiresAt = $pendingVerification['expires_at'] ?? 0;
+            if (time() > $expiresAt) {
+                // Code expired, remove it
+                $this->logger->info('Cleaning up expired verification code', [
+                    'user_id' => $user->getId(),
+                    'expired_at' => $expiresAt,
+                ]);
+                unset($userDetails['phone_verification']);
+                $user->setUserDetails($userDetails);
+                $this->em->flush();
+                $pendingVerification = null;
+            }
+        }
 
         // Return code and expiration if pending
         $response = [
