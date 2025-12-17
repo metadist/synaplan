@@ -376,9 +376,28 @@ class WebhookController extends AbstractController
         $timestamp = (int) $incomingMsg['timestamp'];
         $type = $incomingMsg['type'];
 
+        // Extract phone number ID from webhook metadata (dynamic multi-number support)
+        $phoneNumberId = $value['metadata']['phone_number_id'] ?? null;
+        $displayPhoneNumber = $value['metadata']['display_phone_number'] ?? null;
+
+        if (!$phoneNumberId) {
+            $this->logger->error('WhatsApp message missing phone_number_id', [
+                'message_id' => $messageId,
+                'value' => $value,
+            ]);
+
+            return [
+                'success' => false,
+                'message_id' => $messageId,
+                'error' => 'Missing phone_number_id in webhook payload',
+            ];
+        }
+
         $this->logger->info('WhatsApp message received', [
             'user_id' => $user->getId(),
             'from' => $from,
+            'to_phone_number_id' => $phoneNumberId,
+            'to_display_phone' => $displayPhoneNumber,
             'type' => $type,
             'message_id' => $messageId,
         ]);
@@ -444,6 +463,10 @@ class WebhookController extends AbstractController
         // Store WhatsApp metadata
         $message->setMeta('channel', 'whatsapp');
         $message->setMeta('from_phone', $from);
+        $message->setMeta('to_phone_number_id', $phoneNumberId);
+        if ($displayPhoneNumber) {
+            $message->setMeta('to_display_phone', $displayPhoneNumber);
+        }
         $message->setMeta('external_id', $messageId);
         $message->setMeta('message_type', $type);
 
@@ -469,8 +492,8 @@ class WebhookController extends AbstractController
         // Record usage
         $this->rateLimitService->recordUsage($user, 'MESSAGES');
 
-        // Mark as read
-        $this->whatsAppService->markAsRead($messageId);
+        // Mark as read (using the phone number ID from the webhook)
+        $this->whatsAppService->markAsRead($messageId, $phoneNumberId);
 
         // Process message through pipeline (PreProcessor -> Classifier -> Processor)
         $result = $this->messageProcessor->process($message);
@@ -486,9 +509,9 @@ class WebhookController extends AbstractController
         $response = $result['response'];
         $responseText = $response['content'] ?? '';
 
-        // Send response back to WhatsApp
+        // Send response back to WhatsApp (using the same phone number ID that received the message)
         if (!empty($responseText)) {
-            $sendResult = $this->whatsAppService->sendMessage($from, $responseText);
+            $sendResult = $this->whatsAppService->sendMessage($from, $responseText, $phoneNumberId);
 
             if ($sendResult['success']) {
                 // Store outgoing message
@@ -511,6 +534,10 @@ class WebhookController extends AbstractController
 
                 $outgoingMessage->setMeta('channel', 'whatsapp');
                 $outgoingMessage->setMeta('to_phone', $from);
+                $outgoingMessage->setMeta('from_phone_number_id', $phoneNumberId);
+                if ($displayPhoneNumber) {
+                    $outgoingMessage->setMeta('from_display_phone', $displayPhoneNumber);
+                }
                 $outgoingMessage->setMeta('external_id', $sendResult['message_id']);
                 $this->em->flush();
             }

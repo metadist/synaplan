@@ -13,8 +13,6 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
 class WhatsAppService
 {
     private string $accessToken;
-    private string $phoneNumberId;
-    private string $businessAccountId;
     private bool $enabled;
     private string $apiVersion = 'v21.0';
 
@@ -22,13 +20,9 @@ class WhatsAppService
         private HttpClientInterface $httpClient,
         private LoggerInterface $logger,
         string $whatsappAccessToken,
-        string $whatsappPhoneNumberId,
-        string $whatsappBusinessAccountId,
         bool $whatsappEnabled,
     ) {
         $this->accessToken = $whatsappAccessToken;
-        $this->phoneNumberId = $whatsappPhoneNumberId;
-        $this->businessAccountId = $whatsappBusinessAccountId;
         $this->enabled = $whatsappEnabled;
     }
 
@@ -37,24 +31,28 @@ class WhatsAppService
      */
     public function isAvailable(): bool
     {
-        return $this->enabled
-            && !empty($this->accessToken)
-            && !empty($this->phoneNumberId);
+        return $this->enabled && !empty($this->accessToken);
     }
 
     /**
      * Send text message.
+     *
+     * @param string $phoneNumberId The WhatsApp Phone Number ID to send from (extracted from webhook metadata)
      */
-    public function sendMessage(string $to, string $message): array
+    public function sendMessage(string $to, string $message, string $phoneNumberId): array
     {
         if (!$this->isAvailable()) {
             throw new \RuntimeException('WhatsApp service is not available');
         }
 
+        if (empty($phoneNumberId)) {
+            throw new \InvalidArgumentException('Phone Number ID is required and must be provided dynamically from webhook metadata');
+        }
+
         $url = sprintf(
             'https://graph.facebook.com/%s/%s/messages',
             $this->apiVersion,
-            $this->phoneNumberId
+            $phoneNumberId
         );
 
         try {
@@ -102,15 +100,22 @@ class WhatsAppService
 
     /**
      * Send media (image, audio, video, document).
+     *
+     * @param string $phoneNumberId The WhatsApp Phone Number ID to send from (extracted from webhook metadata)
      */
     public function sendMedia(
         string $to,
         string $mediaType,
         string $mediaUrl,
+        string $phoneNumberId,
         ?string $caption = null,
     ): array {
         if (!$this->isAvailable()) {
             throw new \RuntimeException('WhatsApp service is not available');
+        }
+
+        if (empty($phoneNumberId)) {
+            throw new \InvalidArgumentException('Phone Number ID is required and must be provided dynamically from webhook metadata');
         }
 
         if (!in_array($mediaType, ['image', 'audio', 'video', 'document'])) {
@@ -120,7 +125,7 @@ class WhatsAppService
         $url = sprintf(
             'https://graph.facebook.com/%s/%s/messages',
             $this->apiVersion,
-            $this->phoneNumberId
+            $phoneNumberId
         );
 
         $mediaPayload = [
@@ -175,10 +180,13 @@ class WhatsAppService
 
     /**
      * Send template message.
+     *
+     * @param string $phoneNumberId The WhatsApp Phone Number ID to send from (extracted from webhook metadata)
      */
     public function sendTemplate(
         string $to,
         string $templateName,
+        string $phoneNumberId,
         string $languageCode = 'en_US',
         array $components = [],
     ): array {
@@ -186,10 +194,14 @@ class WhatsAppService
             throw new \RuntimeException('WhatsApp service is not available');
         }
 
+        if (empty($phoneNumberId)) {
+            throw new \InvalidArgumentException('Phone Number ID is required and must be provided dynamically from webhook metadata');
+        }
+
         $url = sprintf(
             'https://graph.facebook.com/%s/%s/messages',
             $this->apiVersion,
-            $this->phoneNumberId
+            $phoneNumberId
         );
 
         try {
@@ -241,17 +253,23 @@ class WhatsAppService
 
     /**
      * Mark message as read.
+     *
+     * @param string $phoneNumberId The WhatsApp Phone Number ID (extracted from webhook metadata)
      */
-    public function markAsRead(string $messageId): array
+    public function markAsRead(string $messageId, string $phoneNumberId): array
     {
         if (!$this->isAvailable()) {
             throw new \RuntimeException('WhatsApp service is not available');
         }
 
+        if (empty($phoneNumberId)) {
+            throw new \InvalidArgumentException('Phone Number ID is required and must be provided dynamically from webhook metadata');
+        }
+
         $url = sprintf(
             'https://graph.facebook.com/%s/%s/messages',
             $this->apiVersion,
-            $this->phoneNumberId
+            $phoneNumberId
         );
 
         try {

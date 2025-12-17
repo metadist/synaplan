@@ -2,6 +2,7 @@
 
 namespace App\Controller;
 
+use App\Entity\Message;
 use App\Entity\User;
 use App\Service\WhatsAppService;
 use Doctrine\ORM\EntityManagerInterface;
@@ -23,6 +24,37 @@ class PhoneVerificationController extends AbstractController
         private WhatsAppService $whatsAppService,
         private LoggerInterface $logger,
     ) {
+    }
+
+    /**
+     * Find the last WhatsApp phone number ID used by this user.
+     * This enables completely dynamic multi-number support.
+     */
+    private function findLastWhatsAppPhoneNumberId(User $user): ?string
+    {
+        $messageRepo = $this->em->getRepository(Message::class);
+
+        // Find the most recent incoming WhatsApp message for this user
+        $lastMessage = $messageRepo->createQueryBuilder('m')
+            ->where('m.userId = :userId')
+            ->andWhere('m.providerIndex = :provider')
+            ->andWhere('m.direction = :direction')
+            ->setParameter('userId', $user->getId())
+            ->setParameter('provider', 'WHATSAPP')
+            ->setParameter('direction', 'IN')
+            ->orderBy('m.unixTimestamp', 'DESC')
+            ->setMaxResults(1)
+            ->getQuery()
+            ->getOneOrNullResult();
+
+        if (!$lastMessage) {
+            return null;
+        }
+
+        // Extract phone_number_id from metadata
+        $phoneNumberId = $lastMessage->getMeta('to_phone_number_id');
+
+        return $phoneNumberId;
     }
 
     #[Route('/request', name: 'request', methods: ['POST'])]
@@ -99,18 +131,34 @@ class PhoneVerificationController extends AbstractController
 
         $this->em->flush();
 
+        // Find the phone number ID from the last WhatsApp interaction (dynamic multi-number support)
+        $phoneNumberId = $this->findLastWhatsAppPhoneNumberId($user);
+
+        if (!$phoneNumberId) {
+            $this->logger->warning('No previous WhatsApp interaction found for verification', [
+                'user_id' => $user->getId(),
+                'phone' => $phoneNumber,
+            ]);
+
+            return $this->json([
+                'success' => false,
+                'error' => 'Please send a message to one of our WhatsApp numbers first before requesting verification. This allows us to identify which number to use for sending your verification code.',
+            ], Response::HTTP_BAD_REQUEST);
+        }
+
         // Send verification code via WhatsApp
         $message = sprintf(
             "🔐 *SynaPlan Verification*\n\nYour verification code is: *%s*\n\nThis code expires in 10 minutes.\n\nIf you didn't request this, please ignore this message.",
             $verificationCode
         );
 
-        $result = $this->whatsAppService->sendMessage($phoneNumber, $message);
+        $result = $this->whatsAppService->sendMessage($phoneNumber, $message, $phoneNumberId);
 
         if (!$result['success']) {
             $this->logger->error('Failed to send verification code', [
                 'user_id' => $user->getId(),
                 'phone' => $phoneNumber,
+                'phone_number_id' => $phoneNumberId,
                 'error' => $result['error'],
             ]);
 

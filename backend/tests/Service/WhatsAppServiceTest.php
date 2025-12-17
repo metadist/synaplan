@@ -12,26 +12,25 @@ use Symfony\Contracts\HttpClient\ResponseInterface;
 
 /**
  * Unit tests for WhatsAppService
- * Tests Meta WhatsApp Business API integration.
+ * Tests Meta WhatsApp Business API integration with dynamic multi-number support.
  */
 class WhatsAppServiceTest extends TestCase
 {
     private WhatsAppService $service;
     private HttpClientInterface $httpClient;
     private LoggerInterface $logger;
+    private string $testPhoneNumberId = '123456789'; // Test phone number ID
 
     protected function setUp(): void
     {
         $this->httpClient = $this->createMock(HttpClientInterface::class);
         $this->logger = $this->createMock(LoggerInterface::class);
 
-        // Create service with test configuration
+        // Create service with test configuration (dynamic multi-number support)
         $this->service = new WhatsAppService(
             $this->httpClient,
             $this->logger,
             'test_token',
-            '123456789',
-            'test_business_id',
             true
         );
     }
@@ -47,8 +46,6 @@ class WhatsAppServiceTest extends TestCase
             $this->httpClient,
             $this->logger,
             'test_token',
-            '123456789',
-            'test_business_id',
             false // disabled
         );
 
@@ -61,15 +58,13 @@ class WhatsAppServiceTest extends TestCase
             $this->httpClient,
             $this->logger,
             'test_token',
-            '123456789',
-            'test_business_id',
             false
         );
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage('WhatsApp service is not available');
 
-        $service->sendMessage('+1234567890', 'Test message');
+        $service->sendMessage('+1234567890', 'Test message', $this->testPhoneNumberId);
     }
 
     public function testSendMessageSuccess(): void
@@ -96,7 +91,7 @@ class WhatsAppServiceTest extends TestCase
             )
             ->willReturn($response);
 
-        $result = $this->service->sendMessage('+1234567890', 'Hello World');
+        $result = $this->service->sendMessage('+1234567890', 'Hello World', $this->testPhoneNumberId);
 
         $this->assertIsArray($result);
         $this->assertTrue($result['success']);
@@ -115,7 +110,7 @@ class WhatsAppServiceTest extends TestCase
             ->method('error')
             ->with('Failed to send WhatsApp message', $this->anything());
 
-        $result = $this->service->sendMessage('+1234567890', 'Test');
+        $result = $this->service->sendMessage('+1234567890', 'Test', $this->testPhoneNumberId);
 
         $this->assertFalse($result['success']);
         $this->assertStringContainsString('API Error', $result['error']);
@@ -133,10 +128,18 @@ class WhatsAppServiceTest extends TestCase
             ->method('error')
             ->with('Failed to send WhatsApp message', $this->anything());
 
-        $result = $this->service->sendMessage('+1234567890', 'Test');
+        $result = $this->service->sendMessage('+1234567890', 'Test', $this->testPhoneNumberId);
 
         $this->assertFalse($result['success']);
         $this->assertStringContainsString('Network error', $result['error']);
+    }
+
+    public function testSendMessageRequiresPhoneNumberId(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('Phone Number ID is required');
+
+        $this->service->sendMessage('+1234567890', 'Test', '');
     }
 
     public function testGetMediaUrlSuccess(): void
@@ -209,7 +212,7 @@ class WhatsAppServiceTest extends TestCase
             )
             ->willReturn($response);
 
-        $this->service->markAsRead('wamid.test123');
+        $this->service->markAsRead('wamid.test123', $this->testPhoneNumberId);
 
         // If no exception thrown, test passes
         $this->assertTrue(true);
@@ -221,15 +224,13 @@ class WhatsAppServiceTest extends TestCase
             $this->httpClient,
             $this->logger,
             'test_token',
-            '123456789',
-            'test_business_id',
             false
         );
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage('WhatsApp service is not available');
 
-        $service->markAsRead('wamid.test123');
+        $service->markAsRead('wamid.test123', $this->testPhoneNumberId);
     }
 
     public function testVerifyWebhookSignature(): void
@@ -279,6 +280,7 @@ class WhatsAppServiceTest extends TestCase
             '+1234567890',
             'image',
             'https://example.com/image.jpg',
+            $this->testPhoneNumberId,
             'Check this out!'
         );
 
