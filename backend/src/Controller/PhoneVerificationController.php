@@ -2,7 +2,6 @@
 
 namespace App\Controller;
 
-use App\Entity\Message;
 use App\Entity\User;
 use App\Service\WhatsAppService;
 use Doctrine\ORM\EntityManagerInterface;
