@@ -68,7 +68,7 @@ class InboundEmailHandlerControllerTest extends WebTestCase
         $this->assertTrue($data['success']);
         $this->assertArrayHasKey('handler', $data);
         $this->assertEquals('Test Handler Integration', $data['handler']['name']);
-        $this->assertEquals('inactive', $data['handler']['status']); // Starts inactive
+        $this->assertEquals('active', $data['handler']['status']); // Auto-activated on creation
         $this->assertCount(1, $data['handler']['departments']);
     }
 
