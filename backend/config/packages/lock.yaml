@@ -1,2 +1,2 @@
 framework:
-    lock: '%env(LOCK_DSN)%'
+    lock: '%env(default:flock:LOCK_DSN)%'

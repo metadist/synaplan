@@ -325,6 +325,8 @@
     "bulkDeleteConfirmMessage": "Are you sure you want to delete {count} mail handler(s)? This action cannot be undone.",
     "bulkDeleteSuccess": "{count} handler(s) deleted successfully",
     "bulkDeleteFailed": "Failed to delete handlers",
+    "connectionTestWarning": "Connection test failed",
+    "handlerSavedTestFailed": "Handler saved, but connection test failed",
     "deleteHandlerConfirmTitle": "Delete Mail Handler?",
     "deleteHandlerConfirmMessage": "Are you sure you want to delete {name}? This action cannot be undone.",
     "handlerDeleted": "Mail handler deleted successfully",

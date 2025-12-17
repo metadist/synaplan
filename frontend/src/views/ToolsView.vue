@@ -779,6 +779,21 @@ const saveMailHandler = async (
       success('Mail handler created successfully!')
     }
 
+    // Automatic connection test after save
+    try {
+      const testResult = await inboundEmailHandlersApi.testConnection(savedHandlerId)
+
+      if (testResult.success) {
+        // Refresh handler list to get updated status
+        await loadMailHandlers()
+      } else {
+        showWarning(t('mail.connectionTestWarning') + ': ' + testResult.message)
+      }
+    } catch (error: any) {
+      console.error('Connection test failed:', error)
+      showWarning(t('mail.handlerSavedTestFailed'))
+    }
+
     cancelMailHandlerEdit()
   } catch (error: any) {
     console.error('Failed to save mail handler:', error)

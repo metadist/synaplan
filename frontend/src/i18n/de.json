@@ -897,6 +897,8 @@
     "bulkDeleteConfirmMessage": "Möchten Sie wirklich {count} Mail-Handler löschen? Diese Aktion kann nicht rückgängig gemacht werden.",
     "bulkDeleteSuccess": "{count} Handler erfolgreich gelöscht",
     "bulkDeleteFailed": "Handler konnten nicht gelöscht werden",
+    "connectionTestWarning": "Verbindungstest fehlgeschlagen",
+    "handlerSavedTestFailed": "Handler gespeichert, aber Verbindungstest fehlgeschlagen",
     "handlerDeleted": "Mail-Handler erfolgreich gelöscht",
     "deleteFailed": "Fehler beim Löschen des Mail-Handlers",
     "connectionHelp": "Verbindungshilfe",
