@@ -334,4 +334,132 @@ class WhatsAppServiceTest extends TestCase
 
         $this->assertNull($result);
     }
+
+    public function testDownloadMediaRejectsFileTooLarge(): void
+    {
+        // Mock getMediaUrl call
+        $getMediaResponse = $this->createMock(ResponseInterface::class);
+        $getMediaResponse->method('getStatusCode')->willReturn(200);
+        $getMediaResponse->method('toArray')->willReturn(['url' => 'https://example.com/media/huge_file.mp4']);
+
+        // Mock download call with file that exceeds 128 MB
+        $downloadResponse = $this->createMock(ResponseInterface::class);
+        $downloadResponse->method('getHeaders')->willReturn([
+            'content-type' => ['video/mp4'],
+            'content-length' => ['150000000'], // 150 MB - exceeds 128 MB limit
+        ]);
+        // Content should not be called since we check Content-Length first
+        $downloadResponse->expects($this->never())->method('getContent');
+
+        $this->httpClient
+            ->expects($this->exactly(2))
+            ->method('request')
+            ->willReturnOnConsecutiveCalls($getMediaResponse, $downloadResponse);
+
+        $this->logger
+            ->expects($this->once())
+            ->method('error')
+            ->with('WhatsApp media file too large (Content-Length)', $this->anything());
+
+        $result = $this->service->downloadMedia('huge_media', $this->testPhoneNumberId);
+
+        // Should return null for files that are too large
+        $this->assertNull($result);
+    }
+
+    public function testDownloadMediaRejectsFileTooLargeByActualSize(): void
+    {
+        // Mock getMediaUrl call
+        $getMediaResponse = $this->createMock(ResponseInterface::class);
+        $getMediaResponse->method('getStatusCode')->willReturn(200);
+        $getMediaResponse->method('toArray')->willReturn(['url' => 'https://example.com/media/file.mp4']);
+
+        // Mock download call without Content-Length header but with large actual content
+        $largeContent = str_repeat('x', 150 * 1024 * 1024); // 150 MB
+        $downloadResponse = $this->createMock(ResponseInterface::class);
+        $downloadResponse->method('getHeaders')->willReturn([
+            'content-type' => ['video/mp4'],
+            // No content-length header
+        ]);
+        $downloadResponse->method('getContent')->willReturn($largeContent);
+
+        $this->httpClient
+            ->expects($this->exactly(2))
+            ->method('request')
+            ->willReturnOnConsecutiveCalls($getMediaResponse, $downloadResponse);
+
+        $this->logger
+            ->expects($this->once())
+            ->method('error')
+            ->with('WhatsApp media file too large (actual size)', $this->anything());
+
+        $result = $this->service->downloadMedia('large_media', $this->testPhoneNumberId);
+
+        // Should return null when actual downloaded size exceeds limit
+        $this->assertNull($result);
+    }
+
+    public function testDownloadMediaRejectsDisallowedFileType(): void
+    {
+        // Mock getMediaUrl call
+        $getMediaResponse = $this->createMock(ResponseInterface::class);
+        $getMediaResponse->method('getStatusCode')->willReturn(200);
+        $getMediaResponse->method('toArray')->willReturn(['url' => 'https://example.com/media/malicious.exe']);
+
+        // Mock download call with disallowed file type (executable)
+        $downloadResponse = $this->createMock(ResponseInterface::class);
+        $downloadResponse->method('getHeaders')->willReturn([
+            'content-type' => ['application/x-msdownload'], // .exe MIME type
+            'content-length' => ['1024'],
+        ]);
+        $downloadResponse->method('getContent')->willReturn('fake_executable_content');
+
+        $this->httpClient
+            ->expects($this->exactly(2))
+            ->method('request')
+            ->willReturnOnConsecutiveCalls($getMediaResponse, $downloadResponse);
+
+        $this->logger
+            ->expects($this->once())
+            ->method('error')
+            ->with('WhatsApp media has disallowed file type', $this->anything());
+
+        $result = $this->service->downloadMedia('malicious_media', $this->testPhoneNumberId);
+
+        // Should return null for disallowed file types
+        $this->assertNull($result);
+    }
+
+    public function testDownloadMediaRejectsUnknownMimeType(): void
+    {
+        // Mock getMediaUrl call
+        $getMediaResponse = $this->createMock(ResponseInterface::class);
+        $getMediaResponse->method('getStatusCode')->willReturn(200);
+        $getMediaResponse->method('toArray')->willReturn(['url' => 'https://example.com/media/unknown.dat']);
+
+        // Mock download call with unknown/unmapped MIME type
+        $downloadResponse = $this->createMock(ResponseInterface::class);
+        $downloadResponse->method('getHeaders')->willReturn([
+            'content-type' => ['application/x-unknown-binary'],
+            'content-length' => ['1024'],
+        ]);
+        $downloadResponse->method('getContent')->willReturn('unknown_content');
+
+        $this->httpClient
+            ->expects($this->exactly(2))
+            ->method('request')
+            ->willReturnOnConsecutiveCalls($getMediaResponse, $downloadResponse);
+
+        $this->logger
+            ->expects($this->once())
+            ->method('error')
+            ->with('WhatsApp media has disallowed file type', $this->callback(function ($context) {
+                return isset($context['extension']) && 'unknown' === $context['extension'];
+            }));
+
+        $result = $this->service->downloadMedia('unknown_media', $this->testPhoneNumberId);
+
+        // Should return null for unknown MIME types
+        $this->assertNull($result);
+    }
 }

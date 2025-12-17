@@ -542,7 +542,7 @@ class WebhookController extends AbstractController
                 if ($mediaUrl) {
                     $message->setMeta('media_url', $mediaUrl);
 
-                    // Download media file
+                    // Download media file (with size validation - max 128 MB)
                     $downloadResult = $this->whatsAppService->downloadMedia($mediaId, $phoneNumberId);
 
                     if ($downloadResult && !empty($downloadResult['file_path'])) {
@@ -555,6 +555,13 @@ class WebhookController extends AbstractController
                             'media_id' => $mediaId,
                             'file_path' => $downloadResult['file_path'],
                             'file_type' => $downloadResult['file_type'] ?? $type,
+                            'size_mb' => $downloadResult['size'] ? round($downloadResult['size'] / 1024 / 1024, 2) : 0,
+                        ]);
+                    } else {
+                        $this->logger->warning('WhatsApp media download failed', [
+                            'media_id' => $mediaId,
+                            'type' => $type,
+                            'reason' => 'File may be too large (>128 MB), disallowed file type, or download failed',
                         ]);
                     }
                 }
