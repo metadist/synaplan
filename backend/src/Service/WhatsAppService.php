@@ -12,6 +12,16 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
  */
 class WhatsAppService
 {
+    private const MAX_FILE_SIZE = 128 * 1024 * 1024; // 128 MB (same as FileStorageService)
+
+    // Allowed file extensions (same as FileStorageService for consistency)
+    private const ALLOWED_EXTENSIONS = [
+        'pdf', 'docx', 'doc', 'xlsx', 'xls', 'pptx', 'ppt', 'txt', 'md', 'csv',
+        'jpg', 'jpeg', 'png', 'gif', 'webp',
+        'mp3', 'mp4', 'wav', 'ogg', 'm4a', 'webm',
+        'amr', 'opus', '3gp', // WhatsApp-specific audio/video formats
+    ];
+
     private string $accessToken;
     private bool $enabled;
     private string $apiVersion = 'v21.0';
@@ -392,11 +402,54 @@ class WhatsAppService
                 ],
             ]);
 
+            // Check Content-Length header before downloading (if available)
+            $headers = $response->getHeaders();
+            if (isset($headers['content-length'][0])) {
+                $contentLength = (int) $headers['content-length'][0];
+                if ($contentLength > self::MAX_FILE_SIZE) {
+                    $sizeMB = round($contentLength / 1024 / 1024, 2);
+                    $maxMB = self::MAX_FILE_SIZE / 1024 / 1024;
+                    $this->logger->error('WhatsApp media file too large (Content-Length)', [
+                        'media_id' => $mediaId,
+                        'size_mb' => $sizeMB,
+                        'max_mb' => $maxMB,
+                    ]);
+
+                    return null;
+                }
+            }
+
             $content = $response->getContent();
-            $contentType = $response->getHeaders()['content-type'][0] ?? 'application/octet-stream';
+            $contentType = $headers['content-type'][0] ?? 'application/octet-stream';
+
+            // Validate actual downloaded size
+            $actualSize = strlen($content);
+            if ($actualSize > self::MAX_FILE_SIZE) {
+                $sizeMB = round($actualSize / 1024 / 1024, 2);
+                $maxMB = self::MAX_FILE_SIZE / 1024 / 1024;
+                $this->logger->error('WhatsApp media file too large (actual size)', [
+                    'media_id' => $mediaId,
+                    'size_mb' => $sizeMB,
+                    'max_mb' => $maxMB,
+                ]);
+
+                return null;
+            }
 
             // Determine file extension from content type
             $extension = $this->getExtensionFromMimeType($contentType);
+
+            // Validate file extension
+            if (!in_array($extension, self::ALLOWED_EXTENSIONS, true)) {
+                $this->logger->error('WhatsApp media has disallowed file type', [
+                    'media_id' => $mediaId,
+                    'extension' => $extension,
+                    'mime_type' => $contentType,
+                    'allowed_extensions' => implode(', ', self::ALLOWED_EXTENSIONS),
+                ]);
+
+                return null;
+            }
 
             // Generate unique filename
             $filename = 'whatsapp_'.time().'_'.bin2hex(random_bytes(8)).'.'.$extension;
@@ -412,11 +465,14 @@ class WhatsAppService
             // Save file
             file_put_contents($fullPath, $content);
 
+            $sizeMB = round($actualSize / 1024 / 1024, 2);
             $this->logger->info('WhatsApp media downloaded and saved', [
                 'media_id' => $mediaId,
                 'file_path' => $relativePath,
-                'size' => strlen($content),
+                'size_bytes' => $actualSize,
+                'size_mb' => $sizeMB,
                 'mime_type' => $contentType,
+                'validated' => true,
             ]);
 
             return [
@@ -438,6 +494,8 @@ class WhatsAppService
 
     /**
      * Get file extension from MIME type.
+     * Returns the extension or 'unknown' for unmapped MIME types.
+     * Note: Unknown types will be rejected by the ALLOWED_EXTENSIONS check.
      */
     private function getExtensionFromMimeType(string $mimeType): string
     {
@@ -451,8 +509,11 @@ class WhatsAppService
             'audio/mp4' => 'm4a',
             'audio/amr' => 'amr',
             'audio/opus' => 'opus',
+            'audio/wav' => 'wav',
+            'audio/webm' => 'webm',
             'video/mp4' => 'mp4',
             'video/3gpp' => '3gp',
+            'video/webm' => 'webm',
             'application/pdf' => 'pdf',
             'application/vnd.ms-powerpoint' => 'ppt',
             'application/msword' => 'doc',
@@ -460,8 +521,12 @@ class WhatsAppService
             'application/vnd.openxmlformats-officedocument.wordprocessingml.document' => 'docx',
             'application/vnd.openxmlformats-officedocument.presentationml.presentation' => 'pptx',
             'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' => 'xlsx',
+            'text/plain' => 'txt',
+            'text/csv' => 'csv',
+            'text/markdown' => 'md',
         ];
 
-        return $mimeMap[$mimeType] ?? 'bin';
+        // Return 'unknown' for unmapped types - will be caught by ALLOWED_EXTENSIONS check
+        return $mimeMap[$mimeType] ?? 'unknown';
     }
 }
