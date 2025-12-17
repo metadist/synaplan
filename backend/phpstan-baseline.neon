@@ -672,17 +672,17 @@ parameters:
 			count: 3
 			path: tests/Service/VectorSearchServiceTest.php
 
-		-
-			message: '#^Call to an undefined method Psr\\Log\\LoggerInterface\:\:expects\(\)\.$#'
-			identifier: method.notFound
-			count: 4
-			path: tests/Service/WhatsAppServiceTest.php
+	-
+		message: '#^Call to an undefined method Psr\\Log\\LoggerInterface\:\:expects\(\)\.$#'
+		identifier: method.notFound
+		count: 8
+		path: tests/Service/WhatsAppServiceTest.phpmak
 
-		-
-			message: '#^Call to an undefined method Symfony\\Contracts\\HttpClient\\HttpClientInterface\:\:expects\(\)\.$#'
-			identifier: method.notFound
-			count: 9
-			path: tests/Service/WhatsAppServiceTest.php
+	-
+		message: '#^Call to an undefined method Symfony\\Contracts\\HttpClient\\HttpClientInterface\:\:expects\(\)\.$#'
+		identifier: method.notFound
+		count: 13
+		path: tests/Service/WhatsAppServiceTest.php
 
 		-
 			message: '#^Call to method PHPUnit\\Framework\\Assert\:\:assertIsArray\(\) with array will always evaluate to true\.$#'
