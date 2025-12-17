@@ -19,9 +19,6 @@
         <env name="SYMFONY_DEPRECATIONS_HELPER" value="weak" />
         <env name="MAILER_DSN" value="null://null" />
         <env name="AI_DEFAULT_PROVIDER" value="test" />
-        <!-- Override DATABASE URLs for tests (use separate test database) -->
-        <env name="DATABASE_WRITE_URL" value="mysql://synaplan_user:synaplan_password@db:3306/synaplan_test?serverVersion=11.8&amp;charset=utf8mb4" force="true" />
-        <env name="DATABASE_READ_URL" value="mysql://synaplan_user:synaplan_password@db:3306/synaplan_test?serverVersion=11.8&amp;charset=utf8mb4" force="true" />
         <!-- AI Provider API Keys (defaults for testing) -->
         <env name="ANTHROPIC_API_KEY" value="" />
         <env name="OPENAI_API_KEY" value="" />
