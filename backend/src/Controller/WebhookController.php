@@ -705,12 +705,13 @@ class WebhookController extends AbstractController
     {
         $this->logger->info('Potential verification code received', [
             'code' => $code,
-            'from_phone' => $fromPhone,
+            'from_phone_raw' => $fromPhone,
             'phone_number_id' => $phoneNumberId,
         ]);
 
-        // Format phone number consistently
-        $fromPhone = preg_replace('/[^0-9+]/', '', $fromPhone);
+        // Format phone number consistently (WhatsApp sends without +, but we might store with +)
+        // Remove all non-digits first
+        $fromPhone = preg_replace('/[^0-9]/', '', $fromPhone);
 
         // Find user with pending verification for this code
         $qb = $this->em->createQueryBuilder();
@@ -734,15 +735,15 @@ class WebhookController extends AbstractController
                 continue;
             }
 
-            // Check if phone number matches (format both the same way)
-            $expectedPhone = preg_replace('/[^0-9+]/', '', $verification['phone_number']);
+            // Check if phone number matches (format both the same way - only digits, no +)
+            // WhatsApp sends numbers without +, so we strip + from stored numbers
+            $expectedPhone = preg_replace('/[^0-9]/', '', $verification['phone_number']);
 
-            $this->logger->debug('Comparing phone numbers for verification', [
+            $this->logger->info('Comparing phone numbers for verification', [
                 'code' => $code,
                 'expected_phone_raw' => $verification['phone_number'],
                 'expected_phone_formatted' => $expectedPhone,
-                'actual_phone_raw' => $fromPhone,
-                'actual_phone_formatted' => $fromPhone,
+                'actual_phone_from_whatsapp' => $fromPhone,
                 'match' => $expectedPhone === $fromPhone,
                 'user_id' => $user->getId(),
             ]);
