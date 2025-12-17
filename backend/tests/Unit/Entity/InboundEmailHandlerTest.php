@@ -69,16 +69,15 @@ class InboundEmailHandlerTest extends TestCase
         $this->assertFalse($handler->shouldProcessHistoricalEmails());
 
         // Test historical mode
-        $handler->setEmailFilter('historical', '2025-01-01T00:00', '2025-12-31T23:59');
+        $handler->setEmailFilter('historical', '2025-01-01T00:00');
 
         $filter = $handler->getEmailFilter();
         $this->assertEquals('historical', $filter['mode']);
         $this->assertEquals('2025-01-01T00:00', $filter['from_date']);
-        $this->assertEquals('2025-12-31T23:59', $filter['to_date']);
         $this->assertTrue($handler->shouldProcessHistoricalEmails());
 
         // Test back to new mode
-        $handler->setEmailFilter('new', null, null);
+        $handler->setEmailFilter('new', null);
         $this->assertEquals('new', $handler->getEmailFilter()['mode']);
         $this->assertFalse($handler->shouldProcessHistoricalEmails());
     }

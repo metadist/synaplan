@@ -298,6 +298,25 @@ class InboundEmailHandlerController extends AbstractController
         security: [['Bearer' => []]],
         tags: ['Inbound Email Handlers']
     )]
+    #[OA\Parameter(
+        name: 'id',
+        in: 'path',
+        description: 'Handler ID',
+        required: true,
+        schema: new OA\Schema(type: 'integer')
+    )]
+    #[OA\Response(
+        response: 200,
+        description: 'Handler deleted successfully',
+        content: new OA\JsonContent(
+            properties: [
+                new OA\Property(property: 'success', type: 'boolean', example: true),
+                new OA\Property(property: 'message', type: 'string', example: 'Handler deleted'),
+            ]
+        )
+    )]
+    #[OA\Response(response: 404, description: 'Handler not found')]
+    #[OA\Response(response: 401, description: 'Not authenticated')]
     public function delete(int $id, #[CurrentUser] ?User $user): JsonResponse
     {
         if (!$user) {
@@ -328,15 +347,36 @@ class InboundEmailHandlerController extends AbstractController
     }
 
     /**
-     * Test IMAP connection.
+     * Test connection (both IMAP and SMTP).
      */
     #[Route('/{id}/test', name: 'test', methods: ['POST'])]
     #[OA\Post(
         path: '/api/v1/inbound-email-handlers/{id}/test',
-        summary: 'Test IMAP connection for handler',
+        summary: 'Test email handler connection',
+        description: 'Tests both IMAP and SMTP connection and updates handler status',
         security: [['Bearer' => []]],
         tags: ['Inbound Email Handlers']
     )]
+    #[OA\Parameter(
+        name: 'id',
+        in: 'path',
+        description: 'Handler ID',
+        required: true,
+        schema: new OA\Schema(type: 'integer')
+    )]
+    #[OA\Response(
+        response: 200,
+        description: 'Connection test result',
+        content: new OA\JsonContent(
+            properties: [
+                new OA\Property(property: 'success', type: 'boolean', example: true),
+                new OA\Property(property: 'message', type: 'string', example: 'Connection successful'),
+            ]
+        )
+    )]
+    #[OA\Response(response: 404, description: 'Handler not found')]
+    #[OA\Response(response: 401, description: 'Not authenticated')]
+    #[OA\Response(response: 500, description: 'Connection test failed')]
     public function test(int $id, #[CurrentUser] ?User $user): JsonResponse
     {
         if (!$user) {
@@ -431,7 +471,49 @@ class InboundEmailHandlerController extends AbstractController
         ];
     }
 
-    #[Route('/bulk-update-status', methods: ['POST'])]
+    /**
+     * Bulk update handler status (activate/deactivate multiple handlers).
+     */
+    #[Route('/bulk-update-status', name: 'bulk_update_status', methods: ['POST'])]
+    #[OA\Post(
+        path: '/api/v1/inbound-email-handlers/bulk-update-status',
+        summary: 'Bulk update handler status',
+        description: 'Activate or deactivate multiple email handlers at once',
+        security: [['Bearer' => []]],
+        tags: ['Inbound Email Handlers']
+    )]
+    #[OA\RequestBody(
+        required: true,
+        content: new OA\JsonContent(
+            required: ['handlerIds', 'status'],
+            properties: [
+                new OA\Property(
+                    property: 'handlerIds',
+                    type: 'array',
+                    items: new OA\Items(type: 'integer'),
+                    example: [1, 2, 3]
+                ),
+                new OA\Property(
+                    property: 'status',
+                    type: 'string',
+                    enum: ['active', 'inactive'],
+                    example: 'active'
+                ),
+            ]
+        )
+    )]
+    #[OA\Response(
+        response: 200,
+        description: 'Handlers updated successfully',
+        content: new OA\JsonContent(
+            properties: [
+                new OA\Property(property: 'success', type: 'boolean', example: true),
+                new OA\Property(property: 'updated', type: 'integer', example: 3),
+            ]
+        )
+    )]
+    #[OA\Response(response: 400, description: 'Invalid parameters')]
+    #[OA\Response(response: 401, description: 'Not authenticated')]
     public function bulkUpdateStatus(Request $request): JsonResponse
     {
         /** @var User $user */
@@ -460,7 +542,43 @@ class InboundEmailHandlerController extends AbstractController
         return $this->json(['success' => true, 'updated' => $updated]);
     }
 
-    #[Route('/bulk-delete', methods: ['POST'])]
+    /**
+     * Bulk delete handlers (delete multiple handlers at once).
+     */
+    #[Route('/bulk-delete', name: 'bulk_delete', methods: ['POST'])]
+    #[OA\Post(
+        path: '/api/v1/inbound-email-handlers/bulk-delete',
+        summary: 'Bulk delete handlers',
+        description: 'Delete multiple email handlers at once',
+        security: [['Bearer' => []]],
+        tags: ['Inbound Email Handlers']
+    )]
+    #[OA\RequestBody(
+        required: true,
+        content: new OA\JsonContent(
+            required: ['handlerIds'],
+            properties: [
+                new OA\Property(
+                    property: 'handlerIds',
+                    type: 'array',
+                    items: new OA\Items(type: 'integer'),
+                    example: [1, 2, 3]
+                ),
+            ]
+        )
+    )]
+    #[OA\Response(
+        response: 200,
+        description: 'Handlers deleted successfully',
+        content: new OA\JsonContent(
+            properties: [
+                new OA\Property(property: 'success', type: 'boolean', example: true),
+                new OA\Property(property: 'deleted', type: 'integer', example: 3),
+            ]
+        )
+    )]
+    #[OA\Response(response: 400, description: 'Invalid parameters')]
+    #[OA\Response(response: 401, description: 'Not authenticated')]
     public function bulkDelete(Request $request): JsonResponse
     {
         /** @var User $user */
