@@ -441,7 +441,25 @@ class WebhookController extends AbstractController
             'message_id' => $messageId,
         ]);
 
-        // Check rate limit
+        // PRIORITY: Check if this is a verification code BEFORE rate limiting
+        // This allows users to verify even if they've hit their rate limit
+        if ('text' === $type) {
+            $messageText = $incomingMsg['text']['body'];
+            $trimmedText = trim(strtoupper($messageText));
+
+            // Check if this is a verification code (5 chars, uppercase letters + numbers)
+            if (preg_match('/^[A-Z0-9]{5}$/', $trimmedText)) {
+                $verificationResult = $this->handleVerificationCode($trimmedText, $from, $phoneNumberId, $messageId);
+                if (null !== $verificationResult) {
+                    // Verification was handled (success or failure), return early
+                    // No rate limit check needed for verification codes
+                    return $verificationResult;
+                }
+                // If null, code was not found in database - continue with normal processing and rate limit check
+            }
+        }
+
+        // Check rate limit (only if not a valid verification code)
         $rateLimitCheck = $this->rateLimitService->checkLimit($user, 'MESSAGES');
         if (!$rateLimitCheck['allowed']) {
             $this->logger->warning('WhatsApp message rate limit exceeded', [
@@ -483,25 +501,15 @@ class WebhookController extends AbstractController
             ];
         }
 
-        // Extract message text
+        // Extract message text and media
         $messageText = '';
         $mediaId = null;
         $mediaUrl = null;
 
         switch ($type) {
             case 'text':
+                // Text was already extracted above for verification check
                 $messageText = $incomingMsg['text']['body'];
-
-                // Check if this is a verification code (5 chars, uppercase letters + numbers)
-                $trimmedText = trim(strtoupper($messageText));
-                if (preg_match('/^[A-Z0-9]{5}$/', $trimmedText)) {
-                    $verificationResult = $this->handleVerificationCode($trimmedText, $from, $phoneNumberId, $messageId);
-                    if (null !== $verificationResult) {
-                        // Verification was handled, return early
-                        return $verificationResult;
-                    }
-                    // If null, continue with normal message processing (code not found or invalid)
-                }
                 break;
             case 'image':
                 $mediaId = $incomingMsg['image']['id'];
