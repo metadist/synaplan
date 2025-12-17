@@ -21,29 +21,28 @@ export interface SummaryResult {
 export const summaryTypes = [
   { value: 'abstractive', label: 'Abstractive Summary' },
   { value: 'extractive', label: 'Extractive Summary' },
-  { value: 'bullet-points', label: 'Bullet Points' }
+  { value: 'bullet-points', label: 'Bullet Points' },
 ]
 
 export const summaryLengths = [
   { value: 'short', label: 'Short (50-150 words)' },
   { value: 'medium', label: 'Medium (200-500 words)' },
   { value: 'long', label: 'Long (500-1000 words)' },
-  { value: 'custom', label: 'Custom Length' }
+  { value: 'custom', label: 'Custom Length' },
 ]
 
 export const outputLanguages = [
   { value: 'en', label: 'English' },
   { value: 'de', label: 'German' },
   { value: 'fr', label: 'French' },
-  { value: 'es', label: 'Spanish' }
+  { value: 'es', label: 'Spanish' },
 ]
 
 export const focusAreaOptions = [
   { value: 'main-ideas', label: 'Main Ideas' },
   { value: 'key-facts', label: 'Key Facts' },
   { value: 'conclusions', label: 'Conclusions' },
-  { value: 'action-items', label: 'Action Items' }
+  { value: 'action-items', label: 'Action Items' },
 ]
 
 export const mockSummaries: SummaryResult[] = []
-

@@ -11,11 +11,17 @@
           </p>
         </div>
 
-        <div v-if="currentPage === 'introduction'" class="space-y-4" data-testid="section-introduction">
+        <div
+          v-if="currentPage === 'introduction'"
+          class="space-y-4"
+          data-testid="section-introduction"
+        >
           <!-- Search Bar -->
           <div class="surface-card p-4" data-testid="section-command-search">
             <div class="relative">
-              <MagnifyingGlassIcon class="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 txt-secondary" />
+              <MagnifyingGlassIcon
+                class="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 txt-secondary"
+              />
               <input
                 v-model="searchQuery"
                 type="text"
@@ -25,14 +31,17 @@
               />
               <button
                 v-if="searchQuery"
-                @click="searchQuery = ''"
                 class="absolute right-4 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full hover-overlay-light transition-colors flex items-center justify-center"
                 data-testid="btn-clear-search"
+                @click="searchQuery = ''"
               >
                 <XMarkIcon class="w-4 h-4 txt-secondary" />
               </button>
             </div>
-            <p v-if="searchQuery && filteredCommands.length === 0" class="txt-secondary text-sm mt-3 text-center">
+            <p
+              v-if="searchQuery && filteredCommands.length === 0"
+              class="txt-secondary text-sm mt-3 text-center"
+            >
               {{ $t('tools.noCommandsFound') }}
             </p>
           </div>
@@ -44,20 +53,20 @@
             data-testid="item-command"
           >
             <button
-              @click="toggleCommand(cmd.name)"
               class="w-full px-6 py-4 flex items-center justify-between hover-overlay-light transition-colors"
               data-testid="btn-toggle-command"
+              @click="toggleCommand(cmd.name)"
             >
               <div class="flex items-center gap-4">
                 <div
                   :class="[
                     'w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0',
-                    getCommandColor(cmd.name)
+                    getCommandColor(cmd.name),
                   ]"
                 >
                   <component :is="getCommandIcon(cmd.name)" class="w-6 h-6 text-white" />
                 </div>
-                
+
                 <div class="text-left">
                   <h3 class="text-lg font-semibold txt-primary font-mono">
                     {{ cmd.usage }}
@@ -71,7 +80,7 @@
               <ChevronDownIcon
                 :class="[
                   'w-5 h-5 txt-secondary transition-transform',
-                  expandedCommands.includes(cmd.name) && 'rotate-180'
+                  expandedCommands.includes(cmd.name) && 'rotate-180',
                 ]"
               />
             </button>
@@ -85,7 +94,10 @@
               leave-to-class="max-h-0 opacity-0"
             >
               <div v-if="expandedCommands.includes(cmd.name)" class="overflow-hidden">
-                <div class="px-6 pb-6 border-t border-light-border/30 dark:border-dark-border/20 pt-4" data-testid="section-command-details">
+                <div
+                  class="px-6 pb-6 border-t border-light-border/30 dark:border-dark-border/20 pt-4"
+                  data-testid="section-command-details"
+                >
                   <div class="flex flex-wrap gap-2 mb-4">
                     <span
                       v-for="tag in getCommandTags(cmd)"
@@ -117,10 +129,10 @@
           <div v-if="!showWidgetEditor">
             <WidgetList
               :widgets="widgets"
+              data-testid="comp-widget-list"
               @create="createWidget"
               @edit="editWidget"
               @delete="deleteWidget"
-              data-testid="comp-widget-list"
             />
           </div>
           <div v-else class="grid grid-cols-1 xl:grid-cols-5 gap-3 sm:gap-4 lg:gap-6">
@@ -130,44 +142,64 @@
                 :widget-id="currentWidgetId"
                 :user-id="'152'"
                 :show-code="!!currentWidgetId"
-                @cancel="cancelEdit"
                 data-testid="comp-widget-editor"
+                @cancel="cancelEdit"
               />
             </div>
 
-            <div v-if="showPreview" class="xl:col-span-3 xl:sticky xl:top-6 xl:h-fit" data-testid="section-widget-preview">
+            <div
+              v-if="showPreview"
+              class="xl:col-span-3 xl:sticky xl:top-6 xl:h-fit"
+              data-testid="section-widget-preview"
+            >
               <div class="surface-card p-2 sm:p-4 lg:p-6">
                 <div class="flex items-center justify-between mb-3 lg:mb-4">
-                  <h3 class="text-base lg:text-lg font-semibold txt-primary flex items-center gap-2">
+                  <h3
+                    class="text-base lg:text-lg font-semibold txt-primary flex items-center gap-2"
+                  >
                     <EyeIcon class="w-4 h-4 lg:w-5 lg:h-5" />
                     Live Preview
                   </h3>
                   <button
-                    @click="togglePreview"
                     class="lg:hidden w-8 h-8 rounded-lg icon-ghost flex items-center justify-center"
+                    @click="togglePreview"
                   >
                     <XMarkIcon class="w-5 h-5" />
                   </button>
                 </div>
                 <p class="txt-secondary text-xs sm:text-sm mb-3 lg:mb-4">
-                  {{ currentWidgetConfig.previewUrl ? 'Live preview on your website' : 'This is how the widget will appear on your website. Click the button to test it.' }}
+                  {{
+                    currentWidgetConfig.previewUrl
+                      ? 'Live preview on your website'
+                      : 'This is how the widget will appear on your website. Click the button to test it.'
+                  }}
                 </p>
-                <div class="relative border-2 border-light-border/30 dark:border-dark-border/20 rounded-xl overflow-hidden h-[600px] sm:h-[650px] lg:h-[700px] max-h-[85vh]">
+                <div
+                  class="relative border-2 border-light-border/30 dark:border-dark-border/20 rounded-xl overflow-hidden h-[600px] sm:h-[650px] lg:h-[700px] max-h-[85vh]"
+                >
                   <iframe
                     v-if="currentWidgetConfig.previewUrl"
                     :src="currentWidgetConfig.previewUrl"
                     class="absolute inset-0 w-full h-full rounded-xl"
                     sandbox="allow-scripts allow-same-origin"
                   />
-                  <div v-else class="absolute inset-0 bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800 rounded-xl">
-                    <div class="absolute inset-0 flex items-center justify-center txt-secondary text-sm">
+                  <div
+                    v-else
+                    class="absolute inset-0 bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800 rounded-xl"
+                  >
+                    <div
+                      class="absolute inset-0 flex items-center justify-center txt-secondary text-sm"
+                    >
                       <div class="text-center">
                         <GlobeAltIcon class="w-12 h-12 mx-auto mb-2 opacity-30" />
                         <p>Your Website</p>
                       </div>
                     </div>
                   </div>
-                  <div class="absolute inset-0 pointer-events-none rounded-xl scale-100 lg:scale-85" style="transform-origin: center">
+                  <div
+                    class="absolute inset-0 pointer-events-none rounded-xl scale-100 lg:scale-85"
+                    style="transform-origin: center"
+                  >
                     <div class="relative w-full h-full pointer-events-none">
                       <div class="pointer-events-auto">
                         <ChatWidget
@@ -191,15 +223,15 @@
         </div>
 
         <div v-else-if="currentPage === 'doc-summary'">
-          <SummaryConfiguration 
-            @generate="handleGenerateSummary"
-            @regenerate="handleRegenerateSummary"
-            @show="showSummaryModal"
+          <SummaryConfiguration
             :is-generating="isGeneratingSummary"
             :current-model="currentChatModel"
             data-testid="comp-summary-config"
+            @generate="handleGenerateSummary"
+            @regenerate="handleRegenerateSummary"
+            @show="showSummaryModal"
           />
-          
+
           <!-- Summary Result Modal -->
           <SummaryResultModal
             :is-open="isSummaryModalOpen"
@@ -210,43 +242,54 @@
           />
         </div>
 
-            <div v-else-if="currentPage === 'mail-handler'">
-              <div v-if="isLoadingMailHandlers" class="flex items-center justify-center py-12">
-                <svg class="w-6 h-6 animate-spin txt-brand" fill="none" viewBox="0 0 24 24">
-                  <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
-                  <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/>
-                </svg>
-                <span class="ml-2 txt-secondary">Loading mail handlers...</span>
-              </div>
-              <MailHandlerList
-                v-else-if="!showMailHandlerEditor"
-                :handlers="mailHandlers"
-                @create="createMailHandler"
-                @edit="editMailHandler"
-                @delete="deleteMailHandler"
-                data-testid="comp-mail-handler-list"
+        <div v-else-if="currentPage === 'mail-handler'">
+          <div v-if="isLoadingMailHandlers" class="flex items-center justify-center py-12">
+            <svg class="w-6 h-6 animate-spin txt-brand" fill="none" viewBox="0 0 24 24">
+              <circle
+                class="opacity-25"
+                cx="12"
+                cy="12"
+                r="10"
+                stroke="currentColor"
+                stroke-width="4"
               />
-              <MailHandlerConfiguration
-                v-else
-                :handler="currentMailHandler"
-                :handler-id="currentMailHandlerId"
-                @save="saveMailHandler"
-                @cancel="cancelMailHandlerEdit"
-                data-testid="comp-mail-handler-config"
+              <path
+                class="opacity-75"
+                fill="currentColor"
+                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
               />
-            </div>
-       </div>
-     </div>
-     
-     <UnsavedChangesBar
-       v-if="showWidgetEditor && currentPage === 'chat-widget'"
-       :show="hasWidgetChanges"
-       :show-preview="!!currentWidgetId"
-       @save="saveWidget"
-       @discard="discardChanges"
-       @preview="togglePreview"
-       data-testid="bar-widget-unsaved"
-     />
+            </svg>
+            <span class="ml-2 txt-secondary">Loading mail handlers...</span>
+          </div>
+          <MailHandlerList
+            v-else-if="!showMailHandlerEditor"
+            :handlers="mailHandlers"
+            data-testid="comp-mail-handler-list"
+            @create="createMailHandler"
+            @edit="editMailHandler"
+            @delete="deleteMailHandler"
+          />
+          <MailHandlerConfiguration
+            v-else
+            :handler="currentMailHandler"
+            :handler-id="currentMailHandlerId"
+            data-testid="comp-mail-handler-config"
+            @save="saveMailHandler"
+            @cancel="cancelMailHandlerEdit"
+          />
+        </div>
+      </div>
+    </div>
+
+    <UnsavedChangesBar
+      v-if="showWidgetEditor && currentPage === 'chat-widget'"
+      :show="hasWidgetChanges"
+      :show-preview="!!currentWidgetId"
+      data-testid="bar-widget-unsaved"
+      @save="saveWidget"
+      @discard="discardChanges"
+      @preview="togglePreview"
+    />
   </MainLayout>
 </template>
 
@@ -263,7 +306,7 @@ import SummaryConfiguration from '@/components/summary/SummaryConfiguration.vue'
 import SummaryResultModal from '@/components/summary/SummaryResultModal.vue'
 import MailHandlerConfiguration from '@/components/mail/MailHandlerConfiguration.vue'
 import MailHandlerList from '@/components/mail/MailHandlerList.vue'
-import { 
+import {
   ChevronDownIcon,
   ChatBubbleLeftRightIcon,
   DocumentTextIcon,
@@ -275,14 +318,18 @@ import {
   LinkIcon,
   ListBulletIcon,
   EyeIcon,
-  XMarkIcon
+  XMarkIcon,
 } from '@heroicons/vue/24/outline'
 import { useCommandsStore } from '@/stores/commands'
 import { useAiConfigStore } from '@/stores/aiConfig'
 import type { Widget, WidgetConfig } from '@/mocks/widgets'
 import { mockWidgets } from '@/mocks/widgets'
 import type { SummaryConfig } from '@/mocks/summaries'
-import type { MailConfig, Department, SavedMailHandler } from '@/services/api/inboundEmailHandlersApi'
+import type {
+  MailConfig,
+  Department,
+  SavedMailHandler,
+} from '@/services/api/inboundEmailHandlersApi'
 import { inboundEmailHandlersApi } from '@/services/api/inboundEmailHandlersApi'
 import * as summaryService from '@/services/summaryService'
 import type { SummaryResponse } from '@/services/summaryService'
@@ -307,7 +354,7 @@ const currentWidgetConfig = ref<WidgetConfig>({
   autoOpen: false,
   aiPrompt: 'general',
   defaultTheme: 'light',
-  previewUrl: ''
+  previewUrl: '',
 })
 const originalWidgetConfig = ref<WidgetConfig | null>(null)
 
@@ -378,29 +425,34 @@ const loadMailHandlers = async () => {
 }
 
 // Watch for page change to doc-summary and load model
-watch(currentPage, async (newPage) => {
-  if (newPage === 'doc-summary' && !currentChatModel.value) {
-    await loadCurrentChatModel()
-  }
-  if (newPage === 'mail-handler' && mailHandlers.value.length === 0) {
-    await loadMailHandlers()
-  }
-}, { immediate: true })
+watch(
+  currentPage,
+  async (newPage) => {
+    if (newPage === 'doc-summary' && !currentChatModel.value) {
+      await loadCurrentChatModel()
+    }
+    if (newPage === 'mail-handler' && mailHandlers.value.length === 0) {
+      await loadMailHandlers()
+    }
+  },
+  { immediate: true }
+)
 
 const filteredCommands = computed(() => {
   if (currentPage.value === 'introduction') {
-    let commands = commandsStore.commands.filter(cmd => !cmd.name.startsWith('test'))
-    
+    let commands = commandsStore.commands.filter((cmd) => !cmd.name.startsWith('test'))
+
     // Apply search filter
     if (searchQuery.value.trim()) {
       const query = searchQuery.value.toLowerCase()
-      commands = commands.filter(cmd =>
-        cmd.name.toLowerCase().includes(query) ||
-        cmd.usage.toLowerCase().includes(query) ||
-        cmd.description.toLowerCase().includes(query)
+      commands = commands.filter(
+        (cmd) =>
+          cmd.name.toLowerCase().includes(query) ||
+          cmd.usage.toLowerCase().includes(query) ||
+          cmd.description.toLowerCase().includes(query)
       )
     }
-    
+
     return commands
   }
   return []
@@ -424,7 +476,7 @@ const getCommandIcon = (name: string) => {
     lang: LanguageIcon,
     web: GlobeAltIcon,
     docs: DocumentTextIcon,
-    link: LinkIcon
+    link: LinkIcon,
   }
   return icons[name] || ChatBubbleLeftRightIcon
 }
@@ -438,7 +490,7 @@ const getCommandColor = (name: string) => {
     lang: 'bg-[#F59E0B]',
     web: 'bg-[#8B5CF6]',
     docs: 'bg-[#10B981]',
-    link: 'bg-[#0066FF]'
+    link: 'bg-[#0066FF]',
   }
   return colors[name] || 'bg-[#6B7280]'
 }
@@ -451,27 +503,27 @@ const getCommandTags = (cmd: any) => {
     lang: ['Multi-language', '7 Languages'],
     web: ['Beta', 'Screenshot'],
     docs: ['Local Search', 'Multiple Formats'],
-    link: ['Secure', 'Profile Access']
+    link: ['Secure', 'Profile Access'],
   }
   return tags[cmd.name] || []
 }
 
 const getPageTitle = () => {
   const titles: Record<string, string> = {
-    'introduction': 'Available Commands',
+    introduction: 'Available Commands',
     'chat-widget': 'Chat Widget',
     'doc-summary': 'Doc Summary',
-    'mail-handler': 'Mail Handler'
+    'mail-handler': 'Mail Handler',
   }
   return titles[currentPage.value] || 'Tools'
 }
 
 const getPageDescription = () => {
   const descriptions: Record<string, string> = {
-    'introduction': 'Explore and use powerful commands to enhance your workflow',
+    introduction: 'Explore and use powerful commands to enhance your workflow',
     'chat-widget': 'Create and manage chat widgets for your website',
     'doc-summary': 'Automatically summarize documents and extract key information',
-    'mail-handler': 'Process and manage email communications automatically'
+    'mail-handler': 'Process and manage email communications automatically',
   }
   return descriptions[currentPage.value] || ''
 }
@@ -489,7 +541,7 @@ const createWidget = () => {
     autoOpen: false,
     aiPrompt: 'general',
     defaultTheme: 'light',
-    previewUrl: ''
+    previewUrl: '',
   }
   currentWidgetConfig.value = { ...newConfig }
   originalWidgetConfig.value = { ...newConfig }
@@ -508,7 +560,7 @@ const editWidget = (widget: Widget) => {
     autoOpen: widget.autoOpen,
     aiPrompt: widget.aiPrompt,
     defaultTheme: widget.defaultTheme || 'light',
-    previewUrl: widget.previewUrl || ''
+    previewUrl: widget.previewUrl || '',
   }
   currentWidgetConfig.value = { ...editConfig }
   originalWidgetConfig.value = { ...editConfig }
@@ -516,7 +568,7 @@ const editWidget = (widget: Widget) => {
 
 const saveWidget = async () => {
   if (currentWidgetId.value) {
-    const index = widgets.value.findIndex(w => w.id === currentWidgetId.value)
+    const index = widgets.value.findIndex((w) => w.id === currentWidgetId.value)
     if (index > -1) {
       widgets.value[index] = {
         id: widgets.value[index].id,
@@ -531,7 +583,7 @@ const saveWidget = async () => {
         defaultTheme: currentWidgetConfig.value.defaultTheme,
         previewUrl: currentWidgetConfig.value.previewUrl,
         createdAt: widgets.value[index].createdAt,
-        updatedAt: new Date()
+        updatedAt: new Date(),
       }
     }
   } else {
@@ -548,18 +600,18 @@ const saveWidget = async () => {
       defaultTheme: currentWidgetConfig.value.defaultTheme,
       previewUrl: currentWidgetConfig.value.previewUrl,
       createdAt: new Date(),
-      updatedAt: new Date()
+      updatedAt: new Date(),
     }
     widgets.value.push(newWidget)
     currentWidgetId.value = newWidget.id
   }
-  
+
   // Update original config after successful save
   originalWidgetConfig.value = { ...currentWidgetConfig.value }
 }
 
 const deleteWidget = (widgetId: string) => {
-  widgets.value = widgets.value.filter(w => w.id !== widgetId)
+  widgets.value = widgets.value.filter((w) => w.id !== widgetId)
 }
 
 const cancelEdit = () => {
@@ -590,7 +642,7 @@ const handleGenerateSummary = async (text: string, config: SummaryConfig) => {
       length: config.length,
       customLength: config.customLength,
       outputLanguage: config.outputLanguage,
-      focusAreas: config.focusAreas
+      focusAreas: config.focusAreas,
     })
 
     if (response.success && response.summary) {
@@ -636,10 +688,21 @@ const editMailHandler = (handler: SavedMailHandler) => {
   currentMailHandlerId.value = handler.id
 }
 
-const saveMailHandler = async (name: string, config: MailConfig, departments: Department[], smtpConfig: any, emailFilter: any) => {
+const saveMailHandler = async (
+  name: string,
+  config: MailConfig,
+  departments: Department[],
+  smtpConfig: any,
+  emailFilter: any
+) => {
   try {
     // Validate that SMTP config is provided
-    if (!smtpConfig || !smtpConfig.smtpServer || !smtpConfig.smtpUsername || !smtpConfig.smtpPassword) {
+    if (
+      !smtpConfig ||
+      !smtpConfig.smtpServer ||
+      !smtpConfig.smtpUsername ||
+      !smtpConfig.smtpPassword
+    ) {
       showError('SMTP configuration is required for email forwarding')
       return
     }
@@ -664,14 +727,14 @@ const saveMailHandler = async (name: string, config: MailConfig, departments: De
       // Email filter settings
       emailFilterMode: emailFilter.mode || 'new',
       emailFilterFromDate: emailFilter.fromDate || null,
-      emailFilterToDate: emailFilter.toDate || null
+      emailFilterToDate: emailFilter.toDate || null,
     }
 
     if (currentMailHandlerId.value) {
       // Update existing
       const updated = await inboundEmailHandlersApi.update(currentMailHandlerId.value, payload)
-      
-      const index = mailHandlers.value.findIndex(h => h.id === currentMailHandlerId.value)
+
+      const index = mailHandlers.value.findIndex((h) => h.id === currentMailHandlerId.value)
       if (index > -1) {
         mailHandlers.value[index] = updated
       }
@@ -682,7 +745,7 @@ const saveMailHandler = async (name: string, config: MailConfig, departments: De
       mailHandlers.value.push(newHandler)
       success('Mail handler created successfully!')
     }
-    
+
     cancelMailHandlerEdit()
   } catch (error: any) {
     console.error('Failed to save mail handler:', error)
@@ -694,10 +757,10 @@ const deleteMailHandler = async (handlerId: string) => {
   if (!confirm('Are you sure you want to delete this mail handler?')) {
     return
   }
-  
+
   try {
     await inboundEmailHandlersApi.delete(handlerId)
-    mailHandlers.value = mailHandlers.value.filter(h => h.id !== handlerId)
+    mailHandlers.value = mailHandlers.value.filter((h) => h.id !== handlerId)
     success('Mail handler deleted successfully!')
   } catch (error: any) {
     console.error('Failed to delete mail handler:', error)

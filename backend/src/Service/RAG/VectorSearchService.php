@@ -103,6 +103,7 @@ class VectorSearchService
             LEFT JOIN BMESSAGES m ON r.BMID = m.BID
             LEFT JOIN BFILES f ON r.BMID = f.BID
             WHERE r.BUID = :user_id
+                AND (m.BID IS NOT NULL OR f.BID IS NOT NULL)
         ';
 
         $params = [

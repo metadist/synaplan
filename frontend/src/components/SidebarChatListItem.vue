@@ -7,8 +7,8 @@
   >
     <button
       class="flex-1 text-left text-sm truncate min-h-[36px] flex flex-col justify-center"
-      @click="$emit('open', chat.id)"
       data-testid="btn-chat-entry-open"
+      @click="$emit('open', chat.id)"
     >
       <span class="truncate">{{ chat.title }}</span>
       <span class="text-xs txt-secondary">{{ chat.timestamp }}</span>
@@ -17,9 +17,9 @@
     <div class="relative">
       <button
         class="icon-ghost transition-opacity"
-        @click.stop="toggleMenu"
         aria-label="More options"
         data-testid="btn-chat-entry-menu"
+        @click.stop="toggleMenu"
       >
         <span class="text-lg leading-none">⋯</span>
       </button>
@@ -27,22 +27,22 @@
       <div v-if="isMenuOpen" class="absolute right-0 mt-2 w-44 dropdown-panel z-30">
         <button
           class="dropdown-item"
-          @click.stop="handleAction('share')"
           data-testid="btn-chat-entry-share"
+          @click.stop="handleAction('share')"
         >
           Share
         </button>
         <button
           class="dropdown-item"
-          @click.stop="handleAction('rename')"
           data-testid="btn-chat-entry-rename"
+          @click.stop="handleAction('rename')"
         >
           Rename
         </button>
         <button
           class="dropdown-item dropdown-item--danger"
-          @click.stop="handleAction('delete')"
           data-testid="btn-chat-entry-delete"
+          @click.stop="handleAction('delete')"
         >
           Delete
         </button>

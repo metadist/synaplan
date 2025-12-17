@@ -35,13 +35,13 @@ class EmailChatServiceTest extends TestCase
 
     public function testParseEmailKeywordWithKeyword(): void
     {
-        $keyword = $this->emailChatService->parseEmailKeyword('smart+mybot@synaplan.com');
+        $keyword = $this->emailChatService->parseEmailKeyword('smart+mybot@synaplan.net');
         $this->assertEquals('mybot', $keyword);
     }
 
     public function testParseEmailKeywordWithoutKeyword(): void
     {
-        $keyword = $this->emailChatService->parseEmailKeyword('smart@synaplan.com');
+        $keyword = $this->emailChatService->parseEmailKeyword('smart@synaplan.net');
         $this->assertNull($keyword);
     }
 
@@ -53,7 +53,7 @@ class EmailChatServiceTest extends TestCase
 
     public function testParseEmailKeywordWithHyphenAndUnderscore(): void
     {
-        $keyword = $this->emailChatService->parseEmailKeyword('smart+my-bot_123@synaplan.com');
+        $keyword = $this->emailChatService->parseEmailKeyword('smart+my-bot_123@synaplan.net');
         $this->assertEquals('my-bot_123', $keyword);
     }
 
@@ -63,7 +63,7 @@ class EmailChatServiceTest extends TestCase
         $user->setUserDetails(['email_keyword' => 'mybot']);
 
         $email = $this->emailChatService->getUserPersonalEmailAddress($user);
-        $this->assertEquals('smart+mybot@synaplan.com', $email);
+        $this->assertEquals('smart+mybot@synaplan.net', $email);
     }
 
     public function testGetUserPersonalEmailAddressWithoutKeyword(): void
@@ -72,6 +72,6 @@ class EmailChatServiceTest extends TestCase
         $user->setUserDetails([]);
 
         $email = $this->emailChatService->getUserPersonalEmailAddress($user);
-        $this->assertEquals('smart@synaplan.com', $email);
+        $this->assertEquals('smart@synaplan.net', $email);
     }
 }

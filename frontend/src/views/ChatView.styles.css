@@ -1,6 +1,12 @@
 /* Processing Status Styles */
 .processing-status-container {
-  max-w-4xl mx-auto px-6 py-2;
+  max-width: 56rem;
+  margin-left: auto;
+  margin-right: auto;
+  padding-left: 1.5rem;
+  padding-right: 1.5rem;
+  padding-top: 0.5rem;
+  padding-bottom: 0.5rem;
 }
 
 .processing-status {
@@ -63,7 +69,9 @@
 }
 
 @keyframes spin {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 @keyframes fadeInSlide {
@@ -82,22 +90,21 @@
   .status-text {
     color: #a78bfa;
   }
-  
+
   .status-spinner {
     border-color: rgba(167, 139, 250, 0.3);
     border-top-color: #a78bfa;
   }
-  
+
   .metadata-badge {
     background: rgba(167, 139, 250, 0.15);
   }
-  
+
   .metadata-label {
     color: #9ca3af;
   }
-  
+
   .metadata-value {
     color: #d1d5db;
   }
 }
-

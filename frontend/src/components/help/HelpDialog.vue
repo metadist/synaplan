@@ -31,9 +31,13 @@
             data-testid="modal-help-body"
           >
             <!-- Header -->
-            <div class="flex items-center justify-between p-6 border-b border-light-border/30 dark:border-dark-border/20">
+            <div
+              class="flex items-center justify-between p-6 border-b border-light-border/30 dark:border-dark-border/20"
+            >
               <div class="flex items-center gap-3">
-                <div class="w-10 h-10 rounded-full bg-[var(--brand)]/10 flex items-center justify-center">
+                <div
+                  class="w-10 h-10 rounded-full bg-[var(--brand)]/10 flex items-center justify-center"
+                >
                   <QuestionMarkCircleIcon class="w-6 h-6 text-[var(--brand)]" />
                 </div>
                 <h2 id="help-title" class="text-xl font-semibold txt-primary">
@@ -42,10 +46,10 @@
               </div>
               <button
                 ref="closeButton"
-                @click="$emit('close')"
                 class="w-10 h-10 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 transition-colors txt-secondary hover:txt-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand)]"
                 :aria-label="$t('help.close')"
                 data-testid="btn-close"
+                @click="$emit('close')"
               >
                 <XMarkIcon class="w-6 h-6 mx-auto" />
               </button>
@@ -64,7 +68,9 @@
                   class="flex gap-4"
                   data-testid="item-step"
                 >
-                  <div class="flex-shrink-0 w-8 h-8 rounded-full bg-[var(--brand)] text-white flex items-center justify-center font-semibold text-sm">
+                  <div
+                    class="flex-shrink-0 w-8 h-8 rounded-full bg-[var(--brand)] text-white flex items-center justify-center font-semibold text-sm"
+                  >
                     {{ index + 1 }}
                   </div>
                   <div class="flex-1">
@@ -82,9 +88,9 @@
             <!-- Footer -->
             <div class="p-6 border-t border-light-border/30 dark:border-dark-border/20">
               <button
-                @click="$emit('close')"
                 class="btn-primary w-full py-3 rounded-lg font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--brand)]"
                 data-testid="btn-confirm"
+                @click="$emit('close')"
               >
                 {{ $t('help.gotIt') }}
               </button>
@@ -121,13 +127,15 @@ const handleKeydown = (e: KeyboardEvent) => {
   }
 }
 
-watch(() => props.show, (newVal) => {
-  if (newVal) {
-    document.addEventListener('keydown', handleKeydown)
-    setTimeout(() => closeButton.value?.focus(), 100)
-  } else {
-    document.removeEventListener('keydown', handleKeydown)
+watch(
+  () => props.show,
+  (newVal) => {
+    if (newVal) {
+      document.addEventListener('keydown', handleKeydown)
+      setTimeout(() => closeButton.value?.focus(), 100)
+    } else {
+      document.removeEventListener('keydown', handleKeydown)
+    }
   }
-})
+)
 </script>
-

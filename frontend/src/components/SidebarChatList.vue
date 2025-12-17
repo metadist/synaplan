@@ -2,9 +2,9 @@
   <div class="flex flex-col gap-2" data-testid="comp-sidebar-chat-list">
     <!-- New Chat Button -->
     <button
-      @click="createNewChat"
       class="btn-primary w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand)]"
       data-testid="btn-chat-new"
+      @click="createNewChat"
     >
       <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
@@ -14,11 +14,13 @@
 
     <div>
       <button
-        @click="toggleSection('my')"
         class="w-full flex items-center gap-2 px-3 py-2 rounded-lg txt-secondary hover-surface transition-colors text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary min-h-[44px]"
         data-testid="btn-chat-section-my"
+        @click="toggleSection('my')"
       >
-        <ChevronRightIcon :class="['w-4 h-4 transition-transform flex-shrink-0', sections.my && 'rotate-90']" />
+        <ChevronRightIcon
+          :class="['w-4 h-4 transition-transform flex-shrink-0', sections.my && 'rotate-90']"
+        />
         <span class="text-xs font-medium uppercase tracking-wider">My Chats</span>
       </button>
 
@@ -36,37 +38,46 @@
 
         <button
           v-if="!showAllMy && allMyChats.length > 5"
-          @click="showAllMy = true"
           class="px-3 py-2 rounded-lg txt-secondary hover-surface transition-colors text-left text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary min-h-[44px]"
           data-testid="btn-chat-show-more-my"
+          @click="showAllMy = true"
         >
           Show more...
         </button>
-        
+
         <!-- End marker for intersection observer -->
-        <div ref="myChatsEndRef" class="h-px" v-if="showAllMy && allMyChats.length > 5"></div>
-        
+        <div v-if="showAllMy && allMyChats.length > 5" ref="myChatsEndRef" class="h-px"></div>
+
         <!-- Show less button - sticky when list is long -->
         <button
           v-if="showAllMy && allMyChats.length > 5"
-          @click="showAllMy = false"
           :class="[
             'px-3 py-2 rounded-lg txt-secondary transition-all text-left text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary min-h-[44px]',
-            isMyButtonSticky ? 'sticky bottom-[4px] z-10 bg-sidebar shadow-lg border border-light-border/30 dark:border-dark-border/20' : 'hover-surface'
+            isMyButtonSticky
+              ? 'sticky bottom-[4px] z-10 bg-sidebar shadow-lg border border-light-border/30 dark:border-dark-border/20'
+              : 'hover-surface',
           ]"
           data-testid="btn-chat-show-less-my"
+          @click="showAllMy = false"
         >
           Show less...
         </button>
 
         <button
           v-if="myArchivedChats.length > 0"
-          @click="toggleSection('myArchived')"
           class="flex items-center gap-2 px-3 py-2 rounded-lg txt-secondary hover-surface transition-colors text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary min-h-[44px] mt-2"
           data-testid="btn-chat-section-my-archived"
+          @click="toggleSection('myArchived')"
         >
-          <ChevronRightIcon :class="['w-3.5 h-3.5 transition-transform flex-shrink-0', sections.myArchived && 'rotate-90']" />
-          <span class="text-xs font-medium uppercase tracking-wider">Archived ({{ myArchivedChats.length }})</span>
+          <ChevronRightIcon
+            :class="[
+              'w-3.5 h-3.5 transition-transform flex-shrink-0',
+              sections.myArchived && 'rotate-90',
+            ]"
+          />
+          <span class="text-xs font-medium uppercase tracking-wider"
+            >Archived ({{ myArchivedChats.length }})</span
+          >
         </button>
 
         <div v-if="sections.myArchived" class="flex flex-col gap-1 mt-1">
@@ -86,11 +97,13 @@
 
     <div>
       <button
-        @click="toggleSection('widget')"
         class="w-full flex items-center gap-2 px-3 py-2 rounded-lg txt-secondary hover-surface transition-colors text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary min-h-[44px]"
         data-testid="btn-chat-section-widget"
+        @click="toggleSection('widget')"
       >
-        <ChevronRightIcon :class="['w-4 h-4 transition-transform flex-shrink-0', sections.widget && 'rotate-90']" />
+        <ChevronRightIcon
+          :class="['w-4 h-4 transition-transform flex-shrink-0', sections.widget && 'rotate-90']"
+        />
         <span class="text-xs font-medium uppercase tracking-wider">Widget Chats</span>
         <PuzzlePieceIcon class="w-3.5 h-3.5 ml-auto" />
       </button>
@@ -109,37 +122,50 @@
 
         <button
           v-if="!showAllWidget && allWidgetChats.length > 5"
-          @click="showAllWidget = true"
           class="px-3 py-2 rounded-lg txt-secondary hover-surface transition-colors text-left text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary min-h-[44px]"
           data-testid="btn-chat-show-more-widget"
+          @click="showAllWidget = true"
         >
           Show more...
         </button>
-        
+
         <!-- End marker for intersection observer -->
-        <div ref="widgetChatsEndRef" class="h-px" v-if="showAllWidget && allWidgetChats.length > 5"></div>
-        
+        <div
+          v-if="showAllWidget && allWidgetChats.length > 5"
+          ref="widgetChatsEndRef"
+          class="h-px"
+        ></div>
+
         <!-- Show less button - sticky when list is long -->
         <button
           v-if="showAllWidget && allWidgetChats.length > 5"
-          @click="showAllWidget = false"
           :class="[
             'px-3 py-2 rounded-lg txt-secondary hover-surface transition-all text-left text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary min-h-[44px]',
-            isWidgetButtonSticky ? 'sticky bottom-[4px] z-10 bg-sidebar shadow-lg border border-light-border/30 dark:border-dark-border/20' : ''
+            isWidgetButtonSticky
+              ? 'sticky bottom-[4px] z-10 bg-sidebar shadow-lg border border-light-border/30 dark:border-dark-border/20'
+              : '',
           ]"
           data-testid="btn-chat-show-less-widget"
+          @click="showAllWidget = false"
         >
           Show less...
         </button>
 
         <button
           v-if="widgetArchivedChats.length > 0"
-          @click="toggleSection('widgetArchived')"
           class="flex items-center gap-2 px-3 py-2 rounded-lg txt-secondary hover-surface transition-colors text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary min-h-[44px] mt-2"
           data-testid="btn-chat-section-widget-archived"
+          @click="toggleSection('widgetArchived')"
         >
-          <ChevronRightIcon :class="['w-3.5 h-3.5 transition-transform flex-shrink-0', sections.widgetArchived && 'rotate-90']" />
-          <span class="text-xs font-medium uppercase tracking-wider">Archived ({{ widgetArchivedChats.length }})</span>
+          <ChevronRightIcon
+            :class="[
+              'w-3.5 h-3.5 transition-transform flex-shrink-0',
+              sections.widgetArchived && 'rotate-90',
+            ]"
+          />
+          <span class="text-xs font-medium uppercase tracking-wider"
+            >Archived ({{ widgetArchivedChats.length }})</span
+          >
         </button>
 
         <div v-if="sections.widgetArchived" class="flex flex-col gap-1 mt-1">
@@ -189,7 +215,7 @@ const sections = ref({
   my: true,
   widget: false,
   myArchived: false,
-  widgetArchived: false
+  widgetArchived: false,
 })
 
 const showAllMy = ref(false)
@@ -217,13 +243,13 @@ const formatDate = (value: string | number): string => {
 // Map API chats to sidebar format
 const allMyChats = computed(() => {
   return chatsStore.chats
-    .filter(c => !c.widgetSession)
-    .map(c => ({
+    .filter((c) => !c.widgetSession)
+    .map((c) => ({
       id: String(c.id),
       title: c.title,
       timestamp: formatDate(c.updatedAt),
       type: 'personal' as const,
-      archived: false
+      archived: false,
     }))
 })
 
@@ -238,12 +264,13 @@ const myArchivedChats = computed((): Chat[] => {
 
 const allWidgetChats = computed((): Chat[] => {
   const sessionChatsRaw = chatsStore.chats
-    .filter(c => c.widgetSession)
-    .map(c => {
+    .filter((c) => c.widgetSession)
+    .map((c) => {
       const session = c.widgetSession!
       const shortId = session.sessionId.slice(-6)
       const title = `${session.widgetName ?? 'Widget'} • ${shortId}`
-      const lastTimestamp = session.lastMessage ?? Math.floor(new Date(c.updatedAt).getTime() / 1000)
+      const lastTimestamp =
+        session.lastMessage ?? Math.floor(new Date(c.updatedAt).getTime() / 1000)
       const timestampLabel = `${session.messageCount} msg · ${formatDate(lastTimestamp)}`
 
       return {
@@ -253,13 +280,13 @@ const allWidgetChats = computed((): Chat[] => {
           title,
           timestamp: timestampLabel,
           type: 'widget' as const,
-          archived: false
-        }
+          archived: false,
+        },
       }
     })
     .sort((a, b) => b.metaTimestamp - a.metaTimestamp)
 
-  return sessionChatsRaw.map(entry => entry.item)
+  return sessionChatsRaw.map((entry) => entry.item)
 })
 
 const widgetChats = computed((): Chat[] => {
@@ -304,23 +331,23 @@ const shareModalChatId = ref<number | null>(null)
 const shareModalChatTitle = ref<string>('')
 
 const handleShare = (id: string) => {
-  const chat = chatsStore.chats.find(c => c.id === Number(id))
+  const chat = chatsStore.chats.find((c) => c.id === Number(id))
   shareModalChatId.value = Number(id)
   shareModalChatTitle.value = chat?.title || 'Chat'
   shareModalOpen.value = true
 }
 
 const handleRename = async (id: string) => {
-  const chat = chatsStore.chats.find(c => c.id === Number(id))
+  const chat = chatsStore.chats.find((c) => c.id === Number(id))
   const newTitle = await dialog.prompt({
     title: 'Rename Chat',
     message: 'Enter a new title for this chat:',
     placeholder: 'Chat title...',
     defaultValue: chat?.title || '',
     confirmText: 'Rename',
-    cancelText: 'Cancel'
+    cancelText: 'Cancel',
   })
-  
+
   if (newTitle && newTitle.trim()) {
     chatsStore.updateChatTitle(Number(id), newTitle.trim())
   }
@@ -332,9 +359,9 @@ const handleDelete = async (id: string) => {
     message: 'Are you sure you want to delete this chat? This action cannot be undone.',
     confirmText: 'Delete',
     cancelText: 'Cancel',
-    danger: true
+    danger: true,
   })
-  
+
   if (confirmed) {
     await chatsStore.deleteChat(Number(id))
   }
@@ -346,21 +373,21 @@ let widgetObserver: IntersectionObserver | null = null
 
 const setupIntersectionObserver = async () => {
   await nextTick()
-  
+
   // Clean up existing observers
   if (myObserver) myObserver.disconnect()
   if (widgetObserver) widgetObserver.disconnect()
-  
+
   const options = {
     root: null,
     rootMargin: '0px 0px -80px 0px', // Trigger sticky when end marker is 80px from bottom (just above footer)
-    threshold: 0
+    threshold: 0,
   }
 
   // Observer for My Chats end marker
   if (showAllMy.value && myChatsEndRef.value) {
     myObserver = new IntersectionObserver((entries) => {
-      entries.forEach(entry => {
+      entries.forEach((entry) => {
         isMyButtonSticky.value = !entry.isIntersecting
       })
     }, options)
@@ -372,7 +399,7 @@ const setupIntersectionObserver = async () => {
   // Observer for Widget Chats end marker
   if (showAllWidget.value && widgetChatsEndRef.value) {
     widgetObserver = new IntersectionObserver((entries) => {
-      entries.forEach(entry => {
+      entries.forEach((entry) => {
         isWidgetButtonSticky.value = !entry.isIntersecting
       })
     }, options)

@@ -108,4 +108,3 @@ export async function revokeApiKey(id: number): Promise<{ success: boolean; mess
     method: 'DELETE',
   })
 }
-

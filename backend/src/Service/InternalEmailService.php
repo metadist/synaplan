@@ -127,7 +127,7 @@ class InternalEmailService
     }
 
     /**
-     * Send AI response email (for smart@synaplan.com chat).
+     * Send AI response email (for smart@synaplan.net chat).
      */
     public function sendAiResponseEmail(
         string $to,
@@ -135,7 +135,7 @@ class InternalEmailService
         string $bodyText,
         ?string $inReplyTo = null,
     ): void {
-        $fromEmail = $_ENV['APP_SENDER_EMAIL'] ?? 'smart@synaplan.com';
+        $fromEmail = $_ENV['APP_SENDER_EMAIL'] ?? 'smart@synaplan.net';
         $fromName = $_ENV['APP_SENDER_NAME'] ?? 'Synaplan AI';
 
         $email = (new Email())

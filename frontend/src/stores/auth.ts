@@ -40,7 +40,7 @@ export const useAuthStore = defineStore('auth', () => {
 
     try {
       const result = await authService.login(email, password, recaptchaToken)
-      
+
       if (result.success) {
         user.value = authService.getUser().value
         return true
@@ -56,13 +56,17 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
-  async function register(email: string, password: string, recaptchaToken?: string): Promise<boolean> {
+  async function register(
+    email: string,
+    password: string,
+    recaptchaToken?: string
+  ): Promise<boolean> {
     loading.value = true
     error.value = null
 
     try {
       const result = await authService.register(email, password, recaptchaToken)
-      
+
       if (result.success) {
         return true
       } else {
@@ -79,7 +83,7 @@ export const useAuthStore = defineStore('auth', () => {
 
   async function logout(): Promise<void> {
     loading.value = true
-    
+
     try {
       await authService.logout()
     } finally {
@@ -109,7 +113,7 @@ export const useAuthStore = defineStore('auth', () => {
 
   async function checkAuth(): Promise<void> {
     if (initialized.value) return
-    
+
     try {
       loading.value = true
       const currentUser = await authService.getCurrentUser()
@@ -139,7 +143,7 @@ export const useAuthStore = defineStore('auth', () => {
 
     try {
       const result = await authService.handleOAuthCallback()
-      
+
       if (result.success) {
         user.value = authService.getUser().value
         initialized.value = true
@@ -166,7 +170,7 @@ export const useAuthStore = defineStore('auth', () => {
    */
   async function revokeAllSessions(): Promise<{ success: boolean; sessionsRevoked?: number }> {
     loading.value = true
-    
+
     try {
       const result = await authService.revokeAllSessions()
       if (result.success) {

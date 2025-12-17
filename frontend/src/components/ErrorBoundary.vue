@@ -18,12 +18,12 @@ const errorInfo = ref<{
 
 onErrorCaptured((err: any) => {
   console.error('Component error:', err)
-  
+
   error.value = true
   errorInfo.value = {
     message: err.message || 'Unknown error',
     statusCode: err.statusCode || 500,
-    stack: err.stack || ''
+    stack: err.stack || '',
   }
 
   // Optionally redirect to error page instead
@@ -33,4 +33,3 @@ onErrorCaptured((err: any) => {
   return false
 })
 </script>
-

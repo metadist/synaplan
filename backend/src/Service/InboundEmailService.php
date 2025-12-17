@@ -2,6 +2,7 @@
 
 namespace App\Service;
 
+use App\Service\Email\SmartEmailHelper;
 use Psr\Log\LoggerInterface;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 
@@ -171,7 +172,8 @@ class InboundEmailService
         foreach ($messages as $message) {
             $emailData = $this->parseMailhogMessage($message);
 
-            // Only process emails to smart@synaplan.com or smart+*@synaplan.com
+            // Only process emails to smart@synaplan.net or smart+*@synaplan.net
+            // (accept legacy synaplan.com too)
             if (!$this->isValidDestination($emailData['to'])) {
                 $this->logger->debug('Skipping email to invalid destination', [
                     'to' => $emailData['to'],
@@ -208,12 +210,10 @@ class InboundEmailService
     }
 
     /**
-     * Check if email destination is valid (smart@synaplan.com or smart+keyword@synaplan.com).
+     * Check if email destination is a valid smart address.
      */
     private function isValidDestination(string $email): bool
     {
-        $email = strtolower(trim($email));
-
-        return 1 === preg_match('/^smart(\+[a-z0-9\-_]+)?@synaplan\.com$/i', $email);
+        return SmartEmailHelper::isValidSmartAddress($email);
     }
 }

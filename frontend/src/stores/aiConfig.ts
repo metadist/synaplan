@@ -7,7 +7,7 @@ import type { AIModel, Capability } from '@/types/ai-models'
 export type DefaultModels = Partial<Record<Capability, number | null>>
 
 export const useAiConfigStore = defineStore('aiConfig', () => {
-  const models = ref<ModelsResponse["models"]>({})
+  const models = ref<ModelsResponse['models']>({})
   const defaults = ref<DefaultModels>({})
   const loading = ref(false)
 
@@ -67,7 +67,7 @@ export const useAiConfigStore = defineStore('aiConfig', () => {
     const capabilityModels = models.value[capability]
     if (!modelId || !capabilityModels) return null
 
-    return capabilityModels.find(m => m.id === modelId) || null
+    return capabilityModels.find((m) => m.id === modelId) || null
   }
 
   return {
@@ -77,7 +77,6 @@ export const useAiConfigStore = defineStore('aiConfig', () => {
     loadModels,
     loadDefaults,
     saveDefaults,
-    getCurrentModel
+    getCurrentModel,
   }
 })
-

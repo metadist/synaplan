@@ -1,6 +1,6 @@
 /**
  * Inbound Email Handlers API
- * 
+ *
  * API for managing email handlers (IMAP/POP3 configuration for email routing)
  */
 
@@ -116,18 +116,18 @@ function convertBackendToFrontend(backend: BackendMailHandler): SavedMailHandler
       username: backend.username,
       password: backend.password, // Already masked
       checkInterval: backend.checkInterval,
-      deleteAfter: backend.deleteAfter
+      deleteAfter: backend.deleteAfter,
     },
     departments: backend.departments.map((dept, index) => ({
       id: dept.id || index.toString(),
       email: dept.email,
       rules: dept.rules,
-      isDefault: dept.isDefault
+      isDefault: dept.isDefault,
     })),
     status: backend.status,
     lastTested: backend.lastChecked ? parseDate(backend.lastChecked) : undefined,
     createdAt: parseDate(backend.created),
-    updatedAt: parseDate(backend.updated)
+    updatedAt: parseDate(backend.updated),
   }
 }
 
@@ -179,7 +179,7 @@ export const inboundEmailHandlersApi = {
       '/api/v1/inbound-email-handlers',
       {
         method: 'POST',
-        body: JSON.stringify(request)
+        body: JSON.stringify(request),
       }
     )
     return convertBackendToFrontend(data.handler)
@@ -193,7 +193,7 @@ export const inboundEmailHandlersApi = {
       `/api/v1/inbound-email-handlers/${id}`,
       {
         method: 'PUT',
-        body: JSON.stringify(request)
+        body: JSON.stringify(request),
       }
     )
     return convertBackendToFrontend(data.handler)
@@ -217,6 +217,5 @@ export const inboundEmailHandlersApi = {
       `/api/v1/inbound-email-handlers/${id}/test`,
       { method: 'POST' }
     )
-  }
+  },
 }
-

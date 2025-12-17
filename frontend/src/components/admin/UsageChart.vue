@@ -7,28 +7,30 @@
       </h3>
 
       <!-- Chart Type Toggle -->
-      <div class="flex gap-1 bg-chat rounded-lg p-1 border border-light-border/30 dark:border-dark-border/20">
+      <div
+        class="flex gap-1 bg-chat rounded-lg p-1 border border-light-border/30 dark:border-dark-border/20"
+      >
         <button
-          @click="chartType = 'line'"
           :class="[
             'px-3 py-1.5 rounded text-xs font-medium transition-all',
-            chartType === 'line' 
-              ? 'bg-[var(--brand)] text-white' 
-              : 'txt-secondary hover:txt-primary'
+            chartType === 'line'
+              ? 'bg-[var(--brand)] text-white'
+              : 'txt-secondary hover:txt-primary',
           ]"
           data-testid="btn-chart-type-line"
+          @click="chartType = 'line'"
         >
           <Icon icon="mdi:chart-line" class="w-4 h-4" />
         </button>
         <button
-          @click="chartType = 'bar'"
           :class="[
             'px-3 py-1.5 rounded text-xs font-medium transition-all',
-            chartType === 'bar' 
-              ? 'bg-[var(--brand)] text-white' 
-              : 'txt-secondary hover:txt-primary'
+            chartType === 'bar'
+              ? 'bg-[var(--brand)] text-white'
+              : 'txt-secondary hover:txt-primary',
           ]"
           data-testid="btn-chart-type-bar"
+          @click="chartType = 'bar'"
         >
           <Icon icon="mdi:chart-bar" class="w-4 h-4" />
         </button>
@@ -37,7 +39,11 @@
 
     <!-- Chart -->
     <div class="relative h-[300px]">
-      <component :is="chartType === 'line' ? Line : Bar" :data="chartData" :options="chartOptions" />
+      <component
+        :is="chartType === 'line' ? Line : Bar"
+        :data="chartData"
+        :options="chartOptions"
+      />
     </div>
   </div>
 </template>
@@ -57,11 +63,21 @@ import {
   Tooltip,
   Legend,
   Filler,
-  type ChartOptions
+  type ChartOptions,
 } from 'chart.js'
 import { useI18n } from 'vue-i18n'
 
-ChartJS.register(CategoryScale, LinearScale, BarElement, LineElement, PointElement, Title, Tooltip, Legend, Filler)
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  BarElement,
+  LineElement,
+  PointElement,
+  Title,
+  Tooltip,
+  Legend,
+  Filler
+)
 
 const { t } = useI18n()
 
@@ -76,16 +92,17 @@ const chartType = ref<'line' | 'bar'>('line')
 // Chart data
 const chartData = computed(() => {
   const labels = Object.keys(props.data)
-  const counts = labels.map(action => props.data[action].count)
-  const tokens = labels.map(action => props.data[action].tokens)
+  const counts = labels.map((action) => props.data[action].count)
+  const tokens = labels.map((action) => props.data[action].tokens)
 
   return {
-    labels: labels.map(l => l.replace('_', ' ').toUpperCase()),
+    labels: labels.map((l) => l.replace('_', ' ').toUpperCase()),
     datasets: [
       {
         label: t('admin.usage.requests'),
         data: counts,
-        backgroundColor: chartType.value === 'line' ? 'rgba(59, 130, 246, 0.2)' : 'rgba(59, 130, 246, 1)',
+        backgroundColor:
+          chartType.value === 'line' ? 'rgba(59, 130, 246, 0.2)' : 'rgba(59, 130, 246, 1)',
         borderColor: 'rgb(59, 130, 246)',
         borderWidth: chartType.value === 'line' ? 3 : 0,
         fill: chartType.value === 'line',
@@ -95,14 +112,15 @@ const chartData = computed(() => {
       {
         label: t('admin.usage.tokens'),
         data: tokens,
-        backgroundColor: chartType.value === 'line' ? 'rgba(16, 185, 129, 0.2)' : 'rgba(16, 185, 129, 1)',
+        backgroundColor:
+          chartType.value === 'line' ? 'rgba(16, 185, 129, 0.2)' : 'rgba(16, 185, 129, 1)',
         borderColor: 'rgb(16, 185, 129)',
         borderWidth: chartType.value === 'line' ? 3 : 0,
         fill: chartType.value === 'line',
         tension: 0.4,
         yAxisID: 'y1',
-      }
-    ]
+      },
+    ],
   }
 })
 
@@ -121,7 +139,7 @@ const chartOptions = computed<ChartOptions<'bar'>>(() => ({
       },
       ticks: {
         color: 'rgb(156, 163, 175)',
-      }
+      },
     },
     y: {
       type: 'linear',
@@ -139,7 +157,7 @@ const chartOptions = computed<ChartOptions<'bar'>>(() => ({
         display: true,
         text: t('admin.usage.requests'),
         color: 'rgb(156, 163, 175)',
-      }
+      },
     },
     y1: {
       type: 'linear',
@@ -157,8 +175,8 @@ const chartOptions = computed<ChartOptions<'bar'>>(() => ({
         display: true,
         text: t('admin.usage.tokens'),
         color: 'rgb(156, 163, 175)',
-      }
-    }
+      },
+    },
   },
   plugins: {
     legend: {
@@ -166,13 +184,12 @@ const chartOptions = computed<ChartOptions<'bar'>>(() => ({
       position: 'top',
       labels: {
         color: 'rgb(156, 163, 175)',
-      }
+      },
     },
     tooltip: {
       mode: 'index',
       intersect: false,
-    }
-  }
+    },
+  },
 }))
 </script>
-

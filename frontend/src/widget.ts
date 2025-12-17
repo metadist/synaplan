@@ -38,7 +38,7 @@ interface WidgetConfig {
   allowFileUpload?: boolean
   fileUploadLimit?: number
   lazy?: boolean
-  vueUrl?: string | null  // undefined = default CDN, null = skip, string = custom URL
+  vueUrl?: string | null // undefined = default CDN, null = skip, string = custom URL
 }
 
 const DEFAULT_VUE_CDN = 'https://cdn.jsdelivr.net/npm/vue@3/dist/vue.global.prod.js'
@@ -72,8 +72,8 @@ class SynaplanWidget {
       allowedDomains: [],
       allowFileUpload: false,
       fileUploadLimit: 3,
-      lazy: true,  // Default to lazy loading
-      ...config
+      lazy: true, // Default to lazy loading
+      ...config,
     }
 
     const start = async () => {
@@ -118,8 +118,8 @@ class SynaplanWidget {
       const apiUrl = this.config.apiUrl || ''
       const response = await fetch(`${apiUrl}/api/v1/widget/${this.config.widgetId}/config`, {
         headers: {
-          'X-Widget-Host': window.location.host
-        }
+          'X-Widget-Host': window.location.host,
+        },
       })
 
       if (!response.ok) return
@@ -130,7 +130,7 @@ class SynaplanWidget {
         this.config = {
           ...this.config,
           ...data.config,
-          widgetTitle: data.name || this.config.widgetTitle
+          widgetTitle: data.name || this.config.widgetTitle,
         }
       }
     } catch (error) {
@@ -172,7 +172,7 @@ class SynaplanWidget {
         <circle cx="12" cy="12" r="10"></circle>
         <path d="M12 16v-4"></path>
         <path d="M12 8h.01"></path>
-      </svg>`
+      </svg>`,
     }
 
     const iconType = this.config?.buttonIcon || 'chat'
@@ -190,10 +190,12 @@ class SynaplanWidget {
       'bottom-right': 'bottom: 20px; right: 20px;',
       'bottom-left': 'bottom: 20px; left: 20px;',
       'top-right': 'top: 20px; right: 20px;',
-      'top-left': 'top: 20px; left: 20px;'
+      'top-left': 'top: 20px; left: 20px;',
     }
 
-    this.button.setAttribute('style', `
+    this.button.setAttribute(
+      'style',
+      `
       position: fixed;
       ${positions[position]}
       z-index: 999999;
@@ -207,7 +209,8 @@ class SynaplanWidget {
       align-items: center;
       justify-content: center;
       transition: transform 0.2s, box-shadow 0.2s;
-    `)
+    `
+    )
 
     this.button.innerHTML = this.getIconContent()
 
@@ -254,7 +257,7 @@ class SynaplanWidget {
         import('vue'),
         import('./components/widgets/ChatWidget.vue'),
         import('./i18n'),
-        import('./style.css?inline')
+        import('./style.css?inline'),
       ])
 
       // Inject styles
@@ -291,7 +294,7 @@ class SynaplanWidget {
         apiUrl: this.config!.apiUrl,
         allowFileUpload: this.config!.allowFileUpload,
         fileUploadLimit: this.config!.fileUploadLimit,
-        isPreview: false
+        isPreview: false,
       })
 
       this.app.use(i18n)
@@ -363,23 +366,29 @@ class SynaplanWidget {
 
   open() {
     if (!this.config) return
-    window.dispatchEvent(new CustomEvent('synaplan-widget-open', {
-      detail: { widgetId: this.config.widgetId }
-    }))
+    window.dispatchEvent(
+      new CustomEvent('synaplan-widget-open', {
+        detail: { widgetId: this.config.widgetId },
+      })
+    )
   }
 
   close() {
     if (!this.config) return
-    window.dispatchEvent(new CustomEvent('synaplan-widget-close', {
-      detail: { widgetId: this.config.widgetId }
-    }))
+    window.dispatchEvent(
+      new CustomEvent('synaplan-widget-close', {
+        detail: { widgetId: this.config.widgetId },
+      })
+    )
   }
 
   startNewChat() {
     if (!this.config) return
-    window.dispatchEvent(new CustomEvent('synaplan-widget-new-chat', {
-      detail: { widgetId: this.config.widgetId }
-    }))
+    window.dispatchEvent(
+      new CustomEvent('synaplan-widget-new-chat', {
+        detail: { widgetId: this.config.widgetId },
+      })
+    )
   }
 }
 
@@ -395,5 +404,5 @@ export default {
   destroy: () => widgetInstance.destroy(),
   open: () => widgetInstance.open(),
   close: () => widgetInstance.close(),
-  startNewChat: () => widgetInstance.startNewChat()
+  startNewChat: () => widgetInstance.startNewChat(),
 }

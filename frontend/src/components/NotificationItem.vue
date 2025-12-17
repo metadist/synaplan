@@ -3,7 +3,7 @@
     :class="[
       'flex items-start gap-3 p-4 rounded shadow-lg border backdrop-blur-sm transition-all duration-300',
       'min-w-[320px] max-w-[420px]',
-      typeClasses[notification.type]
+      typeClasses[notification.type],
     ]"
     data-testid="comp-notification-item"
   >
@@ -19,9 +19,9 @@
     </div>
 
     <button
-      @click="$emit('close')"
       class="flex-shrink-0 p-0.5 rounded hover:bg-black/10 dark:hover:bg-white/10 transition-colors"
       data-testid="btn-notification-close"
+      @click="$emit('close')"
     >
       <XMarkIcon class="w-4 h-4" />
     </button>
@@ -29,12 +29,12 @@
 </template>
 
 <script setup lang="ts">
-import { 
+import {
   CheckCircleIcon,
   XCircleIcon,
   ExclamationTriangleIcon,
   InformationCircleIcon,
-  XMarkIcon
+  XMarkIcon,
 } from '@heroicons/vue/24/outline'
 import type { Notification } from '@/composables/useNotification'
 
@@ -50,7 +50,6 @@ const typeClasses = {
   success: 'bg-green-500/90 dark:bg-green-600/90 text-white border-green-600',
   error: 'bg-red-500/90 dark:bg-red-600/90 text-white border-red-600',
   warning: 'bg-orange-500/90 dark:bg-orange-600/90 text-white border-orange-600',
-  info: 'bg-blue-500/90 dark:bg-blue-600/90 text-white border-blue-600'
+  info: 'bg-blue-500/90 dark:bg-blue-600/90 text-white border-blue-600',
 }
 </script>
-

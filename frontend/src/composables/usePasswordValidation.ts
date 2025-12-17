@@ -41,7 +41,7 @@ export function usePasswordValidation(password: string): PasswordValidation {
   return {
     isValid: errors.length === 0,
     errors,
-    strength
+    strength,
   }
 }
 

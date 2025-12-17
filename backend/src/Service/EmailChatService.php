@@ -6,6 +6,7 @@ use App\Entity\Chat;
 use App\Entity\User;
 use App\Repository\ChatRepository;
 use App\Repository\UserRepository;
+use App\Service\Email\SmartEmailHelper;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 
@@ -13,14 +14,13 @@ use Psr\Log\LoggerInterface;
  * Email Chat Service.
  *
  * Handles email-based chat system:
- * - smart@synaplan.com (general chat)
- * - smart+keyword@synaplan.com (specific chat context)
+ * - smart@synaplan.net (general chat)
+ * - smart+keyword@synaplan.net (specific chat context)
  *
  * This is a TOOL that allows users to chat via email.
  */
 class EmailChatService
 {
-    private const BASE_EMAIL = 'smart@synaplan.com';
     private const MAX_ANONYMOUS_EMAILS_PER_HOUR = 10;
 
     public function __construct(
@@ -33,19 +33,12 @@ class EmailChatService
 
     /**
      * Parse email address to extract keyword
-     * smart@synaplan.com -> null
-     * smart+keyword@synaplan.com -> 'keyword'.
+     * smart@synaplan.net -> null
+     * smart+keyword@synaplan.net -> 'keyword'.
      */
     public function parseEmailKeyword(string $toEmail): ?string
     {
-        $toEmail = strtolower(trim($toEmail));
-
-        // Check if email matches pattern: smart+keyword@synaplan.com
-        if (preg_match('/^smart\+([a-z0-9\-_]+)@synaplan\.com$/i', $toEmail, $matches)) {
-            return $matches[1];
-        }
-
-        return null;
+        return SmartEmailHelper::extractKeyword($toEmail);
     }
 
     /**
@@ -125,9 +118,90 @@ class EmailChatService
     }
 
     /**
+     * Find or create user from WhatsApp phone number.
+     * Similar to email, but uses phone number as identifier.
+     */
+    public function findOrCreateUserFromPhone(string $phoneNumber): array
+    {
+        $phoneNumber = preg_replace('/[^0-9+]/', '', $phoneNumber);
+
+        // Check if user with verified phone exists
+        $sql = "SELECT BID FROM BUSER WHERE JSON_EXTRACT(BUSERDETAILS, '$.phone_verification.phone_number') = :phone AND JSON_EXTRACT(BUSERDETAILS, '$.phone_verification.verified') = true LIMIT 1";
+        $stmt = $this->em->getConnection()->prepare($sql);
+        $result = $stmt->executeQuery(['phone' => $phoneNumber]);
+        $userId = $result->fetchOne();
+
+        if ($userId) {
+            $user = $this->userRepository->find($userId);
+            if ($user) {
+                return [
+                    'user' => $user,
+                    'is_anonymous' => false,
+                ];
+            }
+        }
+
+        // Check if anonymous user with this phone exists
+        $sql = "SELECT BID FROM BUSER WHERE JSON_EXTRACT(BUSERDETAILS, '$.anonymous_phone') = :phone LIMIT 1";
+        $stmt = $this->em->getConnection()->prepare($sql);
+        $result = $stmt->executeQuery(['phone' => $phoneNumber]);
+        $userId = $result->fetchOne();
+
+        if ($userId) {
+            $user = $this->userRepository->find($userId);
+            if ($user) {
+                return [
+                    'user' => $user,
+                    'is_anonymous' => true,
+                ];
+            }
+        }
+
+        // Check spam protection via usage tracking
+        if ($this->isSpamming($phoneNumber)) {
+            return [
+                'user' => null,
+                'is_anonymous' => true,
+                'error' => 'Too many requests. Please try again later.',
+            ];
+        }
+
+        // Create new anonymous WhatsApp user
+        $anonymousUser = new User();
+        $anonymousUser->setMail('whatsapp_'.bin2hex(random_bytes(8)).'@synaplan.local');
+        $anonymousUser->setPw(null); // No password for anonymous users
+        $anonymousUser->setType('WHATSAPP'); // WhatsApp-based anonymous user
+        $anonymousUser->setProviderId('whatsapp'); // Identify as WhatsApp-based
+        $anonymousUser->setUserLevel('ANONYMOUS'); // Anonymous users get ANONYMOUS rate limits
+
+        $details = [
+            'anonymous_phone' => $phoneNumber,
+            'firstName' => 'WhatsApp User',
+            'lastName' => '',
+            'created_via' => 'whatsapp',
+            'original_phone' => $phoneNumber,
+        ];
+        $anonymousUser->setUserDetails($details);
+
+        $this->em->persist($anonymousUser);
+        $this->em->flush();
+
+        $this->logger->info('Created anonymous user from WhatsApp', [
+            'phone' => $phoneNumber,
+            'user_id' => $anonymousUser->getId(),
+        ]);
+
+        return [
+            'user' => $anonymousUser,
+            'is_anonymous' => true,
+            'created' => true,
+        ];
+    }
+
+    /**
      * Find or create chat context for email thread.
      *
-     * @param string|null $keyword      From smart+keyword@synaplan.com
+     * @param string|null $keyword      From smart+keyword@synaplan.net
      * @param string|null $emailSubject Email subject (for thread detection)
      * @param string|null $inReplyTo    In-Reply-To header (for threading)
      */
@@ -202,7 +276,7 @@ class EmailChatService
     }
 
     /**
-     * Get user's email keyword (for smart+keyword@synaplan.com).
+     * Get user's email keyword (for smart+keyword@synaplan.net).
      */
     public function getUserEmailKeyword(User $user): ?string
     {
@@ -239,12 +313,6 @@ class EmailChatService
      */
     public function getUserPersonalEmailAddress(User $user): string
     {
-        $keyword = $this->getUserEmailKeyword($user);
-
-        if ($keyword) {
-            return "smart+{$keyword}@synaplan.com";
-        }
-
-        return self::BASE_EMAIL;
+        return SmartEmailHelper::buildAddress($this->getUserEmailKeyword($user));
     }
 }

@@ -1,9 +1,9 @@
 /*M!999999\- enable the sandbox mode */ 
--- MariaDB dump 10.19-11.7.2-MariaDB, for debian-linux-gnu (x86_64)
+-- MariaDB dump 10.19-11.8.2-MariaDB, for debian-linux-gnu (x86_64)
 --
--- Host: localhost    Database: synadb
+-- Host: localhost    Database: synaplan
 -- ------------------------------------------------------
--- Server version	11.7.2-MariaDB-ubu2404
+-- Server version	11.8.2-MariaDB-ubu2404
 
 /*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;
 /*!40101 SET @OLD_CHARACTER_SET_RESULTS=@@CHARACTER_SET_RESULTS */;
@@ -25,19 +25,24 @@ DROP TABLE IF EXISTS `BUSELOG`;
 /*!40101 SET character_set_client = utf8mb4 */;
 CREATE TABLE `BUSELOG` (
   `BID` bigint(20) NOT NULL AUTO_INCREMENT,
-  `BTIMESTAMP` bigint(20) NOT NULL,
   `BUSERID` bigint(20) NOT NULL,
-  `BMSGID` bigint(20) NOT NULL,
-  `BOPERATIONTYPE` varchar(32) NOT NULL DEFAULT 'general' COMMENT 'Operation type: general, text2pic, text2vid, text2sound, analyzefile',
-  `BSUBSCRIPTION_ID` varchar(64) DEFAULT NULL COMMENT 'Stripe subscription ID when operation was performed',
+  `BUNIXTIMES` bigint(20) NOT NULL,
+  `BACTION` varchar(64) NOT NULL,
+  `BPROVIDER` varchar(32) NOT NULL DEFAULT '',
+  `BMODEL` varchar(128) NOT NULL DEFAULT '',
+  `BTOKENS` int(11) NOT NULL DEFAULT 0,
+  `BCOST` decimal(10,6) NOT NULL DEFAULT 0.000000,
+  `BLATENCY` int(11) NOT NULL DEFAULT 0,
+  `BSTATUS` varchar(16) NOT NULL DEFAULT 'success',
+  `BERROR` longtext NOT NULL,
+  `BMETADATA` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL CHECK (json_valid(`BMETADATA`)),
   PRIMARY KEY (`BID`),
-  KEY `BTIMESTAMP` (`BTIMESTAMP`),
-  KEY `BUSERID` (`BUSERID`),
-  KEY `BMSGID` (`BMSGID`),
-  KEY `BOPERATIONTYPE` (`BOPERATIONTYPE`),
-  KEY `BUSERID_BOPERATIONTYPE` (`BUSERID`, `BOPERATIONTYPE`),
-  KEY `BSUBSCRIPTION_ID` (`BSUBSCRIPTION_ID`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3 COLLATE=utf8mb3_general_ci;
+  KEY `idx_uselog_user` (`BUSERID`),
+  KEY `idx_uselog_time` (`BUNIXTIMES`),
+  KEY `idx_uselog_action` (`BACTION`),
+  KEY `idx_uselog_provider` (`BPROVIDER`),
+  CONSTRAINT `FK_271BCC23FEF0B465` FOREIGN KEY (`BUSERID`) REFERENCES `BUSER` (`BID`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -46,8 +51,10 @@ CREATE TABLE `BUSELOG` (
 
 LOCK TABLES `BUSELOG` WRITE;
 /*!40000 ALTER TABLE `BUSELOG` DISABLE KEYS */;
+set autocommit=0;
 /*!40000 ALTER TABLE `BUSELOG` ENABLE KEYS */;
 UNLOCK TABLES;
+commit;
 /*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
 
 /*!40101 SET SQL_MODE=@OLD_SQL_MODE */;
@@ -58,4 +65,4 @@ UNLOCK TABLES;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*M!100616 SET NOTE_VERBOSITY=@OLD_NOTE_VERBOSITY */;
 
--- Dump completed on 2025-08-05 15:19:31
+-- Dump completed on 2025-12-17  9:37:29

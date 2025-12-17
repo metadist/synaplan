@@ -1,20 +1,26 @@
 <template>
-  <div class="min-h-screen bg-light-bg dark:bg-dark-bg flex items-center justify-center px-4 py-12 relative overflow-hidden" data-testid="page-email-verified">
+  <div
+    class="min-h-screen bg-light-bg dark:bg-dark-bg flex items-center justify-center px-4 py-12 relative overflow-hidden"
+    data-testid="page-email-verified"
+  >
     <div class="absolute inset-0 overflow-hidden pointer-events-none">
-      <div class="absolute top-0 left-1/4 w-96 h-96 bg-primary/5 dark:bg-primary/10 rounded-full blur-3xl animate-float"></div>
-      <div class="absolute bottom-0 right-1/4 w-96 h-96 bg-primary/5 dark:bg-primary/10 rounded-full blur-3xl animate-float-delayed"></div>
+      <div
+        class="absolute top-0 left-1/4 w-96 h-96 bg-primary/5 dark:bg-primary/10 rounded-full blur-3xl animate-float"
+      ></div>
+      <div
+        class="absolute bottom-0 right-1/4 w-96 h-96 bg-primary/5 dark:bg-primary/10 rounded-full blur-3xl animate-float-delayed"
+      ></div>
     </div>
     <div class="absolute top-6 right-6 flex items-center gap-4" data-testid="section-controls">
-      <button
-        @click="cycleLanguage"
-        class="h-10 px-4 rounded-lg icon-ghost text-sm font-medium"
-      >
+      <button class="h-10 px-4 rounded-lg icon-ghost text-sm font-medium" @click="cycleLanguage">
         {{ currentLanguage.toUpperCase() }}
       </button>
       <button
-        @click="toggleTheme"
         class="h-10 w-10 rounded-lg icon-ghost flex items-center justify-center"
-        :aria-label="themeStore.theme.value === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'"
+        :aria-label="
+          themeStore.theme.value === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'
+        "
+        @click="toggleTheme"
       >
         <SunIcon v-if="themeStore.theme.value === 'dark'" class="w-5 h-5" />
         <MoonIcon v-else class="w-5 h-5" />
@@ -24,16 +30,14 @@
     <div class="w-full max-w-md" data-testid="section-card">
       <div class="text-center mb-8" data-testid="section-header">
         <router-link to="/login" class="inline-block">
-          <img
-            :src="logoSrc"
-            alt="synaplan"
-            class="h-12 mx-auto mb-6"
-          />
+          <img :src="logoSrc" alt="synaplan" class="h-12 mx-auto mb-6" />
         </router-link>
       </div>
 
       <div class="surface-card p-8 text-center" data-testid="section-content">
-        <div class="w-20 h-20 mx-auto mb-6 rounded-full bg-green-500/10 flex items-center justify-center animate-scale-in">
+        <div
+          class="w-20 h-20 mx-auto mb-6 rounded-full bg-green-500/10 flex items-center justify-center animate-scale-in"
+        >
           <CheckCircleIcon class="w-12 h-12 text-green-500" />
         </div>
 
@@ -44,9 +48,9 @@
 
         <div class="space-y-3">
           <Button
-            @click="handleContinue"
             class="w-full btn-primary py-3 rounded-lg font-medium"
             data-testid="btn-continue"
+            @click="handleContinue"
           >
             {{ $t('auth.continueToApp') }}
           </Button>
@@ -85,7 +89,9 @@ const isDark = computed(() => {
   return matchMedia('(prefers-color-scheme: dark)').matches
 })
 
-const logoSrc = computed(() => `${import.meta.env.BASE_URL}${isDark.value ? 'synaplan-light.svg' : 'synaplan-dark.svg'}`)
+const logoSrc = computed(
+  () => `${import.meta.env.BASE_URL}${isDark.value ? 'synaplan-light.svg' : 'synaplan-dark.svg'}`
+)
 
 const countdown = ref(5)
 let countdownInterval: number | null = null
@@ -149,4 +155,3 @@ onUnmounted(() => {
   animation: scale-in 0.5s ease-out;
 }
 </style>
-

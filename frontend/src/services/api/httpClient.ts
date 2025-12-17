@@ -4,13 +4,14 @@
  */
 
 import { useConfigStore } from '@/stores/config'
+import { z } from 'zod'
 
 const config = useConfigStore()
 const API_BASE_URL = config.apiBaseUrl
 
 type ResponseType = 'json' | 'blob' | 'text' | 'arrayBuffer'
 
-interface HttpClientOptions extends RequestInit {
+interface HttpClientOptions<S extends z.Schema | undefined = undefined> extends RequestInit {
   params?: Record<string, string>
   /** Skip auto-refresh on 401 (for auth endpoints) */
   skipAuth?: boolean
@@ -18,11 +19,19 @@ interface HttpClientOptions extends RequestInit {
   responseType?: ResponseType
   /** Skip retry on 401 (internal use) */
   _isRetry?: boolean
+  /** Zod schema for response validation */
+  schema?: S
 }
 
 // Track if we're currently refreshing
 let isRefreshing = false
 let refreshPromise: Promise<RefreshResult> | null = null
+
+// Track auth failures to prevent redirect loops
+let authFailureCount = 0
+let lastAuthFailureTime = 0
+const AUTH_FAILURE_WINDOW_MS = 5000 // 5 second window
+const MAX_AUTH_FAILURES_IN_WINDOW = 2
 
 /**
  * Refresh result - indicates if refresh was successful and if OIDC session expired
@@ -30,6 +39,35 @@ let refreshPromise: Promise<RefreshResult> | null = null
 interface RefreshResult {
   success: boolean
   oidcSessionExpired?: boolean
+}
+
+/**
+ * Check if we're in a potential auth failure loop
+ */
+function isInAuthFailureLoop(): boolean {
+  const now = Date.now()
+
+  // Reset counter if outside window
+  if (now - lastAuthFailureTime > AUTH_FAILURE_WINDOW_MS) {
+    authFailureCount = 0
+  }
+
+  return authFailureCount >= MAX_AUTH_FAILURES_IN_WINDOW
+}
+
+/**
+ * Record an auth failure for loop detection
+ */
+function recordAuthFailure(): void {
+  const now = Date.now()
+
+  // Reset counter if outside window
+  if (now - lastAuthFailureTime > AUTH_FAILURE_WINDOW_MS) {
+    authFailureCount = 0
+  }
+
+  authFailureCount++
+  lastAuthFailureTime = now
 }
 
 /**
@@ -52,6 +90,8 @@ async function refreshAccessToken(): Promise<RefreshResult> {
 
       if (response.ok) {
         console.log('🔄 Token refreshed successfully')
+        // Reset failure counter on success
+        authFailureCount = 0
         return { success: true }
       }
 
@@ -81,11 +121,19 @@ async function refreshAccessToken(): Promise<RefreshResult> {
 }
 
 /**
- * Handle authentication failure - logout and redirect
+ * Handle authentication failure - clear state and redirect using router (not full page reload)
  */
 async function handleAuthFailure(): Promise<never> {
   console.warn('🔒 Authentication failed - logging out user')
 
+  // Record this failure for loop detection
+  recordAuthFailure()
+
+  // Check for loop before redirecting
+  if (isInAuthFailureLoop()) {
+    console.error('🛑 Auth failure loop detected - not redirecting')
+    throw new Error('Authentication failed (loop detected)')
+  }
 
   const { useAuthStore } = await import('@/stores/auth')
   const { useHistoryStore } = await import('@/stores/history')
@@ -99,15 +147,55 @@ async function handleAuthFailure(): Promise<never> {
   historyStore.clear()
   chatsStore.$reset()
 
-  // Redirect to login
-  window.location.href = '/login?reason=session_expired'
+  // Use Vue Router instead of window.location.href to avoid full page reload loops
+  // Support subfolder deployments via BASE_URL (from vite.config base option)
+  const loginPath = `${import.meta.env.BASE_URL}login`.replace('//', '/')
 
-  // Return never-resolving promise
-  return new Promise(() => {})
+  try {
+    const { default: router } = await import('@/router')
+    if (!window.location.pathname.startsWith(loginPath)) {
+      router.push({ name: 'login', query: { reason: 'session_expired' } })
+    }
+  } catch {
+    if (!window.location.pathname.startsWith(loginPath)) {
+      window.location.href = `${loginPath}?reason=session_expired`
+    }
+  }
+
+  // Throw error to stop the request chain
+  throw new Error('Authentication required')
 }
 
-async function httpClient<T>(endpoint: string, options: HttpClientOptions = {}): Promise<T> {
-  const { params, skipAuth = false, responseType = 'json', _isRetry = false, ...fetchOptions } = options
+// Overload: with schema
+async function httpClient<S extends z.Schema>(
+  endpoint: string,
+  options: HttpClientOptions<S> & { schema: S }
+): Promise<z.infer<S>>
+
+// Overload: without schema (legacy)
+async function httpClient<T = unknown>(
+  endpoint: string,
+  options?: HttpClientOptions<undefined>
+): Promise<T>
+
+// Implementation
+async function httpClient<T = unknown, S extends z.Schema | undefined = undefined>(
+  endpoint: string,
+  options: HttpClientOptions<S> = {}
+): Promise<T | z.infer<NonNullable<S>>> {
+  const {
+    params,
+    skipAuth = false,
+    responseType = 'json',
+    _isRetry = false,
+    schema,
+    ...fetchOptions
+  } = options
+
+  // Validate schema usage
+  if (schema && responseType !== 'json') {
+    throw new Error('Schema validation can only be used with responseType: "json"')
+  }
 
   let url = `${API_BASE_URL}${endpoint}`
 
@@ -126,13 +214,14 @@ async function httpClient<T>(endpoint: string, options: HttpClientOptions = {}):
   }
 
   // No Authorization header needed - using HttpOnly cookies
-  
+
   console.log('🌐 httpClient request:', {
     url,
     method: fetchOptions.method || 'GET',
-    bodyPreview: fetchOptions.body && !(fetchOptions.body instanceof FormData) 
-      ? JSON.parse(fetchOptions.body as string) 
-      : null
+    bodyPreview:
+      fetchOptions.body && !(fetchOptions.body instanceof FormData)
+        ? JSON.parse(fetchOptions.body as string)
+        : null,
   })
 
   const response = await fetch(url, {
@@ -145,28 +234,29 @@ async function httpClient<T>(endpoint: string, options: HttpClientOptions = {}):
     url,
     status: response.status,
     statusText: response.statusText,
-    ok: response.ok
+    ok: response.ok,
   })
 
   if (!response.ok) {
     // Handle 401 - try to refresh token
     if (response.status === 401 && !skipAuth && !_isRetry) {
       console.log('🔄 Got 401, attempting token refresh...')
-      
+
       const refreshResult = await refreshAccessToken()
-      
+
       // If OIDC session expired (user logged out from Keycloak), immediately logout
       if (refreshResult.oidcSessionExpired) {
         console.log('🔒 OIDC provider invalidated session')
         return handleAuthFailure()
       }
-      
+
       if (refreshResult.success) {
         // Retry the original request
         console.log('🔄 Retrying request after token refresh')
-        return httpClient<T>(endpoint, { ...options, _isRetry: true })
+        // @ts-expect-error - Recursive call with same types
+        return httpClient(endpoint, { ...options, _isRetry: true })
       }
-      
+
       // Refresh failed - logout
       return handleAuthFailure()
     }
@@ -187,17 +277,44 @@ async function httpClient<T>(endpoint: string, options: HttpClientOptions = {}):
   }
 
   // Parse response based on requested type
+  let data: any
   switch (responseType) {
     case 'blob':
-      return response.blob() as Promise<T>
+      data = await response.blob()
+      break
     case 'text':
-      return response.text() as Promise<T>
+      data = await response.text()
+      break
     case 'arrayBuffer':
-      return response.arrayBuffer() as Promise<T>
+      data = await response.arrayBuffer()
+      break
     case 'json':
     default:
-      return response.json()
+      data = await response.json()
+      break
   }
+
+  // Validate with schema if provided
+  if (schema && responseType === 'json') {
+    try {
+      return schema.parse(data) as z.output<NonNullable<S>>
+    } catch (error) {
+      console.error('Schema validation failed for endpoint:', endpoint)
+      console.error('Response data:', data)
+      console.error('Validation error:', error)
+      if (error instanceof z.ZodError) {
+        const zodError = error
+        const errors = zodError.issues || []
+        console.error('Zod errors:', errors)
+        throw new Error(
+          `Invalid API response format: ${errors.map((e) => `${e.path.join('.')}: ${e.message}`).join(', ')}`
+        )
+      }
+      throw new Error('Invalid API response format')
+    }
+  }
+
+  return data as T
 }
 
 export { httpClient, API_BASE_URL }

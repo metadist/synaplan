@@ -79,4 +79,3 @@ export const timezones: Timezone[] = [
   { value: 'Asia/Tokyo', label: 'Asia/Tokyo (GMT+9)' },
   { value: 'Australia/Sydney', label: 'Australia/Sydney (GMT+11)' },
 ]
-

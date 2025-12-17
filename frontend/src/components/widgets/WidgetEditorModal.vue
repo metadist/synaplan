@@ -1,21 +1,32 @@
 <template>
   <!-- Fullscreen Modal Overlay -->
-  <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm" data-testid="modal-widget-editor">
-    <div class="surface-card rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto shadow-2xl" data-testid="section-editor-shell">
+  <div
+    class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+    data-testid="modal-widget-editor"
+  >
+    <div
+      class="surface-card rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto shadow-2xl"
+      data-testid="section-editor-shell"
+    >
       <!-- Header -->
-      <div class="sticky top-0 surface-card border-b border-light-border/30 dark:border-dark-border/20 px-6 py-4 flex items-center justify-between" data-testid="section-header">
+      <div
+        class="sticky top-0 z-10 surface-card border-b border-light-border/30 dark:border-dark-border/20 px-6 py-4 flex items-center justify-between"
+        data-testid="section-header"
+      >
         <div>
           <h2 class="text-xl font-semibold txt-primary flex items-center gap-2">
             <Icon icon="heroicons:cog-6-tooth" class="w-6 h-6 text-[var(--brand)]" />
             {{ isEdit ? $t('widgets.editWidget') : $t('widgets.createWidget') }}
           </h2>
-          <p class="text-sm txt-secondary mt-1">{{ isEdit ? widget?.name : $t('widgets.createDescription') }}</p>
+          <p class="text-sm txt-secondary mt-1">
+            {{ isEdit ? widget?.name : $t('widgets.createDescription') }}
+          </p>
         </div>
         <button
-          @click="$emit('close')"
           class="w-10 h-10 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 transition-colors flex items-center justify-center"
           :aria-label="$t('common.close')"
           data-testid="btn-close"
+          @click="$emit('close')"
         >
           <Icon icon="heroicons:x-mark" class="w-6 h-6 txt-secondary" />
         </button>
@@ -55,11 +66,7 @@
               data-testid="input-task-prompt"
             >
               <option value="">{{ $t('widgets.selectTaskPrompt') }}</option>
-              <option
-                v-for="prompt in taskPrompts"
-                :key="prompt.topic"
-                :value="prompt.topic"
-              >
+              <option v-for="prompt in taskPrompts" :key="prompt.topic" :value="prompt.topic">
                 {{ prompt.name }}
               </option>
             </select>
@@ -141,12 +148,12 @@
               <label class="block text-sm font-medium txt-primary mb-2">
                 {{ $t('widgets.primaryColor') }}
               </label>
-             <input
-               v-model="formData.config.primaryColor"
-               type="color"
-               class="w-full h-12 rounded-lg border border-light-border/30 dark:border-dark-border/20 cursor-pointer"
-               data-testid="input-primary-color"
-             />
+              <input
+                v-model="formData.config.primaryColor"
+                type="color"
+                class="w-full h-12 rounded-lg border border-light-border/30 dark:border-dark-border/20 cursor-pointer"
+                data-testid="input-primary-color"
+              />
             </div>
 
             <!-- Icon Color -->
@@ -154,12 +161,12 @@
               <label class="block text-sm font-medium txt-primary mb-2">
                 {{ $t('widgets.iconColor') }}
               </label>
-             <input
-               v-model="formData.config.iconColor"
-               type="color"
-               class="w-full h-12 rounded-lg border border-light-border/30 dark:border-dark-border/20 cursor-pointer"
-               data-testid="input-icon-color"
-             />
+              <input
+                v-model="formData.config.iconColor"
+                type="color"
+                class="w-full h-12 rounded-lg border border-light-border/30 dark:border-dark-border/20 cursor-pointer"
+                data-testid="input-icon-color"
+              />
             </div>
           </div>
 
@@ -168,22 +175,22 @@
             <label class="block text-sm font-medium txt-primary mb-3">
               {{ $t('widgets.buttonIcon') }}
             </label>
-            
+
             <!-- Predefined Icons -->
             <div class="grid grid-cols-3 md:grid-cols-6 gap-3 mb-4">
               <button
                 v-for="icon in predefinedIcons"
                 :key="icon.value"
                 type="button"
-                @click="selectIcon(icon.value)"
                 :class="[
                   'p-4 rounded-lg border-2 transition-all flex flex-col items-center gap-2',
                   formData.config.buttonIcon === icon.value && !formData.config.buttonIconUrl
                     ? 'border-[var(--brand)] bg-[var(--brand)]/10'
-                    : 'border-light-border/30 dark:border-dark-border/20 hover:border-[var(--brand)]/50'
+                    : 'border-light-border/30 dark:border-dark-border/20 hover:border-[var(--brand)]/50',
                 ]"
                 :title="icon.label"
                 data-testid="btn-icon"
+                @click="selectIcon(icon.value)"
               >
                 <div v-html="getIconPreview(icon.value)"></div>
                 <span class="text-xs txt-secondary">{{ icon.label }}</span>
@@ -200,32 +207,45 @@
                   ref="iconUploadInput"
                   type="file"
                   accept="image/svg+xml,image/png,image/jpeg,image/gif,image/webp"
-                  @change="handleIconUpload"
                   class="hidden"
                   data-testid="input-icon-upload"
+                  @change="handleIconUpload"
                 />
                 <button
                   type="button"
-                  @click="triggerIconUpload"
                   class="flex-1 px-4 py-2 border-2 border-dashed border-light-border/30 dark:border-dark-border/20 rounded-lg hover:border-[var(--brand)]/50 transition-colors txt-secondary hover:txt-primary flex items-center justify-center gap-2"
                   data-testid="btn-upload-icon"
+                  @click="triggerIconUpload"
                 >
                   <Icon icon="heroicons:arrow-up-tray" class="w-5 h-5" />
-                  {{ formData.config.buttonIconUrl ? $t('widgets.changeIcon') : $t('widgets.uploadIcon') }}
+                  {{
+                    formData.config.buttonIconUrl
+                      ? $t('widgets.changeIcon')
+                      : $t('widgets.uploadIcon')
+                  }}
                 </button>
                 <button
                   v-if="formData.config.buttonIconUrl"
                   type="button"
-                  @click="removeCustomIcon"
                   class="px-4 py-2 bg-red-500/10 text-red-600 dark:text-red-400 rounded-lg hover:bg-red-500/20 transition-colors"
                   data-testid="btn-remove-icon"
+                  @click="removeCustomIcon"
                 >
                   <Icon icon="heroicons:trash" class="w-5 h-5" />
                 </button>
               </div>
-              <div v-if="formData.config.buttonIconUrl" class="mt-3 p-3 bg-green-500/10 rounded-lg flex items-center gap-3">
-                <img :src="formData.config.buttonIconUrl" alt="Custom Icon" class="w-10 h-10 object-contain" />
-                <span class="text-sm text-green-700 dark:text-green-400">{{ $t('widgets.customIconActive') }}</span>
+              <div
+                v-if="formData.config.buttonIconUrl"
+                class="mt-3 p-3 bg-green-500/10 rounded-lg flex items-center gap-3"
+              >
+                <img
+                  :src="formData.config.buttonIconUrl"
+                  alt="Custom Icon"
+                  class="w-10 h-10 object-contain"
+                />
+                <span class="text-sm text-green-700 dark:text-green-400">{{
+                  $t('widgets.customIconActive')
+                }}</span>
               </div>
               <p class="text-xs txt-secondary mt-2">{{ $t('widgets.customIconHint') }}</p>
             </div>
@@ -245,14 +265,16 @@
               <p class="font-medium txt-primary">{{ $t('widgets.autoOpen') }}</p>
               <p class="text-xs txt-secondary mt-1">{{ $t('widgets.autoOpenHelp') }}</p>
             </div>
-           <label class="relative inline-flex items-center cursor-pointer">
-             <input
-               v-model="formData.config.autoOpen"
-               type="checkbox"
-               class="sr-only peer"
-               data-testid="input-auto-open"
-             />
-              <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-[var(--brand)]/20 dark:peer-focus:ring-[var(--brand)]/30 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-[var(--brand)]"></div>
+            <label class="relative inline-flex items-center cursor-pointer">
+              <input
+                v-model="formData.config.autoOpen"
+                type="checkbox"
+                class="sr-only peer"
+                data-testid="input-auto-open"
+              />
+              <div
+                class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-[var(--brand)]/20 dark:peer-focus:ring-[var(--brand)]/30 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-[var(--brand)]"
+              ></div>
             </label>
           </div>
 
@@ -261,13 +283,13 @@
             <label class="block text-sm font-medium txt-primary mb-2">
               {{ $t('widgets.autoMessage') }}
             </label>
-             <textarea
-               v-model="formData.config.autoMessage"
-               rows="2"
-               :placeholder="$t('widgets.autoMessagePlaceholder')"
-               class="w-full px-4 py-3 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)] resize-none"
-               data-testid="input-auto-message"
-             />
+            <textarea
+              v-model="formData.config.autoMessage"
+              rows="2"
+              :placeholder="$t('widgets.autoMessagePlaceholder')"
+              class="w-full px-4 py-3 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)] resize-none"
+              data-testid="input-auto-message"
+            />
           </div>
 
           <div class="surface-chip rounded-lg p-4 space-y-3">
@@ -277,13 +299,15 @@
                 <p class="text-xs txt-secondary mt-1">{{ $t('widgets.allowFileUploadHelp') }}</p>
               </div>
               <label class="relative inline-flex items-center cursor-pointer">
-               <input
-                 v-model="formData.config.allowFileUpload"
-                 type="checkbox"
-                 class="sr-only peer"
-                 data-testid="input-allow-upload"
-               />
-                <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-[var(--brand)]/20 dark:peer-focus:ring-[var(--brand)]/30 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-[var(--brand)]"></div>
+                <input
+                  v-model="formData.config.allowFileUpload"
+                  type="checkbox"
+                  class="sr-only peer"
+                  data-testid="input-allow-upload"
+                />
+                <div
+                  class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-[var(--brand)]/20 dark:peer-focus:ring-[var(--brand)]/30 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-[var(--brand)]"
+                ></div>
               </label>
             </div>
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -291,15 +315,15 @@
                 <label class="block text-sm font-medium txt-primary mb-1">
                   {{ $t('widgets.fileUploadLimit') }}
                 </label>
-               <input
-                 v-model.number="formData.config.fileUploadLimit"
-                 type="number"
-                 min="0"
-                 max="20"
-                 :disabled="!formData.config.allowFileUpload"
-                 class="w-full px-4 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)] disabled:opacity-50 disabled:cursor-not-allowed"
-                 data-testid="input-file-limit"
-               />
+                <input
+                  v-model.number="formData.config.fileUploadLimit"
+                  type="number"
+                  min="0"
+                  max="20"
+                  :disabled="!formData.config.allowFileUpload"
+                  class="w-full px-4 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)] disabled:opacity-50 disabled:cursor-not-allowed"
+                  data-testid="input-file-limit"
+                />
                 <p class="text-xs txt-secondary mt-1.5">{{ $t('widgets.fileUploadLimitHelp') }}</p>
               </div>
             </div>
@@ -311,14 +335,14 @@
               <label class="block text-sm font-medium txt-primary mb-2">
                 {{ $t('widgets.messageLimit') }}
               </label>
-             <input
-               v-model.number="formData.config.messageLimit"
-               type="number"
-               min="1"
-               max="100"
-               class="w-full px-4 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
-               data-testid="input-message-limit"
-             />
+              <input
+                v-model.number="formData.config.messageLimit"
+                type="number"
+                min="1"
+                max="100"
+                class="w-full px-4 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+                data-testid="input-message-limit"
+              />
               <p class="text-xs txt-secondary mt-1.5">{{ $t('widgets.messageLimitHelp') }}</p>
             </div>
 
@@ -327,14 +351,14 @@
               <label class="block text-sm font-medium txt-primary mb-2">
                 {{ $t('widgets.maxFileSize') }} (MB)
               </label>
-             <input
-               v-model.number="formData.config.maxFileSize"
-               type="number"
-               min="1"
-               max="50"
-               class="w-full px-4 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
-               data-testid="input-max-file-size"
-             />
+              <input
+                v-model.number="formData.config.maxFileSize"
+                type="number"
+                min="1"
+                max="50"
+                class="w-full px-4 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+                data-testid="input-max-file-size"
+              />
             </div>
           </div>
         </div>
@@ -355,12 +379,12 @@
               type="text"
               :placeholder="$t('widgets.allowedDomainsPlaceholder')"
               class="flex-1 px-4 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
-              @keydown.enter.prevent="addAllowedDomain"
               autocomplete="off"
+              @keydown.enter.prevent="addAllowedDomain"
             />
             <button
-              @click="addAllowedDomain"
               class="btn-primary px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2"
+              @click="addAllowedDomain"
             >
               <Icon icon="heroicons:plus" class="w-4 h-4" />
               {{ $t('widgets.allowedDomainsAdd') }}
@@ -379,7 +403,7 @@
                 'inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium border transition-colors',
                 isLocalTestingDomain(domain)
                   ? 'bg-red-500/10 text-red-600 dark:text-red-300 border-red-500/40'
-                  : 'bg-[var(--brand-alpha-light)] txt-primary border-[var(--brand)]/20'
+                  : 'bg-[var(--brand-alpha-light)] txt-primary border-[var(--brand)]/20',
               ]"
               :title="isLocalTestingDomain(domain) ? $t('widgets.localhostTooltip') : undefined"
             >
@@ -390,9 +414,9 @@
               />
               {{ domain }}
               <button
-                @click="removeAllowedDomain(domain)"
                 class="w-4 h-4 flex items-center justify-center rounded-full hover:bg-black/10 dark:hover:bg-white/10 transition-colors"
                 :aria-label="$t('widgets.removeDomain', { domain })"
+                @click="removeAllowedDomain(domain)"
               >
                 <Icon icon="heroicons:x-mark" class="w-3 h-3" />
               </button>
@@ -420,17 +444,19 @@
       </div>
 
       <!-- Footer -->
-      <div class="sticky bottom-0 surface-card border-t border-light-border/30 dark:border-dark-border/20 px-6 py-4 flex items-center justify-end gap-3">
+      <div
+        class="sticky bottom-0 surface-card border-t border-light-border/30 dark:border-dark-border/20 px-6 py-4 flex items-center justify-end gap-3"
+      >
         <button
-          @click="$emit('close')"
           class="px-6 py-2.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 transition-colors txt-primary font-medium"
+          @click="$emit('close')"
         >
           {{ $t('common.cancel') }}
         </button>
         <button
-          @click="handleSave"
           :disabled="!canSave"
           class="px-6 py-2.5 rounded-lg bg-[var(--brand)] text-white hover:bg-[var(--brand)]/90 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+          @click="handleSave"
         >
           {{ isEdit ? $t('common.save') : $t('common.create') }}
         </button>
@@ -537,7 +563,7 @@ const addAllowedDomain = () => {
 
 const removeAllowedDomain = (domain: string) => {
   const current = formData.value.config.allowedDomains ?? []
-  formData.value.config.allowedDomains = current.filter(item => item !== domain)
+  formData.value.config.allowedDomains = current.filter((item) => item !== domain)
 }
 
 watch(newAllowedDomain, () => {
@@ -555,7 +581,7 @@ const predefinedIcons = [
   { value: 'help', label: t('widgets.icons.help') },
   { value: 'robot', label: t('widgets.icons.robot') },
   { value: 'message', label: t('widgets.icons.message') },
-  { value: 'support', label: t('widgets.icons.support') }
+  { value: 'support', label: t('widgets.icons.support') },
 ]
 
 const getIconPreview = (iconType: string): string => {
@@ -587,7 +613,7 @@ const getIconPreview = (iconType: string): string => {
       <circle cx="12" cy="12" r="10"></circle>
       <path d="M12 16v-4"></path>
       <path d="M12 8h.01"></path>
-    </svg>`
+    </svg>`,
   }
   return icons[iconType] || icons.chat
 }
@@ -603,8 +629,8 @@ const selectIcon = async (iconValue: string) => {
         config: {
           ...formData.value.config,
           buttonIcon: iconValue,
-          buttonIconUrl: undefined
-        }
+          buttonIconUrl: undefined,
+        },
       })
     } catch (err: any) {
       console.error('Failed to update icon:', err)
@@ -620,7 +646,7 @@ const triggerIconUpload = () => {
 const handleIconUpload = async (event: Event) => {
   const target = event.target as HTMLInputElement
   const file = target.files?.[0]
-  
+
   if (!file) return
 
   // Validate file size (max 500KB)
@@ -648,20 +674,20 @@ const handleIconUpload = async (event: Event) => {
   try {
     // Upload icon using widget icon upload API
     const uploadResult = await widgetsApi.uploadWidgetIcon(props.widget.widgetId, file)
-    
+
     if (uploadResult.success) {
       formData.value.config.buttonIconUrl = uploadResult.iconUrl
       formData.value.config.buttonIcon = 'custom'
-      
+
       // Update widget config in backend without closing modal
       await widgetsApi.updateWidget(props.widget.widgetId, {
         config: {
           ...formData.value.config,
           buttonIconUrl: uploadResult.iconUrl,
-          buttonIcon: 'custom'
-        }
+          buttonIcon: 'custom',
+        },
       })
-      
+
       success(t('widgets.iconUploadSuccess') || 'Icon uploaded successfully')
     } else {
       error(t('widgets.iconUploadFailed') || 'Icon upload failed')
@@ -692,8 +718,8 @@ const removeCustomIcon = async () => {
       config: {
         ...formData.value.config,
         buttonIconUrl: undefined,
-        buttonIcon: 'chat'
-      }
+        buttonIcon: 'chat',
+      },
     })
 
     // Update local state
@@ -731,8 +757,8 @@ const formData = ref<{
     maxFileSize: 10,
     allowFileUpload: false,
     fileUploadLimit: 3,
-    allowedDomains: []
-  }
+    allowedDomains: [],
+  },
 })
 
 const applyWidgetToForm = (widget?: Widget | null) => {
@@ -752,8 +778,8 @@ const applyWidgetToForm = (widget?: Widget | null) => {
         maxFileSize: 10,
         allowFileUpload: false,
         fileUploadLimit: 3,
-        allowedDomains: []
-      }
+        allowedDomains: [],
+      },
     }
     return
   }
@@ -762,8 +788,8 @@ const applyWidgetToForm = (widget?: Widget | null) => {
   const combinedAllowed = Array.isArray(config.allowedDomains)
     ? config.allowedDomains
     : Array.isArray((widget as widgetsApi.Widget).allowedDomains)
-    ? (widget as widgetsApi.Widget).allowedDomains
-    : []
+      ? (widget as widgetsApi.Widget).allowedDomains
+      : []
 
   formData.value = {
     name: widget.name ?? '',
@@ -782,8 +808,8 @@ const applyWidgetToForm = (widget?: Widget | null) => {
       maxFileSize: config.maxFileSize || 10,
       allowFileUpload: typeof config.allowFileUpload === 'boolean' ? config.allowFileUpload : false,
       fileUploadLimit: typeof config.fileUploadLimit === 'number' ? config.fileUploadLimit : 3,
-      allowedDomains: sanitizeDomainList(combinedAllowed)
-    }
+      allowedDomains: sanitizeDomainList(combinedAllowed),
+    },
   }
 }
 
@@ -843,26 +869,26 @@ const handleSave = () => {
 
   const payloadConfig: WidgetConfig = {
     ...formData.value.config,
-    allowedDomains: [...sanitizedDomains]
+    allowedDomains: [...sanitizedDomains],
   }
 
   const data = isEdit.value
     ? {
         name: formData.value.name,
         config: payloadConfig,
-        status: formData.value.status
+        status: formData.value.status,
       }
     : {
         name: formData.value.name,
         taskPromptTopic: formData.value.taskPromptTopic,
-        config: payloadConfig
+        config: payloadConfig,
       }
 
   console.log('🔧 WidgetEditorModal handleSave:', {
     isEdit: isEdit.value,
     sanitizedDomains,
     payloadConfig,
-    data
+    data,
   })
 
   emit('save', data)

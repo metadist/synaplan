@@ -9,6 +9,7 @@ lerna-debug.log*
 
 node_modules
 dist
+dist-widget
 dist-ssr
 *.local
 
@@ -26,3 +27,6 @@ dist-ssr
 # Environment files
 .env
 !.env.example
+
+# Generated files
+src/generated/

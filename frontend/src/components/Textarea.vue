@@ -2,13 +2,13 @@
   <textarea
     ref="textareaRef"
     :value="modelValue"
-    @input="handleInput"
-    @focus="emit('focus')"
-    @blur="emit('blur')"
     :placeholder="placeholder"
     :rows="rows"
     class="chat-textarea block w-full bg-transparent resize-none overflow-hidden min-h-[44px] leading-6 text-[16px] txt-primary border-0 px-0 py-[11px] focus:outline-none focus:ring-0 placeholder:txt-secondary"
     data-testid="input-textarea"
+    @input="handleInput"
+    @focus="emit('focus')"
+    @blur="emit('blur')"
   />
 </template>
 
@@ -28,8 +28,8 @@ const props = withDefaults(defineProps<Props>(), {
 
 const emit = defineEmits<{
   'update:modelValue': [value: string]
-  'focus': []
-  'blur': []
+  focus: []
+  blur: []
 }>()
 
 const textareaRef = ref<HTMLTextAreaElement | null>(null)
@@ -48,10 +48,13 @@ const handleInput = (event: Event) => {
   adjustHeight()
 }
 
-watch(() => props.modelValue, async () => {
-  await nextTick()
-  adjustHeight()
-})
+watch(
+  () => props.modelValue,
+  async () => {
+    await nextTick()
+    adjustHeight()
+  }
+)
 
 onMounted(() => {
   adjustHeight()
@@ -64,6 +67,6 @@ const focus = () => {
 
 defineExpose({
   focus,
-  textareaRef
+  textareaRef,
 })
 </script>

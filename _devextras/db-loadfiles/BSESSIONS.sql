@@ -1,9 +1,9 @@
 /*M!999999\- enable the sandbox mode */ 
--- MariaDB dump 10.19-11.7.2-MariaDB, for debian-linux-gnu (x86_64)
+-- MariaDB dump 10.19-11.8.2-MariaDB, for debian-linux-gnu (x86_64)
 --
--- Host: localhost    Database: synadb
+-- Host: localhost    Database: synaplan
 -- ------------------------------------------------------
--- Server version	11.7.2-MariaDB-ubu2404
+-- Server version	11.8.2-MariaDB-ubu2404
 
 /*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;
 /*!40101 SET @OLD_CHARACTER_SET_RESULTS=@@CHARACTER_SET_RESULTS */;
@@ -24,16 +24,22 @@ DROP TABLE IF EXISTS `BSESSIONS`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8mb4 */;
 CREATE TABLE `BSESSIONS` (
-  `BID` bigint(20) NOT NULL AUTO_INCREMENT,
-  `BUSERID` bigint(20) NOT NULL,
-  `BASSID` bigint(20) NOT NULL,
-  `BLASTMESSAGE` bigint(20) NOT NULL,
-  `BSTATE` varchar(32) NOT NULL DEFAULT '',
+  `BID` varchar(128) NOT NULL,
+  `BUSERID` bigint(20) DEFAULT NULL,
+  `BTOKEN` varchar(128) NOT NULL,
+  `BDATA` longtext NOT NULL,
+  `BCREATED` bigint(20) NOT NULL,
+  `BLASTACTIVITY` bigint(20) NOT NULL,
+  `BEXPIRES` bigint(20) NOT NULL,
+  `BIPADDRESS` varchar(45) NOT NULL DEFAULT '',
+  `BUSERAGENT` varchar(255) NOT NULL DEFAULT '',
   PRIMARY KEY (`BID`),
-  KEY `BUSERID` (`BUSERID`),
-  KEY `BASSID` (`BASSID`),
-  KEY `BLASTMESSAGE` (`BLASTMESSAGE`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+  UNIQUE KEY `UNIQ_2F1CE1199D139E52` (`BTOKEN`),
+  KEY `idx_session_user` (`BUSERID`),
+  KEY `idx_session_token` (`BTOKEN`),
+  KEY `idx_session_expires` (`BEXPIRES`),
+  CONSTRAINT `FK_2F1CE119FEF0B465` FOREIGN KEY (`BUSERID`) REFERENCES `BUSER` (`BID`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -42,8 +48,10 @@ CREATE TABLE `BSESSIONS` (
 
 LOCK TABLES `BSESSIONS` WRITE;
 /*!40000 ALTER TABLE `BSESSIONS` DISABLE KEYS */;
+set autocommit=0;
 /*!40000 ALTER TABLE `BSESSIONS` ENABLE KEYS */;
 UNLOCK TABLES;
+commit;
 /*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
 
 /*!40101 SET SQL_MODE=@OLD_SQL_MODE */;
@@ -54,4 +62,4 @@ UNLOCK TABLES;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*M!100616 SET NOTE_VERBOSITY=@OLD_NOTE_VERBOSITY */;
 
--- Dump completed on 2025-08-05 15:19:30
+-- Dump completed on 2025-12-17  9:37:28

@@ -68,11 +68,30 @@ class AdminController extends AbstractController
         response: 200,
         description: 'List of users',
         content: new OA\JsonContent(
+            required: ['users', 'total', 'page', 'limit'],
             properties: [
-                new OA\Property(property: 'users', type: 'array', items: new OA\Items(type: 'object')),
-                new OA\Property(property: 'total', type: 'integer'),
-                new OA\Property(property: 'page', type: 'integer'),
-                new OA\Property(property: 'limit', type: 'integer'),
+                new OA\Property(
+                    property: 'users',
+                    type: 'array',
+                    items: new OA\Items(
+                        type: 'object',
+                        required: ['id', 'email', 'level', 'type', 'providerId', 'emailVerified', 'created', 'isAdmin', 'locale'],
+                        properties: [
+                            new OA\Property(property: 'id', type: 'integer', example: 1),
+                            new OA\Property(property: 'email', type: 'string', format: 'email', example: 'user@example.com'),
+                            new OA\Property(property: 'level', type: 'string', enum: ['NEW', 'PRO', 'TEAM', 'BUSINESS', 'ADMIN'], example: 'PRO'),
+                            new OA\Property(property: 'type', type: 'string', example: 'email'),
+                            new OA\Property(property: 'providerId', type: 'string', example: 'email'),
+                            new OA\Property(property: 'emailVerified', type: 'boolean', example: true),
+                            new OA\Property(property: 'created', type: 'string', format: 'date-time', example: '2024-01-15 10:30:00'),
+                            new OA\Property(property: 'isAdmin', type: 'boolean', example: false),
+                            new OA\Property(property: 'locale', type: 'string', example: 'en'),
+                        ]
+                    )
+                ),
+                new OA\Property(property: 'total', type: 'integer', example: 150),
+                new OA\Property(property: 'page', type: 'integer', example: 1),
+                new OA\Property(property: 'limit', type: 'integer', example: 50),
             ]
         )
     )]

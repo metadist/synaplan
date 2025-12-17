@@ -93,7 +93,7 @@ const componentProps = computed(() => {
     case 'thinking':
       return {
         content: props.part.content || '',
-        thinkingTime: props.part.thinkingTime
+        thinkingTime: props.part.thinkingTime,
       }
     default:
       return { content: props.part.content || '' }

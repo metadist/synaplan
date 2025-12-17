@@ -23,7 +23,9 @@
               class="absolute inset-0 z-50 flex items-center justify-center bg-primary/10 dark:bg-primary/20 backdrop-blur-sm border-4 border-dashed border-primary rounded-lg pointer-events-none"
             >
               <div class="flex flex-col items-center gap-4 p-8 surface-card rounded-xl shadow-2xl">
-                <div class="w-20 h-20 rounded-full bg-primary/20 flex items-center justify-center animate-bounce">
+                <div
+                  class="w-20 h-20 rounded-full bg-primary/20 flex items-center justify-center animate-bounce"
+                >
                   <Icon icon="mdi:cloud-upload" class="w-10 h-10 text-primary" />
                 </div>
                 <div class="text-center">
@@ -66,11 +68,7 @@
                 data-testid="input-group-select"
               >
                 <option value="">{{ $t('files.orSelectExisting') }}</option>
-                <option
-                  v-for="group in fileGroups"
-                  :key="group.name"
-                  :value="group.name"
-                >
+                <option v-for="group in fileGroups" :key="group.name" :value="group.name">
                   {{ group.name }} ({{ group.count }})
                 </option>
               </select>
@@ -82,14 +80,17 @@
               {{ $t('files.selectFiles') }}
             </label>
             <div class="mb-3">
-              <label class="px-4 py-2 rounded-lg border border-light-border/30 dark:border-dark-border/20 txt-primary hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer inline-flex items-center gap-2" data-testid="btn-select-files">
+              <label
+                class="px-4 py-2 rounded-lg border border-light-border/30 dark:border-dark-border/20 txt-primary hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer inline-flex items-center gap-2"
+                data-testid="btn-select-files"
+              >
                 <input
                   type="file"
                   multiple
                   accept=".pdf,.docx,.txt,.jpg,.jpeg,.png,.mp3,.mp4,.xlsx,.csv"
                   class="hidden"
-                  @change="handleFileSelect"
                   data-testid="input-files"
+                  @change="handleFileSelect"
                 />
                 <CloudArrowUpIcon class="w-5 h-5" />
                 {{ $t('files.selectFilesButton') }}
@@ -109,9 +110,10 @@
                   <p class="text-xs txt-secondary">{{ formatFileSize(file.size) }}</p>
                 </div>
                 <button
-                  @click="removeSelectedFile(index)"
-                  class="p-1.5 rounded-lg hover:bg-red-500/10 transition-colors"
+                  :disabled="isUploading"
+                  class="p-1.5 rounded-lg hover:bg-red-500/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent"
                   :aria-label="$t('files.removeFile')"
+                  @click="removeSelectedFile(index)"
                 >
                   <XMarkIcon class="w-4 h-4 text-red-500" />
                 </button>
@@ -128,15 +130,32 @@
           </div>
 
           <button
-            @click="uploadFiles"
             :disabled="selectedFiles.length === 0 || isUploading"
             class="btn-primary px-6 py-2 rounded-lg flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
             data-testid="btn-upload"
+            @click="uploadFiles"
           >
             <CloudArrowUpIcon v-if="!isUploading" class="w-5 h-5" />
-            <svg v-else class="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            <svg
+              v-else
+              class="animate-spin h-5 w-5"
+              xmlns="http://www.w3.org/2000/svg"
+              fill="none"
+              viewBox="0 0 24 24"
+            >
+              <circle
+                class="opacity-25"
+                cx="12"
+                cy="12"
+                r="10"
+                stroke="currentColor"
+                stroke-width="4"
+              ></circle>
+              <path
+                class="opacity-75"
+                fill="currentColor"
+                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+              ></path>
             </svg>
             {{ isUploading ? 'Uploading...' : $t('files.uploadAndProcess') }}
           </button>
@@ -160,19 +179,15 @@
                 data-testid="input-filter-group"
               >
                 <option value="">{{ $t('files.allFiles') }}</option>
-                <option
-                  v-for="group in fileGroups"
-                  :key="group.name"
-                  :value="group.name"
-                >
+                <option v-for="group in fileGroups" :key="group.name" :value="group.name">
                   {{ group.name }}
                 </option>
               </select>
             </div>
             <button
-              @click="applyFilter"
               class="btn-primary px-6 py-2 rounded-lg mt-7"
               data-testid="btn-filter"
+              @click="applyFilter"
             >
               {{ $t('files.filterButton') }}
             </button>
@@ -184,9 +199,9 @@
 
           <div v-if="selectedFileIds.length > 0" class="mb-4">
             <button
-              @click="deleteSelected"
               class="px-4 py-2 rounded-lg bg-red-500 text-white hover:bg-red-600 transition-colors flex items-center gap-2"
               data-testid="btn-delete-selected"
+              @click="deleteSelected"
             >
               <TrashIcon class="w-4 h-4" />
               {{ $t('files.deleteSelected') }}
@@ -194,14 +209,34 @@
           </div>
 
           <div v-if="isLoading" class="text-center py-12 txt-secondary" data-testid="state-loading">
-            <svg class="animate-spin h-8 w-8 mx-auto mb-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            <svg
+              class="animate-spin h-8 w-8 mx-auto mb-2"
+              xmlns="http://www.w3.org/2000/svg"
+              fill="none"
+              viewBox="0 0 24 24"
+            >
+              <circle
+                class="opacity-25"
+                cx="12"
+                cy="12"
+                r="10"
+                stroke="currentColor"
+                stroke-width="4"
+              ></circle>
+              <path
+                class="opacity-75"
+                fill="currentColor"
+                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+              ></path>
             </svg>
             Loading files...
           </div>
 
-          <div v-else-if="filteredFiles.length === 0" class="text-center py-12 txt-secondary" data-testid="state-empty">
+          <div
+            v-else-if="filteredFiles.length === 0"
+            class="text-center py-12 txt-secondary"
+            data-testid="state-empty"
+          >
             {{ $t('files.noFiles') }}
           </div>
 
@@ -213,18 +248,34 @@
                     <input
                       type="checkbox"
                       :checked="allSelected"
-                      @change="toggleSelectAll"
                       class="w-4 h-4 rounded border-light-border/30 dark:border-dark-border/20 text-[var(--brand)]"
+                      @change="toggleSelectAll"
                     />
                   </th>
-                  <th class="text-left py-3 px-3 txt-secondary text-xs font-medium">{{ $t('files.fileId') }}</th>
-                  <th class="text-left py-3 px-3 txt-secondary text-xs font-medium">{{ $t('files.name') }}</th>
-                  <th class="text-left py-3 px-3 txt-secondary text-xs font-medium">{{ $t('files.size') }}</th>
-                  <th class="text-left py-3 px-3 txt-secondary text-xs font-medium">{{ $t('files.status') }}</th>
-                  <th class="text-left py-3 px-3 txt-secondary text-xs font-medium">GroupKey / Tag</th>
-                  <th class="text-left py-3 px-3 txt-secondary text-xs font-medium">{{ $t('files.attachment') }}</th>
-                  <th class="text-left py-3 px-3 txt-secondary text-xs font-medium">{{ $t('files.uploaded') }}</th>
-                  <th class="text-left py-3 px-3 txt-secondary text-xs font-medium">{{ $t('files.action') }}</th>
+                  <th class="text-left py-3 px-3 txt-secondary text-xs font-medium">
+                    {{ $t('files.fileId') }}
+                  </th>
+                  <th class="text-left py-3 px-3 txt-secondary text-xs font-medium">
+                    {{ $t('files.name') }}
+                  </th>
+                  <th class="text-left py-3 px-3 txt-secondary text-xs font-medium">
+                    {{ $t('files.size') }}
+                  </th>
+                  <th class="text-left py-3 px-3 txt-secondary text-xs font-medium">
+                    {{ $t('files.status') }}
+                  </th>
+                  <th class="text-left py-3 px-3 txt-secondary text-xs font-medium">
+                    GroupKey / Tag
+                  </th>
+                  <th class="text-left py-3 px-3 txt-secondary text-xs font-medium">
+                    {{ $t('files.attachment') }}
+                  </th>
+                  <th class="text-left py-3 px-3 txt-secondary text-xs font-medium">
+                    {{ $t('files.uploaded') }}
+                  </th>
+                  <th class="text-left py-3 px-3 txt-secondary text-xs font-medium">
+                    {{ $t('files.action') }}
+                  </th>
                 </tr>
               </thead>
               <tbody>
@@ -238,12 +289,14 @@
                     <input
                       type="checkbox"
                       :checked="selectedFileIds.includes(file.id)"
-                      @change="toggleFileSelection(file.id)"
                       class="w-4 h-4 rounded border-light-border/30 dark:border-dark-border/20 text-[var(--brand)]"
+                      @change="toggleFileSelection(file.id)"
                     />
                   </td>
                   <td class="py-3 px-3 txt-primary text-sm">{{ file.id }}</td>
-                  <td class="py-3 px-3 txt-primary text-sm max-w-xs truncate">{{ file.filename }}</td>
+                  <td class="py-3 px-3 txt-primary text-sm max-w-xs truncate">
+                    {{ file.filename }}
+                  </td>
                   <td class="py-3 px-3 txt-secondary text-xs">
                     {{ formatFileSize(file.file_size) }}
                   </td>
@@ -252,7 +305,7 @@
                       :class="{
                         'pill pill--success': file.status === 'vectorized',
                         'pill pill--warning': file.status === 'extracted',
-                        'pill pill--default': file.status === 'uploaded'
+                        'pill pill--default': file.status === 'uploaded',
                       }"
                       class="text-xs"
                     >
@@ -263,25 +316,31 @@
                   <td class="py-3 px-3">
                     <div v-if="editingGroupKey === file.id" class="flex items-center gap-2">
                       <input
+                        :ref="
+                          (el) => {
+                            if (el && editingGroupKey === file.id)
+                              groupKeyInput = el as HTMLInputElement
+                          }
+                        "
                         v-model="tempGroupKey"
-                        @keyup.enter="saveGroupKey(file.id)"
-                        @keyup.escape="cancelEditGroupKey"
                         type="text"
                         class="px-2 py-1 text-xs rounded border border-[var(--brand)] focus:outline-none focus:ring-1 focus:ring-[var(--brand)] bg-transparent txt-primary"
                         placeholder="GroupKey"
-                        ref="groupKeyInput"
+                        :data-group-key-input="file.id"
+                        @keyup.enter="saveGroupKey(file.id)"
+                        @keyup.escape="cancelEditGroupKey"
                       />
                       <button
-                        @click="saveGroupKey(file.id)"
                         class="icon-ghost icon-ghost--success"
                         title="Save"
+                        @click="saveGroupKey(file.id)"
                       >
                         <Icon icon="heroicons:check" class="w-4 h-4" />
                       </button>
                       <button
-                        @click="cancelEditGroupKey"
                         class="icon-ghost icon-ghost--danger"
                         title="Cancel"
+                        @click="cancelEditGroupKey"
                       >
                         <Icon icon="heroicons:x-mark" class="w-4 h-4" />
                       </button>
@@ -290,8 +349,8 @@
                       <span
                         v-if="fileGroupKeys[file.id]?.groupKey"
                         class="pill text-xs font-mono cursor-pointer hover:bg-[var(--brand)]/20 transition-colors"
-                        @click="startEditGroupKey(file.id, fileGroupKeys[file.id]?.groupKey)"
                         :title="`Click to edit • ${fileGroupKeys[file.id]?.chunks || 0} chunks`"
+                        @click="startEditGroupKey(file.id, fileGroupKeys[file.id]?.groupKey)"
                       >
                         {{ fileGroupKeys[file.id].groupKey }}
                       </span>
@@ -302,17 +361,12 @@
                       >
                         Not vectorized
                       </span>
-                      <span
-                        v-else
-                        class="pill text-xs opacity-50"
-                      >
-                        Loading...
-                      </span>
+                      <span v-else class="pill text-xs opacity-50"> Loading... </span>
                       <button
                         v-if="fileGroupKeys[file.id]?.groupKey"
-                        @click="startEditGroupKey(file.id, fileGroupKeys[file.id]?.groupKey)"
                         class="p-1 rounded hover:bg-[var(--brand)]/10 text-[var(--brand)] opacity-0 group-hover:opacity-100 transition-opacity"
                         title="Edit GroupKey"
+                        @click="startEditGroupKey(file.id, fileGroupKeys[file.id]?.groupKey)"
                       >
                         <Icon icon="heroicons:pencil" class="w-3 h-3" />
                       </button>
@@ -326,80 +380,91 @@
                     >
                       {{ $t('files.attached') }}
                     </span>
-                    <span
-                      v-else
-                      class="pill text-xs"
-                      :title="$t('files.standaloneFile')"
-                    >
+                    <span v-else class="pill text-xs" :title="$t('files.standaloneFile')">
                       {{ $t('files.standalone') }}
                     </span>
                   </td>
                   <td class="py-3 px-3 txt-secondary text-xs">{{ file.uploaded_date }}</td>
-                <td class="py-3 px-3">
-                  <div class="flex gap-2">
-                    <!-- Re-Vectorize Button (only if not vectorized) -->
-                    <button
-                      v-if="fileGroupKeys[file.id]?.isVectorized === false"
-                      @click="reVectorize(file.id)"
-                      class="p-2 rounded hover:bg-purple-500/10 text-purple-600 dark:text-purple-400 transition-colors"
-                      title="Re-vectorize this file with extracted text"
-                      data-testid="btn-revectorize"
-                    >
-                      <Icon icon="heroicons:arrow-path" class="w-4 h-4" />
-                    </button>
-                    <button
-                      @click="viewFileContent(file.id)"
-                      class="p-2 rounded hover:bg-[var(--brand)]/10 text-[var(--brand)] transition-colors"
-                      title="View content"
-                      data-testid="btn-view"
-                    >
-                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                      </svg>
-                    </button>
-                    <button
-                      @click="downloadFile(file.id, file.filename)"
-                      class="icon-ghost icon-ghost--info"
-                      title="Download file"
-                      data-testid="btn-download"
-                    >
-                      <ArrowDownTrayIcon class="w-4 h-4" />
-                    </button>
-                    <!-- Share button removed - MessageFile doesn't support public sharing -->
-                    <button
-                      @click="deleteFile(file.id)"
-                      class="icon-ghost icon-ghost--danger"
-                      title="Delete file"
-                      data-testid="btn-delete"
-                    >
-                      <TrashIcon class="w-4 h-4" />
-                    </button>
-                  </div>
-                </td>
+                  <td class="py-3 px-3">
+                    <div class="flex gap-2">
+                      <!-- Re-Vectorize Button (only if not vectorized) -->
+                      <button
+                        v-if="fileGroupKeys[file.id]?.isVectorized === false"
+                        class="p-2 rounded hover:bg-purple-500/10 text-purple-600 dark:text-purple-400 transition-colors"
+                        title="Re-vectorize this file with extracted text"
+                        data-testid="btn-revectorize"
+                        @click="reVectorize(file.id)"
+                      >
+                        <Icon icon="heroicons:arrow-path" class="w-4 h-4" />
+                      </button>
+                      <button
+                        class="p-2 rounded hover:bg-[var(--brand)]/10 text-[var(--brand)] transition-colors"
+                        title="View content"
+                        data-testid="btn-view"
+                        @click="viewFileContent(file.id)"
+                      >
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                            stroke-width="2"
+                            d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+                          />
+                          <path
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                            stroke-width="2"
+                            d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
+                          />
+                        </svg>
+                      </button>
+                      <button
+                        class="icon-ghost icon-ghost--info"
+                        title="Download file"
+                        data-testid="btn-download"
+                        @click="downloadFile(file.id, file.filename)"
+                      >
+                        <ArrowDownTrayIcon class="w-4 h-4" />
+                      </button>
+                      <!-- Share button removed - MessageFile doesn't support public sharing -->
+                      <button
+                        class="icon-ghost icon-ghost--danger"
+                        title="Delete file"
+                        data-testid="btn-delete"
+                        @click="deleteFile(file.id)"
+                      >
+                        <TrashIcon class="w-4 h-4" />
+                      </button>
+                    </div>
+                  </td>
                 </tr>
               </tbody>
             </table>
           </div>
 
-          <div v-if="filteredFiles.length > 0" class="flex items-center justify-between mt-6" data-testid="section-pagination">
+          <div
+            v-if="filteredFiles.length > 0"
+            class="flex items-center justify-between mt-6"
+            data-testid="section-pagination"
+          >
             <div class="txt-secondary text-sm">
-              {{ $t('files.page') }} {{ currentPage }} ({{ $t('files.showing') }} {{ paginatedFiles.length }} {{ $t('files.files') }})
+              {{ $t('files.page') }} {{ currentPage }} ({{ $t('files.showing') }}
+              {{ paginatedFiles.length }} {{ $t('files.files') }})
             </div>
             <div class="flex gap-2">
               <button
-                @click="previousPage"
                 :disabled="currentPage === 1"
                 class="px-4 py-2 rounded-lg border border-light-border/30 dark:border-dark-border/20 txt-primary hover:bg-black/5 dark:hover:bg-white/5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 data-testid="btn-prev-page"
+                @click="previousPage"
               >
                 {{ $t('files.previous') }}
               </button>
               <button
-                @click="nextPage"
                 :disabled="currentPage >= totalPages"
                 class="px-4 py-2 rounded-lg border border-light-border/30 dark:border-dark-border/20 txt-primary hover:bg-black/5 dark:hover:bg-white/5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 data-testid="btn-next-page"
+                @click="nextPage"
               >
                 {{ $t('files.next') }}
               </button>
@@ -410,11 +475,7 @@
     </div>
 
     <!-- File Content Modal -->
-    <FileContentModal
-      :is-open="isModalOpen"
-      :file-id="selectedFileId"
-      @close="closeModal"
-    />
+    <FileContentModal :is-open="isModalOpen" :file-id="selectedFileId" @close="closeModal" />
     <ShareModal
       :is-open="isShareModalOpen"
       :file-id="shareFileId"
@@ -424,7 +485,7 @@
       @unshared="handleUnshared"
     />
 
-    <!-- Confirm Delete Dialog -->
+    <!-- Confirm Delete Dialog (Single File) -->
     <ConfirmDialog
       :is-open="isConfirmOpen"
       title="Delete File"
@@ -435,6 +496,67 @@
       @confirm="confirmDelete"
       @cancel="cancelDelete"
     />
+
+    <!-- Confirm Delete Selected Dialog (Multiple Files) -->
+    <Teleport to="body">
+      <Transition name="dialog-fade">
+        <div
+          v-if="isDeleteSelectedOpen"
+          class="fixed inset-0 z-50 flex items-center justify-center p-4"
+          data-testid="modal-delete-selected-root"
+          @click.self="cancelDeleteSelected"
+        >
+          <!-- Backdrop -->
+          <div
+            class="absolute inset-0 bg-black/50 dark:bg-black/70 backdrop-blur-sm"
+            data-testid="modal-delete-selected-backdrop"
+          ></div>
+
+          <!-- Dialog -->
+          <div
+            class="relative surface-card rounded-xl shadow-2xl max-w-md w-full p-6 space-y-4 animate-scale-in"
+            role="dialog"
+            aria-modal="true"
+            data-testid="modal-delete-selected"
+          >
+            <!-- Icon and Title -->
+            <div class="flex items-center gap-3">
+              <div
+                class="flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center bg-red-500/10 text-red-500"
+              >
+                <ExclamationTriangleIcon class="w-6 h-6" />
+              </div>
+              <h3 class="text-lg font-semibold txt-primary">
+                {{ $t('files.deleteSelectedConfirmTitle') }}
+              </h3>
+            </div>
+
+            <!-- Message -->
+            <p class="txt-secondary text-sm leading-relaxed">
+              {{ $t('files.deleteSelectedConfirmMessage', { count: selectedFileIds.length }) }}
+            </p>
+
+            <!-- Actions -->
+            <div class="flex gap-3 justify-end pt-2">
+              <button
+                class="px-4 py-2 rounded-lg border border-light-border/30 dark:border-dark-border/20 txt-secondary hover:bg-black/5 dark:hover:bg-white/5 transition-all text-sm font-medium"
+                data-testid="btn-delete-selected-cancel"
+                @click="cancelDeleteSelected"
+              >
+                {{ $t('common.cancel') }}
+              </button>
+              <button
+                class="px-4 py-2 rounded-lg bg-red-500 hover:bg-red-600 text-white text-sm font-medium transition-all"
+                data-testid="btn-delete-selected-confirm"
+                @click="confirmDeleteSelected"
+              >
+                {{ $t('common.delete') }}
+              </button>
+            </div>
+          </div>
+        </div>
+      </Transition>
+    </Teleport>
   </MainLayout>
 </template>
 
@@ -451,7 +573,8 @@ import {
   CloudArrowUpIcon,
   TrashIcon,
   ArrowDownTrayIcon,
-  XMarkIcon
+  XMarkIcon,
+  ExclamationTriangleIcon,
 } from '@heroicons/vue/24/outline'
 import filesService, { type FileItem } from '@/services/filesService'
 import { useNotification } from '@/composables/useNotification'
@@ -479,7 +602,9 @@ const isDragging = ref(false)
 const dragCounter = ref(0)
 
 // GroupKey management
-const fileGroupKeys = ref<Record<number, { groupKey: string | null; isVectorized: boolean; chunks: number; status: string }>>({})
+const fileGroupKeys = ref<
+  Record<number, { groupKey: string | null; isVectorized: boolean; chunks: number; status: string }>
+>({})
 const editingGroupKey = ref<number | null>(null)
 const tempGroupKey = ref('')
 const groupKeyInput = ref<HTMLInputElement | null>(null)
@@ -496,6 +621,7 @@ const shareFileName = ref('')
 // Confirm dialog state
 const isConfirmOpen = ref(false)
 const fileToDelete = ref<number | null>(null)
+const isDeleteSelectedOpen = ref(false)
 const totalCount = ref(0)
 
 const filteredFiles = computed(() => files.value)
@@ -507,8 +633,10 @@ const totalPages = computed(() => {
 const paginatedFiles = computed(() => files.value)
 
 const allSelected = computed(() => {
-  return paginatedFiles.value.length > 0 &&
-         paginatedFiles.value.every(file => selectedFileIds.value.includes(file.id))
+  return (
+    paginatedFiles.value.length > 0 &&
+    paginatedFiles.value.every((file) => selectedFileIds.value.includes(file.id))
+  )
 })
 
 const handleFileSelect = (event: Event) => {
@@ -519,6 +647,9 @@ const handleFileSelect = (event: Event) => {
 }
 
 const removeSelectedFile = (index: number) => {
+  if (isUploading.value) {
+    return
+  }
   selectedFiles.value.splice(index, 1)
 }
 
@@ -561,19 +692,19 @@ const getFileIcon = (filename: string): string => {
   const ext = filename.split('.').pop()?.toLowerCase() || ''
 
   const iconMap: Record<string, string> = {
-    'pdf': 'heroicons:document-text',
-    'docx': 'heroicons:document-text',
-    'doc': 'heroicons:document-text',
-    'txt': 'heroicons:document-text',
-    'jpg': 'heroicons:photo',
-    'jpeg': 'heroicons:photo',
-    'png': 'heroicons:photo',
-    'gif': 'heroicons:photo',
-    'webp': 'heroicons:photo',
-    'mp3': 'heroicons:musical-note',
-    'mp4': 'heroicons:film',
-    'xlsx': 'heroicons:table-cells',
-    'csv': 'heroicons:table-cells'
+    pdf: 'heroicons:document-text',
+    docx: 'heroicons:document-text',
+    doc: 'heroicons:document-text',
+    txt: 'heroicons:document-text',
+    jpg: 'heroicons:photo',
+    jpeg: 'heroicons:photo',
+    png: 'heroicons:photo',
+    gif: 'heroicons:photo',
+    webp: 'heroicons:photo',
+    mp3: 'heroicons:musical-note',
+    mp4: 'heroicons:film',
+    xlsx: 'heroicons:table-cells',
+    csv: 'heroicons:table-cells',
   }
 
   return iconMap[ext] || 'heroicons:document'
@@ -593,14 +724,14 @@ const uploadFiles = async () => {
     const result = await filesService.uploadFiles({
       files: selectedFiles.value,
       groupKey,
-      processLevel: 'vectorize' // Always vectorize for optimal RAG performance
+      processLevel: 'vectorize', // Always vectorize for optimal RAG performance
     })
 
     if (result.success) {
       showSuccess(`Successfully uploaded ${result.files.length} file(s)`)
 
       // Show processing details
-      result.files.forEach(file => {
+      result.files.forEach((file) => {
         const details = `${file.filename}: ${file.extracted_text_length} chars extracted, ${file.chunks_created || 0} chunks created`
         console.log(details)
       })
@@ -618,7 +749,7 @@ const uploadFiles = async () => {
       }
     } else {
       // Show errors
-      result.errors.forEach(error => {
+      result.errors.forEach((error) => {
         showError(`${error.filename}: ${error.error}`)
       })
     }
@@ -697,14 +828,14 @@ const toggleFileSelection = (fileId: number) => {
 
 const toggleSelectAll = () => {
   if (allSelected.value) {
-    paginatedFiles.value.forEach(file => {
+    paginatedFiles.value.forEach((file) => {
       const index = selectedFileIds.value.indexOf(file.id)
       if (index > -1) {
         selectedFileIds.value.splice(index, 1)
       }
     })
   } else {
-    paginatedFiles.value.forEach(file => {
+    paginatedFiles.value.forEach((file) => {
       if (!selectedFileIds.value.includes(file.id)) {
         selectedFileIds.value.push(file.id)
       }
@@ -712,18 +843,19 @@ const toggleSelectAll = () => {
   }
 }
 
-const deleteSelected = async () => {
+const deleteSelected = () => {
   if (selectedFileIds.value.length === 0) return
+  isDeleteSelectedOpen.value = true
+}
 
-  if (!confirm(`Delete ${selectedFileIds.value.length} selected file(s)?`)) {
-    return
-  }
+const confirmDeleteSelected = async () => {
+  if (selectedFileIds.value.length === 0) return
 
   try {
     const results = await filesService.deleteMultipleFiles(selectedFileIds.value)
 
-    const successCount = results.filter(r => r.success).length
-    const failCount = results.filter(r => !r.success).length
+    const successCount = results.filter((r) => r.success).length
+    const failCount = results.filter((r) => !r.success).length
 
     if (successCount > 0) {
       showSuccess(`Deleted ${successCount} file(s)`)
@@ -742,7 +874,13 @@ const deleteSelected = async () => {
   } catch (error) {
     console.error('Delete error:', error)
     showError('Failed to delete files')
+  } finally {
+    isDeleteSelectedOpen.value = false
   }
+}
+
+const cancelDeleteSelected = () => {
+  isDeleteSelectedOpen.value = false
 }
 
 const deleteFile = (fileId: number) => {
@@ -840,7 +978,7 @@ const loadFileGroupKey = async (fileId: number) => {
       groupKey: result.groupKey,
       isVectorized: result.isVectorized,
       chunks: result.chunks,
-      status: result.status
+      status: result.status,
     }
   } catch (err: any) {
     console.error(`Failed to load groupKey for file ${fileId}:`, err)
@@ -848,7 +986,7 @@ const loadFileGroupKey = async (fileId: number) => {
       groupKey: null,
       isVectorized: false,
       chunks: 0,
-      status: 'unknown'
+      status: 'unknown',
     }
   }
 }
@@ -857,7 +995,7 @@ const loadFileGroupKey = async (fileId: number) => {
  * Load groupKeys for all visible files
  */
 const loadAllFileGroupKeys = async () => {
-  const promises = paginatedFiles.value.map(file => loadFileGroupKey(file.id))
+  const promises = paginatedFiles.value.map((file) => loadFileGroupKey(file.id))
   await Promise.all(promises)
 }
 
@@ -868,7 +1006,15 @@ const startEditGroupKey = async (fileId: number, currentGroupKey: string | null)
   editingGroupKey.value = fileId
   tempGroupKey.value = currentGroupKey || ''
   await nextTick()
-  groupKeyInput.value?.focus()
+  // Find the input element for this specific file
+  const inputElement = document.querySelector(
+    `[data-group-key-input="${fileId}"]`
+  ) as HTMLInputElement
+  if (inputElement) {
+    inputElement.focus()
+  } else if (groupKeyInput.value) {
+    groupKeyInput.value.focus()
+  }
 }
 
 /**
@@ -916,7 +1062,9 @@ const reVectorize = async (fileId: number) => {
 
     const result = await filesService.reVectorizeFile(fileId, groupKey)
 
-    showSuccess(`File re-vectorized! Created ${result.chunksCreated} chunks from ${result.extractedTextLength} characters.`)
+    showSuccess(
+      `File re-vectorized! Created ${result.chunksCreated} chunks from ${result.extractedTextLength} characters.`
+    )
 
     // Reload the groupKey for this file
     await loadFileGroupKey(fileId)
@@ -946,5 +1094,30 @@ onMounted(async () => {
 .fade-enter-from,
 .fade-leave-to {
   opacity: 0;
+}
+
+.dialog-fade-enter-active,
+.dialog-fade-leave-active {
+  transition: opacity 0.2s ease;
+}
+
+.dialog-fade-enter-from,
+.dialog-fade-leave-to {
+  opacity: 0;
+}
+
+.animate-scale-in {
+  animation: scale-in 0.2s ease-out;
+}
+
+@keyframes scale-in {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
 }
 </style>

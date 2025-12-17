@@ -1,14 +1,18 @@
-import type { MailConfig, Department, SavedMailHandler } from '@/services/api/inboundEmailHandlersApi'
+import type {
+  MailConfig,
+  Department,
+  SavedMailHandler,
+} from '@/services/api/inboundEmailHandlersApi'
 
 export const protocolOptions = [
   { value: 'IMAP', label: 'IMAP' },
-  { value: 'POP3', label: 'POP3' }
+  { value: 'POP3', label: 'POP3' },
 ]
 
 export const securityOptions = [
   { value: 'SSL/TLS', label: 'SSL/TLS' },
   { value: 'STARTTLS', label: 'STARTTLS' },
-  { value: 'None', label: 'None' }
+  { value: 'None', label: 'None' },
 ]
 
 export const checkIntervalOptions = [
@@ -16,7 +20,7 @@ export const checkIntervalOptions = [
   { value: 10, label: '10 minutes' },
   { value: 15, label: '15 minutes' },
   { value: 30, label: '30 minutes' },
-  { value: 60, label: '1 hour' }
+  { value: 60, label: '1 hour' },
 ]
 
 export const defaultMailConfig: MailConfig = {
@@ -27,7 +31,7 @@ export const defaultMailConfig: MailConfig = {
   username: '',
   password: '',
   checkInterval: 10,
-  deleteAfter: false
+  deleteAfter: false,
 }
 
 export const mockDepartments: Department[] = []
@@ -44,26 +48,26 @@ export const mockMailHandlers: SavedMailHandler[] = [
       username: 'support@example.com',
       password: '••••••••',
       checkInterval: 5,
-      deleteAfter: false
+      deleteAfter: false,
     },
     departments: [
       {
         id: '1',
         email: 'support@example.com',
         rules: 'subject:support',
-        isDefault: true
+        isDefault: true,
       },
       {
         id: '2',
         email: 'tech@example.com',
         rules: 'subject:technical',
-        isDefault: false
-      }
+        isDefault: false,
+      },
     ],
     status: 'active',
     lastTested: new Date('2025-10-08'),
     createdAt: new Date('2025-09-15'),
-    updatedAt: new Date('2025-10-08')
+    updatedAt: new Date('2025-10-08'),
   },
   {
     id: '2',
@@ -76,20 +80,19 @@ export const mockMailHandlers: SavedMailHandler[] = [
       username: 'sales@company.com',
       password: '••••••••',
       checkInterval: 10,
-      deleteAfter: false
+      deleteAfter: false,
     },
     departments: [
       {
         id: '3',
         email: 'sales@company.com',
         rules: 'subject:quote,price',
-        isDefault: true
-      }
+        isDefault: true,
+      },
     ],
     status: 'active',
     lastTested: new Date('2025-10-05'),
     createdAt: new Date('2025-09-20'),
-    updatedAt: new Date('2025-10-05')
-  }
+    updatedAt: new Date('2025-10-05'),
+  },
 ]
-

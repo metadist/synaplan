@@ -1,9 +1,9 @@
 /*M!999999\- enable the sandbox mode */ 
--- MariaDB dump 10.19-11.7.2-MariaDB, for debian-linux-gnu (x86_64)
+-- MariaDB dump 10.19-11.8.2-MariaDB, for debian-linux-gnu (x86_64)
 --
--- Host: localhost    Database: synadb
+-- Host: localhost    Database: synaplan
 -- ------------------------------------------------------
--- Server version	11.7.2-MariaDB-ubu2404
+-- Server version	11.8.2-MariaDB-ubu2404
 
 /*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;
 /*!40101 SET @OLD_CHARACTER_SET_RESULTS=@@CHARACTER_SET_RESULTS */;
@@ -25,20 +25,21 @@ DROP TABLE IF EXISTS `BUSER`;
 /*!40101 SET character_set_client = utf8mb4 */;
 CREATE TABLE `BUSER` (
   `BID` bigint(20) NOT NULL AUTO_INCREMENT,
-  `BCREATED` varchar(20) NOT NULL DEFAULT '',
-  `BINTYPE` varchar(4) NOT NULL DEFAULT 'WEB', /* WEB, ADM, P1, P2, P3 */
-  `BMAIL` varchar(128) NOT NULL DEFAULT '',
-  `BPW` varchar(64) NOT NULL DEFAULT '',
-  `BPROVIDERID` varchar(32) NOT NULL DEFAULT '',
+  `BCREATED` varchar(20) NOT NULL,
+  `BINTYPE` varchar(16) NOT NULL DEFAULT 'WEB',
+  `BMAIL` varchar(128) NOT NULL,
+  `BPW` varchar(64) DEFAULT NULL,
+  `BPROVIDERID` varchar(32) NOT NULL,
   `BUSERLEVEL` varchar(32) NOT NULL DEFAULT 'NEW',
-  `BUSERDETAILS` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL DEFAULT '{}' CHECK (json_valid(`BUSERDETAILS`)),
-  `BPAYMENTDETAILS` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL DEFAULT '{}' CHECK (json_valid(`BPAYMENTDETAILS`)),
+  `BEMAILVERIFIED` tinyint(1) NOT NULL DEFAULT 0,
+  `BUSERDETAILS` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL CHECK (json_valid(`BUSERDETAILS`)),
+  `BPAYMENTDETAILS` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL CHECK (json_valid(`BPAYMENTDETAILS`)),
   PRIMARY KEY (`BID`),
+  KEY `BMAIL` (`BMAIL`),
   KEY `BINTYPE` (`BINTYPE`),
   KEY `BPROVIDERID` (`BPROVIDERID`),
-  KEY `BUSERLEVEL` (`BUSERLEVEL`),
-  KEY `BMAIL` (`BMAIL`)
-) ENGINE=InnoDB AUTO_INCREMENT=150 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+  KEY `BUSERLEVEL` (`BUSERLEVEL`)
+) ENGINE=InnoDB AUTO_INCREMENT=4 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -47,10 +48,14 @@ CREATE TABLE `BUSER` (
 
 LOCK TABLES `BUSER` WRITE;
 /*!40000 ALTER TABLE `BUSER` DISABLE KEYS */;
+set autocommit=0;
 INSERT INTO `BUSER` VALUES
-(2,'20250123171248','ADM','synaplan@synaplan.com','8d5b7b5d36aceed2de9574184b6c8e52','491754070111','NEW','{\n    "firstName": "Test",\n    "lastName": "Testuser",\n    "phone": "+1234567890",\n    "companyName": "metadist data management GmbH",\n    "vatId": "",\n    "street": "",\n    "zipCode": "",\n    "city": "",\n    "country": "",\n    "language": "en",\n    "timezone": "",\n    "invoiceEmail": ""\n}','{}');
+(1,'2025-12-17 09:36:29','WEB','admin@synaplan.com','$2y$13$ySvbD1NP62YmsWSF7Fvl7OzG2wHv1psU1yeXGnF3Zcdqd9Wd2QPM.','','ADMIN',1,'{\"firstName\":\"Admin\",\"lastName\":\"User\",\"company\":\"Synaplan\"}','[]'),
+(2,'2025-12-17 09:36:29','WEB','demo@synaplan.com','$2y$13$dNXBx6Tp/twh84RHdSmxZefol1fwdzgOy862ENOJl4Icposkaw2di','','PRO',1,'{\"firstName\":\"Demo\",\"lastName\":\"User\"}','[]'),
+(3,'2025-12-17 09:36:29','WEB','test@example.com','$2y$13$4YluKVE7TR6Ms.OvGnqzmuZ.wejgAdqERvJ1rqOs7qtPyD7RXSF8C','','NEW',0,'{\"firstName\":\"Test\",\"lastName\":\"User\"}','[]');
 /*!40000 ALTER TABLE `BUSER` ENABLE KEYS */;
 UNLOCK TABLES;
+commit;
 /*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
 
 /*!40101 SET SQL_MODE=@OLD_SQL_MODE */;
@@ -61,4 +66,4 @@ UNLOCK TABLES;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*M!100616 SET NOTE_VERBOSITY=@OLD_NOTE_VERBOSITY */;
 
--- Dump completed on 2025-08-05 15:19:31
+-- Dump completed on 2025-12-17  9:37:29

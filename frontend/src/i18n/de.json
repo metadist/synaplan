@@ -2,7 +2,9 @@
   "welcome": "Willkommen bei Synaplan",
   "chat": {
     "title": "Chat",
-    "newChat": "Neuer Chat"
+    "newChat": "Neuer Chat",
+    "notFound": "Der Chat existiert nicht mehr",
+    "notFoundDesc": "Dieser Chat wurde gelöscht und ist nicht mehr verfügbar."
   },
   "admin": {
     "title": "Admin-Panel",
@@ -48,7 +50,9 @@
       "searchPlaceholder": "Nach E-Mail suchen...",
       "noUsers": "Keine Benutzer gefunden",
       "deleteConfirmTitle": "Benutzer löschen?",
-      "deleteConfirmDesc": "Möchtest du {email} wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden."
+      "deleteConfirmDesc": "Möchtest du {email} wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden.",
+      "levelUpdated": "Benutzer-Level auf {level} aktualisiert",
+      "levelUpdateFailed": "Fehler beim Aktualisieren des Benutzer-Levels"
     },
     "prompts": {
       "shortDesc": "Kurzbeschreibung",
@@ -326,7 +330,64 @@
       "usedFor": "Verwendet für",
       "chatGeneration": "Antwort-Generierung",
       "messageClassification": "Nachrichten-Klassifizierung",
-      "clickToConfig": "Klicken zum Konfigurieren"
+      "clickToConfig": "Klicken zum Konfigurieren",
+      "admin": {
+        "addModels": "Modelle hinzufügen (Import)",
+        "urlsLabel": "URLs (eine pro Zeile)",
+        "urlsPlaceholder": "https://platform.openai.com/docs/pricing",
+        "textDumpLabel": "Text-Dump (Provider-Preise/Modellliste einfügen)",
+        "textDumpPlaceholder": "Tabellen, Modelllisten, Preisabschnitte einfügen…",
+        "allowDelete": "DELETE-Anweisungen erlauben",
+        "generateSql": "SQL generieren",
+        "generating": "Generiere…",
+        "applySql": "SQL anwenden",
+        "applying": "Wende an…",
+        "sqlPreview": "SQL-Vorschau",
+        "sqlPreviewPlaceholder": "Klicken Sie auf \"SQL generieren\", um das SORT-Modell INSERT/UPDATE/DELETE-Anweisungen vorschlagen zu lassen…",
+        "validationErrors": "Validierungsfehler",
+        "validated": "Validiert",
+        "statements": "Anweisung(en)",
+        "generatedBy": "Generiert von",
+        "unknown": "unbekannt",
+        "editModels": "Modelle bearbeiten",
+        "refresh": "Aktualisieren",
+        "servicePlaceholder": "Service (OpenAI)",
+        "tagPlaceholder": "Tag (chat)",
+        "providerIdPlaceholder": "Provider-ID (gpt-4.1)",
+        "namePlaceholder": "Name (GPT-4.1)",
+        "createModel": "Modell erstellen",
+        "creating": "Erstelle…",
+        "uniqueKey": "Eindeutiger Schlüssel",
+        "loadingModels": "Lade Admin-Modelle…",
+        "id": "ID",
+        "service": "Service",
+        "tag": "Tag",
+        "providerId": "Provider-ID",
+        "name": "Name",
+        "selectable": "Auswählbar",
+        "active": "Aktiv",
+        "priceIn": "Preis ein",
+        "unitIn": "Einheit ein",
+        "priceOut": "Preis aus",
+        "unitOut": "Einheit aus",
+        "actions": "Aktionen",
+        "save": "Speichern",
+        "saving": "Speichere…",
+        "delete": "Löschen",
+        "deleting": "Lösche…",
+        "deleteConfirm": "Modell {id} ({service}/{tag}/{providerId}) löschen?",
+        "modelCreated": "Modell erstellt",
+        "modelSaved": "Modell gespeichert",
+        "modelDeleted": "Modell gelöscht",
+        "appliedStatements": "{count} Anweisung(en) angewendet",
+        "failedGenerate": "SQL-Generierung fehlgeschlagen",
+        "failedApply": "SQL-Anwendung fehlgeschlagen",
+        "failedLoad": "Laden der Admin-Modelle fehlgeschlagen",
+        "failedCreate": "Modell erstellen fehlgeschlagen",
+        "failedSave": "Modell speichern fehlgeschlagen",
+        "failedDelete": "Modell löschen fehlgeschlagen",
+        "requiredFields": "Alle Felder sind erforderlich: Service, Tag, Provider-ID, Name"
+      }
     },
     "taskPrompts": {
       "title": "Prompt-Verwaltung",
@@ -681,6 +742,8 @@
     "attachedToMessage": "Diese Datei ist an eine Nachricht angehängt",
     "standaloneFile": "Diese Datei ist eigenständig (nicht an eine Nachricht angehängt)",
     "deleteSelected": "Ausgewählte löschen",
+    "deleteSelectedConfirmTitle": "Ausgewählte Dateien löschen?",
+    "deleteSelectedConfirmMessage": "Möchten Sie wirklich {count} ausgewählte Datei(en) löschen? Diese Aktion kann nicht rückgängig gemacht werden und die Dateien werden dauerhaft gelöscht.",
     "noFiles": "Noch keine Dateien hochgeladen",
     "page": "Seite",
     "showing": "Anzeige",
@@ -837,7 +900,8 @@
     "login": "Anmelden",
     "register": "Registrieren",
     "email": "E-Mail",
-    "emailPlaceholder": "deine@email.de",
+    "emailPlaceholderPrefix": "deine",
+    "emailPlaceholderSuffix": "email.de",
     "password": "Passwort",
     "confirmPassword": "Passwort bestätigen",
     "passwordMismatch": "Passwörter stimmen nicht überein",
@@ -887,4 +951,3 @@
     "recaptchaError": "reCAPTCHA-Verifizierung fehlgeschlagen. Bitte versuche es erneut."
   }
 }
-

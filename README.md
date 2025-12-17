@@ -13,13 +13,21 @@ AI-powered knowledge management with chat, document processing, and RAG (Retriev
 
 ```bash
 git clone <repository-url>
-cd synaplan-dev
+cd synaplan
+```
+
+**Line Endings:** This project enforces LF (Unix-style) line endings via `.gitattributes`, so all platforms will automatically use LF regardless of their Git configuration. If you cloned before this was added, you may need to refresh your working copy:
+
+```bash
+# Only if you experience line ending issues after pulling
+git rm --cached -r .
+git reset --hard
 ```
 
 Run the first-install script for your platform (it verifies Docker, lets you pick your AI provider, and handles all bootstrapping):
 
 ```bash
-# Linux / macOS (WSL): 
+# Linux / macOS (WSL):
 ./_1st_install_linux.sh
 
 # Windows (PowerShell or cmd):
@@ -39,26 +47,27 @@ docker compose up -d
 - ✅ Generates JWT keypair for authentication
 - ✅ Creates database schema (migrations)
 - ✅ Loads test users and fixtures (if database is empty)
-- ✅ Pulls the local `gpt-oss:20b` chat model and `bge-m3` embedding model with live progress (unless disabled)
+- ✅ Pulls `bge-m3` embedding model (always needed for RAG)
+- ✅ Pulls `gpt-oss:20b` chat model only if Local Ollama option selected
 - ✅ Ensures the schema + fixtures are applied (runs `doctrine:schema:update` + fixtures once)
 - ✅ Starts all services
-- ✅ **System ready in ~40 seconds!**
+- ✅ **System ready in ~1-2 minutes!**
 
-**First startup takes ~40 seconds** because:
-- Database initialization: ~5s
-- Schema creation: ~2s
-- Fixtures loading: ~3s
-- Cache warming: ~2s
-- Total: ~40s (one-time setup)
+**First startup takes ~1-2 minutes** because:
+- Database initialization and health checks: ~10s
+- Schema creation and migrations: ~5s
+- Fixtures loading: ~5s
+- Cache warming and service startup: ~10s
+- Groq configuration (if selected): ~5s
 
-**Subsequent restarts take ~15 seconds** (no fixtures needed).
+**Subsequent restarts take ~15-30 seconds** (no fixtures needed).
 
 **AI Model Download Behavior:**
 
 `./_1st_install_linux.sh` (or `_1st_install_win.bat`) guides you through one of two options:
 
 1. **Local Ollama** – downloads `gpt-oss:20b` (chat) + `bge-m3` (vector) so the stack runs fully offline (needs ~24 GB VRAM).
-2. **Groq Cloud (recommended)** – prompts for your free `GROQ_API_KEY`, writes it to `backend/.env`, switches all defaults to Groq’s `llama-3.3-70b-versatile`, and skips the heavy local downloads.
+2. **Groq Cloud (recommended)** – prompts for your free `GROQ_API_KEY`, writes it to `backend/.env`, switches all defaults to Groq's `llama-3.3-70b-versatile`, and only downloads `bge-m3` for local embeddings (much smaller/faster).
 
 Progress (downloads or schema work) streams directly in the script output, so you always know what’s happening.
 
@@ -66,10 +75,10 @@ Progress (downloads or schema work) streams directly in the script output, so yo
 ```bash
 ./_1st_install_linux.sh      # or _1st_install_win.bat
 ```
-- ⚡ **Fast startup** for services (~40s) while downloads (if Ollama) or migrations (if Groq) run in the background
-- 📦 **Progress shown live** in the script (tailing `backend` logs)
+- ⚡ **Fast startup** for services (~1-2 min) while downloads (if Ollama) or migrations (if Groq) run
+- 📦 **Progress shown live** in the script output
 - ✅ **AI chat + RAG ready** as soon as the selected provider is configured
-- 💡 **Best for**: Development/prod setups that either have local GPU (option 1) or prefer Groq’s hosted models (option 2)
+- 💡 **Best for**: Development/prod setups that either have local GPU (option 1) or prefer Groq's hosted models (option 2)
 
 **Option 2: On-demand Downloads**
 ```bash
@@ -116,7 +125,7 @@ Audio files are automatically transcribed using **Whisper.cpp** when uploaded:
 - **Supported formats**: mp3, wav, ogg, m4a, opus, flac, webm, aac, wma
 - **Automatic conversion**: FFmpeg converts all audio to optimal format (16kHz mono WAV)
 - **Models**: tiny, base (default), small, medium, large - configurable via `.env`
-- **Setup**: 
+- **Setup**:
   - **Docker**: Pre-installed, download models on first run
   - **Local**: Install [whisper.cpp](https://github.com/ggerganov/whisper.cpp) and FFmpeg, configure paths in `.env`
 
@@ -137,12 +146,10 @@ SynaPlan integrates with **Meta's official WhatsApp Business API** for bidirecti
 
 ### Setup:
 1. **Create WhatsApp Business Account**: [Meta Business Suite](https://business.facebook.com/)
-2. **Get Credentials**: Access Token, Phone Number ID, Business Account ID
+2. **Get Credentials**: Access Token (supports multiple phone numbers)
 3. **Set Environment Variables**:
 ```bash
 WHATSAPP_ACCESS_TOKEN=your_access_token
-WHATSAPP_PHONE_NUMBER_ID=your_phone_number_id
-WHATSAPP_BUSINESS_ACCOUNT_ID=your_business_account_id
 WHATSAPP_WEBHOOK_VERIFY_TOKEN=your_verify_token
 WHATSAPP_ENABLED=true
 ```
@@ -151,18 +158,37 @@ WHATSAPP_ENABLED=true
    - Verify Token: Same as `WHATSAPP_WEBHOOK_VERIFY_TOKEN`
    - Subscribe to: `messages`
 
-### Phone Verification (Required):
-Users must verify their phone number via WhatsApp to unlock full features:
-- **ANONYMOUS** (not verified): 10 messages, 2 images (very limited)
-- **NEW** (verified): 50 messages, 5 images, 2 videos
-- **PRO/TEAM/BUSINESS**: Full subscription limits
+### 🌟 Fully Dynamic Multi-Number Support:
+**No configuration needed!** The system is 100% dynamic:
 
-Verification Flow:
-1. User enters phone number in web interface
-2. 6-digit code sent via WhatsApp
-3. User confirms code
-4. Phone linked to account → full access
-5. User can remove link anytime
+- ✅ **Zero Configuration**: No Phone Number IDs in config files
+- ✅ **Auto-Detection**: Incoming messages automatically extract `phone_number_id` from webhook payload
+- ✅ **Smart Reply Routing**: Responses are **always** sent from the same number that received the message
+- ✅ **Up to 20 Numbers**: One WhatsApp Business Account can manage up to 20 phone numbers
+- ✅ **Instant Multi-Number**: Add/remove numbers in Meta Portal - works immediately, no code changes needed
+
+**How it works:**
+1. User sends message to **Number A** → Webhook contains `metadata.phone_number_id`
+2. System extracts and stores the Phone Number ID
+3. AI processes and responds → Reply sent **from Number A** automatically
+4. Different user sends to **Number B** → Reply sent **from Number B** automatically
+
+### Anonymous Usage & Phone Verification:
+**No verification required!** Users can immediately use the AI via WhatsApp:
+- 🆓 **Anonymous Users** (no verification): Can use AI with ANONYMOUS rate limits (10 messages, 2 images)
+- ✨ **Verified Users** (optional): Higher rate limits after phone verification (50 messages, 5 images, 2 videos)
+- 💎 **PRO/TEAM/BUSINESS** (subscribers): Full subscription limits
+
+**How it works:**
+1. User sends a WhatsApp message → System automatically creates anonymous account
+2. AI responds immediately, no setup needed
+3. *(Optional)* User can verify phone later for higher limits
+
+**Optional Verification Flow:**
+1. User enters phone number in web interface to request verification
+2. System automatically uses the last contacted number for sending the 6-digit code
+3. User confirms code → Phone linked to account → higher rate limits unlocked
+4. User can remove link anytime
 
 ### Supported Features:
 - ✅ Text Messages (send & receive)
@@ -186,16 +212,16 @@ WhatsApp User → Meta Webhook → /api/v1/webhooks/whatsapp
 SynaPlan supports email-based AI conversations with smart chat context management.
 
 ### Email Addresses:
-- **General**: `smart@synaplan.com` - Creates general chat conversation
-- **Keyword-based**: `smart+keyword@synaplan.com` - Creates dedicated chat context
-  - Example: `smart+project@synaplan.com` for project discussions
-  - Example: `smart+support@synaplan.com` for support tickets
+- **General**: `smart@synaplan.net` - Creates general chat conversation
+- **Keyword-based**: `smart+keyword@synaplan.net` - Creates dedicated chat context
+  - Example: `smart+project@synaplan.net` for project discussions
+  - Example: `smart+support@synaplan.net` for support tickets
 
 ### Features:
 - ✅ **Automatic User Detection**: Registered users get their own rate limits
 - ✅ **Anonymous Email Support**: Unknown senders get ANONYMOUS limits
 - ✅ **Chat Context**: Email threads become chat conversations
-- ✅ **Spam Protection**: 
+- ✅ **Spam Protection**:
   - Max 10 emails/hour per unknown address
   - Automatic blacklisting for spammers
 - ✅ **Email Threading**: Replies stay in the same chat context
@@ -203,7 +229,7 @@ SynaPlan supports email-based AI conversations with smart chat context managemen
 
 ### How It Works:
 ```
-User sends email to smart@synaplan.com
+User sends email to smart@synaplan.net
   → System checks if email is registered user
   → If yes: Use user's rate limits
   → If no: Create anonymous user with ANONYMOUS limits
@@ -274,10 +300,10 @@ synaplan-dev/
 ## ⚙️ Environment Configuration
 
 Environment files are auto-generated on first start:
-- `backend/.env.local` (auto-created by backend container, only if not exists)
+- `backend/.env` (created from `.env.example` by install script, stores API keys)
 - `frontend/.env.docker` (auto-created by frontend container)
 
-**Note:** `.env.local` is never overwritten. To reset: delete the file and restart container.
+**Note:** `backend/.env` is never overwritten if it exists. To reset: delete the file and run the install script again.
 
 Example files provided:
 - `backend/.env.docker.example` (reference)
@@ -314,9 +340,9 @@ docker compose exec frontend npm install <package>
 
 ## 🤖 AI Models
 
-- **gpt-oss:20b (Ollama)** – Pulled automatically by the first-install script (or any `docker compose up -d` with `AUTO_DOWNLOAD_MODELS=true`) so local chat is ready without extra steps. Progress prints as `[Background] [gpt-oss:20b] ...`.
-- **bge-m3 (Ollama)** – Pulled alongside `gpt-oss:20b` during the first-install script so vector search works immediately; progress lines look like `[Background] [bge-m3] ...`.
-- **All cloud models (Groq, OpenAI, etc.)** – Instantly available once their respective API keys are set.
+- **bge-m3 (Ollama)** – Always pulled during install (required for RAG/vector search). This is a small embedding model (~1.5GB).
+- **gpt-oss:20b (Ollama)** – Only pulled if "Local Ollama" option selected during install. Large model (~12GB) for local chat without API keys.
+- **All cloud models (Groq, OpenAI, etc.)** – Instantly available once their respective API keys are set. Groq is recommended (free tier, fast).
 
 Disable the auto download by running:
 ```bash

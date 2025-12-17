@@ -5,7 +5,10 @@
         <div class="text-xs txt-secondary mb-1">{{ $t('commands.original') }}</div>
         <p class="text-sm txt-primary">{{ content }}</p>
       </div>
-      <div class="border-t border-light-border/30 dark:border-dark-border/20 pt-3" data-testid="section-translation-result">
+      <div
+        class="border-t border-light-border/30 dark:border-dark-border/20 pt-3"
+        data-testid="section-translation-result"
+      >
         <div class="text-xs txt-secondary mb-1">
           {{ $t('commands.translatedTo') }} <span class="uppercase font-medium">{{ lang }}</span>
         </div>

@@ -15,14 +15,14 @@
         <button
           v-for="tab in tabs"
           :key="tab.id"
-          @click="activeTab = tab.id"
           :class="[
             'px-4 py-3 font-medium transition-colors relative',
             activeTab === tab.id
               ? 'txt-primary border-b-2 border-[var(--brand)]'
-              : 'txt-secondary hover:txt-primary'
+              : 'txt-secondary hover:txt-primary',
           ]"
           :data-testid="`tab-${tab.id}`"
+          @click="activeTab = tab.id"
         >
           <div class="flex items-center gap-2">
             <Icon :icon="tab.icon" class="w-5 h-5" />
@@ -40,8 +40,8 @@
           </div>
           <div v-else-if="overview" class="space-y-6">
             <!-- Stats Grid -->
-              <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                <div class="surface-card rounded-lg p-6">
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div class="surface-card rounded-lg p-6">
                 <div class="flex items-center justify-between mb-2">
                   <span class="text-sm txt-secondary">{{ $t('admin.overview.totalUsers') }}</span>
                   <Icon icon="mdi:account-multiple" class="w-5 h-5 txt-secondary" />
@@ -49,16 +49,16 @@
                 <div class="text-3xl font-bold txt-primary">{{ overview.totalUsers }}</div>
               </div>
 
-                <div
-                  v-for="(count, level) in overview.usersByLevel"
-                  :key="level"
-                  class="surface-card rounded-lg p-6"
-                >
+              <div
+                v-for="(count, level) in overview.usersByLevel"
+                :key="level"
+                class="surface-card rounded-lg p-6"
+              >
                 <div class="flex items-center justify-between mb-2">
-                    <span class="text-sm txt-secondary">{{ level }}</span>
-                    <Icon :icon="getLevelIcon(level)" class="w-5 h-5 txt-secondary" />
+                  <span class="text-sm txt-secondary">{{ level }}</span>
+                  <Icon :icon="getLevelIcon(level)" class="w-5 h-5 txt-secondary" />
                 </div>
-                  <div class="text-3xl font-bold txt-primary">{{ count }}</div>
+                <div class="text-3xl font-bold txt-primary">{{ count }}</div>
               </div>
             </div>
 
@@ -69,7 +69,7 @@
               :initial-period="analyticsPeriod"
               :initial-group-by="analyticsGroupBy"
               @update:period="updateAnalyticsPeriod"
-              @update:groupBy="updateAnalyticsGroupBy"
+              @update:group-by="updateAnalyticsGroupBy"
             />
 
             <!-- Active Subscriptions Overview -->
@@ -79,10 +79,7 @@
                 {{ $t('admin.usage.activeSubscriptions') }}
               </h3>
               <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <template
-                  v-for="(count, level) in overview.usersByLevel"
-                  :key="level"
-                >
+                <template v-for="(count, level) in overview.usersByLevel" :key="level">
                   <div
                     v-if="level !== 'NEW' && level !== 'ADMIN'"
                     class="surface-elevated rounded-lg p-4"
@@ -92,7 +89,9 @@
                       <Icon :icon="getLevelIcon(level)" class="w-5 h-5 txt-secondary" />
                     </div>
                     <div class="text-2xl font-bold txt-primary">{{ count }}</div>
-                    <div class="text-xs txt-secondary mt-1">{{ $t('admin.usage.activeSubscriptions') }}</div>
+                    <div class="text-xs txt-secondary mt-1">
+                      {{ $t('admin.usage.activeSubscriptions') }}
+                    </div>
                   </div>
                 </template>
               </div>
@@ -108,10 +107,18 @@
                 <table class="w-full">
                   <thead>
                     <tr class="border-b border-light-border/30 dark:border-dark-border/20">
-                      <th class="text-left py-2 px-4 text-sm font-medium txt-secondary">{{ $t('admin.users.email') }}</th>
-                      <th class="text-left py-2 px-4 text-sm font-medium txt-secondary">{{ $t('admin.users.level') }}</th>
-                      <th class="text-left py-2 px-4 text-sm font-medium txt-secondary">{{ $t('admin.users.created') }}</th>
-                      <th class="text-left py-2 px-4 text-sm font-medium txt-secondary">{{ $t('admin.users.status') }}</th>
+                      <th class="text-left py-2 px-4 text-sm font-medium txt-secondary">
+                        {{ $t('admin.users.email') }}
+                      </th>
+                      <th class="text-left py-2 px-4 text-sm font-medium txt-secondary">
+                        {{ $t('admin.users.level') }}
+                      </th>
+                      <th class="text-left py-2 px-4 text-sm font-medium txt-secondary">
+                        {{ $t('admin.users.created') }}
+                      </th>
+                      <th class="text-left py-2 px-4 text-sm font-medium txt-secondary">
+                        {{ $t('admin.users.status') }}
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
@@ -124,7 +131,9 @@
                       <td class="py-3 px-4">
                         <span :class="getLevelBadgeClass(user.level)">{{ user.level }}</span>
                       </td>
-                      <td class="py-3 px-4 txt-secondary text-sm">{{ formatDate(user.created) }}</td>
+                      <td class="py-3 px-4 txt-secondary text-sm">
+                        {{ formatDate(user.created) }}
+                      </td>
                       <td class="py-3 px-4">
                         <Icon
                           v-if="user.emailVerified"
@@ -158,14 +167,14 @@
                   type="text"
                   :placeholder="$t('admin.users.searchPlaceholder')"
                   class="w-full px-4 py-2.5 rounded-lg bg-chat border border-light-border/30 dark:border-dark-border/20 txt-primary focus:ring-2 focus:ring-[var(--brand)] focus:outline-none"
-                  @input="debouncedSearchUsers"
                   data-testid="input-user-search"
+                  @input="debouncedSearchUsers"
                 />
               </div>
               <button
-                @click="loadUsers()"
                 class="btn-secondary px-6 py-2.5 rounded-lg font-medium"
                 data-testid="btn-refresh-users"
+                @click="loadUsers()"
               >
                 <Icon icon="mdi:refresh" class="w-5 h-5" />
               </button>
@@ -186,12 +195,24 @@
                   <thead>
                     <tr class="border-b border-light-border/30 dark:border-dark-border/20">
                       <th class="text-left py-2 px-4 text-sm font-medium txt-secondary">ID</th>
-                      <th class="text-left py-2 px-4 text-sm font-medium txt-secondary">{{ $t('admin.users.email') }}</th>
-                      <th class="text-left py-2 px-4 text-sm font-medium txt-secondary">{{ $t('admin.users.level') }}</th>
-                      <th class="text-left py-2 px-4 text-sm font-medium txt-secondary">{{ $t('admin.users.type') }}</th>
-                      <th class="text-left py-2 px-4 text-sm font-medium txt-secondary">{{ $t('admin.users.provider') }}</th>
-                      <th class="text-left py-2 px-4 text-sm font-medium txt-secondary">{{ $t('admin.users.created') }}</th>
-                      <th class="text-right py-2 px-4 text-sm font-medium txt-secondary">{{ $t('admin.users.actions') }}</th>
+                      <th class="text-left py-2 px-4 text-sm font-medium txt-secondary">
+                        {{ $t('admin.users.email') }}
+                      </th>
+                      <th class="text-left py-2 px-4 text-sm font-medium txt-secondary">
+                        {{ $t('admin.users.level') }}
+                      </th>
+                      <th class="text-left py-2 px-4 text-sm font-medium txt-secondary">
+                        {{ $t('admin.users.type') }}
+                      </th>
+                      <th class="text-left py-2 px-4 text-sm font-medium txt-secondary">
+                        {{ $t('admin.users.provider') }}
+                      </th>
+                      <th class="text-left py-2 px-4 text-sm font-medium txt-secondary">
+                        {{ $t('admin.users.created') }}
+                      </th>
+                      <th class="text-right py-2 px-4 text-sm font-medium txt-secondary">
+                        {{ $t('admin.users.actions') }}
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
@@ -215,10 +236,12 @@
                       <td class="py-3 px-4">
                         <select
                           :value="user.level"
-                          @change="updateUserLevel(user.id, ($event.target as HTMLSelectElement).value)"
                           class="px-3 py-1.5 rounded-lg bg-chat border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:ring-2 focus:ring-[var(--brand)] focus:outline-none"
                           :disabled="user.id === currentUserId"
                           :data-testid="`select-user-level-${user.id}`"
+                          @change="
+                            updateUserLevel(user.id, ($event.target as HTMLSelectElement).value)
+                          "
                         >
                           <option value="NEW">NEW</option>
                           <option value="PRO">PRO</option>
@@ -229,18 +252,22 @@
                       </td>
                       <td class="py-3 px-4 txt-secondary text-sm">{{ user.type }}</td>
                       <td class="py-3 px-4 txt-secondary text-sm">{{ user.providerId }}</td>
-                      <td class="py-3 px-4 txt-secondary text-sm">{{ formatDate(user.created) }}</td>
+                      <td class="py-3 px-4 txt-secondary text-sm">
+                        {{ formatDate(user.created) }}
+                      </td>
                       <td class="py-3 px-4 text-right">
                         <button
                           v-if="user.id !== currentUserId"
-                          @click="confirmDeleteUser(user)"
                           class="text-red-500 hover:text-red-600 dark:text-red-400 dark:hover:text-red-300 p-2 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20"
                           :title="$t('admin.users.delete')"
                           :data-testid="`btn-delete-user-${user.id}`"
+                          @click="confirmDeleteUser(user)"
                         >
                           <Icon icon="mdi:delete" class="w-5 h-5" />
                         </button>
-                        <span v-else class="text-sm txt-secondary italic">{{ $t('admin.users.currentUser') }}</span>
+                        <span v-else class="text-sm txt-secondary italic">{{
+                          $t('admin.users.currentUser')
+                        }}</span>
                       </td>
                     </tr>
                   </tbody>
@@ -250,19 +277,19 @@
               <!-- Pagination -->
               <div v-if="totalPages > 1" class="flex justify-center gap-2 mt-6">
                 <button
-                  @click="currentPage = Math.max(1, currentPage - 1)"
                   :disabled="currentPage === 1"
                   class="btn-secondary px-4 py-2 rounded-lg disabled:opacity-50"
                   data-testid="btn-prev-page"
+                  @click="currentPage = Math.max(1, currentPage - 1)"
                 >
                   <Icon icon="mdi:chevron-left" class="w-5 h-5" />
                 </button>
                 <span class="px-4 py-2 txt-primary">{{ currentPage }} / {{ totalPages }}</span>
                 <button
-                  @click="currentPage = Math.min(totalPages, currentPage + 1)"
                   :disabled="currentPage === totalPages"
                   class="btn-secondary px-4 py-2 rounded-lg disabled:opacity-50"
                   data-testid="btn-next-page"
+                  @click="currentPage = Math.min(totalPages, currentPage + 1)"
                 >
                   <Icon icon="mdi:chevron-right" class="w-5 h-5" />
                 </button>
@@ -277,34 +304,40 @@
             <Icon icon="mdi:loading" class="w-8 h-8 animate-spin mx-auto txt-secondary" />
           </div>
           <div v-else class="space-y-4">
-            <div
-              v-for="prompt in prompts"
-              :key="prompt.id"
-              class="surface-card rounded-lg p-6"
-            >
+            <div v-for="prompt in prompts" :key="prompt.id" class="surface-card rounded-lg p-6">
               <div class="flex items-start justify-between mb-4">
                 <div class="flex-1">
                   <div class="flex items-center gap-3 mb-2">
                     <h3 class="text-lg font-semibold txt-primary">{{ prompt.topic }}</h3>
-                    <span class="px-2 py-1 text-xs rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200">
+                    <span
+                      class="px-2 py-1 text-xs rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200"
+                    >
                       {{ prompt.language }}
                     </span>
                   </div>
                   <p class="text-sm txt-secondary mb-4">{{ prompt.shortDescription }}</p>
                 </div>
                 <button
-                  @click="togglePromptEdit(prompt.id)"
                   class="btn-secondary px-4 py-2 rounded-lg"
                   :data-testid="`btn-edit-prompt-${prompt.id}`"
+                  @click="togglePromptEdit(prompt.id)"
                 >
-                  <Icon :icon="editingPromptId === prompt.id ? 'mdi:close' : 'mdi:pencil'" class="w-4 h-4" />
+                  <Icon
+                    :icon="editingPromptId === prompt.id ? 'mdi:close' : 'mdi:pencil'"
+                    class="w-4 h-4"
+                  />
                 </button>
               </div>
 
               <!-- Edit Form -->
-              <div v-if="editingPromptId === prompt.id" class="space-y-4 mt-4 pt-4 border-t border-light-border/30 dark:border-dark-border/20">
+              <div
+                v-if="editingPromptId === prompt.id"
+                class="space-y-4 mt-4 pt-4 border-t border-light-border/30 dark:border-dark-border/20"
+              >
                 <div>
-                  <label class="block text-sm font-medium txt-primary mb-2">{{ $t('admin.prompts.shortDesc') }}</label>
+                  <label class="block text-sm font-medium txt-primary mb-2">{{
+                    $t('admin.prompts.shortDesc')
+                  }}</label>
                   <input
                     v-model="editingPrompt.shortDescription"
                     type="text"
@@ -313,7 +346,9 @@
                   />
                 </div>
                 <div>
-                  <label class="block text-sm font-medium txt-primary mb-2">{{ $t('admin.prompts.prompt') }}</label>
+                  <label class="block text-sm font-medium txt-primary mb-2">{{
+                    $t('admin.prompts.prompt')
+                  }}</label>
                   <textarea
                     v-model="editingPrompt.prompt"
                     rows="10"
@@ -322,7 +357,9 @@
                   ></textarea>
                 </div>
                 <div>
-                  <label class="block text-sm font-medium txt-primary mb-2">{{ $t('admin.prompts.selectionRules') }}</label>
+                  <label class="block text-sm font-medium txt-primary mb-2">{{
+                    $t('admin.prompts.selectionRules')
+                  }}</label>
                   <textarea
                     v-model="editingPrompt.selectionRules"
                     rows="4"
@@ -333,17 +370,17 @@
                 </div>
                 <div class="flex justify-end gap-3">
                   <button
-                    @click="cancelEditPrompt()"
                     class="btn-secondary px-6 py-2.5 rounded-lg"
                     data-testid="btn-cancel-edit-prompt"
+                    @click="cancelEditPrompt()"
                   >
                     {{ $t('common.cancel') }}
                   </button>
                   <button
-                    @click="savePrompt(prompt.id)"
                     class="btn-primary px-6 py-2.5 rounded-lg"
                     :disabled="promptSaving"
                     data-testid="btn-save-prompt"
+                    @click="savePrompt(prompt.id)"
                   >
                     {{ $t('common.save') }}
                   </button>
@@ -356,7 +393,8 @@
                   {{ prompt.prompt }}
                 </div>
                 <div v-if="prompt.selectionRules" class="text-xs txt-secondary">
-                  <strong>{{ $t('admin.prompts.selectionRules') }}:</strong> {{ prompt.selectionRules }}
+                  <strong>{{ $t('admin.prompts.selectionRules') }}:</strong>
+                  {{ prompt.selectionRules }}
                 </div>
               </div>
             </div>
@@ -371,12 +409,12 @@
               <button
                 v-for="period in ['day', 'week', 'month', 'all']"
                 :key="period"
-                @click="loadUsageStats(period as any)"
                 :class="[
                   'px-4 py-2 rounded-lg font-medium',
-                  usageStatsPeriod === period ? 'btn-primary' : 'btn-secondary'
+                  usageStatsPeriod === period ? 'btn-primary' : 'btn-secondary',
                 ]"
                 :data-testid="`btn-period-${period}`"
+                @click="loadUsageStats(period as any)"
               >
                 {{ $t(`admin.usage.period.${period}`) }}
               </button>
@@ -396,7 +434,9 @@
                   <span class="text-sm txt-secondary">{{ $t('admin.usage.totalRequests') }}</span>
                   <Icon icon="mdi:message" class="w-5 h-5 txt-secondary" />
                 </div>
-                <div class="text-3xl font-bold txt-primary">{{ (usageStats.total_requests || 0).toLocaleString() }}</div>
+                <div class="text-3xl font-bold txt-primary">
+                  {{ (usageStats.total_requests || 0).toLocaleString() }}
+                </div>
               </div>
 
               <div class="surface-card rounded-lg p-6">
@@ -404,7 +444,9 @@
                   <span class="text-sm txt-secondary">{{ $t('admin.usage.totalTokens') }}</span>
                   <Icon icon="mdi:alphabetical-variant" class="w-5 h-5 txt-secondary" />
                 </div>
-                <div class="text-3xl font-bold txt-primary">{{ (usageStats.total_tokens || 0).toLocaleString() }}</div>
+                <div class="text-3xl font-bold txt-primary">
+                  {{ (usageStats.total_tokens || 0).toLocaleString() }}
+                </div>
               </div>
 
               <div class="surface-card rounded-lg p-6">
@@ -412,7 +454,9 @@
                   <span class="text-sm txt-secondary">{{ $t('admin.usage.totalCost') }}</span>
                   <Icon icon="mdi:currency-usd" class="w-5 h-5 txt-secondary" />
                 </div>
-                <div class="text-3xl font-bold txt-primary">${{ (usageStats.total_cost || 0).toFixed(2) }}</div>
+                <div class="text-3xl font-bold txt-primary">
+                  ${{ (usageStats.total_cost || 0).toFixed(2) }}
+                </div>
               </div>
 
               <div class="surface-card rounded-lg p-6">
@@ -420,7 +464,9 @@
                   <span class="text-sm txt-secondary">{{ $t('admin.usage.avgLatency') }}</span>
                   <Icon icon="mdi:speedometer" class="w-5 h-5 txt-secondary" />
                 </div>
-                <div class="text-3xl font-bold txt-primary">{{ (usageStats.avg_latency || 0).toFixed(0) }}ms</div>
+                <div class="text-3xl font-bold txt-primary">
+                  {{ (usageStats.avg_latency || 0).toFixed(0) }}ms
+                </div>
               </div>
             </div>
 
@@ -479,11 +525,21 @@
                   <thead>
                     <tr class="border-b border-light-border/30 dark:border-dark-border/20">
                       <th class="text-left py-2 px-4 text-sm font-medium txt-secondary">#</th>
-                      <th class="text-left py-2 px-4 text-sm font-medium txt-secondary">{{ $t('admin.users.email') }}</th>
-                      <th class="text-left py-2 px-4 text-sm font-medium txt-secondary">{{ $t('admin.users.level') }}</th>
-                      <th class="text-right py-2 px-4 text-sm font-medium txt-secondary">{{ $t('admin.usage.requests') }}</th>
-                      <th class="text-right py-2 px-4 text-sm font-medium txt-secondary">{{ $t('admin.usage.tokens') }}</th>
-                      <th class="text-right py-2 px-4 text-sm font-medium txt-secondary">{{ $t('admin.usage.cost') }}</th>
+                      <th class="text-left py-2 px-4 text-sm font-medium txt-secondary">
+                        {{ $t('admin.users.email') }}
+                      </th>
+                      <th class="text-left py-2 px-4 text-sm font-medium txt-secondary">
+                        {{ $t('admin.users.level') }}
+                      </th>
+                      <th class="text-right py-2 px-4 text-sm font-medium txt-secondary">
+                        {{ $t('admin.usage.requests') }}
+                      </th>
+                      <th class="text-right py-2 px-4 text-sm font-medium txt-secondary">
+                        {{ $t('admin.usage.tokens') }}
+                      </th>
+                      <th class="text-right py-2 px-4 text-sm font-medium txt-secondary">
+                        {{ $t('admin.usage.cost') }}
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
@@ -497,9 +553,15 @@
                       <td class="py-3 px-4">
                         <span :class="getLevelBadgeClass(user.level)">{{ user.level }}</span>
                       </td>
-                      <td class="py-3 px-4 text-right txt-secondary">{{ user.requests.toLocaleString() }}</td>
-                      <td class="py-3 px-4 text-right txt-secondary">{{ user.tokens.toLocaleString() }}</td>
-                      <td class="py-3 px-4 text-right txt-secondary">${{ user.cost.toFixed(2) }}</td>
+                      <td class="py-3 px-4 text-right txt-secondary">
+                        {{ user.requests.toLocaleString() }}
+                      </td>
+                      <td class="py-3 px-4 text-right txt-secondary">
+                        {{ user.tokens.toLocaleString() }}
+                      </td>
+                      <td class="py-3 px-4 text-right txt-secondary">
+                        ${{ user.cost.toFixed(2) }}
+                      </td>
                     </tr>
                   </tbody>
                 </table>
@@ -516,30 +578,35 @@
         <div
           v-if="showDeleteModal"
           class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
-          @click.self="showDeleteModal = false"
           data-testid="modal-delete-user"
+          @click.self="showDeleteModal = false"
         >
-          <div class="surface-elevated w-full max-w-md p-6 m-4" data-testid="modal-delete-user-content">
+          <div
+            class="surface-elevated w-full max-w-md p-6 m-4"
+            data-testid="modal-delete-user-content"
+          >
             <div class="flex items-center justify-center mb-4">
               <Icon icon="mdi:alert-circle-outline" class="w-12 h-12 text-red-500" />
             </div>
-            <h3 class="text-xl font-bold text-center txt-primary mb-2">{{ $t('admin.users.deleteConfirmTitle') }}</h3>
+            <h3 class="text-xl font-bold text-center txt-primary mb-2">
+              {{ $t('admin.users.deleteConfirmTitle') }}
+            </h3>
             <p class="text-center txt-secondary mb-6">
               {{ $t('admin.users.deleteConfirmDesc', { email: userToDelete?.email }) }}
             </p>
 
             <div class="flex justify-end gap-3">
               <button
-                @click="showDeleteModal = false"
                 class="btn-secondary py-2 px-4 rounded-lg"
                 data-testid="btn-cancel-delete-user"
+                @click="showDeleteModal = false"
               >
                 {{ $t('common.cancel') }}
               </button>
               <button
-                @click="deleteUser()"
                 class="btn-danger py-2 px-4 rounded-lg"
                 data-testid="btn-confirm-delete-user"
+                @click="deleteUser()"
               >
                 {{ $t('common.delete') }}
               </button>
@@ -557,12 +624,21 @@ import { Icon } from '@iconify/vue'
 import MainLayout from '@/components/MainLayout.vue'
 import RegistrationChart from '@/components/admin/RegistrationChart.vue'
 import UsageChart from '@/components/admin/UsageChart.vue'
-import { adminApi, type AdminUser, type SystemPrompt, type UsageStats, type SystemOverview, type RegistrationAnalytics } from '@/services/api/adminApi'
+import {
+  adminApi,
+  type AdminUser,
+  type SystemPrompt,
+  type UsageStats,
+  type SystemOverview,
+  type RegistrationAnalytics,
+} from '@/services/api/adminApi'
 import { useAuthStore } from '@/stores/auth'
 import { useI18n } from 'vue-i18n'
+import { useNotification } from '@/composables/useNotification'
 
 const { t } = useI18n()
 const authStore = useAuthStore()
+const { success, error: showError } = useNotification()
 
 type TabId = 'overview' | 'users' | 'prompts' | 'usage'
 interface AdminTab {
@@ -648,7 +724,10 @@ async function loadOverview() {
 
 async function loadRegistrationAnalytics() {
   try {
-    registrationAnalytics.value = await adminApi.getRegistrationAnalytics(analyticsPeriod.value, analyticsGroupBy.value)
+    registrationAnalytics.value = await adminApi.getRegistrationAnalytics(
+      analyticsPeriod.value,
+      analyticsGroupBy.value
+    )
   } catch (error) {
     console.error('Failed to load registration analytics:', error)
   }
@@ -667,11 +746,31 @@ async function updateAnalyticsGroupBy(newGroupBy: string) {
 async function loadUsers() {
   usersLoading.value = true
   try {
-    const response = await adminApi.getUsers(currentPage.value, itemsPerPage.value, userSearch.value)
-    users.value = response.users
-    totalUsers.value = response.total
+    const response = await adminApi.getUsers(
+      currentPage.value,
+      itemsPerPage.value,
+      userSearch.value
+    )
+    if (import.meta.env.DEV) {
+      console.log('📊 Users API response:', response)
+    }
+    if (response && response.users) {
+      users.value = response.users
+      totalUsers.value = response.total
+      if (import.meta.env.DEV) {
+        console.log('✅ Users loaded:', users.value.length)
+      }
+    } else {
+      if (import.meta.env.DEV) {
+        console.error('❌ Invalid response structure:', response)
+      }
+      showError('Invalid response from server')
+    }
   } catch (error) {
-    console.error('Failed to load users:', error)
+    if (import.meta.env.DEV) {
+      console.error('Failed to load users:', error)
+    }
+    showError(error instanceof Error ? error.message : 'Failed to load users')
   } finally {
     usersLoading.value = false
   }
@@ -719,10 +818,12 @@ async function updateUserLevel(userId: number, newLevel: string) {
     // Update local state
     const user = users.value.find((u: AdminUser) => u.id === userId)
     if (user) {
-      user.level = newLevel
+      user.level = newLevel as 'NEW' | 'PRO' | 'TEAM' | 'BUSINESS' | 'ADMIN'
     }
+    success(t('admin.users.levelUpdated', { level: newLevel }))
   } catch (error) {
     console.error('Failed to update user level:', error)
+    showError(error instanceof Error ? error.message : t('admin.users.levelUpdateFailed'))
   }
 }
 
@@ -788,22 +889,22 @@ async function savePrompt(promptId: number) {
 // Helpers
 function getLevelIcon(level: string): string {
   const icons: Record<string, string> = {
-    'NEW': 'mdi:star-outline',
-    'PRO': 'mdi:star',
-    'TEAM': 'mdi:account-group',
-    'BUSINESS': 'mdi:office-building',
-    'ADMIN': 'mdi:shield-crown',
+    NEW: 'mdi:star-outline',
+    PRO: 'mdi:star',
+    TEAM: 'mdi:account-group',
+    BUSINESS: 'mdi:office-building',
+    ADMIN: 'mdi:shield-crown',
   }
   return icons[level] || 'mdi:account'
 }
 
 function getLevelBadgeClass(level: string): string {
   const classes: Record<string, string> = {
-    'NEW': 'badge-level badge-new',
-    'PRO': 'badge-level badge-pro',
-    'TEAM': 'badge-level badge-team',
-    'BUSINESS': 'badge-level badge-business',
-    'ADMIN': 'badge-level badge-admin',
+    NEW: 'badge-level badge-new',
+    PRO: 'badge-level badge-pro',
+    TEAM: 'badge-level badge-team',
+    BUSINESS: 'badge-level badge-business',
+    ADMIN: 'badge-level badge-admin',
   }
   return classes[level] || classes['NEW']
 }
@@ -811,7 +912,11 @@ function getLevelBadgeClass(level: string): string {
 function formatDate(dateStr: string): string {
   try {
     const date = new Date(dateStr)
-    return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    return (
+      date.toLocaleDateString() +
+      ' ' +
+      date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    )
   } catch {
     return dateStr
   }
@@ -823,4 +928,3 @@ onMounted(() => {
   loadRegistrationAnalytics()
 })
 </script>
-

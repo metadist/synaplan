@@ -1,9 +1,9 @@
 /*M!999999\- enable the sandbox mode */ 
--- MariaDB dump 10.19-11.7.2-MariaDB, for debian-linux-gnu (x86_64)
+-- MariaDB dump 10.19-11.8.2-MariaDB, for debian-linux-gnu (x86_64)
 --
--- Host: localhost    Database: synadb
+-- Host: localhost    Database: synaplan
 -- ------------------------------------------------------
--- Server version	11.7.2-MariaDB-ubu2404
+-- Server version	11.8.2-MariaDB-ubu2404
 
 /*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;
 /*!40101 SET @OLD_CHARACTER_SET_RESULTS=@@CHARACTER_SET_RESULTS */;
@@ -25,13 +25,15 @@ DROP TABLE IF EXISTS `BMESSAGEMETA`;
 /*!40101 SET character_set_client = utf8mb4 */;
 CREATE TABLE `BMESSAGEMETA` (
   `BID` bigint(20) NOT NULL AUTO_INCREMENT,
-  `BMESSID` bigint(20) NOT NULL,
-  `BTOKEN` varchar(64) NOT NULL,
-  `BVALUE` varchar(128) NOT NULL,
+  `BMESSAGEID` bigint(20) NOT NULL,
+  `BMETAKEY` varchar(64) NOT NULL,
+  `BMETAVALUE` longtext NOT NULL,
+  `BCREATED` bigint(20) NOT NULL,
   PRIMARY KEY (`BID`),
-  KEY `BMESSID` (`BMESSID`),
-  KEY `BTOKEN` (`BTOKEN`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3 COLLATE=utf8mb3_general_ci;
+  KEY `idx_messagemeta_message` (`BMESSAGEID`),
+  KEY `idx_messagemeta_key` (`BMETAKEY`),
+  CONSTRAINT `FK_F2A54B27EA4931D2` FOREIGN KEY (`BMESSAGEID`) REFERENCES `BMESSAGES` (`BID`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -40,8 +42,10 @@ CREATE TABLE `BMESSAGEMETA` (
 
 LOCK TABLES `BMESSAGEMETA` WRITE;
 /*!40000 ALTER TABLE `BMESSAGEMETA` DISABLE KEYS */;
+set autocommit=0;
 /*!40000 ALTER TABLE `BMESSAGEMETA` ENABLE KEYS */;
 UNLOCK TABLES;
+commit;
 /*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
 
 /*!40101 SET SQL_MODE=@OLD_SQL_MODE */;
@@ -52,4 +56,4 @@ UNLOCK TABLES;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*M!100616 SET NOTE_VERBOSITY=@OLD_NOTE_VERBOSITY */;
 
--- Dump completed on 2025-08-05 15:19:30
+-- Dump completed on 2025-12-17  9:37:26

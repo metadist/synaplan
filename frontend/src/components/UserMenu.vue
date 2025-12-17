@@ -1,11 +1,13 @@
 <template>
   <div class="relative isolate" data-testid="comp-user-menu">
     <button
-      @click="isOpen = !isOpen"
       class="dropdown-trigger w-full"
       data-testid="btn-user-menu-toggle"
+      @click="isOpen = !isOpen"
     >
-      <div class="w-8 h-8 rounded-full surface-chip flex items-center justify-center text-sm font-medium flex-shrink-0">
+      <div
+        class="w-8 h-8 rounded-full surface-chip flex items-center justify-center text-sm font-medium flex-shrink-0"
+      >
         <span class="txt-primary">{{ initials }}</span>
       </div>
       <span v-if="!collapsed" class="text-sm truncate flex-1 text-left">{{ email }}</span>
@@ -22,25 +24,25 @@
     >
       <div
         v-if="isOpen"
-        v-click-outside="() => isOpen = false"
+        v-click-outside="() => (isOpen = false)"
         role="menu"
         class="absolute bottom-full left-0 mb-2 w-full min-w-[220px] max-h-[60vh] overflow-auto scroll-thin dropdown-panel z-[70]"
         data-testid="dropdown-user-menu"
       >
         <button
-          @click="handleProfileSettings"
           role="menuitem"
           class="dropdown-item"
           data-testid="btn-user-profile-settings"
+          @click="handleProfileSettings"
         >
           <UserCircleIcon class="w-5 h-5" />
           <span>Profile settings</span>
         </button>
         <button
-          @click="handleLogout"
           role="menuitem"
           class="dropdown-item"
           data-testid="btn-user-logout"
+          @click="handleLogout"
         >
           <ArrowRightOnRectangleIcon class="w-5 h-5" />
           <span>Log out</span>
@@ -53,7 +55,11 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
-import { UserCircleIcon, ArrowRightOnRectangleIcon, ChevronDownIcon } from '@heroicons/vue/24/outline'
+import {
+  UserCircleIcon,
+  ArrowRightOnRectangleIcon,
+  ChevronDownIcon,
+} from '@heroicons/vue/24/outline'
 import { useAuth } from '@/composables/useAuth'
 
 interface Props {

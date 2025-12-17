@@ -28,7 +28,7 @@ useTheme()
 // SECURITY: Clean up any legacy localStorage entries from before cookie-based auth
 // These should NEVER exist - if they do, they're from old code and must be removed
 const legacyKeys = ['auth_token', 'auth_user', 'refresh_token', 'dev-token']
-legacyKeys.forEach(key => {
+legacyKeys.forEach((key) => {
   if (localStorage.getItem(key)) {
     console.warn(`🧹 Removing legacy localStorage key: ${key}`)
     localStorage.removeItem(key)

@@ -5,4 +5,3 @@ config.global.plugins = [i18n]
 
 // Suppress console.log in tests
 global.console.log = () => {}
-

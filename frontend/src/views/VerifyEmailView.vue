@@ -1,22 +1,31 @@
 <template>
-  <div class="min-h-screen bg-light-bg dark:bg-dark-bg flex items-center justify-center px-4 py-12 relative overflow-hidden" data-testid="page-verify-email">
+  <div
+    class="min-h-screen bg-light-bg dark:bg-dark-bg flex items-center justify-center px-4 py-12 relative overflow-hidden"
+    data-testid="page-verify-email"
+  >
     <div class="absolute inset-0 overflow-hidden pointer-events-none">
-      <div class="absolute top-0 left-1/4 w-96 h-96 bg-primary/5 dark:bg-primary/10 rounded-full blur-3xl animate-float"></div>
-      <div class="absolute bottom-0 right-1/4 w-96 h-96 bg-primary/5 dark:bg-primary/10 rounded-full blur-3xl animate-float-delayed"></div>
+      <div
+        class="absolute top-0 left-1/4 w-96 h-96 bg-primary/5 dark:bg-primary/10 rounded-full blur-3xl animate-float"
+      ></div>
+      <div
+        class="absolute bottom-0 right-1/4 w-96 h-96 bg-primary/5 dark:bg-primary/10 rounded-full blur-3xl animate-float-delayed"
+      ></div>
     </div>
     <div class="absolute top-6 right-6 flex items-center gap-4">
       <button
-        @click="cycleLanguage"
         class="h-10 px-4 rounded-lg icon-ghost text-sm font-medium"
         data-testid="btn-language-toggle"
+        @click="cycleLanguage"
       >
         {{ currentLanguage.toUpperCase() }}
       </button>
       <button
-        @click="toggleTheme"
         class="h-10 w-10 rounded-lg icon-ghost flex items-center justify-center"
-        :aria-label="themeStore.theme.value === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'"
+        :aria-label="
+          themeStore.theme.value === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'
+        "
         data-testid="btn-theme-toggle"
+        @click="toggleTheme"
       >
         <SunIcon v-if="themeStore.theme.value === 'dark'" class="w-5 h-5" />
         <MoonIcon v-else class="w-5 h-5" />
@@ -26,16 +35,14 @@
     <div class="w-full max-w-md">
       <div class="text-center mb-8">
         <router-link to="/login" class="inline-block" data-testid="link-back-login">
-          <img
-            :src="logoSrc"
-            alt="synaplan"
-            class="h-12 mx-auto mb-6"
-          />
+          <img :src="logoSrc" alt="synaplan" class="h-12 mx-auto mb-6" />
         </router-link>
       </div>
 
       <div class="surface-card p-8 text-center" data-testid="section-verify-card">
-        <div class="w-20 h-20 mx-auto mb-6 rounded-full bg-[var(--brand)]/10 flex items-center justify-center">
+        <div
+          class="w-20 h-20 mx-auto mb-6 rounded-full bg-[var(--brand)]/10 flex items-center justify-center"
+        >
           <EnvelopeIcon class="w-10 h-10" style="color: var(--brand)" />
         </div>
 
@@ -55,8 +62,18 @@
           <!-- Success Message -->
           <div v-if="successMessage" class="alert-success" data-testid="alert-resend-success">
             <p class="text-sm alert-success-text flex items-start gap-2">
-              <svg class="w-5 h-5 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+              <svg
+                class="w-5 h-5 flex-shrink-0 mt-0.5"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M5 13l4 4L19 7"
+                ></path>
               </svg>
               <span>{{ successMessage }}</span>
             </p>
@@ -65,36 +82,64 @@
           <!-- Error Message -->
           <div v-if="error" class="alert-error" data-testid="alert-resend-error">
             <p class="text-sm alert-error-text flex items-start gap-2">
-              <svg class="w-5 h-5 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+              <svg
+                class="w-5 h-5 flex-shrink-0 mt-0.5"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M6 18L18 6M6 6l12 12"
+                ></path>
               </svg>
               <span>{{ error }}</span>
             </p>
           </div>
 
           <!-- Remaining Attempts Info -->
-          <div v-if="remainingAttempts < 5" class="alert-warning" data-testid="text-remaining-attempts">
+          <div
+            v-if="remainingAttempts < 5"
+            class="alert-warning"
+            data-testid="text-remaining-attempts"
+          >
             <p class="text-xs alert-warning-text text-center">
               {{ remainingAttempts }} attempt{{ remainingAttempts !== 1 ? 's' : '' }} remaining
             </p>
           </div>
 
           <Button
-            @click="handleResendEmail"
             :disabled="isResending || countdown > 0 || remainingAttempts <= 0"
             class="w-full btn-secondary py-3 rounded-lg font-medium"
             data-testid="btn-resend-email"
+            @click="handleResendEmail"
           >
-            <span v-if="remainingAttempts <= 0">
-              Maximum attempts reached
-            </span>
+            <span v-if="remainingAttempts <= 0"> Maximum attempts reached </span>
             <span v-else-if="!isResending && countdown === 0">
               {{ $t('auth.resendEmail') }}
             </span>
             <span v-else-if="isResending" class="flex items-center justify-center gap-2">
-              <svg class="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              <svg
+                class="animate-spin h-5 w-5"
+                xmlns="http://www.w3.org/2000/svg"
+                fill="none"
+                viewBox="0 0 24 24"
+              >
+                <circle
+                  class="opacity-25"
+                  cx="12"
+                  cy="12"
+                  r="10"
+                  stroke="currentColor"
+                  stroke-width="4"
+                ></circle>
+                <path
+                  class="opacity-75"
+                  fill="currentColor"
+                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                ></path>
               </svg>
               {{ $t('auth.sending') }}
             </span>
@@ -103,12 +148,16 @@
             </span>
           </Button>
 
-          <div class="flex items-center gap-2 text-sm txt-secondary" data-testid="section-change-email">
+          <div
+            class="flex items-center gap-2 text-sm txt-secondary"
+            data-testid="section-change-email"
+          >
             <span>{{ $t('auth.wrongEmail') }}</span>
             <button
-              @click="handleChangeEmail"
-              class="font-medium transition-colors" style="color: var(--brand)"
+              class="font-medium transition-colors"
+              style="color: var(--brand)"
               data-testid="btn-change-email"
+              @click="handleChangeEmail"
             >
               {{ $t('auth.changeEmail') }}
             </button>
@@ -134,7 +183,13 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { SunIcon, MoonIcon, EnvelopeIcon, ArrowLeftIcon, InformationCircleIcon } from '@heroicons/vue/24/outline'
+import {
+  SunIcon,
+  MoonIcon,
+  EnvelopeIcon,
+  ArrowLeftIcon,
+  InformationCircleIcon,
+} from '@heroicons/vue/24/outline'
 import { useTheme } from '../composables/useTheme'
 import { authApi } from '@/services/api'
 import Button from '../components/Button.vue'
@@ -150,9 +205,11 @@ const isDark = computed(() => {
   return matchMedia('(prefers-color-scheme: dark)').matches
 })
 
-const logoSrc = computed(() => `${import.meta.env.BASE_URL}${isDark.value ? 'synaplan-light.svg' : 'synaplan-dark.svg'}`)
+const logoSrc = computed(
+  () => `${import.meta.env.BASE_URL}${isDark.value ? 'synaplan-light.svg' : 'synaplan-dark.svg'}`
+)
 
-const userEmail = ref(route.query.email as string || 'your@email.com')
+const userEmail = ref((route.query.email as string) || 'your@email.com')
 const isResending = ref(false)
 const countdown = ref(0)
 const remainingAttempts = ref(5)
@@ -196,49 +253,53 @@ const handleResendEmail = async () => {
   error.value = ''
   successMessage.value = ''
   isResending.value = true
-  
+
   try {
     const response = await authApi.resendVerification(userEmail.value)
-    
+
     successMessage.value = response.message || 'Verification email sent!'
-    
+
     if (response.remainingAttempts !== undefined) {
       remainingAttempts.value = response.remainingAttempts
     }
-    
+
     if (response.cooldownMinutes !== undefined) {
       cooldownMinutes.value = response.cooldownMinutes
       startCountdown(response.cooldownMinutes * 60)
     }
   } catch (err: any) {
     console.error('Failed to resend email:', err)
-    
+
     if (err.response?.status === 429) {
       // Rate limit error
       const data = err.response.data
       error.value = data.message || data.error || 'Please wait before requesting another email'
-      
+
       if (data.waitSeconds) {
         startCountdown(data.waitSeconds)
       }
-      
+
       if (data.remainingAttempts !== undefined) {
         remainingAttempts.value = data.remainingAttempts
       }
-      
+
       if (data.maxAttemptsReached) {
         error.value = 'Maximum attempts reached. Please contact support.'
         remainingAttempts.value = 0
       }
     } else if (err.response?.status === 500) {
       // Technical error (e.g., mail server issues)
-      error.value = err.response?.data?.message || 'A technical error occurred. Please try again later.'
+      error.value =
+        err.response?.data?.message || 'A technical error occurred. Please try again later.'
     } else if (err.response?.status === 400) {
       // Validation error
       error.value = err.response?.data?.error || err.response?.data?.message || 'Invalid request'
     } else {
       // Generic error
-      error.value = err.response?.data?.message || err.response?.data?.error || 'Failed to send email. Please try again.'
+      error.value =
+        err.response?.data?.message ||
+        err.response?.data?.error ||
+        'Failed to send email. Please try again.'
     }
   } finally {
     isResending.value = false

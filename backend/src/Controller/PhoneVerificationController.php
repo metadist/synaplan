@@ -83,52 +83,37 @@ class PhoneVerificationController extends AbstractController
         // Format phone number (remove spaces, dashes, etc.)
         $phoneNumber = preg_replace('/[^0-9+]/', '', $phoneNumber);
 
-        // Generate 6-digit verification code
-        $verificationCode = str_pad((string) random_int(100000, 999999), 6, '0', STR_PAD_LEFT);
+        // Generate unique verification code (5 characters: uppercase letters + numbers)
+        $verificationCode = $this->generateUniqueVerificationCode();
 
         // Store in user details JSON
         $userDetails = $user->getUserDetails();
         $userDetails['phone_verification'] = [
             'phone_number' => $phoneNumber,
             'code' => $verificationCode,
-            'expires_at' => time() + 600, // 10 minutes
+            'expires_at' => time() + 300, // 5 minutes
             'attempts' => 0,
             'verified' => false,
+            'created_at' => time(),
         ];
         $user->setUserDetails($userDetails);
 
         $this->em->flush();
 
-        // Send verification code via WhatsApp
-        $message = sprintf(
-            "🔐 *SynaPlan Verification*\n\nYour verification code is: *%s*\n\nThis code expires in 10 minutes.\n\nIf you didn't request this, please ignore this message.",
-            $verificationCode
-        );
-
-        $result = $this->whatsAppService->sendMessage($phoneNumber, $message);
-
-        if (!$result['success']) {
-            $this->logger->error('Failed to send verification code', [
-                'user_id' => $user->getId(),
-                'phone' => $phoneNumber,
-                'error' => $result['error'],
-            ]);
-
-            return $this->json([
-                'success' => false,
-                'error' => 'Failed to send verification code. Please check the phone number.',
-            ], Response::HTTP_INTERNAL_SERVER_ERROR);
-        }
-
-        $this->logger->info('Verification code sent', [
+        // Log code generation
+        $this->logger->info('Verification code generated - user must send it to WhatsApp', [
             'user_id' => $user->getId(),
             'phone' => $phoneNumber,
+            'code' => $verificationCode,
+            'expires_in_seconds' => 300,
         ]);
 
         return $this->json([
             'success' => true,
-            'message' => 'Verification code sent to your WhatsApp',
-            'expires_in' => 600,
+            'message' => 'Please send this verification code to one of our WhatsApp numbers.',
+            'phone_number' => $phoneNumber,
+            'verification_code' => $verificationCode,
+            'expires_at' => time() + 300,
         ]);
     }
 
@@ -301,13 +286,65 @@ class PhoneVerificationController extends AbstractController
         $verifiedAt = $userDetails['phone_verified_at'] ?? null;
         $pendingVerification = $userDetails['phone_verification'] ?? null;
 
-        return $this->json([
+        // Return code and expiration if pending
+        $response = [
             'success' => true,
             'phone_number' => $phoneNumber,
             'verified' => !empty($phoneNumber) && !empty($verifiedAt),
             'verified_at' => $verifiedAt,
             'pending_verification' => !empty($pendingVerification),
             'whatsapp_available' => $this->whatsAppService->isAvailable(),
-        ]);
+        ];
+
+        if ($pendingVerification) {
+            $response['verification_code'] = $pendingVerification['code'] ?? null;
+            $response['expires_at'] = $pendingVerification['expires_at'] ?? null;
+        }
+
+        return $this->json($response);
+    }
+
+    /**
+     * Generate unique verification code (5 chars: A-Z and 0-9).
+     * Ensures no other pending verification has the same code.
+     */
+    private function generateUniqueVerificationCode(): string
+    {
+        $maxAttempts = 10;
+        $attempts = 0;
+
+        while ($attempts < $maxAttempts) {
+            // Generate 5 character code: uppercase letters + numbers
+            $characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+            $code = '';
+            for ($i = 0; $i < 5; ++$i) {
+                $code .= $characters[random_int(0, strlen($characters) - 1)];
+            }
+
+            // Check if this code already exists in any pending verification
+            if (!$this->isCodeAlreadyInUse($code)) {
+                return $code;
+            }
+
+            ++$attempts;
+        }
+
+        throw new \RuntimeException('Failed to generate unique verification code after '.$maxAttempts.' attempts');
+    }
+
+    /**
+     * Check if a verification code is already in use by another pending verification.
+     */
+    private function isCodeAlreadyInUse(string $code): bool
+    {
+        $qb = $this->em->createQueryBuilder();
+        $qb->select('COUNT(u.id)')
+            ->from(User::class, 'u')
+            ->where($qb->expr()->like('u.userDetails', ':codePattern'))
+            ->setParameter('codePattern', '%"code":"'.$code.'"%');
+
+        $count = (int) $qb->getQuery()->getSingleScalarResult();
+
+        return $count > 0;
     }
 }

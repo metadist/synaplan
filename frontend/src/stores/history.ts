@@ -16,7 +16,19 @@ function checkAuthOrRedirect(): boolean {
   return true
 }
 
-export type PartType = 'text' | 'image' | 'video' | 'audio' | 'code' | 'links' | 'docs' | 'screenshot' | 'translation' | 'link' | 'commandList' | 'thinking'
+export type PartType =
+  | 'text'
+  | 'image'
+  | 'video'
+  | 'audio'
+  | 'code'
+  | 'links'
+  | 'docs'
+  | 'screenshot'
+  | 'translation'
+  | 'link'
+  | 'commandList'
+  | 'thinking'
 
 export interface Part {
   type: PartType
@@ -33,8 +45,8 @@ export interface Part {
   lang?: string
   result?: string
   expiresAt?: string
-  thinkingTime?: number  // Time in seconds for thinking process
-  isStreaming?: boolean  // For reasoning parts that are still being streamed
+  thinkingTime?: number // Time in seconds for thinking process
+  isStreaming?: boolean // For reasoning parts that are still being streamed
 }
 
 export interface MessageFile {
@@ -113,19 +125,23 @@ function parseContentWithThinking(content: string): Part[] {
     const filename = content.replace('__FILE_GENERATED__:', '').trim()
     // Return a placeholder - the actual translation will be done in the component
     // because we need access to i18n there
-    return [{
-      type: 'text',
-      content: `__FILE_GENERATED__:${filename}`
-    }]
+    return [
+      {
+        type: 'text',
+        content: `__FILE_GENERATED__:${filename}`,
+      },
+    ]
   }
-  
+
   if (content === '__FILE_GENERATION_FAILED__') {
-    return [{
-      type: 'text',
-      content: '__FILE_GENERATION_FAILED__'
-    }]
+    return [
+      {
+        type: 'text',
+        content: '__FILE_GENERATION_FAILED__',
+      },
+    ]
   }
-  
+
   // Legacy: Check for old JSON format (BTEXT) from database
   // This is only for backward compatibility with old messages
   const extraction = extractBTextPayload(content)
@@ -136,44 +152,44 @@ function parseContentWithThinking(content: string): Part[] {
   }
 
   const parts: Part[] = []
-  
+
   // Extract thinking blocks
   const thinkRegex = /<think>([\s\S]*?)<\/think>/g
   const thinkingBlocks: Array<{ content: string; index: number }> = []
   let match
-  
+
   while ((match = thinkRegex.exec(content)) !== null) {
     thinkingBlocks.push({
       content: match[1].trim(),
-      index: match.index
+      index: match.index,
     })
   }
-  
+
   // If there are thinking blocks, extract them
   if (thinkingBlocks.length > 0) {
     // Add thinking blocks
-    thinkingBlocks.forEach(block => {
+    thinkingBlocks.forEach((block) => {
       // Estimate thinking time based on content length (rough approximation)
       const thinkingTime = Math.max(3, Math.floor(block.content.length / 100))
       parts.push({
         type: 'thinking',
         content: block.content,
-        thinkingTime
+        thinkingTime,
       })
     })
-    
+
     // Remove thinking blocks from content
     content = content.replace(/<think>[\s\S]*?<\/think>/g, '').trim()
   }
-  
+
   // Add remaining text content
   if (content) {
     parts.push({
       type: 'text',
-      content
+      content,
     })
   }
-  
+
   return parts.length > 0 ? parts : [{ type: 'text', content: '' }]
 }
 
@@ -184,10 +200,10 @@ export const useHistoryStore = defineStore('history', () => {
   const currentOffset = ref(0)
 
   const addMessage = (
-    role: 'user' | 'assistant', 
-    parts: Part[], 
+    role: 'user' | 'assistant',
+    parts: Part[],
     files?: MessageFile[],
-    provider?: string, 
+    provider?: string,
     modelLabel?: string,
     againData?: AgainData,
     backendMessageId?: number,
@@ -207,13 +223,13 @@ export const useHistoryStore = defineStore('history', () => {
       backendMessageId,
       originalMessageId,
       webSearch,
-      tool
+      tool,
     })
   }
 
   const addStreamingMessage = (
-    role: 'user' | 'assistant', 
-    provider?: string, 
+    role: 'user' | 'assistant',
+    provider?: string,
     modelLabel?: string,
     againData?: AgainData,
     backendMessageId?: number,
@@ -230,20 +246,20 @@ export const useHistoryStore = defineStore('history', () => {
       modelLabel,
       againData,
       backendMessageId,
-      originalMessageId
+      originalMessageId,
     })
     return id
   }
 
   const updateStreamingMessage = (id: string, content: string) => {
-    const message = messages.value.find(m => m.id === id)
+    const message = messages.value.find((m) => m.id === id)
     if (message && message.parts[0]) {
       message.parts[0].content = content
     }
   }
 
   const finishStreamingMessage = (id: string, parts?: Part[]) => {
-    const message = messages.value.find(m => m.id === id)
+    const message = messages.value.find((m) => m.id === id)
     if (message) {
       message.isStreaming = false
       if (parts) {
@@ -253,15 +269,19 @@ export const useHistoryStore = defineStore('history', () => {
       // Only parse if we have a single text part that might contain thinking blocks
       else if (message.parts.length === 1 && message.parts[0].type === 'text') {
         const currentContent = message.parts[0]?.content || ''
-        
+
         console.log('🔍 finishStreamingMessage: Content length:', currentContent.length)
         console.log('🔍 finishStreamingMessage: Has <think>?', currentContent.includes('<think>'))
         console.log('🔍 finishStreamingMessage: Content preview:', currentContent.substring(0, 200))
-        
+
         if (currentContent && currentContent.includes('<think>')) {
           console.log('✅ Parsing <think> tags!')
           message.parts = parseContentWithThinking(currentContent)
-          console.log('✅ Parsed parts:', message.parts.length, message.parts.map(p => p.type))
+          console.log(
+            '✅ Parsed parts:',
+            message.parts.length,
+            message.parts.map((p) => p.type)
+          )
         } else {
           console.log('❌ No <think> tags found or content empty')
         }
@@ -273,7 +293,12 @@ export const useHistoryStore = defineStore('history', () => {
     messages.value = messages.value.filter((m: Message) => m.id !== id)
   }
 
-  const setMessageStatus = (id: string, status: 'sent' | 'failed' | 'rate_limited', errorType?: 'rate_limit' | 'connection' | 'unknown', errorData?: Message['errorData']) => {
+  const setMessageStatus = (
+    id: string,
+    status: 'sent' | 'failed' | 'rate_limited',
+    errorType?: 'rate_limit' | 'connection' | 'unknown',
+    errorData?: Message['errorData']
+  ) => {
     const message = messages.value.find((m: Message) => m.id === id)
     if (message) {
       message.status = status
@@ -306,18 +331,18 @@ export const useHistoryStore = defineStore('history', () => {
 
   const loadMessages = async (chatId: number, offset = 0, limit = 50) => {
     if (!checkAuthOrRedirect()) return
-    
+
     isLoadingMessages.value = true
     try {
       const { chatApi } = await import('@/services/api')
       const response = await chatApi.getChatMessages(chatId, offset, limit)
-      
+
       if (response.success && response.messages) {
         const loadedMessages: Message[] = response.messages.map((m: any) => {
           const role = m.direction === 'IN' ? 'user' : 'assistant'
-          
+
           const parts = parseContentWithThinking(m.text || '')
-          
+
           // Add generated file (image/video/audio) as part if present
           if (m.file && m.file.path) {
             const absoluteUrl = normalizeMediaUrl(m.file.path)
@@ -325,47 +350,49 @@ export const useHistoryStore = defineStore('history', () => {
               parts.push({
                 type: 'image',
                 url: absoluteUrl,
-                alt: m.text || 'Generated image'
+                alt: m.text || 'Generated image',
               })
             } else if (m.file.type === 'video') {
               parts.push({
                 type: 'video',
-                url: absoluteUrl
+                url: absoluteUrl,
               })
             } else if (m.file.type === 'audio') {
               parts.push({
                 type: 'audio',
-                url: absoluteUrl
+                url: absoluteUrl,
               })
             }
           }
-          
+
           // Parse files from backend response (user uploads)
           const files: MessageFile[] = []
           if (m.files && Array.isArray(m.files)) {
-            files.push(...m.files.map((f: any) => ({
-              id: f.id,
-              filename: f.filename || f.fileName,
-              fileType: f.fileType || f.file_type,
-              filePath: f.filePath || f.file_path,
-              fileSize: f.fileSize || f.file_size,
-              fileMime: f.fileMime || f.file_mime
-            })))
+            files.push(
+              ...m.files.map((f: any) => ({
+                id: f.id,
+                filename: f.filename || f.fileName,
+                fileType: f.fileType || f.file_type,
+                filePath: f.filePath || f.file_path,
+                fileSize: f.fileSize || f.file_size,
+                fileMime: f.fileMime || f.file_mime,
+              }))
+            )
           }
-          
+
           // Reconstruct tool metadata from topic field for user messages
           // Also clean command prefix from message content
           let toolData: { command: string; label: string; icon: string } | null = null
           if (role === 'user' && m.topic && m.topic.startsWith('tools:')) {
             const cmd = m.topic.replace('tools:', '')
             const toolMap: Record<string, { label: string; icon: string }> = {
-              'search': { label: 'Web Search', icon: 'mdi:web' },
-              'pic': { label: 'Image Generation', icon: 'mdi:image' },
-              'vid': { label: 'Video Generation', icon: 'mdi:video' }
+              search: { label: 'Web Search', icon: 'mdi:web' },
+              pic: { label: 'Image Generation', icon: 'mdi:image' },
+              vid: { label: 'Video Generation', icon: 'mdi:video' },
             }
             if (toolMap[cmd]) {
               toolData = { command: cmd, ...toolMap[cmd] }
-              
+
               // Remove command prefix from parts content if present
               if (parts.length > 0 && parts[0].type === 'text' && parts[0].content) {
                 const content = parts[0].content
@@ -377,7 +404,7 @@ export const useHistoryStore = defineStore('history', () => {
               }
             }
           }
-          
+
           return {
             id: `backend-${m.id}`,
             role,
@@ -391,17 +418,17 @@ export const useHistoryStore = defineStore('history', () => {
             aiModels: m.aiModels || null, // Parse AI model metadata from backend
             webSearch: m.webSearch || null, // Parse web search metadata from backend
             searchResults: m.searchResults || null, // Parse actual search results from backend
-            tool: toolData // Reconstruct tool metadata from topic
+            tool: toolData, // Reconstruct tool metadata from topic
           }
         })
-        
+
         // If offset is 0, replace messages; otherwise, prepend (for infinite scroll)
         if (offset === 0) {
           messages.value = loadedMessages
         } else {
           messages.value = [...loadedMessages, ...messages.value]
         }
-        
+
         currentOffset.value = offset + loadedMessages.length
         hasMoreMessages.value = response.pagination?.hasMore || false
       }
@@ -434,6 +461,6 @@ export const useHistoryStore = defineStore('history', () => {
     clear,
     clearHistory: clear,
     loadMessages,
-    loadMoreMessages
+    loadMoreMessages,
   }
 })

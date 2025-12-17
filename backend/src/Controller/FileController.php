@@ -7,6 +7,7 @@ use App\Entity\Message;
 use App\Entity\User;
 use App\Repository\FileRepository;
 use App\Repository\MessageRepository;
+use App\Repository\RagDocumentRepository;
 use App\Service\File\FileProcessor;
 use App\Service\File\FileStorageService;
 use App\Service\File\VectorizationService;
@@ -34,6 +35,7 @@ class FileController extends AbstractController
         private StorageQuotaService $storageQuotaService,
         private MessageRepository $messageRepository,
         private FileRepository $fileRepository,
+        private RagDocumentRepository $ragDocumentRepository,
         private EntityManagerInterface $em,
         private LoggerInterface $logger,
         private string $uploadDir,
@@ -426,14 +428,27 @@ class FileController extends AbstractController
         // Build query for MessageFiles
         $qb = $this->fileRepository->createQueryBuilder('mf')
             ->where('mf.userId = :userId')
-            ->setParameter('userId', $user->getId())
-            ->orderBy('mf.createdAt', 'DESC');
+            ->setParameter('userId', $user->getId());
+
+        // If group_key filter is provided, join with BRAG table
+        if ($groupKey) {
+            $qb->innerJoin(
+                \App\Entity\RagDocument::class,
+                'r',
+                'WITH',
+                'r.messageId = mf.id AND r.userId = :userId AND r.groupKey = :groupKey'
+            )
+            ->setParameter('groupKey', $groupKey);
+        }
+
+        $qb->orderBy('mf.createdAt', 'DESC');
 
         // Get total count
-        $totalCount = (clone $qb)->select('COUNT(mf.id)')->getQuery()->getSingleScalarResult();
+        $totalCount = (clone $qb)->select('COUNT(DISTINCT mf.id)')->getQuery()->getSingleScalarResult();
 
         // Get paginated results
-        $messageFiles = $qb->setFirstResult($offset)
+        $messageFiles = $qb->select('DISTINCT mf')
+                          ->setFirstResult($offset)
                           ->setMaxResults($limit)
                           ->getQuery()
                           ->getResult();
@@ -466,6 +481,52 @@ class FileController extends AbstractController
     }
 
     /**
+     * Get all file groups (unique group keys with file counts).
+     *
+     * GET /api/v1/files/groups
+     */
+    #[Route('/groups', name: 'groups', methods: ['GET'])]
+    public function getFileGroups(
+        #[CurrentUser] ?User $user,
+    ): JsonResponse {
+        if (!$user) {
+            return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
+        }
+
+        try {
+            $groups = $this->ragDocumentRepository->findDistinctGroupKeysByUser($user->getId());
+
+            $this->logger->debug('FileController: Retrieved file groups', [
+                'user_id' => $user->getId(),
+                'groups_count' => count($groups),
+                'groups' => $groups,
+            ]);
+
+            // Transform to expected format
+            $groupsData = array_map(function ($row) {
+                return [
+                    'name' => $row['groupKey'],
+                    'count' => (int) $row['count'],
+                ];
+            }, $groups);
+
+            return $this->json([
+                'success' => true,
+                'groups' => $groupsData,
+            ]);
+        } catch (\Exception $e) {
+            $this->logger->error('FileController: Failed to get file groups', [
+                'user_id' => $user->getId(),
+                'error' => $e->getMessage(),
+            ]);
+
+            return $this->json([
+                'error' => 'Failed to load file groups',
+            ], Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    /**
      * Delete file.
      *
      * DELETE /api/v1/files/{id}
@@ -484,6 +545,17 @@ class FileController extends AbstractController
         if (!$messageFile || $messageFile->getUserId() !== $user->getId()) {
             return $this->json(['error' => 'File not found'], Response::HTTP_NOT_FOUND);
         }
+
+        $fileId = $messageFile->getId();
+
+        // Delete RAG embeddings first (before deleting the file entity)
+        $deletedChunks = $this->ragDocumentRepository->deleteByMessageId($fileId);
+
+        $this->logger->info('FileController: Deleted RAG embeddings for file', [
+            'file_id' => $fileId,
+            'user_id' => $user->getId(),
+            'chunks_deleted' => $deletedChunks,
+        ]);
 
         // Delete physical file
         if ($messageFile->getFilePath()) {
@@ -689,7 +761,7 @@ class FileController extends AbstractController
         int $id,
         Request $request,
         #[CurrentUser] ?User $user,
-        \App\Repository\RagDocumentRepository $ragRepository,
+        RagDocumentRepository $ragRepository,
     ): JsonResponse {
         if (!$user) {
             return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
@@ -782,7 +854,7 @@ class FileController extends AbstractController
         int $id,
         Request $request,
         #[CurrentUser] ?User $user,
-        \App\Repository\RagDocumentRepository $ragRepository,
+        RagDocumentRepository $ragRepository,
     ): JsonResponse {
         if (!$user) {
             return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
@@ -943,7 +1015,7 @@ class FileController extends AbstractController
     public function getGroupKey(
         int $id,
         #[CurrentUser] ?User $user,
-        \App\Repository\RagDocumentRepository $ragRepository,
+        RagDocumentRepository $ragRepository,
     ): JsonResponse {
         if (!$user) {
             return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);

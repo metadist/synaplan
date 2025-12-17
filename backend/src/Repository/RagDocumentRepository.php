@@ -17,7 +17,7 @@ class RagDocumentRepository extends ServiceEntityRepository
     }
 
     /**
-     * Findet RAG-Dokumente für einen User.
+     * Finds RAG documents for a user.
      */
     public function findByUser(int $userId, int $limit = 100): array
     {
@@ -31,7 +31,7 @@ class RagDocumentRepository extends ServiceEntityRepository
     }
 
     /**
-     * Findet RAG-Dokumente nach GroupKey.
+     * Finds RAG documents by GroupKey.
      */
     public function findByGroupKey(string $groupKey): array
     {
@@ -46,13 +46,12 @@ class RagDocumentRepository extends ServiceEntityRepository
     /**
      * Vector-Search (Similarity Search).
      *
-     * Hinweis: Für MariaDB 11.7+ mit VECTOR-Type würde man hier
-     * VEC_DISTANCE verwenden. Aktuell als JSON gespeichert.
+     * Note: For MariaDB 11.7+ with VECTOR-Type, VEC_DISTANCE would be used here.
+     * Currently stored as JSON.
      */
     public function searchSimilar(int $userId, array $queryVector, float $threshold = 0.3, int $limit = 10): array
     {
-        // Simplified version - in production würde man hier
-        // MariaDB's VEC_DISTANCE Function nutzen mit Custom DQL Function
+        // Simplified version - in production, MariaDB's VEC_DISTANCE Function would be used with Custom DQL Function
 
         return $this->createQueryBuilder('r')
             ->where('r.userId = :userId')
@@ -70,7 +69,7 @@ class RagDocumentRepository extends ServiceEntityRepository
     }
 
     /**
-     * Löscht RAG-Dokumente nach GroupKey.
+     * Deletes RAG documents by GroupKey.
      */
     public function deleteByGroupKey(string $groupKey): int
     {
@@ -83,7 +82,57 @@ class RagDocumentRepository extends ServiceEntityRepository
     }
 
     /**
-     * Speichert RAG-Dokument.
+     * Deletes RAG documents by MessageId/FileId.
+     *
+     * BMID can refer to either BMESSAGES.BID or BFILES.BID.
+     */
+    public function deleteByMessageId(int $messageId): int
+    {
+        return $this->createQueryBuilder('r')
+            ->delete()
+            ->where('r.messageId = :messageId')
+            ->setParameter('messageId', $messageId)
+            ->getQuery()
+            ->execute();
+    }
+
+    /**
+     * Returns all distinct GroupKeys for a user with file counts.
+     *
+     * Only RAG documents with existing files are counted (orphaned RAG documents are ignored).
+     * BMID can refer to BFILES.BID (for standalone files) or BMESSAGES.BID (for message attachments).
+     *
+     * @return array Array of ['groupKey' => string, 'count' => int]
+     */
+    public function findDistinctGroupKeysByUser(int $userId): array
+    {
+        $conn = $this->getEntityManager()->getConnection();
+
+        // SQL Query: Group by BGROUPKEY and count distinct BMID (files)
+        // UNION Query to consider both BFILES and BMESSAGES
+        // BMID can refer to BFILES.BID (for standalone files) or BMESSAGES.BID (for message attachments)
+        $sql = '
+            SELECT
+                r.BGROUPKEY as groupKey,
+                COUNT(DISTINCT r.BMID) as count
+            FROM BRAG r
+            WHERE r.BUID = :userId
+                AND (
+                    r.BMID IN (SELECT BID FROM BFILES WHERE BUID = :userId)
+                    OR r.BMID IN (SELECT BID FROM BMESSAGES WHERE BUID = :userId)
+                )
+            GROUP BY r.BGROUPKEY
+            ORDER BY r.BGROUPKEY ASC
+        ';
+
+        $stmt = $conn->prepare($sql);
+        $result = $stmt->executeQuery(['userId' => $userId]);
+
+        return $result->fetchAllAssociative();
+    }
+
+    /**
+     * Saves RAG document.
      */
     public function save(RagDocument $ragDocument, bool $flush = true): void
     {
@@ -95,7 +144,7 @@ class RagDocumentRepository extends ServiceEntityRepository
     }
 
     /**
-     * Löscht RAG-Dokument.
+     * Removes RAG document.
      */
     public function remove(RagDocument $ragDocument, bool $flush = true): void
     {

@@ -8,8 +8,8 @@ export const i18n = createI18n({
   legacy: false,
   locale: savedLanguage,
   fallbackLocale: 'en',
-  messages: { 
+  messages: {
     en,
-    de
+    de,
   },
 })

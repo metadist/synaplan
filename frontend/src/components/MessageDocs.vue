@@ -1,10 +1,6 @@
 <template>
   <div class="my-3 space-y-2" data-testid="section-message-docs">
-    <div
-      v-for="(match, index) in matches"
-      :key="index"
-      class="p-3 surface-chip"
-    >
+    <div v-for="(match, index) in matches" :key="index" class="p-3 surface-chip">
       <div class="flex items-start gap-3">
         <DocumentTextIcon class="w-5 h-5 txt-secondary flex-shrink-0 mt-0.5" />
         <div class="flex-1 min-w-0">
