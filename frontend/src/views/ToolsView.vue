@@ -66,7 +66,7 @@
                 >
                   <component :is="getCommandIcon(cmd.name)" class="w-6 h-6 text-white" />
                 </div>
-                
+
                 <div class="text-left">
                   <h3 class="text-lg font-semibold txt-primary font-mono">
                     {{ cmd.usage }}
@@ -223,7 +223,7 @@
         </div>
 
         <div v-else-if="currentPage === 'doc-summary'">
-          <SummaryConfiguration 
+          <SummaryConfiguration
             :is-generating="isGeneratingSummary"
             :current-model="currentChatModel"
             data-testid="comp-summary-config"
@@ -231,7 +231,7 @@
             @regenerate="handleRegenerateSummary"
             @show="showSummaryModal"
           />
-          
+
           <!-- Summary Result Modal -->
           <SummaryResultModal
             :is-open="isSummaryModalOpen"
@@ -242,9 +242,9 @@
           />
         </div>
 
-            <div v-else-if="currentPage === 'mail-handler'">
-              <div v-if="isLoadingMailHandlers" class="flex items-center justify-center py-12">
-                <svg class="w-6 h-6 animate-spin txt-brand" fill="none" viewBox="0 0 24 24">
+        <div v-else-if="currentPage === 'mail-handler'">
+          <div v-if="isLoadingMailHandlers" class="flex items-center justify-center py-12">
+            <svg class="w-6 h-6 animate-spin txt-brand" fill="none" viewBox="0 0 24 24">
               <circle
                 class="opacity-25"
                 cx="12"
@@ -258,40 +258,40 @@
                 fill="currentColor"
                 d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
               />
-                </svg>
-                <span class="ml-2 txt-secondary">Loading mail handlers...</span>
-              </div>
-              <MailHandlerList
-                v-else-if="!showMailHandlerEditor"
-                :handlers="mailHandlers"
+            </svg>
+            <span class="ml-2 txt-secondary">Loading mail handlers...</span>
+          </div>
+          <MailHandlerList
+            v-else-if="!showMailHandlerEditor"
+            :handlers="mailHandlers"
             data-testid="comp-mail-handler-list"
-                @create="createMailHandler"
-                @edit="editMailHandler"
-                @delete="deleteMailHandler"
+            @create="createMailHandler"
+            @edit="editMailHandler"
+            @delete="deleteMailHandler"
             @bulk-update-status="bulkUpdateHandlerStatus"
             @bulk-delete="bulkDeleteHandlers"
-              />
-              <MailHandlerConfiguration
-                v-else
-                :handler="currentMailHandler"
-                :handler-id="currentMailHandlerId"
+          />
+          <MailHandlerConfiguration
+            v-else
+            :handler="currentMailHandler"
+            :handler-id="currentMailHandlerId"
             data-testid="comp-mail-handler-config"
-                @save="saveMailHandler"
-                @cancel="cancelMailHandlerEdit"
-              />
-            </div>
-       </div>
-     </div>
-     
-     <UnsavedChangesBar
-       v-if="showWidgetEditor && currentPage === 'chat-widget'"
-       :show="hasWidgetChanges"
-       :show-preview="!!currentWidgetId"
+            @save="saveMailHandler"
+            @cancel="cancelMailHandlerEdit"
+          />
+        </div>
+      </div>
+    </div>
+
+    <UnsavedChangesBar
+      v-if="showWidgetEditor && currentPage === 'chat-widget'"
+      :show="hasWidgetChanges"
+      :show-preview="!!currentWidgetId"
       data-testid="bar-widget-unsaved"
-       @save="saveWidget"
-       @discard="discardChanges"
-       @preview="togglePreview"
-     />
+      @save="saveWidget"
+      @discard="discardChanges"
+      @preview="togglePreview"
+    />
   </MainLayout>
 </template>
 
@@ -309,7 +309,7 @@ import SummaryConfiguration from '@/components/summary/SummaryConfiguration.vue'
 import SummaryResultModal from '@/components/summary/SummaryResultModal.vue'
 import MailHandlerConfiguration from '@/components/mail/MailHandlerConfiguration.vue'
 import MailHandlerList from '@/components/mail/MailHandlerList.vue'
-import { 
+import {
   ChevronDownIcon,
   ChatBubbleLeftRightIcon,
   DocumentTextIcon,
@@ -434,12 +434,12 @@ const loadMailHandlers = async () => {
 watch(
   currentPage,
   async (newPage) => {
-  if (newPage === 'doc-summary' && !currentChatModel.value) {
-    await loadCurrentChatModel()
-  }
-  if (newPage === 'mail-handler' && mailHandlers.value.length === 0) {
-    await loadMailHandlers()
-  }
+    if (newPage === 'doc-summary' && !currentChatModel.value) {
+      await loadCurrentChatModel()
+    }
+    if (newPage === 'mail-handler' && mailHandlers.value.length === 0) {
+      await loadMailHandlers()
+    }
   },
   { immediate: true }
 )
@@ -447,18 +447,18 @@ watch(
 const filteredCommands = computed(() => {
   if (currentPage.value === 'introduction') {
     let commands = commandsStore.commands.filter((cmd) => !cmd.name.startsWith('test'))
-    
+
     // Apply search filter
     if (searchQuery.value.trim()) {
       const query = searchQuery.value.toLowerCase()
       commands = commands.filter(
         (cmd) =>
-        cmd.name.toLowerCase().includes(query) ||
-        cmd.usage.toLowerCase().includes(query) ||
-        cmd.description.toLowerCase().includes(query)
+          cmd.name.toLowerCase().includes(query) ||
+          cmd.usage.toLowerCase().includes(query) ||
+          cmd.description.toLowerCase().includes(query)
       )
     }
-    
+
     return commands
   }
   return []
@@ -611,7 +611,7 @@ const saveWidget = async () => {
     widgets.value.push(newWidget)
     currentWidgetId.value = newWidget.id
   }
-  
+
   // Update original config after successful save
   originalWidgetConfig.value = { ...currentWidgetConfig.value }
 }
@@ -765,7 +765,7 @@ const saveMailHandler = async (
     if (currentMailHandlerId.value) {
       // Update existing
       const updated = await inboundEmailHandlersApi.update(currentMailHandlerId.value, payload)
-      
+
       const index = mailHandlers.value.findIndex((h) => h.id === currentMailHandlerId.value)
       if (index > -1) {
         mailHandlers.value[index] = updated
@@ -793,7 +793,7 @@ const saveMailHandler = async (
       console.error('Connection test failed:', error)
       showWarning(t('mail.handlerSavedTestFailed'))
     }
-    
+
     cancelMailHandlerEdit()
   } catch (error: any) {
     console.error('Failed to save mail handler:', error)
@@ -815,7 +815,7 @@ const deleteMailHandler = async (handlerId: string) => {
   if (!confirmed) {
     return
   }
-  
+
   try {
     await inboundEmailHandlersApi.delete(handlerId)
     mailHandlers.value = mailHandlers.value.filter((h) => h.id !== handlerId)
