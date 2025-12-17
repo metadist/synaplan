@@ -119,7 +119,7 @@ class EmailChatService
 
     /**
      * Find or create user from WhatsApp phone number.
-     * Priority: Verified phone > Anonymous phone > Create new
+     * Priority: Verified phone > Anonymous phone > Create new.
      */
     public function findOrCreateUserFromPhone(string $phoneNumber): array
     {

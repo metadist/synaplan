@@ -459,7 +459,7 @@ class WebhookController extends AbstractController
 
             if ('lifetime' === $limitType) {
                 $limitMessage .= "erreicht.\n\n";
-                $limitMessage .= "Um weiterhin Synaplan zu nutzen, verifiziere deine Nummer oder upgrade zu einem kostenpflichtigen Plan.";
+                $limitMessage .= 'Um weiterhin Synaplan zu nutzen, verifiziere deine Nummer oder upgrade zu einem kostenpflichtigen Plan.';
             } else {
                 $resetTime = $rateLimitCheck['reset_at'] ?? null;
                 if ($resetTime) {
@@ -467,7 +467,7 @@ class WebhookController extends AbstractController
                     $limitMessage .= "für diesen Zeitraum erreicht.\n\n";
                     $limitMessage .= "Dein Limit wird am $resetDate zurückgesetzt.";
                 } else {
-                    $limitMessage .= "erreicht.";
+                    $limitMessage .= 'erreicht.';
                 }
             }
 
@@ -885,7 +885,7 @@ class WebhookController extends AbstractController
             $this->em->flush();
 
             // Send success message
-            $successMessage = "✅ Erfolgreich verifiziert!";
+            $successMessage = '✅ Erfolgreich verifiziert!';
             $this->whatsAppService->sendMessage($fromPhone, $successMessage, $phoneNumberId);
 
             return [
