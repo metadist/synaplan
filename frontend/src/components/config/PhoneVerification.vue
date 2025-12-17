@@ -57,6 +57,7 @@
             class="w-full px-4 py-3 rounded-lg surface-chip txt-primary border border-light-border focus:border-brand focus:ring-2 focus:ring-brand/20 transition-colors"
             :disabled="verificationPending"
             data-testid="input-phone"
+            @input="formatPhoneNumber"
           />
           <p class="mt-2 text-xs txt-secondary">
             {{ $t('config.phoneVerification.phoneNumberHint') }}
@@ -93,7 +94,7 @@
 
         <button
           v-if="!verificationPending"
-          :disabled="!phoneNumber.trim() || requesting"
+          :disabled="!phoneNumber.trim() || requesting || cooldownRemaining > 0"
           class="btn-primary px-6 py-3 rounded-lg font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
           data-testid="btn-send"
           @click="requestVerification"
@@ -113,12 +114,33 @@
               d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
             ></path>
           </svg>
-          {{ requesting ? $t('common.sending') : $t('config.phoneVerification.sendCode') }}
+          <template v-if="cooldownRemaining > 0">
+            Wait {{ cooldownRemaining }}s
+          </template>
+          <template v-else>
+            {{ requesting ? 'Generating...' : 'Generate Code' }}
+          </template>
         </button>
+
+        <!-- Rate Limit Warning -->
+        <div
+          v-if="attemptsRemaining !== null && attemptsRemaining <= 3 && !verificationPending"
+          class="surface-card p-3 border-l-4 border-orange-500 bg-orange-500/5"
+          data-testid="alert-rate-limit"
+        >
+          <p class="text-sm text-orange-600 dark:text-orange-400">
+            ⚠️ {{ attemptsRemaining }} {{ attemptsRemaining === 1 ? 'attempt' : 'attempts' }}
+            remaining. After 5 attempts, you'll need to wait 5 minutes.
+          </p>
+        </div>
       </div>
 
-      <!-- Verification Code Display - Show generated code -->
-      <div v-if="verificationPending" class="space-y-4 mt-6" data-testid="section-code-display">
+      <!-- Verification Code Display - Show generated code only if phone number is entered -->
+      <div
+        v-if="verificationPending && phoneNumber.trim()"
+        class="space-y-4 mt-6"
+        data-testid="section-code-display"
+      >
         <!-- Instructions -->
         <div
           class="surface-card p-6 border-l-4 border-brand rounded-lg"
@@ -185,15 +207,27 @@
           </div>
         </div>
 
+        <!-- Rate Limit Info -->
+        <div
+          v-if="attemptsRemaining !== null && attemptsRemaining <= 3"
+          class="surface-card p-3 border-l-4 border-orange-500 bg-orange-500/5"
+          data-testid="alert-attempts-remaining"
+        >
+          <p class="text-sm text-orange-600 dark:text-orange-400">
+            ⚠️ {{ attemptsRemaining }} {{ attemptsRemaining === 1 ? 'attempt' : 'attempts' }}
+            remaining. After 5 attempts, you'll need to wait 5 minutes.
+          </p>
+        </div>
+
         <!-- Action Buttons -->
-        <div class="flex gap-3">
+        <div class="flex gap-3 items-center">
           <button
-            :disabled="requesting"
-            class="flex-1 btn-primary-outlined px-6 py-3 rounded-lg font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+            :disabled="requesting || cooldownRemaining > 0"
+            class="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 transition-colors text-sm"
             data-testid="btn-regenerate"
             @click="regenerateCode"
           >
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path
                 stroke-linecap="round"
                 stroke-linejoin="round"
@@ -201,26 +235,22 @@
                 d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
               />
             </svg>
-            {{ requesting ? 'Generating...' : 'Generate New Code' }}
+            <template v-if="cooldownRemaining > 0">
+              Wait {{ cooldownRemaining }}s
+            </template>
+            <template v-else>
+              {{ requesting ? 'Generating...' : 'Generate New Code' }}
+            </template>
           </button>
 
           <button
-            class="surface-chip px-6 py-3 rounded-lg font-medium txt-primary hover:bg-black/5 dark:hover:bg-white/10 transition-colors"
+            class="px-4 py-2 surface-chip rounded-lg font-medium txt-primary hover:bg-black/5 dark:hover:bg-white/10 transition-colors text-sm"
             data-testid="btn-cancel"
             @click="cancelVerification"
           >
             {{ $t('common.cancel') }}
           </button>
         </div>
-
-        <button
-          :disabled="requesting"
-          class="w-full text-sm txt-secondary hover:txt-primary transition-colors"
-          data-testid="btn-resend"
-          @click="requestVerification"
-        >
-          {{ $t('config.phoneVerification.resendCode') }}
-        </button>
       </div>
     </div>
 
@@ -287,6 +317,8 @@ const verificationPending = ref(false)
 const requiresWhatsAppMessage = ref(false)
 const requesting = ref(false)
 const currentTime = ref(Math.floor(Date.now() / 1000)) // Unix timestamp in seconds
+const cooldownRemaining = ref(0) // Seconds until next code can be generated
+const attemptsRemaining = ref<number | null>(null) // Remaining attempts before 5-minute lockout
 
 const config = useConfigStore()
 const API_BASE = config.appBaseUrl
@@ -303,13 +335,18 @@ const timeRemaining = computed(() => {
   return remaining > 0 ? remaining : 0
 })
 
-// Timer to update currentTime every second
+// Timer to update currentTime and cooldown every second
 let timer: ReturnType<typeof setInterval> | null = null
 
 const startTimer = () => {
   if (timer) clearInterval(timer)
   timer = setInterval(() => {
     currentTime.value = Math.floor(Date.now() / 1000)
+
+    // Update cooldown timer
+    if (cooldownRemaining.value > 0) {
+      cooldownRemaining.value--
+    }
   }, 1000)
 }
 
@@ -386,17 +423,22 @@ const loadStatus = async () => {
 
     const data = payload as any
     status.value = data
-    verificationPending.value = Boolean(data?.pending_verification)
+
+    // Don't automatically show verification pending on initial load
+    // Only show it if user explicitly requested verification
+    // This prevents showing old/expired codes on page load
 
     if (data?.phone_number) {
       phoneNumber.value = data.phone_number
     }
 
     // Check if verification is complete (user was verified via WhatsApp)
-    if (data?.verified && verificationPending.value) {
-      // User was verified! Refresh to show verified state
+    if (data?.verified) {
       verificationPending.value = false
-      success('Phone number verified successfully!')
+      // Only show success message if user was in pending state
+      if (phoneNumber.value) {
+        success('Phone number verified successfully!')
+      }
     }
   } catch (err: any) {
     console.error('Failed to load phone verification status:', err)
@@ -424,6 +466,23 @@ const requestVerification = async () => {
 
     const data = payload as any
 
+    // Handle rate limiting
+    if (response.status === 429) {
+      if (data?.cooldown_remaining) {
+        cooldownRemaining.value = data.cooldown_remaining
+        const minutes = Math.floor(data.cooldown_remaining / 60)
+        const seconds = data.cooldown_remaining % 60
+        const timeStr = minutes > 0 ? `${minutes}m ${seconds}s` : `${seconds}s`
+        error.value = `Too many attempts. Please wait ${timeStr}.`
+        showError(error.value)
+      } else if (data?.retry_after) {
+        cooldownRemaining.value = data.retry_after
+        error.value = `Please wait ${data.retry_after} seconds before generating a new code.`
+        showError(error.value)
+      }
+      return
+    }
+
     if (!response.ok) {
       throw new Error(getErrorMessage(payload, 'Failed to generate verification code'))
     }
@@ -439,6 +498,13 @@ const requestVerification = async () => {
       }
       verificationPending.value = true
       requiresWhatsAppMessage.value = false
+
+      // Set cooldown and attempts remaining
+      if (data?.rate_limit) {
+        cooldownRemaining.value = data.rate_limit.retry_after || 30
+        attemptsRemaining.value = data.rate_limit.attempts_remaining
+      }
+
       success('Verification code generated! Send it to our WhatsApp number.')
     } else {
       throw new Error('Invalid response from server')
@@ -455,18 +521,31 @@ const requestVerification = async () => {
   }
 }
 
+const formatPhoneNumber = () => {
+  // Only allow + and digits (0-9)
+  phoneNumber.value = phoneNumber.value.replace(/[^0-9+]/g, '')
+}
+
 const regenerateCode = async () => {
   // Regenerate by calling requestVerification again
   await requestVerification()
 }
 
 const cancelVerification = () => {
-  // Just clear the local state without calling API
+  // Clear the local state without calling API
   verificationPending.value = false
   verificationCode.value = ''
   requiresWhatsAppMessage.value = false
   error.value = null
-  // Keep phoneNumber so user can try again with same number
+
+  // Clear the verification code from status to reset displayCode
+  if (status.value) {
+    status.value.verification_code = null
+    status.value.expires_at = null
+    status.value.pending_verification = false
+  }
+
+  // Keep phoneNumber so user can edit it again
 }
 
 const removePhone = async () => {
