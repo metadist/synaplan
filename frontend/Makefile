@@ -29,7 +29,7 @@ generate-schemas: ## Generate Zod schemas from OpenAPI spec
 
 ## Testing
 test: ## Run tests
-	docker compose -f ../docker-compose.yml exec -T frontend npm run test
+	docker compose -f ../docker-compose.yml exec -T frontend npm run test -- --run
 
 ## Dependencies
 deps: ## Install npm dependencies

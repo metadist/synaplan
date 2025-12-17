@@ -1,17 +1,76 @@
 <template>
   <div class="space-y-4">
-    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-      <div>
-        <h2 class="text-xl font-semibold txt-primary">{{ $t('mail.savedHandlers') }}</h2>
-        <p class="text-sm txt-secondary mt-1">{{ $t('mail.savedHandlersDesc') }}</p>
+    <!-- Header with selection info and actions -->
+    <div class="flex flex-col gap-3">
+      <div class="flex items-center justify-between">
+        <div>
+          <h2 class="text-xl font-semibold txt-primary">{{ $t('mail.savedHandlers') }}</h2>
+          <p class="text-sm txt-secondary mt-1">{{ $t('mail.savedHandlersDesc') }}</p>
+        </div>
+        <button
+          class="btn-primary px-4 py-2 rounded-lg flex items-center gap-2"
+          @click="$emit('create')"
+        >
+          <PlusIcon class="w-5 h-5" />
+          {{ $t('mail.createHandler') }}
+        </button>
       </div>
-      <button
-        class="btn-primary px-4 py-2 rounded-lg flex items-center gap-2 w-full sm:w-auto"
-        @click="$emit('create')"
+
+      <!-- Bulk actions bar (only show when handlers are selected) -->
+      <transition
+        enter-active-class="transition-all duration-200"
+        enter-from-class="opacity-0 -translate-y-2"
+        enter-to-class="opacity-100 translate-y-0"
+        leave-active-class="transition-all duration-150"
+        leave-from-class="opacity-100 translate-y-0"
+        leave-to-class="opacity-0 -translate-y-2"
       >
-        <PlusIcon class="w-5 h-5" />
-        {{ $t('mail.createHandler') }}
-      </button>
+        <div
+          v-if="selectedHandlers.length > 0"
+          class="surface-card p-3 rounded-lg border-2 border-[var(--brand)]/20 flex items-center justify-between gap-3"
+        >
+          <div class="flex items-center gap-2">
+            <div class="w-8 h-8 rounded-full bg-[var(--brand)]/10 flex items-center justify-center">
+              <span class="text-sm font-semibold text-[var(--brand)]">{{
+                selectedHandlers.length
+              }}</span>
+            </div>
+            <span class="text-sm font-medium txt-primary">
+              {{ $t('mail.selectedCount', { count: selectedHandlers.length }) }}
+            </span>
+          </div>
+          <div class="flex items-center gap-2">
+            <button
+              class="px-3 py-1.5 rounded-lg text-sm font-medium transition-colors bg-green-500/10 text-green-600 dark:text-green-400 hover:bg-green-500/20 flex items-center gap-1.5"
+              @click="activateSelected"
+            >
+              <CheckCircleIcon class="w-4 h-4" />
+              {{ $t('mail.activate') }}
+            </button>
+            <button
+              class="px-3 py-1.5 rounded-lg text-sm font-medium transition-colors bg-gray-500/10 txt-secondary hover:bg-gray-500/20 flex items-center gap-1.5"
+              @click="deactivateSelected"
+            >
+              <XCircleIcon class="w-4 h-4" />
+              {{ $t('mail.deactivate') }}
+            </button>
+            <button
+              class="px-3 py-1.5 rounded-lg text-sm font-medium transition-colors bg-red-500/10 text-red-600 dark:text-red-400 hover:bg-red-500/20 flex items-center gap-1.5"
+              @click="deleteSelected"
+            >
+              <TrashIcon class="w-4 h-4" />
+              {{ $t('mail.deleteSelected') }}
+            </button>
+            <button
+              class="p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 transition-colors txt-secondary"
+              :aria-label="$t('common.cancel')"
+              @click="selectedHandlers = []"
+            >
+              <XMarkIcon class="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      </transition>
     </div>
 
     <div v-if="handlers.length === 0" class="surface-card p-12 text-center">
@@ -31,10 +90,31 @@
       <div
         v-for="handler in handlers"
         :key="handler.id"
-        class="surface-card p-5 hover:shadow-lg transition-shadow cursor-pointer group"
-        @click="$emit('edit', handler)"
+        :class="[
+          'surface-card p-5 hover:shadow-lg transition-shadow cursor-pointer group relative',
+          selectedHandlers.includes(handler.id) && 'ring-2 ring-[var(--brand)]',
+        ]"
+        @click="handleCardClick($event, handler)"
       >
-        <div class="flex items-start justify-between mb-3">
+        <!-- Selection Checkbox -->
+        <div class="absolute top-3 right-3 z-10 flex items-center gap-2">
+          <label class="relative flex items-center cursor-pointer" @click.stop>
+            <input
+              v-model="selectedHandlers"
+              type="checkbox"
+              :value="handler.id"
+              class="peer sr-only"
+            />
+            <div
+              class="w-5 h-5 rounded border-2 border-light-border dark:border-dark-border peer-checked:border-[var(--brand)] peer-checked:bg-[var(--brand)] transition-all flex items-center justify-center"
+            >
+              <CheckIcon
+                class="w-3 h-3 text-white opacity-0 peer-checked:opacity-100 transition-opacity"
+              />
+            </div>
+          </label>
+        </div>
+        <div class="flex items-start justify-between mb-3 pr-8">
           <div class="flex items-center gap-3 flex-1 min-w-0">
             <div
               :class="[
@@ -66,14 +146,16 @@
               <p class="text-xs txt-secondary truncate">{{ handler.config.username }}</p>
             </div>
           </div>
-          <button
-            class="icon-ghost icon-ghost--danger opacity-0 group-hover:opacity-100 transition-all"
-            :aria-label="$t('mail.deleteHandler')"
-            @click.stop="$emit('delete', handler.id)"
-          >
-            <TrashIcon class="w-4 h-4" />
-          </button>
         </div>
+
+        <!-- Delete button (separate from header to avoid overlap) -->
+        <button
+          class="absolute top-3 right-10 icon-ghost icon-ghost--danger opacity-0 group-hover:opacity-100 transition-all z-20"
+          :aria-label="$t('mail.deleteHandler')"
+          @click.stop="$emit('delete', handler.id)"
+        >
+          <TrashIcon class="w-4 h-4" />
+        </button>
 
         <div class="space-y-2 mb-3">
           <div class="flex items-center gap-2 text-xs">
@@ -129,6 +211,7 @@
 </template>
 
 <script setup lang="ts">
+import { ref } from 'vue'
 import {
   EnvelopeIcon,
   PlusIcon,
@@ -136,6 +219,10 @@ import {
   ServerIcon,
   UserGroupIcon,
   ClockIcon,
+  CheckCircleIcon,
+  XCircleIcon,
+  CheckIcon,
+  XMarkIcon,
 } from '@heroicons/vue/24/outline'
 import type { SavedMailHandler } from '@/services/api/inboundEmailHandlersApi'
 
@@ -145,11 +232,43 @@ interface Props {
 
 defineProps<Props>()
 
-defineEmits<{
+const emit = defineEmits<{
   create: []
   edit: [handler: SavedMailHandler]
   delete: [id: string]
+  bulkUpdateStatus: [handlerIds: string[], status: 'active' | 'inactive']
+  bulkDelete: [handlerIds: string[]]
 }>()
+
+const selectedHandlers = ref<string[]>([])
+
+const handleCardClick = (event: MouseEvent, handler: SavedMailHandler) => {
+  // Only emit edit if not clicking on checkbox
+  if (!(event.target as HTMLElement).closest('input[type="checkbox"]')) {
+    emit('edit', handler)
+  }
+}
+
+const activateSelected = () => {
+  if (selectedHandlers.value.length > 0) {
+    emit('bulkUpdateStatus', selectedHandlers.value, 'active')
+    selectedHandlers.value = []
+  }
+}
+
+const deactivateSelected = () => {
+  if (selectedHandlers.value.length > 0) {
+    emit('bulkUpdateStatus', selectedHandlers.value, 'inactive')
+    selectedHandlers.value = []
+  }
+}
+
+const deleteSelected = () => {
+  if (selectedHandlers.value.length > 0) {
+    emit('bulkDelete', selectedHandlers.value)
+    selectedHandlers.value = []
+  }
+}
 
 const formatDate = (date: Date) => {
   const now = new Date()

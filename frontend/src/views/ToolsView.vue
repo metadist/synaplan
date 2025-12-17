@@ -268,6 +268,8 @@
             @create="createMailHandler"
             @edit="editMailHandler"
             @delete="deleteMailHandler"
+            @bulk-update-status="bulkUpdateHandlerStatus"
+            @bulk-delete="bulkDeleteHandlers"
           />
           <MailHandlerConfiguration
             v-else
@@ -296,6 +298,7 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
 import { useRoute } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import { useConfigStore } from '@/stores/config'
 import MainLayout from '@/components/MainLayout.vue'
 import WidgetList from '@/components/widgets/WidgetList.vue'
@@ -337,6 +340,7 @@ import { useNotification } from '@/composables/useNotification'
 import { useDialog } from '@/composables/useDialog'
 
 const route = useRoute()
+const { t } = useI18n()
 const config = useConfigStore()
 const commandsStore = useCommandsStore()
 const aiConfigStore = useAiConfigStore()
@@ -695,7 +699,8 @@ const saveMailHandler = async (
   config: MailConfig,
   departments: Department[],
   smtpConfig: any,
-  emailFilter: any
+  emailFilter: any,
+  isActive: boolean
 ) => {
   try {
     // Validate that SMTP config is provided
@@ -719,6 +724,7 @@ const saveMailHandler = async (
       checkInterval: config.checkInterval,
       deleteAfter: config.deleteAfter,
       departments,
+      status: isActive ? 'active' : 'inactive',
       // SMTP credentials (required)
       smtpServer: smtpConfig.smtpServer,
       smtpPort: smtpConfig.smtpPort,
@@ -727,7 +733,6 @@ const saveMailHandler = async (
       // Email filter settings
       emailFilterMode: emailFilter.mode || 'new',
       emailFilterFromDate: emailFilter.fromDate || null,
-      emailFilterToDate: emailFilter.toDate || null,
     }
 
     // Only include passwords if they were changed (not the masked value)
@@ -810,5 +815,50 @@ const cancelMailHandlerEdit = () => {
   showMailHandlerEditor.value = false
   currentMailHandler.value = undefined
   currentMailHandlerId.value = ''
+}
+
+const bulkUpdateHandlerStatus = async (handlerIds: string[], status: 'active' | 'inactive') => {
+  try {
+    await inboundEmailHandlersApi.bulkUpdateStatus(handlerIds, status)
+
+    // Update local state
+    mailHandlers.value = mailHandlers.value.map((handler) => {
+      if (handlerIds.includes(handler.id)) {
+        return { ...handler, status }
+      }
+      return handler
+    })
+
+    success(t('mail.bulkUpdateSuccess', { count: handlerIds.length }))
+  } catch (error: any) {
+    console.error('Failed to bulk update handlers:', error)
+    showError(error.message || t('mail.bulkUpdateFailed'))
+  }
+}
+
+const bulkDeleteHandlers = async (handlerIds: string[]) => {
+  const confirmed = await dialog.confirm({
+    title: t('mail.bulkDeleteConfirmTitle'),
+    message: t('mail.bulkDeleteConfirmMessage', { count: handlerIds.length }),
+    danger: true,
+    confirmText: t('common.delete'),
+    cancelText: t('common.cancel'),
+  })
+
+  if (!confirmed) {
+    return
+  }
+
+  try {
+    await inboundEmailHandlersApi.bulkDelete(handlerIds)
+
+    // Remove from local state
+    mailHandlers.value = mailHandlers.value.filter((h) => !handlerIds.includes(h.id))
+
+    success(t('mail.bulkDeleteSuccess', { count: handlerIds.length }))
+  } catch (error: any) {
+    console.error('Failed to bulk delete handlers:', error)
+    showError(error.message || t('mail.bulkDeleteFailed'))
+  }
 }
 </script>

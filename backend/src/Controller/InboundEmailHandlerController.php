@@ -140,15 +140,15 @@ class InboundEmailHandlerController extends AbstractController
         $handler->setDecryptedPassword($data['password'], $this->encryptionService);
         $handler->setCheckInterval($data['checkInterval'] ?? 10);
         $handler->setDeleteAfter($data['deleteAfter'] ?? false);
-        $handler->setStatus('inactive'); // Start as inactive until tested
+        $handler->setStatus('active'); // Start as active by default
         $handler->setDepartments($data['departments']);
 
         // SMTP credentials for forwarding (optional, encrypted)
         if (isset($data['smtpServer']) && isset($data['smtpUsername']) && isset($data['smtpPassword'])) {
             $handler->setSmtpCredentials(
-                $data['smtpServer'],
+                trim($data['smtpServer']),
                 $data['smtpPort'] ?? 587,
-                $data['smtpUsername'],
+                trim($data['smtpUsername']), // Trim to avoid encoding issues
                 $data['smtpPassword'],
                 $this->encryptionService,
                 $data['smtpSecurity'] ?? 'STARTTLS'
@@ -159,7 +159,7 @@ class InboundEmailHandlerController extends AbstractController
         $emailFilterMode = $data['emailFilterMode'] ?? 'new';
 
         // PRO+ required for historical emails
-        if ('historical' === $emailFilterMode && !in_array($user->getUserLevel(), ['PRO', 'TEAM', 'BUSINESS'])) {
+        if ('historical' === $emailFilterMode && !in_array($user->getUserLevel(), ['PRO', 'TEAM', 'BUSINESS', 'ADMIN'])) {
             return $this->json([
                 'success' => false,
                 'error' => 'Historical email processing is only available for PRO users and above',
@@ -168,8 +168,7 @@ class InboundEmailHandlerController extends AbstractController
 
         $handler->setEmailFilter(
             $emailFilterMode,
-            $data['emailFilterFromDate'] ?? null,
-            $data['emailFilterToDate'] ?? null
+            $data['emailFilterFromDate'] ?? null
         );
 
         $this->em->persist($handler);
@@ -250,9 +249,9 @@ class InboundEmailHandlerController extends AbstractController
         // Update SMTP credentials for forwarding (optional, encrypted)
         if (isset($data['smtpServer']) && isset($data['smtpUsername']) && isset($data['smtpPassword'])) {
             $handler->setSmtpCredentials(
-                $data['smtpServer'],
+                trim($data['smtpServer']),
                 $data['smtpPort'] ?? 587,
-                $data['smtpUsername'],
+                trim($data['smtpUsername']), // Trim to avoid encoding issues
                 $data['smtpPassword'],
                 $this->encryptionService,
                 $data['smtpSecurity'] ?? 'STARTTLS'
@@ -262,7 +261,7 @@ class InboundEmailHandlerController extends AbstractController
         // Update email filter configuration
         if (isset($data['emailFilterMode'])) {
             // PRO+ required for historical emails
-            if ('historical' === $data['emailFilterMode'] && !in_array($user->getUserLevel(), ['PRO', 'TEAM', 'BUSINESS'])) {
+            if ('historical' === $data['emailFilterMode'] && !in_array($user->getUserLevel(), ['PRO', 'TEAM', 'BUSINESS', 'ADMIN'])) {
                 return $this->json([
                     'success' => false,
                     'error' => 'Historical email processing is only available for PRO users and above',
@@ -271,8 +270,7 @@ class InboundEmailHandlerController extends AbstractController
 
             $handler->setEmailFilter(
                 $data['emailFilterMode'],
-                $data['emailFilterFromDate'] ?? null,
-                $data['emailFilterToDate'] ?? null
+                $data['emailFilterFromDate'] ?? null
             );
         }
 
@@ -409,7 +407,6 @@ class InboundEmailHandlerController extends AbstractController
             $emailFilter = [
                 'mode' => $config['email_filter']['mode'] ?? 'new',
                 'fromDate' => $config['email_filter']['from_date'] ?? null,
-                'toDate' => $config['email_filter']['to_date'] ?? null,
             ];
         }
 
@@ -432,5 +429,61 @@ class InboundEmailHandlerController extends AbstractController
             'created' => $handler->getCreated(),
             'updated' => $handler->getUpdated(),
         ];
+    }
+
+    #[Route('/bulk-update-status', methods: ['POST'])]
+    public function bulkUpdateStatus(Request $request): JsonResponse
+    {
+        /** @var User $user */
+        $user = $this->getUser();
+
+        $data = json_decode($request->getContent(), true);
+        $handlerIds = $data['handlerIds'] ?? [];
+        $status = $data['status'] ?? null;
+
+        if (empty($handlerIds) || !in_array($status, ['active', 'inactive'])) {
+            return $this->json(['success' => false, 'error' => 'Invalid parameters'], Response::HTTP_BAD_REQUEST);
+        }
+
+        $updated = 0;
+        foreach ($handlerIds as $handlerId) {
+            $handler = $this->handlerRepository->findOneBy(['id' => $handlerId, 'userId' => $user->getId()]);
+            if ($handler) {
+                $handler->setStatus($status);
+                $handler->touch();
+                ++$updated;
+            }
+        }
+
+        $this->em->flush();
+
+        return $this->json(['success' => true, 'updated' => $updated]);
+    }
+
+    #[Route('/bulk-delete', methods: ['POST'])]
+    public function bulkDelete(Request $request): JsonResponse
+    {
+        /** @var User $user */
+        $user = $this->getUser();
+
+        $data = json_decode($request->getContent(), true);
+        $handlerIds = $data['handlerIds'] ?? [];
+
+        if (empty($handlerIds)) {
+            return $this->json(['success' => false, 'error' => 'Invalid parameters'], Response::HTTP_BAD_REQUEST);
+        }
+
+        $deleted = 0;
+        foreach ($handlerIds as $handlerId) {
+            $handler = $this->handlerRepository->findOneBy(['id' => $handlerId, 'userId' => $user->getId()]);
+            if ($handler) {
+                $this->em->remove($handler);
+                ++$deleted;
+            }
+        }
+
+        $this->em->flush();
+
+        return $this->json(['success' => true, 'deleted' => $deleted]);
     }
 }

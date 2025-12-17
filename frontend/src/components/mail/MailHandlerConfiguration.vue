@@ -16,21 +16,51 @@
       </button>
     </div>
 
-    <!-- Handler Name -->
+    <!-- Handler Name & Status -->
     <div class="surface-card p-6" data-testid="section-handler-name">
-      <label class="block text-sm font-medium txt-primary mb-2">
-        {{ $t('mail.handlerName') }}
-      </label>
-      <input
-        v-model="handlerName"
-        type="text"
-        class="w-full px-4 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
-        :placeholder="$t('mail.handlerNamePlaceholder')"
-        data-testid="input-handler-name"
-      />
-      <p class="text-xs txt-secondary mt-1">
-        {{ $t('mail.handlerNameHelp') }}
-      </p>
+      <div class="flex items-start justify-between gap-6">
+        <div class="flex-1">
+          <label class="block text-sm font-medium txt-primary mb-2">
+            {{ $t('mail.handlerName') }}
+          </label>
+          <input
+            v-model="handlerName"
+            type="text"
+            class="w-full px-4 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+            :placeholder="$t('mail.handlerNamePlaceholder')"
+            data-testid="input-handler-name"
+          />
+          <p class="text-xs txt-secondary mt-1">
+            {{ $t('mail.handlerNameHelp') }}
+          </p>
+        </div>
+
+        <!-- Status Toggle (only when editing) -->
+        <div v-if="handlerId" class="flex flex-col items-end">
+          <label class="block text-sm font-medium txt-primary mb-2">
+            {{ $t('mail.status.label') }}
+          </label>
+          <button
+            :class="[
+              'relative inline-flex h-8 w-14 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--brand)] focus:ring-offset-2',
+              isActive ? 'bg-green-500' : 'bg-gray-300 dark:bg-gray-600',
+            ]"
+            :aria-label="isActive ? $t('mail.status.active') : $t('mail.status.inactive')"
+            data-testid="toggle-status"
+            @click="isActive = !isActive"
+          >
+            <span
+              :class="[
+                'inline-block h-6 w-6 transform rounded-full bg-white transition-transform',
+                isActive ? 'translate-x-7' : 'translate-x-1',
+              ]"
+            />
+          </button>
+          <p class="text-xs txt-secondary mt-1">
+            {{ isActive ? $t('mail.status.active') : $t('mail.status.inactive') }}
+          </p>
+        </div>
+      </div>
     </div>
 
     <!-- Step Indicator -->
@@ -169,28 +199,6 @@
           />
           <p class="text-xs txt-secondary mt-1">
             {{ $t('mail.passwordHelp') }}
-          </p>
-        </div>
-
-        <div>
-          <label class="block text-sm font-medium txt-primary mb-2">
-            {{ $t('mail.checkInterval') }}
-          </label>
-          <select
-            v-model.number="config.checkInterval"
-            class="w-full px-4 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
-            data-testid="input-check-interval"
-          >
-            <option
-              v-for="option in checkIntervalOptions"
-              :key="option.value"
-              :value="option.value"
-            >
-              {{ option.label }}
-            </option>
-          </select>
-          <p class="text-xs txt-secondary mt-1">
-            {{ $t('mail.checkIntervalHelp') }}
           </p>
         </div>
 
@@ -434,53 +442,40 @@
             emailFilter.mode === 'historical'
               ? 'border-[var(--brand)] bg-[var(--brand)]/5'
               : 'border-light-border/30 dark:border-dark-border/20',
-            !isPro ? 'opacity-50 cursor-not-allowed' : 'hover:shadow-md',
+            !hasProFeatures ? 'opacity-50 cursor-not-allowed' : 'hover:shadow-md',
           ]"
         >
           <input
             v-model="emailFilter.mode"
             type="radio"
             value="historical"
-            :disabled="!isPro"
+            :disabled="!hasProFeatures"
             class="mt-1 w-4 h-4 text-[var(--brand)] focus:ring-[var(--brand)]"
             data-testid="input-filter-historical"
           />
           <div class="ml-3 flex-1">
             <div class="flex items-center gap-2">
               <span class="font-medium txt-primary">{{ $t('mail.filterHistorical') }}</span>
-              <span v-if="!isPro" class="text-xs pill">{{ $t('mail.proOnly') }}</span>
+              <span v-if="!hasProFeatures" class="text-xs pill">{{ $t('mail.proOnly') }}</span>
             </div>
             <p class="text-sm txt-secondary mt-1">
               {{ $t('mail.filterHistoricalHelp') }}
             </p>
 
-            <!-- Date range inputs (only show if historical is selected and user is PRO) -->
-            <div
-              v-if="emailFilter.mode === 'historical' && isPro"
-              class="mt-4 grid grid-cols-2 gap-3"
-            >
-              <div>
-                <label class="block text-xs font-medium txt-primary mb-1">
-                  {{ $t('mail.filterFromDate') }}
-                </label>
-                <input
-                  v-model="emailFilter.fromDate"
-                  type="datetime-local"
-                  class="w-full px-3 py-2 text-sm rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
-                  data-testid="input-from-date"
-                />
-              </div>
-              <div>
-                <label class="block text-xs font-medium txt-primary mb-1">
-                  {{ $t('mail.filterToDate') }}
-                </label>
-                <input
-                  v-model="emailFilter.toDate"
-                  type="datetime-local"
-                  class="w-full px-3 py-2 text-sm rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
-                  data-testid="input-to-date"
-                />
-              </div>
+            <!-- Date input (only show if historical is selected and user is PRO) -->
+            <div v-if="emailFilter.mode === 'historical' && hasProFeatures" class="mt-4">
+              <label class="block text-xs font-medium txt-primary mb-1">
+                {{ $t('mail.filterFromDate') }}
+              </label>
+              <input
+                v-model="emailFilter.fromDate"
+                type="datetime-local"
+                class="w-full px-3 py-2 text-sm rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+                data-testid="input-from-date"
+              />
+              <p class="text-xs txt-secondary mt-1">
+                {{ $t('mail.filterFromDateHelp') }}
+              </p>
             </div>
           </div>
         </label>
@@ -760,16 +755,17 @@ import type {
   Department,
   SavedMailHandler,
 } from '@/services/api/inboundEmailHandlersApi'
-import {
-  defaultMailConfig,
-  protocolOptions,
-  securityOptions,
-  checkIntervalOptions,
-} from '@/mocks/mail'
+import { defaultMailConfig, protocolOptions, securityOptions } from '@/mocks/mail'
 import { inboundEmailHandlersApi } from '@/services/api/inboundEmailHandlersApi'
-import { useAuth } from '@/composables/useAuth'
+import { useAuthStore } from '@/stores/auth'
 
-const { isPro } = useAuth()
+const authStore = useAuthStore()
+
+// Historical email processing available for PRO and above
+const hasProFeatures = computed(() => {
+  const level = authStore.user?.level
+  return level && ['PRO', 'TEAM', 'BUSINESS', 'ADMIN'].includes(level)
+})
 
 interface Props {
   handler?: SavedMailHandler
@@ -789,7 +785,6 @@ interface SmtpConfig {
 interface EmailFilter {
   mode: 'new' | 'historical'
   fromDate?: string
-  toDate?: string
 }
 
 const emit = defineEmits<{
@@ -799,6 +794,7 @@ const emit = defineEmits<{
     departments: Department[],
     smtpConfig: SmtpConfig,
     emailFilter: EmailFilter,
+    isActive: boolean,
   ]
   cancel: []
 }>()
@@ -806,7 +802,11 @@ const emit = defineEmits<{
 const steps = ['connection', 'departments', 'test']
 const currentStep = ref(0)
 const handlerName = ref('')
-const config = ref<MailConfig>({ ...defaultMailConfig })
+const isActive = ref(true) // Handler status (active/inactive)
+const config = ref<MailConfig>({
+  ...defaultMailConfig,
+  checkInterval: 1, // Fixed: always check every minute
+})
 const departments = ref<Department[]>([])
 const isTestingConnection = ref(false)
 const testResult = ref<{ success: boolean; message: string } | null>(null)
@@ -824,16 +824,14 @@ const smtpConfig = ref<SmtpConfig>({
 const emailFilter = ref<EmailFilter>({
   mode: 'new', // Default: only new emails
   fromDate: undefined,
-  toDate: undefined,
 })
 
-// Watch for mode change - reset dates if switching to 'new'
+// Watch for mode change - reset date if switching to 'new'
 watch(
   () => emailFilter.value.mode,
   (newMode) => {
     if (newMode === 'new') {
       emailFilter.value.fromDate = undefined
-      emailFilter.value.toDate = undefined
     }
   }
 )
@@ -844,8 +842,28 @@ watch(
   (handler) => {
     if (handler) {
       handlerName.value = handler.name
+      isActive.value = handler.status === 'active'
       config.value = { ...handler.config }
       departments.value = [...handler.departments]
+
+      // Load SMTP config if available
+      if (handler.smtpConfig) {
+        smtpConfig.value = {
+          smtpServer: handler.smtpConfig.smtpServer,
+          smtpPort: handler.smtpConfig.smtpPort,
+          smtpSecurity: handler.smtpConfig.smtpSecurity,
+          smtpUsername: handler.smtpConfig.smtpUsername,
+          smtpPassword: handler.smtpConfig.smtpPassword, // Will be '••••••••' from backend
+        }
+      }
+
+      // Load email filter config if available
+      if (handler.emailFilter) {
+        emailFilter.value = {
+          mode: handler.emailFilter.mode,
+          fromDate: handler.emailFilter.fromDate,
+        }
+      }
     }
   },
   { immediate: true }
@@ -964,7 +982,8 @@ const saveConfiguration = () => {
     config.value,
     departments.value,
     smtpConfig.value,
-    emailFilter.value
+    emailFilter.value,
+    isActive.value
   )
 }
 </script>

@@ -30,7 +30,6 @@ export interface BackendMailHandler {
   emailFilter?: {
     mode: 'new' | 'historical'
     fromDate: string | null
-    toDate: string | null
   } | null
   lastChecked: string | null // YmdHis format
   created: string // YmdHis format
@@ -66,7 +65,6 @@ export interface SmtpConfig {
 export interface EmailFilterConfig {
   mode: 'new' | 'historical'
   fromDate?: string | null
-  toDate?: string | null
 }
 
 export interface SavedMailHandler {
@@ -102,7 +100,6 @@ export interface CreateHandlerRequest {
   // Email filter settings
   emailFilterMode: 'new' | 'historical'
   emailFilterFromDate?: string | null
-  emailFilterToDate?: string | null
 }
 
 export interface UpdateHandlerRequest {
@@ -126,7 +123,6 @@ export interface UpdateHandlerRequest {
   // Email filter settings
   emailFilterMode?: 'new' | 'historical'
   emailFilterFromDate?: string | null
-  emailFilterToDate?: string | null
 }
 
 /**
@@ -166,7 +162,6 @@ function convertBackendToFrontend(backend: BackendMailHandler): SavedMailHandler
       ? {
           mode: backend.emailFilter.mode,
           fromDate: backend.emailFilter.fromDate,
-          toDate: backend.emailFilter.toDate,
         }
       : undefined,
     lastTested: backend.lastChecked ? parseDate(backend.lastChecked) : undefined,
@@ -260,6 +255,35 @@ export const inboundEmailHandlersApi = {
     return httpClient<{ success: boolean; message: string }>(
       `/api/v1/inbound-email-handlers/${id}/test`,
       { method: 'POST' }
+    )
+  },
+
+  /**
+   * Bulk update handler status
+   */
+  async bulkUpdateStatus(
+    handlerIds: string[],
+    status: 'active' | 'inactive'
+  ): Promise<{ success: boolean; updated: number }> {
+    return httpClient<{ success: boolean; updated: number }>(
+      '/api/v1/inbound-email-handlers/bulk-update-status',
+      {
+        method: 'POST',
+        body: JSON.stringify({ handlerIds, status }),
+      }
+    )
+  },
+
+  /**
+   * Bulk delete handlers
+   */
+  async bulkDelete(handlerIds: string[]): Promise<{ success: boolean; deleted: number }> {
+    return httpClient<{ success: boolean; deleted: number }>(
+      '/api/v1/inbound-email-handlers/bulk-delete',
+      {
+        method: 'POST',
+        body: JSON.stringify({ handlerIds }),
+      }
     )
   },
 }
