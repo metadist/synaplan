@@ -460,23 +460,13 @@ const regenerateCode = async () => {
   await requestVerification()
 }
 
-const cancelVerification = async () => {
-  try {
-    // Cancel verification by removing phone number
-    await removePhone()
-    verificationPending.value = false
-    verificationCode.value = ''
-    requiresWhatsAppMessage.value = false
-    error.value = null
-    phoneNumber.value = ''
-  } catch (err: any) {
-    console.error('Failed to cancel verification:', err)
-    // Just clear the local state even if API call fails
-    verificationPending.value = false
-    verificationCode.value = ''
-    requiresWhatsAppMessage.value = false
-    error.value = null
-  }
+const cancelVerification = () => {
+  // Just clear the local state without calling API
+  verificationPending.value = false
+  verificationCode.value = ''
+  requiresWhatsAppMessage.value = false
+  error.value = null
+  // Keep phoneNumber so user can try again with same number
 }
 
 const removePhone = async () => {

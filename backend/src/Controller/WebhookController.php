@@ -499,7 +499,7 @@ class WebhookController extends AbstractController
         $message->setProviderIndex('WHATSAPP');
         $message->setUnixTimestamp($timestamp);
         $message->setDateTime(date('YmdHis', $timestamp));
-        $message->setMessageType('WHATSAPP');
+        $message->setMessageType('WTSP'); // WhatsApp - max 4 chars for BMESSTYPE column
         $message->setFile(0); // Will be set by preprocessor if media
         $message->setTopic('CHAT');
         $message->setLanguage('en'); // Will be detected
@@ -571,7 +571,7 @@ class WebhookController extends AbstractController
                 $outgoingMessage->setProviderIndex('WHATSAPP');
                 $outgoingMessage->setUnixTimestamp(time());
                 $outgoingMessage->setDateTime(date('YmdHis'));
-                $outgoingMessage->setMessageType('WHATSAPP');
+                $outgoingMessage->setMessageType('WTSP'); // WhatsApp - max 4 chars for BMESSTYPE column
                 $outgoingMessage->setFile(0);
                 $outgoingMessage->setTopic('CHAT');
                 $outgoingMessage->setLanguage('en');
@@ -734,11 +734,23 @@ class WebhookController extends AbstractController
                 continue;
             }
 
-            // Check if phone number matches
-            if ($verification['phone_number'] !== $fromPhone) {
+            // Check if phone number matches (format both the same way)
+            $expectedPhone = preg_replace('/[^0-9+]/', '', $verification['phone_number']);
+
+            $this->logger->debug('Comparing phone numbers for verification', [
+                'code' => $code,
+                'expected_phone_raw' => $verification['phone_number'],
+                'expected_phone_formatted' => $expectedPhone,
+                'actual_phone_raw' => $fromPhone,
+                'actual_phone_formatted' => $fromPhone,
+                'match' => $expectedPhone === $fromPhone,
+                'user_id' => $user->getId(),
+            ]);
+
+            if ($expectedPhone !== $fromPhone) {
                 $this->logger->warning('Verification code sent from wrong phone number', [
                     'code' => $code,
-                    'expected_phone' => $verification['phone_number'],
+                    'expected_phone' => $expectedPhone,
                     'actual_phone' => $fromPhone,
                     'user_id' => $user->getId(),
                 ]);
