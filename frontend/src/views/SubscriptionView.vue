@@ -200,10 +200,12 @@ import {
   type SubscriptionStatus,
 } from '@/services/api/subscriptionApi'
 import { useAuthStore } from '@/stores/auth'
+import { useDialog } from '@/composables/useDialog'
 import MainLayout from '@/components/MainLayout.vue'
 
 const { t } = useI18n()
 const authStore = useAuthStore()
+const dialog = useDialog()
 const plans = ref<SubscriptionPlan[]>([])
 const loading = ref(false)
 const isProcessing = ref(false)
@@ -256,7 +258,10 @@ async function loadSubscriptionStatus() {
 
 async function selectPlan(planId: string) {
   if (!stripeConfigured.value) {
-    alert(t('subscription.serviceNotConfigured'))
+    await dialog.alert({
+      title: t('subscription.serviceNotAvailable'),
+      message: t('subscription.serviceNotConfigured'),
+    })
     return
   }
 
@@ -273,9 +278,15 @@ async function selectPlan(planId: string) {
       error.message?.includes('unavailable') ||
       error.message?.includes('STRIPE_NOT_CONFIGURED')
     ) {
-      alert(t('subscription.serviceNotConfigured'))
+      await dialog.alert({
+        title: t('subscription.serviceNotAvailable'),
+        message: t('subscription.serviceNotConfigured'),
+      })
     } else {
-      alert(t('subscription.checkoutFailed'))
+      await dialog.alert({
+        title: t('common.error'),
+        message: t('subscription.checkoutFailed'),
+      })
     }
 
     isProcessing.value = false
@@ -284,7 +295,10 @@ async function selectPlan(planId: string) {
 
 async function openBillingPortal() {
   if (!stripeConfigured.value) {
-    alert(t('subscription.serviceNotConfigured'))
+    await dialog.alert({
+      title: t('subscription.serviceNotAvailable'),
+      message: t('subscription.serviceNotConfigured'),
+    })
     return
   }
 
@@ -295,7 +309,10 @@ async function openBillingPortal() {
     window.location.href = response.url
   } catch (error: any) {
     console.error('Failed to open billing portal:', error)
-    alert(t('subscription.checkoutFailed'))
+    await dialog.alert({
+      title: t('common.error'),
+      message: t('subscription.checkoutFailed'),
+    })
     isProcessing.value = false
   }
 }

@@ -307,6 +307,10 @@
     "noHandlersDesc": "Create your first mail handler to start automating email processing",
     "createFirst": "Create First Handler",
     "deleteHandler": "Delete Handler",
+    "deleteHandlerConfirmTitle": "Delete Mail Handler?",
+    "deleteHandlerConfirmMessage": "Are you sure you want to delete {name}? This action cannot be undone.",
+    "handlerDeleted": "Mail handler deleted successfully",
+    "deleteFailed": "Failed to delete mail handler",
     "checkEvery": "Check every",
     "lastTested": "Last tested",
     "status": {
@@ -506,6 +510,7 @@
         "saving": "Saving…",
         "delete": "Delete",
         "deleting": "Deleting…",
+        "deleteModelTitle": "Delete Model?",
         "deleteConfirm": "Delete model {id} ({service}/{tag}/{providerId})?",
         "modelCreated": "Model created",
         "modelSaved": "Model saved",
@@ -724,6 +729,7 @@
     "retryLater": "Retry"
   },
   "subscription": {
+    "serviceNotAvailable": "Service Not Available",
     "title": "Subscription Plans",
     "subtitle": "Unlock more features and higher limits",
     "chooseYourPlan": "Choose Your Plan",

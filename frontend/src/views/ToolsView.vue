@@ -334,12 +334,14 @@ import { inboundEmailHandlersApi } from '@/services/api/inboundEmailHandlersApi'
 import * as summaryService from '@/services/summaryService'
 import type { SummaryResponse } from '@/services/summaryService'
 import { useNotification } from '@/composables/useNotification'
+import { useDialog } from '@/composables/useDialog'
 
 const route = useRoute()
 const config = useConfigStore()
 const commandsStore = useCommandsStore()
 const aiConfigStore = useAiConfigStore()
 const { success, error: showError, warning: showWarning } = useNotification()
+const dialog = useDialog()
 const expandedCommands = ref<string[]>([])
 const widgets = ref<Widget[]>(mockWidgets)
 const showWidgetEditor = ref(false)
@@ -780,17 +782,27 @@ const saveMailHandler = async (
 }
 
 const deleteMailHandler = async (handlerId: string) => {
-  if (!confirm('Are you sure you want to delete this mail handler?')) {
+  const handler = mailHandlers.value.find((h) => h.id === handlerId)
+
+  const confirmed = await dialog.confirm({
+    title: t('mail.deleteHandlerConfirmTitle'),
+    message: t('mail.deleteHandlerConfirmMessage', { name: handler?.name || 'this handler' }),
+    danger: true,
+    confirmText: t('common.delete'),
+    cancelText: t('common.cancel'),
+  })
+
+  if (!confirmed) {
     return
   }
 
   try {
     await inboundEmailHandlersApi.delete(handlerId)
     mailHandlers.value = mailHandlers.value.filter((h) => h.id !== handlerId)
-    success('Mail handler deleted successfully!')
+    success(t('mail.handlerDeleted'))
   } catch (error: any) {
     console.error('Failed to delete mail handler:', error)
-    showError(error.message || 'Failed to delete mail handler')
+    showError(error.message || t('mail.deleteFailed'))
   }
 }
 
