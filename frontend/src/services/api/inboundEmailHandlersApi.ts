@@ -20,6 +20,18 @@ export interface BackendMailHandler {
   deleteAfter: boolean
   status: 'active' | 'inactive' | 'error'
   departments: Department[]
+  smtpConfig?: {
+    server: string
+    port: number
+    username: string
+    password: string // Always '••••••••' from backend
+    security: 'SSL/TLS' | 'STARTTLS' | 'None'
+  } | null
+  emailFilter?: {
+    mode: 'new' | 'historical'
+    fromDate: string | null
+    toDate: string | null
+  } | null
   lastChecked: string | null // YmdHis format
   created: string // YmdHis format
   updated: string // YmdHis format
@@ -43,12 +55,28 @@ export interface MailConfig {
   deleteAfter: boolean
 }
 
+export interface SmtpConfig {
+  smtpServer: string
+  smtpPort: number
+  smtpSecurity: 'STARTTLS' | 'SSL/TLS' | 'None'
+  smtpUsername: string
+  smtpPassword: string
+}
+
+export interface EmailFilterConfig {
+  mode: 'new' | 'historical'
+  fromDate?: string | null
+  toDate?: string | null
+}
+
 export interface SavedMailHandler {
   id: string
   name: string
   config: MailConfig
   departments: Department[]
   status: 'active' | 'inactive' | 'error'
+  smtpConfig?: SmtpConfig
+  emailFilter?: EmailFilterConfig
   lastTested?: Date
   createdAt: Date
   updatedAt: Date
@@ -125,6 +153,22 @@ function convertBackendToFrontend(backend: BackendMailHandler): SavedMailHandler
       isDefault: dept.isDefault,
     })),
     status: backend.status,
+    smtpConfig: backend.smtpConfig
+      ? {
+          smtpServer: backend.smtpConfig.server,
+          smtpPort: backend.smtpConfig.port,
+          smtpSecurity: backend.smtpConfig.security,
+          smtpUsername: backend.smtpConfig.username,
+          smtpPassword: backend.smtpConfig.password, // Already masked
+        }
+      : undefined,
+    emailFilter: backend.emailFilter
+      ? {
+          mode: backend.emailFilter.mode,
+          fromDate: backend.emailFilter.fromDate,
+          toDate: backend.emailFilter.toDate,
+        }
+      : undefined,
     lastTested: backend.lastChecked ? parseDate(backend.lastChecked) : undefined,
     createdAt: parseDate(backend.created),
     updatedAt: parseDate(backend.updated),

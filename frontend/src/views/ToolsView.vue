@@ -339,7 +339,7 @@ const route = useRoute()
 const config = useConfigStore()
 const commandsStore = useCommandsStore()
 const aiConfigStore = useAiConfigStore()
-const { success, error: showError } = useNotification()
+const { success, error: showError, warning: showWarning } = useNotification()
 const expandedCommands = ref<string[]>([])
 const widgets = ref<Widget[]>(mockWidgets)
 const showWidgetEditor = ref(false)
@@ -714,7 +714,6 @@ const saveMailHandler = async (
       protocol: config.protocol,
       security: config.security,
       username: config.username,
-      password: config.password, // Will be encrypted by backend
       checkInterval: config.checkInterval,
       deleteAfter: config.deleteAfter,
       departments,
@@ -723,12 +722,38 @@ const saveMailHandler = async (
       smtpPort: smtpConfig.smtpPort,
       smtpSecurity: smtpConfig.smtpSecurity,
       smtpUsername: smtpConfig.smtpUsername,
-      smtpPassword: smtpConfig.smtpPassword, // Will be encrypted by backend
       // Email filter settings
       emailFilterMode: emailFilter.mode || 'new',
       emailFilterFromDate: emailFilter.fromDate || null,
       emailFilterToDate: emailFilter.toDate || null,
     }
+
+    // Only include passwords if they were changed (not the masked value)
+    // For CREATE: passwords are required
+    // For UPDATE: only send if changed (not '••••••••')
+    if (!currentMailHandlerId.value) {
+      // Creating new handler - passwords are required
+      if (!config.password || config.password === '••••••••') {
+        showError('IMAP/POP3 password is required for new handlers')
+        return
+      }
+      if (!smtpConfig.smtpPassword || smtpConfig.smtpPassword === '••••••••') {
+        showError('SMTP password is required for new handlers')
+        return
+      }
+      payload.password = config.password
+      payload.smtpPassword = smtpConfig.smtpPassword
+    } else {
+      // Updating existing handler - only send passwords if they were changed
+      if (config.password && config.password !== '••••••••') {
+        payload.password = config.password
+      }
+      if (smtpConfig.smtpPassword && smtpConfig.smtpPassword !== '••••••••') {
+        payload.smtpPassword = smtpConfig.smtpPassword
+      }
+    }
+
+    let savedHandlerId = currentMailHandlerId.value
 
     if (currentMailHandlerId.value) {
       // Update existing
@@ -743,6 +768,7 @@ const saveMailHandler = async (
       // Create new
       const newHandler = await inboundEmailHandlersApi.create(payload)
       mailHandlers.value.push(newHandler)
+      savedHandlerId = newHandler.id
       success('Mail handler created successfully!')
     }
 

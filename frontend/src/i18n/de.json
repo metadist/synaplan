@@ -874,7 +874,20 @@
     "filterFromDate": "Von Datum",
     "filterToDate": "Bis Datum",
     "recommended": "Empfohlen",
-    "proOnly": "PRO+"
+    "proOnly": "PRO+",
+    "connectionHelp": "Verbindungshilfe",
+    "connectionHelpTitle": "Hilfe zu Verbindungseinstellungen",
+    "helpCommonPorts": "Gängige IMAP/POP3-Ports:",
+    "helpImapSsl": "Sichere Verbindung",
+    "helpImapStarttls": "Upgrade auf sicher",
+    "helpPop3Ssl": "Sichere Verbindung",
+    "helpPop3Starttls": "Upgrade auf sicher",
+    "helpSmtpPorts": "Gängige SMTP-Ports:",
+    "helpSmtpStarttls": "Empfohlen für die meisten Server",
+    "helpSmtpSsl": "Alternativer sicherer Port",
+    "helpTip": "Schneller Tipp",
+    "helpTipContent": "Die meisten E-Mail-Anbieter benötigen 'App-Passwörter' anstelle Ihres regulären Passworts. Überprüfen Sie die Sicherheitseinstellungen Ihres E-Mail-Anbieters.",
+    "helpCommonProviders": "Bekannte E-Mail-Anbieter:"
   },
   "widgets": {
     "buttonIcon": "Button-Icon",

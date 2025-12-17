@@ -13,6 +13,7 @@ use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Style\SymfonyStyle;
+use Symfony\Component\Lock\LockFactory;
 
 #[AsCommand(
     name: 'app:process-mail-handlers',
@@ -24,6 +25,7 @@ class ProcessMailHandlersCommand extends Command
         private InboundEmailHandlerService $handlerService,
         private EntityManagerInterface $em,
         private LoggerInterface $logger,
+        private LockFactory $lockFactory,
     ) {
         parent::__construct();
     }
@@ -41,19 +43,36 @@ class ProcessMailHandlersCommand extends Command
         $watch = $input->getOption('watch');
         $interval = max(10, (int) $input->getOption('interval')); // Minimum 10 seconds
 
-        $io->title('Mail Handler Processing Service');
-        $io->info('This service processes inbound emails and routes them to departments using AI.');
+        // Prevent overlapping runs (TTL = 15 minutes, should be > than cronjob interval)
+        $lock = $this->lockFactory->createLock('mail-handler-process', 900);
 
-        if ($watch) {
-            $io->note("Watch mode enabled. Checking every {$interval} seconds. Press CTRL+C to stop.");
-            $io->newLine();
+        if (!$lock->acquire()) {
+            $message = 'Previous mail handler process is still running. Skipping this run to prevent overlap.';
+            $io->warning($message);
+            $this->logger->info($message);
 
-            while (true) {
+            return Command::SUCCESS;
+        }
+
+        try {
+            $io->title('Mail Handler Processing Service');
+            $io->info('This service processes inbound emails and routes them to departments using AI.');
+
+            if ($watch) {
+                $io->note("Watch mode enabled. Checking every {$interval} seconds. Press CTRL+C to stop.");
+                $io->newLine();
+
+                // @phpstan-ignore-next-line (infinite loop is intentional for watch mode)
+                while (true) {
+                    $this->processHandlers($io);
+                    sleep($interval);
+                }
+            } else {
                 $this->processHandlers($io);
-                sleep($interval);
             }
-        } else {
-            $this->processHandlers($io);
+        } finally {
+            // Always release lock when done
+            $lock->release();
         }
 
         return Command::SUCCESS;
@@ -98,7 +117,7 @@ class ProcessMailHandlersCommand extends Command
                     foreach ($result['errors'] as $error) {
                         $io->text("    • {$error}");
                     }
-                    $totalErrors++;
+                    ++$totalErrors;
                 }
             }
 

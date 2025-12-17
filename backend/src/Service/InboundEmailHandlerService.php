@@ -83,7 +83,7 @@ class InboundEmailHandlerService
             $server,
             $handler->getUsername(),
             $password,
-            OP_HALFOPEN
+            0
         );
 
         if (!$connection) {
@@ -262,7 +262,7 @@ class InboundEmailHandlerService
                 ];
             }
 
-            // Get unread messages
+            // Get unread messages only
             $messages = imap_search($connection, 'UNSEEN');
 
             if (!$messages) {

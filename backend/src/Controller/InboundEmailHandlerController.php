@@ -389,6 +389,30 @@ class InboundEmailHandlerController extends AbstractController
      */
     private function serializeHandler(InboundEmailHandler $handler): array
     {
+        $config = $handler->getConfig() ?? [];
+
+        // Extract SMTP config (mask password)
+        $smtpConfig = null;
+        if (isset($config['smtp'])) {
+            $smtpConfig = [
+                'server' => $config['smtp']['server'] ?? '',
+                'port' => $config['smtp']['port'] ?? 587,
+                'username' => $config['smtp']['username'] ?? '',
+                'password' => '••••••••', // Never expose password
+                'security' => $config['smtp']['security'] ?? 'STARTTLS',
+            ];
+        }
+
+        // Extract email filter config
+        $emailFilter = null;
+        if (isset($config['email_filter'])) {
+            $emailFilter = [
+                'mode' => $config['email_filter']['mode'] ?? 'new',
+                'fromDate' => $config['email_filter']['from_date'] ?? null,
+                'toDate' => $config['email_filter']['to_date'] ?? null,
+            ];
+        }
+
         return [
             'id' => $handler->getId(),
             'name' => $handler->getName(),
@@ -402,6 +426,8 @@ class InboundEmailHandlerController extends AbstractController
             'deleteAfter' => $handler->isDeleteAfter(),
             'status' => $handler->getStatus(),
             'departments' => $handler->getDepartments(),
+            'smtpConfig' => $smtpConfig,
+            'emailFilter' => $emailFilter,
             'lastChecked' => $handler->getLastChecked(),
             'created' => $handler->getCreated(),
             'updated' => $handler->getUpdated(),
