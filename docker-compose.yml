@@ -77,10 +77,8 @@ services:
       # Mailer (Mailhog for development)
       MAILER_DSN: smtp://mailhog:1025
       # External API Keys loaded from backend/.env via env_file
-      # WhatsApp Business API
+      # WhatsApp Business API - Fully Dynamic Multi-Number Support
       WHATSAPP_ACCESS_TOKEN: ${WHATSAPP_ACCESS_TOKEN:-}
-      WHATSAPP_PHONE_NUMBER_ID: ${WHATSAPP_PHONE_NUMBER_ID:-}
-      WHATSAPP_BUSINESS_ACCOUNT_ID: ${WHATSAPP_BUSINESS_ACCOUNT_ID:-}
       WHATSAPP_WEBHOOK_VERIFY_TOKEN: ${WHATSAPP_WEBHOOK_VERIFY_TOKEN:-}
       WHATSAPP_ENABLED: ${WHATSAPP_ENABLED:-false}
       # AI Provider API Keys (loaded from backend/.env via env_file above)

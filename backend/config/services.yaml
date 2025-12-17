@@ -108,12 +108,10 @@ services:
             $braveSearchCountry: '%env(BRAVE_SEARCH_COUNTRY)%'
             $braveSearchLang: '%env(BRAVE_SEARCH_SEARCH_LANG)%'
 
-    # WhatsApp Business API Service
+    # WhatsApp Business API Service - Fully Dynamic Multi-Number Support
     App\Service\WhatsAppService:
         arguments:
             $whatsappAccessToken: '%env(WHATSAPP_ACCESS_TOKEN)%'
-            $whatsappPhoneNumberId: '%env(WHATSAPP_PHONE_NUMBER_ID)%'
-            $whatsappBusinessAccountId: '%env(WHATSAPP_BUSINESS_ACCOUNT_ID)%'
             $whatsappEnabled: '%env(bool:WHATSAPP_ENABLED)%'
 
     # Webhook Controller - Bind WhatsApp Verify Token

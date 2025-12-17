@@ -27,7 +27,7 @@ git reset --hard
 Run the first-install script for your platform (it verifies Docker, lets you pick your AI provider, and handles all bootstrapping):
 
 ```bash
-# Linux / macOS (WSL): 
+# Linux / macOS (WSL):
 ./_1st_install_linux.sh
 
 # Windows (PowerShell or cmd):
@@ -125,7 +125,7 @@ Audio files are automatically transcribed using **Whisper.cpp** when uploaded:
 - **Supported formats**: mp3, wav, ogg, m4a, opus, flac, webm, aac, wma
 - **Automatic conversion**: FFmpeg converts all audio to optimal format (16kHz mono WAV)
 - **Models**: tiny, base (default), small, medium, large - configurable via `.env`
-- **Setup**: 
+- **Setup**:
   - **Docker**: Pre-installed, download models on first run
   - **Local**: Install [whisper.cpp](https://github.com/ggerganov/whisper.cpp) and FFmpeg, configure paths in `.env`
 
@@ -146,12 +146,10 @@ SynaPlan integrates with **Meta's official WhatsApp Business API** for bidirecti
 
 ### Setup:
 1. **Create WhatsApp Business Account**: [Meta Business Suite](https://business.facebook.com/)
-2. **Get Credentials**: Access Token, Phone Number ID, Business Account ID
+2. **Get Credentials**: Access Token (supports multiple phone numbers)
 3. **Set Environment Variables**:
 ```bash
 WHATSAPP_ACCESS_TOKEN=your_access_token
-WHATSAPP_PHONE_NUMBER_ID=your_phone_number_id
-WHATSAPP_BUSINESS_ACCOUNT_ID=your_business_account_id
 WHATSAPP_WEBHOOK_VERIFY_TOKEN=your_verify_token
 WHATSAPP_ENABLED=true
 ```
@@ -160,6 +158,21 @@ WHATSAPP_ENABLED=true
    - Verify Token: Same as `WHATSAPP_WEBHOOK_VERIFY_TOKEN`
    - Subscribe to: `messages`
 
+### 🌟 Fully Dynamic Multi-Number Support:
+**No configuration needed!** The system is 100% dynamic:
+
+- ✅ **Zero Configuration**: No Phone Number IDs in config files
+- ✅ **Auto-Detection**: Incoming messages automatically extract `phone_number_id` from webhook payload
+- ✅ **Smart Reply Routing**: Responses are **always** sent from the same number that received the message
+- ✅ **Up to 20 Numbers**: One WhatsApp Business Account can manage up to 20 phone numbers
+- ✅ **Instant Multi-Number**: Add/remove numbers in Meta Portal - works immediately, no code changes needed
+
+**How it works:**
+1. User sends message to **Number A** → Webhook contains `metadata.phone_number_id`
+2. System extracts and stores the Phone Number ID
+3. AI processes and responds → Reply sent **from Number A** automatically
+4. Different user sends to **Number B** → Reply sent **from Number B** automatically
+
 ### Phone Verification (Required):
 Users must verify their phone number via WhatsApp to unlock full features:
 - **ANONYMOUS** (not verified): 10 messages, 2 images (very limited)
@@ -167,11 +180,14 @@ Users must verify their phone number via WhatsApp to unlock full features:
 - **PRO/TEAM/BUSINESS**: Full subscription limits
 
 Verification Flow:
-1. User enters phone number in web interface
-2. 6-digit code sent via WhatsApp
-3. User confirms code
-4. Phone linked to account → full access
-5. User can remove link anytime
+1. User sends a WhatsApp message to any of your numbers first
+2. User enters phone number in web interface to request verification
+3. System automatically uses the same number for sending the 6-digit code
+4. User confirms code
+5. Phone linked to account → full access unlocked
+6. User can remove link anytime
+
+**Note**: Users must initiate WhatsApp contact before requesting phone verification, so the system knows which number to use.
 
 ### Supported Features:
 - ✅ Text Messages (send & receive)
@@ -204,7 +220,7 @@ SynaPlan supports email-based AI conversations with smart chat context managemen
 - ✅ **Automatic User Detection**: Registered users get their own rate limits
 - ✅ **Anonymous Email Support**: Unknown senders get ANONYMOUS limits
 - ✅ **Chat Context**: Email threads become chat conversations
-- ✅ **Spam Protection**: 
+- ✅ **Spam Protection**:
   - Max 10 emails/hour per unknown address
   - Automatic blacklisting for spammers
 - ✅ **Email Threading**: Replies stay in the same chat context
