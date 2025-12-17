@@ -676,7 +676,7 @@ parameters:
 		message: '#^Call to an undefined method Psr\\Log\\LoggerInterface\:\:expects\(\)\.$#'
 		identifier: method.notFound
 		count: 8
-		path: tests/Service/WhatsAppServiceTest.phpmak
+		path: tests/Service/WhatsAppServiceTest.php
 
 	-
 		message: '#^Call to an undefined method Symfony\\Contracts\\HttpClient\\HttpClientInterface\:\:expects\(\)\.$#'
@@ -684,17 +684,17 @@ parameters:
 		count: 13
 		path: tests/Service/WhatsAppServiceTest.php
 
-		-
-			message: '#^Call to method PHPUnit\\Framework\\Assert\:\:assertIsArray\(\) with array will always evaluate to true\.$#'
-			identifier: method.alreadyNarrowedType
-			count: 2
-			path: tests/Service/WhatsAppServiceTest.php
+	-
+		message: '#^Call to method PHPUnit\\Framework\\Assert\:\:assertIsArray\(\) with array will always evaluate to true\.$#'
+		identifier: method.alreadyNarrowedType
+		count: 2
+		path: tests/Service/WhatsAppServiceTest.php
 
-		-
-			message: '#^Call to method PHPUnit\\Framework\\Assert\:\:assertTrue\(\) with true will always evaluate to true\.$#'
-			identifier: method.alreadyNarrowedType
-			count: 1
-			path: tests/Service/WhatsAppServiceTest.php
+	-
+		message: '#^Call to method PHPUnit\\Framework\\Assert\:\:assertTrue\(\) with true will always evaluate to true\.$#'
+		identifier: method.alreadyNarrowedType
+		count: 1
+		path: tests/Service/WhatsAppServiceTest.php
 
 		-
 			message: '#^Call to an undefined method App\\Repository\\ApiKeyRepository\:\:expects\(\)\.$#'
