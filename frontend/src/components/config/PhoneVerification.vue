@@ -431,10 +431,7 @@ const loadStatus = async () => {
     // Check if verification is complete (user was verified via WhatsApp)
     if (data?.verified) {
       verificationPending.value = false
-      // Only show success message if user was in pending state
-      if (phoneNumber.value) {
-        success('Phone number verified successfully!')
-      }
+      // Success message is shown on WhatsApp after verification
     }
   } catch (err: any) {
     console.error('Failed to load phone verification status:', err)

@@ -119,14 +119,19 @@ class EmailChatService
 
     /**
      * Find or create user from WhatsApp phone number.
-     * Similar to email, but uses phone number as identifier.
+     * Priority: Verified phone > Anonymous phone > Create new.
      */
     public function findOrCreateUserFromPhone(string $phoneNumber): array
     {
         $phoneNumber = preg_replace('/[^0-9+]/', '', $phoneNumber);
 
-        // Check if user with verified phone exists
-        $sql = "SELECT BID FROM BUSER WHERE JSON_EXTRACT(BUSERDETAILS, '$.phone_verification.phone_number') = :phone AND JSON_EXTRACT(BUSERDETAILS, '$.phone_verification.verified') = true LIMIT 1";
+        // PRIORITY 1: Check if user with verified phone exists
+        // Format: {"phone_number": "491234567", "phone_verified_at": 1234567890}
+        $sql = "SELECT BID FROM BUSER
+                WHERE JSON_EXTRACT(BUSERDETAILS, '$.phone_number') = :phone
+                AND JSON_EXTRACT(BUSERDETAILS, '$.phone_verified_at') IS NOT NULL
+                ORDER BY CAST(JSON_EXTRACT(BUSERDETAILS, '$.phone_verified_at') AS UNSIGNED) DESC
+                LIMIT 1";
         $stmt = $this->em->getConnection()->prepare($sql);
         $result = $stmt->executeQuery(['phone' => $phoneNumber]);
         $userId = $result->fetchOne();
@@ -134,6 +139,12 @@ class EmailChatService
         if ($userId) {
             $user = $this->userRepository->find($userId);
             if ($user) {
+                $this->logger->info('Found verified phone user for WhatsApp', [
+                    'phone' => $phoneNumber,
+                    'user_id' => $user->getId(),
+                    'level' => $user->getUserLevel(),
+                ]);
+
                 return [
                     'user' => $user,
                     'is_anonymous' => false,

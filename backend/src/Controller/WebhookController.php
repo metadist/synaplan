@@ -444,6 +444,38 @@ class WebhookController extends AbstractController
         // Check rate limit
         $rateLimitCheck = $this->rateLimitService->checkLimit($user, 'MESSAGES');
         if (!$rateLimitCheck['allowed']) {
+            $this->logger->warning('WhatsApp message rate limit exceeded', [
+                'user_id' => $user->getId(),
+                'level' => $user->getRateLimitLevel(),
+                'limit' => $rateLimitCheck['limit'],
+                'used' => $rateLimitCheck['used'],
+                'message_id' => $messageId,
+            ]);
+
+            // Send rate limit notification to user
+            $limitType = $rateLimitCheck['limit_type'] ?? 'lifetime';
+            $limitMessage = "⚠️ *Nachrichtenlimit erreicht*\n\n";
+            $limitMessage .= "Du hast dein Nachrichtenlimit von {$rateLimitCheck['limit']} Nachrichten ";
+
+            if ('lifetime' === $limitType) {
+                $limitMessage .= "erreicht.\n\n";
+                $limitMessage .= 'Um weiterhin Synaplan zu nutzen, verifiziere deine Nummer oder upgrade zu einem kostenpflichtigen Plan.';
+            } else {
+                $resetTime = $rateLimitCheck['reset_at'] ?? null;
+                if ($resetTime) {
+                    $resetDate = date('d.m.Y H:i', $resetTime);
+                    $limitMessage .= "für diesen Zeitraum erreicht.\n\n";
+                    $limitMessage .= "Dein Limit wird am $resetDate zurückgesetzt.";
+                } else {
+                    $limitMessage .= 'erreicht.';
+                }
+            }
+
+            $this->whatsAppService->sendMessage($from, $limitMessage, $phoneNumberId);
+
+            // Mark as read even if rate limited
+            $this->whatsAppService->markAsRead($messageId, $phoneNumberId);
+
             return [
                 'success' => false,
                 'message_id' => $messageId,
@@ -853,7 +885,7 @@ class WebhookController extends AbstractController
             $this->em->flush();
 
             // Send success message
-            $successMessage = "✅ *Phone Verification Successful!*\n\nYour phone number has been verified.\n\nYou now have access to:\n• 50 messages per month\n• 5 images\n• 2 videos\n\nThank you for using SynaPlan!";
+            $successMessage = '✅ Erfolgreich verifiziert!';
             $this->whatsAppService->sendMessage($fromPhone, $successMessage, $phoneNumberId);
 
             return [
