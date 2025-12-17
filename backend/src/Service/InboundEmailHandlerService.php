@@ -313,6 +313,16 @@ class InboundEmailHandlerService
 
             $routedEmail = trim($response['content'] ?? '');
 
+            // Check if AI decided to discard the email
+            if ('DISCARD' === strtoupper($routedEmail)) {
+                $this->logger->info('Email discarded as irrelevant by AI', [
+                    'handler_id' => $handler->getId(),
+                    'subject' => substr($subject, 0, 50),
+                ]);
+
+                return null; // Do not forward
+            }
+
             // Validate that routed email is in departments list
             if ($this->isValidDepartmentEmail($routedEmail, $departments)) {
                 $this->logger->info('Email routed to department', [
@@ -452,6 +462,12 @@ class InboundEmailHandlerService
                             'from' => $from,
                             'subject' => $subject,
                             'routed_to' => $routedEmail,
+                        ]);
+                    } else {
+                        $this->logger->info('Email not forwarded (discarded as irrelevant)', [
+                            'handler_id' => $handler->getId(),
+                            'from' => $from,
+                            'subject' => $subject,
                         ]);
                     }
 

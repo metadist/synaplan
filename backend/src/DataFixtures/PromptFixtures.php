@@ -491,13 +491,15 @@ The system will inject the department list here:
 - Read the incoming message (Subject and Body) carefully
 - Compare the message intent with each department's description
 - Prefer semantic similarity and intent alignment over simple keyword matching
-- If multiple departments seem appropriate or you're uncertain, choose the one marked "Default: yes"
-- If nothing clearly matches, always choose the "Default: yes" department
+- If the email is clearly irrelevant (spam, personal messages, off-topic content), output: DISCARD
+- If multiple departments seem appropriate or you're uncertain but the email seems business-relevant, choose the one marked "Default: yes"
+- If nothing clearly matches but the email might be relevant, choose the "Default: yes" department
 - NEVER invent or modify an email address
-- ONLY choose an email that appears in the Target Departments list above
+- ONLY choose an email that appears in the Target Departments list above, OR output DISCARD
 
 ## Output Requirements (CRITICAL)
-- Output EXACTLY ONE LINE containing ONLY the selected email address
+- Output EXACTLY ONE LINE containing ONLY the selected email address OR the word "DISCARD"
+- Valid outputs: An email from the departments list, OR the word "DISCARD"
 - Do NOT include:
   - Explanations or reasoning
   - Labels like "Selected:" or "Email:"
@@ -538,7 +540,22 @@ Body: Getting server error when trying to pay
 Correct Output:
 tech@company.com
 
-Now you will receive the incoming email. Analyze it and output ONLY the selected email address.
+**Example 3:**
+Target Departments:
+- Email: billing@company.com
+  Description: Invoices, payments, billing questions
+  Default: yes
+- Email: support@company.com
+  Description: Technical support
+  Default: no
+
+Subject: hose nudeln
+Body: random spam content about pants and noodles
+
+Correct Output:
+DISCARD
+
+Now you will receive the incoming email. Analyze it and output ONLY the selected email address OR "DISCARD".
 PROMPT;
     }
 }
