@@ -86,13 +86,14 @@ class PhoneVerificationController extends AbstractController
         // Check rate limiting
         $userDetails = $user->getUserDetails();
         $rateLimitData = $userDetails['verification_rate_limit'] ?? null;
-        
+
         $now = time();
-        
+
         // Check if user is in cooldown period (5 minutes after 5 attempts)
         if ($rateLimitData && isset($rateLimitData['cooldown_until'])) {
             if ($now < $rateLimitData['cooldown_until']) {
                 $remainingSeconds = $rateLimitData['cooldown_until'] - $now;
+
                 return $this->json([
                     'success' => false,
                     'error' => 'Too many verification attempts. Please wait before trying again.',
@@ -103,12 +104,13 @@ class PhoneVerificationController extends AbstractController
             // Cooldown expired, reset counters
             $rateLimitData = null;
         }
-        
+
         // Check if last request was less than 30 seconds ago
         if ($rateLimitData && isset($rateLimitData['last_request_at'])) {
             $timeSinceLastRequest = $now - $rateLimitData['last_request_at'];
             if ($timeSinceLastRequest < 30) {
                 $remainingSeconds = 30 - $timeSinceLastRequest;
+
                 return $this->json([
                     'success' => false,
                     'error' => 'Please wait before generating a new code.',
@@ -117,7 +119,7 @@ class PhoneVerificationController extends AbstractController
                 ], Response::HTTP_TOO_MANY_REQUESTS);
             }
         }
-        
+
         // Initialize or update rate limit data
         if (!$rateLimitData) {
             $rateLimitData = [
@@ -126,25 +128,25 @@ class PhoneVerificationController extends AbstractController
                 'cooldown_until' => null,
             ];
         }
-        
+
         // Increment counter
-        $rateLimitData['count']++;
+        ++$rateLimitData['count'];
         $rateLimitData['last_request_at'] = $now;
-        
+
         // Check if user has reached the limit (5 attempts)
         if ($rateLimitData['count'] >= 5) {
             $rateLimitData['cooldown_until'] = $now + 300; // 5 minutes cooldown
             $rateLimitData['count'] = 0; // Reset counter for next window
-            
+
             $userDetails['verification_rate_limit'] = $rateLimitData;
             $user->setUserDetails($userDetails);
             $this->em->flush();
-            
+
             $this->logger->warning('User hit verification rate limit', [
                 'user_id' => $user->getId(),
                 'cooldown_until' => $rateLimitData['cooldown_until'],
             ]);
-            
+
             return $this->json([
                 'success' => false,
                 'error' => 'Maximum verification attempts reached. Please wait 5 minutes before trying again.',
@@ -152,7 +154,7 @@ class PhoneVerificationController extends AbstractController
                 'rate_limited' => true,
             ], Response::HTTP_TOO_MANY_REQUESTS);
         }
-        
+
         // Save rate limit data
         $userDetails['verification_rate_limit'] = $rateLimitData;
 
