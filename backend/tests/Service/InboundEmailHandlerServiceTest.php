@@ -10,6 +10,7 @@ use App\Repository\InboundEmailHandlerRepository;
 use App\Repository\PromptRepository;
 use App\Service\EncryptionService;
 use App\Service\InboundEmailHandlerService;
+use App\Service\ModelConfigService;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 
@@ -19,6 +20,7 @@ class InboundEmailHandlerServiceTest extends TestCase
     private InboundEmailHandlerRepository $handlerRepository;
     private PromptRepository $promptRepository;
     private AiFacade $aiFacade;
+    private ModelConfigService $modelConfigService;
     private EncryptionService $encryptionService;
     private LoggerInterface $logger;
 
@@ -27,6 +29,7 @@ class InboundEmailHandlerServiceTest extends TestCase
         $this->handlerRepository = $this->createMock(InboundEmailHandlerRepository::class);
         $this->promptRepository = $this->createMock(PromptRepository::class);
         $this->aiFacade = $this->createMock(AiFacade::class);
+        $this->modelConfigService = $this->createMock(ModelConfigService::class);
         $this->encryptionService = $this->createMock(EncryptionService::class);
         $this->logger = $this->createMock(LoggerInterface::class);
 
@@ -34,6 +37,7 @@ class InboundEmailHandlerServiceTest extends TestCase
             $this->handlerRepository,
             $this->promptRepository,
             $this->aiFacade,
+            $this->modelConfigService,
             $this->encryptionService,
             $this->logger
         );
