@@ -20,19 +20,19 @@
     <div class="surface-card p-6" data-testid="section-handler-name">
       <div class="flex items-start justify-between gap-6">
         <div class="flex-1">
-          <label class="block text-sm font-medium txt-primary mb-2">
-            {{ $t('mail.handlerName') }}
-          </label>
-          <input
-            v-model="handlerName"
-            type="text"
-            class="w-full px-4 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
-            :placeholder="$t('mail.handlerNamePlaceholder')"
-            data-testid="input-handler-name"
-          />
-          <p class="text-xs txt-secondary mt-1">
-            {{ $t('mail.handlerNameHelp') }}
-          </p>
+      <label class="block text-sm font-medium txt-primary mb-2">
+        {{ $t('mail.handlerName') }}
+      </label>
+      <input
+        v-model="handlerName"
+        type="text"
+        class="w-full px-4 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+        :placeholder="$t('mail.handlerNamePlaceholder')"
+        data-testid="input-handler-name"
+      />
+      <p class="text-xs txt-secondary mt-1">
+        {{ $t('mail.handlerNameHelp') }}
+      </p>
         </div>
 
         <!-- Status Toggle (only when editing) -->
@@ -411,7 +411,7 @@
 
       <div class="space-y-4">
         <!-- Option 1: New emails only (default) -->
-        <label
+        <label 
           class="flex items-start p-4 rounded-lg border cursor-pointer transition-all hover:shadow-md"
           :class="
             emailFilter.mode === 'new'
@@ -436,7 +436,7 @@
         </label>
 
         <!-- Option 2: Historical emails (PRO+) -->
-        <label
+        <label 
           class="flex items-start p-4 rounded-lg border cursor-pointer transition-all"
           :class="[
             emailFilter.mode === 'historical'
@@ -461,18 +461,18 @@
             <p class="text-sm txt-secondary mt-1">
               {{ $t('mail.filterHistoricalHelp') }}
             </p>
-
+            
             <!-- Date input (only show if historical is selected and user is PRO) -->
             <div v-if="emailFilter.mode === 'historical' && hasProFeatures" class="mt-4">
-              <label class="block text-xs font-medium txt-primary mb-1">
-                {{ $t('mail.filterFromDate') }}
-              </label>
-              <input
-                v-model="emailFilter.fromDate"
+                <label class="block text-xs font-medium txt-primary mb-1">
+                  {{ $t('mail.filterFromDate') }}
+                </label>
+                <input
+                  v-model="emailFilter.fromDate"
                 type="datetime-local"
-                class="w-full px-3 py-2 text-sm rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
-                data-testid="input-from-date"
-              />
+                  class="w-full px-3 py-2 text-sm rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+                  data-testid="input-from-date"
+                />
               <p class="text-xs txt-secondary mt-1">
                 {{ $t('mail.filterFromDateHelp') }}
               </p>
@@ -539,39 +539,39 @@
               <label class="block text-sm font-medium txt-primary mb-2">
                 {{ $t('mail.emailAddress') }}
               </label>
-              <input
-                v-model="dept.email"
-                type="email"
-                class="w-full px-4 py-2.5 rounded-lg bg-transparent border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)] transition-all"
-                :placeholder="$t('mail.emailAddressPlaceholder')"
-                data-testid="input-dept-email"
-              />
+             <input
+               v-model="dept.email"
+               type="email"
+               class="w-full px-4 py-2.5 rounded-lg bg-transparent border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)] transition-all"
+               :placeholder="$t('mail.emailAddressPlaceholder')"
+               data-testid="input-dept-email"
+             />
             </div>
 
             <div>
               <label class="block text-sm font-medium txt-primary mb-2">
                 {{ $t('mail.rulesForwarding') }}
               </label>
-              <input
-                v-model="dept.rules"
-                type="text"
-                class="w-full px-4 py-2.5 rounded-lg bg-transparent border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)] transition-all"
-                :placeholder="$t('mail.rulesPlaceholder')"
-                data-testid="input-dept-rules"
-              />
+             <input
+               v-model="dept.rules"
+               type="text"
+               class="w-full px-4 py-2.5 rounded-lg bg-transparent border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)] transition-all"
+               :placeholder="$t('mail.rulesPlaceholder')"
+               data-testid="input-dept-rules"
+             />
             </div>
           </div>
 
           <div class="mt-4 pt-4 border-t border-light-border/20 dark:border-dark-border/10">
             <label class="flex items-center gap-2 cursor-pointer group">
-              <input
-                :checked="dept.isDefault"
-                type="radio"
-                name="default-dept"
-                class="w-4 h-4 text-[var(--brand)] focus:ring-2 focus:ring-[var(--brand)]"
-                data-testid="input-dept-default"
+             <input
+               :checked="dept.isDefault"
+               type="radio"
+               name="default-dept"
+               class="w-4 h-4 text-[var(--brand)] focus:ring-2 focus:ring-[var(--brand)]"
+               data-testid="input-dept-default"
                 @change="setDefault(dept.id)"
-              />
+             />
               <span class="text-sm txt-secondary group-hover:txt-primary transition-colors">{{
                 $t('mail.setAsDefault')
               }}</span>
@@ -712,19 +712,19 @@
       <div class="flex gap-3">
         <button
           v-if="currentStep < steps.length - 1"
-          :disabled="(currentStep === 0 && !isStep1Valid) || (currentStep === 1 && !isStep2Valid)"
-          class="btn-primary px-6 py-2 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
-          data-testid="btn-next"
+        :disabled="(currentStep === 0 && !isStep1Valid) || (currentStep === 1 && !isStep2Valid)"
+        class="btn-primary px-6 py-2 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
+        data-testid="btn-next"
           @click="nextStep"
-        >
+      >
           {{ $t('mail.next') }}
         </button>
         <button
           v-else
-          class="btn-primary px-6 py-2 rounded-lg flex items-center gap-2"
-          data-testid="btn-save"
+        class="btn-primary px-6 py-2 rounded-lg flex items-center gap-2"
+        data-testid="btn-save"
           @click="saveConfiguration"
-        >
+      >
           <CheckIcon class="w-4 h-4" />
           {{ $t('mail.saveConfiguration') }}
         </button>
@@ -830,9 +830,9 @@ const emailFilter = ref<EmailFilter>({
 watch(
   () => emailFilter.value.mode,
   (newMode) => {
-    if (newMode === 'new') {
-      emailFilter.value.fromDate = undefined
-    }
+  if (newMode === 'new') {
+    emailFilter.value.fromDate = undefined
+  }
   }
 )
 
@@ -840,11 +840,11 @@ watch(
 watch(
   () => props.handler,
   (handler) => {
-    if (handler) {
-      handlerName.value = handler.name
+  if (handler) {
+    handlerName.value = handler.name
       isActive.value = handler.status === 'active'
-      config.value = { ...handler.config }
-      departments.value = [...handler.departments]
+    config.value = { ...handler.config }
+    departments.value = [...handler.departments]
 
       // Load SMTP config if available
       if (handler.smtpConfig) {
@@ -854,7 +854,7 @@ watch(
           smtpSecurity: handler.smtpConfig.smtpSecurity,
           smtpUsername: handler.smtpConfig.smtpUsername,
           smtpPassword: handler.smtpConfig.smtpPassword, // Will be '••••••••' from backend
-        }
+  }
       }
 
       // Load email filter config if available
@@ -877,7 +877,7 @@ const isStep1Valid = computed(() => {
     config.value.username &&
     config.value.password
   )
-
+  
   // SMTP is now required for forwarding
   const smtpValid = !!(
     smtpConfig.value.smtpServer &&
@@ -885,7 +885,7 @@ const isStep1Valid = computed(() => {
     smtpConfig.value.smtpUsername &&
     smtpConfig.value.smtpPassword
   )
-
+  
   return basicValid && smtpValid
 })
 
@@ -949,7 +949,7 @@ const testConnection = async () => {
 
   isTestingConnection.value = true
   testResult.value = null
-
+  
   try {
     const result = await inboundEmailHandlersApi.testConnection(props.handlerId)
     testResult.value = {
@@ -974,7 +974,7 @@ const saveConfiguration = () => {
   if (!handlerName.value.trim()) {
     handlerName.value = `Mail Handler ${Date.now()}`
   }
-
+  
   // SMTP config and email filter are always required
   emit(
     'save',

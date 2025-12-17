@@ -2,19 +2,19 @@
   <div class="space-y-4">
     <!-- Header with selection info and actions -->
     <div class="flex flex-col gap-3">
-      <div class="flex items-center justify-between">
-        <div>
-          <h2 class="text-xl font-semibold txt-primary">{{ $t('mail.savedHandlers') }}</h2>
-          <p class="text-sm txt-secondary mt-1">{{ $t('mail.savedHandlersDesc') }}</p>
-        </div>
-        <button
-          class="btn-primary px-4 py-2 rounded-lg flex items-center gap-2"
-          @click="$emit('create')"
-        >
-          <PlusIcon class="w-5 h-5" />
-          {{ $t('mail.createHandler') }}
-        </button>
+    <div class="flex items-center justify-between">
+      <div>
+        <h2 class="text-xl font-semibold txt-primary">{{ $t('mail.savedHandlers') }}</h2>
+        <p class="text-sm txt-secondary mt-1">{{ $t('mail.savedHandlersDesc') }}</p>
       </div>
+      <button
+          class="btn-primary px-4 py-2 rounded-lg flex items-center gap-2"
+        @click="$emit('create')"
+      >
+        <PlusIcon class="w-5 h-5" />
+        {{ $t('mail.createHandler') }}
+      </button>
+    </div>
 
       <!-- Bulk actions bar (only show when handlers are selected) -->
       <transition
@@ -57,7 +57,7 @@
             <button
               class="px-3 py-1.5 rounded-lg text-sm font-medium transition-colors bg-red-500/10 text-red-600 dark:text-red-400 hover:bg-red-500/20 flex items-center gap-1.5"
               @click="deleteSelected"
-            >
+    >
               <TrashIcon class="w-4 h-4" />
               {{ $t('mail.deleteSelected') }}
             </button>
@@ -107,7 +107,7 @@
             />
             <div
               class="w-5 h-5 rounded border-2 border-light-border dark:border-dark-border peer-checked:border-[var(--brand)] peer-checked:bg-[var(--brand)] transition-all flex items-center justify-center"
-            >
+      >
               <CheckIcon
                 class="w-3 h-3 text-white opacity-0 peer-checked:opacity-100 transition-opacity"
               />
@@ -149,13 +149,13 @@
         </div>
 
         <!-- Delete button (separate from header to avoid overlap) -->
-        <button
+          <button
           class="absolute top-3 right-10 icon-ghost icon-ghost--danger opacity-0 group-hover:opacity-100 transition-all z-20"
           :aria-label="$t('mail.deleteHandler')"
-          @click.stop="$emit('delete', handler.id)"
-        >
-          <TrashIcon class="w-4 h-4" />
-        </button>
+            @click.stop="$emit('delete', handler.id)"
+          >
+            <TrashIcon class="w-4 h-4" />
+          </button>
 
         <div class="space-y-2 mb-3">
           <div class="flex items-center gap-2 text-xs">
@@ -274,11 +274,11 @@ const formatDate = (date: Date) => {
   const now = new Date()
   const diff = now.getTime() - date.getTime()
   const days = Math.floor(diff / (1000 * 60 * 60 * 24))
-
+  
   if (days === 0) return 'Today'
   if (days === 1) return 'Yesterday'
   if (days < 7) return `${days}d ago`
-
+  
   return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
 }
 </script>

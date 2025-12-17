@@ -22,6 +22,7 @@ class InboundEmailHandlerService
         private InboundEmailHandlerRepository $handlerRepository,
         private PromptRepository $promptRepository,
         private AiFacade $aiFacade,
+        private ModelConfigService $modelConfigService,
         private EncryptionService $encryptionService,
         private LoggerInterface $logger,
     ) {
@@ -278,6 +279,25 @@ class InboundEmailHandlerService
         // Add email content
         $fullPrompt = $promptText."\n\nSubject: ".$subject."\n\nBody:\n".$body;
 
+        // Get user's default chat model
+        $modelId = $this->modelConfigService->getDefaultModel('CHAT', $handler->getUserId());
+        $provider = null;
+        $modelName = null;
+
+        if ($modelId) {
+            $provider = $this->modelConfigService->getProviderForModel($modelId);
+            $modelName = $this->modelConfigService->getModelName($modelId);
+        }
+
+        if (!$provider || !$modelName) {
+            $this->logger->error('No chat model configured for mail handler', [
+                'handler_id' => $handler->getId(),
+                'user_id' => $handler->getUserId(),
+            ]);
+
+            return $this->getDefaultDepartment($departments);
+        }
+
         try {
             // Call AI to route email
             $response = $this->aiFacade->chat(
@@ -285,7 +305,10 @@ class InboundEmailHandlerService
                     ['role' => 'user', 'content' => $fullPrompt],
                 ],
                 userId: $handler->getUserId(),
-                options: ['model' => null] // Use default model from user config
+                options: [
+                    'provider' => $provider,
+                    'model' => $modelName,
+                ]
             );
 
             $routedEmail = trim($response['content'] ?? '');

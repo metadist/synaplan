@@ -1,6 +1,6 @@
 /**
  * Inbound Email Handlers API
- *
+ * 
  * API for managing email handlers (IMAP/POP3 configuration for email routing)
  */
 
