@@ -198,10 +198,9 @@ export function useAutoPersist(
     watch(
       chatId,
       () => {
+        // Always load the draft for the new chat (or empty if no draft exists)
         const newPersisted = loadInput()
-        if (newPersisted && !inputRef.value) {
-          inputRef.value = newPersisted
-        }
+        inputRef.value = newPersisted || ''
       },
       { immediate: false }
     )
