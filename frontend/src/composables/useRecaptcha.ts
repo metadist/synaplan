@@ -1,8 +1,10 @@
 import { useReCaptcha } from 'vue-recaptcha-v3'
+import { useConfigStore } from '@/stores/config'
 
 export const useRecaptcha = () => {
-  const recaptchaEnabled = import.meta.env.VITE_RECAPTCHA_ENABLED === 'true'
-  const recaptchaSiteKey = import.meta.env.VITE_RECAPTCHA_SITE_KEY
+  const config = useConfigStore()
+  const recaptchaEnabled = config.recaptcha.enabled
+  const recaptchaSiteKey = config.recaptcha.siteKey
 
   // Only use reCAPTCHA instance if it's enabled and configured
   const recaptchaInstance =
