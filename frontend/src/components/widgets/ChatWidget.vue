@@ -80,14 +80,6 @@
           <div class="flex items-center gap-2">
             <button
               class="w-8 h-8 rounded-lg bg-white/10 hover:bg-white/20 transition-colors flex items-center justify-center"
-              aria-label="Start new chat"
-              data-testid="btn-new"
-              @click="startNewConversation"
-            >
-              <ArrowPathIcon class="w-5 h-5 text-white" />
-            </button>
-            <button
-              class="w-8 h-8 rounded-lg bg-white/10 hover:bg-white/20 transition-colors flex items-center justify-center"
               :aria-label="widgetTheme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'"
               data-testid="btn-theme"
               @click="toggleTheme"
@@ -881,51 +873,6 @@ const removeChatStorageKeys = (sessionToClear?: string) => {
   localStorage.removeItem(legacyKey)
 }
 
-const startNewConversation = () => {
-  const storageKey = getSessionStorageKey()
-  const previousSession = sessionId.value || localStorage.getItem(storageKey) || undefined
-  const newSessionId = createSessionId()
-
-  sessionId.value = newSessionId
-  localStorage.setItem(storageKey, newSessionId)
-
-  if (previousSession) {
-    removeChatStorageKeys(previousSession)
-  } else {
-    removeChatStorageKeys()
-  }
-
-  chatId.value = null
-  messages.value = []
-  inputMessage.value = ''
-  selectedFile.value = null
-  fileSizeError.value = false
-  fileUploadError.value = null
-  fileUploadCount.value = 0
-  if (fileInput.value) {
-    fileInput.value.value = ''
-  }
-  messageCount.value = 0
-  unreadCount.value = 0
-  isTyping.value = false
-  historyLoaded.value = false
-
-  if (isOpen.value) {
-    ensureAutoMessage()
-  }
-
-  window.dispatchEvent(
-    new CustomEvent('synaplan-widget-session-changed', {
-      detail: {
-        widgetId: props.widgetId,
-        sessionId: newSessionId,
-      },
-    })
-  )
-
-  loadConversationHistory()
-}
-
 const handleOpenEvent = (event: Event) => {
   const detail = (event as CustomEvent).detail
   if (detail?.widgetId && detail.widgetId !== props.widgetId) {
@@ -940,14 +887,6 @@ const handleCloseEvent = (event: Event) => {
     return
   }
   closeChat()
-}
-
-const handleNewChatEvent = (event: Event) => {
-  const detail = (event as CustomEvent).detail
-  if (detail?.widgetId && detail.widgetId !== props.widgetId) {
-    return
-  }
-  startNewConversation()
 }
 
 const normalizeServerMessage = (raw: any): Message => {
@@ -1211,7 +1150,6 @@ onMounted(() => {
 
   window.addEventListener('synaplan-widget-open', handleOpenEvent)
   window.addEventListener('synaplan-widget-close', handleCloseEvent)
-  window.addEventListener('synaplan-widget-new-chat', handleNewChatEvent)
 
   const storageKey = getSessionStorageKey()
   let currentSessionId = localStorage.getItem(storageKey)
@@ -1245,7 +1183,6 @@ onBeforeUnmount(() => {
 
   window.removeEventListener('synaplan-widget-open', handleOpenEvent)
   window.removeEventListener('synaplan-widget-close', handleCloseEvent)
-  window.removeEventListener('synaplan-widget-new-chat', handleNewChatEvent)
 })
 
 const getChatStorageKey = () => {
