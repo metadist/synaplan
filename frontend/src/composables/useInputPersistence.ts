@@ -3,7 +3,7 @@
  * Saves chat messages and file selections to localStorage
  */
 
-import { ref, watch, onBeforeUnmount, type Ref } from 'vue'
+import { watch, onBeforeUnmount, type Ref } from 'vue'
 
 interface PersistedInput {
   message?: string
