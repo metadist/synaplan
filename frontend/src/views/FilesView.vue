@@ -578,9 +578,13 @@ import {
 } from '@heroicons/vue/24/outline'
 import filesService, { type FileItem } from '@/services/filesService'
 import { useNotification } from '@/composables/useNotification'
+import { useFilePersistence } from '@/composables/useInputPersistence'
 
 const { t } = useI18n()
 const { success: showSuccess, error: showError, info: showInfo } = useNotification()
+
+// File persistence - save selected files metadata
+const { saveFileMetadata, loadFileMetadata, clearFiles } = useFilePersistence('files_upload')
 
 const storageWidget = ref<InstanceType<typeof StorageQuotaWidget> | null>(null)
 
@@ -643,6 +647,8 @@ const handleFileSelect = (event: Event) => {
   const target = event.target as HTMLInputElement
   if (target.files) {
     selectedFiles.value = Array.from(target.files)
+    // Save metadata for potential recovery after auth
+    saveFileMetadata(selectedFiles.value)
   }
 }
 
@@ -685,6 +691,8 @@ const handleDrop = async (event: DragEvent) => {
     // Add dropped files to selectedFiles array
     selectedFiles.value = [...selectedFiles.value, ...Array.from(files)]
     showSuccess(t('files.filesAddedToQueue', { count: files.length }))
+    // Save metadata for potential recovery after auth
+    saveFileMetadata(selectedFiles.value)
   }
 }
 
@@ -740,6 +748,8 @@ const uploadFiles = async () => {
       selectedFiles.value = []
       groupKeyword.value = ''
       selectedGroup.value = ''
+      // Clear persisted file metadata after successful upload
+      clearFiles()
 
       // Reload files list AND storage widget
       await loadFiles()
@@ -1082,6 +1092,19 @@ onMounted(async () => {
   await loadFiles()
   await loadFileGroups()
   await loadAllFileGroupKeys()
+
+  // Check for persisted file metadata (from before potential auth refresh)
+  const persistedFiles = loadFileMetadata()
+  if (persistedFiles && persistedFiles.length > 0) {
+    showInfo(
+      t('files.filesLostAfterReload', {
+        count: persistedFiles.length,
+        names: persistedFiles.map((f) => f.name).join(', '),
+      })
+    )
+    // Clear the persisted data now that we've shown the notice
+    clearFiles()
+  }
 })
 </script>
 

@@ -16,6 +16,15 @@
     <meta name="theme-color" content="#0003c7" />
     
     <title>New chat</title>
+    
+    <!-- Runtime configuration - values injected by server at container startup -->
+    <!-- Markers like __PLACEHOLDER__ are replaced by docker-entrypoint.sh -->
+    <script>
+      window.__RUNTIME_CONFIG__ = {
+        RECAPTCHA_ENABLED: '__VITE_RECAPTCHA_ENABLED__',
+        RECAPTCHA_SITE_KEY: '__VITE_RECAPTCHA_SITE_KEY__',
+      };
+    </script>
   </head>
   <body>
     <div id="app"></div>

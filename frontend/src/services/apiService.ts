@@ -20,6 +20,37 @@ const API_BASE_URL = config.apiBaseUrl
 const API_TIMEOUT = import.meta.env.VITE_API_TIMEOUT || 30000
 const CSRF_HEADER = import.meta.env.VITE_CSRF_HEADER_NAME || 'X-CSRF-Token'
 
+// Token refresh stampede protection
+let tokenRefreshPromise: Promise<boolean> | null = null
+
+/**
+ * Centralized token refresh - prevents concurrent refresh requests (stampede)
+ */
+async function refreshAccessToken(): Promise<boolean> {
+  // If already refreshing, wait for that promise
+  if (tokenRefreshPromise) {
+    return tokenRefreshPromise
+  }
+
+  tokenRefreshPromise = (async () => {
+    try {
+      const refreshResponse = await fetch(`${API_BASE_URL}/api/v1/auth/refresh`, {
+        method: 'POST',
+        credentials: 'include',
+      })
+
+      return refreshResponse.ok
+    } catch (error) {
+      console.error('Token refresh error:', error)
+      return false
+    } finally {
+      tokenRefreshPromise = null
+    }
+  })()
+
+  return tokenRefreshPromise
+}
+
 interface ApiHttpClientOptions<S extends z.Schema | undefined = undefined> extends RequestInit {
   /** Zod schema for response validation */
   schema?: S
@@ -79,11 +110,58 @@ async function httpClient<T = unknown, S extends z.Schema | undefined = undefine
 
     clearTimeout(timeoutId)
 
-    // 401 handling: With cookie-based auth, token refresh is automatic via httpClient
-    // If we get 401 here, redirect to login
+    // 401 handling: Try to refresh token automatically
     if (response.status === 401) {
-      window.location.href = '/login?reason=session_expired'
-      throw new Error('Session expired')
+      const refreshSuccess = await refreshAccessToken()
+
+      if (refreshSuccess) {
+        // Retry original request with new timeout
+        const retryController = new AbortController()
+        const retryTimeoutId = setTimeout(() => retryController.abort(), API_TIMEOUT)
+
+        try {
+          const retryResponse = await fetch(`${API_BASE_URL}${endpoint}`, {
+            ...requestOptions,
+            headers,
+            credentials: 'include',
+            signal: retryController.signal,
+          })
+
+          clearTimeout(retryTimeoutId)
+
+          if (retryResponse.ok) {
+            const data = await retryResponse.json()
+
+            // Validate with schema if provided
+            if (schema) {
+              try {
+                return schema.parse(data) as z.output<NonNullable<S>>
+              } catch (error) {
+                console.error('Schema validation failed:', error)
+                throw error
+              }
+            }
+
+            return data as T
+          } else if (retryResponse.status === 401) {
+            // Still 401 after refresh - redirect to login
+            window.location.href = '/login?reason=session_expired'
+            throw new Error('Session expired')
+          } else {
+            // Other error - fall through to normal error handling
+            const errorText = await retryResponse.text()
+            console.error('API Error Details:', errorText)
+            throw new Error(`API Error: ${retryResponse.status} ${retryResponse.statusText}`)
+          }
+        } catch (error) {
+          clearTimeout(retryTimeoutId)
+          throw error
+        }
+      } else {
+        // Refresh failed - redirect to login
+        window.location.href = '/login?reason=session_expired'
+        throw new Error('Session expired')
+      }
     }
 
     if (!response.ok) {

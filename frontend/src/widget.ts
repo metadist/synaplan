@@ -50,6 +50,8 @@ class SynaplanWidget {
   private container: HTMLElement | null = null
   private chatLoaded = false
   private chatLoading = false
+  private shouldOpenImmediately = false
+  private closeEventHandler: (() => void) | null = null
 
   async init(config: WidgetConfig) {
     if (!config.widgetId) {
@@ -225,7 +227,15 @@ class SynaplanWidget {
     })
 
     this.button.addEventListener('click', () => {
-      this.loadChat()
+      if (this.chatLoaded) {
+        // Widget already loaded, just open it
+        this.button!.style.display = 'none'
+        this.open()
+      } else {
+        // First click: load and open widget
+        this.shouldOpenImmediately = true
+        this.loadChat()
+      }
     })
 
     document.body.appendChild(this.button)
@@ -268,10 +278,15 @@ class SynaplanWidget {
         document.head.appendChild(styleEl)
       }
 
-      // Remove button
+      // In lazy mode: hide button but keep it for later
+      // In eager mode: remove button completely
       if (this.button) {
-        this.button.remove()
-        this.button = null
+        if (this.config?.lazy) {
+          this.button.style.display = 'none'
+        } else {
+          this.button.remove()
+          this.button = null
+        }
       }
 
       // Create container
@@ -287,6 +302,7 @@ class SynaplanWidget {
         iconColor: this.config!.iconColor,
         defaultTheme: this.config!.defaultTheme,
         autoOpen: this.config!.autoOpen,
+        openImmediately: this.shouldOpenImmediately, // Open immediately if user clicked button
         autoMessage: this.config!.autoMessage,
         messageLimit: this.config!.messageLimit,
         maxFileSize: this.config!.maxFileSize,
@@ -294,11 +310,25 @@ class SynaplanWidget {
         apiUrl: this.config!.apiUrl,
         allowFileUpload: this.config!.allowFileUpload,
         fileUploadLimit: this.config!.fileUploadLimit,
+        hideButton: this.config!.lazy, // Hide ChatWidget's button in lazy mode
         isPreview: false,
       })
 
       this.app.use(i18n)
       this.app.mount(this.container)
+
+      // In lazy mode: listen for close event to show button again
+      if (this.config?.lazy && this.button) {
+        const handleClose = () => {
+          if (this.button) {
+            this.button.style.display = 'flex'
+            this.button.innerHTML = this.getIconContent() // Restore original icon
+            this.shouldOpenImmediately = false
+          }
+        }
+        this.closeEventHandler = handleClose
+        window.addEventListener('synaplan-widget-close', handleClose)
+      }
 
       this.chatLoaded = true
       console.log('✅ Synaplan Widget loaded successfully')
@@ -345,6 +375,12 @@ class SynaplanWidget {
   }
 
   destroy() {
+    // Remove event listener if it exists
+    if (this.closeEventHandler) {
+      window.removeEventListener('synaplan-widget-close', this.closeEventHandler)
+      this.closeEventHandler = null
+    }
+
     if (this.app) {
       this.app.unmount()
       this.app = null
