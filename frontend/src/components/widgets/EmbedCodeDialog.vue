@@ -61,76 +61,6 @@
           </p>
         </div>
 
-        <!-- WordPress Shortcode -->
-        <div data-testid="section-wordpress-code">
-          <div class="flex items-center justify-between mb-3">
-            <h3 class="font-semibold txt-primary flex items-center gap-2">
-              <Icon icon="simple-icons:wordpress" class="w-5 h-5" />
-              {{ $t('widgets.wordPressShortcode') }}
-            </h3>
-            <button
-              class="px-4 py-2 rounded-lg bg-[var(--brand)]/10 text-[var(--brand)] hover:bg-[var(--brand)]/20 transition-colors text-sm font-medium flex items-center gap-2"
-              data-testid="btn-copy-wp"
-              @click="copyToClipboard(wordpressShortcode, 'WordPress')"
-            >
-              <Icon
-                :icon="copiedWP ? 'heroicons:check' : 'heroicons:clipboard-document'"
-                class="w-4 h-4"
-              />
-              {{ copiedWP ? $t('common.copied') : $t('common.copy') }}
-            </button>
-          </div>
-          <div class="relative">
-            <pre
-              class="surface-chip rounded-lg p-4 text-sm overflow-x-auto txt-primary font-mono border border-light-border/30 dark:border-dark-border/20"
-            ><code>{{ wordpressShortcode }}</code></pre>
-          </div>
-          <p class="text-xs txt-secondary mt-2">
-            {{ $t('widgets.wordPressDescription') }}
-          </p>
-        </div>
-
-        <!-- Widget Preview -->
-        <div>
-          <h3 class="font-semibold txt-primary mb-3 flex items-center gap-2">
-            <Icon icon="heroicons:eye" class="w-5 h-5" />
-            {{ $t('widgets.preview') }}
-          </h3>
-          <div
-            class="surface-chip rounded-lg border-2 border-dashed border-light-border/30 dark:border-dark-border/20 relative h-[600px] overflow-hidden"
-          >
-            <!-- Background hint -->
-            <div
-              class="absolute inset-0 flex items-center justify-center txt-secondary text-sm pointer-events-none z-0"
-            >
-              <div class="text-center">
-                <Icon
-                  icon="heroicons:chat-bubble-left-right"
-                  class="w-12 h-12 mx-auto mb-2 opacity-20"
-                />
-                <p class="opacity-50">{{ $t('widgets.previewDescription') }}</p>
-              </div>
-            </div>
-
-            <!-- Live Preview Widget (positioned absolute within this container) -->
-            <div class="absolute inset-0 z-10">
-              <ChatWidget
-                :widget-id="widget.widgetId"
-                :api-url="config.apiBaseUrl"
-                :primary-color="widget.config.primaryColor || '#007bff'"
-                :icon-color="widget.config.iconColor || '#ffffff'"
-                :position="widget.config.position || 'bottom-right'"
-                :auto-open="false"
-                :auto-message="widget.config.autoMessage || 'Hello! How can I help you?'"
-                :message-limit="widget.config.messageLimit || 50"
-                :max-file-size="widget.config.maxFileSize || 10"
-                :default-theme="widget.config.defaultTheme || 'light'"
-                :is-preview="true"
-              />
-            </div>
-          </div>
-        </div>
-
         <!-- Installation Instructions -->
         <div class="surface-chip rounded-lg p-4 border border-blue-500/20 bg-blue-500/5">
           <div class="flex items-start gap-3">
@@ -169,8 +99,6 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { Icon } from '@iconify/vue'
-import { useConfigStore } from '@/stores/config'
-import ChatWidget from '@/components/widgets/ChatWidget.vue'
 import type { Widget } from '@/services/api/widgetsApi'
 import { useNotification } from '@/composables/useNotification'
 
@@ -186,12 +114,9 @@ defineEmits<{
   close: []
 }>()
 
-const config = useConfigStore()
 const { success } = useNotification()
 
 const copiedHTML = ref(false)
-const copiedLegacy = ref(false)
-const copiedWP = ref(false)
 
 /**
  * Copy to clipboard
@@ -200,22 +125,10 @@ const copyToClipboard = async (text: string, type: string) => {
   try {
     await navigator.clipboard.writeText(text)
 
-    if (type === 'HTML') {
-      copiedHTML.value = true
-      setTimeout(() => {
-        copiedHTML.value = false
-      }, 2000)
-    } else if (type === 'Legacy') {
-      copiedLegacy.value = true
-      setTimeout(() => {
-        copiedLegacy.value = false
-      }, 2000)
-    } else {
-      copiedWP.value = true
-      setTimeout(() => {
-        copiedWP.value = false
-      }, 2000)
-    }
+    copiedHTML.value = true
+    setTimeout(() => {
+      copiedHTML.value = false
+    }, 2000)
 
     success(`${type} code copied to clipboard!`)
   } catch (error) {

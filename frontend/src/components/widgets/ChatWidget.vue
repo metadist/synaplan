@@ -12,7 +12,7 @@
       leave-from-class="scale-100 opacity-100"
       leave-to-class="scale-0 opacity-0"
     >
-      <div v-if="!isOpen" class="absolute bottom-0 right-0">
+      <div v-if="!isOpen && !hideButton" class="absolute bottom-0 right-0">
         <button
           :style="{ backgroundColor: primaryColor }"
           class="w-16 h-16 rounded-full shadow-2xl hover:scale-110 transition-transform flex items-center justify-center group"
@@ -78,14 +78,6 @@
             </div>
           </div>
           <div class="flex items-center gap-2">
-            <button
-              class="w-8 h-8 rounded-lg bg-white/10 hover:bg-white/20 transition-colors flex items-center justify-center"
-              aria-label="Start new chat"
-              data-testid="btn-new"
-              @click="startNewConversation"
-            >
-              <ArrowPathIcon class="w-5 h-5 text-white" />
-            </button>
             <button
               class="w-8 h-8 rounded-lg bg-white/10 hover:bg-white/20 transition-colors flex items-center justify-center"
               :aria-label="widgetTheme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'"
@@ -411,7 +403,6 @@ import {
   MoonIcon,
   ExclamationTriangleIcon,
   XCircleIcon,
-  ArrowPathIcon,
 } from '@heroicons/vue/24/outline'
 
 import { uploadWidgetFile, sendWidgetMessage } from '@/services/api/widgetsApi'
@@ -436,6 +427,7 @@ interface Props {
   apiUrl: string
   allowFileUpload?: boolean
   fileUploadLimit?: number
+  hideButton?: boolean
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -452,6 +444,7 @@ const props = withDefaults(defineProps<Props>(), {
   widgetTitle: '',
   allowFileUpload: false,
   fileUploadLimit: 3,
+  hideButton: false,
 })
 
 interface Message {
@@ -584,6 +577,12 @@ const openChat = () => {
 const closeChat = () => {
   if (isOpen.value) {
     isOpen.value = false
+    // Dispatch close event for lazy-loaded widget button to reappear
+    window.dispatchEvent(
+      new CustomEvent('synaplan-widget-close', {
+        detail: { widgetId: props.widgetId },
+      })
+    )
   }
 }
 
@@ -657,7 +656,8 @@ const sendMessage = async () => {
       const uploadResult = await uploadWidgetFile(
         props.widgetId,
         sessionId.value,
-        selectedFile.value
+        selectedFile.value,
+        props.apiUrl
       )
 
       fileIds.push(uploadResult.file.id)
@@ -854,69 +854,6 @@ const getSessionStorageKey = () => `synaplan_widget_session_${props.widgetId}`
 const getChatStorageKeyForSession = (id: string) => `synaplan_widget_chatid_${props.widgetId}_${id}`
 const createSessionId = () => `sess_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`
 
-const removeChatStorageKeys = (sessionToClear?: string) => {
-  const legacyKey = `synaplan_widget_chatid_${props.widgetId}`
-  const prefix = `synaplan_widget_chatid_${props.widgetId}_`
-
-  if (sessionToClear) {
-    localStorage.removeItem(`${prefix}${sessionToClear}`)
-  } else {
-    for (let idx = localStorage.length - 1; idx >= 0; idx -= 1) {
-      const key = localStorage.key(idx)
-      if (key && key.startsWith(prefix)) {
-        localStorage.removeItem(key)
-      }
-    }
-  }
-
-  localStorage.removeItem(legacyKey)
-}
-
-const startNewConversation = () => {
-  const storageKey = getSessionStorageKey()
-  const previousSession = sessionId.value || localStorage.getItem(storageKey) || undefined
-  const newSessionId = createSessionId()
-
-  sessionId.value = newSessionId
-  localStorage.setItem(storageKey, newSessionId)
-
-  if (previousSession) {
-    removeChatStorageKeys(previousSession)
-  } else {
-    removeChatStorageKeys()
-  }
-
-  chatId.value = null
-  messages.value = []
-  inputMessage.value = ''
-  selectedFile.value = null
-  fileSizeError.value = false
-  fileUploadError.value = null
-  fileUploadCount.value = 0
-  if (fileInput.value) {
-    fileInput.value.value = ''
-  }
-  messageCount.value = 0
-  unreadCount.value = 0
-  isTyping.value = false
-  historyLoaded.value = false
-
-  if (isOpen.value) {
-    ensureAutoMessage()
-  }
-
-  window.dispatchEvent(
-    new CustomEvent('synaplan-widget-session-changed', {
-      detail: {
-        widgetId: props.widgetId,
-        sessionId: newSessionId,
-      },
-    })
-  )
-
-  loadConversationHistory()
-}
-
 const handleOpenEvent = (event: Event) => {
   const detail = (event as CustomEvent).detail
   if (detail?.widgetId && detail.widgetId !== props.widgetId) {
@@ -931,14 +868,6 @@ const handleCloseEvent = (event: Event) => {
     return
   }
   closeChat()
-}
-
-const handleNewChatEvent = (event: Event) => {
-  const detail = (event as CustomEvent).detail
-  if (detail?.widgetId && detail.widgetId !== props.widgetId) {
-    return
-  }
-  startNewConversation()
 }
 
 const normalizeServerMessage = (raw: any): Message => {
@@ -1202,7 +1131,6 @@ onMounted(() => {
 
   window.addEventListener('synaplan-widget-open', handleOpenEvent)
   window.addEventListener('synaplan-widget-close', handleCloseEvent)
-  window.addEventListener('synaplan-widget-new-chat', handleNewChatEvent)
 
   const storageKey = getSessionStorageKey()
   let currentSessionId = localStorage.getItem(storageKey)
@@ -1236,7 +1164,6 @@ onBeforeUnmount(() => {
 
   window.removeEventListener('synaplan-widget-open', handleOpenEvent)
   window.removeEventListener('synaplan-widget-close', handleCloseEvent)
-  window.removeEventListener('synaplan-widget-new-chat', handleNewChatEvent)
 })
 
 const getChatStorageKey = () => {
