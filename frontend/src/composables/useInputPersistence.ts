@@ -193,6 +193,20 @@ export function useAutoPersist(
     inputRef.value = persisted
   }
 
+  // Watch chatId changes and reload persisted input for new chat
+  if (chatId) {
+    watch(
+      chatId,
+      () => {
+        const newPersisted = loadInput()
+        if (newPersisted && !inputRef.value) {
+          inputRef.value = newPersisted
+        }
+      },
+      { immediate: false }
+    )
+  }
+
   // Auto-save as user types (debounced)
   let saveTimeout: ReturnType<typeof setTimeout> | null = null
   watch(
@@ -209,6 +223,7 @@ export function useAutoPersist(
 
   // Clear on unmount if input is empty
   onBeforeUnmount(() => {
+    if (saveTimeout) clearTimeout(saveTimeout)
     if (!inputRef.value.trim()) {
       clearInput()
     }

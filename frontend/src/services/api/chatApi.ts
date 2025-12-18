@@ -4,6 +4,10 @@
 
 import { httpClient, API_BASE_URL } from './httpClient'
 
+// SSE token configuration
+// Note: SSE_TOKEN_EXPIRY_MS = 5 * 60 * 1000 (5 minutes, backend setting)
+const SSE_TOKEN_REFRESH_MS = 4 * 60 * 1000 // Refresh 1 minute before expiry
+
 // Cache SSE token (needed because EventSource can't send cookies)
 let cachedSseToken: string | null = null
 let tokenFetchPromise: Promise<string | null> | null = null
@@ -81,18 +85,14 @@ async function getSseToken(): Promise<string | null> {
           const data = await retryResponse.json()
           cachedSseToken = data.token
 
-          // Token expires in 5 min, refresh after 4 min
           // Clear any existing timer first
           if (tokenExpiryTimer) {
             clearTimeout(tokenExpiryTimer)
           }
-          tokenExpiryTimer = setTimeout(
-            () => {
-              cachedSseToken = null
-              tokenExpiryTimer = null
-            },
-            4 * 60 * 1000
-          )
+          tokenExpiryTimer = setTimeout(() => {
+            cachedSseToken = null
+            tokenExpiryTimer = null
+          }, SSE_TOKEN_REFRESH_MS)
 
           return cachedSseToken
         } else {
@@ -107,18 +107,14 @@ async function getSseToken(): Promise<string | null> {
       const data = await response.json()
       cachedSseToken = data.token
 
-      // Token expires in 5 min, refresh after 4 min
       // Clear any existing timer first
       if (tokenExpiryTimer) {
         clearTimeout(tokenExpiryTimer)
       }
-      tokenExpiryTimer = setTimeout(
-        () => {
-          cachedSseToken = null
-          tokenExpiryTimer = null
-        },
-        4 * 60 * 1000
-      )
+      tokenExpiryTimer = setTimeout(() => {
+        cachedSseToken = null
+        tokenExpiryTimer = null
+      }, SSE_TOKEN_REFRESH_MS)
 
       return cachedSseToken
     } catch (error) {
