@@ -665,7 +665,8 @@ const sendMessage = async () => {
       const uploadResult = await uploadWidgetFile(
         props.widgetId,
         sessionId.value,
-        selectedFile.value
+        selectedFile.value,
+        props.apiUrl
       )
 
       fileIds.push(uploadResult.file.id)

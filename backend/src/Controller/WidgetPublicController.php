@@ -681,7 +681,7 @@ class WidgetPublicController extends AbstractController
                 // Record usage for widget owner
                 if ($owner) {
                     $this->rateLimitService->recordUsage($owner, 'FILE_UPLOADS', [
-                        'file_id' => $result['id'],
+                        'file_id' => $result['file']['id'],
                         'widget_id' => $widgetId,
                         'session_id' => $sessionId,
                     ]);
@@ -743,18 +743,18 @@ class WidgetPublicController extends AbstractController
         $file->setFileName($uploadedFile->getClientOriginalName());
         $file->setFileSize($storageResult['size']);
         $file->setFileMime($storageResult['mime']);
-        $file->setFileType($this->getFileTypeCode($fileExtension));
+        $file->setFileType($this->getFileTypeString($fileExtension));
 
         $this->em->persist($file);
         $this->em->flush();
 
         $result = [
             'success' => true,
-            'id' => $file->getId(),
-            'filename' => $uploadedFile->getClientOriginalName(),
-            'size' => $storageResult['size'],
-            'mime' => $storageResult['mime'],
-            'path' => $relativePath,
+            'file' => [
+                'id' => $file->getId(),
+                'filename' => $uploadedFile->getClientOriginalName(),
+                'size' => $storageResult['size'],
+            ],
         ];
 
         // Step 2: Extract text
@@ -769,7 +769,7 @@ class WidgetPublicController extends AbstractController
             $file->setStatus('extracted');
             $this->em->flush();
 
-            $result['extracted_text_length'] = strlen($extractedText);
+            $result['file']['extracted_text_length'] = strlen($extractedText);
             $result['extraction_strategy'] = $extractMeta['strategy'] ?? 'unknown';
         } catch (\Throwable $e) {
             $this->logger->error('Widget file extraction failed', [
@@ -799,7 +799,7 @@ class WidgetPublicController extends AbstractController
                 $file->setStatus('vectorized');
                 $this->em->flush();
 
-                $result['chunks_created'] = $vectorResult['chunks_created'];
+                $result['file']['chunks_created'] = $vectorResult['chunks_created'];
                 $result['vectorized'] = true;
             } else {
                 $this->logger->warning('Widget file vectorization failed', [
@@ -824,9 +824,9 @@ class WidgetPublicController extends AbstractController
     }
 
     /**
-     * Get file type code for BFILETYPE column.
+     * Get file type string for File entity (BFILETYPE column).
      */
-    private function getFileTypeCode(string $extension): string
+    private function getFileTypeString(string $extension): string
     {
         $typeMap = [
             'pdf' => 'document',
@@ -840,6 +840,21 @@ class WidgetPublicController extends AbstractController
         ];
 
         return $typeMap[$extension] ?? 'other';
+    }
+
+    /**
+     * Get file type code for RAG vectorization (matches FileController logic).
+     */
+    private function getFileTypeCode(string $extension): int
+    {
+        return match (strtolower($extension)) {
+            'txt', 'md', 'csv' => 0, // Plain text
+            'jpg', 'jpeg', 'png', 'gif', 'webp' => 1, // Image
+            'mp3', 'mp4', 'wav', 'ogg', 'm4a', 'webm' => 2, // Audio/Video
+            'pdf' => 3, // PDF
+            'docx', 'doc', 'xlsx', 'xls', 'pptx', 'ppt' => 4, // Office
+            default => 5, // Other
+        };
     }
 
     /**

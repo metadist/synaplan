@@ -9,26 +9,26 @@
   <div id="app"></div>
   <script type="module" src="/src/main.js"></script>
 
-  <!-- Synaplan Chat Widget (Optimized) -->
-  <!-- 1. Load Vue.js from CDN (cached across sites) -->
-  <script src="https://cdn.jsdelivr.net/npm/vue@3/dist/vue.global.prod.js"></script>
+ <!-- Synaplan Chat Widget (ES Module with Auto Code-Splitting) -->
+<script type="module">
+  import SynaplanWidget from 'http://localhost:8000/widget.js'
 
-  <!-- 2. Load Synaplan Widget Loader (only 5.8 KB - loads chat on-demand) -->
-  <script src="http://localhost:8000/widget-loader.js"></script>
-
-  <!-- 3. Initialize Widget -->
-  <script>
-    SynaplanWidget.init({
-      widgetId: 'wdg_27058477c2d1dff701a792dd87ca644b',
-      position: 'bottom-right',
-      primaryColor: '#0ea5e9',
-      iconColor: '#ffffff',
-      buttonIcon: 'headset',
-      defaultTheme: 'light',
-      autoOpen: false,
-      apiUrl: 'http://localhost:8000'
-    });
-  </script>
+  SynaplanWidget.init({
+    widgetId: 'wdg_8ee32d5032308b0e02060dead57d4825',
+    position: 'bottom-right',
+    primaryColor: '#007bff',
+    iconColor: '#ffffff',
+    buttonIcon: 'support',
+    defaultTheme: 'light',
+    autoOpen: false,
+    autoMessage: 'Hello! How can I help you today?',
+    messageLimit: 50,
+    maxFileSize: 10,
+    allowFileUpload: true,
+    fileUploadLimit: 3,
+    lazy: true  // Load chat on button click (set to false for immediate load)
+  })
+</script>
 </body>
 </html>
 
