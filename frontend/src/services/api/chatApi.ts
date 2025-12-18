@@ -7,9 +7,45 @@ import { httpClient, API_BASE_URL } from './httpClient'
 // Cache SSE token (needed because EventSource can't send cookies)
 let cachedSseToken: string | null = null
 let tokenFetchPromise: Promise<string | null> | null = null
+let tokenRefreshPromise: Promise<boolean> | null = null
+let tokenExpiryTimer: ReturnType<typeof setTimeout> | null = null
+
+/**
+ * Centralized token refresh - prevents concurrent refresh requests (stampede)
+ */
+async function refreshAccessToken(): Promise<boolean> {
+  // If already refreshing, wait for that promise
+  if (tokenRefreshPromise) {
+    return tokenRefreshPromise
+  }
+
+  tokenRefreshPromise = (async () => {
+    try {
+      const refreshResponse = await fetch(`${API_BASE_URL}/api/v1/auth/refresh`, {
+        method: 'POST',
+        credentials: 'include',
+      })
+
+      if (refreshResponse.ok) {
+        // Clear cached token so it gets refetched
+        cachedSseToken = null
+        return true
+      }
+
+      return false
+    } catch (error) {
+      return false
+    } finally {
+      tokenRefreshPromise = null
+    }
+  })()
+
+  return tokenRefreshPromise
+}
 
 /**
  * Get access token for SSE (EventSource can't send cookies)
+ * Handles 401 with automatic token refresh
  */
 async function getSseToken(): Promise<string | null> {
   // Return cached token if available
@@ -28,8 +64,43 @@ async function getSseToken(): Promise<string | null> {
         credentials: 'include',
       })
 
+      // Handle 401 - try to refresh access token first
+      if (response.status === 401) {
+        const refreshSuccess = await refreshAccessToken()
+
+        if (refreshSuccess) {
+          // Retry original request after successful refresh
+          const retryResponse = await fetch(`${API_BASE_URL}/api/v1/auth/token`, {
+            credentials: 'include',
+          })
+
+          if (!retryResponse.ok) {
+            return null
+          }
+
+          const data = await retryResponse.json()
+          cachedSseToken = data.token
+
+          // Token expires in 5 min, refresh after 4 min
+          // Clear any existing timer first
+          if (tokenExpiryTimer) {
+            clearTimeout(tokenExpiryTimer)
+          }
+          tokenExpiryTimer = setTimeout(
+            () => {
+              cachedSseToken = null
+              tokenExpiryTimer = null
+            },
+            4 * 60 * 1000
+          )
+
+          return cachedSseToken
+        } else {
+          return null
+        }
+      }
+
       if (!response.ok) {
-        console.error('Failed to get SSE token:', response.status)
         return null
       }
 
@@ -37,16 +108,20 @@ async function getSseToken(): Promise<string | null> {
       cachedSseToken = data.token
 
       // Token expires in 5 min, refresh after 4 min
-      setTimeout(
+      // Clear any existing timer first
+      if (tokenExpiryTimer) {
+        clearTimeout(tokenExpiryTimer)
+      }
+      tokenExpiryTimer = setTimeout(
         () => {
           cachedSseToken = null
+          tokenExpiryTimer = null
         },
         4 * 60 * 1000
       )
 
       return cachedSseToken
     } catch (error) {
-      console.error('Error fetching SSE token:', error)
       return null
     } finally {
       tokenFetchPromise = null

@@ -79,11 +79,59 @@ async function httpClient<T = unknown, S extends z.Schema | undefined = undefine
 
     clearTimeout(timeoutId)
 
-    // 401 handling: With cookie-based auth, token refresh is automatic via httpClient
-    // If we get 401 here, redirect to login
+    // 401 handling: Try to refresh token automatically
     if (response.status === 401) {
-      window.location.href = '/login?reason=session_expired'
-      throw new Error('Session expired')
+      try {
+        const refreshResponse = await fetch(`${API_BASE_URL}/api/v1/auth/refresh`, {
+          method: 'POST',
+          credentials: 'include',
+        })
+
+        if (refreshResponse.ok) {
+          // Retry original request
+          const retryResponse = await fetch(`${API_BASE_URL}${endpoint}`, {
+            ...requestOptions,
+            headers,
+            credentials: 'include',
+          })
+
+          if (retryResponse.ok) {
+            const data = await retryResponse.json()
+
+            // Validate with schema if provided
+            if (schema) {
+              try {
+                return schema.parse(data) as z.output<NonNullable<S>>
+              } catch (error) {
+                console.error('Schema validation failed:', error)
+                throw error
+              }
+            }
+
+            return data as T
+          } else if (retryResponse.status === 401) {
+            // Still 401 after refresh - redirect to login
+            window.location.href = '/login?reason=session_expired'
+            throw new Error('Session expired')
+          } else {
+            // Other error - fall through to normal error handling
+            const errorText = await retryResponse.text()
+            console.error('API Error Details:', errorText)
+            throw new Error(`API Error: ${retryResponse.status} ${retryResponse.statusText}`)
+          }
+        } else {
+          // Refresh failed - redirect to login
+          window.location.href = '/login?reason=session_expired'
+          throw new Error('Session expired')
+        }
+      } catch (error: any) {
+        // Error during refresh - redirect to login
+        if (error.message !== 'Session expired') {
+          console.error('Token refresh error:', error)
+        }
+        window.location.href = '/login?reason=session_expired'
+        throw error
+      }
     }
 
     if (!response.ok) {

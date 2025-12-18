@@ -220,6 +220,8 @@ import { chatApi } from '@/services/api/chatApi'
 import type { FileItem } from '@/services/filesService'
 import { AudioRecorder } from '@/services/audioRecorder'
 import { useI18n } from 'vue-i18n'
+import { useAutoPersist } from '@/composables/useInputPersistence'
+import { useChatsStore } from '@/stores/chats'
 
 interface UploadedFile {
   file_id: number
@@ -258,8 +260,16 @@ const audioRecorder = ref<AudioRecorder | null>(null)
 const fileSelectionModalVisible = ref(false)
 
 const aiConfigStore = useAiConfigStore()
+const chatsStore = useChatsStore()
 const { warning, error: showError, success } = useNotification()
 const { t } = useI18n()
+
+// Input persistence - auto-save with proper debouncing
+const { clearInput: clearPersistedInput } = useAutoPersist(
+  message,
+  'chat',
+  computed(() => chatsStore.activeChatId)
+)
 
 const emit = defineEmits<{
   send: [
@@ -356,6 +366,8 @@ watch(
         enhancedMessage.value = ''
       }
     }
+
+    // Note: Input persistence happens automatically via useAutoPersist (debounced 500ms)
   },
   { immediate: false }
 )
@@ -387,6 +399,8 @@ const sendMessage = () => {
     enhanceEnabled.value = false
     originalMessage.value = ''
     enhancedMessage.value = ''
+    // Clear persisted input after successful send
+    clearPersistedInput()
   }
 }
 

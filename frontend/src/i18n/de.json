@@ -756,7 +756,8 @@
     "download": "Herunterladen",
     "dropFiles": "Dateien hier ablegen zum Hochladen",
     "dropFilesHint": "Loslassen, um Dateien zur Upload-Warteschlange hinzuzufügen",
-    "filesAddedToQueue": "{count} Datei hinzugefügt - bereit zum Hochladen | {count} Dateien hinzugefügt - bereit zum Hochladen"
+    "filesAddedToQueue": "{count} Datei hinzugefügt - bereit zum Hochladen | {count} Dateien hinzugefügt - bereit zum Hochladen",
+    "filesLostAfterReload": "Hinweis: Nach dem Neuladen der Seite gingen {count} ausgewählte Datei(en) verloren ({names}). Bitte wählen Sie die Dateien erneut aus."
   },
   "fileSelection": {
     "title": "Dateien auswählen oder hochladen",
