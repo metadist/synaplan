@@ -349,7 +349,8 @@ export async function sendWidgetMessage(
 export async function uploadWidgetFile(
   widgetId: string,
   sessionId: string,
-  file: File
+  file: File,
+  apiUrl?: string
 ): Promise<{
   success: boolean
   file: {
@@ -361,30 +362,45 @@ export async function uploadWidgetFile(
   }
   remainingUploads?: number
 }> {
+  const config = useConfigStore()
+  const baseUrl = apiUrl ?? config.apiBaseUrl
+
   const formData = new FormData()
   formData.append('file', file)
 
-  return httpClient<{
-    success: boolean
-    file: {
-      id: number
-      filename: string
-      size: number
-      extracted_text_length: number
-      chunks_created?: number
-    }
-    remainingUploads?: number
-  }>(`/api/v1/widget/${widgetId}/upload`, {
+  const headers: Record<string, string> = {
+    'X-Widget-Session': sessionId,
+  }
+
+  if (typeof window !== 'undefined' && window.location?.host) {
+    headers['X-Widget-Host'] = window.location.host
+  }
+
+  console.log('🌐 Widget file upload request:', {
+    url: `${baseUrl}/api/v1/widget/${widgetId}/upload`,
     method: 'POST',
-    headers: {
-      'X-Widget-Session': sessionId,
-      ...(typeof window !== 'undefined' && window.location?.host
-        ? { 'X-Widget-Host': window.location.host }
-        : {}),
-    },
-    body: formData,
-    skipAuth: true,
+    bodyPreview: 'FormData with file',
   })
+
+  const response = await fetch(`${baseUrl}/api/v1/widget/${widgetId}/upload`, {
+    method: 'POST',
+    headers,
+    body: formData,
+  })
+
+  console.log('🌐 Widget file upload response:', {
+    url: `/api/v1/widget/${widgetId}/upload`,
+    status: response.status,
+    statusText: response.statusText,
+    ok: response.ok,
+  })
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ error: 'Upload failed' }))
+    throw new Error(error.error || `HTTP ${response.status}: ${response.statusText}`)
+  }
+
+  return await response.json()
 }
 
 /**
