@@ -9,10 +9,10 @@
       enter-from-class="scale-0 opacity-0"
       enter-to-class="scale-100 opacity-100"
       leave-active-class="transition-all duration-150 ease-in"
-      leave-from-class="scale-100 opacity-100"
+      leave-from-class="scale-100 opacity-0"
       leave-to-class="scale-0 opacity-0"
     >
-      <div v-if="!isOpen" class="absolute bottom-0 right-0">
+      <div v-if="!isOpen && !hideButton" class="absolute bottom-0 right-0">
         <button
           :style="{ backgroundColor: primaryColor }"
           class="w-16 h-16 rounded-full shadow-2xl hover:scale-110 transition-transform flex items-center justify-center group"
@@ -436,6 +436,7 @@ interface Props {
   apiUrl: string
   allowFileUpload?: boolean
   fileUploadLimit?: number
+  hideButton?: boolean
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -452,6 +453,7 @@ const props = withDefaults(defineProps<Props>(), {
   widgetTitle: '',
   allowFileUpload: false,
   fileUploadLimit: 3,
+  hideButton: false,
 })
 
 interface Message {
@@ -584,6 +586,12 @@ const openChat = () => {
 const closeChat = () => {
   if (isOpen.value) {
     isOpen.value = false
+    // Dispatch close event for lazy-loaded widget button to reappear
+    window.dispatchEvent(
+      new CustomEvent('synaplan-widget-close', {
+        detail: { widgetId: props.widgetId },
+      })
+    )
   }
 }
 
