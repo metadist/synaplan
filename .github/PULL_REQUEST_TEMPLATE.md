@@ -1,8 +1,8 @@
 ## Summary
-One sentence on what changed and why.
+<!-- One sentence on what changed and why. -->
 
 ## Changes
-- 
+-
 
 ## Verification
 - [ ] Not tested (explain)
@@ -10,6 +10,6 @@ One sentence on what changed and why.
 - [ ] Tests added/updated
 
 ## Notes
-Related issues:
+<!-- Related issues/links/threads. -->
 
 ## Screenshots/Logs
