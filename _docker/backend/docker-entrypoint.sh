@@ -30,14 +30,16 @@ if [ -f "$FRONTEND_INDEX" ]; then
     # Check if index.html has placeholders to replace
     if grep -q "__VITE_" "$FRONTEND_INDEX"; then
         echo "🔧 Injecting frontend runtime configuration..."
-        
+
         # Replace reCAPTCHA placeholders
         RECAPTCHA_ENABLED="${VITE_RECAPTCHA_ENABLED:-false}"
         RECAPTCHA_SITE_KEY="${VITE_RECAPTCHA_SITE_KEY:-}"
-        
+
+        RECAPTCHA_SITE_KEY_ESCAPED=$(printf '%s' "$RECAPTCHA_SITE_KEY" | sed 's/[\/&|\\]/\\&/g')
+
         sed -i "s|__VITE_RECAPTCHA_ENABLED__|${RECAPTCHA_ENABLED}|g" "$FRONTEND_INDEX"
-        sed -i "s|__VITE_RECAPTCHA_SITE_KEY__|${RECAPTCHA_SITE_KEY}|g" "$FRONTEND_INDEX"
-        
+        sed -i "s|__VITE_RECAPTCHA_SITE_KEY__|${RECAPTCHA_SITE_KEY_ESCAPED}|g" "$FRONTEND_INDEX"
+
         echo "   ✅ reCAPTCHA enabled: ${RECAPTCHA_ENABLED}"
         [ -n "$RECAPTCHA_SITE_KEY" ] && echo "   ✅ reCAPTCHA site key: ${RECAPTCHA_SITE_KEY:0:20}..."
     fi
