@@ -16,6 +16,7 @@
 </template>
 
 <script setup lang="ts">
+import { watch } from 'vue'
 import { useTheme } from './composables/useTheme'
 import { useAuthStore } from '@/stores/auth'
 import NotificationContainer from '@/components/NotificationContainer.vue'
@@ -38,4 +39,17 @@ legacyKeys.forEach((key) => {
 // Initialize auth state on app start (validates cookies via /me endpoint)
 const authStore = useAuthStore()
 authStore.checkAuth()
+
+// Hide reCAPTCHA badge when user is authenticated (not needed after login)
+// Show it again on logout for login/register pages
+watch(
+  () => authStore.isAuthenticated,
+  (isAuthenticated) => {
+    const badge = document.querySelector('.grecaptcha-badge') as HTMLElement | null
+    if (badge) {
+      badge.style.visibility = isAuthenticated ? 'hidden' : 'visible'
+    }
+  },
+  { immediate: true }
+)
 </script>

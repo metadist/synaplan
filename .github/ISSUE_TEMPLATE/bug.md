@@ -4,7 +4,7 @@ about: Something is broken
 labels: ["bug"]
 ---
 
-Problem
+## Problem
 **One clear sentence describing what is broken.**
 
 ---
