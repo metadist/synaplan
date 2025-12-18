@@ -376,10 +376,10 @@ export async function uploadWidgetFile(
     headers['X-Widget-Host'] = window.location.host
   }
 
-  console.log('🌐 httpClient request:', {
+  console.log('🌐 Widget file upload request:', {
     url: `${baseUrl}/api/v1/widget/${widgetId}/upload`,
     method: 'POST',
-    bodyPreview: null,
+    bodyPreview: 'FormData with file',
   })
 
   const response = await fetch(`${baseUrl}/api/v1/widget/${widgetId}/upload`, {
@@ -388,7 +388,7 @@ export async function uploadWidgetFile(
     body: formData,
   })
 
-  console.log('🌐 httpClient response:', {
+  console.log('🌐 Widget file upload response:', {
     url: `/api/v1/widget/${widgetId}/upload`,
     status: response.status,
     statusText: response.statusText,

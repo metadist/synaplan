@@ -51,6 +51,7 @@ class SynaplanWidget {
   private chatLoaded = false
   private chatLoading = false
   private shouldOpenImmediately = false
+  private closeEventHandler: (() => void) | null = null
 
   async init(config: WidgetConfig) {
     if (!config.widgetId) {
@@ -325,6 +326,7 @@ class SynaplanWidget {
             this.shouldOpenImmediately = false
           }
         }
+        this.closeEventHandler = handleClose
         window.addEventListener('synaplan-widget-close', handleClose)
       }
 
@@ -373,6 +375,12 @@ class SynaplanWidget {
   }
 
   destroy() {
+    // Remove event listener if it exists
+    if (this.closeEventHandler) {
+      window.removeEventListener('synaplan-widget-close', this.closeEventHandler)
+      this.closeEventHandler = null
+    }
+
     if (this.app) {
       this.app.unmount()
       this.app = null

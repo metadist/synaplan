@@ -9,7 +9,7 @@
       enter-from-class="scale-0 opacity-0"
       enter-to-class="scale-100 opacity-100"
       leave-active-class="transition-all duration-150 ease-in"
-      leave-from-class="scale-100 opacity-0"
+      leave-from-class="scale-100 opacity-100"
       leave-to-class="scale-0 opacity-0"
     >
       <div v-if="!isOpen && !hideButton" class="absolute bottom-0 right-0">
