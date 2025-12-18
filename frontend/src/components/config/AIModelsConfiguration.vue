@@ -3,19 +3,19 @@
     <div class="surface-card p-6" data-testid="section-default-config">
       <h2 class="text-2xl font-semibold txt-primary mb-6 flex items-center gap-2">
         <CpuChipIcon class="w-6 h-6 text-[var(--brand)]" />
-        Default Model Configuration
+        {{ $t('config.aiModels.defaultConfigTitle') }}
       </h2>
 
       <div v-if="loading" class="text-center py-8" data-testid="section-loading">
         <div
           class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-[var(--brand)]"
         ></div>
-        <p class="mt-2 txt-secondary">Loading models...</p>
+        <p class="mt-2 txt-secondary">{{ $t('config.aiModels.loadingModels') }}</p>
       </div>
 
       <div v-else class="grid grid-cols-1 md:grid-cols-2 gap-5" data-testid="section-capabilities">
         <div
-          v-for="(label, capability) in purposeLabels"
+          v-for="capability in Object.keys(purposeLabels)"
           :key="capability"
           :ref="
             (el: any) => {
@@ -32,13 +32,15 @@
         >
           <label class="flex flex-wrap items-center gap-2 text-sm font-semibold txt-primary">
             <CpuChipIcon class="w-4 h-4 text-[var(--brand)]" />
-            <span class="flex-1 min-w-0">{{ label }}</span>
+            <span class="flex-1 min-w-0">{{ purposeLabels[capability as Capability] }}</span>
             <div
               v-if="isSystemModel(capability)"
               class="flex items-center gap-1 px-2 py-0.5 rounded-full bg-yellow-500/10 border border-yellow-500/30"
             >
               <LockClosedIcon class="w-3 h-3 text-yellow-500" />
-              <span class="text-xs font-medium text-yellow-500">System</span>
+              <span class="text-xs font-medium text-yellow-500">{{
+                $t('config.aiModels.system')
+              }}</span>
             </div>
           </label>
           <div class="relative">
@@ -93,7 +95,7 @@
                 data-testid="btn-model-option"
                 @click="selectModel(capability as Capability, null)"
               >
-                <span class="txt-secondary italic">-- Select Model --</span>
+                <span class="txt-secondary italic">{{ $t('config.aiModels.selectModel') }}</span>
               </button>
               <button
                 v-for="model in getModelsByPurpose(capability as Capability)"
@@ -126,17 +128,14 @@
         class="mt-4 flex items-start gap-2 p-3 rounded-lg bg-blue-500/5 border border-blue-500/20"
       >
         <InformationCircleIcon class="w-5 h-5 text-blue-500 flex-shrink-0 mt-0.5" />
-        <span class="text-sm txt-primary"
-          >System models are automatically locked and cannot be changed. These are core models
-          required for specific functionality.</span
-        >
+        <span class="text-sm txt-primary">{{ $t('config.aiModels.systemModelsInfo') }}</span>
       </div>
     </div>
 
     <div class="surface-card p-6" data-testid="section-purpose-filters">
       <h2 class="text-xl font-semibold txt-primary mb-4 flex items-center gap-2">
         <FunnelIcon class="w-5 h-5" />
-        Models & Purposes
+        {{ $t('config.aiModels.modelsPurposesTitle') }}
       </h2>
 
       <div class="flex flex-wrap gap-2">
@@ -150,7 +149,7 @@
           data-testid="btn-filter-all"
           @click="selectedPurpose = null"
         >
-          All Models
+          {{ $t('config.aiModels.allModels') }}
         </button>
         <button
           v-for="capability in Object.keys(purposeLabels)"
@@ -164,23 +163,55 @@
           data-testid="btn-filter"
           @click="selectedPurpose = capability as Capability"
         >
-          {{ capability }}
+          {{ purposeLabels[capability as Capability] }}
         </button>
       </div>
     </div>
 
     <div class="surface-card p-6" data-testid="section-models-table">
-      <h2 class="text-xl font-semibold txt-primary mb-4 flex items-center gap-2">
-        <ListBulletIcon class="w-5 h-5" />
-        Available Models
-      </h2>
+      <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-4">
+        <h2 class="text-xl font-semibold txt-primary flex items-center gap-2">
+          <ListBulletIcon class="w-5 h-5" />
+          {{ $t('config.aiModels.availableModelsTitle') }}
+        </h2>
+
+        <div class="flex items-center gap-3">
+          <!-- Show Rating Toggle -->
+          <label class="flex items-center gap-2 cursor-pointer group">
+            <input
+              v-model="showRatings"
+              type="checkbox"
+              class="w-4 h-4 rounded border-light-border/30 dark:border-dark-border/20 text-[var(--brand)] focus:ring-[var(--brand)] cursor-pointer"
+            />
+            <span class="text-sm txt-secondary group-hover:txt-primary transition-colors">{{
+              $t('config.aiModels.showRating')
+            }}</span>
+          </label>
+
+          <!-- Sort Dropdown -->
+          <div class="relative">
+            <select
+              v-model="sortBy"
+              class="px-3 py-2 pr-8 rounded-lg border border-light-border/30 dark:border-dark-border/20 bg-light-surface dark:bg-dark-surface txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] cursor-pointer appearance-none"
+            >
+              <option value="alphabet">{{ $t('config.aiModels.sortAlphabet') }}</option>
+              <option value="service">{{ $t('config.aiModels.sortService') }}</option>
+              <option value="rating">{{ $t('config.aiModels.sortRating') }}</option>
+              <option value="quality">{{ $t('config.aiModels.sortQuality') }}</option>
+            </select>
+            <ChevronDownIcon
+              class="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 txt-secondary pointer-events-none"
+            />
+          </div>
+        </div>
+      </div>
 
       <div
         v-if="filteredModels.length === 0"
         class="text-center py-12 txt-secondary"
         data-testid="section-models-empty"
       >
-        No models available for this purpose
+        {{ $t('config.aiModels.noModelsAvailable') }}
       </div>
 
       <div v-else class="overflow-x-auto scroll-thin">
@@ -190,43 +221,38 @@
               <th
                 class="text-left py-3 px-2 sm:px-3 txt-secondary text-xs font-semibold uppercase tracking-wide"
               >
-                ID
+                {{ $t('config.aiModels.tableName') }}
               </th>
               <th
                 class="text-left py-3 px-2 sm:px-3 txt-secondary text-xs font-semibold uppercase tracking-wide"
               >
-                Purpose
+                {{ $t('config.aiModels.tableService') }}
               </th>
               <th
-                class="text-left py-3 px-2 sm:px-3 txt-secondary text-xs font-semibold uppercase tracking-wide"
+                v-if="showRatings"
+                class="text-center py-3 px-2 sm:px-3 txt-secondary text-xs font-semibold uppercase tracking-wide"
               >
-                Service
+                {{ $t('config.aiModels.tableRating') }}
               </th>
               <th
-                class="text-left py-3 px-2 sm:px-3 txt-secondary text-xs font-semibold uppercase tracking-wide hidden md:table-cell"
+                class="text-left py-3 px-2 sm:px-3 txt-secondary text-xs font-semibold uppercase tracking-wide hidden sm:table-cell"
               >
-                Name
+                {{ $t('config.aiModels.tablePurpose') }}
               </th>
               <th
                 class="text-left py-3 px-2 sm:px-3 txt-secondary text-xs font-semibold uppercase tracking-wide hidden lg:table-cell"
               >
-                Description
+                {{ $t('config.aiModels.tableDescription') }}
               </th>
             </tr>
           </thead>
           <tbody>
             <tr
-              v-for="model in filteredModels"
+              v-for="model in sortedModels"
               :key="model.id"
               class="border-b border-light-border/10 dark:border-dark-border/10 hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
               data-testid="item-model"
             >
-              <td class="py-3 px-2 sm:px-3">
-                <span class="pill text-xs">{{ model.id }}</span>
-              </td>
-              <td class="py-3 px-2 sm:px-3">
-                <span class="pill pill--active text-xs">{{ model.purpose }}</span>
-              </td>
               <td class="py-3 px-2 sm:px-3">
                 <div class="flex items-center gap-2">
                   <GroqIcon
@@ -239,18 +265,40 @@
                     :icon="getProviderIcon(model.service)"
                     class="w-4 h-4 flex-shrink-0"
                   />
-                  <span
-                    :class="[
-                      'px-2 sm:px-3 py-1 rounded-full text-xs font-medium text-white',
-                      serviceColors[model.service] || 'bg-gray-500',
-                    ]"
-                  >
-                    {{ model.service }}
-                  </span>
+                  <span class="txt-primary text-sm font-medium">{{ model.name }}</span>
                 </div>
               </td>
-              <td class="py-3 px-2 sm:px-3 txt-primary text-sm font-medium hidden md:table-cell">
-                {{ model.name }}
+              <td class="py-3 px-2 sm:px-3">
+                <span
+                  :class="[
+                    'px-2 sm:px-3 py-1 rounded-full text-xs font-medium text-white',
+                    serviceColors[model.service] || 'bg-gray-500',
+                  ]"
+                >
+                  {{ model.service }}
+                </span>
+              </td>
+              <td v-if="showRatings" class="py-3 px-2 sm:px-3">
+                <div class="flex items-center justify-center gap-1">
+                  <svg
+                    v-for="star in 5"
+                    :key="star"
+                    class="w-4 h-4"
+                    :class="
+                      star <= model.rating ? 'text-yellow-500' : 'text-gray-300 dark:text-gray-600'
+                    "
+                    fill="currentColor"
+                    viewBox="0 0 20 20"
+                  >
+                    <path
+                      d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"
+                    />
+                  </svg>
+                  <span class="text-xs txt-secondary ml-1">({{ model.quality.toFixed(1) }})</span>
+                </div>
+              </td>
+              <td class="py-3 px-2 sm:px-3 hidden sm:table-cell">
+                <span class="pill pill--active text-xs">{{ model.purpose }}</span>
               </td>
               <td class="py-3 px-2 sm:px-3 txt-secondary text-sm hidden lg:table-cell">
                 {{ model.description }}
@@ -290,22 +338,25 @@ import {
 import { useAuthStore } from '@/stores/auth'
 import type { AIModel, Capability } from '@/types/ai-models'
 import { getProviderIcon } from '@/utils/providerIcons'
+import { useI18n } from 'vue-i18n'
 
 type ModelsData = Partial<Record<Capability, AIModel[]>>
 
 const authStore = useAuthStore()
 const route = useRoute()
-const purposeLabels: Record<Capability, string> = {
-  SORT: 'Message Sorting',
-  CHAT: 'Chat / General AI',
-  VECTORIZE: 'Embedding / Vectorization',
-  PIC2TEXT: 'Vision (Image → Text)',
-  TEXT2PIC: 'Image Generation (Text → Image)',
-  TEXT2VID: 'Video Generation (Text → Video)',
-  SOUND2TEXT: 'Speech-to-Text',
-  TEXT2SOUND: 'Text-to-Speech',
-  ANALYZE: 'File Analysis',
-}
+const { t } = useI18n()
+
+const purposeLabels = computed<Record<Capability, string>>(() => ({
+  SORT: t('config.aiModels.capabilities.sort'),
+  CHAT: t('config.aiModels.capabilities.chat'),
+  VECTORIZE: t('config.aiModels.capabilities.vectorize'),
+  PIC2TEXT: t('config.aiModels.capabilities.pic2text'),
+  TEXT2PIC: t('config.aiModels.capabilities.text2pic'),
+  TEXT2VID: t('config.aiModels.capabilities.text2vid'),
+  SOUND2TEXT: t('config.aiModels.capabilities.sound2text'),
+  TEXT2SOUND: t('config.aiModels.capabilities.text2sound'),
+  ANALYZE: t('config.aiModels.capabilities.analyze'),
+}))
 
 const loading = ref(false)
 const saving = ref(false)
@@ -328,6 +379,8 @@ const capabilityRefs = ref<Record<Capability, HTMLElement | null>>(
   {} as Record<Capability, HTMLElement | null>
 )
 const openDropdown = ref<Capability | null>(null)
+const showRatings = ref(false)
+const sortBy = ref<'alphabet' | 'service' | 'rating' | 'quality'>('alphabet')
 
 const { success, error: showError, warning } = useNotification()
 
@@ -335,7 +388,7 @@ const { success, error: showError, warning } = useNotification()
 const normalizeHighlight = (highlight: string): Capability | 'ALL' | null => {
   // Direct match
   if (highlight === 'ALL') return 'ALL'
-  if (highlight in purposeLabels) return highlight as Capability
+  if (highlight in purposeLabels.value) return highlight as Capability
 
   // Alias mapping (URL-friendly names to actual capability names)
   const aliasMap: Record<string, Capability> = {
@@ -464,7 +517,9 @@ const loadData = async () => {
 }
 
 const getModelsByPurpose = (purpose: Capability): AIModel[] => {
-  return availableModels.value[purpose] || []
+  const models = availableModels.value[purpose] || []
+  // Sort alphabetically by name
+  return models.sort((a, b) => a.name.localeCompare(b.name))
 }
 
 const isSystemModel = (purpose: string): boolean => {
@@ -542,6 +597,39 @@ const filteredModels = computed(() => {
     return allModels.value
   }
   return allModels.value.filter((model) => model.purpose === selectedPurpose.value)
+})
+
+const sortedModels = computed(() => {
+  const models = [...filteredModels.value]
+
+  switch (sortBy.value) {
+    case 'alphabet':
+      return models.sort((a, b) => a.name.localeCompare(b.name))
+
+    case 'service':
+      return models.sort((a, b) => {
+        const serviceCompare = a.service.localeCompare(b.service)
+        if (serviceCompare !== 0) return serviceCompare
+        return a.name.localeCompare(b.name)
+      })
+
+    case 'rating':
+      return models.sort((a, b) => {
+        const ratingDiff = b.rating - a.rating
+        if (ratingDiff !== 0) return ratingDiff
+        return a.name.localeCompare(b.name)
+      })
+
+    case 'quality':
+      return models.sort((a, b) => {
+        const qualityDiff = b.quality - a.quality
+        if (qualityDiff !== 0) return qualityDiff
+        return a.name.localeCompare(b.name)
+      })
+
+    default:
+      return models
+  }
 })
 
 const saveConfiguration = async () => {
