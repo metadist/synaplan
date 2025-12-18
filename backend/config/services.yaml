@@ -119,6 +119,7 @@ services:
     App\Controller\WebhookController:
         bind:
             $whatsappWebhookVerifyToken: '%env(WHATSAPP_WEBHOOK_VERIFY_TOKEN)%'
+            $whatsappUserId: 2  # WhatsApp messages use User ID 2 for model selection
 
     # Message Processing Services
     App\Service\Message\MessagePreProcessor:
