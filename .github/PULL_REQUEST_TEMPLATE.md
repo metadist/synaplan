@@ -1,34 +1,15 @@
 ## Summary
-**One sentence: what this PR does.**
-
----
+One sentence on what changed and why.
 
 ## Changes
-- …
-- …
-- …
-
----
+- 
 
 ## Verification
-How was this checked?
-- [ ] Manual
-- [ ] Test added / updated
 - [ ] Not tested (explain)
-
----
-
-## Impact
-- [ ] Low (isolated change)
-- [ ] Medium (affects existing behavior)
-- [ ] High (core / risky)
-
----
+- [ ] Manual
+- [ ] Tests added/updated
 
 ## Notes
-related issues:
+Related issues:
 
----
-
-## Screenhots/Logs
-
+## Screenshots/Logs
