@@ -403,7 +403,6 @@ import {
   MoonIcon,
   ExclamationTriangleIcon,
   XCircleIcon,
-  ArrowPathIcon,
 } from '@heroicons/vue/24/outline'
 
 import { uploadWidgetFile, sendWidgetMessage } from '@/services/api/widgetsApi'
@@ -854,24 +853,6 @@ const formatFileSize = (bytes: number): string => {
 const getSessionStorageKey = () => `synaplan_widget_session_${props.widgetId}`
 const getChatStorageKeyForSession = (id: string) => `synaplan_widget_chatid_${props.widgetId}_${id}`
 const createSessionId = () => `sess_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`
-
-const removeChatStorageKeys = (sessionToClear?: string) => {
-  const legacyKey = `synaplan_widget_chatid_${props.widgetId}`
-  const prefix = `synaplan_widget_chatid_${props.widgetId}_`
-
-  if (sessionToClear) {
-    localStorage.removeItem(`${prefix}${sessionToClear}`)
-  } else {
-    for (let idx = localStorage.length - 1; idx >= 0; idx -= 1) {
-      const key = localStorage.key(idx)
-      if (key && key.startsWith(prefix)) {
-        localStorage.removeItem(key)
-      }
-    }
-  }
-
-  localStorage.removeItem(legacyKey)
-}
 
 const handleOpenEvent = (event: Event) => {
   const detail = (event as CustomEvent).detail
