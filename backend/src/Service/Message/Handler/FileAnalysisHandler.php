@@ -241,7 +241,8 @@ class FileAnalysisHandler implements MessageHandlerInterface
         $finalPrompt = !empty($userPrompt) ? $userPrompt : 'What is in this document? Please summarize the content.';
 
         // Get Chat model (not Vision model!)
-        $modelId = $classification['model_id'] ?? $this->modelConfigService->getDefaultModel('CHAT', $message->getUserId());
+        $effectiveUserId = $this->modelConfigService->getEffectiveUserIdForMessage($message);
+        $modelId = $classification['model_id'] ?? $this->modelConfigService->getDefaultModel('CHAT', $effectiveUserId);
         $provider = null;
         $modelName = null;
 
@@ -332,7 +333,8 @@ class FileAnalysisHandler implements MessageHandlerInterface
         }
 
         // Get Vision model (PIC2TEXT)
-        $modelId = $classification['model_id'] ?? $this->modelConfigService->getDefaultModel('PIC2TEXT', $message->getUserId());
+        $effectiveUserId = $this->modelConfigService->getEffectiveUserIdForMessage($message);
+        $modelId = $classification['model_id'] ?? $this->modelConfigService->getDefaultModel('PIC2TEXT', $effectiveUserId);
         $provider = null;
         $modelName = null;
 

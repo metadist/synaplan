@@ -2,8 +2,11 @@
 
 namespace App\Service;
 
+use App\Entity\Message;
+use App\Entity\User;
 use App\Repository\ConfigRepository;
 use App\Repository\ModelRepository;
+use App\Repository\UserRepository;
 use Psr\Cache\CacheItemPoolInterface;
 
 /**
@@ -16,6 +19,7 @@ class ModelConfigService
     public function __construct(
         private ConfigRepository $configRepository,
         private ModelRepository $modelRepository,
+        private UserRepository $userRepository,
         private CacheItemPoolInterface $cache,
     ) {
     }
@@ -313,5 +317,41 @@ class ModelConfigService
         }
 
         return $model->getTag();
+    }
+
+    /**
+     * Get effective user ID for model selection based on message channel.
+     *
+     * For WhatsApp messages: Returns user ID only if WhatsApp number is verified.
+     * For web/other channels: Always returns the user ID (no verification required).
+     *
+     * This ensures unverified WhatsApp users get default models,
+     * while web users always get their configured models.
+     */
+    public function getEffectiveUserIdForMessage(Message $message): ?int
+    {
+        $userId = $message->getUserId();
+        if (!$userId) {
+            return null;
+        }
+
+        // Check if this is a WhatsApp message
+        $channel = $message->getMeta('channel');
+        if ('whatsapp' !== $channel) {
+            // For web/email/other channels: always use user-specific models
+            return $userId;
+        }
+
+        // For WhatsApp: only use user-specific models if verified
+        $user = $this->userRepository->find($userId);
+        if (!$user) {
+            return null;
+        }
+
+        if ($user->hasVerifiedPhone()) {
+            return $userId;
+        }
+
+        return null;
     }
 }

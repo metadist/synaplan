@@ -6,6 +6,7 @@ use App\Entity\Config;
 use App\Entity\Model;
 use App\Repository\ConfigRepository;
 use App\Repository\ModelRepository;
+use App\Repository\UserRepository;
 use App\Service\ModelConfigService;
 use PHPUnit\Framework\TestCase;
 use Psr\Cache\CacheItemInterface;
@@ -15,6 +16,7 @@ class ModelConfigServiceTest extends TestCase
 {
     private ConfigRepository $configRepository;
     private ModelRepository $modelRepository;
+    private UserRepository $userRepository;
     private CacheItemPoolInterface $cache;
     private ModelConfigService $service;
     private CacheItemInterface $cacheItem;
@@ -23,12 +25,14 @@ class ModelConfigServiceTest extends TestCase
     {
         $this->configRepository = $this->createMock(ConfigRepository::class);
         $this->modelRepository = $this->createMock(ModelRepository::class);
+        $this->userRepository = $this->createMock(UserRepository::class);
         $this->cache = $this->createMock(CacheItemPoolInterface::class);
         $this->cacheItem = $this->createMock(CacheItemInterface::class);
 
         $this->service = new ModelConfigService(
             $this->configRepository,
             $this->modelRepository,
+            $this->userRepository,
             $this->cache
         );
     }

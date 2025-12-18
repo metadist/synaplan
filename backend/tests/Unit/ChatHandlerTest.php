@@ -115,6 +115,7 @@ class ChatHandlerTest extends TestCase
         $message->method('getTopic')->willReturn('CHAT');
         $message->method('getLanguage')->willReturn('en');
         $message->method('getFileText')->willReturn('');
+        $message->method('getMeta')->with('channel')->willReturn('web'); // Non-WhatsApp channel
 
         $classification = [
             'topic' => 'CHAT',
@@ -122,6 +123,7 @@ class ChatHandlerTest extends TestCase
         ];
 
         $this->promptRepository->method('findOneBy')->willReturn(null);
+        $this->modelConfigService->method('getEffectiveUserIdForMessage')->with($message)->willReturn(1);
         $this->modelConfigService->method('getDefaultModel')->with('CHAT', 1)->willReturn(10);
         $this->modelConfigService->method('getProviderForModel')->with(10)->willReturn('openai');
         $this->modelConfigService->method('getModelName')->with(10)->willReturn('gpt-4');
