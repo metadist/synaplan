@@ -6,6 +6,7 @@ use App\Entity\Config;
 use App\Entity\Model;
 use App\Repository\ConfigRepository;
 use App\Repository\ModelRepository;
+use App\Repository\UserRepository;
 use App\Service\ModelConfigService;
 use PHPUnit\Framework\TestCase;
 use Psr\Cache\CacheItemInterface;
@@ -15,6 +16,7 @@ class ModelConfigServiceTest extends TestCase
 {
     private ConfigRepository $configRepository;
     private ModelRepository $modelRepository;
+    private UserRepository $userRepository;
     private CacheItemPoolInterface $cache;
     private ModelConfigService $service;
     private CacheItemInterface $cacheItem;
@@ -23,12 +25,14 @@ class ModelConfigServiceTest extends TestCase
     {
         $this->configRepository = $this->createMock(ConfigRepository::class);
         $this->modelRepository = $this->createMock(ModelRepository::class);
+        $this->userRepository = $this->createMock(UserRepository::class);
         $this->cache = $this->createMock(CacheItemPoolInterface::class);
         $this->cacheItem = $this->createMock(CacheItemInterface::class);
 
         $this->service = new ModelConfigService(
             $this->configRepository,
             $this->modelRepository,
+            $this->userRepository,
             $this->cache
         );
     }
@@ -361,5 +365,169 @@ class ModelConfigServiceTest extends TestCase
         $this->assertArrayHasKey('vision', $result);
         $this->assertArrayHasKey('embedding', $result);
         $this->assertEquals('openai', $result['chat']['provider']);
+    }
+
+    public function testGetEffectiveUserIdForMessageWithWhatsAppUnverifiedUser(): void
+    {
+        $userId = 1;
+
+        // Mock message with WhatsApp channel
+        $message = $this->createMock(\App\Entity\Message::class);
+        $message->method('getUserId')->willReturn($userId);
+        $message->method('getMeta')->with('channel')->willReturn('whatsapp');
+
+        // Mock user without verified phone
+        $user = $this->createMock(\App\Entity\User::class);
+        $user->method('hasVerifiedPhone')->willReturn(false);
+
+        $this->userRepository
+            ->expects($this->once())
+            ->method('find')
+            ->with($userId)
+            ->willReturn($user);
+
+        $result = $this->service->getEffectiveUserIdForMessage($message);
+
+        $this->assertNull($result, 'Unverified WhatsApp users should return null');
+    }
+
+    public function testGetEffectiveUserIdForMessageWithWhatsAppVerifiedUser(): void
+    {
+        $userId = 5;
+
+        // Mock message with WhatsApp channel
+        $message = $this->createMock(\App\Entity\Message::class);
+        $message->method('getUserId')->willReturn($userId);
+        $message->method('getMeta')->with('channel')->willReturn('whatsapp');
+
+        // Mock user with verified phone
+        $user = $this->createMock(\App\Entity\User::class);
+        $user->method('hasVerifiedPhone')->willReturn(true);
+
+        $this->userRepository
+            ->expects($this->once())
+            ->method('find')
+            ->with($userId)
+            ->willReturn($user);
+
+        $result = $this->service->getEffectiveUserIdForMessage($message);
+
+        $this->assertEquals($userId, $result, 'Verified WhatsApp users should return their userId');
+    }
+
+    public function testGetEffectiveUserIdForMessageWithWebChannel(): void
+    {
+        $userId = 10;
+
+        // Mock message with web channel (not WhatsApp)
+        $message = $this->createMock(\App\Entity\Message::class);
+        $message->method('getUserId')->willReturn($userId);
+        $message->method('getMeta')->with('channel')->willReturn('web');
+
+        // Should not check user repository for non-WhatsApp channels
+        $this->userRepository
+            ->expects($this->never())
+            ->method('find');
+
+        $result = $this->service->getEffectiveUserIdForMessage($message);
+
+        $this->assertEquals($userId, $result, 'Web channel should always return userId');
+    }
+
+    public function testGetEffectiveUserIdForMessageWithEmailChannel(): void
+    {
+        $userId = 15;
+
+        // Mock message with email channel
+        $message = $this->createMock(\App\Entity\Message::class);
+        $message->method('getUserId')->willReturn($userId);
+        $message->method('getMeta')->with('channel')->willReturn('email');
+
+        // Should not check user repository for non-WhatsApp channels
+        $this->userRepository
+            ->expects($this->never())
+            ->method('find');
+
+        $result = $this->service->getEffectiveUserIdForMessage($message);
+
+        $this->assertEquals($userId, $result, 'Email channel should always return userId');
+    }
+
+    public function testGetEffectiveUserIdForMessageWithNullChannel(): void
+    {
+        $userId = 20;
+
+        // Mock message with null channel (default to non-WhatsApp behavior)
+        $message = $this->createMock(\App\Entity\Message::class);
+        $message->method('getUserId')->willReturn($userId);
+        $message->method('getMeta')->with('channel')->willReturn(null);
+
+        // Should not check user repository for null channel
+        $this->userRepository
+            ->expects($this->never())
+            ->method('find');
+
+        $result = $this->service->getEffectiveUserIdForMessage($message);
+
+        $this->assertEquals($userId, $result, 'Null channel should always return userId');
+    }
+
+    public function testGetEffectiveUserIdForMessageWithUserIdZero(): void
+    {
+        // Mock message with userId = 0 (anonymous/system user)
+        $message = $this->createMock(\App\Entity\Message::class);
+        $message->method('getUserId')->willReturn(0);
+
+        // Should not call getMeta or find when userId is 0
+        $message->expects($this->never())->method('getMeta');
+        $this->userRepository->expects($this->never())->method('find');
+
+        $result = $this->service->getEffectiveUserIdForMessage($message);
+
+        $this->assertNull($result, 'userId = 0 should return null (anonymous/system user)');
+    }
+
+    public function testGetEffectiveUserIdForMessageWithUserNotFound(): void
+    {
+        $userId = 999;
+
+        // Mock message with WhatsApp channel
+        $message = $this->createMock(\App\Entity\Message::class);
+        $message->method('getUserId')->willReturn($userId);
+        $message->method('getMeta')->with('channel')->willReturn('whatsapp');
+
+        // Mock user not found in repository
+        $this->userRepository
+            ->expects($this->once())
+            ->method('find')
+            ->with($userId)
+            ->willReturn(null);
+
+        $result = $this->service->getEffectiveUserIdForMessage($message);
+
+        $this->assertNull($result, 'User not found in database should return null');
+    }
+
+    public function testGetEffectiveUserIdForMessageWithWebChannelUnverifiedUser(): void
+    {
+        $userId = 25;
+
+        // Mock message with web channel
+        $message = $this->createMock(\App\Entity\Message::class);
+        $message->method('getUserId')->willReturn($userId);
+        $message->method('getMeta')->with('channel')->willReturn('web');
+
+        // User verification should not be checked for web channel
+        $this->userRepository
+            ->expects($this->never())
+            ->method('find');
+
+        $result = $this->service->getEffectiveUserIdForMessage($message);
+
+        $this->assertEquals(
+            $userId,
+            $result,
+            'Web channel should return userId regardless of phone verification status'
+        );
     }
 }
