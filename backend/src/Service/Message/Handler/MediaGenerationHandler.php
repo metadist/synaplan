@@ -140,26 +140,28 @@ class MediaGenerationHandler implements MessageHandlerInterface
             }
         } else {
             // For slash commands, skip auto-detection and use the detected type
+            $effectiveUserId = $this->modelConfigService->getEffectiveUserIdForMessage($message);
+
             if ($isSlashCommand) {
                 if ('video' === $mediaType) {
-                    $modelId = $this->modelConfigService->getDefaultModel('TEXT2VID', $message->getUserId());
+                    $modelId = $this->modelConfigService->getDefaultModel('TEXT2VID', $effectiveUserId);
                 } else {
-                    $modelId = $this->modelConfigService->getDefaultModel('TEXT2PIC', $message->getUserId());
+                    $modelId = $this->modelConfigService->getDefaultModel('TEXT2PIC', $effectiveUserId);
                 }
                 $this->logger->info('MediaGenerationHandler: Using default model for slash command', [
                     'media_type' => $mediaType,
                     'model_id' => $modelId,
                 ]);
             } elseif ('video' === $promptMediaType) {
-                $modelId = $this->modelConfigService->getDefaultModel('TEXT2VID', $message->getUserId());
+                $modelId = $this->modelConfigService->getDefaultModel('TEXT2VID', $effectiveUserId);
                 $mediaType = 'video';
                 $this->logger->info('MediaGenerationHandler: Using media type hint from extractor (video)');
             } elseif ('audio' === $promptMediaType) {
-                $modelId = $this->modelConfigService->getDefaultModel('TEXT2SOUND', $message->getUserId());
+                $modelId = $this->modelConfigService->getDefaultModel('TEXT2SOUND', $effectiveUserId);
                 $mediaType = 'audio';
                 $this->logger->info('MediaGenerationHandler: Using media type hint from extractor (audio)');
             } elseif ('image' === $promptMediaType) {
-                $modelId = $this->modelConfigService->getDefaultModel('TEXT2PIC', $message->getUserId());
+                $modelId = $this->modelConfigService->getDefaultModel('TEXT2PIC', $effectiveUserId);
                 $mediaType = 'image';
                 $this->logger->info('MediaGenerationHandler: Using media type hint from extractor (image)');
             } else {
@@ -168,13 +170,13 @@ class MediaGenerationHandler implements MessageHandlerInterface
                 $isAudio = preg_match('/\b(audio|sound|music|voice|speech|song|read|aloud|speak|tts|text.?to.?speech|convert.?to.?audio|make.?voice)\b/i', $prompt);
 
                 if ($isVideo) {
-                    $modelId = $this->modelConfigService->getDefaultModel('TEXT2VID', $message->getUserId());
+                    $modelId = $this->modelConfigService->getDefaultModel('TEXT2VID', $effectiveUserId);
                     $mediaType = 'video';
                 } elseif ($isAudio) {
-                    $modelId = $this->modelConfigService->getDefaultModel('TEXT2SOUND', $message->getUserId());
+                    $modelId = $this->modelConfigService->getDefaultModel('TEXT2SOUND', $effectiveUserId);
                     $mediaType = 'audio';
                 } else {
-                    $modelId = $this->modelConfigService->getDefaultModel('TEXT2PIC', $message->getUserId());
+                    $modelId = $this->modelConfigService->getDefaultModel('TEXT2PIC', $effectiveUserId);
                     $mediaType = 'image';
                 }
 

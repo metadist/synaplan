@@ -89,10 +89,12 @@ class ChatHandler implements MessageHandlerInterface
                 'user_id' => $message->getUserId(),
             ]);
         } else {
-            $modelId = $this->modelConfigService->getDefaultModel('CHAT', $message->getUserId());
+            $effectiveUserId = $this->modelConfigService->getEffectiveUserIdForMessage($message);
+            $modelId = $this->modelConfigService->getDefaultModel('CHAT', $effectiveUserId);
             $this->logger->info('ChatHandler: Using DB default model', [
                 'model_id' => $modelId,
                 'user_id' => $message->getUserId(),
+                'effective_user_id' => $effectiveUserId,
             ]);
         }
 
@@ -382,10 +384,12 @@ class ChatHandler implements MessageHandlerInterface
         }
         // 4. Fall back to user's default model from DB
         else {
-            $modelId = $this->modelConfigService->getDefaultModel('CHAT', $message->getUserId());
+            $effectiveUserId = $this->modelConfigService->getEffectiveUserIdForMessage($message);
+            $modelId = $this->modelConfigService->getDefaultModel('CHAT', $effectiveUserId);
             $this->logger->info('ChatHandler: Using DB default model', [
                 'model_id' => $modelId,
                 'user_id' => $message->getUserId(),
+                'effective_user_id' => $effectiveUserId,
             ]);
         }
 
