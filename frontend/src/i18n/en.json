@@ -418,7 +418,8 @@
     "removeFile": "Remove file",
     "dropFiles": "Drop files here to upload",
     "dropFilesHint": "Release to add files to the upload queue",
-    "filesAddedToQueue": "{count} file added - ready to upload | {count} files added - ready to upload"
+    "filesAddedToQueue": "{count} file added - ready to upload | {count} files added - ready to upload",
+    "filesLostAfterReload": "Note: After reloading the page, {count} selected file(s) were lost ({names}). Please select the files again."
   },
   "fileSelection": {
     "title": "Select or Upload Files",
