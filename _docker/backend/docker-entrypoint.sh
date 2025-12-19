@@ -11,12 +11,6 @@ if [ -f /var/www/backend/.env ]; then
     set +a
 fi
 
-# ─────────────────────────────────────────────────────────────
-# Runtime Configuration
-# Frontend now loads config from /api/v1/config/runtime endpoint
-# No need to inject into index.html anymore
-# ─────────────────────────────────────────────────────────────
-
 # Validate required environment variables
 if [ -z "${APP_URL:-}" ]; then
     echo "❌ ERROR: APP_URL is not set!"

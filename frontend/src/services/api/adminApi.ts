@@ -5,10 +5,23 @@ import { z } from 'zod'
 
 // Create a more flexible schema that accepts datetime strings with or without offset
 const originalUserSchema = GetAdminGetUsersResponseSchema.shape.users.element
-// Use omit to remove the strict datetime field, then extend with a flexible string field
-const FlexibleAdminUserSchema = originalUserSchema.omit({ created: true }).extend({
-  created: z.string(), // Accept any string for created date (more flexible than datetime format)
-})
+// Use omit to remove the strict datetime field, email field, and level field, then extend with more flexible fields
+const FlexibleAdminUserSchema = originalUserSchema
+  .omit({ created: true, email: true, level: true })
+  .extend({
+    created: z.string(), // Accept any string for created date (more flexible than datetime format)
+    // Email field can be: valid email, phone number (flexible format), or null
+    // Backend provides phone from BUSERDETAILS['phone'] if email is missing
+    email: z
+      .union([
+        z.string().email(), // Valid email address
+        z.string().regex(/^\+?\d{5,15}$/), // Phone number: optional +, 5-15 digits (covers various formats)
+        z.null(),
+      ])
+      .nullable()
+      .optional(),
+    level: z.enum(['ANONYMOUS', 'NEW', 'PRO', 'TEAM', 'BUSINESS', 'ADMIN']).catch('NEW'), // Fallback to 'NEW' if invalid
+  })
 
 export const AdminUserSchema = FlexibleAdminUserSchema
 export type AdminUser = z.infer<typeof AdminUserSchema>
