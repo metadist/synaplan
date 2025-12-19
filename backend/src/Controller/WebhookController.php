@@ -32,6 +32,7 @@ class WebhookController extends AbstractController
         private InternalEmailService $internalEmailService,
         private LoggerInterface $logger,
         private string $whatsappWebhookVerifyToken,
+        private int $whatsappUserId,
     ) {
     }
 
@@ -433,7 +434,8 @@ class WebhookController extends AbstractController
         }
 
         $this->logger->info('WhatsApp message received', [
-            'user_id' => $user->getId(),
+            'original_user_id' => $user->getId(),
+            'whatsapp_user_id' => $this->whatsappUserId,
             'from' => $from,
             'to_phone_number_id' => $phoneNumberId,
             'to_display_phone' => $displayPhoneNumber,
@@ -533,8 +535,10 @@ class WebhookController extends AbstractController
         }
 
         // Create incoming message
+        // Use WhatsApp-specific user ID for model selection (configured in services.yaml)
+        // This allows WhatsApp messages to use different AI models than the default
         $message = new Message();
-        $message->setUserId($user->getId());
+        $message->setUserId($this->whatsappUserId);  // WhatsApp uses dedicated user ID for model config
         $message->setTrackingId($timestamp);
         $message->setProviderIndex('WHATSAPP');
         $message->setUnixTimestamp($timestamp);
@@ -553,6 +557,7 @@ class WebhookController extends AbstractController
         // Store WhatsApp metadata
         $message->setMeta('channel', 'whatsapp');
         $message->setMeta('from_phone', $from);
+        $message->setMeta('original_user_id', (string) $user->getId());  // Track original user for reference
         $message->setMeta('to_phone_number_id', $phoneNumberId);
         if ($displayPhoneNumber) {
             $message->setMeta('to_display_phone', $displayPhoneNumber);
@@ -616,7 +621,8 @@ class WebhookController extends AbstractController
 
         $this->em->flush(); // Flush metadata
 
-        // Record usage
+        // Record usage (use original $user for rate limiting, not whatsappUserId)
+        // This ensures each phone number has its own rate limit
         $this->rateLimitService->recordUsage($user, 'MESSAGES');
 
         // Mark as read (using the phone number ID from the webhook)
