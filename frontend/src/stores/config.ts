@@ -3,28 +3,29 @@
  *
  * Centralized configuration management.
  * Configuration is loaded from backend API at runtime (no build-time env vars needed).
- *
- * Plain object for now to avoid Pinia initialization issues when used at module level.
- * Can be converted to Pinia store later when all usage is inside component/function scope.
  */
 
-// Runtime config loaded from backend
-interface RuntimeConfig {
-  recaptcha: {
-    enabled: boolean
-    siteKey: string
-  }
-  features: {
-    help: boolean
-  }
-}
+import { z } from 'zod'
+
+// Runtime config schema based on OpenAPI annotations from ConfigController
+const RuntimeConfigSchema = z.object({
+  recaptcha: z.object({
+    enabled: z.boolean(),
+    siteKey: z.string(),
+  }),
+  features: z.object({
+    help: z.boolean(),
+  }),
+})
+
+type RuntimeConfig = z.infer<typeof RuntimeConfigSchema>
 
 let runtimeConfig: RuntimeConfig | null = null
 let configPromise: Promise<RuntimeConfig> | null = null
 
 /**
  * Load runtime configuration from backend API
- * This is called automatically when accessing config values
+ * Uses fetch directly to avoid circular dependency with httpClient
  */
 async function loadRuntimeConfig(): Promise<RuntimeConfig> {
   // Return cached config if already loaded
@@ -37,7 +38,7 @@ async function loadRuntimeConfig(): Promise<RuntimeConfig> {
     return configPromise
   }
 
-  // Fetch config from backend
+  // Fetch config from backend with Zod validation
   configPromise = fetch('/api/v1/config/runtime')
     .then((response) => {
       if (!response.ok) {
@@ -46,19 +47,25 @@ async function loadRuntimeConfig(): Promise<RuntimeConfig> {
       return response.json()
     })
     .then((data) => {
-      runtimeConfig = data
-      return data
+      // Validate response with Zod schema
+      const validated = RuntimeConfigSchema.parse(data)
+      runtimeConfig = validated
+      return validated
     })
     .catch((error) => {
       console.error('Failed to load runtime config:', error)
       // Return default config on error
-      runtimeConfig = {
+      const defaultConfig: RuntimeConfig = {
         recaptcha: {
           enabled: false,
           siteKey: '',
         },
+        features: {
+          help: false,
+        },
       }
-      return runtimeConfig
+      runtimeConfig = defaultConfig
+      return defaultConfig
     })
     .finally(() => {
       configPromise = null

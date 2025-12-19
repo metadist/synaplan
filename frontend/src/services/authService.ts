@@ -106,10 +106,7 @@ export const authService = {
       user.value = null
       // Clear SSE token cache
       clearSseToken()
-      // Reset logout flag after a short delay
-      setTimeout(() => {
-        isLoggingOut.value = false
-      }, 500)
+      isLoggingOut.value = false
     }
   },
 
