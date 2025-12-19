@@ -224,7 +224,7 @@
                       <td class="py-3 px-4 txt-secondary text-sm">#{{ user.id }}</td>
                       <td class="py-3 px-4">
                         <div class="flex items-center gap-2">
-                          <span class="txt-primary">{{ user.email }}</span>
+                          <span class="txt-primary">{{ user.email || 'N/A' }}</span>
                           <Icon
                             v-if="user.emailVerified"
                             icon="mdi:check-decagram"
@@ -243,6 +243,7 @@
                             updateUserLevel(user.id, ($event.target as HTMLSelectElement).value)
                           "
                         >
+                          <option value="ANONYMOUS">ANONYMOUS</option>
                           <option value="NEW">NEW</option>
                           <option value="PRO">PRO</option>
                           <option value="TEAM">TEAM</option>
