@@ -7,4 +7,23 @@ test.describe('Login', () => {
     await login(page);
     await expect(page.locator(selectors.chat.textInput)).toBeVisible({ timeout: 10_000 });
   });
+
+  test('@smoke logout clears session id=005', async ({ page }) => {
+    await login(page);
+
+    await page.locator(selectors.userMenu.button).waitFor({ state: 'visible' });
+    await page.locator(selectors.userMenu.button).click();
+    await page.locator(selectors.userMenu.logoutBtn).click();
+
+    await expect(page.locator(selectors.login.email)).toBeVisible({ timeout: 10_000 });
+    await expect(page).toHaveURL(/login/);
+
+    await page.goBack();
+    await expect(page.locator(selectors.login.email)).toBeVisible({ timeout: 10_000 });
+    await expect(page).toHaveURL(/login/);
+
+    await page.goto('/profile');
+    await expect(page.locator(selectors.login.email)).toBeVisible({ timeout: 10_000 });
+    await expect(page).toHaveURL(/login/);
+  });
 });
