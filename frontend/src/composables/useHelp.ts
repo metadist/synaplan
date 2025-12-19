@@ -1,11 +1,13 @@
 import { ref, computed } from 'vue'
 import { useRoute } from 'vue-router'
 import { helpContent } from '@/data/helpContent'
+import { useConfigStore } from '@/stores/config'
 
 export function useHelp() {
   const route = useRoute()
+  const config = useConfigStore()
   const isOpen = ref(false)
-  const isEnabled = computed(() => import.meta.env.VITE_FEATURE_HELP === 'true')
+  const isEnabled = computed(() => config.features.help)
 
   const currentHelpId = computed(() => route.meta.helpId as string | undefined)
   const currentHelp = computed(() => {

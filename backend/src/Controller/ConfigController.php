@@ -40,7 +40,7 @@ class ConfigController extends AbstractController
     #[OA\Get(
         path: '/api/v1/config/runtime',
         summary: 'Get public runtime configuration',
-        description: 'Returns public configuration like reCAPTCHA site key (no authentication required)',
+        description: 'Returns public configuration like reCAPTCHA site key, feature flags (no authentication required)',
         tags: ['Configuration']
     )]
     #[OA\Response(
@@ -54,6 +54,13 @@ class ConfigController extends AbstractController
                     properties: [
                         new OA\Property(property: 'enabled', type: 'boolean', example: true),
                         new OA\Property(property: 'siteKey', type: 'string', example: '6LcXXXXXXXXXXXXXXXXXXXXXXXXXXXXX'),
+                    ]
+                ),
+                new OA\Property(
+                    property: 'features',
+                    type: 'object',
+                    properties: [
+                        new OA\Property(property: 'help', type: 'boolean', example: true, description: 'Enable help system'),
                     ]
                 ),
             ]
@@ -70,8 +77,14 @@ class ConfigController extends AbstractController
             'siteKey' => ($recaptchaEnabled && !empty($recaptchaSiteKey) && 'your_site_key_here' !== $recaptchaSiteKey) ? $recaptchaSiteKey : '',
         ];
 
+        // Feature flags
+        $features = [
+            'help' => ($_ENV['FEATURE_HELP'] ?? 'false') === 'true',
+        ];
+
         return $this->json([
             'recaptcha' => $recaptchaConfig,
+            'features' => $features,
         ]);
     }
 

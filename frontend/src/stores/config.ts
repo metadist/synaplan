@@ -13,8 +13,11 @@ interface RuntimeConfig {
   recaptcha: {
     enabled: boolean
     siteKey: string
-    }
   }
+  features: {
+    help: boolean
+  }
+}
 
 let runtimeConfig: RuntimeConfig | null = null
 let configPromise: Promise<RuntimeConfig> | null = null
@@ -93,6 +96,16 @@ const config = {
     get siteKey(): string {
       // Return cached value if available (synchronous)
       return runtimeConfig?.recaptcha.siteKey ?? ''
+    },
+  },
+
+  /**
+   * Feature flags
+   * Loaded from backend at runtime
+   */
+  features: {
+    get help(): boolean {
+      return runtimeConfig?.features.help ?? false
     },
   },
 
