@@ -1,39 +1,67 @@
 /**
  * Application Configuration
  *
- * Centralized configuration management supporting both:
- * 1. Runtime configuration via window.__RUNTIME_CONFIG__ (injected at container startup)
- * 2. Build-time environment variables (fallback for development)
+ * Centralized configuration management.
+ * Configuration is loaded from backend API at runtime (no build-time env vars needed).
  *
  * Plain object for now to avoid Pinia initialization issues when used at module level.
  * Can be converted to Pinia store later when all usage is inside component/function scope.
  */
 
-// Type declaration for runtime config
-declare global {
-  interface Window {
-    __RUNTIME_CONFIG__?: {
-      RECAPTCHA_ENABLED?: string
-      RECAPTCHA_SITE_KEY?: string
+// Runtime config loaded from backend
+interface RuntimeConfig {
+  recaptcha: {
+    enabled: boolean
+    siteKey: string
     }
   }
-}
+
+let runtimeConfig: RuntimeConfig | null = null
+let configPromise: Promise<RuntimeConfig> | null = null
 
 /**
- * Get a runtime config value, falling back to build-time env var.
- * Runtime values are injected into index.html at container startup.
- * Values containing '__' prefix are placeholders that weren't replaced.
+ * Load runtime configuration from backend API
+ * This is called automatically when accessing config values
  */
-function getRuntimeConfig(key: string, buildTimeValue: string): string {
-  const runtimeValue = window.__RUNTIME_CONFIG__?.[key as keyof typeof window.__RUNTIME_CONFIG__]
-
-  // If runtime value exists and isn't a placeholder (still has __), use it
-  if (runtimeValue && !runtimeValue.startsWith('__')) {
-    return runtimeValue
+async function loadRuntimeConfig(): Promise<RuntimeConfig> {
+  // Return cached config if already loaded
+  if (runtimeConfig) {
+    return runtimeConfig
   }
 
-  // Fall back to build-time env var
-  return buildTimeValue
+  // Return existing promise if already loading
+  if (configPromise) {
+    return configPromise
+  }
+
+  // Fetch config from backend
+  configPromise = fetch('/api/v1/config/runtime')
+    .then((response) => {
+      if (!response.ok) {
+        throw new Error(`Failed to load runtime config: ${response.status}`)
+      }
+      return response.json()
+    })
+    .then((data) => {
+      runtimeConfig = data
+      return data
+    })
+    .catch((error) => {
+      console.error('Failed to load runtime config:', error)
+      // Return default config on error
+      runtimeConfig = {
+        recaptcha: {
+          enabled: false,
+          siteKey: '',
+        },
+      }
+      return runtimeConfig
+    })
+    .finally(() => {
+      configPromise = null
+    })
+
+  return configPromise
 }
 
 const config = {
@@ -55,19 +83,25 @@ const config = {
 
   /**
    * Google reCAPTCHA v3 configuration
-   * Supports runtime configuration for Docker deployments
+   * Loaded from backend at runtime
    */
   recaptcha: {
     get enabled(): boolean {
-      const value = getRuntimeConfig(
-        'RECAPTCHA_ENABLED',
-        import.meta.env.VITE_RECAPTCHA_ENABLED || ''
-      )
-      return value === 'true'
+      // Return cached value if available (synchronous)
+      return runtimeConfig?.recaptcha.enabled ?? false
     },
     get siteKey(): string {
-      return getRuntimeConfig('RECAPTCHA_SITE_KEY', import.meta.env.VITE_RECAPTCHA_SITE_KEY || '')
+      // Return cached value if available (synchronous)
+      return runtimeConfig?.recaptcha.siteKey ?? ''
     },
+  },
+
+  /**
+   * Load runtime configuration from backend
+   * Call this before accessing config values (e.g., in main.ts)
+   */
+  async init(): Promise<void> {
+    await loadRuntimeConfig()
   },
 
   /**

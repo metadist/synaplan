@@ -11,6 +11,7 @@ const API_BASE_URL = config.apiBaseUrl
 // This prevents manipulation of isAdmin, level, etc.
 const user = ref<any | null>(null)
 const isRefreshing = ref(false)
+const isLoggingOut = ref(false) // Prevent auth checks during logout
 let refreshPromise: Promise<boolean> | null = null
 
 export const authService = {
@@ -82,19 +83,33 @@ export const authService = {
   /**
    * Logout User - clears cookies on backend
    */
-  async logout(): Promise<void> {
+  async logout(silent = false): Promise<void> {
+    // Prevent multiple logout calls and auth checks during logout
+    if (isLoggingOut.value) {
+      return
+    }
+
+    isLoggingOut.value = true
+
     try {
-      await fetch(`${API_BASE_URL}/api/v1/auth/logout`, {
-        method: 'POST',
-        credentials: 'include',
-      })
+      // Only call logout endpoint if we're not already logged out (silent = false means user initiated)
+      if (!silent) {
+        await fetch(`${API_BASE_URL}/api/v1/auth/logout`, {
+          method: 'POST',
+          credentials: 'include',
+        })
+      }
     } catch (error) {
-      console.error('Logout error:', error)
+      // Ignore errors during logout - session might already be expired
     } finally {
       // Clear local state (memory only)
       user.value = null
       // Clear SSE token cache
       clearSseToken()
+      // Reset logout flag after a short delay
+      setTimeout(() => {
+        isLoggingOut.value = false
+      }, 500)
     }
   },
 
@@ -102,20 +117,37 @@ export const authService = {
    * Get Current User - validates session via cookie
    */
   async getCurrentUser(): Promise<any | null> {
+    // Don't check auth during logout process
+    if (isLoggingOut.value) {
+      return null
+    }
+
     try {
       const response = await fetch(`${API_BASE_URL}/api/v1/auth/me`, {
         credentials: 'include',
       })
 
       if (response.status === 401) {
-        // Try to refresh token
+        // Don't try to refresh if already logging out
+        if (isLoggingOut.value) {
+          return null
+        }
+
+        // Try to refresh token (silently)
         const refreshed = await this.refreshToken()
         if (refreshed) {
-          // Retry getting user
-          return await this.getCurrentUser()
+          // Retry getting user (only once, no recursion)
+          const retryResponse = await fetch(`${API_BASE_URL}/api/v1/auth/me`, {
+            credentials: 'include',
+          })
+          if (retryResponse.ok) {
+            const data = await retryResponse.json()
+            user.value = data.user
+            return data.user
+          }
         }
-        // Refresh failed, clear auth
-        await this.logout()
+        // Refresh failed or retry failed, clear auth silently
+        await this.logout(true)
         return null
       }
 
@@ -128,7 +160,7 @@ export const authService = {
 
       return data.user
     } catch (error) {
-      console.error('Get user error:', error)
+      // Network errors are expected (e.g., offline) - don't log
       return null
     }
   },
@@ -137,6 +169,11 @@ export const authService = {
    * Refresh Access Token using Refresh Token cookie
    */
   async refreshToken(): Promise<boolean> {
+    // Don't refresh during logout
+    if (isLoggingOut.value) {
+      return false
+    }
+
     // Prevent multiple simultaneous refresh calls
     if (isRefreshing.value && refreshPromise) {
       return refreshPromise
@@ -161,9 +198,8 @@ export const authService = {
       })
 
       if (!response.ok) {
-        // Refresh token invalid/expired
-        console.log('Token refresh failed, logging out')
-        await this.logout()
+        // Refresh token invalid/expired (expected behavior, don't spam console)
+        await this.logout(true) // Silent logout
         return false
       }
 
@@ -174,10 +210,11 @@ export const authService = {
         user.value = data.user
       }
 
-      console.log('Token refreshed successfully')
+      console.log('✅ Token refreshed successfully')
       return true
     } catch (error) {
-      console.error('Token refresh error:', error)
+      // Network error - this is unexpected, log it
+      console.error('Token refresh network error:', error)
       return false
     }
   },

@@ -12,38 +12,10 @@ if [ -f /var/www/backend/.env ]; then
 fi
 
 # ─────────────────────────────────────────────────────────────
-# Frontend Runtime Configuration Injection
-# Replaces __VITE_*__ placeholders in index.html with actual env values
+# Runtime Configuration
+# Frontend now loads config from /api/v1/config/runtime endpoint
+# No need to inject into index.html anymore
 # ─────────────────────────────────────────────────────────────
-FRONTEND_INDEX="/var/www/frontend/index.html"
-FRONTEND_ENV="/var/www/frontend/.env"
-
-if [ -f "$FRONTEND_INDEX" ]; then
-    # Load frontend env vars if .fe-env is mounted
-    if [ -f "$FRONTEND_ENV" ]; then
-        echo "📄 Loading frontend environment from $FRONTEND_ENV..."
-        set -a
-        source "$FRONTEND_ENV"
-        set +a
-    fi
-
-    # Check if index.html has placeholders to replace
-    if grep -q "__VITE_" "$FRONTEND_INDEX"; then
-        echo "🔧 Injecting frontend runtime configuration..."
-
-        # Replace reCAPTCHA placeholders
-        RECAPTCHA_ENABLED="${VITE_RECAPTCHA_ENABLED:-false}"
-        RECAPTCHA_SITE_KEY="${VITE_RECAPTCHA_SITE_KEY:-}"
-
-        RECAPTCHA_SITE_KEY_ESCAPED=$(printf '%s' "$RECAPTCHA_SITE_KEY" | sed 's/[\/&|\\]/\\&/g')
-
-        sed -i "s|__VITE_RECAPTCHA_ENABLED__|${RECAPTCHA_ENABLED}|g" "$FRONTEND_INDEX"
-        sed -i "s|__VITE_RECAPTCHA_SITE_KEY__|${RECAPTCHA_SITE_KEY_ESCAPED}|g" "$FRONTEND_INDEX"
-
-        echo "   ✅ reCAPTCHA enabled: ${RECAPTCHA_ENABLED}"
-        [ -n "$RECAPTCHA_SITE_KEY" ] && echo "   ✅ reCAPTCHA site key: ${RECAPTCHA_SITE_KEY:0:20}..."
-    fi
-fi
 
 # Validate required environment variables
 if [ -z "${APP_URL:-}" ]; then
