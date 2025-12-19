@@ -10,7 +10,16 @@ const FlexibleAdminUserSchema = originalUserSchema
   .omit({ created: true, email: true, level: true })
   .extend({
     created: z.string(), // Accept any string for created date (more flexible than datetime format)
-    email: z.string().nullish(), // Accept email OR phone number as string (no email format validation)
+    // Email field can be: valid email, phone number (flexible format), or null
+    // Backend provides phone from BUSERDETAILS['phone'] if email is missing
+    email: z
+      .union([
+        z.string().email(), // Valid email address
+        z.string().regex(/^\+?\d{5,15}$/), // Phone number: optional +, 5-15 digits (covers various formats)
+        z.null(),
+      ])
+      .nullable()
+      .optional(),
     level: z.enum(['ANONYMOUS', 'NEW', 'PRO', 'TEAM', 'BUSINESS', 'ADMIN']).catch('NEW'), // Fallback to 'NEW' if invalid
   })
 

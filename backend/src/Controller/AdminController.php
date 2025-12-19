@@ -136,9 +136,11 @@ class AdminController extends AbstractController
             // If email is empty or invalid, check BUSERDETAILS for phone number
             if (empty($email) || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
                 $userDetails = $u->getUserDetails();
-                if (!empty($userDetails['phone'])) {
+                // Check for phone_number (verified phone) or anonymous_phone
+                $phone = $userDetails['phone_number'] ?? $userDetails['anonymous_phone'] ?? null;
+                if (!empty($phone)) {
                     // Use phone number as email identifier
-                    $email = $userDetails['phone'];
+                    $email = $phone;
                 } else {
                     // No email and no phone - set to null
                     $email = null;
