@@ -243,6 +243,7 @@
                             updateUserLevel(user.id, ($event.target as HTMLSelectElement).value)
                           "
                         >
+                          <option value="ANONYMOUS">ANONYMOUS</option>
                           <option value="NEW">NEW</option>
                           <option value="PRO">PRO</option>
                           <option value="TEAM">TEAM</option>

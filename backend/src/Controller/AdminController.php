@@ -79,7 +79,7 @@ class AdminController extends AbstractController
                         properties: [
                             new OA\Property(property: 'id', type: 'integer', example: 1),
                             new OA\Property(property: 'email', type: 'string', description: 'Email address or phone number (if no email available)', example: 'user@example.com', nullable: true),
-                            new OA\Property(property: 'level', type: 'string', enum: ['NEW', 'PRO', 'TEAM', 'BUSINESS', 'ADMIN'], example: 'PRO'),
+                            new OA\Property(property: 'level', type: 'string', enum: ['ANONYMOUS', 'NEW', 'PRO', 'TEAM', 'BUSINESS', 'ADMIN'], example: 'PRO'),
                             new OA\Property(property: 'type', type: 'string', example: 'email'),
                             new OA\Property(property: 'providerId', type: 'string', example: 'email'),
                             new OA\Property(property: 'emailVerified', type: 'boolean', example: true),
@@ -147,7 +147,7 @@ class AdminController extends AbstractController
 
             // Ensure level is valid, default to 'NEW' if invalid
             $level = $u->getUserLevel();
-            $validLevels = ['NEW', 'PRO', 'TEAM', 'BUSINESS', 'ADMIN'];
+            $validLevels = ['ANONYMOUS', 'NEW', 'PRO', 'TEAM', 'BUSINESS', 'ADMIN'];
             if (!in_array($level, $validLevels, true)) {
                 $level = 'NEW';
             }
@@ -196,7 +196,7 @@ class AdminController extends AbstractController
         content: new OA\JsonContent(
             required: ['level'],
             properties: [
-                new OA\Property(property: 'level', type: 'string', enum: ['NEW', 'PRO', 'TEAM', 'BUSINESS', 'ADMIN'], example: 'PRO'),
+                new OA\Property(property: 'level', type: 'string', enum: ['ANONYMOUS', 'NEW', 'PRO', 'TEAM', 'BUSINESS', 'ADMIN'], example: 'PRO'),
             ]
         )
     )]
@@ -220,7 +220,7 @@ class AdminController extends AbstractController
         $data = json_decode($request->getContent(), true);
         $newLevel = $data['level'] ?? '';
 
-        $allowedLevels = ['NEW', 'PRO', 'TEAM', 'BUSINESS', 'ADMIN'];
+        $allowedLevels = ['ANONYMOUS', 'NEW', 'PRO', 'TEAM', 'BUSINESS', 'ADMIN'];
         if (!in_array($newLevel, $allowedLevels)) {
             return $this->json(['error' => 'Invalid level'], Response::HTTP_BAD_REQUEST);
         }

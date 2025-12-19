@@ -11,7 +11,7 @@ const FlexibleAdminUserSchema = originalUserSchema
   .extend({
     created: z.string(), // Accept any string for created date (more flexible than datetime format)
     email: z.string().nullish(), // Accept email OR phone number as string (no email format validation)
-    level: z.enum(['NEW', 'PRO', 'TEAM', 'BUSINESS', 'ADMIN']).catch('NEW'), // Fallback to 'NEW' if invalid
+    level: z.enum(['ANONYMOUS', 'NEW', 'PRO', 'TEAM', 'BUSINESS', 'ADMIN']).catch('NEW'), // Fallback to 'NEW' if invalid
   })
 
 export const AdminUserSchema = FlexibleAdminUserSchema
