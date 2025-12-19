@@ -224,7 +224,7 @@
                       <td class="py-3 px-4 txt-secondary text-sm">#{{ user.id }}</td>
                       <td class="py-3 px-4">
                         <div class="flex items-center gap-2">
-                          <span class="txt-primary">{{ user.email }}</span>
+                          <span class="txt-primary">{{ user.email || 'N/A' }}</span>
                           <Icon
                             v-if="user.emailVerified"
                             icon="mdi:check-decagram"

@@ -75,10 +75,10 @@ class AdminController extends AbstractController
                     type: 'array',
                     items: new OA\Items(
                         type: 'object',
-                        required: ['id', 'email', 'level', 'type', 'providerId', 'emailVerified', 'created', 'isAdmin', 'locale'],
+                        required: ['id', 'level', 'type', 'providerId', 'emailVerified', 'created', 'isAdmin', 'locale'],
                         properties: [
                             new OA\Property(property: 'id', type: 'integer', example: 1),
-                            new OA\Property(property: 'email', type: 'string', format: 'email', example: 'user@example.com'),
+                            new OA\Property(property: 'email', type: 'string', description: 'Email address or phone number (if no email available)', example: 'user@example.com', nullable: true),
                             new OA\Property(property: 'level', type: 'string', enum: ['NEW', 'PRO', 'TEAM', 'BUSINESS', 'ADMIN'], example: 'PRO'),
                             new OA\Property(property: 'type', type: 'string', example: 'email'),
                             new OA\Property(property: 'providerId', type: 'string', example: 'email'),
@@ -130,10 +130,32 @@ class AdminController extends AbstractController
             ->getResult();
 
         $usersData = array_map(function (User $u) {
+            // Get email from BMAIL field
+            $email = $u->getMail();
+
+            // If email is empty or invalid, check BUSERDETAILS for phone number
+            if (empty($email) || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+                $userDetails = $u->getUserDetails();
+                if (!empty($userDetails['phone'])) {
+                    // Use phone number as email identifier
+                    $email = $userDetails['phone'];
+                } else {
+                    // No email and no phone - set to null
+                    $email = null;
+                }
+            }
+
+            // Ensure level is valid, default to 'NEW' if invalid
+            $level = $u->getUserLevel();
+            $validLevels = ['NEW', 'PRO', 'TEAM', 'BUSINESS', 'ADMIN'];
+            if (!in_array($level, $validLevels, true)) {
+                $level = 'NEW';
+            }
+
             return [
                 'id' => $u->getId(),
-                'email' => $u->getMail(),
-                'level' => $u->getUserLevel(),
+                'email' => $email,
+                'level' => $level,
                 'type' => $u->getType(),
                 'providerId' => $u->getProviderId(),
                 'emailVerified' => $u->isEmailVerified(),
