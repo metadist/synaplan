@@ -5,6 +5,7 @@ namespace App\Controller;
 use App\Entity\Message;
 use App\Entity\User;
 use App\Service\EmailChatService;
+use App\Service\File\FileProcessor;
 use App\Service\InternalEmailService;
 use App\Service\Message\MessageProcessor;
 use App\Service\RateLimitService;
@@ -30,6 +31,7 @@ class WebhookController extends AbstractController
         private WhatsAppService $whatsAppService,
         private EmailChatService $emailChatService,
         private InternalEmailService $internalEmailService,
+        private FileProcessor $fileProcessor,
         private LoggerInterface $logger,
         private string $whatsappWebhookVerifyToken,
         private int $whatsappUserId,
@@ -602,6 +604,33 @@ class WebhookController extends AbstractController
                             'file_type' => $downloadResult['file_type'] ?? $type,
                             'size_mb' => $downloadResult['size'] ? round($downloadResult['size'] / 1024 / 1024, 2) : 0,
                         ]);
+
+                        // WHATSAPP-SPECIFIC: Extract text immediately using FileProcessor
+                        // This ensures WhatsApp files get the same robust processing as web chat uploads
+                        // (with fallback strategies like vision AI for PDFs)
+                        try {
+                            [$extractedText, $extractMeta] = $this->fileProcessor->extractText(
+                                $downloadResult['file_path'],
+                                $downloadResult['file_type'] ?? $type,
+                                $user->getId()
+                            );
+
+                            if (!empty($extractedText)) {
+                                $message->setFileText($extractedText);
+                                $this->logger->info('WhatsApp file text extracted', [
+                                    'media_id' => $mediaId,
+                                    'text_length' => strlen($extractedText),
+                                    'strategy' => $extractMeta['strategy'] ?? 'unknown',
+                                ]);
+                            }
+                        } catch (\Throwable $e) {
+                            $this->logger->error('WhatsApp file extraction failed', [
+                                'media_id' => $mediaId,
+                                'file_path' => $downloadResult['file_path'],
+                                'error' => $e->getMessage(),
+                            ]);
+                            // Continue processing even if extraction fails
+                        }
                     } else {
                         $this->logger->warning('WhatsApp media download failed', [
                             'media_id' => $mediaId,
