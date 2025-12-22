@@ -126,7 +126,7 @@ class FileAnalysisHandler implements MessageHandlerInterface
         ]);
 
         return [
-            'content' => 'This file type cannot be analyzed. Supported types: documents (PDF, DOCX), images (JPG, PNG), and audio (MP3, OGG).',
+            'content' => 'This file type cannot be analyzed. Supported types include documents (such as PDF, Word, Excel), images (such as JPG, PNG, GIF), and audio files (such as MP3, OGG, WAV).',
             'metadata' => ['error' => 'unsupported_file_type'],
         ];
     }
@@ -225,7 +225,7 @@ class FileAnalysisHandler implements MessageHandlerInterface
             'file_name' => $fileInfo['name'],
         ]);
 
-        $streamCallback('This file type cannot be analyzed. Supported types: documents (PDF, DOCX), images (JPG, PNG), and audio (MP3, OGG).');
+        $streamCallback('This file type cannot be analyzed. Supported types include documents (such as PDF, Word, Excel), images (such as JPG, PNG, GIF), and audio files (such as MP3, OGG, WAV).');
 
         return [
             'metadata' => ['error' => 'unsupported_file_type'],
