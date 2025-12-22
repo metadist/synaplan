@@ -1,7 +1,7 @@
 ---
 name: Feature / Enhancement
 about: New ideas, UX improvements, or enhancements
-title: "area: <short summary>"
+title: "<Area>: <short summary>"
 labels: []
 assignees: ""
 type: "Feature"
