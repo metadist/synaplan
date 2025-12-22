@@ -22,7 +22,7 @@ class MessagePreProcessor
 {
     // Supported file types for preprocessing
     public const DOCUMENT_EXTENSIONS = ['pdf', 'docx', 'doc', 'xlsx', 'xls', 'pptx', 'txt'];
-    public const AUDIO_EXTENSIONS = ['ogg', 'mp3', 'wav', 'm4a', 'opus', 'flac', 'webm'];
+    public const AUDIO_EXTENSIONS = ['ogg', 'mp3', 'wav', 'm4a', 'opus', 'flac', 'webm', 'amr'];
     public const IMAGE_EXTENSIONS = ['jpg', 'jpeg', 'png', 'webp', 'gif'];
 
     public function __construct(
@@ -143,7 +143,12 @@ class MessagePreProcessor
                     $currentText = $message->getText();
                     if (empty($currentText) || '[Audio message]' === $currentText || '[Audio]' === $currentText) {
                         $message->setText($transcribedText);
-                        $this->logger->info('PreProcessor: Replaced placeholder text with transcription for better classification');
+
+                        // Remove file flag so audio is treated as normal text message
+                        // This prevents misclassification as "file_analysis" or "image_generation"
+                        $message->setFile(0);
+
+                        $this->logger->info('PreProcessor: Replaced placeholder text with transcription and removed file flag for better classification');
                     }
 
                     $this->logger->info('PreProcessor: Audio transcribed', [
@@ -243,7 +248,12 @@ class MessagePreProcessor
                     $currentText = $message->getText();
                     if (empty($currentText) || '[Audio message]' === $currentText || '[Audio]' === $currentText) {
                         $message->setText($transcribedText);
-                        $this->logger->info('PreProcessor: Replaced placeholder text with transcription for better classification');
+
+                        // Remove file flag so audio is treated as normal text message
+                        // This prevents misclassification as "file_analysis" or "image_generation"
+                        $message->setFile(0);
+
+                        $this->logger->info('PreProcessor: Replaced placeholder text with transcription and removed file flag for better classification');
                     }
 
                     // Update detected language if different
