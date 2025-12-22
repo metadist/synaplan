@@ -407,7 +407,7 @@ class AuthController extends AbstractController
     #[OA\Post(
         path: '/api/v1/auth/logout',
         summary: 'Logout user',
-        description: 'Revoke refresh token and clear auth cookies',
+        description: 'Revoke tokens and clear auth cookies. For OIDC users, also revokes tokens at the identity provider and returns logout URL.',
         tags: ['Authentication']
     )]
     #[OA\Response(
@@ -417,27 +417,60 @@ class AuthController extends AbstractController
             properties: [
                 new OA\Property(property: 'success', type: 'boolean', example: true),
                 new OA\Property(property: 'message', type: 'string', example: 'Logged out'),
+                new OA\Property(property: 'oidc_logout_url', type: 'string', example: 'https://keycloak.com/logout?...', description: 'Optional: OIDC provider logout URL for frontend redirect'),
             ]
         )
     )]
     public function logout(Request $request): Response
     {
         $refreshTokenString = $request->cookies->get(TokenService::REFRESH_COOKIE);
+        $oidcAccessToken = $request->cookies->get(OidcTokenService::OIDC_ACCESS_COOKIE);
+        $oidcRefreshToken = $request->cookies->get(OidcTokenService::OIDC_REFRESH_COOKIE);
+        $oidcProvider = $request->cookies->get(OidcTokenService::OIDC_PROVIDER_COOKIE);
 
-        // Revoke refresh token in DB
+        // Revoke internal refresh token
         if ($refreshTokenString) {
             $this->tokenService->revokeRefreshToken($refreshTokenString);
         }
 
-        $this->logger->info('User logged out');
-
-        // Clear cookies
-        $response = new JsonResponse([
+        $responseData = [
             'success' => true,
             'message' => 'Logged out',
-        ]);
+        ];
 
-        return $this->tokenService->clearAuthCookies($response);
+        // Handle OIDC logout (Keycloak, Google, etc.)
+        if ($oidcAccessToken && $oidcRefreshToken && $oidcProvider) {
+            $this->logger->info('OIDC user logout initiated', ['provider' => $oidcProvider]);
+
+            // Revoke tokens at OIDC provider
+            $revoked = $this->oidcTokenService->revokeOidcTokens(
+                $oidcAccessToken,
+                $oidcRefreshToken,
+                $oidcProvider
+            );
+
+            if ($revoked) {
+                $this->logger->info('OIDC tokens revoked successfully', ['provider' => $oidcProvider]);
+            }
+
+            // Get end session URL for frontend redirect
+            $postLogoutRedirectUri = $_ENV['FRONTEND_URL'] ?? 'http://localhost:5173';
+            $logoutUrl = $this->oidcTokenService->getEndSessionUrl($postLogoutRedirectUri, $oidcProvider);
+
+            if ($logoutUrl) {
+                $responseData['oidc_logout_url'] = $logoutUrl;
+                $this->logger->debug('OIDC logout URL generated', ['url' => $logoutUrl]);
+            }
+        }
+
+        $this->logger->info('User logged out');
+
+        // Clear all auth cookies
+        $response = new JsonResponse($responseData);
+        $this->tokenService->clearAuthCookies($response);
+        $this->oidcTokenService->clearOidcCookies($response);
+
+        return $response;
     }
 
     #[Route('/verify-email', name: 'verify_email', methods: ['POST'])]

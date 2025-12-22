@@ -84,7 +84,7 @@ class VectorSearchService
 
         // 3. Build SQL with VEC_DISTANCE_COSINE (native MariaDB)
         $sql = '
-            SELECT 
+            SELECT
                 r.BID as chunk_id,
                 r.BMID as message_id,
                 r.BTEXT as chunk_text,
@@ -180,7 +180,7 @@ class VectorSearchService
     {
         try {
             $sql = '
-                SELECT 
+                SELECT
                     COUNT(DISTINCT r.BMID) as total_documents,
                     COUNT(r.BID) as total_chunks,
                     COUNT(DISTINCT r.BGROUPKEY) as total_groups,
@@ -189,7 +189,9 @@ class VectorSearchService
                 WHERE r.BUID = :user_id
             ';
 
-            $result = $this->connection->executeQuery($sql, ['user_id' => $userId]);
+            $stmt = $this->connection->prepare($sql);
+            $stmt->bindValue('user_id', $userId, \PDO::PARAM_INT);
+            $result = $stmt->executeQuery();
             $stats = $result->fetchAssociative();
 
             return [
@@ -230,7 +232,7 @@ class VectorSearchService
         try {
             // Get the embedding of the source message's first chunk
             $sql = '
-                SELECT 
+                SELECT
                     r2.BID as chunk_id,
                     r2.BMID as message_id,
                     r2.BTEXT as chunk_text,

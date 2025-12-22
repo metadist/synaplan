@@ -172,28 +172,83 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
 
     public function getRoles(): array
     {
-        // Map user level to roles
+        // Base role
         $roles = ['ROLE_USER'];
 
+        // Map internal user level to roles
         if ('ADMIN' === $this->userLevel) {
             $roles[] = 'ROLE_ADMIN';
             $roles[] = 'ROLE_PRO';
             $roles[] = 'ROLE_BUSINESS';
-
-            return array_unique($roles);
-        }
-
-        if (in_array($this->userLevel, ['PRO', 'TEAM', 'BUSINESS'])) {
+        } elseif (in_array($this->userLevel, ['PRO', 'TEAM', 'BUSINESS'])) {
             $roles[] = 'ROLE_PRO';
+
+            if ('BUSINESS' === $this->userLevel) {
+                $roles[] = 'ROLE_BUSINESS';
+            }
         }
 
-        if ('BUSINESS' === $this->userLevel) {
-            $roles[] = 'ROLE_BUSINESS';
+        // Map OIDC roles to Symfony roles (for Keycloak users)
+        $userDetails = $this->getUserDetails();
+        if (isset($userDetails['oidc_roles']) && is_array($userDetails['oidc_roles'])) {
+            $roles = array_merge($roles, $this->mapOidcRolesToSymfonyRoles($userDetails['oidc_roles']));
         }
 
         return array_unique($roles);
     }
 
+    /**
+     * Map OIDC provider roles to Symfony roles.
+     *
+     * Configurable via OIDC_ROLE_MAPPING environment variable.
+     * Default mapping handles common Keycloak roles.
+     *
+     * @param array<string> $oidcRoles Roles from realm_access or resource_access
+     *
+     * @return array<string> Symfony roles (ROLE_*)
+     */
+    private function mapOidcRolesToSymfonyRoles(array $oidcRoles): array
+    {
+        // Default mapping (can be overridden via env)
+        $defaultMapping = [
+            'admin' => 'ROLE_ADMIN',
+            'realm-admin' => 'ROLE_ADMIN',
+            'synaplan-admin' => 'ROLE_ADMIN',
+            'administrator' => 'ROLE_ADMIN',
+            'pro-user' => 'ROLE_PRO',
+            'pro' => 'ROLE_PRO',
+            'business-user' => 'ROLE_BUSINESS',
+            'business' => 'ROLE_BUSINESS',
+        ];
+
+        // Load custom mapping from env if provided
+        // Format: OIDC_ROLE_MAPPING="keycloak_role:SYMFONY_ROLE,another:ROLE_OTHER"
+        $envMapping = $_ENV['OIDC_ROLE_MAPPING'] ?? '';
+        if (!empty($envMapping)) {
+            $pairs = explode(',', $envMapping);
+            foreach ($pairs as $pair) {
+                $parts = explode(':', trim($pair));
+                if (2 === count($parts)) {
+                    $defaultMapping[strtolower(trim($parts[0]))] = trim($parts[1]);
+                }
+            }
+        }
+
+        $mappedRoles = [];
+        foreach ($oidcRoles as $oidcRole) {
+            $roleLower = strtolower($oidcRole);
+            if (isset($defaultMapping[$roleLower])) {
+                $mappedRoles[] = $defaultMapping[$roleLower];
+            }
+        }
+
+        return $mappedRoles;
+    }
+
+    #[\Deprecated(
+        message: 'eraseCredentials() is empty and will be removed in the future. Sensitive data is not stored in User entity.',
+        since: 'symfony/security-http 7.3'
+    )]
     public function eraseCredentials(): void
     {
         // Nothing to do - we don't store sensitive temp data
