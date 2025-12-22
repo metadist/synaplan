@@ -20,6 +20,11 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
  */
 class MessagePreProcessor
 {
+    // Supported file types for preprocessing
+    public const DOCUMENT_EXTENSIONS = ['pdf', 'docx', 'doc', 'xlsx', 'xls', 'pptx', 'txt'];
+    public const AUDIO_EXTENSIONS = ['ogg', 'mp3', 'wav', 'm4a', 'opus', 'flac', 'webm'];
+    public const IMAGE_EXTENSIONS = ['jpg', 'jpeg', 'png', 'webp', 'gif'];
+
     public function __construct(
         private MessageRepository $messageRepository,
         private HttpClientInterface $httpClient,
@@ -112,7 +117,7 @@ class MessagePreProcessor
         ]);
 
         // Parse File mit Tika (für PDFs, DOCX, etc.)
-        if (in_array($fileType, ['pdf', 'docx', 'doc', 'xlsx', 'xls', 'pptx', 'txt'])) {
+        if (in_array($fileType, self::DOCUMENT_EXTENSIONS)) {
             $text = $this->parseWithTika($fullPath);
             if ($text) {
                 $messageFile->setFileText($text);
@@ -125,7 +130,7 @@ class MessagePreProcessor
         }
 
         // Audio mit Whisper
-        elseif (in_array($fileType, ['ogg', 'mp3', 'wav', 'm4a', 'opus', 'flac', 'webm'])) {
+        elseif (in_array($fileType, self::AUDIO_EXTENSIONS)) {
             try {
                 $result = $this->transcribeWithWhisper($fullPath, null);
                 if ($result && !empty($result['text'])) {
@@ -157,7 +162,7 @@ class MessagePreProcessor
         }
 
         // Image mit Vision AI
-        elseif (in_array($fileType, ['jpg', 'jpeg', 'png', 'webp', 'gif'])) {
+        elseif (in_array($fileType, self::IMAGE_EXTENSIONS)) {
             try {
                 // Use file owner as context for Vision AI
                 $userId = $messageFile->getUserId() ?? 0;
@@ -197,7 +202,7 @@ class MessagePreProcessor
         }
 
         // Parse File mit Tika (für PDFs, DOCX, etc.)
-        if (in_array($fileType, ['pdf', 'docx', 'doc', 'xlsx', 'xls', 'pptx', 'txt'])) {
+        if (in_array($fileType, self::DOCUMENT_EXTENSIONS)) {
             $this->logger->info('PreProcessor: Parsing document with Tika', [
                 'file' => basename($fullPath),
                 'type' => $fileType,
@@ -213,7 +218,7 @@ class MessagePreProcessor
         }
 
         // Audio mit Whisper
-        if (in_array($fileType, ['ogg', 'mp3', 'wav', 'm4a', 'opus', 'flac', 'webm'])) {
+        if (in_array($fileType, self::AUDIO_EXTENSIONS)) {
             if (!$this->whisperService->isAvailable()) {
                 $this->logger->warning('PreProcessor: Whisper not available, skipping audio transcription', [
                     'file' => basename($fullPath),
@@ -262,7 +267,7 @@ class MessagePreProcessor
         }
 
         // Image mit Vision AI (wenn Tika nichts extrahiert hat)
-        if (in_array($fileType, ['jpg', 'jpeg', 'png', 'webp', 'gif'])) {
+        if (in_array($fileType, self::IMAGE_EXTENSIONS)) {
             $this->logger->info('PreProcessor: Processing image with Vision AI', [
                 'file' => basename($fullPath),
                 'type' => $fileType,

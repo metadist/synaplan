@@ -5,6 +5,7 @@ namespace App\Service\Message\Handler;
 use App\AI\Service\AiFacade;
 use App\Entity\File;
 use App\Entity\Message;
+use App\Service\Message\MessagePreProcessor;
 use App\Service\ModelConfigService;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\DependencyInjection\Attribute\AutoconfigureTag;
@@ -16,13 +17,12 @@ use Symfony\Component\DependencyInjection\Attribute\AutoconfigureTag;
  * - For documents (PDF, DOCX, etc.) with pre-extracted text: Uses Chat AI
  * - For images without extracted text: Uses Vision AI
  * - For audio files: Requires pre-transcribed text from PreProcessor
+ *
+ * Note: File type extensions are defined in MessagePreProcessor to avoid duplication.
  */
 #[AutoconfigureTag('app.message.handler')]
 class FileAnalysisHandler implements MessageHandlerInterface
 {
-    private const IMAGE_EXTENSIONS = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'tiff', 'svg'];
-    private const AUDIO_EXTENSIONS = ['ogg', 'mp3', 'wav', 'm4a', 'opus', 'flac', 'webm', 'aac', 'wma'];
-    private const DOCUMENT_EXTENSIONS = ['pdf', 'docx', 'doc', 'xlsx', 'xls', 'pptx', 'ppt', 'txt', 'csv', 'md'];
 
     public function __construct(
         private AiFacade $aiFacade,
@@ -537,9 +537,9 @@ class FileAnalysisHandler implements MessageHandlerInterface
             $file = $files->first();
 
             $fileType = strtolower($file->getFileType());
-            $isImage = in_array($fileType, self::IMAGE_EXTENSIONS, true);
-            $isAudio = in_array($fileType, self::AUDIO_EXTENSIONS, true);
-            $isDocument = in_array($fileType, self::DOCUMENT_EXTENSIONS, true);
+            $isImage = in_array($fileType, MessagePreProcessor::IMAGE_EXTENSIONS, true);
+            $isAudio = in_array($fileType, MessagePreProcessor::AUDIO_EXTENSIONS, true);
+            $isDocument = in_array($fileType, MessagePreProcessor::DOCUMENT_EXTENSIONS, true);
 
             // Normalize path
             $filePath = $file->getFilePath();
@@ -563,9 +563,9 @@ class FileAnalysisHandler implements MessageHandlerInterface
         $filePath = $message->getFilePath();
         if ($filePath) {
             $extension = strtolower(pathinfo($filePath, PATHINFO_EXTENSION));
-            $isImage = in_array($extension, self::IMAGE_EXTENSIONS, true);
-            $isAudio = in_array($extension, self::AUDIO_EXTENSIONS, true);
-            $isDocument = in_array($extension, self::DOCUMENT_EXTENSIONS, true);
+            $isImage = in_array($extension, MessagePreProcessor::IMAGE_EXTENSIONS, true);
+            $isAudio = in_array($extension, MessagePreProcessor::AUDIO_EXTENSIONS, true);
+            $isDocument = in_array($extension, MessagePreProcessor::DOCUMENT_EXTENSIONS, true);
 
             // Normalize path
             if (!str_starts_with($filePath, 'uploads/') && str_contains($filePath, '/uploads/')) {
