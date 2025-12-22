@@ -110,6 +110,19 @@ class MessagePreProcessor
             return;
         }
 
+        // Skip extraction if text already exists (e.g., from FileProcessor in upload endpoint)
+        // This prevents overwriting robust extraction with simple Tika-only extraction
+        if (!empty($messageFile->getFileText())) {
+            $this->logger->info('PreProcessor: File text already extracted, skipping re-extraction', [
+                'file_id' => $messageFile->getId(),
+                'type' => $fileType,
+                'text_length' => strlen($messageFile->getFileText()),
+            ]);
+            $messageFile->setStatus('processed');
+
+            return;
+        }
+
         $this->logger->info('PreProcessor: Processing File', [
             'file_id' => $messageFile->getId(),
             'type' => $fileType,
@@ -196,6 +209,18 @@ class MessagePreProcessor
         $fullPath = $this->uploadsDir.'/'.$filePath;
         if (!file_exists($fullPath)) {
             $this->logger->warning("File not found: {$fullPath}");
+
+            return;
+        }
+
+        // Skip extraction if text already exists (e.g., from WhatsApp FileProcessor)
+        // This prevents overwriting robust extraction (with vision fallback) with simple Tika-only extraction
+        if (!empty($message->getFileText())) {
+            $this->logger->info('PreProcessor: File text already extracted, skipping re-extraction', [
+                'file' => basename($fullPath),
+                'type' => $fileType,
+                'text_length' => strlen($message->getFileText()),
+            ]);
 
             return;
         }
