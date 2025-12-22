@@ -58,7 +58,7 @@ class OidcTokenServiceTest extends TestCase
         $this->assertTrue($result);
     }
 
-    public function testRevokeOidcTokensReturnsTrue_whenRevocationNotSupported(): void
+    public function testRevokeOidcTokensReturnsTrueWhenRevocationNotSupported(): void
     {
         $logger = $this->createMock(LoggerInterface::class);
 
