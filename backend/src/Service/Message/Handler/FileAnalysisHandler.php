@@ -23,7 +23,6 @@ use Symfony\Component\DependencyInjection\Attribute\AutoconfigureTag;
 #[AutoconfigureTag('app.message.handler')]
 class FileAnalysisHandler implements MessageHandlerInterface
 {
-
     public function __construct(
         private AiFacade $aiFacade,
         private ModelConfigService $modelConfigService,
