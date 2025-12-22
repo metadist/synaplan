@@ -143,12 +143,6 @@ class MessagePreProcessor
                     $currentText = $message->getText();
                     if (empty($currentText) || '[Audio message]' === $currentText || '[Audio]' === $currentText) {
                         $message->setText($transcribedText);
-
-                        // Remove file flag so audio is treated as normal text message
-                        // This prevents misclassification as "file_analysis" or "image_generation"
-                        $message->setFile(0);
-
-                        $this->logger->info('PreProcessor: Replaced placeholder text with transcription and removed file flag for better classification');
                     }
 
                     $this->logger->info('PreProcessor: Audio transcribed', [
@@ -248,12 +242,6 @@ class MessagePreProcessor
                     $currentText = $message->getText();
                     if (empty($currentText) || '[Audio message]' === $currentText || '[Audio]' === $currentText) {
                         $message->setText($transcribedText);
-
-                        // Remove file flag so audio is treated as normal text message
-                        // This prevents misclassification as "file_analysis" or "image_generation"
-                        $message->setFile(0);
-
-                        $this->logger->info('PreProcessor: Replaced placeholder text with transcription and removed file flag for better classification');
                     }
 
                     // Update detected language if different
