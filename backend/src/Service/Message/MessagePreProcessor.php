@@ -69,7 +69,7 @@ class MessagePreProcessor
                     'filename' => $messageFile->getFileName(),
                 ]);
 
-                $this->processMessageFile($messageFile);
+                $this->processMessageFile($messageFile, $message);
                 ++$processed;
                 $this->notify($progressCallback, 'preprocessing', "Processed $processed/{$messageFiles->count()} files");
             }
@@ -91,7 +91,7 @@ class MessagePreProcessor
     /**
      * Process a File entity (NEW: multiple files support).
      */
-    private function processMessageFile(File $messageFile): void
+    private function processMessageFile(File $messageFile, Message $message): void
     {
         $filePath = $messageFile->getFilePath();
         $fileType = strtolower($messageFile->getFileType());
@@ -129,11 +129,21 @@ class MessagePreProcessor
             try {
                 $result = $this->transcribeWithWhisper($fullPath, null);
                 if ($result && !empty($result['text'])) {
-                    $messageFile->setFileText($result['text']);
+                    $transcribedText = $result['text'];
+                    $messageFile->setFileText($transcribedText);
                     $messageFile->setStatus('processed');
+
+                    // Update message text for better classification
+                    // If message text is placeholder like '[Audio message]', replace it with transcription
+                    $currentText = $message->getText();
+                    if (empty($currentText) || '[Audio message]' === $currentText || '[Audio]' === $currentText) {
+                        $message->setText($transcribedText);
+                        $this->logger->info('PreProcessor: Replaced placeholder text with transcription for better classification');
+                    }
+
                     $this->logger->info('PreProcessor: Audio transcribed', [
                         'file_id' => $messageFile->getId(),
-                        'text_length' => strlen($result['text']),
+                        'text_length' => strlen($transcribedText),
                         'language' => $result['language'],
                     ]);
                 }
@@ -220,7 +230,16 @@ class MessagePreProcessor
             try {
                 $result = $this->transcribeWithWhisper($fullPath, $message->getLanguage());
                 if ($result && !empty($result['text'])) {
-                    $message->setFileText($result['text']);
+                    $transcribedText = $result['text'];
+                    $message->setFileText($transcribedText);
+
+                    // Update message text for better classification
+                    // If message text is placeholder like '[Audio message]', replace it with transcription
+                    $currentText = $message->getText();
+                    if (empty($currentText) || '[Audio message]' === $currentText || '[Audio]' === $currentText) {
+                        $message->setText($transcribedText);
+                        $this->logger->info('PreProcessor: Replaced placeholder text with transcription for better classification');
+                    }
 
                     // Update detected language if different
                     if ('unknown' !== $result['language'] && $result['language'] !== $message->getLanguage()) {
@@ -228,7 +247,7 @@ class MessagePreProcessor
                     }
 
                     $this->logger->info('PreProcessor: Audio transcribed successfully', [
-                        'text_length' => strlen($result['text']),
+                        'text_length' => strlen($transcribedText),
                         'detected_language' => $result['language'],
                         'duration' => $result['duration'].'s',
                     ]);
