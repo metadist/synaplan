@@ -41,7 +41,7 @@ class FileProcessor
     ];
 
     private const AUDIO_EXTENSIONS = [
-        'ogg', 'mp3', 'wav', 'm4a', 'opus', 'flac', 'webm', 'aac', 'wma',
+        'ogg', 'mp3', 'wav', 'm4a', 'opus', 'flac', 'webm', 'aac', 'wma', 'amr',
         'mp4', 'avi', 'mov', 'mkv', 'mpeg', 'mpg',
     ];
 
