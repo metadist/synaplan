@@ -20,6 +20,11 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
  */
 class MessagePreProcessor
 {
+    // Supported file types for preprocessing
+    public const DOCUMENT_EXTENSIONS = ['pdf', 'docx', 'doc', 'xlsx', 'xls', 'pptx', 'txt'];
+    public const AUDIO_EXTENSIONS = ['ogg', 'mp3', 'wav', 'm4a', 'opus', 'flac', 'webm'];
+    public const IMAGE_EXTENSIONS = ['jpg', 'jpeg', 'png', 'webp', 'gif'];
+
     public function __construct(
         private MessageRepository $messageRepository,
         private HttpClientInterface $httpClient,
@@ -69,7 +74,7 @@ class MessagePreProcessor
                     'filename' => $messageFile->getFileName(),
                 ]);
 
-                $this->processMessageFile($messageFile);
+                $this->processMessageFile($messageFile, $message);
                 ++$processed;
                 $this->notify($progressCallback, 'preprocessing', "Processed $processed/{$messageFiles->count()} files");
             }
@@ -91,7 +96,7 @@ class MessagePreProcessor
     /**
      * Process a File entity (NEW: multiple files support).
      */
-    private function processMessageFile(File $messageFile): void
+    private function processMessageFile(File $messageFile, Message $message): void
     {
         $filePath = $messageFile->getFilePath();
         $fileType = strtolower($messageFile->getFileType());
@@ -112,7 +117,7 @@ class MessagePreProcessor
         ]);
 
         // Parse File mit Tika (für PDFs, DOCX, etc.)
-        if (in_array($fileType, ['pdf', 'docx', 'doc', 'xlsx', 'xls', 'pptx', 'txt'])) {
+        if (in_array($fileType, self::DOCUMENT_EXTENSIONS)) {
             $text = $this->parseWithTika($fullPath);
             if ($text) {
                 $messageFile->setFileText($text);
@@ -125,15 +130,25 @@ class MessagePreProcessor
         }
 
         // Audio mit Whisper
-        elseif (in_array($fileType, ['ogg', 'mp3', 'wav', 'm4a', 'opus', 'flac', 'webm'])) {
+        elseif (in_array($fileType, self::AUDIO_EXTENSIONS)) {
             try {
                 $result = $this->transcribeWithWhisper($fullPath, null);
                 if ($result && !empty($result['text'])) {
-                    $messageFile->setFileText($result['text']);
+                    $transcribedText = $result['text'];
+                    $messageFile->setFileText($transcribedText);
                     $messageFile->setStatus('processed');
+
+                    // Update message text for better classification
+                    // If message text is placeholder like '[Audio message]', replace it with transcription
+                    $currentText = $message->getText();
+                    if (empty($currentText) || '[Audio message]' === $currentText || '[Audio]' === $currentText) {
+                        $message->setText($transcribedText);
+                        $this->logger->info('PreProcessor: Replaced placeholder text with transcription for better classification');
+                    }
+
                     $this->logger->info('PreProcessor: Audio transcribed', [
                         'file_id' => $messageFile->getId(),
-                        'text_length' => strlen($result['text']),
+                        'text_length' => strlen($transcribedText),
                         'language' => $result['language'],
                     ]);
                 }
@@ -147,7 +162,7 @@ class MessagePreProcessor
         }
 
         // Image mit Vision AI
-        elseif (in_array($fileType, ['jpg', 'jpeg', 'png', 'webp', 'gif'])) {
+        elseif (in_array($fileType, self::IMAGE_EXTENSIONS)) {
             try {
                 // Use file owner as context for Vision AI
                 $userId = $messageFile->getUserId() ?? 0;
@@ -187,7 +202,7 @@ class MessagePreProcessor
         }
 
         // Parse File mit Tika (für PDFs, DOCX, etc.)
-        if (in_array($fileType, ['pdf', 'docx', 'doc', 'xlsx', 'xls', 'pptx', 'txt'])) {
+        if (in_array($fileType, self::DOCUMENT_EXTENSIONS)) {
             $this->logger->info('PreProcessor: Parsing document with Tika', [
                 'file' => basename($fullPath),
                 'type' => $fileType,
@@ -203,7 +218,7 @@ class MessagePreProcessor
         }
 
         // Audio mit Whisper
-        if (in_array($fileType, ['ogg', 'mp3', 'wav', 'm4a', 'opus', 'flac', 'webm'])) {
+        if (in_array($fileType, self::AUDIO_EXTENSIONS)) {
             if (!$this->whisperService->isAvailable()) {
                 $this->logger->warning('PreProcessor: Whisper not available, skipping audio transcription', [
                     'file' => basename($fullPath),
@@ -220,7 +235,16 @@ class MessagePreProcessor
             try {
                 $result = $this->transcribeWithWhisper($fullPath, $message->getLanguage());
                 if ($result && !empty($result['text'])) {
-                    $message->setFileText($result['text']);
+                    $transcribedText = $result['text'];
+                    $message->setFileText($transcribedText);
+
+                    // Update message text for better classification
+                    // If message text is placeholder like '[Audio message]', replace it with transcription
+                    $currentText = $message->getText();
+                    if (empty($currentText) || '[Audio message]' === $currentText || '[Audio]' === $currentText) {
+                        $message->setText($transcribedText);
+                        $this->logger->info('PreProcessor: Replaced placeholder text with transcription for better classification');
+                    }
 
                     // Update detected language if different
                     if ('unknown' !== $result['language'] && $result['language'] !== $message->getLanguage()) {
@@ -228,7 +252,7 @@ class MessagePreProcessor
                     }
 
                     $this->logger->info('PreProcessor: Audio transcribed successfully', [
-                        'text_length' => strlen($result['text']),
+                        'text_length' => strlen($transcribedText),
                         'detected_language' => $result['language'],
                         'duration' => $result['duration'].'s',
                     ]);
@@ -243,7 +267,7 @@ class MessagePreProcessor
         }
 
         // Image mit Vision AI (wenn Tika nichts extrahiert hat)
-        if (in_array($fileType, ['jpg', 'jpeg', 'png', 'webp', 'gif'])) {
+        if (in_array($fileType, self::IMAGE_EXTENSIONS)) {
             $this->logger->info('PreProcessor: Processing image with Vision AI', [
                 'file' => basename($fullPath),
                 'type' => $fileType,

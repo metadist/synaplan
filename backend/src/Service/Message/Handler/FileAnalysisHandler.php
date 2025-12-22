@@ -5,6 +5,7 @@ namespace App\Service\Message\Handler;
 use App\AI\Service\AiFacade;
 use App\Entity\File;
 use App\Entity\Message;
+use App\Service\Message\MessagePreProcessor;
 use App\Service\ModelConfigService;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\DependencyInjection\Attribute\AutoconfigureTag;
@@ -15,12 +16,13 @@ use Symfony\Component\DependencyInjection\Attribute\AutoconfigureTag;
  * Handles file analysis requests:
  * - For documents (PDF, DOCX, etc.) with pre-extracted text: Uses Chat AI
  * - For images without extracted text: Uses Vision AI
+ * - For audio files: Requires pre-transcribed text from PreProcessor
+ *
+ * Note: File type extensions are defined in MessagePreProcessor to avoid duplication.
  */
 #[AutoconfigureTag('app.message.handler')]
 class FileAnalysisHandler implements MessageHandlerInterface
 {
-    private const IMAGE_EXTENSIONS = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'tiff', 'svg'];
-
     public function __construct(
         private AiFacade $aiFacade,
         private ModelConfigService $modelConfigService,
@@ -68,16 +70,65 @@ class FileAnalysisHandler implements MessageHandlerInterface
             'has_extracted_text' => !empty($fileInfo['text']),
             'extracted_text_length' => strlen($fileInfo['text'] ?? ''),
             'is_image' => $fileInfo['is_image'],
+            'is_audio' => $fileInfo['is_audio'],
+            'is_document' => $fileInfo['is_document'],
         ]);
 
-        // Decision: Use Chat AI for documents with extracted text, Vision AI for images
-        if (!$fileInfo['is_image'] && !empty($fileInfo['text'])) {
-            // Document with pre-extracted text → Use Chat Model
-            return $this->handleWithChatModel($message, $fileInfo, $userPrompt, $classification, $progressCallback);
-        } else {
-            // Image or document without text → Use Vision Model
+        // Decision logic (explicit and ordered by priority):
+        // 1. Audio files: Must have transcribed text from PreProcessor
+        if ($fileInfo['is_audio']) {
+            if (!empty($fileInfo['text'])) {
+                // Audio with transcription → Use Chat Model
+                return $this->handleWithChatModel($message, $fileInfo, $userPrompt, $classification, $progressCallback);
+            } else {
+                // Audio without transcription → Error
+                $this->logger->error('FileAnalysisHandler: Audio file without transcription', [
+                    'file_id' => $fileInfo['id'],
+                    'file_name' => $fileInfo['name'],
+                ]);
+
+                return [
+                    'content' => 'Audio transcription failed or is not yet available. Please try again in a moment.',
+                    'metadata' => ['error' => 'audio_not_transcribed'],
+                ];
+            }
+        }
+
+        // 2. Documents (PDF, DOCX, etc.): Must have extracted text from PreProcessor
+        if ($fileInfo['is_document']) {
+            if (!empty($fileInfo['text'])) {
+                // Document with extracted text → Use Chat Model
+                return $this->handleWithChatModel($message, $fileInfo, $userPrompt, $classification, $progressCallback);
+            } else {
+                // Document without extracted text → Error
+                $this->logger->error('FileAnalysisHandler: Document without extracted text', [
+                    'file_id' => $fileInfo['id'],
+                    'file_name' => $fileInfo['name'],
+                    'file_type' => $fileInfo['type'],
+                ]);
+
+                return [
+                    'content' => 'Document text extraction failed. The document may be empty, corrupted, or in an unsupported format.',
+                    'metadata' => ['error' => 'document_extraction_failed'],
+                ];
+            }
+        }
+
+        // 3. Images → Use Vision Model
+        if ($fileInfo['is_image']) {
             return $this->handleWithVisionModel($message, $fileInfo, $userPrompt, $classification, $progressCallback);
         }
+
+        // 4. Other files → Error
+        $this->logger->warning('FileAnalysisHandler: Unsupported file type', [
+            'file_type' => $fileInfo['type'],
+            'file_name' => $fileInfo['name'],
+        ]);
+
+        return [
+            'content' => 'This file type cannot be analyzed. Supported types include documents (such as PDF, Word, Excel), images (such as JPG, PNG, GIF), and audio files (such as MP3, OGG, WAV).',
+            'metadata' => ['error' => 'unsupported_file_type'],
+        ];
     }
 
     /**
@@ -117,16 +168,68 @@ class FileAnalysisHandler implements MessageHandlerInterface
             'has_extracted_text' => !empty($fileInfo['text']),
             'extracted_text_length' => strlen($fileInfo['text'] ?? ''),
             'is_image' => $fileInfo['is_image'],
+            'is_audio' => $fileInfo['is_audio'],
+            'is_document' => $fileInfo['is_document'],
         ]);
 
-        // Decision: Use Chat AI for documents with extracted text, Vision AI for images
-        if (!$fileInfo['is_image'] && !empty($fileInfo['text'])) {
-            // Document with pre-extracted text → Use Chat Model with streaming
-            return $this->handleStreamWithChatModel($message, $fileInfo, $userPrompt, $classification, $streamCallback, $progressCallback, $options);
-        } else {
-            // Image or document without text → Use Vision Model (non-streaming, then output)
+        // Decision logic (explicit and ordered by priority):
+        // 1. Audio files: Must have transcribed text from PreProcessor
+        if ($fileInfo['is_audio']) {
+            if (!empty($fileInfo['text'])) {
+                // Audio with transcription → Use Chat Model
+                return $this->handleStreamWithChatModel($message, $fileInfo, $userPrompt, $classification, $streamCallback, $progressCallback, $options);
+            } else {
+                // Audio without transcription → Error
+                $this->logger->error('FileAnalysisHandler: Audio file without transcription (streaming)', [
+                    'file_id' => $fileInfo['id'],
+                    'file_name' => $fileInfo['name'],
+                ]);
+
+                $streamCallback('Audio transcription failed or is not yet available. Please try again in a moment.');
+
+                return [
+                    'metadata' => ['error' => 'audio_not_transcribed'],
+                ];
+            }
+        }
+
+        // 2. Documents (PDF, DOCX, etc.): Must have extracted text from PreProcessor
+        if ($fileInfo['is_document']) {
+            if (!empty($fileInfo['text'])) {
+                // Document with extracted text → Use Chat Model with streaming
+                return $this->handleStreamWithChatModel($message, $fileInfo, $userPrompt, $classification, $streamCallback, $progressCallback, $options);
+            } else {
+                // Document without extracted text → Error
+                $this->logger->error('FileAnalysisHandler: Document without extracted text (streaming)', [
+                    'file_id' => $fileInfo['id'],
+                    'file_name' => $fileInfo['name'],
+                    'file_type' => $fileInfo['type'],
+                ]);
+
+                $streamCallback('Document text extraction failed. The document may be empty, corrupted, or in an unsupported format.');
+
+                return [
+                    'metadata' => ['error' => 'document_extraction_failed'],
+                ];
+            }
+        }
+
+        // 3. Images → Use Vision Model (non-streaming, then output)
+        if ($fileInfo['is_image']) {
             return $this->handleStreamWithVisionModel($message, $fileInfo, $userPrompt, $classification, $streamCallback, $progressCallback);
         }
+
+        // 4. Other files → Error
+        $this->logger->warning('FileAnalysisHandler: Unsupported file type (streaming)', [
+            'file_type' => $fileInfo['type'],
+            'file_name' => $fileInfo['name'],
+        ]);
+
+        $streamCallback('This file type cannot be analyzed. Supported types include documents (such as PDF, Word, Excel), images (such as JPG, PNG, GIF), and audio files (such as MP3, OGG, WAV).');
+
+        return [
+            'metadata' => ['error' => 'unsupported_file_type'],
+        ];
     }
 
     /**
@@ -154,7 +257,9 @@ class FileAnalysisHandler implements MessageHandlerInterface
         $finalPrompt = !empty($userPrompt) ? $userPrompt : 'What is in this document? Please summarize the content.';
 
         // Get Chat model (not Vision model!)
-        $modelId = $classification['model_id'] ?? $this->modelConfigService->getDefaultModel('CHAT', $message->getUserId());
+        // Use effectiveUserId for model selection (WhatsApp anonymous → User 2)
+        $effectiveUserId = $this->modelConfigService->getEffectiveUserIdForMessage($message);
+        $modelId = $classification['model_id'] ?? $this->modelConfigService->getDefaultModel('CHAT', $effectiveUserId);
         $provider = null;
         $modelName = null;
 
@@ -167,6 +272,8 @@ class FileAnalysisHandler implements MessageHandlerInterface
             'model_id' => $modelId,
             'provider' => $provider,
             'model' => $modelName,
+            'user_id' => $message->getUserId(),
+            'effective_user_id' => $effectiveUserId,
         ]);
 
         try {
@@ -255,6 +362,8 @@ class FileAnalysisHandler implements MessageHandlerInterface
             'model_id' => $modelId,
             'provider' => $provider,
             'model' => $modelName,
+            'user_id' => $message->getUserId(),
+            'effective_user_id' => $effectiveUserId,
         ]);
 
         try {
@@ -347,6 +456,8 @@ class FileAnalysisHandler implements MessageHandlerInterface
             'model_id' => $modelId,
             'provider' => $provider,
             'model' => $modelName,
+            'user_id' => $message->getUserId(),
+            'effective_user_id' => $effectiveUserId,
         ]);
 
         try {
@@ -425,7 +536,9 @@ class FileAnalysisHandler implements MessageHandlerInterface
             $file = $files->first();
 
             $fileType = strtolower($file->getFileType());
-            $isImage = in_array($fileType, self::IMAGE_EXTENSIONS, true);
+            $isImage = in_array($fileType, MessagePreProcessor::IMAGE_EXTENSIONS, true);
+            $isAudio = in_array($fileType, MessagePreProcessor::AUDIO_EXTENSIONS, true);
+            $isDocument = in_array($fileType, MessagePreProcessor::DOCUMENT_EXTENSIONS, true);
 
             // Normalize path
             $filePath = $file->getFilePath();
@@ -440,6 +553,8 @@ class FileAnalysisHandler implements MessageHandlerInterface
                 'path' => $filePath,
                 'text' => $file->getFileText(), // Pre-extracted text!
                 'is_image' => $isImage,
+                'is_audio' => $isAudio,
+                'is_document' => $isDocument,
             ];
         }
 
@@ -447,7 +562,9 @@ class FileAnalysisHandler implements MessageHandlerInterface
         $filePath = $message->getFilePath();
         if ($filePath) {
             $extension = strtolower(pathinfo($filePath, PATHINFO_EXTENSION));
-            $isImage = in_array($extension, self::IMAGE_EXTENSIONS, true);
+            $isImage = in_array($extension, MessagePreProcessor::IMAGE_EXTENSIONS, true);
+            $isAudio = in_array($extension, MessagePreProcessor::AUDIO_EXTENSIONS, true);
+            $isDocument = in_array($extension, MessagePreProcessor::DOCUMENT_EXTENSIONS, true);
 
             // Normalize path
             if (!str_starts_with($filePath, 'uploads/') && str_contains($filePath, '/uploads/')) {
@@ -459,8 +576,10 @@ class FileAnalysisHandler implements MessageHandlerInterface
                 'name' => basename($filePath),
                 'type' => $extension,
                 'path' => $filePath,
-                'text' => '', // No pre-extracted text for legacy
+                'text' => $message->getFileText() ?: '', // Get text from message for legacy
                 'is_image' => $isImage,
+                'is_audio' => $isAudio,
+                'is_document' => $isDocument,
             ];
         }
 
