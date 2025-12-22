@@ -1,7 +1,7 @@
 ---
 name: Bug
 about: Something is broken
-title: "area: <short summary>"
+title: "<Area>: <short summary>"
 labels: []
 assignees: ""
 type: "Bug"
