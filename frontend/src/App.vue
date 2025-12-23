@@ -73,8 +73,9 @@ const observer = new MutationObserver((mutations) => {
   const badgeAdded = mutations.some((mutation) => {
     return Array.from(mutation.addedNodes).some((node) => {
       if (node instanceof HTMLElement) {
-        return node.classList?.contains('grecaptcha-badge') ||
-               node.querySelector?.('.grecaptcha-badge')
+        return (
+          node.classList?.contains('grecaptcha-badge') || node.querySelector?.('.grecaptcha-badge')
+        )
       }
       return false
     })

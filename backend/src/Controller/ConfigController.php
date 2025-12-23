@@ -34,7 +34,7 @@ class ConfigController extends AbstractController
 
     /**
      * Get public runtime configuration (no auth required)
-     * Used by frontend to get reCAPTCHA site key and other public settings
+     * Used by frontend to get reCAPTCHA site key and other public settings.
      */
     #[Route('/runtime', name: 'runtime_config', methods: ['GET'])]
     #[OA\Get(
