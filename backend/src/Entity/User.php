@@ -198,10 +198,18 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     }
 
     /**
+     * Cached OIDC role mapping (parsed once per request lifecycle).
+     *
+     * @var array<string, string>|null
+     */
+    private static ?array $cachedRoleMapping = null;
+
+    /**
      * Map OIDC provider roles to Symfony roles.
      *
      * Configurable via OIDC_ROLE_MAPPING environment variable.
      * Default mapping handles common Keycloak roles.
+     * Mapping is cached as static property to avoid re-parsing on multiple getRoles() calls.
      *
      * @param array<string> $oidcRoles Roles from realm_access or resource_access
      *
@@ -209,27 +217,30 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
      */
     private function mapOidcRolesToSymfonyRoles(array $oidcRoles): array
     {
-        // Default mapping (can be overridden via env)
-        $defaultMapping = [
-            'admin' => 'ROLE_ADMIN',
-            'realm-admin' => 'ROLE_ADMIN',
-            'synaplan-admin' => 'ROLE_ADMIN',
-            'administrator' => 'ROLE_ADMIN',
-            'pro-user' => 'ROLE_PRO',
-            'pro' => 'ROLE_PRO',
-            'business-user' => 'ROLE_BUSINESS',
-            'business' => 'ROLE_BUSINESS',
-        ];
+        // Cache the role mapping to avoid re-parsing env var on every call
+        if (null === self::$cachedRoleMapping) {
+            // Default mapping (can be overridden via env)
+            self::$cachedRoleMapping = [
+                'admin' => 'ROLE_ADMIN',
+                'realm-admin' => 'ROLE_ADMIN',
+                'synaplan-admin' => 'ROLE_ADMIN',
+                'administrator' => 'ROLE_ADMIN',
+                'pro-user' => 'ROLE_PRO',
+                'pro' => 'ROLE_PRO',
+                'business-user' => 'ROLE_BUSINESS',
+                'business' => 'ROLE_BUSINESS',
+            ];
 
-        // Load custom mapping from env if provided
-        // Format: OIDC_ROLE_MAPPING="keycloak_role:SYMFONY_ROLE,another:ROLE_OTHER"
-        $envMapping = $_ENV['OIDC_ROLE_MAPPING'] ?? '';
-        if (!empty($envMapping)) {
-            $pairs = explode(',', $envMapping);
-            foreach ($pairs as $pair) {
-                $parts = explode(':', trim($pair));
-                if (2 === count($parts)) {
-                    $defaultMapping[strtolower(trim($parts[0]))] = trim($parts[1]);
+            // Load custom mapping from env if provided
+            // Format: OIDC_ROLE_MAPPING="keycloak_role:SYMFONY_ROLE,another:ROLE_OTHER"
+            $envMapping = $_ENV['OIDC_ROLE_MAPPING'] ?? '';
+            if (!empty($envMapping)) {
+                $pairs = explode(',', $envMapping);
+                foreach ($pairs as $pair) {
+                    $parts = explode(':', trim($pair));
+                    if (2 === count($parts)) {
+                        self::$cachedRoleMapping[strtolower(trim($parts[0]))] = trim($parts[1]);
+                    }
                 }
             }
         }
@@ -237,8 +248,8 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
         $mappedRoles = [];
         foreach ($oidcRoles as $oidcRole) {
             $roleLower = strtolower($oidcRole);
-            if (isset($defaultMapping[$roleLower])) {
-                $mappedRoles[] = $defaultMapping[$roleLower];
+            if (isset(self::$cachedRoleMapping[$roleLower])) {
+                $mappedRoles[] = self::$cachedRoleMapping[$roleLower];
             }
         }
 

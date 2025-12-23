@@ -77,11 +77,10 @@ onMounted(async () => {
 
     if (oidcConfig.success) {
       oidcAvailable.value = true
-      console.log('✅ OIDC/Keycloak available:', oidcConfig.issuer)
     }
   } catch (e) {
-    // OIDC not configured - that's fine, just hide the button
-    console.log('ℹ️ OIDC not configured (button will be hidden)')
+    // OIDC not configured - button will be hidden
+    oidcAvailable.value = false
   }
 })
 

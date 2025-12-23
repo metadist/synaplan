@@ -93,7 +93,9 @@ class JwtValidator
         } catch (\Exception $e) {
             $this->logger->error('JWT validation error', [
                 'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
+                'jwks_uri' => $jwksUri,
+                'expected_issuer' => $expectedIssuer,
+                // Note: Do NOT log token or stack trace - may expose sensitive data
             ]);
 
             return null;
