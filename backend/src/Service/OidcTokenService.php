@@ -137,18 +137,19 @@ class OidcTokenService
      *
      * Performance improvement: ~50-200ms → <5ms (no HTTP call!)
      * Security improvement: Cryptographic signature verification
+     *
      */
     public function validateOidcToken(string $accessToken, string $provider = 'keycloak'): ?array
     {
         try {
             $discovery = $this->getDiscoveryConfig($provider);
 
-            // Validate JWT signature + claims
+            // Validate JWT signature + claims (no audience check for Keycloak compatibility)
             $claims = $this->jwtValidator->validateToken(
                 token: $accessToken,
                 jwksUri: $discovery['jwks_uri'],
                 expectedIssuer: $discovery['issuer'],
-                expectedAudience: $this->oidcClientId, // Optional: verify audience
+                expectedAudience: null, // Skip audience check (Keycloak sends "account", not client_id)
             );
 
             if (!$claims) {
