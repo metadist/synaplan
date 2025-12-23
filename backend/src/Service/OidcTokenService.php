@@ -137,7 +137,6 @@ class OidcTokenService
      *
      * Performance improvement: ~50-200ms → <5ms (no HTTP call!)
      * Security improvement: Cryptographic signature verification
-     *
      */
     public function validateOidcToken(string $accessToken, string $provider = 'keycloak'): ?array
     {
