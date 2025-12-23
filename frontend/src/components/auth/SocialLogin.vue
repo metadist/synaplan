@@ -32,6 +32,21 @@
       <span>{{ $t('auth.loginWithGitHub') }}</span>
     </button>
 
+    <!-- Keycloak/OIDC Login (dynamically loaded) -->
+    <button
+      v-if="oidcAvailable"
+      class="btn-social btn-keycloak"
+      :disabled="loading"
+      @click="loginWithKeycloak"
+    >
+      <svg class="icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" fill="currentColor">
+        <path
+          d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"
+        />
+      </svg>
+      <span>{{ $t('auth.loginWithKeycloak') }}</span>
+    </button>
+
     <div v-if="error" class="error-message">
       {{ error }}
     </div>
@@ -39,16 +54,36 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useConfigStore } from '@/stores/config'
+import { httpClient } from '@/services/api/httpClient'
+import { GetApiOidcDiscoveryResponseSchema } from '@/generated/api-schemas'
 
 const { t } = useI18n()
 const loading = ref(false)
 const error = ref<string | null>(null)
+const oidcAvailable = ref(false)
 
 const config = useConfigStore()
 const API_BASE_URL = config.appBaseUrl
+
+// Check if OIDC/Keycloak is configured
+onMounted(async () => {
+  try {
+    const oidcConfig = await httpClient('/api/v1/oidc/discovery', {
+      schema: GetApiOidcDiscoveryResponseSchema,
+    })
+
+    if (oidcConfig.success) {
+      oidcAvailable.value = true
+      console.log('✅ OIDC/Keycloak available:', oidcConfig.issuer)
+    }
+  } catch (e) {
+    // OIDC not configured - that's fine, just hide the button
+    console.log('ℹ️ OIDC not configured (button will be hidden)')
+  }
+})
 
 const loginWithGoogle = () => {
   try {
@@ -70,6 +105,19 @@ const loginWithGitHub = () => {
 
     // Redirect to GitHub OAuth
     window.location.href = `${API_BASE_URL}/api/v1/auth/github/login`
+  } catch (e: any) {
+    error.value = e.message || t('auth.socialLoginError')
+    loading.value = false
+  }
+}
+
+const loginWithKeycloak = () => {
+  try {
+    loading.value = true
+    error.value = null
+
+    // Redirect to Keycloak OIDC login (with PKCE)
+    window.location.href = `${API_BASE_URL}/api/v1/auth/keycloak/login`
   } catch (e: any) {
     error.value = e.message || t('auth.socialLoginError')
     loading.value = false
@@ -135,6 +183,16 @@ const loginWithGitHub = () => {
 
 .btn-github:hover:not(:disabled) {
   background: #24292e;
+  color: white;
+}
+
+.btn-keycloak {
+  border-color: #0080ff;
+  color: #0080ff;
+}
+
+.btn-keycloak:hover:not(:disabled) {
+  background: #0080ff;
   color: white;
 }
 

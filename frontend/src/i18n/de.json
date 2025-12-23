@@ -1163,6 +1163,7 @@
     "accountReady": "Dein Konto ist einsatzbereit",
     "loginWithGoogle": "Mit Google anmelden",
     "loginWithGitHub": "Mit GitHub anmelden",
+    "loginWithKeycloak": "Mit Keycloak anmelden",
     "socialLoginError": "Social Login fehlgeschlagen. Bitte versuche es erneut.",
     "oauthCallbackProcessing": "Login wird verarbeitet...",
     "noSocialProviders": "Keine Social Login Anbieter konfiguriert",
