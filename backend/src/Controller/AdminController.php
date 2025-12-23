@@ -8,6 +8,7 @@ use App\Repository\PromptRepository;
 use App\Repository\UseLogRepository;
 use App\Repository\UserRepository;
 use App\Service\UsageStatsService;
+use App\Service\UserDeletionService;
 use Doctrine\ORM\EntityManagerInterface;
 use OpenApi\Attributes as OA;
 use Psr\Log\LoggerInterface;
@@ -28,6 +29,7 @@ class AdminController extends AbstractController
         private PromptRepository $promptRepository,
         private UseLogRepository $useLogRepository,
         private UsageStatsService $usageStatsService,
+        private UserDeletionService $userDeletionService,
         private LoggerInterface $logger,
     ) {
     }
@@ -284,17 +286,27 @@ class AdminController extends AbstractController
             return $this->json(['error' => 'User not found'], Response::HTTP_NOT_FOUND);
         }
 
-        $email = $targetUser->getMail();
-        $this->em->remove($targetUser);
-        $this->em->flush();
-
-        $this->logger->info('Admin deleted user', [
+        $this->logger->info('Admin initiated user deletion', [
             'admin_id' => $user->getId(),
-            'deleted_user_id' => $id,
-            'deleted_email' => $email,
+            'target_user_id' => $id,
+            'target_email' => $targetUser->getMail(),
         ]);
 
-        return $this->json(['success' => true, 'message' => 'User deleted']);
+        try {
+            $this->userDeletionService->deleteUser($targetUser);
+
+            return $this->json(['success' => true, 'message' => 'User deleted']);
+        } catch (\Throwable $e) {
+            $this->logger->error('Admin user deletion failed', [
+                'admin_id' => $user->getId(),
+                'target_user_id' => $id,
+                'exception' => $e,
+            ]);
+
+            return $this->json([
+                'error' => 'Failed to delete user. Please contact support.',
+            ], Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
     }
 
     /**

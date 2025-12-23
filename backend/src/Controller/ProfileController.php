@@ -3,19 +3,8 @@
 namespace App\Controller;
 
 use App\Entity\User;
-use App\Repository\ApiKeyRepository;
-use App\Repository\ChatRepository;
-use App\Repository\EmailVerificationAttemptRepository;
-use App\Repository\FileRepository;
-use App\Repository\InboundEmailHandlerRepository;
-use App\Repository\MessageRepository;
-use App\Repository\RagDocumentRepository;
-use App\Repository\SessionRepository;
-use App\Repository\TokenRepository;
-use App\Repository\UseLogRepository;
-use App\Repository\VerificationTokenRepository;
-use App\Repository\WidgetRepository;
 use App\Service\EmailChatService;
+use App\Service\UserDeletionService;
 use Doctrine\ORM\EntityManagerInterface;
 use OpenApi\Attributes as OA;
 use Psr\Log\LoggerInterface;
@@ -35,19 +24,8 @@ class ProfileController extends AbstractController
         private EntityManagerInterface $em,
         private UserPasswordHasherInterface $passwordHasher,
         private EmailChatService $emailChatService,
+        private UserDeletionService $userDeletionService,
         private LoggerInterface $logger,
-        private VerificationTokenRepository $verificationTokenRepository,
-        private TokenRepository $tokenRepository,
-        private ApiKeyRepository $apiKeyRepository,
-        private SessionRepository $sessionRepository,
-        private RagDocumentRepository $ragDocumentRepository,
-        private UseLogRepository $useLogRepository,
-        private WidgetRepository $widgetRepository,
-        private ChatRepository $chatRepository,
-        private MessageRepository $messageRepository,
-        private EmailVerificationAttemptRepository $emailVerificationAttemptRepository,
-        private FileRepository $fileRepository,
-        private InboundEmailHandlerRepository $inboundEmailHandlerRepository,
     ) {
     }
 
@@ -518,108 +496,23 @@ class ProfileController extends AbstractController
         }
 
         // Log account deletion
-        $this->logger->info('User account deletion initiated', [
+        $this->logger->info('User self-deletion initiated', [
             'user_id' => $user->getId(),
             'email' => $user->getMail(),
             'type' => $user->getType(),
         ]);
 
-        $userId = $user->getId();
-
         try {
-            // Delete all related entities to avoid foreign key constraint violations
-
-            // 1. Delete verification tokens
-            $verificationTokens = $this->verificationTokenRepository->findBy(['userId' => $userId]);
-            foreach ($verificationTokens as $token) {
-                $this->em->remove($token);
-            }
-
-            // 2. Delete authentication tokens
-            $tokens = $this->tokenRepository->findBy(['userId' => $userId]);
-            foreach ($tokens as $token) {
-                $this->em->remove($token);
-            }
-
-            // 3. Delete API keys
-            $apiKeys = $this->apiKeyRepository->findBy(['ownerId' => $userId]);
-            foreach ($apiKeys as $apiKey) {
-                $this->em->remove($apiKey);
-            }
-
-            // 4. Delete sessions
-            $sessions = $this->sessionRepository->findBy(['userId' => $userId]);
-            foreach ($sessions as $session) {
-                $this->em->remove($session);
-            }
-
-            // 5. Delete RAG documents
-            $ragDocs = $this->ragDocumentRepository->findBy(['userId' => $userId]);
-            foreach ($ragDocs as $ragDoc) {
-                $this->em->remove($ragDoc);
-            }
-
-            // 6. Delete use logs
-            $useLogs = $this->useLogRepository->findBy(['userId' => $userId]);
-            foreach ($useLogs as $useLog) {
-                $this->em->remove($useLog);
-            }
-
-            // 7. Delete widgets
-            $widgets = $this->widgetRepository->findBy(['ownerId' => $userId]);
-            foreach ($widgets as $widget) {
-                $this->em->remove($widget);
-            }
-
-            // 8. Delete chats (this will cascade to messages)
-            $chats = $this->chatRepository->findBy(['userId' => $userId]);
-            foreach ($chats as $chat) {
-                $this->em->remove($chat);
-            }
-
-            // 9. Delete messages (in case there are orphaned messages)
-            $messages = $this->messageRepository->findBy(['userId' => $userId]);
-            foreach ($messages as $message) {
-                $this->em->remove($message);
-            }
-
-            // 10. Delete email verification attempts
-            $emailAttempts = $this->emailVerificationAttemptRepository->findBy(['email' => $user->getMail()]);
-            foreach ($emailAttempts as $attempt) {
-                $this->em->remove($attempt);
-            }
-
-            // 11. Delete files
-            $files = $this->fileRepository->findBy(['userId' => $userId]);
-            foreach ($files as $file) {
-                // TODO: Also delete physical files from storage
-                $this->em->remove($file);
-            }
-
-            // 12. Delete inbound email handlers
-            $emailHandlers = $this->inboundEmailHandlerRepository->findBy(['userId' => $userId]);
-            foreach ($emailHandlers as $handler) {
-                $this->em->remove($handler);
-            }
-
-            // Finally, delete the user account
-            $this->em->remove($user);
-            $this->em->flush();
-
-            $this->logger->info('User account and all related data deleted successfully', [
-                'user_id' => $userId,
-                'email' => $user->getMail(),
-            ]);
+            $this->userDeletionService->deleteUser($user);
 
             return $this->json([
                 'success' => true,
                 'message' => 'Account deleted successfully',
             ]);
-        } catch (\Exception $e) {
-            $this->logger->error('Failed to delete user account', [
-                'user_id' => $userId,
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
+        } catch (\Throwable $e) {
+            $this->logger->error('User self-deletion failed', [
+                'user_id' => $user->getId(),
+                'exception' => $e,
             ]);
 
             return $this->json([
