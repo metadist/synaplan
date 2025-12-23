@@ -126,7 +126,8 @@ class RagDocumentRepository extends ServiceEntityRepository
         ';
 
         $stmt = $conn->prepare($sql);
-        $result = $stmt->executeQuery(['userId' => $userId]);
+        $stmt->bindValue('userId', $userId);
+        $result = $stmt->executeQuery();
 
         return $result->fetchAllAssociative();
     }

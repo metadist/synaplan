@@ -56,6 +56,10 @@
         "symfony/twig-bundle": "7.3.*",
         "symfony/validator": "7.3.*",
         "symfony/yaml": "7.3.*",
+        "web-token/jwt-library": "^4.1",
+        "web-token/jwt-signature": "^2.2",
+        "web-token/jwt-signature-algorithm-ecdsa": "^2.2",
+        "web-token/jwt-signature-algorithm-rsa": "^2.1",
         "webklex/php-imap": "^6.2"
     },
     "config": {
