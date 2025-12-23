@@ -7,33 +7,35 @@ import './style.css'
 import App from './App.vue'
 import { useConfigStore } from './stores/config'
 
-const app = createApp(App)
+// Bootstrap app - load config before mounting
+;(async () => {
+  const app = createApp(App)
 
-app.use(createPinia())
-app.use(router)
-app.use(i18n)
+  app.use(createPinia())
+  app.use(router)
+  app.use(i18n)
 
-const config = useConfigStore()
-await config.init()
+  const config = useConfigStore()
+  await config.init()
 
-const recaptchaEnabled = config.recaptcha.enabled
-const recaptchaSiteKey = config.recaptcha.siteKey
+  const recaptchaEnabled = config.recaptcha.enabled
+  const recaptchaSiteKey = config.recaptcha.siteKey
 
-if (recaptchaEnabled && recaptchaSiteKey) {
-  app.use(VueReCaptcha, {
-    siteKey: recaptchaSiteKey,
-    loaderOptions: {
-      autoHideBadge: false,
-      explicitRenderParameters: {
-        badge: 'bottomright',
+  if (recaptchaEnabled && recaptchaSiteKey) {
+    app.use(VueReCaptcha, {
+      siteKey: recaptchaSiteKey,
+      loaderOptions: {
+        autoHideBadge: false,
+        explicitRenderParameters: {
+          badge: 'bottomright',
+        },
       },
-    },
-  })
-  console.log('✅ reCAPTCHA v3 enabled')
+    })
+    console.log('✅ reCAPTCHA v3 enabled')
 
-  const style = document.createElement('style')
-  style.id = 'recaptcha-badge-control'
-  style.textContent = `
+    const style = document.createElement('style')
+    style.id = 'recaptcha-badge-control'
+    style.textContent = `
     .grecaptcha-badge {
       visibility: hidden !important;
       opacity: 0 !important;
@@ -44,9 +46,10 @@ if (recaptchaEnabled && recaptchaSiteKey) {
       opacity: 1 !important;
     }
   `
-  document.head.appendChild(style)
-} else {
-  console.log('ℹ️ reCAPTCHA v3 disabled (not configured on backend)')
-}
+    document.head.appendChild(style)
+  } else {
+    console.log('ℹ️ reCAPTCHA v3 disabled (not configured on backend)')
+  }
 
-app.mount('#app')
+  app.mount('#app')
+})()
