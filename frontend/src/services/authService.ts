@@ -1,11 +1,10 @@
 // synaplan-ui/src/services/authService.ts
 // Cookie-based authentication - no localStorage at all (security)
 import { ref } from 'vue'
-import { useConfigStore } from '@/stores/config'
 import { clearSseToken } from '@/services/api/chatApi'
+import { getApiBaseUrl } from '@/services/api/httpClient'
 
-const config = useConfigStore()
-const API_BASE_URL = config.apiBaseUrl
+const API_BASE_URL = getApiBaseUrl()
 
 // Auth State - only in memory, never in localStorage
 // This prevents manipulation of isAdmin, level, etc.

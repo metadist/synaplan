@@ -4,92 +4,29 @@
  * Centralized configuration management.
  * Configuration is loaded from backend API at runtime (no build-time env vars needed).
  *
- * Plain object for now to avoid Pinia initialization issues when used at module level.
- * Can be converted to Pinia store later when all usage is inside component/function scope.
+ * This is a simple wrapper around httpClient config functions to avoid circular dependency.
  */
 
-import { z } from 'zod'
-import { httpClient } from '@/services/api/httpClient'
-import { GetApiConfigRuntimeConfigResponseSchema } from '@/generated/api-schemas'
-
-// Use generated schema from OpenAPI annotations
-type RuntimeConfig = z.infer<typeof GetApiConfigRuntimeConfigResponseSchema>
-
-let runtimeConfig: RuntimeConfig | null = null
-let configPromise: Promise<RuntimeConfig> | null = null
+import { getConfig, getConfigSync } from '@/services/api/httpClient'
 
 /**
  * Load runtime configuration from backend API
  */
-async function loadRuntimeConfig(): Promise<RuntimeConfig> {
-  // Return cached config if already loaded
-  if (runtimeConfig) {
-    return runtimeConfig
-  }
-
-  // Return existing promise if already loading
-  if (configPromise) {
-    return configPromise
-  }
-
-  // Fetch config from backend with httpClient (skipAuth since no login required)
-  configPromise = (async () => {
-    try {
-      const validated = await httpClient('/api/v1/config/runtime', {
-        skipAuth: true,
-        schema: GetApiConfigRuntimeConfigResponseSchema,
-      })
-      runtimeConfig = validated
-      return validated
-    } catch (error) {
-      console.error('Failed to load runtime config:', error)
-      // Return default config on error
-      const defaultConfig: RuntimeConfig = {
-        recaptcha: {
-          enabled: false,
-          siteKey: '',
-        },
-        features: {
-          help: false,
-        },
-      }
-      runtimeConfig = defaultConfig
-      return defaultConfig
-    } finally {
-      configPromise = null
-    }
-  })()
-
-  return configPromise
+async function loadRuntimeConfig() {
+  return getConfig()
 }
 
 const config = {
-  /**
-   * Application base URL - used for building full URLs (OAuth redirects, share links, etc.)
-   * Empty string = same-origin (frontend and backend served from same domain)
-   * Always normalized (no trailing slash)
-   */
-  appBaseUrl: '',
-
-  /**
-   * API base URL for backend API requests.
-   * Defaults to same as appBaseUrl for same-origin deployments.
-   * For widget embedding, this is typically the full backend URL.
-   * Endpoints include /api/ prefix (e.g., /api/v1/...)
-   * Always normalized (no trailing slash)
-   */
-  apiBaseUrl: '',
-
   /**
    * Google reCAPTCHA v3 configuration
    * Loaded from backend at runtime
    */
   recaptcha: {
     get enabled(): boolean {
-      return runtimeConfig?.recaptcha?.enabled ?? false
+      return getConfigSync().recaptcha?.enabled ?? false
     },
     get siteKey(): string {
-      return runtimeConfig?.recaptcha?.siteKey ?? ''
+      return getConfigSync().recaptcha?.siteKey ?? ''
     },
   },
 
@@ -99,7 +36,7 @@ const config = {
    */
   features: {
     get help(): boolean {
-      return runtimeConfig?.features?.help ?? false
+      return getConfigSync().features?.help ?? false
     },
   },
 
@@ -121,3 +58,5 @@ const config = {
 
 // Alias for backwards compatibility / future Pinia migration
 export const useConfigStore = () => config
+
+export default config
