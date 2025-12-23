@@ -7,7 +7,7 @@
  * This is a simple wrapper around httpClient config functions to avoid circular dependency.
  */
 
-import { getConfig, getConfigSync } from '@/services/api/httpClient'
+import { getConfig, getConfigSync, getApiBaseUrl } from '@/services/api/httpClient'
 
 /**
  * Load runtime configuration from backend API
@@ -17,6 +17,22 @@ async function loadRuntimeConfig() {
 }
 
 const config = {
+  /**
+   * Application base URL - used for building full URLs (OAuth redirects, share links, etc.)
+   * Returns current origin (e.g., https://example.com)
+   */
+  get appBaseUrl(): string {
+    return window.location.origin
+  },
+
+  /**
+   * API base URL for backend API requests
+   * Empty string for same-origin (admin UI), full URL for cross-origin scenarios
+   */
+  get apiBaseUrl(): string {
+    return getApiBaseUrl()
+  },
+
   /**
    * Google reCAPTCHA v3 configuration
    * Loaded from backend at runtime
