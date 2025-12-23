@@ -3,11 +3,11 @@
  * All requests include credentials for HttpOnly cookies
  */
 
-import { useConfigStore } from '@/stores/config'
 import { z } from 'zod'
 
-const config = useConfigStore()
-const API_BASE_URL = config.apiBaseUrl
+// API base URL - empty for same-origin (default), or full URL for widget embedding
+// Note: Don't import from config.ts to avoid circular dependency
+const API_BASE_URL = ''
 
 type ResponseType = 'json' | 'blob' | 'text' | 'arrayBuffer'
 

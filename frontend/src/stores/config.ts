@@ -3,29 +3,23 @@
  *
  * Centralized configuration management.
  * Configuration is loaded from backend API at runtime (no build-time env vars needed).
+ *
+ * Plain object for now to avoid Pinia initialization issues when used at module level.
+ * Can be converted to Pinia store later when all usage is inside component/function scope.
  */
 
 import { z } from 'zod'
+import { httpClient } from '@/services/api/httpClient'
+import { GetApiConfigRuntimeConfigResponseSchema } from '@/generated/api-schemas'
 
-// Runtime config schema based on OpenAPI annotations from ConfigController
-const RuntimeConfigSchema = z.object({
-  recaptcha: z.object({
-    enabled: z.boolean(),
-    siteKey: z.string(),
-  }),
-  features: z.object({
-    help: z.boolean(),
-  }),
-})
-
-type RuntimeConfig = z.infer<typeof RuntimeConfigSchema>
+// Use generated schema from OpenAPI annotations
+type RuntimeConfig = z.infer<typeof GetApiConfigRuntimeConfigResponseSchema>
 
 let runtimeConfig: RuntimeConfig | null = null
 let configPromise: Promise<RuntimeConfig> | null = null
 
 /**
  * Load runtime configuration from backend API
- * Uses fetch directly to avoid circular dependency with httpClient
  */
 async function loadRuntimeConfig(): Promise<RuntimeConfig> {
   // Return cached config if already loaded
@@ -38,21 +32,16 @@ async function loadRuntimeConfig(): Promise<RuntimeConfig> {
     return configPromise
   }
 
-  // Fetch config from backend with Zod validation
-  configPromise = fetch('/api/v1/config/runtime')
-    .then((response) => {
-      if (!response.ok) {
-        throw new Error(`Failed to load runtime config: ${response.status}`)
-      }
-      return response.json()
-    })
-    .then((data) => {
-      // Validate response with Zod schema
-      const validated = RuntimeConfigSchema.parse(data)
+  // Fetch config from backend with httpClient (skipAuth since no login required)
+  configPromise = (async () => {
+    try {
+      const validated = await httpClient('/api/v1/config/runtime', {
+        skipAuth: true,
+        schema: GetApiConfigRuntimeConfigResponseSchema,
+      })
       runtimeConfig = validated
       return validated
-    })
-    .catch((error) => {
+    } catch (error) {
       console.error('Failed to load runtime config:', error)
       // Return default config on error
       const defaultConfig: RuntimeConfig = {
@@ -66,10 +55,10 @@ async function loadRuntimeConfig(): Promise<RuntimeConfig> {
       }
       runtimeConfig = defaultConfig
       return defaultConfig
-    })
-    .finally(() => {
+    } finally {
       configPromise = null
-    })
+    }
+  })()
 
   return configPromise
 }
@@ -97,12 +86,10 @@ const config = {
    */
   recaptcha: {
     get enabled(): boolean {
-      // Return cached value if available (synchronous)
-      return runtimeConfig?.recaptcha.enabled ?? false
+      return runtimeConfig?.recaptcha?.enabled ?? false
     },
     get siteKey(): string {
-      // Return cached value if available (synchronous)
-      return runtimeConfig?.recaptcha.siteKey ?? ''
+      return runtimeConfig?.recaptcha?.siteKey ?? ''
     },
   },
 
@@ -112,7 +99,7 @@ const config = {
    */
   features: {
     get help(): boolean {
-      return runtimeConfig?.features.help ?? false
+      return runtimeConfig?.features?.help ?? false
     },
   },
 
