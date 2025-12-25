@@ -35,13 +35,25 @@ class OidcController extends AbstractController
     )]
     #[OA\Response(
         response: 200,
-        description: 'Discovery configuration',
+        description: 'Discovery configuration with OIDC endpoints',
         content: new OA\JsonContent(
+            required: ['success', 'discovery_url', 'issuer', 'client_id'],
             properties: [
-                new OA\Property(property: 'success', type: 'boolean'),
-                new OA\Property(property: 'discovery_url', type: 'string'),
-                new OA\Property(property: 'issuer', type: 'string'),
-                new OA\Property(property: 'client_id', type: 'string', description: 'Public client ID'),
+                new OA\Property(property: 'success', type: 'boolean', example: true, description: 'Whether OIDC is configured'),
+                new OA\Property(property: 'discovery_url', type: 'string', example: 'https://keycloak.example.com/realms/synaplan/.well-known/openid-configuration', description: 'Full URL to OIDC discovery document'),
+                new OA\Property(property: 'issuer', type: 'string', example: 'https://keycloak.example.com/realms/synaplan', description: 'OIDC issuer URL'),
+                new OA\Property(property: 'client_id', type: 'string', example: 'synaplan-client', description: 'Public client ID (safe to expose to frontend)'),
+            ]
+        )
+    )]
+    #[OA\Response(
+        response: 503,
+        description: 'OIDC not configured on server',
+        content: new OA\JsonContent(
+            required: ['success', 'error'],
+            properties: [
+                new OA\Property(property: 'success', type: 'boolean', example: false),
+                new OA\Property(property: 'error', type: 'string', example: 'OIDC not configured'),
             ]
         )
     )]

@@ -63,7 +63,8 @@ class EmailChatService
         // Use native SQL query because Doctrine DQL doesn't support JSON_EXTRACT
         $sql = "SELECT BID FROM BUSER WHERE JSON_EXTRACT(BUSERDETAILS, '$.anonymous_email') = :email LIMIT 1";
         $stmt = $this->em->getConnection()->prepare($sql);
-        $result = $stmt->executeQuery(['email' => $fromEmail]);
+        $stmt->bindValue('email', $fromEmail);
+        $result = $stmt->executeQuery();
         $userId = $result->fetchOne();
 
         if ($userId) {
@@ -133,7 +134,8 @@ class EmailChatService
                 ORDER BY CAST(JSON_EXTRACT(BUSERDETAILS, '$.phone_verified_at') AS UNSIGNED) DESC
                 LIMIT 1";
         $stmt = $this->em->getConnection()->prepare($sql);
-        $result = $stmt->executeQuery(['phone' => $phoneNumber]);
+        $stmt->bindValue('phone', $phoneNumber);
+        $result = $stmt->executeQuery();
         $userId = $result->fetchOne();
 
         if ($userId) {
@@ -155,7 +157,8 @@ class EmailChatService
         // Check if anonymous user with this phone exists
         $sql = "SELECT BID FROM BUSER WHERE JSON_EXTRACT(BUSERDETAILS, '$.anonymous_phone') = :phone LIMIT 1";
         $stmt = $this->em->getConnection()->prepare($sql);
-        $result = $stmt->executeQuery(['phone' => $phoneNumber]);
+        $stmt->bindValue('phone', $phoneNumber);
+        $result = $stmt->executeQuery();
         $userId = $result->fetchOne();
 
         if ($userId) {
@@ -277,10 +280,9 @@ class EmailChatService
         // Use native SQL query because Doctrine DQL doesn't support JSON_EXTRACT
         $sql = "SELECT COUNT(BID) FROM BUSER WHERE JSON_EXTRACT(BUSERDETAILS, '$.anonymous_email') = :email AND BCREATED >= :created_after";
         $stmt = $this->em->getConnection()->prepare($sql);
-        $result = $stmt->executeQuery([
-            'email' => $email,
-            'created_after' => $createdAfter,
-        ]);
+        $stmt->bindValue('email', $email);
+        $stmt->bindValue('created_after', $createdAfter);
+        $result = $stmt->executeQuery();
         $count = $result->fetchOne();
 
         return $count >= self::MAX_ANONYMOUS_EMAILS_PER_HOUR;

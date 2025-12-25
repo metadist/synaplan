@@ -55,6 +55,9 @@
       "noUsers": "No users found",
       "deleteConfirmTitle": "Delete User?",
       "deleteConfirmDesc": "Are you sure you want to delete {email}? This action cannot be undone.",
+      "deleteConfirmCheckbox": "Yes, I confirm deletion of all user data (including chats, widgets, documents)",
+      "userDeleted": "User {email} has been successfully deleted",
+      "userDeleteFailed": "Failed to delete user",
       "levelUpdated": "User level updated to {level}",
       "levelUpdateFailed": "Failed to update user level"
     },
@@ -945,6 +948,7 @@
     "accountReady": "Your account is ready to use",
     "loginWithGoogle": "Login with Google",
     "loginWithGitHub": "Login with GitHub",
+    "loginWithKeycloak": "Login with Keycloak",
     "socialLoginError": "Social login failed. Please try again.",
     "oauthCallbackProcessing": "Processing login...",
     "noSocialProviders": "No social login providers configured",

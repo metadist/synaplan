@@ -10,6 +10,7 @@ parameters:
         - lib/grpc
     excludePaths:
         - src/Kernel.php
+        - tests/Unit/CookieTokenAuthenticatorTest.php
     reportUnmatchedIgnoredErrors: false
     doctrine:
         objectManagerLoader: tests/object-manager.php

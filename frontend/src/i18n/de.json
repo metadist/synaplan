@@ -51,6 +51,9 @@
       "noUsers": "Keine Benutzer gefunden",
       "deleteConfirmTitle": "Benutzer löschen?",
       "deleteConfirmDesc": "Möchtest du {email} wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden.",
+      "deleteConfirmCheckbox": "Ja, ich bestätige das Löschen aller Daten dieses Benutzers (inkl. Chats, Widgets, Dokumente)",
+      "userDeleted": "Benutzer {email} wurde erfolgreich gelöscht",
+      "userDeleteFailed": "Fehler beim Löschen des Benutzers",
       "levelUpdated": "Benutzer-Level auf {level} aktualisiert",
       "levelUpdateFailed": "Fehler beim Aktualisieren des Benutzer-Levels"
     },
@@ -1163,6 +1166,7 @@
     "accountReady": "Dein Konto ist einsatzbereit",
     "loginWithGoogle": "Mit Google anmelden",
     "loginWithGitHub": "Mit GitHub anmelden",
+    "loginWithKeycloak": "Mit Keycloak anmelden",
     "socialLoginError": "Social Login fehlgeschlagen. Bitte versuche es erneut.",
     "oauthCallbackProcessing": "Login wird verarbeitet...",
     "noSocialProviders": "Keine Social Login Anbieter konfiguriert",

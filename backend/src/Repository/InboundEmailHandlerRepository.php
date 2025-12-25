@@ -80,7 +80,8 @@ class InboundEmailHandlerRepository extends ServiceEntityRepository
 
         $conn = $this->getEntityManager()->getConnection();
         $stmt = $conn->prepare($sql);
-        $result = $stmt->executeQuery(['status' => 'active']);
+        $stmt->bindValue('status', 'active');
+        $result = $stmt->executeQuery();
 
         $handlers = [];
         foreach ($result->fetchAllAssociative() as $row) {

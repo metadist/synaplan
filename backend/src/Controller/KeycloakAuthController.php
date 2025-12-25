@@ -19,12 +19,15 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
 /**
  * Keycloak OIDC Authentication Controller.
  *
- * Implements proper OIDC flow:
+ * Implements proper OIDC flow with PKCE (RFC 7636):
  * 1. User authenticates via Keycloak
- * 2. Keycloak issues Access + Refresh tokens
- * 3. Tokens stored in HttpOnly cookies
- * 4. On token expiry: Refresh via Keycloak
- * 5. If Keycloak rejects refresh: Session ends (user logged out from Keycloak)
+ * 2. PKCE: code_challenge sent, code_verifier verified
+ * 3. Keycloak issues Access + Refresh tokens
+ * 4. Tokens stored in HttpOnly cookies
+ * 5. On token expiry: Refresh via Keycloak
+ * 6. If Keycloak rejects refresh: Session ends (user logged out from Keycloak)
+ *
+ * PKCE (Proof Key for Code Exchange) protects against authorization code interception attacks.
  */
 #[Route('/api/v1/auth/keycloak')]
 class KeycloakAuthController extends AbstractController
@@ -50,7 +53,8 @@ class KeycloakAuthController extends AbstractController
     #[Route('/login', name: 'keycloak_auth_login', methods: ['GET'])]
     #[OA\Get(
         path: '/api/v1/auth/keycloak/login',
-        summary: 'Initiate Keycloak OAuth login',
+        summary: 'Initiate Keycloak OAuth login with PKCE',
+        description: 'Initiates OAuth 2.0 Authorization Code Flow with PKCE (RFC 7636) for enhanced security',
         tags: ['Authentication']
     )]
     public function login(Request $request): Response
@@ -61,7 +65,13 @@ class KeycloakAuthController extends AbstractController
             $redirectUri = $this->appUrl.'/api/v1/auth/keycloak/callback';
             $state = bin2hex(random_bytes(16));
 
+            // PKCE (RFC 7636): Generate code_verifier and code_challenge
+            $codeVerifier = $this->generateCodeVerifier();
+            $codeChallenge = $this->generateCodeChallenge($codeVerifier);
+
+            // Store state and code_verifier in session (will be verified in callback)
             $request->getSession()->set('keycloak_oauth_state', $state);
+            $request->getSession()->set('keycloak_pkce_verifier', $codeVerifier);
 
             $params = [
                 'client_id' => $this->oidcClientId,
@@ -69,12 +79,16 @@ class KeycloakAuthController extends AbstractController
                 'response_type' => 'code',
                 'scope' => 'openid email profile offline_access', // offline_access for refresh token
                 'state' => $state,
+                // PKCE parameters (RFC 7636)
+                'code_challenge' => $codeChallenge,
+                'code_challenge_method' => 'S256', // SHA-256
             ];
 
             $authUrl = $discovery['authorization_endpoint'].'?'.http_build_query($params);
 
-            $this->logger->info('Keycloak OAuth login initiated', [
+            $this->logger->info('Keycloak OAuth login initiated with PKCE', [
                 'redirect_uri' => $redirectUri,
+                'pkce_enabled' => true,
             ]);
 
             return $this->redirect($authUrl);
@@ -113,6 +127,7 @@ class KeycloakAuthController extends AbstractController
         $code = $request->query->get('code');
         $state = $request->query->get('state');
         $storedState = $request->getSession()->get('keycloak_oauth_state');
+        $codeVerifier = $request->getSession()->get('keycloak_pkce_verifier');
 
         // Validate state (CSRF protection)
         if (!$state || $state !== $storedState) {
@@ -124,7 +139,19 @@ class KeycloakAuthController extends AbstractController
             ]));
         }
 
+        // Validate PKCE verifier exists
+        if (!$codeVerifier) {
+            $this->logger->error('PKCE code_verifier missing from session');
+
+            return $this->redirect($this->frontendUrl.'/auth/callback?'.http_build_query([
+                'error' => 'PKCE verification failed',
+                'provider' => 'keycloak',
+            ]));
+        }
+
+        // Clean up session
         $request->getSession()->remove('keycloak_oauth_state');
+        $request->getSession()->remove('keycloak_pkce_verifier');
 
         if (!$code) {
             return $this->redirect($this->frontendUrl.'/auth/callback?'.http_build_query([
@@ -136,7 +163,7 @@ class KeycloakAuthController extends AbstractController
         try {
             $discovery = $this->getDiscoveryConfig();
 
-            // Exchange authorization code for tokens
+            // Exchange authorization code for tokens (with PKCE verification)
             $tokenResponse = $this->httpClient->request('POST', $discovery['token_endpoint'], [
                 'body' => [
                     'code' => $code,
@@ -144,6 +171,8 @@ class KeycloakAuthController extends AbstractController
                     'client_secret' => $this->oidcClientSecret,
                     'redirect_uri' => $this->appUrl.'/api/v1/auth/keycloak/callback',
                     'grant_type' => 'authorization_code',
+                    // PKCE verification (RFC 7636)
+                    'code_verifier' => $codeVerifier,
                 ],
             ]);
 
@@ -252,6 +281,45 @@ class KeycloakAuthController extends AbstractController
             $this->logger->error('Failed to load Keycloak discovery config', $errorDetails);
             throw new \Exception('Failed to load OIDC discovery configuration');
         }
+    }
+
+    /**
+     * Generate PKCE code_verifier (RFC 7636).
+     *
+     * Creates a cryptographically random string of 43-128 characters
+     * from the unreserved characters [A-Z] / [a-z] / [0-9] / "-" / "." / "_" / "~"
+     */
+    private function generateCodeVerifier(): string
+    {
+        // Generate 32 random bytes (256 bits) and encode as Base64URL
+        $randomBytes = random_bytes(32);
+
+        return $this->base64UrlEncode($randomBytes);
+    }
+
+    /**
+     * Generate PKCE code_challenge from code_verifier (RFC 7636).
+     *
+     * Uses S256 method: BASE64URL(SHA256(code_verifier))
+     */
+    private function generateCodeChallenge(string $codeVerifier): string
+    {
+        $hash = hash('sha256', $codeVerifier, true);
+
+        return $this->base64UrlEncode($hash);
+    }
+
+    /**
+     * Base64URL encoding (RFC 4648 Section 5).
+     *
+     * Standard Base64 encoding with URL-safe characters:
+     * - Replace '+' with '-'
+     * - Replace '/' with '_'
+     * - Remove padding '='
+     */
+    private function base64UrlEncode(string $data): string
+    {
+        return rtrim(strtr(base64_encode($data), '+/', '-_'), '=');
     }
 
     private function findOrCreateUser(array $userInfo, ?string $refreshToken): User

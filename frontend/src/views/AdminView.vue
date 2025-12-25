@@ -580,7 +580,7 @@
           v-if="showDeleteModal"
           class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
           data-testid="modal-delete-user"
-          @click.self="showDeleteModal = false"
+          @click.self="closeDeleteModal()"
         >
           <div
             class="surface-elevated w-full max-w-md p-6 m-4"
@@ -592,20 +592,37 @@
             <h3 class="text-xl font-bold text-center txt-primary mb-2">
               {{ $t('admin.users.deleteConfirmTitle') }}
             </h3>
-            <p class="text-center txt-secondary mb-6">
+            <p class="text-center txt-secondary mb-4">
               {{ $t('admin.users.deleteConfirmDesc', { email: userToDelete?.email }) }}
             </p>
+
+            <!-- Confirmation Checkbox -->
+            <label
+              class="flex items-start gap-3 p-4 rounded-lg bg-red-50 dark:bg-red-900/10 border border-red-200 dark:border-red-800/30 mb-6 cursor-pointer hover:bg-red-100 dark:hover:bg-red-900/20 transition-colors"
+              data-testid="label-delete-confirm"
+            >
+              <input
+                v-model="deleteConfirmed"
+                type="checkbox"
+                class="mt-1 w-4 h-4 text-red-600 rounded border-red-300 focus:ring-red-500 dark:border-red-700 dark:bg-red-900/30 cursor-pointer"
+                data-testid="checkbox-delete-confirm"
+              />
+              <span class="text-sm txt-secondary leading-relaxed">
+                {{ $t('admin.users.deleteConfirmCheckbox') }}
+              </span>
+            </label>
 
             <div class="flex justify-end gap-3">
               <button
                 class="btn-secondary py-2 px-4 rounded-lg"
                 data-testid="btn-cancel-delete-user"
-                @click="showDeleteModal = false"
+                @click="closeDeleteModal()"
               >
                 {{ $t('common.cancel') }}
               </button>
               <button
-                class="btn-danger py-2 px-4 rounded-lg"
+                :disabled="!deleteConfirmed"
+                class="btn-danger py-2 px-4 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
                 data-testid="btn-confirm-delete-user"
                 @click="deleteUser()"
               >
@@ -692,6 +709,7 @@ const usageStatsPeriod = ref<'day' | 'week' | 'month' | 'all'>('week')
 // Delete Modal
 const showDeleteModal = ref(false)
 const userToDelete = ref<AdminUser | null>(null)
+const deleteConfirmed = ref(false)
 
 // Load data based on active tab
 watch(activeTab, (newTab: string) => {
@@ -830,21 +848,31 @@ async function updateUserLevel(userId: number, newLevel: string) {
 
 function confirmDeleteUser(user: AdminUser) {
   userToDelete.value = user
+  deleteConfirmed.value = false
   showDeleteModal.value = true
+}
+
+function closeDeleteModal() {
+  showDeleteModal.value = false
+  userToDelete.value = null
+  deleteConfirmed.value = false
 }
 
 async function deleteUser() {
   if (!userToDelete.value) return
+
+  const userEmail = userToDelete.value.email
 
   try {
     await adminApi.deleteUser(userToDelete.value.id)
     // Remove from local state
     users.value = users.value.filter((u: AdminUser) => u.id !== userToDelete.value!.id)
     totalUsers.value--
-    showDeleteModal.value = false
-    userToDelete.value = null
+    closeDeleteModal()
+    success(t('admin.users.userDeleted', { email: userEmail }))
   } catch (error) {
     console.error('Failed to delete user:', error)
+    showError(error instanceof Error ? error.message : t('admin.users.userDeleteFailed'))
   }
 }
 

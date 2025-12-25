@@ -101,7 +101,7 @@ class WidgetSessionRepository extends ServiceEntityRepository
         $conn = $this->getEntityManager()->getConnection();
 
         $sql = '
-            SELECT 
+            SELECT
                 ws.BCHATID AS chat_id,
                 ws.BWIDGETID AS widget_id,
                 ws.BSESSIONID AS session_id,

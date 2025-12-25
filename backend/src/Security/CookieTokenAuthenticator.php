@@ -3,6 +3,7 @@
 namespace App\Security;
 
 use App\Repository\UserRepository;
+use App\Service\OidcTokenService;
 use App\Service\TokenService;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -20,12 +21,14 @@ use Symfony\Component\Security\Http\Authenticator\Passport\SelfValidatingPasspor
  * Cookie-based Token Authenticator.
  *
  * Validates access tokens from HttpOnly cookies.
+ * Supports both app tokens and OIDC tokens (Keycloak).
  * Falls back to Authorization header for API compatibility.
  */
 class CookieTokenAuthenticator extends AbstractAuthenticator
 {
     public function __construct(
         private TokenService $tokenService,
+        private OidcTokenService $oidcTokenService,
         private UserRepository $userRepository,
         private LoggerInterface $logger,
     ) {
@@ -33,8 +36,9 @@ class CookieTokenAuthenticator extends AbstractAuthenticator
 
     public function supports(Request $request): ?bool
     {
-        // Support requests with access token cookie OR Authorization header
+        // Support requests with access token cookie OR OIDC token cookie OR Authorization header
         return $request->cookies->has(TokenService::ACCESS_COOKIE)
+            || $request->cookies->has(OidcTokenService::OIDC_ACCESS_COOKIE)
             || $request->headers->has('Authorization');
     }
 
@@ -46,7 +50,30 @@ class CookieTokenAuthenticator extends AbstractAuthenticator
             throw new CustomUserMessageAuthenticationException('No access token provided');
         }
 
-        // Validate access token
+        // Check if OIDC token (try OIDC validation first if OIDC cookies present)
+        if ($request->cookies->has(OidcTokenService::OIDC_ACCESS_COOKIE)) {
+            $oidcProvider = $request->cookies->get(OidcTokenService::OIDC_PROVIDER_COOKIE, 'keycloak');
+
+            // Try OIDC token validation
+            $user = $this->oidcTokenService->getUserFromOidcToken($token, $oidcProvider);
+
+            if ($user) {
+                $this->logger->debug('OIDC token authenticated successfully', [
+                    'user_id' => $user->getId(),
+                    'provider' => $oidcProvider,
+                ]);
+
+                return new SelfValidatingPassport(
+                    new UserBadge((string) $user->getId(), fn () => $user)
+                );
+            }
+
+            // OIDC validation failed - token might be expired
+            $this->logger->debug('OIDC token validation failed, will trigger refresh');
+            throw new CustomUserMessageAuthenticationException('OIDC token expired');
+        }
+
+        // Fall back to app token validation
         $payload = $this->tokenService->validateAccessToken($token);
 
         if (!$payload) {
@@ -90,19 +117,25 @@ class CookieTokenAuthenticator extends AbstractAuthenticator
 
     /**
      * Extract token from cookie or header.
+     *
+     * Priority: OIDC token > App token > Authorization header
      */
     private function extractToken(Request $request): ?string
     {
-        // First try cookie (preferred)
-        $token = $request->cookies->get(TokenService::ACCESS_COOKIE);
+        // First try OIDC token (if present)
+        $oidcToken = $request->cookies->get(OidcTokenService::OIDC_ACCESS_COOKIE);
+        if ($oidcToken) {
+            return $oidcToken;
+        }
 
-        if ($token) {
-            return $token;
+        // Then try app token
+        $appToken = $request->cookies->get(TokenService::ACCESS_COOKIE);
+        if ($appToken) {
+            return $appToken;
         }
 
         // Fall back to Authorization header (for API clients)
         $authHeader = $request->headers->get('Authorization');
-
         if ($authHeader && str_starts_with($authHeader, 'Bearer ')) {
             return substr($authHeader, 7);
         }
