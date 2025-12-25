@@ -14,7 +14,7 @@ export { chatApi } from './chatApi'
 export { legacyApi } from './legacyApi'
 export * from './configApi'
 export * from './apiKeysApi'
-export { httpClient, API_BASE_URL } from './httpClient'
+export { httpClient, getApiBaseUrl, setApiBaseUrl } from './httpClient'
 
 // Re-export for backward compatibility
 export const api = {

@@ -1,7 +1,6 @@
-import { useConfigStore } from '@/stores/config'
+import { getApiBaseUrl } from './httpClient'
 
-const config = useConfigStore()
-const API_BASE_URL = config.apiBaseUrl
+const API_BASE_URL = getApiBaseUrl()
 
 export interface ApiKey {
   id: number

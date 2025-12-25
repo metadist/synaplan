@@ -33,6 +33,62 @@ class ConfigController extends AbstractController
     }
 
     /**
+     * Get public runtime configuration (no auth required)
+     * Used by frontend to get reCAPTCHA site key and other public settings.
+     */
+    #[Route('/runtime', name: 'runtime_config', methods: ['GET'])]
+    #[OA\Get(
+        path: '/api/v1/config/runtime',
+        summary: 'Get public runtime configuration',
+        description: 'Returns public configuration like reCAPTCHA site key, feature flags (no authentication required)',
+        tags: ['Configuration']
+    )]
+    #[OA\Response(
+        response: 200,
+        description: 'Public runtime configuration',
+        content: new OA\JsonContent(
+            properties: [
+                new OA\Property(
+                    property: 'recaptcha',
+                    type: 'object',
+                    properties: [
+                        new OA\Property(property: 'enabled', type: 'boolean', example: true),
+                        new OA\Property(property: 'siteKey', type: 'string', example: '6LcXXXXXXXXXXXXXXXXXXXXXXXXXXXXX'),
+                    ]
+                ),
+                new OA\Property(
+                    property: 'features',
+                    type: 'object',
+                    properties: [
+                        new OA\Property(property: 'help', type: 'boolean', example: true, description: 'Enable help system'),
+                    ]
+                ),
+            ]
+        )
+    )]
+    public function getRuntimeConfig(): JsonResponse
+    {
+        $recaptchaEnabled = ($_ENV['RECAPTCHA_ENABLED'] ?? 'false') === 'true';
+        $recaptchaSiteKey = $_ENV['RECAPTCHA_SITE_KEY'] ?? '';
+
+        // Only send site key if reCAPTCHA is enabled and site key is configured
+        $recaptchaConfig = [
+            'enabled' => $recaptchaEnabled && !empty($recaptchaSiteKey) && 'your_site_key_here' !== $recaptchaSiteKey,
+            'siteKey' => ($recaptchaEnabled && !empty($recaptchaSiteKey) && 'your_site_key_here' !== $recaptchaSiteKey) ? $recaptchaSiteKey : '',
+        ];
+
+        // Feature flags
+        $features = [
+            'help' => ($_ENV['FEATURE_HELP'] ?? 'false') === 'true',
+        ];
+
+        return $this->json([
+            'recaptcha' => $recaptchaConfig,
+            'features' => $features,
+        ]);
+    }
+
+    /**
      * Get all available models (all active models for all capabilities)
      * User can choose ANY model for ANY capability (cross-capability usage).
      */

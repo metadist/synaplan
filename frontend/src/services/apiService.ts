@@ -1,5 +1,5 @@
 import type { AIModel } from '@/stores/models'
-import { useConfigStore } from '@/stores/config'
+import { getApiBaseUrl } from '@/services/api/httpClient'
 import type { z } from 'zod'
 
 export interface DefaultModelConfig {
@@ -15,8 +15,7 @@ export interface DefaultModelConfig {
 }
 
 // Base configuration
-const config = useConfigStore()
-const API_BASE_URL = config.apiBaseUrl
+const API_BASE_URL = getApiBaseUrl()
 const API_TIMEOUT = import.meta.env.VITE_API_TIMEOUT || 30000
 const CSRF_HEADER = import.meta.env.VITE_CSRF_HEADER_NAME || 'X-CSRF-Token'
 
