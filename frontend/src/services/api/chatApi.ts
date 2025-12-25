@@ -2,7 +2,7 @@
  * Chat API - Message & Conversation Management
  */
 
-import { httpClient, API_BASE_URL } from './httpClient'
+import { httpClient, getApiBaseUrl } from './httpClient'
 
 // SSE token configuration
 // Note: SSE_TOKEN_EXPIRY_MS = 5 * 60 * 1000 (5 minutes, backend setting)
@@ -25,7 +25,7 @@ async function refreshAccessToken(): Promise<boolean> {
 
   tokenRefreshPromise = (async () => {
     try {
-      const refreshResponse = await fetch(`${API_BASE_URL}/api/v1/auth/refresh`, {
+      const refreshResponse = await fetch(`${getApiBaseUrl()}/api/v1/auth/refresh`, {
         method: 'POST',
         credentials: 'include',
       })
@@ -64,7 +64,7 @@ async function getSseToken(): Promise<string | null> {
 
   tokenFetchPromise = (async () => {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/v1/auth/token`, {
+      const response = await fetch(`${getApiBaseUrl()}/api/v1/auth/token`, {
         credentials: 'include',
       })
 
@@ -74,7 +74,7 @@ async function getSseToken(): Promise<string | null> {
 
         if (refreshSuccess) {
           // Retry original request after successful refresh
-          const retryResponse = await fetch(`${API_BASE_URL}/api/v1/auth/token`, {
+          const retryResponse = await fetch(`${getApiBaseUrl()}/api/v1/auth/token`, {
             credentials: 'include',
           })
 
@@ -186,7 +186,7 @@ export const chatApi = {
     }
 
     const params = new URLSearchParams(paramsObj)
-    const baseUrl = `${API_BASE_URL}/api/v1/messages/stream?${params}`
+    const baseUrl = `${getApiBaseUrl()}/api/v1/messages/stream?${params}`
 
     let eventSource: EventSource | null = null
     let completionReceived = false

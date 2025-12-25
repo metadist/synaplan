@@ -31,7 +31,10 @@ security:
     access_control:
         # Public API documentation (Swagger)
         - { path: ^/api/doc, roles: PUBLIC_ACCESS }
-        
+
+        # Public runtime configuration (reCAPTCHA site key, etc.)
+        - { path: ^/api/v1/config/runtime, roles: PUBLIC_ACCESS }
+
         # Public auth endpoints
         - { path: ^/api/v1/auth/login, roles: PUBLIC_ACCESS }
         - { path: ^/api/v1/auth/register, roles: PUBLIC_ACCESS }
@@ -40,19 +43,19 @@ security:
         - { path: ^/api/v1/auth/reset-password, roles: PUBLIC_ACCESS }
         - { path: ^/api/v1/auth/resend-verification, roles: PUBLIC_ACCESS }
         - { path: ^/api/v1/auth/refresh, roles: PUBLIC_ACCESS }
-        
+
         # Authenticated auth endpoints
         - { path: ^/api/v1/auth/me, roles: IS_AUTHENTICATED_FULLY }
         - { path: ^/api/v1/auth/logout, roles: IS_AUTHENTICATED_FULLY }
         - { path: ^/api/v1/auth/revoke-all, roles: IS_AUTHENTICATED_FULLY }
-        
+
         # Public test endpoints
         - { path: ^/api/health, roles: PUBLIC_ACCESS }
         - { path: ^/api/test, roles: PUBLIC_ACCESS }
-        
+
         # Public OIDC endpoints
         - { path: ^/api/v1/oidc/discovery, roles: PUBLIC_ACCESS }
-        
+
         # Public Social Login endpoints (Google, GitHub & Keycloak OAuth)
         - { path: ^/api/v1/auth/providers, roles: PUBLIC_ACCESS }
         - { path: ^/api/v1/auth/google/login, roles: PUBLIC_ACCESS }
@@ -61,13 +64,13 @@ security:
         - { path: ^/api/v1/auth/github/callback, roles: PUBLIC_ACCESS }
         - { path: ^/api/v1/auth/keycloak/login, roles: PUBLIC_ACCESS }
         - { path: ^/api/v1/auth/keycloak/callback, roles: PUBLIC_ACCESS }
-        
+
         # Public shared chat endpoint (no auth required)
         - { path: ^/api/v1/chats/shared/, roles: PUBLIC_ACCESS }
-        
+
         # Public file uploads endpoint (controller handles auth internally)
         - { path: ^/api/v1/files/uploads/, roles: PUBLIC_ACCESS }
-        
+
         # Public widget endpoints (no auth required - embedded on external websites)
         - { path: ^/api/v1/widget/[^/]+/config, roles: PUBLIC_ACCESS }
         - { path: ^/api/v1/widget/[^/]+/history, roles: PUBLIC_ACCESS }
@@ -75,26 +78,26 @@ security:
         - { path: ^/api/v1/widget/[^/]+/upload, roles: PUBLIC_ACCESS }
         - { path: ^/api/v1/messages/stream, roles: PUBLIC_ACCESS }
         - { path: ^/api, methods: [OPTIONS], roles: PUBLIC_ACCESS }
-        
+
         # Legacy widget.php endpoint (compatibility layer)
         - { path: ^/widget\.php, roles: PUBLIC_ACCESS }
-        
+
         # Legacy api.php endpoint (WordPress wizard compatibility)
         - { path: ^/api\.php, roles: PUBLIC_ACCESS }
-        
+
         # WordPress integration endpoints (public for plugin onboarding)
         - { path: ^/api/v1/integrations/wordpress, roles: PUBLIC_ACCESS }
-        
+
         # Webhook endpoints (email webhook is public, WhatsApp requires verification)
         - { path: ^/api/v1/webhooks/email, roles: PUBLIC_ACCESS }
         - { path: ^/api/v1/webhooks/whatsapp, roles: PUBLIC_ACCESS }
-        
+
         # Stripe webhook (public - secured by signature verification)
         - { path: ^/api/v1/stripe/webhook, roles: PUBLIC_ACCESS }
-        
+
         # Public subscription plans (no auth needed to view plans)
         - { path: ^/api/v1/subscription/plans, roles: PUBLIC_ACCESS }
-        
+
         # All other API routes require authentication
         - { path: ^/api, roles: IS_AUTHENTICATED_FULLY }
 

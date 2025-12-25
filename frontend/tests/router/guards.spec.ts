@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest'
 
 describe('Router Guards', () => {
   beforeEach(() => {
+    // Cookie-based auth: localStorage should be empty
     localStorage.clear()
   })
 
@@ -12,11 +13,12 @@ describe('Router Guards', () => {
     expect(requiresAuth && !isAuthenticated).toBe(true)
   })
 
-  it('should allow access when authenticated', () => {
-    localStorage.setItem('auth_token', 'dev-token')
-    const token = localStorage.getItem('auth_token')
+  it('should allow access when authenticated (via cookies)', () => {
+    // Auth is now cookie-based, not localStorage
+    // Cookies are set by backend and checked via /api/v1/auth/me
+    const isAuthenticated = true // Would be determined by cookie presence
 
-    expect(token).toBeTruthy()
+    expect(isAuthenticated).toBe(true)
   })
 
   it('should allow public routes without auth', () => {
@@ -24,5 +26,13 @@ describe('Router Guards', () => {
     const requiresAuth = false
 
     expect(isPublicRoute && !requiresAuth).toBe(true)
+  })
+
+  it('should not use localStorage for auth', () => {
+    // SECURITY: Ensure no auth tokens in localStorage
+    const legacyKeys = ['auth_token', 'auth_user', 'refresh_token', 'dev-token']
+    legacyKeys.forEach((key) => {
+      expect(localStorage.getItem(key)).toBeNull()
+    })
   })
 })

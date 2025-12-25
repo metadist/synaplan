@@ -7,31 +7,49 @@ import './style.css'
 import App from './App.vue'
 import { useConfigStore } from './stores/config'
 
-const app = createApp(App)
+// Bootstrap app - load config before mounting
+;(async () => {
+  const app = createApp(App)
 
-app.use(createPinia())
-app.use(router)
-app.use(i18n)
+  app.use(createPinia())
+  app.use(router)
+  app.use(i18n)
 
-// Google reCAPTCHA v3 (only if enabled)
-// Uses runtime config (injected at container startup) with build-time fallback
-const config = useConfigStore()
-const recaptchaEnabled = config.recaptcha.enabled
-const recaptchaSiteKey = config.recaptcha.siteKey
+  const config = useConfigStore()
+  await config.init()
 
-if (recaptchaEnabled && recaptchaSiteKey && recaptchaSiteKey !== 'your_site_key_here') {
-  app.use(VueReCaptcha, {
-    siteKey: recaptchaSiteKey,
-    loaderOptions: {
-      autoHideBadge: false,
-      explicitRenderParameters: {
-        badge: 'bottomright',
+  const recaptchaEnabled = config.recaptcha.enabled
+  const recaptchaSiteKey = config.recaptcha.siteKey
+
+  if (recaptchaEnabled && recaptchaSiteKey) {
+    app.use(VueReCaptcha, {
+      siteKey: recaptchaSiteKey,
+      loaderOptions: {
+        autoHideBadge: false,
+        explicitRenderParameters: {
+          badge: 'bottomright',
+        },
       },
-    },
-  })
-  console.log('✅ reCAPTCHA v3 enabled')
-} else {
-  console.log('ℹ️ reCAPTCHA v3 disabled (dev mode or not configured)')
-}
+    })
+    console.log('✅ reCAPTCHA v3 enabled')
 
-app.mount('#app')
+    const style = document.createElement('style')
+    style.id = 'recaptcha-badge-control'
+    style.textContent = `
+    .grecaptcha-badge {
+      visibility: hidden !important;
+      opacity: 0 !important;
+      transition: opacity 0.3s ease !important;
+    }
+    .grecaptcha-badge.visible {
+      visibility: visible !important;
+      opacity: 1 !important;
+    }
+  `
+    document.head.appendChild(style)
+  } else {
+    console.log('ℹ️ reCAPTCHA v3 disabled (not configured on backend)')
+  }
+
+  app.mount('#app')
+})()

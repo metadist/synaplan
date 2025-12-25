@@ -82,12 +82,13 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   async function logout(): Promise<void> {
+    // Clear user immediately to prevent any auth checks during logout
+    user.value = null
     loading.value = true
 
     try {
       await authService.logout()
     } finally {
-      user.value = null
       loading.value = false
       error.value = null
     }
@@ -112,6 +113,7 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   async function checkAuth(): Promise<void> {
+    // Don't check auth multiple times
     if (initialized.value) return
 
     try {
@@ -121,7 +123,7 @@ export const useAuthStore = defineStore('auth', () => {
         user.value = currentUser
       }
     } catch (err) {
-      // Not authenticated, that's fine
+      // Not authenticated or network error - that's fine, just stay logged out
       user.value = null
     } finally {
       loading.value = false

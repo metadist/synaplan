@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    
+
     <!-- Favicon for modern browsers (SVG) -->
     <link rel="icon" type="image/svg+xml" href="/single_bird.svg" />
     <!-- Fallback favicon for older browsers -->
@@ -14,17 +14,8 @@
     <link rel="manifest" href="/site.webmanifest" />
     <!-- Theme color for mobile browsers -->
     <meta name="theme-color" content="#0003c7" />
-    
+
     <title>New chat</title>
-    
-    <!-- Runtime configuration - values injected by server at container startup -->
-    <!-- Markers like __PLACEHOLDER__ are replaced by docker-entrypoint.sh -->
-    <script>
-      window.__RUNTIME_CONFIG__ = {
-        RECAPTCHA_ENABLED: '__VITE_RECAPTCHA_ENABLED__',
-        RECAPTCHA_SITE_KEY: '__VITE_RECAPTCHA_SITE_KEY__',
-      };
-    </script>
   </head>
   <body>
     <div id="app"></div>

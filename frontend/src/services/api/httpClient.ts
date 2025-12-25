@@ -3,11 +3,116 @@
  * All requests include credentials for HttpOnly cookies
  */
 
-import { useConfigStore } from '@/stores/config'
 import { z } from 'zod'
+import { GetApiConfigRuntimeConfigResponseSchema } from '@/generated/api-schemas'
 
-const config = useConfigStore()
-const API_BASE_URL = config.apiBaseUrl
+// API base URL - lazy initialized on first use
+// For admin UI: empty string (same-origin)
+// For cross-origin scenarios: full URL could be set
+let API_BASE_URL: string | null = null
+
+/**
+ * Get API base URL (lazy initialization)
+ * Returns empty string for same-origin (admin UI)
+ */
+function getApiBaseUrl(): string {
+  if (API_BASE_URL === null) {
+    // For admin UI, API is always same-origin
+    // Frontend and backend are served together, so use relative URLs
+    API_BASE_URL = ''
+  }
+  return API_BASE_URL
+}
+
+/**
+ * Set API base URL (for testing or special deployments)
+ */
+export function setApiBaseUrl(url: string): void {
+  API_BASE_URL = url
+}
+
+// Runtime config cache
+type RuntimeConfig = z.infer<typeof GetApiConfigRuntimeConfigResponseSchema>
+let runtimeConfig: RuntimeConfig | null = null
+let configPromise: Promise<RuntimeConfig> | null = null
+
+/**
+ * Load runtime configuration from backend API
+ * This is separate from the config store to avoid circular dependency
+ */
+async function loadRuntimeConfig(): Promise<RuntimeConfig> {
+  // Return cached config if already loaded
+  if (runtimeConfig) {
+    return runtimeConfig
+  }
+
+  // Return existing promise if already loading
+  if (configPromise) {
+    return configPromise
+  }
+
+  // Fetch config from backend (use raw fetch to avoid circular dependency)
+  configPromise = (async () => {
+    try {
+      const response = await fetch(`${getApiBaseUrl()}/api/v1/config/runtime`, {
+        credentials: 'include',
+      })
+
+      if (!response.ok) {
+        throw new Error(`Failed to load runtime config: ${response.status}`)
+      }
+
+      const data = await response.json()
+      const validated = GetApiConfigRuntimeConfigResponseSchema.parse(data)
+      runtimeConfig = validated
+      return validated
+    } catch (error) {
+      console.error('Failed to load runtime config:', error)
+      // Return default config on error
+      const defaultConfig: RuntimeConfig = {
+        recaptcha: {
+          enabled: false,
+          siteKey: '',
+        },
+        features: {
+          help: false,
+        },
+      }
+      runtimeConfig = defaultConfig
+      return defaultConfig
+    } finally {
+      configPromise = null
+    }
+  })()
+
+  return configPromise
+}
+
+/**
+ * Get runtime config (async)
+ * Call this before rendering to ensure config is loaded
+ */
+export async function getConfig(): Promise<RuntimeConfig> {
+  return loadRuntimeConfig()
+}
+
+/**
+ * Get runtime config (sync)
+ * Returns cached value or default. Call getConfig() first to ensure it's loaded.
+ */
+export function getConfigSync(): RuntimeConfig {
+  return (
+    runtimeConfig ?? {
+      recaptcha: {
+        enabled: false,
+        siteKey: '',
+      },
+      features: {
+        help: false,
+      },
+    }
+  )
+}
 
 type ResponseType = 'json' | 'blob' | 'text' | 'arrayBuffer'
 
@@ -83,7 +188,7 @@ async function refreshAccessToken(): Promise<RefreshResult> {
   isRefreshing = true
   refreshPromise = (async (): Promise<RefreshResult> => {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/v1/auth/refresh`, {
+      const response = await fetch(`${getApiBaseUrl()}/api/v1/auth/refresh`, {
         method: 'POST',
         credentials: 'include',
       })
@@ -197,7 +302,7 @@ async function httpClient<T = unknown, S extends z.Schema | undefined = undefine
     throw new Error('Schema validation can only be used with responseType: "json"')
   }
 
-  let url = `${API_BASE_URL}${endpoint}`
+  let url = `${getApiBaseUrl()}${endpoint}`
 
   if (params) {
     const queryString = new URLSearchParams(params).toString()
@@ -317,4 +422,4 @@ async function httpClient<T = unknown, S extends z.Schema | undefined = undefine
   return data as T
 }
 
-export { httpClient, API_BASE_URL }
+export { httpClient, getApiBaseUrl }
