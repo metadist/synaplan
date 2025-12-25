@@ -1,4 +1,7 @@
 {
+    // PHP Version for Intelephense
+    "intelephense.environment.phpVersion": "8.3.0",
+
     // PHP CS Fixer
     "php-cs-fixer.executablePath": "${workspaceFolder}/backend/vendor/bin/php-cs-fixer",
 
