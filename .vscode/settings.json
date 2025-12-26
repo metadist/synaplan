@@ -1,5 +1,6 @@
 {
-    // PHP Version for Intelephense
+    // PHP Version for Intelephense (must match Docker container PHP 8.3)
+    // Note: Reload Cursor window after changing this setting
     "intelephense.environment.phpVersion": "8.3.0",
 
     // PHP CS Fixer
