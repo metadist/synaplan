@@ -301,26 +301,34 @@ export async function createWidget(
 - No Options API
 - Translations through `vue-i18n` are required
 
+**Design System & Styling (MUST USE):**
+- Always use CSS variables from `frontend/src/style.css` - **NEVER** use Tailwind colors directly.
+- **Background Tokens**: `var(--bg-app)`, `var(--bg-sidebar)`, `var(--bg-chat)`, `var(--bg-card)`, `var(--bg-chip)`
+- **Text Colors**: `var(--txt-primary)`, `var(--txt-secondary)`, `var(--brand)`, `var(--brand-light)`
+- **Surface Classes**: `surface-card` (subtle shadow), `surface-chip` (pill with border), `surface-elevated`
+- **Text Utilities**: `txt-primary`, `txt-secondary`, `txt-brand`
+- **Interactive**: `btn-primary`, `hover-surface`, `pill`, `pill--active`, `nav-item`, `nav-item--active`
+- **Standard Layout**: Always use `<MainLayout>` with `<div class="min-h-screen bg-chat p-4 md:p-8 overflow-y-auto scroll-thin">` and a max-width container.
+
 **Example:**
 ```vue
 <script setup lang="ts">
 import { ref } from 'vue'
+import MainLayout from '@/components/layout/MainLayout.vue'
 
 interface Props {
   widgetId: string
   primaryColor?: string
 }
 
-interface Emits {
-  (e: 'open'): void
-  (e: 'close'): void
-}
-
 const props = withDefaults(defineProps<Props>(), {
   primaryColor: '#007bff'
 })
 
-const emit = defineEmits<Emits>()
+const emit = defineEmits<{
+  (e: 'open'): void
+  (e: 'close'): void
+}>()
 
 const isOpen = ref(false)
 
@@ -329,7 +337,23 @@ function handleOpen() {
   emit('open')
 }
 </script>
+
+<template>
+  <div class="surface-card p-6">
+    <h1 class="text-2xl font-semibold txt-primary mb-1">{{ $t('widget.title') }}</h1>
+    <p class="txt-secondary text-sm">{{ $t('widget.description') }}</p>
+    <button class="btn-primary mt-4" @click="handleOpen">
+      {{ $t('actions.open') }}
+    </button>
+  </div>
+</template>
 ```
+
+### Internationalization (i18n)
+- **Always add to BOTH `en.json` AND `de.json`!**
+- **In Templates**: `{{ $t('key.path') }}`
+- **In Script**: `const { t } = useI18n()`
+- **Common Keys**: `common.ok`, `common.cancel`, `common.save`, `common.delete`, `common.error`, `common.success`.
 
 ### Widget Development
 
@@ -599,6 +623,62 @@ The generation script:
 2. Generates Zod schemas to `src/generated/api-schemas.ts`
 3. Fixes Zod v4 compatibility issues
 4. Creates readable PascalCase aliases (e.g., `GetWidgetResponseSchema`)
+
+### Backend: Fat Service / Thin Controller
+- **Controllers**: HTTP handling ONLY. Keep them under 50 lines. Use attributes for validation/security.
+- **Services**: All business logic. Use dependency injection. Split services if they exceed 500 lines.
+- **Repositories**: All database queries. No DQL in Controllers.
+
+```php
+// ✅ Controller: Thin
+#[Route('/api/v1/widgets', methods: ['POST'])]
+public function create(Request $request, #[CurrentUser] User $user): JsonResponse
+{
+    $data = $request->toArray();
+    try {
+        $widget = $this->widgetService->createWidget($user, $data['name']);
+        return $this->json(['widget' => $widget], Response::HTTP_CREATED);
+    } catch (\InvalidArgumentException $e) {
+        return $this->json(['error' => $e->getMessage()], Response::HTTP_BAD_REQUEST);
+    }
+}
+
+// ✅ Service: Fat (Business Logic)
+final readonly class WidgetService {
+    public function createWidget(User $user, string $name): Widget {
+        if (strlen($name) < 3) throw new \InvalidArgumentException('Too short');
+        $widget = new Widget();
+        $widget->setOwner($user);
+        $widget->setName($name);
+        $this->em->persist($widget);
+        $this->em->flush();
+        return $widget;
+    }
+}
+```
+
+### Frontend: File Organization & Modularity
+- **NEVER** put everything in one file.
+- **Views**: Orchestrate multiple components.
+- **Components**: Modular, reusable, under 300 lines.
+- **Services**: API call logic only. Extract `.data` from responses.
+- **Stores**: State management using Pinia `defineStore`.
+
+**Pattern:**
+```
+frontend/src/
+├── components/MyFeature/
+│   ├── MyFeatureList.vue
+│   └── MyFeatureItem.vue
+├── views/MyFeatureView.vue
+├── services/api/myFeatureApi.ts
+└── stores/myFeature.ts
+```
+
+### UI Patterns & Feedback
+- **Dialogs**: Always use `useDialog()` composable (`const { confirm, alert, prompt } = useDialog()`).
+- **Notifications**: Always use `useNotification()` (`const { success, error, warning } = useNotification()`).
+- **Standard Modal Pattern**: Use `<Teleport to="body">` with a Backdrop and a `<div class="surface-card p-6">`.
 
 ### Error Handling (Backend)
 ```php

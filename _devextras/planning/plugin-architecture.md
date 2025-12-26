@@ -31,6 +31,21 @@ To support millions of users, we move away from a flat `uploads/{userId}/` struc
     - ./plugins:/plugins:ro  # Read-only central repository
   ```
 
+### C. API Documentation & Schema Generation
+Synaplan uses **NelmioApiDocBundle** to provide interactive API documentation.
+
+- **UI URL**: `/api/doc` (served by `app.swagger_ui` route)
+- **JSON Spec**: `/api/doc.json` (served by `app.swagger` route)
+- **Mechanism**: Documentation is generated automatically from PHP attributes (`#[OA\...]`) in Controllers.
+- **Frontend Sync**: The frontend uses `src/generated/api-schemas.ts`, which is generated from the JSON spec using:
+  ```bash
+  make -C frontend generate-schemas
+  ```
+  This creates Zod schemas for runtime validation and TypeScript types for the frontend.
+
+**Plugin Documentation Requirement**:
+Plugins must also use `#[OA\...]` attributes in their controllers. The `nelmio_api_doc` configuration (`backend/config/packages/nelmio_api_doc.yaml`) is configured to scan the `/api` path pattern. As long as plugin routes start with `/api/v1/user/{userId}/plugins/`, they will be automatically included in the global Swagger UI.
+
 ---
 
 ## 1. Plugin Architecture (Top Notch)
