@@ -937,7 +937,7 @@ class ModelFixtures extends Fixture
                 'quality' => 10,
                 'rating' => 1,
                 'json' => [
-                    'description' => 'Claude 4.5 Sonnet - a smart model for complex agents and codin',
+                    'description' => 'Claude 4.5 Sonnet - a smart model for complex agents and coding',
                     'params' => [
                         'model' => 'claude-sonnet-4-5-20250929',
                     ],
