@@ -8,6 +8,7 @@ use App\Entity\Model;
 use App\Entity\Prompt;
 use App\Repository\ModelRepository;
 use App\Repository\PromptRepository;
+use App\Service\File\UserUploadPathBuilder;
 use App\Service\Message\Handler\ChatHandler;
 use App\Service\ModelConfigService;
 use App\Service\PromptService;
@@ -26,6 +27,7 @@ class ChatHandlerTest extends TestCase
     private LoggerInterface $logger;
     private VectorSearchService $vectorSearchService;
     private EntityManagerInterface $em;
+    private UserUploadPathBuilder $userUploadPathBuilder;
     private ChatHandler $handler;
 
     protected function setUp(): void
@@ -38,6 +40,7 @@ class ChatHandlerTest extends TestCase
         $this->logger = $this->createMock(LoggerInterface::class);
         $this->vectorSearchService = $this->createMock(VectorSearchService::class);
         $this->em = $this->createMock(EntityManagerInterface::class);
+        $this->userUploadPathBuilder = $this->createMock(UserUploadPathBuilder::class);
 
         $this->handler = new ChatHandler(
             $this->aiFacade,
@@ -48,7 +51,8 @@ class ChatHandlerTest extends TestCase
             $this->logger,
             $this->vectorSearchService,
             $this->em,
-            '/tmp/uploads'
+            '/tmp/uploads',
+            $this->userUploadPathBuilder
         );
     }
 

@@ -170,7 +170,7 @@ class MediaGenerationHandler implements MessageHandlerInterface
                 // we default to image (most common case)
                 $modelId = $this->modelConfigService->getDefaultModel('TEXT2PIC', $effectiveUserId);
                 $mediaType = 'image';
-                
+
                 $this->logger->warning('MediaGenerationHandler: Media type not determined from extractor, defaulting to image', [
                     'model_id' => $modelId,
                     'prompt_preview' => substr($prompt, 0, 100),
