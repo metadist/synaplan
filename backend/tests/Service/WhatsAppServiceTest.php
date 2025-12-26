@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Service;
 
+use App\Service\File\UserUploadPathBuilder;
 use App\Service\WhatsAppService;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
@@ -19,12 +20,14 @@ class WhatsAppServiceTest extends TestCase
     private WhatsAppService $service;
     private HttpClientInterface $httpClient;
     private LoggerInterface $logger;
+    private UserUploadPathBuilder $pathBuilder;
     private string $testPhoneNumberId = '123456789'; // Test phone number ID
 
     protected function setUp(): void
     {
         $this->httpClient = $this->createMock(HttpClientInterface::class);
         $this->logger = $this->createMock(LoggerInterface::class);
+        $this->pathBuilder = new UserUploadPathBuilder(); // Real instance (final class)
 
         // Create service with test configuration (dynamic multi-number support)
         $this->service = new WhatsAppService(
@@ -32,7 +35,8 @@ class WhatsAppServiceTest extends TestCase
             $this->logger,
             'test_token',
             true,
-            '/tmp/test_uploads' // Test uploads directory
+            '/tmp/test_uploads',
+            $this->pathBuilder
         );
     }
 
@@ -48,7 +52,8 @@ class WhatsAppServiceTest extends TestCase
             $this->logger,
             'test_token',
             false, // disabled
-            '/tmp/test_uploads'
+            '/tmp/test_uploads',
+            $this->pathBuilder
         );
 
         $this->assertFalse($service->isAvailable());
@@ -61,7 +66,8 @@ class WhatsAppServiceTest extends TestCase
             $this->logger,
             'test_token',
             false,
-            '/tmp/test_uploads'
+            '/tmp/test_uploads',
+            $this->pathBuilder
         );
 
         $this->expectException(\RuntimeException::class);
@@ -228,7 +234,8 @@ class WhatsAppServiceTest extends TestCase
             $this->logger,
             'test_token',
             false,
-            '/tmp/test_uploads'
+            '/tmp/test_uploads',
+            $this->pathBuilder
         );
 
         $this->expectException(\RuntimeException::class);
@@ -310,7 +317,7 @@ class WhatsAppServiceTest extends TestCase
             ->method('request')
             ->willReturnOnConsecutiveCalls($getMediaResponse, $downloadResponse);
 
-        $result = $this->service->downloadMedia('media123', $this->testPhoneNumberId);
+        $result = $this->service->downloadMedia('media123', $this->testPhoneNumberId, 27);
 
         // downloadMedia now returns an array with file info
         $this->assertIsArray($result);
@@ -330,7 +337,7 @@ class WhatsAppServiceTest extends TestCase
             ->expects($this->once())
             ->method('error');
 
-        $result = $this->service->downloadMedia('media123', $this->testPhoneNumberId);
+        $result = $this->service->downloadMedia('media123', $this->testPhoneNumberId, 27);
 
         $this->assertNull($result);
     }
@@ -361,7 +368,7 @@ class WhatsAppServiceTest extends TestCase
             ->method('error')
             ->with('WhatsApp media file too large (Content-Length)', $this->anything());
 
-        $result = $this->service->downloadMedia('huge_media', $this->testPhoneNumberId);
+        $result = $this->service->downloadMedia('huge_media', $this->testPhoneNumberId, 27);
 
         // Should return null for files that are too large
         $this->assertNull($result);
@@ -393,7 +400,7 @@ class WhatsAppServiceTest extends TestCase
             ->method('error')
             ->with('WhatsApp media file too large (actual size)', $this->anything());
 
-        $result = $this->service->downloadMedia('large_media', $this->testPhoneNumberId);
+        $result = $this->service->downloadMedia('large_media', $this->testPhoneNumberId, 27);
 
         // Should return null when actual downloaded size exceeds limit
         $this->assertNull($result);
@@ -424,7 +431,7 @@ class WhatsAppServiceTest extends TestCase
             ->method('error')
             ->with('WhatsApp media has disallowed file type', $this->anything());
 
-        $result = $this->service->downloadMedia('malicious_media', $this->testPhoneNumberId);
+        $result = $this->service->downloadMedia('malicious_media', $this->testPhoneNumberId, 27);
 
         // Should return null for disallowed file types
         $this->assertNull($result);
@@ -457,7 +464,7 @@ class WhatsAppServiceTest extends TestCase
                 return isset($context['extension']) && 'unknown' === $context['extension'];
             }));
 
-        $result = $this->service->downloadMedia('unknown_media', $this->testPhoneNumberId);
+        $result = $this->service->downloadMedia('unknown_media', $this->testPhoneNumberId, 27);
 
         // Should return null for unknown MIME types
         $this->assertNull($result);
