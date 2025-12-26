@@ -7,6 +7,7 @@ use App\Entity\File;
 use App\Entity\Message;
 use App\Repository\ModelRepository;
 use App\Repository\PromptRepository;
+use App\Service\File\UserUploadPathBuilder;
 use App\Service\ModelConfigService;
 use App\Service\PromptService;
 use App\Service\RAG\VectorSearchService;
@@ -32,6 +33,7 @@ class ChatHandler implements MessageHandlerInterface
         private VectorSearchService $vectorSearchService,
         private EntityManagerInterface $em,
         private string $uploadDir,
+        private UserUploadPathBuilder $userUploadPathBuilder,
     ) {
     }
 
@@ -942,7 +944,8 @@ class ChatHandler implements MessageHandlerInterface
             $finalFilename = $basename.'_'.$timestamp.'.'.$extension;
 
             // Create relative path
-            $relativePath = sprintf('%d/%s/%s/%s', $userId, $year, $month, $finalFilename);
+            $userBase = $this->userUploadPathBuilder->buildUserBaseRelativePath($userId);
+            $relativePath = $userBase.'/'.$year.'/'.$month.'/'.$finalFilename;
             $absolutePath = $this->uploadDir.'/'.$relativePath;
 
             // Create directory if not exists

@@ -226,27 +226,40 @@ PROMPT;
 # Media generation
 You receive a media generation request. The user has requested the generation of an image, video or an audio file.
 
-Please find out if the user wants an image, video or an audio file.
+## Your Task
+1. Determine the media type: "image", "video", or "audio"
+2. Extract and improve the prompt text
+
+## Output Format
+You MUST respond with JSON in this format:
+{"BTEXT": "improved prompt text", "BMEDIA": "image|video|audio"}
 
 ## For AUDIO/TTS requests:
+- Set BMEDIA to "audio"
 - Extract ONLY the text that should be spoken from BTEXT
 - Remove instruction words like "read", "speak", "convert", "make audio", "generate voice", "erstelle audio", "lies vor", etc.
 - Keep only the actual content to be spoken
 - Preserve the original language and punctuation
 - If text is in quotes, extract the quoted text only
-- Return ONLY the extracted text, nothing else
 
-## For IMAGE/VIDEO requests:
+## For IMAGE requests:
+- Set BMEDIA to "image"
+- Extract the prompt from BTEXT
+- Improve the prompt and add details from the user's purpose
+- Create a better, more detailed prompt in the user's language
+- Include visual details, style, quality hints
+
+## For VIDEO requests:
+- Set BMEDIA to "video"
 - Extract the prompt from BTEXT
 - Improve the prompt and add details from the user's purpose
 - Create a better, more detailed prompt in the user's language
 
-Examples:
-- Audio Input: "Read this aloud: Hello World" → Output: "Hello World"
-- Audio Input: "Erstelle eine audio mit 'Guten Tag!'" → Output: "Guten Tag!"
-- Audio Input: "Lies mir vor: Wie geht es dir?" → Output: "Wie geht es dir?"
-- Audio Input: "Make a voice saying welcome" → Output: "welcome"
-- Image Input: "Generate an image of a cat" → Output: "A detailed image of a cat, photorealistic, high quality"
+## Examples:
+- Input: "Read this aloud: Hello World" → {"BTEXT": "Hello World", "BMEDIA": "audio"}
+- Input: "Erstelle eine audio mit 'Guten Tag!'" → {"BTEXT": "Guten Tag!", "BMEDIA": "audio"}
+- Input: "Generate an image of a cat" → {"BTEXT": "A detailed image of a cat, photorealistic, high quality", "BMEDIA": "image"}
+- Input: "Can you also generate an image of a cat in a tree, playing the violin?" → {"BTEXT": "A whimsical, high-detail illustration of a cat perched on a leafy tree branch, playing a violin with its paws; the cat balanced confidently with tail curled, sheet music clipped to the branch, soft golden-hour sunlight filtering through the leaves, subtle motion in the fur and bow, dreamy storybook atmosphere, vibrant natural colors, shallow depth of field, high resolution", "BMEDIA": "image"}
 
 You are a helpful assistant that generates images, videos, and audio files for users.
 PROMPT;

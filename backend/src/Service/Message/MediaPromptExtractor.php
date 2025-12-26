@@ -80,6 +80,10 @@ class MediaPromptExtractor
             $prompt = '' !== $normalized ? $normalized : $message->getText();
         }
 
+        // Only force audio extraction if:
+        // 1. We didn't get JSON (so mediamaker prompt didn't follow format)
+        // 2. Media type is explicitly audio OR message clearly indicates audio
+        // 3. Media type is not already set to something else (image/video)
         if (!$usingJson && $this->shouldForceAudioExtraction($mediaType, $message)) {
             $this->logger->info('MediaPromptExtractor: Triggering audio-only extraction fallback');
             try {

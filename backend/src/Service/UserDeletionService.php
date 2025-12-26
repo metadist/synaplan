@@ -246,12 +246,12 @@ final readonly class UserDeletionService
     /**
      * Cleanup empty user directories after file deletion.
      * This is done outside the transaction as it's a best-effort cleanup.
-     * Structure: uploads/{userId}/{year}/{month}/.
+     * Structure (under var/uploads): {last2}/{prev3}/{paddedUserId}/{year}/{month}/.
      */
     private function cleanupUserDirectories(int $userId): void
     {
         try {
-            $userDir = $this->fileStorageService->getAbsolutePath((string) $userId);
+            $userDir = $this->fileStorageService->getUserBaseAbsolutePath($userId);
 
             // Only proceed if user directory exists
             if (!is_dir($userDir)) {
@@ -283,6 +283,12 @@ final readonly class UserDeletionService
 
             // Remove user directory if empty
             @rmdir($userDir);
+
+            // Remove hashed parent directories if empty (best effort)
+            $level2Dir = dirname($userDir);
+            @rmdir($level2Dir);
+            $level1Dir = dirname($level2Dir);
+            @rmdir($level1Dir);
 
             $this->logger->debug('User directory cleanup completed', [
                 'user_id' => $userId,

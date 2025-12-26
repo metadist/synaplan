@@ -3,6 +3,7 @@
 namespace App\Tests\Service\File;
 
 use App\Service\File\FileStorageService;
+use App\Service\File\UserUploadPathBuilder;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\HttpFoundation\File\UploadedFile;
@@ -20,7 +21,11 @@ class FileStorageServiceTest extends TestCase
         mkdir($this->testUploadDir, 0755, true);
 
         $this->logger = $this->createMock(LoggerInterface::class);
-        $this->service = new FileStorageService($this->testUploadDir, $this->logger);
+        $this->service = new FileStorageService(
+            $this->testUploadDir,
+            $this->logger,
+            new UserUploadPathBuilder()
+        );
     }
 
     protected function tearDown(): void
@@ -160,8 +165,8 @@ class FileStorageServiceTest extends TestCase
         $result = $this->service->storeUploadedFile($uploadedFile, 456);
         $path = $result['path'];
 
-        // Path should contain: userId/year/month/filename
-        $this->assertStringContainsString('456/', $path);
+        // Path should contain: {last2}/{prev3}/{paddedUserId}/year/month/filename
+        $this->assertStringContainsString('56/004/00456/', $path);
         $this->assertStringContainsString(date('Y').'/', $path);
         $this->assertStringContainsString(date('m').'/', $path);
     }

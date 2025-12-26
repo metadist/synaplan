@@ -540,11 +540,9 @@ class FileAnalysisHandler implements MessageHandlerInterface
             $isAudio = in_array($fileType, MessagePreProcessor::AUDIO_EXTENSIONS, true);
             $isDocument = in_array($fileType, MessagePreProcessor::DOCUMENT_EXTENSIONS, true);
 
-            // Normalize path
-            $filePath = $file->getFilePath();
-            if (!str_starts_with($filePath, 'uploads/') && str_contains($filePath, '/uploads/')) {
-                $filePath = 'uploads/'.substr($filePath, strpos($filePath, '/uploads/') + 9);
-            }
+            // Normalize path to be relative to the upload directory (var/uploads).
+            // DB values should be stored relative; older/legacy values may contain "/uploads/" or full URLs.
+            $filePath = $this->normalizeRelativeUploadPath($file->getFilePath());
 
             return [
                 'id' => $file->getId(),
@@ -566,10 +564,7 @@ class FileAnalysisHandler implements MessageHandlerInterface
             $isAudio = in_array($extension, MessagePreProcessor::AUDIO_EXTENSIONS, true);
             $isDocument = in_array($extension, MessagePreProcessor::DOCUMENT_EXTENSIONS, true);
 
-            // Normalize path
-            if (!str_starts_with($filePath, 'uploads/') && str_contains($filePath, '/uploads/')) {
-                $filePath = 'uploads/'.substr($filePath, strpos($filePath, '/uploads/') + 9);
-            }
+            $filePath = $this->normalizeRelativeUploadPath($filePath);
 
             return [
                 'id' => null,
@@ -584,6 +579,43 @@ class FileAnalysisHandler implements MessageHandlerInterface
         }
 
         return null;
+    }
+
+    /**
+     * Normalize any stored/received file path into a path relative to var/uploads.
+     * Examples:
+     * - "13/000/00013/2025/12/file.pdf" => same
+     * - "uploads/13/000/00013/2025/12/file.pdf" => "13/000/00013/2025/12/file.pdf"
+     * - "/var/www/backend/var/uploads/13/..." => "13/..."
+     * - "/api/v1/files/uploads/13/..." => "13/..."
+     * - "/up/13/..." => "13/...".
+     */
+    private function normalizeRelativeUploadPath(string $path): string
+    {
+        $path = trim($path);
+
+        // Strip known URL prefixes first
+        $path = preg_replace('#^https?://[^/]+/#', '', $path) ?? $path;
+        $path = ltrim($path, '/');
+
+        if (str_starts_with($path, 'api/v1/files/uploads/')) {
+            $path = substr($path, strlen('api/v1/files/uploads/'));
+        }
+        if (str_starts_with($path, 'up/')) {
+            $path = substr($path, strlen('up/'));
+        }
+
+        // Strip filesystem prefix if present
+        if (str_contains($path, '/uploads/')) {
+            $path = substr($path, strpos($path, '/uploads/') + strlen('/uploads/'));
+        }
+
+        // Some legacy code may have stored "uploads/..." relative to project root
+        if (str_starts_with($path, 'uploads/')) {
+            $path = substr($path, strlen('uploads/'));
+        }
+
+        return ltrim($path, '/');
     }
 
     /**

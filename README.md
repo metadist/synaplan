@@ -2,6 +2,8 @@
 
 AI-powered knowledge management with chat, document processing, and RAG (Retrieval-Augmented Generation).
 
+The official instance is hosted at [web.synaplan.com](https://web.synaplan.com/), where we regularly deploy the latest Docker containers.
+
 ## 🚀 Quick Start
 
 ### Prerequisites
@@ -95,6 +97,7 @@ AUTO_DOWNLOAD_MODELS=false docker compose up -d
 |---------|-----|-------------|
 | Frontend | http://localhost:5173 | Vue.js Web App |
 | Backend API | http://localhost:8000 | Symfony REST API |
+| API Docs | http://localhost:8000/api/doc | Swagger UI / OpenAPI |
 | phpMyAdmin | http://localhost:8082 | Database Management |
 | MailHog | http://localhost:8025 | Email Testing |
 | Ollama | http://localhost:11435 | AI Models API |
@@ -313,8 +316,16 @@ Example files provided:
 
 **`SYNAPLAN_URL`** (backend/.env): The publicly accessible URL where Synaplan is hosted
 - Development: `http://localhost:8000`
-- Production: `https://app.synaplan.com`
+- Production: `https://web.synaplan.com`
 - Used for: Widget embed code generation, public URLs, CORS configuration
+
+## 📚 Developer Documentation
+
+For technical deep-dives and "vibe coding" guides, check the `_devextras/planning/` directory. These documents are kept up to date and cover:
+- **Authentication**: Cookie-based & OIDC flows.
+- **Plugins**: Scalable user plugin architecture.
+- **Development**: Coding standards and quick commands.
+- **Infrastructure**: WSL and Ubuntu setup guides.
 
 ## 🛠️ Development
 
@@ -377,7 +388,7 @@ Synaplan includes a production-ready chat widget that can be embedded on any web
 ### Usage Example
 ```html
 <script type="module">
-  import SynaplanWidget from 'https://app.synaplan.com/widget.js'
+  import SynaplanWidget from 'https://web.synaplan.com/widget.js'
 
   SynaplanWidget.init({
     widgetId: 'wdg_abc123',

@@ -109,6 +109,49 @@ if [ "$USE_GROQ" -eq 1 ]; then
     echo ""
     echo "═══════════════════ Configuring Groq Defaults ═══════════════════"
     echo ""
+
+    # Helper function to retry SQL commands with deadlock handling
+    retry_sql() {
+        local sql="$1"
+        local max_attempts=5
+        local attempt=1
+        local delay=1
+
+        while [ $attempt -le $max_attempts ]; do
+            local output
+            local exit_code
+
+            # Capture both output and exit code
+            output=$(docker compose exec -T backend php bin/console dbal:run-sql "$sql" 2>&1)
+            exit_code=$?
+
+            if [ $exit_code -eq 0 ]; then
+                return 0
+            fi
+
+            # Check if it's a deadlock error
+            if echo "$output" | grep -qi "deadlock\|Deadlock\|1213"; then
+                if [ $attempt -lt $max_attempts ]; then
+                    echo "  ⚠️ Deadlock detected, retrying in ${delay}s (attempt $attempt/$max_attempts)..."
+                    sleep "$delay"
+                    delay=$((delay * 2))
+                    attempt=$((attempt + 1))
+                    continue
+                else
+                    echo "  ❌ Deadlock persisted after $max_attempts attempts"
+                    return 1
+                fi
+            else
+                # Not a deadlock, return immediately
+                echo "  ❌ SQL error (not a deadlock):"
+                echo "$output" | head -5
+                return 1
+            fi
+        done
+
+        return 1
+    }
+
     READY=0
     echo "⏳ Waiting for backend console availability..."
     for _ in {1..30}; do
@@ -120,9 +163,42 @@ if [ "$USE_GROQ" -eq 1 ]; then
     done
 
     if [ "$READY" -eq 1 ]; then
-        echo "⚙️ Switching defaults to Groq llama-3.3-70b-versatile..."
-        docker compose exec backend php bin/console dbal:run-sql "UPDATE BCONFIG SET BVALUE='9' WHERE BGROUP='DEFAULTMODEL' AND BSETTING IN ('CHAT','SORT')"
-        docker compose exec backend php bin/console dbal:run-sql "UPDATE BCONFIG SET BVALUE='groq' WHERE BOWNERID=0 AND BGROUP='ai' AND BSETTING='default_chat_provider'"
+        # Wait for fixtures to be loaded (BCONFIG table must exist)
+        echo "⏳ Waiting for database fixtures to be loaded..."
+        FIXTURES_READY=0
+        for _ in {1..30}; do
+            if docker compose exec backend php bin/console dbal:run-sql "SELECT COUNT(*) FROM BCONFIG" >/dev/null 2>&1; then
+                BCONFIG_COUNT=$(docker compose exec -T backend php bin/console dbal:run-sql "SELECT COUNT(*) as count FROM BCONFIG" 2>/dev/null | grep -oE '[0-9]+' | tail -1 || echo "0")
+                if [ "${BCONFIG_COUNT:-0}" -gt "0" ]; then
+                    FIXTURES_READY=1
+                    break
+                fi
+            fi
+            sleep 2
+        done
+
+        if [ "$FIXTURES_READY" -eq 1 ]; then
+            # Wait a bit longer to ensure all fixture transactions are committed
+            echo "⏳ Waiting for database transactions to complete..."
+            sleep 3
+
+            echo "⚙️ Switching defaults to Groq llama-3.3-70b-versatile..."
+            if retry_sql "UPDATE BCONFIG SET BVALUE='9' WHERE BGROUP='DEFAULTMODEL' AND BSETTING IN ('CHAT','SORT')"; then
+                echo "✅ Default model updated"
+            else
+                echo "⚠️ Failed to update default model after retries"
+            fi
+
+            if retry_sql "UPDATE BCONFIG SET BVALUE='groq' WHERE BOWNERID=0 AND BGROUP='ai' AND BSETTING='default_chat_provider'"; then
+                echo "✅ Default provider updated"
+            else
+                echo "⚠️ Failed to update default provider after retries"
+            fi
+        else
+            echo "⚠️ BCONFIG table not ready yet; run these commands once fixtures are loaded:"
+            echo "  docker compose exec backend php bin/console dbal:run-sql \"UPDATE BCONFIG SET BVALUE='9' WHERE BGROUP='DEFAULTMODEL' AND BSETTING IN ('CHAT','SORT')\""
+            echo "  docker compose exec backend php bin/console dbal:run-sql \"UPDATE BCONFIG SET BVALUE='groq' WHERE BOWNERID=0 AND BGROUP='ai' AND BSETTING='default_chat_provider'\""
+        fi
     else
         echo "⚠️ Backend console did not become ready; run these commands once it is:"
         echo "  docker compose exec backend php bin/console dbal:run-sql \"UPDATE BCONFIG SET BVALUE='9' WHERE BGROUP='DEFAULTMODEL' AND BSETTING IN ('CHAT','SORT')\""
