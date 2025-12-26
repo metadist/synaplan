@@ -9,7 +9,8 @@ use Symfony\Component\HttpFoundation\File\UploadedFile;
  * File Storage Service.
  *
  * Handles file uploads, storage, and management.
- * Creates organized directory structure: uploads/{userId}/{year}/{month}/
+ * Creates organized directory structure (under var/uploads):
+ * {last2}/{prev3}/{paddedUserId}/{year}/{month}/
  */
 class FileStorageService
 {
@@ -23,6 +24,7 @@ class FileStorageService
     public function __construct(
         private string $uploadDir,
         private LoggerInterface $logger,
+        private UserUploadPathBuilder $userUploadPathBuilder,
     ) {
     }
 
@@ -64,7 +66,7 @@ class FileStorageService
             // Skip isValid() check for FrankenPHP compatibility
             // FrankenPHP may delete temp files immediately, so we use getContent() instead
 
-            // Generate storage path: uploads/{userId}/{year}/{month}/{filename}
+            // Generate storage path: {last2}/{prev3}/{paddedUserId}/{year}/{month}/{filename}
             $relativePath = $this->generateStoragePath($userId, $file->getClientOriginalName());
             $absolutePath = $this->uploadDir.'/'.$relativePath;
 
@@ -173,7 +175,9 @@ class FileStorageService
         $basename = pathinfo($sanitized, PATHINFO_FILENAME);
         $filename = $basename.'_'.$timestamp.'.'.$extension;
 
-        return sprintf('%d/%s/%s/%s', $userId, $year, $month, $filename);
+        $userBase = $this->userUploadPathBuilder->buildUserBaseRelativePath($userId);
+
+        return $userBase.'/'.$year.'/'.$month.'/'.$filename;
     }
 
     /**
@@ -182,6 +186,16 @@ class FileStorageService
     public function getAbsolutePath(string $relativePath): string
     {
         return $this->uploadDir.'/'.ltrim($relativePath, '/');
+    }
+
+    /**
+     * Get absolute base directory path for a user (without year/month/filename).
+     */
+    public function getUserBaseAbsolutePath(int $userId): string
+    {
+        $relative = $this->userUploadPathBuilder->buildUserBaseRelativePath($userId);
+
+        return $this->getAbsolutePath($relative);
     }
 
     /**

@@ -165,24 +165,15 @@ class MediaGenerationHandler implements MessageHandlerInterface
                 $mediaType = 'image';
                 $this->logger->info('MediaGenerationHandler: Using media type hint from extractor (image)');
             } else {
-                // Auto-detect media type from prompt keywords (English only - sorting handles multilingual)
-                $isVideo = preg_match('/\b(video|film|movie|clip|animation|animated)\b/i', $prompt);
-                $isAudio = preg_match('/\b(audio|sound|music|voice|speech|song|read|aloud|speak|tts|text.?to.?speech|convert.?to.?audio|make.?voice)\b/i', $prompt);
-
-                if ($isVideo) {
-                    $modelId = $this->modelConfigService->getDefaultModel('TEXT2VID', $effectiveUserId);
-                    $mediaType = 'video';
-                } elseif ($isAudio) {
-                    $modelId = $this->modelConfigService->getDefaultModel('TEXT2SOUND', $effectiveUserId);
-                    $mediaType = 'audio';
-                } else {
-                    $modelId = $this->modelConfigService->getDefaultModel('TEXT2PIC', $effectiveUserId);
-                    $mediaType = 'image';
-                }
-
-                $this->logger->info('MediaGenerationHandler: Auto-detected media type', [
-                    'media_type' => $mediaType,
+                // Default to image if media type cannot be determined
+                // The mediamaker prompt should return JSON with BMEDIA, but if it doesn't,
+                // we default to image (most common case)
+                $modelId = $this->modelConfigService->getDefaultModel('TEXT2PIC', $effectiveUserId);
+                $mediaType = 'image';
+                
+                $this->logger->warning('MediaGenerationHandler: Media type not determined from extractor, defaulting to image', [
                     'model_id' => $modelId,
+                    'prompt_preview' => substr($prompt, 0, 100),
                 ]);
             }
         }

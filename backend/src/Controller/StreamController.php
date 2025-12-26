@@ -6,6 +6,7 @@ use App\AI\Service\AiFacade;
 use App\Entity\File;
 use App\Entity\Message;
 use App\Entity\User;
+use App\Service\File\UserUploadPathBuilder;
 use App\Service\Message\MessageProcessor;
 use App\Service\ModelConfigService;
 use App\Service\RateLimitService;
@@ -35,6 +36,7 @@ class StreamController extends AbstractController
         private WidgetSessionService $widgetSessionService,
         private RateLimitService $rateLimitService,
         private string $uploadDir,
+        private UserUploadPathBuilder $userUploadPathBuilder,
     ) {
     }
 
@@ -1112,7 +1114,8 @@ class StreamController extends AbstractController
             $finalFilename = $basename.'_'.$timestamp.'.'.$extension;
 
             // Create relative path
-            $relativePath = sprintf('%d/%s/%s/%s', $userId, $year, $month, $finalFilename);
+            $userBase = $this->userUploadPathBuilder->buildUserBaseRelativePath($userId);
+            $relativePath = $userBase.'/'.$year.'/'.$month.'/'.$finalFilename;
             $absolutePath = $this->uploadDir.'/'.$relativePath;
 
             // Create directory if not exists

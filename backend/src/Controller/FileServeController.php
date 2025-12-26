@@ -32,8 +32,8 @@ class FileServeController extends AbstractController
      *
      * GET /up/{path}
      * Examples:
-     * - /up/1/2025/10/image.jpg
-     * - /up/1/2025/10/document.pdf
+     * - /up/13/000/00013/2025/10/image.jpg
+     * - /up/67/345/1234567/2025/10/document.pdf
      */
     #[Route('/{path}', name: 'serve_file', requirements: ['path' => '.+'], methods: ['GET'])]
     public function serve(
