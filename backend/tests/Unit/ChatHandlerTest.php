@@ -40,7 +40,7 @@ class ChatHandlerTest extends TestCase
         $this->logger = $this->createMock(LoggerInterface::class);
         $this->vectorSearchService = $this->createMock(VectorSearchService::class);
         $this->em = $this->createMock(EntityManagerInterface::class);
-        $this->userUploadPathBuilder = $this->createMock(UserUploadPathBuilder::class);
+        $this->userUploadPathBuilder = new UserUploadPathBuilder();
 
         $this->handler = new ChatHandler(
             $this->aiFacade,
