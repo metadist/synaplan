@@ -384,7 +384,13 @@ class WebhookController extends AbstractController
                         }
 
                         $user = $userResult['user'];
-                        $responses[] = $this->processWhatsAppMessage($incomingMsg, $value, $user);
+                        // Storage + ownership:
+                        // - Verified phone -> store files under that user
+                        // - Unverified/anonymous phone -> store files under the WhatsApp default user
+                        $isAnonymous = $userResult['is_anonymous'] ?? false;
+                        $effectiveUserId = $isAnonymous ? $this->whatsappUserId : $user->getId();
+
+                        $responses[] = $this->processWhatsAppMessage($incomingMsg, $value, $user, $effectiveUserId);
                     }
                 }
             }
@@ -411,7 +417,7 @@ class WebhookController extends AbstractController
     /**
      * Process single WhatsApp message.
      */
-    private function processWhatsAppMessage(array $incomingMsg, array $value, User $user): array
+    private function processWhatsAppMessage(array $incomingMsg, array $value, User $user, int $effectiveUserId): array
     {
         $from = $incomingMsg['from'];
         $messageId = $incomingMsg['id'];
@@ -437,7 +443,8 @@ class WebhookController extends AbstractController
 
         $this->logger->info('WhatsApp message received', [
             'original_user_id' => $user->getId(),
-            'whatsapp_user_id' => $this->whatsappUserId,
+            'whatsapp_default_user_id' => $this->whatsappUserId,
+            'effective_user_id' => $effectiveUserId,
             'from' => $from,
             'to_phone_number_id' => $phoneNumberId,
             'to_display_phone' => $displayPhoneNumber,
@@ -537,10 +544,11 @@ class WebhookController extends AbstractController
         }
 
         // Create incoming message
-        // Use WhatsApp-specific user ID for model selection (configured in services.yaml)
-        // This allows WhatsApp messages to use different AI models than the default
+        // Use an effective user ID for storage/ownership:
+        // - Verified phone -> user's ID
+        // - Unverified/anonymous phone -> WhatsApp default user ID (configured in services.yaml)
         $message = new Message();
-        $message->setUserId($this->whatsappUserId);  // WhatsApp uses dedicated user ID for model config
+        $message->setUserId($effectiveUserId);
         $message->setTrackingId($timestamp);
         $message->setProviderIndex('WHATSAPP');
         $message->setUnixTimestamp($timestamp);
@@ -590,7 +598,8 @@ class WebhookController extends AbstractController
                     $message->setMeta('media_url', $mediaUrl);
 
                     // Download media file (with size validation - max 128 MB)
-                    $downloadResult = $this->whatsAppService->downloadMedia($mediaId, $phoneNumberId);
+                    // Store file under effective user ID (see ownership rules above)
+                    $downloadResult = $this->whatsAppService->downloadMedia($mediaId, $phoneNumberId, $effectiveUserId);
 
                     if ($downloadResult && !empty($downloadResult['file_path'])) {
                         // Set file info on message so PreProcessor can process it
@@ -607,40 +616,28 @@ class WebhookController extends AbstractController
                             'size_mb' => $downloadResult['size'] ? round($downloadResult['size'] / 1024 / 1024, 2) : 0,
                         ]);
 
-                        // WHATSAPP-SPECIFIC: Extract text immediately using FileProcessor
-                        // This ensures WhatsApp files get the same robust processing as web chat uploads
-                        // (with fallback strategies like vision AI for PDFs)
-                        if (empty($downloadResult['file_type'])) {
-                            $this->logger->error('WhatsApp file_type is missing from downloadResult', [
+                        // Extract text immediately (same processing as web chat uploads)
+                        try {
+                            [$extractedText, $extractMeta] = $this->fileProcessor->extractText(
+                                $downloadResult['file_path'],
+                                $downloadResult['file_type'],
+                                $effectiveUserId
+                            );
+
+                            if (!empty($extractedText)) {
+                                $message->setFileText($extractedText);
+                                $this->logger->info('WhatsApp file text extracted', [
+                                    'media_id' => $mediaId,
+                                    'text_length' => strlen($extractedText),
+                                    'strategy' => $extractMeta['strategy'] ?? 'unknown',
+                                ]);
+                            }
+                        } catch (\Throwable $e) {
+                            $this->logger->error('WhatsApp file extraction failed', [
                                 'media_id' => $mediaId,
                                 'file_path' => $downloadResult['file_path'],
-                                'whatsapp_type' => $type,
+                                'error' => $e->getMessage(),
                             ]);
-                        } else {
-                            try {
-                                [$extractedText, $extractMeta] = $this->fileProcessor->extractText(
-                                    $downloadResult['file_path'],
-                                    $downloadResult['file_type'],
-                                    $user->getId()
-                                );
-
-                                if (!empty($extractedText)) {
-                                    $message->setFileText($extractedText);
-                                    $this->logger->info('WhatsApp file text extracted', [
-                                        'media_id' => $mediaId,
-                                        'text_length' => strlen($extractedText),
-                                        'strategy' => $extractMeta['strategy'] ?? 'unknown',
-                                    ]);
-                                }
-                            } catch (\Throwable $e) {
-                                $this->logger->error('WhatsApp file extraction failed', [
-                                    'media_id' => $mediaId,
-                                    'file_path' => $downloadResult['file_path'],
-                                    'file_type' => $downloadResult['file_type'],
-                                    'error' => $e->getMessage(),
-                                ]);
-                                // Continue processing even if extraction fails
-                            }
                         }
                     } else {
                         $this->logger->warning('WhatsApp media download failed', [

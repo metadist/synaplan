@@ -2,6 +2,7 @@
 
 namespace App\Service;
 
+use App\Service\File\UserUploadPathBuilder;
 use Psr\Log\LoggerInterface;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 
@@ -32,6 +33,7 @@ class WhatsAppService
         string $whatsappAccessToken,
         bool $whatsappEnabled,
         private string $uploadsDir,
+        private UserUploadPathBuilder $userUploadPathBuilder,
     ) {
         $this->accessToken = $whatsappAccessToken;
         $this->enabled = $whatsappEnabled;
@@ -377,8 +379,10 @@ class WhatsAppService
     /**
      * Download media from WhatsApp and save locally.
      * Returns array with file_path and file_type.
+     *
+     * @param int $userId User ID to store file under (uses user's directory structure)
      */
-    public function downloadMedia(string $mediaId, string $phoneNumberId): ?array
+    public function downloadMedia(string $mediaId, string $phoneNumberId, int $userId): ?array
     {
         if (!$this->isAvailable()) {
             return null;
@@ -451,15 +455,20 @@ class WhatsAppService
                 return null;
             }
 
-            // Generate unique filename
+            // Generate unique filename with WhatsApp prefix
             $filename = 'whatsapp_'.time().'_'.bin2hex(random_bytes(8)).'.'.$extension;
-            $relativePath = 'whatsapp/'.$filename;
+
+            // Use user-based directory structure (same as regular uploads)
+            $year = date('Y');
+            $month = date('m');
+            $userBase = $this->userUploadPathBuilder->buildUserBaseRelativePath($userId);
+            $relativePath = $userBase.'/'.$year.'/'.$month.'/'.$filename;
             $fullPath = $this->uploadsDir.'/'.$relativePath;
 
             // Create directory if it doesn't exist
             $dir = dirname($fullPath);
             if (!is_dir($dir)) {
-                mkdir($dir, 0775, true);
+                mkdir($dir, 0755, true);
             }
 
             // Save file
