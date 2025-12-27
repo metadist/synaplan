@@ -31,15 +31,26 @@ WORKDIR /var/www/backend
 # Using v1.7.4 - newer versions have better cross-platform SIMD support
 # Note: In 1.6+ the binary is 'whisper-cli' (was 'main') and 'whisper-quantize' (was 'quantize')
 # GGML_NATIVE=OFF disables -mcpu=native which fails under QEMU emulation (Apple Silicon -> x86_64)
+# CRITICAL: Must copy shared libraries (libwhisper.so, libggml*.so) AND run ldconfig!
 RUN cd /tmp && \
     git clone https://github.com/ggerganov/whisper.cpp.git && \
     cd whisper.cpp && \
     git checkout v1.7.4 && \
     cmake -B build -DCMAKE_BUILD_TYPE=Release -DGGML_NATIVE=OFF && \
     cmake --build build --config Release -j$(nproc) && \
+    # Copy binaries
     cp build/bin/whisper-cli /usr/local/bin/whisper && \
     cp build/bin/quantize /usr/local/bin/whisper-quantize && \
     chmod +x /usr/local/bin/whisper* && \
+    # Copy shared libraries (required for binaries to work!)
+    cp build/src/libwhisper.so.1.7.4 /usr/local/lib/ && \
+    ln -sf libwhisper.so.1.7.4 /usr/local/lib/libwhisper.so.1 && \
+    ln -sf libwhisper.so.1 /usr/local/lib/libwhisper.so && \
+    cp build/ggml/src/libggml.so /usr/local/lib/ && \
+    cp build/ggml/src/libggml-cpu.so /usr/local/lib/ && \
+    cp build/ggml/src/libggml-base.so /usr/local/lib/ && \
+    # Update library cache so binaries can find the libs
+    ldconfig && \
     cd / && rm -rf /tmp/whisper.cpp
 
 # Install PHP extensions
