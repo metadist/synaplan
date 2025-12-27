@@ -42,8 +42,7 @@ docker compose up -d
 ```
 
 **What happens automatically:**
-- ✅ Creates `.env` from `.env.example` (Docker Compose variables)
-- ✅ Creates `backend/.env` and `frontend/.env` (app-specific configs)
+- ✅ Creates `backend/.env` from `.env.example` (stores AI keys and server settings)
 - ✅ Installs dependencies (Composer, npm)
 - ✅ Generates JWT keypair for authentication
 - ✅ Creates database schema (migrations)
@@ -126,12 +125,12 @@ Audio files are automatically transcribed using **Whisper.cpp** when uploaded:
 
 - **Supported formats**: mp3, wav, ogg, m4a, opus, flac, webm, aac, wma
 - **Automatic conversion**: FFmpeg converts all audio to optimal format (16kHz mono WAV)
-- **Models**: tiny, base (default), small, medium, large - configurable via `.env`
+- **Models**: tiny, base (default), small, medium, large - configurable via `backend/.env`
 - **Setup**:
   - **Docker**: Pre-installed, download models on first run
-  - **Local**: Install [whisper.cpp](https://github.com/ggerganov/whisper.cpp) and FFmpeg, configure paths in `.env`
+  - **Local**: Install [whisper.cpp](https://github.com/ggerganov/whisper.cpp) and FFmpeg, configure paths in `backend/.env`
 
-**Environment variables** (see `.env.example`):
+**Environment variables** (see `backend/.env.example`):
 ```bash
 WHISPER_BINARY=/usr/local/bin/whisper    # Whisper.cpp binary path
 WHISPER_MODELS_PATH=/var/www/backend/var/whisper  # Model storage
@@ -302,14 +301,12 @@ synaplan-dev/
 ## ⚙️ Environment Configuration
 
 Environment files are auto-generated on first start:
-- `backend/.env` (created from `.env.example` by install script, stores API keys)
-- `frontend/.env.docker` (auto-created by frontend container)
+- `backend/.env` (created from `.env.example` by install script, stores API keys and server settings)
 
 **Note:** `backend/.env` is never overwritten if it exists. To reset: delete the file and run the install script again.
 
 Example files provided:
-- `backend/.env.docker.example` (reference)
-- `frontend/.env.docker.example` (reference)
+- `backend/.env.example` (reference)
 
 ### Required Configuration for Production
 
