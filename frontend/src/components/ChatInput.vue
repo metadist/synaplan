@@ -271,7 +271,31 @@ const aiConfigStore = useAiConfigStore()
 const chatsStore = useChatsStore()
 const configStore = useConfigStore()
 const { warning, error: showError, success } = useNotification()
-const { t } = useI18n()
+const { t, locale } = useI18n()
+
+/**
+ * Get the speech recognition language code from the current UI locale.
+ * Maps short locale codes (en, de) to full BCP-47 codes (en-US, de-DE).
+ */
+const speechLanguage = computed(() => {
+  const currentLocale = locale.value
+  // Map short codes to full BCP-47 language codes for better speech recognition
+  const languageMap: Record<string, string> = {
+    en: 'en-US',
+    de: 'de-DE',
+    fr: 'fr-FR',
+    es: 'es-ES',
+    it: 'it-IT',
+    pt: 'pt-BR',
+    nl: 'nl-NL',
+    pl: 'pl-PL',
+    ru: 'ru-RU',
+    ja: 'ja-JP',
+    zh: 'zh-CN',
+    ko: 'ko-KR',
+  }
+  return languageMap[currentLocale] || currentLocale || 'en-US'
+})
 
 /**
  * Determine if microphone button should be shown.
@@ -692,9 +716,10 @@ const startWebSpeechRecording = async () => {
       '🎙️ Web Speech: Starting with base message:',
       JSON.stringify(speechBaseMessage.value)
     )
+    console.log('🎙️ Web Speech: Using language:', speechLanguage.value)
 
     webSpeechService.value = new WebSpeechService({
-      language: navigator.language,
+      language: speechLanguage.value,
       interimResults: true,
       continuous: true,
       onStart: () => {

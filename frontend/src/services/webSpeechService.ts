@@ -14,6 +14,60 @@
  * @see https://developer.mozilla.org/en-US/docs/Web/API/SpeechRecognition
  */
 
+// Type alias for the window with vendor-prefixed APIs
+type WindowWithSpeech = Window &
+  typeof globalThis & {
+    SpeechRecognition?: SpeechRecognitionConstructor
+    webkitSpeechRecognition?: SpeechRecognitionConstructor
+  }
+
+// Web Speech API type declarations (not all browsers have these in their type defs)
+interface SpeechRecognitionResultItem {
+  transcript: string
+  confidence: number
+}
+
+interface SpeechRecognitionResult {
+  readonly length: number
+  readonly isFinal: boolean
+  item(index: number): SpeechRecognitionResultItem
+  [index: number]: SpeechRecognitionResultItem
+}
+
+interface SpeechRecognitionResultList {
+  readonly length: number
+  item(index: number): SpeechRecognitionResult
+  [index: number]: SpeechRecognitionResult
+}
+
+interface SpeechRecognitionEventType extends Event {
+  readonly resultIndex: number
+  readonly results: SpeechRecognitionResultList
+}
+
+interface SpeechRecognitionErrorEventType extends Event {
+  readonly error: string
+  readonly message: string
+}
+
+interface SpeechRecognitionInstance extends EventTarget {
+  lang: string
+  continuous: boolean
+  interimResults: boolean
+  maxAlternatives: number
+  onstart: ((this: SpeechRecognitionInstance, ev: Event) => void) | null
+  onend: ((this: SpeechRecognitionInstance, ev: Event) => void) | null
+  onresult: ((this: SpeechRecognitionInstance, ev: SpeechRecognitionEventType) => void) | null
+  onerror: ((this: SpeechRecognitionInstance, ev: SpeechRecognitionErrorEventType) => void) | null
+  start(): void
+  stop(): void
+  abort(): void
+}
+
+interface SpeechRecognitionConstructor {
+  new (): SpeechRecognitionInstance
+}
+
 export interface WebSpeechOptions {
   /** Language for recognition (e.g., 'en-US', 'de-DE'). Defaults to browser language. */
   language?: string
@@ -37,31 +91,21 @@ export interface WebSpeechError {
   userMessage: string
 }
 
-/** SpeechRecognition type (vendor-prefixed in some browsers) */
-type SpeechRecognitionType = typeof window.SpeechRecognition
-
 /**
  * Check if Web Speech API is supported in this browser.
  * Returns true for Chrome, Edge, Safari. False for Firefox.
  */
 export function isWebSpeechSupported(): boolean {
-  return !!(
-    window.SpeechRecognition ||
-    (window as unknown as { webkitSpeechRecognition: SpeechRecognitionType })
-      .webkitSpeechRecognition
-  )
+  const win = window as WindowWithSpeech
+  return !!(win.SpeechRecognition || win.webkitSpeechRecognition)
 }
 
 /**
  * Get the SpeechRecognition constructor (handles vendor prefix).
  */
-function getSpeechRecognition(): SpeechRecognitionType | null {
-  return (
-    window.SpeechRecognition ||
-    (window as unknown as { webkitSpeechRecognition: SpeechRecognitionType })
-      .webkitSpeechRecognition ||
-    null
-  )
+function getSpeechRecognition(): SpeechRecognitionConstructor | null {
+  const win = window as WindowWithSpeech
+  return win.SpeechRecognition || win.webkitSpeechRecognition || null
 }
 
 /**
@@ -86,7 +130,7 @@ function getSpeechRecognition(): SpeechRecognitionType | null {
  * ```
  */
 export class WebSpeechService {
-  private recognition: SpeechRecognition | null = null
+  private recognition: SpeechRecognitionInstance | null = null
   private options: WebSpeechOptions
   private isListening = false
 
@@ -147,7 +191,7 @@ export class WebSpeechService {
       this.options.onEnd?.()
     }
 
-    this.recognition.onresult = (event: SpeechRecognitionEvent) => {
+    this.recognition.onresult = (event: SpeechRecognitionEventType) => {
       // Get the latest result
       const resultIndex = event.resultIndex
       const result = event.results[resultIndex]
@@ -161,7 +205,7 @@ export class WebSpeechService {
       }
     }
 
-    this.recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
+    this.recognition.onerror = (event: SpeechRecognitionErrorEventType) => {
       console.error('🎙️ Web Speech error:', event.error, event.message)
 
       const error = this.parseError(event.error, event.message)
