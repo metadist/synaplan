@@ -2,10 +2,10 @@
 
 namespace App\Controller;
 
+use App\Dto\WhatsApp\IncomingMessageDto;
 use App\Entity\Message;
 use App\Entity\User;
 use App\Service\EmailChatService;
-use App\Service\File\FileProcessor;
 use App\Service\InternalEmailService;
 use App\Service\Message\MessageProcessor;
 use App\Service\RateLimitService;
@@ -31,10 +31,8 @@ class WebhookController extends AbstractController
         private WhatsAppService $whatsAppService,
         private EmailChatService $emailChatService,
         private InternalEmailService $internalEmailService,
-        private FileProcessor $fileProcessor,
         private LoggerInterface $logger,
         private string $whatsappWebhookVerifyToken,
-        private int $whatsappUserId,
     ) {
     }
 
@@ -365,16 +363,11 @@ class WebhookController extends AbstractController
                     }
 
                     foreach ($value['messages'] as $incomingMsg) {
-                        // Find or create user from phone number (anonymous users allowed)
+                        // 1. Find or create user from phone number
                         $from = $incomingMsg['from'];
                         $userResult = $this->emailChatService->findOrCreateUserFromPhone($from);
 
                         if (isset($userResult['error'])) {
-                            $this->logger->warning('WhatsApp message rejected', [
-                                'phone' => $from,
-                                'reason' => $userResult['error'],
-                            ]);
-
                             $responses[] = [
                                 'success' => false,
                                 'phone' => $from,
@@ -383,14 +376,15 @@ class WebhookController extends AbstractController
                             continue;
                         }
 
-                        $user = $userResult['user'];
-                        // Storage + ownership:
-                        // - Verified phone -> store files under that user
-                        // - Unverified/anonymous phone -> store files under the WhatsApp default user
-                        $isAnonymous = $userResult['is_anonymous'] ?? false;
-                        $effectiveUserId = $isAnonymous ? $this->whatsappUserId : $user->getId();
+                        // 2. Wrap incoming message in a DTO to reduce arity/signature smells
+                        $dto = IncomingMessageDto::fromPayload($incomingMsg, $value);
 
-                        $responses[] = $this->processWhatsAppMessage($incomingMsg, $value, $user, $effectiveUserId);
+                        // 3. Delegate business logic to WhatsAppService
+                        $responses[] = $this->whatsAppService->handleIncomingMessage(
+                            $dto,
+                            $userResult['user'],
+                            $userResult['is_anonymous'] ?? false
+                        );
                     }
                 }
             }
@@ -412,313 +406,6 @@ class WebhookController extends AbstractController
                 'details' => 'dev' === $_ENV['APP_ENV'] ? $e->getMessage() : null,
             ], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
-    }
-
-    /**
-     * Process single WhatsApp message.
-     */
-    private function processWhatsAppMessage(array $incomingMsg, array $value, User $user, int $effectiveUserId): array
-    {
-        $from = $incomingMsg['from'];
-        $messageId = $incomingMsg['id'];
-        $timestamp = (int) $incomingMsg['timestamp'];
-        $type = $incomingMsg['type'];
-
-        // Extract phone number ID from webhook metadata (dynamic multi-number support)
-        $phoneNumberId = $value['metadata']['phone_number_id'] ?? null;
-        $displayPhoneNumber = $value['metadata']['display_phone_number'] ?? null;
-
-        if (!$phoneNumberId) {
-            $this->logger->error('WhatsApp message missing phone_number_id', [
-                'message_id' => $messageId,
-                'value' => $value,
-            ]);
-
-            return [
-                'success' => false,
-                'message_id' => $messageId,
-                'error' => 'Missing phone_number_id in webhook payload',
-            ];
-        }
-
-        $this->logger->info('WhatsApp message received', [
-            'original_user_id' => $user->getId(),
-            'whatsapp_default_user_id' => $this->whatsappUserId,
-            'effective_user_id' => $effectiveUserId,
-            'from' => $from,
-            'to_phone_number_id' => $phoneNumberId,
-            'to_display_phone' => $displayPhoneNumber,
-            'type' => $type,
-            'message_id' => $messageId,
-        ]);
-
-        // PRIORITY: Check if this is a verification code BEFORE rate limiting
-        // This allows users to verify even if they've hit their rate limit
-        if ('text' === $type) {
-            $messageText = $incomingMsg['text']['body'];
-            $trimmedText = trim(strtoupper($messageText));
-
-            // Check if this is a verification code (5 chars, uppercase letters + numbers)
-            if (preg_match('/^[A-Z0-9]{5}$/', $trimmedText)) {
-                $verificationResult = $this->handleVerificationCode($trimmedText, $from, $phoneNumberId, $messageId);
-                if (null !== $verificationResult) {
-                    // Verification was handled (success or failure), return early
-                    // No rate limit check needed for verification codes
-                    return $verificationResult;
-                }
-                // If null, code was not found in database - continue with normal processing and rate limit check
-            }
-        }
-
-        // Check rate limit (only if not a valid verification code)
-        $rateLimitCheck = $this->rateLimitService->checkLimit($user, 'MESSAGES');
-        if (!$rateLimitCheck['allowed']) {
-            $this->logger->warning('WhatsApp message rate limit exceeded', [
-                'user_id' => $user->getId(),
-                'level' => $user->getRateLimitLevel(),
-                'limit' => $rateLimitCheck['limit'],
-                'used' => $rateLimitCheck['used'],
-                'message_id' => $messageId,
-            ]);
-
-            // Send rate limit notification to user
-            $limitType = $rateLimitCheck['limit_type'] ?? 'lifetime';
-            $limitMessage = "⚠️ *Nachrichtenlimit erreicht*\n\n";
-            $limitMessage .= "Du hast dein Nachrichtenlimit von {$rateLimitCheck['limit']} Nachrichten ";
-
-            if ('lifetime' === $limitType) {
-                $limitMessage .= "erreicht.\n\n";
-                $limitMessage .= 'Um weiterhin Synaplan zu nutzen, verifiziere deine Nummer oder upgrade zu einem kostenpflichtigen Plan.';
-            } else {
-                $resetTime = $rateLimitCheck['reset_at'] ?? null;
-                if ($resetTime) {
-                    $resetDate = date('d.m.Y H:i', $resetTime);
-                    $limitMessage .= "für diesen Zeitraum erreicht.\n\n";
-                    $limitMessage .= "Dein Limit wird am $resetDate zurückgesetzt.";
-                } else {
-                    $limitMessage .= 'erreicht.';
-                }
-            }
-
-            $this->whatsAppService->sendMessage($from, $limitMessage, $phoneNumberId);
-
-            // Mark as read even if rate limited
-            $this->whatsAppService->markAsRead($messageId, $phoneNumberId);
-
-            return [
-                'success' => false,
-                'message_id' => $messageId,
-                'error' => 'Rate limit exceeded',
-            ];
-        }
-
-        // Extract message text and media
-        $messageText = '';
-        $mediaId = null;
-        $mediaUrl = null;
-
-        switch ($type) {
-            case 'text':
-                // Text was already extracted above for verification check
-                $messageText = $incomingMsg['text']['body'];
-                break;
-            case 'image':
-                $mediaId = $incomingMsg['image']['id'];
-                $mediaUrl = $incomingMsg['image']['link'] ?? null;
-                $messageText = $incomingMsg['image']['caption'] ?? '[Image]';
-                break;
-            case 'audio':
-                $mediaId = $incomingMsg['audio']['id'];
-                $messageText = '[Audio message]';
-                break;
-            case 'video':
-                $mediaId = $incomingMsg['video']['id'];
-                $messageText = $incomingMsg['video']['caption'] ?? '[Video]';
-                break;
-            case 'document':
-                $mediaId = $incomingMsg['document']['id'];
-                $messageText = $incomingMsg['document']['caption'] ?? '[Document]';
-                break;
-            default:
-                $messageText = "[Unsupported message type: $type]";
-        }
-
-        // Create incoming message
-        // Use an effective user ID for storage/ownership:
-        // - Verified phone -> user's ID
-        // - Unverified/anonymous phone -> WhatsApp default user ID (configured in services.yaml)
-        $message = new Message();
-        $message->setUserId($effectiveUserId);
-        $message->setTrackingId($timestamp);
-        $message->setProviderIndex('WHATSAPP');
-        $message->setUnixTimestamp($timestamp);
-        $message->setDateTime(date('YmdHis', $timestamp));
-        $message->setMessageType('WTSP'); // WhatsApp - max 4 chars for BMESSTYPE column
-        $message->setFile(0); // Will be set by preprocessor if media
-        $message->setTopic('CHAT');
-        $message->setLanguage('en'); // Will be detected
-        $message->setText($messageText);
-        $message->setDirection('IN');
-        $message->setStatus('processing');
-
-        $this->em->persist($message);
-        $this->em->flush(); // MUST flush before setMeta() to get message ID
-
-        // Store WhatsApp metadata
-        $message->setMeta('channel', 'whatsapp');
-        $message->setMeta('from_phone', $from);
-        $message->setMeta('original_user_id', (string) $user->getId());  // Track original user for reference
-        $message->setMeta('to_phone_number_id', $phoneNumberId);
-        if ($displayPhoneNumber) {
-            $message->setMeta('to_display_phone', $displayPhoneNumber);
-        }
-        $message->setMeta('external_id', $messageId);
-        $message->setMeta('message_type', $type);
-
-        if (!empty($value['contacts'][0]['profile']['name'])) {
-            $message->setMeta('profile_name', $value['contacts'][0]['profile']['name']);
-        }
-
-        if ($mediaId) {
-            $message->setMeta('media_id', $mediaId);
-
-            // Download and process media file
-            try {
-                $this->logger->info('Downloading WhatsApp media', [
-                    'media_id' => $mediaId,
-                    'type' => $type,
-                ]);
-
-                // Get media URL if not provided
-                if (!$mediaUrl) {
-                    $mediaUrl = $this->whatsAppService->getMediaUrl($mediaId, $phoneNumberId);
-                }
-
-                if ($mediaUrl) {
-                    $message->setMeta('media_url', $mediaUrl);
-
-                    // Download media file (with size validation - max 128 MB)
-                    // Store file under effective user ID (see ownership rules above)
-                    $downloadResult = $this->whatsAppService->downloadMedia($mediaId, $phoneNumberId, $effectiveUserId);
-
-                    if ($downloadResult && !empty($downloadResult['file_path'])) {
-                        // Set file info on message so PreProcessor can process it
-                        $message->setFile(1);
-                        $message->setFilePath($downloadResult['file_path']);
-                        // Note: file_type should always be set by downloadMedia(), but use 'unknown' as fallback
-                        $message->setFileType($downloadResult['file_type'] ?? 'unknown');
-
-                        $this->logger->info('WhatsApp media downloaded successfully', [
-                            'media_id' => $mediaId,
-                            'file_path' => $downloadResult['file_path'],
-                            'file_type' => $downloadResult['file_type'] ?? 'unknown',
-                            'whatsapp_type' => $type,
-                            'size_mb' => $downloadResult['size'] ? round($downloadResult['size'] / 1024 / 1024, 2) : 0,
-                        ]);
-
-                        // Extract text immediately (same processing as web chat uploads)
-                        try {
-                            [$extractedText, $extractMeta] = $this->fileProcessor->extractText(
-                                $downloadResult['file_path'],
-                                $downloadResult['file_type'],
-                                $effectiveUserId
-                            );
-
-                            if (!empty($extractedText)) {
-                                $message->setFileText($extractedText);
-                                $this->logger->info('WhatsApp file text extracted', [
-                                    'media_id' => $mediaId,
-                                    'text_length' => strlen($extractedText),
-                                    'strategy' => $extractMeta['strategy'] ?? 'unknown',
-                                ]);
-                            }
-                        } catch (\Throwable $e) {
-                            $this->logger->error('WhatsApp file extraction failed', [
-                                'media_id' => $mediaId,
-                                'file_path' => $downloadResult['file_path'],
-                                'error' => $e->getMessage(),
-                            ]);
-                        }
-                    } else {
-                        $this->logger->warning('WhatsApp media download failed', [
-                            'media_id' => $mediaId,
-                            'type' => $type,
-                            'reason' => 'File may be too large (>128 MB), disallowed file type, or download failed',
-                        ]);
-                    }
-                }
-            } catch (\Exception $e) {
-                $this->logger->error('Failed to download WhatsApp media', [
-                    'media_id' => $mediaId,
-                    'error' => $e->getMessage(),
-                ]);
-                // Continue processing even if media download fails
-            }
-        }
-
-        $this->em->flush(); // Flush metadata
-
-        // Record usage (use original $user for rate limiting, not whatsappUserId)
-        // This ensures each phone number has its own rate limit
-        $this->rateLimitService->recordUsage($user, 'MESSAGES');
-
-        // Mark as read (using the phone number ID from the webhook)
-        $this->whatsAppService->markAsRead($messageId, $phoneNumberId);
-
-        // Process message through pipeline (PreProcessor -> Classifier -> Processor)
-        // PreProcessor will now extract text from audio, PDFs, and analyze images
-        $result = $this->messageProcessor->process($message);
-
-        if (!$result['success']) {
-            return [
-                'success' => false,
-                'message_id' => $messageId,
-                'error' => $result['error'] ?? 'Processing failed',
-            ];
-        }
-
-        $response = $result['response'];
-        $responseText = $response['content'] ?? '';
-
-        // Send response back to WhatsApp (using the same phone number ID that received the message)
-        if (!empty($responseText)) {
-            $sendResult = $this->whatsAppService->sendMessage($from, $responseText, $phoneNumberId);
-
-            if ($sendResult['success']) {
-                // Store outgoing message
-                $outgoingMessage = new Message();
-                $outgoingMessage->setUserId($user->getId());
-                $outgoingMessage->setTrackingId(time());
-                $outgoingMessage->setProviderIndex('WHATSAPP');
-                $outgoingMessage->setUnixTimestamp(time());
-                $outgoingMessage->setDateTime(date('YmdHis'));
-                $outgoingMessage->setMessageType('WTSP'); // WhatsApp - max 4 chars for BMESSTYPE column
-                $outgoingMessage->setFile(0);
-                $outgoingMessage->setTopic('CHAT');
-                $outgoingMessage->setLanguage('en');
-                $outgoingMessage->setText($responseText);
-                $outgoingMessage->setDirection('OUT');
-                $outgoingMessage->setStatus('sent');
-
-                $this->em->persist($outgoingMessage);
-                $this->em->flush();
-
-                $outgoingMessage->setMeta('channel', 'whatsapp');
-                $outgoingMessage->setMeta('to_phone', $from);
-                $outgoingMessage->setMeta('from_phone_number_id', $phoneNumberId);
-                if ($displayPhoneNumber) {
-                    $outgoingMessage->setMeta('from_display_phone', $displayPhoneNumber);
-                }
-                $outgoingMessage->setMeta('external_id', $sendResult['message_id']);
-                $this->em->flush();
-            }
-        }
-
-        return [
-            'success' => true,
-            'message_id' => $messageId,
-            'response_sent' => !empty($responseText),
-        ];
     }
 
     /**
@@ -816,144 +503,5 @@ class WebhookController extends AbstractController
                 'error' => 'Internal error',
             ], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
-    }
-
-    /**
-     * Handle verification code sent via WhatsApp.
-     * Returns array if code is found and processed, null if not a verification code.
-     */
-    private function handleVerificationCode(string $code, string $fromPhone, string $phoneNumberId, string $messageId): ?array
-    {
-        $this->logger->info('Potential verification code received', [
-            'code' => $code,
-            'from_phone_raw' => $fromPhone,
-            'phone_number_id' => $phoneNumberId,
-        ]);
-
-        // Format phone number consistently (WhatsApp sends without +, but we might store with +)
-        // Remove all non-digits first
-        $fromPhone = preg_replace('/[^0-9]/', '', $fromPhone);
-
-        // Find user with pending verification for this code
-        $qb = $this->em->createQueryBuilder();
-        $qb->select('u')
-            ->from(User::class, 'u')
-            ->where($qb->expr()->like('u.userDetails', ':codePattern'))
-            ->setParameter('codePattern', '%"code":"'.$code.'"%');
-
-        $users = $qb->getQuery()->getResult();
-
-        foreach ($users as $user) {
-            $userDetails = $user->getUserDetails();
-            $verification = $userDetails['phone_verification'] ?? null;
-
-            if (!$verification) {
-                continue;
-            }
-
-            // Check if code matches
-            if ($verification['code'] !== $code) {
-                continue;
-            }
-
-            // Check if phone number matches (format both the same way - only digits, no +)
-            // WhatsApp sends numbers without +, so we strip + from stored numbers
-            $expectedPhone = preg_replace('/[^0-9]/', '', $verification['phone_number']);
-
-            $this->logger->info('Comparing phone numbers for verification', [
-                'code' => $code,
-                'expected_phone_raw' => $verification['phone_number'],
-                'expected_phone_formatted' => $expectedPhone,
-                'actual_phone_from_whatsapp' => $fromPhone,
-                'match' => $expectedPhone === $fromPhone,
-                'user_id' => $user->getId(),
-            ]);
-
-            if ($expectedPhone !== $fromPhone) {
-                $this->logger->warning('Verification code sent from wrong phone number', [
-                    'code' => $code,
-                    'expected_phone' => $expectedPhone,
-                    'actual_phone' => $fromPhone,
-                    'user_id' => $user->getId(),
-                ]);
-
-                $errorMessage = "❌ *Verification Failed*\n\nThis code was requested for a different phone number.\n\nPlease use the phone number you entered on the website.";
-                $this->whatsAppService->sendMessage($fromPhone, $errorMessage, $phoneNumberId);
-
-                return [
-                    'success' => false,
-                    'message_id' => $messageId,
-                    'error' => 'Phone number mismatch',
-                ];
-            }
-
-            // Check if code is expired (5 minutes)
-            $expiresAt = $verification['expires_at'] ?? 0;
-            if (time() > $expiresAt) {
-                $this->logger->warning('Verification code expired', [
-                    'code' => $code,
-                    'expired_at' => $expiresAt,
-                    'current_time' => time(),
-                    'user_id' => $user->getId(),
-                ]);
-
-                $expiredMessage = "❌ *Verification Code Expired*\n\nYour verification code has expired. Please request a new code on the website.\n\nCodes are valid for 5 minutes only.";
-                $this->whatsAppService->sendMessage($fromPhone, $expiredMessage, $phoneNumberId);
-
-                // Clean up expired verification
-                unset($userDetails['phone_verification']);
-                $user->setUserDetails($userDetails);
-                $this->em->flush();
-
-                return [
-                    'success' => false,
-                    'message_id' => $messageId,
-                    'error' => 'Code expired',
-                ];
-            }
-
-            // Verification successful!
-            $this->logger->info('Phone verification successful', [
-                'code' => $code,
-                'user_id' => $user->getId(),
-                'phone' => $fromPhone,
-            ]);
-
-            // Update user: set phone number, verified status, and upgrade user level
-            $userDetails['phone_number'] = $fromPhone;
-            $userDetails['phone_verified_at'] = time();
-            unset($userDetails['phone_verification']); // Remove pending verification
-
-            // Upgrade user level if ANONYMOUS
-            if ('ANONYMOUS' === $user->getUserLevel()) {
-                $user->setUserLevel('NEW');
-                $this->logger->info('User upgraded from ANONYMOUS to NEW after verification', [
-                    'user_id' => $user->getId(),
-                ]);
-            }
-
-            $user->setUserDetails($userDetails);
-            $this->em->flush();
-
-            // Send success message
-            $successMessage = '✅ Erfolgreich verifiziert!';
-            $this->whatsAppService->sendMessage($fromPhone, $successMessage, $phoneNumberId);
-
-            return [
-                'success' => true,
-                'message_id' => $messageId,
-                'verified' => true,
-                'user_id' => $user->getId(),
-            ];
-        }
-
-        // Code not found or doesn't match any user
-        $this->logger->debug('Verification code not found in database', [
-            'code' => $code,
-            'from_phone' => $fromPhone,
-        ]);
-
-        // Return null to continue with normal message processing
-        return null;
     }
 }

@@ -114,12 +114,12 @@ services:
             $whatsappAccessToken: '%env(WHATSAPP_ACCESS_TOKEN)%'
             $whatsappEnabled: '%env(bool:WHATSAPP_ENABLED)%'
             $uploadsDir: '%kernel.project_dir%/var/uploads'
+            $whatsappUserId: 2  # WhatsApp messages use User ID 2 for model selection
 
     # Webhook Controller - Bind WhatsApp Verify Token
     App\Controller\WebhookController:
         bind:
             $whatsappWebhookVerifyToken: '%env(WHATSAPP_WEBHOOK_VERIFY_TOKEN)%'
-            $whatsappUserId: 2  # WhatsApp messages use User ID 2 for model selection
 
     # Message Processing Services
     App\Service\Message\MessagePreProcessor:

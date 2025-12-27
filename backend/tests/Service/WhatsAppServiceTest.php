@@ -4,8 +4,12 @@ declare(strict_types=1);
 
 namespace App\Tests\Service;
 
+use App\Service\File\FileProcessor;
 use App\Service\File\UserUploadPathBuilder;
+use App\Service\Message\MessageProcessor;
+use App\Service\RateLimitService;
 use App\Service\WhatsAppService;
+use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
@@ -20,6 +24,10 @@ class WhatsAppServiceTest extends TestCase
     private WhatsAppService $service;
     private HttpClientInterface $httpClient;
     private LoggerInterface $logger;
+    private EntityManagerInterface $em;
+    private RateLimitService $rateLimitService;
+    private MessageProcessor $messageProcessor;
+    private FileProcessor $fileProcessor;
     private UserUploadPathBuilder $pathBuilder;
     private string $testPhoneNumberId = '123456789'; // Test phone number ID
 
@@ -27,16 +35,25 @@ class WhatsAppServiceTest extends TestCase
     {
         $this->httpClient = $this->createMock(HttpClientInterface::class);
         $this->logger = $this->createMock(LoggerInterface::class);
+        $this->em = $this->createMock(EntityManagerInterface::class);
+        $this->rateLimitService = $this->createMock(RateLimitService::class);
+        $this->messageProcessor = $this->createMock(MessageProcessor::class);
+        $this->fileProcessor = $this->createMock(FileProcessor::class);
         $this->pathBuilder = new UserUploadPathBuilder(); // Real instance (final class)
 
         // Create service with test configuration (dynamic multi-number support)
         $this->service = new WhatsAppService(
             $this->httpClient,
             $this->logger,
+            $this->em,
+            $this->rateLimitService,
+            $this->messageProcessor,
+            $this->fileProcessor,
+            $this->pathBuilder,
             'test_token',
             true,
             '/tmp/test_uploads',
-            $this->pathBuilder
+            2
         );
     }
 
@@ -50,10 +67,15 @@ class WhatsAppServiceTest extends TestCase
         $service = new WhatsAppService(
             $this->httpClient,
             $this->logger,
+            $this->em,
+            $this->rateLimitService,
+            $this->messageProcessor,
+            $this->fileProcessor,
+            $this->pathBuilder,
             'test_token',
             false, // disabled
             '/tmp/test_uploads',
-            $this->pathBuilder
+            2
         );
 
         $this->assertFalse($service->isAvailable());
@@ -64,10 +86,15 @@ class WhatsAppServiceTest extends TestCase
         $service = new WhatsAppService(
             $this->httpClient,
             $this->logger,
+            $this->em,
+            $this->rateLimitService,
+            $this->messageProcessor,
+            $this->fileProcessor,
+            $this->pathBuilder,
             'test_token',
             false,
             '/tmp/test_uploads',
-            $this->pathBuilder
+            2
         );
 
         $this->expectException(\RuntimeException::class);
@@ -232,10 +259,15 @@ class WhatsAppServiceTest extends TestCase
         $service = new WhatsAppService(
             $this->httpClient,
             $this->logger,
+            $this->em,
+            $this->rateLimitService,
+            $this->messageProcessor,
+            $this->fileProcessor,
+            $this->pathBuilder,
             'test_token',
             false,
             '/tmp/test_uploads',
-            $this->pathBuilder
+            2
         );
 
         $this->expectException(\RuntimeException::class);
