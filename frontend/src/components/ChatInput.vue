@@ -275,30 +275,28 @@ const { t } = useI18n()
 
 /**
  * Determine if microphone button should be shown.
- * Hidden when: whisperEnabled=false AND Web Speech API not supported.
+ * Show when: Web Speech API is supported OR whisperEnabled is true.
+ * Hidden only when: neither is available.
  */
 const showMicrophoneButton = computed(() => {
   const whisperEnabled = configStore.speech.whisperEnabled
   const webSpeechSupported = isWebSpeechSupported()
 
-  // If whisper is enabled, always show (can use backend)
-  if (whisperEnabled) return true
-
-  // If whisper disabled, only show if Web Speech API is available
-  return webSpeechSupported
+  // Show if either option is available
+  return webSpeechSupported || whisperEnabled
 })
 
 /**
  * Determine which speech recognition method to use.
- * Priority: Web Speech API when whisperEnabled=false, otherwise fallback to Whisper.
+ * Priority: Web Speech API FIRST (real-time streaming), Whisper as fallback.
+ *
+ * - Web Speech API: Real-time streaming, works in Chrome/Edge/Safari
+ * - Whisper backend: Record-then-transcribe, works everywhere
  */
 const useWebSpeech = computed(() => {
-  const whisperEnabled = configStore.speech.whisperEnabled
-  const webSpeechSupported = isWebSpeechSupported()
-
-  // Use Web Speech when: whisper disabled AND browser supports it
-  // OR: whisper enabled but browser supports Web Speech (prefer real-time)
-  return webSpeechSupported && !whisperEnabled
+  // Web Speech API has PRIORITY - use it whenever available
+  // This gives real-time streaming text as user speaks
+  return isWebSpeechSupported()
 })
 
 // Input persistence - auto-save with proper debouncing
@@ -663,12 +661,12 @@ const toggleRecording = async () => {
     return
   }
 
-  // Start recording
+  // Start recording - Web Speech API has priority for real-time streaming
   if (useWebSpeech.value) {
-    // Use Web Speech API for real-time transcription
+    console.log('🎙️ Using Web Speech API (real-time streaming)')
     await startWebSpeechRecording()
   } else {
-    // Use AudioRecorder + Whisper.cpp backend
+    console.log('🎙️ Using Whisper backend (record-then-transcribe)')
     await startWhisperRecording()
   }
 }
@@ -690,15 +688,22 @@ const startWebSpeechRecording = async () => {
     speechFinalTranscript.value = ''
     interimTranscript.value = ''
 
+    console.log(
+      '🎙️ Web Speech: Starting with base message:',
+      JSON.stringify(speechBaseMessage.value)
+    )
+
     webSpeechService.value = new WebSpeechService({
       language: navigator.language,
       interimResults: true,
       continuous: true,
       onStart: () => {
+        console.log('🎙️ Web Speech: onStart fired')
         isRecording.value = true
         success(t('chatInput.listeningStarted'))
       },
       onEnd: () => {
+        console.log('🎙️ Web Speech: onEnd fired')
         isRecording.value = false
         // Finalize: set message to base + finals + any remaining interim
         const base = speechBaseMessage.value
@@ -707,12 +712,16 @@ const startWebSpeechRecording = async () => {
         const separator = base && (finals || interim) ? ' ' : ''
         message.value = base + separator + finals + (finals && interim ? ' ' : '') + interim
 
+        console.log('🎙️ Web Speech: Final message:', JSON.stringify(message.value))
+
         // Reset speech tracking
         speechBaseMessage.value = ''
         speechFinalTranscript.value = ''
         interimTranscript.value = ''
       },
       onResult: (text: string, isFinal: boolean) => {
+        console.log(`🎙️ Web Speech: onResult - "${text}" (isFinal: ${isFinal})`)
+
         const base = speechBaseMessage.value
         const separator = base ? ' ' : ''
 
@@ -724,7 +733,7 @@ const startWebSpeechRecording = async () => {
 
           // Update input field: base + all finals
           message.value = base + separator + speechFinalTranscript.value
-          console.log('🎙️ Final:', text)
+          console.log('🎙️ Final result, message now:', JSON.stringify(message.value))
         } else {
           // Interim result - update live in input field
           interimTranscript.value = text
@@ -733,7 +742,7 @@ const startWebSpeechRecording = async () => {
 
           // Update input field: base + finals + interim (real-time!)
           message.value = base + separator + finals + interimSeparator + text
-          console.log('🎙️ Interim:', text)
+          console.log('🎙️ Interim result, message now:', JSON.stringify(message.value))
         }
       },
       onError: (error) => {
@@ -747,6 +756,7 @@ const startWebSpeechRecording = async () => {
     })
 
     await webSpeechService.value.start()
+    console.log('🎙️ Web Speech: start() completed')
   } catch (err: unknown) {
     console.error('❌ Failed to start Web Speech:', err)
     const errMessage = err instanceof Error ? err.message : 'Unknown error'
