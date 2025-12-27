@@ -68,6 +68,13 @@ const config = {
   },
 
   /**
+   * Installed plugins for the current user
+   */
+  get plugins(): NonNullable<ReturnType<typeof getConfigSync>['plugins']> {
+    return getConfigSync().plugins ?? []
+  },
+
+  /**
    * Load runtime configuration from backend
    * Call this before accessing config values (e.g., in main.ts)
    */

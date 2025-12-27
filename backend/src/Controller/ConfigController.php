@@ -7,6 +7,7 @@ use App\Entity\Config;
 use App\Entity\User;
 use App\Repository\ConfigRepository;
 use App\Repository\ModelRepository;
+use App\Service\Plugin\PluginManager;
 use App\Service\Search\BraveSearchService;
 use App\Service\WhisperService;
 use Doctrine\ORM\EntityManagerInterface;
@@ -29,6 +30,7 @@ class ConfigController extends AbstractController
         private ProviderRegistry $providerRegistry,
         private BraveSearchService $braveSearchService,
         private WhisperService $whisperService,
+        private PluginManager $pluginManager,
     ) {
     }
 
@@ -76,10 +78,23 @@ class ConfigController extends AbstractController
                         ),
                     ]
                 ),
+                new OA\Property(
+                    property: 'plugins',
+                    type: 'array',
+                    description: 'List of installed plugins for the current user',
+                    items: new OA\Items(
+                        properties: [
+                            new OA\Property(property: 'name', type: 'string', example: 'hello_world'),
+                            new OA\Property(property: 'version', type: 'string', example: '1.0.0'),
+                            new OA\Property(property: 'description', type: 'string', example: 'A simple hello world plugin'),
+                            new OA\Property(property: 'capabilities', type: 'array', items: new OA\Items(type: 'string')),
+                        ]
+                    )
+                ),
             ]
         )
     )]
-    public function getRuntimeConfig(): JsonResponse
+    public function getRuntimeConfig(#[CurrentUser] ?User $user): JsonResponse
     {
         $recaptchaEnabled = ($_ENV['RECAPTCHA_ENABLED'] ?? 'false') === 'true';
         $recaptchaSiteKey = $_ENV['RECAPTCHA_SITE_KEY'] ?? '';
@@ -103,10 +118,25 @@ class ConfigController extends AbstractController
             'whisperEnabled' => $whisperEnabled && $this->whisperService->isAvailable(),
         ];
 
+        // Plugins
+        $plugins = [];
+        if ($user) {
+            $installedPlugins = $this->pluginManager->listInstalledPlugins($user->getId());
+            foreach ($installedPlugins as $plugin) {
+                $plugins[] = [
+                    'name' => $plugin->name,
+                    'version' => $plugin->version,
+                    'description' => $plugin->description,
+                    'capabilities' => $plugin->capabilities,
+                ];
+            }
+        }
+
         return $this->json([
             'recaptcha' => $recaptchaConfig,
             'features' => $features,
             'speech' => $speech,
+            'plugins' => $plugins,
         ]);
     }
 

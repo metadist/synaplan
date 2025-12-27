@@ -23,6 +23,7 @@ class UserFixtures extends Fixture
     {
         $users = [
             [
+                'id' => 1,
                 'mail' => 'admin@synaplan.com',
                 'password' => 'admin123',
                 'userLevel' => 'ADMIN',
@@ -35,6 +36,7 @@ class UserFixtures extends Fixture
                 ],
             ],
             [
+                'id' => 2,
                 'mail' => 'demo@synaplan.com',
                 'password' => 'demo123',
                 'userLevel' => 'PRO',
@@ -46,6 +48,7 @@ class UserFixtures extends Fixture
                 ],
             ],
             [
+                'id' => 3,
                 'mail' => 'test@example.com',
                 'password' => 'test123',
                 'userLevel' => 'NEW',
@@ -58,6 +61,14 @@ class UserFixtures extends Fixture
             ],
         ];
 
+        $connection = $manager->getConnection();
+        $databasePlatform = $connection->getDatabasePlatform();
+
+        // 1. Reset BUSER table and auto-increment
+        $connection->executeStatement('SET FOREIGN_KEY_CHECKS=0');
+        $connection->executeStatement('TRUNCATE TABLE BUSER');
+        $connection->executeStatement('SET FOREIGN_KEY_CHECKS=1');
+
         foreach ($users as $data) {
             $user = new User();
             $user->setMail($data['mail']);
@@ -66,16 +77,33 @@ class UserFixtures extends Fixture
             $user->setUserLevel($data['userLevel']);
             $user->setEmailVerified($data['emailVerified']);
             $user->setUserDetails($data['userDetails']);
-            $user->setProviderId(''); // Empty for local users
+            $user->setProviderId('local'); // Set to local
             $user->setPaymentDetails([]);
 
             // Hash the password
             $hashedPassword = $this->passwordHasher->hashPassword($user, $data['password']);
             $user->setPw($hashedPassword);
 
-            $manager->persist($user);
+            // We use manual SQL to insert with fixed ID to bypass auto-increment
+            $connection->executeStatement(
+                'INSERT INTO BUSER (BID, BMAIL, BPW, BCREATED, BINTYPE, BUSERLEVEL, BEMAILVERIFIED, BUSERDETAILS, BPAYMENTDETAILS, BPROVIDERID) 
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                [
+                    $data['id'],
+                    $user->getMail(),
+                    $user->getPw(),
+                    $user->getCreated(),
+                    $user->getType(),
+                    $user->getUserLevel(),
+                    $user->isEmailVerified() ? 1 : 0,
+                    json_encode($user->getUserDetails()),
+                    json_encode($user->getPaymentDetails()),
+                    $user->getProviderId()
+                ]
+            );
         }
 
-        $manager->flush();
+        // Ensure auto-increment starts after our fixed IDs
+        $connection->executeStatement('ALTER TABLE BUSER AUTO_INCREMENT = 4');
     }
 }

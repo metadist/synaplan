@@ -38,14 +38,52 @@ final readonly class PluginManager
     {
         if (!is_dir($this->pluginsDir)) {
             $this->logger->warning("Central plugin repository not found at {$this->pluginsDir}");
+
             return [];
         }
 
         $plugins = [];
-        $dirs = glob($this->pluginsDir . '/*', GLOB_ONLYDIR);
-        
+        $dirs = glob($this->pluginsDir.'/*', GLOB_ONLYDIR);
+
         foreach ($dirs as $dir) {
-            $manifestPath = $dir . '/manifest.json';
+            $manifestPath = $dir.'/manifest.json';
+            if (file_exists($manifestPath)) {
+                $content = file_get_contents($manifestPath);
+                if ($content) {
+                    $data = json_decode($content, true);
+                    if ($data) {
+                        $plugins[] = PluginManifest::fromArray($data);
+                    }
+                }
+            }
+        }
+
+        return $plugins;
+    }
+
+    /**
+     * Lists all plugins installed for a specific user.
+     *
+     * @return PluginManifest[]
+     */
+    public function listInstalledPlugins(int $userId): array
+    {
+        $userBaseDir = $this->fileStorageService->getUserBaseAbsolutePath($userId);
+        $userPluginsDir = $userBaseDir.'/PLUGINS';
+
+        if (!is_dir($userPluginsDir)) {
+            return [];
+        }
+
+        $plugins = [];
+        $dirs = glob($userPluginsDir.'/*', GLOB_ONLYDIR);
+
+        foreach ($dirs as $dir) {
+            $pluginName = basename($dir);
+            // We read the manifest from the central repository to ensure we have full metadata
+            $pluginPath = $this->pluginsDir.'/'.$pluginName;
+            $manifestPath = $pluginPath.'/manifest.json';
+
             if (file_exists($manifestPath)) {
                 $content = file_get_contents($manifestPath);
                 if ($content) {
@@ -65,19 +103,19 @@ final readonly class PluginManager
      */
     public function installPlugin(int $userId, string $pluginName): void
     {
-        $pluginPath = $this->pluginsDir . '/' . $pluginName;
+        $pluginPath = $this->pluginsDir.'/'.$pluginName;
         if (!is_dir($pluginPath)) {
             throw new \InvalidArgumentException("Plugin '$pluginName' not found in central repository.");
         }
 
-        $manifestPath = $pluginPath . '/manifest.json';
+        $manifestPath = $pluginPath.'/manifest.json';
         if (!file_exists($manifestPath)) {
             throw new \RuntimeException("Plugin '$pluginName' is missing manifest.json.");
         }
 
         $userBaseDir = $this->fileStorageService->getUserBaseAbsolutePath($userId);
-        $userPluginsDir = $userBaseDir . '/PLUGINS';
-        $targetDir = $userPluginsDir . '/' . $pluginName;
+        $userPluginsDir = $userBaseDir.'/PLUGINS';
+        $targetDir = $userPluginsDir.'/'.$pluginName;
 
         // Ensure user plugins directory exists
         if (!$this->fs->exists($userPluginsDir)) {
@@ -93,18 +131,18 @@ final readonly class PluginManager
         $this->fs->mkdir($targetDir);
 
         // 1. backend -> /plugins/{pluginName}/backend/
-        if (is_dir($pluginPath . '/backend')) {
-            $this->fs->symlink($pluginPath . '/backend', $targetDir . '/backend');
+        if (is_dir($pluginPath.'/backend')) {
+            $this->fs->symlink($pluginPath.'/backend', $targetDir.'/backend');
         }
 
         // 2. frontend -> /plugins/{pluginName}/frontend/
-        if (is_dir($pluginPath . '/frontend')) {
-            $this->fs->symlink($pluginPath . '/frontend', $targetDir . '/frontend');
+        if (is_dir($pluginPath.'/frontend')) {
+            $this->fs->symlink($pluginPath.'/frontend', $targetDir.'/frontend');
         }
 
         // 3. up -> ../../../ (back to {userId}/ root)
         // Path from uploads/L1/L2/UserId/PLUGINS/PluginName to uploads/L1/L2/UserId/ is ../../../
-        $this->fs->symlink('../../../', $targetDir . '/up');
+        $this->fs->symlink('../../../', $targetDir.'/up');
 
         $this->logger->info("Plugin '$pluginName' symlinked for user $userId.");
 
@@ -118,7 +156,7 @@ final readonly class PluginManager
     public function uninstallPlugin(int $userId, string $pluginName): void
     {
         $userBaseDir = $this->fileStorageService->getUserBaseAbsolutePath($userId);
-        $targetDir = $userBaseDir . '/PLUGINS/' . $pluginName;
+        $targetDir = $userBaseDir.'/PLUGINS/'.$pluginName;
 
         if ($this->fs->exists($targetDir)) {
             $this->fs->remove($targetDir);
@@ -131,15 +169,15 @@ final readonly class PluginManager
      */
     private function runPluginMigrations(int $userId, string $pluginName, string $pluginPath): void
     {
-        $migrationsDir = $pluginPath . '/migrations';
+        $migrationsDir = $pluginPath.'/migrations';
         if (!is_dir($migrationsDir)) {
             return;
         }
 
         $pluginSlug = $this->slugify($pluginName);
-        $group = 'P_' . substr($pluginSlug, 0, 62);
+        $group = 'P_'.substr($pluginSlug, 0, 62);
 
-        $sqlFiles = glob($migrationsDir . '/*.sql');
+        $sqlFiles = glob($migrationsDir.'/*.sql');
         if (!$sqlFiles) {
             return;
         }
@@ -149,7 +187,9 @@ final readonly class PluginManager
 
         foreach ($sqlFiles as $file) {
             $sql = file_get_contents($file);
-            if (!$sql) continue;
+            if (!$sql) {
+                continue;
+            }
 
             $this->logger->info("Running migration $file for plugin '$pluginName' and user $userId");
 
@@ -157,7 +197,7 @@ final readonly class PluginManager
             // Plugins can use :userId and :group in their SQL migrations
             $connection->executeStatement($sql, [
                 'userId' => $userId,
-                'group' => $group
+                'group' => $group,
             ]);
         }
     }
@@ -181,4 +221,3 @@ final readonly class PluginManager
         return $text ?: 'n_a';
     }
 }
-

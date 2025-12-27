@@ -168,6 +168,11 @@
     "received": "Received",
     "sent": "Sent"
   },
+  "plugins": {
+    "title": "Plugins",
+    "description": "Extended functionality for your workflow",
+    "notFound": "Plugin not found or not enabled for your account"
+  },
   "tools": {
     "title": "Available Tools",
     "description": "Explore and use powerful tools to enhance your workflow",

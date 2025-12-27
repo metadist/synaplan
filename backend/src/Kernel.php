@@ -38,7 +38,7 @@ class Kernel extends BaseKernel
         // Dynamic Plugin Route Loading
         $pluginsDir = '/plugins';
         if (is_dir($pluginsDir)) {
-            $dirs = glob($pluginsDir . '/*/backend/Controller', GLOB_ONLYDIR);
+            $dirs = glob($pluginsDir.'/*/backend/Controller', GLOB_ONLYDIR);
             if ($dirs) {
                 foreach ($dirs as $dir) {
                     $routes->import($dir, 'attribute');

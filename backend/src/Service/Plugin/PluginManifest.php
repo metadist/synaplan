@@ -39,4 +39,3 @@ final readonly class PluginManifest
         );
     }
 }
-

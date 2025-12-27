@@ -18,7 +18,7 @@ use Symfony\Component\Console\Style\SymfonyStyle;
 class ListPluginsCommand extends Command
 {
     public function __construct(
-        private PluginManager $pluginManager
+        private PluginManager $pluginManager,
     ) {
         parent::__construct();
     }
@@ -30,6 +30,7 @@ class ListPluginsCommand extends Command
 
         if (empty($plugins)) {
             $io->warning('No plugins found in the central repository.');
+
             return Command::SUCCESS;
         }
 
@@ -40,7 +41,7 @@ class ListPluginsCommand extends Command
                 $plugin->name,
                 $plugin->version,
                 $plugin->description,
-                implode(', ', $plugin->capabilities)
+                implode(', ', $plugin->capabilities),
             ];
         }
 
@@ -49,4 +50,3 @@ class ListPluginsCommand extends Command
         return Command::SUCCESS;
     }
 }
-

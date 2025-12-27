@@ -27,10 +27,10 @@ final class PluginAssetController extends AbstractController
     {
         // 1. Resolve user plugin directory
         $userBaseDir = $this->fileStorageService->getUserBaseAbsolutePath($userId);
-        $pluginFrontendDir = $userBaseDir . '/PLUGINS/' . $pluginName . '/frontend';
-        
+        $pluginFrontendDir = $userBaseDir.'/PLUGINS/'.$pluginName.'/frontend';
+
         // 2. Prevent path traversal
-        $realPath = realpath($pluginFrontendDir . '/' . $path);
+        $realPath = realpath($pluginFrontendDir.'/'.$path);
         if (!$realPath || !str_starts_with($realPath, realpath($pluginFrontendDir))) {
             throw new NotFoundHttpException("Asset '$path' not found or invalid.");
         }
@@ -43,11 +43,10 @@ final class PluginAssetController extends AbstractController
         // 4. Serve file
         $response = new BinaryFileResponse($realPath);
         $response->setContentDisposition(ResponseHeaderBag::DISPOSITION_INLINE);
-        
+
         // Set cache for 1 hour in dev, could be more in prod
         $response->setMaxAge(3600);
-        
+
         return $response;
     }
 }
-

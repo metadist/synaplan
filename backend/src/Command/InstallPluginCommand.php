@@ -19,7 +19,7 @@ use Symfony\Component\Console\Style\SymfonyStyle;
 class InstallPluginCommand extends Command
 {
     public function __construct(
-        private PluginManager $pluginManager
+        private PluginManager $pluginManager,
     ) {
         parent::__construct();
     }
@@ -40,11 +40,12 @@ class InstallPluginCommand extends Command
         try {
             $this->pluginManager->installPlugin($userId, $pluginName);
             $io->success("Plugin '$pluginName' installed successfully for user $userId.");
+
             return Command::SUCCESS;
         } catch (\Exception $e) {
-            $io->error("Failed to install plugin: " . $e->getMessage());
+            $io->error('Failed to install plugin: '.$e->getMessage());
+
             return Command::FAILURE;
         }
     }
 }
-
