@@ -1,22 +1,26 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\DataFixtures;
 
 use App\Entity\User;
 use Doctrine\Bundle\FixturesBundle\Fixture;
+use Doctrine\DBAL\Connection;
 use Doctrine\Persistence\ObjectManager;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 
 /**
- * Loads demo users for development.
+ * Loads demo users for development with fixed IDs (1, 2, 3).
+ *
+ * Uses raw SQL INSERT to ensure consistent IDs regardless of auto-increment state.
+ * The table is empty at this point because the purger has already run.
  */
 class UserFixtures extends Fixture
 {
-    private UserPasswordHasherInterface $passwordHasher;
-
-    public function __construct(UserPasswordHasherInterface $passwordHasher)
-    {
-        $this->passwordHasher = $passwordHasher;
+    public function __construct(
+        private UserPasswordHasherInterface $passwordHasher,
+    ) {
     }
 
     public function load(ObjectManager $manager): void
@@ -61,49 +65,32 @@ class UserFixtures extends Fixture
             ],
         ];
 
+        /** @var Connection $connection */
         $connection = $manager->getConnection();
-        $databasePlatform = $connection->getDatabasePlatform();
-
-        // 1. Reset BUSER table and auto-increment
-        $connection->executeStatement('SET FOREIGN_KEY_CHECKS=0');
-        $connection->executeStatement('TRUNCATE TABLE BUSER');
-        $connection->executeStatement('SET FOREIGN_KEY_CHECKS=1');
 
         foreach ($users as $data) {
+            // Create user entity to hash password
             $user = new User();
-            $user->setMail($data['mail']);
-            $user->setCreated(date('Y-m-d H:i:s'));
-            $user->setType($data['type']);
-            $user->setUserLevel($data['userLevel']);
-            $user->setEmailVerified($data['emailVerified']);
-            $user->setUserDetails($data['userDetails']);
-            $user->setProviderId('local'); // Set to local
-            $user->setPaymentDetails([]);
-
-            // Hash the password
             $hashedPassword = $this->passwordHasher->hashPassword($user, $data['password']);
-            $user->setPw($hashedPassword);
 
-            // We use manual SQL to insert with fixed ID to bypass auto-increment
+            // Use raw SQL INSERT with explicit ID to bypass auto-increment
+            // Table is empty at this point (purger already ran DELETE)
             $connection->executeStatement(
-                'INSERT INTO BUSER (BID, BMAIL, BPW, BCREATED, BINTYPE, BUSERLEVEL, BEMAILVERIFIED, BUSERDETAILS, BPAYMENTDETAILS, BPROVIDERID) 
+                'INSERT INTO BUSER (BID, BCREATED, BINTYPE, BMAIL, BPW, BPROVIDERID, BUSERLEVEL, BEMAILVERIFIED, BUSERDETAILS, BPAYMENTDETAILS) 
                  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
                 [
                     $data['id'],
-                    $user->getMail(),
-                    $user->getPw(),
-                    $user->getCreated(),
-                    $user->getType(),
-                    $user->getUserLevel(),
-                    $user->isEmailVerified() ? 1 : 0,
-                    json_encode($user->getUserDetails()),
-                    json_encode($user->getPaymentDetails()),
-                    $user->getProviderId()
+                    date('Y-m-d H:i:s'),
+                    $data['type'],
+                    $data['mail'],
+                    $hashedPassword,
+                    'local',
+                    $data['userLevel'],
+                    $data['emailVerified'] ? 1 : 0,
+                    json_encode($data['userDetails']),
+                    '[]',
                 ]
             );
         }
-
-        // Ensure auto-increment starts after our fixed IDs
-        $connection->executeStatement('ALTER TABLE BUSER AUTO_INCREMENT = 4');
     }
 }
