@@ -57,6 +57,17 @@ const config = {
   },
 
   /**
+   * Speech-to-text configuration
+   * When whisperEnabled=false, use Web Speech API (browser-based)
+   * When whisperEnabled=true, use local Whisper.cpp backend
+   */
+  speech: {
+    get whisperEnabled(): boolean {
+      return getConfigSync().speech?.whisperEnabled ?? true
+    },
+  },
+
+  /**
    * Load runtime configuration from backend
    * Call this before accessing config values (e.g., in main.ts)
    */
