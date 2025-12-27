@@ -56,6 +56,7 @@ services:
       - ./backend:/var/www/backend
       - ./frontend/dist:/var/www/frontend:ro
       - ./frontend/dist-widget:/var/www/widgets
+      - ./plugins:/plugins:ro
       - ./_docker/backend/Caddyfile:/etc/caddy/Caddyfile:ro
       - ./_docker/backend/docker-entrypoint.sh:/usr/local/bin/docker-entrypoint.sh:ro
       - whisper_models:/var/www/backend/var/whisper:ro

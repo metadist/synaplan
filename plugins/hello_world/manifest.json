@@ -1,0 +1,10 @@
+{
+    "name": "hello_world",
+    "version": "1.0.0",
+    "description": "A simple hello world plugin",
+    "capabilities": ["chat", "ui_extension"],
+    "config": {
+        "greeting": "Hello from Plugin!"
+    }
+}
+
