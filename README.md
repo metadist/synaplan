@@ -26,14 +26,13 @@ git rm --cached -r .
 git reset --hard
 ```
 
-Run the first-install script for your platform (it verifies Docker, lets you pick your AI provider, and handles all bootstrapping):
+Run the first-install script (it verifies Docker, lets you pick your AI provider, and handles all bootstrapping).
+
+**Windows users:** Please use **WSL2** (Windows Subsystem for Linux) and run the Linux script.
 
 ```bash
-# Linux / macOS (WSL):
+# Linux / macOS / Windows WSL2:
 ./_1st_install_linux.sh
-
-# Windows (PowerShell or cmd):
-_1st_install_win.bat
 ```
 
 After the initial install, subsequent restarts only need:
@@ -66,7 +65,7 @@ docker compose up -d
 
 **AI Model Download Behavior:**
 
-`./_1st_install_linux.sh` (or `_1st_install_win.bat`) guides you through one of two options:
+`./_1st_install_linux.sh` guides you through one of two options:
 
 1. **Local Ollama** – downloads `gpt-oss:20b` (chat) + `bge-m3` (vector) so the stack runs fully offline (needs ~24 GB VRAM).
 2. **Groq Cloud (recommended)** – prompts for your free `GROQ_API_KEY`, writes it to `backend/.env`, switches all defaults to Groq's `llama-3.3-70b-versatile`, and only downloads `bge-m3` for local embeddings (much smaller/faster).
@@ -75,7 +74,7 @@ Progress (downloads or schema work) streams directly in the script output, so yo
 
 **Option 1: Default Auto Download (Recommended)**
 ```bash
-./_1st_install_linux.sh      # or _1st_install_win.bat
+./_1st_install_linux.sh
 ```
 - ⚡ **Fast startup** for services (~1-2 min) while downloads (if Ollama) or migrations (if Groq) run
 - 📦 **Progress shown live** in the script output

@@ -2,7 +2,9 @@
 
 namespace App\Service\File;
 
+use App\AI\Exception\ProviderException;
 use App\AI\Service\AiFacade;
+use App\AI\Service\ProviderRegistry;
 use App\Service\WhisperService;
 use Psr\Log\LoggerInterface;
 
@@ -64,6 +66,7 @@ class FileProcessor
         private TextCleaner $textCleaner,
         private AiFacade $aiFacade,
         private WhisperService $whisperService,
+        private ProviderRegistry $providerRegistry,
         private LoggerInterface $logger,
         private string $uploadDir,
         private int $tikaMinLength,
@@ -360,43 +363,116 @@ class FileProcessor
     }
 
     /**
-     * Extract text from audio/video file using Whisper.cpp.
+     * Extract text from audio/video file using Whisper.cpp with external API fallback.
+     *
+     * Strategy order:
+     * 1. Local Whisper.cpp (fast, free, no external dependencies)
+     * 2. External OpenAI Whisper API (fallback when local not available)
+     *
+     * @param string $absolutePath Full path to the audio file
+     * @param array  $baseMeta     Base metadata for logging
+     *
+     * @return array [extractedText, meta]
      */
     private function extractFromAudio(string $absolutePath, array $baseMeta): array
     {
-        if (!$this->whisperService->isAvailable()) {
-            $this->logger->warning('FileProcessor: Whisper not available', $baseMeta);
+        // Try local Whisper.cpp first (preferred)
+        if ($this->whisperService->isAvailable()) {
+            $this->logger->info('FileProcessor: Transcribing audio with local Whisper', $baseMeta);
 
-            return ['', ['strategy' => 'whisper_unavailable'] + $baseMeta];
+            try {
+                $result = $this->whisperService->transcribe($absolutePath);
+                $text = $result['text'] ?? '';
+                $text = $this->textCleaner->clean($text);
+
+                $this->logger->info('FileProcessor: Local Whisper transcription success', [
+                    'strategy' => 'whisper_local',
+                    'bytes' => strlen($text),
+                    'language' => $result['language'] ?? 'unknown',
+                    'duration' => $result['duration'] ?? 0,
+                ]);
+
+                return [$text, [
+                    'strategy' => 'whisper_local',
+                    'language' => $result['language'] ?? 'unknown',
+                    'duration' => $result['duration'] ?? 0,
+                    'model' => $result['model'] ?? 'base',
+                ] + $baseMeta];
+            } catch (\Throwable $e) {
+                $this->logger->warning('FileProcessor: Local Whisper failed, trying external API', [
+                    'error' => $e->getMessage(),
+                ] + $baseMeta);
+                // Fall through to external API
+            }
         }
 
-        $this->logger->info('FileProcessor: Transcribing audio with Whisper', $baseMeta);
+        // Try external speech-to-text provider (OpenAI Whisper API)
+        return $this->extractFromAudioExternal($absolutePath, $baseMeta);
+    }
 
+    /**
+     * Extract text from audio using external API (OpenAI Whisper API).
+     *
+     * Used as fallback when local Whisper.cpp is not available or fails.
+     *
+     * @param string $absolutePath Full path to the audio file
+     * @param array  $baseMeta     Base metadata for logging
+     *
+     * @return array [extractedText, meta]
+     */
+    private function extractFromAudioExternal(string $absolutePath, array $baseMeta): array
+    {
+        // Check if external speech-to-text providers are available
+        $availableProviders = $this->providerRegistry->getAvailableProviders('speech_to_text', false);
+        if (empty($availableProviders)) {
+            $this->logger->warning('FileProcessor: No speech-to-text providers available', $baseMeta);
+
+            return ['', [
+                'strategy' => 'audio_no_providers',
+                'error' => 'No speech-to-text providers configured. Enable local Whisper.cpp or configure OpenAI API key.',
+            ] + $baseMeta];
+        }
+
+        $this->logger->info('FileProcessor: Transcribing audio with external API', [
+            'providers' => $availableProviders,
+        ] + $baseMeta);
+
+        // Try the first available provider (usually OpenAI)
         try {
-            $result = $this->whisperService->transcribe($absolutePath);
+            $provider = $this->providerRegistry->getSpeechToTextProvider();
+            $result = $provider->transcribe($absolutePath);
 
             $text = $result['text'] ?? '';
             $text = $this->textCleaner->clean($text);
 
-            $this->logger->info('FileProcessor: Whisper transcription success', [
-                'strategy' => 'whisper',
+            $this->logger->info('FileProcessor: External API transcription success', [
+                'strategy' => 'whisper_api',
+                'provider' => $provider->getName(),
                 'bytes' => strlen($text),
-                'language' => $result['language'] ?? 'unknown',
-                'duration' => $result['duration'] ?? 0,
             ]);
 
             return [$text, [
-                'strategy' => 'whisper',
-                'language' => $result['language'] ?? 'unknown',
-                'duration' => $result['duration'] ?? 0,
-                'model' => $result['model'] ?? 'base',
+                'strategy' => 'whisper_api',
+                'provider' => $provider->getName(),
             ] + $baseMeta];
-        } catch (\Throwable $e) {
-            $this->logger->error('FileProcessor: Whisper transcription failed', [
+        } catch (ProviderException $e) {
+            $this->logger->error('FileProcessor: External API transcription failed (provider error)', [
                 'error' => $e->getMessage(),
             ] + $baseMeta);
 
-            return ['', ['strategy' => 'whisper_failed', 'error' => $e->getMessage()] + $baseMeta];
+            return ['', [
+                'strategy' => 'audio_api_failed',
+                'error' => $e->getMessage(),
+            ] + $baseMeta];
+        } catch (\Throwable $e) {
+            $this->logger->error('FileProcessor: External API transcription failed', [
+                'error' => $e->getMessage(),
+            ] + $baseMeta);
+
+            return ['', [
+                'strategy' => 'audio_api_failed',
+                'error' => $e->getMessage(),
+            ] + $baseMeta];
         }
     }
 }

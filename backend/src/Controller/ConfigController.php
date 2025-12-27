@@ -63,6 +63,19 @@ class ConfigController extends AbstractController
                         new OA\Property(property: 'help', type: 'boolean', example: true, description: 'Enable help system'),
                     ]
                 ),
+                new OA\Property(
+                    property: 'speech',
+                    type: 'object',
+                    description: 'Speech-to-text configuration',
+                    properties: [
+                        new OA\Property(
+                            property: 'whisperEnabled',
+                            type: 'boolean',
+                            example: true,
+                            description: 'When true, use local Whisper.cpp. When false, frontend should use Web Speech API.'
+                        ),
+                    ]
+                ),
             ]
         )
     )]
@@ -82,9 +95,18 @@ class ConfigController extends AbstractController
             'help' => ($_ENV['FEATURE_HELP'] ?? 'false') === 'true',
         ];
 
+        // Speech-to-text configuration
+        // When whisperEnabled=false, frontend should use Web Speech API
+        // When whisperEnabled=true, use local Whisper.cpp backend
+        $whisperEnabled = ($_ENV['WHISPER_ENABLED'] ?? 'true') === 'true';
+        $speech = [
+            'whisperEnabled' => $whisperEnabled && $this->whisperService->isAvailable(),
+        ];
+
         return $this->json([
             'recaptcha' => $recaptchaConfig,
             'features' => $features,
+            'speech' => $speech,
         ]);
     }
 

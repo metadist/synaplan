@@ -51,6 +51,3 @@ frontend/.vite/
 tests/test-results/
 tests/reports/
 tests/e2e/prompt_guide.md
-
-# Migration scripts (production-only, not for git)
-migrate-upload-directories.php

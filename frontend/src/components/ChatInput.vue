@@ -115,12 +115,14 @@
           data-testid="section-chat-primary-actions"
         >
           <button
+            v-if="showMicrophoneButton"
             type="button"
             :class="[
               'h-[44px] min-w-[44px] flex items-center justify-center rounded-xl pointer-events-auto',
               isRecording ? 'bg-red-500 hover:bg-red-600' : 'icon-ghost',
             ]"
             :aria-label="$t('chatInput.voice')"
+            :title="useWebSpeech ? $t('chatInput.voiceRealtime') : $t('chatInput.voiceWhisper')"
             data-testid="btn-chat-voice"
             @click="toggleRecording"
           >
@@ -219,6 +221,8 @@ import { useNotification } from '@/composables/useNotification'
 import { chatApi } from '@/services/api/chatApi'
 import type { FileItem } from '@/services/filesService'
 import { AudioRecorder } from '@/services/audioRecorder'
+import { WebSpeechService, isWebSpeechSupported } from '@/services/webSpeechService'
+import { useConfigStore } from '@/stores/config'
 import { useI18n } from 'vue-i18n'
 import { useAutoPersist } from '@/composables/useInputPersistence'
 import { useChatsStore } from '@/stores/chats'
@@ -257,12 +261,67 @@ const isFocused = ref(false)
 const isMobile = ref(window.innerWidth < 768)
 const isRecording = ref(false)
 const audioRecorder = ref<AudioRecorder | null>(null)
+const webSpeechService = ref<WebSpeechService | null>(null)
+const interimTranscript = ref('')
+const speechBaseMessage = ref('') // Message content before recording started
+const speechFinalTranscript = ref('') // Accumulated final transcripts during recording
 const fileSelectionModalVisible = ref(false)
 
 const aiConfigStore = useAiConfigStore()
 const chatsStore = useChatsStore()
+const configStore = useConfigStore()
 const { warning, error: showError, success } = useNotification()
-const { t } = useI18n()
+const { t, locale } = useI18n()
+
+/**
+ * Get the speech recognition language code from the current UI locale.
+ * Maps short locale codes (en, de) to full BCP-47 codes (en-US, de-DE).
+ */
+const speechLanguage = computed(() => {
+  const currentLocale = locale.value
+  // Map short codes to full BCP-47 language codes for better speech recognition
+  const languageMap: Record<string, string> = {
+    en: 'en-US',
+    de: 'de-DE',
+    fr: 'fr-FR',
+    es: 'es-ES',
+    it: 'it-IT',
+    pt: 'pt-BR',
+    nl: 'nl-NL',
+    pl: 'pl-PL',
+    ru: 'ru-RU',
+    ja: 'ja-JP',
+    zh: 'zh-CN',
+    ko: 'ko-KR',
+  }
+  return languageMap[currentLocale] || currentLocale || 'en-US'
+})
+
+/**
+ * Determine if microphone button should be shown.
+ * Show when: Web Speech API is supported OR whisperEnabled is true.
+ * Hidden only when: neither is available.
+ */
+const showMicrophoneButton = computed(() => {
+  const whisperEnabled = configStore.speech.whisperEnabled
+  const webSpeechSupported = isWebSpeechSupported()
+
+  // Show if either option is available
+  return webSpeechSupported || whisperEnabled
+})
+
+/**
+ * Determine which speech recognition method to use.
+ * Priority: Web Speech API FIRST (real-time streaming), Whisper as fallback.
+ *
+ * - Web Speech API: Real-time streaming, works in Chrome/Edge/Safari
+ * - Whisper backend: Record-then-transcribe, works everywhere
+ */
+const useWebSpeech = computed(() => {
+  // Web Speech API has PRIORITY - use it whenever available
+  // This gives real-time streaming text as user speaks
+  return isWebSpeechSupported()
+})
 
 // Input persistence - auto-save with proper debouncing
 const { clearInput: clearPersistedInput } = useAutoPersist(
@@ -606,53 +665,182 @@ const uploadFiles = async (files: File[]) => {
   uploading.value = false
 }
 
+/**
+ * Toggle speech recording using hybrid approach.
+ * Uses Web Speech API for real-time transcription when available and whisperEnabled=false.
+ * Falls back to Whisper.cpp backend recording when whisperEnabled=true.
+ */
 const toggleRecording = async () => {
-  if (isRecording.value && audioRecorder.value) {
-    // Stop recording
-    audioRecorder.value.stopRecording()
-    isRecording.value = false
-  } else {
-    // Start recording
-    try {
-      // Create new recorder instance
-      audioRecorder.value = new AudioRecorder({
-        onStart: () => {
-          isRecording.value = true
-          success('🎙️ Recording started...')
-        },
-        onStop: () => {
-          isRecording.value = false
-        },
-        onDataAvailable: async (audioBlob: Blob) => {
-          console.log('🎵 Audio recorded:', audioBlob.size, 'bytes')
-          await transcribeAudio(audioBlob)
-        },
-        onError: (error) => {
-          console.error('❌ Recording error:', error)
-          showError(error.userMessage)
-          isRecording.value = false
-        },
-      })
-
-      // Check support first (with detailed diagnostics)
-      const support = await audioRecorder.value.checkSupport()
-      if (!support.supported || !support.hasDevices) {
-        if (support.error) {
-          showError(support.error.userMessage)
-        }
-        return
-      }
-
-      // Start recording
-      await audioRecorder.value.startRecording()
-    } catch (err: any) {
-      console.error('❌ Failed to start recording:', err)
-      showError(err.userMessage || `Recording failed: ${err.message || 'Unknown error'}`)
-      isRecording.value = false
+  if (isRecording.value) {
+    // Stop recording (either Web Speech or AudioRecorder)
+    if (webSpeechService.value) {
+      // Stop triggers onEnd callback which finalizes the message
+      webSpeechService.value.stop()
+      webSpeechService.value = null
     }
+    if (audioRecorder.value) {
+      audioRecorder.value.stopRecording()
+    }
+    isRecording.value = false
+    return
+  }
+
+  // Start recording - Web Speech API has priority for real-time streaming
+  if (useWebSpeech.value) {
+    console.log('🎙️ Using Web Speech API (real-time streaming)')
+    await startWebSpeechRecording()
+  } else {
+    console.log('🎙️ Using Whisper backend (record-then-transcribe)')
+    await startWhisperRecording()
   }
 }
 
+/**
+ * Start real-time speech recognition using Web Speech API.
+ * Text appears in input field live as user speaks.
+ *
+ * How it works:
+ * - speechBaseMessage: Original text in input before recording started
+ * - speechFinalTranscript: Accumulated finalized phrases during recording
+ * - interimTranscript: Current partial phrase (updates rapidly as user speaks)
+ * - message.value: Always shows baseMessage + finalTranscript + interimTranscript
+ */
+const startWebSpeechRecording = async () => {
+  try {
+    // Save current message as base (text before recording)
+    speechBaseMessage.value = message.value
+    speechFinalTranscript.value = ''
+    interimTranscript.value = ''
+
+    console.log(
+      '🎙️ Web Speech: Starting with base message:',
+      JSON.stringify(speechBaseMessage.value)
+    )
+    console.log('🎙️ Web Speech: Using language:', speechLanguage.value)
+
+    webSpeechService.value = new WebSpeechService({
+      language: speechLanguage.value,
+      interimResults: true,
+      continuous: true,
+      onStart: () => {
+        console.log('🎙️ Web Speech: onStart fired')
+        isRecording.value = true
+        success(t('chatInput.listeningStarted'))
+      },
+      onEnd: () => {
+        console.log('🎙️ Web Speech: onEnd fired')
+        isRecording.value = false
+        // Finalize: set message to base + finals + any remaining interim
+        const base = speechBaseMessage.value
+        const finals = speechFinalTranscript.value
+        const interim = interimTranscript.value
+        const separator = base && (finals || interim) ? ' ' : ''
+        message.value = base + separator + finals + (finals && interim ? ' ' : '') + interim
+
+        console.log('🎙️ Web Speech: Final message:', JSON.stringify(message.value))
+
+        // Reset speech tracking
+        speechBaseMessage.value = ''
+        speechFinalTranscript.value = ''
+        interimTranscript.value = ''
+      },
+      onResult: (text: string, isFinal: boolean) => {
+        console.log(`🎙️ Web Speech: onResult - "${text}" (isFinal: ${isFinal})`)
+
+        const base = speechBaseMessage.value
+        const separator = base ? ' ' : ''
+
+        if (isFinal) {
+          // Final result - add to accumulated finals
+          const finalSeparator = speechFinalTranscript.value ? ' ' : ''
+          speechFinalTranscript.value += finalSeparator + text
+          interimTranscript.value = ''
+
+          // Update input field: base + all finals
+          message.value = base + separator + speechFinalTranscript.value
+          console.log('🎙️ Final result, message now:', JSON.stringify(message.value))
+        } else {
+          // Interim result - update live in input field
+          interimTranscript.value = text
+          const finals = speechFinalTranscript.value
+          const interimSeparator = finals ? ' ' : ''
+
+          // Update input field: base + finals + interim (real-time!)
+          message.value = base + separator + finals + interimSeparator + text
+          console.log('🎙️ Interim result, message now:', JSON.stringify(message.value))
+        }
+      },
+      onError: (error) => {
+        console.error('❌ Web Speech error:', error)
+        // Only show error for actual problems, not 'no-speech' during pauses
+        if (error.type !== 'no_speech') {
+          showError(error.userMessage)
+        }
+        isRecording.value = false
+      },
+    })
+
+    await webSpeechService.value.start()
+    console.log('🎙️ Web Speech: start() completed')
+  } catch (err: unknown) {
+    console.error('❌ Failed to start Web Speech:', err)
+    const errMessage = err instanceof Error ? err.message : 'Unknown error'
+    showError(t('chatInput.speechError', { error: errMessage }))
+    isRecording.value = false
+  }
+}
+
+/**
+ * Start audio recording for Whisper.cpp backend transcription.
+ * Records audio blob, uploads to backend for processing.
+ */
+const startWhisperRecording = async () => {
+  try {
+    audioRecorder.value = new AudioRecorder({
+      onStart: () => {
+        isRecording.value = true
+        success(t('chatInput.recordingStarted'))
+      },
+      onStop: () => {
+        isRecording.value = false
+      },
+      onDataAvailable: async (audioBlob: Blob) => {
+        console.log('🎵 Audio recorded:', audioBlob.size, 'bytes')
+        await transcribeAudio(audioBlob)
+      },
+      onError: (error) => {
+        console.error('❌ Recording error:', error)
+        showError(error.userMessage)
+        isRecording.value = false
+      },
+    })
+
+    // Check support first (with detailed diagnostics)
+    const support = await audioRecorder.value.checkSupport()
+    if (!support.supported || !support.hasDevices) {
+      if (support.error) {
+        showError(support.error.userMessage)
+      }
+      return
+    }
+
+    // Start recording
+    await audioRecorder.value.startRecording()
+  } catch (err: unknown) {
+    console.error('❌ Failed to start recording:', err)
+    const error = err as { userMessage?: string; message?: string }
+    showError(
+      error.userMessage ||
+        t('chatInput.recordingError', { error: error.message || 'Unknown error' })
+    )
+    isRecording.value = false
+  }
+}
+
+/**
+ * Transcribe audio blob using Whisper.cpp backend.
+ * Called after AudioRecorder stops and provides recorded audio.
+ */
 const transcribeAudio = async (audioBlob: Blob) => {
   uploading.value = true
 
@@ -668,7 +856,7 @@ const transcribeAudio = async (audioBlob: Blob) => {
       // Show success notification with preview
       const preview = result.text.substring(0, 50) + (result.text.length > 50 ? '...' : '')
       const languageInfo = result.language ? ` (${result.language})` : ''
-      success(`🎙️ Transcribed${languageInfo}: "${preview}"`)
+      success(t('chatInput.transcribed', { language: languageInfo, preview }))
 
       console.log('✅ Audio transcribed:', {
         text_length: result.text.length,
@@ -681,11 +869,12 @@ const transcribeAudio = async (audioBlob: Blob) => {
         textareaRef.value?.focus()
       })
     } else {
-      warning('⚠️ No speech detected in recording')
+      warning(t('chatInput.noSpeechDetected'))
     }
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error('❌ Transcription failed:', err)
-    showError(`Transcription failed: ${err.message}`)
+    const error = err as { message?: string }
+    showError(t('chatInput.transcriptionFailed', { error: error.message || 'Unknown error' }))
   } finally {
     isRecording.value = false
     uploading.value = false
