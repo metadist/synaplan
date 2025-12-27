@@ -254,15 +254,15 @@ const navItems = computed<NavItem[]>(() => {
     })
   }
 
-  // Plugins: Nur wenn vorhanden
+  // Plugins: Only show if user has plugins installed
   if (configStore.plugins.length > 0) {
     items.push({
       path: '/plugins',
-      label: t('plugins.title'),
+      label: 'Plugins',
       icon: PuzzlePieceIcon,
-      children: configStore.plugins.map((plugin) => ({
+      children: configStore.plugins.map((plugin: { name?: string }) => ({
         path: `/plugins/${plugin.name}`,
-        label: plugin.name,
+        label: plugin.name ?? 'Unknown',
       })),
     })
   }

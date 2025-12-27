@@ -27,7 +27,7 @@ final class PluginAssetController extends AbstractController
     {
         // 1. Resolve user plugin directory
         $userBaseDir = $this->fileStorageService->getUserBaseAbsolutePath($userId);
-        $pluginFrontendDir = $userBaseDir.'/PLUGINS/'.$pluginName.'/frontend';
+        $pluginFrontendDir = $userBaseDir.'/plugins/'.$pluginName.'/frontend';
 
         // 2. Prevent path traversal
         $realPath = realpath($pluginFrontendDir.'/'.$path);
@@ -40,8 +40,28 @@ final class PluginAssetController extends AbstractController
             throw new NotFoundHttpException("Asset '$path' not found.");
         }
 
-        // 4. Serve file
+        // 4. Determine MIME type (critical for ES modules)
+        $mimeTypes = [
+            'js' => 'application/javascript',
+            'mjs' => 'application/javascript',
+            'css' => 'text/css',
+            'html' => 'text/html',
+            'json' => 'application/json',
+            'svg' => 'image/svg+xml',
+            'png' => 'image/png',
+            'jpg' => 'image/jpeg',
+            'jpeg' => 'image/jpeg',
+            'gif' => 'image/gif',
+            'woff' => 'font/woff',
+            'woff2' => 'font/woff2',
+        ];
+
+        $extension = strtolower(pathinfo($realPath, PATHINFO_EXTENSION));
+        $mimeType = $mimeTypes[$extension] ?? 'application/octet-stream';
+
+        // 5. Serve file with correct MIME type
         $response = new BinaryFileResponse($realPath);
+        $response->headers->set('Content-Type', $mimeType);
         $response->setContentDisposition(ResponseHeaderBag::DISPOSITION_INLINE);
 
         // Set cache for 1 hour in dev, could be more in prod

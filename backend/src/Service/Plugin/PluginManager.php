@@ -69,7 +69,7 @@ final readonly class PluginManager
     public function listInstalledPlugins(int $userId): array
     {
         $userBaseDir = $this->fileStorageService->getUserBaseAbsolutePath($userId);
-        $userPluginsDir = $userBaseDir.'/PLUGINS';
+        $userPluginsDir = $userBaseDir.'/plugins';
 
         if (!is_dir($userPluginsDir)) {
             return [];
@@ -114,7 +114,7 @@ final readonly class PluginManager
         }
 
         $userBaseDir = $this->fileStorageService->getUserBaseAbsolutePath($userId);
-        $userPluginsDir = $userBaseDir.'/PLUGINS';
+        $userPluginsDir = $userBaseDir.'/plugins';
         $targetDir = $userPluginsDir.'/'.$pluginName;
 
         // Ensure user plugins directory exists
@@ -141,7 +141,7 @@ final readonly class PluginManager
         }
 
         // 3. up -> ../../../ (back to {userId}/ root)
-        // Path from uploads/L1/L2/UserId/PLUGINS/PluginName to uploads/L1/L2/UserId/ is ../../../
+        // Path from uploads/L1/L2/UserId/plugins/PluginName to uploads/L1/L2/UserId/ is ../../../
         $this->fs->symlink('../../../', $targetDir.'/up');
 
         $this->logger->info("Plugin '$pluginName' symlinked for user $userId.");
@@ -156,7 +156,7 @@ final readonly class PluginManager
     public function uninstallPlugin(int $userId, string $pluginName): void
     {
         $userBaseDir = $this->fileStorageService->getUserBaseAbsolutePath($userId);
-        $targetDir = $userBaseDir.'/PLUGINS/'.$pluginName;
+        $targetDir = $userBaseDir.'/plugins/'.$pluginName;
 
         if ($this->fs->exists($targetDir)) {
             $this->fs->remove($targetDir);
