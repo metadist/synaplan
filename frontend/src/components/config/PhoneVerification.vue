@@ -389,8 +389,28 @@ const requestWithFallback = async (path: string, options: RequestInit = {}) => {
 }
 
 const getErrorMessage = (payload: unknown, fallback: string) => {
-  if (typeof payload === 'string' && payload.trim() !== '') {
-    return payload
+  // If payload is HTML (like Symfony error pages), extract title or show generic message
+  if (typeof payload === 'string') {
+    // Check if it's HTML
+    if (payload.trim().startsWith('<!DOCTYPE') || payload.trim().startsWith('<html')) {
+      // Try to extract title from HTML
+      const titleMatch = payload.match(/<title>(.*?)<\/title>/i)
+      if (titleMatch && titleMatch[1]) {
+        // Extract just the error message part (e.g., "401 Unauthorized" from "Full authentication is required... (401 Unauthorized)")
+        const title = titleMatch[1]
+        const statusMatch = title.match(/\((\d{3})\s+([^)]+)\)/)
+        if (statusMatch) {
+          return `Authentication required (${statusMatch[1]})`
+        }
+        return title
+      }
+      // If we can't extract title, return a generic message
+      return 'Authentication required. Please log in again.'
+    }
+    // Regular string error
+    if (payload.trim() !== '') {
+      return payload
+    }
   }
   if (payload && typeof payload === 'object' && 'error' in payload) {
     return String(payload.error)
@@ -414,6 +434,12 @@ const loadStatus = async () => {
     })
 
     if (!response.ok) {
+      // Handle 401 specifically - likely authentication issue
+      if (response.status === 401) {
+        error.value = 'Authentication required. Please log in again.'
+        loading.value = false
+        return
+      }
       throw new Error(getErrorMessage(payload, 'Failed to load status'))
     }
 

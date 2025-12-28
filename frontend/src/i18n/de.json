@@ -356,6 +356,8 @@
       "sortService": "Sortierung: Anbieter",
       "sortRating": "Sortierung: Bewertung",
       "sortQuality": "Sortierung: Qualität",
+      "sortPurpose": "Sortierung: Verwendungszweck",
+      "qualityScore": "Qualitätswert: {score}/10",
       "noModelsAvailable": "Keine Modelle für diesen Verwendungszweck verfügbar",
       "tableName": "Name",
       "tableService": "Anbieter",

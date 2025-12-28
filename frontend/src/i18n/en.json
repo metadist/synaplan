@@ -498,6 +498,8 @@
       "sortService": "Sort: Service",
       "sortRating": "Sort: Rating",
       "sortQuality": "Sort: Quality",
+      "sortPurpose": "Sort: Purpose",
+      "qualityScore": "Quality score: {score}/10",
       "noModelsAvailable": "No models available for this purpose",
       "tableName": "Name",
       "tableService": "Service",
