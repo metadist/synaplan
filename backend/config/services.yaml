@@ -11,7 +11,7 @@ parameters:
     default_log_format: 'json'
 
     # Plugins
-    plugins_dir: '/plugins'
+    plugins_dir: '%kernel.project_dir%/../plugins'
 
 services:
     _defaults:
@@ -327,5 +327,5 @@ services:
 
     # Plugin discovery
     Plugin\:
-        resource: '/plugins/*/backend'
-        exclude: '/plugins/*/backend/{Entity,migrations,tests}'
+        resource: '%kernel.project_dir%/../plugins/*/backend'
+        exclude: '%kernel.project_dir%/../plugins/*/backend/{Entity,migrations,tests}'
