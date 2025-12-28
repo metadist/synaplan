@@ -14,9 +14,8 @@ Central Repository (/plugins/)          User Directory (uploads/.../plugins/)
 │  my-plugin/            │    symlink   │  my-plugin/              │
 │  ├── backend/          │◄────────────►│  ├── backend -> ...      │
 │  ├── frontend/         │              │  ├── frontend -> ...     │
-│  └── manifest.json     │              │  ├── frontend -> ...     │
-└────────────────────────┘              │  └── up -> user root     │
-                                        └──────────────────────────┘
+│  └── manifest.json     │              │  └── up -> user root     │
+└────────────────────────┘              └──────────────────────────┘
 ```
 
 **Key Concepts:**

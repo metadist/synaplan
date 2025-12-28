@@ -31,7 +31,7 @@ final readonly class PluginManifest
     public static function fromArray(array $data): self
     {
         return new self(
-            $name = $data['name'] ?? 'unknown',
+            $data['name'] ?? 'unknown',
             $data['version'] ?? '1.0.0',
             $data['description'] ?? '',
             $data['capabilities'] ?? [],
