@@ -254,8 +254,8 @@ const navItems = computed<NavItem[]>(() => {
     })
   }
 
-  // Plugins: Only show if user has plugins installed
-  if (configStore.plugins.length > 0) {
+  // Plugins: Only in Advanced Mode and if user has plugins installed
+  if (appModeStore.isAdvancedMode && configStore.plugins.length > 0) {
     items.push({
       path: '/plugins',
       label: 'Plugins',
