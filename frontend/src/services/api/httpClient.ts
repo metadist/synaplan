@@ -97,6 +97,16 @@ export async function getConfig(): Promise<RuntimeConfig> {
 }
 
 /**
+ * Reload runtime config (clears cache and fetches fresh data)
+ * Call this after login to get user-specific config like plugins
+ */
+export async function reloadConfig(): Promise<RuntimeConfig> {
+  runtimeConfig = null
+  configPromise = null
+  return loadRuntimeConfig()
+}
+
+/**
  * Get runtime config (sync)
  * Returns cached value or default. Call getConfig() first to ensure it's loaded.
  */

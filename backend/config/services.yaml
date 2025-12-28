@@ -10,6 +10,9 @@ parameters:
     env(LOG_FORMAT): ''
     default_log_format: 'json'
 
+    # Plugins - mounted at /plugins in Docker, relative path for CI
+    plugins_dir: '/plugins'
+
 services:
     _defaults:
         autowire: true
@@ -321,3 +324,8 @@ services:
     app.monolog_formatter:
         class: Monolog\Formatter\FormatterInterface
         factory: ['@App\Service\MonologFormatterFactory', 'createFormatter']
+
+    # Plugin discovery
+    Plugin\:
+        resource: '/plugins/*/backend'
+        exclude: '/plugins/*/backend/{Entity,migrations,tests}'

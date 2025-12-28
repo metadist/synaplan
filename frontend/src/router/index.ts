@@ -113,6 +113,12 @@ const router = createRouter({
       meta: { requiresAuth: true, helpId: 'tools.mailHandler' },
     },
     {
+      path: '/plugins/:pluginName',
+      name: 'plugin-view',
+      component: () => import('../views/PluginView.vue'),
+      meta: { requiresAuth: true },
+    },
+    {
       path: '/files',
       name: 'files',
       component: () => import('../views/FilesView.vue'),

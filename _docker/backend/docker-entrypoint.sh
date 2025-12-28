@@ -112,7 +112,7 @@ if [ "$APP_ENV" = "dev" ] || [ "$APP_ENV" = "test" ]; then
 
             # Load fixtures
             echo "   Loading fixtures..."
-            if php bin/console doctrine:fixtures:load --no-interaction 2>&1 | tee /tmp/fixtures.log; then
+            if php bin/console doctrine:fixtures:load --purge-with-truncate --no-interaction 2>&1 | tee /tmp/fixtures.log; then
                 if grep -q "loading App" /tmp/fixtures.log; then
                     touch "$FIXTURES_MARKER"
                     echo ""

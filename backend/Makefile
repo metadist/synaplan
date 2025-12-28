@@ -27,8 +27,8 @@ deps: ## Install composer dependencies
 migrate: ## Run migrations
 	docker compose -f ../docker-compose.yml exec -T backend php bin/console doctrine:migrations:migrate --no-interaction
 
-fixtures: ## Load fixtures
-	docker compose -f ../docker-compose.yml exec -T backend php bin/console doctrine:fixtures:load --no-interaction
+fixtures: ## Load fixtures (users get IDs 1,2,3)
+	docker compose -f ../docker-compose.yml exec -T backend php bin/console doctrine:fixtures:load --purge-with-truncate --no-interaction
 
 schema-update: ## Update database schema (dev only!)
 	docker compose -f ../docker-compose.yml exec -T backend php bin/console doctrine:schema:update --force

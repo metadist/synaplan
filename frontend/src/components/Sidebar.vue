@@ -158,10 +158,12 @@ import {
   ChevronDownIcon,
   ShieldCheckIcon,
   SparklesIcon,
+  PuzzlePieceIcon,
 } from '@heroicons/vue/24/outline'
 import { useSidebarStore } from '../stores/sidebar'
 import { useAuthStore } from '../stores/auth'
 import { useAppModeStore } from '../stores/appMode'
+import { useConfigStore } from '../stores/config'
 import { useTheme } from '../composables/useTheme'
 import { getFeaturesStatus } from '../services/featuresService'
 import SidebarChatList from './SidebarChatList.vue'
@@ -170,6 +172,7 @@ import UserMenu from './UserMenu.vue'
 const sidebarStore = useSidebarStore()
 const authStore = useAuthStore()
 const appModeStore = useAppModeStore()
+const configStore = useConfigStore()
 const { theme } = useTheme()
 const route = useRoute()
 const expandedMenus = ref<string[]>([])
@@ -248,6 +251,19 @@ const navItems = computed<NavItem[]>(() => {
         { path: '/tools/doc-summary', label: 'Doc Summary' },
         { path: '/tools/mail-handler', label: 'Mail Handler' },
       ],
+    })
+  }
+
+  // Plugins: Only in Advanced Mode and if user has plugins installed
+  if (appModeStore.isAdvancedMode && configStore.plugins.length > 0) {
+    items.push({
+      path: '/plugins',
+      label: 'Plugins',
+      icon: PuzzlePieceIcon,
+      children: configStore.plugins.map((plugin: { name?: string }) => ({
+        path: `/plugins/${plugin.name}`,
+        label: plugin.name ?? 'Unknown',
+      })),
     })
   }
 

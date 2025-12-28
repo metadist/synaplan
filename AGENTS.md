@@ -429,7 +429,7 @@ FRONTEND_URL=http://localhost:5173  # Public URL for generated links in emails e
 
 See `backend/.env.example` for complete list.
 
-### Frontend (.env)
+### Frontend
 Generally not needed - API URL detected from backend or widget script source.
 
 *MUST* *NOT* contain runtime settings. *VITE_* values are forbidden in general.

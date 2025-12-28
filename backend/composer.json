@@ -78,6 +78,7 @@
     "autoload": {
         "psr-4": {
             "App\\": "src/",
+            "Plugin\\": "/plugins/",
             "Inference\\": "lib/grpc/Inference/",
             "GPBMetadata\\": "lib/grpc/GPBMetadata/"
         }

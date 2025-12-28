@@ -330,6 +330,11 @@
     "fileGenerationFailed": "Es gab ein Problem beim Erstellen der Datei. Bitte versuche es erneut.",
     "cancelledByUser": "⚠️ Vom Benutzer abgebrochen"
   },
+  "plugins": {
+    "title": "Plugins",
+    "description": "Erweiterte Funktionen für Ihren Workflow",
+    "notFound": "Plugin nicht gefunden oder nicht für Ihren Account aktiviert"
+  },
   "config": {
     "inbound": {
       "title": "Eingänge",

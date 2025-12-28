@@ -2,6 +2,55 @@
 
 This document outlines the core infrastructure improvements and the advanced plugin architecture for Synaplan.
 
+---
+
+## TL;DR: Writing Plugins for Synaplan
+
+### Architecture at a Glance
+
+```
+Central Repository (/plugins/)          User Directory (uploads/.../plugins/)
+┌────────────────────────┐              ┌──────────────────────────┐
+│  my-plugin/            │    symlink   │  my-plugin/              │
+│  ├── backend/          │◄────────────►│  ├── backend -> ...      │
+│  ├── frontend/         │              │  ├── frontend -> ...     │
+│  └── manifest.json     │              │  └── up -> user root     │
+└────────────────────────┘              └──────────────────────────┘
+```
+
+**Key Concepts:**
+- **Central Repository**: Admins install plugins once in `/plugins/`. Code is shared, not copied.
+- **User Activation**: When enabled for a user, symlinks are created in their upload directory.
+- **Isolation**: Each user's plugin config is stored in `BCONFIG` with `BGROUP = "P_{slug}"`.
+
+### Plugin Structure
+
+```
+my-plugin/
+├── manifest.json       # Plugin metadata, capabilities, required permissions
+├── backend/            # PHP controllers, services, entities
+├── frontend/           # Vue components, styles
+└── migrations/         # SQL templates applied per-user on activation
+```
+
+### Writing a Plugin
+
+1. **Create `manifest.json`** – Define name, version, routes, and permissions.
+2. **Backend Code** – Write Symfony controllers/services in `backend/`. Use `#[OA\...]` attributes for API docs. Routes must follow: `/api/v1/user/{userId}/plugins/{pluginName}/...`
+3. **Frontend Code** – Vue components in `frontend/`. Loaded dynamically when plugin is active.
+4. **Migrations** – SQL files in `migrations/` run on user activation. Use placeholders for `BOWNERID`.
+5. **Config Storage** – Use `BCONFIG` table with `BGROUP = "P_{your_slug}"` (max 62 chars for slug).
+
+### Installation Flow
+
+1. Admin places plugin in `/plugins/{pluginName}/`
+2. Admin enables plugin for a user via Admin UI
+3. `PluginManager` creates symlinks in user's `plugins/` directory
+4. Migration runner applies `migrations/*.sql` for that user
+5. Plugin routes and UI become available to the user
+
+---
+
 ## 0. Vibe Coding Basics: Scalable Infrastructure
 
 ### A. Scalable User Directory Hashing
@@ -64,10 +113,10 @@ Resides in `/plugins/` inside the container. Admins install plugins here once.
 ### B. User-Specific Symlink Structure
 Instead of copying code, we symlink the central plugin into the user's hashed directory. This is extremely storage-efficient.
 
-**Target Path**: `uploads/{L1}/{L2}/{userId}/PLUGINS/{pluginName}/`
+**Target Path**: `uploads/{L1}/{L2}/{userId}/plugins/{pluginName}/`
 
 ```
-PLUGINS/{pluginName}/
+plugins/{pluginName}/
 ├── backend -> /plugins/{pluginName}/backend/
 ├── frontend -> /plugins/{pluginName}/frontend/
 └── up -> ../../../                                # Reverse link to user's root
@@ -75,7 +124,7 @@ PLUGINS/{pluginName}/
 
 **Reverse Symlink (`up/`)**:
 Inside the plugin directory, `up/` points back to the user's root upload directory.
-- Path from `PLUGINS/{pluginName}/` to `{userId}/` is `../../../`.
+- Path from `plugins/{pluginName}/` to `{userId}/` is `../../../`.
 - This allows a plugin to access user data via `./up/{year}/{month}/file.pdf`.
 
 ---

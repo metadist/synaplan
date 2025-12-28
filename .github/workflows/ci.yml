@@ -97,6 +97,9 @@ jobs:
         working-directory: backend
         run: bash ../.github/scripts/create-test-env.sh
 
+      - name: Create plugins symlink
+        run: sudo ln -s ${{ github.workspace }}/plugins /plugins
+
       - name: Install dependencies
         working-directory: backend
         run: composer install --prefer-dist --no-progress --no-interaction

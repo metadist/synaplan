@@ -56,6 +56,7 @@ services:
       - ./backend:/var/www/backend
       - ./frontend/dist:/var/www/frontend:ro
       - ./frontend/dist-widget:/var/www/widgets
+      - ./plugins:/plugins:ro
       - ./_docker/backend/Caddyfile:/etc/caddy/Caddyfile:ro
       - ./_docker/backend/docker-entrypoint.sh:/usr/local/bin/docker-entrypoint.sh:ro
       - whisper_models:/var/www/backend/var/whisper:ro
@@ -64,6 +65,7 @@ services:
       APP_ENV: dev
       # APP_SECRET loaded from backend/.env (env_file above)
       APP_URL: http://localhost:8000
+      PLUGINS_DIR: /plugins
       FRONTEND_URL: http://localhost:5173
       SYNAPLAN_URL: http://localhost:8000
       DATABASE_WRITE_URL: mysql://synaplan_user:synaplan_password@db:3306/synaplan?serverVersion=11.8&charset=utf8mb4

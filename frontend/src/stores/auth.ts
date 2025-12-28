@@ -3,6 +3,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { authService } from '@/services/authService'
+import { useConfigStore } from '@/stores/config'
 
 export interface User {
   id: number
@@ -43,6 +44,8 @@ export const useAuthStore = defineStore('auth', () => {
 
       if (result.success) {
         user.value = authService.getUser().value
+        // Reload config to get user-specific data like plugins
+        await useConfigStore().reload()
         return true
       } else {
         error.value = result.error || 'Login failed'
@@ -121,6 +124,8 @@ export const useAuthStore = defineStore('auth', () => {
       const currentUser = await authService.getCurrentUser()
       if (currentUser) {
         user.value = currentUser
+        // Reload config to get user-specific data like plugins
+        await useConfigStore().reload()
       }
     } catch (err) {
       // Not authenticated or network error - that's fine, just stay logged out

@@ -7,7 +7,7 @@
  * This is a simple wrapper around httpClient config functions to avoid circular dependency.
  */
 
-import { getConfig, getConfigSync, getApiBaseUrl } from '@/services/api/httpClient'
+import { getConfig, getConfigSync, getApiBaseUrl, reloadConfig } from '@/services/api/httpClient'
 
 /**
  * Load runtime configuration from backend API
@@ -68,11 +68,26 @@ const config = {
   },
 
   /**
+   * Installed plugins for the current user
+   */
+  get plugins(): NonNullable<ReturnType<typeof getConfigSync>['plugins']> {
+    return getConfigSync().plugins ?? []
+  },
+
+  /**
    * Load runtime configuration from backend
    * Call this before accessing config values (e.g., in main.ts)
    */
   async init(): Promise<void> {
     await loadRuntimeConfig()
+  },
+
+  /**
+   * Reload runtime configuration (clears cache)
+   * Call this after login to get user-specific config like plugins
+   */
+  async reload(): Promise<void> {
+    await reloadConfig()
   },
 
   /**
