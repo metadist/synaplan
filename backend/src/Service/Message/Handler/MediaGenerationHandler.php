@@ -178,10 +178,15 @@ class MediaGenerationHandler implements MessageHandlerInterface
             }
         }
 
-        // Resolve model ID to provider + model name
+        // Resolve model ID to provider + model name + config
+        $modelConfig = [];
         if ($modelId) {
-            $provider = $this->modelConfigService->getProviderForModel($modelId);
-            $modelName = $this->modelConfigService->getModelName($modelId);
+            $model = $this->em->getRepository(\App\Entity\Model::class)->find($modelId);
+            if ($model) {
+                $provider = strtolower($model->getService());
+                $modelName = $model->getProviderId() ?: $model->getName();
+                $modelConfig = $model->getJson();
+            }
 
             $this->logger->info('MediaGenerationHandler: Resolved model', [
                 'model_id' => $modelId,
@@ -263,6 +268,7 @@ class MediaGenerationHandler implements MessageHandlerInterface
                     [
                         'provider' => $provider,
                         'model' => $modelName,
+                        'modelConfig' => $modelConfig,
                         'quality' => $options['quality'] ?? 'standard',
                         'style' => $options['style'] ?? 'vivid',
                         'size' => $options['size'] ?? '1024x1024',
