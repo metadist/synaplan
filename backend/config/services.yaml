@@ -10,8 +10,8 @@ parameters:
     env(LOG_FORMAT): ''
     default_log_format: 'json'
 
-    # Plugins
-    plugins_dir: '%kernel.project_dir%/../plugins'
+    # Plugins - mounted at /plugins in Docker, relative path for CI
+    plugins_dir: '/plugins'
 
 services:
     _defaults:
@@ -327,5 +327,5 @@ services:
 
     # Plugin discovery
     Plugin\:
-        resource: '%kernel.project_dir%/../plugins/*/backend'
-        exclude: '%kernel.project_dir%/../plugins/*/backend/{Entity,migrations,tests}'
+        resource: '/plugins/*/backend'
+        exclude: '/plugins/*/backend/{Entity,migrations,tests}'
