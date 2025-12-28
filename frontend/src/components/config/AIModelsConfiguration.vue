@@ -193,11 +193,12 @@
             <select
               v-model="sortBy"
               class="px-3 py-2 pr-8 rounded-lg border border-light-border/30 dark:border-dark-border/20 bg-light-surface dark:bg-dark-surface txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] cursor-pointer appearance-none"
+              @change="sortDirection = sortBy === 'quality' || sortBy === 'rating' ? 'desc' : 'asc'"
             >
               <option value="alphabet">{{ $t('config.aiModels.sortAlphabet') }}</option>
               <option value="service">{{ $t('config.aiModels.sortService') }}</option>
-              <option value="rating">{{ $t('config.aiModels.sortRating') }}</option>
               <option value="quality">{{ $t('config.aiModels.sortQuality') }}</option>
+              <option value="purpose">{{ $t('config.aiModels.sortPurpose') }}</option>
             </select>
             <ChevronDownIcon
               class="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 txt-secondary pointer-events-none"
@@ -219,25 +220,41 @@
           <thead>
             <tr class="border-b-2 border-light-border/30 dark:border-dark-border/20">
               <th
-                class="text-left py-3 px-2 sm:px-3 txt-secondary text-xs font-semibold uppercase tracking-wide"
+                class="text-left py-3 px-2 sm:px-3 txt-secondary text-xs font-semibold uppercase tracking-wide cursor-pointer hover:txt-primary transition-colors select-none"
+                @click="toggleSort('alphabet')"
               >
-                {{ $t('config.aiModels.tableName') }}
+                <div class="flex items-center gap-1">
+                  {{ $t('config.aiModels.tableName') }}
+                  <SortIndicator :active="sortBy === 'alphabet'" :direction="sortDirection" />
+                </div>
               </th>
               <th
-                class="text-left py-3 px-2 sm:px-3 txt-secondary text-xs font-semibold uppercase tracking-wide"
+                class="text-left py-3 px-2 sm:px-3 txt-secondary text-xs font-semibold uppercase tracking-wide cursor-pointer hover:txt-primary transition-colors select-none"
+                @click="toggleSort('service')"
               >
-                {{ $t('config.aiModels.tableService') }}
+                <div class="flex items-center gap-1">
+                  {{ $t('config.aiModels.tableService') }}
+                  <SortIndicator :active="sortBy === 'service'" :direction="sortDirection" />
+                </div>
               </th>
               <th
                 v-if="showRatings"
-                class="text-center py-3 px-2 sm:px-3 txt-secondary text-xs font-semibold uppercase tracking-wide"
+                class="text-center py-3 px-2 sm:px-3 txt-secondary text-xs font-semibold uppercase tracking-wide cursor-pointer hover:txt-primary transition-colors select-none"
+                @click="toggleSort('quality')"
               >
-                {{ $t('config.aiModels.tableRating') }}
+                <div class="flex items-center justify-center gap-1">
+                  {{ $t('config.aiModels.tableRating') }}
+                  <SortIndicator :active="sortBy === 'quality'" :direction="sortDirection" />
+                </div>
               </th>
               <th
-                class="text-left py-3 px-2 sm:px-3 txt-secondary text-xs font-semibold uppercase tracking-wide hidden sm:table-cell"
+                class="text-left py-3 px-2 sm:px-3 txt-secondary text-xs font-semibold uppercase tracking-wide hidden sm:table-cell cursor-pointer hover:txt-primary transition-colors select-none"
+                @click="toggleSort('purpose')"
               >
-                {{ $t('config.aiModels.tablePurpose') }}
+                <div class="flex items-center gap-1">
+                  {{ $t('config.aiModels.tablePurpose') }}
+                  <SortIndicator :active="sortBy === 'purpose'" :direction="sortDirection" />
+                </div>
               </th>
               <th
                 class="text-left py-3 px-2 sm:px-3 txt-secondary text-xs font-semibold uppercase tracking-wide hidden lg:table-cell"
@@ -249,7 +266,7 @@
           <tbody>
             <tr
               v-for="model in sortedModels"
-              :key="model.id"
+              :key="`${model.id}-${model.purpose}`"
               class="border-b border-light-border/10 dark:border-dark-border/10 hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
               data-testid="item-model"
             >
@@ -279,13 +296,18 @@
                 </span>
               </td>
               <td v-if="showRatings" class="py-3 px-2 sm:px-3">
-                <div class="flex items-center justify-center gap-1">
+                <div
+                  class="flex items-center justify-center gap-0.5"
+                  :title="$t('config.aiModels.qualityScore', { score: model.quality.toFixed(1) })"
+                >
                   <svg
                     v-for="star in 5"
                     :key="star"
                     class="w-4 h-4"
                     :class="
-                      star <= model.rating ? 'text-yellow-500' : 'text-gray-300 dark:text-gray-600'
+                      star <= getStarRating(model.quality)
+                        ? 'text-yellow-500'
+                        : 'text-gray-300 dark:text-gray-600'
                     "
                     fill="currentColor"
                     viewBox="0 0 20 20"
@@ -294,7 +316,6 @@
                       d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"
                     />
                   </svg>
-                  <span class="text-xs txt-secondary ml-1">({{ model.quality.toFixed(1) }})</span>
                 </div>
               </td>
               <td class="py-3 px-2 sm:px-3 hidden sm:table-cell">
@@ -326,6 +347,7 @@ import {
 } from '@heroicons/vue/24/outline'
 import { Icon } from '@iconify/vue'
 import AIModelsAdminPanel from '@/components/config/AIModelsAdminPanel.vue'
+import SortIndicator from '@/components/config/SortIndicator.vue'
 import GroqIcon from '@/components/icons/GroqIcon.vue'
 import { useNotification } from '@/composables/useNotification'
 import { serviceColors } from '@/mocks/aiModels'
@@ -380,7 +402,8 @@ const capabilityRefs = ref<Record<Capability, HTMLElement | null>>(
 )
 const openDropdown = ref<Capability | null>(null)
 const showRatings = ref(false)
-const sortBy = ref<'alphabet' | 'service' | 'rating' | 'quality'>('alphabet')
+const sortBy = ref<'alphabet' | 'service' | 'rating' | 'quality' | 'purpose'>('alphabet')
+const sortDirection = ref<'asc' | 'desc'>('asc')
 
 const { success, error: showError, warning } = useNotification()
 
@@ -599,37 +622,77 @@ const filteredModels = computed(() => {
   return allModels.value.filter((model) => model.purpose === selectedPurpose.value)
 })
 
-const sortedModels = computed(() => {
-  const models = [...filteredModels.value]
-
-  switch (sortBy.value) {
-    case 'alphabet':
-      return models.sort((a, b) => a.name.localeCompare(b.name))
-
-    case 'service':
-      return models.sort((a, b) => {
-        const serviceCompare = a.service.localeCompare(b.service)
-        if (serviceCompare !== 0) return serviceCompare
-        return a.name.localeCompare(b.name)
-      })
-
-    case 'rating':
-      return models.sort((a, b) => {
-        const ratingDiff = b.rating - a.rating
-        if (ratingDiff !== 0) return ratingDiff
-        return a.name.localeCompare(b.name)
-      })
-
-    case 'quality':
-      return models.sort((a, b) => {
-        const qualityDiff = b.quality - a.quality
-        if (qualityDiff !== 0) return qualityDiff
-        return a.name.localeCompare(b.name)
-      })
-
-    default:
-      return models
+/**
+ * Toggle sort column - if same column, toggle direction; if new column, set ascending
+ */
+const toggleSort = (column: 'alphabet' | 'service' | 'rating' | 'quality' | 'purpose') => {
+  if (sortBy.value === column) {
+    sortDirection.value = sortDirection.value === 'asc' ? 'desc' : 'asc'
+  } else {
+    sortBy.value = column
+    // Default to descending for quality/rating (best first), ascending for others
+    sortDirection.value = column === 'quality' || column === 'rating' ? 'desc' : 'asc'
   }
+}
+
+/**
+ * Convert quality score (0-10) to star rating (1-5)
+ */
+const getStarRating = (quality: number): number => {
+  // Quality is 0-10, convert to 0-5 stars
+  return Math.round(quality / 2)
+}
+
+const sortedModels = computed(() => {
+  // Force dependency tracking by reading values at the start
+  const currentSortBy = sortBy.value
+  const currentSortDirection = sortDirection.value
+  const sourceModels = filteredModels.value
+
+  // Create a deep copy to avoid any mutation issues
+  const models = sourceModels.map((m) => ({ ...m }))
+  const dir = currentSortDirection === 'asc' ? 1 : -1
+
+  // Sort function that uses the current sort column and direction
+  const compareFn = (a: (typeof models)[0], b: (typeof models)[0]): number => {
+    let primaryCmp = 0
+
+    switch (currentSortBy) {
+      case 'alphabet':
+        primaryCmp = a.name.localeCompare(b.name)
+        break
+
+      case 'service':
+        primaryCmp = a.service.localeCompare(b.service)
+        break
+
+      case 'rating':
+      case 'quality':
+        primaryCmp = a.quality - b.quality
+        break
+
+      case 'purpose':
+        primaryCmp = a.purpose.localeCompare(b.purpose)
+        break
+
+      default:
+        return 0
+    }
+
+    // Apply direction multiplier
+    if (primaryCmp !== 0) {
+      return dir * primaryCmp
+    }
+
+    // Fallback: sort by name (always in the same direction as primary sort)
+    return dir * a.name.localeCompare(b.name)
+  }
+
+  // Sort the array
+  const sorted = models.sort(compareFn)
+
+  // Return a new array reference to ensure Vue detects the change
+  return Array.from(sorted)
 })
 
 const saveConfiguration = async () => {
