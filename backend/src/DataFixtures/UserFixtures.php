@@ -6,7 +6,7 @@ namespace App\DataFixtures;
 
 use App\Entity\User;
 use Doctrine\Bundle\FixturesBundle\Fixture;
-use Doctrine\DBAL\Connection;
+use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\Persistence\ObjectManager;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 
@@ -65,7 +65,9 @@ class UserFixtures extends Fixture
             ],
         ];
 
-        /** @var Connection $connection */
+        if (!$manager instanceof EntityManagerInterface) {
+            throw new \LogicException('Expected EntityManagerInterface');
+        }
         $connection = $manager->getConnection();
 
         foreach ($users as $data) {

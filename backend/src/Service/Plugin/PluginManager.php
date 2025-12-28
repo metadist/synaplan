@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Service\Plugin;
 
-use App\Repository\ConfigRepository;
 use App\Service\File\FileStorageService;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
@@ -20,7 +19,6 @@ final readonly class PluginManager
 
     public function __construct(
         private FileStorageService $fileStorageService,
-        private ConfigRepository $configRepository,
         private EntityManagerInterface $entityManager,
         private LoggerInterface $logger,
         #[Autowire('%plugins_dir%')]
