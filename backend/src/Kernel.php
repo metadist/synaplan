@@ -35,15 +35,15 @@ class Kernel extends BaseKernel
             (require $path)($routes->withPath($path), $this);
         }
 
-        // Dynamic Plugin Route Loading
-        $pluginsDir = '/plugins';
-        if (is_dir($pluginsDir)) {
-            $dirs = glob($pluginsDir.'/*/backend/Controller', GLOB_ONLYDIR);
-            if ($dirs) {
-                foreach ($dirs as $dir) {
-                    $routes->import($dir, 'attribute');
-                }
-            }
-        }
+        // Dynamic Plugin Route Loading (disabled - plugins need proper autoload setup)
+        // $pluginsDir = '/plugins';
+        // if (is_dir($pluginsDir)) {
+        //     $dirs = glob($pluginsDir.'/*/backend/Controller', GLOB_ONLYDIR);
+        //     if ($dirs) {
+        //         foreach ($dirs as $dir) {
+        //             $routes->import($dir, 'attribute');
+        //         }
+        //     }
+        // }
     }
 }
