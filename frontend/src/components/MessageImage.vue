@@ -35,51 +35,53 @@
     <p v-if="alt" class="mt-2 text-sm txt-secondary">{{ alt }}</p>
   </div>
 
-  <!-- Fullscreen Modal -->
-  <Transition
-    enter-active-class="transition-opacity duration-300"
-    enter-from-class="opacity-0"
-    enter-to-class="opacity-100"
-    leave-active-class="transition-opacity duration-200"
-    leave-from-class="opacity-100"
-    leave-to-class="opacity-0"
-  >
-    <div
-      v-if="isFullscreen"
-      class="fixed inset-0 bg-black/95 z-[100] flex items-center justify-center p-4"
-      data-testid="modal-image-fullscreen"
-      @click="closeFullscreen"
+  <!-- Fullscreen Modal - Teleported to body to ensure highest z-index -->
+  <Teleport to="body">
+    <Transition
+      enter-active-class="transition-opacity duration-300"
+      enter-from-class="opacity-0"
+      enter-to-class="opacity-100"
+      leave-active-class="transition-opacity duration-200"
+      leave-from-class="opacity-100"
+      leave-to-class="opacity-0"
     >
-      <button
-        class="absolute top-4 right-4 text-white/80 hover:text-white transition-colors p-2"
-        aria-label="Close"
-        data-testid="btn-image-close"
-        @click.stop="closeFullscreen"
+      <div
+        v-if="isFullscreen"
+        class="fixed inset-0 bg-black z-[9999] flex items-center justify-center p-4"
+        data-testid="modal-image-fullscreen"
+        @click="closeFullscreen"
       >
-        <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            stroke-width="2"
-            d="M6 18L18 6M6 6l12 12"
-          />
-        </svg>
-      </button>
-      <img
-        v-if="blobUrl"
-        :src="blobUrl"
-        :alt="alt"
-        class="max-w-full max-h-full object-contain"
-        @click.stop
-      />
-      <p
-        v-if="alt"
-        class="absolute bottom-6 left-1/2 -translate-x-1/2 text-white/90 text-sm bg-black/50 px-4 py-2 rounded-lg max-w-2xl text-center"
-      >
-        {{ alt }}
-      </p>
-    </div>
-  </Transition>
+        <button
+          class="absolute top-4 right-4 text-white/80 hover:text-white transition-colors p-2 z-10"
+          aria-label="Close"
+          data-testid="btn-image-close"
+          @click.stop="closeFullscreen"
+        >
+          <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M6 18L18 6M6 6l12 12"
+            />
+          </svg>
+        </button>
+        <img
+          v-if="blobUrl"
+          :src="blobUrl"
+          :alt="alt"
+          class="max-w-full max-h-full object-contain z-10"
+          @click.stop
+        />
+        <p
+          v-if="alt"
+          class="absolute bottom-6 left-1/2 -translate-x-1/2 text-white/90 text-sm bg-black/50 px-4 py-2 rounded-lg max-w-2xl text-center z-10"
+        >
+          {{ alt }}
+        </p>
+      </div>
+    </Transition>
+  </Teleport>
 </template>
 
 <script setup lang="ts">
