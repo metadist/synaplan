@@ -26,7 +26,53 @@ git rm --cached -r .
 git reset --hard
 ```
 
-Run the first-install script (it verifies Docker, lets you pick your AI provider, and handles all bootstrapping).
+### Choose Your Installation Mode
+
+| Mode | Download Size | Best For | Command |
+|------|---------------|----------|---------|
+| ⚡ **Light** | ~5 GB | Quick start, cloud AI (Groq/OpenAI) | `docker compose -f docker-compose-light.yml up -d` |
+| 🔧 **Full** | ~9 GB | Local AI, audio transcription | `./_1st_install_linux.sh` |
+
+---
+
+### ⚡ Light Install (Recommended for First-Time Users)
+
+**Fastest way to get started** - uses cloud AI providers, skips large local models.
+
+```bash
+# 1. Start services (~5 GB download, ~2-3 min)
+docker compose -f docker-compose-light.yml up -d
+
+# 2. Set your AI API key (get free key at https://console.groq.com)
+echo "GROQ_API_KEY=your_key_here" >> backend/.env
+
+# 3. Restart backend to apply
+docker compose -f docker-compose-light.yml restart backend
+```
+
+**What's included:**
+- ✅ Full web app and API
+- ✅ Document processing (Tika)
+- ✅ Database (MariaDB)
+- ✅ Cloud AI support (Groq, OpenAI, Anthropic, Gemini)
+- ✅ Dev tools (phpMyAdmin, MailHog)
+
+**What's NOT included (saves ~4 GB):**
+- ❌ Ollama (local AI models)
+- ❌ Whisper models (audio transcription)
+- ❌ Local embedding models
+
+**Upgrade to Full Install later:**
+```bash
+docker compose -f docker-compose-light.yml down
+docker compose up -d  # Starts full stack with Ollama
+```
+
+---
+
+### 🔧 Full Install (Local AI + Audio Transcription)
+
+Run the first-install script for the complete experience with local AI models.
 
 **Windows users:** Please use **WSL2** (Windows Subsystem for Linux) and run the Linux script.
 
@@ -91,14 +137,14 @@ AUTO_DOWNLOAD_MODELS=false docker compose up -d
 
 ## 🌐 Access
 
-| Service | URL | Description |
-|---------|-----|-------------|
-| Frontend | http://localhost:5173 | Vue.js Web App |
-| Backend API | http://localhost:8000 | Symfony REST API |
-| API Docs | http://localhost:8000/api/doc | Swagger UI / OpenAPI |
-| phpMyAdmin | http://localhost:8082 | Database Management |
-| MailHog | http://localhost:8025 | Email Testing |
-| Ollama | http://localhost:11435 | AI Models API |
+| Service | URL | Description | Light | Full |
+|---------|-----|-------------|:-----:|:----:|
+| Frontend | http://localhost:5173 | Vue.js Web App | ✅ | ✅ |
+| Backend API | http://localhost:8000 | Symfony REST API | ✅ | ✅ |
+| API Docs | http://localhost:8000/api/doc | Swagger UI / OpenAPI | ✅ | ✅ |
+| phpMyAdmin | http://localhost:8082 | Database Management | ✅ | ✅ |
+| MailHog | http://localhost:8025 | Email Testing | ✅ | ✅ |
+| Ollama | http://localhost:11435 | AI Models API | ❌ | ✅ |
 
 ## 👤 Test Users
 
@@ -289,13 +335,14 @@ curl -X POST https://your-domain.com/api/v1/webhooks/email \
 
 ```
 synaplan-dev/
-├── _devextras/          # Development extras
-├── _docker/             # Docker configurations
-│   ├── backend/         # Backend Dockerfile & scripts
-│   └── frontend/        # Frontend Dockerfile & nginx
-├── backend/             # Symfony Backend (PHP 8.3)
-├── frontend/            # Vue.js Frontend
-└── docker-compose.yml   # Main orchestration
+├── _devextras/              # Development extras
+├── _docker/                 # Docker configurations
+│   ├── backend/             # Backend Dockerfile & scripts
+│   └── frontend/            # Frontend Dockerfile & nginx
+├── backend/                 # Symfony Backend (PHP 8.3)
+├── frontend/                # Vue.js Frontend
+├── docker-compose.yml       # Full install (Ollama + Whisper)
+└── docker-compose-light.yml # Light install (cloud AI only)
 ```
 
 ## ⚙️ Environment Configuration

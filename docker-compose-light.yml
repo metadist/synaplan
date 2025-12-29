@@ -1,0 +1,207 @@
+# Synaplan Light - Minimal installation for external AI providers
+#
+# This lightweight configuration:
+# - Uses cloud AI providers (Groq, OpenAI, Anthropic) instead of local Ollama
+# - Skips Whisper audio transcription (can be enabled later)
+# - Downloads ~4GB less than full install
+# - Faster startup for first-time users
+#
+# Usage:
+#   docker compose -f docker-compose-light.yml up -d
+#
+# To switch to full install later:
+#   docker compose -f docker-compose-light.yml down
+#   docker compose up -d
+#
+services:
+  # Vue.js Frontend
+  frontend:
+    image: node:22
+    container_name: synaplan-frontend
+    working_dir: /app
+    entrypoint: ["/usr/local/bin/docker-entrypoint.sh"]
+    environment:
+      NODE_ENV: development
+      BACKEND_URL: http://backend
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./_docker/frontend/docker-entrypoint.sh:/usr/local/bin/docker-entrypoint.sh:ro
+      - ./_devextras/frontend/docker-entrypoint.d:/docker-entrypoint.d:ro
+      - ./frontend:/app
+       # Anonymous volume to prevent host node_modules from being mounted (avoids platform-specific binary conflicts)
+      - /app/node_modules
+    depends_on:
+      - backend
+    restart: unless-stopped
+    networks:
+      - synaplan-network
+
+  # Widget Build Watcher (dev only)
+  frontend-widgets:
+    image: node:22
+    container_name: synaplan-frontend-widgets
+    working_dir: /app
+    command: sh -c "npm ci && npm run build:widget -- --watch"
+    environment:
+      NODE_ENV: development
+    volumes:
+      - ./frontend:/app
+      # Anonymous volume to prevent host node_modules from being mounted
+      - /app/node_modules
+    restart: unless-stopped
+    networks:
+      - synaplan-network
+
+  # Symfony PHP Backend
+  # Serves both API and production frontend from frontend/dist
+  backend:
+    image: ghcr.io/metadist/synaplan:latest
+    build:
+      context: .
+      dockerfile: _docker/backend/Dockerfile
+    container_name: synaplan-backend
+    # Optional: Load extra config from backend/.env (for API keys, etc.)
+    env_file:
+      - path: backend/.env
+        required: false
+    ports:
+      - "8000:80"
+    volumes:
+      - ./backend:/var/www/backend
+      - ./frontend/dist:/var/www/frontend:ro
+      - ./frontend/dist-widget:/var/www/widgets
+      - ./plugins:/plugins:ro
+      - ./_docker/backend/Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./_docker/backend/docker-entrypoint.sh:/usr/local/bin/docker-entrypoint.sh:ro
+      - ./_devextras/backend/docker-entrypoint.d:/docker-entrypoint.d:ro
+      # Note: No whisper_models volume - audio transcription disabled
+    environment:
+      APP_ENV: dev
+      # APP_SECRET loaded from backend/.env (env_file above)
+      APP_URL: http://localhost:8000
+      PLUGINS_DIR: /plugins
+      FRONTEND_URL: http://localhost:5173
+      SYNAPLAN_URL: http://localhost:8000
+      DATABASE_WRITE_URL: mysql://synaplan_user:synaplan_password@db:3306/synaplan?serverVersion=11.8&charset=utf8mb4
+      DATABASE_READ_URL: mysql://synaplan_user:synaplan_password@db:3306/synaplan?serverVersion=11.8&charset=utf8mb4
+      # No Ollama - use external AI providers
+      OLLAMA_BASE_URL: ""
+      TRITON_SERVER_URL: ${TRITON_SERVER_URL:-}
+      TIKA_BASE_URL: http://tika:9998
+      # Default to Groq (free tier available) - user should set GROQ_API_KEY in backend/.env
+      AI_DEFAULT_PROVIDER: groq
+      # Token Configuration
+      TOKEN_SECRET: 'change_me_in_production_use_openssl_rand_hex_32'
+      # Mailer (Mailhog for development)
+      MAILER_DSN: smtp://mailhog:1025
+      # External API Keys loaded from backend/.env via env_file
+      # WhatsApp Business API - Fully Dynamic Multi-Number Support
+      WHATSAPP_ACCESS_TOKEN: ${WHATSAPP_ACCESS_TOKEN:-}
+      WHATSAPP_WEBHOOK_VERIFY_TOKEN: ${WHATSAPP_WEBHOOK_VERIFY_TOKEN:-}
+      WHATSAPP_ENABLED: ${WHATSAPP_ENABLED:-false}
+      # AI Provider API Keys (loaded from backend/.env via env_file above)
+      AUTO_DOWNLOAD_MODELS: "false"
+      ENABLE_LOCAL_GPT_OSS: "false"
+      # reCAPTCHA (optional - disabled by default)
+      RECAPTCHA_SITE_KEY: ${RECAPTCHA_SITE_KEY:-}
+      RECAPTCHA_SECRET_KEY: ${RECAPTCHA_SECRET_KEY:-}
+      RECAPTCHA_ENABLED: ${RECAPTCHA_ENABLED:-false}
+      # Stripe Payment Integration - loaded from backend/.env via env_file
+      # OAuth Social Login Providers (loaded from backend/.env via env_file)
+      # Whisper.cpp - DISABLED in light mode (no models downloaded)
+      WHISPER_BINARY: /usr/local/bin/whisper
+      WHISPER_MODELS_PATH: /var/www/backend/var/whisper
+      WHISPER_DEFAULT_MODEL: base
+      WHISPER_ENABLED: "false"
+      FFMPEG_BINARY: /usr/bin/ffmpeg
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 90s
+    networks:
+      - synaplan-network
+
+  # MariaDB 11.8 Database
+  db:
+    image: mariadb:11.8.2
+    container_name: synaplan-db
+    command: --max-allowed-packet=256M --innodb-buffer-pool-size=512M
+    environment:
+      MYSQL_DATABASE: synaplan
+      MYSQL_USER: synaplan_user
+      MYSQL_PASSWORD: synaplan_password
+      MYSQL_ROOT_PASSWORD: root_password
+    ports:
+      - "3307:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./_devextras/db-init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD", "mariadb", "-h", "localhost", "-u", "root", "-proot_password", "-e", "SELECT 1;"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    restart: unless-stopped
+    networks:
+      - synaplan-network
+
+  # Apache Tika - Document Text Extraction
+  tika:
+    image: apache/tika:2.9.2.0
+    container_name: synaplan-tika
+    command: -h 0.0.0.0 -p 9998
+    ports:
+      - "9999:9998"
+    healthcheck:
+      test: ["CMD", "sh", "-c", "wget -qO- http://localhost:9998/version >/dev/null 2>&1 || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 20s
+    restart: unless-stopped
+    networks:
+      - synaplan-network
+
+  # phpMyAdmin (optional - for DB management)
+  phpmyadmin:
+    image: phpmyadmin/phpmyadmin:latest
+    container_name: synaplan-phpmyadmin
+    environment:
+      PMA_HOST: db
+      PMA_PORT: 3306
+      PMA_USER: synaplan_user
+      PMA_PASSWORD: synaplan_password
+    ports:
+      - "8082:80"
+    depends_on:
+      - db
+    restart: unless-stopped
+    networks:
+      - synaplan-network
+
+  # MailHog (SMTP testing)
+  mailhog:
+    image: mailhog/mailhog:latest
+    container_name: synaplan-mailhog
+    ports:
+      - "1025:1025"  # SMTP
+      - "8025:8025"  # Web UI
+    restart: unless-stopped
+    networks:
+      - synaplan-network
+
+volumes:
+  mysql_data:
+  # Note: No ollama_data or whisper_models volumes in light mode
+
+networks:
+  synaplan-network:
+    driver: bridge
