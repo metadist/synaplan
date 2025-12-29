@@ -171,6 +171,7 @@ class InternalEmailService
             if (!empty($metadataParts)) {
                 $htmlBody .= '<br><br><div style="font-size: 11px; color: #888888; margin-top: 20px; padding-top: 15px; border-top: 1px solid #e0e0e0;">';
                 $htmlBody .= implode(' &middot; ', $metadataParts);
+                $htmlBody .= '<br><a href="https://www.synaplan.com/" style="color: #888888;">www.synaplan.com</a>';
                 $htmlBody .= '</div>';
             }
         }
@@ -191,6 +192,7 @@ class InternalEmailService
             }
             if (!empty($metadataText)) {
                 $textBody .= "\n\n---\n".implode(' | ', $metadataText);
+                $textBody .= "\nhttps://www.synaplan.com/";
             }
         }
 
