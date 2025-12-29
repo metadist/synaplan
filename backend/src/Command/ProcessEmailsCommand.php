@@ -11,10 +11,10 @@ use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Style\SymfonyStyle;
 
-    #[AsCommand(
-        name: 'app:process-emails',
-        description: 'Process incoming emails from Gmail IMAP (or Mailhog in dev) and forward to webhook for smart@synaplan.net'
-    )]
+#[AsCommand(
+    name: 'app:process-emails',
+    description: 'Process incoming emails from Gmail IMAP (or Mailhog in dev) and forward to webhook for smart@synaplan.net'
+)]
 class ProcessEmailsCommand extends Command
 {
     public function __construct(
@@ -41,11 +41,11 @@ class ProcessEmailsCommand extends Command
         $deleteAfter = !$input->getOption('keep');
 
         // Use internal URL for webhook calls from within the container
-        // If APP_URL is localhost, use backend service name instead
+        // If APP_URL is localhost:8000, use backend service name instead
         $webhookUrl = rtrim($this->appUrl, '/').'/api/v1/webhooks/email';
-        if (str_contains($webhookUrl, 'localhost')) {
+        if (str_starts_with($webhookUrl, 'http://localhost:8000')) {
             // Replace localhost with backend service name for internal calls
-            $webhookUrl = str_replace('http://localhost:8000', 'http://backend', $webhookUrl);
+            $webhookUrl = 'http://backend'.substr($webhookUrl, strlen('http://localhost:8000'));
         }
 
         $io->title('Email Processing Service');

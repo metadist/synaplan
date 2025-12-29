@@ -250,6 +250,8 @@ class InboundEmailService
             'errors' => [],
         ];
 
+        $connection = null;
+
         try {
             $server = '{imap.gmail.com:993/imap/ssl}INBOX';
             $connection = @imap_open($server, $this->gmailUsername, $this->gmailPassword, 0);
@@ -264,8 +266,6 @@ class InboundEmailService
             $messages = imap_search($connection, $searchCriteria);
 
             if (!$messages) {
-                imap_close($connection);
-
                 return $results;
             }
 
@@ -276,11 +276,21 @@ class InboundEmailService
                     $header = imap_headerinfo($connection, $msgNumber);
                     $body = $this->extractEmailBody($connection, $msgNumber);
 
+                    // Validate from header exists
+                    if (!isset($header->from[0]) || !isset($header->from[0]->mailbox) || !isset($header->from[0]->host)) {
+                        $this->logger->warning('Skipping email - invalid FROM header', [
+                            'message_number' => $msgNumber,
+                        ]);
+                        continue;
+                    }
+
                     $fromEmail = $header->from[0]->mailbox.'@'.$header->from[0]->host;
                     $toAddresses = [];
                     if (isset($header->to)) {
                         foreach ($header->to as $to) {
-                            $toAddresses[] = $to->mailbox.'@'.$to->host;
+                            if (isset($to->mailbox) && isset($to->host)) {
+                                $toAddresses[] = $to->mailbox.'@'.$to->host;
+                            }
                         }
                     }
 
@@ -337,6 +347,8 @@ class InboundEmailService
                             'email' => $fromEmail,
                             'error' => $result['error'] ?? 'Unknown error',
                         ];
+                        // Mark as read anyway to prevent infinite retry loops
+                        imap_setflag_full($connection, $msgNumber, '\\Seen');
                     }
                 } catch (\Exception $e) {
                     ++$results['failed'];
@@ -348,14 +360,14 @@ class InboundEmailService
                         'message_number' => $msgNumber,
                         'error' => $e->getMessage(),
                     ]);
+                    // Mark as read to prevent infinite retry loops
+                    imap_setflag_full($connection, $msgNumber, '\\Seen');
                 }
             }
 
             if ($deleteAfterProcessing) {
                 imap_expunge($connection);
             }
-
-            imap_close($connection);
         } catch (\Exception $e) {
             $this->logger->error('Failed to process Gmail IMAP emails', [
                 'error' => $e->getMessage(),
@@ -364,6 +376,11 @@ class InboundEmailService
                 'email' => 'system',
                 'error' => $e->getMessage(),
             ];
+        } finally {
+            // Always close connection to prevent resource leaks
+            if ($connection) {
+                imap_close($connection);
+            }
         }
 
         return $results;

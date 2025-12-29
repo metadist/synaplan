@@ -130,12 +130,12 @@ class InternalEmailService
     /**
      * Send AI response email (for smart@synaplan.net chat).
      *
-     * @param string      $to           Recipient email address
-     * @param string      $subject      Original email subject
-     * @param string      $bodyText     AI response text (markdown format)
-     * @param string|null $inReplyTo    Message ID for email threading
-     * @param string|null $provider     AI provider name (e.g., 'ollama', 'openai')
-     * @param string|null $model        AI model name (e.g., 'llama3.2')
+     * @param string      $to             Recipient email address
+     * @param string      $subject        Original email subject
+     * @param string      $bodyText       AI response text (markdown format)
+     * @param string|null $inReplyTo      Message ID for email threading
+     * @param string|null $provider       AI provider name (e.g., 'ollama', 'openai')
+     * @param string|null $model          AI model name (e.g., 'llama3.2')
      * @param float|null  $processingTime Processing time in seconds
      */
     public function sendAiResponseEmail(
@@ -151,12 +151,12 @@ class InternalEmailService
         $fromName = $_ENV['APP_SENDER_NAME'] ?? 'Synaplan AI';
 
         // Convert markdown to HTML using Parsedown
-        $parsedown = new Parsedown();
+        $parsedown = new \Parsedown();
         $parsedown->setSafeMode(true); // Prevent XSS
         $htmlBody = $parsedown->text($bodyText);
 
         // Add metadata footer if available
-        if ($provider || $model || $processingTime !== null) {
+        if ($provider || $model || null !== $processingTime) {
             $metadataParts = [];
             if ($provider) {
                 $metadataParts[] = 'Service: '.htmlspecialchars($provider);
@@ -164,7 +164,7 @@ class InternalEmailService
             if ($model) {
                 $metadataParts[] = 'Model: '.htmlspecialchars($model);
             }
-            if ($processingTime !== null) {
+            if (null !== $processingTime) {
                 $metadataParts[] = sprintf('Processing time: %.2f seconds', $processingTime);
             }
 
@@ -175,8 +175,24 @@ class InternalEmailService
             }
         }
 
-        // Create plain text version (strip HTML tags)
-        $textBody = strip_tags($htmlBody);
+        // Create plain text version (use original markdown for better readability)
+        $textBody = $bodyText;
+        // Add metadata footer to plain text as well
+        if ($provider || $model || null !== $processingTime) {
+            $metadataText = [];
+            if ($provider) {
+                $metadataText[] = 'Service: '.$provider;
+            }
+            if ($model) {
+                $metadataText[] = 'Model: '.$model;
+            }
+            if (null !== $processingTime) {
+                $metadataText[] = sprintf('Processing time: %.2f seconds', $processingTime);
+            }
+            if (!empty($metadataText)) {
+                $textBody .= "\n\n---\n".implode(' | ', $metadataText);
+            }
+        }
 
         $email = (new Email())
             ->from(sprintf('%s <%s>', $fromName, $fromEmail))

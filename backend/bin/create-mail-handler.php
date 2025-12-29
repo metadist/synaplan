@@ -5,7 +5,6 @@ use App\Entity\InboundEmailHandler;
 use App\Kernel;
 use App\Service\EncryptionService;
 use Doctrine\ORM\EntityManagerInterface;
-use Symfony\Component\Dotenv\Dotenv;
 
 require __DIR__.'/../vendor/autoload.php';
 
