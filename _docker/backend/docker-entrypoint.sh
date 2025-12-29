@@ -76,6 +76,23 @@ fi
 chown -R www-data:www-data var/ public/up/ 2>/dev/null || true
 chmod -R 775 var/ public/up/ 2>/dev/null || true
 
+# Regenerate autoloader if plugins directory exists and has content
+# This MUST happen BEFORE any php bin/console commands because Symfony bootstrapping
+# will try to compile services from plugins. The Docker image is built without /plugins
+# (it's mounted at runtime) and --classmap-authoritative prevents Composer from
+# scanning for new classes at runtime.
+PLUGINS_DIR="${PLUGINS_DIR:-/plugins}"
+if [ -d "$PLUGINS_DIR" ] && [ "$(ls -A "$PLUGINS_DIR" 2>/dev/null)" ]; then
+    echo "🔌 Plugins detected in $PLUGINS_DIR - regenerating autoloader..."
+    # Use --optimize to maintain performance, but without --classmap-authoritative
+    # so that plugin classes can be discovered at runtime
+    composer dump-autoload --optimize --no-interaction 2>&1 || {
+        echo "⚠️  Failed to regenerate autoloader for plugins"
+        echo "   This may cause plugin loading failures"
+    }
+    echo "✅ Autoloader regenerated with plugin support"
+fi
+
 # Wait for database to be ready
 echo "⏳ Waiting for database connection..."
 until php bin/console dbal:run-sql "SELECT 1" > /dev/null 2>&1; do
