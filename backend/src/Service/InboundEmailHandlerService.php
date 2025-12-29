@@ -205,35 +205,15 @@ class InboundEmailHandlerService
 
     /**
      * Connect to IMAP/POP3 server.
-     * Supports both password-based and OAuth2 authentication (for Gmail).
      */
     private function connectImap(InboundEmailHandler $handler): ?\IMAP\Connection
     {
-        $username = $handler->getUsername();
+        $server = $this->buildServerString($handler);
         $password = $handler->getDecryptedPassword($this->encryptionService);
-
-        // Check if this is Gmail and we have an OAuth token
-        $isGmail = str_contains(strtolower($handler->getMailServer()), 'gmail.com');
-        $oauthToken = $this->getGmailOAuthToken();
-
-        // Use OAuth if available for Gmail and no password is set
-        $useOAuth = $isGmail && $oauthToken && empty($password);
-
-        if ($useOAuth) {
-            $this->logger->info('Using OAuth2 authentication for Gmail', [
-                'username' => $username,
-            ]);
-
-            // Build XOAUTH2 authentication string
-            $xoauth2String = $this->buildXoauth2String($username, $oauthToken);
-            $password = base64_encode($xoauth2String);
-        }
-
-        $server = $this->buildServerString($handler, $useOAuth);
 
         $connection = @imap_open(
             $server,
-            $username,
+            $handler->getUsername(),
             $password,
             0
         );
@@ -252,80 +232,22 @@ class InboundEmailHandlerService
     }
 
     /**
-     * Get Gmail OAuth token from environment.
-     *
-     * @return string|null The access token, or null if not available
-     */
-    private function getGmailOAuthToken(): ?string
-    {
-        $tokenJson = $_ENV['GMAIL_OAUTH_TOKEN'] ?? null;
-
-        if (!$tokenJson) {
-            return null;
-        }
-
-        // Handle both JSON string and already parsed array
-        if (is_string($tokenJson)) {
-            // Remove quotes if the env var was quoted
-            $tokenJson = trim($tokenJson, "'\"");
-            $tokenData = json_decode($tokenJson, true);
-        } else {
-            $tokenData = $tokenJson;
-        }
-
-        if (!is_array($tokenData) || !isset($tokenData['access_token'])) {
-            $this->logger->warning('Gmail OAuth token format is invalid');
-
-            return null;
-        }
-
-        return $tokenData['access_token'];
-    }
-
-    /**
-     * Build XOAUTH2 authentication string for Gmail IMAP.
-     *
-     * Format: user=EMAIL\1auth=Bearer ACCESS_TOKEN\1\1
-     *
-     * @param string $email    Gmail email address
-     * @param string $accessToken OAuth2 access token
-     *
-     * @return string XOAUTH2 authentication string
-     */
-    private function buildXoauth2String(string $email, string $accessToken): string
-    {
-        // XOAUTH2 format: user=EMAIL\1auth=Bearer TOKEN\1\1
-        return sprintf("user=%s\1auth=Bearer %s\1\1", $email, $accessToken);
-    }
-
-    /**
      * Build IMAP server connection string.
-     * For Gmail with OAuth, uses special XOAUTH2 format.
      */
-    private function buildServerString(InboundEmailHandler $handler, bool $useOAuth = false): string
+    private function buildServerString(InboundEmailHandler $handler): string
     {
         $server = $handler->getMailServer();
         $port = $handler->getPort();
         $protocol = strtolower($handler->getProtocol());
         $security = $handler->getSecurity();
-        $username = $handler->getUsername();
 
-        // Build security flag
+        // Build connection string: {server:port/protocol/security}
         $securityFlag = match ($security) {
             'SSL/TLS' => 'ssl',
             'STARTTLS' => 'tls',
             default => 'notls',
         };
 
-        // For Gmail with OAuth, use XOAUTH2 connection string format
-        // Note: PHP imap extension has limited XOAUTH2 support
-        // The connection string format may need adjustment based on PHP version
-        if ($useOAuth && str_contains(strtolower($server), 'gmail.com')) {
-            // Try XOAUTH2 format: {server:port/protocol/security/authuser=EMAIL/user=EMAIL}
-            return sprintf('{%s:%d/%s/%s/authuser=%s/user=%s}INBOX', $server, $port, $protocol, $securityFlag, $username, $username);
-        }
-
-        // Standard connection string: {server:port/protocol/security}
         return sprintf('{%s:%d/%s/%s}INBOX', $server, $port, $protocol, $securityFlag);
     }
 

@@ -207,8 +207,13 @@ class WebhookController extends AbstractController
             // Record usage (unified across all sources)
             $this->rateLimitService->recordUsage($user, 'MESSAGES');
 
+            // Track processing time
+            $startTime = microtime(true);
+
             // Process message through pipeline
             $result = $this->messageProcessor->process($message);
+
+            $processingTime = microtime(true) - $startTime;
 
             if (!$result['success']) {
                 return $this->json([
@@ -220,6 +225,11 @@ class WebhookController extends AbstractController
 
             $aiResponse = $result['response'];
             $responseText = $aiResponse['content'] ?? '';
+            $metadata = $aiResponse['metadata'] ?? [];
+
+            // Extract provider and model from metadata
+            $provider = $metadata['provider'] ?? null;
+            $model = $metadata['model'] ?? null;
 
             // Send email response back to user
             try {
@@ -227,12 +237,18 @@ class WebhookController extends AbstractController
                     $fromEmail,
                     $subject,
                     $responseText,
-                    $messageId
+                    $messageId,
+                    $provider,
+                    $model,
+                    $processingTime
                 );
 
                 $this->logger->info('Email response sent', [
                     'to' => $fromEmail,
                     'subject' => $subject,
+                    'provider' => $provider,
+                    'model' => $model,
+                    'processing_time' => $processingTime,
                 ]);
             } catch (\Exception $e) {
                 $this->logger->error('Failed to send email response', [

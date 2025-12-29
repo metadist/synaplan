@@ -2,6 +2,7 @@
 
 namespace App\Service;
 
+use Parsedown;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Mailer\MailerInterface;
 use Symfony\Component\Mime\Email;
@@ -128,22 +129,61 @@ class InternalEmailService
 
     /**
      * Send AI response email (for smart@synaplan.net chat).
+     *
+     * @param string      $to           Recipient email address
+     * @param string      $subject      Original email subject
+     * @param string      $bodyText     AI response text (markdown format)
+     * @param string|null $inReplyTo    Message ID for email threading
+     * @param string|null $provider     AI provider name (e.g., 'ollama', 'openai')
+     * @param string|null $model        AI model name (e.g., 'llama3.2')
+     * @param float|null  $processingTime Processing time in seconds
      */
     public function sendAiResponseEmail(
         string $to,
         string $subject,
         string $bodyText,
         ?string $inReplyTo = null,
+        ?string $provider = null,
+        ?string $model = null,
+        ?float $processingTime = null,
     ): void {
         $fromEmail = $_ENV['APP_SENDER_EMAIL'] ?? 'smart@synaplan.net';
         $fromName = $_ENV['APP_SENDER_NAME'] ?? 'Synaplan AI';
+
+        // Convert markdown to HTML using Parsedown
+        $parsedown = new Parsedown();
+        $parsedown->setSafeMode(true); // Prevent XSS
+        $htmlBody = $parsedown->text($bodyText);
+
+        // Add metadata footer if available
+        if ($provider || $model || $processingTime !== null) {
+            $metadataParts = [];
+            if ($provider) {
+                $metadataParts[] = 'Service: '.htmlspecialchars($provider);
+            }
+            if ($model) {
+                $metadataParts[] = 'Model: '.htmlspecialchars($model);
+            }
+            if ($processingTime !== null) {
+                $metadataParts[] = sprintf('Processing time: %.2f seconds', $processingTime);
+            }
+
+            if (!empty($metadataParts)) {
+                $htmlBody .= '<br><br><div style="font-size: 11px; color: #888888; margin-top: 20px; padding-top: 15px; border-top: 1px solid #e0e0e0;">';
+                $htmlBody .= implode(' &middot; ', $metadataParts);
+                $htmlBody .= '</div>';
+            }
+        }
+
+        // Create plain text version (strip HTML tags)
+        $textBody = strip_tags($htmlBody);
 
         $email = (new Email())
             ->from(sprintf('%s <%s>', $fromName, $fromEmail))
             ->to($to)
             ->subject('Re: '.$subject)
-            ->text($bodyText)
-            ->html(nl2br(htmlspecialchars($bodyText)));
+            ->text($textBody)
+            ->html($htmlBody);
 
         // Add In-Reply-To header for email threading
         if ($inReplyTo) {
@@ -156,6 +196,8 @@ class InternalEmailService
             $this->logger->info('AI response email sent', [
                 'to' => $to,
                 'subject' => $subject,
+                'provider' => $provider,
+                'model' => $model,
             ]);
         } catch (\Exception $e) {
             $this->logger->error('Failed to send AI response email', [

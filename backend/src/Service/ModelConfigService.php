@@ -354,16 +354,16 @@ class ModelConfigService
 
         // For WhatsApp: only use user-specific models if verified
         if ('whatsapp' === $channel) {
-            $user = $this->userRepository->find($userId);
-            if (!$user) {
-                return null;
-            }
-
-            if ($user->hasVerifiedPhone()) {
-                return $userId;
-            }
-
+        $user = $this->userRepository->find($userId);
+        if (!$user) {
             return null;
+        }
+
+        if ($user->hasVerifiedPhone()) {
+            return $userId;
+        }
+
+        return null;
         }
 
         // For web/other channels: always use user-specific models
