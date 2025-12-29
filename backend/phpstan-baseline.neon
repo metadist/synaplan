@@ -1251,7 +1251,7 @@ parameters:
 		-
 			message: '#^Call to an undefined method App\\Repository\\UserRepository\:\:expects\(\)\.$#'
 			identifier: method.notFound
-			count: 8
+			count: 9
 			path: tests/Unit/ModelConfigServiceTest.php
 
 		-

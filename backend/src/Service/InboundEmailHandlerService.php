@@ -220,7 +220,12 @@ class InboundEmailHandlerService
 
         if (!$connection) {
             $errors = imap_errors();
-            throw new \Exception('IMAP connection failed: '.implode(', ', $errors ?: ['Unknown error']));
+            $alerts = imap_alerts();
+            $errorMessage = 'IMAP connection failed: '.implode(', ', $errors ?: ['Unknown error']);
+            if ($alerts) {
+                $errorMessage .= ' | Alerts: '.implode(', ', $alerts);
+            }
+            throw new \Exception($errorMessage);
         }
 
         return $connection;

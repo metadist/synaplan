@@ -165,10 +165,12 @@ services:
     # Internal Email Service (system emails - uses SMTP from ENV)
     App\Service\InternalEmailService: ~
 
-    # Inbound Email Service (fetches emails from Mailhog)
+    # Inbound Email Service (fetches emails from Gmail IMAP or Mailhog)
     App\Service\InboundEmailService:
         arguments:
             $mailhogApiUrl: 'http://mailhog:8025/api/v2'
+            $gmailUsername: '%env(default::GMAIL_USERNAME)%'
+            $gmailPassword: '%env(default::GMAIL_PASSWORD)%'
 
     # Process Emails Command
     App\Command\ProcessEmailsCommand:

@@ -13,7 +13,7 @@ use Symfony\Component\Console\Style\SymfonyStyle;
 
 #[AsCommand(
     name: 'app:process-emails',
-    description: 'Process incoming emails from Mailhog and forward to webhook'
+    description: 'Process incoming emails from Gmail IMAP (or Mailhog in dev) and forward to webhook for smart@synaplan.net'
 )]
 class ProcessEmailsCommand extends Command
 {
@@ -40,7 +40,13 @@ class ProcessEmailsCommand extends Command
         $interval = (int) $input->getOption('interval');
         $deleteAfter = !$input->getOption('keep');
 
+        // Use internal URL for webhook calls from within the container
+        // If APP_URL is localhost:8000, use backend service name instead
         $webhookUrl = rtrim($this->appUrl, '/').'/api/v1/webhooks/email';
+        if (str_starts_with($webhookUrl, 'http://localhost:8000')) {
+            // Replace localhost with backend service name for internal calls
+            $webhookUrl = 'http://backend'.substr($webhookUrl, strlen('http://localhost:8000'));
+        }
 
         $io->title('Email Processing Service');
         $io->info("Webhook URL: {$webhookUrl}");

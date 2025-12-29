@@ -322,11 +322,15 @@ class ModelConfigService
     /**
      * Get effective user ID for model selection based on message channel.
      *
+     * For Email messages:
+     *   - smart@synaplan.net (no keyword) → returns user ID 2 for model selection
+     *   - smart+keyword@synaplan.net (with keyword) → returns sender's user ID
+     *
      * For WhatsApp messages: Returns user ID only if WhatsApp number is verified.
      * For web/other channels: Always returns the user ID (no verification required).
      *
-     * This ensures unverified WhatsApp users get default models,
-     * while web users always get their configured models.
+     * This ensures unverified WhatsApp users and emails without keywords get default models,
+     * while web users and emails with keywords always get their configured models.
      */
     public function getEffectiveUserIdForMessage(Message $message): ?int
     {
@@ -335,23 +339,35 @@ class ModelConfigService
             return null;
         }
 
-        // Check if this is a WhatsApp message
         $channel = $message->getMeta('channel');
-        if ('whatsapp' !== $channel) {
-            // For web/email/other channels: always use user-specific models
+
+        // For Email: if no keyword (smart@synaplan.net), use user ID 2 for model selection
+        if ('email' === $channel) {
+            $emailKeyword = $message->getMeta('email_keyword');
+            // If no keyword (smart@synaplan.net without +keyword), use user ID 2
+            if (empty($emailKeyword)) {
+                return 2;
+            }
+
+            // If keyword exists (smart+keyword@synaplan.net), use sender's user ID
             return $userId;
         }
 
         // For WhatsApp: only use user-specific models if verified
-        $user = $this->userRepository->find($userId);
-        if (!$user) {
+        if ('whatsapp' === $channel) {
+            $user = $this->userRepository->find($userId);
+            if (!$user) {
+                return null;
+            }
+
+            if ($user->hasVerifiedPhone()) {
+                return $userId;
+            }
+
             return null;
         }
 
-        if ($user->hasVerifiedPhone()) {
-            return $userId;
-        }
-
-        return null;
+        // For web/other channels: always use user-specific models
+        return $userId;
     }
 }
