@@ -1,10 +1,17 @@
 import { api } from './apiService'
-import { httpClient } from './api/httpClient'
+import { httpClient, getApiBaseUrl } from './api/httpClient'
 
 export interface UploadFileOptions {
   files: File[]
   groupKey?: string
   processLevel?: 'extract' | 'vectorize' | 'full'
+  onProgress?: (progress: UploadProgress) => void
+}
+
+export interface UploadProgress {
+  loaded: number
+  total: number
+  percentage: number
 }
 
 export interface UploadedFile {
@@ -60,9 +67,11 @@ export interface FileListResponse {
 }
 
 /**
- * Upload files with processing
+ * Upload files with processing and progress tracking
  *
- * @param options Upload options with files and processing level
+ * Uses XMLHttpRequest to enable upload progress monitoring.
+ *
+ * @param options Upload options with files, processing level, and optional progress callback
  * @returns Upload response with file details
  */
 export const uploadFiles = async (options: UploadFileOptions): Promise<UploadResponse> => {
@@ -82,9 +91,68 @@ export const uploadFiles = async (options: UploadFileOptions): Promise<UploadRes
     formData.append('process_level', options.processLevel)
   }
 
-  const response = await api.post<UploadResponse>('/api/v1/files/upload', formData)
+  // If no progress callback, use simple fetch
+  if (!options.onProgress) {
+    const response = await api.post<UploadResponse>('/api/v1/files/upload', formData)
+    return response.data
+  }
 
-  return response.data
+  // Use XMLHttpRequest for progress tracking
+  return new Promise<UploadResponse>((resolve, reject) => {
+    const xhr = new XMLHttpRequest()
+    const baseUrl = getApiBaseUrl()
+
+    xhr.upload.addEventListener('progress', (event) => {
+      if (event.lengthComputable && options.onProgress) {
+        options.onProgress({
+          loaded: event.loaded,
+          total: event.total,
+          percentage: Math.round((event.loaded / event.total) * 100),
+        })
+      }
+    })
+
+    xhr.addEventListener('load', () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        try {
+          const response = JSON.parse(xhr.responseText)
+          resolve(response)
+        } catch (e) {
+          reject(new Error('Invalid response from server'))
+        }
+      } else if (xhr.status === 401) {
+        // Session expired - redirect to login
+        window.location.href = '/login?reason=session_expired'
+        reject(new Error('Session expired'))
+      } else {
+        try {
+          const errorResponse = JSON.parse(xhr.responseText)
+          reject(new Error(errorResponse.error || `Upload failed: ${xhr.status}`))
+        } catch {
+          reject(new Error(`Upload failed: ${xhr.status} ${xhr.statusText}`))
+        }
+      }
+    })
+
+    xhr.addEventListener('error', () => {
+      reject(new Error('Network error during upload'))
+    })
+
+    xhr.addEventListener('abort', () => {
+      reject(new Error('Upload aborted'))
+    })
+
+    xhr.open('POST', `${baseUrl}/api/v1/files/upload`)
+    xhr.withCredentials = true // Send cookies for auth
+
+    // Add CSRF token if available
+    const csrfToken = sessionStorage.getItem('csrf_token')
+    if (csrfToken) {
+      xhr.setRequestHeader('X-CSRF-Token', csrfToken)
+    }
+
+    xhr.send(formData)
+  })
 }
 
 /**

@@ -157,8 +157,36 @@
                 d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
               ></path>
             </svg>
-            {{ isUploading ? 'Uploading...' : $t('files.uploadAndProcess') }}
+            {{ isUploading ? $t('files.uploading') : $t('files.uploadAndProcess') }}
           </button>
+
+          <!-- Upload Progress Bar -->
+          <Transition name="fade">
+            <div v-if="isUploading && uploadProgress" class="mt-4" data-testid="upload-progress">
+              <div class="flex items-center justify-between mb-1.5">
+                <span class="text-sm txt-secondary">{{ $t('files.uploadProgress') }}</span>
+                <span class="text-sm font-medium txt-primary"
+                  >{{ uploadProgress.percentage }}%</span
+                >
+              </div>
+              <div class="w-full h-2 rounded-full bg-black/10 dark:bg-white/10 overflow-hidden">
+                <div
+                  class="h-full rounded-full bg-[var(--brand)] transition-all duration-300 ease-out"
+                  :style="{ width: `${uploadProgress.percentage}%` }"
+                ></div>
+              </div>
+              <p class="text-xs txt-secondary mt-1.5">
+                {{
+                  uploadProgress.percentage === 100
+                    ? $t('files.processingFiles')
+                    : $t('files.uploadingBytes', {
+                        loaded: formatFileSize(uploadProgress.loaded),
+                        total: formatFileSize(uploadProgress.total),
+                      })
+                }}
+              </p>
+            </div>
+          </Transition>
         </div>
 
         <div class="surface-card p-6" data-testid="section-files-list">
@@ -576,7 +604,7 @@ import {
   XMarkIcon,
   ExclamationTriangleIcon,
 } from '@heroicons/vue/24/outline'
-import filesService, { type FileItem } from '@/services/filesService'
+import filesService, { type FileItem, type UploadProgress } from '@/services/filesService'
 import { useNotification } from '@/composables/useNotification'
 import { useFilePersistence } from '@/composables/useInputPersistence'
 
@@ -599,6 +627,7 @@ const selectedFileIds = ref<number[]>([])
 const currentPage = ref(1)
 const itemsPerPage = 10
 const isUploading = ref(false)
+const uploadProgress = ref<UploadProgress | null>(null)
 const isLoading = ref(false)
 
 // Drag & Drop state
@@ -727,12 +756,16 @@ const uploadFiles = async () => {
   const groupKey = selectedGroup.value || groupKeyword.value || 'DEFAULT'
 
   isUploading.value = true
+  uploadProgress.value = { loaded: 0, total: 0, percentage: 0 }
 
   try {
     const result = await filesService.uploadFiles({
       files: selectedFiles.value,
       groupKey,
       processLevel: 'vectorize', // Always vectorize for optimal RAG performance
+      onProgress: (progress) => {
+        uploadProgress.value = progress
+      },
     })
 
     if (result.success) {
@@ -768,6 +801,7 @@ const uploadFiles = async () => {
     showError('Failed to upload files: ' + (error as Error).message)
   } finally {
     isUploading.value = false
+    uploadProgress.value = null
   }
 }
 
