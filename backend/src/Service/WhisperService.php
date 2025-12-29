@@ -167,6 +167,29 @@ class WhisperService
             return false;
         }
 
+        // Check if shared libraries are available by running --help
+        $process = new Process([$this->whisperBinary, '--help']);
+        $process->setTimeout(5);
+
+        try {
+            $process->run();
+            if (!$process->isSuccessful()) {
+                $this->logger->debug('WhisperService: Binary cannot run (missing shared libraries?)', [
+                    'path' => $this->whisperBinary,
+                    'error' => $process->getErrorOutput(),
+                ]);
+
+                return false;
+            }
+        } catch (\Exception $e) {
+            $this->logger->debug('WhisperService: Binary execution failed', [
+                'path' => $this->whisperBinary,
+                'error' => $e->getMessage(),
+            ]);
+
+            return false;
+        }
+
         // Check if model directory exists
         if (!is_dir($this->whisperModelsPath)) {
             $this->logger->debug('WhisperService: Models directory not found', [
