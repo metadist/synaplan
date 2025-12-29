@@ -438,19 +438,56 @@ class ModelConfigServiceTest extends TestCase
     {
         $userId = 15;
 
-        // Mock message with email channel
+        // Mock message with email channel and keyword (smart+keyword@synaplan.net)
         $message = $this->createMock(\App\Entity\Message::class);
         $message->method('getUserId')->willReturn($userId);
-        $message->method('getMeta')->with('channel')->willReturn('email');
+        $message->method('getMeta')
+            ->willReturnCallback(function ($key) {
+                if ('channel' === $key) {
+                    return 'email';
+                }
+                if ('email_keyword' === $key) {
+                    return 'keyword'; // Has keyword, so should use sender's userId
+                }
 
-        // Should not check user repository for non-WhatsApp channels
+                return null;
+            });
+
+        // Should not check user repository for email channels
         $this->userRepository
             ->expects($this->never())
             ->method('find');
 
         $result = $this->service->getEffectiveUserIdForMessage($message);
 
-        $this->assertEquals($userId, $result, 'Email channel should always return userId');
+        $this->assertEquals($userId, $result, 'Email channel with keyword should return sender userId');
+    }
+
+    public function testGetEffectiveUserIdForMessageWithEmailChannelNoKeyword(): void
+    {
+        // Mock message with email channel but no keyword (smart@synaplan.net)
+        $message = $this->createMock(\App\Entity\Message::class);
+        $message->method('getUserId')->willReturn(20);
+        $message->method('getMeta')
+            ->willReturnCallback(function ($key) {
+                if ('channel' === $key) {
+                    return 'email';
+                }
+                if ('email_keyword' === $key) {
+                    return null; // No keyword, so should use user ID 2
+                }
+
+                return null;
+            });
+
+        // Should not check user repository for email channels
+        $this->userRepository
+            ->expects($this->never())
+            ->method('find');
+
+        $result = $this->service->getEffectiveUserIdForMessage($message);
+
+        $this->assertEquals(2, $result, 'Email channel without keyword should return user ID 2');
     }
 
     public function testGetEffectiveUserIdForMessageWithNullChannel(): void
