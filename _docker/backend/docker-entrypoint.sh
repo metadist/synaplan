@@ -66,15 +66,14 @@ cat <<'EOM'
 EOM
 fi
 
-# Ensure upload directory is available before permissions are fixed
-UPLOAD_DIR="/var/www/backend/var/uploads"
-if [ ! -d "$UPLOAD_DIR" ]; then
-    mkdir -p "$UPLOAD_DIR"
-fi
+# Ensure writable directories exist and have correct permissions
+# This runs on every startup to handle volume mounts (Mac/Linux compatibility)
+mkdir -p /var/www/backend/var/cache /var/www/backend/var/log /var/www/backend/var/uploads /var/www/backend/public/up
 
-# Ensure proper permissions
-chown -R www-data:www-data var/ public/up/ 2>/dev/null || true
-chmod -R 775 var/ public/up/ 2>/dev/null || true
+# Fix ownership and permissions recursively (works on both Mac and Linux)
+# -R flag handles all subdirectories and files, no need for separate find commands
+chown -R www-data:www-data /var/www/backend/var /var/www/backend/public/up 2>/dev/null || true
+chmod -R 775 /var/www/backend/var /var/www/backend/public/up 2>/dev/null || true
 
 # Regenerate autoloader if plugins directory exists and has content
 # This MUST happen BEFORE any php bin/console commands because Symfony bootstrapping

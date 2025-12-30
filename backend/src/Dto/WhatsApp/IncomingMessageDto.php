@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Dto\WhatsApp;
+namespace App\DTO\WhatsApp;
 
 /**
  * Data Transfer Object for incoming WhatsApp messages.

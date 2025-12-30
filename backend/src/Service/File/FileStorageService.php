@@ -73,7 +73,7 @@ class FileStorageService
             // Create directory if not exists
             $dir = dirname($absolutePath);
             if (!is_dir($dir)) {
-                if (!mkdir($dir, 0755, true)) {
+                if (!mkdir($dir, 0775, true)) {
                     $this->logger->error('FileStorage: Failed to create directory', ['dir' => $dir]);
 
                     return [
