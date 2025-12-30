@@ -2,7 +2,7 @@
 
 namespace App\Service;
 
-use App\Dto\WhatsApp\IncomingMessageDto;
+use App\DTO\WhatsApp\IncomingMessageDto;
 use App\Entity\Message;
 use App\Entity\User;
 use App\Service\File\FileProcessor;

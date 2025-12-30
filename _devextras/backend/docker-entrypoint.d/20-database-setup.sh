@@ -6,7 +6,7 @@ echo "🔧 [dev] Checking database schema..."
 # Wait for database to be ready
 max_attempts=30
 attempt=0
-while ! php bin/console doctrine:query:sql "SELECT 1" > /dev/null 2>&1; do
+while ! php bin/console dbal:run-sql "SELECT 1" > /dev/null 2>&1; do
     attempt=$((attempt + 1))
     if [ $attempt -ge $max_attempts ]; then
         echo "❌ [dev] Database connection timeout after ${max_attempts} attempts"
@@ -28,7 +28,7 @@ else
 fi
 
 # Check if fixtures need to be loaded (check if users table is empty)
-user_count=$(php bin/console doctrine:query:sql "SELECT COUNT(*) as count FROM BUSER" --quiet 2>/dev/null | grep -oE '[0-9]+' | head -1 || echo "0")
+user_count=$(php bin/console dbal:run-sql "SELECT COUNT(*) as count FROM BUSER" 2>/dev/null | grep -oE '[0-9]+' | tail -1 || echo "0")
 
 if [ "$user_count" = "0" ]; then
     echo "📦 [dev] Loading database fixtures (test users, config, etc.)..."

@@ -30,24 +30,24 @@ git reset --hard
 
 | Mode | Download Size | Best For | Command |
 |------|---------------|----------|---------|
-| ⚡ **Light** | ~5 GB | Quick start, cloud AI (Groq/OpenAI) | `docker compose -f docker-compose-light.yml up -d` |
-| 🔧 **Full** | ~9 GB | Local AI, audio transcription | `./_1st_install_linux.sh` |
+| ⚡ **Standard** (Default) | ~5 GB | Quick start, cloud AI (Groq/OpenAI) | `docker compose up -d` |
+| 🔧 **Full-Scale** | ~9 GB | Local AI, audio transcription | `docker compose -f docker-compose-full-scale.yml up -d` |
 
 ---
 
-### ⚡ Light Install (Recommended for First-Time Users)
+### ⚡ Standard Install (Recommended for First-Time Users)
 
-**Fastest way to get started** - uses cloud AI providers, skips large local models.
+**Fastest way to get started** - uses cloud AI providers, skips large local models and Whisper compilation.
 
 ```bash
 # 1. Start services (~5 GB download, ~2-3 min)
-docker compose -f docker-compose-light.yml up -d
+docker compose up -d
 
 # 2. Set your AI API key (get free key at https://console.groq.com)
 echo "GROQ_API_KEY=your_key_here" >> backend/.env
 
 # 3. Restart backend to apply
-docker compose -f docker-compose-light.yml restart backend
+docker compose restart backend
 ```
 
 **What's included:**
@@ -62,29 +62,36 @@ docker compose -f docker-compose-light.yml restart backend
 - ❌ Whisper models (audio transcription)
 - ❌ Local embedding models
 
-**Upgrade to Full Install later:**
+**Upgrade to Full-Scale Install later:**
 ```bash
-docker compose -f docker-compose-light.yml down
-docker compose up -d  # Starts full stack with Ollama
+docker compose down
+docker compose -f docker-compose-full-scale.yml up -d  # Starts full stack with Ollama + Whisper
 ```
 
 ---
 
-### 🔧 Full Install (Local AI + Audio Transcription)
+### 🔧 Full-Scale Install (Local AI + Audio Transcription)
 
-Run the first-install script for the complete experience with local AI models.
+For the complete experience with local AI models and Whisper audio transcription.
 
 **Windows users:** Please use **WSL2** (Windows Subsystem for Linux) and run the Linux script.
 
 ```bash
-# Linux / macOS / Windows WSL2:
+# Option 1: Use full-scale docker-compose directly
+docker compose -f docker-compose-full-scale.yml up -d
+
+# Option 2: Use the first-install script (Linux / macOS / Windows WSL2)
 ./_1st_install_linux.sh
 ```
 
 After the initial install, subsequent restarts only need:
 
 ```bash
+# For standard install
 docker compose up -d
+
+# For full-scale install
+docker compose -f docker-compose-full-scale.yml up -d
 ```
 
 **What happens automatically:**
@@ -137,8 +144,8 @@ AUTO_DOWNLOAD_MODELS=false docker compose up -d
 
 ## 🌐 Access
 
-| Service | URL | Description | Light | Full |
-|---------|-----|-------------|:-----:|:----:|
+| Service | URL | Description | Standard | Full-Scale |
+|---------|-----|-------------|:--------:|:----------:|
 | Frontend | http://localhost:5173 | Vue.js Web App | ✅ | ✅ |
 | Backend API | http://localhost:8000 | Symfony REST API | ✅ | ✅ |
 | API Docs | http://localhost:8000/api/doc | Swagger UI / OpenAPI | ✅ | ✅ |
@@ -341,8 +348,8 @@ synaplan-dev/
 │   └── frontend/            # Frontend Dockerfile & nginx
 ├── backend/                 # Symfony Backend (PHP 8.3)
 ├── frontend/                # Vue.js Frontend
-├── docker-compose.yml       # Full install (Ollama + Whisper)
-└── docker-compose-light.yml # Light install (cloud AI only)
+├── docker-compose.yml       # Standard install (cloud AI only, recommended)
+└── docker-compose-full-scale.yml # Full-scale install (Ollama + Whisper)
 ```
 
 ## ⚙️ Environment Configuration
@@ -400,7 +407,11 @@ docker compose exec frontend npm install <package>
 
 Disable the auto download by running:
 ```bash
+# For standard install
 AUTO_DOWNLOAD_MODELS=false docker compose up -d
+
+# For full-scale install
+AUTO_DOWNLOAD_MODELS=false docker compose -f docker-compose-full-scale.yml up -d
 ```
 
 ## ✨ Features

@@ -3,19 +3,25 @@
 FROM dunglas/frankenphp:php8.3-bookworm
 
 # Install system dependencies
-RUN apt-get update && apt-get install -y \
-    git curl unzip jq \
-    libpng-dev libonig-dev libxml2-dev libzip-dev \
-    libfreetype6-dev libjpeg62-turbo-dev libwebp-dev \
-    libsodium-dev libffi-dev \
-    ghostscript imagemagick libmagickwand-dev poppler-utils \
-    build-essential cmake pkg-config \
-    libopenblas-dev liblapack-dev gfortran \
-    ffmpeg libavcodec-extra libavformat-dev libavutil-dev \
-    libswscale-dev libavfilter-dev libswresample-dev \
-    libx264-dev libx265-dev libvpx-dev libmp3lame-dev libopus-dev \
-    libc-client-dev libkrb5-dev \
-    && rm -rf /var/lib/apt/lists/*
+# Retry logic for network resilience (common issue with deb.debian.org connectivity)
+RUN set -eux; \
+    for i in 1 2 3; do \
+        apt-get update && \
+        apt-get install -y --fix-missing --no-install-recommends \
+            git curl unzip jq \
+            libpng-dev libonig-dev libxml2-dev libzip-dev \
+            libfreetype6-dev libjpeg62-turbo-dev libwebp-dev \
+            libsodium-dev libffi-dev \
+            ghostscript imagemagick libmagickwand-dev poppler-utils \
+            build-essential cmake pkg-config \
+            libopenblas-dev liblapack-dev gfortran \
+            ffmpeg libavcodec-extra libavformat-dev libavutil-dev \
+            libswscale-dev libavfilter-dev libswresample-dev \
+            libx264-dev libx265-dev libvpx-dev libmp3lame-dev libopus-dev \
+            libc-client-dev libkrb5-dev && \
+        rm -rf /var/lib/apt/lists/* && \
+        break || sleep 10; \
+    done
 
 # Install protoc (pinned version for consistent proto generation)
 # This version is also used in CI (.github/workflows/ci.yml extracts it via grep)
