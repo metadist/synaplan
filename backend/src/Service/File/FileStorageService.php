@@ -54,14 +54,32 @@ class FileStorageService
             // FrankenPHP compatibility: Check if file exists first
             $tempPath = $file->getPathname();
             $tempExists = file_exists($tempPath);
+            $fileSize = $file->getSize();
 
             $this->logger->info('FileStorage: Starting file store', [
                 'temp_path' => $tempPath,
                 'temp_exists' => $tempExists,
                 'isValid' => $tempExists, // FrankenPHP workaround
                 'original_name' => $file->getClientOriginalName(),
-                'size' => $file->getSize(),
+                'size' => $fileSize,
             ]);
+
+            // Check for cloud-only files (Dropbox, iCloud, OneDrive, etc.)
+            // On Mac, these services use placeholder files with 0 bytes until downloaded
+            if (0 === $fileSize || ($tempExists && 0 === filesize($tempPath))) {
+                $this->logger->warning('FileStorage: Empty file detected (likely cloud-only)', [
+                    'original_name' => $file->getClientOriginalName(),
+                    'temp_path' => $tempPath,
+                ]);
+
+                return [
+                    'success' => false,
+                    'path' => '',
+                    'size' => 0,
+                    'mime' => '',
+                    'error' => 'File appears to be empty. If using Dropbox, iCloud, or OneDrive, please download the file locally first before uploading (right-click → "Make available offline" or similar).',
+                ];
+            }
 
             // Skip isValid() check for FrankenPHP compatibility
             // FrankenPHP may delete temp files immediately, so we use getContent() instead
