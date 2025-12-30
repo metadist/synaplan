@@ -1,3 +1,18 @@
+# Synaplan - Standard Installation (Recommended)
+#
+# This is the default configuration for Synaplan:
+# - Uses cloud AI providers (Groq, OpenAI, Anthropic) instead of local Ollama
+# - Skips Whisper audio transcription (faster startup)
+# - Downloads ~4GB less than full-scale install
+# - Faster startup for first-time users
+#
+# Usage:
+#   docker compose up -d
+#
+# To switch to full-scale install (with Ollama + Whisper):
+#   docker compose down
+#   docker compose -f docker-compose-full-scale.yml up -d
+#
 services:
   # Vue.js Frontend
   frontend:
@@ -59,8 +74,8 @@ services:
       - ./plugins:/plugins:ro
       - ./_docker/backend/Caddyfile:/etc/caddy/Caddyfile:ro
       - ./_docker/backend/docker-entrypoint.sh:/usr/local/bin/docker-entrypoint.sh:ro
-      - whisper_models:/var/www/backend/var/whisper:ro
       - ./_devextras/backend/docker-entrypoint.d:/docker-entrypoint.d:ro
+      # Note: No whisper_models volume - audio transcription disabled
     environment:
       APP_ENV: dev
       # APP_SECRET loaded from backend/.env (env_file above)
@@ -70,10 +85,12 @@ services:
       SYNAPLAN_URL: http://localhost:8000
       DATABASE_WRITE_URL: mysql://synaplan_user:synaplan_password@db:3306/synaplan?serverVersion=11.8&charset=utf8mb4
       DATABASE_READ_URL: mysql://synaplan_user:synaplan_password@db:3306/synaplan?serverVersion=11.8&charset=utf8mb4
-      OLLAMA_BASE_URL: http://ollama:11434
+      # No Ollama - use external AI providers
+      OLLAMA_BASE_URL: ""
       TRITON_SERVER_URL: ${TRITON_SERVER_URL:-}
       TIKA_BASE_URL: http://tika:9998
-      AI_DEFAULT_PROVIDER: ollama
+      # Default to Groq (free tier available) - user should set GROQ_API_KEY in backend/.env
+      AI_DEFAULT_PROVIDER: groq
       # Token Configuration
       TOKEN_SECRET: 'change_me_in_production_use_openssl_rand_hex_32'
       # Mailer (Mailhog for development)
@@ -84,21 +101,19 @@ services:
       WHATSAPP_WEBHOOK_VERIFY_TOKEN: ${WHATSAPP_WEBHOOK_VERIFY_TOKEN:-}
       WHATSAPP_ENABLED: ${WHATSAPP_ENABLED:-false}
       # AI Provider API Keys (loaded from backend/.env via env_file above)
-      # GROQ_API_KEY is automatically loaded from backend/.env
-      AUTO_DOWNLOAD_MODELS: ${AUTO_DOWNLOAD_MODELS:-false}
-      ENABLE_LOCAL_GPT_OSS: ${ENABLE_LOCAL_GPT_OSS:-true}
+      AUTO_DOWNLOAD_MODELS: "false"
+      ENABLE_LOCAL_GPT_OSS: "false"
       # reCAPTCHA (optional - disabled by default)
       RECAPTCHA_SITE_KEY: ${RECAPTCHA_SITE_KEY:-}
       RECAPTCHA_SECRET_KEY: ${RECAPTCHA_SECRET_KEY:-}
       RECAPTCHA_ENABLED: ${RECAPTCHA_ENABLED:-false}
       # Stripe Payment Integration - loaded from backend/.env via env_file
-      # (STRIPE_SECRET_KEY, STRIPE_PUBLISHABLE_KEY, STRIPE_WEBHOOK_SECRET, STRIPE_PRICE_*)
       # OAuth Social Login Providers (loaded from backend/.env via env_file)
-      # Whisper.cpp Service (Audio Transcription)
+      # Whisper.cpp - DISABLED in light mode (no models downloaded)
       WHISPER_BINARY: /usr/local/bin/whisper
       WHISPER_MODELS_PATH: /var/www/backend/var/whisper
       WHISPER_DEFAULT_MODEL: base
-      WHISPER_ENABLED: "true"
+      WHISPER_ENABLED: "false"
       FFMPEG_BINARY: /usr/bin/ffmpeg
     depends_on:
       db:
@@ -138,26 +153,6 @@ services:
     networks:
       - synaplan-network
 
-  # Ollama - Local AI Models
-  ollama:
-    image: ollama/ollama:latest
-    container_name: synaplan-ollama
-    ports:
-      - "11435:11434"
-    volumes:
-      - ollama_data:/root/.ollama
-    environment:
-      OLLAMA_HOST: 0.0.0.0
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:11434/api/tags"]
-      interval: 30s
-      timeout: 10s
-      retries: 5
-      start_period: 60s
-    restart: unless-stopped
-    networks:
-      - synaplan-network
-
   # Apache Tika - Document Text Extraction
   tika:
     image: apache/tika:2.9.2.0
@@ -172,31 +167,6 @@ services:
       retries: 5
       start_period: 20s
     restart: unless-stopped
-    networks:
-      - synaplan-network
-
-  # Whisper Models Download (runs once)
-  whisper-models:
-    image: alpine:3.20
-    container_name: synaplan-whisper-models
-    command: >
-      sh -c '
-        apk add --no-cache curl ca-certificates &&
-        mkdir -p /models &&
-        if [ ! -f "/models/ggml-base.bin" ]; then
-          echo "Downloading Whisper base model..." &&
-          curl -fL --retry 3 --retry-delay 5 --max-time 600 \
-            -o "/models/ggml-base.bin" \
-            "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.bin" &&
-          chmod 644 /models/*.bin &&
-          echo "Whisper model downloaded successfully"
-        else
-          echo "Whisper model already exists, skipping download"
-        fi
-      '
-    volumes:
-      - whisper_models:/models
-    restart: "no"
     networks:
       - synaplan-network
 
@@ -230,10 +200,8 @@ services:
 
 volumes:
   mysql_data:
-  ollama_data:
-  whisper_models:
+  # Note: No ollama_data or whisper_models volumes in standard mode
 
 networks:
   synaplan-network:
     driver: bridge
-
