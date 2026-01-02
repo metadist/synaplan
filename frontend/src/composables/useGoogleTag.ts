@@ -30,7 +30,10 @@ export const useGoogleTag = () => {
    */
   const injectGoogleTag = () => {
     // Check if already injected
-    if (document.getElementById('google-tag-manager') || document.getElementById('google-analytics')) {
+    if (
+      document.getElementById('google-tag-manager') ||
+      document.getElementById('google-analytics')
+    ) {
       return
     }
 
@@ -140,7 +143,11 @@ export const useGoogleTag = () => {
     if (typeof window !== 'undefined') {
       if (typeof (window as unknown as { gtag?: unknown }).gtag === 'function') {
         // Google Analytics 4
-        ;(window as unknown as { gtag: (command: string, targetId: string, config?: Record<string, unknown>) => void }).gtag('event', eventName, eventParams)
+        ;(
+          window as unknown as {
+            gtag: (command: string, targetId: string, config?: Record<string, unknown>) => void
+          }
+        ).gtag('event', eventName, eventParams)
       } else if (Array.isArray((window as unknown as { dataLayer?: unknown[] }).dataLayer)) {
         // Google Tag Manager
         ;(window as unknown as { dataLayer: unknown[] }).dataLayer.push({
@@ -173,4 +180,3 @@ export const useGoogleTagAuto = () => {
     trackEvent,
   }
 }
-
