@@ -77,6 +77,10 @@ async function loadRuntimeConfig(): Promise<RuntimeConfig> {
         features: {
           help: false,
         },
+        googleTag: {
+          enabled: false,
+          tagId: '',
+        },
       }
       runtimeConfig = defaultConfig
       return defaultConfig
@@ -119,6 +123,10 @@ export function getConfigSync(): RuntimeConfig {
       },
       features: {
         help: false,
+      },
+      googleTag: {
+        enabled: false,
+        tagId: '',
       },
     }
   )

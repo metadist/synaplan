@@ -91,6 +91,15 @@ class ConfigController extends AbstractController
                         ]
                     )
                 ),
+                new OA\Property(
+                    property: 'googleTag',
+                    type: 'object',
+                    description: 'Google Tag Manager / Google Analytics configuration',
+                    properties: [
+                        new OA\Property(property: 'enabled', type: 'boolean', example: true, description: 'Whether Google Tag tracking is enabled'),
+                        new OA\Property(property: 'tagId', type: 'string', example: 'G-XXXXXXXXXX', description: 'Google Tag ID (GTM-XXXXXXX or G-XXXXXXXXXX)'),
+                    ]
+                ),
             ]
         )
     )]
@@ -118,6 +127,14 @@ class ConfigController extends AbstractController
             'whisperEnabled' => $whisperEnabled && $this->whisperService->isAvailable(),
         ];
 
+        // Google Tag configuration (read from Config table, ownerId=0 for global config)
+        $googleTagEnabled = $this->configRepository->getValue(0, 'GOOGLE_TAG', 'ENABLED') === '1';
+        $googleTagId = $this->configRepository->getValue(0, 'GOOGLE_TAG', 'TAG_ID') ?? '';
+        $googleTagConfig = [
+            'enabled' => $googleTagEnabled && !empty($googleTagId),
+            'tagId' => ($googleTagEnabled && !empty($googleTagId)) ? $googleTagId : '',
+        ];
+
         // Plugins
         $plugins = [];
         if ($user) {
@@ -137,6 +154,7 @@ class ConfigController extends AbstractController
             'features' => $features,
             'speech' => $speech,
             'plugins' => $plugins,
+            'googleTag' => $googleTagConfig,
         ]);
     }
 

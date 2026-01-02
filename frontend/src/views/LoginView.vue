@@ -199,6 +199,7 @@ import { useTheme } from '../composables/useTheme'
 import { useAuth } from '../composables/useAuth'
 import { useRecaptcha } from '../composables/useRecaptcha'
 import { validateEmail } from '../composables/usePasswordValidation'
+import { useGoogleTagAuto } from '../composables/useGoogleTag'
 import Button from '../components/Button.vue'
 import { useConfigStore } from '@/stores/config'
 
@@ -242,6 +243,9 @@ const toggleTheme = () => {
 const { login, error: authError, loading, clearError } = useAuth()
 const emailError = ref('')
 const sessionExpiredMessage = ref('')
+
+// Google Tag tracking (only injects if enabled and configured)
+useGoogleTagAuto()
 
 // Computed error to show either auth error or session expired message
 const error = computed(() => sessionExpiredMessage.value || authError.value)

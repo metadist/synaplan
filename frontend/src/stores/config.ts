@@ -68,6 +68,19 @@ const config = {
   },
 
   /**
+   * Google Tag Manager / Google Analytics configuration
+   * Loaded from backend at runtime
+   */
+  googleTag: {
+    get enabled(): boolean {
+      return getConfigSync().googleTag?.enabled ?? false
+    },
+    get tagId(): string {
+      return getConfigSync().googleTag?.tagId ?? ''
+    },
+  },
+
+  /**
    * Installed plugins for the current user
    */
   get plugins(): NonNullable<ReturnType<typeof getConfigSync>['plugins']> {
