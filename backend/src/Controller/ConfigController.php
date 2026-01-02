@@ -139,7 +139,16 @@ class ConfigController extends AbstractController
 
         // Google Tag configuration (read from Config table, ownerId=0 for global config)
         $googleTagEnabled = '1' === $this->configRepository->getValue(0, 'GOOGLE_TAG', 'ENABLED');
-        $googleTagId = $this->configRepository->getValue(0, 'GOOGLE_TAG', 'TAG_ID') ?? '';
+        $googleTagIdRaw = $this->configRepository->getValue(0, 'GOOGLE_TAG', 'TAG_ID') ?? '';
+        // Sanitize tag ID to prevent XSS - only allow alphanumeric, dash, and underscore
+        // Valid formats: GTM-XXXXXXX or G-XXXXXXXXXX (where X is alphanumeric)
+        $googleTagId = '';
+        if (!empty($googleTagIdRaw)) {
+            // Validate format: GTM- followed by alphanumeric, or G- followed by alphanumeric
+            if (preg_match('/^(GTM-[A-Z0-9]+|G-[A-Z0-9]+)$/i', $googleTagIdRaw)) {
+                $googleTagId = $googleTagIdRaw;
+            }
+        }
         $googleTagConfig = [
             'enabled' => $googleTagEnabled && !empty($googleTagId),
             'tagId' => ($googleTagEnabled && !empty($googleTagId)) ? $googleTagId : '',

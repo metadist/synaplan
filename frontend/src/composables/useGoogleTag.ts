@@ -1,4 +1,4 @@
-import { onMounted, onUnmounted } from 'vue'
+import { onMounted } from 'vue'
 import { useConfigStore } from '@/stores/config'
 
 /**
@@ -11,6 +11,20 @@ export const useGoogleTag = () => {
   let noscriptElement: HTMLElement | null = null
 
   /**
+   * Sanitize tag ID to prevent XSS
+   * Only allows alphanumeric characters, dash, and underscore
+   * Valid formats: GTM-XXXXXXX or G-XXXXXXXXXX
+   */
+  const sanitizeTagId = (tagId: string): string => {
+    // Validate format: GTM- followed by alphanumeric, or G- followed by alphanumeric
+    const validPattern = /^(GTM-[A-Z0-9]+|G-[A-Z0-9]+)$/i
+    if (validPattern.test(tagId)) {
+      return tagId
+    }
+    return ''
+  }
+
+  /**
    * Inject Google Tag script into document head
    * Supports both Google Tag Manager (GTM-XXXXXXX) and Google Analytics 4 (G-XXXXXXXXXX)
    */
@@ -21,9 +35,16 @@ export const useGoogleTag = () => {
     }
 
     const enabled = config.googleTag.enabled
-    const tagId = config.googleTag.tagId
+    const tagIdRaw = config.googleTag.tagId
 
-    if (!enabled || !tagId) {
+    if (!enabled || !tagIdRaw) {
+      return
+    }
+
+    // Sanitize tag ID to prevent XSS
+    const tagId = sanitizeTagId(tagIdRaw)
+    if (!tagId) {
+      console.warn('Invalid Google Tag ID format, skipping injection')
       return
     }
 
@@ -33,21 +54,24 @@ export const useGoogleTag = () => {
 
     if (isGTM) {
       // Google Tag Manager
-      // Script in head
+      // Script in head - use textContent and create text node to avoid XSS
       scriptElement = document.createElement('script')
       scriptElement.id = 'google-tag-manager'
-      scriptElement.innerHTML = `
-        (function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
-        new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
-        j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
-        'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
-        })(window,document,'script','dataLayer','${tagId}');
-      `
+      const scriptText = document.createTextNode(
+        `(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src='https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);})(window,document,'script','dataLayer','${tagId}');`
+      )
+      scriptElement.appendChild(scriptText)
       document.head.appendChild(scriptElement)
 
-      // Noscript in body
+      // Noscript in body - use createElement for iframe to avoid innerHTML XSS
       noscriptElement = document.createElement('noscript')
-      noscriptElement.innerHTML = `<iframe src="https://www.googletagmanager.com/ns.html?id=${tagId}" height="0" width="0" style="display:none;visibility:hidden"></iframe>`
+      const iframe = document.createElement('iframe')
+      iframe.src = `https://www.googletagmanager.com/ns.html?id=${tagId}`
+      iframe.height = '0'
+      iframe.width = '0'
+      iframe.style.display = 'none'
+      iframe.style.visibility = 'hidden'
+      noscriptElement.appendChild(iframe)
       document.body.insertBefore(noscriptElement, document.body.firstChild)
     } else if (isGA4) {
       // Google Analytics 4
@@ -57,14 +81,12 @@ export const useGoogleTag = () => {
       scriptElement.src = `https://www.googletagmanager.com/gtag/js?id=${tagId}`
       document.head.appendChild(scriptElement)
 
-      // Initialize gtag
+      // Initialize gtag - use textContent to avoid XSS
       const initScript = document.createElement('script')
-      initScript.innerHTML = `
-        window.dataLayer = window.dataLayer || [];
-        function gtag(){dataLayer.push(arguments);}
-        gtag('js', new Date());
-        gtag('config', '${tagId}');
-      `
+      const initText = document.createTextNode(
+        `window.dataLayer = window.dataLayer || [];function gtag(){dataLayer.push(arguments);}gtag('js', new Date());gtag('config', '${tagId}');`
+      )
+      initScript.appendChild(initText)
       document.head.appendChild(initScript)
     }
   }
@@ -141,16 +163,10 @@ export const useGoogleTag = () => {
  * Use this in LoginView and RegisterView
  */
 export const useGoogleTagAuto = () => {
-  const { injectGoogleTag, removeGoogleTag, trackEvent } = useGoogleTag()
+  const { injectGoogleTag, trackEvent } = useGoogleTag()
 
   onMounted(() => {
     injectGoogleTag()
-  })
-
-  onUnmounted(() => {
-    // Note: We typically don't remove Google Tag on unmount for auth pages
-    // as the user will navigate away anyway. But we provide the option.
-    // removeGoogleTag()
   })
 
   return {
