@@ -57,10 +57,9 @@ export const useGoogleTag = () => {
       // Script in head - use textContent and create text node to avoid XSS
       scriptElement = document.createElement('script')
       scriptElement.id = 'google-tag-manager'
-      // prettier-ignore
-      const scriptText = document.createTextNode(
-        `(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src='https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);})(window,document,'script','dataLayer','${tagId}');`
-      )
+      // prettier-ignore-next-line
+      const gtmScript = `(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src='https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);})(window,document,'script','dataLayer','${tagId}');`
+      const scriptText = document.createTextNode(gtmScript)
       scriptElement.appendChild(scriptText)
       document.head.appendChild(scriptElement)
 
@@ -84,10 +83,9 @@ export const useGoogleTag = () => {
 
       // Initialize gtag - use textContent to avoid XSS
       const initScript = document.createElement('script')
-      // prettier-ignore
-      const initText = document.createTextNode(
-        `window.dataLayer = window.dataLayer || [];function gtag(){dataLayer.push(arguments);}gtag('js', new Date());gtag('config', '${tagId}');`
-      )
+      // prettier-ignore-next-line
+      const ga4Script = `window.dataLayer = window.dataLayer || [];function gtag(){dataLayer.push(arguments);}gtag('js', new Date());gtag('config', '${tagId}');`
+      const initText = document.createTextNode(ga4Script)
       initScript.appendChild(initText)
       document.head.appendChild(initScript)
     }
