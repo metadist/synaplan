@@ -1146,7 +1146,10 @@ class StreamController extends AbstractController
             $file->setFileName($filename);
             $file->setFileSize(strlen($content));
             $file->setFileMime($mimeType);
-            $file->setFileText($content); // Store content as text for searchability
+            // Only store text content for text-based files (not binary formats)
+            if ($this->isTextBasedExtension($extension)) {
+                $file->setFileText($content);
+            }
             $file->setStatus('generated');
 
             $this->em->persist($file);
@@ -1189,6 +1192,14 @@ class StreamController extends AbstractController
             'pdf' => 'application/pdf',
             default => 'application/octet-stream',
         };
+    }
+
+    /**
+     * Check if extension is text-based (safe to store content in BFILETEXT).
+     */
+    private function isTextBasedExtension(string $extension): bool
+    {
+        return in_array(strtolower($extension), ['csv', 'txt', 'md', 'html', 'json', 'xml'], true);
     }
 
     /**
