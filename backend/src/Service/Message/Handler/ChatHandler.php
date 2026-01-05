@@ -7,6 +7,7 @@ use App\Entity\File;
 use App\Entity\Message;
 use App\Repository\ModelRepository;
 use App\Repository\PromptRepository;
+use App\Service\File\FileHelper;
 use App\Service\File\UserUploadPathBuilder;
 use App\Service\ModelConfigService;
 use App\Service\PromptService;
@@ -977,7 +978,7 @@ class ChatHandler implements MessageHandlerInterface
             $file->setFileSize(strlen($content));
             $file->setFileMime($mimeType);
             // Only store text content for text-based files (not binary formats)
-            if ($this->isTextBasedExtension($extension)) {
+            if (FileHelper::isTextBasedMimeType($mimeType)) {
                 $file->setFileText($content);
             }
             $file->setStatus('generated');
@@ -1022,13 +1023,5 @@ class ChatHandler implements MessageHandlerInterface
             'pdf' => 'application/pdf',
             default => 'application/octet-stream',
         };
-    }
-
-    /**
-     * Check if extension is text-based (safe to store content in BFILETEXT).
-     */
-    private function isTextBasedExtension(string $extension): bool
-    {
-        return in_array(strtolower($extension), ['csv', 'txt', 'md', 'html', 'json', 'xml'], true);
     }
 }

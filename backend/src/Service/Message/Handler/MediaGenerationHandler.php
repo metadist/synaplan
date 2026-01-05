@@ -4,6 +4,7 @@ namespace App\Service\Message\Handler;
 
 use App\AI\Service\AiFacade;
 use App\Entity\Message;
+use App\Service\File\FileHelper;
 use App\Service\Message\MediaPromptExtractor;
 use App\Service\ModelConfigService;
 use Doctrine\ORM\EntityManagerInterface;
@@ -407,22 +408,12 @@ class MediaGenerationHandler implements MessageHandlerInterface
             return null;
         }
 
-        // Determine extension from MIME type
-        $extension = match ($mimeType) {
-            'image/png' => 'png',
-            'image/jpeg', 'image/jpg' => 'jpg',
-            'image/gif' => 'gif',
-            'image/webp' => 'webp',
-            'video/mp4' => 'mp4',
-            'video/webm' => 'webm',
-            'audio/mpeg', 'audio/mp3' => 'mp3',
-            'audio/wav' => 'wav',
-            default => 'bin',
-        };
+        // Determine extension and sanitize provider
+        $extension = FileHelper::getExtensionFromMimeType($mimeType);
+        $sanitizedProvider = FileHelper::sanitizeProviderName($provider);
 
         // Generate filename: YYYYMM_messageId_provider.ext
         $yearMonth = date('Ym');
-        $sanitizedProvider = preg_replace('/[^a-z0-9]/', '', strtolower($provider));
         $filename = sprintf('%s_%d_%s.%s', $yearMonth, $messageId, $sanitizedProvider, $extension);
 
         // Ensure upload directory exists
@@ -511,21 +502,13 @@ class MediaGenerationHandler implements MessageHandlerInterface
             $finfo = new \finfo(FILEINFO_MIME_TYPE);
             $mimeType = $finfo->buffer($content);
 
-            $extension = match ($mimeType) {
-                'image/png' => 'png',
-                'image/jpeg' => 'jpg',
-                'image/gif' => 'gif',
-                'image/webp' => 'webp',
-                'video/mp4' => 'mp4',
-                'video/webm' => 'webm',
-                'audio/mpeg' => 'mp3',
-                'audio/wav' => 'wav',
-                default => 'image' === $mediaType ? 'png' : ('video' === $mediaType ? 'mp4' : 'bin'),
-            };
+            // Determine extension with media-type-aware fallback
+            $fallback = 'image' === $mediaType ? 'png' : ('video' === $mediaType ? 'mp4' : 'bin');
+            $extension = FileHelper::getExtensionFromMimeType($mimeType, $fallback);
+            $sanitizedProvider = FileHelper::sanitizeProviderName($provider);
 
             // Generate filename: YYYYMM_messageId_provider.ext
             $yearMonth = date('Ym');
-            $sanitizedProvider = preg_replace('/[^a-z0-9]/', '', strtolower($provider));
             $filename = sprintf('%s_%d_%s.%s', $yearMonth, $messageId, $sanitizedProvider, $extension);
             $absolutePath = $this->uploadDir.'/'.$filename;
 
@@ -545,7 +528,7 @@ class MediaGenerationHandler implements MessageHandlerInterface
         } catch (\Exception $e) {
             $this->logger->error('MediaGenerationHandler: Failed to download media', [
                 'error' => $e->getMessage(),
-                'url' => $url,
+                'url' => FileHelper::redactUrlForLogging($url),
             ]);
 
             return null;

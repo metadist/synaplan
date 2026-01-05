@@ -83,22 +83,22 @@ final class DataUrlFixer
             return null;
         }
 
-        // Extension from MIME
-        $ext = match ($mimeType) {
-            'image/png' => 'png',
-            'image/jpeg', 'image/jpg' => 'jpg',
-            'image/gif' => 'gif',
-            'image/webp' => 'webp',
-            'video/mp4' => 'mp4',
-            'video/webm' => 'webm',
-            'audio/mpeg', 'audio/mp3' => 'mp3',
-            'audio/wav' => 'wav',
-            default => 'bin',
-        };
+        // Validate decoded content matches declared MIME type
+        $finfo = new \finfo(FILEINFO_MIME_TYPE);
+        $detectedMime = $finfo->buffer($content);
+        if ($detectedMime && !str_starts_with($detectedMime, explode('/', $mimeType)[0])) {
+            $this->logger->error('DataUrlFixer: MIME type mismatch', [
+                'message_id' => $message->getId(),
+                'declared' => $mimeType,
+                'detected' => $detectedMime,
+            ]);
 
-        // Provider from metadata
-        $provider = $message->getMeta('ai_chat_provider') ?? 'unknown';
-        $provider = preg_replace('/[^a-z0-9]/', '', strtolower($provider));
+            return null;
+        }
+
+        // Extension and provider from metadata
+        $ext = FileHelper::getExtensionFromMimeType($mimeType);
+        $provider = FileHelper::sanitizeProviderName($message->getMeta('ai_chat_provider') ?? 'unknown');
 
         // Filename: YYYYMM_messageId_provider.ext
         $yearMonth = date('Ym', $message->getUnixTimestamp());
