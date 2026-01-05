@@ -7,6 +7,7 @@ use App\Entity\File;
 use App\Entity\Message;
 use App\Repository\ModelRepository;
 use App\Repository\PromptRepository;
+use App\Service\File\FileHelper;
 use App\Service\File\UserUploadPathBuilder;
 use App\Service\ModelConfigService;
 use App\Service\PromptService;
@@ -976,7 +977,10 @@ class ChatHandler implements MessageHandlerInterface
             $file->setFileName($filename);
             $file->setFileSize(strlen($content));
             $file->setFileMime($mimeType);
-            $file->setFileText($content); // Store content as text for searchability
+            // Only store text content for text-based files (not binary formats)
+            if (FileHelper::isTextBasedMimeType($mimeType)) {
+                $file->setFileText($content);
+            }
             $file->setStatus('generated');
 
             $this->em->persist($file);

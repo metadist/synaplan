@@ -7,6 +7,7 @@ use App\Entity\User;
 use App\Repository\ChatRepository;
 use App\Repository\MessageRepository;
 use App\Repository\SearchResultRepository;
+use App\Service\File\DataUrlFixer;
 use App\Service\WidgetSessionService;
 use Doctrine\ORM\EntityManagerInterface;
 use OpenApi\Attributes as OA;
@@ -27,6 +28,7 @@ class ChatController extends AbstractController
         private MessageRepository $messageRepository,
         private SearchResultRepository $searchResultRepository,
         private WidgetSessionService $widgetSessionService,
+        private DataUrlFixer $dataUrlFixer,
         private LoggerInterface $logger,
     ) {
     }
@@ -546,6 +548,12 @@ class ChatController extends AbstractController
                 }
             }
 
+            // Fix data URL to file if needed (legacy migration)
+            $filePath = $m->getFilePath();
+            if ($m->getFile() && $filePath && str_starts_with($filePath, 'data:')) {
+                $filePath = $this->dataUrlFixer->ensureFileOnDisk($m);
+            }
+
             return [
                 'id' => $m->getId(),
                 'text' => $m->getText(),
@@ -560,8 +568,8 @@ class ChatController extends AbstractController
                 'webSearch' => $webSearchData, // Web search metadata
                 'searchResults' => !empty($searchResultsData) ? $searchResultsData : null, // Actual search results
                 // Generated content (images, videos from AI)
-                'file' => ($m->getFile() && $m->getFilePath()) ? [
-                    'path' => $m->getFilePath(),
+                'file' => ($m->getFile() && $filePath) ? [
+                    'path' => $filePath,
                     'type' => $m->getFileType(),
                 ] : null,
             ];
@@ -643,10 +651,17 @@ class ChatController extends AbstractController
 
             // Include file information if present
             if ($m->getFile() && $m->getFilePath()) {
-                $data['file'] = [
-                    'path' => $m->getFilePath(),
-                    'type' => $m->getFileType(),
-                ];
+                // Fix data URL to file if needed (legacy migration)
+                $filePath = $m->getFilePath();
+                if (str_starts_with($filePath, 'data:')) {
+                    $filePath = $this->dataUrlFixer->ensureFileOnDisk($m);
+                }
+                if ($filePath) {
+                    $data['file'] = [
+                        'path' => $filePath,
+                        'type' => $m->getFileType(),
+                    ];
+                }
             }
 
             return $data;

@@ -4,6 +4,7 @@ namespace App\Service\Message\Handler;
 
 use App\AI\Service\AiFacade;
 use App\Entity\Message;
+use App\Service\File\FileHelper;
 use App\Service\Message\MediaPromptExtractor;
 use App\Service\ModelConfigService;
 use Doctrine\ORM\EntityManagerInterface;
@@ -293,7 +294,6 @@ class MediaGenerationHandler implements MessageHandlerInterface
 
             // Download first media and save locally
             $mediaUrl = null;
-            $localPath = null;
 
             if (isset($media[0]['url'])) {
                 $mediaUrl = $media[0]['url'];
@@ -305,31 +305,33 @@ class MediaGenerationHandler implements MessageHandlerInterface
                 throw new \Exception("Generated {$mediaType} has no URL. Check provider response format.");
             }
 
-            // Only attempt download for images (videos might be too large or streaming-only)
-            if ('image' === $mediaType) {
-                $localPath = $this->downloadImage($mediaUrl);
-            }
+            // CRITICAL: Always save to disk - never store data URLs in database
+            $localPath = null;
 
-            if ($localPath) {
-                $this->logger->info('MediaGenerationHandler: Media downloaded', [
+            if (str_starts_with($mediaUrl, 'data:')) {
+                // Data URL from AI provider - decode and save to disk
+                $localPath = $this->saveDataUrlAsFile($mediaUrl, $message->getId(), $provider);
+                if (!$localPath) {
+                    throw new \Exception("Failed to save generated {$mediaType} data URL to disk");
+                }
+                $this->logger->info('MediaGenerationHandler: Saved data URL to disk', [
                     'path' => $localPath,
                     'type' => $mediaType,
                 ]);
             } else {
-                $this->logger->warning('MediaGenerationHandler: Download failed or skipped, will use original URL', [
-                    'original_url' => $mediaUrl,
+                // External URL - download to disk
+                $localPath = $this->downloadMedia($mediaUrl, $message->getId(), $provider, $mediaType);
+                if (!$localPath) {
+                    throw new \Exception("Failed to download {$mediaType} from: {$mediaUrl}");
+                }
+                $this->logger->info('MediaGenerationHandler: Downloaded media to disk', [
+                    'path' => $localPath,
                     'type' => $mediaType,
                 ]);
             }
 
-            // Use local path if available, otherwise use original URL
-            // CRITICAL: Ensure we always have a valid URL
-            $displayUrl = $localPath ? "/api/v1/files/uploads/{$localPath}" : $mediaUrl;
-
-            // Fallback safety check
-            if (!$displayUrl) {
-                throw new \Exception("No valid {$mediaType} URL available (neither local nor remote)");
-            }
+            // Build display URL for StaticUploadController
+            $displayUrl = '/api/v1/files/uploads/'.$localPath;
 
             // Stream response with revised prompt
             $revisedPrompt = $media[0]['revised_prompt'] ?? $prompt;
@@ -379,9 +381,78 @@ class MediaGenerationHandler implements MessageHandlerInterface
     }
 
     /**
-     * Download image from URL to local storage.
+     * Save a data URL (base64 encoded) as a file on disk.
+     *
+     * @param string $dataUrl   the data URL (e.g., data:image/png;base64,...)
+     * @param int    $messageId the message ID for filename
+     * @param string $provider  the AI provider name (google, openai, etc.)
+     *
+     * @return string|null filename or null on failure
      */
-    private function downloadImage(string $url): ?string
+    private function saveDataUrlAsFile(string $dataUrl, int $messageId, string $provider): ?string
+    {
+        // Parse: data:image/png;base64,XXXX
+        if (!preg_match('#^data:([^;]+);base64,(.+)$#', $dataUrl, $matches)) {
+            $this->logger->error('MediaGenerationHandler: Invalid data URL format');
+
+            return null;
+        }
+
+        $mimeType = $matches[1];
+        $base64Data = $matches[2];
+        $content = base64_decode($base64Data, true);
+
+        if (false === $content || '' === $content) {
+            $this->logger->error('MediaGenerationHandler: Failed to decode base64 data');
+
+            return null;
+        }
+
+        // Determine extension and sanitize provider
+        $extension = FileHelper::getExtensionFromMimeType($mimeType);
+        $sanitizedProvider = FileHelper::sanitizeProviderName($provider);
+
+        // Generate filename: YYYYMM_messageId_provider.ext
+        $yearMonth = date('Ym');
+        $filename = sprintf('%s_%d_%s.%s', $yearMonth, $messageId, $sanitizedProvider, $extension);
+
+        // Ensure upload directory exists
+        if (!is_dir($this->uploadDir) && !mkdir($this->uploadDir, 0755, true)) {
+            $this->logger->error('MediaGenerationHandler: Failed to create upload directory');
+
+            return null;
+        }
+
+        // Save file
+        $absolutePath = $this->uploadDir.'/'.$filename;
+        $bytesWritten = file_put_contents($absolutePath, $content);
+
+        if (false === $bytesWritten) {
+            $this->logger->error('MediaGenerationHandler: Failed to write file', ['path' => $absolutePath]);
+
+            return null;
+        }
+
+        $this->logger->info('MediaGenerationHandler: Saved data URL as file', [
+            'filename' => $filename,
+            'mime_type' => $mimeType,
+            'size' => $bytesWritten,
+        ]);
+
+        return $filename;
+    }
+
+    /**
+     * Download media from URL to local storage.
+     *
+     * @param string $url       the media URL to download
+     * @param int    $messageId the message ID for filename
+     * @param string $provider  the AI provider name
+     * @param string $mediaType the type of media (image, video, audio)
+     *
+     * @return string|null filename or null on failure
+     */
+    private function downloadMedia(string $url, int $messageId, string $provider, string $mediaType): ?string
     {
         try {
             $this->logger->info('MediaGenerationHandler: Starting download', [
@@ -390,84 +461,74 @@ class MediaGenerationHandler implements MessageHandlerInterface
             ]);
 
             // Ensure upload directory exists and is writable
-            if (!is_dir($this->uploadDir)) {
-                $this->logger->warning('MediaGenerationHandler: Upload dir does not exist, creating it');
-                if (!mkdir($this->uploadDir, 0777, true)) {
-                    throw new \Exception('Failed to create upload directory');
-                }
+            if (!is_dir($this->uploadDir) && !mkdir($this->uploadDir, 0755, true)) {
+                throw new \Exception('Failed to create upload directory');
             }
 
             if (!is_writable($this->uploadDir)) {
                 throw new \Exception('Upload directory is not writable: '.$this->uploadDir);
             }
 
-            // Try cURL first (more reliable for external URLs)
-            $imageContent = null;
+            // Download with cURL
+            $content = null;
             if (function_exists('curl_init')) {
                 $ch = curl_init($url);
                 curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
                 curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
                 curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
-                curl_setopt($ch, CURLOPT_TIMEOUT, 30);
+                curl_setopt($ch, CURLOPT_TIMEOUT, 60);
                 curl_setopt($ch, CURLOPT_USERAGENT, 'Mozilla/5.0 (compatible; PHP; Synaplan)');
 
-                $imageContent = curl_exec($ch);
+                $content = curl_exec($ch);
                 $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
                 $curlError = curl_error($ch);
                 curl_close($ch);
 
-                if (false === $imageContent || 200 !== $httpCode) {
+                if (false === $content || 200 !== $httpCode) {
                     throw new \Exception("cURL download failed (HTTP {$httpCode}): {$curlError}");
                 }
             } else {
-                // Fallback to file_get_contents
-                $imageContent = @file_get_contents($url);
-                if (false === $imageContent) {
+                $content = @file_get_contents($url);
+                if (false === $content) {
                     throw new \Exception('file_get_contents download failed');
                 }
             }
 
-            if (empty($imageContent)) {
+            if (empty($content)) {
                 throw new \Exception('Downloaded content is empty');
             }
 
-            // Detect image type from content
+            // Detect MIME type from content
             $finfo = new \finfo(FILEINFO_MIME_TYPE);
-            $mimeType = $finfo->buffer($imageContent);
+            $mimeType = $finfo->buffer($content);
 
-            $extension = match ($mimeType) {
-                'image/png' => 'png',
-                'image/jpeg' => 'jpg',
-                'image/gif' => 'gif',
-                'image/webp' => 'webp',
-                default => 'png',
-            };
+            // Determine extension with media-type-aware fallback
+            $fallback = 'image' === $mediaType ? 'png' : ('video' === $mediaType ? 'mp4' : 'bin');
+            $extension = FileHelper::getExtensionFromMimeType($mimeType, $fallback);
+            $sanitizedProvider = FileHelper::sanitizeProviderName($provider);
 
-            // Generate unique filename
-            $filename = 'generated_'.uniqid().'.'.$extension;
-            $localPath = $this->uploadDir.'/'.$filename;
+            // Generate filename: YYYYMM_messageId_provider.ext
+            $yearMonth = date('Ym');
+            $filename = sprintf('%s_%d_%s.%s', $yearMonth, $messageId, $sanitizedProvider, $extension);
+            $absolutePath = $this->uploadDir.'/'.$filename;
 
             // Save to disk
-            $bytesWritten = file_put_contents($localPath, $imageContent);
+            $bytesWritten = file_put_contents($absolutePath, $content);
             if (false === $bytesWritten) {
-                throw new \Exception('Failed to save image to disk');
+                throw new \Exception('Failed to save media to disk');
             }
 
-            $this->logger->info('MediaGenerationHandler: Image downloaded successfully', [
+            $this->logger->info('MediaGenerationHandler: Media downloaded successfully', [
                 'filename' => $filename,
                 'bytes' => $bytesWritten,
                 'mime_type' => $mimeType,
-                'path' => $localPath,
             ]);
 
-            return $filename; // Return relative path (filename only)
+            return $filename;
         } catch (\Exception $e) {
-            $this->logger->error('MediaGenerationHandler: Failed to download image', [
+            $this->logger->error('MediaGenerationHandler: Failed to download media', [
                 'error' => $e->getMessage(),
-                'url' => $url,
-                'upload_dir' => $this->uploadDir,
-                'upload_dir_exists' => is_dir($this->uploadDir),
-                'upload_dir_writable' => is_writable($this->uploadDir),
+                'url' => FileHelper::redactUrlForLogging($url),
             ]);
 
             return null;
