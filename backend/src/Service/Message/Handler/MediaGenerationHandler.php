@@ -5,6 +5,7 @@ namespace App\Service\Message\Handler;
 use App\AI\Service\AiFacade;
 use App\Entity\Message;
 use App\Service\File\FileHelper;
+use App\Service\File\UserUploadPathBuilder;
 use App\Service\Message\MediaPromptExtractor;
 use App\Service\ModelConfigService;
 use Doctrine\ORM\EntityManagerInterface;
@@ -27,6 +28,7 @@ class MediaGenerationHandler implements MessageHandlerInterface
         private EntityManagerInterface $em,
         private LoggerInterface $logger,
         private MediaPromptExtractor $promptExtractor,
+        private UserUploadPathBuilder $userUploadPathBuilder,
         private string $uploadDir = '/var/www/backend/var/uploads',
     ) {
     }
@@ -310,7 +312,7 @@ class MediaGenerationHandler implements MessageHandlerInterface
 
             if (str_starts_with($mediaUrl, 'data:')) {
                 // Data URL from AI provider - decode and save to disk
-                $localPath = $this->saveDataUrlAsFile($mediaUrl, $message->getId(), $provider);
+                $localPath = $this->saveDataUrlAsFile($mediaUrl, $message->getId(), $message->getUserId(), $provider);
                 if (!$localPath) {
                     throw new \Exception("Failed to save generated {$mediaType} data URL to disk");
                 }
@@ -320,7 +322,7 @@ class MediaGenerationHandler implements MessageHandlerInterface
                 ]);
             } else {
                 // External URL - download to disk
-                $localPath = $this->downloadMedia($mediaUrl, $message->getId(), $provider, $mediaType);
+                $localPath = $this->downloadMedia($mediaUrl, $message->getId(), $message->getUserId(), $provider, $mediaType);
                 if (!$localPath) {
                     throw new \Exception("Failed to download {$mediaType} from: {$mediaUrl}");
                 }
@@ -385,11 +387,12 @@ class MediaGenerationHandler implements MessageHandlerInterface
      *
      * @param string $dataUrl   the data URL (e.g., data:image/png;base64,...)
      * @param int    $messageId the message ID for filename
+     * @param int    $userId    the user ID for path generation
      * @param string $provider  the AI provider name (google, openai, etc.)
      *
-     * @return string|null filename or null on failure
+     * @return string|null relative path from uploads dir or null on failure
      */
-    private function saveDataUrlAsFile(string $dataUrl, int $messageId, string $provider): ?string
+    private function saveDataUrlAsFile(string $dataUrl, int $messageId, int $userId, string $provider): ?string
     {
         // Parse: data:image/png;base64,XXXX
         if (!preg_match('#^data:([^;]+);base64,(.+)$#', $dataUrl, $matches)) {
@@ -412,19 +415,26 @@ class MediaGenerationHandler implements MessageHandlerInterface
         $extension = FileHelper::getExtensionFromMimeType($mimeType);
         $sanitizedProvider = FileHelper::sanitizeProviderName($provider);
 
-        // Generate filename: YYYYMM_messageId_provider.ext
-        $yearMonth = date('Ym');
-        $filename = sprintf('%s_%d_%s.%s', $yearMonth, $messageId, $sanitizedProvider, $extension);
+        // Generate filename: messageId_provider_timestamp.ext
+        $timestamp = time();
+        $filename = sprintf('%d_%s_%d.%s', $messageId, $sanitizedProvider, $timestamp, $extension);
 
-        // Ensure upload directory exists
-        if (!is_dir($this->uploadDir) && !mkdir($this->uploadDir, 0755, true)) {
-            $this->logger->error('MediaGenerationHandler: Failed to create upload directory');
+        // Build storage path with user subdirectories: {last2}/{prev3}/{paddedUserId}/{year}/{month}/{filename}
+        $year = date('Y');
+        $month = date('m');
+        $userBase = $this->userUploadPathBuilder->buildUserBaseRelativePath($userId);
+        $relativePath = $userBase.'/'.$year.'/'.$month.'/'.$filename;
+        $absolutePath = $this->uploadDir.'/'.$relativePath;
+
+        // Create directory if not exists
+        $dir = dirname($absolutePath);
+        if (!is_dir($dir) && !mkdir($dir, 0755, true)) {
+            $this->logger->error('MediaGenerationHandler: Failed to create upload directory', ['dir' => $dir]);
 
             return null;
         }
 
         // Save file
-        $absolutePath = $this->uploadDir.'/'.$filename;
         $bytesWritten = file_put_contents($absolutePath, $content);
 
         if (false === $bytesWritten) {
@@ -434,12 +444,12 @@ class MediaGenerationHandler implements MessageHandlerInterface
         }
 
         $this->logger->info('MediaGenerationHandler: Saved data URL as file', [
-            'filename' => $filename,
+            'relative_path' => $relativePath,
             'mime_type' => $mimeType,
             'size' => $bytesWritten,
         ]);
 
-        return $filename;
+        return $relativePath;
     }
 
     /**
@@ -447,27 +457,19 @@ class MediaGenerationHandler implements MessageHandlerInterface
      *
      * @param string $url       the media URL to download
      * @param int    $messageId the message ID for filename
+     * @param int    $userId    the user ID for path generation
      * @param string $provider  the AI provider name
      * @param string $mediaType the type of media (image, video, audio)
      *
-     * @return string|null filename or null on failure
+     * @return string|null relative path from uploads dir or null on failure
      */
-    private function downloadMedia(string $url, int $messageId, string $provider, string $mediaType): ?string
+    private function downloadMedia(string $url, int $messageId, int $userId, string $provider, string $mediaType): ?string
     {
         try {
             $this->logger->info('MediaGenerationHandler: Starting download', [
                 'url' => $url,
                 'upload_dir' => $this->uploadDir,
             ]);
-
-            // Ensure upload directory exists and is writable
-            if (!is_dir($this->uploadDir) && !mkdir($this->uploadDir, 0755, true)) {
-                throw new \Exception('Failed to create upload directory');
-            }
-
-            if (!is_writable($this->uploadDir)) {
-                throw new \Exception('Upload directory is not writable: '.$this->uploadDir);
-            }
 
             // Download with cURL
             $content = null;
@@ -507,10 +509,22 @@ class MediaGenerationHandler implements MessageHandlerInterface
             $extension = FileHelper::getExtensionFromMimeType($mimeType, $fallback);
             $sanitizedProvider = FileHelper::sanitizeProviderName($provider);
 
-            // Generate filename: YYYYMM_messageId_provider.ext
-            $yearMonth = date('Ym');
-            $filename = sprintf('%s_%d_%s.%s', $yearMonth, $messageId, $sanitizedProvider, $extension);
-            $absolutePath = $this->uploadDir.'/'.$filename;
+            // Generate filename: messageId_provider_timestamp.ext
+            $timestamp = time();
+            $filename = sprintf('%d_%s_%d.%s', $messageId, $sanitizedProvider, $timestamp, $extension);
+
+            // Build storage path with user subdirectories: {last2}/{prev3}/{paddedUserId}/{year}/{month}/{filename}
+            $year = date('Y');
+            $month = date('m');
+            $userBase = $this->userUploadPathBuilder->buildUserBaseRelativePath($userId);
+            $relativePath = $userBase.'/'.$year.'/'.$month.'/'.$filename;
+            $absolutePath = $this->uploadDir.'/'.$relativePath;
+
+            // Create directory if not exists
+            $dir = dirname($absolutePath);
+            if (!is_dir($dir) && !mkdir($dir, 0755, true)) {
+                throw new \Exception('Failed to create upload directory: '.$dir);
+            }
 
             // Save to disk
             $bytesWritten = file_put_contents($absolutePath, $content);
@@ -519,12 +533,12 @@ class MediaGenerationHandler implements MessageHandlerInterface
             }
 
             $this->logger->info('MediaGenerationHandler: Media downloaded successfully', [
-                'filename' => $filename,
+                'relative_path' => $relativePath,
                 'bytes' => $bytesWritten,
                 'mime_type' => $mimeType,
             ]);
 
-            return $filename;
+            return $relativePath;
         } catch (\Exception $e) {
             $this->logger->error('MediaGenerationHandler: Failed to download media', [
                 'error' => $e->getMessage(),
