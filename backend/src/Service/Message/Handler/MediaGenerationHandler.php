@@ -107,19 +107,6 @@ class MediaGenerationHandler implements MessageHandlerInterface
             $this->logger->info('MediaGenerationHandler: Detected /vid command, forcing video generation');
         }
 
-        // Check if this is a slash command (e.g., /pic, /vid)
-        $topic = $classification['topic'] ?? null;
-        $isSlashCommand = false;
-        if ('tools:pic' === $topic) {
-            $mediaType = 'image';
-            $isSlashCommand = true;
-            $this->logger->info('MediaGenerationHandler: Detected /pic command, forcing image generation');
-        } elseif ('tools:vid' === $topic) {
-            $mediaType = 'video';
-            $isSlashCommand = true;
-            $this->logger->info('MediaGenerationHandler: Detected /vid command, forcing video generation');
-        }
-
         // Priority: Classification override > DB default
         if (isset($classification['model_id']) && $classification['model_id']) {
             $modelId = $classification['model_id'];
@@ -250,19 +237,39 @@ class MediaGenerationHandler implements MessageHandlerInterface
                     ]
                 );
 
-                // synthesize() returns ['filename' => 'tts_xxx.mp3', 'provider' => 'openai', 'model' => 'tts-1']
-                $filename = $result['filename'];
+                // synthesize() returns ['relativePath' => '13/000/00013/2025/01/tts_xxx.mp3', ...]
+                // File is already saved to user-based path by AiFacade
+                $relativePath = $result['relativePath'];
 
                 $this->logger->info('MediaGenerationHandler: TTS audio generated', [
-                    'filename' => $filename,
+                    'relativePath' => $relativePath,
                     'provider' => $result['provider'],
                 ]);
 
-                $media = [[
-                    'url' => "/api/v1/files/uploads/{$filename}",
-                    'type' => 'audio',
-                    'format' => pathinfo($filename, PATHINFO_EXTENSION),
-                ]];
+                // Build display URL for StaticUploadController
+                $displayUrl = '/api/v1/files/uploads/'.$relativePath;
+
+                // Stream response
+                $responseText = "Generated audio: {$prompt}";
+                $streamCallback($responseText);
+
+                $this->notify($progressCallback, 'generating', 'Audio generated successfully.');
+
+                return [
+                    'metadata' => [
+                        'provider' => $result['provider'] ?? $provider,
+                        'model' => $result['model'] ?? $modelName,
+                        'model_id' => $modelId,
+                        'local_path' => $relativePath,
+                        'media_prompt' => $prompt,
+                        'media_type' => $mediaType,
+                        // StreamController expects this format for 'file' SSE event
+                        'file' => [
+                            'path' => $displayUrl,
+                            'type' => $mediaType,
+                        ],
+                    ],
+                ];
             } else {
                 // Generate image
                 $result = $this->aiFacade->generateImage(
