@@ -29,21 +29,26 @@ class StaticUploadController extends AbstractController
     }
 
     /**
-     * Serve uploaded file by filename.
+     * Serve uploaded file by path (supports subdirectories).
      *
-     * GET /api/v1/files/uploads/{filename}
-     * Example: /api/v1/files/uploads/generated_abc123.png
+     * GET /api/v1/files/uploads/{path}
+     * Examples:
+     * - /api/v1/files/uploads/generated_abc123.png (legacy flat files)
+     * - /api/v1/files/uploads/13/000/00013/2025/01/123_google_1736189000.mp4 (user subdirectories)
      *
      * Access control:
      * - Owner can always access
      * - Public if chat is shared
      */
-    #[Route('/{filename}', name: 'serve_static_upload', requirements: ['filename' => '[a-zA-Z0-9_\-\.]+'], methods: ['GET'])]
+    #[Route('/{path}', name: 'serve_static_upload', requirements: ['path' => '.+'], methods: ['GET'])]
     public function serve(
-        string $filename,
+        string $path,
         #[CurrentUser] ?User $user,
         Request $request,
     ): Response {
+        // Extract filename from path (last segment)
+        $filename = basename($path);
+
         // Check if this is a temporary AI-generated file (TTS, generated images, etc.)
         $isTemporaryAiFile = preg_match('/^(tts_|generated_|ai_)/', $filename);
 
@@ -53,17 +58,17 @@ class StaticUploadController extends AbstractController
             // Browser <audio> and <video> tags can't send Authorization headers
 
             $this->logger->info('StaticUploadController: Serving temporary AI-generated file', [
-                'filename' => $filename,
+                'path' => $path,
                 'user_id' => $user?->getId(),
                 'has_auth' => null !== $user,
             ]);
 
             // Skip message/permission check - serve directly
-            return $this->serveFile($filename);
+            return $this->serveFile($path);
         }
 
-        // 1. For regular files: Find message by filePath (format: "/api/v1/files/uploads/{filename}")
-        $filePath = "/api/v1/files/uploads/{$filename}";
+        // 1. For regular files: Find message by filePath (format: "/api/v1/files/uploads/{path}")
+        $filePath = "/api/v1/files/uploads/{$path}";
 
         $message = $this->messageRepository->createQueryBuilder('m')
             ->leftJoin('m.chat', 'c')
@@ -75,7 +80,7 @@ class StaticUploadController extends AbstractController
 
         if (!$message) {
             $this->logger->warning('StaticUploadController: Message not found for file', [
-                'filename' => $filename,
+                'path' => $path,
                 'file_path' => $filePath,
             ]);
             throw $this->createNotFoundException('File not found in database');
@@ -88,7 +93,7 @@ class StaticUploadController extends AbstractController
         $isPublicAndValid = $isPublicCheck && !$isExpiredCheck;
 
         $this->logger->info('StaticUploadController: Access check', [
-            'filename' => $filename,
+            'path' => $path,
             'message_id' => $message->getId(),
             'chat_id' => $chat ? $chat->getId() : null,
             'is_public' => $isPublicCheck,
@@ -104,7 +109,7 @@ class StaticUploadController extends AbstractController
             // Not public - require authentication
             if (!$user) {
                 $this->logger->warning('StaticUploadController: Unauthorized access attempt', [
-                    'filename' => $filename,
+                    'path' => $path,
                     'is_chat_public' => $chat ? $chat->isPublic() : false,
                     'ip' => $_SERVER['REMOTE_ADDR'] ?? 'unknown',
                 ]);
@@ -117,7 +122,7 @@ class StaticUploadController extends AbstractController
             // Check ownership (only owner can access private files)
             if ($message->getUserId() !== $user->getId()) {
                 $this->logger->warning('StaticUploadController: Forbidden access attempt', [
-                    'filename' => $filename,
+                    'path' => $path,
                     'user_id' => $user->getId(),
                     'owner_id' => $message->getUserId(),
                     'is_chat_public' => $chat ? $chat->isPublic() : false,
@@ -132,7 +137,7 @@ class StaticUploadController extends AbstractController
         // 4. Additional check for expired public shares
         if ($chat && $chat->isPublic() && $message->isShareExpired()) {
             $this->logger->info('StaticUploadController: Expired share link accessed', [
-                'filename' => $filename,
+                'path' => $path,
             ]);
 
             return $this->json([
@@ -141,16 +146,18 @@ class StaticUploadController extends AbstractController
         }
 
         // 5. Serve the file
-        return $this->serveFile($filename);
+        return $this->serveFile($path);
     }
 
     /**
      * Serve file from disk with security checks.
+     *
+     * @param string $path Relative path from uploads dir (can include subdirectories)
      */
-    private function serveFile(string $filename): Response
+    private function serveFile(string $path): Response
     {
         // Build absolute path with security checks
-        $absolutePath = $this->uploadDir.'/'.$filename;
+        $absolutePath = $this->uploadDir.'/'.$path;
 
         // Resolve to real path (prevents symlink attacks)
         $realPath = realpath($absolutePath);
@@ -159,7 +166,7 @@ class StaticUploadController extends AbstractController
         // Security: Ensure file is within upload directory (no path traversal)
         if (!$realPath || !$realUploadDir || 0 !== strpos($realPath, $realUploadDir)) {
             $this->logger->error('StaticUploadController: Path traversal attempt', [
-                'filename' => $filename,
+                'path' => $path,
                 'absolute_path' => $absolutePath,
                 'real_path' => $realPath,
                 'upload_dir' => $realUploadDir,
@@ -169,11 +176,14 @@ class StaticUploadController extends AbstractController
 
         if (!file_exists($realPath)) {
             $this->logger->error('StaticUploadController: File not found on disk', [
-                'filename' => $filename,
+                'path' => $path,
                 'real_path' => $realPath,
             ]);
             throw $this->createNotFoundException('File not found on disk');
         }
+
+        // Extract filename for response headers (last segment of path)
+        $filename = basename($path);
 
         // Determine MIME type and serve inline for images/audio/video
         $extension = strtolower(pathinfo($filename, PATHINFO_EXTENSION));
@@ -205,6 +215,7 @@ class StaticUploadController extends AbstractController
         $response->headers->set('Accept-Ranges', 'bytes');
 
         $this->logger->info('StaticUploadController: File served', [
+            'path' => $path,
             'filename' => $filename,
             'mime_type' => $mimeType,
         ]);

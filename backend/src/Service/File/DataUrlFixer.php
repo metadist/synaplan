@@ -18,6 +18,7 @@ final class DataUrlFixer
 {
     public function __construct(
         private EntityManagerInterface $em,
+        private UserUploadPathBuilder $userUploadPathBuilder,
         private string $uploadDir,
         private LoggerInterface $logger,
     ) {
@@ -58,7 +59,8 @@ final class DataUrlFixer
     /**
      * Save a data URL as a file on disk.
      *
-     * Filename format: {YYYYMM}_{messageId}_{provider}.{ext}
+     * Filename format: {messageId}_{provider}_{timestamp}.{ext}
+     * Path format: {userBase}/{year}/{month}/{filename}
      */
     private function saveDataUrlAsFile(string $dataUrl, Message $message): ?string
     {
@@ -100,23 +102,29 @@ final class DataUrlFixer
         $ext = FileHelper::getExtensionFromMimeType($mimeType);
         $provider = FileHelper::sanitizeProviderName($message->getMeta('ai_chat_provider') ?? 'unknown');
 
-        // Filename: YYYYMM_messageId_provider.ext
-        $yearMonth = date('Ym', $message->getUnixTimestamp());
-        $filename = sprintf('%s_%d_%s.%s', $yearMonth, $message->getId(), $provider, $ext);
+        // Generate filename: messageId_provider_timestamp.ext
+        $timestamp = time();
+        $filename = sprintf('%d_%s_%d.%s', $message->getId(), $provider, $timestamp, $ext);
 
-        // Ensure upload directory exists
-        if (!is_dir($this->uploadDir)) {
-            if (!mkdir($this->uploadDir, 0755, true)) {
-                $this->logger->error('DataUrlFixer: Failed to create upload directory', [
-                    'path' => $this->uploadDir,
-                ]);
+        // Build storage path with user subdirectories: {last2}/{prev3}/{paddedUserId}/{year}/{month}/{filename}
+        $userId = $message->getUserId();
+        $year = date('Y');
+        $month = date('m');
+        $userBase = $this->userUploadPathBuilder->buildUserBaseRelativePath($userId);
+        $relativePath = $userBase.'/'.$year.'/'.$month.'/'.$filename;
+        $absolutePath = $this->uploadDir.'/'.$relativePath;
 
-                return null;
-            }
+        // Create directory if not exists
+        $dir = dirname($absolutePath);
+        if (!is_dir($dir) && !mkdir($dir, 0755, true)) {
+            $this->logger->error('DataUrlFixer: Failed to create upload directory', [
+                'dir' => $dir,
+            ]);
+
+            return null;
         }
 
-        // Save
-        $absolutePath = $this->uploadDir.'/'.$filename;
+        // Save file
         if (!file_put_contents($absolutePath, $content)) {
             $this->logger->error('DataUrlFixer: Failed to write file', [
                 'path' => $absolutePath,
@@ -126,12 +134,12 @@ final class DataUrlFixer
         }
 
         $this->logger->info('DataUrlFixer: Saved file', [
-            'filename' => $filename,
+            'relative_path' => $relativePath,
             'size' => strlen($content),
             'mime' => $mimeType,
         ]);
 
         // Return URL path expected by StaticUploadController
-        return '/api/v1/files/uploads/'.$filename;
+        return '/api/v1/files/uploads/'.$relativePath;
     }
 }

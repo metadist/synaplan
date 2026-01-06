@@ -4,6 +4,7 @@ namespace App\AI\Service;
 
 use App\AI\Exception\ProviderException;
 use App\Service\CircuitBreaker;
+use App\Service\File\UserUploadPathBuilder;
 use App\Service\ModelConfigService;
 use Psr\Log\LoggerInterface;
 
@@ -14,6 +15,8 @@ class AiFacade
         private ModelConfigService $modelConfig,
         private CircuitBreaker $circuitBreaker,
         private LoggerInterface $logger,
+        private UserUploadPathBuilder $userUploadPathBuilder,
+        private string $uploadDir = '/var/www/backend/var/uploads',
     ) {
     }
 
@@ -538,7 +541,7 @@ class AiFacade
      * @param int|null $userId  User ID for config lookup
      * @param array    $options Additional options (provider, model, voice, speed, format, etc.)
      *
-     * @return array Result with filename and metadata
+     * @return array Result with relativePath (user-based path) and metadata
      */
     public function synthesize(string $text, ?int $userId = null, array $options = []): array
     {
@@ -572,10 +575,76 @@ class AiFacade
             throw new ProviderException('TTS failed', 'unknown', null, 0, $e);
         }
 
+        // Provider saves file to uploadDir root - move it to user-based path
+        $relativePath = $this->moveToUserPath($filename, $userId, $provider->getName());
+
         return [
-            'filename' => $filename,
+            'filename' => basename($relativePath),
+            'relativePath' => $relativePath,
             'provider' => $provider->getName(),
             'model' => $options['model'] ?? 'unknown',
         ];
+    }
+
+    /**
+     * Move a file from uploadDir root to user-based path structure.
+     *
+     * @param string   $filename     The filename in uploadDir root (e.g., tts_xxx.mp3)
+     * @param int|null $userId       User ID for path generation
+     * @param string   $providerName Provider name for logging
+     *
+     * @return string Relative path from uploadDir (e.g., 13/000/00013/2025/01/tts_xxx.mp3)
+     */
+    private function moveToUserPath(string $filename, ?int $userId, string $providerName): string
+    {
+        $sourcePath = $this->uploadDir.'/'.$filename;
+
+        // If no userId, keep file in root (fallback)
+        if (!$userId) {
+            $this->logger->warning('AiFacade: No userId for TTS file, keeping in root', [
+                'filename' => $filename,
+                'provider' => $providerName,
+            ]);
+
+            return $filename;
+        }
+
+        // Build user-based path
+        $year = date('Y');
+        $month = date('m');
+        $userBase = $this->userUploadPathBuilder->buildUserBaseRelativePath($userId);
+        $relativePath = $userBase.'/'.$year.'/'.$month.'/'.$filename;
+        $targetPath = $this->uploadDir.'/'.$relativePath;
+
+        // Create directory if not exists
+        $dir = dirname($targetPath);
+        if (!is_dir($dir) && !mkdir($dir, 0755, true)) {
+            $this->logger->error('AiFacade: Failed to create user directory for TTS', [
+                'dir' => $dir,
+                'filename' => $filename,
+            ]);
+
+            // Fall back to root path
+            return $filename;
+        }
+
+        // Move file
+        if (!rename($sourcePath, $targetPath)) {
+            $this->logger->error('AiFacade: Failed to move TTS file to user path', [
+                'source' => $sourcePath,
+                'target' => $targetPath,
+            ]);
+
+            // Fall back to root path
+            return $filename;
+        }
+
+        $this->logger->info('AiFacade: Moved TTS file to user path', [
+            'filename' => $filename,
+            'relativePath' => $relativePath,
+            'userId' => $userId,
+        ]);
+
+        return $relativePath;
     }
 }
