@@ -82,13 +82,15 @@
 		file_server
 	}
 
-	# Backend PHP routes last (API, dynamic routes)
+	# Backend PHP routes last (API, dynamic routes, shared pages)
 	# Dev routes (_profiler, _wdt, _error) only when APP_ENV=dev
+	# /shared/* routes to PHP for Open Graph meta tags (social media previews)
 	@backend_php expression `
 		path('/up/*') ||
 		path('/api/*') ||
 		path('/api.php') ||
 		path('/widget.php') ||
+		path('/shared/*') ||
 		({env.APP_ENV} == 'dev' && (path('/_profiler/*') || path('/_wdt/*') || path('/_error/*')))
 	`
 	handle @backend_php {

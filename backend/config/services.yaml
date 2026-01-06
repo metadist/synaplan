@@ -236,6 +236,11 @@ services:
             $stripePriceBusiness: '%env(STRIPE_PRICE_BUSINESS)%'
             $cache: '@cache.app'
 
+    # Shared Chat Page Controller (serves Open Graph meta tags for social media)
+    App\Controller\SharedChatPageController:
+        arguments:
+            $synaplanUrl: '%env(SYNAPLAN_URL)%'
+
     # Auth Providers Controller (returns enabled providers)
     App\Controller\AuthProvidersController:
         arguments:
@@ -295,6 +300,10 @@ services:
             $uploadDir: '%kernel.project_dir%/var/uploads'
 
     App\Controller\WidgetPublicController:
+        arguments:
+            $uploadDir: '%kernel.project_dir%/var/uploads'
+
+    App\Service\File\ThumbnailService:
         arguments:
             $uploadDir: '%kernel.project_dir%/var/uploads'
 
