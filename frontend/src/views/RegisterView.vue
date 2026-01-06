@@ -304,6 +304,18 @@
             }}</a>
           </p>
 
+          <!-- Hosting platform terms note -->
+          <p class="mt-3 text-center text-xs text-gray-500 dark:text-gray-400 leading-relaxed">
+            {{ $t('auth.hostingTermsNote') }}
+            <a
+              href="https://www.synaplan.com"
+              class="hover:underline"
+              target="_blank"
+              rel="noopener noreferrer"
+              >www.synaplan.com</a
+            >
+          </p>
+
           <p class="mt-4 text-center text-sm txt-secondary">
             {{ $t('auth.hasAccount') }}
             <router-link
@@ -317,6 +329,19 @@
           </p>
         </template>
       </div>
+
+      <!-- Back to homepage link -->
+      <p class="mt-6 text-center text-xs text-gray-500 dark:text-gray-400">
+        <a
+          href="https://www.synaplan.com"
+          class="hover:underline"
+          target="_blank"
+          rel="noopener noreferrer"
+          data-testid="link-homepage"
+        >
+          {{ $t('auth.backToHomepage') }}
+        </a>
+      </p>
     </div>
   </div>
 </template>
@@ -358,7 +383,8 @@ const confirmPassword = ref('')
 const currentLanguage = computed(() => locale.value)
 
 const cycleLanguage = () => {
-  const languages = ['en', 'de', 'tr']
+  // Alphabetical order: DE, EN, ES, TR (EN is default)
+  const languages = ['de', 'en', 'es', 'tr']
   const currentIndex = languages.indexOf(locale.value)
   const nextIndex = (currentIndex + 1) % languages.length
   locale.value = languages[nextIndex]

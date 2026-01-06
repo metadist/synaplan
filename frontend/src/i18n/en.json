@@ -95,6 +95,31 @@
     "featureStatus": "Feature Status",
     "upgrade": "Upgrade"
   },
+  "nav": {
+    "chat": "Chat",
+    "tools": "Tools",
+    "toolsIntroduction": "Introduction",
+    "toolsChatWidget": "Chat Widget",
+    "toolsDocSummary": "Doc Summary",
+    "toolsMailHandler": "Mail Handler",
+    "plugins": "Plugins",
+    "files": "Files",
+    "filesAndRag": "Files & RAG",
+    "fileManager": "File Manager",
+    "semanticSearch": "Semantic Search",
+    "aiConfig": "AI Config",
+    "configInbound": "Inbound",
+    "configAiModels": "AI Models",
+    "configTaskPrompts": "Task Prompts",
+    "configSortingPrompt": "Sorting Prompt",
+    "configApiKeys": "API Keys",
+    "statistics": "Statistics",
+    "subscription": "Subscription",
+    "upgrade": "Upgrade",
+    "admin": "Admin",
+    "adminDashboard": "Dashboard",
+    "adminFeatureStatus": "Feature Status"
+  },
   "chatInput": {
     "placeholder": "Type your message...",
     "provider": "Provider",
@@ -976,7 +1001,9 @@
     "registrationSuccessDesc": "If this email address is not already registered, we have sent you a verification email. Please check your inbox (including spam folder).",
     "passwordResetSuccess": "Request Sent!",
     "passwordResetSuccessDesc": "If an account with this email address exists, we have sent you a password reset link. Please check your inbox.",
-    "recaptchaError": "reCAPTCHA verification failed. Please try again."
+    "recaptchaError": "reCAPTCHA verification failed. Please try again.",
+    "backToHomepage": "← Back to www.synaplan.com",
+    "hostingTermsNote": "The terms and conditions of the hosting platform apply."
   },
   "unsavedChanges": {
     "title": "You have unsaved changes",

@@ -73,12 +73,6 @@
           class="max-w-full max-h-full object-contain z-10"
           @click.stop
         />
-        <p
-          v-if="alt"
-          class="absolute bottom-6 left-1/2 -translate-x-1/2 text-white/90 text-sm bg-black/50 px-4 py-2 rounded-lg max-w-2xl text-center z-10"
-        >
-          {{ alt }}
-        </p>
       </div>
     </Transition>
   </Teleport>

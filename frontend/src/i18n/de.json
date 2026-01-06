@@ -91,6 +91,31 @@
     "featureStatus": "Feature-Status",
     "upgrade": "Upgrade"
   },
+  "nav": {
+    "chat": "Chat",
+    "tools": "Werkzeuge",
+    "toolsIntroduction": "Einführung",
+    "toolsChatWidget": "Chat-Widget",
+    "toolsDocSummary": "Dok-Zusammenfassung",
+    "toolsMailHandler": "E-Mail-Handler",
+    "plugins": "Plugins",
+    "files": "Dateien",
+    "filesAndRag": "Dateien & RAG",
+    "fileManager": "Dateimanager",
+    "semanticSearch": "Semantische Suche",
+    "aiConfig": "KI-Konfiguration",
+    "configInbound": "Eingehend",
+    "configAiModels": "KI-Modelle",
+    "configTaskPrompts": "Aufgaben-Prompts",
+    "configSortingPrompt": "Sortier-Prompt",
+    "configApiKeys": "API-Schlüssel",
+    "statistics": "Statistiken",
+    "subscription": "Abonnement",
+    "upgrade": "Upgrade",
+    "admin": "Admin",
+    "adminDashboard": "Dashboard",
+    "adminFeatureStatus": "Feature-Status"
+  },
   "chatInput": {
     "placeholder": "Schreibe deine Nachricht hier...",
     "model": "Modell",
@@ -1195,6 +1220,8 @@
     "registrationSuccessDesc": "Falls diese E-Mail-Adresse noch nicht registriert ist, haben wir dir eine Bestätigungs-E-Mail gesendet. Bitte überprüfe deinen Posteingang (auch den Spam-Ordner).",
     "passwordResetSuccess": "Anfrage gesendet!",
     "passwordResetSuccessDesc": "Falls ein Konto mit dieser E-Mail-Adresse existiert, haben wir dir einen Link zum Zurücksetzen des Passworts gesendet. Bitte überprüfe deinen Posteingang.",
-    "recaptchaError": "reCAPTCHA-Verifizierung fehlgeschlagen. Bitte versuche es erneut."
+    "recaptchaError": "reCAPTCHA-Verifizierung fehlgeschlagen. Bitte versuche es erneut.",
+    "backToHomepage": "← Zurück zu www.synaplan.com",
+    "hostingTermsNote": "Es gelten die Allgemeinen Geschäftsbedingungen der Hosting-Plattform."
   }
 }

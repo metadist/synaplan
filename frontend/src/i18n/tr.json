@@ -1,0 +1,582 @@
+{
+  "welcome": "Hoş Geldiniz",
+  "chat": {
+    "title": "Sohbet",
+    "historyLog": "Geçmiş",
+    "tools": "Araçlar",
+    "files": "Dosyalar & RAG",
+    "config": "AI Yapılandırması",
+    "statistics": "İstatistikler",
+    "notFound": "Sohbet artık mevcut değil",
+    "notFoundDesc": "Bu sohbet silindi ve artık erişilemiyor."
+  },
+  "admin": {
+    "title": "Yönetici Paneli",
+    "description": "Sistem yönetimi ve yapılandırma",
+    "tabs": {
+      "overview": "Genel Bakış",
+      "users": "Kullanıcılar",
+      "prompts": "Promptlar",
+      "usage": "Kullanım"
+    },
+    "overview": {
+      "totalUsers": "Toplam Kullanıcı",
+      "recentUsers": "Son Kullanıcılar"
+    },
+    "analytics": {
+      "registrations": "Kullanıcı Kayıtları",
+      "usageByAction": "Eylem Bazında Kullanım",
+      "period": {
+        "7d": "7 Gün",
+        "30d": "30 Gün",
+        "90d": "90 Gün",
+        "1y": "1 Yıl",
+        "all": "Tüm Zamanlar"
+      },
+      "groupBy": {
+        "day": "Gün",
+        "week": "Hafta",
+        "month": "Ay"
+      }
+    },
+    "users": {
+      "email": "E-posta",
+      "level": "Seviye",
+      "type": "Tür",
+      "provider": "Sağlayıcı",
+      "created": "Oluşturulma",
+      "status": "Durum",
+      "actions": "İşlemler",
+      "delete": "Kullanıcıyı sil",
+      "currentUser": "(Sen)",
+      "verified": "Doğrulanmış",
+      "unverified": "Doğrulanmamış",
+      "searchPlaceholder": "E-posta ile ara...",
+      "noUsers": "Kullanıcı bulunamadı",
+      "deleteConfirmTitle": "Kullanıcı Silinsin mi?",
+      "deleteConfirmDesc": "{email} kullanıcısını silmek istediğinizden emin misiniz? Bu işlem geri alınamaz.",
+      "deleteConfirmCheckbox": "Evet, tüm kullanıcı verilerinin silinmesini onaylıyorum (sohbetler, widgetlar, belgeler dahil)",
+      "userDeleted": "{email} kullanıcısı başarıyla silindi",
+      "userDeleteFailed": "Kullanıcı silinemedi",
+      "levelUpdated": "Kullanıcı seviyesi {level} olarak güncellendi",
+      "levelUpdateFailed": "Kullanıcı seviyesi güncellenemedi"
+    },
+    "prompts": {
+      "shortDesc": "Kısa Açıklama",
+      "prompt": "Prompt",
+      "selectionRules": "Seçim Kuralları",
+      "selectionRulesPlaceholder": "İsteğe bağlı: Bu promptun otomatik seçimi için kurallar"
+    },
+    "usage": {
+      "title": "Kullanım İstatistikleri",
+      "period": {
+        "day": "24 Saat",
+        "week": "7 Gün",
+        "month": "30 Gün",
+        "all": "Tüm Zamanlar"
+      },
+      "totalRequests": "İstekler",
+      "totalTokens": "Tokenlar",
+      "totalCost": "Maliyet",
+      "avgLatency": "Ort. Gecikme",
+      "byAction": "Eylem Bazında",
+      "byProvider": "Sağlayıcı Bazında",
+      "topModels": "En Çok Kullanılan Modeller",
+      "topUsers": "En Aktif Kullanıcılar",
+      "model": "Model",
+      "requests": "istek",
+      "tokens": "token",
+      "cost": "Maliyet",
+      "activeSubscriptions": "Aktif Abonelikler",
+      "subscriptionOverview": "Abonelik Özeti"
+    }
+  },
+  "sidebar": {
+    "featureStatus": "Özellik Durumu",
+    "upgrade": "Yükselt"
+  },
+  "nav": {
+    "chat": "Sohbet",
+    "tools": "Araçlar",
+    "toolsIntroduction": "Tanıtım",
+    "toolsChatWidget": "Sohbet Widgetı",
+    "toolsDocSummary": "Belge Özeti",
+    "toolsMailHandler": "E-posta İşleyici",
+    "plugins": "Eklentiler",
+    "files": "Dosyalar",
+    "filesAndRag": "Dosyalar & RAG",
+    "fileManager": "Dosya Yöneticisi",
+    "semanticSearch": "Anlamsal Arama",
+    "aiConfig": "AI Yapılandırması",
+    "configInbound": "Gelen",
+    "configAiModels": "AI Modelleri",
+    "configTaskPrompts": "Görev Promptları",
+    "configSortingPrompt": "Sıralama Promptu",
+    "configApiKeys": "API Anahtarları",
+    "statistics": "İstatistikler",
+    "subscription": "Abonelik",
+    "upgrade": "Yükselt",
+    "admin": "Yönetici",
+    "adminDashboard": "Kontrol Paneli",
+    "adminFeatureStatus": "Özellik Durumu"
+  },
+  "chatInput": {
+    "placeholder": "Mesajınızı yazın...",
+    "provider": "Sağlayıcı",
+    "model": "Model",
+    "configureModel": "AI Modelini Yapılandır",
+    "attach": "Ekle",
+    "uploadFile": "Yükle",
+    "deepResearch": "Derinlemesine Araştırma",
+    "docs": "Belgeler",
+    "web": "Web",
+    "webSearch": "Web'de güncel bilgi ara",
+    "enhance": "Geliştir",
+    "thinking": "Düşünme",
+    "reasoningNotSupported": "Mevcut sohbet modeliniz akıl yürütmeyi desteklemiyor. Lütfen AI Yapılandırması → Modeller'den akıl yürütme özellikli bir model seçin (GPT-5, o3, DeepSeek-R1).",
+    "voice": "Sesi başlat",
+    "voiceRealtime": "Gerçek zamanlı konuşma tanıma (Web Speech API)",
+    "voiceWhisper": "Kaydet ve Whisper ile yazıya dök",
+    "listeningStarted": "🎙️ Dinleniyor... şimdi konuşun",
+    "recordingStarted": "🎙️ Kayıt başladı...",
+    "speechError": "Konuşma tanıma hatası: {error}",
+    "recordingError": "Kayıt başarısız: {error}",
+    "transcribed": "🎙️ Yazıya döküldü{language}: \"{preview}\"",
+    "noSpeechDetected": "⚠️ Kayıtta konuşma algılanmadı",
+    "transcriptionFailed": "Yazıya dökme başarısız: {error}",
+    "dropFiles": "Dosyaları buraya bırakın",
+    "dropFilesHint": "Resimler, belgeler, ses dosyaları...",
+    "filesPasted": "{count} dosya yapıştırıldı",
+    "send": "Mesaj gönder",
+    "share": "Paylaş",
+    "tools": {
+      "label": "Araçlar",
+      "webSearch": "Web Araması",
+      "webSearchDesc": "İnternette ara",
+      "imageGen": "Görsel Oluşturma",
+      "imageGenDesc": "Metinden görsel oluştur",
+      "videoGen": "Video Oluşturma",
+      "videoGenDesc": "Metinden video oluştur"
+    },
+    "removeTool": "Aracı kaldır"
+  },
+  "chatMessage": {
+    "again": "Tekrar",
+    "againWith": "Şununla tekrar",
+    "regenerateWith": "Şununla yeniden oluştur"
+  },
+  "commands": {
+    "noResults": "Komut bulunamadı",
+    "availableCommands": "Mevcut Komutlar",
+    "navigate": "git",
+    "select": "seç",
+    "close": "kapat",
+    "videoNotSupported": "Tarayıcınız video etiketini desteklemiyor.",
+    "copyCode": "Kodu kopyala",
+    "copy": "Kopyala",
+    "copied": "Kopyalandı!",
+    "original": "Orijinal",
+    "translatedTo": "Şuna çevrildi",
+    "loginLinkGenerated": "Giriş bağlantısı oluşturuldu",
+    "expiresAt": "Sona erme zamanı"
+  },
+  "statistics": {
+    "title": "Synaplan'a hoş geldiniz!",
+    "messageStats": "Mesaj İstatistikleri",
+    "totalMessages": "Toplam Mesaj",
+    "messagesSent": "Gönderilen Mesajlar",
+    "messagesReceived": "Alınan Mesajlar",
+    "totalFiles": "Toplam Dosya",
+    "filesSent": "Gönderilen Dosyalar",
+    "filesReceived": "Alınan Dosyalar",
+    "latestFiles": "Son Dosyalar",
+    "received": "Alınan",
+    "sent": "Gönderilen"
+  },
+  "plugins": {
+    "title": "Eklentiler",
+    "description": "İş akışınız için genişletilmiş işlevsellik",
+    "notFound": "Eklenti bulunamadı veya hesabınız için etkinleştirilmemiş"
+  },
+  "tools": {
+    "title": "Mevcut Araçlar",
+    "description": "İş akışınızı geliştirmek için güçlü araçları keşfedin ve kullanın",
+    "category": "Kategori",
+    "commands": "Komutlar",
+    "noCommands": "Mevcut komut yok",
+    "searchCommands": "Komut ara...",
+    "noCommandsFound": "Aramanızla eşleşen komut bulunamadı"
+  },
+  "help": {
+    "title": "Yardım",
+    "openHelp": "Yardımı aç",
+    "close": "Kapat",
+    "gotIt": "Anladım!",
+    "noContent": "Bu sayfa için yardım içeriği mevcut değil"
+  },
+  "common": {
+    "ok": "Tamam",
+    "cancel": "İptal",
+    "delete": "Sil",
+    "save": "Kaydet",
+    "close": "Kapat",
+    "copy": "Kopyala",
+    "copied": "Kopyalandı!",
+    "sending": "Gönderiliyor...",
+    "yes": "Evet",
+    "no": "Hayır",
+    "active": "Aktif",
+    "inactive": "Pasif",
+    "back": "Geri",
+    "next": "İleri",
+    "create": "Oluştur",
+    "creating": "Oluşturuluyor...",
+    "loading": "Yükleniyor...",
+    "now": "Şimdi",
+    "justNow": "Az önce",
+    "minutesAgo": "{count} dakika önce",
+    "hoursAgo": "{count} saat önce",
+    "previous": "Önceki",
+    "error": "Hata",
+    "success": "Başarılı",
+    "leave": "Ayrıl",
+    "stay": "Kal",
+    "retry": "Tekrar Dene"
+  },
+  "search": {
+    "sources": "Kaynaklar",
+    "webResults": "Web Arama Sonuçları"
+  },
+  "auth": {
+    "login": "Giriş Yap",
+    "register": "Kayıt Ol",
+    "email": "E-posta",
+    "emailPlaceholderPrefix": "sizin",
+    "emailPlaceholderSuffix": "email.com",
+    "password": "Şifre",
+    "confirmPassword": "Şifreyi Onayla",
+    "passwordMismatch": "Şifreler eşleşmiyor",
+    "fullName": "Ad Soyad",
+    "forgotPassword": "Şifrenizi mi unuttunuz?",
+    "forgotPasswordDesc": "E-posta adresinizi girin, şifrenizi sıfırlamanız için size bir bağlantı göndereceğiz.",
+    "noAccount": "Hesabınız yok mu?",
+    "hasAccount": "Zaten hesabınız var mı?",
+    "signIn": "Giriş Yap",
+    "signingIn": "Giriş yapılıyor...",
+    "signUp": "Kayıt Ol",
+    "signingUp": "Hesap oluşturuluyor...",
+    "orContinueWith": "Veya şununla devam edin",
+    "google": "Google",
+    "github": "GitHub",
+    "facebook": "Facebook",
+    "termsAgree": "Kayıt olarak kabul etmiş olursunuz:",
+    "termsOfService": "Kullanım Koşulları",
+    "and": "ve",
+    "privacyPolicy": "Gizlilik Politikası",
+    "sendResetLink": "Sıfırlama Bağlantısı Gönder",
+    "sending": "Gönderiliyor...",
+    "backToLogin": "Girişe Dön",
+    "emailSent": "E-posta Gönderildi!",
+    "emailSentDesc": "{email} adresine şifre sıfırlama bağlantısı gönderdik. Lütfen gelen kutunuzu kontrol edin.",
+    "resendEmail": "E-postayı Tekrar Gönder",
+    "resendIn": "{seconds}s sonra tekrar gönder",
+    "verifyEmail": "E-postanızı Doğrulayın",
+    "verifyEmailDesc": "{email} adresine doğrulama bağlantısı gönderdik. Lütfen gelen kutunuzu kontrol edin ve e-postanızı doğrulamak için bağlantıya tıklayın.",
+    "checkSpam": "E-postayı almadınız mı? Spam klasörünüzü kontrol edin veya tekrar göndermeyi deneyin.",
+    "wrongEmail": "Yanlış e-posta?",
+    "changeEmail": "Değiştir",
+    "emailVerified": "E-posta Doğrulandı!",
+    "emailVerifiedDesc": "E-postanız başarıyla doğrulandı. Artık hesabınızın tüm özelliklerine erişebilirsiniz.",
+    "continueToApp": "Girişe Devam Et",
+    "redirectIn": "{seconds} saniye içinde yönlendirileceksiniz...",
+    "accountReady": "Hesabınız kullanıma hazır",
+    "loginWithGoogle": "Google ile Giriş Yap",
+    "loginWithGitHub": "GitHub ile Giriş Yap",
+    "loginWithKeycloak": "Keycloak ile Giriş Yap",
+    "socialLoginError": "Sosyal giriş başarısız. Lütfen tekrar deneyin.",
+    "oauthCallbackProcessing": "Giriş işleniyor...",
+    "noSocialProviders": "Sosyal giriş sağlayıcısı yapılandırılmamış",
+    "registrationSuccess": "Kayıt Başarılı!",
+    "registrationSuccessDesc": "Bu e-posta adresi henüz kayıtlı değilse, size bir doğrulama e-postası gönderdik. Lütfen gelen kutunuzu (spam klasörü dahil) kontrol edin.",
+    "passwordResetSuccess": "İstek Gönderildi!",
+    "passwordResetSuccessDesc": "Bu e-posta adresiyle bir hesap varsa, şifre sıfırlama bağlantısı gönderdik. Lütfen gelen kutunuzu kontrol edin.",
+    "recaptchaError": "reCAPTCHA doğrulaması başarısız. Lütfen tekrar deneyin.",
+    "backToHomepage": "← www.synaplan.com'a geri dön",
+    "hostingTermsNote": "Barındırma platformunun kullanım koşulları geçerlidir."
+  },
+  "unsavedChanges": {
+    "title": "Kaydedilmemiş değişiklikleriniz var",
+    "description": "Kaydetmeden ayrılırsanız değişiklikleriniz kaybolacak. İptal etmek için ESC'ye basın.",
+    "save": "Değişiklikleri Kaydet",
+    "saving": "Kaydediliyor...",
+    "discard": "Vazgeç",
+    "saved": "Değişiklikler başarıyla kaydedildi",
+    "confirmLeave": "Kaydedilmemiş değişiklikleriniz var. Ayrılmak istediğinizden emin misiniz?"
+  },
+  "widget": {
+    "title": "Sohbet Desteği",
+    "subtitle": "Genellikle dakikalar içinde yanıt veriyoruz",
+    "placeholder": "Mesajınızı yazın...",
+    "send": "Gönder",
+    "attachFile": "Dosya ekle",
+    "limitWarning": "Mesaj limitine yaklaşıyorsunuz",
+    "limitDetails": "{max} mesajdan {current} tanesini gönderdiniz",
+    "limitReached": "Mesaj limitine ulaşıldı",
+    "limitReachedDetails": "Bu oturum için maksimum mesaj sayısına ulaştınız. Daha fazla yardım için lütfen doğrudan bizimle iletişime geçin.",
+    "limitReachedPlaceholder": "Mesaj limitine ulaşıldı",
+    "fileTooLarge": "Dosya boyutu {max}MB limitini aşıyor",
+    "fileUploadError": "Dosya yüklenemedi",
+    "fileUploadLimitReached": "Bu oturum için dosya yükleme limitine ulaşıldı.",
+    "fileUploadFailed": "Dosya yükleme başarısız. Lütfen tekrar deneyin.",
+    "fileUploadDefaultMessage": "Lütfen ekli dosyayı inceleyin.",
+    "sendFailed": "Üzgünüz, bir hatayla karşılaştık. Lütfen tekrar deneyin.",
+    "defaultAssistantReply": "Mesajınız için teşekkürler! Hemen size döneceğim."
+  },
+  "widgets": {
+    "title": "Sohbet Widgetları",
+    "subtitle": "AI destekli sohbet widgetlarını web sitenize yerleştirin",
+    "createNew": "Widget Oluştur",
+    "createNewWidget": "Yeni Sohbet Widgetı Oluştur",
+    "createWidget": "Widget Oluştur",
+    "editWidget": "Widgetı Düzenle",
+    "emptyTitle": "Henüz widget yok",
+    "emptyDescription": "Web sitenize yerleştirmek için ilk sohbet widgetınızı oluşturun",
+    "createFirst": "İlk Widgetı Oluştur",
+    "active": "Aktif",
+    "inactive": "Pasif"
+  },
+  "profile": {
+    "title": "Profil Ayarları",
+    "subtitle": "Kişisel bilgilerinizi ve hesap ayarlarınızı yönetin",
+    "personalInfo": {
+      "title": "Kişisel Bilgiler",
+      "firstName": "Ad",
+      "firstNamePlaceholder": "Adınız",
+      "lastName": "Soyad",
+      "lastNamePlaceholder": "Soyadınız",
+      "email": "E-posta",
+      "emailHint": "Giriş e-postanız (değiştirilemez)",
+      "phone": "Telefon",
+      "phonePlaceholder": "İsteğe bağlı iletişim numarası"
+    },
+    "companyInfo": {
+      "title": "Şirket Bilgileri",
+      "subtitle": "İsteğe bağlı - Bireyseniz boş bırakın",
+      "companyName": "Şirket Adı",
+      "companyNamePlaceholder": "Şirketiniz A.Ş.",
+      "vatId": "Vergi Numarası",
+      "vatIdPlaceholder": "Vergi kimlik numarası"
+    },
+    "billingAddress": {
+      "title": "Fatura Adresi",
+      "street": "Sokak & Numara",
+      "streetPlaceholder": "Sokak adı ve bina numarası",
+      "zipCode": "Posta Kodu",
+      "zipCodePlaceholder": "Posta kodu",
+      "city": "Şehir",
+      "cityPlaceholder": "Şehir adı",
+      "country": "Ülke",
+      "countryHint": "Doğru vergi hesaplaması için gerekli"
+    },
+    "accountSettings": {
+      "title": "Hesap Ayarları",
+      "language": "Dil",
+      "languageHint": "Arayüz dili",
+      "timezone": "Saat Dilimi",
+      "timezoneHint": "Yerel saat diliminiz"
+    },
+    "changePassword": {
+      "title": "Şifre Değiştir",
+      "subtitle": "Mevcut şifreyi korumak için boş bırakın",
+      "currentPassword": "Mevcut Şifre",
+      "currentPasswordPlaceholder": "Mevcut şifreyi korumak için boş bırakın",
+      "newPassword": "Yeni Şifre",
+      "newPasswordPlaceholder": "Yeni şifre girin",
+      "newPasswordHint": "En az 8 karakter",
+      "confirmPassword": "Şifreyi Onayla",
+      "confirmPasswordPlaceholder": "Yeni şifreyi onaylayın",
+      "confirmPasswordHint": "Yeni şifreyle eşleşmeli"
+    },
+    "dangerZone": {
+      "title": "Tehlikeli Bölge",
+      "subtitle": "Geri alınamaz işlemler",
+      "deleteAccount": "Hesabı Sil",
+      "deleteAccountDesc": "Hesabınızı kalıcı olarak silin. Bu işlem geri alınamaz.",
+      "deleteButton": "Hesabı Kalıcı Olarak Sil"
+    },
+    "saveChanges": "Değişiklikleri Kaydet",
+    "cancel": "İptal"
+  },
+  "notFound": {
+    "title": "Sayfa Bulunamadı",
+    "description": "Aradığınız sayfa mevcut değil veya taşınmış. Sizi doğru yola yönlendirelim.",
+    "goHome": "Ana Sayfaya Git",
+    "goBack": "Geri Dön",
+    "quickLinks": "Hızlı Bağlantılar",
+    "hint": "Bunun bir hata olduğunu düşünüyorsanız, lütfen destek ekibiyle iletişime geçin."
+  },
+  "error": {
+    "title": "Bir Hata Oluştu",
+    "description": "Beklenmeyen bir hatayla karşılaştık. Endişelenmeyin, ekibimiz bilgilendirildi ve üzerinde çalışıyor.",
+    "details": "Hata Detayları",
+    "statusCode": "Durum Kodu",
+    "showStack": "Yığın izini göster",
+    "hideStack": "Yığın izini gizle",
+    "reload": "Sayfayı Yenile",
+    "goHome": "Ana Sayfaya Git",
+    "needHelp": "Yardıma mı İhtiyacınız Var?",
+    "contactSupport": "Bu sorun devam ederse, lütfen aşağıdaki hata detaylarıyla destek ekibimizle iletişime geçin.",
+    "copyError": "Hata Bilgisini Kopyala",
+    "copied": "Kopyalandı!"
+  },
+  "loading": {
+    "default": "Yükleniyor...",
+    "pleaseWait": "Lütfen bekleyin"
+  },
+  "processing": {
+    "started": "İşlem başlatılıyor...",
+    "startedTitle": "Mesajınız işleniyor",
+    "startedDesc": "İsteğiniz analiz ediliyor",
+    "preprocessing": "Dosyalar işleniyor...",
+    "preprocessingTitle": "Ekler işleniyor",
+    "preprocessingDesc": "Dosya içeriği çıkarılıyor ve analiz ediliyor",
+    "classifying": "Mesaj analiz ediliyor...",
+    "classifyingTitle": "İsteğiniz anlaşılıyor",
+    "classifyingDesc": "AI niyet ve içeriği analiz ediyor",
+    "classified": "Tespit edildi",
+    "classifiedTitle": "Analiz tamamlandı",
+    "searching": "Web'de aranıyor...",
+    "searchingTitle": "Web Araması Devam Ediyor",
+    "searchingDesc": "Güncel bilgiler aranıyor",
+    "searchComplete": "Arama tamamlandı",
+    "searchCompleteTitle": "Web Araması Tamamlandı",
+    "searchCompleteDesc": "Bilgi bulundu",
+    "results": "sonuç",
+    "generating": "Yanıt oluşturuluyor...",
+    "generatingTitle": "Yanıt oluşturuluyor",
+    "generatingDesc": "AI yanıtınızı hazırlıyor",
+    "topic": "Konu",
+    "language": "Dil",
+    "modelId": "Model ID"
+  },
+  "message": {
+    "thinking": "Düşünme süreci",
+    "reasoning": "AI Akıl Yürütme",
+    "fileGenerated": "Sizin için '{filename}' dosyasını oluşturdum. Şimdi indirebilirsiniz.",
+    "fileGenerationFailed": "Dosya oluşturulurken bir sorun oluştu. Lütfen tekrar deneyin.",
+    "cancelledByUser": "⚠️ Kullanıcı tarafından iptal edildi"
+  },
+  "subscription": {
+    "serviceNotAvailable": "Hizmet Kullanılamıyor",
+    "title": "Abonelik Planları",
+    "subtitle": "Daha fazla özellik ve daha yüksek limitler açın",
+    "chooseYourPlan": "Planınızı Seçin",
+    "currentPlan": "Mevcut Plan",
+    "yourPlan": "Planınız",
+    "noActiveSubscription": "Aktif abonelik yok",
+    "upgradePlan": "Planı Yükselt",
+    "managePlan": "Planı Yönet",
+    "cancelPlan": "Aboneliği İptal Et",
+    "recommended": "Önerilen",
+    "selectPlan": "Plan Seç",
+    "upgrade": "Yükselt",
+    "processing": "İşleniyor...",
+    "perMonth": "ay",
+    "perYear": "yıl"
+  },
+  "limitReached": {
+    "lifetime": {
+      "title": "Ücretsiz Limit Doldu",
+      "description": "Ücretsiz planınızdaki tüm {limit} {action} kullandınız. Devam etmek için yükseltin!"
+    },
+    "hourly": {
+      "title": "Saatlik Limite Ulaşıldı",
+      "description": "{limit} {action} saatlik limitinize ulaştınız. Limitiniz yakında sıfırlanacak."
+    },
+    "monthly": {
+      "title": "Aylık Limite Ulaşıldı",
+      "description": "Bu ay tüm {limit} {action} kullandınız. Daha fazlası için yükseltin!"
+    },
+    "upgradeNow": "Şimdi Yükselt",
+    "verifyPhone": "Telefon Numarasını Doğrula"
+  },
+  "settings": {
+    "title": "Ayarlar",
+    "subtitle": "Tercihlerinizi ve yapılandırmanızı yönetin",
+    "tabs": {
+      "general": "Genel",
+      "features": "Özellikler"
+    },
+    "appMode": {
+      "title": "Uygulama Modu",
+      "description": "Basitleştirilmiş veya tam özellik seti arasında seçim yapın",
+      "easy": "Kolay Mod",
+      "easyDesc": "Temel özelliklerle basitleştirilmiş arayüz",
+      "advanced": "Gelişmiş Mod",
+      "advancedDesc": "Tüm özelliklere ve araçlara tam erişim"
+    },
+    "theme": {
+      "title": "Tema",
+      "description": "Renk şemanızı seçin",
+      "light": "Açık",
+      "dark": "Koyu",
+      "system": "Sistem"
+    },
+    "account": {
+      "title": "Hesap",
+      "email": "E-posta",
+      "userLevel": "Kullanıcı Seviyesi"
+    },
+    "logout": "Çıkış Yap",
+    "features": {
+      "title": "Sistem Durumu",
+      "subtitle": "Tüm servisleri ve özellikleri izleyin",
+      "loading": "Özellikler yükleniyor...",
+      "requiredConfig": "Gerekli Yapılandırma:",
+      "set": "Ayarlandı",
+      "notSet": "Ayarlanmadı"
+    }
+  },
+  "storage": {
+    "title": "Depolama Kotası",
+    "plan": "Plan",
+    "remaining": "Kalan",
+    "used": "Kullanılan",
+    "limitReached": "Depolama limitine ulaşıldı! Lütfen bazı dosyaları silin veya planınızı yükseltin.",
+    "almostFull": "Depolama neredeyse dolu! Sadece {remaining} kaldı.",
+    "upgradePlan": "Planı Yükselt"
+  },
+  "files": {
+    "uploadTitle": "RAG Dosyaları Yükle",
+    "yourFiles": "Dosyalarınız",
+    "noFiles": "Henüz dosya yüklenmemiş",
+    "delete": "Sil",
+    "download": "İndir"
+  },
+  "config": {
+    "inbound": {
+      "title": "Gelen",
+      "description": "Bu platforma farklı kanallardan ulaşabilirsiniz."
+    },
+    "aiModels": {
+      "title": "AI Modelleri",
+      "description": "AI modellerinizi yapılandırın ve yönetin"
+    },
+    "taskPrompts": {
+      "title": "Prompt Yönetimi",
+      "subtitle": "Farklı görevler için AI promptlarını yönetin ve özelleştirin"
+    },
+    "apiKeys": {
+      "title": "API Anahtarları",
+      "description": "API'ye erişim için API anahtarları oluşturun ve yönetin."
+    },
+    "phoneVerification": {
+      "title": "Telefon Doğrulama",
+      "description": "Tam özellikleri ve daha yüksek limitleri WhatsApp üzerinden açmak için telefon numaranızı doğrulayın."
+    },
+    "usage": {
+      "title": "Kullanım İstatistikleri",
+      "description": "Tüm kanal ve özelliklerdeki API kullanımınızı takip edin"
+    }
+  }
+}

@@ -166,9 +166,11 @@ import { useAppModeStore } from '../stores/appMode'
 import { useConfigStore } from '../stores/config'
 import { useTheme } from '../composables/useTheme'
 import { getFeaturesStatus } from '../services/featuresService'
+import { useI18n } from 'vue-i18n'
 import SidebarChatList from './SidebarChatList.vue'
 import UserMenu from './UserMenu.vue'
 
+const { t } = useI18n()
 const sidebarStore = useSidebarStore()
 const authStore = useAuthStore()
 const appModeStore = useAppModeStore()
@@ -237,19 +239,19 @@ interface NavItem {
 }
 
 const navItems = computed<NavItem[]>(() => {
-  const items: NavItem[] = [{ path: '/', label: 'Chat', icon: ChatBubbleLeftRightIcon }]
+  const items: NavItem[] = [{ path: '/', label: t('nav.chat'), icon: ChatBubbleLeftRightIcon }]
 
   // Tools: nur in Advanced Mode
   if (appModeStore.isAdvancedMode) {
     items.push({
       path: '/tools',
-      label: 'Tools',
+      label: t('nav.tools'),
       icon: WrenchScrewdriverIcon,
       children: [
-        { path: '/tools/introduction', label: 'Introduction' },
-        { path: '/tools/chat-widget', label: 'Chat Widget' },
-        { path: '/tools/doc-summary', label: 'Doc Summary' },
-        { path: '/tools/mail-handler', label: 'Mail Handler' },
+        { path: '/tools/introduction', label: t('nav.toolsIntroduction') },
+        { path: '/tools/chat-widget', label: t('nav.toolsChatWidget') },
+        { path: '/tools/doc-summary', label: t('nav.toolsDocSummary') },
+        { path: '/tools/mail-handler', label: t('nav.toolsMailHandler') },
       ],
     })
   }
@@ -258,7 +260,7 @@ const navItems = computed<NavItem[]>(() => {
   if (appModeStore.isAdvancedMode && configStore.plugins.length > 0) {
     items.push({
       path: '/plugins',
-      label: 'Plugins',
+      label: t('nav.plugins'),
       icon: PuzzlePieceIcon,
       children: configStore.plugins.map((plugin: { name?: string }) => ({
         path: `/plugins/${plugin.name}`,
@@ -269,15 +271,15 @@ const navItems = computed<NavItem[]>(() => {
 
   // Files & RAG: Easy Mode = nur Files, Advanced = mit Submenu
   if (appModeStore.isEasyMode) {
-    items.push({ path: '/files', label: 'Files', icon: FolderIcon })
+    items.push({ path: '/files', label: t('nav.files'), icon: FolderIcon })
   } else {
     items.push({
       path: '/files',
-      label: 'Files & RAG',
+      label: t('nav.filesAndRag'),
       icon: FolderIcon,
       children: [
-        { path: '/files', label: 'File Manager' },
-        { path: '/rag', label: 'Semantic Search' },
+        { path: '/files', label: t('nav.fileManager') },
+        { path: '/rag', label: t('nav.semanticSearch') },
       ],
     })
   }
@@ -286,24 +288,24 @@ const navItems = computed<NavItem[]>(() => {
   if (appModeStore.isAdvancedMode) {
     items.push({
       path: '/config',
-      label: 'AI Config',
+      label: t('nav.aiConfig'),
       icon: Cog6ToothIcon,
       children: [
-        { path: '/config/inbound', label: 'Inbound' },
-        { path: '/config/ai-models', label: 'AI Models' },
-        { path: '/config/task-prompts', label: 'Task Prompts' },
-        { path: '/config/sorting-prompt', label: 'Sorting Prompt' },
-        { path: '/config/api-keys', label: 'API Keys' },
+        { path: '/config/inbound', label: t('nav.configInbound') },
+        { path: '/config/ai-models', label: t('nav.configAiModels') },
+        { path: '/config/task-prompts', label: t('nav.configTaskPrompts') },
+        { path: '/config/sorting-prompt', label: t('nav.configSortingPrompt') },
+        { path: '/config/api-keys', label: t('nav.configApiKeys') },
       ],
     })
   }
 
-  items.push({ path: '/statistics', label: 'Statistics', icon: ChartBarIcon })
+  items.push({ path: '/statistics', label: t('nav.statistics'), icon: ChartBarIcon })
 
   // Subscription - show for all users (different label based on level)
   // Admin users don't need this as they have unlimited access
   if (!authStore.isAdmin) {
-    const subscriptionLabel = authStore.isPro ? 'Subscription' : 'Upgrade'
+    const subscriptionLabel = authStore.isPro ? t('nav.subscription') : t('nav.upgrade')
     const isUpgradeStyle = !authStore.isPro
     items.push({
       path: '/subscription',
@@ -315,12 +317,12 @@ const navItems = computed<NavItem[]>(() => {
 
   // Admin panel - only for admins
   if (authStore.isAdmin) {
-    const adminChildren = [{ path: '/admin', label: 'Dashboard' }]
+    const adminChildren = [{ path: '/admin', label: t('nav.adminDashboard') }]
 
     // Feature Status in Admin (always available for admins)
     const featureStatusItem: { path: string; label: string; badge?: string } = {
       path: '/admin/features',
-      label: 'Feature Status',
+      label: t('nav.adminFeatureStatus'),
     }
     if (disabledFeaturesCount.value > 0) {
       featureStatusItem.badge = String(disabledFeaturesCount.value)
@@ -329,7 +331,7 @@ const navItems = computed<NavItem[]>(() => {
 
     items.push({
       path: '/admin',
-      label: 'Admin',
+      label: t('nav.admin'),
       icon: ShieldCheckIcon,
       children: adminChildren,
     })
