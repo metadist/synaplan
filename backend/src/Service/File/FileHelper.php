@@ -20,9 +20,17 @@ final class FileHelper
     public const DIR_PERMS = 0775;
 
     /**
-     * Write content to file with proper permissions.
-     *
-     * Uses atomic write (temp file + rename) when possible for safety.
+     * Default owner for uploaded files (www-data).
+     */
+    public const FILE_OWNER = 'www-data';
+
+    /**
+     * Default group for uploaded files (www-data).
+     */
+    public const FILE_GROUP = 'www-data';
+
+    /**
+     * Write content to file with proper permissions and ownership.
      *
      * @param string $path    Absolute path to file
      * @param string $content File content
@@ -34,15 +42,48 @@ final class FileHelper
         $result = file_put_contents($path, $content);
 
         if (false !== $result) {
-            // Set proper permissions (ignore errors - might be on a filesystem that doesn't support chmod)
-            @chmod($path, self::FILE_PERMS);
+            // Set proper permissions and ownership
+            self::setFilePermissions($path);
         }
 
         return $result;
     }
 
     /**
-     * Create directory with proper permissions.
+     * Set proper permissions and ownership on a file.
+     *
+     * @param string $path Absolute path to file
+     */
+    public static function setFilePermissions(string $path): void
+    {
+        // Set permissions (ignore errors - might be on a filesystem that doesn't support chmod)
+        @chmod($path, self::FILE_PERMS);
+
+        // Set ownership to www-data if we're running as root
+        // This ensures files created in Docker containers are accessible
+        if (0 === posix_getuid()) {
+            @chown($path, self::FILE_OWNER);
+            @chgrp($path, self::FILE_GROUP);
+        }
+    }
+
+    /**
+     * Set proper permissions and ownership on a directory.
+     *
+     * @param string $path Absolute path to directory
+     */
+    public static function setDirectoryPermissions(string $path): void
+    {
+        @chmod($path, self::DIR_PERMS);
+
+        if (0 === posix_getuid()) {
+            @chown($path, self::FILE_OWNER);
+            @chgrp($path, self::FILE_GROUP);
+        }
+    }
+
+    /**
+     * Create directory with proper permissions and ownership.
      *
      * @param string $path      Directory path to create
      * @param bool   $recursive Create parent directories if needed
@@ -58,8 +99,8 @@ final class FileHelper
         $result = @mkdir($path, self::DIR_PERMS, $recursive);
 
         if ($result) {
-            // Ensure permissions are set (mkdir's mode is affected by umask)
-            @chmod($path, self::DIR_PERMS);
+            // Ensure permissions and ownership are set
+            self::setDirectoryPermissions($path);
         }
 
         return $result || is_dir($path);
