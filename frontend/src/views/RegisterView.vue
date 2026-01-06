@@ -343,6 +343,9 @@
         </a>
       </p>
     </div>
+
+    <!-- GDPR Cookie Consent Banner -->
+    <CookieConsent @consent="handleCookieConsent" />
   </div>
 </template>
 
@@ -355,8 +358,10 @@ import { useTheme } from '../composables/useTheme'
 import { useAuth } from '../composables/useAuth'
 import { useRecaptcha } from '../composables/useRecaptcha'
 import { usePasswordValidation, validateEmail } from '../composables/usePasswordValidation'
-import { useGoogleTagAuto } from '../composables/useGoogleTag'
+import { useGoogleTag } from '../composables/useGoogleTag'
 import Button from '../components/Button.vue'
+import CookieConsent from '../components/CookieConsent.vue'
+import { type CookieConsent as CookieConsentType } from '../composables/useCookieConsent'
 import { useConfigStore } from '@/stores/config'
 
 const router = useRouter()
@@ -403,8 +408,15 @@ const passwordErrors = ref<string[]>([])
 const emailError = ref('')
 const registrationSuccess = ref(false)
 
-// Google Tag tracking (only injects if enabled and configured)
-useGoogleTagAuto()
+// Google Tag tracking (only injects if enabled, configured, AND user consented - GDPR)
+const { injectGoogleTag } = useGoogleTag()
+
+// Handle cookie consent - inject Google Tag only after user accepts
+const handleCookieConsent = (consent: CookieConsentType) => {
+  if (consent.analytics) {
+    injectGoogleTag()
+  }
+}
 
 // Social login providers
 interface SocialProvider {

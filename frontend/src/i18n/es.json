@@ -578,5 +578,33 @@
       "title": "Estadísticas de Uso",
       "description": "Rastrea tu uso de API en todos los canales y funciones"
     }
+  },
+  "cookies": {
+    "title": "Configuración de Cookies",
+    "description": "Usamos cookies para analizar el tráfico del sitio web y optimizar tu experiencia. Al aceptar, consientes las cookies de análisis.",
+    "privacyPolicy": "Política de Privacidad",
+    "acceptAll": "Aceptar Todo",
+    "rejectAll": "Solo Esenciales"
+  },
+  "shared": {
+    "title": "Chat Compartido",
+    "subtitle": "Conversación compartida vía Synaplan AI",
+    "trySynaplan": "Probar Synaplan",
+    "loading": "Cargando chat...",
+    "notFound": "Chat No Encontrado",
+    "notFoundDesc": "Este chat no existe o ya no se comparte públicamente.",
+    "visitSynaplan": "Visitar Synaplan",
+    "infoTitle": "Esta es una conversación compartida",
+    "infoDesc": "Este chat fue compartido públicamente y puede ser encontrado por motores de búsqueda como Google.",
+    "createOwn": "Crea tus propias conversaciones impulsadas por IA",
+    "user": "Usuario",
+    "assistant": "Synaplan AI",
+    "ctaTitle": "¿Quieres crear tus propias conversaciones de IA?",
+    "ctaDesc": "Synaplan AI te ayuda a construir chatbots inteligentes, automatizar flujos de trabajo y crear experiencias increíbles impulsadas por IA.",
+    "getStarted": "Comenzar Gratis",
+    "learnMore": "Más Información",
+    "poweredBy": "Desarrollado por",
+    "privacy": "Privacidad",
+    "terms": "Términos"
   }
 }

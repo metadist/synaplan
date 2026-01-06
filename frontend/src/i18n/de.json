@@ -1223,5 +1223,33 @@
     "recaptchaError": "reCAPTCHA-Verifizierung fehlgeschlagen. Bitte versuche es erneut.",
     "backToHomepage": "← Zurück zu www.synaplan.com",
     "hostingTermsNote": "Es gelten die Allgemeinen Geschäftsbedingungen der Hosting-Plattform."
+  },
+  "cookies": {
+    "title": "Cookie-Einstellungen",
+    "description": "Wir verwenden Cookies, um den Website-Traffic zu analysieren und Ihre Erfahrung zu optimieren. Durch Akzeptieren stimmen Sie Analytics-Cookies zu.",
+    "privacyPolicy": "Datenschutzerklärung",
+    "acceptAll": "Alle akzeptieren",
+    "rejectAll": "Nur essenzielle"
+  },
+  "shared": {
+    "title": "Geteilter Chat",
+    "subtitle": "Geteilte Unterhaltung via Synaplan AI",
+    "trySynaplan": "Synaplan testen",
+    "loading": "Chat wird geladen...",
+    "notFound": "Chat nicht gefunden",
+    "notFoundDesc": "Dieser Chat existiert nicht oder wird nicht mehr öffentlich geteilt.",
+    "visitSynaplan": "Synaplan besuchen",
+    "infoTitle": "Dies ist eine geteilte Unterhaltung",
+    "infoDesc": "Dieser Chat wurde öffentlich geteilt und kann von Suchmaschinen wie Google gefunden werden.",
+    "createOwn": "Erstelle deine eigenen KI-gestützten Unterhaltungen",
+    "user": "Benutzer",
+    "assistant": "Synaplan AI",
+    "ctaTitle": "Möchtest du eigene KI-Unterhaltungen erstellen?",
+    "ctaDesc": "Synaplan AI hilft dir, intelligente Chatbots zu erstellen, Workflows zu automatisieren und erstaunliche KI-gestützte Erlebnisse zu schaffen.",
+    "getStarted": "Kostenlos starten",
+    "learnMore": "Mehr erfahren",
+    "poweredBy": "Bereitgestellt von",
+    "privacy": "Datenschutz",
+    "terms": "AGB"
   }
 }

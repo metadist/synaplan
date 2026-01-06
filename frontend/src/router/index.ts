@@ -55,6 +55,16 @@ const router = createRouter({
       component: () => import('../components/auth/OAuthCallback.vue'),
       meta: { requiresAuth: false, public: true },
     },
+    // Shared chat with optional language parameter for SEO
+    // /shared/de/abc123 -> German UI
+    // /shared/en/abc123 -> English UI
+    // /shared/abc123 -> Default to English (backwards compatible)
+    {
+      path: '/shared/:lang([a-z]{2})/:token',
+      name: 'shared-chat-lang',
+      component: () => import('../views/SharedChatView.vue'),
+      meta: { requiresAuth: false, public: true },
+    },
     {
       path: '/shared/:token',
       name: 'shared-chat',

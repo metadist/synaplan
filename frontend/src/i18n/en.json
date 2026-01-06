@@ -1412,5 +1412,33 @@
       "set": "Set",
       "notSet": "Not Set"
     }
+  },
+  "cookies": {
+    "title": "Cookie Settings",
+    "description": "We use cookies to analyze website traffic and optimize your experience. By accepting, you consent to analytics cookies.",
+    "privacyPolicy": "Privacy Policy",
+    "acceptAll": "Accept All",
+    "rejectAll": "Essential Only"
+  },
+  "shared": {
+    "title": "Shared Chat",
+    "subtitle": "Shared conversation via Synaplan AI",
+    "trySynaplan": "Try Synaplan",
+    "loading": "Loading chat...",
+    "notFound": "Chat Not Found",
+    "notFoundDesc": "This chat doesn't exist or is no longer shared publicly.",
+    "visitSynaplan": "Visit Synaplan",
+    "infoTitle": "This is a shared conversation",
+    "infoDesc": "This chat was shared publicly and can be found by search engines like Google.",
+    "createOwn": "Create your own AI-powered conversations",
+    "user": "User",
+    "assistant": "Synaplan AI",
+    "ctaTitle": "Want to create your own AI conversations?",
+    "ctaDesc": "Synaplan AI helps you build intelligent chatbots, automate workflows, and create amazing AI-powered experiences.",
+    "getStarted": "Get Started Free",
+    "learnMore": "Learn More",
+    "poweredBy": "Powered by",
+    "privacy": "Privacy",
+    "terms": "Terms"
   }
 }

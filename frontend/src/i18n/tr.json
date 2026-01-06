@@ -578,5 +578,33 @@
       "title": "Kullanım İstatistikleri",
       "description": "Tüm kanal ve özelliklerdeki API kullanımınızı takip edin"
     }
+  },
+  "cookies": {
+    "title": "Çerez Ayarları",
+    "description": "Web sitesi trafiğini analiz etmek ve deneyiminizi optimize etmek için çerezler kullanıyoruz. Kabul ederek analitik çerezlerine onay vermiş olursunuz.",
+    "privacyPolicy": "Gizlilik Politikası",
+    "acceptAll": "Tümünü Kabul Et",
+    "rejectAll": "Yalnızca Gerekli"
+  },
+  "shared": {
+    "title": "Paylaşılan Sohbet",
+    "subtitle": "Synaplan AI ile paylaşılan sohbet",
+    "trySynaplan": "Synaplan'ı Dene",
+    "loading": "Sohbet yükleniyor...",
+    "notFound": "Sohbet Bulunamadı",
+    "notFoundDesc": "Bu sohbet mevcut değil veya artık herkese açık paylaşılmıyor.",
+    "visitSynaplan": "Synaplan'ı Ziyaret Et",
+    "infoTitle": "Bu paylaşılan bir sohbettir",
+    "infoDesc": "Bu sohbet herkese açık paylaşıldı ve Google gibi arama motorları tarafından bulunabilir.",
+    "createOwn": "Kendi AI destekli sohbetlerinizi oluşturun",
+    "user": "Kullanıcı",
+    "assistant": "Synaplan AI",
+    "ctaTitle": "Kendi AI sohbetlerinizi oluşturmak ister misiniz?",
+    "ctaDesc": "Synaplan AI, akıllı chatbotlar oluşturmanıza, iş akışlarını otomatikleştirmenize ve harika AI destekli deneyimler yaratmanıza yardımcı olur.",
+    "getStarted": "Ücretsiz Başla",
+    "learnMore": "Daha Fazla Bilgi",
+    "poweredBy": "Sunan",
+    "privacy": "Gizlilik",
+    "terms": "Şartlar"
   }
 }
