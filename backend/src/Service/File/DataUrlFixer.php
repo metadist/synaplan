@@ -115,17 +115,16 @@ final class DataUrlFixer
         $absolutePath = $this->uploadDir.'/'.$relativePath;
 
         // Create directory if not exists
-        $dir = dirname($absolutePath);
-        if (!is_dir($dir) && !mkdir($dir, 0755, true)) {
+        if (!FileHelper::ensureParentDirectory($absolutePath)) {
             $this->logger->error('DataUrlFixer: Failed to create upload directory', [
-                'dir' => $dir,
+                'dir' => dirname($absolutePath),
             ]);
 
             return null;
         }
 
-        // Save file
-        if (!file_put_contents($absolutePath, $content)) {
+        // Save file with proper permissions
+        if (!FileHelper::writeFile($absolutePath, $content)) {
             $this->logger->error('DataUrlFixer: Failed to write file', [
                 'path' => $absolutePath,
             ]);

@@ -8,6 +8,7 @@ use App\AI\Interface\ImageGenerationProviderInterface;
 use App\AI\Interface\TextToSpeechProviderInterface;
 use App\AI\Interface\VideoGenerationProviderInterface;
 use App\AI\Interface\VisionProviderInterface;
+use App\Service\File\FileHelper;
 use Psr\Log\LoggerInterface;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 
@@ -880,12 +881,12 @@ class GoogleProvider implements ChatProviderInterface, ImageGenerationProviderIn
                 default => 'wav',
             };
 
-            // Save to file (ensure upload directory exists and is writable)
+            // Save to file with proper permissions
             $this->ensureUploadDirectory();
             $filename = 'tts_'.uniqid().'.'.$extension;
             $outputPath = rtrim($this->uploadDir, '/\\').'/'.$filename;
 
-            $written = file_put_contents($outputPath, $audioData);
+            $written = FileHelper::writeFile($outputPath, $audioData);
             if (false === $written) {
                 throw new \Exception("Failed to write audio file to {$outputPath}");
             }
@@ -906,10 +907,8 @@ class GoogleProvider implements ChatProviderInterface, ImageGenerationProviderIn
 
     private function ensureUploadDirectory(): void
     {
-        if (!is_dir($this->uploadDir)) {
-            if (!@mkdir($concurrentDirectory = $this->uploadDir, 0775, true) && !is_dir($concurrentDirectory)) {
-                throw new \RuntimeException(sprintf('Unable to create upload directory: %s', $this->uploadDir));
-            }
+        if (!FileHelper::createDirectory($this->uploadDir)) {
+            throw new \RuntimeException(sprintf('Unable to create upload directory: %s', $this->uploadDir));
         }
 
         if (!is_writable($this->uploadDir)) {

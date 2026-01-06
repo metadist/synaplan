@@ -434,15 +434,14 @@ class MediaGenerationHandler implements MessageHandlerInterface
         $absolutePath = $this->uploadDir.'/'.$relativePath;
 
         // Create directory if not exists
-        $dir = dirname($absolutePath);
-        if (!is_dir($dir) && !mkdir($dir, 0755, true)) {
-            $this->logger->error('MediaGenerationHandler: Failed to create upload directory', ['dir' => $dir]);
+        if (!FileHelper::ensureParentDirectory($absolutePath)) {
+            $this->logger->error('MediaGenerationHandler: Failed to create upload directory', ['dir' => dirname($absolutePath)]);
 
             return null;
         }
 
-        // Save file
-        $bytesWritten = file_put_contents($absolutePath, $content);
+        // Save file with proper permissions
+        $bytesWritten = FileHelper::writeFile($absolutePath, $content);
 
         if (false === $bytesWritten) {
             $this->logger->error('MediaGenerationHandler: Failed to write file', ['path' => $absolutePath]);
@@ -528,13 +527,12 @@ class MediaGenerationHandler implements MessageHandlerInterface
             $absolutePath = $this->uploadDir.'/'.$relativePath;
 
             // Create directory if not exists
-            $dir = dirname($absolutePath);
-            if (!is_dir($dir) && !mkdir($dir, 0755, true)) {
-                throw new \Exception('Failed to create upload directory: '.$dir);
+            if (!FileHelper::ensureParentDirectory($absolutePath)) {
+                throw new \Exception('Failed to create upload directory: '.dirname($absolutePath));
             }
 
-            // Save to disk
-            $bytesWritten = file_put_contents($absolutePath, $content);
+            // Save to disk with proper permissions
+            $bytesWritten = FileHelper::writeFile($absolutePath, $content);
             if (false === $bytesWritten) {
                 throw new \Exception('Failed to save media to disk');
             }

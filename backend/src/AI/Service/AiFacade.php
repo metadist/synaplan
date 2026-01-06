@@ -4,6 +4,7 @@ namespace App\AI\Service;
 
 use App\AI\Exception\ProviderException;
 use App\Service\CircuitBreaker;
+use App\Service\File\FileHelper;
 use App\Service\File\UserUploadPathBuilder;
 use App\Service\ModelConfigService;
 use Psr\Log\LoggerInterface;
@@ -617,10 +618,9 @@ class AiFacade
         $targetPath = $this->uploadDir.'/'.$relativePath;
 
         // Create directory if not exists
-        $dir = dirname($targetPath);
-        if (!is_dir($dir) && !mkdir($dir, 0755, true)) {
+        if (!FileHelper::ensureParentDirectory($targetPath)) {
             $this->logger->error('AiFacade: Failed to create user directory for TTS', [
-                'dir' => $dir,
+                'dir' => dirname($targetPath),
                 'filename' => $filename,
             ]);
 
@@ -628,8 +628,8 @@ class AiFacade
             return $filename;
         }
 
-        // Move file
-        if (!rename($sourcePath, $targetPath)) {
+        // Move file and set permissions
+        if (!rename($sourcePath, $targetPath) || !@chmod($targetPath, FileHelper::FILE_PERMS)) {
             $this->logger->error('AiFacade: Failed to move TTS file to user path', [
                 'source' => $sourcePath,
                 'target' => $targetPath,
