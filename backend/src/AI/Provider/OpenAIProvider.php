@@ -9,6 +9,7 @@ use App\AI\Interface\ImageGenerationProviderInterface;
 use App\AI\Interface\SpeechToTextProviderInterface;
 use App\AI\Interface\TextToSpeechProviderInterface;
 use App\AI\Interface\VisionProviderInterface;
+use App\Service\File\FileHelper;
 use OpenAI;
 use Psr\Log\LoggerInterface;
 
@@ -791,11 +792,11 @@ class OpenAIProvider implements ChatProviderInterface, EmbeddingProviderInterfac
                 'speed' => $options['speed'] ?? 1.0,
             ]);
 
-            // Save to temporary file
+            // Save to temporary file with proper permissions
             $filename = 'tts_'.uniqid().'.mp3';
             $outputPath = $this->uploadDir.'/'.$filename;
 
-            if (!is_dir($this->uploadDir) && !mkdir($this->uploadDir, 0775, true) && !is_dir($this->uploadDir)) {
+            if (!FileHelper::createDirectory($this->uploadDir)) {
                 throw new \RuntimeException('Unable to create upload directory: '.$this->uploadDir);
             }
 
@@ -803,7 +804,7 @@ class OpenAIProvider implements ChatProviderInterface, EmbeddingProviderInterfac
                 throw new \RuntimeException('Upload directory is not writable: '.$this->uploadDir);
             }
 
-            file_put_contents($outputPath, $response);
+            FileHelper::writeFile($outputPath, $response);
 
             return $filename;
         } catch (\Exception $e) {

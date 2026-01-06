@@ -39,8 +39,10 @@ class StaticUploadController extends AbstractController
      * Access control:
      * - Owner can always access
      * - Public if chat is shared
+     *
+     * Supports HTTP Range requests for video/audio seeking.
      */
-    #[Route('/{path}', name: 'serve_static_upload', requirements: ['path' => '.+'], methods: ['GET'])]
+    #[Route('/{path}', name: 'serve_static_upload', requirements: ['path' => '.+'], methods: ['GET', 'HEAD'])]
     public function serve(
         string $path,
         #[CurrentUser] ?User $user,
@@ -73,7 +75,7 @@ class StaticUploadController extends AbstractController
             ]);
 
             // Skip message/permission check - serve directly
-            return $this->serveFile($path);
+            return $this->serveFile($path, $request);
         }
 
         // 1. For regular files: Find message by filePath (format: "/api/v1/files/uploads/{path}")
@@ -155,15 +157,18 @@ class StaticUploadController extends AbstractController
         }
 
         // 5. Serve the file
-        return $this->serveFile($path);
+        return $this->serveFile($path, $request);
     }
 
     /**
      * Serve file from disk with security checks.
      *
-     * @param string $path Relative path from uploads dir (can include subdirectories)
+     * Supports HTTP Range requests for video/audio seeking and resumable downloads.
+     *
+     * @param string  $path    Relative path from uploads dir (can include subdirectories)
+     * @param Request $request The HTTP request (for range header processing)
      */
-    private function serveFile(string $path): Response
+    private function serveFile(string $path, Request $request): Response
     {
         // Build absolute path with security checks
         $absolutePath = $this->uploadDir.'/'.$path;
@@ -202,8 +207,10 @@ class StaticUploadController extends AbstractController
             ? ResponseHeaderBag::DISPOSITION_INLINE
             : ResponseHeaderBag::DISPOSITION_ATTACHMENT;
 
+        // Create response and enable automatic ETag generation
         $response = new BinaryFileResponse($realPath);
         $response->setContentDisposition($disposition, $filename);
+        $response->setAutoEtag();
 
         // Set MIME type
         $mimeType = $this->getMimeType($extension);
@@ -214,19 +221,25 @@ class StaticUploadController extends AbstractController
         // Cache headers for better performance
         $response->setPublic();
         $response->setMaxAge(3600); // 1 hour
-        $response->headers->set('Cache-Control', 'public, max-age=3600');
 
         // Security headers
         $response->headers->set('X-Content-Type-Options', 'nosniff');
         $response->headers->set('Referrer-Policy', 'no-referrer');
 
-        // CORS headers for audio/video playback (already handled by Nelmio, but explicit for media)
-        $response->headers->set('Accept-Ranges', 'bytes');
+        // CRITICAL: Prepare response with request to enable Range request handling
+        // This is required for video/audio seeking to work properly
+        $response->prepare($request);
+
+        $fileSize = filesize($realPath);
+        $hasRangeHeader = $request->headers->has('Range');
 
         $this->logger->info('StaticUploadController: File served', [
             'path' => $path,
             'filename' => $filename,
             'mime_type' => $mimeType,
+            'file_size' => $fileSize,
+            'has_range' => $hasRangeHeader,
+            'status_code' => $response->getStatusCode(),
         ]);
 
         return $response;
