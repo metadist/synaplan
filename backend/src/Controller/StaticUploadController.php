@@ -49,18 +49,27 @@ class StaticUploadController extends AbstractController
         // Extract filename from path (last segment)
         $filename = basename($path);
 
-        // Check if this is a temporary AI-generated file (TTS, generated images, etc.)
+        // Check if this is an AI-generated file that should bypass strict auth
+        // Browser <audio> and <video> tags can't send Authorization headers,
+        // so we identify AI-generated files by their naming patterns:
+        // - tts_*, generated_*, ai_* (legacy patterns)
+        // - {messageId}_{provider}_{timestamp}.{ext} (media generation pattern, e.g., 3092_google_1767702325.mp4)
         $isTemporaryAiFile = preg_match('/^(tts_|generated_|ai_)/', $filename);
+        $isMediaGeneratedFile = preg_match('/^\d+_[a-z]+_\d+\.[a-z0-9]+$/i', $filename);
 
-        if ($isTemporaryAiFile) {
-            // For temporary AI-generated files: Allow access without strict auth
-            // These files are ephemeral (not stored in DB) and auto-deleted
-            // Browser <audio> and <video> tags can't send Authorization headers
+        if ($isTemporaryAiFile || $isMediaGeneratedFile) {
+            // For AI-generated files: Allow access without strict auth
+            // Security is provided by:
+            // 1. Files are in user-specific directories (path contains user ID hash)
+            // 2. Filenames include message ID, provider, and timestamp (hard to guess)
+            // 3. Files are ephemeral and can be cleaned up periodically
 
-            $this->logger->info('StaticUploadController: Serving temporary AI-generated file', [
+            $this->logger->info('StaticUploadController: Serving AI-generated file', [
                 'path' => $path,
+                'filename' => $filename,
+                'is_temporary' => $isTemporaryAiFile,
+                'is_media_generated' => $isMediaGeneratedFile,
                 'user_id' => $user?->getId(),
-                'has_auth' => null !== $user,
             ]);
 
             // Skip message/permission check - serve directly
