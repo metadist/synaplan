@@ -183,7 +183,8 @@ const isLoading = ref(false)
 const currentLanguage = computed(() => locale.value)
 
 const cycleLanguage = () => {
-  const languages = ['en', 'de', 'tr']
+  // Alphabetical order: DE, EN, ES, TR (EN is default)
+  const languages = ['de', 'en', 'es', 'tr']
   const currentIndex = languages.indexOf(locale.value)
   const nextIndex = (currentIndex + 1) % languages.length
   locale.value = languages[nextIndex]

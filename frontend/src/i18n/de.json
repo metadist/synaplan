@@ -91,6 +91,31 @@
     "featureStatus": "Feature-Status",
     "upgrade": "Upgrade"
   },
+  "nav": {
+    "chat": "Chat",
+    "tools": "Werkzeuge",
+    "toolsIntroduction": "Einführung",
+    "toolsChatWidget": "Chat-Widget",
+    "toolsDocSummary": "Dok-Zusammenfassung",
+    "toolsMailHandler": "E-Mail-Handler",
+    "plugins": "Plugins",
+    "files": "Dateien",
+    "filesAndRag": "Dateien & RAG",
+    "fileManager": "Dateimanager",
+    "semanticSearch": "Semantische Suche",
+    "aiConfig": "KI-Konfiguration",
+    "configInbound": "Eingehend",
+    "configAiModels": "KI-Modelle",
+    "configTaskPrompts": "Aufgaben-Prompts",
+    "configSortingPrompt": "Sortier-Prompt",
+    "configApiKeys": "API-Schlüssel",
+    "statistics": "Statistiken",
+    "subscription": "Abonnement",
+    "upgrade": "Upgrade",
+    "admin": "Admin",
+    "adminDashboard": "Dashboard",
+    "adminFeatureStatus": "Feature-Status"
+  },
   "chatInput": {
     "placeholder": "Schreibe deine Nachricht hier...",
     "model": "Modell",
@@ -1195,6 +1220,36 @@
     "registrationSuccessDesc": "Falls diese E-Mail-Adresse noch nicht registriert ist, haben wir dir eine Bestätigungs-E-Mail gesendet. Bitte überprüfe deinen Posteingang (auch den Spam-Ordner).",
     "passwordResetSuccess": "Anfrage gesendet!",
     "passwordResetSuccessDesc": "Falls ein Konto mit dieser E-Mail-Adresse existiert, haben wir dir einen Link zum Zurücksetzen des Passworts gesendet. Bitte überprüfe deinen Posteingang.",
-    "recaptchaError": "reCAPTCHA-Verifizierung fehlgeschlagen. Bitte versuche es erneut."
+    "recaptchaError": "reCAPTCHA-Verifizierung fehlgeschlagen. Bitte versuche es erneut.",
+    "backToHomepage": "← Zurück zu www.synaplan.com",
+    "hostingTermsNote": "Es gelten die Allgemeinen Geschäftsbedingungen der Hosting-Plattform."
+  },
+  "cookies": {
+    "title": "Cookie-Einstellungen",
+    "description": "Wir verwenden Cookies, um den Website-Traffic zu analysieren und Ihre Erfahrung zu optimieren. Durch Akzeptieren stimmen Sie Analytics-Cookies zu.",
+    "privacyPolicy": "Datenschutzerklärung",
+    "acceptAll": "Alle akzeptieren",
+    "rejectAll": "Nur essenzielle"
+  },
+  "shared": {
+    "title": "Geteilter Chat",
+    "subtitle": "Geteilte Unterhaltung via Synaplan AI",
+    "trySynaplan": "Synaplan testen",
+    "loading": "Chat wird geladen...",
+    "notFound": "Chat nicht gefunden",
+    "notFoundDesc": "Dieser Chat existiert nicht oder wird nicht mehr öffentlich geteilt.",
+    "visitSynaplan": "Synaplan besuchen",
+    "infoTitle": "Dies ist eine geteilte Unterhaltung",
+    "infoDesc": "Dieser Chat wurde öffentlich geteilt und kann von Suchmaschinen wie Google gefunden werden.",
+    "createOwn": "Erstelle deine eigenen KI-gestützten Unterhaltungen",
+    "user": "Benutzer",
+    "assistant": "Synaplan AI",
+    "ctaTitle": "Möchtest du eigene KI-Unterhaltungen erstellen?",
+    "ctaDesc": "Synaplan AI hilft dir, intelligente Chatbots zu erstellen, Workflows zu automatisieren und erstaunliche KI-gestützte Erlebnisse zu schaffen.",
+    "getStarted": "Kostenlos starten",
+    "learnMore": "Mehr erfahren",
+    "poweredBy": "Bereitgestellt von",
+    "privacy": "Datenschutz",
+    "terms": "AGB"
   }
 }

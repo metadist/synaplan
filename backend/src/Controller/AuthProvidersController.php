@@ -49,13 +49,15 @@ class AuthProvidersController extends AbstractController
             [
                 'id' => 'google',
                 'name' => 'Google',
-                'enabled' => !empty($this->googleClientId) && 'your-google-client-id' !== $this->googleClientId,
+                'enabled' => !empty($this->googleClientId)
+                            && !in_array($this->googleClientId, ['your-google-client-id', 'change-me', ''], true),
                 'icon' => 'google',
             ],
             [
                 'id' => 'github',
                 'name' => 'GitHub',
-                'enabled' => !empty($this->githubClientId) && 'your-github-client-id' !== $this->githubClientId,
+                'enabled' => !empty($this->githubClientId)
+                            && !in_array($this->githubClientId, ['your-github-client-id', 'change-me', ''], true),
                 'icon' => 'github',
             ],
             [
@@ -63,7 +65,7 @@ class AuthProvidersController extends AbstractController
                 'name' => 'Keycloak',
                 'enabled' => !empty($this->oidcClientId)
                             && !empty($this->oidcDiscoveryUrl)
-                            && 'your-oidc-client-id' !== $this->oidcClientId,
+                            && !in_array($this->oidcClientId, ['your-oidc-client-id', 'change-me', ''], true),
                 'icon' => 'key',
             ],
         ];

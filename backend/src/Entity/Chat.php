@@ -111,9 +111,14 @@ class Chat
         return $this;
     }
 
+    /**
+     * Generate a short, URL-friendly share token.
+     * Uses 12 random bytes = 24 hex characters (2^96 possibilities).
+     * Old tokens (64 chars) remain valid for backwards compatibility.
+     */
     public function generateShareToken(): self
     {
-        $this->shareToken = bin2hex(random_bytes(32));
+        $this->shareToken = bin2hex(random_bytes(12));
 
         return $this;
     }

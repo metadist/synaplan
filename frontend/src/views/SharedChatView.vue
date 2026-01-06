@@ -22,18 +22,35 @@
               />
             </svg>
             <div>
-              <h1 class="text-xl font-bold txt-primary">{{ chat?.title || 'Shared Chat' }}</h1>
-              <p class="text-sm txt-secondary">Shared conversation via Synaplan AI</p>
+              <h1 class="text-xl font-bold txt-primary">
+                {{ chat?.title || $t('shared.title') }}
+              </h1>
+              <p class="text-sm txt-secondary">{{ $t('shared.subtitle') }}</p>
             </div>
           </div>
-          <a
-            href="https://synaplan.com"
-            target="_blank"
-            class="btn-primary px-4 py-2 rounded-lg text-sm font-medium"
-            data-testid="btn-try-synaplan"
-          >
-            Try Synaplan
-          </a>
+          <div class="flex items-center gap-2">
+            <!-- Language Selector -->
+            <div class="relative">
+              <select
+                v-model="currentLang"
+                class="appearance-none px-3 py-2 rounded-lg surface-chip txt-primary text-sm font-medium cursor-pointer focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+                @change="switchLanguage"
+              >
+                <option value="de">DE</option>
+                <option value="en">EN</option>
+                <option value="es">ES</option>
+                <option value="tr">TR</option>
+              </select>
+            </div>
+            <a
+              href="https://synaplan.com"
+              target="_blank"
+              class="btn-primary px-4 py-2 rounded-lg text-sm font-medium"
+              data-testid="btn-try-synaplan"
+            >
+              {{ $t('shared.trySynaplan') }}
+            </a>
+          </div>
         </div>
       </div>
     </header>
@@ -44,7 +61,7 @@
         <div
           class="animate-spin rounded-full h-12 w-12 border-b-2 border-[var(--brand)] mx-auto mb-4"
         ></div>
-        <p class="txt-secondary">Loading chat...</p>
+        <p class="txt-secondary">{{ $t('shared.loading') }}</p>
       </div>
     </div>
 
@@ -64,10 +81,10 @@
             d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
           />
         </svg>
-        <h2 class="text-2xl font-bold txt-primary mb-2">Chat Not Found</h2>
-        <p class="txt-secondary mb-6">This chat doesn't exist or is no longer shared publicly.</p>
+        <h2 class="text-2xl font-bold txt-primary mb-2">{{ $t('shared.notFound') }}</h2>
+        <p class="txt-secondary mb-6">{{ $t('shared.notFoundDesc') }}</p>
         <a href="https://synaplan.com" class="btn-primary px-6 py-3 rounded-lg inline-block">
-          Visit Synaplan
+          {{ $t('shared.visitSynaplan') }}
         </a>
       </div>
     </div>
@@ -94,15 +111,15 @@
             />
           </svg>
           <div class="flex-1">
-            <h3 class="font-semibold txt-primary mb-1">This is a shared conversation</h3>
+            <h3 class="font-semibold txt-primary mb-1">{{ $t('shared.infoTitle') }}</h3>
             <p class="text-sm txt-secondary">
-              This chat was shared publicly and can be found by search engines like Google.
+              {{ $t('shared.infoDesc') }}
               <a
                 href="https://synaplan.com"
                 target="_blank"
                 class="text-[var(--brand)] hover:underline"
               >
-                Create your own AI-powered conversations
+                {{ $t('shared.createOwn') }}
               </a>
             </p>
           </div>
@@ -168,7 +185,7 @@
           >
             <div class="flex items-baseline justify-between mb-2">
               <span class="font-semibold txt-primary text-sm">
-                {{ message.direction === 'IN' ? 'User' : 'Synaplan AI' }}
+                {{ message.direction === 'IN' ? $t('shared.user') : $t('shared.assistant') }}
               </span>
               <span class="text-xs txt-secondary">
                 {{ formatDate(message.timestamp) }}
@@ -214,24 +231,23 @@
         class="mt-12 p-8 rounded-lg bg-gradient-to-r from-[var(--brand)]/10 to-purple-500/10 border border-[var(--brand)]/20 text-center"
       >
         <h3 class="text-2xl font-bold txt-primary mb-3">
-          Want to create your own AI conversations?
+          {{ $t('shared.ctaTitle') }}
         </h3>
         <p class="txt-secondary mb-6 max-w-2xl mx-auto">
-          Synaplan AI helps you build intelligent chatbots, automate workflows, and create amazing
-          AI-powered experiences.
+          {{ $t('shared.ctaDesc') }}
         </p>
         <div class="flex gap-4 justify-center">
           <a
             href="https://synaplan.com/register"
             class="btn-primary px-6 py-3 rounded-lg font-medium inline-block"
           >
-            Get Started Free
+            {{ $t('shared.getStarted') }}
           </a>
           <a
             href="https://synaplan.com"
             class="px-6 py-3 rounded-lg border border-light-border dark:border-dark-border hover-surface transition-colors font-medium inline-block"
           >
-            Learn More
+            {{ $t('shared.learnMore') }}
           </a>
         </div>
       </div>
@@ -241,7 +257,7 @@
     <footer class="mt-20 border-t border-light-border dark:border-dark-border py-8">
       <div class="max-w-4xl mx-auto px-4 text-center txt-secondary text-sm">
         <p>
-          Powered by
+          {{ $t('shared.poweredBy') }}
           <a
             href="https://synaplan.com"
             target="_blank"
@@ -250,25 +266,42 @@
             Synaplan AI
           </a>
           ·
-          <a href="https://synaplan.com/privacy" target="_blank" class="hover:underline">Privacy</a>
+          <a href="https://synaplan.com/privacy" target="_blank" class="hover:underline">{{
+            $t('shared.privacy')
+          }}</a>
           ·
-          <a href="https://synaplan.com/terms" target="_blank" class="hover:underline">Terms</a>
+          <a href="https://synaplan.com/terms" target="_blank" class="hover:underline">{{
+            $t('shared.terms')
+          }}</a>
         </p>
       </div>
     </footer>
+
+    <!-- GDPR Cookie Consent Banner -->
+    <CookieConsent @consent="handleCookieConsent" />
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import MessageImage from '../components/MessageImage.vue'
 import MessageVideo from '../components/MessageVideo.vue'
+import CookieConsent from '../components/CookieConsent.vue'
+import { type CookieConsent as CookieConsentType } from '../composables/useCookieConsent'
+import { useGoogleTag } from '../composables/useGoogleTag'
 import { httpClient } from '@/services/api/httpClient'
+import { supportedLanguages, type SupportedLanguage } from '@/i18n'
 
 const route = useRoute()
+const router = useRouter()
+const { locale, t } = useI18n()
+const { injectGoogleTag } = useGoogleTag()
+
 const loading = ref(true)
 const error = ref(false)
+const currentLang = ref<string>('en')
 
 interface Message {
   id: number
@@ -292,13 +325,51 @@ interface Chat {
 const chat = ref<Chat | null>(null)
 const messages = ref<Message[]>([])
 
+// Get token from route (works with both /shared/:token and /shared/:lang/:token)
+const token = computed(() => {
+  return (route.params.token as string) || ''
+})
+
+// Initialize language from URL parameter
+const initLanguage = () => {
+  const langParam = route.params.lang as string | undefined
+
+  if (langParam && supportedLanguages.includes(langParam as SupportedLanguage)) {
+    currentLang.value = langParam
+    locale.value = langParam
+  } else {
+    // Default to English for backwards compatibility
+    currentLang.value = 'en'
+    locale.value = 'en'
+  }
+}
+
+// Switch language and update URL
+const switchLanguage = () => {
+  locale.value = currentLang.value
+
+  // Update URL to include language
+  const newPath = `/shared/${currentLang.value}/${token.value}`
+  router.replace(newPath)
+
+  // Update meta tags
+  updateMetaTags()
+}
+
+// Handle cookie consent - inject Google Tag only after user accepts
+const handleCookieConsent = (consent: CookieConsentType) => {
+  if (consent.analytics) {
+    injectGoogleTag()
+  }
+}
+
 const pageTitle = computed(() => {
-  if (!chat.value) return 'Shared Chat | Synaplan AI'
-  return `${chat.value.title} | Shared Chat | Synaplan AI`
+  if (!chat.value) return `${t('shared.title')} | Synaplan AI`
+  return `${chat.value.title} | ${t('shared.title')} | Synaplan AI`
 })
 
 const pageDescription = computed(() => {
-  if (!messages.value.length) return 'A shared conversation powered by Synaplan AI'
+  if (!messages.value.length) return t('shared.subtitle')
   const firstMessage = messages.value.find((m) => m.direction === 'IN')?.text || ''
   return firstMessage.substring(0, 160) + (firstMessage.length > 160 ? '...' : '')
 })
@@ -307,7 +378,11 @@ const currentUrl = computed(() => {
   return window.location.href
 })
 
-// Update document title and meta tags
+const baseUrl = computed(() => {
+  return window.location.origin
+})
+
+// Update document title and meta tags including hreflang
 const updateMetaTags = () => {
   // Title
   document.title = pageTitle.value
@@ -321,6 +396,7 @@ const updateMetaTags = () => {
   updateOrCreateMeta('property', 'og:title', pageTitle.value)
   updateOrCreateMeta('property', 'og:description', pageDescription.value)
   updateOrCreateMeta('property', 'og:site_name', 'Synaplan AI')
+  updateOrCreateMeta('property', 'og:locale', currentLang.value)
 
   // Twitter
   updateOrCreateMeta('property', 'twitter:card', 'summary_large_image')
@@ -332,13 +408,39 @@ const updateMetaTags = () => {
   updateOrCreateMeta('name', 'robots', 'index, follow')
   updateOrCreateMeta('name', 'googlebot', 'index, follow')
 
-  // Canonical
-  updateOrCreateLink('canonical', currentUrl.value)
+  // Canonical - always point to language-specific URL
+  const canonicalUrl = `${baseUrl.value}/shared/${currentLang.value}/${token.value}`
+  updateOrCreateLink('canonical', canonicalUrl)
+
+  // hreflang tags for SEO - tell search engines about all language variants
+  updateHreflangTags()
 
   // JSON-LD Structured Data
   if (chat.value && messages.value.length > 0) {
     updateStructuredData()
   }
+}
+
+// Add hreflang tags for all supported languages
+const updateHreflangTags = () => {
+  // Remove existing hreflang tags
+  document.querySelectorAll('link[hreflang]').forEach((el) => el.remove())
+
+  // Add hreflang for each supported language
+  supportedLanguages.forEach((lang) => {
+    const link = document.createElement('link')
+    link.rel = 'alternate'
+    link.hreflang = lang
+    link.href = `${baseUrl.value}/shared/${lang}/${token.value}`
+    document.head.appendChild(link)
+  })
+
+  // Add x-default (points to English)
+  const defaultLink = document.createElement('link')
+  defaultLink.rel = 'alternate'
+  defaultLink.hreflang = 'x-default'
+  defaultLink.href = `${baseUrl.value}/shared/en/${token.value}`
+  document.head.appendChild(defaultLink)
 }
 
 const updateOrCreateMeta = (attr: string, key: string, content: string) => {
@@ -375,6 +477,7 @@ const updateStructuredData = () => {
     name: chat.value?.title,
     description: pageDescription.value,
     datePublished: chat.value?.createdAt,
+    inLanguage: currentLang.value,
     author: {
       '@type': 'Organization',
       name: 'Synaplan AI',
@@ -384,22 +487,24 @@ const updateStructuredData = () => {
 }
 
 // Watch for changes and update meta tags
-watch([chat, messages, pageTitle, pageDescription], () => {
+watch([chat, messages, pageTitle, pageDescription, currentLang], () => {
   if (chat.value) {
     updateMetaTags()
   }
 })
 
 onMounted(async () => {
-  const token = route.params.token as string
-  if (!token) {
+  // Initialize language from URL
+  initLanguage()
+
+  if (!token.value) {
     error.value = true
     loading.value = false
     return
   }
 
   try {
-    const data = await httpClient<any>(`/api/v1/chats/shared/${token}`, {
+    const data = await httpClient<any>(`/api/v1/chats/shared/${token.value}`, {
       skipAuth: true,
     })
 
@@ -418,7 +523,7 @@ onMounted(async () => {
 })
 
 const formatDate = (timestamp: number): string => {
-  return new Date(timestamp * 1000).toLocaleString()
+  return new Date(timestamp * 1000).toLocaleString(currentLang.value)
 }
 
 const escapeHtml = (text: string): string => {

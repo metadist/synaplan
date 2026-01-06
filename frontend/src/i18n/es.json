@@ -1,0 +1,610 @@
+{
+  "welcome": "Bienvenido",
+  "chat": {
+    "title": "Chat",
+    "historyLog": "Historial",
+    "tools": "Herramientas",
+    "files": "Archivos y RAG",
+    "config": "Configuración de IA",
+    "statistics": "Estadísticas",
+    "notFound": "El chat ya no existe",
+    "notFoundDesc": "Este chat ha sido eliminado y ya no está disponible."
+  },
+  "admin": {
+    "title": "Panel de Administración",
+    "description": "Gestión y configuración del sistema",
+    "tabs": {
+      "overview": "Resumen",
+      "users": "Usuarios",
+      "prompts": "Prompts",
+      "usage": "Uso"
+    },
+    "overview": {
+      "totalUsers": "Usuarios Totales",
+      "recentUsers": "Usuarios Recientes"
+    },
+    "analytics": {
+      "registrations": "Registros de Usuarios",
+      "usageByAction": "Uso por Acción",
+      "period": {
+        "7d": "7 Días",
+        "30d": "30 Días",
+        "90d": "90 Días",
+        "1y": "1 Año",
+        "all": "Todo el Tiempo"
+      },
+      "groupBy": {
+        "day": "Día",
+        "week": "Semana",
+        "month": "Mes"
+      }
+    },
+    "users": {
+      "email": "Correo",
+      "level": "Nivel",
+      "type": "Tipo",
+      "provider": "Proveedor",
+      "created": "Creado",
+      "status": "Estado",
+      "actions": "Acciones",
+      "delete": "Eliminar usuario",
+      "currentUser": "(Tú)",
+      "verified": "Verificado",
+      "unverified": "No verificado",
+      "searchPlaceholder": "Buscar por correo...",
+      "noUsers": "No se encontraron usuarios",
+      "deleteConfirmTitle": "¿Eliminar Usuario?",
+      "deleteConfirmDesc": "¿Estás seguro de que deseas eliminar a {email}? Esta acción no se puede deshacer.",
+      "deleteConfirmCheckbox": "Sí, confirmo la eliminación de todos los datos del usuario (incluyendo chats, widgets, documentos)",
+      "userDeleted": "Usuario {email} eliminado correctamente",
+      "userDeleteFailed": "Error al eliminar usuario",
+      "levelUpdated": "Nivel de usuario actualizado a {level}",
+      "levelUpdateFailed": "Error al actualizar nivel de usuario"
+    },
+    "prompts": {
+      "shortDesc": "Descripción Corta",
+      "prompt": "Prompt",
+      "selectionRules": "Reglas de Selección",
+      "selectionRulesPlaceholder": "Opcional: Reglas para la selección automática de este prompt"
+    },
+    "usage": {
+      "title": "Estadísticas de Uso",
+      "period": {
+        "day": "24 Horas",
+        "week": "7 Días",
+        "month": "30 Días",
+        "all": "Todo el Tiempo"
+      },
+      "totalRequests": "Solicitudes",
+      "totalTokens": "Tokens",
+      "totalCost": "Costo",
+      "avgLatency": "Latencia Prom.",
+      "byAction": "Por Acción",
+      "byProvider": "Por Proveedor",
+      "topModels": "Modelos Principales",
+      "topUsers": "Usuarios Principales",
+      "model": "Modelo",
+      "requests": "solicitudes",
+      "tokens": "tokens",
+      "cost": "Costo",
+      "activeSubscriptions": "Suscripciones Activas",
+      "subscriptionOverview": "Resumen de Suscripciones"
+    }
+  },
+  "sidebar": {
+    "featureStatus": "Estado de Funciones",
+    "upgrade": "Mejorar"
+  },
+  "nav": {
+    "chat": "Chat",
+    "tools": "Herramientas",
+    "toolsIntroduction": "Introducción",
+    "toolsChatWidget": "Widget de Chat",
+    "toolsDocSummary": "Resumen de Documentos",
+    "toolsMailHandler": "Gestor de Correo",
+    "plugins": "Plugins",
+    "files": "Archivos",
+    "filesAndRag": "Archivos & RAG",
+    "fileManager": "Gestor de Archivos",
+    "semanticSearch": "Búsqueda Semántica",
+    "aiConfig": "Configuración IA",
+    "configInbound": "Entrante",
+    "configAiModels": "Modelos IA",
+    "configTaskPrompts": "Prompts de Tareas",
+    "configSortingPrompt": "Prompt de Clasificación",
+    "configApiKeys": "Claves API",
+    "statistics": "Estadísticas",
+    "subscription": "Suscripción",
+    "upgrade": "Mejorar",
+    "admin": "Admin",
+    "adminDashboard": "Panel",
+    "adminFeatureStatus": "Estado de Funciones"
+  },
+  "chatInput": {
+    "placeholder": "Escribe tu mensaje...",
+    "provider": "Proveedor",
+    "model": "Modelo",
+    "configureModel": "Configurar Modelo de IA",
+    "attach": "Adjuntar",
+    "uploadFile": "Subir",
+    "deepResearch": "Investigación Profunda",
+    "docs": "Documentos",
+    "web": "Web",
+    "webSearch": "Buscar información actualizada en la web",
+    "enhance": "Mejorar",
+    "thinking": "Pensamiento",
+    "reasoningNotSupported": "Tu modelo de chat actual no soporta razonamiento. Por favor selecciona un modelo con capacidad de razonamiento (GPT-5, o3, DeepSeek-R1) en Configuración de IA → Modelos.",
+    "voice": "Iniciar voz",
+    "voiceRealtime": "Reconocimiento de voz en tiempo real (Web Speech API)",
+    "voiceWhisper": "Grabar y transcribir con Whisper",
+    "listeningStarted": "🎙️ Escuchando... habla ahora",
+    "recordingStarted": "🎙️ Grabación iniciada...",
+    "speechError": "Error de reconocimiento de voz: {error}",
+    "recordingError": "Error de grabación: {error}",
+    "transcribed": "🎙️ Transcrito{language}: \"{preview}\"",
+    "noSpeechDetected": "⚠️ No se detectó voz en la grabación",
+    "transcriptionFailed": "Error de transcripción: {error}",
+    "dropFiles": "Suelta los archivos aquí",
+    "dropFilesHint": "Imágenes, documentos, archivos de audio...",
+    "filesPasted": "{count} archivo pegado | {count} archivos pegados",
+    "send": "Enviar mensaje",
+    "share": "Compartir",
+    "tools": {
+      "label": "Herramientas",
+      "webSearch": "Búsqueda Web",
+      "webSearchDesc": "Buscar en internet",
+      "imageGen": "Generación de Imágenes",
+      "imageGenDesc": "Crear imágenes desde texto",
+      "videoGen": "Generación de Video",
+      "videoGenDesc": "Generar videos desde texto"
+    },
+    "removeTool": "Quitar herramienta"
+  },
+  "chatMessage": {
+    "again": "Otra vez",
+    "againWith": "Otra vez con",
+    "regenerateWith": "Regenerar con"
+  },
+  "commands": {
+    "noResults": "No se encontraron comandos",
+    "availableCommands": "Comandos Disponibles",
+    "navigate": "navegar",
+    "select": "seleccionar",
+    "close": "cerrar",
+    "videoNotSupported": "Tu navegador no soporta la etiqueta de video.",
+    "copyCode": "Copiar código",
+    "copy": "Copiar",
+    "copied": "¡Copiado!",
+    "original": "Original",
+    "translatedTo": "Traducido a",
+    "loginLinkGenerated": "Enlace de inicio de sesión generado",
+    "expiresAt": "Expira en"
+  },
+  "statistics": {
+    "title": "¡Bienvenido a Synaplan!",
+    "messageStats": "Estadísticas de Mensajes",
+    "totalMessages": "Mensajes Totales",
+    "messagesSent": "Mensajes Enviados",
+    "messagesReceived": "Mensajes Recibidos",
+    "totalFiles": "Archivos Totales",
+    "filesSent": "Archivos Enviados",
+    "filesReceived": "Archivos Recibidos",
+    "latestFiles": "Archivos Recientes",
+    "received": "Recibido",
+    "sent": "Enviado"
+  },
+  "plugins": {
+    "title": "Plugins",
+    "description": "Funcionalidad extendida para tu flujo de trabajo",
+    "notFound": "Plugin no encontrado o no habilitado para tu cuenta"
+  },
+  "tools": {
+    "title": "Herramientas Disponibles",
+    "description": "Explora y usa herramientas poderosas para mejorar tu flujo de trabajo",
+    "category": "Categoría",
+    "commands": "Comandos",
+    "noCommands": "No hay comandos disponibles",
+    "searchCommands": "Buscar comandos...",
+    "noCommandsFound": "No hay comandos que coincidan con tu búsqueda"
+  },
+  "help": {
+    "title": "Ayuda",
+    "openHelp": "Abrir ayuda",
+    "close": "Cerrar",
+    "gotIt": "¡Entendido!",
+    "noContent": "No hay ayuda disponible para esta página"
+  },
+  "common": {
+    "ok": "OK",
+    "cancel": "Cancelar",
+    "delete": "Eliminar",
+    "save": "Guardar",
+    "close": "Cerrar",
+    "copy": "Copiar",
+    "copied": "¡Copiado!",
+    "sending": "Enviando...",
+    "yes": "Sí",
+    "no": "No",
+    "active": "Activo",
+    "inactive": "Inactivo",
+    "back": "Atrás",
+    "next": "Siguiente",
+    "create": "Crear",
+    "creating": "Creando...",
+    "loading": "Cargando...",
+    "now": "Ahora",
+    "justNow": "Justo ahora",
+    "minutesAgo": "hace {count} minuto | hace {count} minutos",
+    "hoursAgo": "hace {count} hora | hace {count} horas",
+    "previous": "Anterior",
+    "error": "Error",
+    "success": "Éxito",
+    "leave": "Salir",
+    "stay": "Quedarse",
+    "retry": "Reintentar"
+  },
+  "search": {
+    "sources": "Fuentes",
+    "webResults": "Resultados de Búsqueda Web"
+  },
+  "auth": {
+    "login": "Iniciar Sesión",
+    "register": "Registrarse",
+    "email": "Correo Electrónico",
+    "emailPlaceholderPrefix": "tu",
+    "emailPlaceholderSuffix": "correo.com",
+    "password": "Contraseña",
+    "confirmPassword": "Confirmar Contraseña",
+    "passwordMismatch": "Las contraseñas no coinciden",
+    "fullName": "Nombre Completo",
+    "forgotPassword": "¿Olvidaste tu contraseña?",
+    "forgotPasswordDesc": "Ingresa tu dirección de correo electrónico y te enviaremos un enlace para restablecer tu contraseña.",
+    "noAccount": "¿No tienes cuenta?",
+    "hasAccount": "¿Ya tienes cuenta?",
+    "signIn": "Iniciar Sesión",
+    "signingIn": "Iniciando sesión...",
+    "signUp": "Registrarse",
+    "signingUp": "Creando cuenta...",
+    "orContinueWith": "O continuar con",
+    "google": "Google",
+    "github": "GitHub",
+    "facebook": "Facebook",
+    "termsAgree": "Al registrarte, aceptas nuestros",
+    "termsOfService": "Términos de Servicio",
+    "and": "y",
+    "privacyPolicy": "Política de Privacidad",
+    "sendResetLink": "Enviar Enlace de Restablecimiento",
+    "sending": "Enviando...",
+    "backToLogin": "Volver al Inicio de Sesión",
+    "emailSent": "¡Correo Enviado!",
+    "emailSentDesc": "Hemos enviado un enlace para restablecer tu contraseña a {email}. Por favor revisa tu bandeja de entrada.",
+    "resendEmail": "Reenviar Correo",
+    "resendIn": "Reenviar en {seconds}s",
+    "verifyEmail": "Verifica tu Correo",
+    "verifyEmailDesc": "Hemos enviado un enlace de verificación a {email}. Por favor revisa tu bandeja de entrada y haz clic en el enlace para verificar tu correo electrónico.",
+    "checkSpam": "¿No recibiste el correo? Revisa tu carpeta de spam o intenta reenviar.",
+    "wrongEmail": "¿Correo incorrecto?",
+    "changeEmail": "Cambiar",
+    "emailVerified": "¡Correo Verificado!",
+    "emailVerifiedDesc": "Tu correo ha sido verificado correctamente. Ahora puedes acceder a todas las funciones de tu cuenta.",
+    "continueToApp": "Continuar al Inicio de Sesión",
+    "redirectIn": "Redirigiendo en {seconds} segundos...",
+    "accountReady": "Tu cuenta está lista para usar",
+    "loginWithGoogle": "Iniciar sesión con Google",
+    "loginWithGitHub": "Iniciar sesión con GitHub",
+    "loginWithKeycloak": "Iniciar sesión con Keycloak",
+    "socialLoginError": "Error de inicio de sesión social. Por favor intenta de nuevo.",
+    "oauthCallbackProcessing": "Procesando inicio de sesión...",
+    "noSocialProviders": "No hay proveedores de inicio de sesión social configurados",
+    "registrationSuccess": "¡Registro Exitoso!",
+    "registrationSuccessDesc": "Si esta dirección de correo no está registrada, te hemos enviado un correo de verificación. Por favor revisa tu bandeja de entrada (incluyendo spam).",
+    "passwordResetSuccess": "¡Solicitud Enviada!",
+    "passwordResetSuccessDesc": "Si existe una cuenta con esta dirección de correo, te hemos enviado un enlace para restablecer tu contraseña. Por favor revisa tu bandeja de entrada.",
+    "recaptchaError": "Error de verificación reCAPTCHA. Por favor intenta de nuevo.",
+    "backToHomepage": "← Volver a www.synaplan.com",
+    "hostingTermsNote": "Aplican los términos y condiciones de la plataforma de hosting."
+  },
+  "unsavedChanges": {
+    "title": "Tienes cambios sin guardar",
+    "description": "Tus cambios se perderán si sales sin guardar. Presiona ESC para descartar.",
+    "save": "Guardar Cambios",
+    "saving": "Guardando...",
+    "discard": "Descartar",
+    "saved": "Cambios guardados correctamente",
+    "confirmLeave": "Tienes cambios sin guardar. ¿Estás seguro de que deseas salir?"
+  },
+  "widget": {
+    "title": "Soporte por Chat",
+    "subtitle": "Normalmente respondemos en minutos",
+    "placeholder": "Escribe tu mensaje...",
+    "send": "Enviar",
+    "attachFile": "Adjuntar archivo",
+    "limitWarning": "Acercándose al límite de mensajes",
+    "limitDetails": "Has enviado {current} de {max} mensajes",
+    "limitReached": "Límite de mensajes alcanzado",
+    "limitReachedDetails": "Has alcanzado el número máximo de mensajes para esta sesión. Por favor contáctanos directamente para más asistencia.",
+    "limitReachedPlaceholder": "Límite de mensajes alcanzado",
+    "fileTooLarge": "El tamaño del archivo excede el límite de {max}MB",
+    "fileUploadError": "Error al subir archivo",
+    "fileUploadLimitReached": "Límite de subida de archivos alcanzado para esta sesión.",
+    "fileUploadFailed": "Error al subir archivo. Por favor intenta de nuevo.",
+    "fileUploadDefaultMessage": "Por favor revisa el archivo adjunto.",
+    "sendFailed": "Lo siento, ocurrió un error. Por favor intenta de nuevo.",
+    "defaultAssistantReply": "¡Gracias por tu mensaje! Te responderé de inmediato."
+  },
+  "widgets": {
+    "title": "Widgets de Chat",
+    "subtitle": "Integra widgets de chat con IA en tu sitio web",
+    "createNew": "Crear Widget",
+    "createNewWidget": "Crear Nuevo Widget de Chat",
+    "createWidget": "Crear Widget",
+    "editWidget": "Editar Widget",
+    "emptyTitle": "Aún no hay widgets",
+    "emptyDescription": "Crea tu primer widget de chat para integrarlo en tu sitio web",
+    "createFirst": "Crear Primer Widget",
+    "active": "Activo",
+    "inactive": "Inactivo"
+  },
+  "profile": {
+    "title": "Configuración de Perfil",
+    "subtitle": "Administra tu información personal y configuración de cuenta",
+    "personalInfo": {
+      "title": "Información Personal",
+      "firstName": "Nombre",
+      "firstNamePlaceholder": "Tu nombre",
+      "lastName": "Apellido",
+      "lastNamePlaceholder": "Tu apellido",
+      "email": "Correo",
+      "emailHint": "Tu correo de inicio de sesión (no se puede cambiar)",
+      "phone": "Teléfono",
+      "phonePlaceholder": "Número de contacto opcional"
+    },
+    "companyInfo": {
+      "title": "Información de Empresa",
+      "subtitle": "Opcional - Deja vacío si eres una persona particular",
+      "companyName": "Nombre de Empresa",
+      "companyNamePlaceholder": "Tu Empresa S.A.",
+      "vatId": "NIF/CIF",
+      "vatIdPlaceholder": "Número de identificación fiscal"
+    },
+    "billingAddress": {
+      "title": "Dirección de Facturación",
+      "street": "Calle y Número",
+      "streetPlaceholder": "Nombre de calle y número",
+      "zipCode": "Código Postal",
+      "zipCodePlaceholder": "Código postal",
+      "city": "Ciudad",
+      "cityPlaceholder": "Nombre de ciudad",
+      "country": "País",
+      "countryHint": "Requerido para el cálculo correcto de impuestos"
+    },
+    "accountSettings": {
+      "title": "Configuración de Cuenta",
+      "language": "Idioma",
+      "languageHint": "Idioma de la interfaz",
+      "timezone": "Zona Horaria",
+      "timezoneHint": "Tu zona horaria local"
+    },
+    "changePassword": {
+      "title": "Cambiar Contraseña",
+      "subtitle": "Deja vacío para mantener la contraseña actual",
+      "currentPassword": "Contraseña Actual",
+      "currentPasswordPlaceholder": "Deja vacío para mantener la contraseña actual",
+      "newPassword": "Nueva Contraseña",
+      "newPasswordPlaceholder": "Ingresa nueva contraseña",
+      "newPasswordHint": "Mínimo 8 caracteres",
+      "confirmPassword": "Confirmar Contraseña",
+      "confirmPasswordPlaceholder": "Confirma nueva contraseña",
+      "confirmPasswordHint": "Debe coincidir con la nueva contraseña"
+    },
+    "dangerZone": {
+      "title": "Zona de Peligro",
+      "subtitle": "Acciones irreversibles",
+      "deleteAccount": "Eliminar Cuenta",
+      "deleteAccountDesc": "Elimina permanentemente tu cuenta. Esta acción no se puede deshacer.",
+      "deleteButton": "Eliminar Cuenta Permanentemente"
+    },
+    "saveChanges": "Guardar Cambios",
+    "cancel": "Cancelar"
+  },
+  "notFound": {
+    "title": "Página No Encontrada",
+    "description": "La página que buscas no existe o ha sido movida. Vamos a ponerte en el camino correcto.",
+    "goHome": "Ir al Inicio",
+    "goBack": "Volver",
+    "quickLinks": "Enlaces Rápidos",
+    "hint": "Si crees que esto es un error, por favor contacta al soporte."
+  },
+  "error": {
+    "title": "Algo Salió Mal",
+    "description": "Encontramos un error inesperado. No te preocupes, nuestro equipo ha sido notificado y está trabajando en ello.",
+    "details": "Detalles del Error",
+    "statusCode": "Código de Estado",
+    "showStack": "Mostrar traza de pila",
+    "hideStack": "Ocultar traza de pila",
+    "reload": "Recargar Página",
+    "goHome": "Ir al Inicio",
+    "needHelp": "¿Necesitas Ayuda?",
+    "contactSupport": "Si este problema persiste, por favor contacta a nuestro equipo de soporte con los detalles del error a continuación.",
+    "copyError": "Copiar Info del Error",
+    "copied": "¡Copiado!"
+  },
+  "loading": {
+    "default": "Cargando...",
+    "pleaseWait": "Por favor espera"
+  },
+  "processing": {
+    "started": "Iniciando procesamiento...",
+    "startedTitle": "Procesando tu mensaje",
+    "startedDesc": "Preparando para analizar tu solicitud",
+    "preprocessing": "Procesando archivos...",
+    "preprocessingTitle": "Procesando adjuntos",
+    "preprocessingDesc": "Extrayendo y analizando contenido de archivos",
+    "classifying": "Analizando mensaje...",
+    "classifyingTitle": "Entendiendo tu solicitud",
+    "classifyingDesc": "La IA está analizando la intención y el contenido",
+    "classified": "Detectado",
+    "classifiedTitle": "Análisis completado",
+    "searching": "Buscando en la web...",
+    "searchingTitle": "Búsqueda Web en Progreso",
+    "searchingDesc": "Buscando información actual",
+    "searchComplete": "Búsqueda completada",
+    "searchCompleteTitle": "Búsqueda Web Completada",
+    "searchCompleteDesc": "Información encontrada",
+    "results": "resultados",
+    "generating": "Generando respuesta...",
+    "generatingTitle": "Generando respuesta",
+    "generatingDesc": "La IA está elaborando tu respuesta",
+    "topic": "Tema",
+    "language": "Idioma",
+    "modelId": "ID de Modelo"
+  },
+  "message": {
+    "thinking": "Proceso de pensamiento",
+    "reasoning": "Razonamiento de IA",
+    "fileGenerated": "He creado el archivo '{filename}' para ti. Ahora puedes descargarlo.",
+    "fileGenerationFailed": "Hubo un problema al crear el archivo. Por favor intenta de nuevo.",
+    "cancelledByUser": "⚠️ Cancelado por el usuario"
+  },
+  "subscription": {
+    "serviceNotAvailable": "Servicio No Disponible",
+    "title": "Planes de Suscripción",
+    "subtitle": "Desbloquea más funciones y límites más altos",
+    "chooseYourPlan": "Elige Tu Plan",
+    "currentPlan": "Plan Actual",
+    "yourPlan": "Tu Plan",
+    "noActiveSubscription": "Sin suscripción activa",
+    "upgradePlan": "Mejorar Plan",
+    "managePlan": "Administrar Plan",
+    "cancelPlan": "Cancelar Suscripción",
+    "recommended": "Recomendado",
+    "selectPlan": "Seleccionar Plan",
+    "upgrade": "Mejorar",
+    "processing": "Procesando...",
+    "perMonth": "mes",
+    "perYear": "año"
+  },
+  "limitReached": {
+    "lifetime": {
+      "title": "Límite Gratuito Alcanzado",
+      "description": "Has usado todos los {limit} {action} de tu plan gratuito. ¡Mejora para continuar!"
+    },
+    "hourly": {
+      "title": "Límite Por Hora Alcanzado",
+      "description": "Has alcanzado tu límite por hora de {limit} {action}. Tu límite se restablecerá pronto."
+    },
+    "monthly": {
+      "title": "Límite Mensual Alcanzado",
+      "description": "Has usado todos los {limit} {action} este mes. ¡Mejora para obtener más!"
+    },
+    "upgradeNow": "Mejorar Ahora",
+    "verifyPhone": "Verificar Número de Teléfono"
+  },
+  "settings": {
+    "title": "Configuración",
+    "subtitle": "Administra tus preferencias y configuración",
+    "tabs": {
+      "general": "General",
+      "features": "Funciones"
+    },
+    "appMode": {
+      "title": "Modo de Aplicación",
+      "description": "Elige entre conjunto de funciones simplificado o completo",
+      "easy": "Modo Fácil",
+      "easyDesc": "Interfaz simplificada con funciones esenciales",
+      "advanced": "Modo Avanzado",
+      "advancedDesc": "Acceso completo a todas las funciones y herramientas"
+    },
+    "theme": {
+      "title": "Tema",
+      "description": "Elige tu esquema de colores",
+      "light": "Claro",
+      "dark": "Oscuro",
+      "system": "Sistema"
+    },
+    "account": {
+      "title": "Cuenta",
+      "email": "Correo",
+      "userLevel": "Nivel de Usuario"
+    },
+    "logout": "Cerrar Sesión",
+    "features": {
+      "title": "Estado del Sistema",
+      "subtitle": "Monitorea todos los servicios y funciones",
+      "loading": "Cargando funciones...",
+      "requiredConfig": "Configuración Requerida:",
+      "set": "Configurado",
+      "notSet": "No Configurado"
+    }
+  },
+  "storage": {
+    "title": "Cuota de Almacenamiento",
+    "plan": "Plan",
+    "remaining": "Restante",
+    "used": "Usado",
+    "limitReached": "¡Límite de almacenamiento alcanzado! Por favor elimina algunos archivos o mejora tu plan.",
+    "almostFull": "¡Almacenamiento casi lleno! Solo quedan {remaining}.",
+    "upgradePlan": "Mejorar Plan"
+  },
+  "files": {
+    "uploadTitle": "Subir Archivos RAG",
+    "yourFiles": "Tus Archivos",
+    "noFiles": "Aún no hay archivos subidos",
+    "delete": "Eliminar",
+    "download": "Descargar"
+  },
+  "config": {
+    "inbound": {
+      "title": "Entrante",
+      "description": "Puedes acceder a esta plataforma a través de diferentes canales."
+    },
+    "aiModels": {
+      "title": "Modelos de IA",
+      "description": "Configura y administra tus modelos de IA"
+    },
+    "taskPrompts": {
+      "title": "Gestión de Prompts",
+      "subtitle": "Administra y personaliza prompts de IA para diferentes tareas"
+    },
+    "apiKeys": {
+      "title": "Claves API",
+      "description": "Crea y administra claves API para acceder a la API."
+    },
+    "phoneVerification": {
+      "title": "Verificación de Teléfono",
+      "description": "Verifica tu número de teléfono para desbloquear todas las funciones y límites más altos vía WhatsApp."
+    },
+    "usage": {
+      "title": "Estadísticas de Uso",
+      "description": "Rastrea tu uso de API en todos los canales y funciones"
+    }
+  },
+  "cookies": {
+    "title": "Configuración de Cookies",
+    "description": "Usamos cookies para analizar el tráfico del sitio web y optimizar tu experiencia. Al aceptar, consientes las cookies de análisis.",
+    "privacyPolicy": "Política de Privacidad",
+    "acceptAll": "Aceptar Todo",
+    "rejectAll": "Solo Esenciales"
+  },
+  "shared": {
+    "title": "Chat Compartido",
+    "subtitle": "Conversación compartida vía Synaplan AI",
+    "trySynaplan": "Probar Synaplan",
+    "loading": "Cargando chat...",
+    "notFound": "Chat No Encontrado",
+    "notFoundDesc": "Este chat no existe o ya no se comparte públicamente.",
+    "visitSynaplan": "Visitar Synaplan",
+    "infoTitle": "Esta es una conversación compartida",
+    "infoDesc": "Este chat fue compartido públicamente y puede ser encontrado por motores de búsqueda como Google.",
+    "createOwn": "Crea tus propias conversaciones impulsadas por IA",
+    "user": "Usuario",
+    "assistant": "Synaplan AI",
+    "ctaTitle": "¿Quieres crear tus propias conversaciones de IA?",
+    "ctaDesc": "Synaplan AI te ayuda a construir chatbots inteligentes, automatizar flujos de trabajo y crear experiencias increíbles impulsadas por IA.",
+    "getStarted": "Comenzar Gratis",
+    "learnMore": "Más Información",
+    "poweredBy": "Desarrollado por",
+    "privacy": "Privacidad",
+    "terms": "Términos"
+  }
+}

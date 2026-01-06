@@ -95,6 +95,31 @@
     "featureStatus": "Feature Status",
     "upgrade": "Upgrade"
   },
+  "nav": {
+    "chat": "Chat",
+    "tools": "Tools",
+    "toolsIntroduction": "Introduction",
+    "toolsChatWidget": "Chat Widget",
+    "toolsDocSummary": "Doc Summary",
+    "toolsMailHandler": "Mail Handler",
+    "plugins": "Plugins",
+    "files": "Files",
+    "filesAndRag": "Files & RAG",
+    "fileManager": "File Manager",
+    "semanticSearch": "Semantic Search",
+    "aiConfig": "AI Config",
+    "configInbound": "Inbound",
+    "configAiModels": "AI Models",
+    "configTaskPrompts": "Task Prompts",
+    "configSortingPrompt": "Sorting Prompt",
+    "configApiKeys": "API Keys",
+    "statistics": "Statistics",
+    "subscription": "Subscription",
+    "upgrade": "Upgrade",
+    "admin": "Admin",
+    "adminDashboard": "Dashboard",
+    "adminFeatureStatus": "Feature Status"
+  },
   "chatInput": {
     "placeholder": "Type your message...",
     "provider": "Provider",
@@ -976,7 +1001,9 @@
     "registrationSuccessDesc": "If this email address is not already registered, we have sent you a verification email. Please check your inbox (including spam folder).",
     "passwordResetSuccess": "Request Sent!",
     "passwordResetSuccessDesc": "If an account with this email address exists, we have sent you a password reset link. Please check your inbox.",
-    "recaptchaError": "reCAPTCHA verification failed. Please try again."
+    "recaptchaError": "reCAPTCHA verification failed. Please try again.",
+    "backToHomepage": "← Back to www.synaplan.com",
+    "hostingTermsNote": "The terms and conditions of the hosting platform apply."
   },
   "unsavedChanges": {
     "title": "You have unsaved changes",
@@ -1385,5 +1412,33 @@
       "set": "Set",
       "notSet": "Not Set"
     }
+  },
+  "cookies": {
+    "title": "Cookie Settings",
+    "description": "We use cookies to analyze website traffic and optimize your experience. By accepting, you consent to analytics cookies.",
+    "privacyPolicy": "Privacy Policy",
+    "acceptAll": "Accept All",
+    "rejectAll": "Essential Only"
+  },
+  "shared": {
+    "title": "Shared Chat",
+    "subtitle": "Shared conversation via Synaplan AI",
+    "trySynaplan": "Try Synaplan",
+    "loading": "Loading chat...",
+    "notFound": "Chat Not Found",
+    "notFoundDesc": "This chat doesn't exist or is no longer shared publicly.",
+    "visitSynaplan": "Visit Synaplan",
+    "infoTitle": "This is a shared conversation",
+    "infoDesc": "This chat was shared publicly and can be found by search engines like Google.",
+    "createOwn": "Create your own AI-powered conversations",
+    "user": "User",
+    "assistant": "Synaplan AI",
+    "ctaTitle": "Want to create your own AI conversations?",
+    "ctaDesc": "Synaplan AI helps you build intelligent chatbots, automate workflows, and create amazing AI-powered experiences.",
+    "getStarted": "Get Started Free",
+    "learnMore": "Learn More",
+    "poweredBy": "Powered by",
+    "privacy": "Privacy",
+    "terms": "Terms"
   }
 }

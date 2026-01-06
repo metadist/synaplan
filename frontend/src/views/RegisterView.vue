@@ -304,6 +304,18 @@
             }}</a>
           </p>
 
+          <!-- Hosting platform terms note -->
+          <p class="mt-3 text-center text-xs text-gray-500 dark:text-gray-400 leading-relaxed">
+            {{ $t('auth.hostingTermsNote') }}
+            <a
+              href="https://www.synaplan.com"
+              class="hover:underline"
+              target="_blank"
+              rel="noopener noreferrer"
+              >www.synaplan.com</a
+            >
+          </p>
+
           <p class="mt-4 text-center text-sm txt-secondary">
             {{ $t('auth.hasAccount') }}
             <router-link
@@ -317,7 +329,23 @@
           </p>
         </template>
       </div>
+
+      <!-- Back to homepage link -->
+      <p class="mt-6 text-center text-xs text-gray-500 dark:text-gray-400">
+        <a
+          href="https://www.synaplan.com"
+          class="hover:underline"
+          target="_blank"
+          rel="noopener noreferrer"
+          data-testid="link-homepage"
+        >
+          {{ $t('auth.backToHomepage') }}
+        </a>
+      </p>
     </div>
+
+    <!-- GDPR Cookie Consent Banner -->
+    <CookieConsent @consent="handleCookieConsent" />
   </div>
 </template>
 
@@ -330,8 +358,10 @@ import { useTheme } from '../composables/useTheme'
 import { useAuth } from '../composables/useAuth'
 import { useRecaptcha } from '../composables/useRecaptcha'
 import { usePasswordValidation, validateEmail } from '../composables/usePasswordValidation'
-import { useGoogleTagAuto } from '../composables/useGoogleTag'
+import { useGoogleTag } from '../composables/useGoogleTag'
 import Button from '../components/Button.vue'
+import CookieConsent from '../components/CookieConsent.vue'
+import { type CookieConsent as CookieConsentType } from '../composables/useCookieConsent'
 import { useConfigStore } from '@/stores/config'
 
 const router = useRouter()
@@ -358,7 +388,8 @@ const confirmPassword = ref('')
 const currentLanguage = computed(() => locale.value)
 
 const cycleLanguage = () => {
-  const languages = ['en', 'de', 'tr']
+  // Alphabetical order: DE, EN, ES, TR (EN is default)
+  const languages = ['de', 'en', 'es', 'tr']
   const currentIndex = languages.indexOf(locale.value)
   const nextIndex = (currentIndex + 1) % languages.length
   locale.value = languages[nextIndex]
@@ -377,8 +408,15 @@ const passwordErrors = ref<string[]>([])
 const emailError = ref('')
 const registrationSuccess = ref(false)
 
-// Google Tag tracking (only injects if enabled and configured)
-useGoogleTagAuto()
+// Google Tag tracking (only injects if enabled, configured, AND user consented - GDPR)
+const { injectGoogleTag } = useGoogleTag()
+
+// Handle cookie consent - inject Google Tag only after user accepts
+const handleCookieConsent = (consent: CookieConsentType) => {
+  if (consent.analytics) {
+    injectGoogleTag()
+  }
+}
 
 // Social login providers
 interface SocialProvider {

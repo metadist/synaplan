@@ -97,8 +97,9 @@ const isLangOpen = ref(false)
 const langSelectorRef = ref<HTMLElement | null>(null)
 
 const languages = [
-  { value: 'en', label: 'EN' },
   { value: 'de', label: 'DE' },
+  { value: 'en', label: 'EN' },
+  { value: 'es', label: 'ES' },
   { value: 'tr', label: 'TR' },
 ]
 

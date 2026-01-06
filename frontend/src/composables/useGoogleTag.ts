@@ -1,9 +1,11 @@
 import { onMounted } from 'vue'
 import { useConfigStore } from '@/stores/config'
+import { hasAnalyticsConsent } from '@/composables/useCookieConsent'
 
 /**
  * Google Tag Manager / Google Analytics integration
- * Conditionally injects Google Tag script only if enabled and configured
+ * Conditionally injects Google Tag script only if enabled, configured, AND user has consented
+ * GDPR/DSGVO compliant: No tracking without explicit consent
  */
 export const useGoogleTag = () => {
   const config = useConfigStore()
@@ -27,8 +29,14 @@ export const useGoogleTag = () => {
   /**
    * Inject Google Tag script into document head
    * Supports both Google Tag Manager (GTM-XXXXXXX) and Google Analytics 4 (G-XXXXXXXXXX)
+   * GDPR: Only injects if user has given analytics consent
    */
   const injectGoogleTag = () => {
+    // GDPR: Check for cookie consent FIRST
+    if (!hasAnalyticsConsent()) {
+      return
+    }
+
     // Check if already injected
     if (
       document.getElementById('google-tag-manager') ||
