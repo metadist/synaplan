@@ -112,10 +112,29 @@ class SharedChatPageController extends AbstractController
      */
     private function generateTitle($chat, array $messages): string
     {
-        // Try to use first AI response as title
+        // First, try to use chat title if it's meaningful
+        $chatTitle = $chat->getTitle();
+        if ($chatTitle && 'New Chat' !== $chatTitle && 'New chat' !== $chatTitle) {
+            // Clean slash commands from chat title
+            $cleanTitle = $this->cleanSlashCommands($chatTitle);
+            if (!empty(trim($cleanTitle))) {
+                return trim($cleanTitle).' | Synaplan AI';
+            }
+        }
+
+        // Try to use first meaningful AI response as title
         foreach ($messages as $message) {
             if ('OUT' === $message->getDirection()) {
                 $text = strip_tags($message->getText());
+
+                // Skip media generation responses - extract the actual content
+                if (preg_match('/^Generated (?:image|video|audio):\s*(.+)$/i', $text, $matches)) {
+                    $text = $matches[1];
+                }
+
+                // Remove slash commands from the beginning
+                $text = $this->cleanSlashCommands($text);
+
                 // Get first sentence or first 60 chars
                 $firstSentence = preg_split('/[.!?]/', $text, 2)[0] ?? $text;
                 if (strlen($firstSentence) > 60) {
@@ -127,13 +146,15 @@ class SharedChatPageController extends AbstractController
             }
         }
 
-        // Fallback to chat title
-        $chatTitle = $chat->getTitle();
-        if ($chatTitle && 'New Chat' !== $chatTitle) {
-            return $chatTitle.' | Synaplan AI';
-        }
-
         return 'Shared Chat | Synaplan AI';
+    }
+
+    /**
+     * Remove slash commands from text.
+     */
+    private function cleanSlashCommands(string $text): string
+    {
+        return preg_replace('/^\/(?:pic|vid|audio|tts|image|video)\s*/i', '', $text);
     }
 
     /**
@@ -145,11 +166,17 @@ class SharedChatPageController extends AbstractController
         foreach ($messages as $message) {
             if ('IN' === $message->getDirection()) {
                 $text = strip_tags($message->getText());
+
+                // Remove slash commands from description
+                $text = $this->cleanSlashCommands($text);
+
                 if (strlen($text) > 160) {
                     return substr($text, 0, 157).'...';
                 }
 
-                return $text;
+                if (!empty(trim($text))) {
+                    return trim($text);
+                }
             }
         }
 
