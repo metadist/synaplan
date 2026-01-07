@@ -2,7 +2,7 @@
   <div
     :class="[isPreview ? 'absolute' : 'fixed', 'z-[9999]', positionClass]"
     data-testid="comp-chat-widget"
-    style="pointer-events: auto;"
+    style="pointer-events: auto"
   >
     <!-- Chat Button - absolute positioned to avoid layout shift -->
     <Transition

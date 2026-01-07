@@ -308,7 +308,9 @@ class SynaplanWidget {
         font-size: 16px !important;
         line-height: 1.5 !important;
         box-sizing: border-box !important;
-      `.replace(/\s+/g, ' ').trim()
+      `
+          .replace(/\s+/g, ' ')
+          .trim()
       )
 
       document.body.appendChild(this.container)
