@@ -98,7 +98,9 @@ async function getSseToken(): Promise<string | null> {
           }
 
           // Refresh succeeded but token fetch failed - auth issue
-          console.error('🔒 Token refresh succeeded but SSE token fetch failed - authentication expired')
+          console.error(
+            '🔒 Token refresh succeeded but SSE token fetch failed - authentication expired'
+          )
           throw new Error('Authentication required')
         } else {
           // Refresh failed - session expired
