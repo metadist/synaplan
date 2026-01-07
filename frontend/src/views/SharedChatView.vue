@@ -199,7 +199,7 @@
             </div>
             <div
               class="txt-primary whitespace-pre-wrap break-words overflow-wrap-anywhere"
-              style="overflow-wrap: anywhere; word-break: break-word;"
+              style="overflow-wrap: anywhere; word-break: break-word"
               v-html="formatMessageText(message.text)"
             ></div>
 
