@@ -659,38 +659,22 @@ const formatMessageText = (text: string): string => {
 }
 
 const formatInline = (text: string): string => {
-  // Preserve inline code first (URLs in code blocks should not become links)
-  const codeBlocks: string[] = []
-  let content = text.replace(/`([^`]+)`/g, (match) => {
-    const placeholder = `__INLINE_CODE_${codeBlocks.length}__`
-    codeBlocks.push(
-      `<code class="px-1 py-0.5 rounded bg-black/10 dark:bg-white/10 font-mono text-sm">${match.slice(1, -1)}</code>`
-    )
-    return placeholder
-  })
-
-  // Process markdown links first
-  content = content.replace(
-    /\[([^\]]+)\]\(([^)]+)\)/g,
-    '<a href="$2" target="_blank" rel="noopener noreferrer" class="text-blue-600 dark:text-blue-400 hover:underline break-all" style="overflow-wrap: anywhere; word-break: break-word;">$1</a>'
+  return (
+    text
+      // Links [text](url)
+      .replace(
+        /\[([^\]]+)\]\(([^)]+)\)/g,
+        '<a href="$2" target="_blank" rel="noopener noreferrer" class="text-blue-600 dark:text-blue-400 hover:underline" style="overflow-wrap: anywhere; word-break: break-word;">$1</a>'
+      )
+      // Inline code
+      .replace(
+        /`([^`]+)`/g,
+        '<code class="px-1 py-0.5 rounded bg-black/10 dark:bg-white/10 font-mono text-sm">$1</code>'
+      )
+      // Bold
+      .replace(/\*\*([^*]+)\*\*/g, '<strong class="font-semibold">$1</strong>')
+      // Italic
+      .replace(/\*([^*]+)\*/g, '<em class="italic">$1</em>')
   )
-
-  // Then process plain URLs (not already in <a> tags)
-  content = content.replace(
-    /(?<!href=["'])(https?:\/\/[^\s<>"]+)/g,
-    '<a href="$1" target="_blank" rel="noopener noreferrer" class="text-blue-600 dark:text-blue-400 hover:underline break-all" style="overflow-wrap: anywhere; word-break: break-word;">$1</a>'
-  )
-
-  // Format text styles
-  content = content
-    .replace(/\*\*([^*]+)\*\*/g, '<strong class="font-semibold">$1</strong>')
-    .replace(/\*([^*]+)\*/g, '<em class="italic">$1</em>')
-
-  // Restore inline code blocks
-  codeBlocks.forEach((block, index) => {
-    content = content.replace(`__INLINE_CODE_${index}__`, block)
-  })
-
-  return content
 }
 </script>
