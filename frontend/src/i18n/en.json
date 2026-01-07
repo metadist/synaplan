@@ -375,11 +375,6 @@
     "deleteFailed": "Failed to delete mail handler",
     "checkEvery": "Check every",
     "lastTested": "Last tested",
-    "status": {
-      "active": "Active",
-      "inactive": "Inactive",
-      "error": "Error"
-    },
     "mailServerPlaceholder": "mail.example.com",
     "portPlaceholder": "993",
     "emailAddressPlaceholder": "department at company.com",
@@ -1003,7 +998,11 @@
     "passwordResetSuccessDesc": "If an account with this email address exists, we have sent you a password reset link. Please check your inbox.",
     "recaptchaError": "reCAPTCHA verification failed. Please try again.",
     "backToHomepage": "← Back to www.synaplan.com",
-    "hostingTermsNote": "The terms and conditions of the hosting platform apply."
+    "hostingTermsNote": "The terms and conditions of the hosting platform apply.",
+    "sessionExpired": "Session Expired",
+    "sessionExpiredDesc": "Your session has expired. Please log in again to continue.",
+    "authenticationRequired": "Authentication required. Please log in to continue.",
+    "tokenRefreshFailed": "Failed to refresh your session. Please log in again."
   },
   "unsavedChanges": {
     "title": "You have unsaved changes",

@@ -138,6 +138,7 @@
 <script setup lang="ts">
 import { ref, computed, nextTick, watch, onMounted, onBeforeUnmount } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { useRouter } from 'vue-router'
 import { Icon } from '@iconify/vue'
 import MainLayout from '@/components/MainLayout.vue'
 import ChatInput from '@/components/ChatInput.vue'
@@ -157,6 +158,7 @@ import { normalizeMediaUrl } from '@/utils/urlHelper'
 import { httpClient } from '@/services/api/httpClient'
 
 const { t } = useI18n()
+const router = useRouter()
 const { showLimitModal, limitData, checkAndShowLimit, closeLimitModal } = useLimitCheck()
 const { error: showErrorToast } = useNotification()
 
@@ -1262,6 +1264,15 @@ async function saveCancelledMessageToBackend(
 // Handle "Again" with specific model from backend
 const handleAgain = async (backendMessageId: number, modelId?: number) => {
   console.log('🔄 Handle Again:', backendMessageId, modelId)
+
+  // Check authentication before attempting to resend
+  if (!authStore.isAuthenticated) {
+    console.error('❌ Not authenticated - redirecting to login')
+    const { error } = useNotification()
+    error(t('auth.sessionExpired'))
+    await router.push({ name: 'login', query: { reason: 'session_expired' } })
+    return
+  }
 
   // Find the original user message for this assistant response
   const assistantMessage = historyStore.messages.find(

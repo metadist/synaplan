@@ -50,6 +50,7 @@ async function refreshAccessToken(): Promise<boolean> {
 /**
  * Get access token for SSE (EventSource can't send cookies)
  * Handles 401 with automatic token refresh
+ * Throws error if authentication fails (triggers redirect to login)
  */
 async function getSseToken(): Promise<string | null> {
   // Return cached token if available
@@ -70,6 +71,7 @@ async function getSseToken(): Promise<string | null> {
 
       // Handle 401 - try to refresh access token first
       if (response.status === 401) {
+        console.log('🔄 SSE token fetch got 401 - attempting token refresh')
         const refreshSuccess = await refreshAccessToken()
 
         if (refreshSuccess) {
@@ -78,29 +80,35 @@ async function getSseToken(): Promise<string | null> {
             credentials: 'include',
           })
 
-          if (!retryResponse.ok) {
-            return null
+          if (retryResponse.ok) {
+            const data = await retryResponse.json()
+            cachedSseToken = data.token
+
+            // Clear any existing timer first
+            if (tokenExpiryTimer) {
+              clearTimeout(tokenExpiryTimer)
+            }
+            tokenExpiryTimer = setTimeout(() => {
+              cachedSseToken = null
+              tokenExpiryTimer = null
+            }, SSE_TOKEN_REFRESH_MS)
+
+            console.log('✅ SSE token refreshed successfully')
+            return cachedSseToken
           }
 
-          const data = await retryResponse.json()
-          cachedSseToken = data.token
-
-          // Clear any existing timer first
-          if (tokenExpiryTimer) {
-            clearTimeout(tokenExpiryTimer)
-          }
-          tokenExpiryTimer = setTimeout(() => {
-            cachedSseToken = null
-            tokenExpiryTimer = null
-          }, SSE_TOKEN_REFRESH_MS)
-
-          return cachedSseToken
+          // Refresh succeeded but token fetch failed - auth issue
+          console.error('🔒 Token refresh succeeded but SSE token fetch failed - authentication expired')
+          throw new Error('Authentication required')
         } else {
-          return null
+          // Refresh failed - session expired
+          console.error('🔒 Token refresh failed - session expired')
+          throw new Error('Authentication required')
         }
       }
 
       if (!response.ok) {
+        console.error('❌ SSE token fetch failed:', response.status)
         return null
       }
 
@@ -118,6 +126,11 @@ async function getSseToken(): Promise<string | null> {
 
       return cachedSseToken
     } catch (error) {
+      // If error is "Authentication required", redirect to login
+      if (error instanceof Error && error.message === 'Authentication required') {
+        // Trigger auth failure handling (redirect to login)
+        window.location.href = `/login?reason=session_expired`
+      }
       return null
     } finally {
       tokenFetchPromise = null
@@ -199,8 +212,12 @@ export const chatApi = {
 
         const token = await getSseToken()
         if (!token) {
-          console.error('🚫 No SSE token available')
-          onUpdate({ status: 'error', error: 'Authentication required' })
+          console.error('🚫 No SSE token available - authentication required')
+          onUpdate({
+            status: 'error',
+            error: 'Authentication required. Please log in again to continue.',
+            message: 'Your session has expired. Please refresh the page and log in again.',
+          })
           return
         }
 
