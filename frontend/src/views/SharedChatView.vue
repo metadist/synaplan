@@ -5,11 +5,13 @@
       class="sticky top-0 z-10 backdrop-blur-lg bg-surface/80 border-b border-light-border dark:border-dark-border"
       data-testid="section-header"
     >
-      <div class="max-w-4xl mx-auto px-4 py-4">
-        <div class="flex items-center justify-between">
-          <div class="flex items-center gap-3">
+      <div class="max-w-4xl mx-auto px-3 sm:px-4 py-3 sm:py-4">
+        <!-- Mobile: Two-row layout, Desktop: Single-row layout -->
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <!-- Logo & Title -->
+          <div class="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
             <svg
-              class="w-8 h-8 text-[var(--brand)]"
+              class="w-7 h-7 sm:w-8 sm:h-8 text-[var(--brand)] flex-shrink-0"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -21,14 +23,18 @@
                 d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
               />
             </svg>
-            <div>
-              <h1 class="text-xl font-bold txt-primary">
+            <div class="min-w-0 flex-1">
+              <h1 class="text-base sm:text-xl font-bold txt-primary truncate">
                 {{ chat?.title || $t('shared.title') }}
               </h1>
-              <p class="text-sm txt-secondary">{{ $t('shared.subtitle') }}</p>
+              <p class="text-xs sm:text-sm txt-secondary">
+                {{ $t('shared.subtitle') }}
+              </p>
             </div>
           </div>
-          <div class="flex items-center gap-2">
+
+          <!-- Actions - New row on mobile, same row on desktop -->
+          <div class="flex items-center gap-2 flex-shrink-0">
             <!-- Language Selector -->
             <div class="relative">
               <select
@@ -45,7 +51,7 @@
             <a
               href="https://synaplan.com"
               target="_blank"
-              class="btn-primary px-4 py-2 rounded-lg text-sm font-medium"
+              class="btn-primary px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap"
               data-testid="btn-try-synaplan"
             >
               {{ $t('shared.trySynaplan') }}
@@ -192,7 +198,8 @@
               </span>
             </div>
             <div
-              class="txt-primary whitespace-pre-wrap break-words"
+              class="txt-primary whitespace-pre-wrap break-words overflow-wrap-anywhere"
+              style="overflow-wrap: anywhere; word-break: break-word"
               v-html="formatMessageText(message.text)"
             ></div>
 
@@ -657,7 +664,7 @@ const formatInline = (text: string): string => {
       // Links [text](url)
       .replace(
         /\[([^\]]+)\]\(([^)]+)\)/g,
-        '<a href="$2" target="_blank" rel="noopener noreferrer" class="text-blue-600 dark:text-blue-400 hover:underline">$1</a>'
+        '<a href="$2" target="_blank" rel="noopener noreferrer" class="text-blue-600 dark:text-blue-400 hover:underline" style="overflow-wrap: anywhere; word-break: break-word;">$1</a>'
       )
       // Inline code
       .replace(
