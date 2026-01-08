@@ -628,8 +628,8 @@ class AiFacade
             return $filename;
         }
 
-        // Move file and set permissions
-        if (!rename($sourcePath, $targetPath) || !@chmod($targetPath, FileHelper::FILE_PERMS)) {
+        // Move file and set permissions/ownership
+        if (!rename($sourcePath, $targetPath)) {
             $this->logger->error('AiFacade: Failed to move TTS file to user path', [
                 'source' => $sourcePath,
                 'target' => $targetPath,
@@ -638,6 +638,9 @@ class AiFacade
             // Fall back to root path
             return $filename;
         }
+
+        // Set proper permissions and ownership on the moved file
+        FileHelper::setFilePermissions($targetPath);
 
         $this->logger->info('AiFacade: Moved TTS file to user path', [
             'filename' => $filename,

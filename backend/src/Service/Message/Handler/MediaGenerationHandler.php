@@ -5,6 +5,7 @@ namespace App\Service\Message\Handler;
 use App\AI\Service\AiFacade;
 use App\Entity\Message;
 use App\Service\File\FileHelper;
+use App\Service\File\ThumbnailService;
 use App\Service\File\UserUploadPathBuilder;
 use App\Service\Message\MediaPromptExtractor;
 use App\Service\ModelConfigService;
@@ -29,6 +30,7 @@ class MediaGenerationHandler implements MessageHandlerInterface
         private LoggerInterface $logger,
         private MediaPromptExtractor $promptExtractor,
         private UserUploadPathBuilder $userUploadPathBuilder,
+        private ThumbnailService $thumbnailService,
         private string $uploadDir = '/var/www/backend/var/uploads',
     ) {
     }
@@ -342,6 +344,19 @@ class MediaGenerationHandler implements MessageHandlerInterface
             // Build display URL for StaticUploadController
             $displayUrl = '/api/v1/files/uploads/'.$localPath;
 
+            // Generate thumbnail for video files
+            $thumbnailPath = null;
+            if ('video' === $mediaType) {
+                $this->notify($progressCallback, 'generating', 'Creating video thumbnail...');
+                $thumbnailPath = $this->thumbnailService->generateThumbnail($localPath);
+                if ($thumbnailPath) {
+                    $this->logger->info('MediaGenerationHandler: Video thumbnail generated', [
+                        'video' => $localPath,
+                        'thumbnail' => $thumbnailPath,
+                    ]);
+                }
+            }
+
             // Stream response with revised prompt
             $revisedPrompt = $media[0]['revised_prompt'] ?? $prompt;
             $responseText = "Generated {$mediaType}: {$revisedPrompt}";
@@ -358,6 +373,7 @@ class MediaGenerationHandler implements MessageHandlerInterface
                     'model_id' => $modelId,
                     'image_url' => $mediaUrl,
                     'local_path' => $localPath,
+                    'thumbnail_path' => $thumbnailPath,
                     'media_prompt' => $prompt,
                     'media_type' => $mediaType,
                     // StreamController expects this format for 'file' SSE event

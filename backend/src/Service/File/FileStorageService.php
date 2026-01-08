@@ -20,11 +20,13 @@ class FileStorageService
         'jpg', 'jpeg', 'png', 'gif', 'webp',
         'mp3', 'mp4', 'wav', 'ogg', 'm4a', 'webm',
     ];
+    private const VIDEO_EXTENSIONS = ['mp4', 'webm', 'mov', 'avi', 'mkv'];
 
     public function __construct(
         private string $uploadDir,
         private LoggerInterface $logger,
         private UserUploadPathBuilder $userUploadPathBuilder,
+        private ThumbnailService $thumbnailService,
     ) {
     }
 
@@ -225,7 +227,7 @@ class FileStorageService
     }
 
     /**
-     * Delete file.
+     * Delete file and its associated thumbnail (if any).
      */
     public function deleteFile(string $relativePath): bool
     {
@@ -233,6 +235,12 @@ class FileStorageService
 
         if (!is_file($absolutePath)) {
             return false;
+        }
+
+        // Delete associated thumbnail for video files
+        $extension = strtolower(pathinfo($relativePath, PATHINFO_EXTENSION));
+        if (in_array($extension, self::VIDEO_EXTENSIONS, true)) {
+            $this->thumbnailService->deleteThumbnail($relativePath);
         }
 
         return @unlink($absolutePath);

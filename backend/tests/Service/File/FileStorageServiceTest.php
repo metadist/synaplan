@@ -3,6 +3,7 @@
 namespace App\Tests\Service\File;
 
 use App\Service\File\FileStorageService;
+use App\Service\File\ThumbnailService;
 use App\Service\File\UserUploadPathBuilder;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
@@ -21,10 +22,12 @@ class FileStorageServiceTest extends TestCase
         mkdir($this->testUploadDir, 0755, true);
 
         $this->logger = $this->createMock(LoggerInterface::class);
+        $thumbnailService = new ThumbnailService($this->testUploadDir, $this->logger);
         $this->service = new FileStorageService(
             $this->testUploadDir,
             $this->logger,
-            new UserUploadPathBuilder()
+            new UserUploadPathBuilder(),
+            $thumbnailService
         );
     }
 

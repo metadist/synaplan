@@ -52,6 +52,6 @@ tests/test-results/
 tests/reports/
 tests/e2e/prompt_guide.md
 
-# Platform connfigs
+# Platform configs
 platform/
 _devextras/agents_yusuf.md
