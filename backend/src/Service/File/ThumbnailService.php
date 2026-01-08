@@ -36,7 +36,8 @@ final class ThumbnailService
     {
         $videoAbsolutePath = $this->uploadDir.'/'.ltrim($videoRelativePath, '/');
 
-        if (!is_file($videoAbsolutePath)) {
+        // Use NFS-aware file check for multi-server deployments
+        if (!FileHelper::fileExistsNfs($videoAbsolutePath)) {
             $this->logger->warning('ThumbnailService: Video file not found', [
                 'path' => $videoRelativePath,
             ]);
@@ -69,7 +70,8 @@ final class ThumbnailService
             }
         }
 
-        if (!$result || !is_file($thumbnailAbsolutePath)) {
+        // Use NFS-aware check - thumbnail was just created, might not be visible yet on other servers
+        if (!$result || !FileHelper::fileExistsNfs($thumbnailAbsolutePath)) {
             $this->logger->error('ThumbnailService: Failed to generate thumbnail', [
                 'video' => $videoRelativePath,
             ]);
@@ -112,6 +114,8 @@ final class ThumbnailService
     /**
      * Check if a thumbnail exists for a video file.
      *
+     * Uses NFS-aware file check for multi-server deployments.
+     *
      * @param string $videoRelativePath relative path to video
      *
      * @return bool true if thumbnail exists
@@ -121,7 +125,7 @@ final class ThumbnailService
         $thumbnailPath = $this->getThumbnailPath($videoRelativePath);
         $absolutePath = $this->uploadDir.'/'.ltrim($thumbnailPath, '/');
 
-        return is_file($absolutePath);
+        return FileHelper::fileExistsNfs($absolutePath);
     }
 
     /**
@@ -152,7 +156,8 @@ final class ThumbnailService
         $thumbnailPath = $this->getThumbnailPath($videoRelativePath);
         $absolutePath = $this->uploadDir.'/'.ltrim($thumbnailPath, '/');
 
-        if (!is_file($absolutePath)) {
+        // Use NFS-aware check for multi-server deployments
+        if (!FileHelper::fileExistsNfs($absolutePath)) {
             return true; // Already deleted or never existed
         }
 
