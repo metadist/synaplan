@@ -306,7 +306,12 @@ class SynaplanWidget {
       // Inject styles into Shadow DOM (not document.head!)
       const styleEl = document.createElement('style')
       styleEl.id = 'synaplan-widget-styles'
-      styleEl.textContent = widgetStyles.default
+      // Adapt global selectors (:root, body) for Shadow DOM context
+      // In Shadow DOM, :root and body don't exist - use :host instead
+      const adaptedCss = widgetStyles.default
+        .replace(/:root\b/g, ':host')
+        .replace(/\bbody\b/g, ':host')
+      styleEl.textContent = adaptedCss
       shadow.appendChild(styleEl)
 
       // Create root element inside Shadow DOM for Vue to mount to
