@@ -44,10 +44,45 @@ my-plugin/
 ### Installation Flow
 
 1. Admin places plugin in `/plugins/{pluginName}/`
-2. Admin enables plugin for a user via Admin UI
+2. Admin enables plugin for a user via Admin UI or CLI
 3. `PluginManager` creates symlinks in user's `plugins/` directory
 4. Migration runner applies `migrations/*.sql` for that user
 5. Plugin routes and UI become available to the user
+
+### CLI Commands
+
+**Install a plugin for a user:**
+```bash
+docker compose exec backend php bin/console app:plugin:install <userId> <pluginName>
+
+# Example:
+docker compose exec backend php bin/console app:plugin:install 1 my-awesome-plugin
+```
+
+**List available commands:**
+```bash
+docker compose exec backend php bin/console list app:plugin
+```
+
+### PluginManager Service
+
+The `PluginManager` service (`src/Service/Plugin/PluginManager.php`) provides the core API:
+
+| Method | Description |
+|--------|-------------|
+| `listAvailablePlugins()` | Lists all plugins in the central repository |
+| `listInstalledPlugins(int $userId)` | Lists plugins installed for a specific user |
+| `installPlugin(int $userId, string $pluginName)` | Installs/activates a plugin for a user |
+| `uninstallPlugin(int $userId, string $pluginName)` | Removes a plugin from a user |
+
+**What `installPlugin()` does:**
+1. Validates plugin exists in central repository with a `manifest.json`
+2. Creates the user's `plugins/` directory if needed
+3. Creates symlinks:
+   - `backend/` → central plugin's backend code
+   - `frontend/` → central plugin's frontend code
+   - `up/` → shortcut back to user's root directory
+4. Runs SQL migrations from the plugin's `migrations/` folder (with `:userId` and `:group` placeholders)
 
 ---
 

@@ -4,6 +4,7 @@ namespace App\Controller;
 
 use App\Entity\User;
 use App\Repository\MessageRepository;
+use App\Service\File\FileHelper;
 use Psr\Log\LoggerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
@@ -110,30 +111,21 @@ class FileServeController extends AbstractController
         }
 
         // 4. Build absolute path with path traversal protection
+        // Use NFS-aware path resolution to handle multi-server deployments with shared storage
         $absolutePath = $this->uploadDir.'/'.$path;
+        $validatedPath = FileHelper::resolvePathNfs($absolutePath, $this->uploadDir);
 
-        // Resolve to real path (prevents symlink attacks)
-        $realPath = realpath($absolutePath);
-        $realUploadDir = realpath($this->uploadDir);
-
-        // Security: Ensure file is within upload directory (no path traversal)
-        if (!$realPath || !$realUploadDir || 0 !== strpos($realPath, $realUploadDir)) {
-            $this->logger->error('Path traversal attempt detected', [
+        // Security: Ensure file is within upload directory and exists
+        if (false === $validatedPath) {
+            $this->logger->error('Invalid path or file not found', [
                 'path' => $path,
                 'absolute_path' => $absolutePath,
-                'real_path' => $realPath,
-                'upload_dir' => $realUploadDir,
+                'upload_dir' => $this->uploadDir,
             ]);
-            throw $this->createNotFoundException('Invalid file path');
+            throw $this->createNotFoundException('Invalid file path or file not found');
         }
 
-        if (!file_exists($realPath)) {
-            $this->logger->error('File not found on disk', [
-                'path' => $path,
-                'real_path' => $realPath,
-            ]);
-            throw $this->createNotFoundException('File not found on disk');
-        }
+        $realPath = $validatedPath;
 
         // 5. Determine content disposition (inline vs download)
         $extension = strtolower(pathinfo($path, PATHINFO_EXTENSION));
