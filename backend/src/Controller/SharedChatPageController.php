@@ -255,16 +255,57 @@ class SharedChatPageController extends AbstractController
         string $token,
         bool $isCrawler,
     ): Response {
+        // Try to load the built index.html from production build
+        $indexPath = '/var/www/frontend/index.html';
+        $html = '';
+
+        if (file_exists($indexPath)) {
+            // Production: Use built index.html with correct asset paths
+            $html = file_get_contents($indexPath);
+
+            // Replace the title
+            $html = preg_replace(
+                '/<title>.*?<\/title>/i',
+                '<title>'.$this->escape($title).'</title>',
+                $html
+            );
+
+            // Inject Open Graph and additional meta tags into <head>
+            $metaTags = $this->generateMetaTags($title, $description, $imageUrl, $canonicalUrl, $lang, $token);
+            $html = str_replace('</head>', $metaTags.'</head>', $html);
+        } else {
+            // Development fallback: Build HTML manually with dev paths
+            // This allows the controller to work in development without built assets
+            $html = $this->buildHtmlManually($title, $description, $imageUrl, $canonicalUrl, $lang, $token);
+        }
+
+        $response = new Response($html);
+        $response->headers->set('Content-Type', 'text/html; charset=UTF-8');
+
+        // Allow caching for crawlers
+        if ($isCrawler) {
+            $response->setPublic();
+            $response->setMaxAge(3600); // 1 hour
+        }
+
+        return $response;
+    }
+
+    /**
+     * Generate Open Graph and additional meta tags for injection.
+     */
+    private function generateMetaTags(
+        string $title,
+        string $description,
+        string $imageUrl,
+        string $canonicalUrl,
+        string $lang,
+        string $token,
+    ): string {
         // Determine if image is a video
         $isVideo = str_ends_with($imageUrl, '.mp4') || str_ends_with($imageUrl, '.webm');
 
-        $html = <<<HTML
-<!DOCTYPE html>
-<html lang="{$lang}">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{$this->escape($title)}</title>
+        $metaTags = <<<HTML
 
     <!-- Basic Meta Tags -->
     <meta name="description" content="{$this->escape($description)}">
@@ -281,7 +322,7 @@ class SharedChatPageController extends AbstractController
 HTML;
 
         if ($isVideo) {
-            $html .= <<<HTML
+            $metaTags .= <<<HTML
 
     <!-- Video Preview -->
     <meta property="og:video" content="{$this->escape($imageUrl)}">
@@ -289,7 +330,7 @@ HTML;
     <meta property="og:image" content="{$this->escape($this->synaplanUrl)}/apple-touch-icon.png">
 HTML;
         } else {
-            $html .= <<<HTML
+            $metaTags .= <<<HTML
 
     <!-- Image Preview -->
     <meta property="og:image" content="{$this->escape($imageUrl)}">
@@ -298,7 +339,7 @@ HTML;
 HTML;
         }
 
-        $html .= <<<HTML
+        $metaTags .= <<<HTML
 
     <!-- Twitter Card -->
     <meta name="twitter:card" content="summary_large_image">
@@ -307,16 +348,42 @@ HTML;
     <meta name="twitter:description" content="{$this->escape($description)}">
     <meta name="twitter:image" content="{$this->escape($isVideo ? $this->synaplanUrl.'/apple-touch-icon.png' : $imageUrl)}">
 
+    <!-- hreflang for SEO -->
+    <link rel="alternate" hreflang="en" href="{$this->escape($this->synaplanUrl)}/shared/en/{$this->escape($token)}">
+    <link rel="alternate" hreflang="de" href="{$this->escape($this->synaplanUrl)}/shared/de/{$this->escape($token)}">
+    <link rel="alternate" hreflang="x-default" href="{$this->escape($this->synaplanUrl)}/shared/en/{$this->escape($token)}">
+
+HTML;
+
+        return $metaTags;
+    }
+
+    /**
+     * Build HTML manually (for development when built index.html doesn't exist).
+     */
+    private function buildHtmlManually(
+        string $title,
+        string $description,
+        string $imageUrl,
+        string $canonicalUrl,
+        string $lang,
+        string $token,
+    ): string {
+        $metaTags = $this->generateMetaTags($title, $description, $imageUrl, $canonicalUrl, $lang, $token);
+
+        return <<<HTML
+<!DOCTYPE html>
+<html lang="{$lang}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{$this->escape($title)}</title>
+{$metaTags}
     <!-- Favicon -->
     <link rel="icon" type="image/svg+xml" href="/single_bird.svg">
     <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png">
     <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
     <meta name="theme-color" content="#0003c7">
-
-    <!-- hreflang for SEO -->
-    <link rel="alternate" hreflang="en" href="{$this->escape($this->synaplanUrl)}/shared/en/{$this->escape($token)}">
-    <link rel="alternate" hreflang="de" href="{$this->escape($this->synaplanUrl)}/shared/de/{$this->escape($token)}">
-    <link rel="alternate" hreflang="x-default" href="{$this->escape($this->synaplanUrl)}/shared/en/{$this->escape($token)}">
 </head>
 <body>
     <div id="app"></div>
@@ -329,17 +396,6 @@ HTML;
 </body>
 </html>
 HTML;
-
-        $response = new Response($html);
-        $response->headers->set('Content-Type', 'text/html; charset=UTF-8');
-
-        // Allow caching for crawlers
-        if ($isCrawler) {
-            $response->setPublic();
-            $response->setMaxAge(3600); // 1 hour
-        }
-
-        return $response;
     }
 
     /**
@@ -347,7 +403,30 @@ HTML;
      */
     private function render404(): Response
     {
-        $html = <<<'HTML'
+        $title = 'Chat Not Found | Synaplan AI';
+        $indexPath = '/var/www/frontend/index.html';
+        $html = '';
+
+        if (file_exists($indexPath)) {
+            // Production: Use built index.html
+            $html = file_get_contents($indexPath);
+
+            // Replace the title
+            $html = preg_replace(
+                '/<title>.*?<\/title>/i',
+                '<title>'.$this->escape($title).'</title>',
+                $html
+            );
+
+            // Add noindex meta tag
+            $html = str_replace(
+                '</head>',
+                '    <meta name="robots" content="noindex">'."\n".'</head>',
+                $html
+            );
+        } else {
+            // Development fallback: Build HTML manually
+            $html = <<<'HTML'
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -355,6 +434,10 @@ HTML;
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Chat Not Found | Synaplan AI</title>
     <meta name="robots" content="noindex">
+    <link rel="icon" type="image/svg+xml" href="/single_bird.svg">
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png">
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+    <meta name="theme-color" content="#0003c7">
 </head>
 <body>
     <div id="app"></div>
@@ -366,6 +449,7 @@ HTML;
 </body>
 </html>
 HTML;
+        }
 
         return new Response($html, Response::HTTP_NOT_FOUND, [
             'Content-Type' => 'text/html; charset=UTF-8',
