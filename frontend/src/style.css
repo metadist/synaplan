@@ -1,5 +1,162 @@
 @import 'tailwindcss';
 
+/* ============================================================================
+   WIDGET ISOLATION LAYER
+   Critical CSS reset for embedding the widget in foreign environments
+   (WordPress, custom sites, etc.)
+   ============================================================================ */
+
+/* Container isolation - prevents parent CSS from affecting the widget */
+#synaplan-widget-root {
+  all: initial !important;
+
+  /* Explicit defaults for widget container */
+  display: block !important;
+  position: fixed !important;
+  z-index: 2147483647 !important;
+  pointer-events: none !important;
+  inset: 0 !important;
+  font-family:
+    -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Helvetica Neue', Arial, sans-serif,
+    'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol' !important;
+  font-size: 16px !important;
+  line-height: 1.5 !important;
+  color: #000000 !important;
+  box-sizing: border-box !important;
+  -webkit-font-smoothing: antialiased !important;
+  -moz-osx-font-smoothing: grayscale !important;
+}
+
+/* Reset all children to prevent inheritance of parent page styles */
+#synaplan-widget-root *,
+#synaplan-widget-root *::before,
+#synaplan-widget-root *::after {
+  all: unset;
+  box-sizing: border-box;
+  font-family: inherit;
+  line-height: inherit;
+}
+
+/* Restore essential display properties */
+#synaplan-widget-root div {
+  display: block;
+}
+#synaplan-widget-root span {
+  display: inline;
+}
+#synaplan-widget-root button {
+  display: inline-flex;
+  cursor: pointer;
+  align-items: center;
+  justify-content: center;
+}
+#synaplan-widget-root input,
+#synaplan-widget-root textarea {
+  display: inline-block;
+  cursor: text;
+}
+#synaplan-widget-root svg {
+  display: inline-block;
+  fill: currentColor;
+}
+#synaplan-widget-root img {
+  display: inline-block;
+}
+#synaplan-widget-root a {
+  display: inline;
+  cursor: pointer;
+}
+#synaplan-widget-root p {
+  display: block;
+}
+#synaplan-widget-root ul,
+#synaplan-widget-root ol {
+  display: block;
+}
+#synaplan-widget-root li {
+  display: list-item;
+}
+#synaplan-widget-root h1,
+#synaplan-widget-root h2,
+#synaplan-widget-root h3,
+#synaplan-widget-root h4,
+#synaplan-widget-root h5,
+#synaplan-widget-root h6 {
+  display: block;
+  font-weight: bold;
+}
+#synaplan-widget-root pre,
+#synaplan-widget-root code {
+  display: block;
+  font-family:
+    ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace;
+}
+#synaplan-widget-root code {
+  display: inline;
+}
+
+/* Enable pointer events for interactive elements */
+#synaplan-widget-root button,
+#synaplan-widget-root input,
+#synaplan-widget-root textarea,
+#synaplan-widget-root a,
+#synaplan-widget-root select {
+  pointer-events: auto;
+}
+
+/* Enable pointer events for all widget components */
+#synaplan-widget-root [data-testid*='btn-'],
+#synaplan-widget-root [data-testid*='comp-'],
+#synaplan-widget-root [data-testid*='section-'],
+#synaplan-widget-root [data-testid*='input-'] {
+  pointer-events: auto;
+}
+
+/* Restore form element properties */
+#synaplan-widget-root input,
+#synaplan-widget-root textarea,
+#synaplan-widget-root select {
+  border: 1px solid transparent;
+  background: transparent;
+  padding: 0;
+  margin: 0;
+  font-size: inherit;
+  font-family: inherit;
+  line-height: inherit;
+  color: inherit;
+}
+
+/* Restore button properties */
+#synaplan-widget-root button {
+  border: none;
+  background: none;
+  padding: 0;
+  margin: 0;
+  font-size: inherit;
+  font-family: inherit;
+  line-height: inherit;
+  color: inherit;
+  text-align: center;
+}
+
+/* SVG properties */
+#synaplan-widget-root svg {
+  width: 1em;
+  height: 1em;
+  vertical-align: -0.125em;
+}
+
+/* Ensure transitions and animations work */
+#synaplan-widget-root * {
+  transition-property: none;
+  transition-duration: 0s;
+  animation-name: none;
+  animation-duration: 0s;
+}
+
+/* End of Widget Isolation Layer */
+/* ============================================================================ */
+
 /* Base */
 @layer base {
   body {

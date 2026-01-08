@@ -289,9 +289,30 @@ class SynaplanWidget {
         }
       }
 
-      // Create container
+      // Create container with CSS isolation
       this.container = document.createElement('div')
       this.container.id = 'synaplan-widget-root'
+
+      // Inline styles for guaranteed isolation (in addition to CSS reset)
+      // These critical styles ensure the widget works even if CSS loading fails
+      this.container.setAttribute(
+        'style',
+        `
+        all: initial !important;
+        position: fixed !important;
+        inset: 0 !important;
+        z-index: 2147483647 !important;
+        pointer-events: none !important;
+        display: block !important;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+        font-size: 16px !important;
+        line-height: 1.5 !important;
+        box-sizing: border-box !important;
+      `
+          .replace(/\s+/g, ' ')
+          .trim()
+      )
+
       document.body.appendChild(this.container)
 
       // Mount Vue app
