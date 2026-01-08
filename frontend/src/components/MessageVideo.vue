@@ -3,14 +3,41 @@
     <div
       class="relative w-full aspect-video surface-card overflow-hidden border border-light-border/30 dark:border-dark-border/20 group"
     >
+      <!-- Loading/Retry indicator -->
+      <div
+        v-if="isRetrying"
+        class="absolute inset-0 flex items-center justify-center bg-black/50 z-10"
+      >
+        <div class="text-white text-sm flex items-center gap-2">
+          <svg class="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
+            <circle
+              class="opacity-25"
+              cx="12"
+              cy="12"
+              r="10"
+              stroke="currentColor"
+              stroke-width="4"
+            ></circle>
+            <path
+              class="opacity-75"
+              fill="currentColor"
+              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+            ></path>
+          </svg>
+          {{ $t('common.loading') }}...
+        </div>
+      </div>
+
       <video
         ref="videoRef"
-        :src="url"
+        :src="videoSrc"
         :poster="poster"
         class="w-full h-full bg-black"
         preload="metadata"
         data-testid="media-video-player"
         @click="togglePlay"
+        @error="handleVideoError"
+        @loadedmetadata="handleLoadSuccess"
       >
         {{ $t('commands.videoNotSupported') }}
       </video>
@@ -98,14 +125,14 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 
 interface Props {
   url: string
   poster?: string
 }
 
-defineProps<Props>()
+const props = defineProps<Props>()
 
 const videoRef = ref<HTMLVideoElement | null>(null)
 const isPlaying = ref(false)
@@ -113,6 +140,49 @@ const isMuted = ref(false)
 const progress = ref(0)
 const currentTime = ref('0:00')
 const duration = ref('0:00')
+
+// NFS retry logic - newly created files may take a moment to propagate across servers
+const retryCount = ref(0)
+const maxRetries = 3
+const retryDelays = [1000, 2000, 3000] // Increasing delays: 1s, 2s, 3s
+const isRetrying = ref(false)
+const cacheBuster = ref(0)
+
+// Add cache buster to URL on retries to bypass browser cache
+const videoSrc = computed(() => {
+  if (cacheBuster.value === 0) {
+    return props.url
+  }
+  const separator = props.url.includes('?') ? '&' : '?'
+  return `${props.url}${separator}_retry=${cacheBuster.value}`
+})
+
+const handleVideoError = () => {
+  if (retryCount.value < maxRetries) {
+    isRetrying.value = true
+    const delay = retryDelays[retryCount.value]
+    console.log(
+      `Video load failed, retrying in ${delay}ms (attempt ${retryCount.value + 1}/${maxRetries})`
+    )
+
+    setTimeout(() => {
+      retryCount.value++
+      cacheBuster.value = Date.now()
+      // Force video to reload
+      if (videoRef.value) {
+        videoRef.value.load()
+      }
+    }, delay)
+  } else {
+    isRetrying.value = false
+    console.error('Video failed to load after all retries')
+  }
+}
+
+const handleLoadSuccess = () => {
+  isRetrying.value = false
+  updateDuration()
+}
 
 const formatTime = (seconds: number): string => {
   const mins = Math.floor(seconds / 60)
@@ -174,7 +244,6 @@ const seek = (e: MouseEvent) => {
 onMounted(() => {
   if (videoRef.value) {
     videoRef.value.addEventListener('timeupdate', updateProgress)
-    videoRef.value.addEventListener('loadedmetadata', updateDuration)
     videoRef.value.addEventListener('ended', () => {
       isPlaying.value = false
     })
@@ -184,7 +253,6 @@ onMounted(() => {
 onUnmounted(() => {
   if (videoRef.value) {
     videoRef.value.removeEventListener('timeupdate', updateProgress)
-    videoRef.value.removeEventListener('loadedmetadata', updateDuration)
   }
 })
 </script>

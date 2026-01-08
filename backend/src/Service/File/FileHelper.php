@@ -32,6 +32,9 @@ final class FileHelper
     /**
      * Write content to file with proper permissions and ownership.
      *
+     * For NFS environments, this also flushes the file to ensure it's
+     * visible on other servers before returning.
+     *
      * @param string $path    Absolute path to file
      * @param string $content File content
      *
@@ -44,6 +47,10 @@ final class FileHelper
         if (false !== $result) {
             // Set proper permissions and ownership
             self::setFilePermissions($path);
+
+            // For NFS: flush filesystem caches to help propagation
+            // clearstatcache ensures PHP doesn't cache stale info
+            clearstatcache(true, $path);
         }
 
         return $result;

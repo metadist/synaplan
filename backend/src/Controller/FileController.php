@@ -8,6 +8,7 @@ use App\Entity\User;
 use App\Repository\FileRepository;
 use App\Repository\MessageRepository;
 use App\Repository\RagDocumentRepository;
+use App\Service\File\FileHelper;
 use App\Service\File\FileProcessor;
 use App\Service\File\FileStorageService;
 use App\Service\File\VectorizationService;
@@ -341,7 +342,8 @@ class FileController extends AbstractController
 
         $absolutePath = $this->uploadDir.'/'.$filePath;
 
-        if (!file_exists($absolutePath)) {
+        // Use NFS-aware file check for multi-server deployments
+        if (!FileHelper::fileExistsNfs($absolutePath)) {
             $this->logger->error('FileController: File not found on disk', [
                 'file_id' => $id,
                 'path' => $absolutePath,
@@ -893,7 +895,8 @@ class FileController extends AbstractController
         if ('' === trim($extractedText)) {
             $absolutePath = rtrim($this->uploadDir, '/').'/'.ltrim($relativePath, '/');
 
-            if (!is_file($absolutePath)) {
+            // Use NFS-aware file check for multi-server deployments
+            if (!FileHelper::fileExistsNfs($absolutePath)) {
                 return $this->json([
                     'success' => false,
                     'error' => 'File not found on disk',
