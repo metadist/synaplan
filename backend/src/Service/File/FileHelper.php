@@ -185,6 +185,8 @@ final class FileHelper
      * This method forces a cache refresh by clearing PHP's stat cache and attempting
      * to directly open the file, which bypasses the NFS client's cached directory listing.
      *
+     * Note: This method is for FILES only (not directories). Symlinks to files are followed.
+     *
      * @param string $absolutePath Absolute path to the file
      *
      * @return bool True if file exists and is readable
@@ -195,7 +197,9 @@ final class FileHelper
         clearstatcache(true, $absolutePath);
 
         // First try the standard check (works if cache is fresh)
-        if (file_exists($absolutePath)) {
+        // Use is_file() instead of file_exists() for consistency - we only handle files,
+        // not directories. is_file() returns true for files and symlinks to files.
+        if (is_file($absolutePath)) {
             return true;
         }
 
