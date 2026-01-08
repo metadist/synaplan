@@ -176,4 +176,120 @@ final class FileHelper
 
         return $result;
     }
+
+    /**
+     * Check if a file exists, with NFS cache refresh.
+     *
+     * NFS clients cache directory listings and file attributes. When a file is created
+     * on one server, other servers may not see it immediately due to attribute caching.
+     * This method forces a cache refresh by clearing PHP's stat cache and attempting
+     * to directly open the file, which bypasses the NFS client's cached directory listing.
+     *
+     * Note: This method is for FILES only (not directories). Symlinks to files are followed.
+     *
+     * @param string $absolutePath Absolute path to the file
+     *
+     * @return bool True if file exists and is readable
+     */
+    public static function fileExistsNfs(string $absolutePath): bool
+    {
+        // Clear PHP's internal stat cache for this specific file
+        clearstatcache(true, $absolutePath);
+
+        // First try the standard check (works if cache is fresh)
+        // Use is_file() instead of file_exists() for consistency - we only handle files,
+        // not directories. is_file() returns true for files and symlinks to files.
+        if (is_file($absolutePath)) {
+            return true;
+        }
+
+        // NFS cache might be stale - try to open the file directly
+        // This forces NFS to check the server for the file's existence
+        // even if the directory listing is cached
+        $handle = @fopen($absolutePath, 'rb');
+        if (false !== $handle) {
+            fclose($handle);
+
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * Validate and resolve a file path safely for NFS environments.
+     *
+     * This replaces realpath() which relies on cached directory listings that
+     * may be stale on NFS. Instead, we manually validate the path components
+     * and check if the file exists using NFS-aware methods.
+     *
+     * @param string $absolutePath Absolute path to validate
+     * @param string $baseDir      Base directory the file must be within (security check)
+     *
+     * @return string|false Validated absolute path or false if invalid/not found
+     */
+    public static function resolvePathNfs(string $absolutePath, string $baseDir): string|false
+    {
+        // Normalize path separators and resolve . and ..
+        $normalizedPath = self::normalizePath($absolutePath);
+        $normalizedBase = self::normalizePath($baseDir);
+
+        // Security: Ensure path is within base directory
+        if (!str_starts_with($normalizedPath, $normalizedBase.'/') && $normalizedPath !== $normalizedBase) {
+            return false;
+        }
+
+        // Check if file exists (with NFS cache refresh)
+        if (!self::fileExistsNfs($normalizedPath)) {
+            return false;
+        }
+
+        return $normalizedPath;
+    }
+
+    /**
+     * Normalize a path by resolving . and .. components.
+     *
+     * Unlike realpath(), this doesn't require the file to exist and doesn't
+     * rely on NFS cached directory listings.
+     *
+     * @param string $path Path to normalize
+     *
+     * @return string Normalized path
+     */
+    public static function normalizePath(string $path): string
+    {
+        // Handle empty path
+        if ('' === $path) {
+            return '';
+        }
+
+        // Preserve leading slash for absolute paths
+        $isAbsolute = '/' === $path[0];
+
+        // Split path into components
+        $parts = explode('/', $path);
+        $normalized = [];
+
+        foreach ($parts as $part) {
+            if ('.' === $part || '' === $part) {
+                // Skip current directory and empty parts
+                continue;
+            }
+            if ('..' === $part) {
+                // Go up one directory (if possible)
+                if (count($normalized) > 0 && '..' !== end($normalized)) {
+                    array_pop($normalized);
+                } elseif (!$isAbsolute) {
+                    $normalized[] = '..';
+                }
+            } else {
+                $normalized[] = $part;
+            }
+        }
+
+        $result = implode('/', $normalized);
+
+        return $isAbsolute ? '/'.$result : $result;
+    }
 }

@@ -4,6 +4,7 @@ namespace App\Controller;
 
 use App\Entity\User;
 use App\Repository\MessageRepository;
+use App\Service\File\FileHelper;
 use Psr\Log\LoggerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
@@ -164,6 +165,7 @@ class StaticUploadController extends AbstractController
      * Serve file from disk with security checks.
      *
      * Supports HTTP Range requests for video/audio seeking and resumable downloads.
+     * Uses NFS-aware file checks to handle multi-server deployments with shared storage.
      *
      * @param string  $path    Relative path from uploads dir (can include subdirectories)
      * @param Request $request The HTTP request (for range header processing)
@@ -173,28 +175,21 @@ class StaticUploadController extends AbstractController
         // Build absolute path with security checks
         $absolutePath = $this->uploadDir.'/'.$path;
 
-        // Resolve to real path (prevents symlink attacks)
-        $realPath = realpath($absolutePath);
-        $realUploadDir = realpath($this->uploadDir);
+        // Use NFS-aware path resolution instead of realpath()
+        // This handles NFS attribute caching issues in multi-server deployments
+        $validatedPath = FileHelper::resolvePathNfs($absolutePath, $this->uploadDir);
 
-        // Security: Ensure file is within upload directory (no path traversal)
-        if (!$realPath || !$realUploadDir || 0 !== strpos($realPath, $realUploadDir)) {
-            $this->logger->error('StaticUploadController: Path traversal attempt', [
+        // Security: Ensure file is within upload directory and exists
+        if (false === $validatedPath) {
+            $this->logger->error('StaticUploadController: Invalid path or file not found', [
                 'path' => $path,
                 'absolute_path' => $absolutePath,
-                'real_path' => $realPath,
-                'upload_dir' => $realUploadDir,
+                'upload_dir' => $this->uploadDir,
             ]);
-            throw $this->createNotFoundException('Invalid file path');
+            throw $this->createNotFoundException('Invalid file path or file not found');
         }
 
-        if (!file_exists($realPath)) {
-            $this->logger->error('StaticUploadController: File not found on disk', [
-                'path' => $path,
-                'real_path' => $realPath,
-            ]);
-            throw $this->createNotFoundException('File not found on disk');
-        }
+        $realPath = $validatedPath;
 
         // Extract filename for response headers (last segment of path)
         $filename = basename($path);
