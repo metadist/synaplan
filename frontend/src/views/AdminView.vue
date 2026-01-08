@@ -10,7 +10,7 @@
         <p class="txt-secondary">{{ $t('admin.description') }}</p>
       </div>
 
-      <!-- Tabs -->
+      <!-- Tabs h -->
       <div class="flex gap-2 mb-6 border-b border-light-border/30 dark:border-dark-border/20">
         <button
           v-for="tab in tabs"
