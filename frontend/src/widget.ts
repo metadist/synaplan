@@ -270,14 +270,6 @@ class SynaplanWidget {
         import('./style.css?inline'),
       ])
 
-      // Inject styles
-      if (!document.getElementById('synaplan-widget-styles')) {
-        const styleEl = document.createElement('style')
-        styleEl.id = 'synaplan-widget-styles'
-        styleEl.textContent = widgetStyles.default
-        document.head.appendChild(styleEl)
-      }
-
       // In lazy mode: hide button but keep it for later
       // In eager mode: remove button completely
       if (this.button) {
@@ -289,25 +281,18 @@ class SynaplanWidget {
         }
       }
 
-      // Create container with CSS isolation
+      // Create container with Shadow DOM for 100% CSS isolation
       this.container = document.createElement('div')
-      this.container.id = 'synaplan-widget-root'
+      this.container.id = 'synaplan-widget-host'
 
-      // Inline styles for guaranteed isolation (in addition to CSS reset)
-      // These critical styles ensure the widget works even if CSS loading fails
+      // Set container styles (outside Shadow DOM)
       this.container.setAttribute(
         'style',
         `
-        all: initial !important;
         position: fixed !important;
         inset: 0 !important;
         z-index: 2147483647 !important;
         pointer-events: none !important;
-        display: block !important;
-        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
-        font-size: 16px !important;
-        line-height: 1.5 !important;
-        box-sizing: border-box !important;
       `
           .replace(/\s+/g, ' ')
           .trim()
@@ -315,7 +300,33 @@ class SynaplanWidget {
 
       document.body.appendChild(this.container)
 
-      // Mount Vue app
+      // Create Shadow DOM - provides 100% CSS isolation from parent page
+      const shadow = this.container.attachShadow({ mode: 'open' })
+
+      // Inject styles into Shadow DOM (not document.head!)
+      const styleEl = document.createElement('style')
+      styleEl.id = 'synaplan-widget-styles'
+      styleEl.textContent = widgetStyles.default
+      shadow.appendChild(styleEl)
+
+      // Create root element inside Shadow DOM for Vue to mount to
+      const root = document.createElement('div')
+      root.id = 'synaplan-widget-root'
+      root.setAttribute(
+        'style',
+        `
+        display: block;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        font-size: 16px;
+        line-height: 1.5;
+        box-sizing: border-box;
+      `
+          .replace(/\s+/g, ' ')
+          .trim()
+      )
+      shadow.appendChild(root)
+
+      // Mount Vue app into Shadow DOM root
       this.app = createApp(ChatWidget.default, {
         widgetId: this.config!.widgetId,
         position: this.config!.position,
@@ -336,7 +347,7 @@ class SynaplanWidget {
       })
 
       this.app.use(i18n)
-      this.app.mount(this.container)
+      this.app.mount(root)
 
       // In lazy mode: listen for close event to show button again
       if (this.config?.lazy && this.button) {
@@ -370,15 +381,18 @@ class SynaplanWidget {
   private async ensureVueLoaded(): Promise<void> {
     const vueUrl = this.config?.vueUrl
 
-    // null = skip Vue loading (already in page)
+    // null = skip Vue loading (Vue is either bundled or already in page)
     if (vueUrl === null) {
+      // Check if Vue is available as global (for legacy support)
       if (!(window as any).Vue) {
-        throw new Error('Vue.js not found. Set vueUrl or include Vue.js in your page.')
+        // Vue is not global, but that's okay - it might be bundled as ES module
+        // The dynamic import will handle it
+        console.debug('Vue.js not found as global, assuming ES module bundle')
       }
       return
     }
 
-    // Check if Vue is already loaded
+    // Check if Vue is already loaded globally
     if ((window as any).Vue) {
       return
     }
