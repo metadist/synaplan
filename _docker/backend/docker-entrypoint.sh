@@ -3,6 +3,13 @@ set -euo pipefail
 
 echo "🚀 Starting Synaplan Backend..."
 
+# Create empty .env file if it doesn't exist
+# This is needed for Symfony's Dotenv component to work properly
+if [ ! -f /var/www/backend/.env ]; then
+    echo "📝 Creating empty .env file..."
+    touch /var/www/backend/.env
+fi
+
 # Source .env file if it exists
 if [ -f /var/www/backend/.env ]; then
     echo "📄 Loading environment from .env file..."
@@ -94,7 +101,7 @@ fi
 
 # Wait for database to be ready
 echo "⏳ Waiting for database connection..."
-until php bin/console dbal:run-sql "SELECT 1" > /dev/null 2>&1; do
+until php bin/console dbal:run-sql "SELECT 1" 2>&1; do
     echo "   Database is not ready yet - sleeping..."
     sleep 2
 done
@@ -127,8 +134,10 @@ if [ "$APP_ENV" = "dev" ] || [ "$APP_ENV" = "test" ]; then
             php bin/console doctrine:schema:update --force --complete || true
 
             # Load fixtures
+            # Note: Not using --purge-with-truncate because TRUNCATE fails with foreign key constraints
+            # Even on empty tables, MariaDB/MySQL blocks TRUNCATE if FK constraints exist
             echo "   Loading fixtures..."
-            if php bin/console doctrine:fixtures:load --purge-with-truncate --no-interaction 2>&1 | tee /tmp/fixtures.log; then
+            if php bin/console doctrine:fixtures:load --no-interaction 2>&1 | tee /tmp/fixtures.log; then
                 if grep -q "loading App" /tmp/fixtures.log; then
                     touch "$FIXTURES_MARKER"
                     echo ""

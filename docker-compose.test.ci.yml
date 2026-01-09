@@ -1,0 +1,15 @@
+# CI overrides for docker-compose.test.yml
+# This file configures the setup for CI by:
+#   1. Using a pre-built Docker image (via APP_IMAGE env var)
+#   2. Removing volume mounts to use the baked image content
+#
+# Usage in CI:
+#   docker compose -f docker-compose.test.yml -f docker-compose.test.ci.yml up
+
+services:
+  app_test:
+    # Use pre-built image from CI (e.g., synaplan-test:ci)
+    image: ${APP_IMAGE:-}
+    # Remove all volume mounts to use the baked image content
+    # The !reset tag is required to clear inherited volumes from base file
+    volumes: !reset []

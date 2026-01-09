@@ -1,86 +1,107 @@
 # Playwright Smoke Test Setup
 
-Minimal-robustes Playwright-Smoke-Setup für laufende Web-App.
+Minimal robust Playwright smoke test setup for running web applications.
 
 ## Setup
 
 ```bash
-# Node.js 18+ erforderlich
+# Node.js 18+ required
 node --version
 
-# Dependencies installieren
+# Install dependencies
 npm install
 
-# Playwright Browser installieren
+# Install Playwright browsers
 npx playwright install chromium
 ```
 
 ## Environment Variables
 
-Kopiere `.env.example` zu `.env` und passe an:
+Copy `.env.example` to `.env` and adjust:
 
 ```bash
 cp .env.example .env
 ```
 
-Wichtige ENV-Variablen:
-- `BASE_URL`: BaseURL für Tests (Default: `http://localhost:5137`)
-- `AUTH_USER`: Username für Login-Tests
-- `AUTH_PASS`: Password für Login-Tests
-- `API_TOKEN`: Optional: Token für API-Tests
+Important environment variables:
+- `BASE_URL`: Base URL for tests (Default: `http://localhost:5173`)
+- `AUTH_USER`: Username for login tests
+- `AUTH_PASS`: Password for login tests
+- `API_TOKEN`: Optional: Token for API tests
 
-## Lokaler Run
+## Local Run
+
+### With Docker (recommended)
 
 ```bash
-# Alle Tests
-npm test
+# Start test environment with Docker
+cd ..
+docker compose -f docker-compose.test.yml up -d
 
-# Nur Smoke-Tests
-npm run test:smoke
+# Wait until services are ready
+docker compose -f docker-compose.test.yml ps
 
-# Mit custom BASE_URL
-BASE_URL=http://localhost:5137 npm run test:smoke
+# Run tests
+cd tests
+AUTH_USER=admin@synaplan.com AUTH_PASS=admin123 npx playwright test
+
+# Stop test environment
+cd ..
+docker compose -f docker-compose.test.yml down -v
 ```
 
-## Test-Entwicklung
+### Without Docker
 
 ```bash
-# Codegen: Generiert Test-Code während du interagierst
+# All tests
+npm test
+
+# Smoke tests only
+npm run test:smoke
+
+# With custom BASE_URL
+BASE_URL=http://localhost:5173 npm run test:smoke
+```
+
+## Test Development
+
+```bash
+# Codegen: Generate test code while you interact
 npm run codegen
 
-# UI Mode: Visueller Test-Runner mit Live-Preview & Debug
+# UI Mode: Visual test runner with live preview & debug
 npm run test:ui
 
-# Einzelnen Test ausführen
+# Run single test
 npx playwright test tests/e2e/smoke/01_login.spec.ts
 
-# Headed mode (Browser sichtbar)
+# Headed mode (browser visible)
 npx playwright test --headed
 ```
 
 ## Reports
 
 ```bash
-# HTML-Report öffnen
+# Open HTML report
 npm run report
 
-# Trace anzeigen
+# Show trace
 npm run trace
 ```
 
-## Selektoren-Guideline
+## Selector Guidelines
 
-Bevorzugt `[data-testid]` Attribute verwenden für robuste Selektoren.
+Prefer using `[data-testid]` attributes for robust selectors.
 
-Passe Selektoren in `tests/utils/selectors.ts` an deine App an.
+Adapt selectors in `tests/utils/selectors.ts` to your app.
 
 ## CI/CD
 
-GitHub Actions Workflow läuft:
+GitHub Actions workflow runs:
 - On push to main
-- 3× täglich (6:00, 12:00, 18:00 UTC)
+- 3× daily (6:00, 12:00, 18:00 UTC)
 
-Setze Secrets in GitHub:
+Set secrets in GitHub:
 - `BASE_URL`
 - `AUTH_USER`
 - `AUTH_PASS`
@@ -89,13 +110,13 @@ Setze Secrets in GitHub:
 ## Troubleshooting
 
 **Timeouts:**
-- Erhöhe `timeout` in `playwright.config.ts`
-- Prüfe ob App läuft auf `BASE_URL`
+- Increase `timeout` in `playwright.config.ts`
+- Check if app is running on `BASE_URL`
 
 **Flaky Tests:**
-- Nutze `waitForIdle()` statt `sleep()`
-- Prüfe Selektoren in `selectors.ts`
+- Use `waitForIdle()` instead of `sleep()`
+- Check selectors in `selectors.ts`
 
-**Langsame CI:**
-- Reduziere `workers` in `playwright.config.ts` (z.B. auf 2)
+**Slow CI:**
+- Reduce `workers` in `playwright.config.ts` (e.g., to 2)
 

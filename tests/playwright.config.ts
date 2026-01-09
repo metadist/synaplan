@@ -18,8 +18,8 @@ export default defineConfig({
 
   // BaseURL aus ENV oder Default
   use: {
-    baseURL: process.env.BASE_URL || 'http://localhost:5137',
-    headless: false,
+    baseURL: process.env.BASE_URL || 'http://localhost:5173',
+    headless: process.env.CI ? true : false,
     screenshot: 'only-on-failure',
     video: 'retain-on-failure',
     trace: 'retain-on-failure',
@@ -38,15 +38,19 @@ export default defineConfig({
   // Worker-Konfiguration
   workers: 1,
 
-  // Projekte: Chromium only
+  // Projekte: All major browsers
   projects: [
     {
       name: 'chromium',
       use: { ...devices['Desktop Chrome'] },
     },
+    {
+      name: 'firefox',
+      use: { ...devices['Desktop Firefox'] },
+    }
   ],
 
   // Standard-Grep für @smoke
  // grep: /@smoke/,
-  grep: /id=004/,
+  grep: /login/,
 });
