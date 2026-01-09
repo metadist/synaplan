@@ -108,12 +108,10 @@ import { ChevronRightIcon, PuzzlePieceIcon } from '@heroicons/vue/24/outline'
 import SidebarChatListItem from './SidebarChatListItem.vue'
 import ChatShareModal from './ChatShareModal.vue'
 import { useChatsStore } from '@/stores/chats'
-import { useHistoryStore } from '@/stores/history'
 import { useDialog } from '@/composables/useDialog'
 import type { Chat } from '@/mocks/chats'
 
 const chatsStore = useChatsStore()
-const historyStore = useHistoryStore()
 const router = useRouter()
 const dialog = useDialog()
 
