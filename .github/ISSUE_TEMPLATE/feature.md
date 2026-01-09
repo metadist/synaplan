@@ -8,7 +8,7 @@ type: "Feature"
 ---
 
 <!-- issue-type: Feature -->
-<!-- Title format: area: <short summary> -->
+<!-- Title format: <Area>: <short summary> -->
 
 ## Summary
 <!-- Short description of the change. -->

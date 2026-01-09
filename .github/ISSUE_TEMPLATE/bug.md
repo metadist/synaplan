@@ -8,7 +8,7 @@ type: "Bug"
 ---
 
 <!-- issue-type: Bug -->
-<!-- Title format: area: <short summary> -->
+<!-- Title format:<Area>: <short summary> -->
 
 ## Problem
 <!-- One clear sentence describing what is broken. -->
