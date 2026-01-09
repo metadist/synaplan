@@ -30,18 +30,49 @@ git reset --hard
 
 | Mode | Download Size | Best For | Command |
 |------|---------------|----------|---------|
-| ⚡ **Standard** (Default) | ~5 GB | Quick start, cloud AI (Groq/OpenAI) | `docker compose up -d` |
-| 🔧 **Full-Scale** | ~9 GB | Local AI, audio transcription | `docker compose -f docker-compose-full-scale.yml up -d` |
+| 🔧 **Standard** (Default) | ~9 GB | Full features, local AI, audio transcription | `docker compose up -d` |
+| ⚡ **Minimal** | ~5 GB | Quick start, cloud AI (Groq/OpenAI) | `docker compose -f docker-compose-minimal.yml up -d` |
 
 ---
 
-### ⚡ Standard Install (Recommended for First-Time Users)
+### 🔧 Standard Install (Recommended)
+
+The default installation with all features including local AI models and Whisper audio transcription.
+
+**Windows users:** Please use **WSL2** (Windows Subsystem for Linux) and run the Linux script.
+
+```bash
+# Option 1: Use docker-compose directly
+docker compose up -d
+
+# Option 2: Use the first-install script (Linux / macOS / Windows WSL2)
+./_1st_install_linux.sh
+```
+
+**What's included:**
+- ✅ Full web app and API
+- ✅ Document processing (Tika)
+- ✅ Database (MariaDB)
+- ✅ Local Ollama AI models (gpt-oss:20b, bge-m3)
+- ✅ Whisper audio transcription
+- ✅ Cloud AI support (Groq, OpenAI, Anthropic, Gemini)
+- ✅ Dev tools (phpMyAdmin, MailHog)
+
+After the initial install, subsequent restarts only need:
+
+```bash
+docker compose up -d
+```
+
+---
+
+### ⚡ Minimal Install (Cloud AI Only)
 
 **Fastest way to get started** - uses cloud AI providers, skips large local models and Whisper compilation.
 
 ```bash
 # 1. Start services (~5 GB download, ~2-3 min)
-docker compose up -d
+docker compose -f docker-compose-minimal.yml up -d
 
 # 2. Set your AI API key (get free key at https://console.groq.com)
 echo "GROQ_API_KEY=your_key_here" >> backend/.env
@@ -62,36 +93,10 @@ docker compose restart backend
 - ❌ Whisper models (audio transcription)
 - ❌ Local embedding models
 
-**Upgrade to Full-Scale Install later:**
+**Upgrade to Standard Install later:**
 ```bash
-docker compose down
-docker compose -f docker-compose-full-scale.yml up -d  # Starts full stack with Ollama + Whisper
-```
-
----
-
-### 🔧 Full-Scale Install (Local AI + Audio Transcription)
-
-For the complete experience with local AI models and Whisper audio transcription.
-
-**Windows users:** Please use **WSL2** (Windows Subsystem for Linux) and run the Linux script.
-
-```bash
-# Option 1: Use full-scale docker-compose directly
-docker compose -f docker-compose-full-scale.yml up -d
-
-# Option 2: Use the first-install script (Linux / macOS / Windows WSL2)
-./_1st_install_linux.sh
-```
-
-After the initial install, subsequent restarts only need:
-
-```bash
-# For standard install
-docker compose up -d
-
-# For full-scale install
-docker compose -f docker-compose-full-scale.yml up -d
+docker compose -f docker-compose-minimal.yml down
+docker compose up -d  # Starts full stack with Ollama + Whisper
 ```
 
 **What happens automatically:**
@@ -124,7 +129,7 @@ docker compose -f docker-compose-full-scale.yml up -d
 
 Progress (downloads or schema work) streams directly in the script output, so you always know what’s happening.
 
-**Option 1: Default Auto Download (Recommended)**
+**Using the Install Script (Recommended)**
 ```bash
 ./_1st_install_linux.sh
 ```
@@ -133,7 +138,7 @@ Progress (downloads or schema work) streams directly in the script output, so yo
 - ✅ **AI chat + RAG ready** as soon as the selected provider is configured
 - 💡 **Best for**: Development/prod setups that either have local GPU (option 1) or prefer Groq's hosted models (option 2)
 
-**Option 2: On-demand Downloads**
+**On-demand Downloads (Alternative)**
 ```bash
 AUTO_DOWNLOAD_MODELS=false docker compose up -d
 ```
@@ -144,14 +149,14 @@ AUTO_DOWNLOAD_MODELS=false docker compose up -d
 
 ## 🌐 Access
 
-| Service | URL | Description | Standard | Full-Scale |
-|---------|-----|-------------|:--------:|:----------:|
+| Service | URL | Description | Standard | Minimal |
+|---------|-----|-------------|:--------:|:-------:|
 | Frontend | http://localhost:5173 | Vue.js Web App | ✅ | ✅ |
 | Backend API | http://localhost:8000 | Symfony REST API | ✅ | ✅ |
 | API Docs | http://localhost:8000/api/doc | Swagger UI / OpenAPI | ✅ | ✅ |
 | phpMyAdmin | http://localhost:8082 | Database Management | ✅ | ✅ |
 | MailHog | http://localhost:8025 | Email Testing | ✅ | ✅ |
-| Ollama | http://localhost:11435 | AI Models API | ❌ | ✅ |
+| Ollama | http://localhost:11435 | AI Models API | ✅ | ❌ |
 
 ## 👤 Test Users
 
@@ -348,8 +353,8 @@ synaplan-dev/
 │   └── frontend/            # Frontend Dockerfile & nginx
 ├── backend/                 # Symfony Backend (PHP 8.3)
 ├── frontend/                # Vue.js Frontend
-├── docker-compose.yml       # Standard install (cloud AI only, recommended)
-└── docker-compose-full-scale.yml # Full-scale install (Ollama + Whisper)
+├── docker-compose.yml       # Standard install (Ollama + Whisper, recommended)
+└── docker-compose-minimal.yml # Minimal install (cloud AI only)
 ```
 
 ## ⚙️ Environment Configuration
@@ -407,11 +412,7 @@ docker compose exec frontend npm install <package>
 
 Disable the auto download by running:
 ```bash
-# For standard install
 AUTO_DOWNLOAD_MODELS=false docker compose up -d
-
-# For full-scale install
-AUTO_DOWNLOAD_MODELS=false docker compose -f docker-compose-full-scale.yml up -d
 ```
 
 ## ✨ Features
