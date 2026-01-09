@@ -671,7 +671,7 @@ class ModelFixtures extends Fixture
                 'tag' => 'chat',
                 'selectable' => 1,
                 'active' => 1,
-                'providerId' => 'gemini-2.5-pro-preview-06-05',
+                'providerId' => 'gemini-2.5-pro',
                 'priceIn' => 2.5,
                 'inUnit' => 'per1M',
                 'priceOut' => 15,
@@ -681,7 +681,7 @@ class ModelFixtures extends Fixture
                 'json' => [
                     'description' => 'Googles Answer to the other LLM models',
                     'params' => [
-                        'model' => 'gemini-2.5-pro-preview-06-05',
+                        'model' => 'gemini-2.5-pro',
                     ],
                 ],
             ],
@@ -692,7 +692,7 @@ class ModelFixtures extends Fixture
                 'tag' => 'pic2text',
                 'selectable' => 1,
                 'active' => 1,
-                'providerId' => 'gemini-2.5-pro-preview-06-05',
+                'providerId' => 'gemini-2.5-pro',
                 'priceIn' => 2.5,
                 'inUnit' => 'per1M',
                 'priceOut' => 15,
@@ -703,7 +703,7 @@ class ModelFixtures extends Fixture
                     'description' => 'Googles Powerhouse can also process images, not just text',
                     'prompt' => 'Describe the image in detail. Extract any text you see.',
                     'params' => [
-                        'model' => 'gemini-2.5-pro-preview-06-05',
+                        'model' => 'gemini-2.5-pro',
                     ],
                 ],
             ],
@@ -1036,9 +1036,9 @@ class ModelFixtures extends Fixture
             // Convert JSON array to string
             $jsonData = json_encode($data['json']);
 
-            $sql = 'INSERT INTO BMODELS (BID, BSERVICE, BNAME, BTAG, BSELECTABLE, BACTIVE, BPROVID, BPRICEIN, BINUNIT, BPRICEOUT, BOUTUNIT, BQUALITY, BRATING, BJSON) 
+            $sql = 'INSERT INTO BMODELS (BID, BSERVICE, BNAME, BTAG, BSELECTABLE, BACTIVE, BPROVID, BPRICEIN, BINUNIT, BPRICEOUT, BOUTUNIT, BQUALITY, BRATING, BJSON)
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                    ON DUPLICATE KEY UPDATE 
+                    ON DUPLICATE KEY UPDATE
                         BSERVICE = VALUES(BSERVICE),
                         BNAME = VALUES(BNAME),
                         BTAG = VALUES(BTAG),
