@@ -1,16 +1,16 @@
-import { defineConfig, devices } from '@playwright/test';
-import dotenv from 'dotenv';
+import { defineConfig, devices } from '@playwright/test'
+import dotenv from 'dotenv'
 
 // Lade .env Datei (automatisch im Projektverzeichnis)
-dotenv.config({ path: '.env.local' });
+dotenv.config({ path: '.env.local' })
 
 /**
  * Minimal-robustes Playwright-Smoke-Setup
  * BaseURL: http://localhost:5137 (überschreibbar via BASE_URL ENV)
  */
 export default defineConfig({
-  // Tests liegen im tests/-Verzeichnis
-  testDir: './e2e',
+  // Tests liegen im tests/-Verzeichnis (relative to this config file)
+  testDir: './tests',
 
   // Retries und Timeout auf Config-Ebene
   retries: 0,
@@ -47,10 +47,9 @@ export default defineConfig({
     {
       name: 'firefox',
       use: { ...devices['Desktop Firefox'] },
-    }
+    },
   ],
 
   // Standard-Grep für @smoke
- // grep: /@smoke/,
-  grep: /login/,
-});
+  grepInvert: /^(?!.*login).*$/,
+})

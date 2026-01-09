@@ -1,8 +1,8 @@
 export const selectors = {
   login: {
-    email: '#email', 
-    password: '#password', 
-    submit: 'button[type="submit"]', 
+    email: '#email',
+    password: '#password',
+    submit: 'button[type="submit"]',
   },
   nav: {
     newChatButton: '[data-testid="btn-chat-new"]',
@@ -15,13 +15,11 @@ export const selectors = {
     loadIndicator: '[data-testid="loading-typing-indicator"]',
     messageText: '[data-testid="message-text"]',
     againDropdown: '[data-testid="btn-message-model-toggle"]',
-    againDropdownItem: 'button.dropdown-item'
+    againDropdownItem: 'button.dropdown-item',
   },
   userMenu: {
-    button:  '[data-testid="btn-user-menu-toggle"]',
+    button: '[data-testid="btn-user-menu-toggle"]',
     logoutBtn: '[data-testid="btn-user-logout"]',
   },
-  toast: {
-    
-  },
-} as const;
+  toast: {},
+} as const

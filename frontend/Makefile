@@ -1,4 +1,4 @@
-.PHONY: help lint format check-types test deps build build-widget generate-schemas
+.PHONY: help lint format check-types test test-e2e deps deps-host build build-widget generate-schemas
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-20s\033[0m %s\n", $$1, $$2}'
@@ -28,9 +28,15 @@ generate-schemas: ## Generate Zod schemas from OpenAPI spec
 	docker compose -f ../docker-compose.yml exec -T frontend npm run generate:schemas
 
 ## Testing
-test: ## Run tests
+test: ## Run unit tests
 	docker compose -f ../docker-compose.yml exec -T frontend npm run test -- --run
 
+test-e2e: ## Run e2e tests
+	npm run test:e2e
+
 ## Dependencies
+deps-host: ## Install npm dependencies on host (not in container) for playwright
+	npm ci
+
 deps: ## Install npm dependencies
 	docker compose -f ../docker-compose.yml exec -T frontend npm ci

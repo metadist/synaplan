@@ -99,6 +99,13 @@ export default [
     },
   },
   {
-    ignores: ['dist/**', 'dist-widget/**', 'node_modules/**', 'src/generated/**'],
+    ignores: [
+      'dist/**',
+      'dist-widget/**',
+      'node_modules/**',
+      'src/generated/**',
+      'tests/e2e/test-results/**',
+      'tests/e2e/reports/**',
+    ],
   },
 ]

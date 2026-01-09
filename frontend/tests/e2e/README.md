@@ -24,6 +24,7 @@ cp .env.example .env
 ```
 
 Important environment variables:
+
 - `BASE_URL`: Base URL for tests (Default: `http://localhost:5173`)
 - `AUTH_USER`: Username for login tests
 - `AUTH_PASS`: Password for login tests
@@ -98,10 +99,12 @@ Adapt selectors in `tests/utils/selectors.ts` to your app.
 ## CI/CD
 
 GitHub Actions workflow runs:
+
 - On push to main
 - 3× daily (6:00, 12:00, 18:00 UTC)
 
 Set secrets in GitHub:
+
 - `BASE_URL`
 - `AUTH_USER`
 - `AUTH_PASS`
@@ -110,13 +113,15 @@ Set secrets in GitHub:
 ## Troubleshooting
 
 **Timeouts:**
+
 - Increase `timeout` in `playwright.config.ts`
 - Check if app is running on `BASE_URL`
 
 **Flaky Tests:**
+
 - Use `waitForIdle()` instead of `sleep()`
 - Check selectors in `selectors.ts`
 
 **Slow CI:**
-- Reduce `workers` in `playwright.config.ts` (e.g., to 2)
 
+- Reduce `workers` in `playwright.config.ts` (e.g., to 2)

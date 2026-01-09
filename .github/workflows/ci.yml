@@ -359,18 +359,18 @@ jobs:
         with:
           node-version: "20"
           cache: "npm"
-          cache-dependency-path: tests/package-lock.json
+          cache-dependency-path: frontend/package-lock.json
 
       - name: Install Playwright dependencies
-        working-directory: tests
+        working-directory: frontend
         run: npm ci
 
       - name: Install Playwright browsers
-        working-directory: tests
+        working-directory: frontend
         run: npx playwright install --with-deps ${{ matrix.browser }}
 
       - name: Run E2E tests
-        working-directory: tests
+        working-directory: frontend
         env:
           BASE_URL: http://localhost:8001
           AUTH_USER: admin@synaplan.com
@@ -379,7 +379,7 @@ jobs:
           echo "============================================"
           echo "Running E2E tests with ${{ matrix.browser }}"
           echo "============================================"
-          npx playwright test --project=${{ matrix.project }}
+          npx playwright test --config=tests/e2e/playwright.config.ts --project=${{ matrix.project }}
 
       - name: Upload Playwright test results
         if: always()
@@ -387,8 +387,8 @@ jobs:
         with:
           name: playwright-results-${{ matrix.browser }}
           path: |
-            tests/test-results/
-            tests/reports/
+            frontend/tests/e2e/test-results/
+            frontend/tests/e2e/reports/
           retention-days: 7
           if-no-files-found: ignore
 
