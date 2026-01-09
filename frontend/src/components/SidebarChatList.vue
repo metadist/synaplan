@@ -1,100 +1,6 @@
 <template>
   <div class="flex flex-col gap-2" data-testid="comp-sidebar-chat-list">
-    <!-- New Chat Button -->
-    <button
-      class="btn-primary w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand)]"
-      data-testid="btn-chat-new"
-      @click="createNewChat"
-    >
-      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
-      </svg>
-      <span class="font-medium text-sm">New Chat</span>
-    </button>
-
-    <div>
-      <button
-        class="w-full flex items-center gap-2 px-3 py-2 rounded-lg txt-secondary hover-surface transition-colors text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary min-h-[44px]"
-        data-testid="btn-chat-section-my"
-        @click="toggleSection('my')"
-      >
-        <ChevronRightIcon
-          :class="['w-4 h-4 transition-transform flex-shrink-0', sections.my && 'rotate-90']"
-        />
-        <span class="text-xs font-medium uppercase tracking-wider">My Chats</span>
-      </button>
-
-      <div v-if="sections.my" class="flex flex-col gap-1 mt-1 relative">
-        <SidebarChatListItem
-          v-for="chat in myChats"
-          :key="chat.id"
-          :chat="chat"
-          :is-active="chat.id === activeChat"
-          @open="openChat"
-          @share="handleShare"
-          @rename="handleRename"
-          @delete="handleDelete"
-        />
-
-        <button
-          v-if="!showAllMy && allMyChats.length > 5"
-          class="px-3 py-2 rounded-lg txt-secondary hover-surface transition-colors text-left text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary min-h-[44px]"
-          data-testid="btn-chat-show-more-my"
-          @click="showAllMy = true"
-        >
-          Show more...
-        </button>
-
-        <!-- End marker for intersection observer -->
-        <div v-if="showAllMy && allMyChats.length > 5" ref="myChatsEndRef" class="h-px"></div>
-
-        <!-- Show less button - sticky when list is long -->
-        <button
-          v-if="showAllMy && allMyChats.length > 5"
-          :class="[
-            'px-3 py-2 rounded-lg txt-secondary transition-all text-left text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary min-h-[44px]',
-            isMyButtonSticky
-              ? 'sticky bottom-[4px] z-10 bg-sidebar shadow-lg border border-light-border/30 dark:border-dark-border/20'
-              : 'hover-surface',
-          ]"
-          data-testid="btn-chat-show-less-my"
-          @click="showAllMy = false"
-        >
-          Show less...
-        </button>
-
-        <button
-          v-if="myArchivedChats.length > 0"
-          class="flex items-center gap-2 px-3 py-2 rounded-lg txt-secondary hover-surface transition-colors text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary min-h-[44px] mt-2"
-          data-testid="btn-chat-section-my-archived"
-          @click="toggleSection('myArchived')"
-        >
-          <ChevronRightIcon
-            :class="[
-              'w-3.5 h-3.5 transition-transform flex-shrink-0',
-              sections.myArchived && 'rotate-90',
-            ]"
-          />
-          <span class="text-xs font-medium uppercase tracking-wider"
-            >Archived ({{ myArchivedChats.length }})</span
-          >
-        </button>
-
-        <div v-if="sections.myArchived" class="flex flex-col gap-1 mt-1">
-          <SidebarChatListItem
-            v-for="chat in myArchivedChats"
-            :key="chat.id"
-            :chat="chat"
-            :is-active="chat.id === activeChat"
-            @open="openChat"
-            @share="handleShare"
-            @rename="handleRename"
-            @delete="handleDelete"
-          />
-        </div>
-      </div>
-    </div>
-
+    <!-- Widget Chats Section (only this remains) -->
     <div>
       <button
         class="w-full flex items-center gap-2 px-3 py-2 rounded-lg txt-secondary hover-surface transition-colors text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary min-h-[44px]"
@@ -212,19 +118,14 @@ const router = useRouter()
 const dialog = useDialog()
 
 const sections = ref({
-  my: true,
   widget: false,
-  myArchived: false,
   widgetArchived: false,
 })
 
-const showAllMy = ref(false)
 const showAllWidget = ref(false)
 
 // Refs for sticky button behavior
-const myChatsEndRef = ref<HTMLElement | null>(null)
 const widgetChatsEndRef = ref<HTMLElement | null>(null)
-const isMyButtonSticky = ref(false)
 const isWidgetButtonSticky = ref(false)
 
 // Helper to format dates
@@ -240,28 +141,7 @@ const formatDate = (value: string | number): string => {
   return date.toLocaleDateString()
 }
 
-// Map API chats to sidebar format
-const allMyChats = computed(() => {
-  return chatsStore.chats
-    .filter((c) => !c.widgetSession)
-    .map((c) => ({
-      id: String(c.id),
-      title: c.title,
-      timestamp: formatDate(c.updatedAt),
-      type: 'personal' as const,
-      archived: false,
-    }))
-})
-
-const myChats = computed(() => {
-  return showAllMy.value ? allMyChats.value : allMyChats.value.slice(0, 5)
-})
-
-const myArchivedChats = computed((): Chat[] => {
-  // Archived chats not implemented yet
-  return []
-})
-
+// Map API chats to sidebar format - removed allMyChats and myChats
 const allWidgetChats = computed((): Chat[] => {
   const sessionChatsRaw = chatsStore.chats
     .filter((c) => c.widgetSession)
@@ -301,19 +181,8 @@ const activeChat = computed(() => {
   return chatsStore.activeChatId ? String(chatsStore.activeChatId) : ''
 })
 
-const toggleSection = (section: 'my' | 'widget' | 'myArchived' | 'widgetArchived') => {
+const toggleSection = (section: 'widget' | 'widgetArchived') => {
   sections.value[section] = !sections.value[section]
-}
-
-const createNewChat = async () => {
-  const newChat = await chatsStore.createChat()
-  if (newChat) {
-    historyStore.clearHistory()
-    // Navigate to chat view if not already there
-    if (router.currentRoute.value.path !== '/') {
-      router.push('/')
-    }
-  }
 }
 
 const openChat = async (id: string) => {
@@ -368,15 +237,8 @@ const handleDelete = async (id: string) => {
 }
 
 // Setup Intersection Observer for sticky button behavior
-let myObserver: IntersectionObserver | null = null
-let widgetObserver: IntersectionObserver | null = null
-
 const setupIntersectionObserver = async () => {
   await nextTick()
-
-  // Clean up existing observers
-  if (myObserver) myObserver.disconnect()
-  if (widgetObserver) widgetObserver.disconnect()
 
   const options = {
     root: null,
@@ -384,21 +246,9 @@ const setupIntersectionObserver = async () => {
     threshold: 0,
   }
 
-  // Observer for My Chats end marker
-  if (showAllMy.value && myChatsEndRef.value) {
-    myObserver = new IntersectionObserver((entries) => {
-      entries.forEach((entry) => {
-        isMyButtonSticky.value = !entry.isIntersecting
-      })
-    }, options)
-    myObserver.observe(myChatsEndRef.value)
-  } else {
-    isMyButtonSticky.value = false
-  }
-
-  // Observer for Widget Chats end marker
+  // Observer for Widget Chats end marker only
   if (showAllWidget.value && widgetChatsEndRef.value) {
-    widgetObserver = new IntersectionObserver((entries) => {
+    const widgetObserver = new IntersectionObserver((entries) => {
       entries.forEach((entry) => {
         isWidgetButtonSticky.value = !entry.isIntersecting
       })
@@ -409,8 +259,8 @@ const setupIntersectionObserver = async () => {
   }
 }
 
-// Watch for changes in showAll states
-watch([showAllMy, showAllWidget], () => {
+// Watch for changes in showAll states (widget only)
+watch([showAllWidget], () => {
   setupIntersectionObserver()
 })
 
@@ -420,8 +270,11 @@ onMounted(async () => {
   await setupIntersectionObserver()
 })
 
+let cleanupObserver: (() => void) | undefined
+
 onBeforeUnmount(() => {
-  if (myObserver) myObserver.disconnect()
-  if (widgetObserver) widgetObserver.disconnect()
+  if (cleanupObserver) {
+    cleanupObserver()
+  }
 })
 </script>
