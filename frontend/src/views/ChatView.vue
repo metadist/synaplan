@@ -229,7 +229,29 @@ onBeforeUnmount(() => {
 // Watch for active chat changes and load messages
 watch(
   () => chatsStore.activeChatId,
-  async (newChatId) => {
+  async (newChatId, oldChatId) => {
+    // Cleanup: Delete previous chat if it was empty (no messages)
+    // BUT: Only if the new chat is NOT also empty (to avoid flicker when creating multiple new chats)
+    if (oldChatId && oldChatId !== newChatId) {
+      const oldChat = chatsStore.chats.find((c) => c.id === oldChatId)
+      const newChat = chatsStore.chats.find((c) => c.id === newChatId)
+
+      // Only cleanup if old chat is empty AND new chat has messages OR is not brand new
+      if (oldChat && (oldChat.messageCount === 0 || oldChat.messageCount === undefined)) {
+        // Check if it actually has no messages by looking at history
+        const hadMessages = historyStore.messages.length > 0
+
+        // Don't cleanup if both old and new are empty (rapid "new chat" clicking)
+        const newChatIsEmpty =
+          newChat && (newChat.messageCount === 0 || newChat.messageCount === undefined)
+
+        if (!hadMessages && !newChatIsEmpty) {
+          console.log('🧹 Auto-cleaning empty chat:', oldChatId)
+          await chatsStore.deleteChat(oldChatId, true) // silent = true
+        }
+      }
+    }
+
     if (newChatId) {
       historyStore.clear()
       await historyStore.loadMessages(newChatId)

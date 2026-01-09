@@ -144,6 +144,32 @@ export const useChatsStore = defineStore('chats', () => {
     }
   }
 
+  /**
+   * Find an existing empty chat or create a new one.
+   * Prevents creating multiple empty chats unnecessarily.
+   */
+  async function findOrCreateEmptyChat(): Promise<Chat | null> {
+    if (!checkAuthOrRedirect()) return null
+
+    // Look for an existing empty chat (no messages, default title)
+    const emptyChat = chats.value.find(
+      (chat) =>
+        !chat.widgetSession &&
+        (chat.messageCount === 0 || chat.messageCount === undefined) &&
+        (chat.title === 'New Chat' || chat.title === 'Neuer Chat' || chat.title.startsWith('Chat '))
+    )
+
+    if (emptyChat) {
+      // Found an empty chat - just switch to it
+      console.log('♻️ Reusing existing empty chat:', emptyChat.id)
+      updateActiveChatSelection(emptyChat.id)
+      return emptyChat
+    }
+
+    // No empty chat found - create a new one
+    return await createChat()
+  }
+
   async function updateChatTitle(chatId: number, title: string) {
     if (!checkAuthOrRedirect()) return
 
@@ -163,7 +189,7 @@ export const useChatsStore = defineStore('chats', () => {
     }
   }
 
-  async function deleteChat(chatId: number) {
+  async function deleteChat(chatId: number, silent: boolean = false) {
     if (!checkAuthOrRedirect()) return
 
     try {
@@ -182,8 +208,10 @@ export const useChatsStore = defineStore('chats', () => {
         updateActiveChatSelection(chats.value[0].id)
       }
     } catch (err: any) {
-      error.value = err.message || 'Failed to delete chat'
-      console.error('Error deleting chat:', err)
+      if (!silent) {
+        error.value = err.message || 'Failed to delete chat'
+        console.error('Error deleting chat:', err)
+      }
     }
   }
 
@@ -262,6 +290,7 @@ export const useChatsStore = defineStore('chats', () => {
     error,
     loadChats,
     createChat,
+    findOrCreateEmptyChat,
     updateChatTitle,
     deleteChat,
     shareChat,

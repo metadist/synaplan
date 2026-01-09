@@ -57,8 +57,15 @@
       <div class="flex-1 overflow-y-auto sidebar-scroll px-3 py-4">
         <nav class="space-y-2" data-testid="nav-sidebar">
           <template v-for="item in navItems" :key="item.path">
+            <!-- Chat Dropdown (special case) -->
+            <ChatDropdown
+              v-if="item.path === '/' && !item.children"
+              :is-collapsed="sidebarStore.isCollapsed"
+            />
+
+            <!-- Regular nav items -->
             <router-link
-              v-if="!item.children"
+              v-else-if="!item.children && item.path !== '/'"
               :to="item.path"
               :class="[
                 'group flex items-center gap-3 rounded-xl px-3 min-h-[42px]',
@@ -167,6 +174,7 @@ import { useConfigStore } from '../stores/config'
 import { useTheme } from '../composables/useTheme'
 import { getFeaturesStatus } from '../services/featuresService'
 import { useI18n } from 'vue-i18n'
+import ChatDropdown from './ChatDropdown.vue'
 import SidebarChatList from './SidebarChatList.vue'
 import UserMenu from './UserMenu.vue'
 
