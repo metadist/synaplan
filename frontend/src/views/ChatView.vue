@@ -175,6 +175,7 @@ const authStore = useAuthStore()
 let streamingAbortController: AbortController | null = null
 let stopStreamingFn: (() => void) | null = null // Store EventSource close function
 let currentTrackId: number | undefined = undefined // Store current trackId for stop request
+let currentStreamingChatId: number | undefined = undefined // Store chatId where stream was started
 
 // Processing status for real-time feedback
 const processingStatus = ref<string>('')
@@ -230,6 +231,12 @@ onBeforeUnmount(() => {
 watch(
   () => chatsStore.activeChatId,
   async (newChatId, oldChatId) => {
+    // CRITICAL: Stop any active streaming when switching chats
+    if (oldChatId !== newChatId && isStreaming.value) {
+      console.log('🛑 Stopping active stream before switching chat')
+      await handleStopStreaming()
+    }
+
     // Cleanup: Delete previous chat if it was empty (no messages)
     // BUT: Only if the new chat is NOT also empty (to avoid flicker when creating multiple new chats)
     if (oldChatId && oldChatId !== newChatId) {
@@ -545,7 +552,13 @@ const streamAIResponse = async (
 
       const trackId = Date.now()
       currentTrackId = trackId // Store for stop functionality
-      console.log('🎯 TrackId set for streaming:', currentTrackId)
+      currentStreamingChatId = chatId // Store chatId for stop functionality
+      console.log(
+        '🎯 TrackId set for streaming:',
+        currentTrackId,
+        'in chat:',
+        currentStreamingChatId
+      )
       let fullContent = ''
 
       const includeReasoning = options?.includeReasoning ?? false
@@ -950,6 +963,7 @@ const streamAIResponse = async (
             streamingAbortController = null
             stopStreamingFn = null
             currentTrackId = undefined
+            currentStreamingChatId = undefined
           } else if (data.status === 'error') {
             const errorMsg = data.error || data.message || 'Unknown error'
             console.error('Error:', errorMsg, data)
@@ -971,6 +985,7 @@ const streamAIResponse = async (
               streamingAbortController = null
               stopStreamingFn = null
               currentTrackId = undefined
+              currentStreamingChatId = undefined
               return
             }
 
@@ -1010,6 +1025,7 @@ const streamAIResponse = async (
               streamingAbortController = null
               stopStreamingFn = null
               currentTrackId = undefined
+              currentStreamingChatId = undefined
               return
             }
 
@@ -1064,6 +1080,7 @@ const streamAIResponse = async (
             streamingAbortController = null
             stopStreamingFn = null
             currentTrackId = undefined
+            currentStreamingChatId = undefined
           } else {
             console.log('⚠️ Unknown status:', data.status, data)
           }
@@ -1091,6 +1108,7 @@ const streamAIResponse = async (
     streamingAbortController = null
     stopStreamingFn = null
     currentTrackId = undefined
+    currentStreamingChatId = undefined
   }
   // NOTE: Don't clean up in finally block! The streaming is async and still running.
   // Cleanup happens in the 'complete' event handler or in handleStopStreaming()
@@ -1177,9 +1195,9 @@ const handleStopStreaming = async () => {
     console.log('✅ Streaming message finished with cancellation notice')
 
     // Save the cancelled message to backend so it persists after refresh
-    // IMPORTANT: Use the trackId and chatId BEFORE clearing them
+    // CRITICAL: Use the ORIGINAL chatId where stream was started, NOT the current active chat!
     const trackIdToSave = currentTrackId
-    const chatIdToSave = chatsStore.activeChatId
+    const chatIdToSave = currentStreamingChatId
 
     if (trackIdToSave && chatIdToSave) {
       console.log('📤 Saving cancelled message to backend', {
@@ -1210,6 +1228,7 @@ const handleStopStreaming = async () => {
   // Clear references AFTER saving
   streamingAbortController = null
   currentTrackId = undefined
+  currentStreamingChatId = undefined
 }
 
 // Helper function to save cancelled message to backend
