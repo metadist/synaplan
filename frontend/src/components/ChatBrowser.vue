@@ -380,16 +380,25 @@ const itemsPerPage = 10
 
 // Format date helper
 const formatDate = (timestamp: number | string | undefined): string => {
-  if (!timestamp) return t('chat.browser.older')
+  if (!timestamp) return t('common.unknown')
 
   const date = typeof timestamp === 'number' ? new Date(timestamp * 1000) : new Date(timestamp)
   const now = new Date()
   const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000)
 
-  if (diffInSeconds < 60) return t('chat.browser.today')
-  if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)}m ago`
-  if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)}h ago`
-  if (diffInSeconds < 604800) return `${Math.floor(diffInSeconds / 86400)}d ago`
+  if (diffInSeconds < 60) return t('common.justNow')
+  if (diffInSeconds < 3600) {
+    const minutes = Math.floor(diffInSeconds / 60)
+    return t('common.minutesAgo', { count: minutes })
+  }
+  if (diffInSeconds < 86400) {
+    const hours = Math.floor(diffInSeconds / 3600)
+    return t('common.hoursAgo', { count: hours })
+  }
+  if (diffInSeconds < 604800) {
+    const days = Math.floor(diffInSeconds / 86400)
+    return t('common.daysAgo', { count: days })
+  }
   return date.toLocaleDateString()
 }
 
@@ -408,9 +417,9 @@ const isInDateRange = (timestamp: number | string | undefined): boolean => {
     case 'yesterday':
       return diffInDays === 1
     case 'lastWeek':
-      return diffInDays <= 7
+      return diffInDays > 1 && diffInDays <= 7
     case 'lastMonth':
-      return diffInDays <= 30
+      return diffInDays > 7 && diffInDays <= 30
     case 'older':
       return diffInDays > 30
     default:

@@ -974,9 +974,11 @@
     "justNow": "Just now",
     "minutesAgo": "{count} minute ago | {count} minutes ago",
     "hoursAgo": "{count} hour ago | {count} hours ago",
+    "daysAgo": "{count} day ago | {count} days ago",
     "previous": "Previous",
     "error": "Error",
     "success": "Success",
+    "unknown": "Unknown",
     "leave": "Leave",
     "stay": "Stay",
     "retry": "Retry"
