@@ -1051,8 +1051,6 @@
     "allowedDomainsAdd": "Domain hinzufügen",
     "allowedDomainsEmpty": "Noch keine Domains auf der Whitelist.",
     "allowedDomainsSummary": "Domains auf der Whitelist",
-    "noDomains": "Mindestens eine Domain erforderlich",
-    "noDomainsHelp": "Das Widget funktioniert nicht ohne mindestens eine Domain auf der Whitelist. Fügen Sie Domains hinzu, auf denen Sie dieses Widget einbetten möchten.",
     "invalidDomain": "Bitte geben Sie eine gültige Domain ein (z.B. beispiel.de oder *.beispiel.de).",
     "domainAlreadyAdded": "Diese Domain ist bereits auf der Whitelist.",
     "allowedDomainsLimit": "Sie können bis zu {max} Domains auf die Whitelist setzen.",

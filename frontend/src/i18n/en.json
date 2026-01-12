@@ -1164,8 +1164,6 @@
     "allowedDomainsAdd": "Add domain",
     "allowedDomainsEmpty": "No domains whitelisted yet.",
     "allowedDomainsSummary": "Whitelisted Domains",
-    "noDomains": "At least one domain required",
-    "noDomainsHelp": "The widget will not work without at least one whitelisted domain. Add domains where you want to embed this widget.",
     "invalidDomain": "Please enter a valid domain (e.g., example.com or *.example.com).",
     "domainAlreadyAdded": "This domain is already whitelisted.",
     "allowedDomainsLimit": "You can whitelist up to {max} domains.",
