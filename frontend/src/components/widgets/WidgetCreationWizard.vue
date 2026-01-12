@@ -464,20 +464,9 @@
                     </button>
                   </span>
                 </div>
-                <div v-else>
-                  <div
-                    class="p-4 rounded-lg border border-orange-500/30 bg-orange-500/10 flex items-start gap-2 text-orange-600 dark:text-orange-300"
-                  >
-                    <Icon
-                      icon="heroicons:exclamation-triangle"
-                      class="w-5 h-5 flex-shrink-0 mt-0.5"
-                    />
-                    <div class="text-xs">
-                      <p class="font-semibold">{{ $t('widgets.noDomains') }}</p>
-                      <p class="mt-1">{{ $t('widgets.noDomainsHelp') }}</p>
-                    </div>
-                  </div>
-                </div>
+                <p v-else class="text-xs txt-secondary">
+                  {{ $t('widgets.allowedDomainsEmpty') }}
+                </p>
 
                 <div
                   v-if="hasLocalTestingDomain"
@@ -754,8 +743,7 @@ const canProceed = computed(() => {
 })
 
 const canCreate = computed(() => {
-  const hasAllowedDomains = (formData.value.config.allowedDomains?.length ?? 0) > 0
-  return canProceed.value && !creating.value && hasAllowedDomains
+  return canProceed.value && !creating.value
 })
 
 const MAX_ALLOWED_DOMAINS = 20
