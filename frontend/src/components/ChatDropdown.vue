@@ -112,25 +112,15 @@
         {{ $t('chat.noChats') }}
       </div>
 
-      <!-- Show More/Less Button -->
+      <!-- Show All Button -->
       <button
-        v-if="hasMoreChats && !showAll"
+        v-if="hasMoreChats"
         class="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg txt-secondary hover-surface transition-colors text-sm font-medium mt-1 min-h-[36px]"
         data-testid="btn-chat-show-all"
-        @click="showAll = true"
+        @click="navigateToStatistics"
       >
-        <span>{{ $t('chat.showMore') }}</span>
+        <span>{{ $t('chat.showAll') }}</span>
         <ChevronDownIcon class="w-3.5 h-3.5" />
-      </button>
-
-      <button
-        v-if="showAll && hasMoreChats"
-        class="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg txt-secondary hover-surface transition-colors text-sm font-medium mt-1 min-h-[36px]"
-        data-testid="btn-chat-show-less"
-        @click="showAll = false"
-      >
-        <span>{{ $t('chat.showLess') }}</span>
-        <ChevronUpIcon class="w-3.5 h-3.5" />
       </button>
     </div>
 
@@ -154,7 +144,6 @@ import {
   ChatBubbleLeftRightIcon,
   ChatBubbleLeftIcon,
   ChevronDownIcon,
-  ChevronUpIcon,
   EllipsisVerticalIcon,
   PlusIcon,
   ClockIcon,
@@ -177,7 +166,6 @@ const dialog = useDialog()
 const { t } = useI18n()
 
 const isOpen = ref(false)
-const showAll = ref(false)
 const openMenuChatId = ref<number | null>(null)
 const shareModalOpen = ref(false)
 const shareModalChatId = ref<number | null>(null)
@@ -188,7 +176,6 @@ const MAX_RECENT_CHATS = 4
 const toggleDropdown = () => {
   isOpen.value = !isOpen.value
   if (!isOpen.value) {
-    showAll.value = false
     openMenuChatId.value = null
   }
 }
@@ -210,7 +197,7 @@ const allChats = computed(() => {
 
 // Display chats based on showAll state
 const displayedChats = computed(() => {
-  return showAll.value ? allChats.value : allChats.value.slice(0, MAX_RECENT_CHATS)
+  return allChats.value.slice(0, MAX_RECENT_CHATS)
 })
 
 const hasMoreChats = computed(() => {
@@ -273,6 +260,11 @@ const handleNewChat = async () => {
   }
   // Don't close dropdown - keep it open
   openMenuChatId.value = null
+}
+
+const navigateToStatistics = () => {
+  router.push('/statistics#chats')
+  isOpen.value = false
 }
 
 // Close menu when clicking outside

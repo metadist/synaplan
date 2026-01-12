@@ -26,35 +26,14 @@
           @delete="handleDelete"
         />
 
+        <!-- Show All Button -->
         <button
-          v-if="!showAllWidget && allWidgetChats.length > 5"
+          v-if="allWidgetChats.length > 5"
           class="px-3 py-2 rounded-lg txt-secondary hover-surface transition-colors text-left text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary min-h-[44px]"
-          data-testid="btn-chat-show-more-widget"
-          @click="showAllWidget = true"
+          data-testid="btn-chat-show-all-widget"
+          @click="navigateToStatistics"
         >
-          Show more...
-        </button>
-
-        <!-- End marker for intersection observer -->
-        <div
-          v-if="showAllWidget && allWidgetChats.length > 5"
-          ref="widgetChatsEndRef"
-          class="h-px"
-        ></div>
-
-        <!-- Show less button - sticky when list is long -->
-        <button
-          v-if="showAllWidget && allWidgetChats.length > 5"
-          :class="[
-            'px-3 py-2 rounded-lg txt-secondary hover-surface transition-all text-left text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary min-h-[44px]',
-            isWidgetButtonSticky
-              ? 'sticky bottom-[4px] z-10 bg-sidebar shadow-lg border border-light-border/30 dark:border-dark-border/20'
-              : '',
-          ]"
-          data-testid="btn-chat-show-less-widget"
-          @click="showAllWidget = false"
-        >
-          Show less...
+          {{ $t('chat.showAll') }}
         </button>
 
         <button
@@ -102,7 +81,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onBeforeUnmount, nextTick, watch } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ChevronRightIcon, PuzzlePieceIcon } from '@heroicons/vue/24/outline'
 import SidebarChatListItem from './SidebarChatListItem.vue'
@@ -119,12 +98,6 @@ const sections = ref({
   widget: false,
   widgetArchived: false,
 })
-
-const showAllWidget = ref(false)
-
-// Refs for sticky button behavior
-const widgetChatsEndRef = ref<HTMLElement | null>(null)
-const isWidgetButtonSticky = ref(false)
 
 // Helper to format dates
 const formatDate = (value: string | number): string => {
@@ -168,7 +141,7 @@ const allWidgetChats = computed((): Chat[] => {
 })
 
 const widgetChats = computed((): Chat[] => {
-  return showAllWidget.value ? allWidgetChats.value : allWidgetChats.value.slice(0, 5)
+  return allWidgetChats.value.slice(0, 5)
 })
 
 const widgetArchivedChats = computed((): Chat[] => {
@@ -234,45 +207,12 @@ const handleDelete = async (id: string) => {
   }
 }
 
-// Setup Intersection Observer for sticky button behavior
-const setupIntersectionObserver = async () => {
-  await nextTick()
-
-  const options = {
-    root: null,
-    rootMargin: '0px 0px -80px 0px', // Trigger sticky when end marker is 80px from bottom (just above footer)
-    threshold: 0,
-  }
-
-  // Observer for Widget Chats end marker only
-  if (showAllWidget.value && widgetChatsEndRef.value) {
-    const widgetObserver = new IntersectionObserver((entries) => {
-      entries.forEach((entry) => {
-        isWidgetButtonSticky.value = !entry.isIntersecting
-      })
-    }, options)
-    widgetObserver.observe(widgetChatsEndRef.value)
-  } else {
-    isWidgetButtonSticky.value = false
-  }
+const navigateToStatistics = () => {
+  router.push('/statistics#chats')
 }
-
-// Watch for changes in showAll states (widget only)
-watch([showAllWidget], () => {
-  setupIntersectionObserver()
-})
 
 // Load chats on mount
 onMounted(async () => {
   await chatsStore.loadChats()
-  await setupIntersectionObserver()
-})
-
-let cleanupObserver: (() => void) | undefined
-
-onBeforeUnmount(() => {
-  if (cleanupObserver) {
-    cleanupObserver()
-  }
 })
 </script>
