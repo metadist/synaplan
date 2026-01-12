@@ -1268,13 +1268,25 @@ class StreamController extends AbstractController
             }
 
             // Create outgoing message for the cancelled response
+            // CRITICAL: Ensure response timestamp is AFTER incoming message timestamp
+            // to guarantee correct chronological order (fix race condition when switching chats quickly)
+            $currentTimestamp = time();
+            $incomingTimestamp = $incomingMessage->getUnixTimestamp();
+
+            // Only adjust timestamp if it would cause wrong order (response before or same time as input)
+            if ($currentTimestamp <= $incomingTimestamp) {
+                $responseTimestamp = $incomingTimestamp + 1;
+            } else {
+                $responseTimestamp = $currentTimestamp;
+            }
+
             $outgoingMessage = new Message();
             $outgoingMessage->setUserId($user->getId());
             $outgoingMessage->setChat($chat);
             $outgoingMessage->setTrackingId($trackId);
             $outgoingMessage->setProviderIndex($incomingMessage->getProviderIndex());
-            $outgoingMessage->setUnixTimestamp(time());
-            $outgoingMessage->setDateTime(date('YmdHis'));
+            $outgoingMessage->setUnixTimestamp($responseTimestamp);
+            $outgoingMessage->setDateTime(date('YmdHis', $responseTimestamp));
             $outgoingMessage->setMessageType($incomingMessage->getMessageType());
             $outgoingMessage->setFile(0);
             $outgoingMessage->setTopic($incomingMessage->getTopic());
