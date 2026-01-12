@@ -213,13 +213,13 @@ jobs:
           path: frontend/dist-widget/
           retention-days: 1
 
-  docker:
+  docker-build:
     name: Build Docker Image
     runs-on: ubuntu-latest
     needs: [frontend]
-    permissions:
-      contents: read
-      packages: write
+    outputs:
+      image-tags: ${{ steps.meta.outputs.tags }}
+      image-labels: ${{ steps.meta.outputs.labels }}
 
     steps:
       - name: Checkout
@@ -240,13 +240,6 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Log in to the Container registry
-        uses: docker/login-action@v3
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
       - name: Extract metadata (tags, labels)
         id: meta
         uses: docker/metadata-action@v5
@@ -263,30 +256,205 @@ jobs:
             type=ref,event=pr
 
       - name: Build Docker image
+        id: build
         uses: docker/build-push-action@v6
         with:
           context: .
           file: _docker/backend/Dockerfile
-          # Push only on main branch or tags, not on PRs or develop
-          push: ${{ github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/')) }}
+          push: false
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+          # Export to tar file for sharing between jobs
+          outputs: type=docker,dest=/tmp/docker-image.tar
+
+      - name: Upload Docker image artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: docker-image
+          path: /tmp/docker-image.tar
+          retention-days: 1
+
+  e2e:
+    name: E2E Tests (${{ matrix.browser }})
+    runs-on: ubuntu-latest
+    needs: [docker-build]
+    strategy:
+      fail-fast: false
+      matrix:
+        browser: [chromium, firefox]
+        include:
+          # Basic browser configurations
+          - browser: chromium
+            project: chromium
+          - browser: firefox
+            project: firefox
+
+          # Example: Add environment-specific test configurations
+          # Uncomment and modify as needed:
+          # - browser: chromium
+          #   project: chromium
+          #   env_name: staging
+          #   ai_provider: groq
+          #   test_tag: "@smoke"
+          # - browser: firefox
+          #   project: firefox
+          #   env_name: production-like
+          #   ai_provider: openai
+          #   test_tag: "@critical"
+    env:
+      APP_IMAGE: synaplan-test:ci
+      APP_URL: http://localhost:8001
+      # You can add matrix-specific env vars here:
+      # AI_DEFAULT_PROVIDER: ${{ matrix.ai_provider || 'test' }}
+      # TEST_ENV: ${{ matrix.env_name || 'test' }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download Docker image artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: docker-image
+          path: /tmp
+
+      - name: Load Docker image
+        run: |
+          docker load -i /tmp/docker-image.tar
+          echo "Loaded images:"
+          docker images
+
+          # Tag the first loaded image as synaplan-test:ci for docker-compose
+          IMAGE_TAG=$(docker images --format "{{.Repository}}:{{.Tag}}" | head -n 1)
+          echo "Tagging $IMAGE_TAG as synaplan-test:ci"
+          docker tag $IMAGE_TAG synaplan-test:ci
+          docker images
+
+      - name: Start test services and show logs
+        run: |
+          echo "Starting services..."
+          docker compose -f docker-compose.test.yml -f docker-compose.test.ci.yml up -d
+
+          # Start following logs in background
+          docker compose -f docker-compose.test.yml -f docker-compose.test.ci.yml logs -f &
+          LOGS_PID=$!
+
+          echo "Waiting for services to be healthy..."
+          docker compose -f docker-compose.test.yml -f docker-compose.test.ci.yml up --wait || {
+            echo "Failed to start services. Status:"
+            docker compose -f docker-compose.test.yml -f docker-compose.test.ci.yml ps
+            echo ""
+            echo "Container logs:"
+            docker compose -f docker-compose.test.yml -f docker-compose.test.ci.yml logs
+            exit 1
+          }
+
+          echo "Services are ready!"
+          docker compose -f docker-compose.test.yml -f docker-compose.test.ci.yml ps
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install Playwright dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Install Playwright browsers
+        working-directory: frontend
+        run: npx playwright install --with-deps ${{ matrix.browser }}
+
+      - name: Run E2E tests
+        working-directory: frontend
+        env:
+          BASE_URL: http://localhost:8001
+          AUTH_USER: admin@synaplan.com
+          AUTH_PASS: admin123
+        run: |
+          echo "============================================"
+          echo "Running E2E tests with ${{ matrix.browser }}"
+          echo "============================================"
+          npx playwright test --config=tests/e2e/playwright.config.ts --project=${{ matrix.project }}
+
+      - name: Upload Playwright test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-results-${{ matrix.browser }}
+          path: |
+            frontend/tests/e2e/test-results/
+            frontend/tests/e2e/reports/
+          retention-days: 7
+          if-no-files-found: ignore
+
+      - name: Stop test services
+        if: always()
+        run: docker compose -f docker-compose.test.yml -f docker-compose.test.ci.yml down -v
+
+  docker-push:
+    name: Push Docker Image
+    runs-on: ubuntu-latest
+    needs: [docker-build, e2e]
+    # Only run on main branch or tags (e2e tests already passed)
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/'))
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Download Docker image artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: docker-image
+          path: /tmp
+
+      - name: Load Docker image
+        run: |
+          docker load -i /tmp/docker-image.tar
+          echo "Loaded images:"
+          docker images
+
+      - name: Log in to the Container registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Push Docker image
+        run: |
+          echo "Pushing all tags..."
+          docker images --format "{{.Repository}}:{{.Tag}}" | grep "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}" | while read -r tag; do
+            echo "Pushing: $tag"
+            docker push "$tag"
+          done
+          echo "✅ All images pushed successfully"
 
   # Gate job that depends on all checks - only this needs to be required in branch protection
   all-checks-passed:
     name: All Checks Passed
     runs-on: ubuntu-latest
-    needs: [lint, backend, frontend, docker]
+    needs: [lint, backend, frontend, docker-build, e2e, docker-push]
     if: always()
     steps:
       - name: Check for failures
-        if: ${{ !cancelled() && (needs.lint.result != 'success' || needs.backend.result != 'success' || needs.frontend.result != 'success' || needs.docker.result != 'success') }}
+        if: |
+          !cancelled() && (
+            needs.lint.result != 'success' ||
+            needs.backend.result != 'success' ||
+            needs.frontend.result != 'success' ||
+            needs.docker-build.result != 'success' ||
+            needs.e2e.result != 'success' ||
+            (needs.docker-push.result != 'success' && needs.docker-push.result != 'skipped')
+          )
         run: |
           echo "One or more checks failed, were cancelled, or were skipped"
           exit 1
 
       - name: All checks passed
-        if: ${{ !cancelled() && needs.lint.result == 'success' && needs.backend.result == 'success' && needs.frontend.result == 'success' && needs.docker.result == 'success' }}
         run: echo "All checks passed!"

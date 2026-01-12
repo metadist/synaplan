@@ -62,7 +62,9 @@ export default defineConfig(({ mode }) => {
     test: {
       globals: true,
       environment: 'happy-dom',
-      setupFiles: ['./tests/setup.ts'],
+      setupFiles: ['./tests/unit/setup.ts'],
+      include: ['tests/unit/**/*.{test,spec}.{js,ts}'],
+      exclude: ['tests/e2e/**', 'node_modules/**'],
       coverage: {
         provider: 'v8',
         reporter: ['text', 'json', 'html'],

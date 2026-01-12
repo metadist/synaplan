@@ -16,9 +16,12 @@ format: ## Fix code formatting (backend + frontend)
 	$(MAKE) -C backend format
 	$(MAKE) -C frontend format
 
-test: ## Run all tests (backend + frontend)
+test: ## Run all tests (backend + frontend unit tests)
 	$(MAKE) -C backend test
 	$(MAKE) -C frontend test
+
+test-e2e: ## Run e2e tests
+	$(MAKE) -C frontend test-e2e
 
 audit: ## Run security audit (backend)
 	$(MAKE) -C backend audit
