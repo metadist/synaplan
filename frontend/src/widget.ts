@@ -139,6 +139,8 @@ class SynaplanWidget {
           console.warn('Synaplan Widget: Widget is not active (503 Service Unavailable)')
         } else if (response.status === 404) {
           console.error('Synaplan Widget: Widget not found (404)')
+        } else if (response.status === 403) {
+          console.warn('Synaplan Widget: Domain not allowed (403 Forbidden)')
         } else {
           console.error(`Synaplan Widget: Failed to load config (${response.status})`)
         }
