@@ -3,6 +3,7 @@
   <div
     class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
     data-testid="modal-widget-editor"
+    @click.self="$emit('close')"
   >
     <div
       class="surface-card rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto shadow-2xl"
@@ -466,7 +467,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { Icon } from '@iconify/vue'
 import type { Widget, WidgetConfig } from '@/services/api/widgetsApi'
 import { promptsApi } from '@/services/api/promptsApi'
@@ -894,6 +895,15 @@ const handleSave = () => {
   emit('save', data)
 }
 
+/**
+ * Handle ESC key press
+ */
+const handleEscape = (event: KeyboardEvent) => {
+  if (event.key === 'Escape') {
+    emit('close')
+  }
+}
+
 onMounted(() => {
   if (isEdit.value) {
     if (props.widget) {
@@ -912,5 +922,13 @@ onMounted(() => {
       pushAllowedDomain(window.location.host)
     }
   }
+
+  // Add ESC key listener
+  window.addEventListener('keydown', handleEscape)
+})
+
+onUnmounted(() => {
+  // Remove ESC key listener
+  window.removeEventListener('keydown', handleEscape)
 })
 </script>
