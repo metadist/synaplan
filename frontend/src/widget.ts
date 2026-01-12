@@ -97,7 +97,12 @@ class SynaplanWidget {
    * Lazy mode: Show button, load chat on click
    */
   private async startLazy() {
-    await this.loadRemoteConfig()
+    const configLoaded = await this.loadRemoteConfig()
+    if (!configLoaded) {
+      console.warn('Synaplan Widget: Widget is not active or unavailable')
+      return
+    }
+
     this.createButton()
 
     if (this.config?.autoOpen) {
@@ -109,12 +114,17 @@ class SynaplanWidget {
    * Eager mode: Load chat immediately
    */
   private async startEager() {
-    await this.loadRemoteConfig()
+    const configLoaded = await this.loadRemoteConfig()
+    if (!configLoaded) {
+      console.warn('Synaplan Widget: Widget is not active or unavailable')
+      return
+    }
+
     await this.loadChat()
   }
 
-  private async loadRemoteConfig(): Promise<void> {
-    if (!this.config || this.config.isPreview) return
+  private async loadRemoteConfig(): Promise<boolean> {
+    if (!this.config || this.config.isPreview) return true
 
     try {
       const apiUrl = this.config.apiUrl || ''
@@ -124,7 +134,18 @@ class SynaplanWidget {
         },
       })
 
-      if (!response.ok) return
+      if (!response.ok) {
+        if (response.status === 503) {
+          console.warn('Synaplan Widget: Widget is not active (503 Service Unavailable)')
+        } else if (response.status === 404) {
+          console.error('Synaplan Widget: Widget not found (404)')
+        } else if (response.status === 403) {
+          console.warn('Synaplan Widget: Domain not allowed (403 Forbidden)')
+        } else {
+          console.error(`Synaplan Widget: Failed to load config (${response.status})`)
+        }
+        return false
+      }
 
       const data = await response.json()
 
@@ -134,9 +155,13 @@ class SynaplanWidget {
           ...data.config,
           widgetTitle: data.name || this.config.widgetTitle,
         }
+        return true
       }
+
+      return false
     } catch (error) {
-      console.warn('Synaplan Widget: Failed to load remote config', error)
+      console.error('Synaplan Widget: Failed to load remote config', error)
+      return false
     }
   }
 

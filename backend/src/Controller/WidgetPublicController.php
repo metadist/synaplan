@@ -974,7 +974,9 @@ class WidgetPublicController extends AbstractController
         $allowedDomains = $config['allowedDomains'] ?? [];
         if (empty($allowedDomains)) {
             $this->logger->warning('Widget request blocked: no domains configured', [
-                'widget_config' => $config,
+                'allowed_domains_count' => 0,
+                'config_keys' => array_keys($config),
+                'request_host' => $request->headers->get('X-Widget-Host') ?? $request->getHost(),
             ]);
 
             return $this->json([
