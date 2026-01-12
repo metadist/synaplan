@@ -3,6 +3,7 @@
   <div
     class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
     data-testid="modal-embed-code"
+    @click.self="$emit('close')"
   >
     <div
       class="surface-card rounded-2xl max-w-4xl w-full max-h-[90vh] flex flex-col shadow-2xl"
@@ -97,7 +98,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import { Icon } from '@iconify/vue'
 import type { Widget } from '@/services/api/widgetsApi'
 import { useNotification } from '@/composables/useNotification'
@@ -110,7 +111,7 @@ interface Props {
 }
 
 defineProps<Props>()
-defineEmits<{
+const emit = defineEmits<{
   close: []
 }>()
 
@@ -135,4 +136,23 @@ const copyToClipboard = async (text: string, type: string) => {
     console.error('Failed to copy:', error)
   }
 }
+
+/**
+ * Handle ESC key press
+ */
+const handleEscape = (event: KeyboardEvent) => {
+  if (event.key === 'Escape') {
+    emit('close')
+  }
+}
+
+onMounted(() => {
+  // Add ESC key listener
+  window.addEventListener('keydown', handleEscape)
+})
+
+onUnmounted(() => {
+  // Remove ESC key listener
+  window.removeEventListener('keydown', handleEscape)
+})
 </script>
