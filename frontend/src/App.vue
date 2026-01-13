@@ -18,8 +18,10 @@
 <script setup lang="ts">
 import { watch } from 'vue'
 import { useRoute } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import { useTheme } from './composables/useTheme'
 import { useAuthStore } from '@/stores/auth'
+import { APP_NAME } from '@/router'
 import NotificationContainer from '@/components/NotificationContainer.vue'
 import Dialog from '@/components/Dialog.vue'
 import ErrorBoundary from '@/components/ErrorBoundary.vue'
@@ -41,10 +43,21 @@ legacyKeys.forEach((key) => {
 const authStore = useAuthStore()
 authStore.checkAuth()
 
+// Update page title when language changes
+const route = useRoute()
+const { t, locale } = useI18n()
+
+watch(locale, () => {
+  const titleKey = route.meta.titleKey as string | undefined
+  if (titleKey) {
+    const pageTitle = t(titleKey)
+    document.title = `${pageTitle} | ${APP_NAME}`
+  }
+})
+
 // Google reCAPTCHA v3 Badge visibility control
 // Only show badge on auth-related pages (login, register)
 // Hide everywhere else for better UX (v3 works invisibly in background)
-const route = useRoute()
 
 // Auth routes where reCAPTCHA badge should be visible
 const authRoutes = ['login', 'register']
