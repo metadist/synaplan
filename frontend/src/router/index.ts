@@ -4,7 +4,7 @@ import { authReady } from '@/stores/auth'
 import { i18n } from '@/i18n'
 import LoadingView from '@/views/LoadingView.vue'
 
-const APP_NAME = 'Synaplan'
+export const APP_NAME = 'Synaplan'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),

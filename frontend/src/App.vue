@@ -21,14 +21,13 @@ import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useTheme } from './composables/useTheme'
 import { useAuthStore } from '@/stores/auth'
+import { APP_NAME } from '@/router'
 import NotificationContainer from '@/components/NotificationContainer.vue'
 import Dialog from '@/components/Dialog.vue'
 import ErrorBoundary from '@/components/ErrorBoundary.vue'
 import LoadingView from '@/views/LoadingView.vue'
 
 useTheme()
-
-const APP_NAME = 'Synaplan'
 
 // SECURITY: Clean up any legacy localStorage entries from before cookie-based auth
 // These should NEVER exist - if they do, they're from old code and must be removed
