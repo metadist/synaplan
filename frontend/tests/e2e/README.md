@@ -1,127 +1,52 @@
-# Playwright Smoke Test Setup
+# Playwright E2E Guide
 
-Minimal robust Playwright smoke test setup for running web applications.
+This folder contains the Playwright suite (`tests/`) and config (`playwright.config.ts`). Run everything from the `frontend/` directory.
 
-## Setup
+## Prerequisites
+- Node.js 18+
+- Dependencies installed via npm (no sudo)
 
+## One-time setup
 ```bash
-# Node.js 18+ required
-node --version
-
-# Install dependencies
-npm install
-
-# Install Playwright browsers
-npx playwright install chromium
+cd frontend
+npm ci
+npx playwright install --with-deps
 ```
 
-## Environment Variables
+## Environment
+Defaults (see `playwright.config.ts`):
+- `BASE_URL` defaults to `http://localhost:5173`
+- `headless` runs in CI, headed locally
+- Login tests are excluded by default via `grepInvert`
 
-Copy `.env.example` to `.env` and adjust:
+Provide env values via shell or `frontend/tests/e2e/.env` / `.env.local`:
+- `BASE_URL` – app URL
+- `AUTH_USER`, `AUTH_PASS` – credentials for auth flows
+- Optional: feature flags or API tokens your backend expects
 
+## Running tests
 ```bash
-cp .env.example .env
+# From frontend/
+npm run test:e2e  # runs suite except tests containing "login"
+
+# Run a specific file
+npx playwright test tests/login.spec.ts --config=tests/e2e/playwright.config.ts
+
+# Include login tests explicitly
+npx playwright test --grep login --config=tests/e2e/playwright.config.ts
+
+# Headed debugging
+npx playwright test --headed --config=tests/e2e/playwright.config.ts
 ```
 
-Important environment variables:
-
-- `BASE_URL`: Base URL for tests (Default: `http://localhost:5173`)
-- `AUTH_USER`: Username for login tests
-- `AUTH_PASS`: Password for login tests
-- `API_TOKEN`: Optional: Token for API tests
-
-## Local Run
-
-### With Docker (recommended)
-
+## Reports and traces
+Artifacts live in `frontend/tests/e2e/test-results` and `frontend/tests/e2e/reports`.
 ```bash
-# Start test environment with Docker
-cd ..
-docker compose -f docker-compose.test.yml up -d
-
-# Wait until services are ready
-docker compose -f docker-compose.test.yml ps
-
-# Run tests
-cd tests
-AUTH_USER=admin@synaplan.com AUTH_PASS=admin123 npx playwright test
-
-# Stop test environment
-cd ..
-docker compose -f docker-compose.test.yml down -v
+npm run report  # open HTML report
+npm run trace   # open last trace
 ```
-
-### Without Docker
-
-```bash
-# All tests
-npm test
-
-# Smoke tests only
-npm run test:smoke
-
-# With custom BASE_URL
-BASE_URL=http://localhost:5173 npm run test:smoke
-```
-
-## Test Development
-
-```bash
-# Codegen: Generate test code while you interact
-npm run codegen
-
-# UI Mode: Visual test runner with live preview & debug
-npm run test:ui
-
-# Run single test
-npx playwright test tests/e2e/smoke/01_login.spec.ts
-
-# Headed mode (browser visible)
-npx playwright test --headed
-```
-
-## Reports
-
-```bash
-# Open HTML report
-npm run report
-
-# Show trace
-npm run trace
-```
-
-## Selector Guidelines
-
-Prefer using `[data-testid]` attributes for robust selectors.
-
-Adapt selectors in `tests/utils/selectors.ts` to your app.
-
-## CI/CD
-
-GitHub Actions workflow runs:
-
-- On push to main
-- 3× daily (6:00, 12:00, 18:00 UTC)
-
-Set secrets in GitHub:
-
-- `BASE_URL`
-- `AUTH_USER`
-- `AUTH_PASS`
-- `API_TOKEN`
 
 ## Troubleshooting
-
-**Timeouts:**
-
-- Increase `timeout` in `playwright.config.ts`
-- Check if app is running on `BASE_URL`
-
-**Flaky Tests:**
-
-- Use `waitForIdle()` instead of `sleep()`
-- Check selectors in `selectors.ts`
-
-**Slow CI:**
-
-- Reduce `workers` in `playwright.config.ts` (e.g., to 2)
+- `playwright: not found`: reinstall deps (`npm ci`) and run `npx playwright install --with-deps`.
+- `EACCES` in node_modules: ensure `node_modules` is owned by your user (no sudo npm).
+- Timeouts: verify `BASE_URL` is reachable; increase `timeout` in `playwright.config.ts` if needed.

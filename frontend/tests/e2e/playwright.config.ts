@@ -4,8 +4,6 @@ import dotenv from 'dotenv'
 // Lade .env Datei (automatisch im Projektverzeichnis)
 dotenv.config({ path: '.env.local' })
 
-const grepPattern = process.env.PW_GREP ? new RegExp(process.env.PW_GREP) : undefined
-
 /**
  * Minimal-robustes Playwright-Smoke-Setup
  * BaseURL: http://localhost:5137 (überschreibbar via BASE_URL ENV)
@@ -53,6 +51,5 @@ export default defineConfig({
   ],
 
   // Standard-Grep für @smoke
-  grep: grepPattern,
-  grepInvert: grepPattern ? undefined : /^(?!.*login).*$/,
+  grepInvert: /^(?!.*login).*$/,
 })
