@@ -51,6 +51,7 @@ frontend/.vite/
 tests/test-results/
 tests/reports/
 tests/prompts
+frontend/tests/e2e/prompts/
 
 # Platform configs
 platform/
