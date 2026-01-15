@@ -285,6 +285,7 @@ class MessageController extends AbstractController
             ->where('m.userId = :userId')
             ->setParameter('userId', $user->getId())
             ->orderBy('m.unixTimestamp', 'DESC')
+            ->addOrderBy('m.id', 'DESC')
             ->setMaxResults($limit);
 
         if ($trackId) {

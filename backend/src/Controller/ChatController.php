@@ -450,6 +450,7 @@ class ChatController extends AbstractController
             ->where('m.chatId = :chatId')
             ->setParameter('chatId', $chat->getId())
             ->orderBy('m.unixTimestamp', 'DESC')
+            ->addOrderBy('m.id', 'DESC')
             ->setFirstResult($offset)
             ->setMaxResults($limit);
 
