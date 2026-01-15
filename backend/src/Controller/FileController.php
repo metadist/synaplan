@@ -161,7 +161,20 @@ class FileController extends AbstractController
         string $groupKey,
         string $processLevel,
     ): array {
-        // Step 0: Check storage quota BEFORE uploading
+        // Step 0a: Check rate limit for FILE_ANALYSIS BEFORE uploading
+        $rateLimitCheck = $this->rateLimitService->checkLimit($user, 'FILE_ANALYSIS');
+        if (!$rateLimitCheck['allowed']) {
+            return [
+                'success' => false,
+                'error' => "Rate limit exceeded for FILE_ANALYSIS. Used: {$rateLimitCheck['used']}/{$rateLimitCheck['limit']}",
+                'rate_limit_exceeded' => true,
+                'action' => 'FILE_ANALYSIS',
+                'used' => $rateLimitCheck['used'],
+                'limit' => $rateLimitCheck['limit'],
+            ];
+        }
+
+        // Step 0b: Check storage quota BEFORE uploading
         $fileSize = $uploadedFile->getSize();
         try {
             $this->storageQuotaService->checkStorageLimit($user, $fileSize);
@@ -287,41 +300,14 @@ class FileController extends AbstractController
             $result['ai_processing_note'] = 'AI processing not yet implemented';
         }
 
-        // Record file type-specific usage for statistics
-        $fileAction = $this->getFileUsageAction($fileExtension);
-        $this->rateLimitService->recordUsage($user, $fileAction, [
+        // Record FILE_ANALYSIS usage for statistics
+        $this->rateLimitService->recordUsage($user, 'FILE_ANALYSIS', [
             'file_id' => $messageFile->getId(),
             'filename' => $uploadedFile->getClientOriginalName(),
             'source' => 'WEB',
         ]);
 
         return $result;
-    }
-
-    /**
-     * Get usage action based on file extension for statistics tracking.
-     */
-    private function getFileUsageAction(string $extension): string
-    {
-        $ext = strtolower($extension);
-
-        // Images
-        if (in_array($ext, ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg'], true)) {
-            return 'IMAGES';
-        }
-
-        // Videos
-        if (in_array($ext, ['mp4', 'mov', 'avi', 'mkv', 'webm', 'wmv', 'flv'], true)) {
-            return 'VIDEOS';
-        }
-
-        // Audio
-        if (in_array($ext, ['mp3', 'wav', 'ogg', 'm4a', 'opus', 'flac', 'amr', 'aac'], true)) {
-            return 'AUDIOS';
-        }
-
-        // Documents (default for all other files including PDF, DOCX, etc.)
-        return 'FILE_ANALYSIS';
     }
 
     /**

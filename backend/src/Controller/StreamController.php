@@ -885,6 +885,26 @@ class StreamController extends AbstractController
                     'source' => $isWidgetMode ? 'WIDGET' : 'WEB',
                 ]);
 
+                // Record AI-generated media usage (IMAGES, VIDEOS, AUDIOS) separately
+                $mediaType = $response['metadata']['media_type'] ?? null;
+                if ($mediaType) {
+                    $mediaAction = match ($mediaType) {
+                        'image' => 'IMAGES',
+                        'video' => 'VIDEOS',
+                        'audio' => 'AUDIOS',
+                        default => null,
+                    };
+
+                    if ($mediaAction) {
+                        $this->rateLimitService->recordUsage($user, $mediaAction, [
+                            'provider' => $response['metadata']['provider'] ?? 'unknown',
+                            'model' => $response['metadata']['model'] ?? 'unknown',
+                            'chat_id' => $chatId,
+                            'source' => $isWidgetMode ? 'WIDGET' : 'WEB',
+                        ]);
+                    }
+                }
+
                 // Get search results if available
                 $searchResults = null;
                 if (isset($result['search_results']) && !empty($result['search_results']['results'])) {

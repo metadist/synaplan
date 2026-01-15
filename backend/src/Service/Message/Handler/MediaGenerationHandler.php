@@ -4,11 +4,13 @@ namespace App\Service\Message\Handler;
 
 use App\AI\Service\AiFacade;
 use App\Entity\Message;
+use App\Entity\User;
 use App\Service\File\FileHelper;
 use App\Service\File\ThumbnailService;
 use App\Service\File\UserUploadPathBuilder;
 use App\Service\Message\MediaPromptExtractor;
 use App\Service\ModelConfigService;
+use App\Service\RateLimitService;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\DependencyInjection\Attribute\AutoconfigureTag;
@@ -31,6 +33,7 @@ class MediaGenerationHandler implements MessageHandlerInterface
         private MediaPromptExtractor $promptExtractor,
         private UserUploadPathBuilder $userUploadPathBuilder,
         private ThumbnailService $thumbnailService,
+        private RateLimitService $rateLimitService,
         private string $uploadDir = '/var/www/backend/var/uploads',
     ) {
     }
@@ -204,6 +207,41 @@ class MediaGenerationHandler implements MessageHandlerInterface
 
         $statusMessage = "AI is crafting your $mediaTypeLabel with $providerName $modelName";
         $this->notify($progressCallback, 'generating', $statusMessage);
+
+        // Check rate limit for media type BEFORE generating (IMAGES, VIDEOS, AUDIOS)
+        $mediaAction = match ($mediaType) {
+            'image' => 'IMAGES',
+            'video' => 'VIDEOS',
+            'audio' => 'AUDIOS',
+            default => 'IMAGES',
+        };
+
+        $userId = $message->getUserId();
+        $user = $this->em->getRepository(User::class)->find($userId);
+
+        if ($user) {
+            $rateLimitCheck = $this->rateLimitService->checkLimit($user, $mediaAction);
+            if (!$rateLimitCheck['allowed']) {
+                $errorMessage = "Rate limit exceeded for {$mediaAction}. Used: {$rateLimitCheck['used']}/{$rateLimitCheck['limit']}";
+                $this->logger->warning('MediaGenerationHandler: Rate limit exceeded', [
+                    'user_id' => $userId,
+                    'action' => $mediaAction,
+                    'used' => $rateLimitCheck['used'],
+                    'limit' => $rateLimitCheck['limit'],
+                ]);
+
+                $streamCallback($errorMessage);
+
+                return [
+                    'metadata' => [
+                        'error' => 'rate_limit_exceeded',
+                        'action' => $mediaAction,
+                        'used' => $rateLimitCheck['used'],
+                        'limit' => $rateLimitCheck['limit'],
+                    ],
+                ];
+            }
+        }
 
         try {
             // Generate media based on type

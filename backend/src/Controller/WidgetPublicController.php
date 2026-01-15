@@ -629,16 +629,6 @@ class WidgetPublicController extends AbstractController
             $owner = $this->em->getRepository(\App\Entity\User::class)->find($widget->getOwnerId());
         }
 
-        if ($owner) {
-            $ownerLimit = $this->rateLimitService->checkLimit($owner, 'FILE_UPLOADS');
-            if (!($ownerLimit['allowed'] ?? true)) {
-                return $this->json([
-                    'error' => 'Owner file upload limit exceeded',
-                    'reason' => $ownerLimit['reason'] ?? 'limit_exceeded',
-                ], Response::HTTP_TOO_MANY_REQUESTS);
-            }
-        }
-
         $fileLimit = (int) ($config['fileUploadLimit'] ?? WidgetSessionService::DEFAULT_MAX_FILES);
         $fileLimitCheck = $this->sessionService->checkFileUploadLimit($widgetSession, $fileLimit);
         if (!$fileLimitCheck['allowed']) {
@@ -656,6 +646,20 @@ class WidgetPublicController extends AbstractController
             return $this->json([
                 'error' => 'No file uploaded. Use form-data with file field',
             ], Response::HTTP_BAD_REQUEST);
+        }
+
+        // Check FILE_ANALYSIS rate limit for widget owner
+        if ($owner) {
+            $fileAnalysisLimit = $this->rateLimitService->checkLimit($owner, 'FILE_ANALYSIS');
+            if (!($fileAnalysisLimit['allowed'] ?? true)) {
+                return $this->json([
+                    'error' => 'Rate limit exceeded for FILE_ANALYSIS',
+                    'rate_limit_exceeded' => true,
+                    'action' => 'FILE_ANALYSIS',
+                    'used' => $fileAnalysisLimit['used'],
+                    'limit' => $fileAnalysisLimit['limit'],
+                ], Response::HTTP_TOO_MANY_REQUESTS);
+            }
         }
 
         // Check file size limit (from widget config)
@@ -678,13 +682,9 @@ class WidgetPublicController extends AbstractController
             if ($result['success']) {
                 $this->sessionService->incrementFileCount($widgetSession);
 
-                // Record usage for widget owner
+                // Record FILE_ANALYSIS usage for widget owner
                 if ($owner) {
-                    // Record the file type-specific action for statistics
-                    $fileExtension = strtolower($uploadedFile->getClientOriginalExtension());
-                    $fileAction = $this->getFileUsageAction($fileExtension);
-
-                    $this->rateLimitService->recordUsage($owner, $fileAction, [
+                    $this->rateLimitService->recordUsage($owner, 'FILE_ANALYSIS', [
                         'file_id' => $result['file']['id'],
                         'widget_id' => $widgetId,
                         'session_id' => $sessionId,
@@ -861,32 +861,6 @@ class WidgetPublicController extends AbstractController
             'docx', 'doc', 'xlsx', 'xls', 'pptx', 'ppt' => 4, // Office
             default => 5, // Other
         };
-    }
-
-    /**
-     * Get usage action based on file extension for statistics tracking.
-     */
-    private function getFileUsageAction(string $extension): string
-    {
-        $ext = strtolower($extension);
-
-        // Images
-        if (in_array($ext, ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg'], true)) {
-            return 'IMAGES';
-        }
-
-        // Videos
-        if (in_array($ext, ['mp4', 'mov', 'avi', 'mkv', 'webm', 'wmv', 'flv'], true)) {
-            return 'VIDEOS';
-        }
-
-        // Audio
-        if (in_array($ext, ['mp3', 'wav', 'ogg', 'm4a', 'opus', 'flac', 'amr', 'aac'], true)) {
-            return 'AUDIOS';
-        }
-
-        // Documents (default for all other files including PDF, DOCX, etc.)
-        return 'FILE_ANALYSIS';
     }
 
     /**
