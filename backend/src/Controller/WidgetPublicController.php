@@ -504,6 +504,16 @@ class WidgetPublicController extends AbstractController
                         $tokens = array_sum(array_map(static fn ($value) => is_numeric($value) ? (int) $value : 0, $tokens));
                     }
 
+                    // Get classification data (topic, language) from result
+                    $classification = $result['classification'] ?? [];
+                    $topic = $classification['topic'] ?? 'WIDGET';
+                    $language = $classification['language'] ?? 'en';
+
+                    // Update incoming message with classification
+                    $incomingMessage->setTopic($topic);
+                    $incomingMessage->setLanguage($language);
+                    $incomingMessage->setStatus('complete');
+
                     $outgoingMessage = new Message();
                     $outgoingMessage->setUserId($owner->getId());
                     $outgoingMessage->setChat($chat);
@@ -515,13 +525,11 @@ class WidgetPublicController extends AbstractController
                     $outgoingMessage->setFile(0);
                     $outgoingMessage->setFilePath('');
                     $outgoingMessage->setFileType('');
-                    $outgoingMessage->setTopic($incomingMessage->getTopic());
-                    $outgoingMessage->setLanguage($incomingMessage->getLanguage());
+                    $outgoingMessage->setTopic($topic);
+                    $outgoingMessage->setLanguage($language);
                     $outgoingMessage->setText($responseText);
                     $outgoingMessage->setDirection('OUT');
                     $outgoingMessage->setStatus('complete');
-
-                    $incomingMessage->setStatus('complete');
 
                     $this->em->persist($outgoingMessage);
                     $this->em->flush();
