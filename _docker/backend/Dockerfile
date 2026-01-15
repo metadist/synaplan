@@ -158,6 +158,9 @@ COPY frontend/dist /var/www/frontend
 # Copy built widgets (built externally in CI, empty in dev)
 COPY frontend/dist-widget /var/www/widgets
 
+# Copy plugins directory (for SortX and other plugins)
+COPY plugins/ /plugins/
+
 # Copy Caddyfile for production routing (API vs SPA)
 COPY _docker/backend/Caddyfile /etc/caddy/Caddyfile
 

@@ -80,6 +80,7 @@
         "psr-4": {
             "App\\": "src/",
             "Plugin\\": "/plugins/",
+            "Plugin\\SortX\\": "/plugins/sortx/backend/",
             "Inference\\": "lib/grpc/Inference/",
             "GPBMetadata\\": "lib/grpc/GPBMetadata/"
         }
