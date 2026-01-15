@@ -19,6 +19,7 @@ services:
     volumes:
       # Volume mounts for local development (overridden in CI via docker-compose.test.ci.yml)
       - ./backend:/var/www/backend
+      - ./plugins:/plugins
       - ./_docker/backend/docker-entrypoint.sh:/usr/local/bin/docker-entrypoint.sh:ro
     environment:
       APP_ENV: test
