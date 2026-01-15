@@ -238,6 +238,31 @@ class WidgetPublicController extends AbstractController
                 $this->em->persist($chat);
                 $this->em->flush();
 
+                // Create welcome message if configured
+                $autoMessage = $config['autoMessage'] ?? '';
+                if (!empty($autoMessage)) {
+                    // Use timestamp 1 second before current time to ensure welcome message comes first
+                    $welcomeTimestamp = time() - 1;
+                    $welcomeMessage = new Message();
+                    $welcomeMessage->setUserId($owner->getId());
+                    $welcomeMessage->setChat($chat);
+                    $welcomeMessage->setText($autoMessage);
+                    $welcomeMessage->setDirection('OUT');
+                    $welcomeMessage->setStatus('complete');
+                    $welcomeMessage->setMessageType('WDGT');
+                    $welcomeMessage->setTrackingId($welcomeTimestamp);
+                    $welcomeMessage->setUnixTimestamp($welcomeTimestamp);
+                    $welcomeMessage->setDateTime(date('YmdHis', $welcomeTimestamp));
+                    $welcomeMessage->setProviderIndex('widget');
+                    $this->em->persist($welcomeMessage);
+                    $this->em->flush();
+
+                    $this->logger->info('Widget welcome message created', [
+                        'widget_id' => $widget->getWidgetId(),
+                        'chat_id' => $chat->getId(),
+                    ]);
+                }
+
                 $this->logger->info('Widget chat created', [
                     'widget_id' => $widget->getWidgetId(),
                     'chat_id' => $chat->getId(),
@@ -259,7 +284,7 @@ class WidgetPublicController extends AbstractController
             $incomingMessage->setTrackingId(time());
             $incomingMessage->setUnixTimestamp(time());
             $incomingMessage->setDateTime(date('YmdHis'));
-            $incomingMessage->setProviderIndex(999); // Special provider index for widgets
+            $incomingMessage->setProviderIndex('widget'); // Special provider index for widgets
 
             $this->em->persist($incomingMessage);
             $this->em->flush();
