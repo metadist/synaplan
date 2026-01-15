@@ -35,8 +35,8 @@ final readonly class OAuthStateService
     /**
      * Generate a signed OAuth state token.
      *
-     * @param string $provider   OAuth provider identifier (e.g., 'google', 'github')
-     * @param array  $extraData  Additional data to include in the state (e.g., PKCE verifier)
+     * @param string $provider  OAuth provider identifier (e.g., 'google', 'github')
+     * @param array  $extraData Additional data to include in the state (e.g., PKCE verifier)
      *
      * @return string Base64-encoded signed state token
      */
