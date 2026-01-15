@@ -61,15 +61,20 @@ class WidgetSessionRepository extends ServiceEntityRepository
 
     /**
      * Count active sessions for a widget.
+     *
+     * A session is considered "active" if it had activity in the last 15 minutes.
      */
     public function countActiveSessionsByWidget(string $widgetId): int
     {
+        // Active = last message within the last 15 minutes
+        $activeThreshold = time() - (5 * 60);
+
         return $this->createQueryBuilder('ws')
             ->select('COUNT(ws.id)')
             ->where('ws.widgetId = :widgetId')
-            ->andWhere('ws.expires > :now')
+            ->andWhere('ws.lastMessage > :threshold')
             ->setParameter('widgetId', $widgetId)
-            ->setParameter('now', time())
+            ->setParameter('threshold', $activeThreshold)
             ->getQuery()
             ->getSingleScalarResult();
     }

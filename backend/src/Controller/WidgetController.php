@@ -90,6 +90,7 @@ class WidgetController extends AbstractController
                 'isActive' => $this->widgetService->isWidgetActive($widget),
                 'created' => $widget->getCreated(),
                 'updated' => $widget->getUpdated(),
+                'stats' => $this->sessionService->getWidgetStats($widget->getWidgetId()),
             ];
         }, $widgets);
 
