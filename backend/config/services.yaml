@@ -249,6 +249,11 @@ services:
             $oidcClientId: '%env(string:default::OIDC_CLIENT_ID)%'
             $oidcDiscoveryUrl: '%env(string:default::OIDC_DISCOVERY_URL)%'
 
+    # OAuth State Service (signed tokens for CSRF protection)
+    App\Service\OAuthStateService:
+        arguments:
+            $appSecret: '%env(APP_SECRET)%'
+
     # Token Service (Access/Refresh Tokens)
     App\Service\TokenService:
         arguments:
