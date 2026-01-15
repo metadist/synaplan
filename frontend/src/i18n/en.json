@@ -80,7 +80,7 @@
       "activeFilters": "Active filters",
       "clearAll": "Clear all",
       "selected": "{count} selected",
-      "selectAll": "Select all",
+      "selectAll": "Select all on page",
       "deselectAll": "Deselect all",
       "deleteSelected": "Delete selected",
       "deleteMultiple": "Delete multiple chats",

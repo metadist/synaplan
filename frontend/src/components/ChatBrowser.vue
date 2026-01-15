@@ -502,8 +502,8 @@ const itemsPerPage = 10
 // Selection states
 const selectedChatIds = ref<Set<number>>(new Set())
 const isAllSelected = computed(() => {
-  if (filteredChats.value.length === 0) return false
-  return filteredChats.value.every((chat) => selectedChatIds.value.has(chat.id))
+  if (paginatedChats.value.length === 0) return false
+  return paginatedChats.value.every((chat) => selectedChatIds.value.has(chat.id))
 })
 
 // Share modal states
@@ -524,9 +524,15 @@ const toggleChatSelection = (chatId: number) => {
 
 const toggleSelectAll = () => {
   if (isAllSelected.value) {
-    selectedChatIds.value = new Set()
+    // Deselect only items on current page
+    const newSet = new Set(selectedChatIds.value)
+    paginatedChats.value.forEach((chat) => newSet.delete(chat.id))
+    selectedChatIds.value = newSet
   } else {
-    selectedChatIds.value = new Set(filteredChats.value.map((c) => c.id))
+    // Select only items on current page
+    const newSet = new Set(selectedChatIds.value)
+    paginatedChats.value.forEach((chat) => newSet.add(chat.id))
+    selectedChatIds.value = newSet
   }
 }
 
@@ -789,6 +795,8 @@ const goToPage = (page: number) => {
 // Reset to page 1 when filters change
 watch([searchQuery, selectedType, selectedDateRange, sortBy], () => {
   currentPage.value = 1
+  // Clear selections when filters change to avoid confusion
+  selectedChatIds.value = new Set()
 })
 
 const openChat = (id: number) => {

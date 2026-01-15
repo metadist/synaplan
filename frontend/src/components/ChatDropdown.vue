@@ -182,7 +182,7 @@ const toggleDropdown = () => {
 const handleMainChatClick = async () => {
   // Check if we have an active chat with messages
   const currentChat = chatsStore.chats.find((c) => c.id === chatsStore.activeChatId)
-  const hasMessages = currentChat && currentChat.messageCount && currentChat.messageCount > 0
+  const hasMessages = currentChat && (currentChat.messageCount ?? 0) > 0
 
   // Only create new chat if:
   // 1. Dropdown is currently closed AND
