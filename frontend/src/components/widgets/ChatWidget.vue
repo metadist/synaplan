@@ -388,7 +388,13 @@
           :style="{ borderColor: widgetTheme === 'dark' ? '#333' : '#e5e7eb' }"
         >
           <p class="text-xs" :style="{ color: widgetTheme === 'dark' ? '#9ca3af' : '#6b7280' }">
-            Powered by <span class="font-semibold" :style="{ color: primaryColor }">synaplan</span>
+            Powered by <a
+              href="https://www.synaplan.com/"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="font-semibold hover:underline"
+              :style="{ color: primaryColor }"
+            >synaplan</a>
           </p>
         </div>
       </div>
