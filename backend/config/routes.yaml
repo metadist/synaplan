@@ -3,3 +3,10 @@ controllers:
         path: ../src/Controller/
         namespace: App\Controller
     type: attribute
+
+# Plugin routes - SortX
+plugin_sortx:
+    resource:
+        path: /plugins/sortx/backend/Controller/
+        namespace: Plugin\SortX\Controller
+    type: attribute

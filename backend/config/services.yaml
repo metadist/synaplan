@@ -340,8 +340,7 @@ services:
         class: Monolog\Formatter\FormatterInterface
         factory: ['@App\Service\MonologFormatterFactory', 'createFormatter']
 
-    # Plugin discovery (commented out - enable when plugins are properly set up)
-    # Plugins need to be registered via Composer autoload or manually registered
-    # Plugin\:
-    #     resource: '/plugins/*/backend'
-    #     exclude: '/plugins/*/backend/{Entity,migrations,tests}'
+    # Plugin discovery
+    Plugin\SortX\:
+        resource: '/plugins/sortx/backend/'
+        exclude: '/plugins/sortx/backend/{Entity,migrations,tests}'
