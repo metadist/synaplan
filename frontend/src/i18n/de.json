@@ -73,7 +73,18 @@
       "showing": "Zeige {start} bis {end} von {total}",
       "page": "Seite {current} von {total}",
       "activeFilters": "Aktive Filter",
-      "clearAll": "Alle löschen"
+      "clearAll": "Alle löschen",
+      "selected": "{count} ausgewählt",
+      "selectAll": "Alle auswählen",
+      "deselectAll": "Auswahl aufheben",
+      "deleteSelected": "Ausgewählte löschen",
+      "deleteMultiple": "Mehrere Chats löschen",
+      "deleteMultipleConfirm": "Möchtest du wirklich {count} Chats löschen? Diese Aktion kann nicht rückgängig gemacht werden.",
+      "deleteCount": "{count} Chats löschen",
+      "deletedCount": "{count} Chats erfolgreich gelöscht",
+      "chatDeleted": "Chat erfolgreich gelöscht",
+      "share": "Chat teilen",
+      "public": "Öffentlich"
     }
   },
   "admin": {

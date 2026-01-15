@@ -1,6 +1,6 @@
 <template>
   <div class="relative" data-testid="comp-chat-dropdown">
-    <!-- Chat Button with Dropdown -->
+    <!-- Chat Button -->
     <button
       :class="[
         'w-full group flex items-center gap-3 rounded-xl px-3 min-h-[42px] nav-item',
@@ -8,7 +8,7 @@
         (isActive || isOpen) && 'nav-item--active',
       ]"
       data-testid="btn-chat-toggle"
-      @click="toggleDropdown"
+      @click="handleMainChatClick"
     >
       <div class="flex items-center gap-3">
         <ChatBubbleLeftRightIcon class="w-5 h-5 flex-shrink-0" />
@@ -60,7 +60,7 @@
           <button
             class="flex-1 text-left flex items-center gap-2 min-w-0"
             :data-testid="`btn-chat-item-${chat.id}`"
-            @click="handleChatClick(chat.id)"
+            @click="handleChatItemClick(chat.id)"
           >
             <ChatBubbleLeftIcon class="w-4 h-4 flex-shrink-0 opacity-60" />
             <span class="flex-1 truncate text-sm max-w-[140px]">{{ chat.title }}</span>
@@ -120,7 +120,6 @@
         @click="navigateToStatistics"
       >
         <span>{{ $t('chat.showAll') }}</span>
-        <ChevronDownIcon class="w-3.5 h-3.5" />
       </button>
     </div>
 
@@ -180,8 +179,29 @@ const toggleDropdown = () => {
   }
 }
 
+const handleMainChatClick = async () => {
+  // Check if we have an active chat with messages
+  const currentChat = chatsStore.chats.find((c) => c.id === chatsStore.activeChatId)
+  const hasMessages = currentChat && currentChat.messageCount && currentChat.messageCount > 0
+
+  // Only create new chat if:
+  // 1. Dropdown is currently closed AND
+  // 2. Either no active chat OR active chat is empty
+  if (!isOpen.value && !hasMessages) {
+    await handleNewChat()
+  }
+
+  // Always toggle dropdown
+  toggleDropdown()
+}
+
 const toggleChatMenu = (chatId: number) => {
   openMenuChatId.value = openMenuChatId.value === chatId ? null : chatId
+}
+
+const navigateToStatistics = () => {
+  router.push('/statistics#chats')
+  isOpen.value = false
 }
 
 // Active if we're on chat route
@@ -204,7 +224,7 @@ const hasMoreChats = computed(() => {
   return allChats.value.length > MAX_RECENT_CHATS
 })
 
-const handleChatClick = (chatId: number) => {
+const handleChatItemClick = (chatId: number) => {
   chatsStore.activeChatId = chatId
   if (route.path !== '/') {
     router.push('/')
@@ -260,11 +280,6 @@ const handleNewChat = async () => {
   }
   // Don't close dropdown - keep it open
   openMenuChatId.value = null
-}
-
-const navigateToStatistics = () => {
-  router.push('/statistics#chats')
-  isOpen.value = false
 }
 
 // Close menu when clicking outside

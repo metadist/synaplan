@@ -5,7 +5,7 @@
       class="flex flex-col h-full overflow-y-auto bg-chat scroll-thin"
       data-testid="page-statistics"
     >
-      <div class="max-w-7xl mx-auto w-full px-6 py-8 space-y-12">
+      <div class="max-w-7xl mx-auto w-full px-4 md:px-6 py-4 md:py-8 space-y-8 md:space-y-12">
         <!-- Header -->
         <div class="mb-8" data-testid="section-header">
           <h1 class="text-3xl font-semibold txt-primary mb-2">📊 {{ $t('statistics.title') }}</h1>
