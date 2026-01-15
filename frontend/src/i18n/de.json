@@ -1278,7 +1278,9 @@
     "sessionExpired": "Sitzung abgelaufen",
     "sessionExpiredDesc": "Deine Sitzung ist abgelaufen. Bitte melde dich erneut an, um fortzufahren.",
     "authenticationRequired": "Anmeldung erforderlich. Bitte melde dich an, um fortzufahren.",
-    "tokenRefreshFailed": "Sitzung konnte nicht erneuert werden. Bitte melde dich erneut an."
+    "tokenRefreshFailed": "Sitzung konnte nicht erneuert werden. Bitte melde dich erneut an.",
+    "showPassword": "Passwort anzeigen",
+    "hidePassword": "Passwort ausblenden"
   },
   "cookies": {
     "title": "Cookie-Einstellungen",
