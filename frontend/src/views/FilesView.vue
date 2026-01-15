@@ -276,7 +276,7 @@
                     <input
                       type="checkbox"
                       :checked="allSelected"
-                      class="w-4 h-4 rounded border-light-border/30 dark:border-dark-border/20 text-[var(--brand)]"
+                      class="checkbox-brand"
                       @change="toggleSelectAll"
                     />
                   </th>
@@ -317,7 +317,7 @@
                     <input
                       type="checkbox"
                       :checked="selectedFileIds.includes(file.id)"
-                      class="w-4 h-4 rounded border-light-border/30 dark:border-dark-border/20 text-[var(--brand)]"
+                      class="checkbox-brand"
                       @change="toggleFileSelection(file.id)"
                     />
                   </td>

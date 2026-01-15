@@ -78,7 +78,18 @@
       "showing": "Showing {start} to {end} of {total}",
       "page": "Page {current} of {total}",
       "activeFilters": "Active filters",
-      "clearAll": "Clear all"
+      "clearAll": "Clear all",
+      "selected": "{count} selected",
+      "selectAll": "Select all on page",
+      "deselectAll": "Deselect all",
+      "deleteSelected": "Delete selected",
+      "deleteMultiple": "Delete multiple chats",
+      "deleteMultipleConfirm": "Are you sure you want to delete {count} chats? This action cannot be undone.",
+      "deleteCount": "Delete {count} chats",
+      "deletedCount": "{count} chats deleted successfully",
+      "chatDeleted": "Chat deleted successfully",
+      "share": "Share chat",
+      "public": "Public"
     }
   },
   "admin": {
@@ -1078,7 +1089,9 @@
     "sessionExpired": "Session Expired",
     "sessionExpiredDesc": "Your session has expired. Please log in again to continue.",
     "authenticationRequired": "Authentication required. Please log in to continue.",
-    "tokenRefreshFailed": "Failed to refresh your session. Please log in again."
+    "tokenRefreshFailed": "Failed to refresh your session. Please log in again.",
+    "showPassword": "Show password",
+    "hidePassword": "Hide password"
   },
   "unsavedChanges": {
     "title": "You have unsaved changes",
