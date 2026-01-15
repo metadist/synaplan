@@ -153,19 +153,47 @@
                   v-html="renderMessageContent(message.content)"
                 />
               </template>
-              <div v-else-if="message.type === 'file'" class="flex items-center gap-2">
-                <DocumentIcon
-                  class="w-5 h-5"
-                  :style="{
-                    color:
-                      message.role === 'user'
-                        ? iconColor
-                        : widgetTheme === 'dark'
-                          ? '#e5e5e5'
-                          : '#1f2937',
-                  }"
-                />
-                <span
+              <div v-else-if="message.type === 'file'" class="space-y-2">
+                <!-- File attachments (clickable for download) -->
+                <div class="flex flex-wrap gap-1">
+                  <button
+                    v-for="file in message.files || [
+                      { id: message.fileId, filename: message.fileName },
+                    ]"
+                    :key="file.id"
+                    class="flex items-center gap-2 px-2 py-1 rounded-md bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 transition-colors cursor-pointer"
+                    :title="$t('widget.downloadFile')"
+                    @click="downloadFileById(file.id, file.filename)"
+                  >
+                    <DocumentIcon
+                      class="w-4 h-4 flex-shrink-0"
+                      :style="{
+                        color:
+                          message.role === 'user'
+                            ? iconColor
+                            : widgetTheme === 'dark'
+                              ? '#e5e5e5'
+                              : '#1f2937',
+                      }"
+                    />
+                    <span
+                      class="text-sm underline truncate max-w-[150px]"
+                      :style="{
+                        color:
+                          message.role === 'user'
+                            ? iconColor
+                            : widgetTheme === 'dark'
+                              ? '#e5e5e5'
+                              : '#1f2937',
+                      }"
+                    >
+                      {{ file.filename }}
+                    </span>
+                  </button>
+                </div>
+                <!-- Text content (question about the file) -->
+                <p
+                  v-if="message.content && message.content !== message.fileName"
                   class="text-sm"
                   :style="{
                     color:
@@ -175,9 +203,8 @@
                           ? '#e5e5e5'
                           : '#1f2937',
                   }"
-                >
-                  {{ message.fileName }}
-                </span>
+                  v-html="renderMessageContent(message.content)"
+                />
               </div>
               <p
                 v-if="message.timestamp"
@@ -470,12 +497,23 @@ const emit = defineEmits<{
   (e: 'close'): void
 }>()
 
+interface MessageFile {
+  id: number
+  filename: string
+  fileType?: string
+  filePath?: string
+  fileSize?: number
+  fileMime?: string
+}
+
 interface Message {
   id: string
   role: 'user' | 'assistant'
   type: 'text' | 'file'
   content: string
   fileName?: string
+  fileId?: number
+  files?: MessageFile[]
   timestamp: Date
 }
 
@@ -739,6 +777,7 @@ const sendMessage = async () => {
   if (!canSend.value || uploadingFile.value) return
 
   const fileIds: number[] = []
+  const uploadedFiles: MessageFile[] = []
   fileUploadError.value = null
 
   // Upload files if selected
@@ -752,7 +791,7 @@ const sendMessage = async () => {
       uploadingFile.value = true
       fileUploadError.value = null
 
-      // Upload each file
+      // Upload each file and collect info (don't create separate messages)
       for (const file of selectedFiles.value) {
         const uploadResult = await uploadWidgetFile(props.widgetId, sessionId.value, file, {
           apiUrl: props.apiUrl,
@@ -762,13 +801,12 @@ const sendMessage = async () => {
         fileIds.push(uploadResult.file.id)
         fileUploadCount.value += 1
 
-        messages.value.push({
-          id: `file-${uploadResult.file.id}`,
-          role: 'user',
-          type: 'file',
-          content: file.name,
-          fileName: file.name,
-          timestamp: new Date(),
+        // Collect file info for the combined message
+        uploadedFiles.push({
+          id: uploadResult.file.id,
+          filename: file.name,
+          fileSize: file.size,
+          fileMime: file.type,
         })
       }
 
@@ -796,11 +834,16 @@ const sendMessage = async () => {
     return
   }
 
+  // Create a single message with both text and files (if any)
+  const hasFiles = uploadedFiles.length > 0
   messages.value.push({
     id: Date.now().toString(),
     role: 'user',
-    type: 'text',
+    type: hasFiles ? 'file' : 'text',
     content: userMessage,
+    fileName: hasFiles ? uploadedFiles[0].filename : undefined,
+    fileId: hasFiles ? uploadedFiles[0].id : undefined,
+    files: hasFiles ? uploadedFiles : undefined,
     timestamp: new Date(),
   })
   messageCount.value++
@@ -952,6 +995,55 @@ const formatFileSize = (bytes: number): string => {
   return (bytes / (1024 * 1024)).toFixed(1) + ' MB'
 }
 
+const downloadFileById = async (fileId: number | undefined, filename: string | undefined) => {
+  if (!fileId) {
+    console.error('No file ID found for download')
+    return
+  }
+
+  if (!sessionId.value) {
+    console.error('No session ID for download')
+    return
+  }
+
+  const downloadFilename = filename || 'file'
+
+  try {
+    // Use public widget file download endpoint (no auth required)
+    const downloadUrl = `${props.apiUrl}/api/v1/widget/${props.widgetId}/files/${fileId}/download?sessionId=${encodeURIComponent(sessionId.value)}`
+    const response = await fetch(downloadUrl, {
+      method: 'GET',
+      credentials: props.testMode ? 'include' : 'omit',
+      headers: testModeHeaders.value,
+    })
+
+    if (!response.ok) {
+      throw new Error(`Download failed: ${response.status}`)
+    }
+
+    const blob = await response.blob()
+    const url = window.URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = downloadFilename
+    document.body.appendChild(a)
+    a.click()
+    window.URL.revokeObjectURL(url)
+    document.body.removeChild(a)
+  } catch (error) {
+    console.error('Download failed:', error)
+    // Show error in chat instead of alert
+    addBotMessage(t('widget.downloadFailed'))
+  }
+}
+
+const downloadFile = async (message: Message) => {
+  // Get file ID from message
+  const fileId = message.fileId || (message.files && message.files[0]?.id)
+  const filename = message.fileName || (message.files && message.files[0]?.filename) || 'file'
+  await downloadFileById(fileId, filename)
+}
+
 const getSessionStorageKey = () => `synaplan_widget_session_${props.widgetId}`
 const getChatStorageKeyForSession = (id: string) => `synaplan_widget_chatid_${props.widgetId}_${id}`
 const createSessionId = () => `sess_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`
@@ -991,11 +1083,32 @@ const normalizeServerMessage = (raw: any): Message => {
   const role = raw.direction === 'IN' ? 'user' : 'assistant'
   const timestampSeconds = typeof raw.timestamp === 'number' ? raw.timestamp : Date.now() / 1000
 
+  // Check if message has attached files
+  const files: MessageFile[] =
+    raw.files && Array.isArray(raw.files)
+      ? raw.files.map((f: any) => ({
+          id: f.id,
+          filename: f.filename,
+          fileType: f.fileType,
+          filePath: f.filePath,
+          fileSize: f.fileSize,
+          fileMime: f.fileMime,
+        }))
+      : []
+
+  // If message has files and is from user, mark as file message but KEEP the text content
+  const hasFiles = files.length > 0
+  const isFileMessage = hasFiles && role === 'user'
+
   return {
     id: String(raw.id ?? crypto.randomUUID()),
     role,
-    type: 'text',
+    type: isFileMessage ? 'file' : 'text',
+    // Keep the original text content - the file info is shown separately via files array
     content,
+    fileName: isFileMessage && files[0] ? files[0].filename : undefined,
+    fileId: isFileMessage && files[0] ? files[0].id : undefined,
+    files,
     timestamp: new Date(timestampSeconds * 1000),
   }
 }

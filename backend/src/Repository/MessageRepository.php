@@ -146,4 +146,24 @@ class MessageRepository extends ServiceEntityRepository
             $this->getEntityManager()->flush();
         }
     }
+
+    /**
+     * Check if a file is attached to any message in a specific chat.
+     *
+     * Used for security validation in widget file downloads.
+     */
+    public function isFileInChat(int $chatId, int $fileId): bool
+    {
+        $result = $this->createQueryBuilder('m')
+            ->select('COUNT(m.id)')
+            ->innerJoin('m.files', 'f')
+            ->where('m.chatId = :chatId')
+            ->andWhere('f.id = :fileId')
+            ->setParameter('chatId', $chatId)
+            ->setParameter('fileId', $fileId)
+            ->getQuery()
+            ->getSingleScalarResult();
+
+        return (int) $result > 0;
+    }
 }

@@ -974,12 +974,28 @@ class WidgetPublicController extends AbstractController
         );
 
         $history = array_map(static function (Message $message) {
+            // Include attached files if any
+            $filesData = [];
+            if ($message->hasFiles()) {
+                foreach ($message->getFiles() as $file) {
+                    $filesData[] = [
+                        'id' => $file->getId(),
+                        'filename' => $file->getFileName(),
+                        'fileType' => $file->getFileType(),
+                        'filePath' => $file->getFilePath(),
+                        'fileSize' => $file->getFileSize(),
+                        'fileMime' => $file->getFileMime(),
+                    ];
+                }
+            }
+
             return [
                 'id' => $message->getId(),
                 'direction' => $message->getDirection(),
                 'text' => $message->getText(),
                 'timestamp' => $message->getUnixTimestamp(),
                 'messageType' => $message->getMessageType(),
+                'files' => $filesData,
                 'metadata' => [
                     'topic' => $message->getTopic(),
                     'language' => $message->getLanguage(),
@@ -998,6 +1014,109 @@ class WidgetPublicController extends AbstractController
                 'lastMessage' => $session->getLastMessage() ?: null,
             ],
         ]);
+    }
+
+    /**
+     * Download a file uploaded via widget.
+     *
+     * PUBLIC endpoint - validates session ownership instead of user auth.
+     */
+    #[Route('/{widgetId}/files/{fileId}/download', name: 'file_download', methods: ['GET'])]
+    #[OA\Get(
+        path: '/api/v1/widget/{widgetId}/files/{fileId}/download',
+        summary: 'Download a widget file',
+        tags: ['Widget (Public)']
+    )]
+    #[OA\Parameter(name: 'widgetId', in: 'path', required: true, schema: new OA\Schema(type: 'string'))]
+    #[OA\Parameter(name: 'fileId', in: 'path', required: true, schema: new OA\Schema(type: 'integer'))]
+    #[OA\Parameter(name: 'sessionId', in: 'query', required: true, schema: new OA\Schema(type: 'string'))]
+    #[OA\Response(response: 200, description: 'File content')]
+    #[OA\Response(response: 403, description: 'Access denied')]
+    #[OA\Response(response: 404, description: 'File not found')]
+    public function downloadWidgetFile(string $widgetId, int $fileId, Request $request): Response
+    {
+        $sessionId = $request->query->getString('sessionId');
+
+        if ('' === $sessionId) {
+            return $this->json(['error' => 'Session ID required'], Response::HTTP_BAD_REQUEST);
+        }
+
+        // Get the widget
+        $widget = $this->widgetService->getWidgetById($widgetId);
+        if (!$widget) {
+            return $this->json(['error' => 'Widget not found'], Response::HTTP_NOT_FOUND);
+        }
+
+        // Get the session
+        $session = $this->sessionService->getSession($widgetId, $sessionId);
+        if (!$session) {
+            return $this->json(['error' => 'Session not found'], Response::HTTP_NOT_FOUND);
+        }
+
+        // Get the file
+        $file = $this->fileRepository->find($fileId);
+        if (!$file) {
+            return $this->json(['error' => 'File not found'], Response::HTTP_NOT_FOUND);
+        }
+
+        // Security: Widget files are uploaded with userId=0 and linked to widget session
+        // Verify file was uploaded via widget (userId=0) and belongs to this session
+        $isWidgetFile = 0 === $file->getUserId() && $file->getUserSessionId() === $session->getId();
+        $isOwnerFile = $file->getUserId() === $widget->getOwnerId();
+
+        if (!$isWidgetFile && !$isOwnerFile) {
+            $this->logger->warning('Widget file download: access denied', [
+                'file_id' => $fileId,
+                'file_user_id' => $file->getUserId(),
+                'file_session_id' => $file->getUserSessionId(),
+                'widget_session_id' => $session->getId(),
+                'widget_owner' => $widget->getOwnerId(),
+            ]);
+
+            return $this->json(['error' => 'Access denied'], Response::HTTP_FORBIDDEN);
+        }
+
+        // Get the chat ID from the session
+        $chatId = $session->getChatId();
+        if (!$chatId) {
+            return $this->json(['error' => 'Chat not found'], Response::HTTP_NOT_FOUND);
+        }
+
+        // Verify file is attached to a message in this chat
+        $fileInChat = $this->messageRepository->isFileInChat($chatId, $fileId);
+        if (!$fileInChat) {
+            $this->logger->warning('Widget file download: file not in chat', [
+                'file_id' => $fileId,
+                'chat_id' => $chatId,
+            ]);
+
+            return $this->json(['error' => 'File not associated with this chat'], Response::HTTP_FORBIDDEN);
+        }
+
+        $filePath = $file->getFilePath();
+        if (!$filePath) {
+            return $this->json(['error' => 'File path not found'], Response::HTTP_NOT_FOUND);
+        }
+
+        $absolutePath = $this->uploadDir.'/'.$filePath;
+
+        if (!file_exists($absolutePath)) {
+            $this->logger->error('Widget file download: file not on disk', [
+                'file_id' => $fileId,
+                'path' => $absolutePath,
+            ]);
+
+            return $this->json(['error' => 'File not found on disk'], Response::HTTP_NOT_FOUND);
+        }
+
+        // Return file as download
+        $response = new \Symfony\Component\HttpFoundation\BinaryFileResponse($absolutePath);
+        $response->setContentDisposition(
+            \Symfony\Component\HttpFoundation\ResponseHeaderBag::DISPOSITION_ATTACHMENT,
+            $file->getFileName()
+        );
+
+        return $response;
     }
 
     private function ensureDomainAllowed(array $config, Request $request, ?int $widgetOwnerId = null): ?JsonResponse
