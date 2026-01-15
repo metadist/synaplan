@@ -1,5 +1,58 @@
 <template>
   <div class="space-y-6" data-testid="comp-chat-browser">
+    <!-- Bulk Actions Bar (slides down when items selected) -->
+    <Transition name="slide-down">
+      <div
+        v-if="selectedChatIds.size > 0"
+        class="sticky top-0 z-20 -mx-4 md:-mx-6 px-4 md:px-6 py-3 bg-gradient-to-r from-brand/10 via-brand/5 to-brand/10 backdrop-blur-md border-b border-brand/20 shadow-lg"
+        data-testid="bulk-actions-bar"
+      >
+        <div
+          class="max-w-7xl mx-auto flex items-center justify-between gap-2 md:gap-4 flex-wrap md:flex-nowrap"
+        >
+          <div class="flex items-center gap-2 md:gap-3">
+            <div
+              class="flex items-center justify-center w-8 h-8 rounded-full bg-brand text-white font-bold text-sm"
+            >
+              {{ selectedChatIds.size }}
+            </div>
+            <span class="txt-primary font-medium text-sm md:text-base">
+              {{ $t('chat.browser.selected', { count: selectedChatIds.size }) }}
+            </span>
+          </div>
+          <div class="flex items-center gap-2">
+            <button
+              class="px-3 md:px-4 py-2 rounded-lg txt-secondary hover-surface transition-all text-sm font-medium flex items-center gap-2"
+              data-testid="btn-select-all"
+              @click="toggleSelectAll"
+            >
+              <CheckIcon v-if="isAllSelected" class="w-4 h-4" />
+              <Squares2X2Icon v-else class="w-4 h-4" />
+              <span class="hidden sm:inline">{{
+                isAllSelected ? $t('chat.browser.deselectAll') : $t('chat.browser.selectAll')
+              }}</span>
+            </button>
+            <button
+              class="px-3 md:px-4 py-2 rounded-lg bg-red-500/10 text-red-600 dark:text-red-400 hover:bg-red-500/20 transition-all text-sm font-medium flex items-center gap-2"
+              data-testid="btn-bulk-delete"
+              @click="handleBulkDelete"
+            >
+              <TrashIcon class="w-4 h-4" />
+              <span class="hidden sm:inline">{{ $t('chat.browser.deleteSelected') }}</span>
+            </button>
+            <button
+              class="p-2 rounded-lg txt-secondary hover-surface transition-all"
+              :title="$t('common.cancel')"
+              data-testid="btn-clear-selection"
+              @click="clearSelection"
+            >
+              <XMarkIcon class="w-5 h-5" />
+            </button>
+          </div>
+        </div>
+      </div>
+    </Transition>
+
     <!-- Header with Stats -->
     <div class="flex flex-col gap-4">
       <div class="flex items-center gap-3">
@@ -51,17 +104,17 @@
     </div>
 
     <!-- Search and Filters -->
-    <div class="surface-card p-5 space-y-4">
+    <div class="surface-card p-4 md:p-5 space-y-4">
       <!-- Search Bar -->
       <div class="relative">
         <div class="absolute left-3 top-1/2 -translate-y-1/2 flex items-center gap-2">
-          <MagnifyingGlassIcon class="w-5 h-5 txt-secondary" />
+          <MagnifyingGlassIcon class="w-4 h-4 md:w-5 md:h-5 txt-secondary" />
         </div>
         <input
           v-model="searchQuery"
           type="text"
           :placeholder="$t('chat.browser.searchPlaceholder')"
-          class="w-full pl-10 pr-4 py-3 bg-app border border-light-border dark:border-dark-border rounded-lg txt-primary placeholder:txt-secondary focus:outline-none focus:ring-2 focus:ring-primary transition-all"
+          class="w-full pl-9 md:pl-10 pr-10 py-2.5 md:py-3 bg-app border border-light-border dark:border-dark-border rounded-lg txt-primary placeholder:txt-secondary focus:outline-none focus:ring-2 focus:ring-primary transition-all text-sm md:text-base"
           data-testid="input-search-chats"
         />
         <button
@@ -83,7 +136,7 @@
           </label>
           <select
             v-model="selectedType"
-            class="w-full px-3 py-2.5 bg-app border border-light-border dark:border-dark-border rounded-lg txt-primary focus:outline-none focus:ring-2 focus:ring-primary transition-all"
+            class="w-full px-3 py-2.5 bg-app border border-light-border dark:border-dark-border rounded-lg txt-primary focus:outline-none focus:ring-2 focus:ring-primary transition-all text-sm md:text-base"
             data-testid="select-type-filter"
           >
             <option value="all">{{ $t('chat.browser.allTypes') }}</option>
@@ -100,7 +153,7 @@
           </label>
           <select
             v-model="selectedDateRange"
-            class="w-full px-3 py-2.5 bg-app border border-light-border dark:border-dark-border rounded-lg txt-primary focus:outline-none focus:ring-2 focus:ring-primary transition-all"
+            class="w-full px-3 py-2.5 bg-app border border-light-border dark:border-dark-border rounded-lg txt-primary focus:outline-none focus:ring-2 focus:ring-primary transition-all text-sm md:text-base"
             data-testid="select-date-filter"
           >
             <option value="all">{{ $t('chat.browser.allDates') }}</option>
@@ -120,7 +173,7 @@
           </label>
           <select
             v-model="sortBy"
-            class="w-full px-3 py-2.5 bg-app border border-light-border dark:border-dark-border rounded-lg txt-primary focus:outline-none focus:ring-2 focus:ring-primary transition-all"
+            class="w-full px-3 py-2.5 bg-app border border-light-border dark:border-dark-border rounded-lg txt-primary focus:outline-none focus:ring-2 focus:ring-primary transition-all text-sm md:text-base"
             data-testid="select-sort"
           >
             <option value="newest">{{ $t('chat.browser.sortNewest') }}</option>
@@ -179,7 +232,7 @@
     <!-- Results Count -->
     <div
       v-if="filteredChats.length > 0"
-      class="flex items-center justify-between txt-secondary text-sm"
+      class="flex flex-col sm:flex-row items-start sm:items-center justify-between txt-secondary text-xs sm:text-sm gap-1 sm:gap-0"
     >
       <span>
         {{
@@ -200,12 +253,27 @@
       <div
         v-for="chat in paginatedChats"
         :key="chat.id"
-        class="surface-card p-5 hover-surface transition-all cursor-pointer group border-2 border-transparent hover:border-brand/20"
+        class="surface-card p-3 md:p-5 hover-surface transition-all group border-2 border-transparent"
+        :class="[
+          selectedChatIds.has(chat.id) ? 'border-brand/40 bg-brand/5' : 'hover:border-brand/20',
+        ]"
         data-testid="chat-item"
-        @click="openChat(chat.id)"
       >
-        <div class="flex items-start justify-between gap-4">
-          <div class="flex-1 min-w-0">
+        <div class="flex items-start gap-3 md:gap-4">
+          <!-- Checkbox -->
+          <div class="flex-shrink-0 pt-1">
+            <input
+              type="checkbox"
+              :checked="selectedChatIds.has(chat.id)"
+              class="checkbox-brand"
+              data-testid="checkbox-chat-select"
+              @click.stop
+              @change="toggleChatSelection(chat.id)"
+            />
+          </div>
+
+          <!-- Main Content (clickable to open chat) -->
+          <div class="flex-1 min-w-0 cursor-pointer" @click="openChat(chat.id)">
             <!-- Title and Type Badge -->
             <div class="flex items-center gap-2 mb-2">
               <div
@@ -222,17 +290,27 @@
                 <UserIcon class="w-3.5 h-3.5" />
                 <span class="text-xs font-medium">{{ $t('chat.browser.myChats') }}</span>
               </div>
+              <!-- Share status badge -->
+              <div
+                v-if="getShareStatus(chat.id)"
+                class="flex items-center gap-1 px-2 py-1 rounded-md bg-blue-500/10 text-blue-600 dark:text-blue-400"
+              >
+                <GlobeAltIcon class="w-3 h-3" />
+                <span class="text-xs font-medium">{{ $t('chat.browser.public') }}</span>
+              </div>
             </div>
 
             <!-- Chat Title -->
             <h3
-              class="text-base font-semibold txt-primary mb-2 truncate group-hover:txt-brand transition-colors"
+              class="text-sm md:text-base font-semibold txt-primary mb-2 truncate group-hover:txt-brand transition-colors"
             >
               {{ chat.title }}
             </h3>
 
             <!-- Meta Information -->
-            <div class="flex items-center gap-4 txt-secondary text-sm">
+            <div
+              class="flex items-center gap-2 md:gap-4 txt-secondary text-xs md:text-sm flex-wrap"
+            >
               <span class="flex items-center gap-1.5">
                 <ChatBubbleLeftIcon class="w-4 h-4" />
                 <span class="font-medium">{{ chat.messageCount }}</span>
@@ -247,16 +325,37 @@
             </div>
           </div>
 
-          <!-- Action Button -->
-          <div class="flex items-center gap-2 flex-shrink-0">
-            <div
-              class="px-3 py-2 rounded-lg bg-brand/10 txt-brand opacity-0 group-hover:opacity-100 transition-opacity"
+          <!-- Action Buttons -->
+          <div
+            class="flex flex-col md:flex-row items-center gap-1 flex-shrink-0 opacity-100 md:opacity-0 group-hover:opacity-100 transition-opacity"
+          >
+            <!-- Share Button -->
+            <button
+              class="p-1.5 md:p-2 rounded-lg txt-secondary hover:txt-brand hover:bg-brand/10 transition-all"
+              :title="$t('chat.browser.share')"
+              data-testid="btn-chat-share"
+              @click.stop="openShareModal(chat)"
             >
-              <span class="text-sm font-medium">{{ $t('common.open') }}</span>
-            </div>
-            <ChevronRightIcon
-              class="w-5 h-5 txt-secondary group-hover:txt-brand transition-all group-hover:translate-x-1"
-            />
+              <ShareIcon class="w-4 h-4 md:w-5 md:h-5" />
+            </button>
+            <!-- Delete Button -->
+            <button
+              class="p-1.5 md:p-2 rounded-lg txt-secondary hover:text-red-500 hover:bg-red-500/10 transition-all"
+              :title="$t('common.delete')"
+              data-testid="btn-chat-delete"
+              @click.stop="handleSingleDelete(chat.id)"
+            >
+              <TrashIcon class="w-4 h-4 md:w-5 md:h-5" />
+            </button>
+            <!-- Open Button -->
+            <button
+              class="px-2 md:px-3 py-1.5 md:py-2 rounded-lg bg-brand/10 txt-brand transition-all flex items-center gap-1 text-sm"
+              data-testid="btn-chat-open"
+              @click.stop="openChat(chat.id)"
+            >
+              <span class="font-medium">{{ $t('common.open') }}</span>
+              <ChevronRightIcon class="w-3.5 h-3.5 md:w-4 md:h-4" />
+            </button>
           </div>
         </div>
       </div>
@@ -265,35 +364,35 @@
     <!-- Pagination -->
     <div
       v-if="filteredChats.length > 0 && totalPages > 1"
-      class="flex items-center justify-center gap-2"
+      class="flex items-center justify-center gap-1 md:gap-2"
       data-testid="pagination"
     >
       <!-- Previous Button -->
       <button
         :disabled="currentPage === 1"
-        class="px-3 py-2 rounded-lg txt-secondary hover-surface transition-all disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-primary"
+        class="px-2 md:px-3 py-2 rounded-lg txt-secondary hover-surface transition-all disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-primary"
         data-testid="btn-prev-page"
         @click="goToPage(currentPage - 1)"
       >
-        <ChevronLeftIcon class="w-5 h-5" />
+        <ChevronLeftIcon class="w-4 h-4 md:w-5 md:h-5" />
       </button>
 
       <!-- First Page -->
       <button
         v-if="currentPage > 3"
-        class="px-3 py-2 rounded-lg txt-secondary hover-surface transition-all focus:outline-none focus:ring-2 focus:ring-primary min-w-[44px]"
+        class="px-2 md:px-3 py-2 rounded-lg txt-secondary hover-surface transition-all focus:outline-none focus:ring-2 focus:ring-primary min-w-[36px] md:min-w-[44px] text-sm md:text-base"
         @click="goToPage(1)"
       >
         1
       </button>
-      <span v-if="currentPage > 3" class="txt-secondary">...</span>
+      <span v-if="currentPage > 3" class="txt-secondary text-sm md:text-base">...</span>
 
       <!-- Page Numbers -->
       <button
         v-for="page in visiblePages"
         :key="page"
         :class="[
-          'px-3 py-2 rounded-lg transition-all focus:outline-none focus:ring-2 focus:ring-primary min-w-[44px]',
+          'px-2 md:px-3 py-2 rounded-lg transition-all focus:outline-none focus:ring-2 focus:ring-primary min-w-[36px] md:min-w-[44px] text-sm md:text-base',
           page === currentPage
             ? 'bg-primary text-white font-medium'
             : 'txt-secondary hover-surface',
@@ -305,10 +404,12 @@
       </button>
 
       <!-- Last Page -->
-      <span v-if="currentPage < totalPages - 2" class="txt-secondary">...</span>
+      <span v-if="currentPage < totalPages - 2" class="txt-secondary text-sm md:text-base"
+        >...</span
+      >
       <button
         v-if="currentPage < totalPages - 2"
-        class="px-3 py-2 rounded-lg txt-secondary hover-surface transition-all focus:outline-none focus:ring-2 focus:ring-primary min-w-[44px]"
+        class="px-2 md:px-3 py-2 rounded-lg txt-secondary hover-surface transition-all focus:outline-none focus:ring-2 focus:ring-primary min-w-[36px] md:min-w-[44px] text-sm md:text-base"
         @click="goToPage(totalPages)"
       >
         {{ totalPages }}
@@ -317,11 +418,11 @@
       <!-- Next Button -->
       <button
         :disabled="currentPage === totalPages"
-        class="px-3 py-2 rounded-lg txt-secondary hover-surface transition-all disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-primary"
+        class="px-2 md:px-3 py-2 rounded-lg txt-secondary hover-surface transition-all disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-primary"
         data-testid="btn-next-page"
         @click="goToPage(currentPage + 1)"
       >
-        <ChevronRightIcon class="w-5 h-5" />
+        <ChevronRightIcon class="w-4 h-4 md:w-5 md:h-5" />
       </button>
     </div>
 
@@ -339,6 +440,16 @@
         {{ $t('chat.browser.noResultsDesc') }}
       </p>
     </div>
+
+    <!-- Share Modal -->
+    <ChatShareModal
+      :is-open="shareModalOpen"
+      :chat-id="shareModalChatId"
+      :chat-title="shareModalChatTitle"
+      @close="shareModalOpen = false"
+      @shared="chatsStore.loadChats()"
+      @unshared="chatsStore.loadChats()"
+    />
   </div>
 </template>
 
@@ -358,12 +469,22 @@ import {
   CalendarIcon,
   ArrowsUpDownIcon,
   ClockIcon,
+  TrashIcon,
+  ShareIcon,
+  CheckIcon,
+  Squares2X2Icon,
+  GlobeAltIcon,
 } from '@heroicons/vue/24/outline'
+import ChatShareModal from './ChatShareModal.vue'
 import { useChatsStore } from '@/stores/chats'
+import { useDialog } from '@/composables/useDialog'
+import { useNotification } from '@/composables/useNotification'
 import { useI18n } from 'vue-i18n'
 
 const chatsStore = useChatsStore()
 const router = useRouter()
+const dialog = useDialog()
+const { success: showSuccess } = useNotification()
 const { t } = useI18n()
 
 // Filter states
@@ -377,6 +498,106 @@ const sortBy = ref<'newest' | 'oldest' | 'mostMessages'>('newest')
 // Pagination states
 const currentPage = ref(1)
 const itemsPerPage = 10
+
+// Selection states
+const selectedChatIds = ref<Set<number>>(new Set())
+const isAllSelected = computed(() => {
+  if (paginatedChats.value.length === 0) return false
+  return paginatedChats.value.every((chat) => selectedChatIds.value.has(chat.id))
+})
+
+// Share modal states
+const shareModalOpen = ref(false)
+const shareModalChatId = ref<number | null>(null)
+const shareModalChatTitle = ref<string>('')
+
+// Selection methods
+const toggleChatSelection = (chatId: number) => {
+  const newSet = new Set(selectedChatIds.value)
+  if (newSet.has(chatId)) {
+    newSet.delete(chatId)
+  } else {
+    newSet.add(chatId)
+  }
+  selectedChatIds.value = newSet
+}
+
+const toggleSelectAll = () => {
+  if (isAllSelected.value) {
+    // Deselect only items on current page
+    const newSet = new Set(selectedChatIds.value)
+    paginatedChats.value.forEach((chat) => newSet.delete(chat.id))
+    selectedChatIds.value = newSet
+  } else {
+    // Select only items on current page
+    const newSet = new Set(selectedChatIds.value)
+    paginatedChats.value.forEach((chat) => newSet.add(chat.id))
+    selectedChatIds.value = newSet
+  }
+}
+
+const clearSelection = () => {
+  selectedChatIds.value = new Set()
+}
+
+// Get share status for a chat
+const getShareStatus = (chatId: number): boolean => {
+  const chat = chatsStore.chats.find((c) => c.id === chatId)
+  return chat?.isShared ?? false
+}
+
+// Share modal
+const openShareModal = (chat: ChatItem) => {
+  shareModalChatId.value = chat.id
+  shareModalChatTitle.value = chat.title
+  shareModalOpen.value = true
+}
+
+// Single delete
+const handleSingleDelete = async (chatId: number) => {
+  const confirmed = await dialog.confirm({
+    title: t('chat.delete'),
+    message: t('chat.deleteConfirm'),
+    confirmText: t('common.delete'),
+    cancelText: t('common.cancel'),
+    danger: true,
+  })
+
+  if (confirmed) {
+    await chatsStore.deleteChat(chatId)
+    selectedChatIds.value.delete(chatId)
+    showSuccess(t('chat.browser.chatDeleted'))
+  }
+}
+
+// Bulk delete
+const handleBulkDelete = async () => {
+  const count = selectedChatIds.value.size
+  const confirmed = await dialog.confirm({
+    title: t('chat.browser.deleteMultiple'),
+    message: t('chat.browser.deleteMultipleConfirm', { count }),
+    confirmText: t('chat.browser.deleteCount', { count }),
+    cancelText: t('common.cancel'),
+    danger: true,
+  })
+
+  if (confirmed) {
+    const idsToDelete = Array.from(selectedChatIds.value)
+    let deletedCount = 0
+
+    for (const chatId of idsToDelete) {
+      try {
+        await chatsStore.deleteChat(chatId, true)
+        deletedCount++
+      } catch (e) {
+        console.error('Failed to delete chat:', chatId, e)
+      }
+    }
+
+    selectedChatIds.value = new Set()
+    showSuccess(t('chat.browser.deletedCount', { count: deletedCount }))
+  }
+}
 
 // Format date helper
 const formatDate = (timestamp: number | string | undefined): string => {
@@ -574,6 +795,8 @@ const goToPage = (page: number) => {
 // Reset to page 1 when filters change
 watch([searchQuery, selectedType, selectedDateRange, sortBy], () => {
   currentPage.value = 1
+  // Clear selections when filters change to avoid confusion
+  selectedChatIds.value = new Set()
 })
 
 const openChat = (id: number) => {

@@ -1096,4 +1096,63 @@
       transform: translateX(100%) translateY(100%) rotate(45deg);
     }
   }
+
+  /* Custom Checkbox - matches design system */
+  .checkbox-brand {
+    appearance: none;
+    width: 1.25rem;
+    height: 1.25rem;
+    border-radius: 0.375rem;
+    border: 2px solid var(--txt-secondary);
+    background: var(--bg-card);
+    cursor: pointer;
+    transition: all 0.15s ease;
+    position: relative;
+  }
+  .checkbox-brand:hover {
+    border-color: var(--brand);
+  }
+  .checkbox-brand:checked {
+    background: var(--brand);
+    border-color: var(--brand);
+  }
+  .checkbox-brand:checked::after {
+    content: '';
+    position: absolute;
+    left: 5px;
+    top: 2px;
+    width: 5px;
+    height: 9px;
+    border: solid white;
+    border-width: 0 2px 2px 0;
+    transform: rotate(45deg);
+  }
+  .checkbox-brand:focus-visible {
+    outline: 2px solid var(--brand);
+    outline-offset: 2px;
+  }
+  .dark .checkbox-brand {
+    background: var(--bg-chip);
+    border-color: var(--txt-secondary);
+  }
+  .dark .checkbox-brand:checked {
+    background: var(--brand);
+    border-color: var(--brand);
+  }
+
+  /* Slide-down transition for bulk action bars */
+  .slide-down-enter-active,
+  .slide-down-leave-active {
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  .slide-down-enter-from,
+  .slide-down-leave-to {
+    opacity: 0;
+    transform: translateY(-100%);
+  }
+  .slide-down-enter-to,
+  .slide-down-leave-from {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }

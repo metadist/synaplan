@@ -334,7 +334,9 @@
     "passwordResetSuccessDesc": "Si existe una cuenta con esta dirección de correo, te hemos enviado un enlace para restablecer tu contraseña. Por favor revisa tu bandeja de entrada.",
     "recaptchaError": "Error de verificación reCAPTCHA. Por favor intenta de nuevo.",
     "backToHomepage": "← Volver a www.synaplan.com",
-    "hostingTermsNote": "Aplican los términos y condiciones de la plataforma de hosting."
+    "hostingTermsNote": "Aplican los términos y condiciones de la plataforma de hosting.",
+    "showPassword": "Mostrar contraseña",
+    "hidePassword": "Ocultar contraseña"
   },
   "unsavedChanges": {
     "title": "Tienes cambios sin guardar",

@@ -60,15 +60,27 @@
             <label for="password" class="block text-sm font-medium txt-primary mb-2">
               {{ $t('auth.password') }}
             </label>
-            <input
-              id="password"
-              v-model="password"
-              type="password"
-              required
-              class="w-full px-4 py-3 rounded-lg surface-chip txt-primary placeholder:txt-secondary focus:outline-none focus:ring-2 focus:ring-[var(--brand)] transition-colors border-0"
-              :placeholder="$t('auth.password')"
-              data-testid="input-password"
-            />
+            <div class="relative">
+              <input
+                id="password"
+                v-model="password"
+                :type="showPassword ? 'text' : 'password'"
+                required
+                class="w-full px-4 py-3 pr-12 rounded-lg surface-chip txt-primary placeholder:txt-secondary focus:outline-none focus:ring-2 focus:ring-[var(--brand)] transition-colors border-0"
+                :placeholder="$t('auth.password')"
+                data-testid="input-password"
+              />
+              <button
+                type="button"
+                class="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded txt-secondary hover:txt-primary transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+                :aria-label="showPassword ? $t('auth.hidePassword') : $t('auth.showPassword')"
+                data-testid="btn-toggle-password"
+                @click="showPassword = !showPassword"
+              >
+                <EyeSlashIcon v-if="showPassword" class="w-5 h-5" />
+                <EyeIcon v-else class="w-5 h-5" />
+              </button>
+            </div>
           </div>
 
           <div class="flex items-center justify-end">
@@ -210,7 +222,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { SunIcon, MoonIcon } from '@heroicons/vue/24/outline'
+import { SunIcon, MoonIcon, EyeIcon, EyeSlashIcon } from '@heroicons/vue/24/outline'
 import { useTheme } from '../composables/useTheme'
 import { useAuth } from '../composables/useAuth'
 import { useRecaptcha } from '../composables/useRecaptcha'
@@ -240,6 +252,7 @@ const logoSrc = computed(
 
 const email = ref('')
 const password = ref('')
+const showPassword = ref(false)
 
 const currentLanguage = computed(() => locale.value)
 
