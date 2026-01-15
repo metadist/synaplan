@@ -1,6 +1,10 @@
 <template>
   <div
-    :class="[isPreview ? 'absolute' : 'fixed', 'z-[9999]', positionClass]"
+    :class="[
+      testMode ? 'relative w-full h-full' : isPreview ? 'absolute' : 'fixed',
+      testMode ? '' : 'z-[9999]',
+      testMode ? '' : positionClass,
+    ]"
     data-testid="comp-chat-widget"
     style="pointer-events: auto"
   >
@@ -388,13 +392,15 @@
           :style="{ borderColor: widgetTheme === 'dark' ? '#333' : '#e5e7eb' }"
         >
           <p class="text-xs" :style="{ color: widgetTheme === 'dark' ? '#9ca3af' : '#6b7280' }">
-            Powered by <a
+            Powered by
+            <a
               href="https://www.synaplan.com/"
               target="_blank"
               rel="noopener noreferrer"
               class="font-semibold hover:underline"
               :style="{ color: primaryColor }"
-            >synaplan</a>
+              >synaplan</a
+            >
           </p>
         </div>
       </div>
@@ -439,6 +445,7 @@ interface Props {
   allowFileUpload?: boolean
   fileUploadLimit?: number
   hideButton?: boolean
+  testMode?: boolean
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -456,7 +463,12 @@ const props = withDefaults(defineProps<Props>(), {
   allowFileUpload: false,
   fileUploadLimit: 3,
   hideButton: false,
+  testMode: false,
 })
+
+const emit = defineEmits<{
+  (e: 'close'): void
+}>()
 
 interface Message {
   id: string
@@ -499,8 +511,11 @@ const isLoadingHistory = ref(false)
 const isMobile = ref(false)
 const { t } = useI18n()
 
-const allowFileUploads = computed(() => !!props.allowFileUpload && !props.isPreview)
+const allowFileUploads = computed(
+  () => !!props.allowFileUpload && (!props.isPreview || props.testMode)
+)
 const fileUploadLimit = computed(() => props.fileUploadLimit ?? 0)
+const testModeHeaders = computed(() => (props.testMode ? { 'X-Widget-Test-Mode': 'true' } : {}))
 const fileUploadCount = ref(0)
 const uploadingFile = ref(false)
 const fileUploadError = ref<string | null>(null)
@@ -536,6 +551,10 @@ const chatWindowClasses = computed(() => {
   if (isMobile.value && !props.isPreview) {
     return ['fixed inset-0 rounded-none w-screen h-screen']
   }
+  // Test mode: fill parent container completely
+  if (props.testMode) {
+    return ['rounded-2xl w-full h-full']
+  }
   return ['rounded-2xl w-full max-w-[420px]']
 })
 
@@ -544,6 +563,14 @@ const chatWindowStyle = computed(() => {
     return {
       width: '100vw',
       height: '100vh',
+    }
+  }
+
+  // Test mode: fill the parent container completely
+  if (props.testMode) {
+    return {
+      width: '100%',
+      height: '100%',
     }
   }
 
@@ -608,6 +635,10 @@ const closeChat = () => {
         detail: { widgetId: props.widgetId },
       })
     )
+    // In test mode, emit close event for parent to handle
+    if (props.testMode) {
+      emit('close')
+    }
   }
 }
 
@@ -723,12 +754,10 @@ const sendMessage = async () => {
 
       // Upload each file
       for (const file of selectedFiles.value) {
-        const uploadResult = await uploadWidgetFile(
-          props.widgetId,
-          sessionId.value,
-          file,
-          props.apiUrl
-        )
+        const uploadResult = await uploadWidgetFile(props.widgetId, sessionId.value, file, {
+          apiUrl: props.apiUrl,
+          headers: testModeHeaders.value,
+        })
 
         fileIds.push(uploadResult.file.id)
         fileUploadCount.value += 1
@@ -800,6 +829,7 @@ const sendMessage = async () => {
       chatId: chatId.value ?? undefined,
       fileIds,
       apiUrl: props.apiUrl,
+      headers: testModeHeaders.value,
       onChunk: async (chunk: string) => {
         if (!chunk) return
         if (isTyping.value) {

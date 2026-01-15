@@ -101,7 +101,7 @@ class WidgetPublicController extends AbstractController
         }
 
         $config = $widget->getConfig();
-        if ($domainError = $this->ensureDomainAllowed($config, $request)) {
+        if ($domainError = $this->ensureDomainAllowed($config, $request, $widget->getOwnerId())) {
             return $domainError;
         }
 
@@ -177,7 +177,7 @@ class WidgetPublicController extends AbstractController
         }
 
         $config = $widget->getConfig();
-        if ($domainError = $this->ensureDomainAllowed($config, $request)) {
+        if ($domainError = $this->ensureDomainAllowed($config, $request, $widget->getOwnerId())) {
             return $domainError;
         }
 
@@ -610,7 +610,7 @@ class WidgetPublicController extends AbstractController
 
         // Check domain whitelist
         $config = $widget->getConfig();
-        if ($domainError = $this->ensureDomainAllowed($config, $request)) {
+        if ($domainError = $this->ensureDomainAllowed($config, $request, $widget->getOwnerId())) {
             return $domainError;
         }
 
@@ -892,7 +892,7 @@ class WidgetPublicController extends AbstractController
         }
 
         $config = $widget->getConfig();
-        if ($domainError = $this->ensureDomainAllowed($config, $request)) {
+        if ($domainError = $this->ensureDomainAllowed($config, $request, $widget->getOwnerId())) {
             return $domainError;
         }
 
@@ -975,8 +975,22 @@ class WidgetPublicController extends AbstractController
         ]);
     }
 
-    private function ensureDomainAllowed(array $config, Request $request): ?JsonResponse
+    private function ensureDomainAllowed(array $config, Request $request, ?int $widgetOwnerId = null): ?JsonResponse
     {
+        // Check for test mode: if X-Widget-Test-Mode header is set
+        // and the authenticated user is the widget owner, skip domain check
+        if ('true' === $request->headers->get('X-Widget-Test-Mode') && $widgetOwnerId) {
+            $user = $this->getUser();
+            if ($user && method_exists($user, 'getId') && $user->getId() === $widgetOwnerId) {
+                $this->logger->info('Widget domain check bypassed for owner in test mode', [
+                    'user_id' => $user->getId(),
+                    'widget_owner_id' => $widgetOwnerId,
+                ]);
+
+                return null; // Allow - owner is testing their own widget
+            }
+        }
+
         $allowedDomains = $config['allowedDomains'] ?? [];
         if (empty($allowedDomains)) {
             $this->logger->warning('Widget request blocked: no domains configured', [
