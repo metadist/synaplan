@@ -6,7 +6,6 @@ namespace Plugin\SortX\Controller;
 
 use App\AI\Service\AiFacade;
 use App\Entity\User;
-use App\Repository\PromptRepository;
 use App\Service\ModelConfigService;
 use OpenApi\Attributes as OA;
 use Psr\Log\LoggerInterface;
@@ -58,7 +57,6 @@ PROMPT;
 
     public function __construct(
         private AiFacade $aiFacade,
-        private PromptRepository $promptRepository,
         private ModelConfigService $modelConfigService,
         private LoggerInterface $logger,
     ) {
@@ -68,7 +66,7 @@ PROMPT;
     #[OA\Post(
         path: '/api/v1/user/{userId}/plugins/sortx/classify',
         summary: 'Classify document text using AI',
-        description: 'Analyzes extracted document text and returns classification',
+        description: 'Analyzes extracted document text and returns classification with multiple categories',
         security: [['Bearer' => []]],
         tags: ['SortX Plugin']
     )]
@@ -241,8 +239,7 @@ PROMPT;
                     property: 'data',
                     type: 'object',
                     properties: [
-                        new OA\Property(property: 'category', type: 'string'),
-                        new OA\Property(property: 'subcategory', type: 'string'),
+                        new OA\Property(property: 'categories', type: 'array', items: new OA\Items(type: 'string')),
                         new OA\Property(property: 'confidence', type: 'number'),
                         new OA\Property(property: 'extracted_text', type: 'string'),
                     ]
@@ -278,20 +275,9 @@ PROMPT;
         }
 
         try {
-            // For vision analysis, we need to use a vision-capable model
-            // This is a simplified implementation - in production you'd want
-            // to use the actual vision API with base64 encoding
-
             $filename = $file->getClientOriginalName();
             $mimeType = $file->getMimeType();
 
-            // Build context
-            $contextStr = 'None provided';
-            if (!empty($userContext['name'])) {
-                $contextStr = 'User: '.$userContext['name'];
-            }
-
-            // For now, return a placeholder - vision integration would go here
             $this->logger->info('SortX file analysis requested', [
                 'user_id' => $userId,
                 'filename' => $filename,
@@ -308,8 +294,7 @@ PROMPT;
             return $this->json([
                 'success' => true,
                 'data' => [
-                    'category' => 'unknown',
-                    'subcategory' => null,
+                    'categories' => [],
                     'confidence' => 0.0,
                     'extracted_text' => null,
                     'metadata' => [
@@ -354,7 +339,6 @@ PROMPT;
                             new OA\Property(property: 'key', type: 'string'),
                             new OA\Property(property: 'name', type: 'string'),
                             new OA\Property(property: 'description', type: 'string'),
-                            new OA\Property(property: 'subcategories', type: 'array', items: new OA\Items(type: 'string')),
                         ]
                     )
                 ),
@@ -407,7 +391,7 @@ PROMPT;
 
     /**
      * Parse AI response into structured classification result.
-     * Now supports multiple categories (1-to-n relationship).
+     * Supports multiple categories (1-to-n relationship).
      */
     private function parseClassificationResponse(string $response): array
     {
