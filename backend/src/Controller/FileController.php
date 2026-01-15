@@ -12,6 +12,7 @@ use App\Service\File\FileHelper;
 use App\Service\File\FileProcessor;
 use App\Service\File\FileStorageService;
 use App\Service\File\VectorizationService;
+use App\Service\RateLimitService;
 use App\Service\StorageQuotaService;
 use Doctrine\ORM\EntityManagerInterface;
 use OpenApi\Attributes as OA;
@@ -34,6 +35,7 @@ class FileController extends AbstractController
         private FileProcessor $fileProcessor,
         private VectorizationService $vectorizationService,
         private StorageQuotaService $storageQuotaService,
+        private RateLimitService $rateLimitService,
         private MessageRepository $messageRepository,
         private FileRepository $fileRepository,
         private RagDocumentRepository $ragDocumentRepository,
@@ -285,7 +287,41 @@ class FileController extends AbstractController
             $result['ai_processing_note'] = 'AI processing not yet implemented';
         }
 
+        // Record file type-specific usage for statistics
+        $fileAction = $this->getFileUsageAction($fileExtension);
+        $this->rateLimitService->recordUsage($user, $fileAction, [
+            'file_id' => $messageFile->getId(),
+            'filename' => $uploadedFile->getClientOriginalName(),
+            'source' => 'WEB',
+        ]);
+
         return $result;
+    }
+
+    /**
+     * Get usage action based on file extension for statistics tracking.
+     */
+    private function getFileUsageAction(string $extension): string
+    {
+        $ext = strtolower($extension);
+
+        // Images
+        if (in_array($ext, ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg'], true)) {
+            return 'IMAGES';
+        }
+
+        // Videos
+        if (in_array($ext, ['mp4', 'mov', 'avi', 'mkv', 'webm', 'wmv', 'flv'], true)) {
+            return 'VIDEOS';
+        }
+
+        // Audio
+        if (in_array($ext, ['mp3', 'wav', 'ogg', 'm4a', 'opus', 'flac', 'amr', 'aac'], true)) {
+            return 'AUDIOS';
+        }
+
+        // Documents (default for all other files including PDF, DOCX, etc.)
+        return 'FILE_ANALYSIS';
     }
 
     /**

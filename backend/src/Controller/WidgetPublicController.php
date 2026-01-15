@@ -680,10 +680,16 @@ class WidgetPublicController extends AbstractController
 
                 // Record usage for widget owner
                 if ($owner) {
-                    $this->rateLimitService->recordUsage($owner, 'FILE_UPLOADS', [
+                    // Record the file type-specific action for statistics
+                    $fileExtension = strtolower($uploadedFile->getClientOriginalExtension());
+                    $fileAction = $this->getFileUsageAction($fileExtension);
+
+                    $this->rateLimitService->recordUsage($owner, $fileAction, [
                         'file_id' => $result['file']['id'],
                         'widget_id' => $widgetId,
                         'session_id' => $sessionId,
+                        'filename' => $uploadedFile->getClientOriginalName(),
+                        'source' => 'WIDGET',
                     ]);
                 }
 
@@ -855,6 +861,32 @@ class WidgetPublicController extends AbstractController
             'docx', 'doc', 'xlsx', 'xls', 'pptx', 'ppt' => 4, // Office
             default => 5, // Other
         };
+    }
+
+    /**
+     * Get usage action based on file extension for statistics tracking.
+     */
+    private function getFileUsageAction(string $extension): string
+    {
+        $ext = strtolower($extension);
+
+        // Images
+        if (in_array($ext, ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg'], true)) {
+            return 'IMAGES';
+        }
+
+        // Videos
+        if (in_array($ext, ['mp4', 'mov', 'avi', 'mkv', 'webm', 'wmv', 'flv'], true)) {
+            return 'VIDEOS';
+        }
+
+        // Audio
+        if (in_array($ext, ['mp3', 'wav', 'ogg', 'm4a', 'opus', 'flac', 'amr', 'aac'], true)) {
+            return 'AUDIOS';
+        }
+
+        // Documents (default for all other files including PDF, DOCX, etc.)
+        return 'FILE_ANALYSIS';
     }
 
     /**

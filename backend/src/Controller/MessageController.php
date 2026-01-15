@@ -540,6 +540,14 @@ class MessageController extends AbstractController
                 'status' => $messageFile->getStatus(),
             ]);
 
+            // Record file type-specific usage for statistics
+            $fileAction = $this->getFileUsageAction($fileExtension);
+            $this->rateLimitService->recordUsage($user, $fileAction, [
+                'file_id' => $messageFile->getId(),
+                'filename' => $uploadedFile->getClientOriginalName(),
+                'source' => 'WEB',
+            ]);
+
             $response = [
                 'success' => true,
                 'file_id' => $messageFile->getId(),
@@ -628,5 +636,31 @@ class MessageController extends AbstractController
         }
 
         return $this->json($status);
+    }
+
+    /**
+     * Get usage action based on file extension for statistics tracking.
+     */
+    private function getFileUsageAction(string $extension): string
+    {
+        $ext = strtolower($extension);
+
+        // Images
+        if (in_array($ext, ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg'], true)) {
+            return 'IMAGES';
+        }
+
+        // Videos
+        if (in_array($ext, ['mp4', 'mov', 'avi', 'mkv', 'webm', 'wmv', 'flv'], true)) {
+            return 'VIDEOS';
+        }
+
+        // Audio
+        if (in_array($ext, ['mp3', 'wav', 'ogg', 'm4a', 'opus', 'flac', 'amr', 'aac'], true)) {
+            return 'AUDIOS';
+        }
+
+        // Documents (default for all other files including PDF, DOCX, etc.)
+        return 'FILE_ANALYSIS';
     }
 }
