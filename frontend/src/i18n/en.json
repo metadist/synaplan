@@ -1078,7 +1078,9 @@
     "sessionExpired": "Session Expired",
     "sessionExpiredDesc": "Your session has expired. Please log in again to continue.",
     "authenticationRequired": "Authentication required. Please log in to continue.",
-    "tokenRefreshFailed": "Failed to refresh your session. Please log in again."
+    "tokenRefreshFailed": "Failed to refresh your session. Please log in again.",
+    "showPassword": "Show password",
+    "hidePassword": "Hide password"
   },
   "unsavedChanges": {
     "title": "You have unsaved changes",

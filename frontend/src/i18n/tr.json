@@ -334,7 +334,9 @@
     "passwordResetSuccessDesc": "Bu e-posta adresiyle bir hesap varsa, şifre sıfırlama bağlantısı gönderdik. Lütfen gelen kutunuzu kontrol edin.",
     "recaptchaError": "reCAPTCHA doğrulaması başarısız. Lütfen tekrar deneyin.",
     "backToHomepage": "← www.synaplan.com'a geri dön",
-    "hostingTermsNote": "Barındırma platformunun kullanım koşulları geçerlidir."
+    "hostingTermsNote": "Barındırma platformunun kullanım koşulları geçerlidir.",
+    "showPassword": "Şifreyi göster",
+    "hidePassword": "Şifreyi gizle"
   },
   "unsavedChanges": {
     "title": "Kaydedilmemiş değişiklikleriniz var",
