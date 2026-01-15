@@ -102,7 +102,7 @@
         <!-- Messages -->
         <div
           ref="messagesContainer"
-          class="flex-1 overflow-y-auto p-4 space-y-3"
+          class="flex-1 overflow-y-auto p-4 flex flex-col gap-3"
           :style="{
             backgroundColor: widgetTheme === 'dark' ? '#1a1a1a' : '#ffffff',
           }"
