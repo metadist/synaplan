@@ -262,7 +262,7 @@
           </div>
 
           <div
-            v-if="allowFileUploads && fileLimitReached"
+            v-if="allowFileUploads && fileLimitReached && selectedFiles.length === 0"
             class="mb-2 p-2 bg-amber-500/10 border border-amber-500/30 rounded-lg"
           >
             <div class="flex items-start gap-2">
@@ -273,32 +273,35 @@
             </div>
           </div>
 
-          <div
-            v-if="selectedFile"
-            class="mb-2 flex items-center gap-2 p-2 rounded-lg"
-            :style="{ backgroundColor: widgetTheme === 'dark' ? '#2a2a2a' : '#f3f4f6' }"
-          >
-            <DocumentIcon
-              class="w-5 h-5"
-              :style="{ color: widgetTheme === 'dark' ? '#9ca3af' : '#6b7280' }"
-            />
-            <span
-              class="text-sm flex-1 truncate"
-              :style="{ color: widgetTheme === 'dark' ? '#e5e5e5' : '#1f2937' }"
-              >{{ selectedFile.name }}</span
+          <div v-if="selectedFiles.length > 0" class="mb-2 space-y-1">
+            <div
+              v-for="(file, index) in selectedFiles"
+              :key="`${file.name}-${file.size}`"
+              class="flex items-center gap-2 p-2 rounded-lg"
+              :style="{ backgroundColor: widgetTheme === 'dark' ? '#2a2a2a' : '#f3f4f6' }"
             >
-            <span
-              class="text-xs"
-              :style="{ color: widgetTheme === 'dark' ? '#9ca3af' : '#6b7280' }"
-              >{{ formatFileSize(selectedFile.size) }}</span
-            >
-            <button
-              class="w-6 h-6 rounded hover:bg-black/10 dark:hover:bg-white/10 flex items-center justify-center"
-              data-testid="btn-remove-file"
-              @click="removeFile"
-            >
-              <XMarkIcon class="w-4 h-4 txt-secondary" />
-            </button>
+              <DocumentIcon
+                class="w-5 h-5 flex-shrink-0"
+                :style="{ color: widgetTheme === 'dark' ? '#9ca3af' : '#6b7280' }"
+              />
+              <span
+                class="text-sm flex-1 truncate"
+                :style="{ color: widgetTheme === 'dark' ? '#e5e5e5' : '#1f2937' }"
+                >{{ file.name }}</span
+              >
+              <span
+                class="text-xs flex-shrink-0"
+                :style="{ color: widgetTheme === 'dark' ? '#9ca3af' : '#6b7280' }"
+                >{{ formatFileSize(file.size) }}</span
+              >
+              <button
+                class="w-6 h-6 rounded hover:bg-black/10 dark:hover:bg-white/10 flex items-center justify-center flex-shrink-0"
+                :data-testid="`btn-remove-file-${index}`"
+                @click="removeFile(index)"
+              >
+                <XMarkIcon class="w-4 h-4 txt-secondary" />
+              </button>
+            </div>
           </div>
 
           <!-- File Size Error -->
@@ -321,11 +324,12 @@
                 type="file"
                 accept="image/*,.pdf,.doc,.docx,.txt"
                 class="hidden"
+                multiple
                 data-testid="input-file"
                 @change="handleFileSelect"
               />
               <button
-                :disabled="limitReached || fileLimitReached"
+                :disabled="limitReached || !canAddMoreFiles"
                 class="w-10 h-10 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 transition-colors flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
                 :aria-label="$t('widget.attachFile')"
                 data-testid="btn-attach"
@@ -472,7 +476,7 @@ const getButtonIconComponent = computed(() => {
   // In the full implementation, we would map buttonIcon values to different components
   return ChatBubbleLeftRightIcon
 })
-const selectedFile = ref<File | null>(null)
+const selectedFiles = ref<File[]>([])
 const fileSizeError = ref(false)
 const messages = ref<Message[]>([])
 const isTyping = ref(false)
@@ -501,6 +505,18 @@ const fileLimitReached = computed(() => {
     return true
   }
   return fileUploadCount.value >= limit
+})
+
+const remainingFileSlots = computed(() => {
+  if (!allowFileUploads.value) return 0
+  const limit = fileUploadLimit.value
+  if (limit <= 0) return 0
+  // Remaining = total limit - already uploaded - currently selected
+  return Math.max(0, limit - fileUploadCount.value - selectedFiles.value.length)
+})
+
+const canAddMoreFiles = computed(() => {
+  return remainingFileSlots.value > 0
 })
 
 const updateIsMobile = () => {
@@ -541,8 +557,8 @@ const positionClass = computed(() => {
 
 const canSend = computed(() => {
   const hasText = inputMessage.value.trim() !== ''
-  const hasFile = allowFileUploads.value && selectedFile.value !== null
-  if (!hasText && !hasFile) {
+  const hasFiles = allowFileUploads.value && selectedFiles.value.length > 0
+  if (!hasText && !hasFiles) {
     return false
   }
   if (uploadingFile.value) {
@@ -601,7 +617,7 @@ const toggleTheme = () => {
 
 const handleFileSelect = (event: Event) => {
   const target = event.target as HTMLInputElement
-  const file = target.files?.[0]
+  const files = target.files
   fileUploadError.value = null
 
   if (!allowFileUploads.value) {
@@ -609,29 +625,72 @@ const handleFileSelect = (event: Event) => {
     return
   }
 
-  if (fileLimitReached.value) {
+  if (!files || files.length === 0) {
+    target.value = ''
+    return
+  }
+
+  // Check if we can still add files
+  if (!canAddMoreFiles.value) {
     fileUploadError.value = t('widget.fileUploadLimitReached')
     target.value = ''
     return
   }
 
-  if (file) {
+  // Process selected files
+  const filesToAdd: File[] = []
+  let hasError = false
+
+  for (let i = 0; i < files.length; i++) {
+    const file = files[i]
+
+    // Check if we've reached the limit (considering already selected + new)
+    if (
+      selectedFiles.value.length + filesToAdd.length >=
+      remainingFileSlots.value + selectedFiles.value.length
+    ) {
+      fileUploadError.value = t('widget.fileUploadLimitReached')
+      break
+    }
+
+    // Check file size
     const fileSizeMB = file.size / (1024 * 1024)
     if (fileSizeMB > props.maxFileSize) {
-      fileSizeError.value = true
-      setTimeout(() => {
-        fileSizeError.value = false
-      }, 3000)
-      target.value = ''
-      return
+      hasError = true
+      continue // Skip this file but continue with others
     }
-    selectedFile.value = file
+
+    // Check if file with same name is already selected
+    const isDuplicate = selectedFiles.value.some(
+      (f) => f.name === file.name && f.size === file.size
+    )
+    if (!isDuplicate) {
+      filesToAdd.push(file)
+    }
+  }
+
+  if (hasError && filesToAdd.length === 0) {
+    fileSizeError.value = true
+    setTimeout(() => {
+      fileSizeError.value = false
+    }, 3000)
+  }
+
+  // Add valid files to the selection
+  if (filesToAdd.length > 0) {
+    // Limit to remaining slots
+    const slotsAvailable = remainingFileSlots.value
+    const filesToActuallyAdd = filesToAdd.slice(0, slotsAvailable)
+    selectedFiles.value = [...selectedFiles.value, ...filesToActuallyAdd]
     fileSizeError.value = false
   }
+
+  // Reset input so the same file can be selected again if removed
+  target.value = ''
 }
 
-const removeFile = () => {
-  selectedFile.value = null
+const removeFile = (index: number) => {
+  selectedFiles.value = selectedFiles.value.filter((_, i) => i !== index)
   if (fileInput.value) {
     fileInput.value.value = ''
   }
@@ -643,8 +702,8 @@ const sendMessage = async () => {
   const fileIds: number[] = []
   fileUploadError.value = null
 
-  // Upload file if selected
-  if (allowFileUploads.value && selectedFile.value) {
+  // Upload files if selected
+  if (allowFileUploads.value && selectedFiles.value.length > 0) {
     if (fileLimitReached.value) {
       fileUploadError.value = t('widget.fileUploadLimitReached')
       return
@@ -654,26 +713,29 @@ const sendMessage = async () => {
       uploadingFile.value = true
       fileUploadError.value = null
 
-      const uploadResult = await uploadWidgetFile(
-        props.widgetId,
-        sessionId.value,
-        selectedFile.value,
-        props.apiUrl
-      )
+      // Upload each file
+      for (const file of selectedFiles.value) {
+        const uploadResult = await uploadWidgetFile(
+          props.widgetId,
+          sessionId.value,
+          file,
+          props.apiUrl
+        )
 
-      fileIds.push(uploadResult.file.id)
-      fileUploadCount.value += 1
+        fileIds.push(uploadResult.file.id)
+        fileUploadCount.value += 1
 
-      messages.value.push({
-        id: `file-${uploadResult.file.id}`,
-        role: 'user',
-        type: 'file',
-        content: selectedFile.value.name,
-        fileName: selectedFile.value.name,
-        timestamp: new Date(),
-      })
+        messages.value.push({
+          id: `file-${uploadResult.file.id}`,
+          role: 'user',
+          type: 'file',
+          content: file.name,
+          fileName: file.name,
+          timestamp: new Date(),
+        })
+      }
 
-      selectedFile.value = null
+      selectedFiles.value = []
       if (fileInput.value) {
         fileInput.value.value = ''
       }
