@@ -36,6 +36,14 @@ class Chat
     #[ORM\Column(name: 'BISPUBLIC', type: 'boolean', options: ['default' => false])]
     private bool $isPublic = false;
 
+    /**
+     * Path to the OG image for social media sharing.
+     * This is a relative path from the uploads directory (e.g., "og/12/abc123.jpg").
+     * The image is generated when sharing is enabled and verified to exist before use.
+     */
+    #[ORM\Column(name: 'BOGIMAGEPATH', type: 'string', length: 255, nullable: true)]
+    private ?string $ogImagePath = null;
+
     #[ORM\OneToMany(mappedBy: 'chat', targetEntity: Message::class)]
     private Collection $messages;
 
@@ -131,6 +139,18 @@ class Chat
     public function setIsPublic(bool $isPublic): self
     {
         $this->isPublic = $isPublic;
+
+        return $this;
+    }
+
+    public function getOgImagePath(): ?string
+    {
+        return $this->ogImagePath;
+    }
+
+    public function setOgImagePath(?string $ogImagePath): self
+    {
+        $this->ogImagePath = $ogImagePath;
 
         return $this;
     }
