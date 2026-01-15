@@ -1201,6 +1201,7 @@
     "allowFileUploadHelp": "Let visitors attach files. Extracted text is automatically added to the widget's knowledge base.",
     "fileUploadLimit": "File Upload Limit",
     "fileUploadLimitHelp": "Maximum number of files each visitor can upload per session. Set to 0 for unlimited uploads.",
+    "fileUploadUnlimitedWarning": "Warning: Unlimited uploads may increase resource usage.",
     "embedCode": "Embed Code",
     "htmlCode": "HTML Embed Code",
     "htmlCodeDescription": "Paste this code before the closing </body> tag of your website",

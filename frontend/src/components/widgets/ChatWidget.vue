@@ -507,8 +507,9 @@ const fileUploadError = ref<string | null>(null)
 const fileLimitReached = computed(() => {
   if (!allowFileUploads.value) return false
   const limit = fileUploadLimit.value
+  // 0 means unlimited
   if (limit <= 0) {
-    return true
+    return false
   }
   return fileUploadCount.value >= limit
 })
@@ -516,7 +517,8 @@ const fileLimitReached = computed(() => {
 const remainingFileSlots = computed(() => {
   if (!allowFileUploads.value) return 0
   const limit = fileUploadLimit.value
-  if (limit <= 0) return 0
+  // 0 means unlimited - return a large number
+  if (limit <= 0) return 999
   // Remaining = total limit - already uploaded - currently selected
   return Math.max(0, limit - fileUploadCount.value - selectedFiles.value.length)
 })
@@ -824,6 +826,7 @@ const sendMessage = async () => {
 
     if (typeof result.remainingUploads === 'number') {
       const limit = fileUploadLimit.value
+      // Only track count if there's an actual limit (0 = unlimited)
       if (limit > 0) {
         fileUploadCount.value = Math.max(0, limit - result.remainingUploads)
       }

@@ -1088,6 +1088,7 @@
     "allowFileUploadHelp": "Ermöglichen Sie Besuchern das Anhängen von Dateien. Extrahierter Text wird automatisch zur Wissensbasis des Widgets hinzugefügt.",
     "fileUploadLimit": "Datei-Upload-Limit",
     "fileUploadLimitHelp": "Maximale Anzahl an Dateien, die jeder Besucher pro Sitzung hochladen kann. Setzen Sie auf 0 für unbegrenzte Uploads.",
+    "fileUploadUnlimitedWarning": "Achtung: Unbegrenzte Uploads können die Ressourcennutzung erhöhen.",
     "embedCode": "Einbettungscode",
     "htmlCode": "HTML Einbettungscode",
     "htmlCodeDescription": "Fügen Sie diesen Code vor dem schließenden </body>-Tag Ihrer Website ein",
