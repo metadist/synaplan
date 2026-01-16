@@ -50,7 +50,7 @@ frontend/.vite/
 *.cache
 frontend/tests/e2e/tests/test-results/
 frontend/tests/e2e/tests/reports/
-frontend/tests/e2e/prompts/
+frontend/tests/e2e/prompts/*
 
 # Platform configs
 platform/
