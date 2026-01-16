@@ -244,8 +244,10 @@ final class FileHelper
             return true;
         }
 
-        // Last resort: try to open the file directly
-        // This forces NFS to check the server for the file's existence
+        // Final check: try to open the file directly
+        // This catches edge cases where the directory listing is still stale but the
+        // file inode is already accessible. This can happen when NFS caches are not
+        // fully synchronized despite the directory refresh.
         $handle = @fopen($absolutePath, 'rb');
         if (false !== $handle) {
             fclose($handle);
