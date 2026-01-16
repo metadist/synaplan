@@ -84,6 +84,16 @@
           </div>
           <div class="flex items-center gap-2">
             <button
+              v-if="messages.length > 0"
+              class="w-8 h-8 rounded-lg bg-white/10 hover:bg-white/20 transition-colors flex items-center justify-center"
+              :aria-label="$t('widget.exportChat')"
+              :title="$t('widget.exportChat')"
+              data-testid="btn-export"
+              @click="exportChat"
+            >
+              <ArrowDownTrayIcon class="w-5 h-5 text-white" />
+            </button>
+            <button
               class="w-8 h-8 rounded-lg bg-white/10 hover:bg-white/20 transition-colors flex items-center justify-center"
               :aria-label="widgetTheme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'"
               data-testid="btn-theme"
@@ -447,6 +457,7 @@ import {
   MoonIcon,
   ExclamationTriangleIcon,
   XCircleIcon,
+  ArrowDownTrayIcon,
 } from '@heroicons/vue/24/outline'
 
 import { uploadWidgetFile, sendWidgetMessage } from '@/services/api/widgetsApi'
@@ -690,6 +701,203 @@ const toggleChat = () => {
 
 const toggleTheme = () => {
   widgetTheme.value = widgetTheme.value === 'dark' ? 'light' : 'dark'
+}
+
+// Format a date for the export
+const formatExportDate = (date: Date): string => {
+  return date.toLocaleString(undefined, {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+}
+
+// Escape HTML special characters
+const escapeHtml = (text: string): string => {
+  const div = document.createElement('div')
+  div.textContent = text
+  return div.innerHTML
+}
+
+// Export chat as PDF (via print dialog)
+const exportChat = () => {
+  if (messages.value.length === 0) return
+
+  const exportDate = new Date()
+  const chatTitle = props.widgetTitle || t('widget.title')
+  const themeColor = props.primaryColor || '#6366f1'
+
+  // Build HTML content
+  let html = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>${escapeHtml(chatTitle)} - ${t('widget.exportChat')}</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      line-height: 1.6;
+      color: #1a1a1a;
+      background: #fff;
+      padding: 40px;
+      max-width: 800px;
+      margin: 0 auto;
+    }
+    .header {
+      border-bottom: 3px solid ${themeColor};
+      padding-bottom: 20px;
+      margin-bottom: 30px;
+    }
+    .header h1 {
+      color: ${themeColor};
+      font-size: 28px;
+      margin-bottom: 15px;
+    }
+    .meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 20px;
+      font-size: 14px;
+      color: #666;
+    }
+    .meta-item { display: flex; gap: 6px; }
+    .meta-label { font-weight: 600; color: #333; }
+    .messages { display: flex; flex-direction: column; gap: 20px; }
+    .message {
+      padding: 16px 20px;
+      border-radius: 12px;
+      max-width: 85%;
+      page-break-inside: avoid;
+    }
+    .message-user {
+      background: ${themeColor};
+      color: white;
+      margin-left: auto;
+      border-bottom-right-radius: 4px;
+    }
+    .message-assistant {
+      background: #f3f4f6;
+      color: #1a1a1a;
+      margin-right: auto;
+      border-bottom-left-radius: 4px;
+    }
+    .message-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+      font-size: 12px;
+      opacity: 0.8;
+    }
+    .message-sender { font-weight: 600; }
+    .message-content {
+      font-size: 15px;
+      white-space: pre-wrap;
+      word-wrap: break-word;
+    }
+    .message-user .message-content { color: white; }
+    .attachment {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(0,0,0,0.1);
+      padding: 6px 12px;
+      border-radius: 6px;
+      font-size: 13px;
+      margin-bottom: 8px;
+    }
+    .message-user .attachment { background: rgba(255,255,255,0.2); }
+    .footer {
+      margin-top: 40px;
+      padding-top: 20px;
+      border-top: 1px solid #e5e7eb;
+      text-align: center;
+      font-size: 12px;
+      color: #999;
+    }
+    @media print {
+      body { padding: 20px; }
+      .message { break-inside: avoid; }
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>${escapeHtml(chatTitle)}</h1>
+    <div class="meta">
+      <div class="meta-item">
+        <span class="meta-label">${t('widget.exportChatId')}:</span>
+        <span>${chatId.value || 'N/A'}</span>
+      </div>
+      <div class="meta-item">
+        <span class="meta-label">${t('widget.exportDate')}:</span>
+        <span>${formatExportDate(exportDate)}</span>
+      </div>
+      <div class="meta-item">
+        <span class="meta-label">${t('widget.exportMessageCount')}:</span>
+        <span>${messages.value.length}</span>
+      </div>
+    </div>
+  </div>
+  <div class="messages">
+`
+
+  // Add messages
+  for (const message of messages.value) {
+    const isUser = message.role === 'user'
+    const sender = isUser ? t('widget.you') : t('widget.assistant')
+    const icon = isUser ? '👤' : '🤖'
+    const time = formatExportDate(message.timestamp)
+
+    html += `
+    <div class="message message-${message.role}">
+      <div class="message-header">
+        <span class="message-sender">${icon} ${sender}</span>
+        <span>${time}</span>
+      </div>
+`
+
+    // Handle file attachments
+    if (message.files && message.files.length > 0) {
+      for (const file of message.files) {
+        html += `      <div class="attachment">📎 ${escapeHtml(file.filename)}</div>\n`
+      }
+    } else if (message.fileName) {
+      html += `      <div class="attachment">📎 ${escapeHtml(message.fileName)}</div>\n`
+    }
+
+    // Add message content
+    if (message.content) {
+      html += `      <div class="message-content">${escapeHtml(message.content)}</div>\n`
+    }
+
+    html += `    </div>\n`
+  }
+
+  html += `
+  </div>
+  <div class="footer">${t('widget.exportFooter')}</div>
+</body>
+</html>`
+
+  // Open in new window and trigger print
+  const printWindow = window.open('', '_blank')
+  if (printWindow) {
+    printWindow.document.write(html)
+    printWindow.document.close()
+    // Wait for content to load then print
+    printWindow.onload = () => {
+      printWindow.print()
+    }
+    // Fallback if onload doesn't fire
+    setTimeout(() => {
+      printWindow.print()
+    }, 500)
+  }
 }
 
 const handleFileSelect = (event: Event) => {
@@ -1181,15 +1389,6 @@ const loadConversationHistory = async (force = false) => {
       ensureAutoMessage()
     }
   }
-}
-
-const escapeHtml = (value: string): string => {
-  return value
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#039;')
 }
 
 const applyInlineFormatting = (text: string): string => {
