@@ -8,6 +8,7 @@ use App\Repository\ChatRepository;
 use App\Repository\MessageRepository;
 use App\Repository\SearchResultRepository;
 use App\Service\File\DataUrlFixer;
+use App\Service\File\OgImageService;
 use App\Service\WidgetSessionService;
 use Doctrine\ORM\EntityManagerInterface;
 use OpenApi\Attributes as OA;
@@ -29,6 +30,7 @@ class ChatController extends AbstractController
         private SearchResultRepository $searchResultRepository,
         private WidgetSessionService $widgetSessionService,
         private DataUrlFixer $dataUrlFixer,
+        private OgImageService $ogImageService,
         private LoggerInterface $logger,
     ) {
     }
@@ -376,8 +378,16 @@ class ChatController extends AbstractController
                 $chat->generateShareToken();
             }
             $chat->setIsPublic(true);
+
+            // Generate OG image for social media sharing
+            $ogImagePath = $this->ogImageService->generateOgImage($chat);
+            $chat->setOgImagePath($ogImagePath);
         } else {
             $chat->setIsPublic(false);
+
+            // Delete OG image to free up storage space
+            $this->ogImageService->deleteOgImage($chat);
+            $chat->setOgImagePath(null);
         }
 
         $this->em->flush();

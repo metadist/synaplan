@@ -60,13 +60,13 @@ final class ThumbnailService
 
         // Generate thumbnail using ffmpeg
         $timestamp = $timestamp ?? self::DEFAULT_TIMESTAMP;
-        $result = $this->runFfmpeg($videoAbsolutePath, $thumbnailAbsolutePath, $timestamp);
+        $result = $this->extractVideoFrame($videoAbsolutePath, $thumbnailAbsolutePath, $timestamp);
 
         if (!$result) {
             // Try at 0 seconds if 1 second fails (for very short videos)
             if ('00:00:01' === $timestamp) {
                 $this->logger->info('ThumbnailService: Retrying at 0 seconds for short video');
-                $result = $this->runFfmpeg($videoAbsolutePath, $thumbnailAbsolutePath, '00:00:00');
+                $result = $this->extractVideoFrame($videoAbsolutePath, $thumbnailAbsolutePath, '00:00:00');
             }
         }
 
@@ -189,13 +189,17 @@ final class ThumbnailService
     /**
      * Run ffmpeg to extract a frame from video.
      *
+     * This method is public to allow reuse by other services (e.g., OgImageService)
+     * that need video frame extraction without duplicating ffmpeg logic.
+     *
      * @param string $inputPath  absolute path to video
      * @param string $outputPath absolute path for thumbnail
      * @param string $timestamp  timestamp to extract (HH:MM:SS)
+     * @param int    $quality    ffmpeg quality (1-31, lower is better), default: 2
      *
      * @return bool true on success
      */
-    private function runFfmpeg(string $inputPath, string $outputPath, string $timestamp): bool
+    public function extractVideoFrame(string $inputPath, string $outputPath, string $timestamp, int $quality = self::DEFAULT_QUALITY): bool
     {
         // Build ffmpeg command
         // -ss: seek to timestamp (before input for speed)
@@ -207,7 +211,7 @@ final class ThumbnailService
             'ffmpeg -ss %s -i %s -vframes 1 -q:v %d -y %s 2>&1',
             escapeshellarg($timestamp),
             escapeshellarg($inputPath),
-            self::DEFAULT_QUALITY,
+            $quality,
             escapeshellarg($outputPath)
         );
 
@@ -217,7 +221,7 @@ final class ThumbnailService
         exec($command, $output, $returnCode);
 
         if (0 !== $returnCode) {
-            $this->logger->debug('ThumbnailService: ffmpeg command failed', [
+            $this->logger->debug('ThumbnailService: ffmpeg extraction failed', [
                 'command' => $command,
                 'return_code' => $returnCode,
                 'output' => implode("\n", array_slice($output, -5)),

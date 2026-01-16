@@ -52,6 +52,18 @@ class StaticUploadController extends AbstractController
         // Extract filename from path (last segment)
         $filename = basename($path);
 
+        // Check if this is an OG image for social media sharing
+        // OG images are public and stored in og/{shard}/{token}.{ext}
+        $isOgImage = str_starts_with($path, 'og/');
+
+        if ($isOgImage) {
+            $this->logger->info('StaticUploadController: Serving OG image', [
+                'path' => $path,
+            ]);
+
+            return $this->serveFile($path, $request);
+        }
+
         // Check if this is an AI-generated file that should bypass strict auth
         // Browser <audio> and <video> tags can't send Authorization headers,
         // so we identify AI-generated files by their naming patterns:
