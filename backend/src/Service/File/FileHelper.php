@@ -30,6 +30,16 @@ final class FileHelper
     public const FILE_GROUP = 'www-data';
 
     /**
+     * Number of directory entries to read to force NFS cache refresh.
+     *
+     * Reading at least two entries (. and ..) ensures the NFS client
+     * fetches the complete directory listing from the server, not just
+     * cached metadata. This is necessary for file existence checks to
+     * be reliable in multi-server NFS environments.
+     */
+    private const DIRECTORY_REFRESH_READ_COUNT = 2;
+
+    /**
      * Write content to file with proper permissions and ownership.
      *
      * For NFS environments, this also flushes the file to ensure it's
@@ -189,8 +199,11 @@ final class FileHelper
      *
      * NFS clients cache directory listings and file attributes. When a file is created
      * on one server, other servers may not see it immediately due to attribute caching.
-     * This method forces a cache refresh by clearing PHP's stat cache and attempting
-     * to directly open the file, which bypasses the NFS client's cached directory listing.
+     *
+     * This method forces a cache refresh by:
+     * 1. Clearing PHP's stat cache
+     * 2. Refreshing the parent directory listing (forces NFS to re-read from server)
+     * 3. Attempting to directly open the file
      *
      * Note: This method is for FILES only (not directories). Symlinks to files are followed.
      *
@@ -200,7 +213,7 @@ final class FileHelper
      */
     public static function fileExistsNfs(string $absolutePath): bool
     {
-        // Clear PHP's internal stat cache for this specific file
+        // Clear PHP's internal stat cache for this specific file and its directory
         clearstatcache(true, $absolutePath);
 
         // First try the standard check (works if cache is fresh)
@@ -210,9 +223,31 @@ final class FileHelper
             return true;
         }
 
-        // NFS cache might be stale - try to open the file directly
-        // This forces NFS to check the server for the file's existence
-        // even if the directory listing is cached
+        // Force NFS to refresh the parent directory listing
+        // This is critical: even if fopen() would work, NFS clients cache directory
+        // listings separately from file attributes. Reading the directory forces
+        // the NFS client to fetch the latest listing from the server.
+        $parentDir = dirname($absolutePath);
+        clearstatcache(true, $parentDir);
+        $dirHandle = @opendir($parentDir);
+        if (false !== $dirHandle) {
+            // Read entries to force NFS to actually fetch the directory
+            for ($i = 0; $i < self::DIRECTORY_REFRESH_READ_COUNT; ++$i) {
+                @readdir($dirHandle);
+            }
+            closedir($dirHandle);
+        }
+
+        // Now try the standard check again after directory refresh
+        clearstatcache(true, $absolutePath);
+        if (is_file($absolutePath)) {
+            return true;
+        }
+
+        // Final check: try to open the file directly
+        // This catches edge cases where the directory listing is still stale but the
+        // file inode is already accessible. This can happen when NFS caches are not
+        // fully synchronized despite the directory refresh.
         $handle = @fopen($absolutePath, 'rb');
         if (false !== $handle) {
             fclose($handle);
