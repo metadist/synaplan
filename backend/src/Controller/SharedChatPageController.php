@@ -217,11 +217,14 @@ class SharedChatPageController extends AbstractController
         string $token,
         bool $isCrawler,
     ): Response {
-        // Try to load the built index.html from production build
         $indexPath = '/var/www/frontend/index.html';
         $html = '';
 
-        if (file_exists($indexPath)) {
+        // In development mode, always use dev-compatible HTML with Vite's /src/main.ts
+        // In production, use the built index.html with hashed asset paths
+        $isDev = 'dev' === ($_ENV['APP_ENV'] ?? 'prod');
+
+        if (!$isDev && file_exists($indexPath)) {
             // Production: Use built index.html with correct asset paths
             $html = file_get_contents($indexPath);
 
@@ -236,8 +239,8 @@ class SharedChatPageController extends AbstractController
             $metaTags = $this->generateMetaTags($title, $description, $imageUrl, $canonicalUrl, $lang, $token);
             $html = str_replace('</head>', $metaTags.'</head>', $html);
         } else {
-            // Development fallback: Build HTML manually with dev paths
-            // This allows the controller to work in development without built assets
+            // Development: Build HTML manually with Vite dev server paths
+            // This allows hot module replacement to work properly
             $html = $this->buildHtmlManually($title, $description, $imageUrl, $canonicalUrl, $lang, $token);
         }
 
