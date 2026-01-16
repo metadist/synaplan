@@ -312,6 +312,11 @@ services:
         arguments:
             $uploadDir: '%kernel.project_dir%/var/uploads'
 
+    App\Service\File\OgImageService:
+        arguments:
+            $uploadDir: '%kernel.project_dir%/var/uploads'
+            $frontendDir: '%kernel.project_dir%/../frontend'
+
     App\Service\File\PdfRasterizer:
         arguments:
             $uploadDir: '%kernel.project_dir%/var/uploads'
