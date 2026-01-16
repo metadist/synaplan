@@ -30,6 +30,16 @@ final class FileHelper
     public const FILE_GROUP = 'www-data';
 
     /**
+     * Number of directory entries to read to force NFS cache refresh.
+     *
+     * Reading at least two entries (. and ..) ensures the NFS client
+     * fetches the complete directory listing from the server, not just
+     * cached metadata. This is necessary for file existence checks to
+     * be reliable in multi-server NFS environments.
+     */
+    private const DIRECTORY_REFRESH_READ_COUNT = 2;
+
+    /**
      * Write content to file with proper permissions and ownership.
      *
      * For NFS environments, this also flushes the file to ensure it's
@@ -221,9 +231,10 @@ final class FileHelper
         clearstatcache(true, $parentDir);
         $dirHandle = @opendir($parentDir);
         if (false !== $dirHandle) {
-            // Read a few entries to force NFS to actually fetch the directory
-            @readdir($dirHandle);
-            @readdir($dirHandle);
+            // Read entries to force NFS to actually fetch the directory
+            for ($i = 0; $i < self::DIRECTORY_REFRESH_READ_COUNT; ++$i) {
+                @readdir($dirHandle);
+            }
             closedir($dirHandle);
         }
 
