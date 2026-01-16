@@ -189,8 +189,11 @@ final class FileHelper
      *
      * NFS clients cache directory listings and file attributes. When a file is created
      * on one server, other servers may not see it immediately due to attribute caching.
-     * This method forces a cache refresh by clearing PHP's stat cache and attempting
-     * to directly open the file, which bypasses the NFS client's cached directory listing.
+     *
+     * This method forces a cache refresh by:
+     * 1. Clearing PHP's stat cache
+     * 2. Refreshing the parent directory listing (forces NFS to re-read from server)
+     * 3. Attempting to directly open the file
      *
      * Note: This method is for FILES only (not directories). Symlinks to files are followed.
      *
@@ -200,7 +203,7 @@ final class FileHelper
      */
     public static function fileExistsNfs(string $absolutePath): bool
     {
-        // Clear PHP's internal stat cache for this specific file
+        // Clear PHP's internal stat cache for this specific file and its directory
         clearstatcache(true, $absolutePath);
 
         // First try the standard check (works if cache is fresh)
@@ -210,9 +213,28 @@ final class FileHelper
             return true;
         }
 
-        // NFS cache might be stale - try to open the file directly
+        // Force NFS to refresh the parent directory listing
+        // This is critical: even if fopen() would work, NFS clients cache directory
+        // listings separately from file attributes. Reading the directory forces
+        // the NFS client to fetch the latest listing from the server.
+        $parentDir = dirname($absolutePath);
+        clearstatcache(true, $parentDir);
+        $dirHandle = @opendir($parentDir);
+        if (false !== $dirHandle) {
+            // Read a few entries to force NFS to actually fetch the directory
+            @readdir($dirHandle);
+            @readdir($dirHandle);
+            closedir($dirHandle);
+        }
+
+        // Now try the standard check again after directory refresh
+        clearstatcache(true, $absolutePath);
+        if (is_file($absolutePath)) {
+            return true;
+        }
+
+        // Last resort: try to open the file directly
         // This forces NFS to check the server for the file's existence
-        // even if the directory listing is cached
         $handle = @fopen($absolutePath, 'rb');
         if (false !== $handle) {
             fclose($handle);
