@@ -4,6 +4,7 @@ namespace App\Controller;
 
 use App\Entity\User;
 use App\Repository\UserRepository;
+use App\Service\OAuthStateService;
 use App\Service\TokenService;
 use Doctrine\ORM\EntityManagerInterface;
 use OpenApi\Attributes as OA;
@@ -28,6 +29,7 @@ class GitHubAuthController extends AbstractController
         private UserRepository $userRepository,
         private EntityManagerInterface $em,
         private TokenService $tokenService,
+        private OAuthStateService $oauthStateService,
         private LoggerInterface $logger,
         private string $githubClientId,
         private string $githubClientSecret,
@@ -46,13 +48,12 @@ class GitHubAuthController extends AbstractController
         response: 302,
         description: 'Redirect to GitHub OAuth authorization'
     )]
-    public function login(Request $request): Response
+    public function login(): Response
     {
         $redirectUri = $this->appUrl.'/api/v1/auth/github/callback';
-        $state = bin2hex(random_bytes(16));
 
-        // Store state in session for CSRF protection
-        $request->getSession()->set('github_oauth_state', $state);
+        // Generate signed state token (no session required)
+        $state = $this->oauthStateService->generateState('github');
 
         $params = [
             'client_id' => $this->githubClientId,
@@ -65,7 +66,6 @@ class GitHubAuthController extends AbstractController
 
         $this->logger->info('GitHub OAuth login initiated', [
             'redirect_uri' => $redirectUri,
-            'state' => $state,
         ]);
 
         return $this->redirect($authUrl);
@@ -85,13 +85,11 @@ class GitHubAuthController extends AbstractController
     {
         $code = $request->query->get('code');
         $state = $request->query->get('state');
-        $storedState = $request->getSession()->get('github_oauth_state');
 
-        // Validate state (CSRF protection)
-        if (!$state || $state !== $storedState) {
-            $this->logger->error('GitHub OAuth state mismatch', [
-                'received_state' => $state,
-                'stored_state' => $storedState,
+        // Validate signed state token (CSRF protection, no session required)
+        if (!$state || !$this->oauthStateService->validateState($state, 'github')) {
+            $this->logger->error('GitHub OAuth state validation failed', [
+                'state_present' => !empty($state),
             ]);
 
             $errorUrl = $this->frontendUrl.'/auth/callback?'.http_build_query([
@@ -101,9 +99,6 @@ class GitHubAuthController extends AbstractController
 
             return $this->redirect($errorUrl);
         }
-
-        // Clear stored state
-        $request->getSession()->remove('github_oauth_state');
 
         if (!$code) {
             $errorUrl = $this->frontendUrl.'/auth/callback?'.http_build_query([

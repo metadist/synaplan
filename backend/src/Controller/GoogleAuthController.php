@@ -4,6 +4,7 @@ namespace App\Controller;
 
 use App\Entity\User;
 use App\Repository\UserRepository;
+use App\Service\OAuthStateService;
 use App\Service\TokenService;
 use Doctrine\ORM\EntityManagerInterface;
 use OpenApi\Attributes as OA;
@@ -27,6 +28,7 @@ class GoogleAuthController extends AbstractController
         private UserRepository $userRepository,
         private EntityManagerInterface $em,
         private TokenService $tokenService,
+        private OAuthStateService $oauthStateService,
         private LoggerInterface $logger,
         private string $googleClientId,
         private string $googleClientSecret,
@@ -45,13 +47,12 @@ class GoogleAuthController extends AbstractController
         response: 302,
         description: 'Redirect to Google OAuth consent screen'
     )]
-    public function login(Request $request): Response
+    public function login(): Response
     {
         $redirectUri = $this->appUrl.'/api/v1/auth/google/callback';
-        $state = bin2hex(random_bytes(16));
 
-        // Store state in session for CSRF protection
-        $request->getSession()->set('google_oauth_state', $state);
+        // Generate signed state token (no session required)
+        $state = $this->oauthStateService->generateState('google');
 
         $params = [
             'client_id' => $this->googleClientId,
@@ -67,7 +68,6 @@ class GoogleAuthController extends AbstractController
 
         $this->logger->info('Google OAuth login initiated', [
             'redirect_uri' => $redirectUri,
-            'state' => $state,
         ]);
 
         return $this->redirect($authUrl);
@@ -87,13 +87,11 @@ class GoogleAuthController extends AbstractController
     {
         $code = $request->query->get('code');
         $state = $request->query->get('state');
-        $storedState = $request->getSession()->get('google_oauth_state');
 
-        // Validate state (CSRF protection)
-        if (!$state || $state !== $storedState) {
-            $this->logger->error('Google OAuth state mismatch', [
-                'received_state' => $state,
-                'stored_state' => $storedState,
+        // Validate signed state token (CSRF protection, no session required)
+        if (!$state || !$this->oauthStateService->validateState($state, 'google')) {
+            $this->logger->error('Google OAuth state validation failed', [
+                'state_present' => !empty($state),
             ]);
 
             $errorUrl = $this->frontendUrl.'/auth/callback?'.http_build_query([
@@ -103,9 +101,6 @@ class GoogleAuthController extends AbstractController
 
             return $this->redirect($errorUrl);
         }
-
-        // Clear stored state
-        $request->getSession()->remove('google_oauth_state');
 
         if (!$code) {
             $errorUrl = $this->frontendUrl.'/auth/callback?'.http_build_query([

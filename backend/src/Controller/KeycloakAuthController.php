@@ -4,6 +4,7 @@ namespace App\Controller;
 
 use App\Entity\User;
 use App\Repository\UserRepository;
+use App\Service\OAuthStateService;
 use App\Service\OidcTokenService;
 use App\Service\TokenService;
 use Doctrine\ORM\EntityManagerInterface;
@@ -40,6 +41,7 @@ class KeycloakAuthController extends AbstractController
         private EntityManagerInterface $em,
         private TokenService $tokenService,
         private OidcTokenService $oidcTokenService,
+        private OAuthStateService $oauthStateService,
         private LoggerInterface $logger,
         private string $oidcClientId,
         private string $oidcClientSecret,
@@ -57,21 +59,21 @@ class KeycloakAuthController extends AbstractController
         description: 'Initiates OAuth 2.0 Authorization Code Flow with PKCE (RFC 7636) for enhanced security',
         tags: ['Authentication']
     )]
-    public function login(Request $request): Response
+    public function login(): Response
     {
         try {
             $discovery = $this->getDiscoveryConfig();
 
             $redirectUri = $this->appUrl.'/api/v1/auth/keycloak/callback';
-            $state = bin2hex(random_bytes(16));
 
             // PKCE (RFC 7636): Generate code_verifier and code_challenge
             $codeVerifier = $this->generateCodeVerifier();
             $codeChallenge = $this->generateCodeChallenge($codeVerifier);
 
-            // Store state and code_verifier in session (will be verified in callback)
-            $request->getSession()->set('keycloak_oauth_state', $state);
-            $request->getSession()->set('keycloak_pkce_verifier', $codeVerifier);
+            // Generate signed state token with PKCE verifier embedded (no session required)
+            $state = $this->oauthStateService->generateState('keycloak', [
+                'pkce_verifier' => $codeVerifier,
+            ]);
 
             $params = [
                 'client_id' => $this->oidcClientId,
@@ -126,12 +128,14 @@ class KeycloakAuthController extends AbstractController
     {
         $code = $request->query->get('code');
         $state = $request->query->get('state');
-        $storedState = $request->getSession()->get('keycloak_oauth_state');
-        $codeVerifier = $request->getSession()->get('keycloak_pkce_verifier');
 
-        // Validate state (CSRF protection)
-        if (!$state || $state !== $storedState) {
-            $this->logger->error('Keycloak OAuth state mismatch');
+        // Validate signed state token and extract PKCE verifier (no session required)
+        $statePayload = $state ? $this->oauthStateService->validateState($state, 'keycloak') : null;
+
+        if (!$statePayload) {
+            $this->logger->error('Keycloak OAuth state validation failed', [
+                'state_present' => !empty($state),
+            ]);
 
             return $this->redirect($this->frontendUrl.'/auth/callback?'.http_build_query([
                 'error' => 'Invalid state parameter',
@@ -139,19 +143,16 @@ class KeycloakAuthController extends AbstractController
             ]));
         }
 
-        // Validate PKCE verifier exists
+        // Extract PKCE verifier from validated state
+        $codeVerifier = $statePayload['pkce_verifier'] ?? null;
         if (!$codeVerifier) {
-            $this->logger->error('PKCE code_verifier missing from session');
+            $this->logger->error('PKCE code_verifier missing from state token');
 
             return $this->redirect($this->frontendUrl.'/auth/callback?'.http_build_query([
                 'error' => 'PKCE verification failed',
                 'provider' => 'keycloak',
             ]));
         }
-
-        // Clean up session
-        $request->getSession()->remove('keycloak_oauth_state');
-        $request->getSession()->remove('keycloak_pkce_verifier');
 
         if (!$code) {
             return $this->redirect($this->frontendUrl.'/auth/callback?'.http_build_query([
