@@ -8,12 +8,14 @@
    ```
 
 Node.js 18+ (if not2. **Install Node.js 18+** (if not installed):
-   ```bash
-   curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
-   sudo apt-get install -y nodejs
-   ```
+
+```bash
+curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+sudo apt-get install -y nodejs
+```
 
 3. **Setup Playwright**:
+
    ```bash
    cd frontend
    npm install
@@ -32,12 +34,15 @@ Node.js 18+ (if not2. **Install Node.js 18+** (if not installed):
 ## Configuration
 
 Optional: Create `frontend/tests/e2e/.env.local`:
+
 ```bash
 BASE_URL=http://localhost:5173
 AUTH_USER=admin@synaplan.com
 AUTH_PASS=admin123
 ```
-For some Tests you need to run local ollama models 
+
+For some Tests you need to run local ollama models
+
 ## Commands
 
 ```bash
@@ -59,6 +64,7 @@ npm run test:e2e:report
 **"npm: command not found"** → Install Node.js (see step 2 above)
 
 **EACCES errors** → Fix permissions:
+
 ```bash
 cd frontend
 rm -rf node_modules package-lock.json

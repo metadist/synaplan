@@ -60,11 +60,21 @@ test('@smoke semantic search completes and shows results summary id=007', async 
   await page.locator(selectors.rag.searchButton).click()
 
   await Promise.race([
-    page.locator(selectors.rag.searchSummary).waitFor({ state: 'visible', timeout: 60_000 }).catch(() => {}),
-    page.getByText(/error|failed|not found/i).waitFor({ state: 'visible', timeout: 60_000 }).catch(() => {}),
+    page
+      .locator(selectors.rag.searchSummary)
+      .waitFor({ state: 'visible', timeout: 60_000 })
+      .catch(() => {}),
+    page
+      .getByText(/error|failed|not found/i)
+      .waitFor({ state: 'visible', timeout: 60_000 })
+      .catch(() => {}),
   ])
 
-  const errorText = await page.getByText(/error|failed|not found|model.*not found/i).first().isVisible().catch(() => false)
+  const errorText = await page
+    .getByText(/error|failed|not found|model.*not found/i)
+    .first()
+    .isVisible()
+    .catch(() => false)
   if (errorText) {
     // In CI, TestProvider should be used instead of Ollama
     // If we still get an error, it might be a real issue - log it but don't skip

@@ -60,10 +60,7 @@ export async function loginViaApi(
 /**
  * Delete user by email via admin API
  */
-export async function deleteUser(
-  request: APIRequestContext,
-  userEmail: string
-): Promise<boolean> {
+export async function deleteUser(request: APIRequestContext, userEmail: string): Promise<boolean> {
   const baseUrl = process.env.BASE_URL || 'http://localhost:5173'
 
   try {
@@ -91,14 +88,11 @@ export async function deleteUser(
     }
 
     // Delete user via admin API
-    const deleteResponse = await request.delete(
-      `${baseUrl}/api/v1/admin/users/${targetUser.id}`,
-      {
-        headers: {
-          Cookie: cookieHeader,
-        },
-      }
-    )
+    const deleteResponse = await request.delete(`${baseUrl}/api/v1/admin/users/${targetUser.id}`, {
+      headers: {
+        Cookie: cookieHeader,
+      },
+    })
 
     if (deleteResponse.status() === 200) {
       console.log(`User ${userEmail} successfully deleted`)

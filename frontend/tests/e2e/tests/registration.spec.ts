@@ -2,7 +2,10 @@ import { test, expect } from '@playwright/test'
 import { selectors } from '../helpers/selectors'
 import { deleteUser } from '../helpers/auth'
 
-test('@ci @auth @smoke registration flow with email verification id=006', async ({ page, request }) => {
+test('@ci @auth @smoke registration flow with email verification id=006', async ({
+  page,
+  request,
+}) => {
   const uniqueSuffix = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
   const testEmail = `test+${uniqueSuffix}@test.com`
   const testPassword = 'Test1234'
@@ -12,9 +15,7 @@ test('@ci @auth @smoke registration flow with email verification id=006', async 
   const decodeQuotedPrintable = (input: string) =>
     input
       .replace(/=\r?\n/g, '')
-      .replace(/=([0-9A-Fa-f]{2})/g, (_, hex: string) =>
-        String.fromCharCode(parseInt(hex, 16))
-      )
+      .replace(/=([0-9A-Fa-f]{2})/g, (_, hex: string) => String.fromCharCode(parseInt(hex, 16)))
 
   try {
     await page.goto('/login')
@@ -44,51 +45,51 @@ test('@ci @auth @smoke registration flow with email verification id=006', async 
     await expect(page).toHaveURL(/\/login/)
 
     let verificationEmail: any = null
-    await expect.poll(
-      async () => {
-        const mailhogResponse = await request.get(`${mailhogUrl}/api/v2/messages`)
-        if (!mailhogResponse.ok()) {
-          throw new Error(`MailHog API returned ${mailhogResponse.status()}`)
-        }
-
-        const messages = await mailhogResponse.json()
-        verificationEmail = messages.items?.find((msg: any) => {
-          const toHeader = msg.Content?.Headers?.To || []
-          const toList = Array.isArray(toHeader) ? toHeader : [toHeader]
-          const toMatches = toList.some((to: string) => to.includes(testEmail))
-
-          const subjectHeader = msg.Content?.Headers?.Subject || []
-          const subjectList = Array.isArray(subjectHeader) ? subjectHeader : [subjectHeader]
-          const subjectMatches = subjectList.some((subj: string) =>
-            subj.toLowerCase().includes('verif')
-          )
-
-          const body = msg.Content?.Body || ''
-          const partBodies = Array.isArray(msg.Content?.Parts)
-            ? msg.Content.Parts.map((part: any) => part.Body || '').join(' ')
-            : ''
-          const contentLower = `${body} ${partBodies}`.toLowerCase()
-          const contentMatches =
-            contentLower.includes('verify') || contentLower.includes('verification')
-
-          const createdValue =
-            msg.Created ?? msg.created ?? msg.CreatedAt ?? msg.createdAt ?? msg.CreatedUTC
-          let createdMs =
-            typeof createdValue === 'number' ? createdValue : Date.parse(createdValue)
-          if (typeof createdValue === 'number' && createdValue < 1_000_000_000_000) {
-            createdMs = createdValue * 1000
+    await expect
+      .poll(
+        async () => {
+          const mailhogResponse = await request.get(`${mailhogUrl}/api/v2/messages`)
+          if (!mailhogResponse.ok()) {
+            throw new Error(`MailHog API returned ${mailhogResponse.status()}`)
           }
-          const isRecent = Number.isFinite(createdMs)
-            ? createdMs >= testStartTime - 1000
-            : true
 
-          return toMatches && isRecent && (subjectMatches || contentMatches)
-        })
+          const messages = await mailhogResponse.json()
+          verificationEmail = messages.items?.find((msg: any) => {
+            const toHeader = msg.Content?.Headers?.To || []
+            const toList = Array.isArray(toHeader) ? toHeader : [toHeader]
+            const toMatches = toList.some((to: string) => to.includes(testEmail))
 
-        return verificationEmail ?? null
-      },
-      { timeout: 60_000, intervals: [500] }
-    ).not.toBeNull()
+            const subjectHeader = msg.Content?.Headers?.Subject || []
+            const subjectList = Array.isArray(subjectHeader) ? subjectHeader : [subjectHeader]
+            const subjectMatches = subjectList.some((subj: string) =>
+              subj.toLowerCase().includes('verif')
+            )
+
+            const body = msg.Content?.Body || ''
+            const partBodies = Array.isArray(msg.Content?.Parts)
+              ? msg.Content.Parts.map((part: any) => part.Body || '').join(' ')
+              : ''
+            const contentLower = `${body} ${partBodies}`.toLowerCase()
+            const contentMatches =
+              contentLower.includes('verify') || contentLower.includes('verification')
+
+            const createdValue =
+              msg.Created ?? msg.created ?? msg.CreatedAt ?? msg.createdAt ?? msg.CreatedUTC
+            let createdMs =
+              typeof createdValue === 'number' ? createdValue : Date.parse(createdValue)
+            if (typeof createdValue === 'number' && createdValue < 1_000_000_000_000) {
+              createdMs = createdValue * 1000
+            }
+            const isRecent = Number.isFinite(createdMs) ? createdMs >= testStartTime - 1000 : true
+
+            return toMatches && isRecent && (subjectMatches || contentMatches)
+          })
+
+          return verificationEmail ?? null
+        },
+        { timeout: 60_000, intervals: [500] }
+      )
+      .not.toBeNull()
 
     const emailBody = verificationEmail.Content.Body || ''
     const emailParts = Array.isArray(verificationEmail.Content?.Parts)
@@ -98,9 +99,7 @@ test('@ci @auth @smoke registration flow with email verification id=006', async 
     const fullBody = emailHtml || emailBody
     const decodedBody = decodeQuotedPrintable(fullBody)
 
-    let linkMatch = decodedBody.match(
-      /href=["']([^"']*\/verify-email-callback\?token=[^"']*)["']/i
-    )
+    let linkMatch = decodedBody.match(/href=["']([^"']*\/verify-email-callback\?token=[^"']*)["']/i)
     if (!linkMatch) {
       linkMatch = decodedBody.match(
         /(https?:\/\/[^\s<>"]+\/verify-email-callback\?token=[^\s<>"]+)/i
@@ -122,9 +121,7 @@ test('@ci @auth @smoke registration flow with email verification id=006', async 
     await page.goto(normalizedVerificationLink)
 
     await expect(page.locator(selectors.verifyEmail.successState)).toBeVisible({ timeout: 10_000 })
-    await expect(page.locator(selectors.verifyEmail.successState)).toContainText(
-      /email.*verified/i
-    )
+    await expect(page.locator(selectors.verifyEmail.successState)).toContainText(/email.*verified/i)
 
     await page.locator(selectors.verifyEmail.goToLoginLink).click()
     await expect(page).toHaveURL(/\/login/)
