@@ -140,7 +140,12 @@ final readonly class PluginManager
 
         // 3. up -> ../../../ (back to {userId}/ root)
         // Path from uploads/L1/L2/UserId/plugins/PluginName to uploads/L1/L2/UserId/ is ../../../
-        $this->fs->symlink('../../../', $targetDir.'/up');
+        // Remove any existing 'up' file/directory/symlink before creating the symlink
+        $upPath = $targetDir.'/up';
+        if ($this->fs->exists($upPath)) {
+            $this->fs->remove($upPath);
+        }
+        $this->fs->symlink('../../../', $upPath);
 
         $this->logger->info("Plugin '$pluginName' symlinked for user $userId.");
 
