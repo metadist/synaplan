@@ -31,7 +31,7 @@ services:
       OLLAMA_BASE_URL: http://ollama_test:11434
       TIKA_BASE_URL: http://tika_test:9998
       AI_DEFAULT_PROVIDER: test
-      MAILER_DSN: null://null
+      MAILER_DSN: smtp://mailhog_test:1025
       AUTO_DOWNLOAD_MODELS: "false"
       TOKEN_SECRET: "test_token_secret"
       OIDC_CLIENT_ID: "test_client_id"
@@ -46,6 +46,8 @@ services:
     depends_on:
       db_test:
         condition: service_healthy
+      mailhog_test:
+        condition: service_started
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost/api/health"]
       interval: 10s
@@ -105,6 +107,17 @@ services:
       - "9997:9998"
     profiles:
       - integration
+    restart: "no"
+    networks:
+      - synaplan-test-network
+
+  # MailHog Test (Required for registration flow tests)
+  mailhog_test:
+    image: mailhog/mailhog:latest
+    container_name: synaplan-mailhog-test
+    ports:
+      - "8025:8025"  # Web UI / API
+      - "1025:1025"  # SMTP
     restart: "no"
     networks:
       - synaplan-test-network

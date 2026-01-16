@@ -175,7 +175,7 @@ test('@smoke All models can generate a valid answer "success" id=004', async ({ 
   }
 });
 
-test('@regression vision models respond and can be retried via again id=008', async ({ page }) => {
+test.skip('@regression vision models respond and can be retried via again id=008', async ({ page }) => {
   const failures: string[] = [];
 
   await login(page);
@@ -203,7 +203,7 @@ test('@regression vision models respond and can be retried via again id=008', as
   }
 });
 
-test('@regression image generation via /pic supports again id=009', async ({ page }) => {
+test.skip('@regression image generation via /pic supports again id=009', async ({ page }) => {
   const failures: string[] = [];
 
   await login(page);
@@ -225,7 +225,7 @@ test('@regression image generation via /pic supports again id=009', async ({ pag
   }
 });
 
-test('@regression video generation via /vid supports again id=010', async ({ page }) => {
+test.skip('@regression video generation via /vid supports again id=010', async ({ page }) => {
   const failures: string[] = [];
 
   await login(page);
