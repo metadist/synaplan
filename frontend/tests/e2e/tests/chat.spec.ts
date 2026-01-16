@@ -31,8 +31,9 @@ async function ensureAdvancedMode(page: Page) {
 }
 
 async function startNewChat(page: Page) {
-  await page.locator(selectors.nav.newChatButton).waitFor({ state: 'visible' });
-  await page.locator(selectors.nav.newChatButton).click();
+  await page.locator(selectors.chat.chatBtnToggle).click();
+  await page.locator(selectors.chat.newChatButton).waitFor({ state: 'visible' });
+  await page.locator(selectors.chat.newChatButton).click();
   await page.locator(selectors.chat.textInput).waitFor({ state: 'visible' });
 }
 
@@ -81,7 +82,7 @@ async function runAgainOptions(
     return;
   }
 
-  const startIndex = optionCount > 1 ? 1 : 0; // initial run already covered the first model when multiple exist
+  const startIndex = optionCount > 1 ? 1 : 0;
 
   for (let i = startIndex; i < optionCount; i += 1) {
     let labelText = '';
@@ -134,8 +135,7 @@ async function runAgainOptions(
 test('@smoke Standard model generates valid answer "success" id=003', async ({ page }) => {
   await login(page);
 
-  await page.locator(selectors.nav.newChatButton).waitFor({ state: 'visible' });
-  await page.locator(selectors.nav.newChatButton).click();
+  await startNewChat(page);
   await page.locator(selectors.chat.textInput).waitFor({ state: 'visible' });
 
   const previousCount = await page.locator(selectors.chat.aiAnswerBubble).count();
@@ -143,7 +143,7 @@ test('@smoke Standard model generates valid answer "success" id=003', async ({ p
   await page.locator(selectors.chat.sendBtn).click();
 
   const aiText = await waitForAnswer(page, previousCount);
-  await expect.soft(aiText).toContain('success');
+  await expect(aiText).toContain('success');
 });
 
 test('@smoke All models can generate a valid answer "success" id=004', async ({ page }) => {
@@ -151,8 +151,7 @@ test('@smoke All models can generate a valid answer "success" id=004', async ({ 
 
   await login(page);
 
-  await page.locator(selectors.nav.newChatButton).waitFor({ state: 'visible' });
-  await page.locator(selectors.nav.newChatButton).click();
+  await startNewChat(page);
   await page.locator(selectors.chat.textInput).waitFor({ state: 'visible' });
 
   try {

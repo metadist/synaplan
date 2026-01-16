@@ -3,12 +3,25 @@ export const selectors = {
     email: '#email',
     password: '#password',
     submit: 'button[type="submit"]',
+    signUpLink: '[data-testid="link-signup"]',
+  },
+  register: {
+    fullName: '[data-testid="input-full-name"]',
+    email: '[data-testid="input-email"]',
+    password: '[data-testid="input-password"]',
+    confirmPassword: '[data-testid="input-confirm-password"]',
+    submit: '[data-testid="btn-register"]',
+    successSection: '[data-testid="section-registration-success"]',
+    backToLoginBtn: '[data-testid="btn-goto-login"]',
+  },
+  verifyEmail: {
+    successState: '[data-testid="state-success"]',
+    goToLoginLink: '[data-testid="link-success-login"]',
   },
   header: {
     modeToggle: '[data-testid="btn-mode-toggle"]',
   },
   nav: {
-    newChatButton: '[data-testid="btn-chat-new"]',
     sidebar: '[data-testid="nav-sidebar"]',
   },
   models: {
@@ -26,6 +39,8 @@ export const selectors = {
     resultItem: '[data-testid="item-result"]',
   },
   chat: {
+    newChatButton: '[data-testid="btn-chat-new-dropdown"]',
+    chatBtnToggle: '[data-testid="btn-chat-toggle"]',
     textInput: '[data-testid="input-chat-message"]',
     sendBtn: '[data-testid="btn-chat-send"]',
     attachBtn: '[data-testid="btn-chat-attach"]',

@@ -1,52 +1,68 @@
-# Playwright E2E Guide
+# Playwright E2E Tests
 
-This folder contains the Playwright suite (`tests/`) and config (`playwright.config.ts`). Run everything from the `frontend/` directory.
+## Quick Start
 
-## Prerequisites
-- Node.js 18+
-- Dependencies installed via npm (no sudo)
+1. **Start the application** (see [root README](../../README.md)):
+   ```bash
+   docker compose up -d
+   ```
 
-## One-time setup
+Node.js 18+ (if not2. **Install Node.js 18+** (if not installed):
+   ```bash
+   curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+   sudo apt-get install -y nodejs
+   ```
+
+3. **Setup Playwright**:
+   ```bash
+   cd frontend
+   npm install
+   npx playwright install --with-deps
+   ```
+
+4. **Run tests**:
+   You may change the grep command in playwright.config.ts
+   ```bash
+   cd frontend
+   npm run test:e2e  # Only Chromium locally (faster)
+   ```
+
+**Note:** Locally runs Chromium only. CI tests both Chromium and Firefox.
+
+## Configuration
+
+Optional: Create `frontend/tests/e2e/.env.local`:
 ```bash
-cd frontend
-npm ci
-npx playwright install --with-deps
+BASE_URL=http://localhost:5173
+AUTH_USER=admin@synaplan.com
+AUTH_PASS=admin123
 ```
+For some Tests you need to run local ollama models 
+## Commands
 
-## Environment
-Defaults (see `playwright.config.ts`):
-- `BASE_URL` defaults to `http://localhost:5173`
-- `headless` runs in CI, headed locally
-- Login tests are excluded by default via `grepInvert`
-
-Provide env values via shell or `frontend/tests/e2e/.env` / `.env.local`:
-- `BASE_URL` – app URL
-- `AUTH_USER`, `AUTH_PASS` – credentials for auth flows
-- Optional: feature flags or API tokens your backend expects
-
-## Running tests
 ```bash
-# From frontend/
-npm run test:e2e  # runs suite except tests containing "login"
+# Run all tests (Chromium only)
+npm run test:e2e
 
-# Run a specific file
-npx playwright test tests/login.spec.ts --config=tests/e2e/playwright.config.ts
+# Run both browsers
+npx playwright test --config=tests/e2e/playwright.config.ts
 
-# Include login tests explicitly
-npx playwright test --grep login --config=tests/e2e/playwright.config.ts
+# Run specific test
+npx playwright test tests/login.spec.ts --config=tests/e2e/playwright.config.ts --project=chromium
 
-# Headed debugging
-npx playwright test --headed --config=tests/e2e/playwright.config.ts
-```
-
-## Reports and traces
-Artifacts live in `frontend/tests/e2e/test-results` and `frontend/tests/e2e/reports`.
-```bash
-npm run report  # open HTML report
-npm run trace   # open last trace
+# View HTML report
+npm run test:e2e:report
 ```
 
 ## Troubleshooting
-- `playwright: not found`: reinstall deps (`npm ci`) and run `npx playwright install --with-deps`.
-- `EACCES` in node_modules: ensure `node_modules` is owned by your user (no sudo npm).
-- Timeouts: verify `BASE_URL` is reachable; increase `timeout` in `playwright.config.ts` if needed.
+
+**"npm: command not found"** → Install Node.js (see step 2 above)
+
+**EACCES errors** → Fix permissions:
+```bash
+cd frontend
+rm -rf node_modules package-lock.json
+npm install
+```
+
+**"Connection refused"** → Ensure app is running: `docker compose up -d`

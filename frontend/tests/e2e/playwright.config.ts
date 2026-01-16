@@ -1,22 +1,28 @@
 import { defineConfig, devices } from '@playwright/test'
 import dotenv from 'dotenv'
+import path from 'path'
+import { fileURLToPath } from 'url'
 
-// Lade .env Datei (automatisch im Projektverzeichnis)
-dotenv.config({ path: '.env.local' })
+// Get __dirname equivalent in ES modules
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = path.dirname(__filename)
+
+// Load .env file from e2e directory
+dotenv.config({ path: path.join(__dirname, '.env.local') })
 
 /**
- * Minimal-robustes Playwright-Smoke-Setup
- * BaseURL: http://localhost:5137 (überschreibbar via BASE_URL ENV)
+ * Playwright E2E Test Configuration
+ * BaseURL: http://localhost:5173 (overridable via BASE_URL ENV)
  */
 export default defineConfig({
-  // Tests liegen im tests/-Verzeichnis (relative to this config file)
+  // Test directory (relative to this config file)
   testDir: './tests',
 
-  // Retries und Timeout auf Config-Ebene
+  // Retries and timeout
   retries: 0,
   timeout: 60_000,
 
-  // BaseURL aus ENV oder Default
+  // BaseURL from ENV or default
   use: {
     baseURL: process.env.BASE_URL || 'http://localhost:5173',
     headless: process.env.CI ? true : false,
@@ -25,20 +31,21 @@ export default defineConfig({
     trace: 'retain-on-failure',
   },
 
-  // Reporter mit Pfaden unter tests/
+  // Reporters
   reporter: [
     ['list'],
     ['junit', { outputFile: 'reports/junit.xml' }],
     ['html', { outputFolder: 'reports/html', open: 'never' }],
   ],
 
-  // Ausgabeordner für Traces, Screenshots etc.
+  // Output directory for traces, screenshots, etc.
   outputDir: 'test-results',
 
-  // Worker-Konfiguration
+  // Worker configuration
   workers: 1,
 
-  // Projekte: All major browsers
+  // Browser projects
+  // Both browsers defined for CI, but local dev uses --project=chromium for speed
   projects: [
     {
       name: 'chromium',
@@ -50,6 +57,6 @@ export default defineConfig({
     },
   ],
 
-  // Standard-Grep für @smoke
-  grepInvert: /^(?!.*login).*$/,
+  // Default filter: only run @smoke tests
+  // grep: /@smoke/,
 })
