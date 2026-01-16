@@ -789,11 +789,15 @@ const exportChat = () => {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      margin-bottom: 8px;
-      font-size: 12px;
-      opacity: 0.8;
+      gap: 16px;
+      margin-bottom: 10px;
+      font-size: 13px;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
     }
     .message-sender { font-weight: 600; }
+    .message-time { white-space: nowrap; }
+    .message-user .message-header { color: #333; }
     .message-content {
       font-size: 15px;
       white-space: pre-wrap;
@@ -857,7 +861,7 @@ const exportChat = () => {
     <div class="message message-${message.role}">
       <div class="message-header">
         <span class="message-sender">${icon} ${sender}</span>
-        <span>${time}</span>
+        <span class="message-time">${time}</span>
       </div>
 `
 
