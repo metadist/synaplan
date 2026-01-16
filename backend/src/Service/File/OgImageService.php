@@ -25,13 +25,13 @@ final class OgImageService
     private const DEFAULT_OG_IMAGE = '/og-image.png';
     private const VIDEO_FRAME_TIMESTAMP = '00:00:02'; // 2 seconds into video
     private const VIDEO_FRAME_FALLBACK = '00:00:00'; // 0 seconds for short videos
-    private const FFMPEG_QUALITY = 2; // 1-31, lower is better
     private const IMAGE_EXTENSIONS = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
     private const VIDEO_EXTENSIONS = ['mp4', 'webm'];
 
     public function __construct(
         private MessageRepository $messageRepository,
         private DataUrlFixer $dataUrlFixer,
+        private ThumbnailService $thumbnailService,
         private string $uploadDir,
         private string $frontendDir,
         private LoggerInterface $logger,
@@ -73,7 +73,7 @@ final class OgImageService
         // Strategy 2: Extract frame from first video
         $videoPath = $this->findFirstVideo($messages);
         if ($videoPath) {
-            $ogPath = $this->extractVideoFrame($chat, $videoPath);
+            $ogPath = $this->extractVideoFrameFromVideo($chat, $videoPath);
             if ($ogPath && $this->verifyFileExists($ogPath)) {
                 $this->logger->info('OgImageService: Extracted video frame for OG', [
                     'chat_id' => $chat->getId(),
@@ -282,12 +282,14 @@ final class OgImageService
     /**
      * Extract a frame from a video file.
      *
+     * Uses ThumbnailService for video frame extraction to avoid code duplication.
+     *
      * @param Chat   $chat      The chat
      * @param string $videoPath Video file path (API path)
      *
      * @return string|null Relative path to extracted frame, or null on failure
      */
-    private function extractVideoFrame(Chat $chat, string $videoPath): ?string
+    private function extractVideoFrameFromVideo(Chat $chat, string $videoPath): ?string
     {
         $absoluteVideo = $this->getAbsolutePathFromApiPath($videoPath);
         if (!FileHelper::fileExistsNfs($absoluteVideo)) {
@@ -302,15 +304,15 @@ final class OgImageService
             return null;
         }
 
-        // Try extracting at 2 seconds first
-        if ($this->runFfmpeg($absoluteVideo, $absoluteTarget, self::VIDEO_FRAME_TIMESTAMP)) {
+        // Try extracting at 2 seconds first using shared ThumbnailService
+        if ($this->thumbnailService->extractVideoFrame($absoluteVideo, $absoluteTarget, self::VIDEO_FRAME_TIMESTAMP)) {
             FileHelper::setFilePermissions($absoluteTarget);
 
             return $ogPath;
         }
 
         // Try at 0 seconds for short videos
-        if ($this->runFfmpeg($absoluteVideo, $absoluteTarget, self::VIDEO_FRAME_FALLBACK)) {
+        if ($this->thumbnailService->extractVideoFrame($absoluteVideo, $absoluteTarget, self::VIDEO_FRAME_FALLBACK)) {
             FileHelper::setFilePermissions($absoluteTarget);
 
             return $ogPath;
@@ -406,41 +408,4 @@ final class OgImageService
         return sprintf('%s/%s/%s.%s', self::OG_DIRECTORY, $shard, $identifier, $extension);
     }
 
-    /**
-     * Run ffmpeg to extract a frame from video.
-     *
-     * @param string $inputPath  Absolute path to video
-     * @param string $outputPath Absolute path for output image
-     * @param string $timestamp  Timestamp to extract (HH:MM:SS)
-     *
-     * @return bool True on success
-     */
-    private function runFfmpeg(string $inputPath, string $outputPath, string $timestamp): bool
-    {
-        $command = sprintf(
-            'ffmpeg -ss %s -i %s -vframes 1 -q:v %d -y %s 2>&1',
-            escapeshellarg($timestamp),
-            escapeshellarg($inputPath),
-            self::FFMPEG_QUALITY,
-            escapeshellarg($outputPath)
-        );
-
-        $output = [];
-        $returnCode = 0;
-
-        exec($command, $output, $returnCode);
-
-        if (0 !== $returnCode) {
-            $this->logger->debug('OgImageService: ffmpeg command failed', [
-                'command' => $command,
-                'return_code' => $returnCode,
-                'output' => implode("\n", array_slice($output, -5)),
-            ]);
-
-            return false;
-        }
-
-        // Verify output file exists
-        return FileHelper::fileExistsNfs($outputPath);
-    }
 }

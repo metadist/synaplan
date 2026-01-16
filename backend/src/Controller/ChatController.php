@@ -384,7 +384,10 @@ class ChatController extends AbstractController
             $chat->setOgImagePath($ogImagePath);
         } else {
             $chat->setIsPublic(false);
-            // Optionally keep OG image for potential re-sharing
+
+            // Delete OG image to free up storage space
+            $this->ogImageService->deleteOgImage($chat);
+            $chat->setOgImagePath(null);
         }
 
         $this->em->flush();
