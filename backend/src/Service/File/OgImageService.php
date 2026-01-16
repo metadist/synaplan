@@ -407,5 +407,4 @@ final class OgImageService
 
         return sprintf('%s/%s/%s.%s', self::OG_DIRECTORY, $shard, $identifier, $extension);
     }
-
 }
