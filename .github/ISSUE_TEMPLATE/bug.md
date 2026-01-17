@@ -1,14 +1,14 @@
 ---
 name: Bug
 about: Something is broken
-title: "area: <short summary>"
+title: "<Area>: <short summary>"
 labels: []
 assignees: ""
 type: "Bug"
 ---
 
 <!-- issue-type: Bug -->
-<!-- Title format: area: <short summary> -->
+<!-- Title format:<Area>: <short summary> -->
 
 ## Problem
 <!-- One clear sentence describing what is broken. -->

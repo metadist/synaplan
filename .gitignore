@@ -48,9 +48,9 @@ frontend/.vite/
 
 # Test artifacts
 *.cache
-tests/test-results/
-tests/reports/
-tests/e2e/prompt_guide.md
+frontend/tests/e2e/tests/test-results/
+frontend/tests/e2e/tests/reports/
+frontend/tests/e2e/prompts/*
 
 # Platform configs
 platform/

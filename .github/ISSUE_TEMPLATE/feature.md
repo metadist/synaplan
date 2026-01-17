@@ -1,14 +1,14 @@
 ---
 name: Feature / Enhancement
 about: New ideas, UX improvements, or enhancements
-title: "area: <short summary>"
+title: "<Area>: <short summary>"
 labels: []
 assignees: ""
 type: "Feature"
 ---
 
 <!-- issue-type: Feature -->
-<!-- Title format: area: <short summary> -->
+<!-- Title format: <Area>: <short summary> -->
 
 ## Summary
 <!-- Short description of the change. -->

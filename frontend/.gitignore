@@ -34,3 +34,4 @@ src/generated/
 # Test results
 tests/e2e/reports/
 tests/e2e/test-results/
+tests/e2e/prompts/
