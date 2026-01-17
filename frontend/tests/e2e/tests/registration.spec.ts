@@ -116,7 +116,7 @@ test('@ci @auth @smoke registration flow with email verification id=006', async 
       throw new Error('Could not extract verification link from email')
     }
     let verificationLink = linkMatch[1] || linkMatch[0]
-    
+
     // Normalize the link to use baseUrl (replace any absolute URL with baseUrl)
     // This handles cases where the backend uses a different FRONTEND_URL than the test expects
     if (verificationLink.startsWith('http://') || verificationLink.startsWith('https://')) {
