@@ -14,6 +14,7 @@
     "mailHandler": "E-Mail-Bearbeitung",
     "plugins": "Plugins",
     "files": "Dateien",
+    "memories": "Erinnerungen",
     "ragSearch": "Semantische Suche",
     "configInbound": "Eingangskanäle",
     "configAiModels": "KI-Modelle",
@@ -86,6 +87,11 @@
       "share": "Chat teilen",
       "public": "Öffentlich"
     }
+  },
+  "chatMessage": {
+    "again": "Nochmal",
+    "againWith": "Nochmal mit",
+    "regenerateWith": "Regenerieren mit"
   },
   "admin": {
     "title": "Admin-Panel",
@@ -174,6 +180,7 @@
   },
   "nav": {
     "chat": "Chat",
+    "profile": "Profil",
     "tools": "Werkzeuge",
     "toolsIntroduction": "Einführung",
     "toolsChatWidget": "Chat-Widget",
@@ -198,6 +205,7 @@
     "adminFeatureStatus": "Feature-Status"
   },
   "chatInput": {
+    "attach": "Anhängen",
     "placeholder": "Schreibe deine Nachricht hier...",
     "model": "Modell",
     "configureModel": "KI-Modell konfigurieren",
@@ -838,6 +846,8 @@
     "daysAgo": "vor {count} Tag | vor {count} Tagen",
     "back": "Zurück",
     "next": "Weiter",
+    "edit": "Bearbeiten",
+    "actions": "Aktionen",
     "previous": "Zurück",
     "loading": "Lädt...",
     "error": "Fehler",
@@ -845,7 +855,9 @@
     "unknown": "Unbekannt",
     "leave": "Verlassen",
     "stay": "Bleiben",
-    "retry": "Erneut versuchen"
+    "retry": "Erneut versuchen",
+    "created": "Erstellt",
+    "updated": "Aktualisiert"
   },
   "search": {
     "sources": "Quellen",
@@ -1309,5 +1321,127 @@
     "poweredBy": "Bereitgestellt von",
     "privacy": "Datenschutz",
     "terms": "AGB"
+  },
+  "memories": {
+    "title": "Erinnerungen",
+    "description": "Wichtige Informationen über dich und deine Präferenzen, die die KI für zukünftige Gespräche nutzen kann.",
+    "empty": "Noch keine Erinnerungen gespeichert.",
+    "emptyDesc": "Die KI wird relevante Informationen automatisch aus deinen Gesprächen extrahieren und hier speichern. Du kannst auch manuell neue Erinnerungen hinzufügen.",
+    "allCategories": "Alle Kategorien",
+    "selected": "{count} ausgewählt",
+    "selectAll": "Alle auswählen",
+    "search": "Erinnerungen durchsuchen...",
+    "noResults": "Keine Erinnerungen gefunden",
+    "category": "Kategorie",
+    "key": "Schlüssel",
+    "value": "Wert",
+    "updated": "Aktualisiert",
+    "createButton": "Neue Erinnerung",
+    "listView": {
+      "title": "Listenansicht",
+      "source": "Quelle",
+      "sortByCategory": "Nach Kategorie sortieren",
+      "sortByKey": "Nach Name sortieren",
+      "sortByDate": "Nach Datum sortieren"
+    },
+    "graphView": {
+      "title": "Neuronales Netzwerk"
+    },
+    "categories": {
+      "all": "Alle Kategorien",
+      "preferences": "Präferenzen",
+      "personal": "Persönlich",
+      "work": "Arbeit",
+      "projects": "Projekte"
+    },
+    "source": {
+      "auto_detected": "Automatisch erkannt",
+      "user_created": "Manuell erstellt",
+      "user_edited": "Manuell bearbeitet"
+    },
+    "actions": {
+      "create": "Neue Erinnerung",
+      "edit": "Bearbeiten",
+      "delete": "Löschen",
+      "save": "Speichern",
+      "cancel": "Abbrechen"
+    },
+    "create": {
+      "title": "Neue Erinnerung",
+      "category": "Kategorie",
+      "categoryPlaceholder": "z.B. Präferenzen, Persönlich, Arbeit...",
+      "categoryHint": "Du kannst beliebige Kategorienamen eingeben",
+      "key": "Schlüssel",
+      "keyPlaceholder": "z.B. Lieblingssprache",
+      "value": "Wert",
+      "valuePlaceholder": "z.B. TypeScript"
+    },
+    "edit": {
+      "title": "Erinnerung bearbeiten"
+    },
+    "delete": {
+      "title": "Erinnerung löschen",
+      "message": "Bist du sicher, dass du diese Erinnerung löschen möchtest? Diese Aktion kann nicht rückgängig gemacht werden.",
+      "confirm": "Löschen"
+    },
+    "deleteConfirm": {
+      "title": "Erinnerung löschen?",
+      "message": "Bist du sicher, dass du diese Erinnerung löschen möchtest? Diese Aktion kann nicht rückgängig gemacht werden.",
+      "confirm": "Löschen"
+    },
+    "bulkDeleteConfirm": {
+      "title": "Mehrere Erinnerungen löschen?",
+      "message": "Möchtest du wirklich {count} Erinnerungen löschen? Diese Aktion kann nicht rückgängig gemacht werden."
+    },
+    "deleteSuccess": "Erinnerung erfolgreich gelöscht",
+    "deleteError": "Fehler beim Löschen der Erinnerung",
+    "bulkDeleteSuccess": "{count} Erinnerungen erfolgreich gelöscht",
+    "bulkDeleteError": "Fehler beim Löschen der Erinnerungen",
+    "createSuccess": "Erinnerung erfolgreich erstellt",
+    "createError": "Fehler beim Erstellen der Erinnerung",
+    "editSuccess": "Erinnerung erfolgreich aktualisiert",
+    "editError": "Fehler beim Aktualisieren der Erinnerung",
+    "memorySaved": "Neue Erinnerung erfolgreich gespeichert!",
+    "toast": {
+      "title": "Neue Erinnerung erkannt",
+      "discard": "Verwerfen",
+      "edit": "Anpassen",
+      "discarded": "Erinnerung verworfen"
+    },
+    "context": {
+      "title": "Aktive Erinnerungen",
+      "count": "{count} Erinnerung geladen | {count} Erinnerungen geladen"
+    },
+    "graph": {
+      "legend": "Legende",
+      "memoryNode": "Erinnerungs-Knoten",
+      "connection": "Kategorie-Verbindung",
+      "resetView": "Ansicht zurücksetzen",
+      "togglePhysics": "Physik umschalten",
+      "noResultsDesc": "Keine Erinnerungen in den gewählten Kategorien gefunden.",
+      "noResultsKeys": "Keine Erinnerungen mit den gewählten Keys gefunden.",
+      "clearFilters": "Filter zurücksetzen",
+      "moreCategories": "weitere",
+      "groupByCategory": "Nach Kategorie gruppieren",
+      "groupByKey": "Nach Key filtern",
+      "groupingByCategory": "Gruppiert nach Kategorie",
+      "groupingByKey": "Filtern nach Key",
+      "filterByCategory": "Nach Kategorie filtern",
+      "filterByLetter": "Nach Anfangsbuchstabe filtern"
+    }
+  },
+  "error": {
+    "title": "Etwas ist schiefgelaufen",
+    "description": "Wir sind auf einen unerwarteten Fehler gestoßen. Keine Sorge, unser Team wurde benachrichtigt und arbeitet daran.",
+    "details": "Fehlerdetails",
+    "statusCode": "Statuscode",
+    "showStack": "Stack-Trace anzeigen",
+    "hideStack": "Stack-Trace ausblenden",
+    "reload": "Seite neu laden",
+    "goHome": "Zur Startseite",
+    "needHelp": "Brauchst du Hilfe?",
+    "contactSupport": "Wenn dieses Problem weiterhin besteht, kontaktiere bitte unser Support-Team mit den Fehlerdetails unten.",
+    "copyError": "Fehlerinfo kopieren",
+    "copied": "Kopiert!"
   }
 }

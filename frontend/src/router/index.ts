@@ -139,6 +139,12 @@ const router = createRouter({
       meta: { requiresAuth: true, titleKey: 'pageTitles.files' },
     },
     {
+      path: '/memories',
+      name: 'memories',
+      component: () => import('../views/MemoriesView.vue'),
+      meta: { requiresAuth: true, titleKey: 'pageTitles.memories' },
+    },
+    {
       path: '/rag',
       name: 'rag',
       component: () => import('../views/RagSearchView.vue'),

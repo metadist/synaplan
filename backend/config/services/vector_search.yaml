@@ -1,0 +1,14 @@
+# Qdrant Client - Production (echte Qdrant Service Integration)
+App\Service\VectorSearch\QdrantClientHttp:
+    arguments:
+        $httpClient: '@Symfony\Contracts\HttpClient\HttpClientInterface'
+        $baseUrl: '%env(QDRANT_SERVICE_URL)%'
+        $apiKey: '%env(QDRANT_SERVICE_API_KEY)%'
+
+App\Service\VectorSearch\QdrantClientInterface:
+    alias: App\Service\VectorSearch\QdrantClientHttp
+
+# Für Development ohne Qdrant: QdrantClientMock verwenden
+# App\Service\VectorSearch\QdrantClientInterface:
+#     alias: App\Service\VectorSearch\QdrantClientMock
+

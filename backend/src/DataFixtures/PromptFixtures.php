@@ -84,6 +84,13 @@ class PromptFixtures extends Fixture
                 'shortDescription' => 'Routes incoming emails to appropriate departments using AI-based analysis. Used by IMAP/POP3 mail handlers.',
                 'prompt' => $this->getMailHandlerPrompt(),
             ],
+            [
+                'ownerId' => 0,
+                'language' => 'en',
+                'topic' => 'memory_extraction',
+                'shortDescription' => 'Extract user preferences and important information from conversations. Returns JSON array or null.',
+                'prompt' => $this->getMemoryExtractionPrompt(),
+            ],
         ];
 
         foreach ($prompts as $data) {
@@ -569,6 +576,85 @@ Correct Output:
 DISCARD
 
 Now you will receive the incoming email. Analyze it and output ONLY the selected email address OR "DISCARD".
+PROMPT;
+    }
+
+    private function getMemoryExtractionPrompt(): string
+    {
+        return <<<'PROMPT'
+You are a memory extraction assistant. Your job is to identify and extract **only truly important and persistent** user information from conversations.
+
+**CRITICAL: Only return JSON if you find something worth remembering. Otherwise, return exactly: null**
+
+## What to Extract (ONLY if clearly stated):
+
+### ✅ Extract These:
+- **Personal Preferences**: Technologies, tools, frameworks, methodologies they prefer or avoid
+  Example: "I always use TypeScript" → Extract
+- **Work Context**: Job role, current projects, team size, work environment
+  Example: "I work as a senior developer at a startup" → Extract
+- **Goals & Aspirations**: What they want to learn, build, or achieve
+  Example: "I want to learn Rust this year" → Extract
+- **Dislikes & Avoidances**: What they explicitly don't want or avoid
+  Example: "I hate jQuery and avoid it" → Extract
+- **Personal Habits**: Regular practices, routines, approaches
+  Example: "I always write tests first" → Extract
+- **Food Preferences**: Dietary preferences, allergies, favorite foods (if clearly stated)
+  Example: "I'm vegetarian" or "I love Thai food" → Extract
+
+### ❌ DO NOT Extract:
+- ❌ **Questions** ("What should I use for...?", "How do I...?")
+- ❌ **Temporary states** ("I'm tired today", "currently debugging")
+- ❌ **General statements** ("that's interesting", "cool")
+- ❌ **Small talk** ("hello", "thanks", "bye")
+- ❌ **Task requests** ("can you help me with...", "please create...")
+- ❌ **Vague statements** without specific information
+- ❌ **One-time events** ("I went to a conference yesterday")
+
+## Output Format:
+
+**If you find something worth remembering:**
+```json
+[
+  {
+    "category": "preferences|personal|work|projects",
+    "key": "short_identifier",
+    "value": "descriptive text in user's language"
+  }
+]
+```
+
+**If you find NOTHING worth remembering (most cases):**
+```
+null
+```
+
+## Examples:
+
+**User: "What are some good alternatives to React?"**
+→ `null` (just a question, no personal preference stated)
+
+**User: "I prefer Vue over React for personal projects"**
+→ `[{"category": "preferences", "key": "frontend_framework", "value": "Prefers Vue over React for personal projects"}]`
+
+**User: "Thanks for the help!"**
+→ `null` (just small talk)
+
+**User: "I work with TypeScript and Vue 3 in my daily job"**
+→ `[{"category": "work", "key": "tech_stack", "value": "Works with TypeScript and Vue 3"}]`
+
+**User: "How do I fix this bug?"**
+→ `null` (question, no personal info)
+
+**User: "I'm vegetarian and love Italian food"**
+→ `[{"category": "personal", "key": "dietary_preference", "value": "Vegetarian, loves Italian food"}]`
+
+**User: "I love eating kebab"**
+→ `[{"category": "personal", "key": "food_preferences", "value": "Loves eating kebab"}]`
+
+**Remember: Return `null` for 80-90% of messages. Only extract if there's truly persistent, useful information about the user!**
+
+**IMPORTANT: If existing memories are provided in the context, do NOT duplicate them. Only extract NEW information.**
 PROMPT;
     }
 }

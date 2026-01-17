@@ -5,13 +5,16 @@ namespace App\Service\Message\Handler;
 use App\AI\Service\AiFacade;
 use App\Entity\File;
 use App\Entity\Message;
+use App\Entity\User;
 use App\Repository\ModelRepository;
 use App\Repository\PromptRepository;
 use App\Service\File\FileHelper;
 use App\Service\File\UserUploadPathBuilder;
+use App\Service\MemoryExtractionService;
 use App\Service\ModelConfigService;
 use App\Service\PromptService;
 use App\Service\RAG\VectorSearchService;
+use App\Service\UserMemoryService;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\DependencyInjection\Attribute\AutoconfigureTag;
@@ -35,6 +38,8 @@ class ChatHandler implements MessageHandlerInterface
         private EntityManagerInterface $em,
         private string $uploadDir,
         private UserUploadPathBuilder $userUploadPathBuilder,
+        private UserMemoryService $memoryService,
+        private MemoryExtractionService $memoryExtractionService,
     ) {
     }
 
@@ -355,6 +360,66 @@ class ChatHandler implements MessageHandlerInterface
             ));
         }
 
+        // ✨ NEW: Load user memories from Qdrant/Microservice
+        $memoriesContext = '';
+        $loadedMemories = [];
+
+        try {
+            $this->logger->debug('ChatHandler: Loading user memories', [
+                'user_id' => $message->getUserId(),
+                'message_text' => substr($message->getText(), 0, 100),
+            ]);
+
+            // Search for relevant memories using Qdrant
+            $loadedMemories = $this->memoryService->searchRelevantMemories(
+                $message->getUserId(),
+                $message->getText(),
+                limit: 5,
+                minScore: 0.5
+            );
+
+            if (!empty($loadedMemories)) {
+                $memoriesContext = "\n\n## User Memories (relevant to this conversation):\n";
+                foreach ($loadedMemories as $idx => $memory) {
+                    $memoriesContext .= sprintf(
+                        "[Memory %d] %s: %s\n",
+                        $idx + 1,
+                        $memory['key'],
+                        $memory['value']
+                    );
+                }
+                $memoriesContext .= "\nUse these memories to personalize your response.\n";
+
+                $this->logger->info('ChatHandler: User memories loaded', [
+                    'user_id' => $message->getUserId(),
+                    'memories_count' => count($loadedMemories),
+                ]);
+
+                // Send SSE event to frontend showing which memories are used
+                if ($progressCallback) {
+                    $progressCallback([
+                        'status' => 'memories_loaded',
+                        'message' => 'Memories loaded',
+                        'metadata' => [
+                            'memories' => $loadedMemories,
+                            'count' => count($loadedMemories),
+                        ],
+                        'timestamp' => time(),
+                    ]);
+                }
+            } else {
+                $this->logger->debug('ChatHandler: No relevant memories found', [
+                    'user_id' => $message->getUserId(),
+                ]);
+            }
+        } catch (\Throwable $e) {
+            $this->logger->error('ChatHandler: Failed to load user memories', [
+                'user_id' => $message->getUserId(),
+                'error' => $e->getMessage(),
+            ]);
+            // Continue without memories
+        }
+
         // Get model - Priority: User-selected (Again) > Prompt Metadata > Classification override > DB default
         $modelId = null;
         $provider = null;
@@ -414,6 +479,15 @@ class ChatHandler implements MessageHandlerInterface
             $this->logger->info('ChatHandler: RAG context appended to system prompt', [
                 'topic' => $topic,
                 'rag_context_length' => strlen($ragContext),
+            ]);
+        }
+
+        // ✨ NEW: Append user memories context to system prompt if available
+        if (!empty($memoriesContext)) {
+            $systemPrompt .= $memoriesContext;
+            $this->logger->info('ChatHandler: Memories context appended to system prompt', [
+                'memories_count' => count($loadedMemories),
+                'memories_context_length' => strlen($memoriesContext),
             ]);
         }
 
@@ -483,6 +557,10 @@ class ChatHandler implements MessageHandlerInterface
         $this->logger->info('🔵 ChatHandler: AiFacade chatStream returned');
 
         $this->notify($progressCallback, 'generating', 'Response generated.');
+
+        // Memory Extraction (Option B: After AI-Response, in the same Request)
+        // Pass loaded memories to avoid duplicates
+        $this->extractMemoriesAfterResponse($message, $thread, $loadedMemories, $progressCallback);
 
         return [
             'metadata' => [
@@ -1002,6 +1080,109 @@ class ChatHandler implements MessageHandlerInterface
             ]);
 
             return null;
+        }
+    }
+
+    /**
+     * Extract memories after AI response (Option B).
+     *
+     * Runs in same request, after chat stream completes.
+     * Receives already loaded memories to avoid duplicates.
+     */
+    private function extractMemoriesAfterResponse(
+        Message $message,
+        array $thread,
+        array $existingMemories = [],
+        ?callable $progressCallback = null,
+    ): void {
+        try {
+            $this->logger->debug('ChatHandler: Starting memory extraction', [
+                'message_id' => $message->getId(),
+                'user_id' => $message->getUserId(),
+                'existing_memories_count' => count($existingMemories),
+            ]);
+
+            // Extract memories (AI will see existing memories in the conversation history)
+            $memories = $this->memoryExtractionService->analyzeAndExtract($message, $thread, $existingMemories);
+
+            $this->logger->debug('ChatHandler: Memories extracted', [
+                'message_id' => $message->getId(),
+                'memories' => $memories,
+                'count' => count($memories),
+            ]);
+
+            if (empty($memories)) {
+                $this->logger->debug('ChatHandler: No memories extracted');
+
+                return;
+            }
+
+            // Save memories to DB + Qdrant
+            $userId = $message->getUserId();
+
+            // Load user entity (Message only has userId, not User object)
+            $user = $this->em->getRepository(User::class)->find($userId);
+            if (!$user) {
+                $this->logger->warning('ChatHandler: User not found for memory extraction', [
+                    'user_id' => $userId,
+                    'message_id' => $message->getId(),
+                ]);
+
+                return;
+            }
+
+            $savedMemories = [];
+            foreach ($memories as $memoryData) {
+                try {
+                    $memory = $this->memoryService->createMemory(
+                        $user,
+                        $memoryData['category'],
+                        $memoryData['key'],
+                        $memoryData['value'],
+                        'auto_detected',
+                        $message->getId()
+                    );
+
+                    // Use toArray() method instead of getters
+                    $savedMemories[] = $memory->toArray();
+                } catch (\Throwable $e) {
+                    $this->logger->error('ChatHandler: Failed to save memory', [
+                        'error' => $e->getMessage(),
+                        'memory' => $memoryData,
+                    ]);
+                }
+            }
+
+            if (!empty($savedMemories)) {
+                $this->logger->info('ChatHandler: Memories saved', [
+                    'count' => count($savedMemories),
+                    'message_id' => $message->getId(),
+                ]);
+
+                // Send SSE event to frontend with extracted memories
+                if ($progressCallback) {
+                    foreach ($savedMemories as $memoryData) {
+                        $this->logger->debug('ChatHandler: Sending memory_suggested SSE', [
+                            'memory' => $memoryData,
+                        ]);
+                        // Send SSE event with correct format: array with status, message, metadata, timestamp
+                        $progressCallback([
+                            'status' => 'memory_suggested',
+                            'message' => 'Memory saved',
+                            'metadata' => $memoryData,
+                            'timestamp' => time(),
+                        ]);
+                    }
+                }
+            }
+        } catch (\Throwable $e) {
+            $this->logger->error('ChatHandler: Memory extraction failed', [
+                'message_id' => $message->getId(),
+                'error' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+                'trace' => $e->getTraceAsString(),
+            ]);
         }
     }
 

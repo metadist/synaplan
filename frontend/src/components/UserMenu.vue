@@ -36,7 +36,16 @@
           @click="handleProfileSettings"
         >
           <UserCircleIcon class="w-5 h-5" />
-          <span>Profile settings</span>
+          <span>{{ $t('nav.profile') }}</span>
+        </button>
+        <button
+          role="menuitem"
+          class="dropdown-item"
+          data-testid="btn-user-memories"
+          @click="handleOpenMemories"
+        >
+          <Icon icon="mdi:brain" class="w-5 h-5" />
+          <span>{{ $t('pageTitles.memories') }}</span>
         </button>
         <button
           role="menuitem"
@@ -45,7 +54,7 @@
           @click="handleLogout"
         >
           <ArrowRightOnRectangleIcon class="w-5 h-5" />
-          <span>Log out</span>
+          <span>{{ $t('settings.logout') }}</span>
         </button>
       </div>
     </Transition>
@@ -60,6 +69,7 @@ import {
   ArrowRightOnRectangleIcon,
   ChevronDownIcon,
 } from '@heroicons/vue/24/outline'
+import { Icon } from '@iconify/vue'
 import { useAuth } from '@/composables/useAuth'
 
 interface Props {
@@ -67,10 +77,16 @@ interface Props {
   collapsed?: boolean
 }
 
+interface Emits {
+  (e: 'openMemories'): void
+}
+
 const props = withDefaults(defineProps<Props>(), {
   email: 'guest@synaplan.com',
   collapsed: false,
 })
+
+const emit = defineEmits<Emits>()
 
 const router = useRouter()
 const { logout } = useAuth()
@@ -87,6 +103,11 @@ const initials = computed(() => {
 const handleProfileSettings = () => {
   isOpen.value = false
   router.push('/profile')
+}
+
+const handleOpenMemories = () => {
+  isOpen.value = false
+  emit('openMemories')
 }
 
 const handleLogout = async () => {

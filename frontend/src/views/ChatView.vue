@@ -34,7 +34,10 @@
         data-testid="section-messages"
         @scroll="handleScroll"
       >
-        <div class="max-w-4xl mx-auto py-6">
+        <div class="max-w-4xl mx-auto py-6 px-4">
+          <!-- Memory Context Panel -->
+          <MemoryContextPanel :memories="loadedMemories" />
+
           <!-- Loading indicator for infinite scroll -->
           <div
             v-if="historyStore.isLoadingMessages"
@@ -132,6 +135,14 @@
       @upgrade="closeLimitModal"
       @verify-phone="closeLimitModal"
     />
+
+    <!-- Memory Suggestion Toasts -->
+    <MemoryToast
+      :memories="activeMemoryToasts"
+      @dismiss="handleMemoryToastClose"
+      @discard="handleMemoryDiscard"
+      @edit="handleMemoryEdit"
+    />
   </MainLayout>
 </template>
 
@@ -149,6 +160,7 @@ import { useChatsStore } from '@/stores/chats'
 import { useModelsStore } from '@/stores/models'
 import { useAiConfigStore } from '@/stores/aiConfig'
 import { useAuthStore } from '@/stores/auth'
+import { useMemoriesStore } from '@/stores/userMemories'
 import { useLimitCheck } from '@/composables/useLimitCheck'
 import { useNotification } from '@/composables/useNotification'
 import { chatApi } from '@/services/api'
@@ -156,6 +168,9 @@ import type { ModelOption } from '@/composables/useModelSelection'
 import { parseAIResponse } from '@/utils/responseParser'
 import { normalizeMediaUrl } from '@/utils/urlHelper'
 import { httpClient } from '@/services/api/httpClient'
+import type { UserMemory } from '@/services/api/userMemoriesApi'
+import MemoryToast from '@/components/MemoryToast.vue'
+import MemoryContextPanel from '@/components/MemoryContextPanel.vue'
 
 const { t } = useI18n()
 const router = useRouter()
@@ -172,6 +187,8 @@ const chatsStore = useChatsStore()
 const modelsStore = useModelsStore()
 const aiConfigStore = useAiConfigStore()
 const authStore = useAuthStore()
+const memoriesStore = useMemoriesStore()
+const { success } = useNotification()
 let streamingAbortController: AbortController | null = null
 let stopStreamingFn: (() => void) | null = null // Store EventSource close function
 let currentTrackId: number | undefined = undefined // Store current trackId for stop request
@@ -180,6 +197,13 @@ let currentStreamingChatId: number | undefined = undefined // Store chatId where
 // Processing status for real-time feedback
 const processingStatus = ref<string>('')
 const processingMetadata = ref<any>({})
+
+// Memory suggestion toasts
+const activeMemoryToasts = ref<Array<UserMemory & { toastId: number }>>([])
+let memoryToastIdCounter = 0
+
+// Loaded memories for current context (shown in panel)
+const loadedMemories = ref<UserMemory[]>([])
 
 // Use mock data in development or when API is not available
 const useMockData = import.meta.env.VITE_USE_MOCK_DATA === 'true' || false
@@ -821,6 +845,44 @@ const streamAIResponse = async (
                 }),
               })
             }
+          } else if (data.status === 'memory_suggested') {
+            // Handle memory suggestions from backend
+            console.log('🧠 Memory suggested received:', data)
+
+            // Memory data is in metadata
+            const memoryData = data.metadata
+            console.log('🧠 Memory metadata:', memoryData)
+
+            if (!memoryData || !memoryData.id) {
+              console.warn('⚠️ Invalid memory data received:', data)
+              return
+            }
+
+            console.log('✅ Creating toast with memory ID:', memoryData.id)
+
+            // Create toast for the suggested memory
+            const toastMemory: UserMemory & { toastId: number } = {
+              id: memoryData.id,
+              category: memoryData.category,
+              key: memoryData.key,
+              value: memoryData.value,
+              source: memoryData.source || 'auto_detected',
+              messageId: memoryData.messageId || null,
+              created: memoryData.created || Date.now(),
+              updated: memoryData.updated || Date.now(),
+              toastId: memoryToastIdCounter++,
+            }
+
+            console.log('🎯 Toast memory object:', toastMemory)
+
+            activeMemoryToasts.value.push(toastMemory)
+          } else if (data.status === 'memories_loaded') {
+            // Handle loaded memories (shown in context panel)
+            console.log('🧠 Memories loaded:', data)
+            // Memories are in metadata.memories
+            if (data.metadata && data.metadata.memories && Array.isArray(data.metadata.memories)) {
+              loadedMemories.value = data.metadata.memories
+            }
           } else if (data.status === 'complete') {
             console.log('✅ Complete event received:', data)
 
@@ -1390,6 +1452,40 @@ const handleRetryMessage = async (message: Message, content: string) => {
 
   // Stream the AI response (don't add new user message, it already exists)
   await streamAIResponse(content)
+}
+
+// Memory toast handlers
+function handleMemoryEdit(memory: UserMemory & { toastId: number }) {
+  // Close the toast first
+  const index = activeMemoryToasts.value.findIndex((m) => m.toastId === memory.toastId)
+  if (index !== -1) {
+    activeMemoryToasts.value.splice(index, 1)
+  }
+
+  // Navigate to memories page (will show edit dialog there)
+  router.push({ path: '/memories', query: { edit: memory.id.toString() } })
+}
+
+function handleMemoryDiscard(memory: UserMemory & { toastId: number }) {
+  // Delete memory via store
+  memoriesStore.removeMemory(memory.id)
+
+  // Close the toast
+  const index = activeMemoryToasts.value.findIndex((m) => m.toastId === memory.toastId)
+  if (index !== -1) {
+    activeMemoryToasts.value.splice(index, 1)
+  }
+
+  // Show notification
+  const { success } = useNotification()
+  success(t('memories.toast.discarded'))
+}
+
+function handleMemoryToastClose(toastId: number) {
+  const index = activeMemoryToasts.value.findIndex((m) => m.toastId === toastId)
+  if (index !== -1) {
+    activeMemoryToasts.value.splice(index, 1)
+  }
 }
 </script>
 

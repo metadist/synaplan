@@ -27,6 +27,7 @@
     "@iconify/vue": "^5.0.0",
     "chart.js": "^4.5.1",
     "highlight.js": "^11.11.1",
+    "lucide-vue-next": "^0.562.0",
     "pinia": "^3.0.3",
     "vue": "^3.4.38",
     "vue-chartjs": "^5.3.3",
