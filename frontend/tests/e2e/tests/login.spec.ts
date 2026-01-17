@@ -2,12 +2,12 @@ import { test, expect } from '@playwright/test'
 import { login } from '../helpers/auth'
 import { selectors } from '../helpers/selectors'
 
-test('@smoke @auth should successfully login id=002', async ({ page }) => {
+test('@ci @smoke @auth should successfully login id=002', async ({ page }) => {
   await login(page)
   await expect(page.locator(selectors.chat.textInput)).toBeVisible({ timeout: 10_000 })
 })
 
-test('@smoke @auth logout should clear session id=005', async ({ page }) => {
+test('@ci @smoke @auth logout should clear session id=005', async ({ page }) => {
   await login(page)
 
   await page.locator(selectors.userMenu.button).waitFor({ state: 'visible' })

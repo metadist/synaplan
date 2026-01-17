@@ -1,6 +1,16 @@
 import type { Page, APIRequestContext } from '@playwright/test'
 import { selectors } from '../helpers/selectors'
 
+interface AdminUserSummary {
+  id: number
+  email: string | null
+  emailVerified: boolean
+}
+
+interface AdminUsersResponse {
+  users?: AdminUserSummary[]
+}
+
 export async function login(page: Page, credentials?: { user: string; pass: string }) {
   const user = credentials?.user ?? process.env.AUTH_USER ?? 'admin@synaplan.com'
   const pass = credentials?.pass ?? process.env.AUTH_PASS ?? 'admin123'
@@ -57,6 +67,34 @@ export async function loginViaApi(
   return cookies.join('; ')
 }
 
+export async function getUserByEmail(
+  request: APIRequestContext,
+  userEmail: string
+): Promise<AdminUserSummary | null> {
+  const baseUrl = process.env.BASE_URL || 'http://localhost:5173'
+
+  // Login as admin via API and get cookie header
+  const cookieHeader = await loginViaApi(request)
+
+  const usersResponse = await request.get(
+    `${baseUrl}/api/v1/admin/users?search=${encodeURIComponent(userEmail)}`,
+    {
+      headers: {
+        Cookie: cookieHeader,
+      },
+    }
+  )
+
+  if (!usersResponse.ok()) {
+    throw new Error(`Failed to fetch users: ${usersResponse.status()}`)
+  }
+
+  const usersData: AdminUsersResponse = await usersResponse.json()
+  const targetUser = usersData.users?.find((u) => u.email === userEmail)
+
+  return targetUser ?? null
+}
+
 /**
  * Delete user by email via admin API
  */
@@ -68,19 +106,22 @@ export async function deleteUser(request: APIRequestContext, userEmail: string):
     const cookieHeader = await loginViaApi(request)
 
     // Find user by email via admin API
-    const usersResponse = await request.get(`${baseUrl}/api/v1/admin/users?search=${userEmail}`, {
-      headers: {
-        Cookie: cookieHeader,
-      },
-    })
+    const usersResponse = await request.get(
+      `${baseUrl}/api/v1/admin/users?search=${encodeURIComponent(userEmail)}`,
+      {
+        headers: {
+          Cookie: cookieHeader,
+        },
+      }
+    )
 
     if (!usersResponse.ok()) {
       console.warn(`Failed to fetch users: ${usersResponse.status()}`)
       return false
     }
 
-    const usersData = await usersResponse.json()
-    const targetUser = usersData.users?.find((u: any) => u.email === userEmail)
+    const usersData: AdminUsersResponse = await usersResponse.json()
+    const targetUser = usersData.users?.find((u) => u.email === userEmail)
 
     if (!targetUser) {
       console.log(`User ${userEmail} not found - may already be deleted`)

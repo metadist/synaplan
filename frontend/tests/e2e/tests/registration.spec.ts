@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test'
 import { selectors } from '../helpers/selectors'
-import { deleteUser } from '../helpers/auth'
+import { deleteUser, getUserByEmail } from '../helpers/auth'
 
 test('@ci @auth @smoke registration flow with email verification id=006', async ({
   page,
@@ -41,6 +41,16 @@ test('@ci @auth @smoke registration flow with email verification id=006', async 
       /registration.*success/i
     )
 
+    await expect
+      .poll(
+        async () => {
+          const user = await getUserByEmail(request, testEmail)
+          return user?.emailVerified
+        },
+        { timeout: 10_000, intervals: [500] }
+      )
+      .toBe(false)
+
     await page.locator(selectors.register.backToLoginBtn).click()
     await expect(page).toHaveURL(/\/login/)
 
@@ -70,8 +80,7 @@ test('@ci @auth @smoke registration flow with email verification id=006', async 
               ? msg.Content.Parts.map((part: any) => part.Body || '').join(' ')
               : ''
             const contentLower = `${body} ${partBodies}`.toLowerCase()
-            const contentMatches =
-              contentLower.includes('verify') || contentLower.includes('verification')
+            const contentMatches = contentLower.includes('verify-email-callback')
 
             const createdValue =
               msg.Created ?? msg.created ?? msg.CreatedAt ?? msg.createdAt ?? msg.CreatedUTC
@@ -80,7 +89,7 @@ test('@ci @auth @smoke registration flow with email verification id=006', async 
             if (typeof createdValue === 'number' && createdValue < 1_000_000_000_000) {
               createdMs = createdValue * 1000
             }
-            const isRecent = Number.isFinite(createdMs) ? createdMs >= testStartTime - 1000 : true
+            const isRecent = Number.isFinite(createdMs) && createdMs >= testStartTime - 1000
 
             return toMatches && isRecent && (subjectMatches || contentMatches)
           })
@@ -135,6 +144,16 @@ test('@ci @auth @smoke registration flow with email verification id=006', async 
     await expect(page.locator(selectors.verifyEmail.successState)).toBeVisible({ timeout: 10_000 })
     await expect(page.locator(selectors.verifyEmail.successState)).toContainText(/email.*verified/i)
 
+    await expect
+      .poll(
+        async () => {
+          const user = await getUserByEmail(request, testEmail)
+          return user?.emailVerified
+        },
+        { timeout: 10_000, intervals: [500] }
+      )
+      .toBe(true)
+
     await page.locator(selectors.verifyEmail.goToLoginLink).click()
     await expect(page).toHaveURL(/\/login/)
 
@@ -142,6 +161,8 @@ test('@ci @auth @smoke registration flow with email verification id=006', async 
     await page.locator(selectors.login.password).fill(testPassword)
     await page.locator(selectors.login.submit).click()
 
+    await expect(page.locator(selectors.nav.sidebar)).toBeVisible({ timeout: 10_000 })
+    await expect(page.locator(selectors.userMenu.button)).toBeVisible()
     await expect(page.locator(selectors.chat.textInput)).toBeVisible({ timeout: 10_000 })
     await expect(page.locator(selectors.chat.textInput)).toBeEnabled()
   } finally {
