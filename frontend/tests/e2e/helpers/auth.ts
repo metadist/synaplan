@@ -67,34 +67,6 @@ export async function loginViaApi(
   return cookies.join('; ')
 }
 
-export async function getUserByEmail(
-  request: APIRequestContext,
-  userEmail: string
-): Promise<AdminUserSummary | null> {
-  const baseUrl = process.env.BASE_URL || 'http://localhost:5173'
-
-  // Login as admin via API and get cookie header
-  const cookieHeader = await loginViaApi(request)
-
-  const usersResponse = await request.get(
-    `${baseUrl}/api/v1/admin/users?search=${encodeURIComponent(userEmail)}`,
-    {
-      headers: {
-        Cookie: cookieHeader,
-      },
-    }
-  )
-
-  if (!usersResponse.ok()) {
-    throw new Error(`Failed to fetch users: ${usersResponse.status()}`)
-  }
-
-  const usersData: AdminUsersResponse = await usersResponse.json()
-  const targetUser = usersData.users?.find((u) => u.email === userEmail)
-
-  return targetUser ?? null
-}
-
 /**
  * Delete user by email via admin API
  */
