@@ -371,12 +371,23 @@ class ChatHandler implements MessageHandlerInterface
             ]);
 
             // Search for relevant memories using Qdrant
+            // Use low score threshold to catch potentially conflicting memories
+            // (e.g., "Döner ohne Tzatziki" should find old "Döner mit Tzatziki" memory)
             $loadedMemories = $this->memoryService->searchRelevantMemories(
                 $message->getUserId(),
                 $message->getText(),
-                limit: 5,
-                minScore: 0.5
+                limit: 20, // More memories to catch related ones
+                minScore: 0.2 // Very low threshold to catch semantic opposites
             );
+
+            $this->logger->debug('ChatHandler: Memories loaded from Qdrant', [
+                'count' => count($loadedMemories),
+                'memories' => array_map(fn ($m) => [
+                    'id' => $m['id'] ?? null,
+                    'key' => $m['key'] ?? null,
+                    'category' => $m['category'] ?? null,
+                ], $loadedMemories),
+            ]);
 
             if (!empty($loadedMemories)) {
                 $memoriesContext = "\n\n## User Memories (relevant to this conversation):\n";
@@ -1087,23 +1098,27 @@ class ChatHandler implements MessageHandlerInterface
      * Extract memories after AI response (Option B).
      *
      * Runs in same request, after chat stream completes.
-     * Receives already loaded memories to avoid duplicates.
+     * Uses the SAME relevant memories that the chat AI saw (from microservice).
      */
     private function extractMemoriesAfterResponse(
         Message $message,
         array $thread,
-        array $existingMemories = [],
+        array $relevantMemories = [], // The SAME memories that chat AI saw (from microservice)
         ?callable $progressCallback = null,
     ): void {
         try {
+            $userId = $message->getUserId();
+
             $this->logger->debug('ChatHandler: Starting memory extraction', [
                 'message_id' => $message->getId(),
-                'user_id' => $message->getUserId(),
-                'existing_memories_count' => count($existingMemories),
+                'user_id' => $userId,
+                'relevant_memories_count' => count($relevantMemories),
+                'sample_memory' => $relevantMemories[0] ?? null,
             ]);
 
-            // Extract memories (AI will see existing memories in the conversation history)
-            $memories = $this->memoryExtractionService->analyzeAndExtract($message, $thread, $existingMemories);
+            // Extract memories (AI sees SAME memories as chat AI - from microservice)
+            // The AI will decide: create new, update existing, or skip
+            $memories = $this->memoryExtractionService->analyzeAndExtract($message, $thread, $relevantMemories);
 
             $this->logger->debug('ChatHandler: Memories extracted', [
                 'message_id' => $message->getId(),
@@ -1117,7 +1132,7 @@ class ChatHandler implements MessageHandlerInterface
                 return;
             }
 
-            // Save memories to DB + Qdrant
+            // Process memory actions (create/update)
             $userId = $message->getUserId();
 
             // Load user entity (Message only has userId, not User object)
@@ -1132,23 +1147,48 @@ class ChatHandler implements MessageHandlerInterface
             }
 
             $savedMemories = [];
-            foreach ($memories as $memoryData) {
+            foreach ($memories as $memoryAction) {
                 try {
-                    $memory = $this->memoryService->createMemory(
-                        $user,
-                        $memoryData['category'],
-                        $memoryData['key'],
-                        $memoryData['value'],
-                        'auto_detected',
-                        $message->getId()
-                    );
+                    $action = $memoryAction['action'] ?? 'create';
 
-                    // Use toArray() method instead of getters
-                    $savedMemories[] = $memory->toArray();
-                } catch (\Throwable $e) {
-                    $this->logger->error('ChatHandler: Failed to save memory', [
+                    if ('create' === $action) {
+                        // Create new memory
+                        $memory = $this->memoryService->createMemory(
+                            $user,
+                            $memoryAction['category'],
+                            $memoryAction['key'],
+                            $memoryAction['value'],
+                            'auto_detected',
+                            $message->getId()
+                        );
+                        $savedMemories[] = $memory->toArray();
+
+                        $this->logger->info('ChatHandler: Memory created', [
+                            'memory_id' => $memory->id,
+                            'key' => $memory->key,
+                        ]);
+                    } elseif ('update' === $action && isset($memoryAction['memory_id'])) {
+                        // Update existing memory
+                        $memoryId = $memoryAction['memory_id'];
+                        $memory = $this->memoryService->updateMemory(
+                            $userId,
+                            $memoryId,
+                            $memoryAction['value']
+                        );
+
+                        if ($memory) {
+                            $savedMemories[] = $memory->toArray();
+
+                            $this->logger->info('ChatHandler: Memory updated', [
+                                'memory_id' => $memory->id,
+                                'key' => $memory->key,
+                            ]);
+                        }
+                    }
+                } catch (\Exception $e) {
+                    $this->logger->error('ChatHandler: Failed to process memory action', [
+                        'action' => $memoryAction,
                         'error' => $e->getMessage(),
-                        'memory' => $memoryData,
                     ]);
                 }
             }

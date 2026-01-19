@@ -1553,6 +1553,9 @@
     "listView": {
       "title": "List View",
       "source": "Source",
+      "allMemories": "All Memories",
+      "categories": "Categories",
+      "keys": "Keys",
       "sortByCategory": "Sort by Category",
       "sortByKey": "Sort by Name",
       "sortByDate": "Sort by Date"
@@ -1618,7 +1621,7 @@
     "toast": {
       "title": "New Memory Detected",
       "discard": "Discard",
-      "edit": "Edit",
+        "edit": "Edit",
       "discarded": "Memory discarded"
     },
     "context": {

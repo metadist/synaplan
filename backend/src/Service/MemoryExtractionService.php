@@ -29,23 +29,23 @@ final readonly class MemoryExtractionService
     /**
      * Analyze conversation and extract memories using AI.
      *
-     * AI decides what's memory-worthy - no heuristic filters!
+     * AI decides what's memory-worthy and whether to create/update/skip memories.
      *
      * @param Message $message             Current user message
      * @param array   $conversationHistory Recent messages for context
-     * @param array   $existingMemories    Already loaded memories (to avoid duplicates)
+     * @param array   $existingMemories    Already loaded memories (with IDs for updates)
      *
-     * @return array Array of extracted memories: [['category' => string, 'key' => string, 'value' => string], ...]
+     * @return array Array of memory actions: [['action' => 'create'|'update', 'memory_id' => int|null, 'category' => string, 'key' => string, 'value' => string], ...]
      */
     public function analyzeAndExtract(Message $message, array $conversationHistory, array $existingMemories = []): array
     {
-        $this->logger->info('Memory extraction triggered (AI-based)', [
+        $this->logger->info('Memory extraction triggered (AI-based with update capability)', [
             'message_id' => $message->getId(),
             'user_id' => $message->getUserId(),
             'existing_memories_count' => count($existingMemories),
         ]);
 
-        // Extract via AI (no pre-filtering!)
+        // Extract via AI (AI decides: create, update, or skip)
         return $this->extractMemoriesViaAi($message, $conversationHistory, $existingMemories);
     }
 
@@ -74,17 +74,27 @@ final readonly class MemoryExtractionService
         // System prompt for memory extraction (always English)
         $systemPrompt = $this->getExtractionPrompt();
 
-        // Build existing memories context
+        // Build existing memories context with category, key, and ID
         $existingMemoriesText = '';
         if (!empty($existingMemories)) {
-            $existingMemoriesText = "\n\nExisting User Memories (DO NOT duplicate these):\n";
+            $existingMemoriesText = "\n\nExisting User Memories (with IDs for updates):\n";
             foreach ($existingMemories as $memory) {
+                $id = $memory['id'] ?? 'unknown';
+                $category = $memory['category'] ?? 'unknown';
+                $key = $memory['key'] ?? 'unknown';
+                $value = $memory['value'] ?? 'unknown';
                 $existingMemoriesText .= sprintf(
-                    "- %s: %s\n",
-                    $memory['key'] ?? 'unknown',
-                    $memory['value'] ?? 'unknown'
+                    "ID:%s [%s] %s: %s\n",
+                    $id,
+                    $category,
+                    $key,
+                    $value
                 );
             }
+            $existingMemoriesText .= "\nYOUR JOB: Decide for each new information:\n";
+            $existingMemoriesText .= "- If it's TRULY NEW → action: 'create'\n";
+            $existingMemoriesText .= "- If it UPDATES existing info → action: 'update' (include memory_id)\n";
+            $existingMemoriesText .= "- If ALREADY COVERED → don't include it\n";
         }
 
         // AI call
@@ -96,7 +106,37 @@ Current Message:
 {$message->getText()}
 {$existingMemoriesText}
 
-Extract NEW memories from this conversation in JSON format. Do NOT duplicate existing memories listed above.
+TASK: Analyze this conversation and decide what to do with memories.
+
+RESPONSE FORMAT (JSON):
+[
+  {
+    "action": "create",
+    "category": "category_name",
+    "key": "key_name",
+    "value": "the information"
+  },
+  {
+    "action": "update",
+    "memory_id": 123,
+    "category": "category_name",
+    "key": "key_name",
+    "value": "updated information"
+  }
+]
+
+DECISION RULES:
+1. action: "create" → Use when information is COMPLETELY NEW
+2. action: "update" → Use when information REPLACES or EXTENDS existing memory (must include memory_id)
+3. NO ACTION → If information already exists and hasn't changed, return empty array []
+
+EXAMPLES:
+- Existing: "Liebt Döner" → New: "Liebt Döner mit Tzatziki" → UPDATE (more specific)
+- Existing: "Mag Auto fahren" → New: "Findet Fahrrad besser" → UPDATE (preference changed)
+- Existing: "Liebt Döner" → New: "Liebt Döner" → NO ACTION (already stored)
+- No existing → New: "Liebt Pizza" → CREATE (new info)
+
+Be intelligent and selective!
 PROMPT;
 
         try {
@@ -119,16 +159,16 @@ PROMPT;
                 'content_preview' => substr($content, 0, 200),
             ]);
 
-            // Parse JSON response
-            $memories = $this->parseMemoriesFromResponse($content);
+            // Parse JSON response (now includes actions)
+            $memoryActions = $this->parseMemoriesFromResponse($content);
 
-            $this->logger->info('Memories extracted', [
+            $this->logger->info('Memory actions extracted', [
                 'message_id' => $message->getId(),
-                'count' => count($memories),
-                'memories' => $memories,
+                'count' => count($memoryActions),
+                'actions' => $memoryActions,
             ]);
 
-            return $memories;
+            return $memoryActions;
         } catch (\Throwable $e) {
             $this->logger->error('Memory extraction failed', [
                 'message_id' => $message->getId(),
@@ -167,8 +207,9 @@ PROMPT;
      * Parse memories from AI response.
      *
      * Handles both JSON array and null response.
+     * Now supports action field for create/update decisions.
      *
-     * @return array Array of memories
+     * @return array Array of memory actions
      */
     private function parseMemoriesFromResponse(string $content): array
     {
@@ -194,7 +235,7 @@ PROMPT;
                 return [];
             }
 
-            // Validate structure
+            // Validate structure and handle actions
             $validated = [];
             foreach ($memories as $memory) {
                 if (!isset($memory['category'], $memory['key'], $memory['value'])) {
@@ -205,7 +246,28 @@ PROMPT;
                     continue;
                 }
 
-                $validated[] = $memory;
+                $action = $memory['action'] ?? 'create';
+                $validatedMemory = [
+                    'action' => $action,
+                    'category' => $memory['category'],
+                    'key' => $memory['key'],
+                    'value' => $memory['value'],
+                ];
+
+                // For updates, memory_id is required
+                if ('update' === $action) {
+                    $memoryId = $memory['memory_id'] ?? null;
+                    if (null === $memoryId) {
+                        $this->logger->warning('Update action missing memory_id, treating as create', [
+                            'memory' => $memory,
+                        ]);
+                        $validatedMemory['action'] = 'create';
+                    } else {
+                        $validatedMemory['memory_id'] = (int) $memoryId;
+                    }
+                }
+
+                $validated[] = $validatedMemory;
             }
 
             return $validated;

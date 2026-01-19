@@ -1340,6 +1340,9 @@
     "listView": {
       "title": "Listenansicht",
       "source": "Quelle",
+      "allMemories": "Alle Erinnerungen",
+      "categories": "Kategorien",
+      "keys": "Keys",
       "sortByCategory": "Nach Kategorie sortieren",
       "sortByKey": "Nach Name sortieren",
       "sortByDate": "Nach Datum sortieren"

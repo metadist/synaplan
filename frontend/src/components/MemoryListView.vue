@@ -17,13 +17,24 @@
           />
         </div>
         <select
-          v-model="selectedCategory"
+          v-model="filterValue"
           class="px-4 py-2.5 surface-chip txt-primary cursor-pointer focus:outline-none focus:ring-2 focus:ring-brand/50"
         >
-          <option value="">{{ $t('memories.allCategories') }}</option>
-          <option v-for="cat in availableCategories" :key="cat.category" :value="cat.category">
-            {{ $t(`memories.categories.${cat.category}`, cat.category) }} ({{ cat.count }})
-          </option>
+          <option value="">{{ $t('memories.listView.allMemories') }}</option>
+
+          <!-- Categories -->
+          <optgroup :label="$t('memories.listView.categories')">
+            <option v-for="cat in availableCategories" :key="'cat-' + cat.category" :value="'category:' + cat.category">
+              {{ $t(`memories.categories.${cat.category}`, cat.category) }} ({{ cat.count }})
+            </option>
+          </optgroup>
+
+          <!-- Keys -->
+          <optgroup :label="$t('memories.listView.keys')">
+            <option v-for="keyItem in availableKeys" :key="'key-' + keyItem.key" :value="'key:' + keyItem.key">
+              {{ keyItem.key }} ({{ keyItem.count }})
+            </option>
+          </optgroup>
         </select>
         <select
           v-model="sortBy"
@@ -80,7 +91,7 @@
               <input
                 type="checkbox"
                 :checked="isAllSelected"
-                class="w-4 h-4 rounded border-gray-300 text-brand-500 focus:ring-brand-500"
+                class="checkbox-brand"
                 @change="toggleSelectAll"
               />
             </th>
@@ -115,7 +126,7 @@
               <input
                 type="checkbox"
                 :checked="isSelected(memory.id)"
-                class="w-4 h-4 rounded border-gray-300 text-brand-500 focus:ring-brand-500"
+                class="checkbox-brand"
                 @change="toggleSelect(memory.id)"
               />
             </td>
@@ -192,15 +203,32 @@ const props = defineProps<Props>()
 const emit = defineEmits<Emits>()
 
 const searchQuery = ref('')
-const selectedCategory = ref('')
+const filterValue = ref('') // Format: 'category:xyz' or 'key:xyz'
 const selectedMemories = ref<number[]>([])
 const sortBy = ref<'category' | 'key' | 'updated'>('category')
+
+// Available keys for filtering
+const availableKeys = computed(() => {
+  const keysMap = new Map<string, number>()
+  props.memories.forEach(m => {
+    keysMap.set(m.key, (keysMap.get(m.key) || 0) + 1)
+  })
+  return Array.from(keysMap.entries())
+    .map(([key, count]) => ({ key, count }))
+    .sort((a, b) => a.key.localeCompare(b.key))
+})
 
 const filteredMemories = computed(() => {
   let filtered = props.memories
 
-  if (selectedCategory.value) {
-    filtered = filtered.filter((m) => m.category === selectedCategory.value)
+  // Parse filter value
+  if (filterValue.value) {
+    const [type, value] = filterValue.value.split(':')
+    if (type === 'category') {
+      filtered = filtered.filter((m) => m.category === value)
+    } else if (type === 'key') {
+      filtered = filtered.filter((m) => m.key === value)
+    }
   }
 
   if (searchQuery.value) {
