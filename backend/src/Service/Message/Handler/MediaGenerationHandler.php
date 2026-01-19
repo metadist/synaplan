@@ -208,6 +208,21 @@ class MediaGenerationHandler implements MessageHandlerInterface
         try {
             // Generate media based on type
             if ('video' === $mediaType) {
+                // Get duration from AI classification (detected by MessageSorter)
+                // Priority: explicit option > AI-detected from classification > default (8)
+                if (isset($options['duration'])) {
+                    $duration = (int) $options['duration'];
+                } elseif (isset($classification['duration'])) {
+                    $duration = (int) $classification['duration'];
+                } else {
+                    $duration = 8; // Default to 8 seconds
+                }
+
+                $this->logger->info('MediaGenerationHandler: Video duration from AI classification', [
+                    'duration' => $duration,
+                    'source' => isset($options['duration']) ? 'options' : (isset($classification['duration']) ? 'ai_classification' : 'default'),
+                ]);
+
                 // Use video generation API
                 $result = $this->aiFacade->generateVideo(
                     $prompt,
@@ -215,7 +230,7 @@ class MediaGenerationHandler implements MessageHandlerInterface
                     [
                         'provider' => $provider,
                         'model' => $modelName,
-                        'duration' => $options['duration'] ?? 5,
+                        'duration' => $duration,
                         'aspect_ratio' => $options['aspect_ratio'] ?? '16:9',
                     ]
                 );

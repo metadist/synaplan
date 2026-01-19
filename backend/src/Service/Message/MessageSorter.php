@@ -214,6 +214,8 @@ class MessageSorter
                 'topic' => $parsed['topic'],
                 'language' => $parsed['language'],
                 'web_search' => $webSearch ?? false,
+                'media_type' => $parsed['media_type'] ?? null,
+                'duration' => $parsed['duration'] ?? null,
                 'raw_response' => $aiResponse,
                 'prompt_metadata' => $promptMetadata,
                 // Don't return model_id/provider/model_name from sorting - they are for internal use only
@@ -326,10 +328,28 @@ class MessageSorter
                 $webSearch = (bool) $data['BWEBSEARCH'];
             }
 
+            // Parse BMEDIA for mediamaker topic (image, video, audio)
+            $mediaType = null;
+            if (isset($data['BMEDIA']) && is_string($data['BMEDIA'])) {
+                $mediaType = $this->normalizeMediaType($data['BMEDIA']);
+            }
+
+            // Parse BDURATION for video generation (integer seconds)
+            $duration = null;
+            if (isset($data['BDURATION']) && is_numeric($data['BDURATION'])) {
+                $duration = (int) $data['BDURATION'];
+                // Sanity check: duration should be between 1 and 120 seconds
+                if ($duration < 1 || $duration > 120) {
+                    $duration = null;
+                }
+            }
+
             return [
                 'topic' => $data['BTOPIC'] ?? $originalData['BTOPIC'] ?? 'general',
                 'language' => $data['BLANG'] ?? $originalData['BLANG'] ?? 'en',
                 'web_search' => $webSearch,
+                'media_type' => $mediaType,
+                'duration' => $duration,
             ];
         } catch (\JsonException $e) {
             $this->logger->warning('MessageSorter: Failed to parse JSON response', [
@@ -342,7 +362,24 @@ class MessageSorter
                 'topic' => $originalData['BTOPIC'] ?? 'general',
                 'language' => $originalData['BLANG'] ?? 'en',
                 'web_search' => false,
+                'media_type' => null,
+                'duration' => null,
             ];
         }
+    }
+
+    /**
+     * Normalize media type string to standard values.
+     */
+    private function normalizeMediaType(string $value): ?string
+    {
+        $value = strtolower(trim($value));
+
+        return match ($value) {
+            'audio', 'sound', 'voice', 'tts', 'text2sound', 'speech' => 'audio',
+            'video', 'vid', 'text2vid', 'film', 'clip', 'animation' => 'video',
+            'image', 'img', 'picture', 'pic', 'text2pic', 'photo' => 'image',
+            default => null,
+        };
     }
 }

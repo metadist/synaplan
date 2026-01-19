@@ -145,7 +145,7 @@ class MessageClassifier
             'raw_ai_response' => $result['raw_response'] ?? 'N/A',
         ]);
 
-        return [
+        $classification = [
             'topic' => $result['topic'],
             'language' => $result['language'],
             'web_search' => $result['web_search'] ?? false,
@@ -153,6 +153,20 @@ class MessageClassifier
             'skip_sorting' => false,
             'intent' => $this->mapTopicToIntent($result['topic']), // Map topic to intent for routing
         ];
+
+        // Pass through media_type if detected (for mediamaker topic)
+        $mediaType = $result['media_type'] ?? null;
+        if (null !== $mediaType) {
+            $classification['media_type'] = $mediaType;
+        }
+
+        // Pass through duration if detected (for video generation)
+        $duration = $result['duration'] ?? null;
+        if (null !== $duration) {
+            $classification['duration'] = $duration;
+        }
+
+        return $classification;
     }
 
     /**

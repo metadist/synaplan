@@ -401,9 +401,17 @@ class GoogleProvider implements ChatProviderInterface, ImageGenerationProviderIn
         }
 
         try {
+            // Map requested duration to valid Veo values (4, 6, or 8 seconds)
+            $requestedDuration = $options['duration'] ?? 8;
+            $durationSeconds = $this->mapToValidVeoDuration($requestedDuration);
+            $aspectRatio = $options['aspect_ratio'] ?? '16:9';
+
             $this->logger->info('Google Veo: Starting video generation', [
                 'model' => $model,
                 'prompt_length' => strlen($prompt),
+                'requested_duration' => $requestedDuration,
+                'actual_duration' => $durationSeconds,
+                'aspect_ratio' => $aspectRatio,
             ]);
 
             // Use Gemini API (not Vertex AI!) - predictLongRunning endpoint for async operation
@@ -414,6 +422,10 @@ class GoogleProvider implements ChatProviderInterface, ImageGenerationProviderIn
                     [
                         'prompt' => $prompt,
                     ],
+                ],
+                'parameters' => [
+                    'durationSeconds' => $durationSeconds,
+                    'aspectRatio' => $aspectRatio,
                 ],
             ];
 
@@ -511,7 +523,7 @@ class GoogleProvider implements ChatProviderInterface, ImageGenerationProviderIn
                     return [[
                         'url' => 'data:video/mp4;base64,'.$base64Video,
                         'revised_prompt' => $prompt,
-                        'duration' => 8, // Veo 3.1 generates 8-second videos
+                        'duration' => $durationSeconds,
                     ]];
                 }
             }
@@ -534,6 +546,33 @@ class GoogleProvider implements ChatProviderInterface, ImageGenerationProviderIn
 
             throw new ProviderException('Google video generation error: '.$e->getMessage(), 'google');
         }
+    }
+
+    /**
+     * Map requested duration to valid Veo duration values.
+     *
+     * Google Veo 3.1 only supports 4, 6, or 8 seconds.
+     * This method maps any requested duration to the closest valid value.
+     */
+    private function mapToValidVeoDuration(int|float $requestedDuration): int
+    {
+        $duration = (int) round($requestedDuration);
+
+        // Veo 3.1 valid values: 4, 6, 8
+        if ($duration <= 4) {
+            return 4;
+        }
+        if ($duration <= 5) {
+            return 4; // 5 rounds down to 4
+        }
+        if ($duration <= 6) {
+            return 6;
+        }
+        if ($duration <= 7) {
+            return 6; // 7 rounds down to 6
+        }
+
+        return 8; // 8 or more defaults to 8 (max)
     }
 
     public function editImage(string $imageUrl, string $maskUrl, string $prompt): string
