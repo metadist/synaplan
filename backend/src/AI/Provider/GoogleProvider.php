@@ -559,20 +559,14 @@ class GoogleProvider implements ChatProviderInterface, ImageGenerationProviderIn
         $duration = (int) round($requestedDuration);
 
         // Veo 3.1 valid values: 4, 6, 8
-        if ($duration <= 4) {
+        if ($duration <= 5) {
             return 4;
         }
-        if ($duration <= 5) {
-            return 4; // 5 rounds down to 4
-        }
-        if ($duration <= 6) {
+        if ($duration <= 7) {
             return 6;
         }
-        if ($duration <= 7) {
-            return 6; // 7 rounds down to 6
-        }
 
-        return 8; // 8 or more defaults to 8 (max)
+        return 8;
     }
 
     public function editImage(string $imageUrl, string $maskUrl, string $prompt): string
