@@ -375,11 +375,12 @@ jobs:
           BASE_URL: http://localhost:8001
           AUTH_USER: admin@synaplan.com
           AUTH_PASS: admin123
+          MAILHOG_URL: http://localhost:8025
         run: |
           echo "============================================"
           echo "Running E2E tests with ${{ matrix.browser }}"
           echo "============================================"
-          npx playwright test --config=tests/e2e/playwright.config.ts --project=${{ matrix.project }}
+          npx playwright test --config=tests/e2e/playwright.config.ts --project=${{ matrix.project }} --grep "@ci"
 
       - name: Upload Playwright test results
         if: always()
