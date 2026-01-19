@@ -380,7 +380,7 @@ jobs:
           echo "============================================"
           echo "Running E2E tests with ${{ matrix.browser }}"
           echo "============================================"
-          npx playwright test --config=tests/e2e/playwright.config.ts --project=${{ matrix.project }} --grep "@ci"
+          npx playwright test --config=tests/e2e/playwright.config.ts --project=${{ matrix.project }} --grep-invert "@noci"
 
       - name: Upload Playwright test results
         if: always()

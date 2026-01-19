@@ -39,7 +39,22 @@ async function startNewChat(page: Page) {
 
 async function attachFile(page: Page, file: { name: string; mimeType: string; buffer: Buffer }) {
   await page.locator(selectors.chat.attachBtn).click()
-  await page.locator(selectors.chat.fileInput).setInputFiles(file)
+
+  const modal = page.locator(selectors.fileSelection.modal)
+  await modal.waitFor({ state: 'visible', timeout: 10_000 })
+
+  const [fileChooser] = await Promise.all([
+    page.waitForEvent('filechooser'),
+    modal.locator(selectors.fileSelection.uploadButton).click(),
+  ])
+  await fileChooser.setFiles(file)
+
+  await modal.getByText(file.name).waitFor({ state: 'visible', timeout: 30_000 })
+
+  const attachButton = modal.locator(selectors.fileSelection.attachButton)
+  await expect(attachButton).toBeEnabled({ timeout: 30_000 })
+  await attachButton.click()
+  await modal.waitFor({ state: 'hidden', timeout: 10_000 })
 }
 
 async function openLatestAgainDropdown(page: Page): Promise<{
@@ -52,18 +67,21 @@ async function openLatestAgainDropdown(page: Page): Promise<{
     .last()
     .locator(selectors.chat.againDropdown)
 
+  await toggle.scrollIntoViewIfNeeded()
   await expect(toggle).toBeVisible({ timeout: 10_000 })
   await expect(toggle).toBeEnabled({ timeout: 10_000 })
   await toggle.click()
 
   const dropdown = page.locator('.dropdown-panel').last()
-  await dropdown.waitFor({ state: 'visible', timeout: 10_000 }).catch(() => {})
+  try {
+    await dropdown.waitFor({ state: 'visible', timeout: 5_000 })
+  } catch {
+    await toggle.click()
+    await dropdown.waitFor({ state: 'visible', timeout: 5_000 })
+  }
 
   const options = dropdown.locator(selectors.chat.againDropdownItem)
-  await options
-    .first()
-    .waitFor({ state: 'visible', timeout: 10_000 })
-    .catch(() => {})
+  await options.first().waitFor({ state: 'visible', timeout: 5_000 })
 
   const optionCount = await options.count()
 
@@ -76,7 +94,17 @@ async function runAgainOptions(
   failures?: string[],
   purpose?: string
 ) {
-  const initialDropdown = await openLatestAgainDropdown(page)
+  let initialDropdown: Awaited<ReturnType<typeof openLatestAgainDropdown>>
+  try {
+    initialDropdown = await openLatestAgainDropdown(page)
+  } catch (error) {
+    failures?.push(
+      `${purpose || 'purpose'} dropdown failed to open: ${
+        error instanceof Error ? error.message : String(error)
+      }`
+    )
+    return
+  }
   const optionCount = initialDropdown.optionCount
   await initialDropdown.toggle.click()
 
@@ -105,7 +133,7 @@ async function runAgainOptions(
       }
 
       const option = options.nth(i)
-      await option.waitFor({ state: 'visible' })
+      await option.waitFor({ state: 'visible', timeout: 5_000 })
 
       labelText = (await option.innerText()).toLowerCase().trim()
       if (labelText.includes('ollama')) {
@@ -142,7 +170,7 @@ async function runAgainOptions(
   }
 }
 
-test('@smoke Standard model generates valid answer "success" id=003', async ({ page }) => {
+test('@noci @smoke Standard model generates valid answer "success" id=003', async ({ page }) => {
   await login(page)
 
   await startNewChat(page)
@@ -156,7 +184,7 @@ test('@smoke Standard model generates valid answer "success" id=003', async ({ p
   await expect(aiText).toContain('success')
 })
 
-test('@smoke All models can generate a valid answer "success" id=004', async ({ page }) => {
+test('@noci @smoke All models can generate a valid answer "success" id=004', async ({ page }) => {
   const failures: string[] = []
 
   await login(page)
@@ -185,7 +213,7 @@ test('@smoke All models can generate a valid answer "success" id=004', async ({ 
   }
 })
 
-test.skip('@regression vision models respond and can be retried via again id=008', async ({
+test('@noci @regression vision models respond and can be retried via again id=008', async ({
   page,
 }) => {
   const failures: string[] = []
@@ -215,7 +243,7 @@ test.skip('@regression vision models respond and can be retried via again id=008
   }
 })
 
-test.skip('@regression image generation via /pic supports again id=009', async ({ page }) => {
+test('@noci @regression image generation via /pic supports again id=009', async ({ page }) => {
   const failures: string[] = []
 
   await login(page)
@@ -237,7 +265,7 @@ test.skip('@regression image generation via /pic supports again id=009', async (
   }
 })
 
-test.skip('@regression video generation via /vid supports again id=010', async ({ page }) => {
+test('@noci @regression video generation via /vid supports again id=010', async ({ page }) => {
   const failures: string[] = []
 
   await login(page)
@@ -257,12 +285,4 @@ test.skip('@regression video generation via /vid supports again id=010', async (
     console.warn('Video generation issues:', failures)
     await expect.soft(failures).toEqual([])
   }
-})
-
-test.skip('@regression stt coverage via voice input id=011', async () => {
-  test.skip(true, 'No automated STT trigger available in UI; requires manual voice input.')
-})
-
-test.skip('@regression tts coverage via audio playback id=012', async () => {
-  test.skip(true, 'No automated TTS validation path without parsing audio; keep manual.')
 })

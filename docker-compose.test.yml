@@ -25,7 +25,6 @@ services:
       APP_ENV: test
       APP_SECRET: test_secret_not_for_production
       APP_URL: ${APP_URL:-http://localhost:8001}
-      FRONTEND_URL: ${APP_URL:-http://localhost:8001}
       PLUGINS_DIR: /plugins
       DATABASE_WRITE_URL: mysql://synaplan_test:synaplan_test@db_test:3306/synaplan?serverVersion=11.8&charset=utf8mb4
       DATABASE_READ_URL: mysql://synaplan_test:synaplan_test@db_test:3306/synaplan?serverVersion=11.8&charset=utf8mb4

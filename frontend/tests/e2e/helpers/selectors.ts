@@ -62,6 +62,11 @@ export const selectors = {
     fileRow: '[data-testid="item-file"]',
     emptyState: '[data-testid="state-empty"]',
   },
+  fileSelection: {
+    modal: '[data-testid="modal-file-selection"]',
+    uploadButton: '[data-testid="btn-file-selection-upload"]',
+    attachButton: '[data-testid="btn-file-selection-attach"]',
+  },
   userMenu: {
     button: '[data-testid="btn-user-menu-toggle"]',
     logoutBtn: '[data-testid="btn-user-logout"]',

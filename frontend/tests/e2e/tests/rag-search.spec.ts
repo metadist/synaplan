@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test'
 import { login } from '../helpers/auth'
 import { selectors } from '../helpers/selectors'
 
-test('@smoke semantic search completes and shows results summary id=007', async ({ page }) => {
+test('@noci @smoke semantic search completes and shows results summary id=007', async ({ page }) => {
   await login(page)
 
   const modeToggle = page.locator(selectors.header.modeToggle)
@@ -10,7 +10,7 @@ test('@smoke semantic search completes and shows results summary id=007', async 
   const modeLabel = (await modeToggle.innerText()).toLowerCase()
   if (modeLabel.includes('easy')) {
     await modeToggle.click()
-    await expect.soft(modeToggle).toContainText(/advanced/i)
+    await expect(modeToggle).toContainText(/advanced/i)
   }
 
   const sidebar = page.locator(selectors.nav.sidebar)
@@ -42,8 +42,8 @@ test('@smoke semantic search completes and shows results summary id=007', async 
   await page.locator(selectors.files.table).waitFor({ state: 'visible', timeout: 60_000 })
 
   const uploadedRow = page.locator(selectors.files.fileRow).filter({ hasText: fileName })
-  await expect.soft(uploadedRow).toBeVisible({ timeout: 30_000 })
-  await expect.soft(uploadedRow).toContainText(/uploaded|extracted|vectorized/i)
+  await expect(uploadedRow).toBeVisible({ timeout: 30_000 })
+  await expect(uploadedRow).toContainText(/uploaded|extracted|vectorized/i)
 
   let ragLink = sidebar.getByRole('link', { name: /semantic search/i })
   if ((await ragLink.count()) === 0) {
@@ -59,29 +59,9 @@ test('@smoke semantic search completes and shows results summary id=007', async 
   await page.locator(selectors.rag.queryInput).fill(query)
   await page.locator(selectors.rag.searchButton).click()
 
-  await Promise.race([
-    page
-      .locator(selectors.rag.searchSummary)
-      .waitFor({ state: 'visible', timeout: 60_000 })
-      .catch(() => {}),
-    page
-      .getByText(/error|failed|not found/i)
-      .waitFor({ state: 'visible', timeout: 60_000 })
-      .catch(() => {}),
-  ])
-
-  const errorText = await page
-    .getByText(/error|failed|not found|model.*not found/i)
-    .first()
-    .isVisible()
-    .catch(() => false)
-  if (errorText) {
-    // In CI, TestProvider should be used instead of Ollama
-    // If we still get an error, it might be a real issue - log it but don't skip
-    console.warn('Ollama model (bge-m3) not available - TestProvider should handle this in CI')
-    // Continue with test - TestProvider should work for embeddings
-    // If TestProvider is used, we might get 0 results, which is acceptable
-  }
+  const errorBanner = page.getByText(/error|failed|not found|model.*not found/i)
+  await page.locator(selectors.rag.searchSummary).waitFor({ state: 'visible', timeout: 60_000 })
+  await expect(errorBanner).toBeHidden()
 
   const results = page.locator(selectors.rag.resultItem)
   if (await results.count()) {

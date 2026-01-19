@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test'
 import { selectors } from '../helpers/selectors'
 import { deleteUser } from '../helpers/auth'
 
-test('@ci @auth @smoke registration flow with email verification id=006', async ({
+test('@auth @smoke registration flow with email verification id=006', async ({
   page,
   request,
 }) => {
