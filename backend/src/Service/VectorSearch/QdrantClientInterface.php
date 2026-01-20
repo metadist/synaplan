@@ -78,7 +78,27 @@ interface QdrantClientInterface
     public function healthCheck(): bool;
 
     /**
+     * Get detailed health information including metrics.
+     *
+     * @return array{status: string, service?: string, version?: string, uptime_seconds?: int, qdrant?: array, metrics?: array, message?: string}
+     */
+    public function getHealthDetails(): array;
+
+    /**
+     * Check if Qdrant service is configured and available.
+     * Returns false if service URL is not configured or service is unreachable.
+     */
+    public function isAvailable(): bool;
+
+    /**
      * Get collection info (point count, etc.).
      */
     public function getCollectionInfo(): array;
+
+    /**
+     * Get service info (version, stats, system info).
+     *
+     * @return array Service info with structure: ['version' => string, 'status' => string, 'collection' => array, ...]
+     */
+    public function getServiceInfo(): array;
 }

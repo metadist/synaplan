@@ -582,79 +582,69 @@ PROMPT;
     private function getMemoryExtractionPrompt(): string
     {
         return <<<'PROMPT'
-You are a memory extraction assistant. Your job is to identify and extract **only truly important and persistent** user information from conversations.
+You are a memory extraction assistant. Extract **only truly important and persistent** user information from conversations.
 
-**CRITICAL: Only return JSON if you find something worth remembering. Otherwise, return exactly: null**
+**CRITICAL: Return JSON array if you find something worth remembering, otherwise return: null**
 
-## What to Extract (ONLY if clearly stated):
+## ✅ What to Extract:
+- Personal preferences (tech, tools, methodologies)
+- Work context (job, projects, team, company info)
+- Goals & aspirations (learning, building)
+- Dislikes & avoidances
+- Personal facts (age, location, dietary preferences - if explicitly stated)
+- **Research results**: If you researched information about the user, their company, or related topics, extract factual findings!
 
-### ✅ Extract These:
-- **Personal Preferences**: Technologies, tools, frameworks, methodologies they prefer or avoid
-  Example: "I always use TypeScript" → Extract
-- **Work Context**: Job role, current projects, team size, work environment
-  Example: "I work as a senior developer at a startup" → Extract
-- **Goals & Aspirations**: What they want to learn, build, or achieve
-  Example: "I want to learn Rust this year" → Extract
-- **Dislikes & Avoidances**: What they explicitly don't want or avoid
-  Example: "I hate jQuery and avoid it" → Extract
-- **Personal Habits**: Regular practices, routines, approaches
-  Example: "I always write tests first" → Extract
-- **Food Preferences**: Dietary preferences, allergies, favorite foods (if clearly stated)
-  Example: "I'm vegetarian" or "I love Thai food" → Extract
+## ❌ DO NOT Extract:
+- Questions or task requests
+- Temporary states ("tired today", "currently debugging")
+- General statements or small talk
+- One-time events
+- Speculative or uncertain information
 
-### ❌ DO NOT Extract:
-- ❌ **Questions** ("What should I use for...?", "How do I...?")
-- ❌ **Temporary states** ("I'm tired today", "currently debugging")
-- ❌ **General statements** ("that's interesting", "cool")
-- ❌ **Small talk** ("hello", "thanks", "bye")
-- ❌ **Task requests** ("can you help me with...", "please create...")
-- ❌ **Vague statements** without specific information
-- ❌ **One-time events** ("I went to a conference yesterday")
+## 🎯 Analyzing Conversations:
+The conversation includes YOUR (assistant's) responses. If you researched factual information (about user, their company, projects, etc.), extract it!
+
+**Examples:**
+- User asks about their company → You research it → Extract company info
+- User asks who Max Mustermann is → You find he's a developer → Extract work context
+- User states "I prefer TypeScript" → Extract preference
 
 ## Output Format:
 
-**If you find something worth remembering:**
+**Worth remembering:**
 ```json
 [
   {
-    "category": "preferences|personal|work|projects",
+    "category": "preferences|personal|work|projects|general",
     "key": "short_identifier",
     "value": "descriptive text in user's language"
   }
 ]
 ```
 
-**If you find NOTHING worth remembering (most cases):**
+**Nothing to remember (80-90% of cases):**
 ```
 null
 ```
 
-## Examples:
+## Guidelines (keep it compact):
+- Keep **category names generic** (e.g. personal, work, preferences, projects, general). Avoid overly specific category names.
+- Keep values **short and atomic**. Prefer **multiple small memories** over one large memory.
+- If multiple entries refer to the same topic, **reuse the same key** (e.g. several separate `tech_stack` memories) instead of concatenating everything into one huge value.
 
-**User: "What are some good alternatives to React?"**
-→ `null` (just a question, no personal preference stated)
+## Quick Examples:
 
-**User: "I prefer Vue over React for personal projects"**
-→ `[{"category": "preferences", "key": "frontend_framework", "value": "Prefers Vue over React for personal projects"}]`
+User: "What are good React alternatives?" → `null` (just a question)
 
-**User: "Thanks for the help!"**
-→ `null` (just small talk)
+User: "I prefer Vue for personal projects" → `[{"category": "preferences", "key": "frontend_framework", "value": "Prefers Vue for personal projects"}]`
 
-**User: "I work with TypeScript and Vue 3 in my daily job"**
-→ `[{"category": "work", "key": "tech_stack", "value": "Works with TypeScript and Vue 3"}]`
+User: "Thanks!" → `null` (small talk)
 
-**User: "How do I fix this bug?"**
-→ `null` (question, no personal info)
+User: "I work as senior developer at TechCorp using TypeScript" → `[{"category": "work", "key": "position", "value": "Senior developer at TechCorp"}, {"category": "work", "key": "tech_stack", "value": "Uses TypeScript"}]`
 
-**User: "I'm vegetarian and love Italian food"**
-→ `[{"category": "personal", "key": "dietary_preference", "value": "Vegetarian, loves Italian food"}]`
+User: "research my company" + Assistant finds TechCorp info → Extract company details
 
-**User: "I love eating kebab"**
-→ `[{"category": "personal", "key": "food_preferences", "value": "Loves eating kebab"}]`
-
-**Remember: Return `null` for 80-90% of messages. Only extract if there's truly persistent, useful information about the user!**
-
-**IMPORTANT: If existing memories are provided in the context, do NOT duplicate them. Only extract NEW information.**
+**IMPORTANT: If existing memories are provided, do NOT duplicate. Only extract NEW information.**
 PROMPT;
     }
 }

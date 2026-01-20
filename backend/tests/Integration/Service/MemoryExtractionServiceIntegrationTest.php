@@ -2,16 +2,16 @@
 
 declare(strict_types=1);
 
-namespace App\Tests\Service;
+namespace App\Tests\Integration\Service;
 
 use App\Service\MemoryExtractionService;
 use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
 
 /**
- * Smoke Tests für MemoryExtractionService.
- * Testet nur grundlegende Funktionalität ohne komplexe Mocks.
+ * Integration Tests für MemoryExtractionService.
+ * Testet mit echtem Service Container.
  */
-final class MemoryExtractionServiceTest extends KernelTestCase
+final class MemoryExtractionServiceIntegrationTest extends KernelTestCase
 {
     private MemoryExtractionService $service;
 
@@ -22,14 +22,14 @@ final class MemoryExtractionServiceTest extends KernelTestCase
         $this->service = $container->get(MemoryExtractionService::class);
     }
 
-    public function testServiceCanBeInstantiated(): void
+    public function testServiceCanBeInstantiatedFromContainer(): void
     {
         $this->assertInstanceOf(MemoryExtractionService::class, $this->service);
     }
 
-    public function testServiceIsAvailableViaContainer(): void
+    public function testServiceHasRequiredDependencies(): void
     {
-        $service = static::getContainer()->get(MemoryExtractionService::class);
-        $this->assertNotNull($service);
+        // Verify service can be constructed with all dependencies
+        $this->assertNotNull($this->service);
     }
 }

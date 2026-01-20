@@ -433,6 +433,15 @@
     "generatingFile": "Erstelle Datei...",
     "generatingFileTitle": "Datei wird generiert",
     "generatingFileDesc": "KI erstellt die angeforderte Datei",
+    "analyzingMemories": "Analysiere Erinnerungen...",
+    "analyzingMemoriesTitle": "Erinnerungen werden analysiert",
+    "analyzingMemoriesDesc": "KI prüft, was wichtig ist und gespeichert werden soll",
+    "savingMemories": "Speichere Erinnerungen...",
+    "savingMemoriesTitle": "Speichere Erinnerungen",
+    "savingMemoriesDesc": "Neue Informationen werden gesichert",
+    "memoriesComplete": "Erinnerungen aktualisiert",
+    "memoriesCompleteTitle": "Erinnerungen aktualisiert",
+    "memoriesCompleteDesc": "Analyse abgeschlossen",
     "topic": "Thema",
     "language": "Sprache",
     "modelId": "Model ID"
@@ -1327,6 +1336,7 @@
     "description": "Wichtige Informationen über dich und deine Präferenzen, die die KI für zukünftige Gespräche nutzen kann.",
     "empty": "Noch keine Erinnerungen gespeichert.",
     "emptyDesc": "Die KI wird relevante Informationen automatisch aus deinen Gesprächen extrahieren und hier speichern. Du kannst auch manuell neue Erinnerungen hinzufügen.",
+    "loading": "Erinnerungen werden geladen...",
     "allCategories": "Alle Kategorien",
     "selected": "{count} ausgewählt",
     "selectAll": "Alle auswählen",
@@ -1337,6 +1347,15 @@
     "value": "Wert",
     "updated": "Aktualisiert",
     "createButton": "Neue Erinnerung",
+    "unavailable": {
+      "title": "Erinnerungen werden eingerichtet",
+      "message": "Das Erinnerungs-System wird gerade eingerichtet und ist vorübergehend nicht verfügbar. Dies kann einige Minuten dauern.",
+      "reason": "Mögliche Gründe:",
+      "reason1": "Der Vektordatenbank-Service wird gestartet",
+      "reason2": "KI-Embeddings werden neu konfiguriert",
+      "reason3": "Bestehende Erinnerungen werden migriert",
+      "retry": "Erneut versuchen"
+    },
     "listView": {
       "title": "Listenansicht",
       "source": "Quelle",
@@ -1348,7 +1367,7 @@
       "sortByDate": "Nach Datum sortieren"
     },
     "graphView": {
-      "title": "Neuronales Netzwerk"
+      "title": "Netzwerk-Ansicht"
     },
     "categories": {
       "all": "Alle Kategorien",
@@ -1405,12 +1424,29 @@
     "editSuccess": "Erinnerung erfolgreich aktualisiert",
     "editError": "Fehler beim Aktualisieren der Erinnerung",
     "memorySaved": "Neue Erinnerung erfolgreich gespeichert!",
+    "showingRecent": "Zeige die {count} neuesten Erinnerungen",
+    "totalCount": "Insgesamt {count} Erinnerungen gespeichert",
+    "viewAll": "Alle anzeigen",
+    "serviceDisabled": {
+      "title": "Erinnerungen deaktiviert",
+      "message": "Der Erinnerungs-Service ist derzeit nicht verfügbar. Bitte kontaktieren Sie den Administrator.",
+      "badge": "Service nicht verfügbar",
+      "tooltip": "Der Erinnerungs-Service ist deaktiviert oder nicht erreichbar. Diese Erinnerung kann nicht angezeigt werden."
+    },
+    "referenceMissing": {
+      "badge": "Erinnerung nicht gefunden",
+      "tooltip": "Diese Erinnerung ist nicht (mehr) verfügbar. Sie wurde eventuell gelöscht oder der Service konnte sie nicht laden."
+    },
     "toast": {
       "title": "Neue Erinnerung erkannt",
+      "titleCompact": "Erinnerung",
       "discard": "Verwerfen",
+      "discardCompact": "Ausblenden",
       "edit": "Anpassen",
+      "editCompact": "Bearbeiten",
       "discarded": "Erinnerung verworfen"
     },
+    "usedInResponse": "{count} Erinnerung verwendet | {count} Erinnerungen verwendet",
     "context": {
       "title": "Aktive Erinnerungen",
       "count": "{count} Erinnerung geladen | {count} Erinnerungen geladen"

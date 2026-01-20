@@ -1,16 +1,13 @@
 <template>
-  <div
-    class="relative w-full overflow-hidden bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900"
-    style="min-height: 600px; height: 100%"
-  >
+  <div class="relative w-full overflow-hidden bg-chat" style="min-height: 600px; height: 100%">
     <!-- Empty State -->
     <div
       v-if="props.memories.length === 0"
       class="absolute inset-0 flex items-center justify-center z-20"
     >
-      <div class="text-center text-white/70 max-w-md p-8">
-        <Icon icon="mdi:brain" class="w-20 h-20 mx-auto mb-4 text-white/30" />
-        <h3 class="text-xl font-semibold mb-2 text-white/90">{{ $t('memories.empty') }}</h3>
+      <div class="text-center txt-secondary max-w-md p-8">
+        <Icon icon="mdi:brain" class="w-20 h-20 mx-auto mb-4 opacity-30" />
+        <h3 class="text-xl font-semibold mb-2 txt-primary">{{ $t('memories.empty') }}</h3>
         <p class="text-sm">{{ $t('memories.emptyDesc') }}</p>
       </div>
     </div>
@@ -33,12 +30,8 @@
     <!-- Toggle Button - Compact & Elegant Top Left -->
     <div v-if="props.memories.length > 0" class="absolute top-4 left-4 z-20">
       <button
-        class="px-3 md:px-4 py-2 md:py-2.5 rounded-lg text-xs md:text-sm font-medium transition-all duration-200 backdrop-blur-sm flex items-center gap-2 shadow-lg"
-        :class="
-          groupBy === 'category'
-            ? 'bg-white/10 text-white hover:bg-white/20 border border-white/20'
-            : 'bg-brand-500 text-white hover:bg-brand-600'
-        "
+        class="px-3 md:px-4 py-2 md:py-2.5 rounded-lg text-xs md:text-sm font-medium transition-all duration-200 flex items-center gap-2 nav-item"
+        :class="groupBy === 'category' ? 'nav-item--active' : ''"
         @click="toggleGroupBy"
       >
         <Icon
@@ -68,12 +61,8 @@
         <button
           v-for="cat in availableCategories"
           :key="cat.category"
-          class="px-3 py-1.5 rounded-full text-xs font-medium transition-all duration-200 whitespace-nowrap"
-          :class="
-            selectedCategories.includes(cat.category)
-              ? 'bg-brand-500 text-white shadow-lg shadow-brand-500/50'
-              : 'bg-white/10 text-white/70 hover:bg-white/20'
-          "
+          class="px-3 py-1.5 rounded-full text-xs font-medium transition-all duration-200 whitespace-nowrap nav-item"
+          :class="selectedCategories.includes(cat.category) ? 'nav-item--active' : ''"
           @click="toggleCategory(cat.category)"
         >
           <span
@@ -89,12 +78,8 @@
         <button
           v-for="keyItem in availableKeys"
           :key="keyItem.key"
-          class="px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-200 whitespace-nowrap"
-          :class="
-            selectedKeys.includes(keyItem.key)
-              ? 'bg-brand-500 text-white shadow-lg shadow-brand-500/50'
-              : 'bg-white/10 text-white/70 hover:bg-white/20'
-          "
+          class="px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-200 whitespace-nowrap nav-item"
+          :class="selectedKeys.includes(keyItem.key) ? 'nav-item--active' : ''"
           @click="toggleKey(keyItem.key)"
         >
           {{ keyItem.key }} <span class="text-[10px] opacity-70">({{ keyItem.count }})</span>
@@ -111,12 +96,12 @@
       "
       class="absolute inset-0 flex items-center justify-center z-20 p-4"
     >
-      <div class="text-center text-white/70 max-w-md">
+      <div class="text-center txt-secondary max-w-md">
         <Icon
           icon="mdi:filter-off"
-          class="w-12 h-12 md:w-16 md:h-16 mx-auto mb-3 md:mb-4 text-white/30"
+          class="w-12 h-12 md:w-16 md:h-16 mx-auto mb-3 md:mb-4 opacity-30"
         />
-        <h3 class="text-base md:text-lg font-semibold mb-2 text-white/90">
+        <h3 class="text-base md:text-lg font-semibold mb-2 txt-primary">
           {{ $t('memories.noResults') }}
         </h3>
         <p class="text-xs md:text-sm mb-3 md:mb-4 px-4">
@@ -127,7 +112,7 @@
           }}
         </p>
         <button
-          class="px-4 py-2 rounded-lg bg-brand-500 text-white hover:bg-brand-600 transition-colors text-sm"
+          class="px-4 py-2 rounded-lg btn-primary transition-colors text-sm"
           @click="clearFilters"
         >
           {{ $t('memories.graph.clearFilters', 'Filter zurücksetzen') }}
@@ -158,70 +143,6 @@
         <Icon icon="mdi:atom" class="w-4 h-4 md:w-5 md:h-5" />
       </button>
     </div>
-
-    <!-- Memory Detail Panel -->
-    <Transition
-      enter-active-class="transition-all duration-300 ease-out"
-      leave-active-class="transition-all duration-200 ease-in"
-      enter-from-class="translate-y-full opacity-0"
-      leave-to-class="translate-y-full opacity-0"
-    >
-      <div
-        v-if="selectedMemory"
-        class="absolute bottom-2 md:bottom-4 left-2 right-2 md:left-1/2 md:right-auto md:transform md:-translate-x-1/2 z-20 md:max-w-md md:w-full"
-      >
-        <div
-          class="surface-card p-4 md:p-6 rounded-2xl backdrop-blur-xl bg-white/90 dark:bg-slate-800/90 shadow-2xl"
-        >
-          <div class="flex items-start justify-between mb-3 md:mb-4">
-            <div class="flex-1 min-w-0">
-              <div
-                class="text-xs font-semibold uppercase tracking-wider mb-1 flex items-center gap-2"
-              >
-                <span
-                  class="inline-block w-2 h-2 rounded-full flex-shrink-0"
-                  :style="{
-                    backgroundColor:
-                      categoryColors[selectedMemory.category] || categoryColors.default,
-                  }"
-                ></span>
-                <span class="txt-brand truncate">{{
-                  $t(`memories.categories.${selectedMemory.category}`, selectedMemory.category)
-                }}</span>
-              </div>
-              <h3 class="text-base md:text-lg font-bold txt-primary truncate">
-                {{ selectedMemory.key }}
-              </h3>
-            </div>
-            <button
-              class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 p-1 -mr-1 flex-shrink-0"
-              @click="selectedMemory = null"
-            >
-              <Icon icon="mdi:close" class="w-5 h-5" />
-            </button>
-          </div>
-          <p class="txt-secondary text-xs md:text-sm mb-3 md:mb-4 line-clamp-3">
-            {{ selectedMemory.value }}
-          </p>
-          <div class="flex items-center justify-between text-xs txt-tertiary mb-3 md:mb-4">
-            <span>{{ $t(`memories.source.${selectedMemory.source}`) }}</span>
-            <span class="truncate ml-2">{{ formatTimestamp(selectedMemory.updated) }}</span>
-          </div>
-          <div class="flex gap-2">
-            <button class="btn-primary flex-1 py-2 text-sm" @click="handleEdit(selectedMemory)">
-              <Icon icon="mdi:pencil" class="w-4 h-4 inline mr-1" />
-              <span class="hidden sm:inline">{{ $t('common.edit') }}</span>
-              <span class="sm:hidden">{{ $t('common.edit') }}</span>
-            </button>
-            <button class="btn-secondary flex-1 py-2 text-sm" @click="handleDelete(selectedMemory)">
-              <Icon icon="mdi:delete" class="w-4 h-4 inline mr-1" />
-              <span class="hidden sm:inline">{{ $t('common.delete') }}</span>
-              <span class="sm:hidden">{{ $t('common.delete') }}</span>
-            </button>
-          </div>
-        </div>
-      </div>
-    </Transition>
 
     <!-- Legend -->
     <div
@@ -272,11 +193,11 @@ import type { UserMemory } from '@/services/api/userMemoriesApi'
 interface Props {
   memories: UserMemory[]
   availableCategories: Array<{ category: string; count: number }>
+  selectedMemoryId?: number | null
 }
 
 interface Emits {
-  (e: 'edit', memory: UserMemory): void
-  (e: 'delete', memory: UserMemory): void
+  (e: 'select', memory: UserMemory | null): void
 }
 
 const props = defineProps<Props>()
@@ -288,20 +209,37 @@ let ctx: CanvasRenderingContext2D | null = null
 let animationId: number | null = null
 
 // Graph State
-interface Node {
+type NodeType = 'hub' | 'memory'
+
+interface BaseNode {
   id: number
+  type: NodeType
   x: number
   y: number
   vx: number
   vy: number
   radius: number
-  memory: UserMemory
   color: string
+  groupKey: string
 }
+
+interface HubNode extends BaseNode {
+  type: 'hub'
+  label: string
+  count: number
+}
+
+interface MemoryNode extends BaseNode {
+  type: 'memory'
+  memory: UserMemory
+}
+
+type Node = HubNode | MemoryNode
 
 interface Edge {
   source: Node
   target: Node
+  restLength: number
 }
 
 const nodes = ref<Node[]>([])
@@ -424,6 +362,7 @@ function createNodes() {
   const isMobile = canvasRef.value!.offsetWidth < 768
   const nodeBaseRadius = isMobile ? 12 : 8
   const radiusVariance = isMobile ? 6 : 4
+  const hubRadius = isMobile ? 26 : 20
 
   console.log('🎯 Canvas dimensions:', {
     width: canvasRef.value!.offsetWidth,
@@ -434,110 +373,83 @@ function createNodes() {
     isMobile,
   })
 
-  // Sort/group memories based on groupBy setting
-  let sortedMemories = [...filteredMemories]
-
-  if (groupBy.value === 'category') {
-    // Group by category, then sort within each category by key
-    sortedMemories.sort((a, b) => {
-      if (a.category !== b.category) {
-        return a.category.localeCompare(b.category)
-      }
-      return a.key.localeCompare(b.key)
-    })
-  } else {
-    // Sort by key
-    sortedMemories.sort((a, b) => a.key.localeCompare(b.key))
+  // Build groups (category or key) -> memories
+  const groups = new Map<string, UserMemory[]>()
+  for (const memory of filteredMemories) {
+    const groupKey = groupBy.value === 'category' ? memory.category : memory.key
+    const list = groups.get(groupKey) || []
+    list.push(memory)
+    groups.set(groupKey, list)
   }
 
-  // Position nodes based on groupBy mode
-  if (groupBy.value === 'category') {
-    // Group by category in clusters
-    const categories = Array.from(new Set(sortedMemories.map((m) => m.category)))
-    const categoryAngles = new Map<string, number>()
+  const groupKeys = Array.from(groups.keys()).sort((a, b) => a.localeCompare(b))
+  const groupAngles = new Map<string, number>()
+  groupKeys.forEach((k, i) => {
+    const angle = (i / Math.max(1, groupKeys.length)) * Math.PI * 2
+    groupAngles.set(k, angle)
+  })
 
-    categories.forEach((cat, i) => {
-      const angle = (i / categories.length) * Math.PI * 2
-      categoryAngles.set(cat, angle)
-    })
+  const newNodes: Node[] = []
 
-    const categoryMemoryCounts = new Map<string, { count: number; index: number }>()
-    sortedMemories.forEach((m) => {
-      const current = categoryMemoryCounts.get(m.category) || { count: 0, index: 0 }
-      current.count++
-      categoryMemoryCounts.set(m.category, current)
-    })
+  // Place a hub per group, then place memories around that hub
+  for (let i = 0; i < groupKeys.length; i++) {
+    const groupKey = groupKeys[i]
+    const groupMemories = groups.get(groupKey) || []
+    const angle = groupAngles.get(groupKey) || 0
 
-    nodes.value = sortedMemories.map((memory) => {
-      const categoryAngle = categoryAngles.get(memory.category)!
-      const categoryInfo = categoryMemoryCounts.get(memory.category)!
-      const memoryIndex = categoryInfo.index++
-      const memoriesInCategory = categoryInfo.count
+    // Spread group hubs around center; if only one group, keep it centered
+    const hubOrbitRadius = groupKeys.length <= 1 ? 0 : baseRadius * 0.55
+    const hubX = centerX + Math.cos(angle) * hubOrbitRadius
+    const hubY = centerY + Math.sin(angle) * hubOrbitRadius
 
-      // Position in a sub-cluster around category angle
-      const clusterRadius = baseRadius * (0.6 + Math.random() * 0.3)
-      const angleOffset =
-        memoriesInCategory > 1
-          ? (memoryIndex / memoriesInCategory - 0.5) * (Math.PI / 3) // Spread within 60 degrees
-          : 0
+    // Hub color: category color in category-mode, otherwise use the first memory's category color
+    const hubColor =
+      groupBy.value === 'category'
+        ? categoryColors[groupKey] || categoryColors.default
+        : categoryColors[groupMemories[0]?.category] || categoryColors.default
 
-      const finalAngle = categoryAngle + angleOffset
+    const hubNode: HubNode = {
+      id: -1 - i,
+      type: 'hub',
+      x: hubX,
+      y: hubY,
+      vx: 0,
+      vy: 0,
+      radius: hubRadius,
+      color: hubColor,
+      groupKey,
+      label: groupKey,
+      count: groupMemories.length,
+    }
+    newNodes.push(hubNode)
 
-      return {
+    // Sort memories in group for stable placement
+    const sorted = [...groupMemories].sort((a, b) => a.key.localeCompare(b.key))
+
+    // Place memory nodes around hub
+    const ringRadius = isMobile ? 85 : 70
+    sorted.forEach((memory, idx) => {
+      const memAngle =
+        sorted.length <= 1 ? angle : angle + (idx / sorted.length - 0.5) * (Math.PI / 1.8)
+      const jitter = (Math.random() - 0.5) * 14
+
+      const node: MemoryNode = {
         id: memory.id,
-        x: centerX + Math.cos(finalAngle) * clusterRadius,
-        y: centerY + Math.sin(finalAngle) * clusterRadius,
+        type: 'memory',
+        x: hubX + Math.cos(memAngle) * (ringRadius + jitter),
+        y: hubY + Math.sin(memAngle) * (ringRadius + jitter),
         vx: (Math.random() - 0.5) * 0.5,
         vy: (Math.random() - 0.5) * 0.5,
         radius: nodeBaseRadius + Math.random() * radiusVariance,
         memory,
         color: categoryColors[memory.category] || categoryColors.default,
+        groupKey,
       }
-    })
-  } else {
-    // Key mode: Group by key in clusters
-    const keys = Array.from(new Set(sortedMemories.map((m) => m.key)))
-    const keyAngles = new Map<string, number>()
-
-    keys.forEach((key, i) => {
-      const angle = (i / keys.length) * Math.PI * 2
-      keyAngles.set(key, angle)
-    })
-
-    const keyMemoryCounts = new Map<string, { count: number; index: number }>()
-    sortedMemories.forEach((m) => {
-      const current = keyMemoryCounts.get(m.key) || { count: 0, index: 0 }
-      current.count++
-      keyMemoryCounts.set(m.key, current)
-    })
-
-    nodes.value = sortedMemories.map((memory) => {
-      const keyAngle = keyAngles.get(memory.key)!
-      const keyInfo = keyMemoryCounts.get(memory.key)!
-      const memoryIndex = keyInfo.index++
-      const memoriesWithKey = keyInfo.count
-
-      // Position in a sub-cluster around key angle
-      const clusterRadius = baseRadius * (0.6 + Math.random() * 0.3)
-      const angleOffset =
-        memoriesWithKey > 1
-          ? (memoryIndex / memoriesWithKey - 0.5) * (Math.PI / 4) // Spread within 45 degrees
-          : 0
-
-      const finalAngle = keyAngle + angleOffset
-
-      return {
-        id: memory.id,
-        x: centerX + Math.cos(finalAngle) * clusterRadius,
-        y: centerY + Math.sin(finalAngle) * clusterRadius,
-        vx: (Math.random() - 0.5) * 0.5,
-        vy: (Math.random() - 0.5) * 0.5,
-        radius: nodeBaseRadius + Math.random() * radiusVariance,
-        memory,
-        color: categoryColors[memory.category] || categoryColors.default,
-      }
+      newNodes.push(node)
     })
   }
+
+  nodes.value = newNodes
 
   console.log('✅ Created nodes:', nodes.value.length)
 }
@@ -545,32 +457,24 @@ function createNodes() {
 function createEdges() {
   edges.value = []
 
-  if (groupBy.value === 'category') {
-    // Connect nodes within the same category
-    for (let i = 0; i < nodes.value.length; i++) {
-      for (let j = i + 1; j < nodes.value.length; j++) {
-        const nodeA = nodes.value[i]
-        const nodeB = nodes.value[j]
-
-        // Only connect if same category
-        if (nodeA.memory.category === nodeB.memory.category) {
-          edges.value.push({ source: nodeA, target: nodeB })
-        }
-      }
+  const hubsByGroupKey = new Map<string, HubNode>()
+  for (const node of nodes.value) {
+    if (node.type === 'hub') {
+      hubsByGroupKey.set(node.groupKey, node)
     }
-  } else {
-    // Key mode: Connect nodes with the same key
-    for (let i = 0; i < nodes.value.length; i++) {
-      for (let j = i + 1; j < nodes.value.length; j++) {
-        const nodeA = nodes.value[i]
-        const nodeB = nodes.value[j]
+  }
 
-        // Only connect if same key
-        if (nodeA.memory.key === nodeB.memory.key) {
-          edges.value.push({ source: nodeA, target: nodeB })
-        }
-      }
-    }
+  // Connect each memory node to its hub node
+  for (const node of nodes.value) {
+    if (node.type !== 'memory') continue
+    const hub = hubsByGroupKey.get(node.groupKey)
+    if (!hub) continue
+
+    edges.value.push({
+      source: hub,
+      target: node,
+      restLength: 75,
+    })
   }
 
   console.log('🔗 Created edges:', edges.value.length, 'in', groupBy.value, 'mode')
@@ -583,8 +487,11 @@ function animate() {
   const width = canvas.offsetWidth
   const height = canvas.offsetHeight
 
-  // Clear canvas with dark background
-  ctx.fillStyle = '#0f172a' // Dark slate background
+  // Detect dark mode
+  const isDarkMode = document.documentElement.classList.contains('dark')
+
+  // Clear canvas with theme-aware background
+  ctx.fillStyle = isDarkMode ? '#0f172a' : '#f8fafc' // dark slate vs light slate
   ctx.fillRect(0, 0, width, height)
 
   // Apply physics
@@ -592,8 +499,8 @@ function animate() {
     applyForces()
   }
 
-  // Draw edges
-  ctx.strokeStyle = 'rgba(168, 85, 247, 0.3)' // purple with opacity
+  // Draw edges with theme-aware colors
+  ctx.strokeStyle = isDarkMode ? 'rgba(168, 85, 247, 0.3)' : 'rgba(168, 85, 247, 0.2)' // purple
   ctx.lineWidth = 2
   for (const edge of edges.value) {
     ctx.beginPath()
@@ -626,31 +533,44 @@ function animate() {
     ctx.arc(node.x, node.y, node.radius, 0, Math.PI * 2)
     ctx.fill()
 
-    // White border for visibility
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)'
-    ctx.lineWidth = 1
+    // Border with theme-aware color
+    ctx.strokeStyle = isDarkMode ? 'rgba(255, 255, 255, 0.3)' : 'rgba(0, 0, 0, 0.2)'
+    ctx.lineWidth = node.type === 'hub' ? 2 : 1
     ctx.stroke()
 
     drawnNodes++
 
     // Highlight selected
-    if (selectedMemory.value?.id === node.id) {
-      ctx.strokeStyle = '#ffffff'
+    if (node.type === 'memory' && selectedMemory.value?.id === node.id) {
+      ctx.strokeStyle = isDarkMode ? '#ffffff' : '#000000'
       ctx.lineWidth = 3
       ctx.beginPath()
       ctx.arc(node.x, node.y, node.radius + 4, 0, Math.PI * 2)
       ctx.stroke()
     }
 
-    // Draw label on hover
-    const dx = lastMouseX - node.x
-    const dy = lastMouseY - node.y
-    const dist = Math.sqrt(dx * dx + dy * dy)
-    if (dist < node.radius + 10) {
-      ctx.fillStyle = '#ffffff'
-      ctx.font = 'bold 14px sans-serif'
+    // Hub label (always)
+    if (node.type === 'hub') {
+      ctx.fillStyle = isDarkMode ? '#ffffff' : '#0f172a'
+      ctx.font = '700 12px sans-serif'
       ctx.textAlign = 'center'
-      ctx.fillText(node.memory.key, node.x, node.y - node.radius - 12)
+      ctx.fillText(node.label, node.x, node.y + 4)
+      ctx.font = '600 10px sans-serif'
+      ctx.fillStyle = isDarkMode ? 'rgba(255,255,255,0.75)' : 'rgba(15,23,42,0.65)'
+      ctx.fillText(`${node.count}`, node.x, node.y + 18)
+    }
+
+    // Memory label on hover with theme-aware color
+    if (node.type === 'memory') {
+      const dx = lastMouseX - node.x
+      const dy = lastMouseY - node.y
+      const dist = Math.sqrt(dx * dx + dy * dy)
+      if (dist < node.radius + 10) {
+        ctx.fillStyle = isDarkMode ? '#ffffff' : '#0f172a'
+        ctx.font = 'bold 14px sans-serif'
+        ctx.textAlign = 'center'
+        ctx.fillText(node.memory.key, node.x, node.y - node.radius - 12)
+      }
     }
   }
 
@@ -674,11 +594,12 @@ function applyForces() {
         const dx = other.x - node.x
         const dy = other.y - node.y
         const distance = Math.sqrt(dx * dx + dy * dy)
-        const targetDistance = 80
-        const force = (distance - targetDistance) * 0.01
+        const targetDistance = edge.restLength
+        const safeDistance = Math.max(0.001, distance)
+        const force = (safeDistance - targetDistance) * 0.01
 
-        node.vx += (dx / distance) * force
-        node.vy += (dy / distance) * force
+        node.vx += (dx / safeDistance) * force
+        node.vy += (dy / safeDistance) * force
       }
     }
 
@@ -688,18 +609,21 @@ function applyForces() {
       const dx = node.x - other.x
       const dy = node.y - other.y
       const distance = Math.sqrt(dx * dx + dy * dy)
-      if (distance < 100) {
-        const force = 50 / (distance * distance)
-        node.vx += (dx / distance) * force
-        node.vy += (dy / distance) * force
+      const minDistance = node.radius + other.radius + 18
+      if (distance < minDistance) {
+        const safeDistance = Math.max(0.001, distance)
+        const force = 80 / (safeDistance * safeDistance)
+        node.vx += (dx / safeDistance) * force
+        node.vy += (dy / safeDistance) * force
       }
     }
 
     // Center attraction
     const dx = centerX - node.x
     const dy = centerY - node.y
-    node.vx += dx * 0.0001
-    node.vy += dy * 0.0001
+    const centerStrength = node.type === 'hub' ? 0.00025 : 0.00008
+    node.vx += dx * centerStrength
+    node.vy += dy * centerStrength
 
     // Damping
     node.vx *= 0.95
@@ -711,7 +635,7 @@ function applyForces() {
       node.y += node.vy
 
       // Boundaries
-      const margin = 50
+      const margin = node.type === 'hub' ? 80 : 50
       if (node.x < margin) node.vx = Math.abs(node.vx)
       if (node.x > canvasRef.value!.offsetWidth - margin) node.vx = -Math.abs(node.vx)
       if (node.y < margin) node.vy = Math.abs(node.vy)
@@ -733,7 +657,13 @@ function handleMouseDown(e: MouseEvent) {
     const dist = Math.sqrt(dx * dx + dy * dy)
     if (dist < node.radius + 5) {
       draggedNode = node
-      selectedMemory.value = node.memory
+      if (node.type === 'memory') {
+        selectedMemory.value = node.memory
+        emit('select', node.memory)
+      } else {
+        selectedMemory.value = null
+        emit('select', null)
+      }
       isDragging = true
       return
     }
@@ -817,19 +747,6 @@ function clearFilters() {
   createEdges()
 }
 
-function handleEdit(memory: UserMemory) {
-  emit('edit', memory)
-}
-
-function handleDelete(memory: UserMemory) {
-  emit('delete', memory)
-}
-
-function formatTimestamp(timestamp: number) {
-  const date = new Date(timestamp * 1000)
-  return date.toLocaleString()
-}
-
 // Touch Handlers for Mobile
 function handleTouchStart(e: TouchEvent) {
   if (e.touches.length === 1) {
@@ -845,7 +762,13 @@ function handleTouchStart(e: TouchEvent) {
       const dist = Math.sqrt(dx * dx + dy * dy)
       if (dist < node.radius + 10) {
         draggedNode = node
-        selectedMemory.value = node.memory
+        if (node.type === 'memory') {
+          selectedMemory.value = node.memory
+          emit('select', node.memory)
+        } else {
+          selectedMemory.value = null
+          emit('select', null)
+        }
         isDragging = true
         e.preventDefault()
         return
@@ -907,5 +830,17 @@ watch(
     createEdges()
   },
   { deep: true }
+)
+
+// Sync selection from parent (renders the detail card outside the graph)
+watch(
+  () => props.selectedMemoryId,
+  (id) => {
+    if (!id) {
+      selectedMemory.value = null
+      return
+    }
+    selectedMemory.value = props.memories.find((m) => m.id === id) || null
+  }
 )
 </script>

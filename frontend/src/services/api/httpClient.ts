@@ -54,9 +54,16 @@ async function loadRuntimeConfig(): Promise<RuntimeConfig> {
   // Fetch config from backend (use raw fetch to avoid circular dependency)
   configPromise = (async () => {
     try {
+      // Add timeout to fetch to prevent hanging
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 2000) // 2 second timeout
+
       const response = await fetch(`${getApiBaseUrl()}/api/v1/config/runtime`, {
         credentials: 'include',
+        signal: controller.signal,
       })
+
+      clearTimeout(timeoutId)
 
       if (!response.ok) {
         throw new Error(`Failed to load runtime config: ${response.status}`)
@@ -76,6 +83,7 @@ async function loadRuntimeConfig(): Promise<RuntimeConfig> {
         },
         features: {
           help: false,
+          memoryService: false, // Add this!
         },
         googleTag: {
           enabled: false,

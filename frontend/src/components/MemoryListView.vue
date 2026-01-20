@@ -24,14 +24,22 @@
 
           <!-- Categories -->
           <optgroup :label="$t('memories.listView.categories')">
-            <option v-for="cat in availableCategories" :key="'cat-' + cat.category" :value="'category:' + cat.category">
+            <option
+              v-for="cat in availableCategories"
+              :key="'cat-' + cat.category"
+              :value="'category:' + cat.category"
+            >
               {{ $t(`memories.categories.${cat.category}`, cat.category) }} ({{ cat.count }})
             </option>
           </optgroup>
 
           <!-- Keys -->
           <optgroup :label="$t('memories.listView.keys')">
-            <option v-for="keyItem in availableKeys" :key="'key-' + keyItem.key" :value="'key:' + keyItem.key">
+            <option
+              v-for="keyItem in availableKeys"
+              :key="'key-' + keyItem.key"
+              :value="'key:' + keyItem.key"
+            >
               {{ keyItem.key }} ({{ keyItem.count }})
             </option>
           </optgroup>
@@ -119,6 +127,7 @@
           <tr
             v-for="memory in filteredMemories"
             :key="memory.id"
+            :data-memory-id="memory.id"
             class="border-b border-light-border/10 dark:border-dark-border/10 hover:bg-surface-soft transition-colors"
             :class="{ 'bg-brand-500/10': isSelected(memory.id) }"
           >
@@ -210,7 +219,7 @@ const sortBy = ref<'category' | 'key' | 'updated'>('category')
 // Available keys for filtering
 const availableKeys = computed(() => {
   const keysMap = new Map<string, number>()
-  props.memories.forEach(m => {
+  props.memories.forEach((m) => {
     keysMap.set(m.key, (keysMap.get(m.key) || 0) + 1)
   })
   return Array.from(keysMap.entries())

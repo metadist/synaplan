@@ -90,6 +90,38 @@ final readonly class QdrantClientMock implements QdrantClientInterface
         return false; // Not available yet
     }
 
+    public function getHealthDetails(): array
+    {
+        $this->logger->debug('QdrantClientMock: getHealthDetails called');
+
+        return [
+            'status' => 'mock',
+            'service' => 'synaplan-qdrant-service (mock)',
+            'version' => '0.0.0-mock',
+            'uptime_seconds' => 0,
+            'qdrant' => [
+                'status' => 'mock',
+                'collection_status' => 'Green',
+                'points_count' => 0,
+                'vectors_count' => 0,
+            ],
+            'metrics' => [
+                'requests_total' => 0,
+                'requests_failed' => 0,
+                'requests_success' => 0,
+                'success_rate_percent' => '100.00',
+            ],
+        ];
+    }
+
+    public function isAvailable(): bool
+    {
+        $this->logger->debug('QdrantClientMock: isAvailable called');
+
+        // Mock is never available (development placeholder)
+        return false;
+    }
+
     public function getCollectionInfo(): array
     {
         $this->logger->debug('QdrantClientMock: getCollectionInfo called');
@@ -99,6 +131,25 @@ final readonly class QdrantClientMock implements QdrantClientInterface
             'status' => 'mock',
             'points_count' => 0,
             'vectors_count' => 0,
+        ];
+    }
+
+    public function getServiceInfo(): array
+    {
+        $this->logger->debug('QdrantClientMock: getServiceInfo called');
+
+        // Mock service info
+        return [
+            'service' => 'synaplan-qdrant-service',
+            'version' => '0.0.0-mock',
+            'rust_version' => 'mock',
+            'status' => 'mock',
+            'collection' => [
+                'status' => 'mock',
+                'points_count' => 0,
+                'vectors_count' => 0,
+                'indexed_vectors_count' => 0,
+            ],
         ];
     }
 }

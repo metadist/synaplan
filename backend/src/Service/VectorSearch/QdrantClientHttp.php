@@ -12,13 +12,19 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
  *
  * Connects to Rust-based Qdrant service via REST API.
  */
-final readonly class QdrantClientHttp implements QdrantClientInterface
+final class QdrantClientHttp implements QdrantClientInterface
 {
+    private const HEALTH_CHECK_CACHE_TTL_SUCCESS = 30; // Cache successful health check for 30 seconds
+    private const HEALTH_CHECK_CACHE_TTL_FAILURE = 60; // Cache failure for 1 minute (reasonable, not too long)
+
+    private static ?bool $healthCheckCache = null;
+    private static ?int $healthCheckCacheTime = null;
+
     public function __construct(
-        private HttpClientInterface $httpClient,
-        private string $baseUrl,
-        private LoggerInterface $logger,
-        private ?string $apiKey = null,
+        private readonly HttpClientInterface $httpClient,
+        private readonly string $baseUrl,
+        private readonly LoggerInterface $logger,
+        private readonly ?string $apiKey = null,
     ) {
     }
 
@@ -190,20 +196,118 @@ final readonly class QdrantClientHttp implements QdrantClientInterface
 
     public function healthCheck(): bool
     {
+        // If base URL is not configured, service is not available
+        if (empty($this->baseUrl) || 'http://' === $this->baseUrl || 'https://' === $this->baseUrl) {
+            return false;
+        }
+
+        // Check cache first (different TTL for success/failure)
+        $now = time();
+        if (null !== self::$healthCheckCache && null !== self::$healthCheckCacheTime) {
+            // Use longer cache for failures (1 min), shorter for success (30s)
+            $cacheTTL = self::$healthCheckCache
+                ? self::HEALTH_CHECK_CACHE_TTL_SUCCESS
+                : self::HEALTH_CHECK_CACHE_TTL_FAILURE;
+
+            if (($now - self::$healthCheckCacheTime) < $cacheTTL) {
+                return self::$healthCheckCache;
+            }
+        }
+
+        try {
+            $response = $this->httpClient->request('GET', "{$this->baseUrl}/health", [
+                'headers' => $this->getHeaders(),
+                'timeout' => 0.5, // 500ms total timeout
+                'max_duration' => 0.5, // Also limit total duration
+            ]);
+
+            if (200 !== $response->getStatusCode()) {
+                self::$healthCheckCache = false;
+                self::$healthCheckCacheTime = $now;
+
+                return false;
+            }
+
+            // Parse response to check status
+            $data = $response->toArray();
+            $isHealthy = 'healthy' === ($data['status'] ?? 'unhealthy');
+
+            self::$healthCheckCache = $isHealthy;
+            self::$healthCheckCacheTime = $now;
+
+            return $isHealthy;
+        } catch (\Throwable $e) {
+            // Service is down - cache this for 1 minute
+            $this->logger->warning('Qdrant health check failed - caching failure', [
+                'error' => $e->getMessage(),
+            ]);
+
+            self::$healthCheckCache = false;
+            self::$healthCheckCacheTime = $now;
+
+            return false;
+        }
+    }
+
+    public function getHealthDetails(): array
+    {
+        // If base URL is not configured, service is not available
+        if (empty($this->baseUrl) || 'http://' === $this->baseUrl || 'https://' === $this->baseUrl) {
+            return [
+                'status' => 'unavailable',
+                'message' => 'Service URL not configured',
+            ];
+        }
+
         try {
             $response = $this->httpClient->request('GET', "{$this->baseUrl}/health", [
                 'headers' => $this->getHeaders(),
                 'timeout' => 3,
             ]);
 
-            return 200 === $response->getStatusCode();
+            if (200 !== $response->getStatusCode()) {
+                return [
+                    'status' => 'error',
+                    'message' => 'Health check returned non-200 status',
+                    'http_code' => $response->getStatusCode(),
+                ];
+            }
+
+            $data = $response->toArray();
+
+            return [
+                'status' => $data['status'] ?? 'unknown',
+                'service' => $data['service'] ?? 'unknown',
+                'version' => $data['version'] ?? 'unknown',
+                'uptime_seconds' => $data['uptime_seconds'] ?? 0,
+                'qdrant' => $data['qdrant'] ?? [],
+                'metrics' => $data['metrics'] ?? [],
+            ];
         } catch (\Throwable $e) {
             $this->logger->warning('Qdrant health check failed', [
                 'error' => $e->getMessage(),
             ]);
 
+            return [
+                'status' => 'error',
+                'message' => $e->getMessage(),
+            ];
+        }
+    }
+
+    public function isAvailable(): bool
+    {
+        // Check if base URL is configured
+        if (empty($this->baseUrl) || 'http://' === $this->baseUrl || 'https://' === $this->baseUrl) {
+            $this->logger->debug('Qdrant service not configured', [
+                'base_url' => $this->baseUrl,
+            ]);
+
             return false;
         }
+
+        // Check if service is healthy
+        return $this->healthCheck();
     }
 
     public function getCollectionInfo(): array
@@ -224,6 +328,33 @@ final readonly class QdrantClientHttp implements QdrantClientInterface
             ]);
 
             return [];
+        }
+    }
+
+    public function getServiceInfo(): array
+    {
+        try {
+            $response = $this->httpClient->request('GET', "{$this->baseUrl}/info", [
+                'headers' => $this->getHeaders(),
+                'timeout' => 5,
+            ]);
+
+            if (200 !== $response->getStatusCode()) {
+                throw new \RuntimeException("Qdrant service info failed: {$response->getContent(false)}");
+            }
+
+            return $response->toArray();
+        } catch (\Throwable $e) {
+            $this->logger->error('Failed to get Qdrant service info', [
+                'error' => $e->getMessage(),
+            ]);
+
+            return [
+                'service' => 'synaplan-qdrant-service',
+                'version' => 'unknown',
+                'status' => 'error',
+                'error' => $e->getMessage(),
+            ];
         }
     }
 

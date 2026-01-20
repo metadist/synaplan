@@ -94,6 +94,29 @@
             </div>
 
             <div v-else class="space-y-3">
+              <!-- Show limit notice if not filtering -->
+              <div
+                v-if="
+                  !searchQuery && selectedCategory === 'all' && memoriesStore.memories.length > 10
+                "
+                class="surface-chip rounded-lg p-4 flex items-center justify-between"
+              >
+                <div class="flex items-center gap-3">
+                  <Icon icon="mdi:information" class="w-5 h-5 txt-brand" />
+                  <div>
+                    <p class="text-sm txt-primary font-medium">
+                      {{ $t('memories.showingRecent', { count: 10 }) }}
+                    </p>
+                    <p class="text-xs txt-secondary">
+                      {{ $t('memories.totalCount', { count: memoriesStore.memories.length }) }}
+                    </p>
+                  </div>
+                </div>
+                <button class="btn-primary px-4 py-2 rounded-lg text-sm" @click="viewAllMemories">
+                  {{ $t('memories.viewAll') }}
+                </button>
+              </div>
+
               <div
                 v-for="memory in filteredMemories"
                 :key="memory.id"
@@ -152,6 +175,7 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { useRouter } from 'vue-router'
 import { Icon } from '@iconify/vue'
 import { useMemoriesStore } from '@/stores/userMemories'
 import { useNotification } from '@/composables/useNotification'
@@ -172,6 +196,7 @@ const props = defineProps<Props>()
 const emit = defineEmits<Emits>()
 
 const { t } = useI18n()
+const router = useRouter()
 const memoriesStore = useMemoriesStore()
 const { success, error } = useNotification()
 const { confirm } = useDialog()
@@ -200,6 +225,11 @@ const filteredMemories = computed(() => {
         m.value.toLowerCase().includes(query) ||
         m.category.toLowerCase().includes(query)
     )
+  }
+
+  // Limit to 10 most recent memories (unless searching/filtering)
+  if (!searchQuery.value && selectedCategory.value === 'all') {
+    return memories.slice(0, 10)
   }
 
   return memories
@@ -292,6 +322,11 @@ function formatDate(date: Date | number | string): string {
     hour: '2-digit',
     minute: '2-digit',
   }).format(d)
+}
+
+function viewAllMemories() {
+  close()
+  router.push('/memories')
 }
 </script>
 

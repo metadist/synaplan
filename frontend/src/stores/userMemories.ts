@@ -84,13 +84,34 @@ export const useMemoriesStore = defineStore('memories', () => {
     error.value = null
 
     try {
-      memories.value = await getMemories(category)
+      // Add timeout to prevent hanging when service is down
+      // Very aggressive timeout - fail fast to not block page load!
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('Memory service timeout')), 1500) // 1.5s timeout
+      })
+
+      const fetchPromise = getMemories(category)
+
+      memories.value = (await Promise.race([fetchPromise, timeoutPromise])) as UserMemory[]
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : 'Failed to load memories'
       error.value = errorMsg
-      const { error: showError } = getNotifications()
-      const { t } = getI18n()
-      showError(t('memories.errors.loadFailed') || errorMsg)
+
+      // Silent fail if service unavailable - don't show notification on page load
+      if (
+        !errorMsg.includes('timeout') &&
+        !errorMsg.includes('503') &&
+        !errorMsg.includes('unavailable')
+      ) {
+        const { error: showError } = getNotifications()
+        const { t } = getI18n()
+        showError(t('memories.errors.loadFailed') || errorMsg)
+      } else {
+        console.warn('⚠️ Memory service unavailable (timeout or down), continuing without memories')
+      }
+
+      // Set empty array so page can continue
+      memories.value = []
     } finally {
       loading.value = false
     }

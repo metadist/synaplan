@@ -1418,6 +1418,15 @@
     "generatingFile": "Creating file...",
     "generatingFileTitle": "File is being generated",
     "generatingFileDesc": "AI is creating the requested file",
+    "analyzingMemories": "Analyzing memories...",
+    "analyzingMemoriesTitle": "Analyzing memories",
+    "analyzingMemoriesDesc": "AI is checking what's important and should be saved",
+    "savingMemories": "Saving memories...",
+    "savingMemoriesTitle": "Saving memories",
+    "savingMemoriesDesc": "New information is being saved",
+    "memoriesComplete": "Memories updated",
+    "memoriesCompleteTitle": "Memories updated",
+    "memoriesCompleteDesc": "Analysis complete",
     "topic": "Topic",
     "language": "Language",
     "modelId": "Model ID"
@@ -1540,6 +1549,7 @@
     "description": "Important information about you and your preferences that the AI can use for future conversations.",
     "empty": "No memories saved yet.",
     "emptyDesc": "The AI will automatically extract relevant information from your conversations and store it here. You can also manually add new memories.",
+    "loading": "Loading memories...",
     "allCategories": "All Categories",
     "selected": "{count} selected",
     "selectAll": "Select All",
@@ -1550,6 +1560,15 @@
     "value": "Value",
     "updated": "Updated",
     "createButton": "New Memory",
+    "unavailable": {
+      "title": "Memories are being set up",
+      "message": "The memories system is currently being configured and is temporarily unavailable. This may take a few minutes.",
+      "reason": "Possible reasons:",
+      "reason1": "Vector database service is starting",
+      "reason2": "AI embeddings are being reconfigured",
+      "reason3": "Existing memories are being migrated",
+      "retry": "Retry"
+    },
     "listView": {
       "title": "List View",
       "source": "Source",
@@ -1561,7 +1580,7 @@
       "sortByDate": "Sort by Date"
     },
     "graphView": {
-      "title": "Neural Graph"
+      "title": "Neural View"
     },
     "categories": {
       "all": "All Categories",
@@ -1618,12 +1637,29 @@
     "editSuccess": "Memory updated successfully",
     "editError": "Failed to update memory",
     "memorySaved": "New memory saved successfully!",
+    "showingRecent": "Showing the {count} most recent memories",
+    "totalCount": "{count} memories stored in total",
+    "viewAll": "View All",
+    "serviceDisabled": {
+      "title": "Memories Disabled",
+      "message": "The memory service is currently unavailable. Please contact the administrator.",
+      "badge": "Service unavailable",
+      "tooltip": "The memory service is disabled or unreachable. This memory cannot be displayed."
+    },
+    "referenceMissing": {
+      "badge": "Memory not found",
+      "tooltip": "This memory is no longer available. It may have been deleted, or the service could not load it."
+    },
     "toast": {
       "title": "New Memory Detected",
+      "titleCompact": "Memory",
       "discard": "Discard",
-        "edit": "Edit",
+      "discardCompact": "Dismiss",
+      "edit": "Edit",
+      "editCompact": "Edit",
       "discarded": "Memory discarded"
     },
+    "usedInResponse": "{count} memory used | {count} memories used",
     "context": {
       "title": "Active Memories",
       "count": "{count} memory loaded | {count} memories loaded"

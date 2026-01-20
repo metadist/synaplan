@@ -15,7 +15,7 @@ use Psr\Log\LoggerInterface;
  *
  * Uses AI-based extraction with prompts from database.
  */
-final readonly class MemoryExtractionService
+readonly class MemoryExtractionService
 {
     public function __construct(
         private AiFacade $aiFacade,
@@ -95,6 +95,11 @@ final readonly class MemoryExtractionService
             $existingMemoriesText .= "- If it's TRULY NEW → action: 'create'\n";
             $existingMemoriesText .= "- If it UPDATES existing info → action: 'update' (include memory_id)\n";
             $existingMemoriesText .= "- If ALREADY COVERED → don't include it\n";
+        } else {
+            // 🎯 CRITICAL: When NO memories exist, explicitly tell AI to create new ones!
+            $existingMemoriesText = "\n\n✨ NO EXISTING MEMORIES YET!\n";
+            $existingMemoriesText .= "This is a FRESH START. Extract ALL relevant information you find.\n";
+            $existingMemoriesText .= "Use action: 'create' for everything worth remembering.\n";
         }
 
         // AI call
@@ -154,9 +159,12 @@ PROMPT;
 
             $content = $response['content'] ?? '';
 
-            $this->logger->debug('MemoryExtractionService: AI response received', [
+            $this->logger->info('🤖 MemoryExtractionService: FULL AI response', [
                 'message_id' => $message->getId(),
-                'content_preview' => substr($content, 0, 200),
+                'model' => $this->getExtractionModel($message->getUserId()),
+                'full_content' => $content,
+                'user_message' => $message->getText(),
+                'existing_memories_count' => count($existingMemories),
             ]);
 
             // Parse JSON response (now includes actions)

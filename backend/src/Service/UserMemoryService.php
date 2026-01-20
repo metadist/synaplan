@@ -16,8 +16,10 @@ use Psr\Log\LoggerInterface;
  *
  * All memories stored in Qdrant microservice (no MariaDB).
  * Returns UserMemoryDTO for API responses.
+ *
+ * Note: Not final to allow mocking in tests
  */
-final readonly class UserMemoryService
+readonly class UserMemoryService
 {
     private const MAX_MEMORIES_PER_USER = 500;
 
@@ -28,6 +30,24 @@ final readonly class UserMemoryService
         private ModelConfigService $modelConfigService,
         private LoggerInterface $logger,
     ) {
+    }
+
+    /**
+     * Check if memory service is available.
+     * Returns false if Qdrant is not configured or not reachable.
+     */
+    public function isAvailable(): bool
+    {
+        return $this->qdrantClient->isAvailable();
+    }
+
+    /**
+     * Get the Qdrant client instance.
+     * Used by ConfigController to fetch service info.
+     */
+    public function getQdrantClient(): QdrantClientInterface
+    {
+        return $this->qdrantClient;
     }
 
     /**
@@ -232,9 +252,51 @@ final readonly class UserMemoryService
         }
 
         try {
-            // Create embedding for query
-            $queryVector = $this->aiFacade->embed($queryText, $userId);
+            $this->logger->info('🔍 searchRelevantMemories called', [
+                'userId' => $userId,
+                'queryText' => substr($queryText, 0, 100),
+                'limit' => $limit,
+                'minScore' => $minScore,
+            ]);
+
+            // Get embedding model (SAME as when storing!)
+            $embeddingModelId = $this->modelConfigService->getDefaultModel('VECTORIZE', $userId);
+            $modelName = null;
+            $provider = null;
+
+            if ($embeddingModelId) {
+                $model = $this->em->getRepository('App\Entity\Model')->find($embeddingModelId);
+                if ($model) {
+                    $modelName = $model->getProviderId();
+                    $provider = strtolower($model->getService());
+                }
+            }
+
+            $this->logger->info('🎯 Using embedding model for search', [
+                'userId' => $userId,
+                'modelId' => $embeddingModelId,
+                'modelName' => $modelName,
+                'provider' => $provider,
+            ]);
+
+            // Create embedding for query (with EXPLICIT model!)
+            $queryVector = $this->aiFacade->embed($queryText, $userId, array_filter([
+                'model' => $modelName,
+                'provider' => $provider,
+            ]));
+
+            $this->logger->info('📊 Embedding created', [
+                'userId' => $userId,
+                'vectorLength' => count($queryVector),
+                'isEmpty' => empty($queryVector),
+            ]);
+
             if (empty($queryVector)) {
+                $this->logger->warning('Empty vector returned from embedding', [
+                    'userId' => $userId,
+                    'queryText' => substr($queryText, 0, 100),
+                ]);
+
                 return [];
             }
 
@@ -246,6 +308,13 @@ final readonly class UserMemoryService
                 $limit,
                 $minScore
             );
+
+            $this->logger->info('🎯 Qdrant search results', [
+                'userId' => $userId,
+                'resultsCount' => count($results),
+                'limit' => $limit,
+                'minScore' => $minScore,
+            ]);
 
             // Convert to DTOs
             $memories = [];

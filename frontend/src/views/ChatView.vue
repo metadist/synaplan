@@ -35,9 +35,6 @@
         @scroll="handleScroll"
       >
         <div class="max-w-4xl mx-auto py-6 px-4">
-          <!-- Memory Context Panel -->
-          <MemoryContextPanel :memories="loadedMemories" />
-
           <!-- Loading indicator for infinite scroll -->
           <div
             v-if="historyStore.isLoadingMessages"
@@ -102,6 +99,7 @@
               :search-results="message.searchResults"
               :ai-models="message.aiModels"
               :web-search="message.webSearch"
+              :memory-ids="message.memoryIds"
               :status="message.status"
               :error-type="message.errorType"
               :error-data="message.errorData"
@@ -170,7 +168,6 @@ import { normalizeMediaUrl } from '@/utils/urlHelper'
 import { httpClient } from '@/services/api/httpClient'
 import type { UserMemory } from '@/services/api/userMemoriesApi'
 import MemoryToast from '@/components/MemoryToast.vue'
-import MemoryContextPanel from '@/components/MemoryContextPanel.vue'
 
 const { t } = useI18n()
 const router = useRouter()
@@ -188,7 +185,6 @@ const modelsStore = useModelsStore()
 const aiConfigStore = useAiConfigStore()
 const authStore = useAuthStore()
 const memoriesStore = useMemoriesStore()
-const { success } = useNotification()
 let streamingAbortController: AbortController | null = null
 let stopStreamingFn: (() => void) | null = null // Store EventSource close function
 let currentTrackId: number | undefined = undefined // Store current trackId for stop request
@@ -201,9 +197,6 @@ const processingMetadata = ref<any>({})
 // Memory suggestion toasts
 const activeMemoryToasts = ref<Array<UserMemory & { toastId: number }>>([])
 let memoryToastIdCounter = 0
-
-// Loaded memories for current context (shown in panel)
-const loadedMemories = ref<UserMemory[]>([])
 
 // Use mock data in development or when API is not available
 const useMockData = import.meta.env.VITE_USE_MOCK_DATA === 'true' || false
@@ -219,8 +212,14 @@ const isStreaming = computed(() => {
 
 // Init on mount
 onMounted(async () => {
-  // Load AI models config for Again functionality
+  // Load AI models config for Again functionality (await these - they're fast)
   await Promise.all([aiConfigStore.loadModels(), aiConfigStore.loadDefaults()])
+
+  // Start loading memories in background (don't await - non-blocking!)
+  // Memories button will be disabled until loaded
+  memoriesStore.fetchMemories().catch((err) => {
+    console.warn('⚠️ Failed to load memories in background:', err)
+  })
 
   // Load chats first
   await chatsStore.loadChats()
@@ -678,6 +677,28 @@ const streamAIResponse = async (
               // Generic routing message, suppress spam
               console.log('Processing: Routing to handler')
             }
+          } else if (data.status === 'analyzing_memories') {
+            // 🎯 Memory analysis started
+            console.log('🧠 Analyzing memories...')
+            processingStatus.value = 'analyzing_memories'
+            processingMetadata.value = { customMessage: data.message || undefined }
+          } else if (data.status === 'saving_memories') {
+            // 🎯 Saving memories
+            console.log('💾 Saving memories:', data.message)
+            processingStatus.value = 'saving_memories'
+            processingMetadata.value = { customMessage: data.message || undefined }
+          } else if (data.status === 'memories_complete') {
+            // 🎯 Memory analysis complete
+            console.log('✅ Memories complete:', data.message)
+            processingStatus.value = 'memories_complete'
+            processingMetadata.value = { customMessage: data.message || undefined }
+            // Clear processing status after a short delay
+            setTimeout(() => {
+              if (processingStatus.value === 'memories_complete') {
+                processingStatus.value = ''
+                processingMetadata.value = {}
+              }
+            }, 2000)
           } else if (data.status === 'status') {
             // Generic status message
             console.log('Status:', data.message)
@@ -877,12 +898,9 @@ const streamAIResponse = async (
 
             activeMemoryToasts.value.push(toastMemory)
           } else if (data.status === 'memories_loaded') {
-            // Handle loaded memories (shown in context panel)
+            // Memories loaded event - we now show them per message, not globally
             console.log('🧠 Memories loaded:', data)
-            // Memories are in metadata.memories
-            if (data.metadata && data.metadata.memories && Array.isArray(data.metadata.memories)) {
-              loadedMemories.value = data.metadata.memories
-            }
+            // No action needed - memories will be attached to the response message
           } else if (data.status === 'complete') {
             console.log('✅ Complete event received:', data)
 
@@ -987,6 +1005,13 @@ const streamAIResponse = async (
                   query: data.searchResults[0]?.query || '',
                   resultsCount: data.searchResults.length,
                 }
+              }
+
+              // Store memory IDs if provided (full memories loaded from store)
+              if (data.memoryIds && Array.isArray(data.memoryIds) && data.memoryIds.length > 0) {
+                console.log('🧠 Setting memory IDs used in response:', data.memoryIds.length, 'IDs')
+                message.memoryIds = data.memoryIds
+                console.log('📝 Updated message with memory IDs')
               }
 
               // Update provider and model from backend metadata

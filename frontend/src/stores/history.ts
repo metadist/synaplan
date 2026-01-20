@@ -110,10 +110,12 @@ export interface Message {
     resultsCount?: number
   } | null // Web search metadata
   tool?: {
-    command: string // The command name (e.g., 'search', 'pic', 'vid')
-    label: string // Display label (e.g., 'Web Search', 'Image Generation', 'Video Generation')
-    icon: string // Icon identifier
-  } | null // Tool/command metadata
+    icon: string
+    label: string
+  } | null // Tool metadata (e.g., web search, file generation)
+  memoryIds?: number[] | null // IDs of memories used (resolved from memoriesStore)
+  processingStatus?: string
+  processingMetadata?: any
 }
 
 /**

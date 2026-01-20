@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { useAuth } from '@/composables/useAuth'
+import { useConfigStore } from '@/stores/config'
 import { authReady } from '@/stores/auth'
 import { i18n } from '@/i18n'
 import LoadingView from '@/views/LoadingView.vue'
@@ -143,6 +144,16 @@ const router = createRouter({
       name: 'memories',
       component: () => import('../views/MemoriesView.vue'),
       meta: { requiresAuth: true, titleKey: 'pageTitles.memories' },
+      beforeEnter: (_to, _from, next) => {
+        // Check if memory service is available
+        const configStore = useConfigStore()
+        if (configStore.features?.memoryService === false) {
+          // Memory service not available - redirect to chat
+          next({ name: 'chat' })
+        } else {
+          next()
+        }
+      },
     },
     {
       path: '/rag',

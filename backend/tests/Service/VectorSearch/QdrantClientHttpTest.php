@@ -18,6 +18,21 @@ use Symfony\Component\HttpClient\Response\MockResponse;
  */
 final class QdrantClientHttpTest extends TestCase
 {
+    protected function tearDown(): void
+    {
+        // Clear static cache between tests to ensure test isolation
+        $reflection = new \ReflectionClass(QdrantClientHttp::class);
+        $cacheProperty = $reflection->getProperty('healthCheckCache');
+        $cacheProperty->setAccessible(true);
+        $cacheProperty->setValue(null, null);
+
+        $timeProperty = $reflection->getProperty('healthCheckCacheTime');
+        $timeProperty->setAccessible(true);
+        $timeProperty->setValue(null, null);
+
+        parent::tearDown();
+    }
+
     private function createClient(array $responses): QdrantClientHttp
     {
         $mockClient = new MockHttpClient($responses);

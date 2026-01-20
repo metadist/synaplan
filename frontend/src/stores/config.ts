@@ -8,6 +8,12 @@
  */
 
 import { getConfig, getConfigSync, getApiBaseUrl, reloadConfig } from '@/services/api/httpClient'
+import { checkMemoryServiceAvailability } from '@/services/api/configApi'
+import { ref } from 'vue'
+
+// Async state for memory service availability
+const memoryServiceAvailable = ref<boolean | null>(null)
+const memoryServiceLoading = ref(false)
 
 /**
  * Load runtime configuration from backend API
@@ -52,7 +58,19 @@ const config = {
    */
   features: {
     get help(): boolean {
-      return getConfigSync().features?.help ?? false
+      const features = getConfigSync().features
+      return features?.help === true
+    },
+    get memoryService(): boolean {
+      // Return cached async check if available, otherwise fall back to config flag
+      if (memoryServiceAvailable.value !== null) {
+        return memoryServiceAvailable.value
+      }
+      const features = getConfigSync().features
+      return features?.memoryService === true
+    },
+    get memoryServiceLoading(): boolean {
+      return memoryServiceLoading.value
     },
   },
 
@@ -93,6 +111,32 @@ const config = {
    */
   async init(): Promise<void> {
     await loadRuntimeConfig()
+
+    // Start async memory service check (don't await - non-blocking!)
+    this.checkMemoryServiceAsync()
+  },
+
+  /**
+   * Check memory service availability asynchronously (non-blocking)
+   * This runs in background and updates memoryServiceAvailable when done
+   */
+  async checkMemoryServiceAsync(): Promise<void> {
+    if (!getConfigSync().features?.memoryService) {
+      // Not configured at all - no need to check
+      memoryServiceAvailable.value = false
+      return
+    }
+
+    memoryServiceLoading.value = true
+    try {
+      const result = await checkMemoryServiceAvailability()
+      memoryServiceAvailable.value = result.available
+    } catch (err) {
+      console.warn('⚠️ Memory service check failed:', err)
+      memoryServiceAvailable.value = false
+    } finally {
+      memoryServiceLoading.value = false
+    }
   },
 
   /**
@@ -101,6 +145,8 @@ const config = {
    */
   async reload(): Promise<void> {
     await reloadConfig()
+    // Re-check memory service after reload
+    this.checkMemoryServiceAsync()
   },
 
   /**

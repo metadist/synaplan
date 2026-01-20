@@ -39,13 +39,17 @@
           <span>{{ $t('nav.profile') }}</span>
         </button>
         <button
+          v-if="isMemoryServiceAvailable"
           role="menuitem"
           class="dropdown-item"
+          :class="{ 'opacity-50 cursor-wait': isMemoriesLoading }"
+          :disabled="isMemoriesLoading"
           data-testid="btn-user-memories"
           @click="handleOpenMemories"
         >
           <Icon icon="mdi:brain" class="w-5 h-5" />
           <span>{{ $t('pageTitles.memories') }}</span>
+          <Icon v-if="isMemoriesLoading" icon="mdi:loading" class="w-4 h-4 animate-spin ml-auto" />
         </button>
         <button
           role="menuitem"
@@ -71,6 +75,8 @@ import {
 } from '@heroicons/vue/24/outline'
 import { Icon } from '@iconify/vue'
 import { useAuth } from '@/composables/useAuth'
+import { useConfigStore } from '@/stores/config'
+import { useMemoriesStore } from '@/stores/userMemories'
 
 interface Props {
   email?: string
@@ -90,7 +96,16 @@ const emit = defineEmits<Emits>()
 
 const router = useRouter()
 const { logout } = useAuth()
+const configStore = useConfigStore()
+const memoriesStore = useMemoriesStore()
 const isOpen = ref(false)
+
+// Check if memory service is available
+const isMemoryServiceAvailable = computed(() => configStore.features?.memoryService ?? false)
+const isMemoriesLoading = computed(() => {
+  // Loading if either config store is checking service OR memories store is loading
+  return configStore.features?.memoryServiceLoading || memoriesStore.loading
+})
 
 const initials = computed(() => {
   const parts = props.email.split('@')[0].split('.')
