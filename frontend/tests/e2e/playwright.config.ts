@@ -18,7 +18,7 @@ export default defineConfig({
   // Test directory (relative to this config file)
   testDir: './tests',
 
-  // Retries and timeout
+  // Retries, timeout, and pacing
   retries: 0,
   timeout: 60_000,
 
@@ -29,6 +29,9 @@ export default defineConfig({
     screenshot: 'only-on-failure',
     video: 'retain-on-failure',
     trace: 'retain-on-failure',
+    // launchOptions: {
+    //   slowMo: 500,
+    // },
   },
 
   // Reporters
@@ -57,6 +60,5 @@ export default defineConfig({
     },
   ],
 
-  // Default filter: only run @smoke tests
   // grep: /@smoke/,
 })
