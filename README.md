@@ -404,6 +404,13 @@ docker compose exec backend composer require <package>
 docker compose exec frontend npm install <package>
 ```
 
+## ✅ Tests
+
+For details on running the Playwright E2E tests (browser-based UI tests), see the dedicated README in the frontend:
+
+- `frontend/tests/e2e/README.md`
+
+
 ## 🤖 AI Models
 
 - **bge-m3 (Ollama)** – Always pulled during install (required for RAG/vector search). This is a small embedding model (~1.5GB).
