@@ -323,11 +323,16 @@ class ChatHandlerTest extends TestCase
             ->method('chatStream')
             ->with(
                 $this->anything(),
-                $streamCallback,
+                $this->callback(static fn ($cb) => is_callable($cb)),
                 1,
                 $this->anything()
             )
-            ->willReturn(['provider' => 'test', 'model' => 'test']);
+            ->willReturnCallback(static function ($messages, $cb, $userId, $options) {
+                // Simulate one streamed chunk coming from the provider.
+                $cb('hello');
+
+                return ['provider' => 'test', 'model' => 'test'];
+            });
 
         $this->handler->handleStream(
             $message,
@@ -335,6 +340,8 @@ class ChatHandlerTest extends TestCase
             ['topic' => 'CHAT', 'language' => 'en'],
             $streamCallback
         );
+
+        self::assertNotEmpty($chunks);
     }
 
     public function testHandleStreamLoadsPromptMetadataForTaskPrompt(): void

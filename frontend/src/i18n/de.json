@@ -88,11 +88,6 @@
       "public": "Öffentlich"
     }
   },
-  "chatMessage": {
-    "again": "Nochmal",
-    "againWith": "Nochmal mit",
-    "regenerateWith": "Regenerieren mit"
-  },
   "admin": {
     "title": "Admin-Panel",
     "description": "Systemverwaltung und Konfiguration",
@@ -210,7 +205,6 @@
     "provider": "Anbieter",
     "model": "Modell",
     "configureModel": "KI-Modell konfigurieren",
-    "attach": "Anhängen",
     "uploadFile": "Hochladen",
     "deepResearch": "Tiefenrecherche",
     "docs": "Dokumente",
@@ -419,6 +413,13 @@
       "timezoneHint": "Deine lokale Zeitzone",
       "invoiceEmail": "Rechnungs-E-Mail",
       "invoiceEmailPlaceholder": "Alternative E-Mail für Rechnungen (leer lassen um Haupt-E-Mail zu verwenden)"
+    },
+    "memories": {
+      "title": "Erinnerungen",
+      "subtitle": "Steuere, ob Synaplan deine Erinnerungen zur Personalisierung nutzen und automatisch aktualisieren darf.",
+      "toggleLabel": "Erinnerungen für mein Konto aktivieren",
+      "enabledHint": "Aktiv: Die KI kann Erinnerungen nutzen und anhand von Gesprächen aktualisieren.",
+      "disabledHint": "Deaktiviert: Die KI nutzt keine Erinnerungen und aktualisiert sie nicht automatisch. Du kannst es jederzeit wieder aktivieren."
     },
     "changePassword": {
       "title": "Passwort ändern",
@@ -1455,13 +1456,20 @@
     "allCategories": "Alle Kategorien",
     "selected": "{count} ausgewählt",
     "selectAll": "Alle auswählen",
-    "search": "Erinnerungen durchsuchen...",
+    "search": {
+      "placeholder": "Erinnerungen durchsuchen..."
+    },
     "noResults": "Keine Erinnerungen gefunden",
     "category": "Kategorie",
     "key": "Schlüssel",
     "value": "Wert",
     "updated": "Aktualisiert",
     "createButton": "Neue Erinnerung",
+    "userDisabled": {
+      "title": "Erinnerungen sind für dein Konto deaktiviert",
+      "message": "Die KI nutzt keine Erinnerungen und aktualisiert sie nicht automatisch. Du kannst das jederzeit in den Profileinstellungen aktivieren.",
+      "enable": "Erinnerungen aktivieren"
+    },
     "unavailable": {
       "title": "Erinnerungen werden eingerichtet",
       "message": "Das Erinnerungs-System wird gerade eingerichtet und ist vorübergehend nicht verfügbar. Dies kann einige Minuten dauern.",
@@ -1583,19 +1591,5 @@
       "filterByCategory": "Nach Kategorie filtern",
       "filterByLetter": "Nach Anfangsbuchstabe filtern"
     }
-  },
-  "error": {
-    "title": "Etwas ist schiefgelaufen",
-    "description": "Wir sind auf einen unerwarteten Fehler gestoßen. Keine Sorge, unser Team wurde benachrichtigt und arbeitet daran.",
-    "details": "Fehlerdetails",
-    "statusCode": "Statuscode",
-    "showStack": "Stack-Trace anzeigen",
-    "hideStack": "Stack-Trace ausblenden",
-    "reload": "Seite neu laden",
-    "goHome": "Zur Startseite",
-    "needHelp": "Brauchst du Hilfe?",
-    "contactSupport": "Wenn dieses Problem weiterhin besteht, kontaktiere bitte unser Support-Team mit den Fehlerdetails unten.",
-    "copyError": "Fehlerinfo kopieren",
-    "copied": "Kopiert!"
   }
 }

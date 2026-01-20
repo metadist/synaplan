@@ -362,7 +362,8 @@ function createNodes() {
   const isMobile = canvasRef.value!.offsetWidth < 768
   const nodeBaseRadius = isMobile ? 12 : 8
   const radiusVariance = isMobile ? 6 : 4
-  const hubRadius = isMobile ? 26 : 20
+  // Hub is the "main bubble" for category/key. Make it a bit larger for readability.
+  const hubRadius = isMobile ? 34 : 28
 
   console.log('🎯 Canvas dimensions:', {
     width: canvasRef.value!.offsetWidth,
@@ -427,7 +428,8 @@ function createNodes() {
     const sorted = [...groupMemories].sort((a, b) => a.key.localeCompare(b.key))
 
     // Place memory nodes around hub
-    const ringRadius = isMobile ? 85 : 70
+    // Keep memory nodes further away now that hub is larger.
+    const ringRadius = isMobile ? 95 : 80
     sorted.forEach((memory, idx) => {
       const memAngle =
         sorted.length <= 1 ? angle : angle + (idx / sorted.length - 0.5) * (Math.PI / 1.8)
@@ -483,16 +485,18 @@ function createEdges() {
 function animate() {
   if (!ctx || !canvasRef.value) return
 
+  const context = ctx
   const canvas = canvasRef.value
   const width = canvas.offsetWidth
   const height = canvas.offsetHeight
+  const isMobile = width < 768
 
   // Detect dark mode
   const isDarkMode = document.documentElement.classList.contains('dark')
 
   // Clear canvas with theme-aware background
-  ctx.fillStyle = isDarkMode ? '#0f172a' : '#f8fafc' // dark slate vs light slate
-  ctx.fillRect(0, 0, width, height)
+  context.fillStyle = isDarkMode ? '#0f172a' : '#f8fafc' // dark slate vs light slate
+  context.fillRect(0, 0, width, height)
 
   // Apply physics
   if (physicsEnabled.value) {
@@ -500,13 +504,13 @@ function animate() {
   }
 
   // Draw edges with theme-aware colors
-  ctx.strokeStyle = isDarkMode ? 'rgba(168, 85, 247, 0.3)' : 'rgba(168, 85, 247, 0.2)' // purple
-  ctx.lineWidth = 2
+  context.strokeStyle = isDarkMode ? 'rgba(168, 85, 247, 0.3)' : 'rgba(168, 85, 247, 0.2)' // purple
+  context.lineWidth = 2
   for (const edge of edges.value) {
-    ctx.beginPath()
-    ctx.moveTo(edge.source.x, edge.source.y)
-    ctx.lineTo(edge.target.x, edge.target.y)
-    ctx.stroke()
+    context.beginPath()
+    context.moveTo(edge.source.x, edge.source.y)
+    context.lineTo(edge.target.x, edge.target.y)
+    context.stroke()
   }
 
   // Draw nodes
@@ -519,45 +523,74 @@ function animate() {
     }
 
     // Glow effect
-    const gradient = ctx.createRadialGradient(node.x, node.y, 0, node.x, node.y, node.radius * 2)
+    const gradient = context.createRadialGradient(
+      node.x,
+      node.y,
+      0,
+      node.x,
+      node.y,
+      node.radius * 2
+    )
     gradient.addColorStop(0, `${node.color}cc`) // More opaque
     gradient.addColorStop(1, `${node.color}00`)
-    ctx.fillStyle = gradient
-    ctx.beginPath()
-    ctx.arc(node.x, node.y, node.radius * 2, 0, Math.PI * 2)
-    ctx.fill()
+    context.fillStyle = gradient
+    context.beginPath()
+    context.arc(node.x, node.y, node.radius * 2, 0, Math.PI * 2)
+    context.fill()
 
     // Node circle
-    ctx.fillStyle = node.color
-    ctx.beginPath()
-    ctx.arc(node.x, node.y, node.radius, 0, Math.PI * 2)
-    ctx.fill()
+    context.fillStyle = node.color
+    context.beginPath()
+    context.arc(node.x, node.y, node.radius, 0, Math.PI * 2)
+    context.fill()
 
     // Border with theme-aware color
-    ctx.strokeStyle = isDarkMode ? 'rgba(255, 255, 255, 0.3)' : 'rgba(0, 0, 0, 0.2)'
-    ctx.lineWidth = node.type === 'hub' ? 2 : 1
-    ctx.stroke()
+    context.strokeStyle = isDarkMode ? 'rgba(255, 255, 255, 0.3)' : 'rgba(0, 0, 0, 0.2)'
+    context.lineWidth = node.type === 'hub' ? 2 : 1
+    context.stroke()
 
     drawnNodes++
 
     // Highlight selected
     if (node.type === 'memory' && selectedMemory.value?.id === node.id) {
-      ctx.strokeStyle = isDarkMode ? '#ffffff' : '#000000'
-      ctx.lineWidth = 3
-      ctx.beginPath()
-      ctx.arc(node.x, node.y, node.radius + 4, 0, Math.PI * 2)
-      ctx.stroke()
+      context.strokeStyle = isDarkMode ? '#ffffff' : '#000000'
+      context.lineWidth = 3
+      context.beginPath()
+      context.arc(node.x, node.y, node.radius + 4, 0, Math.PI * 2)
+      context.stroke()
     }
 
     // Hub label (always)
     if (node.type === 'hub') {
-      ctx.fillStyle = isDarkMode ? '#ffffff' : '#0f172a'
-      ctx.font = '700 12px sans-serif'
-      ctx.textAlign = 'center'
-      ctx.fillText(node.label, node.x, node.y + 4)
-      ctx.font = '600 10px sans-serif'
-      ctx.fillStyle = isDarkMode ? 'rgba(255,255,255,0.75)' : 'rgba(15,23,42,0.65)'
-      ctx.fillText(`${node.count}`, node.x, node.y + 18)
+      const fontStack = 'ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, sans-serif'
+
+      function truncateToWidth(text: string, maxWidth: number) {
+        if (context.measureText(text).width <= maxWidth) return text
+        const ellipsis = '…'
+        let lo = 0
+        let hi = text.length
+        while (lo < hi) {
+          const mid = Math.ceil((lo + hi) / 2)
+          const candidate = text.slice(0, mid) + ellipsis
+          if (context.measureText(candidate).width <= maxWidth) lo = mid
+          else hi = mid - 1
+        }
+        return text.slice(0, lo) + ellipsis
+      }
+
+      context.textAlign = 'center'
+      context.textBaseline = 'alphabetic'
+
+      // Smaller, cleaner label within hub bubble
+      context.fillStyle = isDarkMode ? '#ffffff' : '#0f172a'
+      context.font = `600 ${isMobile ? 11 : 10}px ${fontStack}`
+      const labelMaxWidth = node.radius * 1.45
+      context.fillText(truncateToWidth(node.label, labelMaxWidth), node.x, node.y + 3)
+
+      // Count below label, subtle
+      context.font = `600 ${isMobile ? 10 : 9}px ${fontStack}`
+      context.fillStyle = isDarkMode ? 'rgba(255,255,255,0.7)' : 'rgba(15,23,42,0.6)'
+      context.fillText(`${node.count}`, node.x, node.y + Math.max(16, node.radius * 0.62))
     }
 
     // Memory label on hover with theme-aware color
@@ -566,10 +599,10 @@ function animate() {
       const dy = lastMouseY - node.y
       const dist = Math.sqrt(dx * dx + dy * dy)
       if (dist < node.radius + 10) {
-        ctx.fillStyle = isDarkMode ? '#ffffff' : '#0f172a'
-        ctx.font = 'bold 14px sans-serif'
-        ctx.textAlign = 'center'
-        ctx.fillText(node.memory.key, node.x, node.y - node.radius - 12)
+        context.fillStyle = isDarkMode ? '#ffffff' : '#0f172a'
+        context.font = 'bold 14px sans-serif'
+        context.textAlign = 'center'
+        context.fillText(node.memory.key, node.x, node.y - node.radius - 12)
       }
     }
   }

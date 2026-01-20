@@ -364,7 +364,15 @@ class ChatHandler implements MessageHandlerInterface
         $memoriesContext = '';
         $loadedMemories = [];
 
-        if ($this->memoryService->isAvailable()) {
+        // Load user entity (Message only has userId, not User object)
+        $user = $this->em->getRepository(User::class)->find($message->getUserId());
+        $memoriesEnabledForUser = $user?->isMemoriesEnabled() ?? true;
+
+        if (!$memoriesEnabledForUser) {
+            $this->logger->debug('ChatHandler: Memories disabled by user setting, skipping memories', [
+                'user_id' => $message->getUserId(),
+            ]);
+        } elseif ($this->memoryService->isAvailable()) {
             try {
                 $this->logger->debug('ChatHandler: Loading user memories', [
                     'user_id' => $message->getUserId(),
@@ -1131,10 +1139,30 @@ class ChatHandler implements MessageHandlerInterface
         ?callable $progressCallback = null,
     ): void {
         try {
+            $userId = $message->getUserId();
+
+            // Load user entity (Message only has userId, not User object)
+            $user = $this->em->getRepository(User::class)->find($userId);
+            if (!$user) {
+                $this->logger->warning('ChatHandler: User not found for memory extraction', [
+                    'user_id' => $userId,
+                    'message_id' => $message->getId(),
+                ]);
+
+                return;
+            }
+
+            if (!$user->isMemoriesEnabled()) {
+                $this->logger->info('ChatHandler: Skipping memory extraction (disabled by user)', [
+                    'user_id' => $userId,
+                    'message_id' => $message->getId(),
+                ]);
+
+                return;
+            }
+
             // 🎯 NOTIFY: Starting memory analysis
             $this->notify($progressCallback, 'analyzing_memories', 'Analyzing memories...');
-
-            $userId = $message->getUserId();
 
             $this->logger->info('🧠 ChatHandler: Starting memory extraction', [
                 'message_id' => $message->getId(),
@@ -1177,17 +1205,6 @@ class ChatHandler implements MessageHandlerInterface
 
             // Process memory actions (create/update)
             $userId = $message->getUserId();
-
-            // Load user entity (Message only has userId, not User object)
-            $user = $this->em->getRepository(User::class)->find($userId);
-            if (!$user) {
-                $this->logger->warning('ChatHandler: User not found for memory extraction', [
-                    'user_id' => $userId,
-                    'message_id' => $message->getId(),
-                ]);
-
-                return;
-            }
 
             $savedMemories = [];
             foreach ($memories as $memoryAction) {

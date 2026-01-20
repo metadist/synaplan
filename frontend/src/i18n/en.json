@@ -1322,6 +1322,13 @@
       "invoiceEmail": "Invoice Email",
       "invoiceEmailPlaceholder": "Alternative email for invoices (leave empty to use main email)"
     },
+    "memories": {
+      "title": "Memories",
+      "subtitle": "Control whether Synaplan should use and automatically update your memories for personalization.",
+      "toggleLabel": "Enable memories for my account",
+      "enabledHint": "Enabled: the AI may use and update your memories based on conversations.",
+      "disabledHint": "Disabled: the AI will not use or auto-update memories. You can re-enable at any time."
+    },
     "changePassword": {
       "title": "Change Password",
       "subtitle": "Leave empty to keep current password",
@@ -1553,13 +1560,20 @@
     "allCategories": "All Categories",
     "selected": "{count} selected",
     "selectAll": "Select All",
-    "search": "Search memories...",
+    "search": {
+      "placeholder": "Search memories..."
+    },
     "noResults": "No memories found",
     "category": "Category",
     "key": "Key",
     "value": "Value",
     "updated": "Updated",
     "createButton": "New Memory",
+    "userDisabled": {
+      "title": "Memories are disabled for your account",
+      "message": "The AI will not use or automatically update memories. You can enable this in your profile settings at any time.",
+      "enable": "Enable memories"
+    },
     "unavailable": {
       "title": "Memories are being set up",
       "message": "The memories system is currently being configured and is temporarily unavailable. This may take a few minutes.",

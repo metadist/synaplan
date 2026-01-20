@@ -1,6 +1,6 @@
 <template>
   <MainLayout>
-    <div class="min-h-screen bg-chat p-2 md:p-4 lg:p-8">
+    <div class="min-h-screen bg-chat p-2 md:p-4 lg:p-8 relative">
       <div class="max-w-7xl mx-auto h-full flex flex-col">
         <!-- Header -->
         <div
@@ -110,6 +110,57 @@
           />
         </div>
       </div>
+
+      <!-- Fullscreen Overlay wenn Memories für User deaktiviert sind -->
+      <Teleport to="body">
+        <div
+          v-if="!memoriesEnabledForUser"
+          class="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/70 backdrop-blur-md"
+          @click.self="router.push('/profile')"
+        >
+          <div
+            class="surface-elevated max-w-md w-full p-8 rounded-2xl shadow-2xl animate-in fade-in zoom-in-95 duration-300"
+          >
+            <!-- Icon Header -->
+            <div class="flex justify-center mb-6">
+              <div
+                class="w-20 h-20 rounded-full flex items-center justify-center"
+                style="background: linear-gradient(135deg, #f97316 0%, #fb923c 100%)"
+              >
+                <Icon icon="mdi:lock-alert" class="w-12 h-12 text-white" />
+              </div>
+            </div>
+
+            <!-- Title & Message -->
+            <div class="text-center mb-6">
+              <h2 class="text-2xl font-bold txt-primary mb-3">
+                {{ $t('memories.userDisabled.title') }}
+              </h2>
+              <p class="txt-secondary text-base leading-relaxed">
+                {{ $t('memories.userDisabled.message') }}
+              </p>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="flex flex-col gap-3">
+              <button
+                class="w-full btn-primary py-3.5 rounded-xl font-semibold text-base flex items-center justify-center gap-2 shadow-lg hover:shadow-xl transition-shadow"
+                @click="enableMemoriesForUser"
+              >
+                <Icon icon="mdi:check-circle" class="w-6 h-6" />
+                {{ $t('memories.userDisabled.enable') }}
+              </button>
+              <button
+                class="w-full surface-chip py-3 rounded-xl font-medium txt-secondary hover:txt-primary transition-colors flex items-center justify-center gap-2"
+                @click="router.push('/profile?highlight=memories')"
+              >
+                <Icon icon="mdi:cog" class="w-5 h-5" />
+                {{ $t('pageTitles.profile') }}
+              </button>
+            </div>
+          </div>
+        </div>
+      </Teleport>
     </div>
 
     <!-- Edit/Create Dialog -->
@@ -124,7 +175,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Icon } from '@iconify/vue'
 import { useI18n } from 'vue-i18n'
@@ -137,6 +188,8 @@ import { useMemoriesStore } from '@/stores/userMemories'
 import { useNotification } from '@/composables/useNotification'
 import { useDialog } from '@/composables/useDialog'
 import { getCategories } from '@/services/api/userMemoriesApi'
+import { profileApi } from '@/services/api'
+import { useAuthStore } from '@/stores/auth'
 import type {
   UserMemory,
   CreateMemoryRequest,
@@ -146,6 +199,7 @@ import type {
 const { t } = useI18n()
 const route = useRoute()
 const router = useRouter()
+const authStore = useAuthStore()
 const memoriesStore = useMemoriesStore()
 const { success, error } = useNotification()
 const { confirm } = useDialog()
@@ -156,6 +210,8 @@ const isFormDialogOpen = ref(false)
 const currentMemoryToEdit = ref<UserMemory | null>(null)
 const isServiceUnavailable = ref(false)
 const selectedGraphMemory = ref<UserMemory | null>(null)
+
+const memoriesEnabledForUser = computed(() => authStore.user?.memoriesEnabled !== false)
 
 const graphCategoryColors: Record<string, string> = {
   preferences: '#3b82f6',
@@ -309,5 +365,15 @@ function handleFormDialogClose() {
 async function loadMemories() {
   await memoriesStore.fetchMemories()
   availableCategories.value = await getCategories()
+}
+
+async function enableMemoriesForUser() {
+  try {
+    await profileApi.updateProfile({ memoriesEnabled: true })
+    await authStore.refreshUser()
+    success(t('memories.userDisabled.enable'))
+  } catch (err: any) {
+    error(err.message || 'Failed to enable memories')
+  }
 }
 </script>

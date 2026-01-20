@@ -42,14 +42,26 @@
           v-if="isMemoryServiceAvailable"
           role="menuitem"
           class="dropdown-item"
-          :class="{ 'opacity-50 cursor-wait': isMemoriesLoading }"
+          :class="{
+            'opacity-50 cursor-wait': isMemoriesLoading,
+            'opacity-70': !memoriesEnabledForUser,
+          }"
           :disabled="isMemoriesLoading"
           data-testid="btn-user-memories"
           @click="handleOpenMemories"
         >
           <Icon icon="mdi:brain" class="w-5 h-5" />
           <span>{{ $t('pageTitles.memories') }}</span>
-          <Icon v-if="isMemoriesLoading" icon="mdi:loading" class="w-4 h-4 animate-spin ml-auto" />
+          <Icon
+            v-if="!memoriesEnabledForUser"
+            icon="mdi:lock"
+            class="w-4 h-4 ml-auto text-orange-500 dark:text-orange-400"
+          />
+          <Icon
+            v-else-if="isMemoriesLoading"
+            icon="mdi:loading"
+            class="w-4 h-4 animate-spin ml-auto"
+          />
         </button>
         <button
           role="menuitem"
@@ -75,6 +87,7 @@ import {
 } from '@heroicons/vue/24/outline'
 import { Icon } from '@iconify/vue'
 import { useAuth } from '@/composables/useAuth'
+import { useAuthStore } from '@/stores/auth'
 import { useConfigStore } from '@/stores/config'
 import { useMemoriesStore } from '@/stores/userMemories'
 
@@ -96,6 +109,7 @@ const emit = defineEmits<Emits>()
 
 const router = useRouter()
 const { logout } = useAuth()
+const authStore = useAuthStore()
 const configStore = useConfigStore()
 const memoriesStore = useMemoriesStore()
 const isOpen = ref(false)
@@ -105,6 +119,11 @@ const isMemoryServiceAvailable = computed(() => configStore.features?.memoryServ
 const isMemoriesLoading = computed(() => {
   // Loading if either config store is checking service OR memories store is loading
   return configStore.features?.memoryServiceLoading || memoriesStore.loading
+})
+
+// Check if memories are enabled for the user
+const memoriesEnabledForUser = computed(() => {
+  return authStore.user?.memoriesEnabled !== false
 })
 
 const initials = computed(() => {
@@ -122,6 +141,11 @@ const handleProfileSettings = () => {
 
 const handleOpenMemories = () => {
   isOpen.value = false
+  // If memories disabled for user, redirect to profile settings with highlight
+  if (!memoriesEnabledForUser.value) {
+    router.push('/profile?highlight=memories')
+    return
+  }
   emit('openMemories')
 }
 

@@ -62,6 +62,7 @@ class ProfileController extends AbstractController
                         new OA\Property(property: 'invoiceEmail', type: 'string', example: 'billing@example.com'),
                         new OA\Property(property: 'emailKeyword', type: 'string', nullable: true, example: 'myproject'),
                         new OA\Property(property: 'personalEmailAddress', type: 'string', example: 'smart+myproject@synaplan.net'),
+                        new OA\Property(property: 'memoriesEnabled', type: 'boolean', example: true),
                     ]
                 ),
             ]
@@ -119,6 +120,7 @@ class ProfileController extends AbstractController
                 'isExternalAuth' => $user->isExternalAuth(),
                 'externalAuthInfo' => $externalAuthInfo,
                 'isAdmin' => $user->isAdmin(),
+                'memoriesEnabled' => $user->isMemoriesEnabled(),
             ],
         ]);
     }
@@ -190,6 +192,12 @@ class ProfileController extends AbstractController
             if (isset($data[$field])) {
                 $details[$field] = $data[$field];
             }
+        }
+
+        if (array_key_exists('memoriesEnabled', $data)) {
+            $user->setMemoriesEnabled((bool) $data['memoriesEnabled']);
+            // Ensure details are in sync for this request
+            $details = $user->getUserDetails();
         }
 
         // Handle email keyword separately (uses EmailChatService)

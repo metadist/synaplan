@@ -232,6 +232,52 @@
             </div>
           </section>
 
+          <section
+            ref="memoriesSection"
+            class="surface-card rounded-lg p-6 transition-all duration-500"
+            :class="{ 'ring-4 ring-brand-500/50 shadow-2xl': shouldHighlight }"
+            data-testid="section-memories-settings"
+          >
+            <h2 class="text-xl font-semibold txt-primary mb-2 flex items-center gap-2">
+              <Icon icon="mdi:brain" class="w-5 h-5" />
+              {{ $t('profile.memories.title') }}
+            </h2>
+            <p class="txt-secondary text-sm mb-6">
+              {{ $t('profile.memories.subtitle') }}
+            </p>
+
+            <div
+              class="flex items-start justify-between gap-4 p-4 rounded-lg bg-chat border border-light-border/30 dark:border-dark-border/20"
+            >
+              <div class="min-w-0">
+                <p class="txt-primary font-medium">
+                  {{ $t('profile.memories.toggleLabel') }}
+                </p>
+                <p class="txt-secondary text-sm mt-1">
+                  {{
+                    formData.memoriesEnabled
+                      ? $t('profile.memories.enabledHint')
+                      : $t('profile.memories.disabledHint')
+                  }}
+                </p>
+              </div>
+
+              <label class="relative inline-flex items-center cursor-pointer select-none">
+                <input v-model="formData.memoriesEnabled" type="checkbox" class="sr-only" />
+                <div
+                  class="w-11 h-6 rounded-full transition-colors"
+                  :class="
+                    formData.memoriesEnabled ? 'bg-[var(--brand)]' : 'bg-gray-300 dark:bg-gray-700'
+                  "
+                />
+                <div
+                  class="absolute left-0.5 top-0.5 w-5 h-5 rounded-full bg-white transition-transform shadow"
+                  :class="formData.memoriesEnabled ? 'translate-x-5' : 'translate-x-0'"
+                />
+              </label>
+            </div>
+          </section>
+
           <section class="surface-card rounded-lg p-6" data-testid="section-change-password">
             <h2 class="text-xl font-semibold txt-primary mb-2 flex items-center gap-2">
               <Icon icon="mdi:lock" class="w-5 h-5" />
@@ -469,8 +515,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 import { Icon } from '@iconify/vue'
 import MainLayout from '@/components/MainLayout.vue'
 import UnsavedChangesBar from '@/components/UnsavedChangesBar.vue'
@@ -481,8 +527,12 @@ import { profileApi } from '@/services/api'
 import { useAuthStore } from '@/stores/auth'
 
 const router = useRouter()
+const route = useRoute()
 const authStore = useAuthStore()
-const { error, success } = useNotification()
+const { error } = useNotification()
+
+const memoriesSection = ref<HTMLElement | null>(null)
+const shouldHighlight = ref(false)
 
 const formData = ref<UserProfile>({
   email: '',
@@ -498,6 +548,7 @@ const formData = ref<UserProfile>({
   language: 'en',
   timezone: 'Europe/Berlin',
   invoiceEmail: '',
+  memoriesEnabled: true,
 })
 const originalData = ref<UserProfile>({ ...formData.value })
 const passwordData = ref({
@@ -550,11 +601,33 @@ onMounted(async () => {
       if (response.profile.isAdmin !== undefined && authStore.user) {
         authStore.user.isAdmin = response.profile.isAdmin
       }
+
+      // Sync per-user memories toggle to auth store (used across UI)
+      if (authStore.user) {
+        authStore.user.memoriesEnabled = response.profile.memoriesEnabled
+      }
     }
   } catch (err: any) {
     error(err.message || 'Failed to load profile')
   } finally {
     loading.value = false
+  }
+
+  // Check if we should scroll to and highlight memories section
+  if (route.query.highlight === 'memories') {
+    await nextTick()
+    if (memoriesSection.value) {
+      memoriesSection.value.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      shouldHighlight.value = true
+
+      // Remove highlight after 3 seconds
+      setTimeout(() => {
+        shouldHighlight.value = false
+      }, 3000)
+
+      // Clear query param
+      router.replace({ query: {} })
+    }
   }
 })
 
@@ -582,13 +655,20 @@ const handleSave = saveChanges(async () => {
     // Update profile
     await profileApi.updateProfile(formData.value)
 
+    // Refresh /auth/me to propagate updated flags (e.g. memoriesEnabled)
+    await authStore.refreshUser()
+
+    // Keep local authStore flag in sync (refreshUser should do this, but be explicit)
+    if (authStore.user) {
+      authStore.user.memoriesEnabled = formData.value.memoriesEnabled
+    }
+
     // Change password if provided and allowed
     if (canChangePassword.value && passwordData.value.current && passwordData.value.new) {
       await profileApi.changePassword(passwordData.value.current, passwordData.value.new)
       passwordData.value = { current: '', new: '', confirm: '' }
     }
 
-    success('Profile updated successfully')
     originalData.value = { ...formData.value }
   } catch (err: any) {
     error(err.message || 'Failed to update profile')
