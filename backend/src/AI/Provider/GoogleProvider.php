@@ -402,7 +402,9 @@ class GoogleProvider implements ChatProviderInterface, ImageGenerationProviderIn
 
         try {
             // Map requested duration to valid Veo values (4, 6, or 8 seconds)
-            $requestedDuration = $options['duration'] ?? 8;
+            $requestedDuration = isset($options['duration']) && is_numeric($options['duration'])
+                ? (int) $options['duration']
+                : 8;
             $durationSeconds = $this->mapToValidVeoDuration($requestedDuration);
             $aspectRatio = $options['aspect_ratio'] ?? '16:9';
 
