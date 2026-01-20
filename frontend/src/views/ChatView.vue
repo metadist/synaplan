@@ -260,7 +260,9 @@ watch(
     }
 
     if (newChatId) {
-      historyStore.clear()
+      // Note: Don't call historyStore.clear() here!
+      // loadMessages() replaces messages when offset=0, making clear() redundant.
+      // Calling clear() first causes empty chat if loadMessages() fails silently.
       await historyStore.loadMessages(newChatId)
       await nextTick()
       scrollToBottom()
