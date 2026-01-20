@@ -1,127 +1,74 @@
-# Playwright Smoke Test Setup
+# Playwright E2E Tests
 
-Minimal robust Playwright smoke test setup for running web applications.
+## Quick Start
 
-## Setup
+1. **Start the application** (see [root README](../../README.md)):
+   ```bash
+   docker compose up -d
+   ```
 
-```bash
-# Node.js 18+ required
-node --version
-
-# Install dependencies
-npm install
-
-# Install Playwright browsers
-npx playwright install chromium
-```
-
-## Environment Variables
-
-Copy `.env.example` to `.env` and adjust:
+Node.js 18+ (if not2. **Install Node.js 18+** (if not installed):
 
 ```bash
-cp .env.example .env
+curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+sudo apt-get install -y nodejs
 ```
 
-Important environment variables:
+3. **Setup Playwright**:
 
-- `BASE_URL`: Base URL for tests (Default: `http://localhost:5173`)
-- `AUTH_USER`: Username for login tests
-- `AUTH_PASS`: Password for login tests
-- `API_TOKEN`: Optional: Token for API tests
+   ```bash
+   cd frontend
+   npm install
+   npx playwright install --with-deps
+   ```
 
-## Local Run
+4. **Run tests**:
+   You may change the grep command in playwright.config.ts
+   ```bash
+   cd frontend
+   npm run test:e2e  # Only Chromium locally (faster)
+   ```
 
-### With Docker (recommended)
+**Note:** Locally runs Chromium only. CI tests both Chromium and Firefox.
+
+## Configuration
+
+Optional: Create `frontend/tests/e2e/.env.local`:
 
 ```bash
-# Start test environment with Docker
-cd ..
-docker compose -f docker-compose.test.yml up -d
-
-# Wait until services are ready
-docker compose -f docker-compose.test.yml ps
-
-# Run tests
-cd tests
-AUTH_USER=admin@synaplan.com AUTH_PASS=admin123 npx playwright test
-
-# Stop test environment
-cd ..
-docker compose -f docker-compose.test.yml down -v
+BASE_URL=http://localhost:5173
+AUTH_USER=admin@synaplan.com
+AUTH_PASS=admin123
 ```
 
-### Without Docker
+For some Tests you need to run local ollama models
+
+## Commands
 
 ```bash
-# All tests
-npm test
+# Run all tests (Chromium only)
+npm run test:e2e
 
-# Smoke tests only
-npm run test:smoke
+# Run both browsers
+npx playwright test --config=tests/e2e/playwright.config.ts
 
-# With custom BASE_URL
-BASE_URL=http://localhost:5173 npm run test:smoke
+# Run specific test
+npx playwright test tests/login.spec.ts --config=tests/e2e/playwright.config.ts --project=chromium
+
+# View HTML report
+npm run test:e2e:report
 ```
-
-## Test Development
-
-```bash
-# Codegen: Generate test code while you interact
-npm run codegen
-
-# UI Mode: Visual test runner with live preview & debug
-npm run test:ui
-
-# Run single test
-npx playwright test tests/e2e/smoke/01_login.spec.ts
-
-# Headed mode (browser visible)
-npx playwright test --headed
-```
-
-## Reports
-
-```bash
-# Open HTML report
-npm run report
-
-# Show trace
-npm run trace
-```
-
-## Selector Guidelines
-
-Prefer using `[data-testid]` attributes for robust selectors.
-
-Adapt selectors in `tests/utils/selectors.ts` to your app.
-
-## CI/CD
-
-GitHub Actions workflow runs:
-
-- On push to main
-- 3× daily (6:00, 12:00, 18:00 UTC)
-
-Set secrets in GitHub:
-
-- `BASE_URL`
-- `AUTH_USER`
-- `AUTH_PASS`
-- `API_TOKEN`
 
 ## Troubleshooting
 
-**Timeouts:**
+**"npm: command not found"** → Install Node.js (see step 2 above)
 
-- Increase `timeout` in `playwright.config.ts`
-- Check if app is running on `BASE_URL`
+**EACCES errors** → Fix permissions:
 
-**Flaky Tests:**
+```bash
+cd frontend
+rm -rf node_modules package-lock.json
+npm install
+```
 
-- Use `waitForIdle()` instead of `sleep()`
-- Check selectors in `selectors.ts`
-
-**Slow CI:**
-
-- Reduce `workers` in `playwright.config.ts` (e.g., to 2)
+**"Connection refused"** → Ensure app is running: `docker compose up -d`

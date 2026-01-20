@@ -6,8 +6,7 @@ namespace App\Controller;
 
 use App\Repository\ChatRepository;
 use App\Repository\MessageRepository;
-use App\Service\File\DataUrlFixer;
-use App\Service\File\ThumbnailService;
+use App\Service\File\OgImageService;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -40,8 +39,7 @@ class SharedChatPageController extends AbstractController
     public function __construct(
         private ChatRepository $chatRepository,
         private MessageRepository $messageRepository,
-        private DataUrlFixer $dataUrlFixer,
-        private ThumbnailService $thumbnailService,
+        private OgImageService $ogImageService,
         private string $synaplanUrl,
     ) {
     }
@@ -77,7 +75,7 @@ class SharedChatPageController extends AbstractController
         // Extract metadata for Open Graph
         $title = $this->generateTitle($chat, $messages);
         $description = $this->generateDescription($messages);
-        $imageUrl = $this->findFirstMediaUrl($messages);
+        $imageUrl = $this->getOgImageUrl($chat);
         $canonicalUrl = $this->synaplanUrl.'/shared/'.$lang.'/'.$token;
 
         // For crawlers, serve HTML with meta tags
@@ -85,7 +83,7 @@ class SharedChatPageController extends AbstractController
         return $this->renderSharedPage(
             $title,
             $description,
-            $imageUrl,
+            $imageUrl, // May be null if no valid OG image exists
             $canonicalUrl,
             $lang,
             $token,
@@ -184,63 +182,27 @@ class SharedChatPageController extends AbstractController
     }
 
     /**
-     * Find first image or video thumbnail URL for og:image.
+     * Get OG image URL for a chat.
+     *
+     * Uses the pre-generated OG image stored with the chat when sharing was enabled.
+     * Only returns the URL if the image file actually exists.
+     *
+     * @param \App\Entity\Chat $chat The chat to get OG image for
+     *
+     * @return string|null Full URL to OG image, or null if no valid image exists
      */
-    private function findFirstMediaUrl(array $messages): string
+    private function getOgImageUrl($chat): ?string
     {
-        foreach ($messages as $message) {
-            $filePath = $message->getFilePath();
-            if (!$filePath) {
-                continue;
-            }
+        $ogImagePath = $chat->getOgImagePath();
 
-            // Fix data URL to file if needed
-            if (str_starts_with($filePath, 'data:')) {
-                $filePath = $this->dataUrlFixer->ensureFileOnDisk($message);
-            }
-
-            if (!$filePath) {
-                continue;
-            }
-
-            // Extract relative path from API URL format
-            // filePath is like "/api/v1/files/uploads/02/000/00002/2026/01/3092_google_xxx.mp4"
-            $relativePath = $filePath;
-            if (str_starts_with($filePath, '/api/v1/files/uploads/')) {
-                $relativePath = substr($filePath, strlen('/api/v1/files/uploads/'));
-            }
-
-            // Check if it's an image or video
-            $extension = strtolower(pathinfo($relativePath, PATHINFO_EXTENSION));
-            $isImage = in_array($extension, ['jpg', 'jpeg', 'png', 'gif', 'webp']);
-            $isVideo = in_array($extension, ['mp4', 'webm']);
-
-            if ($isImage) {
-                // For images, return full URL
-                return $this->synaplanUrl.$filePath;
-            }
-
-            if ($isVideo) {
-                // For videos, use thumbnail if available
-                $thumbnailPath = $this->thumbnailService->getThumbnailIfExists($relativePath);
-                if ($thumbnailPath) {
-                    // Return thumbnail URL
-                    return $this->synaplanUrl.'/api/v1/files/uploads/'.$thumbnailPath;
-                }
-
-                // Fallback: generate thumbnail on-the-fly for social media
-                $thumbnailPath = $this->thumbnailService->generateThumbnail($relativePath);
-                if ($thumbnailPath) {
-                    return $this->synaplanUrl.'/api/v1/files/uploads/'.$thumbnailPath;
-                }
-
-                // Last resort: return video URL (some platforms support video previews)
-                return $this->synaplanUrl.$filePath;
-            }
+        // Only return URL if we have a stored path AND the file exists
+        if ($ogImagePath && $this->ogImageService->verifyFileExists($ogImagePath)) {
+            return $this->ogImageService->getOgImageUrl($ogImagePath, $this->synaplanUrl);
         }
 
-        // Fallback to default Synaplan image
-        return $this->synaplanUrl.'/apple-touch-icon.png';
+        // No valid OG image - return null to skip og:image tag entirely
+        // This is better than returning a broken URL
+        return null;
     }
 
     /**
@@ -249,17 +211,20 @@ class SharedChatPageController extends AbstractController
     private function renderSharedPage(
         string $title,
         string $description,
-        string $imageUrl,
+        ?string $imageUrl,
         string $canonicalUrl,
         string $lang,
         string $token,
         bool $isCrawler,
     ): Response {
-        // Try to load the built index.html from production build
         $indexPath = '/var/www/frontend/index.html';
         $html = '';
 
-        if (file_exists($indexPath)) {
+        // In development mode, always use dev-compatible HTML with Vite's /src/main.ts
+        // In production, use the built index.html with hashed asset paths
+        $isDev = 'dev' === ($_ENV['APP_ENV'] ?? 'prod');
+
+        if (!$isDev && file_exists($indexPath)) {
             // Production: Use built index.html with correct asset paths
             $html = file_get_contents($indexPath);
 
@@ -274,8 +239,8 @@ class SharedChatPageController extends AbstractController
             $metaTags = $this->generateMetaTags($title, $description, $imageUrl, $canonicalUrl, $lang, $token);
             $html = str_replace('</head>', $metaTags.'</head>', $html);
         } else {
-            // Development fallback: Build HTML manually with dev paths
-            // This allows the controller to work in development without built assets
+            // Development: Build HTML manually with Vite dev server paths
+            // This allows hot module replacement to work properly
             $html = $this->buildHtmlManually($title, $description, $imageUrl, $canonicalUrl, $lang, $token);
         }
 
@@ -297,14 +262,11 @@ class SharedChatPageController extends AbstractController
     private function generateMetaTags(
         string $title,
         string $description,
-        string $imageUrl,
+        ?string $imageUrl,
         string $canonicalUrl,
         string $lang,
         string $token,
     ): string {
-        // Determine if image is a video
-        $isVideo = str_ends_with($imageUrl, '.mp4') || str_ends_with($imageUrl, '.webm');
-
         $metaTags = <<<HTML
 
     <!-- Basic Meta Tags -->
@@ -321,15 +283,8 @@ class SharedChatPageController extends AbstractController
     <meta property="og:locale" content="{$this->escape($lang)}">
 HTML;
 
-        if ($isVideo) {
-            $metaTags .= <<<HTML
-
-    <!-- Video Preview -->
-    <meta property="og:video" content="{$this->escape($imageUrl)}">
-    <meta property="og:video:type" content="video/mp4">
-    <meta property="og:image" content="{$this->escape($this->synaplanUrl)}/apple-touch-icon.png">
-HTML;
-        } else {
+        // Only add og:image if we have a valid, verified image URL
+        if ($imageUrl) {
             $metaTags .= <<<HTML
 
     <!-- Image Preview -->
@@ -342,11 +297,21 @@ HTML;
         $metaTags .= <<<HTML
 
     <!-- Twitter Card -->
-    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:card" content="{$this->escape($imageUrl ? 'summary_large_image' : 'summary')}">
     <meta name="twitter:url" content="{$this->escape($canonicalUrl)}">
     <meta name="twitter:title" content="{$this->escape($title)}">
     <meta name="twitter:description" content="{$this->escape($description)}">
-    <meta name="twitter:image" content="{$this->escape($isVideo ? $this->synaplanUrl.'/apple-touch-icon.png' : $imageUrl)}">
+HTML;
+
+        // Only add twitter:image if we have a valid image
+        if ($imageUrl) {
+            $metaTags .= <<<HTML
+
+    <meta name="twitter:image" content="{$this->escape($imageUrl)}">
+HTML;
+        }
+
+        $metaTags .= <<<HTML
 
     <!-- hreflang for SEO -->
     <link rel="alternate" hreflang="en" href="{$this->escape($this->synaplanUrl)}/shared/en/{$this->escape($token)}">
@@ -364,7 +329,7 @@ HTML;
     private function buildHtmlManually(
         string $title,
         string $description,
-        string $imageUrl,
+        ?string $imageUrl,
         string $canonicalUrl,
         string $lang,
         string $token,

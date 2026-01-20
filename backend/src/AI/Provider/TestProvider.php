@@ -80,6 +80,9 @@ class TestProvider implements ChatProviderInterface, EmbeddingProviderInterface,
             'hello' => "Hello! I'm the TestProvider. I can generate mock texts, images, and videos for you. Try asking me to create an image or video!",
             'how are you' => "I'm doing great! As a TestProvider, I'm always ready to help you test the system.",
             'what can you do' => "I can:\n\n• Generate mock text responses\n• Create mock images (try: 'create an image')\n• Generate mock videos (try: 'make a video')\n• Help you test the chat system!",
+            // Support for smoke test prompts
+            'smoke test' => 'success',
+            'answer with "success"' => 'success',
         ];
 
         // Check for specific keywords

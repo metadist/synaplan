@@ -57,6 +57,13 @@ export default defineConfig(({ mode }) => {
           target: backendUrl,
           changeOrigin: true,
         },
+        // Proxy shared chat pages to backend for OG meta tags
+        // Social media crawlers (Facebook, LinkedIn, Twitter) don't execute JS
+        // so the backend must serve pre-rendered HTML with meta tags
+        '/shared': {
+          target: backendUrl,
+          changeOrigin: true,
+        },
       },
     },
     test: {

@@ -1,5 +1,16 @@
 // synaplan-ui/src/services/authService.ts
 // Cookie-based authentication - no localStorage at all (security)
+//
+// OAuth Cookie Race Condition Fix:
+// When redirecting back from OAuth providers (Google, GitHub, etc.), there can be
+// a race condition where cookies are set by the backend but not immediately available
+// in the browser on the next request. This is especially common with SameSite=LAX cookies
+// during cross-site navigation (OAuth redirects).
+//
+// Solution: Retry mechanism with exponential backoff in getCurrentUser() and handleOAuthCallback()
+// - Up to 3 retries with delays: 200ms, 400ms, 800ms (max ~1.4s total)
+// - Only triggered during OAuth callback flow
+// - Falls back to normal refresh token flow if retries exhausted
 import { ref } from 'vue'
 import { clearSseToken } from '@/services/api/chatApi'
 import { getApiBaseUrl } from '@/services/api/httpClient'
@@ -111,8 +122,10 @@ export const authService = {
 
   /**
    * Get Current User - validates session via cookie
+   * @param retries Number of retry attempts (used for OAuth callback race conditions)
+   * @param retryDelay Initial delay between retries in ms (exponential backoff)
    */
-  async getCurrentUser(): Promise<any | null> {
+  async getCurrentUser(retries = 0, retryDelay = 200): Promise<any | null> {
     // Don't check auth during logout process
     if (isLoggingOut.value) {
       return null
@@ -127,6 +140,16 @@ export const authService = {
         // Don't try to refresh if already logging out
         if (isLoggingOut.value) {
           return null
+        }
+
+        // OAuth callback race condition: Cookies might not be available yet
+        // Retry with exponential backoff before trying to refresh
+        if (retries > 0) {
+          console.log(
+            `⏳ Auth cookies not yet available, retrying in ${retryDelay}ms (${retries} retries left)...`
+          )
+          await new Promise((resolve) => setTimeout(resolve, retryDelay))
+          return this.getCurrentUser(retries - 1, retryDelay * 2)
         }
 
         // Try to refresh token (silently)
@@ -240,16 +263,20 @@ export const authService = {
 
   /**
    * Handle OAuth callback - cookies are already set by redirect
+   * Uses retry mechanism to handle race conditions where cookies aren't immediately available
    */
   async handleOAuthCallback(): Promise<{ success: boolean; error?: string }> {
     try {
-      // Just fetch current user - cookies were set by OAuth redirect
-      const currentUser = await this.getCurrentUser()
+      // Fetch current user with retries to handle OAuth cookie race conditions
+      // Retry up to 3 times with exponential backoff (200ms, 400ms, 800ms = max ~1.4s total)
+      const currentUser = await this.getCurrentUser(3, 200)
 
       if (currentUser) {
+        console.log('✅ OAuth callback successful, user authenticated')
         return { success: true }
       }
 
+      console.error('❌ OAuth callback failed: No user after retries')
       return { success: false, error: 'Failed to get user after OAuth' }
     } catch (error) {
       console.error('OAuth callback error:', error)

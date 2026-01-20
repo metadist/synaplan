@@ -201,11 +201,17 @@
   },
   "chatInput": {
     "placeholder": "Schreibe deine Nachricht hier...",
+    "provider": "Anbieter",
     "model": "Modell",
     "configureModel": "KI-Modell konfigurieren",
+    "attach": "Anhängen",
+    "uploadFile": "Hochladen",
+    "deepResearch": "Tiefenrecherche",
+    "docs": "Dokumente",
+    "web": "Web",
     "webSearch": "Web nach aktuellen Informationen durchsuchen",
-    "send": "Senden",
-    "stop": "Stoppen",
+    "send": "Nachricht senden",
+    "share": "Teilen",
     "enhance": "Verbessern",
     "thinking": "Denken",
     "reasoningNotSupported": "Dein aktuelles Chat-Modell unterstützt kein Reasoning. Bitte wähle ein Reasoning-fähiges Modell (GPT-5, o3, DeepSeek-R1) in der KI-Konfiguration → Modelle.",
@@ -221,7 +227,112 @@
     "transcriptionFailed": "Transkription fehlgeschlagen: {error}",
     "dropFiles": "Dateien hier ablegen",
     "dropFilesHint": "Bilder, Dokumente, Audiodateien...",
-    "filesPasted": "{count} Datei eingefügt | {count} Dateien eingefügt"
+    "filesPasted": "{count} Datei eingefügt | {count} Dateien eingefügt",
+    "tools": {
+      "label": "Werkzeuge",
+      "webSearch": "Web-Suche",
+      "webSearchDesc": "Im Internet suchen",
+      "imageGen": "Bilderzeugung",
+      "imageGenDesc": "Bilder aus Text erstellen",
+      "videoGen": "Videoerzeugung",
+      "videoGenDesc": "Videos aus Text erstellen"
+    },
+    "removeTool": "Werkzeug entfernen"
+  },
+  "chatMessage": {
+    "again": "Nochmal",
+    "againWith": "Nochmal mit",
+    "regenerateWith": "Neu generieren mit"
+  },
+  "commands": {
+    "noResults": "Keine Befehle gefunden",
+    "availableCommands": "Verfügbare Befehle",
+    "navigate": "navigieren",
+    "select": "auswählen",
+    "close": "schließen",
+    "videoNotSupported": "Dein Browser unterstützt das Video-Tag nicht.",
+    "copyCode": "Code kopieren",
+    "copy": "Kopieren",
+    "copied": "Kopiert!",
+    "original": "Original",
+    "translatedTo": "Übersetzt nach",
+    "loginLinkGenerated": "Login-Link generiert",
+    "expiresAt": "Läuft ab am"
+  },
+  "statistics": {
+    "title": "Willkommen bei Synaplan!",
+    "messageStats": "Nachrichtenstatistik",
+    "totalMessages": "Nachrichten gesamt",
+    "messagesSent": "Gesendete Nachrichten",
+    "messagesReceived": "Empfangene Nachrichten",
+    "totalFiles": "Dateien gesamt",
+    "filesSent": "Gesendete Dateien",
+    "filesReceived": "Empfangene Dateien",
+    "latestFiles": "Neueste Dateien",
+    "received": "Empfangen",
+    "sent": "Gesendet"
+  },
+  "tools": {
+    "title": "Verfügbare Werkzeuge",
+    "description": "Entdecke und nutze leistungsstarke Werkzeuge zur Verbesserung deines Workflows",
+    "category": "Kategorie",
+    "commands": "Befehle",
+    "noCommands": "Keine Befehle verfügbar",
+    "searchCommands": "Befehle suchen...",
+    "noCommandsFound": "Keine Befehle entsprechen deiner Suche"
+  },
+  "help": {
+    "title": "Hilfe",
+    "openHelp": "Hilfe öffnen",
+    "close": "Schließen",
+    "gotIt": "Verstanden!",
+    "noContent": "Keine Hilfe für diese Seite verfügbar"
+  },
+  "unsavedChanges": {
+    "title": "Du hast ungespeicherte Änderungen",
+    "description": "Deine Änderungen gehen verloren, wenn du ohne Speichern gehst. Drücke ESC zum Verwerfen.",
+    "save": "Änderungen speichern",
+    "saving": "Wird gespeichert...",
+    "discard": "Verwerfen",
+    "saved": "Änderungen erfolgreich gespeichert",
+    "confirmLeave": "Du hast ungespeicherte Änderungen. Bist du sicher, dass du gehen möchtest?"
+  },
+  "notFound": {
+    "title": "Seite nicht gefunden",
+    "description": "Die gesuchte Seite existiert nicht oder wurde verschoben. Lass uns dich zurück auf den richtigen Weg bringen.",
+    "goHome": "Zur Startseite",
+    "goBack": "Zurück",
+    "quickLinks": "Schnelllinks",
+    "hint": "Wenn du glaubst, dass dies ein Fehler ist, kontaktiere bitte den Support."
+  },
+  "error": {
+    "title": "Etwas ist schiefgelaufen",
+    "description": "Wir sind auf einen unerwarteten Fehler gestoßen. Keine Sorge, unser Team wurde benachrichtigt und arbeitet daran.",
+    "details": "Fehlerdetails",
+    "statusCode": "Statuscode",
+    "showStack": "Stack-Trace anzeigen",
+    "hideStack": "Stack-Trace ausblenden",
+    "reload": "Seite neu laden",
+    "goHome": "Zur Startseite",
+    "needHelp": "Brauchst du Hilfe?",
+    "contactSupport": "Wenn dieses Problem weiterhin besteht, kontaktiere bitte unser Support-Team mit den folgenden Fehlerdetails.",
+    "copyError": "Fehlerinfo kopieren",
+    "copied": "Kopiert!"
+  },
+  "loading": {
+    "default": "Lädt...",
+    "pleaseWait": "Bitte warten"
+  },
+  "aiProvider": {
+    "error": {
+      "prefix": "Fehler",
+      "noModelTitle": "Modell-Download erforderlich",
+      "quickModels": "Schnell & Leicht",
+      "mediumModels": "Mittel (Bessere Qualität)",
+      "largeModels": "Groß (Beste Qualität)",
+      "exampleCommand": "Installationsbefehl",
+      "restartNote": "Nach dem Herunterladen die Seite aktualisieren und erneut versuchen."
+    }
   },
   "login": {
     "title": "Anmelden",
@@ -828,6 +939,8 @@
     "open": "Öffnen",
     "share": "Teilen",
     "rename": "Umbenennen",
+    "copy": "Kopieren",
+    "copied": "Kopiert!",
     "sending": "Sende...",
     "yes": "Ja",
     "no": "Nein",
@@ -840,6 +953,8 @@
     "daysAgo": "vor {count} Tag | vor {count} Tagen",
     "back": "Zurück",
     "next": "Weiter",
+    "create": "Erstellen",
+    "creating": "Wird erstellt...",
     "previous": "Zurück",
     "loading": "Lädt...",
     "error": "Fehler",
