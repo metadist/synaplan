@@ -8,6 +8,8 @@ use App\AI\Service\AiFacade;
 use App\Entity\User;
 use App\Service\ModelConfigService;
 use OpenApi\Attributes as OA;
+use Plugin\SortX\Repository\SortxCategoryRepository;
+use Plugin\SortX\Service\PromptGenerator;
 use Psr\Log\LoggerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\File\UploadedFile;
@@ -18,55 +20,180 @@ use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\CurrentUser;
 
 /**
- * SortX Plugin API Controller.
+ * SortX Plugin API Controller v2.0.
  *
- * Provides document classification endpoints for the SortX local tool.
+ * Provides document classification endpoints with metadata extraction.
  * Routes: /api/v1/user/{userId}/plugins/sortx/...
  */
 #[Route('/api/v1/user/{userId}/plugins/sortx', name: 'api_plugin_sortx_')]
 #[OA\Tag(name: 'SortX Plugin')]
 class SortXController extends AbstractController
 {
-    private const CLASSIFICATION_PROMPT = <<<'PROMPT'
-You are a document classification assistant. Analyze the document and assign ALL applicable categories.
-
-IMPORTANT: A document can belong to MULTIPLE categories. For example, an employment contract belongs to both "contract" AND "human_resources".
-
-Categories (assign ALL that apply):
-- contract: Legal agreements, contracts, leases, terms of service, NDAs
-- invoice: Bills, invoices, receipts, payment documents
-- request: Formal requests, applications, proposals, inquiries
-- research: Academic papers, research documents, studies, whitepapers, theses
-- human_resources: CVs, resumes, job applications, employment documents, personnel files
-- sales: Quotes, quotations, offers, orders, purchase documents
-
-User Context:
-%s
-
-Document filename: %s
-
-Respond ONLY with a JSON object (no markdown, no explanation):
-{"categories": ["category1", "category2"], "confidence": 0.0-1.0, "reasoning": "brief explanation"}
-
-Rules:
-1. Return an ARRAY of categories - a document can match multiple categories
-2. Return empty array [] if confidence would be below 0.5 for all categories
-3. Consider filename as a hint but prioritize content
-4. Be thorough - if a document fits multiple categories, include ALL of them
-PROMPT;
-
     public function __construct(
         private AiFacade $aiFacade,
         private ModelConfigService $modelConfigService,
+        private PromptGenerator $promptGenerator,
+        private SortxCategoryRepository $categoryRepo,
         private LoggerInterface $logger,
     ) {
     }
 
+    /**
+     * Get the complete category schema for the local tool.
+     */
+    #[Route('/schema', name: 'schema', methods: ['GET'])]
+    #[OA\Get(
+        path: '/api/v1/user/{userId}/plugins/sortx/schema',
+        summary: 'Get category schema and classification prompt',
+        description: 'Returns the user\'s category definitions, fields, and generated classification prompt',
+        security: [['Bearer' => []]],
+        tags: ['SortX Plugin']
+    )]
+    #[OA\Parameter(
+        name: 'userId',
+        in: 'path',
+        required: true,
+        description: 'User ID',
+        schema: new OA\Schema(type: 'integer')
+    )]
+    #[OA\Response(
+        response: 200,
+        description: 'Schema retrieved successfully',
+        content: new OA\JsonContent(
+            required: ['success', 'data'],
+            properties: [
+                new OA\Property(property: 'success', type: 'boolean', example: true),
+                new OA\Property(
+                    property: 'data',
+                    type: 'object',
+                    properties: [
+                        new OA\Property(
+                            property: 'categories',
+                            type: 'array',
+                            items: new OA\Items(
+                                type: 'object',
+                                properties: [
+                                    new OA\Property(property: 'key', type: 'string', example: 'invoice'),
+                                    new OA\Property(property: 'name', type: 'string', example: 'Invoice'),
+                                    new OA\Property(property: 'description', type: 'string'),
+                                    new OA\Property(
+                                        property: 'fields',
+                                        type: 'array',
+                                        items: new OA\Items(
+                                            type: 'object',
+                                            properties: [
+                                                new OA\Property(property: 'key', type: 'string'),
+                                                new OA\Property(property: 'name', type: 'string'),
+                                                new OA\Property(property: 'type', type: 'string'),
+                                                new OA\Property(property: 'required', type: 'boolean'),
+                                            ]
+                                        )
+                                    ),
+                                ]
+                            )
+                        ),
+                        new OA\Property(property: 'prompt_preview', type: 'string'),
+                        new OA\Property(
+                            property: 'config',
+                            type: 'object',
+                            properties: [
+                                new OA\Property(property: 'confidence_threshold', type: 'number', example: 0.5),
+                                new OA\Property(property: 'max_text_length', type: 'integer', example: 10000),
+                                new OA\Property(property: 'max_file_size_mb', type: 'integer', example: 50),
+                            ]
+                        ),
+                    ]
+                ),
+            ]
+        )
+    )]
+    #[OA\Response(response: 401, description: 'Not authenticated')]
+    public function getSchema(
+        int $userId,
+        #[CurrentUser] ?User $user,
+    ): JsonResponse {
+        if (!$this->canAccessPlugin($user, $userId)) {
+            return $this->json(['success' => false, 'error' => 'Unauthorized'], Response::HTTP_UNAUTHORIZED);
+        }
+
+        $schema = $this->promptGenerator->getSchemaForUser($userId);
+
+        // Generate prompt with metadata extraction enabled
+        $promptPreview = $this->promptGenerator->generatePrompt($schema, extractMetadata: true);
+
+        // Get config (could be extended to read from BCONFIG)
+        $config = $this->getPluginConfig($userId);
+
+        return $this->json([
+            'success' => true,
+            'data' => [
+                'categories' => $schema,
+                'prompt_preview' => $promptPreview,
+                'config' => $config,
+            ],
+        ]);
+    }
+
+    /**
+     * Get classification categories.
+     */
+    #[Route('/categories', name: 'categories', methods: ['GET'])]
+    #[OA\Get(
+        path: '/api/v1/user/{userId}/plugins/sortx/categories',
+        summary: 'Get available classification categories',
+        security: [['Bearer' => []]],
+        tags: ['SortX Plugin']
+    )]
+    #[OA\Parameter(
+        name: 'userId',
+        in: 'path',
+        required: true,
+        description: 'User ID',
+        schema: new OA\Schema(type: 'integer')
+    )]
+    #[OA\Response(
+        response: 200,
+        description: 'List of categories',
+        content: new OA\JsonContent(
+            properties: [
+                new OA\Property(property: 'success', type: 'boolean'),
+                new OA\Property(
+                    property: 'categories',
+                    type: 'array',
+                    items: new OA\Items(
+                        properties: [
+                            new OA\Property(property: 'key', type: 'string'),
+                            new OA\Property(property: 'name', type: 'string'),
+                            new OA\Property(property: 'description', type: 'string'),
+                            new OA\Property(property: 'fields', type: 'array', items: new OA\Items(type: 'object')),
+                        ]
+                    )
+                ),
+            ]
+        )
+    )]
+    public function categories(int $userId, #[CurrentUser] ?User $user): JsonResponse
+    {
+        if (!$this->canAccessPlugin($user, $userId)) {
+            return $this->json(['success' => false, 'error' => 'Unauthorized'], Response::HTTP_UNAUTHORIZED);
+        }
+
+        $schema = $this->promptGenerator->getSchemaForUser($userId);
+
+        return $this->json([
+            'success' => true,
+            'categories' => $schema,
+        ]);
+    }
+
+    /**
+     * Classify document text and optionally extract metadata.
+     */
     #[Route('/classify', name: 'classify', methods: ['POST'])]
     #[OA\Post(
         path: '/api/v1/user/{userId}/plugins/sortx/classify',
-        summary: 'Classify document text using AI',
-        description: 'Analyzes extracted document text and returns classification with multiple categories',
+        summary: 'Classify document text with optional metadata extraction',
+        description: 'Analyzes extracted document text, returns multi-label classification and structured metadata',
         security: [['Bearer' => []]],
         tags: ['SortX Plugin']
     )]
@@ -83,16 +210,8 @@ PROMPT;
             required: ['text'],
             properties: [
                 new OA\Property(property: 'filename', type: 'string', example: 'invoice_2024.pdf'),
-                new OA\Property(property: 'text', type: 'string', example: 'Invoice #12345...'),
-                new OA\Property(
-                    property: 'user_context',
-                    type: 'object',
-                    properties: [
-                        new OA\Property(property: 'name', type: 'string', example: 'John Doe'),
-                        new OA\Property(property: 'address', type: 'string', example: '123 Main St'),
-                        new OA\Property(property: 'aka_names', type: 'array', items: new OA\Items(type: 'string')),
-                    ]
-                ),
+                new OA\Property(property: 'text', type: 'string', example: 'Invoice #12345 from Acme Corp...'),
+                new OA\Property(property: 'extract_metadata', type: 'boolean', example: true, description: 'Whether to extract structured metadata'),
             ]
         )
     )]
@@ -103,13 +222,18 @@ PROMPT;
             properties: [
                 new OA\Property(property: 'success', type: 'boolean', example: true),
                 new OA\Property(
-                    property: 'data',
+                    property: 'categories',
+                    type: 'array',
+                    items: new OA\Items(type: 'string'),
+                    example: '["invoice", "contract"]'
+                ),
+                new OA\Property(property: 'confidence', type: 'number', example: 0.92),
+                new OA\Property(property: 'reasoning', type: 'string'),
+                new OA\Property(
+                    property: 'metadata',
                     type: 'object',
-                    properties: [
-                        new OA\Property(property: 'categories', type: 'array', items: new OA\Items(type: 'string'), example: '["contract", "human_resources"]'),
-                        new OA\Property(property: 'confidence', type: 'number', example: 0.92),
-                        new OA\Property(property: 'reasoning', type: 'string'),
-                    ]
+                    nullable: true,
+                    example: '{"sender": {"value": "Acme Corp", "confidence": 0.95}, "amount": {"value": 1250.00, "confidence": 0.98}}'
                 ),
             ]
         )
@@ -121,7 +245,7 @@ PROMPT;
         int $userId,
         #[CurrentUser] ?User $user,
     ): JsonResponse {
-        if (!$user || $user->getId() !== $userId) {
+        if (!$this->canAccessPlugin($user, $userId)) {
             return $this->json(['success' => false, 'error' => 'Unauthorized'], Response::HTTP_UNAUTHORIZED);
         }
 
@@ -131,40 +255,35 @@ PROMPT;
             return $this->json(['success' => false, 'error' => 'Text is required'], Response::HTTP_BAD_REQUEST);
         }
 
-        $filename = $data['filename'] ?? 'unknown';
+        $filename = $data['filename'] ?? 'document';
         $text = $data['text'];
-        $userContext = $data['user_context'] ?? [];
+        $extractMetadata = $data['extract_metadata'] ?? false;
+
+        // Get config
+        $config = $this->getPluginConfig($userId);
+        $maxLength = $config['max_text_length'];
 
         // Truncate text if too long
-        $maxLength = 10000;
         if (strlen($text) > $maxLength) {
             $text = substr($text, 0, $maxLength).'... [truncated]';
         }
 
-        // Build user context string
-        $contextStr = 'None provided';
-        if (!empty($userContext)) {
-            $parts = [];
-            if (!empty($userContext['name'])) {
-                $parts[] = 'Name: '.$userContext['name'];
-            }
-            if (!empty($userContext['address'])) {
-                $parts[] = 'Address: '.$userContext['address'];
-            }
-            if (!empty($userContext['aka_names'])) {
-                $parts[] = 'Also known as: '.implode(', ', $userContext['aka_names']);
-            }
-            if (!empty($parts)) {
-                $contextStr = implode("\n", $parts);
-            }
+        // Build prompt from user's schema
+        $schema = $this->promptGenerator->getSchemaForUser($userId);
+        if (empty($schema)) {
+            return $this->json([
+                'success' => false,
+                'error' => 'No categories configured. Please run plugin installation to seed default categories.',
+            ], Response::HTTP_BAD_REQUEST);
         }
 
-        try {
-            $systemPrompt = sprintf(self::CLASSIFICATION_PROMPT, $contextStr, $filename);
+        $systemPrompt = $this->promptGenerator->generatePrompt($schema, $extractMetadata);
+        $userMessage = "Classify this document:\n\nFilename: {$filename}\n\nContent:\n{$text}";
 
+        try {
             $messages = [
                 ['role' => 'system', 'content' => $systemPrompt],
-                ['role' => 'user', 'content' => "Document content:\n\n".$text],
+                ['role' => 'user', 'content' => $userMessage],
             ];
 
             // Get user's model config
@@ -180,40 +299,50 @@ PROMPT;
                 'provider' => $provider,
                 'model' => $modelName,
                 'temperature' => 0.1,
-                'max_tokens' => 500,
+                'max_tokens' => 1000,
             ]);
 
-            $result = $this->parseClassificationResponse($response['content']);
+            $result = $this->parseAiResponse($response['content']);
 
             $this->logger->info('SortX classification completed', [
                 'user_id' => $userId,
                 'filename' => $filename,
                 'categories' => $result['categories'],
                 'confidence' => $result['confidence'],
+                'has_metadata' => isset($result['metadata']),
             ]);
 
             return $this->json([
                 'success' => true,
-                'data' => $result,
+                'categories' => $result['categories'] ?? ['unknown'],
+                'confidence' => $result['confidence'] ?? 0.0,
+                'reasoning' => $result['reasoning'] ?? null,
+                'metadata' => $extractMetadata ? ($result['metadata'] ?? null) : null,
             ]);
         } catch (\Throwable $e) {
             $this->logger->error('SortX classification failed', [
                 'user_id' => $userId,
+                'filename' => $filename,
                 'error' => $e->getMessage(),
             ]);
 
             return $this->json([
                 'success' => false,
                 'error' => 'Classification failed: '.$e->getMessage(),
+                'categories' => ['unknown'],
+                'confidence' => 0.0,
             ], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
 
+    /**
+     * Full file analysis with vision models.
+     */
     #[Route('/analyze-file', name: 'analyze_file', methods: ['POST'])]
     #[OA\Post(
         path: '/api/v1/user/{userId}/plugins/sortx/analyze-file',
-        summary: 'Full file analysis with vision models',
-        description: 'Uploads and analyzes a file using vision models for image-based documents',
+        summary: 'Full file analysis with text extraction and classification',
+        description: 'Uploads and analyzes a file, extracting text and classifying with optional metadata',
         security: [['Bearer' => []]],
         tags: ['SortX Plugin']
     )]
@@ -224,7 +353,7 @@ PROMPT;
             schema: new OA\Schema(
                 properties: [
                     new OA\Property(property: 'file', type: 'string', format: 'binary'),
-                    new OA\Property(property: 'user_context', type: 'string', description: 'JSON-encoded user context'),
+                    new OA\Property(property: 'extract_metadata', type: 'boolean', description: 'Whether to extract metadata'),
                 ]
             )
         )
@@ -235,15 +364,11 @@ PROMPT;
         content: new OA\JsonContent(
             properties: [
                 new OA\Property(property: 'success', type: 'boolean'),
-                new OA\Property(
-                    property: 'data',
-                    type: 'object',
-                    properties: [
-                        new OA\Property(property: 'categories', type: 'array', items: new OA\Items(type: 'string')),
-                        new OA\Property(property: 'confidence', type: 'number'),
-                        new OA\Property(property: 'extracted_text', type: 'string'),
-                    ]
-                ),
+                new OA\Property(property: 'categories', type: 'array', items: new OA\Items(type: 'string')),
+                new OA\Property(property: 'confidence', type: 'number'),
+                new OA\Property(property: 'reasoning', type: 'string'),
+                new OA\Property(property: 'metadata', type: 'object', nullable: true),
+                new OA\Property(property: 'extracted_text', type: 'string', nullable: true),
             ]
         )
     )]
@@ -252,7 +377,7 @@ PROMPT;
         int $userId,
         #[CurrentUser] ?User $user,
     ): JsonResponse {
-        if (!$user || $user->getId() !== $userId) {
+        if (!$this->canAccessPlugin($user, $userId)) {
             return $this->json(['success' => false, 'error' => 'Unauthorized'], Response::HTTP_UNAUTHORIZED);
         }
 
@@ -263,16 +388,17 @@ PROMPT;
             return $this->json(['success' => false, 'error' => 'File is required'], Response::HTTP_BAD_REQUEST);
         }
 
-        // Check file size (50MB default)
-        $maxSize = 50 * 1024 * 1024;
+        $config = $this->getPluginConfig($userId);
+        $maxSize = $config['max_file_size_mb'] * 1024 * 1024;
+
         if ($file->getSize() > $maxSize) {
-            return $this->json(['success' => false, 'error' => 'File too large'], Response::HTTP_BAD_REQUEST);
+            return $this->json([
+                'success' => false,
+                'error' => "File too large. Maximum size is {$config['max_file_size_mb']}MB",
+            ], Response::HTTP_BAD_REQUEST);
         }
 
-        $userContext = [];
-        if ($request->request->has('user_context')) {
-            $userContext = json_decode($request->request->get('user_context'), true) ?? [];
-        }
+        $extractMetadata = filter_var($request->request->get('extract_metadata', 'false'), FILTER_VALIDATE_BOOLEAN);
 
         try {
             $filename = $file->getClientOriginalName();
@@ -285,25 +411,25 @@ PROMPT;
                 'size' => $file->getSize(),
             ]);
 
-            // TODO: Implement actual vision model call
+            // TODO: Implement actual file processing using Synaplan's FileProcessor
             // This would involve:
-            // 1. Converting file to base64
-            // 2. Calling vision-capable model
-            // 3. Parsing response
+            // 1. Extract text using FileProcessor->extractText()
+            // 2. If extraction fails, use vision model via AiFacade->analyzeImage()
+            // 3. Classify extracted text
 
             return $this->json([
                 'success' => true,
-                'data' => [
-                    'categories' => [],
-                    'confidence' => 0.0,
-                    'extracted_text' => null,
-                    'metadata' => [
-                        'filename' => $filename,
-                        'mime_type' => $mimeType,
-                        'size' => $file->getSize(),
-                    ],
-                    'note' => 'Vision analysis not yet implemented - use /classify with extracted text',
+                'categories' => [],
+                'confidence' => 0.0,
+                'reasoning' => null,
+                'metadata' => null,
+                'extracted_text' => null,
+                'file_info' => [
+                    'filename' => $filename,
+                    'mime_type' => $mimeType,
+                    'size' => $file->getSize(),
                 ],
+                'note' => 'Full file analysis implementation pending - use /classify with pre-extracted text',
             ]);
         } catch (\Throwable $e) {
             $this->logger->error('SortX file analysis failed', [
@@ -318,87 +444,43 @@ PROMPT;
         }
     }
 
-    #[Route('/categories', name: 'categories', methods: ['GET'])]
-    #[OA\Get(
-        path: '/api/v1/user/{userId}/plugins/sortx/categories',
-        summary: 'Get available classification categories',
-        security: [['Bearer' => []]],
-        tags: ['SortX Plugin']
-    )]
-    #[OA\Response(
-        response: 200,
-        description: 'List of categories',
-        content: new OA\JsonContent(
-            properties: [
-                new OA\Property(property: 'success', type: 'boolean'),
-                new OA\Property(
-                    property: 'categories',
-                    type: 'array',
-                    items: new OA\Items(
-                        properties: [
-                            new OA\Property(property: 'key', type: 'string'),
-                            new OA\Property(property: 'name', type: 'string'),
-                            new OA\Property(property: 'description', type: 'string'),
-                        ]
-                    )
-                ),
-            ]
-        )
-    )]
-    public function categories(int $userId, #[CurrentUser] ?User $user): JsonResponse
+    /**
+     * Verify user has access to this plugin instance.
+     */
+    private function canAccessPlugin(?User $user, int $userId): bool
     {
-        if (!$user || $user->getId() !== $userId) {
-            return $this->json(['success' => false, 'error' => 'Unauthorized'], Response::HTTP_UNAUTHORIZED);
+        if ($user === null) {
+            return false;
         }
 
-        return $this->json([
-            'success' => true,
-            'categories' => [
-                [
-                    'key' => 'contract',
-                    'name' => 'Contract',
-                    'description' => 'Legal agreements, contracts, leases, NDAs',
-                ],
-                [
-                    'key' => 'invoice',
-                    'name' => 'Invoice',
-                    'description' => 'Bills, invoices, receipts, payment documents',
-                ],
-                [
-                    'key' => 'request',
-                    'name' => 'Request',
-                    'description' => 'Formal requests, applications, proposals',
-                ],
-                [
-                    'key' => 'research',
-                    'name' => 'Research',
-                    'description' => 'Academic papers, studies, whitepapers, theses',
-                ],
-                [
-                    'key' => 'human_resources',
-                    'name' => 'Human Resources',
-                    'description' => 'CVs, resumes, job applications, personnel files',
-                ],
-                [
-                    'key' => 'sales',
-                    'name' => 'Sales',
-                    'description' => 'Quotes, quotations, offers, orders',
-                ],
-            ],
-            'note' => 'Documents can belong to multiple categories. Empty array means unknown/unclassified.',
-        ]);
+        // User can access their own plugin
+        return $user->getId() === $userId;
     }
 
     /**
-     * Parse AI response into structured classification result.
-     * Supports multiple categories (1-to-n relationship).
+     * Get plugin configuration.
+     *
+     * @return array{confidence_threshold: float, max_text_length: int, max_file_size_mb: int}
      */
-    private function parseClassificationResponse(string $response): array
+    private function getPluginConfig(int $userId): array
     {
-        // Try to extract JSON from response
-        $response = trim($response);
+        // TODO: Read from BCONFIG (P_sortx group) if configured
+        return [
+            'confidence_threshold' => 0.5,
+            'max_text_length' => 10000,
+            'max_file_size_mb' => 50,
+        ];
+    }
 
-        // Remove markdown code blocks if present
+    /**
+     * Parse AI response, handling common issues like markdown wrapping.
+     *
+     * @return array{categories: array, confidence: float, reasoning: ?string, metadata: ?array}
+     */
+    private function parseAiResponse(string $response): array
+    {
+        // Strip markdown code blocks if present
+        $response = trim($response);
         if (str_starts_with($response, '```')) {
             $response = preg_replace('/^```(?:json)?\s*/i', '', $response);
             $response = preg_replace('/\s*```$/', '', $response);
@@ -407,27 +489,24 @@ PROMPT;
         $decoded = json_decode($response, true);
 
         if (json_last_error() !== JSON_ERROR_NONE) {
-            // Fallback if not valid JSON
+            $this->logger->warning('Failed to parse AI response as JSON', [
+                'response' => substr($response, 0, 500),
+                'error' => json_last_error_msg(),
+            ]);
+
             return [
-                'categories' => [],
+                'categories' => ['unknown'],
                 'confidence' => 0.0,
                 'reasoning' => 'Failed to parse AI response',
+                'metadata' => null,
             ];
         }
 
-        // Handle both old single-category and new multi-category format
-        $categories = [];
-        if (isset($decoded['categories']) && is_array($decoded['categories'])) {
-            $categories = $decoded['categories'];
-        } elseif (isset($decoded['category']) && $decoded['category'] !== 'unknown') {
-            // Backward compatibility with single category
-            $categories = [$decoded['category']];
-        }
-
         return [
-            'categories' => $categories,
+            'categories' => $decoded['categories'] ?? ['unknown'],
             'confidence' => (float) ($decoded['confidence'] ?? 0.0),
             'reasoning' => $decoded['reasoning'] ?? null,
+            'metadata' => $decoded['metadata'] ?? null,
         ];
     }
 }
