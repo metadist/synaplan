@@ -46,7 +46,7 @@ class PromptFixtures extends Fixture
                 'ownerId' => 0,
                 'language' => 'en',
                 'topic' => 'mediamaker',
-                'shortDescription' => 'The user asks for generation of an image, video or audio/speech. Examples: "create an image", "make a video", "generate a picture", "read this aloud", "text to speech", "convert to audio", "make a voice". User wants to CREATE visual or audio media, not analyze it. This handles the connection to media generation AIs like DALL-E, Stable Diffusion, TTS, etc.',
+                'shortDescription' => 'The user asks for generation of an image, video or audio/speech. Examples: "create an image", "make a video", "generate a picture", "read this aloud", "text to speech", "convert to audio". User wants to CREATE visual or audio media, not analyze it. This prompt enhances the user request for better AI generation results.',
                 'prompt' => $this->getMediaMakerPrompt(),
             ],
             [
@@ -179,6 +179,27 @@ This is the list, use only this:
    - Questions that explicitly require internet search
    Otherwise, set BWEBSEARCH to 0.
 
+7. **Detect media type (BMEDIA)**: If BTOPIC is "mediamaker", also set BMEDIA to specify the type of media the user wants:
+   - "video" - if user wants a video, film, clip, animation, or moving images
+   - "audio" - if user wants audio, sound, voice, speech, TTS, or text-to-speech
+   - "image" - if user wants an image, picture, photo, illustration (this is the default)
+   Examples:
+   - "Erstelle ein Video von einem Auto" → BMEDIA: "video"
+   - "Make a video of a dog running" → BMEDIA: "video"
+   - "Generate an image of a cat" → BMEDIA: "image"
+   - "Create a picture of a sunset" → BMEDIA: "image"
+   - "Read this text aloud" → BMEDIA: "audio"
+   - "Convert to speech" → BMEDIA: "audio"
+
+8. **Detect video duration (BDURATION)**: If BTOPIC is "mediamaker" AND BMEDIA is "video", extract the requested duration in seconds as an integer.
+   - If the user specifies a duration (e.g., "3 seconds", "6 Sekunden", "10-second video"), set BDURATION to that number
+   - If no duration is mentioned, do NOT include BDURATION (let the system use default)
+   Examples:
+   - "Erstelle ein 3 Sekunden Video von einem Auto" → BDURATION: 3
+   - "Make a 6-second video of a dog" → BDURATION: 6
+   - "Create a 10 second clip" → BDURATION: 10
+   - "Generate a video of a cat" → (no BDURATION, user didn't specify)
+
 # Answer format
 
 You must respond with the **same JSON object as received**, modifying only:
@@ -186,6 +207,8 @@ You must respond with the **same JSON object as received**, modifying only:
 * "BTOPIC": [KEYLIST]
 * "BLANG": [LANGLIST]
 * "BWEBSEARCH": 0 | 1
+* "BMEDIA": "image" | "video" | "audio" (only when BTOPIC is "mediamaker")
+* "BDURATION": integer (only when BMEDIA is "video" AND user specified a duration)
 
 If you cannot define the language from the text, leave "BLANG" as "en".
 If you cannot define the topic, leave "BTOPIC" as "general".
@@ -196,7 +219,7 @@ If BTEXT is empty, but BFILETEXT is set, use BFILETEXT primarily to define the t
 If the user changes topics mid-conversation, update BTOPIC to match the new topic in your next response.
 
 Do not change any other fields.
-Do not add any new fields beyond BTOPIC, BLANG, and BWEBSEARCH.
+Do not add any new fields beyond BTOPIC, BLANG, BWEBSEARCH, BMEDIA, and BDURATION.
 Do not add any additional text beyond the JSON.
 **Do not answer the question of the user.**
 Only send the JSON object.
@@ -223,45 +246,61 @@ PROMPT;
     private function getMediaMakerPrompt(): string
     {
         return <<<'PROMPT'
-# Media generation
-You receive a media generation request. The user has requested the generation of an image, video or an audio file.
+# Media Prompt Enhancement
+
+You receive a media generation request. Your task is to improve and enhance the user's prompt for better AI generation results.
+
+## Critical Rules
+1. **PRESERVE all user-specified visual parameters**: size, resolution, colors, style, etc.
+2. **DO NOT override** user preferences with default values
+3. **DO NOT include duration** in the enhanced prompt - duration is handled separately by the system
+4. If user specifies a style or color, preserve it exactly
 
 ## Your Task
-1. Determine the media type: "image", "video", or "audio"
-2. Extract and improve the prompt text
+Take the user's request and create an enhanced, detailed prompt that will produce better results. Focus on visual and cinematic details only.
 
-## Output Format
-You MUST respond with JSON in this format:
-{"BTEXT": "improved prompt text", "BMEDIA": "image|video|audio"}
+## Guidelines
 
-## For AUDIO/TTS requests:
-- Set BMEDIA to "audio"
-- Extract ONLY the text that should be spoken from BTEXT
-- Remove instruction words like "read", "speak", "convert", "make audio", "generate voice", "erstelle audio", "lies vor", etc.
-- Keep only the actual content to be spoken
-- Preserve the original language and punctuation
-- If text is in quotes, extract the quoted text only
+### For IMAGE prompts:
+- Preserve any user-specified: size, colors, style, mood
+- Add visual details: lighting, composition, quality hints
+- Keep the user's core intent and specifications intact
+- Use the user's language
 
-## For IMAGE requests:
-- Set BMEDIA to "image"
-- Extract the prompt from BTEXT
-- Improve the prompt and add details from the user's purpose
-- Create a better, more detailed prompt in the user's language
-- Include visual details, style, quality hints
+### For VIDEO prompts:
+- **DO NOT include duration** in the enhanced prompt (duration is extracted separately and passed as API parameter)
+- Add camera movement, lighting, atmosphere details
+- Keep the user's subject and action intact
+- Use the user's language
 
-## For VIDEO requests:
-- Set BMEDIA to "video"
-- Extract the prompt from BTEXT
-- Improve the prompt and add details from the user's purpose
-- Create a better, more detailed prompt in the user's language
+### For AUDIO/TTS prompts:
+- Extract ONLY the text that should be spoken
+- Remove instruction words like "read", "speak", "say", "lies vor", "erstelle audio"
+- Keep the actual content to be spoken
+- Preserve original language and punctuation
 
-## Examples:
-- Input: "Read this aloud: Hello World" → {"BTEXT": "Hello World", "BMEDIA": "audio"}
-- Input: "Erstelle eine audio mit 'Guten Tag!'" → {"BTEXT": "Guten Tag!", "BMEDIA": "audio"}
-- Input: "Generate an image of a cat" → {"BTEXT": "A detailed image of a cat, photorealistic, high quality", "BMEDIA": "image"}
-- Input: "Can you also generate an image of a cat in a tree, playing the violin?" → {"BTEXT": "A whimsical, high-detail illustration of a cat perched on a leafy tree branch, playing a violin with its paws; the cat balanced confidently with tail curled, sheet music clipped to the branch, soft golden-hour sunlight filtering through the leaves, subtle motion in the fur and bow, dreamy storybook atmosphere, vibrant natural colors, shallow depth of field, high resolution", "BMEDIA": "image"}
+## Response Format
+Respond with ONLY the enhanced prompt text. Do not include any JSON, explanations, or metadata.
 
-You are a helpful assistant that generates images, videos, and audio files for users.
+## Examples
+
+Input: "Generate an image of a cat"
+Output: A detailed image of a cat, photorealistic, soft natural lighting, high resolution, shallow depth of field
+
+Input: "Erstelle ein 3 Sekunden Video von einem Mann der winkt"
+Output: Cinematic video of a man waving, natural movement, friendly expression, soft daylight, shallow depth of field, 4K quality
+
+Input: "Make a 5 second video of a dog running in a park"
+Output: Dynamic video of a happy dog running through a lush green park, tracking shot, natural sunlight, playful movement, cinematic quality
+
+Input: "Erstelle ein Video von einem BMW Auto, was gerade fährt"
+Output: Cinematic video of a modern BMW sedan driving smoothly on an asphalt road, front three-quarter tracking shot, realistic motion blur, reflections on glossy paint, golden-hour lighting, urban background, 4K quality
+
+Input: "Read this aloud: Hello World"
+Output: Hello World
+
+Input: "Erstelle eine audio mit 'Guten Tag!'"
+Output: Guten Tag!
 PROMPT;
     }
 

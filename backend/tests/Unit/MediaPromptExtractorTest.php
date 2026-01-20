@@ -112,6 +112,96 @@ class MediaPromptExtractorTest extends TestCase
         $this->assertNull($result['media_type']);
     }
 
+    public function testUsesMediaTypeFromClassificationWhenPresent(): void
+    {
+        $chatHandler = $this->createMock(ChatHandler::class);
+        $logger = $this->createMock(LoggerInterface::class);
+
+        // AI returns JSON with media_type "image", but classification has "video"
+        $chatHandler->expects($this->once())
+            ->method('handle')
+            ->willReturn(['content' => '{"BMEDIA":"image","BTEXT":"Enhanced prompt"}']);
+
+        // Expect logging when using sorter-provided media_type (among other info logs)
+        $logger->expects($this->atLeastOnce())
+            ->method('info')
+            ->willReturnCallback(function (string $message, array $context = []) {
+                // Verify the specific log message is called
+                if ('MediaPromptExtractor: Using media_type from sorter' === $message) {
+                    $this->assertSame('video', $context['media_type']);
+                }
+            });
+
+        $classification = [
+            'topic' => 'mediamaker',
+            'language' => 'en',
+            'media_type' => 'video', // This should take precedence over JSON
+        ];
+
+        $extractor = new MediaPromptExtractor($chatHandler, $logger);
+        $result = $extractor->extract($this->message, [], $classification);
+
+        $this->assertSame('Enhanced prompt', $result['prompt']);
+        $this->assertSame('video', $result['media_type']); // Classification wins
+    }
+
+    public function testFallsBackToJsonMediaTypeWhenClassificationDoesNotProvideIt(): void
+    {
+        $chatHandler = $this->createMock(ChatHandler::class);
+        $logger = $this->createMock(LoggerInterface::class);
+
+        // AI returns JSON with media_type
+        $chatHandler->expects($this->once())
+            ->method('handle')
+            ->willReturn(['content' => '{"BMEDIA":"audio","BTEXT":"Hallo Welt"}']);
+
+        // Verify the sorter log is NOT called (since classification doesn't provide media_type)
+        $logger->expects($this->atLeastOnce())
+            ->method('info')
+            ->willReturnCallback(function (string $message) {
+                // This specific log should NOT be called
+                $this->assertNotSame(
+                    'MediaPromptExtractor: Using media_type from sorter',
+                    $message,
+                    'Should not use sorter media_type when classification does not provide it'
+                );
+            });
+
+        $classification = [
+            'topic' => 'mediamaker',
+            'language' => 'de',
+            // No media_type in classification - should fall back to JSON
+        ];
+
+        $extractor = new MediaPromptExtractor($chatHandler, $logger);
+        $result = $extractor->extract($this->message, [], $classification);
+
+        $this->assertSame('Hallo Welt', $result['prompt']);
+        $this->assertSame('audio', $result['media_type']); // Falls back to JSON
+    }
+
+    public function testPreservesMediaTypeFromClassificationOnException(): void
+    {
+        $chatHandler = $this->createMock(ChatHandler::class);
+        $logger = $this->createMock(LoggerInterface::class);
+
+        $chatHandler->expects($this->once())
+            ->method('handle')
+            ->willThrowException(new \RuntimeException('AI service unavailable'));
+
+        $classification = [
+            'topic' => 'mediamaker',
+            'language' => 'en',
+            'media_type' => 'video', // Should be preserved in fallback
+        ];
+
+        $extractor = new MediaPromptExtractor($chatHandler, $logger);
+        $result = $extractor->extract($this->message, [], $classification);
+
+        $this->assertSame($this->message->getText(), $result['prompt']);
+        $this->assertSame('video', $result['media_type']); // Preserved from classification
+    }
+
     public function testTriggersAudioFallbackWhenResponseIsNotJson(): void
     {
         $chatHandler = $this->createMock(ChatHandler::class);
