@@ -335,6 +335,13 @@ export const useHistoryStore = defineStore('history', () => {
     if (!checkAuthOrRedirect()) return
 
     isLoadingMessages.value = true
+
+    // Reset pagination state when loading from start (prevents stale state on error)
+    if (offset === 0) {
+      currentOffset.value = 0
+      hasMoreMessages.value = false
+    }
+
     try {
       const { chatApi } = await import('@/services/api')
       const response = await chatApi.getChatMessages(chatId, offset, limit)
