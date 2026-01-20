@@ -46,6 +46,10 @@ class MediaPromptExtractor
             ];
         }
 
+        // First, check if media_type was already determined by the sorter
+        // This is the preferred source as it avoids relying on JSON parsing from AI
+        $mediaTypeFromSorter = $classification['media_type'] ?? null;
+
         $rawContent = '';
 
         try {
@@ -58,7 +62,7 @@ class MediaPromptExtractor
 
             return [
                 'prompt' => $message->getText(),
-                'media_type' => null,
+                'media_type' => $mediaTypeFromSorter,
                 'raw' => '',
             ];
         }
@@ -70,13 +74,24 @@ class MediaPromptExtractor
         $mediaType = null;
 
         if (is_array($decoded)) {
+            // AI returned JSON - extract prompt and optionally media type
             $prompt = trim((string) ($decoded['BTEXT'] ?? $decoded['prompt'] ?? $decoded['text'] ?? ''));
             $mediaType = $this->normalizeMediaType($decoded['BMEDIA'] ?? $decoded['media'] ?? null);
+        }
+
+        // Use media type from sorter as primary source (more reliable)
+        // Only fall back to JSON-parsed media type if sorter didn't provide one
+        if (null !== $mediaTypeFromSorter) {
+            $mediaType = $mediaTypeFromSorter;
+            $this->logger->info('MediaPromptExtractor: Using media_type from sorter', [
+                'media_type' => $mediaType,
+            ]);
         }
 
         $usingJson = is_array($decoded);
 
         if ('' === $prompt) {
+            // AI returned plain text (not JSON) - use as prompt directly
             $prompt = '' !== $normalized ? $normalized : $message->getText();
         }
 
