@@ -37,8 +37,14 @@ export interface WidgetConfig {
 
 export interface CreateWidgetRequest {
   name: string
-  taskPromptTopic: string
+  taskPromptTopic?: string
+  websiteUrl?: string
   config?: WidgetConfig
+}
+
+export interface QuickCreateWidgetRequest {
+  name: string
+  websiteUrl: string
 }
 
 export interface UpdateWidgetRequest {
@@ -72,6 +78,21 @@ export async function createWidget(request: CreateWidgetRequest): Promise<Widget
   const data = await httpClient<{ success: boolean; widget: Widget }>('/api/v1/widgets', {
     method: 'POST',
     body: JSON.stringify(request),
+  })
+  return data.widget
+}
+
+/**
+ * Quick create widget with minimal setup (name + website only)
+ * Uses default prompt and auto-adds website domain to allowed list
+ */
+export async function quickCreateWidget(request: QuickCreateWidgetRequest): Promise<Widget> {
+  const data = await httpClient<{ success: boolean; widget: Widget }>('/api/v1/widgets', {
+    method: 'POST',
+    body: JSON.stringify({
+      name: request.name,
+      websiteUrl: request.websiteUrl,
+    }),
   })
   return data.widget
 }
@@ -411,6 +432,56 @@ export async function uploadWidgetFile(
   }
 
   return await response.json()
+}
+
+/**
+ * Send a message in the widget setup interview
+ */
+export async function sendSetupMessage(
+  widgetId: string,
+  text: string,
+  chatId: number | null
+): Promise<{
+  success: boolean
+  chatId: number
+  messageId: number
+  text: string
+  progress: number
+}> {
+  const data = await httpClient<{
+    success: boolean
+    chatId: number
+    messageId: number
+    text: string
+    progress: number
+  }>(`/api/v1/widgets/${widgetId}/setup-chat`, {
+    method: 'POST',
+    body: JSON.stringify({ text, chatId }),
+  })
+  return data
+}
+
+/**
+ * Generate and save a custom prompt from the setup interview
+ */
+export async function generateWidgetPrompt(
+  widgetId: string,
+  generatedPrompt: string,
+  chatId: number | null
+): Promise<{
+  success: boolean
+  promptTopic: string
+  promptId: number
+}> {
+  const data = await httpClient<{
+    success: boolean
+    promptTopic: string
+    promptId: number
+  }>(`/api/v1/widgets/${widgetId}/generate-prompt`, {
+    method: 'POST',
+    body: JSON.stringify({ generatedPrompt, chatId }),
+  })
+  return data
 }
 
 /**

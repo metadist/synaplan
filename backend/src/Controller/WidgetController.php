@@ -7,6 +7,7 @@ use App\Entity\Widget;
 use App\Repository\WidgetRepository;
 use App\Service\WidgetService;
 use App\Service\WidgetSessionService;
+use App\Service\WidgetSetupService;
 use Doctrine\ORM\EntityManagerInterface;
 use OpenApi\Attributes as OA;
 use Psr\Log\LoggerInterface;
@@ -29,6 +30,7 @@ class WidgetController extends AbstractController
     public function __construct(
         private WidgetService $widgetService,
         private WidgetSessionService $sessionService,
+        private WidgetSetupService $setupService,
         private WidgetRepository $widgetRepository,
         private EntityManagerInterface $em,
         private LoggerInterface $logger,
@@ -102,6 +104,10 @@ class WidgetController extends AbstractController
 
     /**
      * Create new widget.
+     *
+     * Supports two modes:
+     * - Quick setup: Only name and websiteUrl required (uses default prompt)
+     * - Full setup: name and taskPromptTopic for custom configuration
      */
     #[Route('', name: 'create', methods: ['POST'])]
     #[OA\Post(
@@ -113,11 +119,37 @@ class WidgetController extends AbstractController
     #[OA\RequestBody(
         required: true,
         content: new OA\JsonContent(
-            required: ['name', 'taskPromptTopic'],
+            required: ['name'],
             properties: [
                 new OA\Property(property: 'name', type: 'string', example: 'Support Chat'),
-                new OA\Property(property: 'taskPromptTopic', type: 'string', example: 'customer-support'),
+                new OA\Property(property: 'websiteUrl', type: 'string', example: 'https://example.com', description: 'Website URL - domain will be added to allowed domains'),
+                new OA\Property(property: 'taskPromptTopic', type: 'string', example: 'customer-support', description: 'Optional - defaults to widget-default'),
                 new OA\Property(property: 'config', type: 'object'),
+            ]
+        )
+    )]
+    #[OA\Response(
+        response: 201,
+        description: 'Widget created successfully',
+        content: new OA\JsonContent(
+            properties: [
+                new OA\Property(property: 'success', type: 'boolean', example: true),
+                new OA\Property(property: 'message', type: 'string'),
+                new OA\Property(
+                    property: 'widget',
+                    type: 'object',
+                    properties: [
+                        new OA\Property(property: 'id', type: 'integer'),
+                        new OA\Property(property: 'widgetId', type: 'string', example: 'wdg_abc123...'),
+                        new OA\Property(property: 'name', type: 'string'),
+                        new OA\Property(property: 'taskPromptTopic', type: 'string'),
+                        new OA\Property(property: 'status', type: 'string'),
+                        new OA\Property(property: 'config', type: 'object'),
+                        new OA\Property(property: 'allowedDomains', type: 'array', items: new OA\Items(type: 'string')),
+                        new OA\Property(property: 'created', type: 'integer'),
+                        new OA\Property(property: 'updated', type: 'integer'),
+                    ]
+                ),
             ]
         )
     )]
@@ -129,9 +161,9 @@ class WidgetController extends AbstractController
 
         $data = json_decode($request->getContent(), true);
 
-        if (empty($data['name']) || empty($data['taskPromptTopic'])) {
+        if (empty($data['name'])) {
             return $this->json([
-                'error' => 'Missing required fields: name, taskPromptTopic',
+                'error' => 'Missing required field: name',
             ], Response::HTTP_BAD_REQUEST);
         }
 
@@ -139,8 +171,9 @@ class WidgetController extends AbstractController
             $widget = $this->widgetService->createWidget(
                 $user,
                 $data['name'],
-                $data['taskPromptTopic'],
-                $data['config'] ?? []
+                $data['taskPromptTopic'] ?? null,
+                $data['config'] ?? [],
+                $data['websiteUrl'] ?? null
             );
 
             $widget->syncAllowedDomainsFromConfig();
@@ -497,6 +530,183 @@ class WidgetController extends AbstractController
 
             return $this->json([
                 'error' => 'Failed to upload icon: '.$e->getMessage(),
+            ], Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    /**
+     * Send a message in the widget setup interview.
+     *
+     * This endpoint powers the AI-guided setup wizard that helps users
+     * configure their widget through a conversational interface.
+     */
+    #[Route('/{widgetId}/setup-chat', name: 'setup_chat', methods: ['POST'])]
+    #[OA\Post(
+        path: '/api/v1/widgets/{widgetId}/setup-chat',
+        summary: 'Send message in widget setup interview',
+        security: [['Bearer' => []]],
+        tags: ['Widgets']
+    )]
+    #[OA\Parameter(
+        name: 'widgetId',
+        in: 'path',
+        required: true,
+        schema: new OA\Schema(type: 'string')
+    )]
+    #[OA\RequestBody(
+        required: true,
+        content: new OA\JsonContent(
+            required: ['text'],
+            properties: [
+                new OA\Property(property: 'text', type: 'string', description: 'User message or __START_INTERVIEW__ to begin'),
+                new OA\Property(property: 'chatId', type: 'integer', nullable: true, description: 'Existing chat ID to continue conversation'),
+            ]
+        )
+    )]
+    #[OA\Response(
+        response: 200,
+        description: 'Message processed',
+        content: new OA\JsonContent(
+            properties: [
+                new OA\Property(property: 'success', type: 'boolean'),
+                new OA\Property(property: 'chatId', type: 'integer'),
+                new OA\Property(property: 'messageId', type: 'integer'),
+                new OA\Property(property: 'text', type: 'string', description: 'AI response'),
+            ]
+        )
+    )]
+    public function setupChat(string $widgetId, Request $request, #[CurrentUser] ?User $user): JsonResponse
+    {
+        if (!$user) {
+            return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
+        }
+
+        $widget = $this->widgetRepository->findByWidgetId($widgetId);
+
+        if (!$widget) {
+            return $this->json(['error' => 'Widget not found'], Response::HTTP_NOT_FOUND);
+        }
+
+        if ($widget->getOwnerId() !== $user->getId()) {
+            return $this->json(['error' => 'Access denied'], Response::HTTP_FORBIDDEN);
+        }
+
+        $data = json_decode($request->getContent(), true);
+
+        if (empty($data['text'])) {
+            return $this->json(['error' => 'Missing required field: text'], Response::HTTP_BAD_REQUEST);
+        }
+
+        try {
+            $result = $this->setupService->sendSetupMessage(
+                $widget,
+                $user,
+                $data['text'],
+                $data['chatId'] ?? null
+            );
+
+            return $this->json([
+                'success' => true,
+                'chatId' => $result['chatId'],
+                'messageId' => $result['messageId'],
+                'text' => $result['text'],
+                'progress' => $result['progress'],
+            ]);
+        } catch (\Exception $e) {
+            $this->logger->error('Widget setup chat failed', [
+                'widget_id' => $widgetId,
+                'error' => $e->getMessage(),
+            ]);
+
+            return $this->json([
+                'error' => 'Failed to process message',
+            ], Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    /**
+     * Generate and save a custom prompt from the setup interview.
+     *
+     * Called after the AI-guided interview is complete to save
+     * the generated task prompt and associate it with the widget.
+     */
+    #[Route('/{widgetId}/generate-prompt', name: 'generate_prompt', methods: ['POST'])]
+    #[OA\Post(
+        path: '/api/v1/widgets/{widgetId}/generate-prompt',
+        summary: 'Generate custom prompt from setup interview',
+        security: [['Bearer' => []]],
+        tags: ['Widgets']
+    )]
+    #[OA\Parameter(
+        name: 'widgetId',
+        in: 'path',
+        required: true,
+        schema: new OA\Schema(type: 'string')
+    )]
+    #[OA\RequestBody(
+        required: true,
+        content: new OA\JsonContent(
+            required: ['generatedPrompt'],
+            properties: [
+                new OA\Property(property: 'generatedPrompt', type: 'string', description: 'The AI-generated prompt text'),
+                new OA\Property(property: 'chatId', type: 'integer', nullable: true, description: 'Chat ID from the interview session'),
+            ]
+        )
+    )]
+    #[OA\Response(
+        response: 200,
+        description: 'Prompt saved successfully',
+        content: new OA\JsonContent(
+            properties: [
+                new OA\Property(property: 'success', type: 'boolean'),
+                new OA\Property(property: 'promptId', type: 'integer'),
+                new OA\Property(property: 'promptTopic', type: 'string'),
+            ]
+        )
+    )]
+    public function generatePrompt(string $widgetId, Request $request, #[CurrentUser] ?User $user): JsonResponse
+    {
+        if (!$user) {
+            return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
+        }
+
+        $widget = $this->widgetRepository->findByWidgetId($widgetId);
+
+        if (!$widget) {
+            return $this->json(['error' => 'Widget not found'], Response::HTTP_NOT_FOUND);
+        }
+
+        if ($widget->getOwnerId() !== $user->getId()) {
+            return $this->json(['error' => 'Access denied'], Response::HTTP_FORBIDDEN);
+        }
+
+        $data = json_decode($request->getContent(), true);
+
+        if (empty($data['generatedPrompt'])) {
+            return $this->json(['error' => 'Missing required field: generatedPrompt'], Response::HTTP_BAD_REQUEST);
+        }
+
+        try {
+            $result = $this->setupService->generatePrompt(
+                $widget,
+                $user,
+                $data['generatedPrompt'],
+                $data['chatId'] ?? null
+            );
+
+            return $this->json([
+                'success' => true,
+                'promptId' => $result['promptId'],
+                'promptTopic' => $result['promptTopic'],
+            ]);
+        } catch (\Exception $e) {
+            $this->logger->error('Widget prompt generation failed', [
+                'widget_id' => $widgetId,
+                'error' => $e->getMessage(),
+            ]);
+
+            return $this->json([
+                'error' => 'Failed to generate prompt',
             ], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }

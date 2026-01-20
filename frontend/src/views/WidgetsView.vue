@@ -54,7 +54,7 @@
 
           <!-- Empty State -->
           <div
-            v-else-if="widgets.length === 0 && !showWizard"
+            v-else-if="widgets.length === 0"
             class="surface-card p-8 lg:p-12 text-center"
             data-testid="state-widgets-empty"
           >
@@ -78,7 +78,7 @@
 
           <!-- Widgets List -->
           <div
-            v-else-if="!showWizard"
+            v-else
             class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4"
             data-testid="section-widget-cards"
           >
@@ -148,12 +148,20 @@
                   <Icon icon="heroicons:play" class="w-4 h-4 text-green-600 dark:text-green-400" />
                 </button>
                 <button
-                  class="px-3 py-2 rounded-lg hover-surface transition-colors"
-                  :title="$t('widgets.edit')"
-                  data-testid="btn-widget-edit"
-                  @click="editWidget(widget)"
+                  class="px-3 py-2 rounded-lg bg-[var(--brand-alpha-light)] hover:bg-[var(--brand)]/20 transition-colors"
+                  :title="$t('widgets.aiSetup')"
+                  data-testid="btn-widget-ai-setup"
+                  @click="startAiSetup(widget)"
                 >
-                  <Icon icon="heroicons:pencil" class="w-4 h-4 txt-secondary" />
+                  <Icon icon="heroicons:sparkles" class="w-4 h-4 txt-brand" />
+                </button>
+                <button
+                  class="px-3 py-2 rounded-lg hover-surface transition-colors"
+                  :title="$t('widgets.advancedConfigLabel')"
+                  data-testid="btn-widget-advanced"
+                  @click="openAdvancedConfig(widget)"
+                >
+                  <Icon icon="heroicons:cog-6-tooth" class="w-4 h-4 txt-secondary" />
                 </button>
                 <button
                   class="px-3 py-2 rounded-lg hover:bg-red-500/10 transition-colors"
@@ -170,15 +178,44 @@
       </div>
     </div>
 
-    <!-- Step-by-Step Creation Wizard -->
-    <WidgetCreationWizard
-      v-if="showWizard"
-      data-testid="comp-widget-wizard"
-      @close="closeWizard"
+    <!-- Simple Widget Form (Quick Create) -->
+    <SimpleWidgetForm
+      v-if="showSimpleForm"
+      data-testid="comp-simple-form"
+      @close="showSimpleForm = false"
       @created="handleWidgetCreated"
     />
 
-    <!-- Edit Modal -->
+    <!-- Success Modal (after creation) -->
+    <WidgetSuccessModal
+      v-if="successWidget"
+      :widget="successWidget"
+      data-testid="comp-success-modal"
+      @close="successWidget = null"
+      @start-ai-setup="startAiSetupFromSuccess"
+      @open-advanced="openAdvancedFromSuccess"
+      @test-widget="testWidgetFromSuccess"
+    />
+
+    <!-- AI Setup Chat Modal -->
+    <SetupChatModal
+      v-if="setupWidget"
+      :widget="setupWidget"
+      data-testid="comp-setup-chat"
+      @close="setupWidget = null"
+      @completed="handleSetupCompleted"
+    />
+
+    <!-- Advanced Config Modal -->
+    <AdvancedWidgetConfig
+      v-if="advancedWidget"
+      :widget="advancedWidget"
+      data-testid="comp-advanced-config"
+      @close="advancedWidget = null"
+      @saved="handleAdvancedSaved"
+    />
+
+    <!-- Legacy Edit Modal -->
     <WidgetEditorModal
       v-if="currentWidget"
       :widget="currentWidget"
@@ -239,7 +276,10 @@ import MainLayout from '@/components/MainLayout.vue'
 import * as widgetsApi from '@/services/api/widgetsApi'
 import { useNotification } from '@/composables/useNotification'
 import { useDialog } from '@/composables/useDialog'
-import WidgetCreationWizard from '@/components/widgets/WidgetCreationWizard.vue'
+import SimpleWidgetForm from '@/components/widgets/SimpleWidgetForm.vue'
+import WidgetSuccessModal from '@/components/widgets/WidgetSuccessModal.vue'
+import SetupChatModal from '@/components/widgets/SetupChatModal.vue'
+import AdvancedWidgetConfig from '@/components/widgets/AdvancedWidgetConfig.vue'
 import WidgetEditorModal from '@/components/widgets/WidgetEditorModal.vue'
 import EmbedCodeDialog from '@/components/widgets/EmbedCodeDialog.vue'
 import ChatWidget from '@/components/widgets/ChatWidget.vue'
@@ -253,7 +293,10 @@ const configStore = useConfigStore()
 
 const loading = ref(false)
 const widgets = ref<widgetsApi.Widget[]>([])
-const showWizard = ref(false)
+const showSimpleForm = ref(false)
+const successWidget = ref<widgetsApi.Widget | null>(null)
+const setupWidget = ref<widgetsApi.Widget | null>(null)
+const advancedWidget = ref<widgetsApi.Widget | null>(null)
 const currentWidget = ref<widgetsApi.Widget | null>(null)
 const showEmbedModal = ref(false)
 const embedWidget = ref<widgetsApi.Widget | null>(null)
@@ -279,26 +322,80 @@ const loadWidgets = async () => {
 }
 
 /**
- * Start widget creation
+ * Start widget creation (simple form)
  */
 const startCreation = () => {
-  showWizard.value = true
+  showSimpleForm.value = true
 }
 
 /**
- * Close wizard
+ * Handle widget created - show success modal
  */
-const closeWizard = () => {
-  showWizard.value = false
-}
-
-/**
- * Handle widget created
- */
-const handleWidgetCreated = async () => {
-  showWizard.value = false
+const handleWidgetCreated = async (widget: widgetsApi.Widget) => {
+  showSimpleForm.value = false
+  successWidget.value = widget
   await loadWidgets()
   success(t('widgets.createSuccess'))
+}
+
+/**
+ * Start AI setup from success modal
+ */
+const startAiSetupFromSuccess = () => {
+  if (successWidget.value) {
+    setupWidget.value = successWidget.value
+    successWidget.value = null
+  }
+}
+
+/**
+ * Open advanced config from success modal
+ */
+const openAdvancedFromSuccess = () => {
+  if (successWidget.value) {
+    advancedWidget.value = successWidget.value
+    successWidget.value = null
+  }
+}
+
+/**
+ * Test widget from success modal
+ */
+const testWidgetFromSuccess = () => {
+  if (successWidget.value) {
+    testWidget.value = successWidget.value
+  }
+}
+
+/**
+ * Start AI setup for existing widget
+ */
+const startAiSetup = (widget: widgetsApi.Widget) => {
+  setupWidget.value = widget
+}
+
+/**
+ * Open advanced config for existing widget
+ */
+const openAdvancedConfig = (widget: widgetsApi.Widget) => {
+  advancedWidget.value = widget
+}
+
+/**
+ * Handle AI setup completed
+ */
+const handleSetupCompleted = async () => {
+  setupWidget.value = null
+  await loadWidgets()
+  success(t('widgets.setupComplete'))
+}
+
+/**
+ * Handle advanced config saved
+ */
+const handleAdvancedSaved = async () => {
+  advancedWidget.value = null
+  await loadWidgets()
 }
 
 /**
@@ -306,13 +403,6 @@ const handleWidgetCreated = async () => {
  */
 const viewWidget = (widget: widgetsApi.Widget) => {
   showEmbed(widget)
-}
-
-/**
- * Edit widget
- */
-const editWidget = (widget: widgetsApi.Widget) => {
-  currentWidget.value = widget
 }
 
 /**
@@ -330,16 +420,11 @@ const closeTestChat = () => {
 }
 
 /**
- * Handle save
+ * Handle save (legacy editor)
  */
 const handleSave = async (data: any) => {
   try {
     if (currentWidget.value) {
-      console.log('🔧 WidgetsView handleSave:', {
-        widgetId: currentWidget.value.widgetId,
-        data: data,
-        allowedDomains: data.config?.allowedDomains,
-      })
       await widgetsApi.updateWidget(currentWidget.value.widgetId, data)
       success(t('widgets.updateSuccess'))
     }
