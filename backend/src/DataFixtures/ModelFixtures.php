@@ -711,11 +711,11 @@ class ModelFixtures extends Fixture
             [
                 'id' => 69,
                 'service' => 'Anthropic',
-                'name' => 'Claude 3 Opus',
+                'name' => 'Claude Opus 4.1',
                 'tag' => 'chat',
                 'selectable' => 1,
                 'active' => 1,
-                'providerId' => 'claude-3-opus-20240229',
+                'providerId' => 'claude-opus-4-1-20250805',
                 'priceIn' => 15,
                 'inUnit' => 'per1M',
                 'priceOut' => 75,
@@ -723,9 +723,9 @@ class ModelFixtures extends Fixture
                 'quality' => 10,
                 'rating' => 1,
                 'json' => [
-                    'description' => 'Claude 3 Opus - Anthropic\'s most powerful model for complex tasks, analysis, and high-quality outputs. Excellent at reasoning and following instructions.',
+                    'description' => 'Claude Opus 4.1 - Anthropic model with strong reasoning, bug detection, and precision tasks. Successor to Claude 3 Opus.',
                     'params' => [
-                        'model' => 'claude-3-opus-20240229',
+                        'model' => 'claude-opus-4-1-20250805',
                     ],
                     'features' => ['vision'],
                     'meta' => [
@@ -763,11 +763,11 @@ class ModelFixtures extends Fixture
             [
                 'id' => 93,
                 'service' => 'Anthropic',
-                'name' => 'Claude 3 Opus (Vision)',
+                'name' => 'Claude Opus 4.1 (Vision)',
                 'tag' => 'pic2text',
                 'selectable' => 1,
                 'active' => 1,
-                'providerId' => 'claude-3-opus-20240229',
+                'providerId' => 'claude-opus-4-1-20250805',
                 'priceIn' => 15,
                 'inUnit' => 'per1M',
                 'priceOut' => 75,
@@ -775,10 +775,10 @@ class ModelFixtures extends Fixture
                 'quality' => 10,
                 'rating' => 1,
                 'json' => [
-                    'description' => 'Claude 3 Opus for image analysis and vision tasks. Excellent at understanding complex images, charts, diagrams, and extracting text.',
+                    'description' => 'Claude Opus 4.1 for image analysis and vision tasks. Excellent at understanding complex images, charts, diagrams, and extracting text.',
                     'prompt' => 'Describe the image in detail. Extract any text you see.',
                     'params' => [
-                        'model' => 'claude-3-opus-20240229',
+                        'model' => 'claude-opus-4-1-20250805',
                     ],
                     'meta' => [
                         'supports_images' => true,
