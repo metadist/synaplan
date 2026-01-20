@@ -1,19 +1,21 @@
 import { test, expect, type Locator, type Page } from '@playwright/test'
+import { readFileSync } from 'fs'
 import { selectors } from '../helpers/selectors'
 import { login } from '../helpers/auth'
 
 const PROMPT = 'Ai, this is a smoke test. Answer with "success" add nothing else'
-const ONE_BY_ONE_PNG = Buffer.from(
-  '89504e470d0a1a0a0000000d49484452000000010000000108060000001f15c4890000000a49444154789c6360000002000100ffff03000006000557bf0000000049454e44ae426082',
-  'hex'
-)
+const VISION_FIXTURE = readFileSync(new URL('../fixtures/vision-pattern-64.png', import.meta.url))
+
+function conversationBubbles(page: Page) {
+  return page.locator(selectors.chat.messageContainer).locator(selectors.chat.aiAnswerBubble)
+}
 
 async function waitForAnswer(page: Page, previousCount: number): Promise<string> {
   const loader = page.locator(selectors.chat.loadIndicator)
   await loader.waitFor({ state: 'visible', timeout: 5_000 }).catch(() => {})
   await loader.waitFor({ state: 'hidden' })
 
-  const bubbles = page.locator(selectors.chat.aiAnswerBubble)
+  const bubbles = conversationBubbles(page)
   await expect(bubbles).toHaveCount(previousCount + 1, { timeout: 30_000 })
 
   const answer = bubbles.nth(previousCount).locator(selectors.chat.messageText)
@@ -31,10 +33,19 @@ async function ensureAdvancedMode(page: Page) {
 }
 
 async function startNewChat(page: Page) {
+  const conversation = page.locator(selectors.chat.messageContainer)
+
+  await page.locator(selectors.chat.chatBtnToggle).waitFor({ state: 'visible' })
   await page.locator(selectors.chat.chatBtnToggle).click()
   await page.locator(selectors.chat.newChatButton).waitFor({ state: 'visible' })
   await page.locator(selectors.chat.newChatButton).click()
-  await page.locator(selectors.chat.textInput).waitFor({ state: 'visible' })
+  const textInput = page.locator(selectors.chat.textInput)
+  await textInput.waitFor({ state: 'visible' })
+
+  await expect(conversation.locator(selectors.chat.aiAnswerBubble)).toHaveCount(0, {
+    timeout: 10_000,
+  })
+  await expect(textInput).toHaveValue('', { timeout: 10_000 })
 }
 
 async function attachFile(page: Page, file: { name: string; mimeType: string; buffer: Buffer }) {
@@ -49,7 +60,7 @@ async function attachFile(page: Page, file: { name: string; mimeType: string; bu
   ])
   await fileChooser.setFiles(file)
 
-  await modal.getByText(file.name).waitFor({ state: 'visible', timeout: 30_000 })
+  await modal.getByText(file.name).first().waitFor({ state: 'visible', timeout: 30_000 })
 
   const attachButton = modal.locator(selectors.fileSelection.attachButton)
   await expect(attachButton).toBeEnabled({ timeout: 30_000 })
@@ -62,8 +73,7 @@ async function openLatestAgainDropdown(page: Page): Promise<{
   options: Locator
   optionCount: number
 }> {
-  const toggle = page
-    .locator(selectors.chat.aiAnswerBubble)
+  const toggle = conversationBubbles(page)
     .last()
     .locator(selectors.chat.againDropdown)
 
@@ -94,6 +104,27 @@ async function runAgainOptions(
   failures?: string[],
   purpose?: string
 ) {
+  async function restoreLastWorkingModel(label: string) {
+    try {
+      const { toggle, options } = await openLatestAgainDropdown(page)
+      const candidate = options.filter({ hasText: label }).first()
+      if ((await candidate.count()) === 0) {
+        await toggle.click()
+        return
+      }
+
+      const currentCount = await conversationBubbles(page).count()
+      await candidate.click()
+      await waitForAnswer(page, currentCount)
+    } catch (restoreError) {
+      failures?.push(
+        `Failed to restore last working model (${label}): ${
+          restoreError instanceof Error ? restoreError.message : String(restoreError)
+        }`
+      )
+    }
+  }
+
   let initialDropdown: Awaited<ReturnType<typeof openLatestAgainDropdown>>
   try {
     initialDropdown = await openLatestAgainDropdown(page)
@@ -114,9 +145,11 @@ async function runAgainOptions(
   }
 
   const startIndex = optionCount > 1 ? 1 : 0
+  let lastWorkingLabel: string | null = null
 
   for (let i = startIndex; i < optionCount; i += 1) {
     let labelText = ''
+    let rawLabel = ''
     try {
       const {
         toggle: rowToggle,
@@ -135,13 +168,14 @@ async function runAgainOptions(
       const option = options.nth(i)
       await option.waitFor({ state: 'visible', timeout: 5_000 })
 
-      labelText = (await option.innerText()).toLowerCase().trim()
+      rawLabel = (await option.innerText()).trim()
+      labelText = rawLabel.toLowerCase()
       if (labelText.includes('ollama')) {
         await rowToggle.click()
         continue
       }
 
-      const currentCount = await page.locator(selectors.chat.aiAnswerBubble).count()
+      const currentCount = await conversationBubbles(page).count()
       await option.click()
 
       const aiText = await waitForAnswer(page, currentCount)
@@ -160,12 +194,16 @@ async function runAgainOptions(
           )
           .toBeFalsy()
       }
+      lastWorkingLabel = rawLabel
     } catch (error) {
       failures?.push(
         `${purpose || 'purpose'} model ${i} (${labelText || 'unknown'}): ${
           error instanceof Error ? error.message : String(error)
         }`
       )
+      if (lastWorkingLabel) {
+        await restoreLastWorkingModel(lastWorkingLabel)
+      }
     }
   }
 }
@@ -174,9 +212,8 @@ test('@noci @smoke Standard model generates valid answer "success" id=003', asyn
   await login(page)
 
   await startNewChat(page)
-  await page.locator(selectors.chat.textInput).waitFor({ state: 'visible' })
 
-  const previousCount = await page.locator(selectors.chat.aiAnswerBubble).count()
+  const previousCount = await conversationBubbles(page).count()
   await page.locator(selectors.chat.textInput).fill(PROMPT)
   await page.locator(selectors.chat.sendBtn).click()
 
@@ -190,10 +227,9 @@ test('@noci @smoke All models can generate a valid answer "success" id=004', asy
   await login(page)
 
   await startNewChat(page)
-  await page.locator(selectors.chat.textInput).waitFor({ state: 'visible' })
 
   try {
-    const previousCount = await page.locator(selectors.chat.aiAnswerBubble).count()
+    const previousCount = await conversationBubbles(page).count()
     await page.locator(selectors.chat.textInput).fill(PROMPT)
     await page.locator(selectors.chat.sendBtn).click()
 
@@ -225,10 +261,10 @@ test('@noci @regression vision models respond and can be retried via again id=00
   await attachFile(page, {
     name: 'vision-1x1.png',
     mimeType: 'image/png',
-    buffer: ONE_BY_ONE_PNG,
+    buffer: VISION_FIXTURE,
   })
 
-  const previousCount = await page.locator(selectors.chat.aiAnswerBubble).count()
+  const previousCount = await conversationBubbles(page).count()
   await page.locator(selectors.chat.textInput).fill('What do you see in this image?')
   await page.locator(selectors.chat.sendBtn).click()
 
@@ -243,15 +279,15 @@ test('@noci @regression vision models respond and can be retried via again id=00
   }
 })
 
-test('@noci @regression image generation via /pic supports again id=009', async ({ page }) => {
+test('@noci @regression image generation supports again id=009', async ({ page }) => {
   const failures: string[] = []
 
   await login(page)
   await ensureAdvancedMode(page)
   await startNewChat(page)
 
-  const previousCount = await page.locator(selectors.chat.aiAnswerBubble).count()
-  await page.locator(selectors.chat.textInput).fill('/pic draw a tiny blue square')
+  const previousCount = await conversationBubbles(page).count()
+  await page.locator(selectors.chat.textInput).fill('draw a tiny blue square')
   await page.locator(selectors.chat.sendBtn).click()
 
   const aiText = await waitForAnswer(page, previousCount)
@@ -272,7 +308,7 @@ test('@noci @regression video generation via /vid supports again id=010', async 
   await ensureAdvancedMode(page)
   await startNewChat(page)
 
-  const previousCount = await page.locator(selectors.chat.aiAnswerBubble).count()
+  const previousCount = await conversationBubbles(page).count()
   await page.locator(selectors.chat.textInput).fill('/vid short demo clip of a robot waving')
   await page.locator(selectors.chat.sendBtn).click()
 

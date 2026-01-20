@@ -7,7 +7,7 @@
    docker compose up -d
    ```
 
-Node.js 18+ (if not2. **Install Node.js 18+** (if not installed):
+2. **Install Node.js 18+** (if not installed):
 
 ```bash
 curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
@@ -22,18 +22,30 @@ sudo apt-get install -y nodejs
    npx playwright install --with-deps
    ```
 
-4. **Run tests**:
-   You may change the grep command in playwright.config.ts
+   **Note:** `npm install` only installs the npm package `@playwright/test`. The browser binaries (Chromium, Firefox, WebKit) must be downloaded separately with `npx playwright install`. The `--with-deps` flag also installs the required system dependencies.
+
+   **Alternative (using Makefile):**
    ```bash
+   make -C frontend deps-host
    cd frontend
-   npm run test:e2e  # Only Chromium locally (faster)
+   npx playwright install --with-deps
    ```
 
-**Note:** Locally runs Chromium only. CI tests both Chromium and Firefox.
+4. **Run tests**:
+   ```bash
+   cd frontend
+   npm run test:e2e  # Chromium by default
+   ```
+
+   Pass `--grep "keyword"` to either the npm script or the Playwright CLI to limit the scope.
+
+**Note:** Chromium only locally, Firefox added in CI.
+
+The `grep` line in `frontend/tests/e2e/playwright.config.ts` is commented out (`// grep: /@smoke/,`), so `npm run test:e2e` runs every file in `tests/e2e` unless you pass `--grep` or re-enable that filter.
 
 ## Configuration
 
-Optional: Create `frontend/tests/e2e/.env.local`:
+Optional: Create `frontend/tests/e2e/.env.local` for local test credentials:
 
 ```bash
 BASE_URL=http://localhost:5173
@@ -41,34 +53,43 @@ AUTH_USER=admin@synaplan.com
 AUTH_PASS=admin123
 ```
 
-For some Tests you need to run local ollama models
+Some tests require local Ollama models.
 
 ## Commands
 
 ```bash
-# Run all tests (Chromium only)
+# Run all E2E tests (Chromium only)
 npm run test:e2e
 
-# Run both browsers
+# Run both browsers from Playwright config
 npx playwright test --config=tests/e2e/playwright.config.ts
 
-# Run specific test
+# Run a specific test file
 npx playwright test tests/login.spec.ts --config=tests/e2e/playwright.config.ts --project=chromium
 
-# View HTML report
+# Run tests that match a pattern (grep)
+npx playwright test --config=tests/e2e/playwright.config.ts --project=chromium --grep "registration"
+
+# Browse the suite interactively
+npm run test:e2e:ui
+
+# View HTML report and trace
 npm run test:e2e:report
 ```
 
-## Troubleshooting
-
-**"npm: command not found"** → Install Node.js (see step 2 above)
-
-**EACCES errors** → Fix permissions:
+Slow-motion runs are configured by setting `launchOptions.slowMo` in `tests/e2e/playwright.config.ts`. It waits for the given time in ms after each playwright action.
 
 ```bash
-cd frontend
-rm -rf node_modules package-lock.json
-npm install
+npx playwright test --config=tests/e2e/playwright.config.ts --project=chromium
 ```
 
-**"Connection refused"** → Ensure app is running: `docker compose up -d`
+```bash
+npx playwright test --config=tests/e2e/playwright.config.ts --ui
+```
+
+
+## Troubleshooting
+
+- **"npm: command not found"** → install Node.js (see step 2 above)
+- **EACCES errors** → delete `node_modules`/`package-lock.json` and reinstall (`npm install`)
+- **"Connection refused"** → start services (`docker compose up -d`)
