@@ -507,8 +507,10 @@ class WidgetController extends AbstractController
             // Move file to upload directory
             $uploadedFile->move($uploadDir, $filename);
 
-            // Generate public URL
-            $baseUrl = $request->getSchemeAndHttpHost();
+            // Generate public URL using SYNAPLAN_URL (public backend URL)
+            // Fallback to request host if not configured
+            $baseUrl = $_ENV['SYNAPLAN_URL'] ?? $request->getSchemeAndHttpHost();
+            $baseUrl = rtrim($baseUrl, '/');
             $iconUrl = $baseUrl.'/uploads/widget-icons/'.$filename;
 
             $this->logger->info('Widget icon uploaded', [

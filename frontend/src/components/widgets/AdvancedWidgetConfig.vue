@@ -130,6 +130,140 @@
                 </div>
               </div>
             </div>
+
+            <!-- Button Icon Selection -->
+            <div class="mt-6">
+              <label class="block text-sm font-medium txt-primary mb-3">
+                {{ $t('widgets.buttonIcon') }}
+              </label>
+
+              <!-- Predefined Icons + Custom Icon Option -->
+              <div class="grid grid-cols-3 md:grid-cols-6 gap-3 mb-4">
+                <!-- Standard Icons -->
+                <button
+                  v-for="icon in predefinedIcons"
+                  :key="icon.value"
+                  type="button"
+                  :class="[
+                    'p-4 rounded-lg border-2 transition-all flex flex-col items-center gap-2',
+                    config.buttonIcon === icon.value
+                      ? 'border-[var(--brand)] bg-[var(--brand)]/10'
+                      : 'border-light-border/30 dark:border-dark-border/20 hover:border-[var(--brand)]/50',
+                  ]"
+                  :title="icon.label"
+                  data-testid="btn-icon"
+                  @click="selectIcon(icon.value)"
+                >
+                  <div
+                    class="w-12 h-12 rounded-full flex items-center justify-center"
+                    :style="{ backgroundColor: config.primaryColor }"
+                  >
+                    <div v-html="getIconPreview(icon.value)"></div>
+                  </div>
+                  <span class="text-xs txt-secondary">{{ icon.label }}</span>
+                </button>
+
+                <!-- Custom Icon Option (only shown when a custom icon is uploaded) -->
+                <button
+                  v-if="config.buttonIconUrl"
+                  type="button"
+                  :class="[
+                    'p-4 rounded-lg border-2 transition-all flex flex-col items-center gap-2',
+                    config.buttonIcon === 'custom'
+                      ? 'border-[var(--brand)] bg-[var(--brand)]/10'
+                      : 'border-light-border/30 dark:border-dark-border/20 hover:border-[var(--brand)]/50',
+                  ]"
+                  :title="$t('widgets.customIcon')"
+                  data-testid="btn-icon-custom"
+                  @click="selectIcon('custom')"
+                >
+                  <div
+                    class="w-12 h-12 rounded-full flex items-center justify-center overflow-hidden"
+                    :style="{ backgroundColor: config.primaryColor }"
+                  >
+                    <img
+                      :src="config.buttonIconUrl"
+                      alt="Custom"
+                      class="w-8 h-8 object-contain"
+                    />
+                  </div>
+                  <span class="text-xs txt-secondary">Custom</span>
+                </button>
+              </div>
+
+              <!-- Custom Icon Upload -->
+              <div class="mt-4">
+                <label class="block text-sm font-medium txt-secondary mb-2">
+                  {{ $t('widgets.customIcon') }}
+                </label>
+                <div class="flex gap-3">
+                  <input
+                    ref="iconUploadInput"
+                    type="file"
+                    accept="image/svg+xml,image/png,image/jpeg,image/gif,image/webp"
+                    class="hidden"
+                    data-testid="input-icon-upload"
+                    @change="handleIconUpload"
+                  />
+                  <button
+                    type="button"
+                    :disabled="uploadingIcon"
+                    class="flex-1 px-4 py-2 border-2 border-dashed border-light-border/30 dark:border-dark-border/20 rounded-lg hover:border-[var(--brand)]/50 transition-colors txt-secondary hover:txt-primary flex items-center justify-center gap-2 disabled:opacity-50"
+                    data-testid="btn-upload-icon"
+                    @click="triggerIconUpload"
+                  >
+                    <Icon
+                      v-if="uploadingIcon"
+                      icon="heroicons:arrow-path"
+                      class="w-5 h-5 animate-spin"
+                    />
+                    <Icon v-else icon="heroicons:arrow-up-tray" class="w-5 h-5" />
+                    {{
+                      config.buttonIconUrl
+                        ? $t('widgets.changeIcon')
+                        : $t('widgets.uploadIcon')
+                    }}
+                  </button>
+                  <button
+                    v-if="config.buttonIconUrl"
+                    type="button"
+                    class="px-4 py-2 bg-red-500/10 text-red-600 dark:text-red-400 rounded-lg hover:bg-red-500/20 transition-colors"
+                    data-testid="btn-remove-icon"
+                    @click="removeCustomIcon"
+                  >
+                    <Icon icon="heroicons:trash" class="w-5 h-5" />
+                  </button>
+                </div>
+                <div
+                  v-if="config.buttonIconUrl"
+                  class="mt-3 p-3 rounded-lg flex items-center gap-3"
+                  :class="config.buttonIcon === 'custom' ? 'bg-green-500/10' : 'bg-gray-500/10'"
+                >
+                  <div
+                    class="w-10 h-10 rounded-full flex items-center justify-center overflow-hidden"
+                    :style="{ backgroundColor: config.primaryColor }"
+                  >
+                    <img
+                      :src="config.buttonIconUrl"
+                      alt="Custom Icon"
+                      class="w-6 h-6 object-contain"
+                    />
+                  </div>
+                  <div class="flex-1">
+                    <span
+                      v-if="config.buttonIcon === 'custom'"
+                      class="text-sm text-green-700 dark:text-green-400"
+                    >
+                      {{ $t('widgets.customIconActive') }}
+                    </span>
+                    <span v-else class="text-sm txt-secondary">
+                      {{ $t('widgets.customIconAvailable') }}
+                    </span>
+                  </div>
+                </div>
+                <p class="text-xs txt-secondary mt-2">{{ $t('widgets.customIconHint') }}</p>
+              </div>
+            </div>
           </div>
 
           <!-- Behavior Tab -->
@@ -532,6 +666,8 @@ const config = reactive<widgetsApi.WidgetConfig>({
   position: 'bottom-right',
   primaryColor: '#007bff',
   iconColor: '#ffffff',
+  buttonIcon: 'chat',
+  buttonIconUrl: null as string | null,
   defaultTheme: 'light',
   autoOpen: false,
   autoMessage: '',
@@ -541,6 +677,111 @@ const config = reactive<widgetsApi.WidgetConfig>({
   fileUploadLimit: 3,
   allowedDomains: [],
 })
+
+// Icon selection
+const iconUploadInput = ref<HTMLInputElement | null>(null)
+const uploadingIcon = ref(false)
+
+const predefinedIcons = [
+  { value: 'chat', label: t('widgets.icons.chat') },
+  { value: 'headset', label: t('widgets.icons.headset') },
+  { value: 'help', label: t('widgets.icons.help') },
+  { value: 'robot', label: t('widgets.icons.robot') },
+  { value: 'message', label: t('widgets.icons.message') },
+  { value: 'support', label: t('widgets.icons.support') },
+]
+
+const getIconPreview = (iconType: string): string => {
+  const iconColor = config.iconColor || '#ffffff'
+  const icons: Record<string, string> = {
+    chat: `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="${iconColor}" stroke-width="2">
+      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+    </svg>`,
+    headset: `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="${iconColor}" stroke-width="2">
+      <path d="M3 18v-6a9 9 0 0 1 18 0v6"></path>
+      <path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"></path>
+    </svg>`,
+    help: `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="${iconColor}" stroke-width="2">
+      <circle cx="12" cy="12" r="10"></circle>
+      <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+      <line x1="12" y1="17" x2="12.01" y2="17"></line>
+    </svg>`,
+    robot: `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="${iconColor}" stroke-width="2">
+      <rect x="3" y="11" width="18" height="10" rx="2"></rect>
+      <circle cx="12" cy="5" r="2"></circle>
+      <path d="M12 7v4"></path>
+      <line x1="8" y1="16" x2="8" y2="16"></line>
+      <line x1="16" y1="16" x2="16" y2="16"></line>
+    </svg>`,
+    message: `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="${iconColor}" stroke-width="2">
+      <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path>
+    </svg>`,
+    support: `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="${iconColor}" stroke-width="2">
+      <circle cx="12" cy="12" r="10"></circle>
+      <circle cx="12" cy="12" r="4"></circle>
+      <line x1="4.93" y1="4.93" x2="9.17" y2="9.17"></line>
+      <line x1="14.83" y1="14.83" x2="19.07" y2="19.07"></line>
+      <line x1="14.83" y1="9.17" x2="19.07" y2="4.93"></line>
+      <line x1="4.93" y1="19.07" x2="9.17" y2="14.83"></line>
+    </svg>`,
+  }
+  return icons[iconType] || icons.chat
+}
+
+const selectIcon = (iconValue: string) => {
+  config.buttonIcon = iconValue
+  // Don't clear buttonIconUrl here - only the delete button should remove the custom icon
+}
+
+const triggerIconUpload = () => {
+  iconUploadInput.value?.click()
+}
+
+const handleIconUpload = async (event: Event) => {
+  const target = event.target as HTMLInputElement
+  const file = target.files?.[0]
+
+  if (!file) return
+
+  // Validate file type
+  const allowedTypes = ['image/svg+xml', 'image/png', 'image/jpeg', 'image/gif', 'image/webp']
+  if (!allowedTypes.includes(file.type)) {
+    showError(t('widgets.invalidIconType'))
+    target.value = ''
+    return
+  }
+
+  // Validate file size (max 500KB)
+  if (file.size > 500 * 1024) {
+    showError(t('widgets.iconTooLarge'))
+    target.value = ''
+    return
+  }
+
+  uploadingIcon.value = true
+
+  try {
+    const uploadResult = await widgetsApi.uploadWidgetIcon(props.widget.widgetId, file)
+    if (uploadResult.iconUrl) {
+      config.buttonIconUrl = uploadResult.iconUrl
+      config.buttonIcon = 'custom'
+      success(t('widgets.iconUploadSuccess'))
+    }
+  } catch (err) {
+    showError(t('widgets.iconUploadFailed'))
+  } finally {
+    uploadingIcon.value = false
+    target.value = ''
+  }
+}
+
+const removeCustomIcon = () => {
+  config.buttonIconUrl = null // Use null instead of undefined so it gets sent to backend
+  config.buttonIcon = 'chat'
+  if (iconUploadInput.value) {
+    iconUploadInput.value.value = ''
+  }
+}
 
 // Prompt config for AI Assistant tab
 const promptData = reactive({
@@ -765,6 +1006,8 @@ onMounted(async () => {
     position: widgetConfig.position || 'bottom-right',
     primaryColor: widgetConfig.primaryColor || '#007bff',
     iconColor: widgetConfig.iconColor || '#ffffff',
+    buttonIcon: widgetConfig.buttonIcon || 'chat',
+    buttonIconUrl: widgetConfig.buttonIconUrl || null,
     defaultTheme: widgetConfig.defaultTheme || 'light',
     autoOpen: widgetConfig.autoOpen || false,
     autoMessage: widgetConfig.autoMessage || '',

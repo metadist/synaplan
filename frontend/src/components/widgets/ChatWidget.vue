@@ -26,7 +26,7 @@
           @click="toggleChat"
         >
           <img
-            v-if="buttonIconUrl"
+            v-if="buttonIcon === 'custom' && buttonIconUrl"
             :src="buttonIconUrl"
             alt="Chat"
             class="w-9 h-9 object-contain"
@@ -131,7 +131,7 @@
               :class="['max-w-[80%] rounded-2xl px-4 py-2', message.role === 'user' ? '' : '']"
               :style="
                 message.role === 'user'
-                  ? { backgroundColor: primaryColor, color: iconColor }
+                  ? { backgroundColor: primaryColor, color: '#ffffff' }
                   : { backgroundColor: widgetTheme === 'dark' ? '#2a2a2a' : '#f3f4f6' }
               "
             >
@@ -155,7 +155,7 @@
                   :style="{
                     color:
                       message.role === 'user'
-                        ? iconColor
+                        ? '#ffffff'
                         : widgetTheme === 'dark'
                           ? '#e5e5e5'
                           : '#1f2937',
@@ -180,7 +180,7 @@
                       :style="{
                         color:
                           message.role === 'user'
-                            ? iconColor
+                            ? '#ffffff'
                             : widgetTheme === 'dark'
                               ? '#e5e5e5'
                               : '#1f2937',
@@ -191,7 +191,7 @@
                       :style="{
                         color:
                           message.role === 'user'
-                            ? iconColor
+                            ? '#ffffff'
                             : widgetTheme === 'dark'
                               ? '#e5e5e5'
                               : '#1f2937',
@@ -208,7 +208,7 @@
                   :style="{
                     color:
                       message.role === 'user'
-                        ? iconColor
+                        ? '#ffffff'
                         : widgetTheme === 'dark'
                           ? '#e5e5e5'
                           : '#1f2937',
@@ -222,7 +222,7 @@
                 :style="{
                   color:
                     message.role === 'user'
-                      ? iconColor
+                      ? '#ffffff'
                       : widgetTheme === 'dark'
                         ? '#9ca3af'
                         : '#6b7280',

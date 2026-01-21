@@ -250,6 +250,7 @@
             :primary-color="testWidget.config?.primaryColor || '#007bff'"
             :icon-color="testWidget.config?.iconColor || '#ffffff'"
             :button-icon="testWidget.config?.buttonIcon || 'chat'"
+            :button-icon-url="testWidget.config?.buttonIconUrl"
             :auto-message="testWidget.config?.autoMessage || ''"
             :message-limit="testWidget.config?.messageLimit || 50"
             :max-file-size="testWidget.config?.maxFileSize || 10"
@@ -364,6 +365,7 @@ const openAdvancedFromSuccess = () => {
 const testWidgetFromSuccess = () => {
   if (successWidget.value) {
     testWidget.value = successWidget.value
+    successWidget.value = null // Close success modal
   }
 }
 

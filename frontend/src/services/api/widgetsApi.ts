@@ -24,7 +24,7 @@ export interface WidgetConfig {
   primaryColor?: string
   iconColor?: string
   buttonIcon?: string
-  buttonIconUrl?: string
+  buttonIconUrl?: string | null
   defaultTheme?: 'light' | 'dark'
   autoOpen?: boolean
   autoMessage?: string
