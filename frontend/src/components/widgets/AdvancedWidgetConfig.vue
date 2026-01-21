@@ -272,20 +272,47 @@
             class="space-y-6"
             data-testid="section-behavior"
           >
-            <div class="surface-chip p-4 rounded-lg flex items-center justify-between">
+            <!-- Widget Active Status -->
+            <label
+              class="surface-chip p-4 rounded-lg flex items-center justify-between cursor-pointer hover:opacity-80 transition-opacity"
+              :class="widgetStatus === 'inactive' ? 'border-2 border-yellow-500/50' : ''"
+            >
+              <div>
+                <p class="font-medium txt-primary">{{ $t('widgets.advancedConfig.widgetActive') }}</p>
+                <p class="text-xs txt-secondary mt-1">
+                  {{ $t('widgets.advancedConfig.widgetActiveHelp') }}
+                </p>
+                <p v-if="widgetStatus === 'inactive'" class="text-xs text-yellow-600 dark:text-yellow-400 mt-2 font-medium">
+                  {{ $t('widgets.advancedConfig.widgetInactiveWarning') }}
+                </p>
+              </div>
+              <div class="relative inline-flex items-center flex-shrink-0">
+                <input
+                  :checked="widgetStatus === 'active'"
+                  type="checkbox"
+                  class="sr-only peer"
+                  @change="widgetStatus = ($event.target as HTMLInputElement).checked ? 'active' : 'inactive'"
+                />
+                <div
+                  class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-[var(--brand)]/20 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[var(--brand)]"
+                ></div>
+              </div>
+            </label>
+
+            <label class="surface-chip p-4 rounded-lg flex items-center justify-between cursor-pointer hover:opacity-80 transition-opacity">
               <div>
                 <p class="font-medium txt-primary">{{ $t('widgets.advancedConfig.autoOpen') }}</p>
                 <p class="text-xs txt-secondary mt-1">
                   {{ $t('widgets.advancedConfig.autoOpenHelp') }}
                 </p>
               </div>
-              <label class="relative inline-flex items-center cursor-pointer">
+              <div class="relative inline-flex items-center flex-shrink-0">
                 <input v-model="config.autoOpen" type="checkbox" class="sr-only peer" />
                 <div
                   class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-[var(--brand)]/20 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[var(--brand)]"
                 ></div>
-              </label>
-            </div>
+              </div>
+            </label>
 
             <div>
               <label class="block text-sm font-medium txt-primary mb-2">
@@ -335,8 +362,8 @@
               </div>
             </div>
 
-            <div class="surface-chip p-4 rounded-lg space-y-4">
-              <div class="flex items-center justify-between">
+            <div class="surface-chip rounded-lg">
+              <label class="p-4 flex items-center justify-between cursor-pointer hover:opacity-80 transition-opacity">
                 <div>
                   <p class="font-medium txt-primary">
                     {{ $t('widgets.advancedConfig.allowFileUpload') }}
@@ -345,15 +372,15 @@
                     {{ $t('widgets.advancedConfig.allowFileUploadHelp') }}
                   </p>
                 </div>
-                <label class="relative inline-flex items-center cursor-pointer">
+                <div class="relative inline-flex items-center flex-shrink-0">
                   <input v-model="config.allowFileUpload" type="checkbox" class="sr-only peer" />
                   <div
                     class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-[var(--brand)]/20 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[var(--brand)]"
                   ></div>
-                </label>
-              </div>
+                </div>
+              </label>
 
-              <div v-if="config.allowFileUpload">
+              <div v-if="config.allowFileUpload" class="px-4 pb-4">
                 <label class="block text-sm font-medium txt-primary mb-2">
                   {{ $t('widgets.advancedConfig.fileUploadLimit') }}
                 </label>
@@ -919,6 +946,9 @@ const removeCustomIcon = () => {
 // Widget name (editable in AI Assistant tab)
 const widgetName = ref('')
 
+// Widget active status
+const widgetStatus = ref<'active' | 'inactive'>('active')
+
 // Prompt config for AI Assistant tab
 const promptData = reactive({
   id: 0,
@@ -1018,15 +1048,22 @@ const removeDomain = (domain: string) => {
 const handleSave = async () => {
   saving.value = true
   try {
-    // Build update request with config and name if changed
-    const updateRequest: { config: typeof config; name?: string } = { config }
+    // Build update request with config, name, and status
+    const updateRequest: { config: typeof config; name?: string; status?: 'active' | 'inactive' } = {
+      config,
+    }
 
     // Include widget name if it was changed
     if (widgetName.value && widgetName.value !== props.widget.name) {
       updateRequest.name = widgetName.value
     }
 
-    // Save widget config (and name)
+    // Include status if it was changed
+    if (widgetStatus.value !== props.widget.status) {
+      updateRequest.status = widgetStatus.value
+    }
+
+    // Save widget config (and name/status)
     await widgetsApi.updateWidget(props.widget.widgetId, updateRequest)
 
     // Save prompt if on assistant tab and has custom prompt
@@ -1219,8 +1256,9 @@ onMounted(async () => {
     promptLoading.value = true
   }
 
-  // Load current widget name
+  // Load current widget name and status
   widgetName.value = props.widget.name || ''
+  widgetStatus.value = props.widget.status || 'active'
 
   // Load current config from widget
   const widgetConfig = props.widget.config || {}
