@@ -108,7 +108,7 @@ class PluginData
 
     public function setDataKey(?string $dataKey): self
     {
-        $this->dataKey = $dataKey !== null ? $this->sanitizeKey($dataKey) : null;
+        $this->dataKey = null !== $dataKey ? $this->sanitizeKey($dataKey) : null;
 
         return $this;
     }

@@ -48,7 +48,7 @@ final readonly class PluginDataService
     {
         $entry = $this->repository->findOneByKey($userId, $plugin, $type, $key);
 
-        if ($entry === null) {
+        if (null === $entry) {
             $entry = new PluginData();
             $entry->setUserId($userId);
             $entry->setPluginName($plugin);
@@ -106,7 +106,7 @@ final readonly class PluginDataService
     {
         $entry = $this->repository->findOneByKey($userId, $plugin, $type, $key);
 
-        if ($entry === null) {
+        if (null === $entry) {
             return false;
         }
 
@@ -137,7 +137,7 @@ final readonly class PluginDataService
      */
     public function exists(int $userId, string $plugin, string $type, string $key): bool
     {
-        return $this->repository->findOneByKey($userId, $plugin, $type, $key) !== null;
+        return null !== $this->repository->findOneByKey($userId, $plugin, $type, $key);
     }
 
     /**
@@ -158,7 +158,7 @@ final readonly class PluginDataService
         foreach ($entries as $key => $data) {
             $entry = $this->repository->findOneByKey($userId, $plugin, $type, $key);
 
-            if ($entry === null) {
+            if (null === $entry) {
                 $entry = new PluginData();
                 $entry->setUserId($userId);
                 $entry->setPluginName($plugin);
