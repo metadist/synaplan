@@ -4,69 +4,52 @@ declare(strict_types=1);
 
 namespace Plugin\SortX\Service;
 
-use Plugin\SortX\Entity\SortxCategory;
-use Plugin\SortX\Entity\SortxCategoryField;
-use Plugin\SortX\Repository\SortxCategoryRepository;
+use App\Service\PluginDataService;
 
+/**
+ * Generates classification prompts from user's category schema.
+ *
+ * Uses PluginDataService to load categories stored in the generic plugin_data table.
+ */
 final readonly class PromptGenerator
 {
     private const SUPPORTED_LANGUAGES = 'English, German, French, Spanish, Italian, Chinese, Arabic';
+    private const PLUGIN_NAME = 'sortx';
+    private const DATA_TYPE_CATEGORY = 'category';
 
     public function __construct(
-        private SortxCategoryRepository $categoryRepo,
+        private PluginDataService $pluginData,
     ) {
     }
 
     /**
      * Build the complete schema array for a user (used by /schema endpoint).
      *
-     * @return array<int, array{key: string, name: string, description: ?string, fields: array<int, array{key: string, name: string, type: string, enum_values: ?array, description: ?string, required: bool}>}>
+     * @return array<int, array{key: string, name: string, description: ?string, fields: array}>
      */
     public function getSchemaForUser(int $userId): array
     {
-        $categories = $this->categoryRepo->findEnabledByUser($userId);
+        $categoriesData = $this->pluginData->list($userId, self::PLUGIN_NAME, self::DATA_TYPE_CATEGORY);
         $schema = [];
 
-        foreach ($categories as $category) {
-            $schema[] = $this->categoryToArray($category);
+        foreach ($categoriesData as $key => $data) {
+            // Only include enabled categories
+            if (!($data['enabled'] ?? true)) {
+                continue;
+            }
+
+            $schema[] = [
+                'key' => $key,
+                'name' => $data['name'] ?? $key,
+                'description' => $data['description'] ?? null,
+                'fields' => $data['fields'] ?? [],
+            ];
         }
 
+        // Sort by sort_order
+        usort($schema, fn ($a, $b) => ($a['sort_order'] ?? 0) <=> ($b['sort_order'] ?? 0));
+
         return $schema;
-    }
-
-    /**
-     * Convert a category entity to array format.
-     *
-     * @return array{key: string, name: string, description: ?string, fields: array<int, array{key: string, name: string, type: string, enum_values: ?array, description: ?string, required: bool}>}
-     */
-    public function categoryToArray(SortxCategory $category): array
-    {
-        return [
-            'key' => $category->getKey(),
-            'name' => $category->getName(),
-            'description' => $category->getDescription(),
-            'fields' => array_map(
-                fn (SortxCategoryField $f) => $this->fieldToArray($f),
-                $category->getFields()->toArray()
-            ),
-        ];
-    }
-
-    /**
-     * Convert a field entity to array format.
-     *
-     * @return array{key: string, name: string, type: string, enum_values: ?array, description: ?string, required: bool}
-     */
-    public function fieldToArray(SortxCategoryField $field): array
-    {
-        return [
-            'key' => $field->getFieldKey(),
-            'name' => $field->getFieldName(),
-            'type' => $field->getFieldType(),
-            'enum_values' => $field->getEnumValues(),
-            'description' => $field->getDescription(),
-            'required' => $field->isRequired(),
-        ];
     }
 
     /**
@@ -135,11 +118,11 @@ PROMPT;
             $section .= "\n[{$cat['key']}]\n";
 
             foreach ($cat['fields'] as $field) {
-                $type = $field['type'];
+                $type = $field['type'] ?? 'text';
                 if ($type === 'enum' && !empty($field['enum_values'])) {
                     $type = 'one of: '.implode(', ', $field['enum_values']);
                 }
-                $required = $field['required'] ? ' (required)' : '';
+                $required = ($field['required'] ?? false) ? ' (required)' : '';
                 $section .= "  - {$field['key']} ({$type}){$required}\n";
             }
         }

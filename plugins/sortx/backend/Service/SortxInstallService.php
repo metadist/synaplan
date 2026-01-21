@@ -4,19 +4,20 @@ declare(strict_types=1);
 
 namespace Plugin\SortX\Service;
 
-use Doctrine\ORM\EntityManagerInterface;
-use Plugin\SortX\Entity\SortxCategory;
-use Plugin\SortX\Entity\SortxCategoryField;
-use Plugin\SortX\Repository\SortxCategoryRepository;
+use App\Service\PluginDataService;
 
 /**
  * Seeds default categories and fields when plugin is installed for a user.
+ *
+ * Uses PluginDataService for non-invasive data storage.
  */
 final readonly class SortxInstallService
 {
+    private const PLUGIN_NAME = 'sortx';
+    private const DATA_TYPE_CATEGORY = 'category';
+
     public function __construct(
-        private EntityManagerInterface $em,
-        private SortxCategoryRepository $categoryRepo,
+        private PluginDataService $pluginData,
     ) {
     }
 
@@ -27,37 +28,35 @@ final readonly class SortxInstallService
     public function seedDefaultCategories(int $userId): void
     {
         // Skip if user already has categories
-        if ($this->categoryRepo->userHasCategories($userId)) {
+        if ($this->pluginData->count($userId, self::PLUGIN_NAME, self::DATA_TYPE_CATEGORY) > 0) {
             return;
         }
 
         $defaults = $this->getDefaultCategoryDefinitions();
 
         foreach ($defaults as $sortOrder => $catDef) {
-            $category = new SortxCategory();
-            $category->setUserId($userId);
-            $category->setKey($catDef['key']);
-            $category->setName($catDef['name']);
-            $category->setDescription($catDef['description']);
-            $category->setSortOrder($sortOrder);
-
-            foreach ($catDef['fields'] ?? [] as $fieldOrder => $fieldDef) {
-                $field = new SortxCategoryField();
-                $field->setFieldKey($fieldDef['key']);
-                $field->setFieldName($fieldDef['name']);
-                $field->setFieldType($fieldDef['type']);
-                $field->setDescription($fieldDef['description'] ?? null);
-                $field->setEnumValues($fieldDef['enum_values'] ?? null);
-                $field->setRequired($fieldDef['required'] ?? false);
-                $field->setSortOrder($fieldOrder);
-
-                $category->addField($field);
-            }
-
-            $this->em->persist($category);
+            $this->pluginData->set(
+                $userId,
+                self::PLUGIN_NAME,
+                self::DATA_TYPE_CATEGORY,
+                $catDef['key'],
+                [
+                    'name' => $catDef['name'],
+                    'description' => $catDef['description'],
+                    'enabled' => true,
+                    'sort_order' => $sortOrder,
+                    'fields' => $catDef['fields'] ?? [],
+                ]
+            );
         }
+    }
 
-        $this->em->flush();
+    /**
+     * Check if user has any categories configured.
+     */
+    public function userHasCategories(int $userId): bool
+    {
+        return $this->pluginData->count($userId, self::PLUGIN_NAME, self::DATA_TYPE_CATEGORY) > 0;
     }
 
     /**

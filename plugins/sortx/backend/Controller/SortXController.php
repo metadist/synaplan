@@ -7,8 +7,8 @@ namespace Plugin\SortX\Controller;
 use App\AI\Service\AiFacade;
 use App\Entity\User;
 use App\Service\ModelConfigService;
+use App\Service\PluginDataService;
 use OpenApi\Attributes as OA;
-use Plugin\SortX\Repository\SortxCategoryRepository;
 use Plugin\SortX\Service\PromptGenerator;
 use Psr\Log\LoggerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -23,17 +23,22 @@ use Symfony\Component\Security\Http\Attribute\CurrentUser;
  * SortX Plugin API Controller v2.0.
  *
  * Provides document classification endpoints with metadata extraction.
+ * Uses PluginDataService for non-invasive data storage (no plugin-specific tables).
+ *
  * Routes: /api/v1/user/{userId}/plugins/sortx/...
  */
 #[Route('/api/v1/user/{userId}/plugins/sortx', name: 'api_plugin_sortx_')]
 #[OA\Tag(name: 'SortX Plugin')]
 class SortXController extends AbstractController
 {
+    private const PLUGIN_NAME = 'sortx';
+    private const DATA_TYPE_CATEGORY = 'category';
+
     public function __construct(
         private AiFacade $aiFacade,
         private ModelConfigService $modelConfigService,
         private PromptGenerator $promptGenerator,
-        private SortxCategoryRepository $categoryRepo,
+        private PluginDataService $pluginData,
         private LoggerInterface $logger,
     ) {
     }
