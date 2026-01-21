@@ -6,6 +6,7 @@ namespace Plugin\SortX\Controller;
 
 use App\AI\Service\AiFacade;
 use App\Entity\User;
+use App\Service\File\FileProcessor;
 use App\Service\ModelConfigService;
 use App\Service\PluginDataService;
 use OpenApi\Attributes as OA;
@@ -20,7 +21,7 @@ use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\CurrentUser;
 
 /**
- * SortX Plugin API Controller v2.0.
+ * SortX Plugin API Controller v3.0.
  *
  * Provides document classification endpoints with metadata extraction.
  * Uses PluginDataService for non-invasive data storage (no plugin-specific tables).
@@ -36,10 +37,12 @@ class SortXController extends AbstractController
 
     public function __construct(
         private AiFacade $aiFacade,
+        private FileProcessor $fileProcessor,
         private ModelConfigService $modelConfigService,
         private PromptGenerator $promptGenerator,
         private PluginDataService $pluginData,
         private LoggerInterface $logger,
+        private string $uploadDir,
     ) {
     }
 
@@ -445,6 +448,157 @@ class SortXController extends AbstractController
             return $this->json([
                 'success' => false,
                 'error' => 'File analysis failed: '.$e->getMessage(),
+            ], Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    /**
+     * Extract text from uploaded file using FileProcessor (v3.0).
+     *
+     * Uses Synaplan's robust extraction pipeline:
+     * 1. Native (plain text)
+     * 2. Tika (PDF, DOCX, etc.)
+     * 3. Rasterize + Vision AI (fallback for scanned PDFs)
+     * 4. Vision AI (images)
+     *
+     * This endpoint counts against user's API usage quota.
+     */
+    #[Route('/extract-text', name: 'extract_text', methods: ['POST'])]
+    #[OA\Post(
+        path: '/api/v1/user/{userId}/plugins/sortx/extract-text',
+        summary: 'Extract text from a document file',
+        description: 'Uses Synaplan\'s FileProcessor for robust text extraction with Tika and Vision AI fallback',
+        security: [['Bearer' => []]],
+        tags: ['SortX Plugin']
+    )]
+    #[OA\Parameter(
+        name: 'userId',
+        in: 'path',
+        required: true,
+        description: 'User ID',
+        schema: new OA\Schema(type: 'integer')
+    )]
+    #[OA\RequestBody(
+        required: true,
+        content: new OA\MediaType(
+            mediaType: 'multipart/form-data',
+            schema: new OA\Schema(
+                required: ['file'],
+                properties: [
+                    new OA\Property(property: 'file', type: 'string', format: 'binary', description: 'Document file to extract text from'),
+                ]
+            )
+        )
+    )]
+    #[OA\Response(
+        response: 200,
+        description: 'Text extraction result',
+        content: new OA\JsonContent(
+            required: ['success'],
+            properties: [
+                new OA\Property(property: 'success', type: 'boolean', example: true),
+                new OA\Property(property: 'text', type: 'string', description: 'Extracted text content'),
+                new OA\Property(property: 'strategy', type: 'string', example: 'tika', description: 'Extraction method used'),
+                new OA\Property(property: 'bytes', type: 'integer', example: 5432, description: 'Length of extracted text'),
+                new OA\Property(property: 'mime', type: 'string', example: 'application/pdf'),
+                new OA\Property(property: 'filename', type: 'string'),
+            ]
+        )
+    )]
+    #[OA\Response(response: 400, description: 'Invalid request (missing file, too large)')]
+    #[OA\Response(response: 401, description: 'Not authenticated')]
+    public function extractText(
+        Request $request,
+        int $userId,
+        #[CurrentUser] ?User $user,
+    ): JsonResponse {
+        if (!$this->canAccessPlugin($user, $userId)) {
+            return $this->json(['success' => false, 'error' => 'Unauthorized'], Response::HTTP_UNAUTHORIZED);
+        }
+
+        /** @var UploadedFile|null $file */
+        $file = $request->files->get('file');
+
+        if (!$file) {
+            return $this->json(['success' => false, 'error' => 'File is required'], Response::HTTP_BAD_REQUEST);
+        }
+
+        $config = $this->getPluginConfig($userId);
+        $maxSize = $config['max_file_size_mb'] * 1024 * 1024;
+
+        if ($file->getSize() > $maxSize) {
+            return $this->json([
+                'success' => false,
+                'error' => "File too large. Maximum size is {$config['max_file_size_mb']}MB",
+            ], Response::HTTP_BAD_REQUEST);
+        }
+
+        $filename = $file->getClientOriginalName();
+        $extension = pathinfo($filename, PATHINFO_EXTENSION);
+
+        $this->logger->info('SortX text extraction requested', [
+            'user_id' => $userId,
+            'filename' => $filename,
+            'size' => $file->getSize(),
+        ]);
+
+        try {
+            // Move uploaded file to temp location for processing
+            $tempDir = $this->uploadDir.'/sortx_temp';
+            if (!is_dir($tempDir)) {
+                mkdir($tempDir, 0755, true);
+            }
+
+            $tempFilename = uniqid('sortx_').'_'.preg_replace('/[^a-zA-Z0-9._-]/', '_', $filename);
+            $tempPath = $tempDir.'/'.$tempFilename;
+            $file->move($tempDir, $tempFilename);
+
+            // Use FileProcessor for extraction (includes Tika + Vision fallback)
+            $relativePath = 'sortx_temp/'.$tempFilename;
+
+            try {
+                [$extractedText, $meta] = $this->fileProcessor->extractText($relativePath, $extension, $userId);
+            } finally {
+                // Clean up temp file
+                if (file_exists($tempPath)) {
+                    @unlink($tempPath);
+                }
+            }
+
+            $strategy = $meta['strategy'] ?? 'unknown';
+            $bytes = strlen($extractedText);
+
+            $this->logger->info('SortX text extraction completed', [
+                'user_id' => $userId,
+                'filename' => $filename,
+                'strategy' => $strategy,
+                'bytes' => $bytes,
+            ]);
+
+            // Truncate text if too long (prevent huge responses)
+            $maxTextLength = $config['max_text_length'];
+            if ($bytes > $maxTextLength) {
+                $extractedText = mb_substr($extractedText, 0, $maxTextLength).'... [truncated]';
+            }
+
+            return $this->json([
+                'success' => true,
+                'text' => $extractedText,
+                'strategy' => $strategy,
+                'bytes' => $bytes,
+                'mime' => $meta['mime'] ?? null,
+                'filename' => $filename,
+            ]);
+        } catch (\Throwable $e) {
+            $this->logger->error('SortX text extraction failed', [
+                'user_id' => $userId,
+                'filename' => $filename,
+                'error' => $e->getMessage(),
+            ]);
+
+            return $this->json([
+                'success' => false,
+                'error' => 'Text extraction failed: '.$e->getMessage(),
             ], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }

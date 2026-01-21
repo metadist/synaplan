@@ -356,3 +356,7 @@ services:
     Plugin\SortX\:
         resource: '%plugins_dir%/sortx/backend/'
         exclude: '%plugins_dir%/sortx/backend/{Entity,migrations,tests}'
+
+    Plugin\SortX\Controller\SortXController:
+        arguments:
+            $uploadDir: '%kernel.project_dir%/var/uploads'
