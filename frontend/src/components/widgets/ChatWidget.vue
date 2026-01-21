@@ -564,7 +564,9 @@ const allowFileUploads = computed(
   () => !!props.allowFileUpload && (!props.isPreview || props.testMode)
 )
 const fileUploadLimit = computed(() => props.fileUploadLimit ?? 0)
-const testModeHeaders = computed(() => (props.testMode ? { 'X-Widget-Test-Mode': 'true' } : {}))
+const testModeHeaders = computed(() =>
+  props.testMode || props.isPreview ? { 'X-Widget-Test-Mode': 'true' } : {}
+)
 const fileUploadCount = ref(0)
 const uploadingFile = ref(false)
 const fileUploadError = ref<string | null>(null)

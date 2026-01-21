@@ -181,8 +181,11 @@ class WidgetPublicController extends AbstractController
             return $domainError;
         }
 
+        // Check if this is a test mode session
+        $isTestMode = 'true' === $request->headers->get('X-Widget-Test-Mode');
+
         // Get or create session
-        $session = $this->sessionService->getOrCreateSession($widgetId, $data['sessionId']);
+        $session = $this->sessionService->getOrCreateSession($widgetId, $data['sessionId'], $isTestMode);
 
         // Check session limits
         $messageLimit = (int) ($config['messageLimit'] ?? WidgetSessionService::DEFAULT_MAX_MESSAGES);
@@ -554,9 +557,6 @@ class WidgetPublicController extends AbstractController
                         ],
                     ]);
                 } catch (\Throwable $e) {
-                    $incomingMessage->setStatus('failed');
-                    $this->em->flush();
-
                     $this->logger->error('Widget message streaming failed', [
                         'error' => $e->getMessage(),
                         'trace' => $e->getTraceAsString(),
@@ -564,6 +564,16 @@ class WidgetPublicController extends AbstractController
                         'file' => $e->getFile(),
                         'line' => $e->getLine(),
                     ]);
+
+                    try {
+                        $incomingMessage->setStatus('failed');
+                        $this->em->flush();
+                    } catch (\Throwable $flushException) {
+                        // EntityManager might be closed after database error
+                        $this->logger->warning('Could not update message status after error', [
+                            'error' => $flushException->getMessage(),
+                        ]);
+                    }
 
                     $this->sendSse('error', [
                         'error' => 'Failed to process message',
@@ -654,8 +664,11 @@ class WidgetPublicController extends AbstractController
             ], Response::HTTP_FORBIDDEN);
         }
 
+        // Check if this is a test mode session
+        $isTestMode = 'true' === $request->headers->get('X-Widget-Test-Mode');
+
         // Get or create widget session
-        $widgetSession = $this->sessionService->getOrCreateSession($widgetId, $sessionId);
+        $widgetSession = $this->sessionService->getOrCreateSession($widgetId, $sessionId, $isTestMode);
 
         $owner = $widget->getOwner();
         if (!$owner) {

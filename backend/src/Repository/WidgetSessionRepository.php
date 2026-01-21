@@ -73,8 +73,10 @@ class WidgetSessionRepository extends ServiceEntityRepository
             ->select('COUNT(ws.id)')
             ->where('ws.widgetId = :widgetId')
             ->andWhere('ws.lastMessage > :threshold')
+            ->andWhere('ws.isTest = :isTest')
             ->setParameter('widgetId', $widgetId)
             ->setParameter('threshold', $activeThreshold)
+            ->setParameter('isTest', false)
             ->getQuery()
             ->getSingleScalarResult();
     }
@@ -87,7 +89,9 @@ class WidgetSessionRepository extends ServiceEntityRepository
         return $this->createQueryBuilder('ws')
             ->select('SUM(ws.messageCount)')
             ->where('ws.widgetId = :widgetId')
+            ->andWhere('ws.isTest = :isTest')
             ->setParameter('widgetId', $widgetId)
+            ->setParameter('isTest', false)
             ->getQuery()
             ->getSingleScalarResult() ?? 0;
     }

@@ -204,8 +204,13 @@ final class WidgetSetupService
         // Generate friendly metadata using AI
         $metadata = $this->generatePromptMetadata($user, $widget, $collectedAnswers);
 
-        // Generate a unique but readable topic
-        $promptTopic = sprintf('widget-%s-%d', $this->slugify($metadata['title']), time());
+        // Generate a unique short topic (max 16 chars for BTOPIC column)
+        // Format: w_{14_hex_chars} = 16 chars total (cryptographically secure)
+        // Keep generating until we find a unique one
+        $promptRepository = $this->em->getRepository(Prompt::class);
+        do {
+            $promptTopic = 'w_'.bin2hex(random_bytes(7));
+        } while ($promptRepository->findOneBy(['topic' => $promptTopic]));
 
         // Create the new prompt
         $prompt = new Prompt();

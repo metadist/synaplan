@@ -35,7 +35,7 @@ class WidgetSessionService
     /**
      * Get or create a session for a widget.
      */
-    public function getOrCreateSession(string $widgetId, string $sessionId): WidgetSession
+    public function getOrCreateSession(string $widgetId, string $sessionId, bool $isTest = false): WidgetSession
     {
         $session = $this->sessionRepository->findByWidgetAndSession($widgetId, $sessionId);
 
@@ -43,24 +43,31 @@ class WidgetSessionService
             $session = new WidgetSession();
             $session->setWidgetId($widgetId);
             $session->setSessionId($sessionId);
+            $session->setIsTest($isTest);
             $this->em->persist($session);
             $this->em->flush();
 
             $this->logger->info('New widget session created', [
                 'widget_id' => $widgetId,
                 'session_id' => substr($sessionId, 0, 8).'...',
+                'is_test' => $isTest,
             ]);
         } elseif ($session->isExpired()) {
             // Reset expired session
             $session->setMessageCount(0);
             $session->setFileCount(0);
             $session->setExpires(time() + (self::SESSION_EXPIRY_HOURS * 3600));
+            $session->setIsTest($isTest);
             $this->em->flush();
 
             $this->logger->info('Widget session reset after expiry', [
                 'widget_id' => $widgetId,
                 'session_id' => substr($sessionId, 0, 8).'...',
             ]);
+        } elseif ($isTest && !$session->isTest()) {
+            // If this is a test session but wasn't marked before, mark it now
+            $session->setIsTest(true);
+            $this->em->flush();
         }
 
         return $session;

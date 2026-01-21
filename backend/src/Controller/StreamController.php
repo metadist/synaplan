@@ -141,8 +141,11 @@ class StreamController extends AbstractController
                     ], Response::HTTP_SERVICE_UNAVAILABLE);
                 }
 
+                // Check if this is a test mode session
+                $isTestMode = 'true' === $request->headers->get('X-Widget-Test-Mode');
+
                 // Get or create widget session
-                $widgetSession = $this->widgetSessionService->getOrCreateSession($widgetId, $sessionId);
+                $widgetSession = $this->widgetSessionService->getOrCreateSession($widgetId, $sessionId, $isTestMode);
 
                 // Check session rate limits (anonymous limits)
                 $limitCheck = $this->widgetSessionService->checkSessionLimit($widgetSession);

@@ -41,6 +41,9 @@ class WidgetSession
     #[ORM\Column(name: 'BEXPIRES', type: 'bigint')]
     private int $expires;
 
+    #[ORM\Column(name: 'BISTEST', type: 'boolean')]
+    private bool $isTest = false;
+
     public function __construct()
     {
         $this->created = time();
@@ -171,6 +174,18 @@ class WidgetSession
     public function isExpired(): bool
     {
         return time() > $this->expires;
+    }
+
+    public function isTest(): bool
+    {
+        return $this->isTest;
+    }
+
+    public function setIsTest(bool $isTest): self
+    {
+        $this->isTest = $isTest;
+
+        return $this;
     }
 
     /**
