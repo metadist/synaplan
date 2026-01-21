@@ -758,9 +758,11 @@ const { t } = useI18n()
 const { success, error: showError } = useNotification()
 
 // Check if widget has a custom prompt (not the default)
+// Custom prompts use either 'widget-' prefix (old format) or 'w_' prefix (new format)
 const hasCustomPrompt = computed(() => {
   const topic = props.widget.taskPromptTopic
-  return topic && topic !== 'widget-default' && topic.startsWith('widget-')
+  if (!topic || topic === 'widget-default') return false
+  return topic.startsWith('widget-') || topic.startsWith('w_')
 })
 
 const tabs = computed(() => {
