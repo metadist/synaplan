@@ -43,6 +43,7 @@ final readonly class PromptGenerator
                 'name' => $data['name'] ?? $key,
                 'description' => $data['description'] ?? null,
                 'fields' => $data['fields'] ?? [],
+                'sort_order' => $data['sort_order'] ?? 0,
             ];
         }
 
