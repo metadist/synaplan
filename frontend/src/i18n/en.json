@@ -1184,6 +1184,7 @@
     "subtitle": "Embed AI-powered chat widgets on your website",
     "createNew": "Create Widget",
     "aiSetup": "AI Setup",
+    "aiAssistant": "AI Assistant",
     "advancedConfigLabel": "Advanced Settings",
     "setupComplete": "Widget setup completed successfully!",
     "simpleSetup": {
@@ -1258,6 +1259,9 @@
       "noDomainsYet": "No domains configured. Widget can be embedded on any website.",
       "saveSuccess": "Settings saved successfully!",
       "saveError": "Failed to save settings",
+      "aiSetupRequired": "AI Setup Required",
+      "aiSetupRequiredDescription": "To customize your AI assistant, you first need to complete the guided AI setup. This will help configure the perfect assistant for your needs.",
+      "startAiSetup": "Start AI Setup",
       "restartAiSetup": "Restart Setup",
       "restartAiSetupTitle": "Re-run AI Setup Assistant",
       "restartAiSetupDescription": "Start the guided setup again to reconfigure your assistant.",

@@ -148,11 +148,10 @@
                   <Icon icon="heroicons:play" class="w-4 h-4 text-green-600 dark:text-green-400" />
                 </button>
                 <button
-                  v-if="!hasCustomPrompt(widget)"
                   class="px-3 py-2 rounded-lg bg-[var(--brand-alpha-light)] hover:bg-[var(--brand)]/20 transition-colors"
-                  :title="$t('widgets.aiSetup')"
-                  data-testid="btn-widget-ai-setup"
-                  @click="startAiSetup(widget)"
+                  :title="$t('widgets.aiAssistant')"
+                  data-testid="btn-widget-ai-assistant"
+                  @click="openAdvancedConfigWithTab(widget, 'assistant')"
                 >
                   <Icon icon="heroicons:sparkles" class="w-4 h-4 txt-brand" />
                 </button>
@@ -211,8 +210,9 @@
     <AdvancedWidgetConfig
       v-if="advancedWidget"
       :widget="advancedWidget"
+      :initial-tab="advancedWidgetInitialTab"
       data-testid="comp-advanced-config"
-      @close="advancedWidget = null"
+      @close="closeAdvancedConfig"
       @saved="handleAdvancedSaved"
       @start-ai-setup="startAiSetupFromAdvanced"
     />
@@ -300,6 +300,7 @@ const showSimpleForm = ref(false)
 const successWidget = ref<widgetsApi.Widget | null>(null)
 const setupWidget = ref<widgetsApi.Widget | null>(null)
 const advancedWidget = ref<widgetsApi.Widget | null>(null)
+const advancedWidgetInitialTab = ref<string | undefined>(undefined)
 const currentWidget = ref<widgetsApi.Widget | null>(null)
 const showEmbedModal = ref(false)
 const embedWidget = ref<widgetsApi.Widget | null>(null)
@@ -392,7 +393,24 @@ const startAiSetup = (widget: widgetsApi.Widget) => {
  * Open advanced config for existing widget
  */
 const openAdvancedConfig = (widget: widgetsApi.Widget) => {
+  advancedWidgetInitialTab.value = undefined
   advancedWidget.value = widget
+}
+
+/**
+ * Open advanced config with specific tab
+ */
+const openAdvancedConfigWithTab = (widget: widgetsApi.Widget, tab: string) => {
+  advancedWidgetInitialTab.value = tab
+  advancedWidget.value = widget
+}
+
+/**
+ * Close advanced config and reset initial tab
+ */
+const closeAdvancedConfig = () => {
+  advancedWidget.value = null
+  advancedWidgetInitialTab.value = undefined
 }
 
 /**
@@ -431,15 +449,6 @@ const openTestChat = (widget: widgetsApi.Widget) => {
  */
 const closeTestChat = () => {
   testWidget.value = null
-}
-
-/**
- * Check if widget has a custom prompt (AI setup was completed)
- */
-const hasCustomPrompt = (widget: widgetsApi.Widget): boolean => {
-  const topic = widget.taskPromptTopic
-  // Has custom prompt if topic exists and starts with 'widget-' but is not the default
-  return !!(topic && topic !== 'widget-default' && topic.startsWith('widget-'))
 }
 
 /**

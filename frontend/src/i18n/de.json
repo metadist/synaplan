@@ -1173,6 +1173,7 @@
     "subtitle": "Betten Sie KI-gestützte Chat-Widgets auf Ihrer Website ein",
     "createNew": "Widget erstellen",
     "aiSetup": "KI-Setup",
+    "aiAssistant": "KI-Assistent",
     "advancedConfigLabel": "Erweiterte Einstellungen",
     "setupComplete": "Widget-Setup erfolgreich abgeschlossen!",
     "simpleSetup": {
@@ -1247,6 +1248,9 @@
       "noDomainsYet": "Keine Domains konfiguriert. Widget kann auf jeder Website eingebettet werden.",
       "saveSuccess": "Einstellungen erfolgreich gespeichert!",
       "saveError": "Einstellungen konnten nicht gespeichert werden",
+      "aiSetupRequired": "KI-Setup erforderlich",
+      "aiSetupRequiredDescription": "Um Ihren KI-Assistenten anzupassen, müssen Sie zuerst das geführte KI-Setup abschließen. Dies hilft Ihnen, den perfekten Assistenten für Ihre Bedürfnisse zu konfigurieren.",
+      "startAiSetup": "KI-Setup starten",
       "restartAiSetup": "Setup neu starten",
       "restartAiSetupTitle": "KI-Setup-Assistent erneut ausführen",
       "restartAiSetupDescription": "Starten Sie das geführte Setup erneut, um Ihren Assistenten neu zu konfigurieren.",

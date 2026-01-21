@@ -434,37 +434,61 @@
             class="space-y-6"
             data-testid="section-assistant"
           >
-            <!-- Loading State -->
-            <div v-if="promptLoading" class="flex items-center justify-center py-12">
-              <Icon icon="heroicons:arrow-path" class="w-8 h-8 txt-secondary animate-spin" />
+            <!-- Not Configured State -->
+            <div v-if="!hasCustomPrompt" class="flex flex-col items-center justify-center py-12 text-center">
+              <div class="w-20 h-20 rounded-full bg-[var(--brand-alpha-light)] flex items-center justify-center mb-6">
+                <Icon icon="heroicons:sparkles" class="w-10 h-10 txt-brand" />
+              </div>
+              <h3 class="text-lg font-semibold txt-primary mb-2">
+                {{ $t('widgets.advancedConfig.aiSetupRequired') }}
+              </h3>
+              <p class="text-sm txt-secondary max-w-md mb-6">
+                {{ $t('widgets.advancedConfig.aiSetupRequiredDescription') }}
+              </p>
+              <button
+                type="button"
+                class="btn-primary px-6 py-3 rounded-lg font-medium flex items-center gap-2"
+                data-testid="btn-start-ai-setup"
+                @click="emit('startAiSetup')"
+              >
+                <Icon icon="heroicons:sparkles" class="w-5 h-5" />
+                {{ $t('widgets.advancedConfig.startAiSetup') }}
+              </button>
             </div>
 
-            <!-- Error State -->
-            <div
-              v-else-if="promptError"
-              class="p-4 rounded-lg bg-red-500/10 border border-red-500/30"
-            >
-              <p class="text-sm text-red-600 dark:text-red-400">{{ promptError }}</p>
-            </div>
-
-            <!-- Prompt Editor -->
+            <!-- Configured State -->
             <template v-else>
-              <!-- Restart AI Setup Option -->
-              <div class="p-4 rounded-lg bg-[var(--brand-alpha-light)] border border-[var(--brand)]/20">
-                <div class="flex items-center justify-between">
-                  <div class="flex items-start gap-3">
-                    <Icon icon="heroicons:sparkles" class="w-5 h-5 txt-brand flex-shrink-0 mt-0.5" />
-                    <div>
-                      <p class="text-sm font-medium txt-primary">
-                        {{ $t('widgets.advancedConfig.restartAiSetupTitle') }}
-                      </p>
-                      <p class="text-xs txt-secondary mt-1">
-                        {{ $t('widgets.advancedConfig.restartAiSetupDescription') }}
-                      </p>
+              <!-- Loading State -->
+              <div v-if="promptLoading" class="flex items-center justify-center py-12">
+                <Icon icon="heroicons:arrow-path" class="w-8 h-8 txt-secondary animate-spin" />
+              </div>
+
+              <!-- Error State -->
+              <div
+                v-else-if="promptError"
+                class="p-4 rounded-lg bg-red-500/10 border border-red-500/30"
+              >
+                <p class="text-sm text-red-600 dark:text-red-400">{{ promptError }}</p>
+              </div>
+
+              <!-- Prompt Editor -->
+              <template v-else>
+                <!-- Restart AI Setup Option -->
+                <div class="p-4 rounded-lg bg-[var(--brand-alpha-light)] border border-[var(--brand)]/20">
+                  <div class="flex items-center justify-between">
+                    <div class="flex items-start gap-3">
+                      <Icon icon="heroicons:sparkles" class="w-5 h-5 txt-brand flex-shrink-0 mt-0.5" />
+                      <div>
+                        <p class="text-sm font-medium txt-primary">
+                          {{ $t('widgets.advancedConfig.restartAiSetupTitle') }}
+                        </p>
+                        <p class="text-xs txt-secondary mt-1">
+                          {{ $t('widgets.advancedConfig.restartAiSetupDescription') }}
+                        </p>
+                      </div>
                     </div>
-                  </div>
-                  <button
-                    type="button"
+                    <button
+                      type="button"
                     class="px-4 py-2 rounded-lg bg-[var(--brand)] text-white text-sm font-medium hover:bg-[var(--brand-hover)] transition-colors flex items-center gap-2"
                     data-testid="btn-restart-ai-setup"
                     @click="emit('startAiSetup')"
@@ -672,6 +696,7 @@
                   </p>
                 </div>
               </div>
+              </template>
             </template>
           </div>
         </div>
@@ -720,6 +745,7 @@ defineOptions({
 
 const props = defineProps<{
   widget: widgetsApi.Widget
+  initialTab?: string
 }>()
 
 const emit = defineEmits<{
@@ -738,7 +764,7 @@ const hasCustomPrompt = computed(() => {
 })
 
 const tabs = computed(() => {
-  const baseTabs = [
+  return [
     {
       id: 'branding',
       icon: 'heroicons:paint-brush',
@@ -754,21 +780,15 @@ const tabs = computed(() => {
       icon: 'heroicons:shield-check',
       labelKey: 'widgets.advancedConfig.tabs.security',
     },
-  ]
-
-  // Only show AI Assistant tab if widget has a custom prompt
-  if (hasCustomPrompt.value) {
-    baseTabs.push({
+    {
       id: 'assistant',
       icon: 'heroicons:sparkles',
       labelKey: 'widgets.advancedConfig.tabs.assistant',
-    })
-  }
-
-  return baseTabs
+    },
+  ]
 })
 
-const activeTab = ref('branding')
+const activeTab = ref(props.initialTab || 'branding')
 const saving = ref(false)
 const newDomain = ref('')
 
@@ -1192,6 +1212,11 @@ const savePromptData = async () => {
 }
 
 onMounted(async () => {
+  // Set loading state immediately if we have a custom prompt to prevent flicker
+  if (hasCustomPrompt.value) {
+    promptLoading.value = true
+  }
+
   // Load current widget name
   widgetName.value = props.widget.name || ''
 
