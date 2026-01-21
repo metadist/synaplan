@@ -449,6 +449,32 @@
 
             <!-- Prompt Editor -->
             <template v-else>
+              <!-- Restart AI Setup Option -->
+              <div class="p-4 rounded-lg bg-[var(--brand-alpha-light)] border border-[var(--brand)]/20">
+                <div class="flex items-center justify-between">
+                  <div class="flex items-start gap-3">
+                    <Icon icon="heroicons:sparkles" class="w-5 h-5 txt-brand flex-shrink-0 mt-0.5" />
+                    <div>
+                      <p class="text-sm font-medium txt-primary">
+                        {{ $t('widgets.advancedConfig.restartAiSetupTitle') }}
+                      </p>
+                      <p class="text-xs txt-secondary mt-1">
+                        {{ $t('widgets.advancedConfig.restartAiSetupDescription') }}
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    class="px-4 py-2 rounded-lg bg-[var(--brand)] text-white text-sm font-medium hover:bg-[var(--brand-hover)] transition-colors flex items-center gap-2"
+                    data-testid="btn-restart-ai-setup"
+                    @click="emit('startAiSetup')"
+                  >
+                    <Icon icon="heroicons:arrow-path" class="w-4 h-4" />
+                    {{ $t('widgets.advancedConfig.restartAiSetup') }}
+                  </button>
+                </div>
+              </div>
+
               <!-- Prompt Name -->
               <div>
                 <label class="block text-sm font-medium txt-primary mb-2 flex items-center gap-2">
@@ -562,6 +588,89 @@
                   {{ $t('widgets.advancedConfig.promptContentHelp') }}
                 </p>
               </div>
+
+              <!-- Knowledge Base / File Upload -->
+              <div>
+                <label class="block text-sm font-medium txt-primary mb-2 flex items-center gap-2">
+                  <Icon icon="heroicons:document-arrow-up" class="w-4 h-4" />
+                  {{ $t('widgets.advancedConfig.knowledgeBase') }}
+                </label>
+                <p class="text-xs txt-secondary mb-4">
+                  {{ $t('widgets.advancedConfig.knowledgeBaseDescription') }}
+                </p>
+
+                <!-- File Upload Area -->
+                <div class="mb-4">
+                  <label
+                    class="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-lg cursor-pointer border-light-border/50 dark:border-dark-border/30 hover:border-[var(--brand)]/50 hover:bg-[var(--brand)]/5 transition-colors"
+                  >
+                    <div class="flex flex-col items-center justify-center pt-5 pb-6">
+                      <Icon
+                        v-if="uploadingFile"
+                        icon="heroicons:arrow-path"
+                        class="w-8 h-8 mb-2 txt-brand animate-spin"
+                      />
+                      <Icon v-else icon="heroicons:cloud-arrow-up" class="w-8 h-8 mb-2 txt-secondary" />
+                      <p class="text-sm txt-secondary">
+                        <span v-if="uploadingFile">{{ $t('widgets.advancedConfig.uploadingFile') }}</span>
+                        <span v-else class="font-medium txt-brand">{{ $t('widgets.advancedConfig.uploadFiles') }}</span>
+                      </p>
+                      <p class="text-xs txt-secondary mt-1">PDF, DOCX, TXT, MD (max 10MB)</p>
+                    </div>
+                    <input
+                      ref="fileUploadInput"
+                      type="file"
+                      class="hidden"
+                      accept=".pdf,.doc,.docx,.txt,.md,.csv,.json"
+                      multiple
+                      :disabled="uploadingFile"
+                      @change="handleFileUpload"
+                    />
+                  </label>
+                </div>
+
+                <!-- Uploaded Files List -->
+                <div v-if="promptFiles.length > 0" class="space-y-2">
+                  <div
+                    v-for="file in promptFiles"
+                    :key="file.id"
+                    class="flex items-center justify-between p-3 rounded-lg surface-chip"
+                  >
+                    <div class="flex items-center gap-3 min-w-0">
+                      <Icon icon="heroicons:document" class="w-5 h-5 txt-secondary flex-shrink-0" />
+                      <div class="min-w-0">
+                        <p class="text-sm txt-primary truncate">{{ file.fileName }}</p>
+                        <p class="text-xs txt-secondary">{{ file.chunks }} chunks</p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      class="p-2 rounded-lg hover:bg-red-500/10 transition-colors"
+                      :title="$t('widgets.advancedConfig.deleteFile')"
+                      :disabled="deletingFileId === file.id"
+                      @click="handleDeleteFile(file.id)"
+                    >
+                      <Icon
+                        v-if="deletingFileId === file.id"
+                        icon="heroicons:arrow-path"
+                        class="w-4 h-4 text-red-500 animate-spin"
+                      />
+                      <Icon v-else icon="heroicons:trash" class="w-4 h-4 text-red-500" />
+                    </button>
+                  </div>
+                </div>
+
+                <!-- Empty State -->
+                <div
+                  v-else
+                  class="text-center py-6 surface-chip rounded-lg"
+                >
+                  <Icon icon="heroicons:document-text" class="w-10 h-10 txt-secondary mx-auto mb-2 opacity-50" />
+                  <p class="text-sm txt-secondary">
+                    {{ $t('widgets.advancedConfig.noFilesYet') }}
+                  </p>
+                </div>
+              </div>
             </template>
           </div>
         </div>
@@ -615,6 +724,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   close: []
   saved: []
+  startAiSetup: []
 }>()
 
 const { t } = useI18n()
@@ -796,6 +906,12 @@ const promptData = reactive({
 const promptLoading = ref(false)
 const promptError = ref<string | null>(null)
 
+// File upload for Knowledge Base
+const fileUploadInput = ref<HTMLInputElement | null>(null)
+const promptFiles = ref<{ id: number; fileName: string; chunks: number }[]>([])
+const uploadingFile = ref(false)
+const deletingFileId = ref<number | null>(null)
+
 // AI Models
 const allModels = ref<Partial<Record<Capability, AIModel[]>>>({})
 const loadingModels = ref(false)
@@ -951,12 +1067,76 @@ const loadPromptData = async () => {
         availableTools: tools,
         content: prompt.prompt,
       })
+
+      // Load files for this prompt
+      await loadPromptFiles()
     }
   } catch (err: any) {
     console.error('Failed to load prompt:', err)
     promptError.value = err.message || 'Failed to load prompt data'
   } finally {
     promptLoading.value = false
+  }
+}
+
+const loadPromptFiles = async () => {
+  if (!props.widget.taskPromptTopic) return
+
+  try {
+    const files = await promptsApi.getPromptFiles(props.widget.taskPromptTopic)
+    promptFiles.value = files.map((f) => ({
+      id: f.id,
+      fileName: f.fileName,
+      chunks: f.chunks,
+    }))
+  } catch (err) {
+    console.error('Failed to load prompt files:', err)
+    // Don't show error, just have empty file list
+  }
+}
+
+const handleFileUpload = async (event: Event) => {
+  const input = event.target as HTMLInputElement
+  const files = input.files
+  if (!files || files.length === 0 || !props.widget.taskPromptTopic) return
+
+  uploadingFile.value = true
+
+  try {
+    for (const file of Array.from(files)) {
+      await promptsApi.uploadPromptFile(props.widget.taskPromptTopic, file)
+    }
+
+    // Reload files list
+    await loadPromptFiles()
+    success(t('widgets.advancedConfig.fileUploadSuccess'))
+  } catch (err: any) {
+    console.error('Failed to upload file:', err)
+    showError(err.message || t('widgets.advancedConfig.fileUploadError'))
+  } finally {
+    uploadingFile.value = false
+    // Reset input
+    if (input) {
+      input.value = ''
+    }
+  }
+}
+
+const handleDeleteFile = async (fileId: number) => {
+  if (!props.widget.taskPromptTopic) return
+
+  deletingFileId.value = fileId
+
+  try {
+    await promptsApi.deletePromptFile(props.widget.taskPromptTopic, fileId)
+    // Remove from local list
+    promptFiles.value = promptFiles.value.filter((f) => f.id !== fileId)
+    success(t('widgets.advancedConfig.fileDeleteSuccess'))
+  } catch (err: any) {
+    console.error('Failed to delete file:', err)
+    showError(err.message || t('widgets.advancedConfig.fileDeleteError'))
+  } finally {
+    deletingFileId.value = null
   }
 }
 

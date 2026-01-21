@@ -148,6 +148,7 @@
                   <Icon icon="heroicons:play" class="w-4 h-4 text-green-600 dark:text-green-400" />
                 </button>
                 <button
+                  v-if="!hasCustomPrompt(widget)"
                   class="px-3 py-2 rounded-lg bg-[var(--brand-alpha-light)] hover:bg-[var(--brand)]/20 transition-colors"
                   :title="$t('widgets.aiSetup')"
                   data-testid="btn-widget-ai-setup"
@@ -213,6 +214,7 @@
       data-testid="comp-advanced-config"
       @close="advancedWidget = null"
       @saved="handleAdvancedSaved"
+      @start-ai-setup="startAiSetupFromAdvanced"
     />
 
     <!-- Legacy Edit Modal -->
@@ -360,6 +362,16 @@ const openAdvancedFromSuccess = () => {
 }
 
 /**
+ * Start AI setup from advanced config modal
+ */
+const startAiSetupFromAdvanced = () => {
+  if (advancedWidget.value) {
+    setupWidget.value = advancedWidget.value
+    advancedWidget.value = null // Close advanced modal
+  }
+}
+
+/**
  * Test widget from success modal
  */
 const testWidgetFromSuccess = () => {
@@ -419,6 +431,15 @@ const openTestChat = (widget: widgetsApi.Widget) => {
  */
 const closeTestChat = () => {
   testWidget.value = null
+}
+
+/**
+ * Check if widget has a custom prompt (AI setup was completed)
+ */
+const hasCustomPrompt = (widget: widgetsApi.Widget): boolean => {
+  const topic = widget.taskPromptTopic
+  // Has custom prompt if topic exists and starts with 'widget-' but is not the default
+  return !!(topic && topic !== 'widget-default' && topic.startsWith('widget-'))
 }
 
 /**
