@@ -564,8 +564,9 @@ const allowFileUploads = computed(
   () => !!props.allowFileUpload && (!props.isPreview || props.testMode)
 )
 const fileUploadLimit = computed(() => props.fileUploadLimit ?? 0)
+const isTestEnvironment = computed(() => props.testMode || props.isPreview)
 const testModeHeaders = computed(() =>
-  props.testMode || props.isPreview ? { 'X-Widget-Test-Mode': 'true' } : {}
+  isTestEnvironment.value ? { 'X-Widget-Test-Mode': 'true' } : {}
 )
 const fileUploadCount = ref(0)
 const uploadingFile = ref(false)
@@ -1102,9 +1103,12 @@ const sendMessage = async () => {
 
     if (result.chatId && result.chatId > 0) {
       chatId.value = result.chatId
-      const key = getChatStorageKey()
-      if (key) {
-        localStorage.setItem(key, result.chatId.toString())
+      // Skip localStorage in test mode
+      if (!isTestEnvironment.value) {
+        const key = getChatStorageKey()
+        if (key) {
+          localStorage.setItem(key, result.chatId.toString())
+        }
       }
       if (!historyLoaded.value) {
         await loadConversationHistory()
@@ -1328,7 +1332,8 @@ const normalizeServerMessage = (raw: any): Message => {
 }
 
 const loadConversationHistory = async (force = false) => {
-  if (props.isPreview) {
+  // In test/preview mode, skip loading real history but mark as loaded for auto message
+  if (isTestEnvironment.value) {
     historyLoaded.value = true
     ensureAutoMessage()
     return
@@ -1541,7 +1546,7 @@ const renderMessageContent = (value: string): string => {
   return result
 }
 
-// Load session ID from localStorage on mount
+// Load session ID from localStorage on mount (skip for test mode)
 onMounted(() => {
   updateIsMobile()
   if (typeof window !== 'undefined') {
@@ -1552,6 +1557,15 @@ onMounted(() => {
   window.addEventListener('synaplan-widget-open', handleOpenEvent)
   window.addEventListener('synaplan-widget-close', handleCloseEvent)
 
+  // In test mode, create a temporary session without localStorage persistence
+  if (isTestEnvironment.value) {
+    sessionId.value = createSessionId()
+    // Still call loadConversationHistory to trigger ensureAutoMessage (but it won't load actual history)
+    loadConversationHistory()
+    return
+  }
+
+  // Normal mode: use localStorage for session persistence
   const storageKey = getSessionStorageKey()
   let currentSessionId = localStorage.getItem(storageKey)
   if (!currentSessionId) {
@@ -1591,9 +1605,9 @@ const getChatStorageKey = () => {
   return getChatStorageKeyForSession(sessionId.value)
 }
 
-// Save chatId to localStorage when it changes
+// Save chatId to localStorage when it changes (skip for test mode)
 watch(chatId, (newChatId) => {
-  if (!newChatId) return
+  if (!newChatId || isTestEnvironment.value) return
   const key = getChatStorageKey()
   if (key) {
     localStorage.setItem(key, newChatId.toString())
