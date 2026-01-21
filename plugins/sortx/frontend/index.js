@@ -15,7 +15,7 @@ export default {
           <h3 style="color: var(--txt-primary, #333); margin-bottom: 12px; font-size: 18px;">Plugin Status</h3>
           <ul style="margin-top: 8px; font-size: 14px; color: var(--txt-secondary, #666); list-style: none; padding: 0;">
             <li style="margin-bottom: 8px;">✅ <strong>Status:</strong> Active</li>
-            <li style="margin-bottom: 8px;">✅ <strong>Version:</strong> 2.0.0</li>
+            <li style="margin-bottom: 8px;">✅ <strong>Version:</strong> 3.0.0</li>
             <li style="margin-bottom: 8px;">✅ <strong>API Endpoints:</strong> Available</li>
           </ul>
         </div>
@@ -25,6 +25,7 @@ export default {
             <li style="margin-bottom: 8px;">📄 <code style="background: var(--bg-chip, #f0f0f0); padding: 2px 6px; border-radius: 4px;">GET /schema</code> - Get category schema, fields & prompt</li>
             <li style="margin-bottom: 8px;">📄 <code style="background: var(--bg-chip, #f0f0f0); padding: 2px 6px; border-radius: 4px;">GET /categories</code> - Get categories with metadata fields</li>
             <li style="margin-bottom: 8px;">📄 <code style="background: var(--bg-chip, #f0f0f0); padding: 2px 6px; border-radius: 4px;">POST /classify</code> - Classify text with metadata extraction</li>
+            <li style="margin-bottom: 8px;">📄 <code style="background: var(--bg-chip, #f0f0f0); padding: 2px 6px; border-radius: 4px;">POST /extract-text</code> - Extract text from document (Tika + Vision fallback)</li>
             <li style="margin-bottom: 8px;">📄 <code style="background: var(--bg-chip, #f0f0f0); padding: 2px 6px; border-radius: 4px;">POST /analyze-file</code> - Full file analysis</li>
           </ul>
         </div>
