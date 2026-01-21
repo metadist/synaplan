@@ -475,17 +475,18 @@
                 </div>
               </div>
 
-              <!-- Prompt Name -->
+              <!-- Widget Name -->
               <div>
                 <label class="block text-sm font-medium txt-primary mb-2 flex items-center gap-2">
                   <Icon icon="heroicons:tag" class="w-4 h-4" />
-                  {{ $t('widgets.advancedConfig.promptName') }}
+                  {{ $t('widgets.widgetName') }}
                 </label>
                 <input
-                  v-model="promptData.name"
+                  v-model="widgetName"
                   type="text"
                   class="w-full px-4 py-2.5 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
-                  data-testid="input-prompt-name"
+                  data-testid="input-widget-name"
+                  :placeholder="$t('widgets.widgetNamePlaceholder')"
                 />
               </div>
 
@@ -893,6 +894,9 @@ const removeCustomIcon = () => {
   }
 }
 
+// Widget name (editable in AI Assistant tab)
+const widgetName = ref('')
+
 // Prompt config for AI Assistant tab
 const promptData = reactive({
   id: 0,
@@ -992,8 +996,16 @@ const removeDomain = (domain: string) => {
 const handleSave = async () => {
   saving.value = true
   try {
-    // Save widget config
-    await widgetsApi.updateWidget(props.widget.widgetId, { config })
+    // Build update request with config and name if changed
+    const updateRequest: { config: typeof config; name?: string } = { config }
+
+    // Include widget name if it was changed
+    if (widgetName.value && widgetName.value !== props.widget.name) {
+      updateRequest.name = widgetName.value
+    }
+
+    // Save widget config (and name)
+    await widgetsApi.updateWidget(props.widget.widgetId, updateRequest)
 
     // Save prompt if on assistant tab and has custom prompt
     if (activeTab.value === 'assistant' && hasCustomPrompt.value && promptData.id) {
@@ -1180,6 +1192,9 @@ const savePromptData = async () => {
 }
 
 onMounted(async () => {
+  // Load current widget name
+  widgetName.value = props.widget.name || ''
+
   // Load current config from widget
   const widgetConfig = props.widget.config || {}
   Object.assign(config, {
