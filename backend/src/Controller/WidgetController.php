@@ -604,7 +604,8 @@ class WidgetController extends AbstractController
                 $widget,
                 $user,
                 $data['text'],
-                $data['chatId'] ?? null
+                $data['chatId'] ?? null,
+                $data['language'] ?? 'en'
             );
 
             return $this->json([

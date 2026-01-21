@@ -440,7 +440,8 @@ export async function uploadWidgetFile(
 export async function sendSetupMessage(
   widgetId: string,
   text: string,
-  chatId: number | null
+  chatId: number | null,
+  language?: string
 ): Promise<{
   success: boolean
   chatId: number
@@ -456,7 +457,7 @@ export async function sendSetupMessage(
     progress: number
   }>(`/api/v1/widgets/${widgetId}/setup-chat`, {
     method: 'POST',
-    body: JSON.stringify({ text, chatId }),
+    body: JSON.stringify({ text, chatId, language }),
   })
   return data
 }

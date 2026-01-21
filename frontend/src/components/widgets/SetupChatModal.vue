@@ -214,7 +214,7 @@ const emit = defineEmits<{
   completed: [promptTopic: string]
 }>()
 
-const { t } = useI18n()
+const { t, locale } = useI18n()
 const { success, error: showError } = useNotification()
 
 interface Message {
@@ -255,10 +255,13 @@ const handleClose = () => {
 
 const cleanResponseText = (text: string): string => {
   // Remove tracking markers and prompt markers from displayed text
+  // Support both German (FRAGE) and English (QUESTION) markers
   return text
     .replace(/\[PROGRESS:\d+\/5\]/g, '')
     .replace(/\[FRAGE:\d+\]/gi, '')
     .replace(/\[FRAGE:DONE\]/gi, '')
+    .replace(/\[QUESTION:\d+\]/gi, '')
+    .replace(/\[QUESTION:DONE\]/gi, '')
     .replace(/<<<GENERATED_PROMPT>>>[\s\S]*?<<<END_PROMPT>>>/g, '')
     .trim()
 }
@@ -283,7 +286,7 @@ const sendMessage = async () => {
   isTyping.value = true
 
   try {
-    const response = await widgetsApi.sendSetupMessage(props.widget.widgetId, text, chatId.value)
+    const response = await widgetsApi.sendSetupMessage(props.widget.widgetId, text, chatId.value, locale.value)
 
     chatId.value = response.chatId
     isTyping.value = false
@@ -345,11 +348,12 @@ const saveGeneratedPrompt = async () => {
 const startInterview = async () => {
   isTyping.value = true
   try {
-    // Send initial message to start the interview
+    // Send initial message to start the interview (pass app language)
     const response = await widgetsApi.sendSetupMessage(
       props.widget.widgetId,
       '__START_INTERVIEW__',
-      null
+      null,
+      locale.value
     )
 
     chatId.value = response.chatId

@@ -41,7 +41,7 @@ final class WidgetSetupService
      *
      * @return array{chatId: int, messageId: int, text: string}
      */
-    public function sendSetupMessage(Widget $widget, User $user, string $text, ?int $chatId = null): array
+    public function sendSetupMessage(Widget $widget, User $user, string $text, ?int $chatId = null, string $language = 'en'): array
     {
         // Get or create chat for this setup session
         $chat = $chatId ? $this->chatRepository->find($chatId) : null;
@@ -104,10 +104,30 @@ final class WidgetSetupService
         $this->logger->info('Widget setup using AI model', [
             'provider' => $provider,
             'model' => $modelName,
+            'language' => $language,
         ]);
 
+        // Inject language instruction at the start of the system prompt
+        $languageNames = [
+            'en' => 'English',
+            'de' => 'German',
+            'fr' => 'French',
+            'es' => 'Spanish',
+            'it' => 'Italian',
+            'pt' => 'Portuguese',
+            'nl' => 'Dutch',
+            'pl' => 'Polish',
+            'ru' => 'Russian',
+            'ja' => 'Japanese',
+            'zh' => 'Chinese',
+            'ko' => 'Korean',
+        ];
+        $languageName = $languageNames[$language] ?? 'English';
+        $languageInstruction = "**LANGUAGE SETTING**: The user's application is set to {$languageName}. Start the conversation in {$languageName}. Only switch languages if the user explicitly requests a different language or starts writing in a different language.\n\n";
+        $systemPromptWithLanguage = $languageInstruction.$systemPrompt;
+
         // Build conversation history
-        $messages = $this->buildConversationMessages($chat, $systemPrompt, $text);
+        $messages = $this->buildConversationMessages($chat, $systemPromptWithLanguage, $text);
 
         // Build AI options
         $aiOptions = [
@@ -154,8 +174,8 @@ final class WidgetSetupService
         $this->em->flush();
 
         // Calculate progress from the AI's response
-        // If AI asks [FRAGE:X], it means questions 1 to X-1 are answered
-        // If AI says [FRAGE:DONE], all 5 questions are answered
+        // If AI asks [QUESTION:X] or [FRAGE:X], it means questions 1 to X-1 are answered
+        // If AI says [QUESTION:DONE] or [FRAGE:DONE], all 5 questions are answered
         $progress = $this->calculateProgressFromAiResponse($aiResponse);
 
         // Debug logging
@@ -411,9 +431,9 @@ PROMPT;
 
         foreach ($historyMessages as $msg) {
             if ('OUT' === $msg->getDirection()) {
-                // Match the [FRAGE:X] marker at the end of AI responses
-                if (preg_match('/\[FRAGE:(\d)\]/i', $msg->getText(), $matches)) {
-                    $questionNum = (int) $matches[1];
+                // Match the [QUESTION:X] or [FRAGE:X] marker at the end of AI responses
+                if (preg_match('/\[(QUESTION|FRAGE):(\d)\]/i', $msg->getText(), $matches)) {
+                    $questionNum = (int) $matches[2];
                     if ($questionNum >= 1 && $questionNum <= 5) {
                         $lastAsked = $questionNum;
                     }
@@ -443,9 +463,9 @@ PROMPT;
             $direction = $msg->getDirection();
 
             if ('OUT' === $direction) {
-                // Check which question the AI asked via [FRAGE:X] marker
-                if (preg_match('/\[FRAGE:(\d)\]/i', $text, $matches)) {
-                    $currentQuestion = (int) $matches[1];
+                // Check which question the AI asked via [QUESTION:X] or [FRAGE:X] marker
+                if (preg_match('/\[(QUESTION|FRAGE):(\d)\]/i', $text, $matches)) {
+                    $currentQuestion = (int) $matches[2];
 
                     // If AI moved to a higher question, the previous answer was accepted
                     if (null !== $pendingAnswer && $currentQuestion > $pendingQuestion) {
@@ -454,7 +474,7 @@ PROMPT;
 
                     $pendingAnswer = null;
                     $pendingQuestion = $currentQuestion;
-                } elseif (preg_match('/\[FRAGE:DONE\]/i', $text)) {
+                } elseif (preg_match('/\[(QUESTION|FRAGE):DONE\]/i', $text)) {
                     // AI says all done - accept the pending answer if there was one
                     if (null !== $pendingAnswer && $pendingQuestion >= 1) {
                         $answers[$pendingQuestion] = $pendingAnswer;
@@ -478,30 +498,30 @@ PROMPT;
     private function buildInstructionBlock(array $collectedAnswers): string
     {
         $block = "\n\n";
-        $block .= "### BEREITS BESTÄTIGTE INFOS (NICHT NOCHMAL FRAGEN!) ###\n";
+        $block .= "### ALREADY CONFIRMED INFO (DO NOT ASK AGAIN!) ###\n";
 
         $labels = [
-            1 => 'Business/Produkte',
-            2 => 'Zielgruppe/Besucher',
-            3 => 'Aufgaben des Assistenten',
-            4 => 'Ton/Stil',
-            5 => 'Einschränkungen/Tabu-Themen',
+            1 => 'Business/Products',
+            2 => 'Target audience/Visitors',
+            3 => 'Assistant tasks',
+            4 => 'Tone/Style',
+            5 => 'Restrictions/Off-limit topics',
         ];
 
         if (empty($collectedAnswers)) {
-            $block .= "Noch nichts gesammelt.\n";
+            $block .= "Nothing collected yet.\n";
         } else {
             foreach ($collectedAnswers as $q => $answer) {
-                $block .= "✓ Frage {$q} ({$labels[$q]}): \"{$answer}\"\n";
+                $block .= "✓ Question {$q} ({$labels[$q]}): \"{$answer}\"\n";
             }
         }
 
         $answeredCount = count($collectedAnswers);
         $block .= "\n### STATUS ###\n";
-        $block .= "{$answeredCount} von 5 Fragen beantwortet.\n";
+        $block .= "{$answeredCount} of 5 questions answered.\n";
 
         if ($answeredCount >= 5) {
-            $block .= "Alle Infos da! Generiere <<<GENERATED_PROMPT>>> mit [FRAGE:DONE] am Ende.\n";
+            $block .= "All info collected! Generate <<<GENERATED_PROMPT>>> with [QUESTION:DONE] at the end.\n";
         }
 
         return $block;
@@ -517,19 +537,19 @@ PROMPT;
 
     /**
      * Calculate progress from the AI's response marker.
-     * If AI asks [FRAGE:X], progress = X-1 (questions 1 to X-1 are done).
-     * If AI says [FRAGE:DONE], progress = 5.
+     * If AI asks [QUESTION:X] or [FRAGE:X], progress = X-1 (questions 1 to X-1 are done).
+     * If AI says [QUESTION:DONE] or [FRAGE:DONE], progress = 5.
      */
     private function calculateProgressFromAiResponse(string $aiResponse): int
     {
-        // Check for DONE marker first
-        if (preg_match('/\[FRAGE:DONE\]/i', $aiResponse)) {
+        // Check for DONE marker first (support both English and German)
+        if (preg_match('/\[(QUESTION|FRAGE):DONE\]/i', $aiResponse)) {
             return 5;
         }
 
-        // Check for question number marker
-        if (preg_match('/\[FRAGE:(\d)\]/i', $aiResponse, $matches)) {
-            $questionNum = (int) $matches[1];
+        // Check for question number marker (support both English and German)
+        if (preg_match('/\[(QUESTION|FRAGE):(\d)\]/i', $aiResponse, $matches)) {
+            $questionNum = (int) $matches[2];
 
             // If asking question X, then X-1 questions are answered
             return max(0, $questionNum - 1);
@@ -544,7 +564,8 @@ PROMPT;
      */
     private function extractQuestionMarker(string $aiResponse): string
     {
-        if (preg_match('/\[FRAGE:(DONE|\d)\]/i', $aiResponse, $matches)) {
+        // Support both English (QUESTION) and German (FRAGE) markers
+        if (preg_match('/\[(QUESTION|FRAGE):(DONE|\d)\]/i', $aiResponse, $matches)) {
             return $matches[0];
         }
 
