@@ -83,10 +83,34 @@ final class UserMemoryServiceTest extends TestCase
 
         $this->qdrantClient
             ->expects($this->once())
+            ->method('isAvailable')
+            ->willReturn(true);
+
+        $this->qdrantClient
+            ->expects($this->once())
             ->method('deleteMemory')
             ->with("mem_123_{$memoryId}");
 
         $this->service->deleteMemory($memoryId, $user);
+    }
+
+    public function testDeleteMemoryDoesNotCallQdrantWhenUnavailable(): void
+    {
+        $memoryId = 1768900000;
+        $user = $this->createMock(User::class);
+        $user->method('getId')->willReturn(123);
+
+        $this->qdrantClient
+            ->expects($this->once())
+            ->method('isAvailable')
+            ->willReturn(false);
+
+        $this->qdrantClient
+            ->expects($this->never())
+            ->method('deleteMemory');
+
+        $this->service->deleteMemory($memoryId, $user);
+        $this->addToAssertionCount(1);
     }
 
     public function testServiceIsAvailableWhenQdrantConfigured(): void

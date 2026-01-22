@@ -78,12 +78,7 @@ final class UserMemoryServiceIntegrationTest extends KernelTestCase
             $this->markTestSkipped('Could not set user ID via reflection');
         }
 
-        $this->expectNotToPerformAssertions();
-
-        try {
-            $this->service->deleteMemory(1768900000, $user);
-        } catch (\Exception $e) {
-            $this->fail('deleteMemory should not throw exception: '.$e->getMessage());
-        }
+        $this->service->deleteMemory(1768900000, $user);
+        $this->addToAssertionCount(1);
     }
 }

@@ -157,6 +157,15 @@ readonly class UserMemoryService
      */
     public function deleteMemory(int $memoryId, User $user): void
     {
+        if (!$this->qdrantClient->isAvailable()) {
+            $this->logger->warning('Memory service unavailable - skipping delete', [
+                'memory_id' => $memoryId,
+                'user_id' => $user->getId(),
+            ]);
+
+            return;
+        }
+
         $pointId = "mem_{$user->getId()}_{$memoryId}";
 
         try {
