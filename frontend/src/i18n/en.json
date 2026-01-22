@@ -1260,6 +1260,8 @@
       "allowedDomains": "Allowed Domains",
       "allowedDomainsHelp": "Only these domains can embed and use your widget. Leave empty to allow all domains.",
       "noDomainsYet": "No domains configured. Widget can be embedded on any website.",
+      "localhostWarningTitle": "Localhost allowed for testing",
+      "localhostWarningDescription": "Keeping localhost or 127.0.0.1 in the allow list enables testing but should be removed before sharing the widget publicly to avoid security risks.",
       "saveSuccess": "Settings saved successfully!",
       "saveError": "Failed to save settings",
       "aiSetupRequired": "AI Setup Required",

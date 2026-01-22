@@ -457,6 +457,27 @@
               <p v-else class="text-xs txt-secondary">
                 {{ $t('widgets.advancedConfig.noDomainsYet') }}
               </p>
+
+              <!-- Localhost Warning -->
+              <div
+                v-if="hasLocalhostInDomains"
+                class="mt-3 p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/30"
+              >
+                <div class="flex items-start gap-2">
+                  <Icon
+                    icon="heroicons:exclamation-triangle"
+                    class="w-5 h-5 text-yellow-600 dark:text-yellow-400 flex-shrink-0 mt-0.5"
+                  />
+                  <div>
+                    <p class="text-sm font-medium text-yellow-700 dark:text-yellow-300">
+                      {{ $t('widgets.advancedConfig.localhostWarningTitle') }}
+                    </p>
+                    <p class="text-xs text-yellow-600 dark:text-yellow-400 mt-1">
+                      {{ $t('widgets.advancedConfig.localhostWarningDescription') }}
+                    </p>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -870,6 +891,18 @@ const hasCustomPrompt = computed(() => {
   const topic = props.widget.taskPromptTopic
   if (!topic || topic === 'widget-default') return false
   return topic.startsWith('widget-') || topic.startsWith('w_')
+})
+
+// Check if localhost addresses are in allowed domains
+const hasLocalhostInDomains = computed(() => {
+  if (!config.allowedDomains?.length) return false
+  return config.allowedDomains.some(
+    (domain) =>
+      domain === 'localhost' ||
+      domain.startsWith('localhost:') ||
+      domain === '127.0.0.1' ||
+      domain.startsWith('127.0.0.1:')
+  )
 })
 
 const tabs = computed(() => {

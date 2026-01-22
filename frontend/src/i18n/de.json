@@ -1249,6 +1249,8 @@
       "allowedDomains": "Erlaubte Domains",
       "allowedDomainsHelp": "Nur diese Domains können Ihr Widget einbetten und nutzen. Leer lassen, um alle Domains zu erlauben.",
       "noDomainsYet": "Keine Domains konfiguriert. Widget kann auf jeder Website eingebettet werden.",
+      "localhostWarningTitle": "Localhost für Tests erlaubt",
+      "localhostWarningDescription": "Localhost oder 127.0.0.1 in der Erlaubnisliste ermöglicht Tests, sollte aber vor der öffentlichen Freigabe entfernt werden, um Sicherheitsrisiken zu vermeiden.",
       "saveSuccess": "Einstellungen erfolgreich gespeichert!",
       "saveError": "Einstellungen konnten nicht gespeichert werden",
       "aiSetupRequired": "KI-Setup erforderlich",
