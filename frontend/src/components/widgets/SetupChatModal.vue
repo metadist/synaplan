@@ -169,7 +169,7 @@
             <button
               type="submit"
               :disabled="!inputText.trim() || isTyping || isSending"
-              class="w-12 h-12 rounded-xl bg-[var(--brand)] text-white flex items-center justify-center hover:bg-[var(--brand-hover)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0"
+              class="w-14 h-14 rounded-xl bg-[var(--brand)] text-white flex items-center justify-center hover:bg-[var(--brand-hover)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0"
               data-testid="btn-send"
             >
               <Icon v-if="isSending" icon="heroicons:arrow-path" class="w-5 h-5 animate-spin" />
@@ -337,6 +337,10 @@ const sendMessage = async () => {
   } finally {
     isSending.value = false
     isTyping.value = false
+
+    // Refocus input field after sending
+    await nextTick()
+    inputRef.value?.focus()
   }
 }
 
@@ -395,6 +399,10 @@ const startInterview = async () => {
     showError(err.message || t('widgets.setupChat.startError'))
   } finally {
     isTyping.value = false
+
+    // Focus input field after interview starts
+    await nextTick()
+    inputRef.value?.focus()
   }
 }
 
