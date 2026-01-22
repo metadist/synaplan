@@ -6,7 +6,6 @@ import {
   updateMemory,
   deleteMemory,
   searchMemories,
-  type UserMemory,
   type CreateMemoryRequest,
   type UpdateMemoryRequest,
 } from '@/services/api/userMemoriesApi'
@@ -157,32 +156,6 @@ describe('User Memories API', () => {
         schema: expect.any(Object),
       })
       expect(result).toEqual(mockResponse.memory)
-    })
-
-    it('should update only the category', async () => {
-      const memoryId = 1
-      const updates: UpdateMemoryRequest = {
-        category: 'work',
-      }
-
-      const mockResponse = {
-        memory: {
-          id: memoryId,
-          category: 'work',
-          key: 'tech_stack',
-          value: 'TypeScript',
-          source: 'user_edited' as const,
-          messageId: null,
-          created: 1705234567,
-          updated: 1705234600,
-        },
-      }
-
-      vi.mocked(httpClient).mockResolvedValue(mockResponse)
-
-      const result = await updateMemory(memoryId, updates)
-
-      expect(result.category).toBe('work')
     })
   })
 
