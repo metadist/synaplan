@@ -37,23 +37,16 @@ final class WidgetSetupService
     }
 
     /**
-     * Send a message in the setup interview chat.
+     * Send a message in the setup interview.
      *
-     * @return array{chatId: int, messageId: int, text: string}
+     * The conversation is NOT stored in the database. History is passed from the frontend.
+     *
+     * @param array<array{role: string, content: string}> $history Previous conversation history
+     *
+     * @return array{text: string, progress: int}
      */
-    public function sendSetupMessage(Widget $widget, User $user, string $text, ?int $chatId = null, string $language = 'en'): array
+    public function sendSetupMessage(Widget $widget, User $user, string $text, array $history = [], string $language = 'en'): array
     {
-        // Get or create chat for this setup session
-        $chat = $chatId ? $this->chatRepository->find($chatId) : null;
-
-        if (!$chat) {
-            $chat = new Chat();
-            $chat->setUserId($user->getId());
-            $chat->setTitle('Widget Setup: '.$widget->getName());
-            $this->em->persist($chat);
-            $this->em->flush();
-        }
-
         // Get the setup interview prompt
         $promptData = $this->promptService->getPromptWithMetadata(
             self::SETUP_INTERVIEW_TOPIC,
@@ -126,8 +119,8 @@ final class WidgetSetupService
         $languageInstruction = "**LANGUAGE SETTING**: The user's application is set to {$languageName}. Start the conversation in {$languageName}. Only switch languages if the user explicitly requests a different language or starts writing in a different language.\n\n";
         $systemPromptWithLanguage = $languageInstruction.$systemPrompt;
 
-        // Build conversation history
-        $messages = $this->buildConversationMessages($chat, $systemPromptWithLanguage, $text);
+        // Build conversation history from passed messages
+        $messages = $this->buildConversationMessagesFromHistory($history, $systemPromptWithLanguage, $text);
 
         // Build AI options
         $aiOptions = [
@@ -149,53 +142,19 @@ final class WidgetSetupService
 
         $aiResponse = $response['content'] ?? '';
 
-        // Save user message (unless it's the start marker)
-        if (self::START_MARKER !== $text) {
-            $userMessage = new Message();
-            $userMessage->setUserId($user->getId());
-            $userMessage->setChat($chat);
-            $userMessage->setDirection('IN');
-            $userMessage->setMessageType('WEB');
-            $userMessage->setText($text);
-            $userMessage->setTrackingId(0);
-            $this->em->persist($userMessage);
-        }
-
-        // Save AI response
-        $aiMessage = new Message();
-        $aiMessage->setUserId($user->getId());
-        $aiMessage->setChat($chat);
-        $aiMessage->setDirection('OUT');
-        $aiMessage->setMessageType('WEB');
-        $aiMessage->setText($aiResponse);
-        $aiMessage->setTrackingId(0);
-        $this->em->persist($aiMessage);
-
-        $this->em->flush();
-
         // Calculate progress from the AI's response
         // If AI asks [QUESTION:X] or [FRAGE:X], it means questions 1 to X-1 are answered
         // If AI says [QUESTION:DONE] or [FRAGE:DONE], all 5 questions are answered
         $progress = $this->calculateProgressFromAiResponse($aiResponse);
 
-        // Debug logging
-        $this->logger->info('Widget setup progress calculated', [
+        $this->logger->info('Widget setup message processed (no database storage)', [
             'widget_id' => $widget->getWidgetId(),
-            'chat_id' => $chat->getId(),
             'ai_response_marker' => $this->extractQuestionMarker($aiResponse),
             'progress' => $progress,
-        ]);
-
-        $this->logger->info('Widget setup message processed', [
-            'widget_id' => $widget->getWidgetId(),
-            'chat_id' => $chat->getId(),
-            'message_id' => $aiMessage->getId(),
-            'progress' => $progress,
+            'history_length' => count($history),
         ]);
 
         return [
-            'chatId' => $chat->getId(),
-            'messageId' => $aiMessage->getId(),
             'text' => $aiResponse,
             'progress' => $progress,
         ];
@@ -204,22 +163,14 @@ final class WidgetSetupService
     /**
      * Generate and save a custom prompt from the setup interview.
      *
+     * @param array<array{role: string, content: string}> $history Conversation history (not stored in DB)
+     *
      * @return array{promptId: int, promptTopic: string}
      */
-    public function generatePrompt(Widget $widget, User $user, string $generatedPrompt, ?int $chatId = null): array
+    public function generatePrompt(Widget $widget, User $user, string $generatedPrompt, array $history = []): array
     {
-        // Get collected answers from chat history for metadata generation
-        $collectedAnswers = [];
-        if ($chatId) {
-            $chat = $this->chatRepository->find($chatId);
-            if ($chat) {
-                $historyMessages = $this->em->getRepository(Message::class)->findBy(
-                    ['chat' => $chat],
-                    ['id' => 'ASC']
-                );
-                $collectedAnswers = $this->extractCollectedAnswers($historyMessages);
-            }
-        }
+        // Extract collected answers from the passed history for metadata generation
+        $collectedAnswers = $this->extractCollectedAnswersFromHistory($history);
 
         // Generate friendly metadata using AI
         $metadata = $this->generatePromptMetadata($user, $widget, $collectedAnswers);
@@ -253,6 +204,7 @@ final class WidgetSetupService
             'prompt_id' => $prompt->getId(),
             'prompt_topic' => $promptTopic,
             'title' => $metadata['title'],
+            'history_length' => count($history),
         ]);
 
         return [
@@ -418,6 +370,94 @@ PROMPT;
         }
 
         return $messages;
+    }
+
+    /**
+     * Build conversation messages from array-based history (no database).
+     *
+     * @param array<array{role: string, content: string}> $history
+     *
+     * @return array<array{role: string, content: string}>
+     */
+    private function buildConversationMessagesFromHistory(array $history, string $systemPrompt, string $newUserMessage): array
+    {
+        $messages = [];
+
+        // Extract answered questions from history (based on AI's previous decisions)
+        $collectedAnswers = $this->extractCollectedAnswersFromHistory($history);
+
+        // Build enhanced system prompt - tell AI what we've already collected
+        $enhancedSystemPrompt = $systemPrompt;
+        $enhancedSystemPrompt .= $this->buildInstructionBlock($collectedAnswers);
+
+        $messages[] = [
+            'role' => 'system',
+            'content' => $enhancedSystemPrompt,
+        ];
+
+        // Add conversation history
+        foreach ($history as $msg) {
+            $messages[] = [
+                'role' => $msg['role'],
+                'content' => $msg['content'],
+            ];
+        }
+
+        // Add new user message (unless it's the start marker)
+        if (self::START_MARKER !== $newUserMessage) {
+            $messages[] = [
+                'role' => 'user',
+                'content' => $newUserMessage,
+            ];
+        }
+
+        return $messages;
+    }
+
+    /**
+     * Extract answered questions from array-based history.
+     *
+     * @param array<array{role: string, content: string}> $history
+     *
+     * @return array<int, string> Question number => answer text
+     */
+    private function extractCollectedAnswersFromHistory(array $history): array
+    {
+        $answers = [];
+        $pendingAnswer = null;
+        $pendingQuestion = 0;
+
+        foreach ($history as $msg) {
+            $text = $msg['content'];
+            $role = $msg['role'];
+
+            if ('assistant' === $role) {
+                // Check which question the AI asked via [QUESTION:X] or [FRAGE:X] marker
+                if (preg_match('/\[(QUESTION|FRAGE):(\d)\]/i', $text, $matches)) {
+                    $currentQuestion = (int) $matches[2];
+
+                    // If AI moved to a higher question, the previous answer was accepted
+                    if (null !== $pendingAnswer && $currentQuestion > $pendingQuestion) {
+                        $answers[$pendingQuestion] = $pendingAnswer;
+                    }
+
+                    $pendingAnswer = null;
+                    $pendingQuestion = $currentQuestion;
+                } elseif (preg_match('/\[(QUESTION|FRAGE):DONE\]/i', $text)) {
+                    // AI says all done - accept the pending answer if there was one
+                    if (null !== $pendingAnswer && $pendingQuestion >= 1) {
+                        $answers[$pendingQuestion] = $pendingAnswer;
+                    }
+                }
+            } elseif ('user' === $role) {
+                // Store this as a pending answer (will be confirmed when AI moves forward)
+                if (!$this->isStartMarker($text) && $pendingQuestion >= 1) {
+                    $pendingAnswer = $text;
+                }
+            }
+        }
+
+        return $answers;
     }
 
     /**

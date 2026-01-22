@@ -231,7 +231,9 @@ const generatedPrompt = ref<string | null>(null)
 const questionsAnswered = ref(0)
 const messagesContainer = ref<HTMLElement | null>(null)
 const inputRef = ref<HTMLTextAreaElement | null>(null)
-const chatId = ref<number | null>(null)
+
+// Conversation history - kept in memory, NOT stored in database
+const conversationHistory = ref<{ role: 'user' | 'assistant'; content: string }[]>([])
 
 const progressPercent = computed(() => Math.min(100, (questionsAnswered.value / 5) * 100))
 
@@ -270,8 +272,12 @@ const sendMessage = async () => {
   const text = inputText.value.trim()
   if (!text || isTyping.value || isSending.value) return
 
-  // Add user message
+  // Add user message to display
   messages.value.push({ role: 'user', content: text })
+
+  // Add to conversation history (for API calls)
+  conversationHistory.value.push({ role: 'user', content: text })
+
   inputText.value = ''
 
   // Reset textarea height
@@ -281,7 +287,7 @@ const sendMessage = async () => {
 
   await scrollToBottom()
 
-  // Send to backend
+  // Send to backend with full history
   isSending.value = true
   isTyping.value = true
 
@@ -289,11 +295,10 @@ const sendMessage = async () => {
     const response = await widgetsApi.sendSetupMessage(
       props.widget.widgetId,
       text,
-      chatId.value,
+      conversationHistory.value,
       locale.value
     )
 
-    chatId.value = response.chatId
     isTyping.value = false
 
     // Use progress from backend (calculated server-side)
@@ -309,6 +314,8 @@ const sendMessage = async () => {
       const cleanMessage = cleanResponseText(response.text)
       if (cleanMessage) {
         messages.value.push({ role: 'assistant', content: cleanMessage })
+        // Add to history
+        conversationHistory.value.push({ role: 'assistant', content: response.text })
       }
       setupComplete.value = true
     } else {
@@ -316,6 +323,8 @@ const sendMessage = async () => {
       const cleanMessage = cleanResponseText(response.text)
       if (cleanMessage) {
         messages.value.push({ role: 'assistant', content: cleanMessage })
+        // Add to history (keep original text for AI context)
+        conversationHistory.value.push({ role: 'assistant', content: response.text })
       }
     }
 
@@ -323,6 +332,8 @@ const sendMessage = async () => {
   } catch (err: any) {
     console.error('Failed to send message:', err)
     showError(err.message || t('widgets.setupChat.sendError'))
+    // Remove the user message from history on error
+    conversationHistory.value.pop()
   } finally {
     isSending.value = false
     isTyping.value = false
@@ -337,7 +348,7 @@ const saveGeneratedPrompt = async () => {
     const result = await widgetsApi.generateWidgetPrompt(
       props.widget.widgetId,
       generatedPrompt.value,
-      chatId.value
+      conversationHistory.value
     )
 
     success(t('widgets.setupChat.saveSuccess'))
@@ -352,16 +363,18 @@ const saveGeneratedPrompt = async () => {
 
 const startInterview = async () => {
   isTyping.value = true
+
+  // Clear history for new interview
+  conversationHistory.value = []
+
   try {
     // Send initial message to start the interview (pass app language)
     const response = await widgetsApi.sendSetupMessage(
       props.widget.widgetId,
       '__START_INTERVIEW__',
-      null,
+      [],
       locale.value
     )
-
-    chatId.value = response.chatId
 
     // Use progress from backend (calculated server-side)
     if (typeof response.progress === 'number') {
@@ -372,6 +385,8 @@ const startInterview = async () => {
     const cleanMessage = cleanResponseText(response.text)
     if (cleanMessage) {
       messages.value.push({ role: 'assistant', content: cleanMessage })
+      // Add to history (keep original for AI context)
+      conversationHistory.value.push({ role: 'assistant', content: response.text })
     }
 
     await scrollToBottom()

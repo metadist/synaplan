@@ -434,30 +434,32 @@ export async function uploadWidgetFile(
   return await response.json()
 }
 
+export interface SetupMessage {
+  role: 'user' | 'assistant'
+  content: string
+}
+
 /**
  * Send a message in the widget setup interview
+ * Note: Conversation is NOT stored in database - history is passed from frontend
  */
 export async function sendSetupMessage(
   widgetId: string,
   text: string,
-  chatId: number | null,
+  history: SetupMessage[],
   language?: string
 ): Promise<{
   success: boolean
-  chatId: number
-  messageId: number
   text: string
   progress: number
 }> {
   const data = await httpClient<{
     success: boolean
-    chatId: number
-    messageId: number
     text: string
     progress: number
   }>(`/api/v1/widgets/${widgetId}/setup-chat`, {
     method: 'POST',
-    body: JSON.stringify({ text, chatId, language }),
+    body: JSON.stringify({ text, history, language }),
   })
   return data
 }
@@ -468,7 +470,7 @@ export async function sendSetupMessage(
 export async function generateWidgetPrompt(
   widgetId: string,
   generatedPrompt: string,
-  chatId: number | null
+  history: SetupMessage[]
 ): Promise<{
   success: boolean
   promptTopic: string
@@ -480,7 +482,7 @@ export async function generateWidgetPrompt(
     promptId: number
   }>(`/api/v1/widgets/${widgetId}/generate-prompt`, {
     method: 'POST',
-    body: JSON.stringify({ generatedPrompt, chatId }),
+    body: JSON.stringify({ generatedPrompt, history }),
   })
   return data
 }

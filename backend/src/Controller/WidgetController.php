@@ -561,7 +561,18 @@ class WidgetController extends AbstractController
             required: ['text'],
             properties: [
                 new OA\Property(property: 'text', type: 'string', description: 'User message or __START_INTERVIEW__ to begin'),
-                new OA\Property(property: 'chatId', type: 'integer', nullable: true, description: 'Existing chat ID to continue conversation'),
+                new OA\Property(
+                    property: 'history',
+                    type: 'array',
+                    description: 'Previous conversation history (kept in memory, not stored)',
+                    items: new OA\Items(
+                        properties: [
+                            new OA\Property(property: 'role', type: 'string', enum: ['user', 'assistant']),
+                            new OA\Property(property: 'content', type: 'string'),
+                        ]
+                    )
+                ),
+                new OA\Property(property: 'language', type: 'string', description: 'Language code (en, de, etc.)'),
             ]
         )
     )]
@@ -571,9 +582,8 @@ class WidgetController extends AbstractController
         content: new OA\JsonContent(
             properties: [
                 new OA\Property(property: 'success', type: 'boolean'),
-                new OA\Property(property: 'chatId', type: 'integer'),
-                new OA\Property(property: 'messageId', type: 'integer'),
                 new OA\Property(property: 'text', type: 'string', description: 'AI response'),
+                new OA\Property(property: 'progress', type: 'integer', description: 'Interview progress (0-5)'),
             ]
         )
     )]
@@ -604,14 +614,12 @@ class WidgetController extends AbstractController
                 $widget,
                 $user,
                 $data['text'],
-                $data['chatId'] ?? null,
+                $data['history'] ?? [],
                 $data['language'] ?? 'en'
             );
 
             return $this->json([
                 'success' => true,
-                'chatId' => $result['chatId'],
-                'messageId' => $result['messageId'],
                 'text' => $result['text'],
                 'progress' => $result['progress'],
             ]);
@@ -652,7 +660,17 @@ class WidgetController extends AbstractController
             required: ['generatedPrompt'],
             properties: [
                 new OA\Property(property: 'generatedPrompt', type: 'string', description: 'The AI-generated prompt text'),
-                new OA\Property(property: 'chatId', type: 'integer', nullable: true, description: 'Chat ID from the interview session'),
+                new OA\Property(
+                    property: 'history',
+                    type: 'array',
+                    description: 'Conversation history for metadata extraction',
+                    items: new OA\Items(
+                        properties: [
+                            new OA\Property(property: 'role', type: 'string', enum: ['user', 'assistant']),
+                            new OA\Property(property: 'content', type: 'string'),
+                        ]
+                    )
+                ),
             ]
         )
     )]
@@ -694,7 +712,7 @@ class WidgetController extends AbstractController
                 $widget,
                 $user,
                 $data['generatedPrompt'],
-                $data['chatId'] ?? null
+                $data['history'] ?? []
             );
 
             return $this->json([
