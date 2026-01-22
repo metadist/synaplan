@@ -107,10 +107,18 @@ readonly class UserMemoryService
     /**
      * Update existing memory in Qdrant.
      */
-    public function updateMemory(int $memoryId, User $user, string $value): UserMemoryDTO
-    {
+    public function updateMemory(
+        int $memoryId,
+        User $user,
+        string $value,
+        string $source = 'user_edited',
+        ?int $messageId = null,
+    ): UserMemoryDTO {
         if (mb_strlen($value) < 5) {
             throw new \InvalidArgumentException('Memory value must be at least 5 characters');
+        }
+        if (!in_array($source, ['auto_detected', 'user_created', 'user_edited', 'ai_edited'], true)) {
+            throw new \InvalidArgumentException('Invalid source type');
         }
 
         $pointId = "mem_{$user->getId()}_{$memoryId}";
@@ -127,9 +135,10 @@ readonly class UserMemoryService
                 category: $existing['category'] ?? 'personal',
                 key: $existing['key'] ?? 'unknown',
                 value: $value,
-                source: 'user_edited',
-                messageId: $existing['message_id'] ?? null,
+                source: $source,
+                messageId: $messageId ?? ($existing['message_id'] ?? null),
                 created: $existing['created'] ?? time(),
+                updated: time(),
             );
 
             $this->storeInQdrant($dto, $user, $memoryId);

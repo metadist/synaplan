@@ -668,8 +668,11 @@ null
 
 ## Guidelines (keep it compact):
 - Keep **category names generic** (e.g. personal, work, preferences, projects, general). Avoid overly specific category names.
-- Keep values **short and atomic**. Prefer **multiple small memories** over one large memory.
-- If multiple entries refer to the same topic, **reuse the same key** (e.g. several separate `tech_stack` memories) instead of concatenating everything into one huge value.
+- Keep **keys as short as possible** while still being meaningful (aim for <= 24 characters). Do NOT use IDs, timestamps, or full sentences as keys.
+- ATOMIC RULE: **1 memory = 1 fact / preference**. Do NOT combine multiple facts in one value.
+- If a message contains multiple facts about the same topic, **create multiple memories** and **reuse the same key** (same key is allowed multiple times).
+  - Example: `diet: Eats halal` + `diet: Prefers low-calorie meals for weight loss`
+- Keep values **short** (single sentence, no lists).
 
 ## Quick Examples:
 

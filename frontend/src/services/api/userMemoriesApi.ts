@@ -7,7 +7,7 @@ export const UserMemorySchema = z.object({
   category: z.string(),
   key: z.string(),
   value: z.string(),
-  source: z.enum(['auto_detected', 'user_created', 'user_edited']),
+  source: z.enum(['auto_detected', 'user_created', 'user_edited', 'ai_edited']),
   messageId: z.number().nullable(),
   created: z.number(),
   updated: z.number(),
@@ -77,7 +77,7 @@ export async function getMemories(category?: string): Promise<UserMemory[]> {
 
   const url = `/api/v1/user/memories${params.toString() ? `?${params.toString()}` : ''}`
 
-  const data = await httpClient<z.infer<typeof GetMemoriesResponseSchema>>(url, {
+  const data = await httpClient(url, {
     schema: GetMemoriesResponseSchema,
   })
 
@@ -88,12 +88,9 @@ export async function getMemories(category?: string): Promise<UserMemory[]> {
  * Get categories with memory counts.
  */
 export async function getCategories(): Promise<Array<{ category: string; count: number }>> {
-  const data = await httpClient<z.infer<typeof GetCategoriesResponseSchema>>(
-    '/api/v1/user/memories/categories',
-    {
-      schema: GetCategoriesResponseSchema,
-    }
-  )
+  const data = await httpClient('/api/v1/user/memories/categories', {
+    schema: GetCategoriesResponseSchema,
+  })
 
   return data.categories
 }
@@ -102,14 +99,11 @@ export async function getCategories(): Promise<Array<{ category: string; count: 
  * Create a new memory.
  */
 export async function createMemory(request: CreateMemoryRequest): Promise<UserMemory> {
-  const data = await httpClient<z.infer<typeof CreateMemoryResponseSchema>>(
-    '/api/v1/user/memories',
-    {
-      method: 'POST',
-      body: JSON.stringify(request),
-      schema: CreateMemoryResponseSchema,
-    }
-  )
+  const data = await httpClient('/api/v1/user/memories', {
+    method: 'POST',
+    body: JSON.stringify(request),
+    schema: CreateMemoryResponseSchema,
+  })
 
   return data.memory
 }
@@ -118,14 +112,11 @@ export async function createMemory(request: CreateMemoryRequest): Promise<UserMe
  * Update a memory.
  */
 export async function updateMemory(id: number, request: UpdateMemoryRequest): Promise<UserMemory> {
-  const data = await httpClient<z.infer<typeof UpdateMemoryResponseSchema>>(
-    `/api/v1/user/memories/${id}`,
-    {
-      method: 'PUT',
-      body: JSON.stringify(request),
-      schema: UpdateMemoryResponseSchema,
-    }
-  )
+  const data = await httpClient(`/api/v1/user/memories/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(request),
+    schema: UpdateMemoryResponseSchema,
+  })
 
   return data.memory
 }
@@ -134,7 +125,7 @@ export async function updateMemory(id: number, request: UpdateMemoryRequest): Pr
  * Delete a memory.
  */
 export async function deleteMemory(id: number): Promise<void> {
-  await httpClient<z.infer<typeof DeleteMemoryResponseSchema>>(`/api/v1/user/memories/${id}`, {
+  await httpClient(`/api/v1/user/memories/${id}`, {
     method: 'DELETE',
     schema: DeleteMemoryResponseSchema,
   })
@@ -144,14 +135,11 @@ export async function deleteMemory(id: number): Promise<void> {
  * Search memories semantically.
  */
 export async function searchMemories(request: SearchMemoriesRequest): Promise<UserMemory[]> {
-  const data = await httpClient<z.infer<typeof SearchMemoriesResponseSchema>>(
-    '/api/v1/user/memories/search',
-    {
-      method: 'POST',
-      body: JSON.stringify(request),
-      schema: SearchMemoriesResponseSchema,
-    }
-  )
+  const data = await httpClient('/api/v1/user/memories/search', {
+    method: 'POST',
+    body: JSON.stringify(request),
+    schema: SearchMemoriesResponseSchema,
+  })
 
   return data.memories
 }

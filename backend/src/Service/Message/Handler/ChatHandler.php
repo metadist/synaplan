@@ -575,10 +575,19 @@ class ChatHandler implements MessageHandlerInterface
 
         // 🎯 CAPTURE AI RESPONSE: Collect the full response text for memory extraction
         $fullResponseText = '';
-        $wrappedStreamCallback = function (string $chunk, array $metadata = []) use ($streamCallback, &$fullResponseText): void {
-            // Accumulate the response text
-            $fullResponseText .= $chunk;
-            // Forward to original callback
+        $wrappedStreamCallback = function (string|array $chunk, array $metadata = []) use ($streamCallback, &$fullResponseText): void {
+            // Handle both string chunks (old providers) and array chunks (new providers with type/content)
+            if (is_array($chunk)) {
+                // Extract content from array format: ['type' => 'content', 'content' => '...']
+                if (isset($chunk['type']) && 'content' === $chunk['type'] && isset($chunk['content'])) {
+                    $fullResponseText .= $chunk['content'];
+                }
+            } else {
+                // Old format: simple string
+                $fullResponseText .= $chunk;
+            }
+
+            // Forward to original callback (always pass the chunk as-is)
             $streamCallback($chunk, $metadata);
         };
 
@@ -1233,7 +1242,9 @@ class ChatHandler implements MessageHandlerInterface
                         $memory = $this->memoryService->updateMemory(
                             $memoryId,
                             $user,
-                            $memoryAction['value']
+                            $memoryAction['value'],
+                            'ai_edited',
+                            $message->getId()
                         );
 
                         if ($memory) {

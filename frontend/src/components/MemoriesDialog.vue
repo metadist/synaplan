@@ -314,7 +314,14 @@ async function handleSaveMemory(memoryData: Partial<UserMemory>) {
 }
 
 function formatDate(date: Date | number | string): string {
-  const d = typeof date === 'string' || typeof date === 'number' ? new Date(date) : date
+  // Backend returns unix timestamps in SECONDS (e.g. 1705234567)
+  // JS Date expects milliseconds, so convert when needed.
+  const d =
+    typeof date === 'number'
+      ? new Date(date < 10_000_000_000 ? date * 1000 : date)
+      : typeof date === 'string'
+        ? new Date(date)
+        : date
   return new Intl.DateTimeFormat('de-DE', {
     year: 'numeric',
     month: '2-digit',

@@ -1,6 +1,6 @@
 <template>
   <MainLayout>
-    <div class="min-h-screen bg-chat p-2 md:p-4 lg:p-8 relative">
+    <div class="min-h-screen bg-chat p-2 md:p-4 lg:p-8 relative overflow-x-hidden">
       <div class="max-w-7xl mx-auto h-full flex flex-col">
         <!-- Header -->
         <div
@@ -28,15 +28,29 @@
             >
               <Icon icon="mdi:graph" class="w-4 h-4 md:w-5 md:h-5 inline mr-1" />
               <span class="hidden sm:inline">{{ $t('memories.graphView.title') }}</span>
-              <span class="sm:hidden">Graph</span>
+              <span class="sm:hidden">2D</span>
+            </button>
+            <button
+              v-if="is3dSupported"
+              class="flex-1 sm:flex-none px-3 md:px-4 py-2 rounded-md transition-colors text-sm nav-item"
+              :class="viewMode === 'graph3d' ? 'nav-item--active' : ''"
+              @click="viewMode = 'graph3d'"
+            >
+              <Icon icon="mdi:cube-outline" class="w-4 h-4 md:w-5 md:h-5 inline mr-1" />
+              <span class="hidden sm:inline">{{ $t('memories.graph3dView.title') }}</span>
+              <span class="sm:hidden">3D</span>
             </button>
           </div>
         </div>
 
         <!-- Views -->
         <div
-          class="flex-1 surface-card rounded-xl p-3 md:p-6 overflow-hidden"
-          style="min-height: 500px; max-height: calc(100vh - 200px)"
+          class="flex-1 surface-card rounded-xl p-3 md:p-6"
+          :class="viewMode === 'list' ? 'overflow-visible' : 'overflow-hidden'"
+          :style="{
+            minHeight: '500px',
+            maxHeight: viewMode === 'list' ? 'none' : 'calc(100vh - 200px)',
+          }"
         >
           <!-- Loading State -->
           <div
@@ -87,18 +101,32 @@
               @create="handleCreate"
             />
             <MemoryGraphView
-              v-else
+              v-else-if="viewMode === 'graph'"
               class="w-full h-full"
               :memories="memoriesStore.memories"
               :available-categories="availableCategories"
               :selected-memory-id="selectedGraphMemory?.id ?? null"
               @select="selectedGraphMemory = $event"
+              @edit="handleEdit"
+              @delete="handleDelete"
+            />
+            <MemoryGraph3DView
+              v-else-if="viewMode === 'graph3d' && is3dSupported"
+              class="w-full h-full"
+              :memories="memoriesStore.memories"
+              :selected-memory="selectedGraphMemory"
+              @select-memory="selectedGraphMemory = $event"
+              @edit-memory="handleEdit"
+              @delete-memory="handleDelete"
             />
           </template>
         </div>
 
         <!-- Selected Memory Details (below graph, outside canvas) -->
-        <div v-if="viewMode === 'graph' && selectedGraphMemory" class="mt-4">
+        <div
+          v-if="(viewMode === 'graph' || viewMode === 'graph3d') && selectedGraphMemory"
+          class="mt-4"
+        >
           <MemorySelectionCard
             :memory="selectedGraphMemory"
             :category-color="
@@ -175,13 +203,14 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, computed, watch, onBeforeUnmount } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Icon } from '@iconify/vue'
 import { useI18n } from 'vue-i18n'
 import MainLayout from '@/components/MainLayout.vue'
 import MemoryListView from '@/components/MemoryListView.vue'
 import MemoryGraphView from '@/components/MemoryGraphView.vue'
+import MemoryGraph3DView from '@/components/MemoryGraph3DView.vue'
 import MemoryFormDialog from '@/components/MemoryFormDialog.vue'
 import MemorySelectionCard from '@/components/memories/MemorySelectionCard.vue'
 import { useMemoriesStore } from '@/stores/userMemories'
@@ -204,7 +233,16 @@ const memoriesStore = useMemoriesStore()
 const { success, error } = useNotification()
 const { confirm } = useDialog()
 
-const viewMode = ref<'list' | 'graph'>('list')
+const viewMode = ref<'list' | 'graph' | 'graph3d'>('list')
+const is3dSupported = ref(true)
+let viewportMql: MediaQueryList | null = null
+const handleViewportChange = () => {
+  update3dSupport()
+}
+const handleFullscreenChange = () => {
+  update3dSupport()
+}
+
 const availableCategories = ref<Array<{ category: string; count: number }>>([])
 const isFormDialogOpen = ref(false)
 const currentMemoryToEdit = ref<UserMemory | null>(null)
@@ -221,7 +259,21 @@ const graphCategoryColors: Record<string, string> = {
   default: '#6366f1',
 }
 
+function update3dSupport() {
+  const isCoarse = window.matchMedia('(pointer: coarse)').matches
+  const isSmall = window.matchMedia('(max-width: 768px)').matches
+  is3dSupported.value = !(isCoarse || isSmall)
+  if (!is3dSupported.value && viewMode.value === 'graph3d') {
+    viewMode.value = 'graph'
+  }
+}
+
 onMounted(async () => {
+  viewportMql = window.matchMedia('(max-width: 768px)')
+  viewportMql.addEventListener?.('change', handleViewportChange)
+  document.addEventListener('fullscreenchange', handleFullscreenChange)
+  update3dSupport()
+
   try {
     await memoriesStore.init()
     availableCategories.value = await getCategories()
@@ -263,6 +315,25 @@ onMounted(async () => {
   }
 })
 
+onBeforeUnmount(() => {
+  if (viewportMql) {
+    viewportMql.removeEventListener?.('change', handleViewportChange)
+  }
+  document.removeEventListener('fullscreenchange', handleFullscreenChange)
+})
+
+// Keep selection consistent when memories list changes (e.g. after delete)
+watch(
+  () => memoriesStore.memories,
+  (list) => {
+    if (!selectedGraphMemory.value) return
+    const exists = list.some((m) => m.id === selectedGraphMemory.value!.id)
+    if (!exists) {
+      selectedGraphMemory.value = null
+    }
+  }
+)
+
 async function retryConnection() {
   isServiceUnavailable.value = false
   await memoriesStore.init()
@@ -301,6 +372,9 @@ async function handleDelete(memory: UserMemory) {
     await memoriesStore.removeMemory(memory.id)
     if (!memoriesStore.error) {
       success(t('memories.deleteSuccess'))
+      if (selectedGraphMemory.value?.id === memory.id) {
+        selectedGraphMemory.value = null
+      }
       await loadMemories()
     } else {
       error(t('memories.deleteError'))

@@ -1,5 +1,10 @@
 <template>
-  <div class="relative w-full overflow-hidden bg-chat" style="min-height: 600px; height: 100%">
+  <div
+    ref="rootRef"
+    class="relative w-full overflow-hidden bg-chat"
+    :class="isPseudoFullscreen ? 'fixed inset-0 z-[9998] w-screen h-screen' : ''"
+    style="min-height: 600px; height: 100%"
+  >
     <!-- Empty State -->
     <div
       v-if="props.memories.length === 0"
@@ -142,6 +147,16 @@
       >
         <Icon icon="mdi:atom" class="w-4 h-4 md:w-5 md:h-5" />
       </button>
+      <button
+        class="p-2 md:p-2.5 rounded-lg bg-white/10 text-white hover:bg-white/20 transition-colors backdrop-blur-sm"
+        :title="isFullscreen ? $t('memories.fullscreen.exit') : $t('memories.fullscreen.enter')"
+        @click="toggleFullscreen"
+      >
+        <Icon
+          :icon="isFullscreen ? 'mdi:fullscreen-exit' : 'mdi:fullscreen'"
+          class="w-4 h-4 md:w-5 md:h-5"
+        />
+      </button>
     </div>
 
     <!-- Legend -->
@@ -182,6 +197,22 @@
         </div>
       </div>
     </div>
+
+    <!-- Fullscreen bottom sheet (must be INSIDE fullscreen element to be visible) -->
+    <div
+      v-if="(isFullscreen || isPseudoFullscreen) && selectedMemory"
+      class="absolute left-0 right-0 bottom-0 z-[9999] p-4"
+    >
+      <div class="surface-elevated rounded-2xl p-4 max-h-[40vh] overflow-y-auto scroll-thin">
+        <MemorySelectionCard
+          :memory="selectedMemory"
+          :category-color="categoryColors[selectedMemory.category] || categoryColors.default"
+          @close="handleCloseSelectedMemory"
+          @edit="emit('edit', $event)"
+          @delete="emit('delete', $event)"
+        />
+      </div>
+    </div>
   </div>
 </template>
 
@@ -189,6 +220,7 @@
 import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import { Icon } from '@iconify/vue'
 import type { UserMemory } from '@/services/api/userMemoriesApi'
+import MemorySelectionCard from '@/components/memories/MemorySelectionCard.vue'
 
 interface Props {
   memories: UserMemory[]
@@ -198,10 +230,17 @@ interface Props {
 
 interface Emits {
   (e: 'select', memory: UserMemory | null): void
+  (e: 'edit', memory: UserMemory): void
+  (e: 'delete', memory: UserMemory): void
 }
 
 const props = defineProps<Props>()
 const emit = defineEmits<Emits>()
+
+// Fullscreen
+const rootRef = ref<HTMLElement | null>(null)
+const isFullscreen = ref(false)
+const isPseudoFullscreen = ref(false)
 
 // Canvas & Animation
 const canvasRef = ref<HTMLCanvasElement | null>(null)
@@ -245,10 +284,49 @@ interface Edge {
 const nodes = ref<Node[]>([])
 const edges = ref<Edge[]>([])
 const selectedMemory = ref<UserMemory | null>(null)
+
+function handleCloseSelectedMemory() {
+  selectedMemory.value = null
+  emit('select', null)
+}
 const selectedCategories = ref<string[]>([])
 const selectedKeys = ref<string[]>([])
 const physicsEnabled = ref(true)
 const groupBy = ref<'category' | 'key'>('category')
+
+let onFullscreenChangeHandler: (() => void) | null = null
+let onKeyDownHandler: ((e: KeyboardEvent) => void) | null = null
+
+function resizeCanvas() {
+  if (!canvasRef.value) return
+  canvasRef.value.width = canvasRef.value.offsetWidth * window.devicePixelRatio
+  canvasRef.value.height = canvasRef.value.offsetHeight * window.devicePixelRatio
+  // Reset transform before scaling to avoid compounding scales across resizes
+  ctx?.setTransform(1, 0, 0, 1, 0, 0)
+  ctx?.scale(window.devicePixelRatio, window.devicePixelRatio)
+}
+
+async function toggleFullscreen() {
+  const el = rootRef.value
+  if (!el) return
+
+  try {
+    if (document.fullscreenElement) {
+      await document.exitFullscreen()
+      return
+    }
+    if (el.requestFullscreen) {
+      await el.requestFullscreen()
+      return
+    }
+  } catch {
+    // Fallback to pseudo fullscreen below
+  }
+
+  isPseudoFullscreen.value = !isPseudoFullscreen.value
+  // Let layout settle, then resize
+  requestAnimationFrame(() => resizeCanvas())
+}
 
 // Available keys for key-based filtering
 const availableKeys = computed(() => {
@@ -841,18 +919,39 @@ function handleTouchEnd() {
 // Lifecycle
 onMounted(() => {
   initializeGraph()
-  window.addEventListener('resize', () => {
-    if (canvasRef.value) {
-      canvasRef.value.width = canvasRef.value.offsetWidth * window.devicePixelRatio
-      canvasRef.value.height = canvasRef.value.offsetHeight * window.devicePixelRatio
-      ctx?.scale(window.devicePixelRatio, window.devicePixelRatio)
+  resizeCanvas()
+
+  onFullscreenChangeHandler = () => {
+    isFullscreen.value = Boolean(document.fullscreenElement)
+    if (!isFullscreen.value) {
+      isPseudoFullscreen.value = false
     }
-  })
+    requestAnimationFrame(() => resizeCanvas())
+  }
+
+  onKeyDownHandler = (e: KeyboardEvent) => {
+    if (e.key === 'Escape' && isPseudoFullscreen.value) {
+      isPseudoFullscreen.value = false
+      requestAnimationFrame(() => resizeCanvas())
+    }
+  }
+
+  window.addEventListener('resize', resizeCanvas)
+  document.addEventListener('fullscreenchange', onFullscreenChangeHandler)
+  window.addEventListener('keydown', onKeyDownHandler)
 })
 
 onBeforeUnmount(() => {
   if (animationId) {
     cancelAnimationFrame(animationId)
+  }
+
+  window.removeEventListener('resize', resizeCanvas)
+  if (onFullscreenChangeHandler) {
+    document.removeEventListener('fullscreenchange', onFullscreenChangeHandler)
+  }
+  if (onKeyDownHandler) {
+    window.removeEventListener('keydown', onKeyDownHandler)
   }
 })
 

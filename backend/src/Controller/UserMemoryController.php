@@ -267,7 +267,7 @@ class UserMemoryController extends AbstractController
         }
 
         try {
-            $memory = $this->memoryService->updateMemory($id, $user, $value);
+            $memory = $this->memoryService->updateMemory($id, $user, $value, 'user_edited');
 
             return $this->json([
                 'memory' => $memory->toArray(),

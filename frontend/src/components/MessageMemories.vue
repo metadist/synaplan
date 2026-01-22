@@ -88,8 +88,9 @@ const navigateToMemory = (memory: UserMemory) => {
 
 // Listen for memory reference clicks from the message text
 const handleMemoryRefClick = (event: CustomEvent) => {
-  const { memoryIndex } = event.detail
-  if (memoryIndex >= 0 && memoryIndex < props.memories.length) {
+  const { memoryId } = event.detail as { memoryId: number }
+  const memoryIndex = props.memories.findIndex((m) => m.id === memoryId)
+  if (memoryIndex >= 0) {
     highlightedMemory.value = memoryIndex
 
     // Auto-expand if collapsed

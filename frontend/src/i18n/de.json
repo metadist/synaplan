@@ -1448,6 +1448,10 @@
     "terms": "AGB"
   },
   "memories": {
+    "fullscreen": {
+      "enter": "Vollbild",
+      "exit": "Vollbild beenden"
+    },
     "title": "Erinnerungen",
     "description": "Wichtige Informationen über dich und deine Präferenzen, die die KI für zukünftige Gespräche nutzen kann.",
     "empty": "Noch keine Erinnerungen gespeichert.",
@@ -1492,6 +1496,25 @@
     "graphView": {
       "title": "Netzwerk-Ansicht"
     },
+    "graph3dView": {
+      "title": "3D-Visualisierung"
+    },
+    "graph3d": {
+      "categories": "Kategorien",
+      "keys": "Schlüssel",
+      "memories": "Erinnerungen",
+      "category": "Kategorie",
+      "key": "Schlüssel",
+      "memory": "Erinnerung",
+      "controls": {
+        "rotate": "Drehen",
+        "zoom": "Zoom",
+        "select": "Auswählen",
+        "drag": "Maus ziehen",
+        "scroll": "Mausrad",
+        "click": "Klicken"
+      }
+    },
     "categories": {
       "all": "Alle Kategorien",
       "preferences": "Präferenzen",
@@ -1502,7 +1525,8 @@
     "source": {
       "auto_detected": "Automatisch erkannt",
       "user_created": "Manuell erstellt",
-      "user_edited": "Manuell bearbeitet"
+      "user_edited": "Manuell bearbeitet",
+      "ai_edited": "KI-bearbeitet"
     },
     "actions": {
       "create": "Neue Erinnerung",

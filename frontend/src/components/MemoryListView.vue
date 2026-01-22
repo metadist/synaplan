@@ -1,10 +1,10 @@
 <template>
-  <div class="flex flex-col h-full">
+  <div class="flex flex-col h-full w-full max-w-full overflow-x-hidden">
     <!-- Toolbar -->
-    <div class="flex items-center justify-between mb-4 flex-wrap gap-3">
+    <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between mb-4 gap-3">
       <!-- Search & Filters -->
-      <div class="flex items-center gap-3 flex-1 min-w-0">
-        <div class="relative flex-1 max-w-md">
+      <div class="grid grid-cols-1 md:flex md:items-center gap-3 flex-1 min-w-0 w-full max-w-full">
+        <div class="relative w-full md:flex-1 md:max-w-md min-w-0 max-w-full">
           <Icon
             icon="mdi:magnify"
             class="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 txt-secondary"
@@ -13,12 +13,12 @@
             v-model="searchQuery"
             type="text"
             :placeholder="$t('memories.search.placeholder')"
-            class="w-full pl-10 pr-4 py-2.5 surface-chip txt-primary placeholder:txt-secondary focus:outline-none focus:ring-2 focus:ring-brand/50"
+            class="w-full max-w-full min-w-0 pl-10 pr-4 py-2.5 surface-chip txt-primary placeholder:txt-secondary focus:outline-none focus:ring-2 focus:ring-brand/50"
           />
         </div>
         <select
           v-model="filterValue"
-          class="px-4 py-2.5 surface-chip txt-primary cursor-pointer focus:outline-none focus:ring-2 focus:ring-brand/50"
+          class="w-full md:w-auto max-w-full min-w-0 px-4 py-2.5 surface-chip txt-primary cursor-pointer focus:outline-none focus:ring-2 focus:ring-brand/50"
         >
           <option value="">{{ $t('memories.listView.allMemories') }}</option>
 
@@ -46,7 +46,7 @@
         </select>
         <select
           v-model="sortBy"
-          class="px-4 py-2.5 surface-chip txt-primary cursor-pointer focus:outline-none focus:ring-2 focus:ring-brand/50"
+          class="w-full md:w-auto max-w-full min-w-0 px-4 py-2.5 surface-chip txt-primary cursor-pointer focus:outline-none focus:ring-2 focus:ring-brand/50"
         >
           <option value="category">{{ $t('memories.listView.sortByCategory') }}</option>
           <option value="key">{{ $t('memories.listView.sortByKey') }}</option>
@@ -90,9 +90,9 @@
       </div>
     </div>
 
-    <!-- Memory Table -->
-    <div class="flex-1 overflow-auto scroll-thin">
-      <table class="w-full">
+    <!-- Memory Table (desktop) -->
+    <div class="flex-1 md:overflow-auto md:scroll-thin">
+      <table class="w-full hidden md:table">
         <thead class="sticky top-0 bg-surface-card backdrop-blur-xl z-10">
           <tr class="border-b border-light-border/30 dark:border-dark-border/20">
             <th class="p-3 text-left w-12">
@@ -181,6 +181,66 @@
           </tr>
         </tbody>
       </table>
+
+      <!-- Mobile Cards -->
+      <div class="md:hidden space-y-3 pb-2">
+        <div
+          v-for="memory in filteredMemories"
+          :key="memory.id"
+          :data-memory-id="memory.id"
+          class="surface-card rounded-xl p-4"
+          :class="isSelected(memory.id) ? 'ring-2 ring-brand' : ''"
+        >
+          <div class="flex items-start gap-3">
+            <input
+              type="checkbox"
+              class="checkbox-brand mt-1"
+              :checked="isSelected(memory.id)"
+              @change="toggleSelect(memory.id)"
+            />
+            <div class="min-w-0 flex-1">
+              <div class="flex items-center gap-2 flex-wrap mb-1">
+                <span
+                  class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium"
+                  :style="{
+                    backgroundColor: getCategoryColor(memory.category) + '20',
+                    color: getCategoryColor(memory.category),
+                  }"
+                >
+                  {{ $t(`memories.categories.${memory.category}`, memory.category) }}
+                </span>
+                <span class="txt-primary font-semibold truncate max-w-[12rem]">{{
+                  memory.key
+                }}</span>
+              </div>
+              <div class="txt-secondary text-sm leading-snug">
+                {{ memory.value }}
+              </div>
+              <div class="flex items-center justify-between mt-3 gap-2">
+                <div class="text-xs txt-tertiary">
+                  {{ formatTimestamp(memory.updated) }}
+                </div>
+                <div class="flex items-center gap-1">
+                  <button
+                    class="p-2 rounded-lg hover:bg-brand-500/10 txt-brand transition-colors"
+                    :title="$t('common.edit')"
+                    @click="$emit('edit', memory)"
+                  >
+                    <Icon icon="mdi:pencil" class="w-4 h-4" />
+                  </button>
+                  <button
+                    class="p-2 rounded-lg hover:bg-red-500/10 text-red-500 transition-colors"
+                    :title="$t('common.delete')"
+                    @click="$emit('delete', memory)"
+                  >
+                    <Icon icon="mdi:delete" class="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
 
       <!-- Empty State -->
       <div v-if="filteredMemories.length === 0" class="text-center py-12">

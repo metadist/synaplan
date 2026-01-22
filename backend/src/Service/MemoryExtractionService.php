@@ -113,6 +113,16 @@ Current Message:
 
 TASK: Analyze this conversation and decide what to do with memories.
 
+KEY NAMING (IMPORTANT):
+- Keep memory keys as short as possible while still being meaningful (aim for <= 24 characters).
+- Use stable, reusable identifiers (e.g. "frontend_framework", "diet", "timezone").
+- Do NOT include IDs, timestamps, or full sentences in keys.
+
+ATOMIC MEMORIES (VERY IMPORTANT):
+- Store **at most ONE fact** per memory value (single sentence, no lists, no "and ...").
+- If multiple facts belong under the same key, **create multiple memories with the same key** (same key can appear multiple times).
+  - Example: `diet: Eats halal` and `diet: Prefers low-calorie meals for weight loss`
+
 RESPONSE FORMAT (JSON):
 [
   {

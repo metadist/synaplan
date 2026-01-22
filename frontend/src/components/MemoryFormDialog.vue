@@ -1,9 +1,9 @@
 <template>
-  <Teleport to="body">
+  <Teleport :to="teleportTarget">
     <Transition name="fade">
       <div
         v-if="isOpen"
-        class="fixed inset-0 bg-black/50 z-[110] flex items-center justify-center p-4"
+        class="fixed inset-0 bg-black/50 z-[10000] flex items-center justify-center p-4"
         @click.self="close"
       >
         <div class="surface-card rounded-xl shadow-2xl max-w-lg w-full overflow-hidden" @click.stop>
@@ -96,6 +96,7 @@ import type {
   CreateMemoryRequest,
   UpdateMemoryRequest,
 } from '@/services/api/userMemoriesApi'
+import { useFullscreenTeleportTarget } from '@/composables/useFullscreenTeleportTarget'
 
 interface Props {
   isOpen: boolean
@@ -110,6 +111,7 @@ interface Emits {
 
 const props = defineProps<Props>()
 const emit = defineEmits<Emits>()
+const { teleportTarget } = useFullscreenTeleportTarget()
 
 const formData = ref({
   category: 'preferences',
