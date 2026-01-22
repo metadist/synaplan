@@ -37,7 +37,6 @@ final class UserMemoryServiceIntegrationTest extends KernelTestCase
         $isAvailable = $this->service->isAvailable();
 
         // Should match Qdrant client availability
-        $this->assertIsBool($isAvailable);
         $this->assertEquals($this->qdrantClient->isAvailable(), $isAvailable);
     }
 

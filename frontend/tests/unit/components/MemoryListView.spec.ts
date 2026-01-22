@@ -73,5 +73,3 @@ describe('MemoryListView', () => {
     }
   })
 })
-
-

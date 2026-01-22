@@ -19,7 +19,6 @@ readonly class MemoryExtractionService
 {
     public function __construct(
         private AiFacade $aiFacade,
-        private UserMemoryService $memoryService,
         private ModelConfigService $modelConfigService,
         private PromptRepository $promptRepository,
         private LoggerInterface $logger,

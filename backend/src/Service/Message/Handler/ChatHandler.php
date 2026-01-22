@@ -1247,14 +1247,12 @@ class ChatHandler implements MessageHandlerInterface
                             $message->getId()
                         );
 
-                        if ($memory) {
-                            $savedMemories[] = $memory->toArray();
+                        $savedMemories[] = $memory->toArray();
 
-                            $this->logger->info('ChatHandler: Memory updated', [
-                                'memory_id' => $memory->id,
-                                'key' => $memory->key,
-                            ]);
-                        }
+                        $this->logger->info('ChatHandler: Memory updated', [
+                            'memory_id' => $memory->id,
+                            'key' => $memory->key,
+                        ]);
                     }
                 } catch (\Exception $e) {
                     $this->logger->error('ChatHandler: Failed to process memory action', [

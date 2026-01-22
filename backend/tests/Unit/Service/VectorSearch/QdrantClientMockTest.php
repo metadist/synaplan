@@ -36,7 +36,6 @@ final class QdrantClientMockTest extends TestCase
     {
         $details = $this->client->getHealthDetails();
 
-        $this->assertIsArray($details);
         $this->assertArrayHasKey('status', $details);
         $this->assertEquals('mock', $details['status']);
         $this->assertArrayHasKey('metrics', $details);
@@ -47,7 +46,6 @@ final class QdrantClientMockTest extends TestCase
     {
         $info = $this->client->getServiceInfo();
 
-        $this->assertIsArray($info);
         $this->assertArrayHasKey('service', $info);
         $this->assertArrayHasKey('version', $info);
         $this->assertStringContainsString('mock', $info['version']);
@@ -57,7 +55,6 @@ final class QdrantClientMockTest extends TestCase
     {
         $info = $this->client->getCollectionInfo();
 
-        $this->assertIsArray($info);
         $this->assertArrayHasKey('status', $info);
         $this->assertArrayHasKey('points_count', $info);
         $this->assertEquals(0, $info['points_count']);
@@ -88,7 +85,6 @@ final class QdrantClientMockTest extends TestCase
             123
         );
 
-        $this->assertIsArray($result);
         $this->assertEmpty($result);
     }
 
@@ -96,7 +92,6 @@ final class QdrantClientMockTest extends TestCase
     {
         $result = $this->client->scrollMemories(123);
 
-        $this->assertIsArray($result);
         $this->assertEmpty($result);
     }
 

@@ -40,7 +40,6 @@ describe('useFullscreenTeleportTarget', () => {
     await nextTick()
 
     expect(wrapper.text()).toContain('DIV')
-
     ;(document.fullscreenElement as any) = null
     document.dispatchEvent(new Event('fullscreenchange'))
     await nextTick()
@@ -48,5 +47,3 @@ describe('useFullscreenTeleportTarget', () => {
     expect(wrapper.text()).toContain('body')
   })
 })
-
-

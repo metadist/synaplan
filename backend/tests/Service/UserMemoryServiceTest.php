@@ -11,6 +11,7 @@ use App\Service\UserMemoryService;
 use App\Service\VectorSearch\QdrantClientInterface;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\TestCase;
+use PHPUnit\Framework\MockObject\MockObject;
 use Psr\Log\LoggerInterface;
 
 /**
@@ -19,6 +20,7 @@ use Psr\Log\LoggerInterface;
 final class UserMemoryServiceTest extends TestCase
 {
     private EntityManagerInterface $em;
+    /** @var QdrantClientInterface&MockObject */
     private QdrantClientInterface $qdrantClient;
     private AiFacade $aiFacade;
     private ModelConfigService $modelConfigService;

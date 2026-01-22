@@ -78,7 +78,6 @@ final class MemoryExtractionServicePromptRulesTest extends TestCase
 
         $service = new MemoryExtractionService(
             $aiFacade,
-            $memoryService,
             $modelConfigService,
             $promptRepository,
             $logger
@@ -95,5 +94,3 @@ final class MemoryExtractionServicePromptRulesTest extends TestCase
         self::assertSame('Prefers low-calorie meals for weight loss', $result[1]['value']);
     }
 }
-
-

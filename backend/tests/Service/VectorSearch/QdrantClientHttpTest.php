@@ -47,6 +47,8 @@ final class QdrantClientHttpTest extends TestCase
 
     public function testUpsertMemorySuccess(): void
     {
+        $this->expectNotToPerformAssertions();
+
         $responses = [
             new MockResponse(json_encode([
                 'success' => true,
@@ -71,9 +73,6 @@ final class QdrantClientHttpTest extends TestCase
                 'active' => true,
             ]
         );
-
-        // Wenn kein Exception → Test passed
-        $this->assertTrue(true);
     }
 
     public function testUpsertMemoryFailure(): void
@@ -178,7 +177,6 @@ final class QdrantClientHttpTest extends TestCase
             minScore: 0.7
         );
 
-        $this->assertIsArray($results);
         $this->assertCount(1, $results);
         $this->assertEquals('mem_1_123', $results[0]['id']);
         $this->assertEquals(0.95, $results[0]['score']);
@@ -186,6 +184,8 @@ final class QdrantClientHttpTest extends TestCase
 
     public function testDeleteMemorySuccess(): void
     {
+        $this->expectNotToPerformAssertions();
+
         $responses = [
             new MockResponse(json_encode([
                 'success' => true,
@@ -195,8 +195,6 @@ final class QdrantClientHttpTest extends TestCase
 
         $client = $this->createClient($responses);
         $client->deleteMemory('mem_1_123');
-
-        $this->assertTrue(true);
     }
 
     public function testHealthCheckSuccess(): void
@@ -242,7 +240,6 @@ final class QdrantClientHttpTest extends TestCase
         $client = $this->createClient($responses);
         $info = $client->getCollectionInfo();
 
-        $this->assertIsArray($info);
         $this->assertEquals('1', $info['status']);
         $this->assertEquals(100, $info['points_count']);
     }

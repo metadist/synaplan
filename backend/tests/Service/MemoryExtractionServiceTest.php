@@ -30,6 +30,6 @@ final class MemoryExtractionServiceTest extends KernelTestCase
     public function testServiceIsAvailableViaContainer(): void
     {
         $service = static::getContainer()->get(MemoryExtractionService::class);
-        $this->assertNotNull($service);
+        $this->assertInstanceOf(MemoryExtractionService::class, $service);
     }
 }

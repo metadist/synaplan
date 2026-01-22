@@ -7,7 +7,6 @@ namespace App\Controller;
 use App\Entity\User;
 use App\Service\UserMemoryService;
 use OpenApi\Attributes as OA;
-use Psr\Log\LoggerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
@@ -21,7 +20,6 @@ class UserMemoryController extends AbstractController
 {
     public function __construct(
         private readonly UserMemoryService $memoryService,
-        private readonly LoggerInterface $logger,
     ) {
     }
 
@@ -391,7 +389,7 @@ class UserMemoryController extends AbstractController
         $memories = $this->memoryService->searchMemories($user, $query, $category, $limit);
 
         return $this->json([
-            'memories' => array_map(fn ($m) => $m->toArray(), $memories),
+            'memories' => $memories,
         ]);
     }
 }

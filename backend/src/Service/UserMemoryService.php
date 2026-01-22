@@ -68,7 +68,7 @@ readonly class UserMemoryService
         if (mb_strlen($value) < 5) {
             throw new \InvalidArgumentException('Memory value must be at least 5 characters');
         }
-        if (!in_array($source, ['auto_detected', 'user_created', 'user_edited'], true)) {
+        if (!in_array($source, ['auto_detected', 'user_created', 'user_edited', 'ai_edited'], true)) {
             throw new \InvalidArgumentException('Invalid source type');
         }
 
@@ -240,6 +240,25 @@ readonly class UserMemoryService
     }
 
     /**
+     * Search memories for API usage.
+     *
+     * Returns the same memory array format as used by ChatHandler (so frontend can consume it directly).
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public function searchMemories(User $user, string $query, ?string $category = null, int $limit = 5): array
+    {
+        // Reuse existing semantic search logic and keep response format stable (arrays).
+        return $this->searchRelevantMemories(
+            $user->getId(),
+            $query,
+            $category,
+            $limit,
+            0.5
+        );
+    }
+
+    /**
      * Search relevant memories by text similarity.
      */
     public function searchRelevantMemories(
@@ -325,7 +344,7 @@ readonly class UserMemoryService
                 'minScore' => $minScore,
             ]);
 
-            // Convert to DTOs
+            // Convert to arrays (format consumed by ChatHandler + frontend)
             $memories = [];
             foreach ($results as $result) {
                 $memories[] = UserMemoryDTO::fromQdrantPayload(

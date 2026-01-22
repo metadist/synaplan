@@ -29,7 +29,6 @@ final class MemoryExtractionServiceIntegrationTest extends KernelTestCase
 
     public function testServiceHasRequiredDependencies(): void
     {
-        // Verify service can be constructed with all dependencies
-        $this->assertNotNull($this->service);
+        $this->expectNotToPerformAssertions();
     }
 }
