@@ -799,13 +799,6 @@ const memories = computed(() => {
     .map((id) => memoriesStore.memories.find((m) => m.id === id))
     .filter((m) => m !== undefined)
 
-  console.log('🧠 ChatMessage: Resolved memories:', {
-    memoryIds: props.memoryIds,
-    storeMemoriesCount: memoriesStore.memories.length,
-    resolvedCount: resolved.length,
-    resolved: resolved,
-  })
-
   return resolved.length > 0 ? resolved : null
 })
 

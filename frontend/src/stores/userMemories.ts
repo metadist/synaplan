@@ -1,5 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
+import { useNotification } from '@/composables/useNotification'
+import { useI18n } from 'vue-i18n'
 import {
   getMemories,
   getCategories,
@@ -17,8 +19,6 @@ export const useMemoriesStore = defineStore('memories', () => {
   // Lazy-load composables to avoid calling them outside setup context
   const getNotifications = () => {
     try {
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
-      const { useNotification } = require('@/composables/useNotification')
       return useNotification()
     } catch {
       return { success: () => {}, error: () => {} }
@@ -27,8 +27,6 @@ export const useMemoriesStore = defineStore('memories', () => {
 
   const getI18n = () => {
     try {
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
-      const { useI18n } = require('vue-i18n')
       return useI18n()
     } catch {
       return { t: (key: string) => key }

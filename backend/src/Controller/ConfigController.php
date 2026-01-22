@@ -14,6 +14,7 @@ use App\Service\WhisperService;
 use Doctrine\ORM\EntityManagerInterface;
 use OpenApi\Attributes as OA;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -33,6 +34,8 @@ class ConfigController extends AbstractController
         private WhisperService $whisperService,
         private PluginManager $pluginManager,
         private UserMemoryService $memoryService,
+        #[Autowire('%env(string:default::QDRANT_SERVICE_URL)%')]
+        private readonly string $qdrantServiceUrl,
     ) {
     }
 
@@ -59,7 +62,7 @@ class ConfigController extends AbstractController
     )]
     public function checkMemoryService(): JsonResponse
     {
-        $configured = !empty($_ENV['QDRANT_SERVICE_URL']);
+        $configured = '' !== trim($this->qdrantServiceUrl);
         $available = $configured && $this->memoryService->isAvailable();
 
         return $this->json([

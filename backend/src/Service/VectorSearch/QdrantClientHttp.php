@@ -5,6 +5,9 @@ declare(strict_types=1);
 namespace App\Service\VectorSearch;
 
 use Psr\Log\LoggerInterface;
+use Symfony\Component\DependencyInjection\Attribute\Autowire;
+use Symfony\Contracts\Cache\CacheInterface;
+use Symfony\Contracts\Cache\ItemInterface;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 
 /**
@@ -17,13 +20,12 @@ final class QdrantClientHttp implements QdrantClientInterface
     private const HEALTH_CHECK_CACHE_TTL_SUCCESS = 30; // Cache successful health check for 30 seconds
     private const HEALTH_CHECK_CACHE_TTL_FAILURE = 60; // Cache failure for 1 minute (reasonable, not too long)
 
-    private static ?bool $healthCheckCache = null;
-    private static ?int $healthCheckCacheTime = null;
-
     public function __construct(
         private readonly HttpClientInterface $httpClient,
         private readonly string $baseUrl,
         private readonly LoggerInterface $logger,
+        #[Autowire(service: 'cache.app')]
+        private readonly ?CacheInterface $cache = null,
         private readonly ?string $apiKey = null,
     ) {
     }
@@ -201,19 +203,34 @@ final class QdrantClientHttp implements QdrantClientInterface
             return false;
         }
 
-        // Check cache first (different TTL for success/failure)
-        $now = time();
-        if (null !== self::$healthCheckCache && null !== self::$healthCheckCacheTime) {
-            // Use longer cache for failures (1 min), shorter for success (30s)
-            $cacheTTL = self::$healthCheckCache
-                ? self::HEALTH_CHECK_CACHE_TTL_SUCCESS
-                : self::HEALTH_CHECK_CACHE_TTL_FAILURE;
-
-            if (($now - self::$healthCheckCacheTime) < $cacheTTL) {
-                return self::$healthCheckCache;
-            }
+        if (null === $this->cache) {
+            return $this->doHealthCheckRequest();
         }
 
+        $cacheKey = 'qdrant.health.'.sha1($this->baseUrl.'|'.($this->apiKey ?? ''));
+
+        try {
+            return (bool) $this->cache->get($cacheKey, function (ItemInterface $item): bool {
+                $isHealthy = $this->doHealthCheckRequest();
+
+                $item->expiresAfter($isHealthy
+                    ? self::HEALTH_CHECK_CACHE_TTL_SUCCESS
+                    : self::HEALTH_CHECK_CACHE_TTL_FAILURE
+                );
+
+                return $isHealthy;
+            });
+        } catch (\Throwable $e) {
+            $this->logger->warning('Qdrant health check cache failed', [
+                'error' => $e->getMessage(),
+            ]);
+
+            return $this->doHealthCheckRequest();
+        }
+    }
+
+    private function doHealthCheckRequest(): bool
+    {
         try {
             $response = $this->httpClient->request('GET', "{$this->baseUrl}/health", [
                 'headers' => $this->getHeaders(),
@@ -222,28 +239,16 @@ final class QdrantClientHttp implements QdrantClientInterface
             ]);
 
             if (200 !== $response->getStatusCode()) {
-                self::$healthCheckCache = false;
-                self::$healthCheckCacheTime = $now;
-
                 return false;
             }
 
-            // Parse response to check status
             $data = $response->toArray();
-            $isHealthy = 'healthy' === ($data['status'] ?? 'unhealthy');
 
-            self::$healthCheckCache = $isHealthy;
-            self::$healthCheckCacheTime = $now;
-
-            return $isHealthy;
+            return 'healthy' === ($data['status'] ?? 'unhealthy');
         } catch (\Throwable $e) {
-            // Service is down - cache this for 1 minute
-            $this->logger->warning('Qdrant health check failed - caching failure', [
+            $this->logger->warning('Qdrant health check failed', [
                 'error' => $e->getMessage(),
             ]);
-
-            self::$healthCheckCache = false;
-            self::$healthCheckCacheTime = $now;
 
             return false;
         }

@@ -236,7 +236,6 @@ onMounted(async () => {
   await nextTick()
   setTimeout(() => {
     if (chatInputRef.value?.textareaRef) {
-      console.log('🎯 Auto-focusing ChatInput')
       chatInputRef.value.textareaRef.focus()
     } else {
       console.warn('⚠️ ChatInput ref not available for auto-focus')
@@ -246,7 +245,6 @@ onMounted(async () => {
 
 // Cleanup: Stop streaming when component unmounts (user leaves chat)
 onBeforeUnmount(() => {
-  console.log('🧹 ChatView unmounting - cleaning up streaming')
   handleStopStreaming()
 })
 
@@ -256,7 +254,6 @@ watch(
   async (newChatId, oldChatId) => {
     // CRITICAL: Stop any active streaming when switching chats
     if (oldChatId !== newChatId && isStreaming.value) {
-      console.log('🛑 Stopping active stream before switching chat')
       await handleStopStreaming()
     }
 
@@ -276,7 +273,6 @@ watch(
           newChat && (newChat.messageCount === 0 || newChat.messageCount === undefined)
 
         if (!hadMessages && !newChatIsEmpty) {
-          console.log('🧹 Auto-cleaning empty chat:', oldChatId)
           await chatsStore.deleteChat(oldChatId, true) // silent = true
         }
       }
@@ -578,12 +574,6 @@ const streamAIResponse = async (
       const trackId = Date.now()
       currentTrackId = trackId // Store for stop functionality
       currentStreamingChatId = chatId // Store chatId for stop functionality
-      console.log(
-        '🎯 TrackId set for streaming:',
-        currentTrackId,
-        'in chat:',
-        currentStreamingChatId
-      )
       let fullContent = ''
 
       const includeReasoning = options?.includeReasoning ?? false
@@ -593,14 +583,6 @@ const streamAIResponse = async (
       const finalModelId = options?.modelId // Don't fallback to current model!
       const fileIds = options?.fileIds || [] // Array of fileIds
 
-      console.log('🚀 Streaming with options:', {
-        includeReasoning,
-        webSearch,
-        modelId: finalModelId,
-        fileIds,
-        fileCount: fileIds.length,
-      })
-
       const stopStreaming = chatApi.streamMessage(
         userId,
         userMessage,
@@ -609,7 +591,6 @@ const streamAIResponse = async (
         (data) => {
           // CRITICAL: Check abort signal at the very beginning
           if (streamingAbortController?.signal.aborted) {
-            console.log('⏹️ Ignoring chunk - streaming aborted')
             return
           }
 
@@ -673,25 +654,16 @@ const streamAIResponse = async (
             }
           } else if (data.status === 'processing') {
             // Processing/routing messages - improved logging
-            if (data.message && !data.message.includes('image_generation')) {
-              console.log('Processing:', data.message)
-            } else {
-              // Generic routing message, suppress spam
-              console.log('Processing: Routing to handler')
-            }
           } else if (data.status === 'analyzing_memories') {
             // 🎯 Memory analysis started
-            console.log('🧠 Analyzing memories...')
             processingStatus.value = 'analyzing_memories'
             processingMetadata.value = { customMessage: data.message || undefined }
           } else if (data.status === 'saving_memories') {
             // 🎯 Saving memories
-            console.log('💾 Saving memories:', data.message)
             processingStatus.value = 'saving_memories'
             processingMetadata.value = { customMessage: data.message || undefined }
           } else if (data.status === 'memories_complete') {
             // 🎯 Memory analysis complete
-            console.log('✅ Memories complete:', data.message)
             processingStatus.value = 'memories_complete'
             processingMetadata.value = { customMessage: data.message || undefined }
             // Clear processing status after a short delay
@@ -703,10 +675,7 @@ const streamAIResponse = async (
             }, 2000)
           } else if (data.status === 'status') {
             // Generic status message
-            console.log('Status:', data.message)
           } else if (data.status === 'data' && data.chunk) {
-            console.log('📦 Received chunk:', data.chunk.substring(0, 20) + '...')
-
             if (processingStatus.value) {
               processingStatus.value = ''
               processingMetadata.value = {}
@@ -735,7 +704,6 @@ const streamAIResponse = async (
               }
 
               // Don't update message parts yet - wait for backend to process
-              console.log('📄 Detected file generation JSON, waiting for backend processing...')
 
               // Set message parts to EMPTY to hide JSON during generation
               const message = historyStore.messages.find((m) => m.id === messageId)
@@ -807,8 +775,6 @@ const streamAIResponse = async (
             }
           } else if (data.status === 'reasoning' && data.chunk) {
             // Reasoning chunks from OpenAI o-series / GPT-5 models
-            console.log('🧠 Received reasoning chunk:', data.chunk.substring(0, 50) + '...')
-
             const message = historyStore.messages.find((m) => m.id === messageId)
             if (message) {
               // Find existing reasoning part or create new one
@@ -829,7 +795,6 @@ const streamAIResponse = async (
             }
           } else if (data.status === 'file') {
             // Handle file attachments (images, videos, audio, etc.)
-            console.log('📎 File received:', data.type, data.url)
             const message = historyStore.messages.find((m) => m.id === messageId)
             if (message) {
               // Add file part based on type - normalize URLs to absolute
@@ -844,7 +809,6 @@ const streamAIResponse = async (
             }
           } else if (data.status === 'links') {
             // Handle web search results
-            console.log('🔗 Links received:', data.links)
             const message = historyStore.messages.find((m) => m.id === messageId)
             if (message && data.links) {
               message.parts.push({
@@ -870,18 +834,13 @@ const streamAIResponse = async (
             }
           } else if (data.status === 'memory_suggested') {
             // Handle memory suggestions from backend
-            console.log('🧠 Memory suggested received:', data)
-
             // Memory data is in metadata
             const memoryData = data.metadata
-            console.log('🧠 Memory metadata:', memoryData)
 
             if (!memoryData || !memoryData.id) {
               console.warn('⚠️ Invalid memory data received:', data)
               return
             }
-
-            console.log('✅ Creating toast with memory ID:', memoryData.id)
 
             // Create toast for the suggested memory
             const toastMemory: UserMemory & { toastId: number } = {
@@ -896,16 +855,11 @@ const streamAIResponse = async (
               toastId: memoryToastIdCounter++,
             }
 
-            console.log('🎯 Toast memory object:', toastMemory)
-
             activeMemoryToasts.value.push(toastMemory)
           } else if (data.status === 'memories_loaded') {
             // Memories loaded event - we now show them per message, not globally
-            console.log('🧠 Memories loaded:', data)
             // No action needed - memories will be attached to the response message
           } else if (data.status === 'complete') {
-            console.log('✅ Complete event received:', data)
-
             // Clear processing status
             processingStatus.value = ''
             processingMetadata.value = {}
@@ -913,12 +867,8 @@ const streamAIResponse = async (
             // Update message metadata
             const message = historyStore.messages.find((m) => m.id === messageId)
             if (message) {
-              console.log('📍 Found message to update:', message.id)
-
               // ✨ NEW: Handle generated file from backend
               if (data.generatedFile) {
-                console.log('📄 Generated file received from backend:', data.generatedFile)
-
                 // Add file to message FIRST
                 if (!message.files) {
                   message.files = []
@@ -935,8 +885,6 @@ const streamAIResponse = async (
                 }
 
                 message.files.push(fileData)
-
-                console.log('📄 File attached to message:', message.files)
 
                 // Replace JSON content or special markers with translated message
                 const hasJsonOrMarker =
@@ -957,7 +905,6 @@ const streamAIResponse = async (
                       content: translatedMessage,
                     },
                   ]
-                  console.log('📄 Set translated message:', translatedMessage)
                 }
 
                 // Force Vue reactivity with multiple strategies
@@ -978,8 +925,6 @@ const streamAIResponse = async (
 
                     // Replace in store
                     historyStore.messages.splice(messageIndex, 1, updatedMessage)
-
-                    console.log('📄 Message updated with new references')
                   }
                 })
               }
@@ -989,7 +934,6 @@ const streamAIResponse = async (
               // based on available models and message type (image/video/audio)
 
               if (data.messageId) {
-                console.log('🆔 Setting backendMessageId:', data.messageId)
                 message.backendMessageId = data.messageId
               }
 
@@ -999,7 +943,6 @@ const streamAIResponse = async (
                 Array.isArray(data.searchResults) &&
                 data.searchResults.length > 0
               ) {
-                console.log('🔍 Setting searchResults:', data.searchResults.length, 'results')
                 message.searchResults = data.searchResults
 
                 // Also set webSearch metadata for assistant message
@@ -1011,25 +954,20 @@ const streamAIResponse = async (
 
               // Store memory IDs if provided (full memories loaded from store)
               if (data.memoryIds && Array.isArray(data.memoryIds) && data.memoryIds.length > 0) {
-                console.log('🧠 Setting memory IDs used in response:', data.memoryIds.length, 'IDs')
                 message.memoryIds = data.memoryIds
-                console.log('📝 Updated message with memory IDs')
               }
 
               // Update provider and model from backend metadata
               if (data.provider) {
                 message.provider = data.provider
-                console.log('🏢 Updated provider:', data.provider)
               }
               if (data.model) {
                 message.modelLabel = data.model
-                console.log('🤖 Updated model label:', data.model)
               }
 
               // Store topic from classification
               if (data.topic) {
                 message.topic = data.topic
-                console.log('🏷️ Updated topic:', data.topic)
               }
 
               // Mark reasoning parts as complete (remove streaming flag)
@@ -1048,7 +986,6 @@ const streamAIResponse = async (
             historyStore.finishStreamingMessage(messageId)
 
             // Clean up streaming resources after successful completion
-            console.log('🧹 Cleaning up after successful stream completion')
             streamingAbortController = null
             stopStreamingFn = null
             currentTrackId = undefined
@@ -1165,13 +1102,12 @@ const streamAIResponse = async (
             }
 
             // Clean up streaming resources after error
-            console.log('🧹 Cleaning up after streaming error')
             streamingAbortController = null
             stopStreamingFn = null
             currentTrackId = undefined
             currentStreamingChatId = undefined
           } else {
-            console.log('⚠️ Unknown status:', data.status, data)
+            console.warn('⚠️ Unknown status:', data.status, data)
           }
         },
         includeReasoning,
@@ -1204,35 +1140,21 @@ const streamAIResponse = async (
 }
 
 const handleStopStreaming = async () => {
-  console.log('🛑 Stop streaming requested', {
-    hasAbortController: !!streamingAbortController,
-    hasStopFn: !!stopStreamingFn,
-    currentTrackId,
-    typeOfTrackId: typeof currentTrackId,
-    isUndefined: currentTrackId === undefined,
-    isNull: currentTrackId === null,
-    isFalsy: !currentTrackId,
-  })
-
   // CRITICAL: Abort signal FIRST to prevent any further chunk processing
   if (streamingAbortController) {
     streamingAbortController.abort()
-    console.log('✅ Abort signal sent')
   }
 
   // Close the EventSource connection IMMEDIATELY
   if (stopStreamingFn) {
     stopStreamingFn()
-    console.log('✅ EventSource closed')
     stopStreamingFn = null
   }
 
   // Notify backend to stop streaming
   if (currentTrackId) {
-    console.log('📤 Sending stop request to backend with trackId:', currentTrackId)
     try {
       await chatApi.stopStream(currentTrackId)
-      console.log('✅ Backend notified to stop streaming')
     } catch (error) {
       console.error('❌ Failed to notify backend:', error)
     }
@@ -1281,7 +1203,6 @@ const handleStopStreaming = async () => {
     }
 
     historyStore.finishStreamingMessage(streamingMessage.id)
-    console.log('✅ Streaming message finished with cancellation notice')
 
     // Save the cancelled message to backend so it persists after refresh
     // CRITICAL: Use the ORIGINAL chatId where stream was started, NOT the current active chat!
@@ -1289,10 +1210,6 @@ const handleStopStreaming = async () => {
     const chatIdToSave = currentStreamingChatId
 
     if (trackIdToSave && chatIdToSave) {
-      console.log('📤 Saving cancelled message to backend', {
-        trackId: trackIdToSave,
-        chatId: chatIdToSave,
-      })
       // Save and update message with backend ID, pass current metadata
       const metadata = {
         provider: streamingMessage.provider,
@@ -1328,14 +1245,6 @@ async function saveCancelledMessageToBackend(
   messageId: string,
   metadata?: { provider?: string; model?: string; topic?: string }
 ) {
-  console.log('📡 saveCancelledMessageToBackend called', {
-    trackId,
-    chatId,
-    contentLength: content.length,
-    messageId,
-    metadata,
-  })
-
   try {
     const data = await httpClient<any>('/api/v1/messages/save-cancelled', {
       method: 'POST',
@@ -1348,8 +1257,6 @@ async function saveCancelledMessageToBackend(
         topic: metadata?.topic,
       }),
     })
-
-    console.log('✅ Cancelled message saved to backend:', data)
 
     // Update the message with backend message ID and metadata so the footer buttons appear
     const message = historyStore.messages.find((m) => m.id === messageId)
@@ -1377,14 +1284,6 @@ async function saveCancelledMessageToBackend(
           },
         }
       }
-
-      console.log('✅ Updated message with metadata:', {
-        backendMessageId: data.messageId,
-        topic: data.topic,
-        provider: data.provider,
-        model: data.model,
-        aiModels: message.aiModels,
-      })
     }
   } catch (error) {
     console.error('❌ Error saving cancelled message:', error)
@@ -1393,8 +1292,6 @@ async function saveCancelledMessageToBackend(
 
 // Handle "Again" with specific model from backend
 const handleAgain = async (backendMessageId: number, modelId?: number) => {
-  console.log('🔄 Handle Again:', backendMessageId, modelId)
-
   // Check authentication before attempting to resend
   if (!authStore.isAuthenticated) {
     console.error('❌ Not authenticated - redirecting to login')
@@ -1437,16 +1334,12 @@ const handleAgain = async (backendMessageId: number, modelId?: number) => {
     return
   }
 
-  console.log('✅ Re-sending user message:', userText.substring(0, 50) + '...')
-
   // Re-send the user message with the selected model
   // This will trigger normal streaming flow
   await handleSendMessage(userText, { modelId })
 }
 
 const handleRegenerate = async (message: Message, modelOption: ModelOption) => {
-  console.log('Regenerating with model:', modelOption)
-
   streamingAbortController = new AbortController()
 
   // Mark the current message as superseded
@@ -1472,8 +1365,6 @@ const handleRegenerate = async (message: Message, modelOption: ModelOption) => {
 
 // Handle retry for rate-limited messages
 const handleRetryMessage = async (message: Message, content: string) => {
-  console.log('🔄 Retrying message:', content.substring(0, 50) + '...')
-
   // Clear the error status on the message
   historyStore.clearMessageError(message.id)
 

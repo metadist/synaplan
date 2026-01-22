@@ -79,7 +79,10 @@ readonly class UserMemoryService
         }
 
         // Generate ID
-        $memoryId = time() + random_int(1000, 9999);
+        // Use a high-entropy numeric ID to avoid collisions under load.
+        // JS frontend expects a number, so we keep it as int (fits into 64-bit).
+        $timestampMs = (int) floor(microtime(true) * 1000);
+        $memoryId = ($timestampMs * 1000) + random_int(0, 999);
 
         // Create DTO
         $dto = new UserMemoryDTO(

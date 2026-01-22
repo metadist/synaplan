@@ -195,7 +195,7 @@ interface Emits {
 const props = defineProps<Props>()
 const emit = defineEmits<Emits>()
 
-const { t } = useI18n()
+const { t, locale } = useI18n()
 const router = useRouter()
 const memoriesStore = useMemoriesStore()
 const { success, error } = useNotification()
@@ -322,7 +322,9 @@ function formatDate(date: Date | number | string): string {
       : typeof date === 'string'
         ? new Date(date)
         : date
-  return new Intl.DateTimeFormat('de-DE', {
+  const browserLocale = typeof navigator !== 'undefined' ? navigator.language : 'en'
+  const activeLocale = (locale?.value || browserLocale) as string
+  return new Intl.DateTimeFormat(activeLocale, {
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',

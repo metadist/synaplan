@@ -173,7 +173,11 @@ class UserMemoryController extends AbstractController
         $key = $data['key'] ?? null;
         $value = $data['value'] ?? null;
 
-        if (!$category || !$key || !$value) {
+        if (
+            !is_string($category) || '' === trim($category)
+            || !is_string($key) || '' === trim($key)
+            || !is_string($value) || '' === trim($value)
+        ) {
             return $this->json([
                 'error' => 'Missing required fields: category, key, value',
             ], Response::HTTP_BAD_REQUEST);
@@ -258,7 +262,7 @@ class UserMemoryController extends AbstractController
         $data = $request->toArray();
         $value = $data['value'] ?? null;
 
-        if (!$value) {
+        if (!is_string($value) || '' === trim($value)) {
             return $this->json([
                 'error' => 'Missing required field: value',
             ], Response::HTTP_BAD_REQUEST);

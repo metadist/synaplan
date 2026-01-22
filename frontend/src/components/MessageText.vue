@@ -33,14 +33,78 @@ const memoriesStore = useMemoriesStore()
 const isMemoryServiceAvailable = computed(() => configStore.features.memoryService)
 const isMemoryServiceLoading = computed(() => configStore.features.memoryServiceLoading)
 
-async function ensureMemoriesLoadedBestEffort(): Promise<void> {
-  if (!props.content.includes('[Memory:')) return
-  if (memoriesStore.memories.length > 0) return
+function extractReferencedMemoryIds(content: string): number[] {
+  const ids: number[] = []
+  const regex = /\[Memory\s*:\s*(\d+)\]/gi
+  let match: RegExpExecArray | null = null
+  while ((match = regex.exec(content)) !== null) {
+    const id = parseInt(match[1] || '', 10)
+    if (Number.isFinite(id) && id > 0) ids.push(id)
+  }
+  return Array.from(new Set(ids))
+}
+
+const referencedMemoryIds = computed(() => extractReferencedMemoryIds(props.content))
+
+const missingReferencedMemoryIds = computed(() => {
+  if (referencedMemoryIds.value.length === 0) return []
+  const available = new Set(memoriesStore.memories.map((m) => m.id))
+  return referencedMemoryIds.value.filter((id) => !available.has(id))
+})
+
+const isMemoryServiceDefinitelyUnavailable = computed(() => {
+  return !isMemoryServiceLoading.value && !isMemoryServiceAvailable.value
+})
+
+const isFetchProbablyUnreachable = computed(() => {
+  const msg = (memoriesStore.error || '').toLowerCase()
+  return msg.includes('timeout') || msg.includes('503') || msg.includes('unavailable')
+})
+
+const retryAttempt = ref(0)
+const gaveUp = ref(false)
+let retryTimer: number | null = null
+
+function clearRetryTimer() {
+  if (retryTimer !== null && typeof window !== 'undefined') {
+    window.clearTimeout(retryTimer)
+  }
+  retryTimer = null
+}
+
+async function fetchMemoriesWithRetryBestEffort(): Promise<void> {
+  if (referencedMemoryIds.value.length === 0) return
+  if (missingReferencedMemoryIds.value.length === 0) return
+  if (gaveUp.value) return
+  if (isMemoryServiceDefinitelyUnavailable.value) return
   if (memoriesStore.loading) return
 
-  // Best-effort: try to load memories so badges resolve without requiring a refresh.
-  // Even if the service is down, fetchMemories() fails silently for common unavailability cases.
-  await memoriesStore.fetchMemories().catch(() => {})
+  // Retry because the backend may emit [Memory:ID] before the memory is fully persisted / visible.
+  const delaysMs = [0, 400, 900, 1500, 2500, 4000]
+  const delay = delaysMs[Math.min(retryAttempt.value, delaysMs.length - 1)]
+  retryAttempt.value += 1
+
+  clearRetryTimer()
+
+  if (typeof window === 'undefined') return
+  retryTimer = window.setTimeout(async () => {
+    retryTimer = null
+    if (missingReferencedMemoryIds.value.length === 0) return
+    if (isMemoryServiceDefinitelyUnavailable.value) return
+
+    await memoriesStore.fetchMemories().catch(() => {})
+
+    if (missingReferencedMemoryIds.value.length === 0) {
+      return
+    }
+
+    if (retryAttempt.value >= delaysMs.length) {
+      gaveUp.value = true
+      return
+    }
+
+    void fetchMemoriesWithRetryBestEffort()
+  }, delay)
 }
 
 // Handle clicks on memory badges
@@ -89,7 +153,7 @@ onMounted(() => {
     messageTextRef.value.addEventListener('mouseenter', handleTooltipPosition, true)
   }
 
-  void ensureMemoriesLoadedBestEffort()
+  void fetchMemoriesWithRetryBestEffort()
 })
 
 onUnmounted(() => {
@@ -97,13 +161,39 @@ onUnmounted(() => {
     messageTextRef.value.removeEventListener('click', handleMemoryBadgeClick)
     messageTextRef.value.removeEventListener('mouseenter', handleTooltipPosition, true)
   }
+  clearRetryTimer()
 })
 
 // If config finishes loading and memory service becomes available, ensure we load memories so badges resolve.
 watch(
   () => [isMemoryServiceAvailable.value, isMemoryServiceLoading.value],
   () => {
-    void ensureMemoriesLoadedBestEffort()
+    void fetchMemoriesWithRetryBestEffort()
+  }
+)
+
+// When message content changes, reset retry state and try again.
+watch(
+  () => props.content,
+  () => {
+    clearRetryTimer()
+    retryAttempt.value = 0
+    gaveUp.value = false
+    void fetchMemoriesWithRetryBestEffort()
+  }
+)
+
+// When store updates, if some referenced IDs are still missing, keep trying (briefly).
+watch(
+  () => missingReferencedMemoryIds.value,
+  (missing) => {
+    if (missing.length === 0) {
+      clearRetryTimer()
+      retryAttempt.value = 0
+      gaveUp.value = false
+      return
+    }
+    void fetchMemoriesWithRetryBestEffort()
   }
 )
 
@@ -126,30 +216,17 @@ const formattedContent = computed(() => {
   // 🔥 REAKTIV: Access memoriesStore.memories to make computed reactive to changes!
   // This forces the computed to re-run whenever memories are loaded/updated
   const availableMemories = memoriesStore.memories
-  const memoriesCount = availableMemories.length
+  const missingIds = missingReferencedMemoryIds.value
 
   if (html.includes('[Memory')) {
-    console.log('🔍 MessageText: Found [Memory] pattern, searching for IDs...', {
-      memoriesAvailable: memoriesCount,
-      memoriesLoading: memoriesStore.loading,
-    })
-
     // Match [Memory:42] or [Memory: 42] format (with optional whitespace around colon)
-    html = html.replace(/\[Memory\s*:\s*(\d+)\]/gi, (match, memoryId) => {
+    html = html.replace(/\[Memory\s*:\s*(\d+)\]/gi, (_match, memoryId) => {
       const memoryIdNum = parseInt(memoryId)
-
-      console.log('✅ REGEX MATCHED!', {
-        match,
-        memoryId: memoryIdNum,
-        memoriesInStore: memoriesCount,
-        serviceAvailable: isMemoryServiceAvailable.value,
-      })
 
       // Find memory by ID from the reactive array
       const memory = availableMemories.find((m) => m.id === memoryIdNum)
 
       if (memory) {
-        console.log('🎯 Replacing with memory badge for:', memory.key, 'ID:', memoryId)
         // Escape HTML in memory data for tooltip/display
         const escapedKey = escapeHtml(memory.key)
         const escapedValue = escapeHtml(memory.value)
@@ -163,20 +240,20 @@ const formattedContent = computed(() => {
       // Memory not found:
       // - If we're still loading: show a short loading placeholder
       // - If we're NOT loading: show a "missing" badge (avoid infinite spinner)
-      console.warn('⚠️ Memory not found in store:', {
-        memoryId: memoryIdNum,
-        totalMemories: memoriesCount,
-        loading: memoriesStore.loading,
-      })
-
-      if (memoriesStore.loading || isMemoryServiceLoading.value) {
+      if (
+        memoriesStore.loading ||
+        isMemoryServiceLoading.value ||
+        (!gaveUp.value && missingIds.includes(memoryIdNum))
+      ) {
         return `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 text-xs font-medium border border-gray-200 dark:border-gray-700 align-middle"><svg class="animate-spin h-3 w-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg><span class="font-medium">[Memory:${memoryId}...]</span></span>`
       }
 
-      // Only show service-disabled badge once we know the feature is not available.
+      // Show service-unavailable badge if the service is disabled OR we likely couldn't reach it after retries.
       // This avoids false "service unavailable" on first render before config/memories are loaded.
-      if (!isMemoryServiceAvailable.value) {
-        console.warn('⚠️ Memory service disabled, showing disabled badge')
+      if (
+        isMemoryServiceDefinitelyUnavailable.value ||
+        (gaveUp.value && isFetchProbablyUnreachable.value)
+      ) {
         return `<span class="memory-badge-wrapper inline relative group"><button class="memory-ref memory-ref--disabled inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-red-50 dark:bg-red-950/30 text-red-600 dark:text-red-400 text-xs font-medium hover:bg-red-100 dark:hover:bg-red-900/40 transition-all border border-red-200 dark:border-red-800/50 cursor-not-allowed align-middle" data-memory-id="${memoryId}" data-disabled="true"><svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="currentColor" class="flex-shrink-0"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg><span class="font-medium">[Memory:${memoryId}]</span></button><div class="memory-tooltip fixed opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 pointer-events-none z-[9999] whitespace-normal" style="max-width: 280px;"><div class="surface-elevated px-4 py-3 rounded-lg border border-red-200 dark:border-red-700 border-l-4 border-l-red-500"><div class="flex items-center gap-2 mb-2"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" class="text-red-500 flex-shrink-0"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg><span class="text-xs font-bold txt-primary">${t('memories.serviceDisabled.badge')}</span></div><div class="text-xs txt-primary leading-relaxed">${t('memories.serviceDisabled.tooltip')}</div></div></div></span>`
       }
 

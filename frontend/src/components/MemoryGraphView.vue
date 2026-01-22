@@ -363,7 +363,6 @@ const categoryColors: Record<string, string> = {
 
 // Initialize Graph
 function initializeGraph() {
-  console.log('🚀 initializeGraph called')
   if (!canvasRef.value) {
     console.warn('⚠️ No canvasRef.value')
     return
@@ -376,21 +375,10 @@ function initializeGraph() {
     return
   }
 
-  console.log('📐 Initial canvas offsetWidth/Height:', {
-    offsetWidth: canvas.offsetWidth,
-    offsetHeight: canvas.offsetHeight,
-  })
-
   // Set canvas size
   canvas.width = canvas.offsetWidth * window.devicePixelRatio
   canvas.height = canvas.offsetHeight * window.devicePixelRatio
   ctx.scale(window.devicePixelRatio, window.devicePixelRatio)
-
-  console.log('📐 Canvas size after setup:', {
-    width: canvas.width,
-    height: canvas.height,
-    devicePixelRatio: window.devicePixelRatio,
-  })
 
   // Create nodes from memories
   createNodes()
@@ -398,10 +386,7 @@ function initializeGraph() {
   // Create edges (connections based on category similarity)
   createEdges()
 
-  console.log('🔗 Created edges:', edges.value.length)
-
   // Start animation loop
-  console.log('🎬 Starting animation')
   animate()
 }
 
@@ -417,14 +402,6 @@ function createNodes() {
   if (groupBy.value === 'key' && selectedKeys.value.length > 0) {
     filteredMemories = filteredMemories.filter((m) => selectedKeys.value.includes(m.key))
   }
-
-  console.log('🧠 MemoryGraphView - createNodes:', {
-    totalMemories: props.memories.length,
-    filteredCount: filteredMemories.length,
-    groupBy: groupBy.value,
-    selectedCategories: selectedCategories.value,
-    selectedKeys: selectedKeys.value,
-  })
 
   // Early return if no memories
   if (filteredMemories.length === 0) {
@@ -442,15 +419,6 @@ function createNodes() {
   const radiusVariance = isMobile ? 6 : 4
   // Hub is the "main bubble" for category/key. Make it a bit larger for readability.
   const hubRadius = isMobile ? 34 : 28
-
-  console.log('🎯 Canvas dimensions:', {
-    width: canvasRef.value!.offsetWidth,
-    height: canvasRef.value!.offsetHeight,
-    centerX,
-    centerY,
-    baseRadius,
-    isMobile,
-  })
 
   // Build groups (category or key) -> memories
   const groups = new Map<string, UserMemory[]>()
@@ -530,8 +498,6 @@ function createNodes() {
   }
 
   nodes.value = newNodes
-
-  console.log('✅ Created nodes:', nodes.value.length)
 }
 
 function createEdges() {
@@ -556,8 +522,6 @@ function createEdges() {
       restLength: 75,
     })
   }
-
-  console.log('🔗 Created edges:', edges.value.length, 'in', groupBy.value, 'mode')
 }
 
 function animate() {
@@ -683,11 +647,6 @@ function animate() {
         context.fillText(node.memory.key, node.x, node.y - node.radius - 12)
       }
     }
-  }
-
-  // Debug: Log first frame
-  if (!animationId) {
-    console.log(`🎨 First frame drawn - ${drawnNodes} nodes rendered`)
   }
 
   animationId = requestAnimationFrame(animate)

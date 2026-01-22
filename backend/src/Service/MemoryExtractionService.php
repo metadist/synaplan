@@ -168,21 +168,25 @@ PROMPT;
 
             $content = $response['content'] ?? '';
 
-            $this->logger->info('🤖 MemoryExtractionService: FULL AI response', [
+            $this->logger->debug('Memory extraction AI response received', [
                 'message_id' => $message->getId(),
                 'model' => $this->getExtractionModel($message->getUserId()),
-                'full_content' => $content,
-                'user_message' => $message->getText(),
+                'content_length' => strlen($content),
                 'existing_memories_count' => count($existingMemories),
             ]);
 
             // Parse JSON response (now includes actions)
             $memoryActions = $this->parseMemoriesFromResponse($content);
 
+            $actionTypes = array_count_values(array_map(
+                static fn (array $action): string => (string) ($action['action'] ?? 'unknown'),
+                $memoryActions
+            ));
+
             $this->logger->info('Memory actions extracted', [
                 'message_id' => $message->getId(),
                 'count' => count($memoryActions),
-                'actions' => $memoryActions,
+                'action_types' => $actionTypes,
             ]);
 
             return $memoryActions;
