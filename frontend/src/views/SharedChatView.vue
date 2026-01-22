@@ -198,8 +198,7 @@
               </span>
             </div>
             <div
-              class="txt-primary whitespace-pre-wrap break-words overflow-wrap-anywhere"
-              style="overflow-wrap: anywhere; word-break: break-word"
+              class="prose prose-sm max-w-none txt-primary break-words"
               v-html="formatMessageText(message.text)"
             ></div>
 
@@ -298,6 +297,7 @@ import MessageVideo from '../components/MessageVideo.vue'
 import CookieConsent from '../components/CookieConsent.vue'
 import { type CookieConsent as CookieConsentType } from '../composables/useCookieConsent'
 import { useGoogleTag } from '../composables/useGoogleTag'
+import { useMarkdown } from '@/composables/useMarkdown'
 import { httpClient } from '@/services/api/httpClient'
 import { supportedLanguages, type SupportedLanguage } from '@/i18n'
 
@@ -305,6 +305,7 @@ const route = useRoute()
 const router = useRouter()
 const { locale, t } = useI18n()
 const { injectGoogleTag } = useGoogleTag()
+const { render: renderMarkdown } = useMarkdown()
 
 const loading = ref(true)
 const error = ref(false)
@@ -533,148 +534,11 @@ const formatDate = (timestamp: number): string => {
   return new Date(timestamp * 1000).toLocaleString(currentLang.value)
 }
 
-const escapeHtml = (text: string): string => {
-  const div = document.createElement('div')
-  div.textContent = text
-  return div.innerHTML
-}
-
+/**
+ * Format message text using the shared markdown renderer.
+ * This ensures consistent rendering with the main chat interface.
+ */
 const formatMessageText = (text: string): string => {
-  // Handle code blocks first
-  const codeBlocks: string[] = []
-  let content = text.replace(/```(\w+)?\n([\s\S]*?)```/g, (_, _lang, code) => {
-    const placeholder = `__CODEBLOCK_${codeBlocks.length}__`
-    codeBlocks.push(
-      `<pre class="bg-black/5 dark:bg-white/5 p-3 rounded-lg overflow-x-auto my-2"><code class="text-xs font-mono">${escapeHtml(code.trim())}</code></pre>`
-    )
-    return placeholder
-  })
-
-  // Process line by line for block-level elements
-  const lines = content.split('\n')
-  let html = ''
-  let inList = false
-  let inOrderedList = false
-  let inBlockquote = false
-
-  for (let i = 0; i < lines.length; i++) {
-    let line = lines[i]
-    const trimmed = line.trim()
-
-    // Empty line
-    if (trimmed === '') {
-      if (inList) ((html += '</ul>'), (inList = false))
-      if (inOrderedList) ((html += '</ol>'), (inOrderedList = false))
-      if (inBlockquote) ((html += '</blockquote>'), (inBlockquote = false))
-      html += '<br>'
-      continue
-    }
-
-    // Horizontal rule
-    if (trimmed === '---' || trimmed === '***') {
-      if (inList) ((html += '</ul>'), (inList = false))
-      if (inOrderedList) ((html += '</ol>'), (inOrderedList = false))
-      if (inBlockquote) ((html += '</blockquote>'), (inBlockquote = false))
-      html += '<hr class="my-3 border-t border-gray-300 dark:border-gray-600">'
-      continue
-    }
-
-    // Blockquote
-    if (trimmed.startsWith('> ')) {
-      if (inList) ((html += '</ul>'), (inList = false))
-      if (inOrderedList) ((html += '</ol>'), (inOrderedList = false))
-      if (!inBlockquote) {
-        inBlockquote = true
-        html +=
-          '<blockquote class="border-l-4 pl-3 py-1 my-2 italic rounded-r" style="border-color: #6b7280; background-color: #f3f4f6; color: #1f2937;">'
-      }
-      html += `<p class="mb-1">${formatInline(trimmed.substring(2))}</p>`
-      continue
-    } else if (inBlockquote) {
-      html += '</blockquote>'
-      inBlockquote = false
-    }
-
-    // Headers
-    const headingMatch = trimmed.match(/^(#{1,6})\s+(.*)$/)
-    if (headingMatch) {
-      if (inList) ((html += '</ul>'), (inList = false))
-      if (inOrderedList) ((html += '</ol>'), (inOrderedList = false))
-      const level = headingMatch[1].length
-      const headingClasses = [
-        'text-2xl font-bold mt-4',
-        'text-xl font-bold mt-3',
-        'text-lg font-semibold mt-2',
-        'text-base font-semibold mt-2',
-        'text-sm font-semibold mt-1',
-        'text-sm font-medium mt-1',
-      ]
-      html += `<h${level} class="${headingClasses[level - 1] || headingClasses[5]}">${formatInline(headingMatch[2])}</h${level}>`
-      continue
-    }
-
-    // Unordered list
-    if (/^[-*]\s+/.test(trimmed)) {
-      if (inOrderedList) ((html += '</ol>'), (inOrderedList = false))
-      if (inBlockquote) ((html += '</blockquote>'), (inBlockquote = false))
-      if (!inList) {
-        inList = true
-        html += '<ul class="list-disc pl-5 space-y-1 my-2">'
-      }
-      html += `<li>${formatInline(trimmed.replace(/^[-*]\s+/, ''))}</li>`
-      continue
-    }
-
-    // Ordered list
-    const orderedMatch = trimmed.match(/^(\d+)\.\s+(.*)$/)
-    if (orderedMatch) {
-      if (inList) ((html += '</ul>'), (inList = false))
-      if (inBlockquote) ((html += '</blockquote>'), (inBlockquote = false))
-      if (!inOrderedList) {
-        inOrderedList = true
-        html += '<ol class="list-decimal pl-5 space-y-1 my-2">'
-      }
-      html += `<li>${formatInline(orderedMatch[2])}</li>`
-      continue
-    }
-
-    // Regular paragraph
-    if (inList) ((html += '</ul>'), (inList = false))
-    if (inOrderedList) ((html += '</ol>'), (inOrderedList = false))
-    if (inBlockquote) ((html += '</blockquote>'), (inBlockquote = false))
-    html += `<p class="mb-2">${formatInline(line)}</p>`
-  }
-
-  // Close any open tags
-  if (inList) html += '</ul>'
-  if (inOrderedList) html += '</ol>'
-  if (inBlockquote) html += '</blockquote>'
-
-  // Restore code blocks
-  codeBlocks.forEach((block, index) => {
-    html = html.replace(`__CODEBLOCK_${index}__`, block)
-  })
-
-  return html
-}
-
-const formatInline = (text: string): string => {
-  return (
-    text
-      // Links [text](url)
-      .replace(
-        /\[([^\]]+)\]\(([^)]+)\)/g,
-        '<a href="$2" target="_blank" rel="noopener noreferrer" class="text-blue-600 dark:text-blue-400 hover:underline" style="overflow-wrap: anywhere; word-break: break-word;">$1</a>'
-      )
-      // Inline code
-      .replace(
-        /`([^`]+)`/g,
-        '<code class="px-1 py-0.5 rounded bg-black/10 dark:bg-white/10 font-mono text-sm">$1</code>'
-      )
-      // Bold
-      .replace(/\*\*([^*]+)\*\*/g, '<strong class="font-semibold">$1</strong>')
-      // Italic
-      .replace(/\*([^*]+)\*/g, '<em class="italic">$1</em>')
-  )
+  return renderMarkdown(text)
 }
 </script>
