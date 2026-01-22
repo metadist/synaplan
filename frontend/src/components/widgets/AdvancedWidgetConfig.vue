@@ -489,7 +489,7 @@
           >
             <!-- Not Configured State -->
             <div
-              v-if="!hasCustomPrompt"
+              v-if="!hasCustomPrompt && !creatingManualPrompt && !manualPromptCreated"
               class="flex flex-col items-center justify-center py-12 text-center"
             >
               <div
@@ -503,15 +503,35 @@
               <p class="text-sm txt-secondary max-w-md mb-6">
                 {{ $t('widgets.advancedConfig.aiSetupRequiredDescription') }}
               </p>
-              <button
-                type="button"
-                class="btn-primary px-6 py-3 rounded-lg font-medium flex items-center gap-2"
-                data-testid="btn-start-ai-setup"
-                @click="emit('startAiSetup')"
-              >
-                <Icon icon="heroicons:sparkles" class="w-5 h-5" />
-                {{ $t('widgets.advancedConfig.startAiSetup') }}
-              </button>
+              <div class="flex flex-col sm:flex-row gap-3">
+                <button
+                  type="button"
+                  class="btn-primary px-6 py-3 rounded-lg font-medium flex items-center justify-center gap-2"
+                  data-testid="btn-start-ai-setup"
+                  @click="emit('startAiSetup')"
+                >
+                  <Icon icon="heroicons:sparkles" class="w-5 h-5" />
+                  {{ $t('widgets.advancedConfig.startAiSetup') }}
+                </button>
+                <button
+                  type="button"
+                  class="px-6 py-3 rounded-lg font-medium flex items-center justify-center gap-2 border border-light-border/30 dark:border-dark-border/20 txt-secondary hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+                  data-testid="btn-manual-create"
+                  @click="handleManualCreate"
+                >
+                  <Icon icon="heroicons:pencil-square" class="w-5 h-5" />
+                  {{ $t('widgets.advancedConfig.manualCreate') }}
+                </button>
+              </div>
+            </div>
+
+            <!-- Creating Manual Prompt Loading State -->
+            <div
+              v-else-if="creatingManualPrompt"
+              class="flex flex-col items-center justify-center py-12"
+            >
+              <Icon icon="heroicons:arrow-path" class="w-8 h-8 txt-secondary animate-spin mb-4" />
+              <p class="text-sm txt-secondary">{{ $t('widgets.advancedConfig.creatingPrompt') }}</p>
             </div>
 
             <!-- Configured State -->
@@ -531,8 +551,9 @@
 
               <!-- Prompt Editor -->
               <template v-else>
-                <!-- Restart AI Setup Option -->
+                <!-- Restart AI Setup Option (only show if not manually created) -->
                 <div
+                  v-if="!manualPromptCreated"
                   class="p-4 rounded-lg bg-[var(--brand-alpha-light)] border border-[var(--brand)]/20"
                 >
                   <div class="flex items-center justify-between">
@@ -1074,6 +1095,8 @@ const promptData = reactive({
 })
 const promptLoading = ref(false)
 const promptError = ref<string | null>(null)
+const creatingManualPrompt = ref(false)
+const manualPromptCreated = ref(false) // Flag to show form after manual creation
 
 // File upload for Knowledge Base
 const fileUploadInput = ref<HTMLInputElement | null>(null)
@@ -1141,6 +1164,48 @@ const groupedModels = computed(() => {
 
 const handleClose = () => {
   emit('close')
+}
+
+// Handle manual prompt creation
+const handleManualCreate = async () => {
+  creatingManualPrompt.value = true
+
+  try {
+    // Create a new empty prompt for the widget
+    const defaultPromptContent = `You are a helpful AI assistant for ${props.widget.name || 'this website'}.
+
+Your role is to assist visitors with their questions and provide helpful information.
+
+Be friendly, professional, and concise in your responses.`
+
+    const result = await widgetsApi.generateWidgetPrompt(
+      props.widget.widgetId,
+      defaultPromptContent,
+      null
+    )
+
+    // Update local state to show the form
+    // Match the backend's default format for selection rules
+    const widgetName = props.widget.name || 'this'
+    promptData.id = result.promptId
+    promptData.name = `${widgetName} Assistant`
+    promptData.rules = `Use for customer inquiries on ${widgetName} website`
+    promptData.aiModel =
+      'AUTOMATED - Tries to define the best model for the task on SYNAPLAN [System Model]'
+    promptData.availableTools = []
+    promptData.content = defaultPromptContent
+
+    // Set flag to show the form (without closing modal)
+    manualPromptCreated.value = true
+
+    // Load AI models for the dropdown
+    await loadAIModels()
+  } catch (err: any) {
+    console.error('Failed to create manual prompt:', err)
+    showError(err.message || t('widgets.advancedConfig.manualCreateError'))
+  } finally {
+    creatingManualPrompt.value = false
+  }
 }
 
 const addDomain = () => {
