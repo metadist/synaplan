@@ -131,9 +131,7 @@ export async function processKatexInMarkdown(markdown: string): Promise<string> 
  * Check if content contains math formulas
  */
 export function hasMathFormulas(content: string): boolean {
-  return (
-    content.includes('$') || content.includes('\\(') || content.includes('\\[')
-  )
+  return content.includes('$') || content.includes('\\(') || content.includes('\\[')
 }
 
 /**

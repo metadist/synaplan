@@ -183,9 +183,31 @@ function createRenderer(): MarkedExtension {
 function sanitizeHtml(html: string): string {
   return DOMPurify.sanitize(html, {
     // Allow mermaid and KaTeX elements
-    ADD_TAGS: ['mermaid', 'math', 'mrow', 'mi', 'mo', 'mn', 'msup', 'msub', 'mfrac', 'semantics', 'annotation'],
+    ADD_TAGS: [
+      'mermaid',
+      'math',
+      'mrow',
+      'mi',
+      'mo',
+      'mn',
+      'msup',
+      'msub',
+      'mfrac',
+      'semantics',
+      'annotation',
+    ],
     // Allow data attributes, classes, and KaTeX-specific attributes
-    ADD_ATTR: ['class', 'target', 'rel', 'data-*', 'style', 'aria-hidden', 'focusable', 'role', 'xmlns'],
+    ADD_ATTR: [
+      'class',
+      'target',
+      'rel',
+      'data-*',
+      'style',
+      'aria-hidden',
+      'focusable',
+      'role',
+      'xmlns',
+    ],
     // Allow standard HTML elements plus KaTeX SVG elements
     ALLOWED_TAGS: [
       'h1',

@@ -121,7 +121,10 @@ export interface Message {
  * Parse content to extract thinking blocks, code blocks, and regular text.
  * This ensures consistent rendering between streaming and loaded messages.
  */
-function parseContentWithThinking(content: string, role: 'user' | 'assistant' = 'assistant'): Part[] {
+function parseContentWithThinking(
+  content: string,
+  role: 'user' | 'assistant' = 'assistant'
+): Part[] {
   // Handle special file generation markers from backend
   if (content.startsWith('__FILE_GENERATED__:')) {
     const filename = content.replace('__FILE_GENERATED__:', '').trim()

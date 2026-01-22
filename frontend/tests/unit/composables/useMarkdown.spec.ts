@@ -140,9 +140,7 @@ describe('useMarkdown', () => {
 
     describe('tables (GFM)', () => {
       it('should render tables', () => {
-        const html = markdown.render(
-          '| Header 1 | Header 2 |\n| --- | --- |\n| Cell 1 | Cell 2 |'
-        )
+        const html = markdown.render('| Header 1 | Header 2 |\n| --- | --- |\n| Cell 1 | Cell 2 |')
         expect(html).toContain('class="markdown-table"')
         expect(html).toContain('<thead')
         expect(html).toContain('<tbody')
@@ -151,9 +149,7 @@ describe('useMarkdown', () => {
       })
 
       it('should render table headers and cells', () => {
-        const html = markdown.render(
-          '| Name | Age |\n| --- | --- |\n| Alice | 30 |'
-        )
+        const html = markdown.render('| Name | Age |\n| --- | --- |\n| Alice | 30 |')
         expect(html).toContain('Name')
         expect(html).toContain('Age')
         expect(html).toContain('Alice')
@@ -250,10 +246,7 @@ describe('useMarkdown', () => {
     })
 
     it('should highlight TypeScript code', () => {
-      const highlighted = markdown.highlightCode(
-        'const x: number = 42;',
-        'typescript'
-      )
+      const highlighted = markdown.highlightCode('const x: number = 42;', 'typescript')
       expect(highlighted).toContain('hljs-')
     })
 

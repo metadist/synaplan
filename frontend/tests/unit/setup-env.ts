@@ -27,7 +27,8 @@ const localStorageMock = {
 }
 
 // Set up localStorage on all possible global objects
-;(globalThis as unknown as { localStorage: typeof localStorageMock }).localStorage = localStorageMock
+;(globalThis as unknown as { localStorage: typeof localStorageMock }).localStorage =
+  localStorageMock
 
 if (typeof window !== 'undefined') {
   ;(window as unknown as { localStorage: typeof localStorageMock }).localStorage = localStorageMock
