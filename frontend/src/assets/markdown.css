@@ -1,0 +1,213 @@
+/**
+ * Shared Markdown Styles
+ *
+ * These styles are applied to markdown content rendered by useMarkdown.
+ * Import this file in components that render markdown or include globally.
+ *
+ * Usage:
+ * - Add class "markdown-content" to the container element
+ * - Use v-html to render the markdown HTML
+ */
+
+/* Code blocks */
+.markdown-content .code-block {
+  @apply p-4 overflow-x-auto my-3 rounded-lg;
+  background-color: var(--bg-chip, rgba(0, 0, 0, 0.05));
+}
+
+.markdown-content .code-block code {
+  @apply text-sm;
+  font-family: 'Monaco', 'Menlo', 'Courier New', monospace;
+}
+
+/* Inline code */
+.markdown-content .inline-code {
+  @apply px-1.5 py-0.5 text-sm font-mono rounded;
+  background-color: var(--bg-chip, rgba(0, 0, 0, 0.05));
+}
+
+/* Headers */
+.markdown-content h1 {
+  @apply text-2xl font-bold mt-6 mb-4;
+}
+
+.markdown-content h2 {
+  @apply text-xl font-bold mt-5 mb-3;
+}
+
+.markdown-content h3 {
+  @apply text-lg font-semibold mt-4 mb-2;
+}
+
+.markdown-content h4,
+.markdown-content h5,
+.markdown-content h6 {
+  @apply text-base font-semibold mt-3 mb-2;
+}
+
+/* Lists */
+.markdown-content ul {
+  @apply my-2 ml-6 list-disc;
+}
+
+.markdown-content ol {
+  @apply my-2 ml-6 list-decimal;
+}
+
+.markdown-content li {
+  @apply my-1;
+}
+
+/* Task lists (GFM) */
+.markdown-content li > input[type='checkbox'] {
+  @apply mr-2;
+}
+
+/* Blockquotes */
+.markdown-content .markdown-blockquote {
+  @apply border-l-4 pl-4 py-2 my-2 italic rounded-r;
+  border-color: var(--border-light, #6b7280);
+  background-color: var(--bg-chip, #f3f4f6);
+}
+
+/* Tables */
+.markdown-content .markdown-table {
+  @apply w-full border-collapse my-4;
+}
+
+.markdown-content .markdown-table th,
+.markdown-content .markdown-table td {
+  @apply border px-3 py-2;
+  border-color: var(--border-light, rgba(0, 0, 0, 0.1));
+}
+
+.markdown-content .markdown-table th {
+  @apply font-semibold;
+  background-color: var(--bg-chip, rgba(0, 0, 0, 0.05));
+}
+
+/* Links */
+.markdown-content a {
+  color: var(--brand, #3b82f6);
+}
+
+.markdown-content a:hover {
+  @apply underline;
+}
+
+/* Horizontal rule */
+.markdown-content hr {
+  @apply my-4 border-t;
+  border-color: var(--border-light, #d1d5db);
+}
+
+/* Strikethrough (GFM) */
+.markdown-content del {
+  @apply line-through opacity-60;
+}
+
+/* Paragraphs */
+.markdown-content p {
+  @apply my-2;
+}
+
+.markdown-content p:first-child {
+  @apply mt-0;
+}
+
+.markdown-content p:last-child {
+  @apply mb-0;
+}
+
+/* Strong/Bold */
+.markdown-content strong {
+  @apply font-semibold;
+}
+
+/* Emphasis/Italic */
+.markdown-content em {
+  @apply italic;
+}
+
+/* Mermaid diagrams */
+.markdown-content .mermaid-diagram {
+  @apply my-4 overflow-x-auto;
+}
+
+.markdown-content .mermaid-diagram svg {
+  @apply max-w-full h-auto;
+}
+
+.markdown-content .mermaid-block {
+  @apply p-4 overflow-x-auto my-3 rounded-lg;
+  background-color: var(--bg-chip, rgba(0, 0, 0, 0.05));
+}
+
+.markdown-content .mermaid-error {
+  @apply border-2 border-red-300;
+}
+
+/* KaTeX math formulas */
+.markdown-content .katex-block {
+  @apply my-4 overflow-x-auto text-center;
+}
+
+.markdown-content .katex-inline {
+  @apply inline;
+}
+
+.markdown-content .katex-error {
+  @apply text-red-500 font-mono text-sm;
+}
+
+.markdown-content .katex {
+  font-size: 1.1em;
+}
+
+/* Dark mode adjustments */
+@media (prefers-color-scheme: dark) {
+  .markdown-content .code-block,
+  .markdown-content .inline-code,
+  .markdown-content .mermaid-block {
+    background-color: rgba(255, 255, 255, 0.05);
+  }
+
+  .markdown-content .markdown-blockquote {
+    border-color: #4b5563;
+    background-color: rgba(255, 255, 255, 0.05);
+  }
+
+  .markdown-content .markdown-table th,
+  .markdown-content .markdown-table td {
+    border-color: rgba(255, 255, 255, 0.1);
+  }
+
+  .markdown-content .markdown-table th {
+    background-color: rgba(255, 255, 255, 0.05);
+  }
+}
+
+/* Dark mode class-based (for manual dark mode toggle) */
+.dark .markdown-content .code-block,
+.dark .markdown-content .inline-code,
+.dark .markdown-content .mermaid-block {
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+.dark .markdown-content .markdown-blockquote {
+  border-color: #4b5563;
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+.dark .markdown-content .markdown-table th,
+.dark .markdown-content .markdown-table td {
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+.dark .markdown-content .markdown-table th {
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+.dark .markdown-content a {
+  color: var(--brand-light, #60a5fa);
+}

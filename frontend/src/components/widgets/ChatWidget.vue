@@ -409,6 +409,7 @@ import {
 import { uploadWidgetFile, sendWidgetMessage } from '@/services/api/widgetsApi'
 import { useI18n } from 'vue-i18n'
 import { parseAIResponse } from '@/utils/responseParser'
+import { getMarkdownRenderer } from '@/composables/useMarkdown'
 
 interface Props {
   widgetId: string
@@ -969,157 +970,14 @@ const loadConversationHistory = async (force = false) => {
   }
 }
 
-const escapeHtml = (value: string): string => {
-  return value
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#039;')
-}
-
-const applyInlineFormatting = (text: string): string => {
-  return text
-    .replace(/(\*\*|__)(.+?)\1/g, '<strong>$2</strong>')
-    .replace(/(\*|_)(.+?)\1/g, '<em>$2</em>')
-    .replace(/~~(.+?)~~/g, '<del>$1</del>')
-    .replace(
-      /`([^`]+)`/g,
-      '<code class="px-1 py-0.5 rounded bg-black/10 dark:bg-white/10 text-xs">$1</code>'
-    )
-    .replace(
-      /\[(.+?)\]\((https?:\/\/[^\s)]+)\)/g,
-      '<a href="$2" class="underline" target="_blank" rel="noopener noreferrer">$1</a>'
-    )
-}
+// Use the shared markdown renderer (singleton for widget performance)
+const markdownRenderer = getMarkdownRenderer()
 
 const renderMessageContent = (value: string): string => {
   if (!value) {
     return ''
   }
-
-  // First handle code blocks
-  let content = value
-  const codeBlocks: string[] = []
-  content = content.replace(
-    /```(\w+)?\n([\s\S]*?)```/g,
-    (_: string, lang: string, code: string) => {
-      const language = lang || 'text'
-      const placeholder = `__CODEBLOCK_${codeBlocks.length}__`
-      codeBlocks.push(
-        `<pre class="bg-black/5 dark:bg-white/5 p-3 rounded-lg overflow-x-auto my-2"><code class="language-${language} text-xs font-mono">${escapeHtml(code.trim())}</code></pre>`
-      )
-      return placeholder
-    }
-  )
-
-  const lines = content.split(/\r?\n/)
-  const htmlParts: string[] = []
-  let inList = false
-  let inOrderedList = false
-  let inBlockquote = false
-
-  const closeListIfNeeded = () => {
-    if (inList) {
-      htmlParts.push('</ul>')
-      inList = false
-    }
-    if (inOrderedList) {
-      htmlParts.push('</ol>')
-      inOrderedList = false
-    }
-    if (inBlockquote) {
-      htmlParts.push('</blockquote>')
-      inBlockquote = false
-    }
-  }
-
-  for (const rawLine of lines) {
-    const trimmed = rawLine.trim()
-
-    if (trimmed === '') {
-      closeListIfNeeded()
-      htmlParts.push('<br>')
-      continue
-    }
-
-    // Check for horizontal rule
-    if (trimmed === '---' || trimmed === '***') {
-      closeListIfNeeded()
-      htmlParts.push('<hr class="my-3 border-t border-gray-300 dark:border-gray-600" />')
-      continue
-    }
-
-    // Check for blockquote
-    if (trimmed.startsWith('> ')) {
-      if (inList) (htmlParts.push('</ul>'), (inList = false))
-      if (inOrderedList) (htmlParts.push('</ol>'), (inOrderedList = false))
-      if (!inBlockquote) {
-        inBlockquote = true
-        htmlParts.push(
-          '<blockquote class="border-l-4 pl-3 py-1 my-2 italic rounded-r" style="border-color: #6b7280; background-color: #f3f4f6; color: #1f2937;">'
-        )
-      }
-      const quoteContent = applyInlineFormatting(escapeHtml(trimmed.substring(2)))
-      htmlParts.push(`<p class="mb-1">${quoteContent}</p>`)
-      continue
-    } else if (inBlockquote) {
-      htmlParts.push('</blockquote>')
-      inBlockquote = false
-    }
-
-    const headingMatch = trimmed.match(/^(#{1,6})\s+(.*)$/)
-    if (headingMatch) {
-      closeListIfNeeded()
-      const level = headingMatch[1].length
-      const content = applyInlineFormatting(escapeHtml(headingMatch[2]))
-      const sizeClass = level <= 2 ? 'text-base' : 'text-sm'
-      htmlParts.push(`<div class="font-semibold ${sizeClass} mt-2">${content}</div>`)
-      continue
-    }
-
-    // Unordered list
-    if (/^[-*]\s+/.test(trimmed)) {
-      if (inOrderedList) (htmlParts.push('</ol>'), (inOrderedList = false))
-      if (inBlockquote) (htmlParts.push('</blockquote>'), (inBlockquote = false))
-      if (!inList) {
-        inList = true
-        htmlParts.push('<ul class="list-disc pl-5 space-y-1 my-2">')
-      }
-      const item = trimmed.replace(/^[-*]\s+/, '')
-      const content = applyInlineFormatting(escapeHtml(item))
-      htmlParts.push(`<li>${content}</li>`)
-      continue
-    }
-
-    // Ordered list
-    const orderedMatch = trimmed.match(/^(\d+)\.\s+(.*)$/)
-    if (orderedMatch) {
-      if (inList) (htmlParts.push('</ul>'), (inList = false))
-      if (inBlockquote) (htmlParts.push('</blockquote>'), (inBlockquote = false))
-      if (!inOrderedList) {
-        inOrderedList = true
-        htmlParts.push('<ol class="list-decimal pl-5 space-y-1 my-2">')
-      }
-      const content = applyInlineFormatting(escapeHtml(orderedMatch[2]))
-      htmlParts.push(`<li>${content}</li>`)
-      continue
-    }
-
-    closeListIfNeeded()
-    const content = applyInlineFormatting(escapeHtml(rawLine))
-    htmlParts.push(`<p class="mb-2 last:mb-0">${content}</p>`)
-  }
-
-  closeListIfNeeded()
-  let result = htmlParts.join('')
-
-  // Restore code blocks
-  codeBlocks.forEach((block, index) => {
-    result = result.replace(`__CODEBLOCK_${index}__`, block)
-  })
-
-  return result
+  return markdownRenderer.render(value)
 }
 
 // Load session ID from localStorage on mount
@@ -1212,3 +1070,138 @@ function buildWidgetHeaders(includeContentType = true) {
   return headers
 }
 </script>
+
+<style scoped>
+/* Markdown content styling for widget */
+:deep(.code-block) {
+  padding: 0.75rem;
+  border-radius: 0.5rem;
+  overflow-x: auto;
+  margin-top: 0.5rem;
+  margin-bottom: 0.5rem;
+  background-color: rgba(0, 0, 0, 0.05);
+}
+
+:deep(.dark .code-block) {
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+:deep(.code-block code) {
+  font-size: 0.75rem;
+  font-family: ui-monospace, SFMono-Regular, monospace;
+}
+
+:deep(.inline-code) {
+  padding: 0.125rem 0.25rem;
+  border-radius: 0.25rem;
+  font-size: 0.75rem;
+  background-color: rgba(0, 0, 0, 0.1);
+}
+
+:deep(.dark .inline-code) {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+:deep(h1),
+:deep(h2) {
+  font-size: 1rem;
+  font-weight: 600;
+  margin-top: 0.5rem;
+}
+
+:deep(h3),
+:deep(h4),
+:deep(h5),
+:deep(h6) {
+  font-size: 0.875rem;
+  font-weight: 600;
+  margin-top: 0.5rem;
+}
+
+:deep(ul) {
+  list-style-type: disc;
+  padding-left: 1.25rem;
+  margin-top: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+:deep(ol) {
+  list-style-type: decimal;
+  padding-left: 1.25rem;
+  margin-top: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+:deep(li) {
+  margin-top: 0.25rem;
+  margin-bottom: 0.25rem;
+}
+
+:deep(.markdown-blockquote) {
+  border-left-width: 4px;
+  padding-left: 0.75rem;
+  padding-top: 0.25rem;
+  padding-bottom: 0.25rem;
+  margin-top: 0.5rem;
+  margin-bottom: 0.5rem;
+  font-style: italic;
+  border-top-right-radius: 0.25rem;
+  border-bottom-right-radius: 0.25rem;
+  border-color: #6b7280;
+  background-color: #f3f4f6;
+  color: #1f2937;
+}
+
+:deep(.markdown-table) {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 0.5rem;
+  margin-bottom: 0.5rem;
+  font-size: 0.875rem;
+}
+
+:deep(.markdown-table th),
+:deep(.markdown-table td) {
+  border-width: 1px;
+  border-style: solid;
+  padding: 0.25rem 0.5rem;
+  border-color: rgba(0, 0, 0, 0.1);
+}
+
+:deep(.markdown-table th) {
+  font-weight: 600;
+  background-color: rgba(0, 0, 0, 0.05);
+}
+
+:deep(hr) {
+  margin-top: 0.75rem;
+  margin-bottom: 0.75rem;
+  border-top-width: 1px;
+  border-color: #d1d5db;
+}
+
+:deep(a) {
+  text-decoration: underline;
+}
+
+:deep(p) {
+  margin-bottom: 0.5rem;
+}
+
+:deep(p:last-child) {
+  margin-bottom: 0;
+}
+
+:deep(del) {
+  text-decoration: line-through;
+  opacity: 0.6;
+}
+
+:deep(strong) {
+  font-weight: 600;
+}
+
+:deep(em) {
+  font-style: italic;
+}
+</style>

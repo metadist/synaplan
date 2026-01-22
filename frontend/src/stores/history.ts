@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { normalizeMediaUrl } from '@/utils/urlHelper'
 import { extractBTextPayload } from '@/utils/jsonResponse'
+import { parseAIResponse } from '@/utils/responseParser'
 import type { AgainData } from '@/types/ai-models'
 import { authService } from '@/services/authService'
 
@@ -117,9 +118,10 @@ export interface Message {
 }
 
 /**
- * Parse content to extract thinking blocks and regular text
+ * Parse content to extract thinking blocks, code blocks, and regular text.
+ * This ensures consistent rendering between streaming and loaded messages.
  */
-function parseContentWithThinking(content: string): Part[] {
+function parseContentWithThinking(content: string, role: 'user' | 'assistant' = 'assistant'): Part[] {
   // Handle special file generation markers from backend
   if (content.startsWith('__FILE_GENERATED__:')) {
     const filename = content.replace('__FILE_GENERATED__:', '').trim()
@@ -153,7 +155,7 @@ function parseContentWithThinking(content: string): Part[] {
 
   const parts: Part[] = []
 
-  // Extract thinking blocks
+  // Extract thinking blocks first
   const thinkRegex = /<think>([\s\S]*?)<\/think>/g
   const thinkingBlocks: Array<{ content: string; index: number }> = []
   let match
@@ -182,8 +184,35 @@ function parseContentWithThinking(content: string): Part[] {
     content = content.replace(/<think>[\s\S]*?<\/think>/g, '').trim()
   }
 
-  // Add remaining text content
-  if (content) {
+  // For assistant messages, use parseAIResponse to extract code blocks
+  // This ensures consistent rendering between streaming and loaded messages
+  if (role === 'assistant' && content) {
+    const parsed = parseAIResponse(content)
+    parsed.parts.forEach((part) => {
+      if (part.type === 'code') {
+        parts.push({
+          type: 'code',
+          content: part.content,
+          language: part.language,
+        })
+      } else if (part.type === 'text' && part.content.trim()) {
+        parts.push({
+          type: 'text',
+          content: part.content,
+        })
+      } else if (part.type === 'links' && part.links) {
+        parts.push({
+          type: 'links',
+          items: part.links.map((l) => ({
+            title: l.title,
+            url: l.url,
+            desc: l.description,
+          })),
+        })
+      }
+    })
+  } else if (content) {
+    // For user messages, just add as text
     parts.push({
       type: 'text',
       content,
@@ -348,7 +377,7 @@ export const useHistoryStore = defineStore('history', () => {
         const loadedMessages: Message[] = response.messages.map((m: any) => {
           const role = m.direction === 'IN' ? 'user' : 'assistant'
 
-          const parts = parseContentWithThinking(m.text || '')
+          const parts = parseContentWithThinking(m.text || '', role)
 
           // Add generated file (image/video/audio) as part if present
           if (m.file && m.file.path) {
