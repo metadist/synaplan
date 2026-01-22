@@ -181,11 +181,7 @@
                     class="w-12 h-12 rounded-full flex items-center justify-center overflow-hidden"
                     :style="{ backgroundColor: config.primaryColor }"
                   >
-                    <img
-                      :src="config.buttonIconUrl"
-                      alt="Custom"
-                      class="w-8 h-8 object-contain"
-                    />
+                    <img :src="config.buttonIconUrl" alt="Custom" class="w-8 h-8 object-contain" />
                   </div>
                   <span class="text-xs txt-secondary">Custom</span>
                 </button>
@@ -218,11 +214,7 @@
                       class="w-5 h-5 animate-spin"
                     />
                     <Icon v-else icon="heroicons:arrow-up-tray" class="w-5 h-5" />
-                    {{
-                      config.buttonIconUrl
-                        ? $t('widgets.changeIcon')
-                        : $t('widgets.uploadIcon')
-                    }}
+                    {{ config.buttonIconUrl ? $t('widgets.changeIcon') : $t('widgets.uploadIcon') }}
                   </button>
                   <button
                     v-if="config.buttonIconUrl"
@@ -278,11 +270,16 @@
               :class="widgetStatus === 'inactive' ? 'border-2 border-yellow-500/50' : ''"
             >
               <div>
-                <p class="font-medium txt-primary">{{ $t('widgets.advancedConfig.widgetActive') }}</p>
+                <p class="font-medium txt-primary">
+                  {{ $t('widgets.advancedConfig.widgetActive') }}
+                </p>
                 <p class="text-xs txt-secondary mt-1">
                   {{ $t('widgets.advancedConfig.widgetActiveHelp') }}
                 </p>
-                <p v-if="widgetStatus === 'inactive'" class="text-xs text-yellow-600 dark:text-yellow-400 mt-2 font-medium">
+                <p
+                  v-if="widgetStatus === 'inactive'"
+                  class="text-xs text-yellow-600 dark:text-yellow-400 mt-2 font-medium"
+                >
                   {{ $t('widgets.advancedConfig.widgetInactiveWarning') }}
                 </p>
               </div>
@@ -291,7 +288,11 @@
                   :checked="widgetStatus === 'active'"
                   type="checkbox"
                   class="sr-only peer"
-                  @change="widgetStatus = ($event.target as HTMLInputElement).checked ? 'active' : 'inactive'"
+                  @change="
+                    widgetStatus = ($event.target as HTMLInputElement).checked
+                      ? 'active'
+                      : 'inactive'
+                  "
                 />
                 <div
                   class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-[var(--brand)]/20 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[var(--brand)]"
@@ -299,7 +300,9 @@
               </div>
             </label>
 
-            <label class="surface-chip p-4 rounded-lg flex items-center justify-between cursor-pointer hover:opacity-80 transition-opacity">
+            <label
+              class="surface-chip p-4 rounded-lg flex items-center justify-between cursor-pointer hover:opacity-80 transition-opacity"
+            >
               <div>
                 <p class="font-medium txt-primary">{{ $t('widgets.advancedConfig.autoOpen') }}</p>
                 <p class="text-xs txt-secondary mt-1">
@@ -363,7 +366,9 @@
             </div>
 
             <div class="surface-chip rounded-lg">
-              <label class="p-4 flex items-center justify-between cursor-pointer hover:opacity-80 transition-opacity">
+              <label
+                class="p-4 flex items-center justify-between cursor-pointer hover:opacity-80 transition-opacity"
+              >
                 <div>
                   <p class="font-medium txt-primary">
                     {{ $t('widgets.advancedConfig.allowFileUpload') }}
@@ -462,8 +467,13 @@
             data-testid="section-assistant"
           >
             <!-- Not Configured State -->
-            <div v-if="!hasCustomPrompt" class="flex flex-col items-center justify-center py-12 text-center">
-              <div class="w-20 h-20 rounded-full bg-[var(--brand-alpha-light)] flex items-center justify-center mb-6">
+            <div
+              v-if="!hasCustomPrompt"
+              class="flex flex-col items-center justify-center py-12 text-center"
+            >
+              <div
+                class="w-20 h-20 rounded-full bg-[var(--brand-alpha-light)] flex items-center justify-center mb-6"
+              >
                 <Icon icon="heroicons:sparkles" class="w-10 h-10 txt-brand" />
               </div>
               <h3 class="text-lg font-semibold txt-primary mb-2">
@@ -501,10 +511,15 @@
               <!-- Prompt Editor -->
               <template v-else>
                 <!-- Restart AI Setup Option -->
-                <div class="p-4 rounded-lg bg-[var(--brand-alpha-light)] border border-[var(--brand)]/20">
+                <div
+                  class="p-4 rounded-lg bg-[var(--brand-alpha-light)] border border-[var(--brand)]/20"
+                >
                   <div class="flex items-center justify-between">
                     <div class="flex items-start gap-3">
-                      <Icon icon="heroicons:sparkles" class="w-5 h-5 txt-brand flex-shrink-0 mt-0.5" />
+                      <Icon
+                        icon="heroicons:sparkles"
+                        class="w-5 h-5 txt-brand flex-shrink-0 mt-0.5"
+                      />
                       <div>
                         <p class="text-sm font-medium txt-primary">
                           {{ $t('widgets.advancedConfig.restartAiSetupTitle') }}
@@ -516,213 +531,269 @@
                     </div>
                     <button
                       type="button"
-                    class="px-4 py-2 rounded-lg bg-[var(--brand)] text-white text-sm font-medium hover:bg-[var(--brand-hover)] transition-colors flex items-center gap-2"
-                    data-testid="btn-restart-ai-setup"
-                    @click="emit('startAiSetup')"
-                  >
-                    <Icon icon="heroicons:arrow-path" class="w-4 h-4" />
-                    {{ $t('widgets.advancedConfig.restartAiSetup') }}
-                  </button>
-                </div>
-              </div>
-
-              <!-- Widget Name -->
-              <div>
-                <label class="block text-sm font-medium txt-primary mb-2 flex items-center gap-2">
-                  <Icon icon="heroicons:tag" class="w-4 h-4" />
-                  {{ $t('widgets.widgetName') }}
-                </label>
-                <input
-                  v-model="widgetName"
-                  type="text"
-                  class="w-full px-4 py-2.5 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
-                  data-testid="input-widget-name"
-                  :placeholder="$t('widgets.widgetNamePlaceholder')"
-                />
-              </div>
-
-              <!-- Selection Rules -->
-              <div>
-                <label class="block text-sm font-medium txt-primary mb-2 flex items-center gap-2">
-                  <Icon icon="heroicons:funnel" class="w-4 h-4" />
-                  {{ $t('widgets.advancedConfig.selectionRules') }}
-                </label>
-                <textarea
-                  v-model="promptData.rules"
-                  rows="2"
-                  class="w-full px-4 py-3 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)] resize-none"
-                  :placeholder="$t('widgets.advancedConfig.selectionRulesPlaceholder')"
-                  data-testid="input-selection-rules"
-                ></textarea>
-                <p class="text-xs txt-secondary mt-1">
-                  {{ $t('widgets.advancedConfig.selectionRulesHelp') }}
-                </p>
-              </div>
-
-              <!-- AI Model Selection -->
-              <div>
-                <label class="block text-sm font-medium txt-primary mb-2 flex items-center gap-2">
-                  <Icon icon="heroicons:cpu-chip" class="w-4 h-4" />
-                  {{ $t('widgets.advancedConfig.aiModel') }}
-                </label>
-                <select
-                  v-model="promptData.aiModel"
-                  class="w-full px-4 py-2.5 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
-                  data-testid="input-ai-model"
-                >
-                  <option
-                    value="AUTOMATED - Tries to define the best model for the task on SYNAPLAN [System Model]"
-                  >
-                    ✨ {{ $t('widgets.advancedConfig.automated') }}
-                  </option>
-                  <template v-if="!loadingModels && groupedModels.length > 0">
-                    <optgroup
-                      v-for="group in groupedModels"
-                      :key="group.capability"
-                      :label="group.label"
+                      class="px-4 py-2 rounded-lg bg-[var(--brand)] text-white text-sm font-medium hover:bg-[var(--brand-hover)] transition-colors flex items-center gap-2"
+                      data-testid="btn-restart-ai-setup"
+                      @click="emit('startAiSetup')"
                     >
-                      <option
-                        v-for="model in group.models"
-                        :key="model.id"
-                        :value="`${model.name} (${model.service})`"
-                      >
-                        {{ model.name }} ({{ model.service }})
-                        <template v-if="model.rating">⭐ {{ model.rating.toFixed(1) }}</template>
-                      </option>
-                    </optgroup>
-                  </template>
-                  <option v-if="loadingModels" disabled>Loading models...</option>
-                </select>
-                <p class="text-xs txt-secondary mt-1">
-                  {{ $t('widgets.advancedConfig.aiModelHelp') }}
-                </p>
-              </div>
-
-              <!-- Available Tools -->
-              <div>
-                <label class="block text-sm font-medium txt-primary mb-3 flex items-center gap-2">
-                  <Icon icon="heroicons:wrench-screwdriver" class="w-4 h-4" />
-                  {{ $t('widgets.advancedConfig.availableTools') }}
-                </label>
-                <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  <label
-                    v-for="tool in availableTools"
-                    :key="tool.value"
-                    class="flex items-center gap-3 p-3 rounded-lg surface-chip cursor-pointer hover:bg-[var(--brand)]/5 transition-colors"
-                    data-testid="item-tool"
-                  >
-                    <input
-                      v-model="promptData.availableTools"
-                      type="checkbox"
-                      :value="tool.value"
-                      class="w-5 h-5 rounded border-light-border/30 dark:border-dark-border/20 text-[var(--brand)] focus:ring-2 focus:ring-[var(--brand)]"
-                    />
-                    <Icon :icon="tool.icon" class="w-5 h-5 txt-secondary" />
-                    <span class="text-sm txt-primary">{{ tool.label }}</span>
-                  </label>
-                </div>
-              </div>
-
-              <!-- Prompt Content -->
-              <div>
-                <label class="block text-sm font-medium txt-primary mb-2 flex items-center gap-2">
-                  <Icon icon="heroicons:document-text" class="w-4 h-4" />
-                  {{ $t('widgets.advancedConfig.promptContent') }}
-                </label>
-                <textarea
-                  v-model="promptData.content"
-                  rows="12"
-                  class="w-full px-4 py-3 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)] resize-y font-mono text-sm"
-                  :placeholder="$t('widgets.advancedConfig.promptContentPlaceholder')"
-                  data-testid="input-prompt-content"
-                ></textarea>
-                <p class="text-xs txt-secondary mt-1">
-                  {{ $t('widgets.advancedConfig.promptContentHelp') }}
-                </p>
-              </div>
-
-              <!-- Knowledge Base / File Upload -->
-              <div>
-                <label class="block text-sm font-medium txt-primary mb-2 flex items-center gap-2">
-                  <Icon icon="heroicons:document-arrow-up" class="w-4 h-4" />
-                  {{ $t('widgets.advancedConfig.knowledgeBase') }}
-                </label>
-                <p class="text-xs txt-secondary mb-4">
-                  {{ $t('widgets.advancedConfig.knowledgeBaseDescription') }}
-                </p>
-
-                <!-- File Upload Area -->
-                <div class="mb-4">
-                  <label
-                    class="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-lg cursor-pointer border-light-border/50 dark:border-dark-border/30 hover:border-[var(--brand)]/50 hover:bg-[var(--brand)]/5 transition-colors"
-                  >
-                    <div class="flex flex-col items-center justify-center pt-5 pb-6">
-                      <Icon
-                        v-if="uploadingFile"
-                        icon="heroicons:arrow-path"
-                        class="w-8 h-8 mb-2 txt-brand animate-spin"
-                      />
-                      <Icon v-else icon="heroicons:cloud-arrow-up" class="w-8 h-8 mb-2 txt-secondary" />
-                      <p class="text-sm txt-secondary">
-                        <span v-if="uploadingFile">{{ $t('widgets.advancedConfig.uploadingFile') }}</span>
-                        <span v-else class="font-medium txt-brand">{{ $t('widgets.advancedConfig.uploadFiles') }}</span>
-                      </p>
-                      <p class="text-xs txt-secondary mt-1">PDF, DOCX, TXT, MD (max 10MB)</p>
-                    </div>
-                    <input
-                      ref="fileUploadInput"
-                      type="file"
-                      class="hidden"
-                      accept=".pdf,.doc,.docx,.txt,.md,.csv,.json"
-                      multiple
-                      :disabled="uploadingFile"
-                      @change="handleFileUpload"
-                    />
-                  </label>
-                </div>
-
-                <!-- Uploaded Files List -->
-                <div v-if="promptFiles.length > 0" class="space-y-2">
-                  <div
-                    v-for="file in promptFiles"
-                    :key="file.id"
-                    class="flex items-center justify-between p-3 rounded-lg surface-chip"
-                  >
-                    <div class="flex items-center gap-3 min-w-0">
-                      <Icon icon="heroicons:document" class="w-5 h-5 txt-secondary flex-shrink-0" />
-                      <div class="min-w-0">
-                        <p class="text-sm txt-primary truncate">{{ file.fileName }}</p>
-                        <p class="text-xs txt-secondary">{{ file.chunks }} chunks</p>
-                      </div>
-                    </div>
-                    <button
-                      type="button"
-                      class="p-2 rounded-lg hover:bg-red-500/10 transition-colors"
-                      :title="$t('widgets.advancedConfig.deleteFile')"
-                      :disabled="deletingFileId === file.id"
-                      @click="handleDeleteFile(file.id)"
-                    >
-                      <Icon
-                        v-if="deletingFileId === file.id"
-                        icon="heroicons:arrow-path"
-                        class="w-4 h-4 text-red-500 animate-spin"
-                      />
-                      <Icon v-else icon="heroicons:trash" class="w-4 h-4 text-red-500" />
+                      <Icon icon="heroicons:arrow-path" class="w-4 h-4" />
+                      {{ $t('widgets.advancedConfig.restartAiSetup') }}
                     </button>
                   </div>
                 </div>
 
-                <!-- Empty State -->
-                <div
-                  v-else
-                  class="text-center py-6 surface-chip rounded-lg"
-                >
-                  <Icon icon="heroicons:document-text" class="w-10 h-10 txt-secondary mx-auto mb-2 opacity-50" />
-                  <p class="text-sm txt-secondary">
-                    {{ $t('widgets.advancedConfig.noFilesYet') }}
+                <!-- Widget Name -->
+                <div>
+                  <label class="block text-sm font-medium txt-primary mb-2 flex items-center gap-2">
+                    <Icon icon="heroicons:tag" class="w-4 h-4" />
+                    {{ $t('widgets.widgetName') }}
+                  </label>
+                  <input
+                    v-model="widgetName"
+                    type="text"
+                    class="w-full px-4 py-2.5 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+                    data-testid="input-widget-name"
+                    :placeholder="$t('widgets.widgetNamePlaceholder')"
+                  />
+                </div>
+
+                <!-- Selection Rules -->
+                <div>
+                  <label class="block text-sm font-medium txt-primary mb-2 flex items-center gap-2">
+                    <Icon icon="heroicons:funnel" class="w-4 h-4" />
+                    {{ $t('widgets.advancedConfig.selectionRules') }}
+                  </label>
+                  <textarea
+                    v-model="promptData.rules"
+                    rows="2"
+                    class="w-full px-4 py-3 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)] resize-none"
+                    :placeholder="$t('widgets.advancedConfig.selectionRulesPlaceholder')"
+                    data-testid="input-selection-rules"
+                  ></textarea>
+                  <p class="text-xs txt-secondary mt-1">
+                    {{ $t('widgets.advancedConfig.selectionRulesHelp') }}
                   </p>
                 </div>
-              </div>
+
+                <!-- AI Model Selection -->
+                <div>
+                  <label class="block text-sm font-medium txt-primary mb-2 flex items-center gap-2">
+                    <Icon icon="heroicons:cpu-chip" class="w-4 h-4" />
+                    {{ $t('widgets.advancedConfig.aiModel') }}
+                  </label>
+                  <select
+                    v-model="promptData.aiModel"
+                    class="w-full px-4 py-2.5 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+                    data-testid="input-ai-model"
+                  >
+                    <option
+                      value="AUTOMATED - Tries to define the best model for the task on SYNAPLAN [System Model]"
+                    >
+                      ✨ {{ $t('widgets.advancedConfig.automated') }}
+                    </option>
+                    <template v-if="!loadingModels && groupedModels.length > 0">
+                      <optgroup
+                        v-for="group in groupedModels"
+                        :key="group.capability"
+                        :label="group.label"
+                      >
+                        <option
+                          v-for="model in group.models"
+                          :key="model.id"
+                          :value="`${model.name} (${model.service})`"
+                        >
+                          {{ model.name }} ({{ model.service }})
+                          <template v-if="model.rating">⭐ {{ model.rating.toFixed(1) }}</template>
+                        </option>
+                      </optgroup>
+                    </template>
+                    <option v-if="loadingModels" disabled>Loading models...</option>
+                  </select>
+                  <p class="text-xs txt-secondary mt-1">
+                    {{ $t('widgets.advancedConfig.aiModelHelp') }}
+                  </p>
+                </div>
+
+                <!-- Available Tools -->
+                <div>
+                  <label class="block text-sm font-medium txt-primary mb-3 flex items-center gap-2">
+                    <Icon icon="heroicons:wrench-screwdriver" class="w-4 h-4" />
+                    {{ $t('widgets.advancedConfig.availableTools') }}
+                  </label>
+                  <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <label
+                      v-for="tool in availableTools"
+                      :key="tool.value"
+                      class="flex items-center gap-3 p-3 rounded-lg surface-chip cursor-pointer hover:bg-[var(--brand)]/5 transition-colors"
+                      data-testid="item-tool"
+                    >
+                      <input
+                        v-model="promptData.availableTools"
+                        type="checkbox"
+                        :value="tool.value"
+                        class="w-5 h-5 rounded border-light-border/30 dark:border-dark-border/20 text-[var(--brand)] focus:ring-2 focus:ring-[var(--brand)]"
+                      />
+                      <Icon :icon="tool.icon" class="w-5 h-5 txt-secondary" />
+                      <span class="text-sm txt-primary">{{ tool.label }}</span>
+                    </label>
+                  </div>
+                </div>
+
+                <!-- Prompt Content -->
+                <div>
+                  <label class="block text-sm font-medium txt-primary mb-2 flex items-center gap-2">
+                    <Icon icon="heroicons:document-text" class="w-4 h-4" />
+                    {{ $t('widgets.advancedConfig.promptContent') }}
+                  </label>
+                  <textarea
+                    v-model="promptData.content"
+                    rows="12"
+                    class="w-full px-4 py-3 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)] resize-y font-mono text-sm"
+                    :placeholder="$t('widgets.advancedConfig.promptContentPlaceholder')"
+                    data-testid="input-prompt-content"
+                  ></textarea>
+                  <p class="text-xs txt-secondary mt-1">
+                    {{ $t('widgets.advancedConfig.promptContentHelp') }}
+                  </p>
+                </div>
+
+                <!-- Knowledge Base / File Upload -->
+                <div>
+                  <label class="block text-sm font-medium txt-primary mb-2 flex items-center gap-2">
+                    <Icon icon="heroicons:document-arrow-up" class="w-4 h-4" />
+                    {{ $t('widgets.advancedConfig.knowledgeBase') }}
+                  </label>
+                  <p class="text-xs txt-secondary mb-4">
+                    {{ $t('widgets.advancedConfig.knowledgeBaseDescription') }}
+                  </p>
+
+                  <!-- File Actions -->
+                  <div class="flex gap-3 mb-4">
+                    <!-- Upload File Button -->
+                    <label
+                      class="flex-1 flex items-center justify-center gap-2 px-4 py-3 border-2 border-dashed rounded-lg cursor-pointer border-light-border/50 dark:border-dark-border/30 hover:border-[var(--brand)]/50 hover:bg-[var(--brand)]/5 transition-colors"
+                    >
+                      <Icon
+                        v-if="uploadingFile"
+                        icon="heroicons:arrow-path"
+                        class="w-5 h-5 txt-brand animate-spin"
+                      />
+                      <Icon v-else icon="heroicons:cloud-arrow-up" class="w-5 h-5 txt-secondary" />
+                      <span class="text-sm txt-secondary">
+                        <span v-if="uploadingFile">{{
+                          $t('widgets.advancedConfig.uploadingFile')
+                        }}</span>
+                        <span v-else class="font-medium txt-brand">{{
+                          $t('widgets.advancedConfig.uploadFiles')
+                        }}</span>
+                      </span>
+                      <input
+                        ref="fileUploadInput"
+                        type="file"
+                        class="hidden"
+                        accept=".pdf,.doc,.docx,.txt,.md,.csv,.json"
+                        multiple
+                        :disabled="uploadingFile"
+                        @change="handleFileUpload"
+                      />
+                    </label>
+
+                    <!-- Select from File Manager Button -->
+                    <button
+                      type="button"
+                      class="flex-1 flex items-center justify-center gap-2 px-4 py-3 border-2 border-dashed rounded-lg border-light-border/50 dark:border-dark-border/30 hover:border-[var(--brand)]/50 hover:bg-[var(--brand)]/5 transition-colors"
+                      @click="showFilePicker = true"
+                    >
+                      <Icon icon="heroicons:folder-open" class="w-5 h-5 txt-secondary" />
+                      <span class="text-sm font-medium txt-brand">
+                        {{ $t('widgets.advancedConfig.selectFromFileManager') }}
+                      </span>
+                    </button>
+                  </div>
+
+                  <!-- Files List with Summaries -->
+                  <div v-if="promptFiles.length > 0" class="space-y-3">
+                    <div
+                      v-for="file in promptFiles"
+                      :key="file.id"
+                      class="p-3 rounded-lg surface-chip"
+                    >
+                      <!-- File Header -->
+                      <div class="flex items-center justify-between">
+                        <div class="flex items-center gap-3 min-w-0">
+                          <Icon
+                            icon="heroicons:document"
+                            class="w-5 h-5 txt-secondary flex-shrink-0"
+                          />
+                          <div class="min-w-0">
+                            <p class="text-sm txt-primary truncate">{{ file.fileName }}</p>
+                            <p class="text-xs txt-secondary">{{ file.chunks }} chunks</p>
+                          </div>
+                        </div>
+                        <div class="flex items-center gap-2">
+                          <!-- Generate Summary Button -->
+                          <button
+                            v-if="!fileSummaries.has(file.id) && !loadingSummary.has(file.id)"
+                            type="button"
+                            class="p-2 rounded-lg hover:bg-[var(--brand)]/10 transition-colors"
+                            :title="$t('widgets.advancedConfig.generateSummary')"
+                            @click="generateFileSummary(file.id)"
+                          >
+                            <Icon icon="heroicons:sparkles" class="w-4 h-4 txt-brand" />
+                          </button>
+                          <!-- Loading Summary -->
+                          <div v-if="loadingSummary.has(file.id)" class="p-2">
+                            <Icon
+                              icon="heroicons:arrow-path"
+                              class="w-4 h-4 txt-brand animate-spin"
+                            />
+                          </div>
+                          <!-- Delete Button -->
+                          <button
+                            type="button"
+                            class="p-2 rounded-lg hover:bg-red-500/10 transition-colors"
+                            :title="$t('widgets.advancedConfig.deleteFile')"
+                            :disabled="deletingFileId === file.id"
+                            @click="handleDeleteFile(file.id)"
+                          >
+                            <Icon
+                              v-if="deletingFileId === file.id"
+                              icon="heroicons:arrow-path"
+                              class="w-4 h-4 text-red-500 animate-spin"
+                            />
+                            <Icon v-else icon="heroicons:trash" class="w-4 h-4 text-red-500" />
+                          </button>
+                        </div>
+                      </div>
+
+                      <!-- Summary Display -->
+                      <div
+                        v-if="fileSummaries.has(file.id)"
+                        class="mt-2 pt-2 border-t border-light-border/30 dark:border-dark-border/20"
+                      >
+                        <div class="flex items-start gap-2">
+                          <Icon
+                            icon="heroicons:sparkles"
+                            class="w-4 h-4 txt-brand flex-shrink-0 mt-0.5"
+                          />
+                          <p class="text-xs txt-secondary italic">
+                            {{ fileSummaries.get(file.id) }}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Empty State -->
+                  <div v-else class="text-center py-6 surface-chip rounded-lg">
+                    <Icon
+                      icon="heroicons:document-text"
+                      class="w-10 h-10 txt-secondary mx-auto mb-2 opacity-50"
+                    />
+                    <p class="text-sm txt-secondary">
+                      {{ $t('widgets.advancedConfig.noFilesYet') }}
+                    </p>
+                  </div>
+                </div>
               </template>
             </template>
           </div>
@@ -752,6 +823,14 @@
         </div>
       </div>
     </div>
+
+    <!-- File Picker Modal -->
+    <FilePicker
+      :is-open="showFilePicker"
+      :exclude-message-ids="excludedFileIds"
+      @close="showFilePicker = false"
+      @select="handleFilePickerSelect"
+    />
   </Teleport>
 </template>
 
@@ -761,9 +840,10 @@ import { Icon } from '@iconify/vue'
 import { useI18n } from 'vue-i18n'
 import { useNotification } from '@/composables/useNotification'
 import * as widgetsApi from '@/services/api/widgetsApi'
-import { promptsApi } from '@/services/api/promptsApi'
+import { promptsApi, type AvailableFile } from '@/services/api/promptsApi'
 import { configApi } from '@/services/api/configApi'
 import type { AIModel, Capability } from '@/types/ai-models'
+import FilePicker from './FilePicker.vue'
 
 // Disable attribute inheritance since we use Teleport as root
 defineOptions({
@@ -968,6 +1048,12 @@ const promptFiles = ref<{ id: number; fileName: string; chunks: number }[]>([])
 const uploadingFile = ref(false)
 const deletingFileId = ref<number | null>(null)
 
+// File summaries for Knowledge Base
+const showFilePicker = ref(false)
+const fileSummaries = ref<Map<number, string>>(new Map())
+const loadingSummary = ref<Set<number>>(new Set())
+const excludedFileIds = computed(() => promptFiles.value.map((f) => f.id))
+
 // AI Models
 const allModels = ref<Partial<Record<Capability, AIModel[]>>>({})
 const loadingModels = ref(false)
@@ -1049,9 +1135,10 @@ const handleSave = async () => {
   saving.value = true
   try {
     // Build update request with config, name, and status
-    const updateRequest: { config: typeof config; name?: string; status?: 'active' | 'inactive' } = {
-      config,
-    }
+    const updateRequest: { config: typeof config; name?: string; status?: 'active' | 'inactive' } =
+      {
+        config,
+      }
 
     // Include widget name if it was changed
     if (widgetName.value && widgetName.value !== props.widget.name) {
@@ -1173,6 +1260,9 @@ const handleFileUpload = async (event: Event) => {
 
   uploadingFile.value = true
 
+  // Track existing file IDs before upload
+  const existingFileIds = new Set(promptFiles.value.map((f) => f.id))
+
   try {
     for (const file of Array.from(files)) {
       await promptsApi.uploadPromptFile(props.widget.taskPromptTopic, file)
@@ -1181,6 +1271,13 @@ const handleFileUpload = async (event: Event) => {
     // Reload files list
     await loadPromptFiles()
     success(t('widgets.advancedConfig.fileUploadSuccess'))
+
+    // Generate summaries for newly added files
+    for (const file of promptFiles.value) {
+      if (!existingFileIds.has(file.id)) {
+        generateFileSummary(file.id)
+      }
+    }
   } catch (err: any) {
     console.error('Failed to upload file:', err)
     showError(err.message || t('widgets.advancedConfig.fileUploadError'))
@@ -1202,6 +1299,8 @@ const handleDeleteFile = async (fileId: number) => {
     await promptsApi.deletePromptFile(props.widget.taskPromptTopic, fileId)
     // Remove from local list
     promptFiles.value = promptFiles.value.filter((f) => f.id !== fileId)
+    // Also remove summary
+    fileSummaries.value.delete(fileId)
     success(t('widgets.advancedConfig.fileDeleteSuccess'))
   } catch (err: any) {
     console.error('Failed to delete file:', err)
@@ -1209,6 +1308,80 @@ const handleDeleteFile = async (fileId: number) => {
   } finally {
     deletingFileId.value = null
   }
+}
+
+// Generate AI summary for a file
+const generateFileSummary = async (fileId: number) => {
+  if (!props.widget.taskPromptTopic) return
+
+  loadingSummary.value.add(fileId)
+  loadingSummary.value = new Set(loadingSummary.value)
+
+  try {
+    const { summary } = await promptsApi.summarizeFile(props.widget.taskPromptTopic, fileId)
+    fileSummaries.value.set(fileId, summary)
+    fileSummaries.value = new Map(fileSummaries.value)
+  } catch (err: any) {
+    console.error('Failed to generate summary:', err)
+    showError(err.message || t('widgets.advancedConfig.summaryError'))
+  } finally {
+    loadingSummary.value.delete(fileId)
+    loadingSummary.value = new Set(loadingSummary.value)
+  }
+}
+
+// Handle file selection from FilePicker
+const handleFilePickerSelect = async (files: AvailableFile[]) => {
+  if (!props.widget.taskPromptTopic) return
+
+  for (const file of files) {
+    try {
+      // Link file to prompt
+      await promptsApi.linkFileToPrompt(props.widget.taskPromptTopic, file.messageId)
+
+      // Add to local list
+      promptFiles.value.push({
+        id: file.messageId,
+        fileName: file.fileName,
+        chunks: file.chunks,
+      })
+
+      // Generate summary for the file
+      generateFileSummary(file.messageId)
+    } catch (err: any) {
+      console.error('Failed to link file:', err)
+      showError(err.message || t('widgets.advancedConfig.linkFileError'))
+    }
+  }
+
+  if (files.length > 0) {
+    success(t('widgets.advancedConfig.filesAddedSuccess', { count: files.length }))
+  }
+}
+
+// Build Knowledge Base section from file summaries
+const buildKnowledgeBaseSection = (): string => {
+  const filesWithSummaries = promptFiles.value.filter((f) => fileSummaries.value.has(f.id))
+
+  if (filesWithSummaries.length === 0) {
+    return ''
+  }
+
+  let section = '\n\n## Knowledge Base\nThe following documents are available for reference:\n'
+
+  for (const file of filesWithSummaries) {
+    const summary = fileSummaries.value.get(file.id)
+    section += `\n### ${file.fileName}\n${summary}\n`
+  }
+
+  return section
+}
+
+// Remove existing Knowledge Base section from prompt content
+const removeKnowledgeBaseSection = (content: string): string => {
+  // Match section starting with "## Knowledge Base" until the end or next top-level heading
+  const regex = /\n\n## Knowledge Base\n[\s\S]*$/
+  return content.replace(regex, '')
 }
 
 const savePromptData = async () => {
@@ -1242,12 +1415,19 @@ const savePromptData = async () => {
   metadata.tool_files_search = promptData.availableTools.includes('files-search')
   metadata.tool_url_screenshot = promptData.availableTools.includes('url-screenshot')
 
+  // Build final prompt content with Knowledge Base section
+  let finalContent = removeKnowledgeBaseSection(promptData.content)
+  finalContent += buildKnowledgeBaseSection()
+
   await promptsApi.updatePrompt(promptData.id, {
     shortDescription: promptData.name,
-    prompt: promptData.content,
+    prompt: finalContent,
     selectionRules: promptData.rules || null,
     metadata,
   })
+
+  // Update local state with final content
+  promptData.content = finalContent
 }
 
 onMounted(async () => {

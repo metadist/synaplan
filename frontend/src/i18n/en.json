@@ -1280,7 +1280,7 @@
       "promptContentPlaceholder": "Enter the instructions for your AI assistant...",
       "promptContentHelp": "This is the system prompt that defines how your AI assistant behaves and responds.",
       "knowledgeBase": "Knowledge Base",
-      "knowledgeBaseDescription": "Upload documents to give your assistant access to specific information.",
+      "knowledgeBaseDescription": "Upload documents or select from your file manager to give your assistant access to specific information.",
       "uploadFiles": "Upload Files",
       "uploadingFile": "Uploading...",
       "noFilesYet": "No files uploaded yet. Upload documents to enhance your assistant's knowledge.",
@@ -1288,7 +1288,20 @@
       "fileUploadSuccess": "File uploaded successfully!",
       "fileUploadError": "Failed to upload file",
       "fileDeleteSuccess": "File deleted successfully!",
-      "fileDeleteError": "Failed to delete file"
+      "fileDeleteError": "Failed to delete file",
+      "selectFromFileManager": "Select from Files",
+      "generateSummary": "Generate AI summary",
+      "summaryError": "Failed to generate summary",
+      "linkFileError": "Failed to add file",
+      "filesAddedSuccess": "{count} file(s) added successfully!"
+    },
+    "filePicker": {
+      "title": "Select Files",
+      "searchPlaceholder": "Search files...",
+      "noResults": "No files match your search.",
+      "noFiles": "No vectorized files available. Upload files first in the File Manager.",
+      "selected": "{count} selected",
+      "addFiles": "Add Files"
     },
     "createNewWidget": "Create New Chat Widget",
     "createWidget": "Create Widget",

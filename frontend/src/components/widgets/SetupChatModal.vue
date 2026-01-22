@@ -286,7 +286,12 @@ const sendMessage = async () => {
   isTyping.value = true
 
   try {
-    const response = await widgetsApi.sendSetupMessage(props.widget.widgetId, text, chatId.value, locale.value)
+    const response = await widgetsApi.sendSetupMessage(
+      props.widget.widgetId,
+      text,
+      chatId.value,
+      locale.value
+    )
 
     chatId.value = response.chatId
     isTyping.value = false

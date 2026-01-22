@@ -78,9 +78,14 @@
               </div>
 
               <!-- Info Box -->
-              <div class="p-4 rounded-lg bg-[var(--brand-alpha-light)] border border-[var(--brand)]/20">
+              <div
+                class="p-4 rounded-lg bg-[var(--brand-alpha-light)] border border-[var(--brand)]/20"
+              >
                 <div class="flex items-start gap-3">
-                  <Icon icon="heroicons:light-bulb" class="w-5 h-5 txt-brand flex-shrink-0 mt-0.5" />
+                  <Icon
+                    icon="heroicons:light-bulb"
+                    class="w-5 h-5 txt-brand flex-shrink-0 mt-0.5"
+                  />
                   <div class="text-sm">
                     <p class="txt-primary font-medium mb-1">
                       {{ $t('widgets.simpleSetup.infoTitle') }}
@@ -203,7 +208,10 @@
                           style="background-color: #007bff"
                         >
                           <div class="flex items-center gap-2">
-                            <Icon icon="heroicons:chat-bubble-left-right" class="w-5 h-5 text-white" />
+                            <Icon
+                              icon="heroicons:chat-bubble-left-right"
+                              class="w-5 h-5 text-white"
+                            />
                             <span class="text-white font-medium text-sm">Chat Assistant</span>
                           </div>
                           <button
@@ -217,10 +225,14 @@
                         <!-- Chat Messages -->
                         <div class="p-4 h-48 overflow-y-auto bg-gray-50">
                           <div class="flex gap-3 mb-3">
-                            <div class="w-8 h-8 rounded-full bg-gray-300 flex-shrink-0 flex items-center justify-center">
+                            <div
+                              class="w-8 h-8 rounded-full bg-gray-300 flex-shrink-0 flex items-center justify-center"
+                            >
                               <Icon icon="heroicons:user" class="w-4 h-4 text-gray-500" />
                             </div>
-                            <div class="bg-white rounded-lg px-4 py-2.5 text-sm text-gray-700 shadow-sm max-w-[85%]">
+                            <div
+                              class="bg-white rounded-lg px-4 py-2.5 text-sm text-gray-700 shadow-sm max-w-[85%]"
+                            >
                               {{ $t('widgets.simpleSetup.previewChatGreeting') }}
                             </div>
                           </div>
@@ -270,7 +282,9 @@
           </div>
 
           <!-- Actions -->
-          <div class="flex items-center justify-end gap-3 pt-5 mt-5 border-t border-light-border/30 dark:border-dark-border/20">
+          <div
+            class="flex items-center justify-end gap-3 pt-5 mt-5 border-t border-light-border/30 dark:border-dark-border/20"
+          >
             <button
               type="button"
               class="px-5 py-2.5 rounded-lg hover-surface transition-colors txt-secondary font-medium"

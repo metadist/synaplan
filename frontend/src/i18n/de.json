@@ -1269,7 +1269,7 @@
       "promptContentPlaceholder": "Geben Sie die Anweisungen für Ihren KI-Assistenten ein...",
       "promptContentHelp": "Dies ist der System-Prompt, der definiert, wie sich Ihr KI-Assistent verhält und antwortet.",
       "knowledgeBase": "Wissensdatenbank",
-      "knowledgeBaseDescription": "Laden Sie Dokumente hoch, um Ihrem Assistenten Zugang zu spezifischen Informationen zu geben.",
+      "knowledgeBaseDescription": "Laden Sie Dokumente hoch oder wählen Sie aus Ihrem Dateimanager, um Ihrem Assistenten Zugang zu spezifischen Informationen zu geben.",
       "uploadFiles": "Dateien hochladen",
       "uploadingFile": "Wird hochgeladen...",
       "noFilesYet": "Noch keine Dateien hochgeladen. Laden Sie Dokumente hoch, um das Wissen Ihres Assistenten zu erweitern.",
@@ -1277,7 +1277,20 @@
       "fileUploadSuccess": "Datei erfolgreich hochgeladen!",
       "fileUploadError": "Datei konnte nicht hochgeladen werden",
       "fileDeleteSuccess": "Datei erfolgreich gelöscht!",
-      "fileDeleteError": "Datei konnte nicht gelöscht werden"
+      "fileDeleteError": "Datei konnte nicht gelöscht werden",
+      "selectFromFileManager": "Aus Dateien wählen",
+      "generateSummary": "KI-Zusammenfassung generieren",
+      "summaryError": "Zusammenfassung konnte nicht generiert werden",
+      "linkFileError": "Datei konnte nicht hinzugefügt werden",
+      "filesAddedSuccess": "{count} Datei(en) erfolgreich hinzugefügt!"
+    },
+    "filePicker": {
+      "title": "Dateien auswählen",
+      "searchPlaceholder": "Dateien suchen...",
+      "noResults": "Keine Dateien gefunden.",
+      "noFiles": "Keine vektorisierten Dateien verfügbar. Laden Sie zuerst Dateien im Dateimanager hoch.",
+      "selected": "{count} ausgewählt",
+      "addFiles": "Dateien hinzufügen"
     },
     "createNewWidget": "Neues Chat-Widget erstellen",
     "createWidget": "Widget erstellen",
