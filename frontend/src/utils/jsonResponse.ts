@@ -87,8 +87,8 @@ export function extractBTextPayload(content: string): ParsedBTextResult {
       }
     }
     return { data, remainder: remainder || undefined }
-  } catch (error) {
-    console.warn('Failed to parse JSON payload', error)
+  } catch {
+    // Expected during streaming when content looks like JSON but isn't complete
     return {}
   }
 }

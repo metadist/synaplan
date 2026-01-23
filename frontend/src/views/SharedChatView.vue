@@ -198,7 +198,7 @@
               </span>
             </div>
             <div
-              class="prose prose-sm max-w-none txt-primary break-words"
+              class="prose prose-sm max-w-none txt-primary break-words markdown-content"
               v-html="formatMessageText(message.text)"
             ></div>
 
@@ -542,3 +542,72 @@ const formatMessageText = (text: string): string => {
   return renderMarkdown(text)
 }
 </script>
+
+<style scoped>
+/* Markdown content styles for shared chat view */
+.markdown-content :deep(.code-block) {
+  padding: 1rem;
+  overflow-x: auto;
+  margin: 0.75rem 0;
+  border-radius: 0.5rem;
+  background: rgba(0, 0, 0, 0.05);
+}
+
+.dark .markdown-content :deep(.code-block) {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.markdown-content :deep(.code-block code) {
+  font-size: 0.875rem;
+  font-family: 'Monaco', 'Menlo', 'Courier New', monospace;
+}
+
+.markdown-content :deep(.inline-code) {
+  padding: 0.125rem 0.375rem;
+  font-size: 0.875rem;
+  font-family: ui-monospace, SFMono-Regular, monospace;
+  border-radius: 0.25rem;
+  background: rgba(0, 0, 0, 0.05);
+}
+
+.dark .markdown-content :deep(.inline-code) {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.markdown-content :deep(.markdown-blockquote) {
+  border-left-width: 4px;
+  border-left-style: solid;
+  padding-left: 1rem;
+  padding-top: 0.5rem;
+  padding-bottom: 0.5rem;
+  margin: 0.5rem 0;
+  font-style: italic;
+  border-color: #6b7280;
+  background-color: rgba(0, 0, 0, 0.03);
+}
+
+.markdown-content :deep(.markdown-table) {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1rem 0;
+}
+
+.markdown-content :deep(.markdown-table th),
+.markdown-content :deep(.markdown-table td) {
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  padding: 0.5rem 0.75rem;
+}
+
+.markdown-content :deep(.markdown-table th) {
+  font-weight: 600;
+  background-color: rgba(0, 0, 0, 0.03);
+}
+
+.markdown-content :deep(a) {
+  color: #2563eb;
+}
+
+.markdown-content :deep(a:hover) {
+  text-decoration: underline;
+}
+</style>

@@ -20,6 +20,7 @@ import MessageThinking from './MessageThinking.vue'
 
 interface Props {
   part: Part
+  isStreaming?: boolean
 }
 
 const props = defineProps<Props>()
@@ -58,7 +59,7 @@ const componentType = computed(() => {
 const componentProps = computed(() => {
   switch (props.part.type) {
     case 'text':
-      return { content: props.part.content || '' }
+      return { content: props.part.content || '', isStreaming: props.isStreaming }
     case 'image':
       return { url: props.part.url || '', alt: props.part.alt }
     case 'video':

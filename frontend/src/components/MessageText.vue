@@ -9,7 +9,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, nextTick, onMounted } from 'vue'
+import { ref, watch, nextTick, onMounted, onBeforeUnmount } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useMarkdown } from '@/composables/useMarkdown'
 import { useTheme } from '@/composables/useTheme'
@@ -18,6 +18,7 @@ import { hasMathFormulas } from '@/composables/useMarkdownKatex'
 
 interface Props {
   content: string
+  isStreaming?: boolean
 }
 
 const props = defineProps<Props>()
@@ -27,8 +28,15 @@ const { theme } = useTheme()
 const containerRef = ref<HTMLElement | null>(null)
 const renderedContent = ref('')
 
+// Counter to prevent race conditions in async rendering
+let renderVersion = 0
+
+// Debounce timer for mermaid rendering
+let mermaidDebounceTimer: ReturnType<typeof setTimeout> | null = null
+const MERMAID_DEBOUNCE_MS = 500 // Wait 500ms after last content change before rendering
+
 // Process content - sync for regular markdown, async for math formulas
-async function processContent(content: string): Promise<string> {
+async function processContent(content: string, version: number): Promise<string | null> {
   // Handle special file generation markers from backend with i18n
   if (content.startsWith('__FILE_GENERATED__:')) {
     const filename = content.replace('__FILE_GENERATED__:', '').trim()
@@ -39,7 +47,10 @@ async function processContent(content: string): Promise<string> {
 
   // Use async rendering if content has math formulas, otherwise sync
   if (hasMathFormulas(content)) {
-    return await renderAsync(content, { processFileMarkers: false, katex: true })
+    const result = await renderAsync(content, { processFileMarkers: false, katex: true })
+    // Check if this render is still current (prevents race conditions)
+    if (version !== renderVersion) return null
+    return result
   }
   return render(content, { processFileMarkers: false })
 }
@@ -48,7 +59,13 @@ async function processContent(content: string): Promise<string> {
 watch(
   () => props.content,
   async (newContent) => {
-    renderedContent.value = await processContent(newContent)
+    // Increment version to invalidate any pending async renders
+    const currentVersion = ++renderVersion
+    const result = await processContent(newContent, currentVersion)
+    // Only update if this is still the current render
+    if (result !== null) {
+      renderedContent.value = result
+    }
   },
   { immediate: true }
 )
@@ -61,7 +78,7 @@ function getActualTheme(): 'light' | 'dark' {
   return theme.value
 }
 
-// Render mermaid diagrams after content is mounted/updated
+// Render mermaid diagrams after content is mounted/updated (debounced)
 async function processMermaidBlocks(): Promise<void> {
   await nextTick()
   if (containerRef.value && hasMermaidBlocks(containerRef.value)) {
@@ -69,8 +86,34 @@ async function processMermaidBlocks(): Promise<void> {
   }
 }
 
-onMounted(processMermaidBlocks)
-watch(renderedContent, processMermaidBlocks)
+// Mermaid processing - debounced during streaming, immediate otherwise
+function scheduleMermaidProcessing(): void {
+  // Clear any pending timer
+  if (mermaidDebounceTimer) {
+    clearTimeout(mermaidDebounceTimer)
+    mermaidDebounceTimer = null
+  }
+
+  // If streaming, debounce to avoid rendering incomplete diagrams
+  if (props.isStreaming) {
+    mermaidDebounceTimer = setTimeout(() => {
+      processMermaidBlocks()
+    }, MERMAID_DEBOUNCE_MS)
+  } else {
+    // Not streaming - render immediately
+    processMermaidBlocks()
+  }
+}
+
+// Cleanup timer on unmount
+onBeforeUnmount(() => {
+  if (mermaidDebounceTimer) {
+    clearTimeout(mermaidDebounceTimer)
+  }
+})
+
+onMounted(scheduleMermaidProcessing)
+watch(renderedContent, scheduleMermaidProcessing)
 </script>
 
 <style scoped>

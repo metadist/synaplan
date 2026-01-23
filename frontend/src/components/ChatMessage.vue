@@ -227,7 +227,12 @@
           </div>
 
           <!-- Message Content -->
-          <MessagePart v-for="(part, index) in contentParts" :key="index" :part="part" />
+          <MessagePart
+            v-for="(part, index) in contentParts"
+            :key="index"
+            :part="part"
+            :is-streaming="isStreaming"
+          />
 
           <!-- Web Search Results Carousel (AFTER content) -->
           <div

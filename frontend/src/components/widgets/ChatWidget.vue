@@ -135,9 +135,9 @@
                     :class="widgetTheme === 'dark' ? 'bg-white/15' : 'bg-black/5'"
                   />
                 </div>
-                <p
+                <div
                   v-else
-                  class="text-sm whitespace-pre-wrap break-words"
+                  class="text-sm break-words markdown-content"
                   :style="{
                     color:
                       message.role === 'user'
@@ -147,7 +147,7 @@
                           : '#1f2937',
                   }"
                   v-html="renderMessageContent(message.content)"
-                />
+                ></div>
               </template>
               <div v-else-if="message.type === 'file'" class="flex items-center gap-2">
                 <DocumentIcon

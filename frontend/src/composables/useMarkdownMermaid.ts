@@ -31,11 +31,56 @@ async function initMermaid(): Promise<typeof import('mermaid')> {
       theme: 'default',
       securityLevel: 'strict',
       fontFamily: 'inherit',
+      suppressErrorRendering: true, // Don't render error messages in DOM
     })
     mermaidInitialized = true
   }
 
   return mermaidModule
+}
+
+/**
+ * Check if mermaid diagram code looks complete (not still being streamed).
+ * During streaming, brackets/braces might be unbalanced.
+ */
+function isDiagramCodeComplete(code: string): boolean {
+  const trimmed = code.trim()
+
+  // Must have at least a diagram type declaration
+  if (!trimmed.match(/^(flowchart|graph|sequenceDiagram|classDiagram|stateDiagram|erDiagram|journey|gantt|pie|quadrantChart|requirementDiagram|gitGraph|mindmap|timeline|zenuml|sankey|xychart)/i)) {
+    return false
+  }
+
+  // Count brackets - they should be balanced
+  let squareBrackets = 0
+  let curlyBraces = 0
+  let parentheses = 0
+
+  for (const char of trimmed) {
+    switch (char) {
+      case '[':
+        squareBrackets++
+        break
+      case ']':
+        squareBrackets--
+        break
+      case '{':
+        curlyBraces++
+        break
+      case '}':
+        curlyBraces--
+        break
+      case '(':
+        parentheses++
+        break
+      case ')':
+        parentheses--
+        break
+    }
+  }
+
+  // All brackets should be balanced for a complete diagram
+  return squareBrackets === 0 && curlyBraces === 0 && parentheses === 0
 }
 
 /**
@@ -66,6 +111,7 @@ export async function renderMermaidBlocks(
       theme: theme === 'dark' ? 'dark' : 'default',
       securityLevel: 'strict',
       fontFamily: 'inherit',
+      suppressErrorRendering: true, // Don't render error messages in DOM
     })
 
     for (const block of mermaidBlocks) {
@@ -74,6 +120,16 @@ export async function renderMermaidBlocks(
 
       const diagramCode = codeElement.textContent || ''
       if (!diagramCode.trim()) continue
+
+      // Skip incomplete diagrams (still being streamed)
+      if (!isDiagramCodeComplete(diagramCode)) {
+        continue
+      }
+
+      // Skip if already processed (has error or is rendered)
+      if (block.classList.contains('mermaid-error') || block.classList.contains('mermaid-rendered')) {
+        continue
+      }
 
       try {
         const id = `mermaid-${Math.random().toString(36).slice(2, 11)}`
@@ -86,19 +142,19 @@ export async function renderMermaidBlocks(
 
         // Replace the code block with the rendered diagram
         block.replaceWith(diagramContainer)
-      } catch (error) {
-        // If rendering fails, add an error indicator but keep the code visible
-        console.warn('Failed to render mermaid diagram:', error)
+      } catch {
+        // Mark as error to prevent re-rendering attempts
         block.classList.add('mermaid-error')
 
+        // Add error indicator
         const errorBanner = document.createElement('div')
         errorBanner.className = 'text-xs text-red-500 mb-2'
         errorBanner.textContent = 'Failed to render diagram'
         block.insertBefore(errorBanner, block.firstChild)
       }
     }
-  } catch (error) {
-    console.warn('Failed to load mermaid library:', error)
+  } catch {
+    // Failed to load mermaid library - silently ignore
   }
 }
 
