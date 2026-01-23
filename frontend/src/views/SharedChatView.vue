@@ -197,10 +197,15 @@
                 {{ formatDate(message.timestamp) }}
               </span>
             </div>
-            <div
-              class="prose prose-sm max-w-none txt-primary break-words markdown-content"
-              v-html="formatMessageText(message.text)"
-            ></div>
+            <!-- Message parts (text, code blocks) -->
+            <template v-for="(part, partIndex) in parseMessageParts(message)" :key="partIndex">
+              <MessageCode
+                v-if="part.type === 'code'"
+                :content="part.content"
+                :language="part.language"
+              />
+              <MessageText v-else-if="part.type === 'text'" :content="part.content" />
+            </template>
 
             <!-- File attachments (images, videos) -->
             <div v-if="message.file" class="mt-3">
@@ -294,18 +299,19 @@ import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import MessageImage from '../components/MessageImage.vue'
 import MessageVideo from '../components/MessageVideo.vue'
+import MessageCode from '../components/MessageCode.vue'
+import MessageText from '../components/MessageText.vue'
 import CookieConsent from '../components/CookieConsent.vue'
 import { type CookieConsent as CookieConsentType } from '../composables/useCookieConsent'
 import { useGoogleTag } from '../composables/useGoogleTag'
-import { useMarkdown } from '@/composables/useMarkdown'
 import { httpClient } from '@/services/api/httpClient'
 import { supportedLanguages, type SupportedLanguage } from '@/i18n'
+import { parseAIResponse } from '@/utils/responseParser'
 
 const route = useRoute()
 const router = useRouter()
 const { locale, t } = useI18n()
 const { injectGoogleTag } = useGoogleTag()
-const { render: renderMarkdown } = useMarkdown()
 
 const loading = ref(true)
 const error = ref(false)
@@ -534,80 +540,37 @@ const formatDate = (timestamp: number): string => {
   return new Date(timestamp * 1000).toLocaleString(currentLang.value)
 }
 
+interface MessagePart {
+  type: 'text' | 'code'
+  content: string
+  language?: string
+}
+
 /**
- * Format message text using the shared markdown renderer.
- * This ensures consistent rendering with the main chat interface.
+ * Parse message text into parts (text and code blocks).
+ * Uses the same parser as the main chat for consistent rendering.
  */
-const formatMessageText = (text: string): string => {
-  return renderMarkdown(text)
+const parseMessageParts = (message: Message): MessagePart[] => {
+  if (!message.text) return []
+
+  // For user messages, just return as text
+  if (message.direction === 'IN') {
+    return [{ type: 'text', content: message.text }]
+  }
+
+  // For assistant messages, parse into parts
+  const parsed = parseAIResponse(message.text)
+  return parsed.parts
+    .filter((part) => part.type === 'text' || part.type === 'code')
+    .map((part) => ({
+      type: part.type as 'text' | 'code',
+      content: part.content,
+      language: part.language,
+    }))
+    .filter((part) => part.content.trim())
 }
 </script>
 
 <style scoped>
-/* Markdown content styles for shared chat view */
-.markdown-content :deep(.code-block) {
-  padding: 1rem;
-  overflow-x: auto;
-  margin: 0.75rem 0;
-  border-radius: 0.5rem;
-  background: rgba(0, 0, 0, 0.05);
-}
-
-.dark .markdown-content :deep(.code-block) {
-  background: rgba(255, 255, 255, 0.05);
-}
-
-.markdown-content :deep(.code-block code) {
-  font-size: 0.875rem;
-  font-family: 'Monaco', 'Menlo', 'Courier New', monospace;
-}
-
-.markdown-content :deep(.inline-code) {
-  padding: 0.125rem 0.375rem;
-  font-size: 0.875rem;
-  font-family: ui-monospace, SFMono-Regular, monospace;
-  border-radius: 0.25rem;
-  background: rgba(0, 0, 0, 0.05);
-}
-
-.dark .markdown-content :deep(.inline-code) {
-  background: rgba(255, 255, 255, 0.1);
-}
-
-.markdown-content :deep(.markdown-blockquote) {
-  border-left-width: 4px;
-  border-left-style: solid;
-  padding-left: 1rem;
-  padding-top: 0.5rem;
-  padding-bottom: 0.5rem;
-  margin: 0.5rem 0;
-  font-style: italic;
-  border-color: #6b7280;
-  background-color: rgba(0, 0, 0, 0.03);
-}
-
-.markdown-content :deep(.markdown-table) {
-  width: 100%;
-  border-collapse: collapse;
-  margin: 1rem 0;
-}
-
-.markdown-content :deep(.markdown-table th),
-.markdown-content :deep(.markdown-table td) {
-  border: 1px solid rgba(0, 0, 0, 0.1);
-  padding: 0.5rem 0.75rem;
-}
-
-.markdown-content :deep(.markdown-table th) {
-  font-weight: 600;
-  background-color: rgba(0, 0, 0, 0.03);
-}
-
-.markdown-content :deep(a) {
-  color: #2563eb;
-}
-
-.markdown-content :deep(a:hover) {
-  text-decoration: underline;
-}
+/* No additional styles needed - MessageText and MessageCode components have their own styles */
 </style>

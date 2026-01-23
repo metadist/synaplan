@@ -107,6 +107,7 @@
             backgroundColor: widgetTheme === 'dark' ? '#1a1a1a' : '#ffffff',
           }"
           data-testid="section-messages"
+          @click="handleMessagesClick"
         >
           <div
             v-for="message in messages"
@@ -973,11 +974,116 @@ const loadConversationHistory = async (force = false) => {
 // Use the shared markdown renderer (singleton for widget performance)
 const markdownRenderer = getMarkdownRenderer()
 
+interface CodeBlock {
+  language: string
+  code: string
+  start: number
+  end: number
+}
+
+// Extract code blocks from content
+function extractCodeBlocks(content: string): { textParts: string[]; codeBlocks: CodeBlock[] } {
+  const codeBlockRegex = /```(\w+)?\n([\s\S]*?)```/g
+  const codeBlocks: CodeBlock[] = []
+  let lastIndex = 0
+  const textParts: string[] = []
+  let match
+
+  while ((match = codeBlockRegex.exec(content)) !== null) {
+    // Add text before this code block
+    if (match.index > lastIndex) {
+      textParts.push(content.slice(lastIndex, match.index))
+    } else {
+      textParts.push('')
+    }
+
+    codeBlocks.push({
+      language: match[1] || 'text',
+      code: match[2].trim(),
+      start: match.index,
+      end: match.index + match[0].length,
+    })
+
+    lastIndex = match.index + match[0].length
+  }
+
+  // Add remaining text after last code block
+  if (lastIndex < content.length) {
+    textParts.push(content.slice(lastIndex))
+  }
+
+  return { textParts, codeBlocks }
+}
+
+// Handle clicks on messages container (for copy buttons)
+async function handleMessagesClick(event: MouseEvent): Promise<void> {
+  const target = event.target as HTMLElement
+  if (target.classList.contains('widget-copy-btn')) {
+    event.preventDefault()
+    const code = target.getAttribute('data-code') || ''
+    // Decode HTML entities
+    const decodedCode = code
+      .replace(/&amp;/g, '&')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&quot;/g, '"')
+
+    try {
+      await navigator.clipboard.writeText(decodedCode)
+      const originalText = target.textContent
+      target.textContent = t('commands.copied')
+      setTimeout(() => {
+        target.textContent = originalText
+      }, 2000)
+    } catch (err) {
+      console.error('Failed to copy:', err)
+    }
+  }
+}
+
+// Render message content with enhanced code blocks
 const renderMessageContent = (value: string): string => {
   if (!value) {
     return ''
   }
-  return markdownRenderer.render(value)
+
+  // Parse code blocks and render with copy button
+  const { textParts, codeBlocks } = extractCodeBlocks(value)
+
+  if (codeBlocks.length === 0) {
+    return markdownRenderer.render(value)
+  }
+
+  // Build HTML with enhanced code blocks
+  let html = ''
+  for (let i = 0; i < textParts.length; i++) {
+    // Render text part
+    if (textParts[i].trim()) {
+      html += markdownRenderer.render(textParts[i])
+    }
+
+    // Add code block if exists
+    if (i < codeBlocks.length) {
+      const block = codeBlocks[i]
+      const escapedCode = block.code
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+
+      html += `
+        <div class="widget-code-block my-2 rounded-lg overflow-hidden border border-black/10 dark:border-white/10">
+          <div class="flex items-center justify-between px-3 py-1.5 bg-black/5 dark:bg-white/5 border-b border-black/10 dark:border-white/10">
+            <span class="text-xs font-semibold uppercase tracking-wide opacity-70">${block.language}</span>
+            <button class="widget-copy-btn text-xs px-2 py-0.5 rounded hover:bg-black/10 dark:hover:bg-white/10 transition-colors" data-code="${escapedCode.replace(/"/g, '&quot;')}">${t('commands.copy')}</button>
+          </div>
+          <pre class="p-3 overflow-x-auto text-xs"><code class="font-mono">${escapedCode}</code></pre>
+        </div>
+      `
+    }
+  }
+
+  return html
 }
 
 // Load session ID from localStorage on mount
@@ -1072,8 +1178,10 @@ function buildWidgetHeaders(includeContentType = true) {
 </script>
 
 <style scoped>
-/* Markdown content styling for widget */
-:deep(.code-block) {
+/* Markdown content styling for widget - scoped to .markdown-content */
+
+/* Code blocks */
+.markdown-content :deep(.code-block) {
   padding: 0.75rem;
   border-radius: 0.5rem;
   overflow-x: auto;
@@ -1082,63 +1190,67 @@ function buildWidgetHeaders(includeContentType = true) {
   background-color: rgba(0, 0, 0, 0.05);
 }
 
-:deep(.dark .code-block) {
-  background-color: rgba(255, 255, 255, 0.05);
-}
-
-:deep(.code-block code) {
+.markdown-content :deep(.code-block code) {
   font-size: 0.75rem;
   font-family: ui-monospace, SFMono-Regular, monospace;
 }
 
-:deep(.inline-code) {
+/* Inline code */
+.markdown-content :deep(.inline-code) {
   padding: 0.125rem 0.25rem;
   border-radius: 0.25rem;
   font-size: 0.75rem;
   background-color: rgba(0, 0, 0, 0.1);
 }
 
-:deep(.dark .inline-code) {
-  background-color: rgba(255, 255, 255, 0.1);
-}
-
-:deep(h1),
-:deep(h2) {
+/* Headers */
+.markdown-content :deep(h1),
+.markdown-content :deep(h2) {
   font-size: 1rem;
   font-weight: 600;
   margin-top: 0.5rem;
+  margin-bottom: 0.25rem;
 }
 
-:deep(h3),
-:deep(h4),
-:deep(h5),
-:deep(h6) {
+.markdown-content :deep(h3),
+.markdown-content :deep(h4),
+.markdown-content :deep(h5),
+.markdown-content :deep(h6) {
   font-size: 0.875rem;
   font-weight: 600;
   margin-top: 0.5rem;
+  margin-bottom: 0.25rem;
 }
 
-:deep(ul) {
+/* Lists */
+.markdown-content :deep(ul) {
   list-style-type: disc;
   padding-left: 1.25rem;
   margin-top: 0.5rem;
   margin-bottom: 0.5rem;
 }
 
-:deep(ol) {
+.markdown-content :deep(ol) {
   list-style-type: decimal;
   padding-left: 1.25rem;
   margin-top: 0.5rem;
   margin-bottom: 0.5rem;
 }
 
-:deep(li) {
+.markdown-content :deep(li) {
   margin-top: 0.25rem;
   margin-bottom: 0.25rem;
 }
 
-:deep(.markdown-blockquote) {
+/* Task lists */
+.markdown-content :deep(li > input[type='checkbox']) {
+  margin-right: 0.375rem;
+}
+
+/* Blockquotes */
+.markdown-content :deep(.markdown-blockquote) {
   border-left-width: 4px;
+  border-left-style: solid;
   padding-left: 0.75rem;
   padding-top: 0.25rem;
   padding-bottom: 0.25rem;
@@ -1148,11 +1260,11 @@ function buildWidgetHeaders(includeContentType = true) {
   border-top-right-radius: 0.25rem;
   border-bottom-right-radius: 0.25rem;
   border-color: #6b7280;
-  background-color: #f3f4f6;
-  color: #1f2937;
+  background-color: rgba(0, 0, 0, 0.03);
 }
 
-:deep(.markdown-table) {
+/* Tables */
+.markdown-content :deep(.markdown-table) {
   width: 100%;
   border-collapse: collapse;
   margin-top: 0.5rem;
@@ -1160,48 +1272,124 @@ function buildWidgetHeaders(includeContentType = true) {
   font-size: 0.875rem;
 }
 
-:deep(.markdown-table th),
-:deep(.markdown-table td) {
+.markdown-content :deep(.markdown-table th),
+.markdown-content :deep(.markdown-table td) {
   border-width: 1px;
   border-style: solid;
   padding: 0.25rem 0.5rem;
   border-color: rgba(0, 0, 0, 0.1);
 }
 
-:deep(.markdown-table th) {
+.markdown-content :deep(.markdown-table th) {
   font-weight: 600;
   background-color: rgba(0, 0, 0, 0.05);
 }
 
-:deep(hr) {
+/* Horizontal rule */
+.markdown-content :deep(hr) {
   margin-top: 0.75rem;
   margin-bottom: 0.75rem;
   border-top-width: 1px;
   border-color: #d1d5db;
 }
 
-:deep(a) {
+/* Links */
+.markdown-content :deep(a) {
+  color: #2563eb;
   text-decoration: underline;
 }
 
-:deep(p) {
+/* Paragraphs */
+.markdown-content :deep(p) {
+  margin-top: 0.25rem;
   margin-bottom: 0.5rem;
 }
 
-:deep(p:last-child) {
+.markdown-content :deep(p:first-child) {
+  margin-top: 0;
+}
+
+.markdown-content :deep(p:last-child) {
   margin-bottom: 0;
 }
 
-:deep(del) {
+/* Strikethrough */
+.markdown-content :deep(del) {
   text-decoration: line-through;
   opacity: 0.6;
 }
 
-:deep(strong) {
+/* Bold */
+.markdown-content :deep(strong) {
   font-weight: 600;
 }
 
-:deep(em) {
+/* Italic */
+.markdown-content :deep(em) {
   font-style: italic;
+}
+
+/* Mermaid diagrams */
+.markdown-content :deep(.mermaid-diagram) {
+  margin-top: 0.5rem;
+  margin-bottom: 0.5rem;
+  overflow-x: auto;
+}
+
+.markdown-content :deep(.mermaid-diagram svg) {
+  max-width: 100%;
+  height: auto;
+}
+
+.markdown-content :deep(.mermaid-block) {
+  padding: 0.75rem;
+  overflow-x: auto;
+  margin: 0.5rem 0;
+  border-radius: 0.5rem;
+  background: rgba(0, 0, 0, 0.05);
+}
+
+/* KaTeX math */
+.markdown-content :deep(.katex-block) {
+  margin-top: 0.5rem;
+  margin-bottom: 0.5rem;
+  overflow-x: auto;
+  text-align: center;
+}
+
+.markdown-content :deep(.katex-inline) {
+  display: inline;
+}
+
+.markdown-content :deep(.katex) {
+  font-size: 1em;
+}
+
+/* Widget code block with copy button */
+.markdown-content :deep(.widget-code-block) {
+  margin: 0.5rem 0;
+  border-radius: 0.5rem;
+  overflow: hidden;
+}
+
+.markdown-content :deep(.widget-code-block pre) {
+  margin: 0;
+  padding: 0.75rem;
+  overflow-x: auto;
+  background: rgba(0, 0, 0, 0.03);
+}
+
+.markdown-content :deep(.widget-code-block code) {
+  font-size: 0.75rem;
+  font-family: ui-monospace, SFMono-Regular, monospace;
+}
+
+.markdown-content :deep(.widget-copy-btn) {
+  cursor: pointer;
+  opacity: 0.7;
+}
+
+.markdown-content :deep(.widget-copy-btn:hover) {
+  opacity: 1;
 }
 </style>
