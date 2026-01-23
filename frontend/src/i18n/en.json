@@ -1688,6 +1688,10 @@
       "badge": "Memory not found",
       "tooltip": "This memory is no longer available. It may have been deleted, or the service could not load it."
     },
+    "referencePending": {
+      "badge": "Memory pending",
+      "tooltip": "This memory was just created or updated. It may take a few seconds until it can be loaded."
+    },
     "toast": {
       "title": "New Memory Detected",
       "titleCompact": "Memory",

@@ -355,7 +355,6 @@
                   <div
                     v-for="(result, index) in searchResults"
                     :key="index"
-                    :ref="(el) => (sourceRefs[index] = el)"
                     :class="[
                       'group flex flex-col gap-2 p-2 sm:p-3 rounded-lg transition-all cursor-pointer flex-shrink-0',
                       'w-full sm:w-[calc(33.333%-0.5rem)]',
@@ -680,7 +679,15 @@ interface Props {
   againData?: AgainData
   backendMessageId?: number
   processingStatus?: string
-  processingMetadata?: any
+  processingMetadata?: {
+    model_name?: string
+    provider?: string
+    topic?: string
+    language?: string
+    customMessage?: string
+    results_count?: number
+    handler?: string
+  } | null
   files?: MessageFile[] // Attached files
   searchResults?: Array<{
     title: string
@@ -737,7 +744,6 @@ const sourcesExpanded = ref(false)
 // Carousel state for search results
 const carouselPage = ref(0) // Which "page" we're on (0-based)
 const highlightedSource = ref<number | null>(null)
-const sourceRefs = ref<any[]>([])
 
 // Calculate total badges count (files + webSearch/tool)
 const totalBadgesCount = computed(() => {

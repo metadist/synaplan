@@ -272,20 +272,8 @@ export const useHistoryStore = defineStore('history', () => {
       else if (message.parts.length === 1 && message.parts[0].type === 'text') {
         const currentContent = message.parts[0]?.content || ''
 
-        console.log('🔍 finishStreamingMessage: Content length:', currentContent.length)
-        console.log('🔍 finishStreamingMessage: Has <think>?', currentContent.includes('<think>'))
-        console.log('🔍 finishStreamingMessage: Content preview:', currentContent.substring(0, 200))
-
         if (currentContent && currentContent.includes('<think>')) {
-          console.log('✅ Parsing <think> tags!')
           message.parts = parseContentWithThinking(currentContent)
-          console.log(
-            '✅ Parsed parts:',
-            message.parts.length,
-            message.parts.map((p) => p.type)
-          )
-        } else {
-          console.log('❌ No <think> tags found or content empty')
         }
       }
     }

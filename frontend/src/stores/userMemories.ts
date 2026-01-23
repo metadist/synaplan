@@ -77,15 +77,18 @@ export const useMemoriesStore = defineStore('memories', () => {
   })
 
   // Actions
-  async function fetchMemories(category?: string) {
+  async function fetchMemories(
+    category?: string,
+    options: { timeoutMs?: number; silent?: boolean } = {}
+  ) {
     loading.value = true
     error.value = null
+    const timeoutMs = options.timeoutMs ?? 1500
+    const silent = options.silent ?? false
 
     try {
-      // Add timeout to prevent hanging when service is down
-      // Very aggressive timeout - fail fast to not block page load!
       const timeoutPromise = new Promise((_, reject) => {
-        setTimeout(() => reject(new Error('Memory service timeout')), 1500) // 1.5s timeout
+        setTimeout(() => reject(new Error('Memory service timeout')), timeoutMs)
       })
 
       const fetchPromise = getMemories(category)
@@ -96,16 +99,20 @@ export const useMemoriesStore = defineStore('memories', () => {
       error.value = errorMsg
 
       // Silent fail if service unavailable - don't show notification on page load
-      if (
-        !errorMsg.includes('timeout') &&
-        !errorMsg.includes('503') &&
-        !errorMsg.includes('unavailable')
-      ) {
-        const { error: showError } = getNotifications()
-        const { t } = getI18n()
-        showError(t('memories.errors.loadFailed') || errorMsg)
-      } else {
-        console.warn('⚠️ Memory service unavailable (timeout or down), continuing without memories')
+      if (!silent) {
+        if (
+          !errorMsg.includes('timeout') &&
+          !errorMsg.includes('503') &&
+          !errorMsg.includes('unavailable')
+        ) {
+          const { error: showError } = getNotifications()
+          const { t } = getI18n()
+          showError(t('memories.errors.loadFailed') || errorMsg)
+        } else {
+          console.warn(
+            '⚠️ Memory service unavailable (timeout or down), continuing without memories'
+          )
+        }
       }
 
       // Set empty array so page can continue

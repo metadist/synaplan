@@ -419,9 +419,12 @@ class ChatHandler implements MessageHandlerInterface
                 );
             }
             $memoriesContext .= "\nUse these memories to personalize your response.\n";
-            $memoriesContext .= "IMPORTANT: When referencing memories, use the format [Memory:ID] with the actual memory ID.\n";
+            $memoriesContext .= "IMPORTANT (MEMORY REFERENCES):\n";
+            $memoriesContext .= "- Only reference memories using the format [Memory:ID] where ID is a numeric ID that appears in the list above.\n";
+            $memoriesContext .= "- NEVER invent IDs or placeholders (no 'new', 'neu', arrows, or free text inside [Memory:...]).\n";
+            $memoriesContext .= "- If you mention information that is NOT in the list above (e.g. something that will be saved after this reply), do NOT add a [Memory:...] reference.\n";
             $memoriesContext .= "Examples: 'According to [Memory:42], you prefer...' or 'Based on [Memory:15], your name is...'\n";
-            $memoriesContext .= "The [Memory:ID] references are clickable for the user, so always use this exact format when mentioning a memory.\n";
+            $memoriesContext .= "The [Memory:ID] references are clickable for the user.\n";
 
             $this->logger->info('ChatHandler: User memories loaded', [
                 'user_id' => $message->getUserId(),

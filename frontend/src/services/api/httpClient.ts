@@ -220,7 +220,6 @@ async function refreshAccessToken(): Promise<RefreshResult> {
       })
 
       if (response.ok) {
-        console.log('🔄 Token refreshed successfully')
         // Reset failure counter on success
         authFailureCount = 0
         return { success: true }
@@ -230,14 +229,12 @@ async function refreshAccessToken(): Promise<RefreshResult> {
       try {
         const errorData = await response.json()
         if (errorData.code === 'OIDC_SESSION_EXPIRED') {
-          console.log('🔒 OIDC session expired - user logged out from identity provider')
           return { success: false, oidcSessionExpired: true }
         }
       } catch {
         // Ignore JSON parse errors
       }
 
-      console.log('🔄 Token refresh failed')
       return { success: false }
     } catch (error) {
       console.error('Token refresh error:', error)
@@ -346,44 +343,24 @@ async function httpClient<T = unknown, S extends z.Schema | undefined = undefine
 
   // No Authorization header needed - using HttpOnly cookies
 
-  console.log('🌐 httpClient request:', {
-    url,
-    method: fetchOptions.method || 'GET',
-    bodyPreview:
-      fetchOptions.body && !(fetchOptions.body instanceof FormData)
-        ? JSON.parse(fetchOptions.body as string)
-        : null,
-  })
-
   const response = await fetch(url, {
     ...fetchOptions,
     headers,
     credentials: 'include', // Always include cookies
   })
 
-  console.log('🌐 httpClient response:', {
-    url,
-    status: response.status,
-    statusText: response.statusText,
-    ok: response.ok,
-  })
-
   if (!response.ok) {
     // Handle 401 - try to refresh token
     if (response.status === 401 && !skipAuth && !_isRetry) {
-      console.log('🔄 Got 401, attempting token refresh...')
-
       const refreshResult = await refreshAccessToken()
 
       // If OIDC session expired (user logged out from Keycloak), immediately logout
       if (refreshResult.oidcSessionExpired) {
-        console.log('🔒 OIDC provider invalidated session')
         return handleAuthFailure()
       }
 
       if (refreshResult.success) {
         // Retry the original request
-        console.log('🔄 Retrying request after token refresh')
         // @ts-expect-error - Recursive call with same types
         return httpClient(endpoint, { ...options, _isRetry: true })
       }
@@ -431,12 +408,16 @@ async function httpClient<T = unknown, S extends z.Schema | undefined = undefine
       return schema.parse(data) as z.output<NonNullable<S>>
     } catch (error) {
       console.error('Schema validation failed for endpoint:', endpoint)
-      console.error('Response data:', data)
-      console.error('Validation error:', error)
+      if (import.meta.env.DEV) {
+        console.error('Response data:', data)
+        console.error('Validation error:', error)
+      }
       if (error instanceof z.ZodError) {
         const zodError = error
         const errors = zodError.issues || []
-        console.error('Zod errors:', errors)
+        if (import.meta.env.DEV) {
+          console.error('Zod errors:', errors)
+        }
         throw new Error(
           `Invalid API response format: ${errors.map((e) => `${e.path.join('.')}: ${e.message}`).join(', ')}`
         )

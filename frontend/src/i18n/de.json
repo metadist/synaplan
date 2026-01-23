@@ -1584,6 +1584,10 @@
       "badge": "Erinnerung nicht gefunden",
       "tooltip": "Diese Erinnerung ist nicht (mehr) verfügbar. Sie wurde eventuell gelöscht oder der Service konnte sie nicht laden."
     },
+    "referencePending": {
+      "badge": "Erinnerung wird geladen",
+      "tooltip": "Diese Erinnerung wurde gerade erstellt oder aktualisiert. Es kann ein paar Sekunden dauern, bis sie geladen werden kann."
+    },
     "toast": {
       "title": "Neue Erinnerung erkannt",
       "titleCompact": "Erinnerung",
