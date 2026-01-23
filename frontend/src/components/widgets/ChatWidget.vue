@@ -1180,7 +1180,13 @@ function buildWidgetHeaders(includeContentType = true) {
 </script>
 
 <style scoped>
-/* Markdown content styling for widget - scoped to .markdown-content */
+/*
+ * Widget-specific markdown styles
+ *
+ * NOTE: The widget is a separate bundle embedded on external sites,
+ * so it cannot use the global markdown.css from the main app.
+ * These styles are necessary for the widget to render markdown correctly.
+ */
 
 /* Code blocks */
 .markdown-content :deep(.code-block) {

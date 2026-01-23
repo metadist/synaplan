@@ -4,6 +4,7 @@ import { VueReCaptcha } from 'vue-recaptcha-v3'
 import router from './router'
 import { i18n } from './i18n'
 import './style.css'
+import './assets/markdown.css'
 import App from './App.vue'
 import { useConfigStore } from './stores/config'
 
