@@ -47,7 +47,11 @@ function isDiagramCodeComplete(code: string): boolean {
   const trimmed = code.trim()
 
   // Must have at least a diagram type declaration
-  if (!trimmed.match(/^(flowchart|graph|sequenceDiagram|classDiagram|stateDiagram|erDiagram|journey|gantt|pie|quadrantChart|requirementDiagram|gitGraph|mindmap|timeline|zenuml|sankey|xychart)/i)) {
+  if (
+    !trimmed.match(
+      /^(flowchart|graph|sequenceDiagram|classDiagram|stateDiagram|erDiagram|journey|gantt|pie|quadrantChart|requirementDiagram|gitGraph|mindmap|timeline|zenuml|sankey|xychart)/i
+    )
+  ) {
     return false
   }
 
@@ -127,7 +131,10 @@ export async function renderMermaidBlocks(
       }
 
       // Skip if already processed (has error or is rendered)
-      if (block.classList.contains('mermaid-error') || block.classList.contains('mermaid-rendered')) {
+      if (
+        block.classList.contains('mermaid-error') ||
+        block.classList.contains('mermaid-rendered')
+      ) {
         continue
       }
 

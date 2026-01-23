@@ -61,7 +61,11 @@ const componentType = computed(() => {
 const componentProps = computed(() => {
   switch (props.part.type) {
     case 'text':
-      return { content: props.part.content || '', isStreaming: props.isStreaming, memories: props.memories }
+      return {
+        content: props.part.content || '',
+        isStreaming: props.isStreaming,
+        memories: props.memories,
+      }
     case 'image':
       return { url: props.part.url || '', alt: props.part.alt }
     case 'video':
