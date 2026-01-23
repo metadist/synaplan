@@ -14,6 +14,7 @@
     "mailHandler": "E-Mail-Bearbeitung",
     "plugins": "Plugins",
     "files": "Dateien",
+    "memories": "Erinnerungen",
     "ragSearch": "Semantische Suche",
     "configInbound": "Eingangskanäle",
     "configAiModels": "KI-Modelle",
@@ -176,6 +177,7 @@
   },
   "nav": {
     "chat": "Chat",
+    "profile": "Profil",
     "tools": "Werkzeuge",
     "toolsIntroduction": "Einführung",
     "toolsChatWidget": "Chat-Widget",
@@ -200,11 +202,11 @@
     "adminFeatureStatus": "Feature-Status"
   },
   "chatInput": {
+    "attach": "Anhängen",
     "placeholder": "Schreibe deine Nachricht hier...",
     "provider": "Anbieter",
     "model": "Modell",
     "configureModel": "KI-Modell konfigurieren",
-    "attach": "Anhängen",
     "uploadFile": "Hochladen",
     "deepResearch": "Tiefenrecherche",
     "docs": "Dokumente",
@@ -414,6 +416,13 @@
       "invoiceEmail": "Rechnungs-E-Mail",
       "invoiceEmailPlaceholder": "Alternative E-Mail für Rechnungen (leer lassen um Haupt-E-Mail zu verwenden)"
     },
+    "memories": {
+      "title": "Erinnerungen",
+      "subtitle": "Steuere, ob Synaplan deine Erinnerungen zur Personalisierung nutzen und automatisch aktualisieren darf.",
+      "toggleLabel": "Erinnerungen für mein Konto aktivieren",
+      "enabledHint": "Aktiv: Die KI kann Erinnerungen nutzen und anhand von Gesprächen aktualisieren.",
+      "disabledHint": "Deaktiviert: Die KI nutzt keine Erinnerungen und aktualisiert sie nicht automatisch. Du kannst es jederzeit wieder aktivieren."
+    },
     "changePassword": {
       "title": "Passwort ändern",
       "subtitle": "Leer lassen um aktuelles Passwort zu behalten",
@@ -538,6 +547,15 @@
     "generatingFile": "Erstelle Datei...",
     "generatingFileTitle": "Datei wird generiert",
     "generatingFileDesc": "KI erstellt die angeforderte Datei",
+    "analyzingMemories": "Analysiere Erinnerungen...",
+    "analyzingMemoriesTitle": "Erinnerungen werden analysiert",
+    "analyzingMemoriesDesc": "KI prüft, was wichtig ist und gespeichert werden soll",
+    "savingMemories": "Speichere Erinnerungen...",
+    "savingMemoriesTitle": "Speichere Erinnerungen",
+    "savingMemoriesDesc": "Neue Informationen werden gesichert",
+    "memoriesComplete": "Erinnerungen aktualisiert",
+    "memoriesCompleteTitle": "Erinnerungen aktualisiert",
+    "memoriesCompleteDesc": "Analyse abgeschlossen",
     "topic": "Thema",
     "language": "Sprache",
     "modelId": "Model ID"
@@ -954,6 +972,8 @@
     "daysAgo": "vor {count} Tag | vor {count} Tagen",
     "back": "Zurück",
     "next": "Weiter",
+    "edit": "Bearbeiten",
+    "actions": "Aktionen",
     "create": "Erstellen",
     "creating": "Wird erstellt...",
     "previous": "Zurück",
@@ -965,7 +985,9 @@
     "stay": "Bleiben",
     "retry": "Erneut versuchen",
     "add": "Hinzufügen",
-    "done": "Fertig"
+    "done": "Fertig",
+    "created": "Erstellt",
+    "updated": "Aktualisiert"
   },
   "search": {
     "sources": "Quellen",
@@ -1569,5 +1591,178 @@
     "poweredBy": "Bereitgestellt von",
     "privacy": "Datenschutz",
     "terms": "AGB"
+  },
+  "memories": {
+    "fullscreen": {
+      "enter": "Vollbild",
+      "exit": "Vollbild beenden"
+    },
+    "title": "Erinnerungen",
+    "description": "Wichtige Informationen über dich und deine Präferenzen, die die KI für zukünftige Gespräche nutzen kann.",
+    "empty": "Noch keine Erinnerungen gespeichert.",
+    "emptyDesc": "Die KI wird relevante Informationen automatisch aus deinen Gesprächen extrahieren und hier speichern. Du kannst auch manuell neue Erinnerungen hinzufügen.",
+    "loading": "Erinnerungen werden geladen...",
+    "allCategories": "Alle Kategorien",
+    "selected": "{count} ausgewählt",
+    "selectAll": "Alle auswählen",
+    "search": {
+      "placeholder": "Erinnerungen durchsuchen..."
+    },
+    "noResults": "Keine Erinnerungen gefunden",
+    "category": "Kategorie",
+    "key": "Schlüssel",
+    "value": "Wert",
+    "updated": "Aktualisiert",
+    "createButton": "Neue Erinnerung",
+    "userDisabled": {
+      "title": "Erinnerungen sind für dein Konto deaktiviert",
+      "message": "Die KI nutzt keine Erinnerungen und aktualisiert sie nicht automatisch. Du kannst das jederzeit in den Profileinstellungen aktivieren.",
+      "enable": "Erinnerungen aktivieren"
+    },
+    "unavailable": {
+      "title": "Erinnerungen werden eingerichtet",
+      "message": "Das Erinnerungs-System wird gerade eingerichtet und ist vorübergehend nicht verfügbar. Dies kann einige Minuten dauern.",
+      "reason": "Mögliche Gründe:",
+      "reason1": "Der Vektordatenbank-Service wird gestartet",
+      "reason2": "KI-Embeddings werden neu konfiguriert",
+      "reason3": "Bestehende Erinnerungen werden migriert",
+      "retry": "Erneut versuchen"
+    },
+    "listView": {
+      "title": "Listenansicht",
+      "source": "Quelle",
+      "allMemories": "Alle Erinnerungen",
+      "categories": "Kategorien",
+      "keys": "Keys",
+      "sortByCategory": "Nach Kategorie sortieren",
+      "sortByKey": "Nach Name sortieren",
+      "sortByDate": "Nach Datum sortieren"
+    },
+    "graphView": {
+      "title": "Netzwerk-Ansicht"
+    },
+    "graph3dView": {
+      "title": "3D-Visualisierung"
+    },
+    "graph3d": {
+      "categories": "Kategorien",
+      "keys": "Schlüssel",
+      "memories": "Erinnerungen",
+      "category": "Kategorie",
+      "key": "Schlüssel",
+      "memory": "Erinnerung",
+      "controls": {
+        "rotate": "Drehen",
+        "zoom": "Zoom",
+        "select": "Auswählen",
+        "drag": "Maus ziehen",
+        "scroll": "Mausrad",
+        "click": "Klicken"
+      }
+    },
+    "categories": {
+      "all": "Alle Kategorien",
+      "preferences": "Präferenzen",
+      "personal": "Persönlich",
+      "work": "Arbeit",
+      "projects": "Projekte"
+    },
+    "source": {
+      "auto_detected": "Automatisch erkannt",
+      "user_created": "Manuell erstellt",
+      "user_edited": "Manuell bearbeitet",
+      "ai_edited": "KI-bearbeitet"
+    },
+    "actions": {
+      "create": "Neue Erinnerung",
+      "edit": "Bearbeiten",
+      "delete": "Löschen",
+      "save": "Speichern",
+      "cancel": "Abbrechen"
+    },
+    "create": {
+      "title": "Neue Erinnerung",
+      "category": "Kategorie",
+      "categoryPlaceholder": "z.B. Präferenzen, Persönlich, Arbeit...",
+      "categoryHint": "Du kannst beliebige Kategorienamen eingeben",
+      "key": "Schlüssel",
+      "keyPlaceholder": "z.B. Lieblingssprache",
+      "value": "Wert",
+      "valuePlaceholder": "z.B. TypeScript"
+    },
+    "edit": {
+      "title": "Erinnerung bearbeiten"
+    },
+    "delete": {
+      "title": "Erinnerung löschen",
+      "message": "Bist du sicher, dass du diese Erinnerung löschen möchtest? Diese Aktion kann nicht rückgängig gemacht werden.",
+      "confirm": "Löschen"
+    },
+    "deleteConfirm": {
+      "title": "Erinnerung löschen?",
+      "message": "Bist du sicher, dass du diese Erinnerung löschen möchtest? Diese Aktion kann nicht rückgängig gemacht werden.",
+      "confirm": "Löschen"
+    },
+    "bulkDeleteConfirm": {
+      "title": "Mehrere Erinnerungen löschen?",
+      "message": "Möchtest du wirklich {count} Erinnerungen löschen? Diese Aktion kann nicht rückgängig gemacht werden."
+    },
+    "deleteSuccess": "Erinnerung erfolgreich gelöscht",
+    "deleteError": "Fehler beim Löschen der Erinnerung",
+    "bulkDeleteSuccess": "{count} Erinnerungen erfolgreich gelöscht",
+    "bulkDeleteError": "Fehler beim Löschen der Erinnerungen",
+    "createSuccess": "Erinnerung erfolgreich erstellt",
+    "createError": "Fehler beim Erstellen der Erinnerung",
+    "editSuccess": "Erinnerung erfolgreich aktualisiert",
+    "editError": "Fehler beim Aktualisieren der Erinnerung",
+    "memorySaved": "Neue Erinnerung erfolgreich gespeichert!",
+    "showingRecent": "Zeige die {count} neuesten Erinnerungen",
+    "totalCount": "Insgesamt {count} Erinnerungen gespeichert",
+    "viewAll": "Alle anzeigen",
+    "serviceDisabled": {
+      "title": "Erinnerungen deaktiviert",
+      "message": "Der Erinnerungs-Service ist derzeit nicht verfügbar. Bitte kontaktieren Sie den Administrator.",
+      "badge": "Service nicht verfügbar",
+      "tooltip": "Der Erinnerungs-Service ist deaktiviert oder nicht erreichbar. Diese Erinnerung kann nicht angezeigt werden."
+    },
+    "referenceMissing": {
+      "badge": "Erinnerung nicht gefunden",
+      "tooltip": "Diese Erinnerung ist nicht (mehr) verfügbar. Sie wurde eventuell gelöscht oder der Service konnte sie nicht laden."
+    },
+    "referencePending": {
+      "badge": "Erinnerung wird geladen",
+      "tooltip": "Diese Erinnerung wurde gerade erstellt oder aktualisiert. Es kann ein paar Sekunden dauern, bis sie geladen werden kann."
+    },
+    "toast": {
+      "title": "Neue Erinnerung erkannt",
+      "titleCompact": "Erinnerung",
+      "discard": "Verwerfen",
+      "discardCompact": "Ausblenden",
+      "edit": "Anpassen",
+      "editCompact": "Bearbeiten",
+      "discarded": "Erinnerung verworfen"
+    },
+    "usedInResponse": "{count} Erinnerung verwendet | {count} Erinnerungen verwendet",
+    "context": {
+      "title": "Aktive Erinnerungen",
+      "count": "{count} Erinnerung geladen | {count} Erinnerungen geladen"
+    },
+    "graph": {
+      "legend": "Legende",
+      "memoryNode": "Erinnerungs-Knoten",
+      "connection": "Kategorie-Verbindung",
+      "resetView": "Ansicht zurücksetzen",
+      "togglePhysics": "Physik umschalten",
+      "noResultsDesc": "Keine Erinnerungen in den gewählten Kategorien gefunden.",
+      "noResultsKeys": "Keine Erinnerungen mit den gewählten Keys gefunden.",
+      "clearFilters": "Filter zurücksetzen",
+      "moreCategories": "weitere",
+      "groupByCategory": "Nach Kategorie gruppieren",
+      "groupByKey": "Nach Key filtern",
+      "groupingByCategory": "Gruppiert nach Kategorie",
+      "groupingByKey": "Filtern nach Key",
+      "filterByCategory": "Nach Kategorie filtern",
+      "filterByLetter": "Nach Anfangsbuchstabe filtern"
+    }
   }
 }

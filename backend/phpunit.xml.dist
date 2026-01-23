@@ -31,6 +31,9 @@
         <env name="BRAVE_SEARCH_COUNT" value="10" />
         <env name="BRAVE_SEARCH_COUNTRY" value="us" />
         <env name="BRAVE_SEARCH_SEARCH_LANG" value="en" />
+        <!-- Qdrant / Memory Service (defaults for testing) -->
+        <env name="QDRANT_SERVICE_URL" value="" />
+        <env name="QDRANT_SERVICE_API_KEY" value="" />
     </php>
 
     <testsuites>

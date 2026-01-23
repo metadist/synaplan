@@ -14,6 +14,7 @@
     "mailHandler": "Mail Handler",
     "plugins": "Plugins",
     "files": "Files",
+    "memories": "Memories",
     "ragSearch": "Semantic Search",
     "configInbound": "Inbound Channels",
     "configAiModels": "AI Models",
@@ -181,6 +182,7 @@
   },
   "nav": {
     "chat": "Chat",
+    "profile": "Profile",
     "tools": "Tools",
     "toolsIntroduction": "Introduction",
     "toolsChatWidget": "Chat Widget",
@@ -1017,6 +1019,8 @@
     "create": "Create",
     "creating": "Creating...",
     "loading": "Loading...",
+    "edit": "Edit",
+    "actions": "Actions",
     "now": "Now",
     "justNow": "Just now",
     "minutesAgo": "{count} minute ago | {count} minutes ago",
@@ -1030,7 +1034,9 @@
     "stay": "Stay",
     "retry": "Retry",
     "add": "Add",
-    "done": "Done"
+    "done": "Done",
+    "created": "Created",
+    "updated": "Updated"
   },
   "search": {
     "sources": "Sources",
@@ -1461,6 +1467,13 @@
       "invoiceEmail": "Invoice Email",
       "invoiceEmailPlaceholder": "Alternative email for invoices (leave empty to use main email)"
     },
+    "memories": {
+      "title": "Memories",
+      "subtitle": "Control whether Synaplan should use and automatically update your memories for personalization.",
+      "toggleLabel": "Enable memories for my account",
+      "enabledHint": "Enabled: the AI may use and update your memories based on conversations.",
+      "disabledHint": "Disabled: the AI will not use or auto-update memories. You can re-enable at any time."
+    },
     "changePassword": {
       "title": "Change Password",
       "subtitle": "Leave empty to keep current password",
@@ -1557,6 +1570,15 @@
     "generatingFile": "Creating file...",
     "generatingFileTitle": "File is being generated",
     "generatingFileDesc": "AI is creating the requested file",
+    "analyzingMemories": "Analyzing memories...",
+    "analyzingMemoriesTitle": "Analyzing memories",
+    "analyzingMemoriesDesc": "AI is checking what's important and should be saved",
+    "savingMemories": "Saving memories...",
+    "savingMemoriesTitle": "Saving memories",
+    "savingMemoriesDesc": "New information is being saved",
+    "memoriesComplete": "Memories updated",
+    "memoriesCompleteTitle": "Memories updated",
+    "memoriesCompleteDesc": "Analysis complete",
     "topic": "Topic",
     "language": "Language",
     "modelId": "Model ID"
@@ -1673,5 +1695,178 @@
     "poweredBy": "Powered by",
     "privacy": "Privacy",
     "terms": "Terms"
+  },
+  "memories": {
+    "fullscreen": {
+      "enter": "Fullscreen",
+      "exit": "Exit fullscreen"
+    },
+    "title": "Memories",
+    "description": "Important information about you and your preferences that the AI can use for future conversations.",
+    "empty": "No memories saved yet.",
+    "emptyDesc": "The AI will automatically extract relevant information from your conversations and store it here. You can also manually add new memories.",
+    "loading": "Loading memories...",
+    "allCategories": "All Categories",
+    "selected": "{count} selected",
+    "selectAll": "Select All",
+    "search": {
+      "placeholder": "Search memories..."
+    },
+    "noResults": "No memories found",
+    "category": "Category",
+    "key": "Key",
+    "value": "Value",
+    "updated": "Updated",
+    "createButton": "New Memory",
+    "userDisabled": {
+      "title": "Memories are disabled for your account",
+      "message": "The AI will not use or automatically update memories. You can enable this in your profile settings at any time.",
+      "enable": "Enable memories"
+    },
+    "unavailable": {
+      "title": "Memories are being set up",
+      "message": "The memories system is currently being configured and is temporarily unavailable. This may take a few minutes.",
+      "reason": "Possible reasons:",
+      "reason1": "Vector database service is starting",
+      "reason2": "AI embeddings are being reconfigured",
+      "reason3": "Existing memories are being migrated",
+      "retry": "Retry"
+    },
+    "listView": {
+      "title": "List View",
+      "source": "Source",
+      "allMemories": "All Memories",
+      "categories": "Categories",
+      "keys": "Keys",
+      "sortByCategory": "Sort by Category",
+      "sortByKey": "Sort by Name",
+      "sortByDate": "Sort by Date"
+    },
+    "graphView": {
+      "title": "Neural View"
+    },
+    "graph3dView": {
+      "title": "3D Visualization"
+    },
+    "graph3d": {
+      "categories": "Categories",
+      "keys": "Keys",
+      "memories": "Memories",
+      "category": "Category",
+      "key": "Key",
+      "memory": "Memory",
+      "controls": {
+        "rotate": "Rotate",
+        "zoom": "Zoom",
+        "select": "Select",
+        "drag": "Drag mouse",
+        "scroll": "Mouse wheel",
+        "click": "Click"
+      }
+    },
+    "categories": {
+      "all": "All Categories",
+      "preferences": "Preferences",
+      "personal": "Personal",
+      "work": "Work",
+      "projects": "Projects"
+    },
+    "source": {
+      "auto_detected": "Auto-detected",
+      "user_created": "User-created",
+      "user_edited": "User-edited",
+      "ai_edited": "AI-edited"
+    },
+    "actions": {
+      "create": "New Memory",
+      "edit": "Edit",
+      "delete": "Delete",
+      "save": "Save",
+      "cancel": "Cancel"
+    },
+    "create": {
+      "title": "New Memory",
+      "category": "Category",
+      "categoryPlaceholder": "e.g. preferences, personal, work...",
+      "categoryHint": "You can enter any category name",
+      "key": "Key",
+      "keyPlaceholder": "e.g. favorite_language",
+      "value": "Value",
+      "valuePlaceholder": "e.g. TypeScript"
+    },
+    "edit": {
+      "title": "Edit Memory"
+    },
+    "delete": {
+      "title": "Delete Memory",
+      "message": "Are you sure you want to delete this memory? This action cannot be undone.",
+      "confirm": "Delete"
+    },
+    "deleteConfirm": {
+      "title": "Delete Memory?",
+      "message": "Are you sure you want to delete this memory? This action cannot be undone.",
+      "confirm": "Delete"
+    },
+    "bulkDeleteConfirm": {
+      "title": "Delete Multiple Memories?",
+      "message": "Are you sure you want to delete {count} memories? This action cannot be undone."
+    },
+    "deleteSuccess": "Memory deleted successfully",
+    "deleteError": "Failed to delete memory",
+    "bulkDeleteSuccess": "{count} memories deleted successfully",
+    "bulkDeleteError": "Failed to delete memories",
+    "createSuccess": "Memory created successfully",
+    "createError": "Failed to create memory",
+    "editSuccess": "Memory updated successfully",
+    "editError": "Failed to update memory",
+    "memorySaved": "New memory saved successfully!",
+    "showingRecent": "Showing the {count} most recent memories",
+    "totalCount": "{count} memories stored in total",
+    "viewAll": "View All",
+    "serviceDisabled": {
+      "title": "Memories Disabled",
+      "message": "The memory service is currently unavailable. Please contact the administrator.",
+      "badge": "Service unavailable",
+      "tooltip": "The memory service is disabled or unreachable. This memory cannot be displayed."
+    },
+    "referenceMissing": {
+      "badge": "Memory not found",
+      "tooltip": "This memory is no longer available. It may have been deleted, or the service could not load it."
+    },
+    "referencePending": {
+      "badge": "Memory pending",
+      "tooltip": "This memory was just created or updated. It may take a few seconds until it can be loaded."
+    },
+    "toast": {
+      "title": "New Memory Detected",
+      "titleCompact": "Memory",
+      "discard": "Discard",
+      "discardCompact": "Dismiss",
+      "edit": "Edit",
+      "editCompact": "Edit",
+      "discarded": "Memory discarded"
+    },
+    "usedInResponse": "{count} memory used | {count} memories used",
+    "context": {
+      "title": "Active Memories",
+      "count": "{count} memory loaded | {count} memories loaded"
+    },
+    "graph": {
+      "legend": "Legend",
+      "memoryNode": "Memory Node",
+      "connection": "Category Connection",
+      "resetView": "Reset View",
+      "togglePhysics": "Toggle Physics",
+      "noResultsDesc": "No memories found in selected categories.",
+      "noResultsKeys": "No memories found with selected keys.",
+      "clearFilters": "Clear Filters",
+      "moreCategories": "more",
+      "groupByCategory": "Group by Category",
+      "groupByKey": "Filter by Key",
+      "groupingByCategory": "Grouped by Category",
+      "groupingByKey": "Filter by Key",
+      "filterByCategory": "Filter by Category",
+      "filterByLetter": "Filter by First Letter"
+    }
   }
 }

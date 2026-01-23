@@ -1,9 +1,9 @@
 <template>
-  <Teleport to="body">
+  <Teleport :to="teleportTarget">
     <Transition name="dialog-fade">
       <div
         v-if="dialog.isOpen"
-        class="fixed inset-0 z-50 flex items-center justify-center p-4"
+        class="fixed inset-0 z-[10000] flex items-center justify-center p-4"
         data-testid="modal-dialog-root"
         @click.self="handleBackdropClick"
       >
@@ -91,6 +91,7 @@
 <script setup lang="ts">
 import { ref, watch, nextTick, onMounted, onBeforeUnmount } from 'vue'
 import { useDialog } from '@/composables/useDialog'
+import { useFullscreenTeleportTarget } from '@/composables/useFullscreenTeleportTarget'
 import {
   ExclamationTriangleIcon,
   QuestionMarkCircleIcon,
@@ -98,6 +99,7 @@ import {
 } from '@heroicons/vue/24/outline'
 
 const { dialog, close } = useDialog()
+const { teleportTarget } = useFullscreenTeleportTarget()
 const inputValue = ref('')
 const inputRef = ref<HTMLInputElement>()
 

@@ -939,6 +939,15 @@ class StreamController extends AbstractController
                     'searchResults' => $searchResults, // Include search results
                 ];
 
+                // Include memories used for this response
+                // Send only memory IDs (frontend loads full memories from store)
+                if (isset($response['metadata']['memories']) && is_array($response['metadata']['memories'])) {
+                    $completeData['memoryIds'] = array_map(fn ($m) => $m['id'], $response['metadata']['memories']);
+                    $this->logger->info('StreamController: Including memory IDs in complete event', [
+                        'count' => count($response['metadata']['memories']),
+                    ]);
+                }
+
                 // Include generated file info if present
                 if ($generatedFile) {
                     $completeData['generatedFile'] = [
