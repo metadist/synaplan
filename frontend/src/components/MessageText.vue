@@ -435,13 +435,19 @@ function scheduleMermaidProcessing(): void {
   }
 }
 
-// Cleanup timers on unmount
+// Cleanup timers and event listeners on unmount
 onBeforeUnmount(() => {
   if (mermaidDebounceTimer) {
     clearTimeout(mermaidDebounceTimer)
   }
   clearRetryTimer()
   clearSlowRetryTimer()
+
+  // Remove event listeners to prevent memory leaks
+  if (containerRef.value) {
+    containerRef.value.removeEventListener('click', handleMemoryBadgeClick)
+    containerRef.value.removeEventListener('mouseenter', handleTooltipPosition, true)
+  }
 })
 
 onMounted(() => {
