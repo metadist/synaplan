@@ -204,7 +204,11 @@
                 :content="part.content"
                 :language="part.language"
               />
-              <MessageText v-else-if="part.type === 'text'" :content="part.content" />
+              <MessageText
+                v-else-if="part.type === 'text'"
+                :content="part.content"
+                :is-streaming="false"
+              />
             </template>
 
             <!-- File attachments (images, videos) -->
