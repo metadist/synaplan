@@ -342,7 +342,7 @@ const copyLink = async () => {
     setTimeout(() => {
       copied.value = false
     }, 2000)
-  } catch (error) {
+  } catch {
     showError('Failed to copy link')
   }
 }

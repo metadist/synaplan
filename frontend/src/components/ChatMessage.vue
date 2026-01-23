@@ -959,12 +959,12 @@ const handleAgain = () => {
     return
   }
 
-  if (props.backendMessageId && (model as any).id) {
+  if (props.backendMessageId && model.id) {
     // New backend-driven again
-    emit('again', props.backendMessageId, (model as any).id)
+    emit('again', props.backendMessageId, model.id)
   } else {
     // Fallback to old regenerate
-    emit('regenerate', model as any)
+    emit('regenerate', model)
   }
 }
 
@@ -986,20 +986,24 @@ const selectModel = (model: ModelOption) => {
   modelDropdownOpen.value = false
 }
 
+interface ClickOutsideElement extends HTMLElement {
+  __clickOutsideHandler?: (event: MouseEvent) => void
+}
+
 const vClickOutside = {
-  mounted(el: HTMLElement, binding: any) {
+  mounted(el: ClickOutsideElement, binding: { value: () => void }) {
     const handler = (event: MouseEvent) => {
       if (!(el === event.target || el.contains(event.target as Node))) {
         binding.value()
       }
     }
-    ;(el as any).__clickOutsideHandler = handler
+    el.__clickOutsideHandler = handler
     setTimeout(() => {
       document.addEventListener('click', handler)
     }, 0)
   },
-  unmounted(el: HTMLElement) {
-    const handler = (el as any).__clickOutsideHandler
+  unmounted(el: ClickOutsideElement) {
+    const handler = el.__clickOutsideHandler
     if (handler) {
       document.removeEventListener('click', handler)
     }
