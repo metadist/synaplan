@@ -30,4 +30,4 @@ global.fetch = vi.fn((url) => {
     status: 404,
     json: () => Promise.resolve({}),
   })
-}) as any
+}) as unknown as typeof fetch

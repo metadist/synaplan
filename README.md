@@ -420,6 +420,7 @@ AUTO_DOWNLOAD_MODELS=false docker compose up -d
 - ✅ **AI Chat**: Multiple providers (Ollama, OpenAI, Anthropic, Groq, Gemini)
 - ✅ **Embeddable Chat Widget**: Add AI chat to any website with a single script tag
 - ✅ **RAG System**: Semantic search with MariaDB VECTOR + bge-m3 embeddings (1024 dim)
+- ✅ **Optional Memories Backend (Qdrant)**: Connect [synaplan-memories](https://github.com/metadist/synaplan-memories) to enable user profiling / AI memories (separate Rust + Qdrant stack)
 - ✅ **Document Processing**: PDF, Word, Excel, Images (Tika + OCR)
 - ✅ **Audio Transcription**: Whisper.cpp integration
 - ✅ **File Management**: Upload, share (public/private), organize with expiry
@@ -427,6 +428,23 @@ AUTO_DOWNLOAD_MODELS=false docker compose up -d
 - ✅ **Security**: Private files by default, secure sharing with tokens
 - ✅ **Multi-user**: Role-based access with JWT authentication
 - ✅ **Responsive UI**: Vue.js 3 + TypeScript + Tailwind CSS
+
+## 🧠 Optional: synaplan-memories (User Profiling / AI Memories)
+
+Synaplan can run without an external vector DB for memories.
+
+If you want AI “memories” (user profiling) backed by **Qdrant**, install:
+
+- [metadist/synaplan-memories](https://github.com/metadist/synaplan-memories)
+
+It contains a small Rust microservice + Qdrant and can be connected via:
+
+- `QDRANT_SERVICE_URL`
+- `QDRANT_SERVICE_API_KEY`
+
+Benchmarking (Qdrant vs MariaDB VECTOR) is available here:
+
+- [metadist/synaplan-vectordb-test](https://github.com/metadist/synaplan-vectordb-test)
 
 ## 💬 Embeddable Chat Widget
 

@@ -111,10 +111,12 @@ export interface Message {
     resultsCount?: number
   } | null // Web search metadata
   tool?: {
-    command: string // The command name (e.g., 'search', 'pic', 'vid')
-    label: string // Display label (e.g., 'Web Search', 'Image Generation', 'Video Generation')
-    icon: string // Icon identifier
-  } | null // Tool/command metadata
+    icon: string
+    label: string
+  } | null // Tool metadata (e.g., web search, file generation)
+  memoryIds?: number[] | null // IDs of memories used (resolved from memoriesStore)
+  processingStatus?: string
+  processingMetadata?: any
 }
 
 /**
@@ -302,20 +304,8 @@ export const useHistoryStore = defineStore('history', () => {
       else if (message.parts.length === 1 && message.parts[0].type === 'text') {
         const currentContent = message.parts[0]?.content || ''
 
-        console.log('🔍 finishStreamingMessage: Content length:', currentContent.length)
-        console.log('🔍 finishStreamingMessage: Has <think>?', currentContent.includes('<think>'))
-        console.log('🔍 finishStreamingMessage: Content preview:', currentContent.substring(0, 200))
-
         if (currentContent && currentContent.includes('<think>')) {
-          console.log('✅ Parsing <think> tags!')
           message.parts = parseContentWithThinking(currentContent)
-          console.log(
-            '✅ Parsed parts:',
-            message.parts.length,
-            message.parts.map((p) => p.type)
-          )
-        } else {
-          console.log('❌ No <think> tags found or content empty')
         }
       }
     }

@@ -12,6 +12,7 @@ export interface UserProfile {
   language: string
   timezone: string
   invoiceEmail: string
+  memoriesEnabled: boolean
   canChangePassword?: boolean
   authProvider?: string
   isExternalAuth?: boolean
@@ -46,6 +47,7 @@ export const mockProfile: UserProfile = {
   language: 'en',
   timezone: 'Europe/Berlin',
   invoiceEmail: 'ys@metadist.de',
+  memoriesEnabled: true,
 }
 
 export const countries: Country[] = [

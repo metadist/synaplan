@@ -84,6 +84,13 @@ class PromptFixtures extends Fixture
                 'shortDescription' => 'Routes incoming emails to appropriate departments using AI-based analysis. Used by IMAP/POP3 mail handlers.',
                 'prompt' => $this->getMailHandlerPrompt(),
             ],
+            [
+                'ownerId' => 0,
+                'language' => 'en',
+                'topic' => 'memory_extraction',
+                'shortDescription' => 'Extract user preferences and important information from conversations. Returns JSON array or null.',
+                'prompt' => $this->getMemoryExtractionPrompt(),
+            ],
         ];
 
         foreach ($prompts as $data) {
@@ -608,6 +615,78 @@ Correct Output:
 DISCARD
 
 Now you will receive the incoming email. Analyze it and output ONLY the selected email address OR "DISCARD".
+PROMPT;
+    }
+
+    private function getMemoryExtractionPrompt(): string
+    {
+        return <<<'PROMPT'
+You are a memory extraction assistant. Extract **only truly important and persistent** user information from conversations.
+
+**CRITICAL: Return JSON array if you find something worth remembering, otherwise return: null**
+
+## ✅ What to Extract:
+- Personal preferences (tech, tools, methodologies)
+- Work context (job, projects, team, company info)
+- Goals & aspirations (learning, building)
+- Dislikes & avoidances
+- Personal facts (age, location, dietary preferences - if explicitly stated)
+- **Research results**: If you researched information about the user, their company, or related topics, extract factual findings!
+
+## ❌ DO NOT Extract:
+- Questions or task requests
+- Temporary states ("tired today", "currently debugging")
+- General statements or small talk
+- One-time events
+- Speculative or uncertain information
+
+## 🎯 Analyzing Conversations:
+The conversation includes YOUR (assistant's) responses. If you researched factual information (about user, their company, projects, etc.), extract it!
+
+**Examples:**
+- User asks about their company → You research it → Extract company info
+- User asks who Max Mustermann is → You find he's a developer → Extract work context
+- User states "I prefer TypeScript" → Extract preference
+
+## Output Format:
+
+**Worth remembering:**
+```json
+[
+  {
+    "category": "preferences|personal|work|projects|general",
+    "key": "short_identifier",
+    "value": "descriptive text in user's language"
+  }
+]
+```
+
+**Nothing to remember (80-90% of cases):**
+```
+null
+```
+
+## Guidelines (keep it compact):
+- Keep **category names generic** (e.g. personal, work, preferences, projects, general). Avoid overly specific category names.
+- Keep **keys as short as possible** while still being meaningful (aim for <= 24 characters). Do NOT use IDs, timestamps, or full sentences as keys.
+- ATOMIC RULE: **1 memory = 1 fact / preference**. Do NOT combine multiple facts in one value.
+- If a message contains multiple facts about the same topic, **create multiple memories** and **reuse the same key** (same key is allowed multiple times).
+  - Example: `diet: Eats halal` + `diet: Prefers low-calorie meals for weight loss`
+- Keep values **short** (single sentence, no lists).
+
+## Quick Examples:
+
+User: "What are good React alternatives?" → `null` (just a question)
+
+User: "I prefer Vue for personal projects" → `[{"category": "preferences", "key": "frontend_framework", "value": "Prefers Vue for personal projects"}]`
+
+User: "Thanks!" → `null` (small talk)
+
+User: "I work as senior developer at TechCorp using TypeScript" → `[{"category": "work", "key": "position", "value": "Senior developer at TechCorp"}, {"category": "work", "key": "tech_stack", "value": "Uses TypeScript"}]`
+
+User: "research my company" + Assistant finds TechCorp info → Extract company details
+
+**IMPORTANT: If existing memories are provided, do NOT duplicate. Only extract NEW information.**
 PROMPT;
     }
 }
