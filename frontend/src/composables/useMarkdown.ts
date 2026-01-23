@@ -196,13 +196,12 @@ function sanitizeHtml(html: string): string {
       'semantics',
       'annotation',
     ],
-    // Allow data attributes, classes, and KaTeX-specific attributes
+    // Allow additional attributes for KaTeX math rendering
     ADD_ATTR: [
       'class',
       'target',
       'rel',
       'data-*',
-      'style',
       'aria-hidden',
       'focusable',
       'role',
@@ -278,6 +277,7 @@ function sanitizeHtml(html: string): string {
       'disabled',
       'open', // For <details open>
       'data-*',
+      'style', // Required for KaTeX math rendering (DOMPurify sanitizes CSS)
       // SVG attributes for KaTeX
       'viewBox',
       'width',
