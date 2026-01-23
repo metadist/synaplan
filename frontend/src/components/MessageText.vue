@@ -427,11 +427,15 @@ function scheduleMermaidProcessing(): void {
   // If streaming, debounce to avoid rendering incomplete diagrams
   if (props.isStreaming) {
     mermaidDebounceTimer = setTimeout(() => {
-      processMermaidBlocks()
+      processMermaidBlocks().catch((error) => {
+        console.error('Error processing mermaid blocks:', error)
+      })
     }, MERMAID_DEBOUNCE_MS)
   } else {
     // Not streaming - render immediately
-    processMermaidBlocks()
+    processMermaidBlocks().catch((error) => {
+      console.error('Error processing mermaid blocks:', error)
+    })
   }
 }
 
