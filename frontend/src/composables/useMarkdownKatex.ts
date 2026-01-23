@@ -13,25 +13,17 @@
  * 2. Or call renderKatexBlocks() after mounting to process rendered HTML
  */
 
+// Import KaTeX CSS from installed package (ensures version consistency)
+import 'katex/dist/katex.min.css'
+
 let katexModule: typeof import('katex') | null = null
-let katexCssLoaded = false
 
 /**
- * Lazy-load KaTeX and its CSS
+ * Lazy-load KaTeX module (CSS is already loaded via import)
  */
 async function loadKatex(): Promise<typeof import('katex')> {
   if (katexModule) {
     return katexModule
-  }
-
-  // Load KaTeX CSS if not already loaded
-  if (!katexCssLoaded && typeof document !== 'undefined') {
-    const link = document.createElement('link')
-    link.rel = 'stylesheet'
-    link.href = 'https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css'
-    link.crossOrigin = 'anonymous'
-    document.head.appendChild(link)
-    katexCssLoaded = true
   }
 
   // Dynamic import for code-splitting
