@@ -197,16 +197,7 @@ function sanitizeHtml(html: string): string {
       'annotation',
     ],
     // Allow additional attributes for KaTeX math rendering
-    ADD_ATTR: [
-      'class',
-      'target',
-      'rel',
-      'data-*',
-      'aria-hidden',
-      'focusable',
-      'role',
-      'xmlns',
-    ],
+    ADD_ATTR: ['class', 'target', 'rel', 'data-*', 'aria-hidden', 'focusable', 'role', 'xmlns'],
     // Allow standard HTML elements plus KaTeX SVG elements
     ALLOWED_TAGS: [
       'h1',
