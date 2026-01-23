@@ -1015,18 +1015,20 @@ function extractCodeBlocks(content: string): { textParts: string[]; codeBlocks: 
   return { textParts, codeBlocks }
 }
 
+// Decode HTML entities using browser's built-in decoder
+function decodeHtmlEntities(html: string): string {
+  const textarea = document.createElement('textarea')
+  textarea.innerHTML = html
+  return textarea.value
+}
+
 // Handle clicks on messages container (for copy buttons)
 async function handleMessagesClick(event: MouseEvent): Promise<void> {
   const target = event.target as HTMLElement
   if (target.classList.contains('widget-copy-btn')) {
     event.preventDefault()
     const code = target.getAttribute('data-code') || ''
-    // Decode HTML entities
-    const decodedCode = code
-      .replace(/&amp;/g, '&')
-      .replace(/&lt;/g, '<')
-      .replace(/&gt;/g, '>')
-      .replace(/&quot;/g, '"')
+    const decodedCode = decodeHtmlEntities(code)
 
     try {
       await navigator.clipboard.writeText(decodedCode)
