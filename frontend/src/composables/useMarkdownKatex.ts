@@ -94,11 +94,16 @@ export async function processKatexInMarkdown(markdown: string): Promise<string> 
   }
 
   // Process inline math ($...$) - be careful not to match $$
-  // Use negative lookbehind/lookahead to avoid matching $$
-  const inlineMathRegex = /(?<!\$)\$(?!\$)([^$\n]+?)\$(?!\$)/g
+  // Avoid lookbehind for Safari compatibility; filter $$ matches manually
+  const inlineMathRegex = /\$(?!\$)([^$\n]+?)\$(?!\$)/g
   const inlineMatches = [...result.matchAll(inlineMathRegex)]
 
   for (const match of inlineMatches.reverse()) {
+    const startIndex = match.index ?? -1
+    // Emulate negative lookbehind: skip if preceded by '$' (part of '$$')
+    if (startIndex > 0 && result[startIndex - 1] === '$') {
+      continue
+    }
     const formula = match[1].trim()
     const rendered = await renderMath(formula, false)
     const wrapper = `<span class="katex-inline">${rendered}</span>`
