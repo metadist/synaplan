@@ -34,6 +34,7 @@ security:
 
         # Public runtime configuration (reCAPTCHA site key, etc.)
         - { path: ^/api/v1/config/runtime, roles: PUBLIC_ACCESS }
+        - { path: ^/api/v1/config/memory-service/check, roles: PUBLIC_ACCESS }
 
         # Public auth endpoints
         - { path: ^/api/v1/auth/login, roles: PUBLIC_ACCESS }

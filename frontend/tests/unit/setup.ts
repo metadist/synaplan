@@ -1,6 +1,5 @@
 import { config } from '@vue/test-utils'
 import { i18n } from '@/i18n'
-import { vi } from 'vitest'
 
 config.global.plugins = [i18n]
 
@@ -30,4 +29,4 @@ global.fetch = vi.fn((url) => {
     status: 404,
     json: () => Promise.resolve({}),
   })
-}) as any
+}) as unknown as typeof fetch

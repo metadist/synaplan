@@ -146,9 +146,13 @@
         <UserMenu
           :email="authStore.user?.email || 'guest@synaplan.com'"
           :collapsed="sidebarStore.isCollapsed"
+          @open-memories="isMemoriesDialogOpen = true"
         />
       </div>
     </div>
+
+    <!-- Memories Dialog -->
+    <MemoriesDialog :is-open="isMemoriesDialogOpen" @close="isMemoriesDialogOpen = false" />
   </aside>
 </template>
 
@@ -177,6 +181,7 @@ import { useI18n } from 'vue-i18n'
 import ChatDropdown from './ChatDropdown.vue'
 import SidebarChatList from './SidebarChatList.vue'
 import UserMenu from './UserMenu.vue'
+import MemoriesDialog from './MemoriesDialog.vue'
 
 const { t } = useI18n()
 const sidebarStore = useSidebarStore()
@@ -186,6 +191,7 @@ const configStore = useConfigStore()
 const { theme } = useTheme()
 const route = useRoute()
 const expandedMenus = ref<string[]>([])
+const isMemoriesDialogOpen = ref(false)
 
 // Feature Status
 const disabledFeaturesCount = ref(0)

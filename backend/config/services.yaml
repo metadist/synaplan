@@ -340,6 +340,17 @@ services:
 
     App\Service\File\VectorizationService: ~
 
+    # Qdrant Vector Search Client (User Memories)
+    App\Service\VectorSearch\QdrantClientHttp:
+        arguments:
+            $httpClient: '@Symfony\Contracts\HttpClient\HttpClientInterface'
+            $baseUrl: '%env(QDRANT_SERVICE_URL)%'
+            $apiKey: '%env(QDRANT_SERVICE_API_KEY)%'
+
+    App\Service\VectorSearch\QdrantClientInterface:
+        alias: App\Service\VectorSearch\QdrantClientHttp
+    # For Development without Qdrant: alias: App\Service\VectorSearch\QdrantClientMock
+
     # Monolog Formatter Factory (for env-based log format switching)
     App\Service\MonologFormatterFactory:
         arguments:

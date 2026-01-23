@@ -173,6 +173,7 @@ class AuthController extends AbstractController
                     new OA\Property(property: 'email', type: 'string', example: 'user@example.com'),
                     new OA\Property(property: 'level', type: 'string', example: 'NEW'),
                     new OA\Property(property: 'isAdmin', type: 'boolean', example: false),
+                    new OA\Property(property: 'memoriesEnabled', type: 'boolean', example: true),
                 ]),
             ]
         )
@@ -251,6 +252,7 @@ class AuthController extends AbstractController
                 'level' => $user->getUserLevel(),
                 'emailVerified' => $user->isEmailVerified(),
                 'isAdmin' => $user->isAdmin(),
+                'memoriesEnabled' => $user->isMemoriesEnabled(),
             ],
         ]);
 
@@ -728,6 +730,7 @@ class AuthController extends AbstractController
                 'emailVerified' => $user->isEmailVerified(),
                 'created' => $user->getCreated(),
                 'isAdmin' => $user->isAdmin(),
+                'memoriesEnabled' => $user->isMemoriesEnabled(),
             ],
         ]);
     }

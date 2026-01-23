@@ -38,8 +38,35 @@
           class="px-4 pt-3 pb-3 processing-enter"
           data-testid="loading-typing-indicator"
         >
+          <!-- Trennlinie für Memory-Processing (nach dem Haupt-Content) -->
+          <div
+            v-if="
+              processingStatus.startsWith('analyzing_memories') ||
+              processingStatus.startsWith('saving_memories') ||
+              processingStatus.startsWith('memories_complete')
+            "
+            class="border-t border-gray-200 dark:border-gray-700 mb-3 -mx-4"
+          ></div>
+
           <div class="flex items-center gap-3">
+            <!-- Icon: Brain for memory-related, otherwise spinner -->
             <svg
+              v-if="processingStatus.includes('memories')"
+              class="w-5 h-5 txt-brand flex-shrink-0"
+              :class="{ 'animate-pulse': processingStatus === 'analyzing_memories' }"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"
+              />
+            </svg>
+            <svg
+              v-else
               class="w-5 h-5 animate-spin txt-brand flex-shrink-0"
               fill="none"
               viewBox="0 0 24 24"
@@ -154,6 +181,26 @@
                   {{ processingMetadata?.customMessage || $t('processing.generatingFileDesc') }}
                 </div>
               </template>
+              <template v-else-if="processingStatus === 'analyzing_memories'">
+                <div class="font-medium animate-pulse">
+                  {{ $t('processing.analyzingMemoriesTitle') }}
+                </div>
+                <div class="text-sm txt-tertiary mt-0.5">
+                  {{ processingMetadata?.customMessage || $t('processing.analyzingMemoriesDesc') }}
+                </div>
+              </template>
+              <template v-else-if="processingStatus === 'saving_memories'">
+                <div class="font-medium">{{ $t('processing.savingMemoriesTitle') }}</div>
+                <div class="text-sm txt-tertiary mt-0.5">
+                  {{ processingMetadata?.customMessage || $t('processing.savingMemoriesDesc') }}
+                </div>
+              </template>
+              <template v-else-if="processingStatus === 'memories_complete'">
+                <div class="font-medium">{{ $t('processing.memoriesCompleteTitle') }}</div>
+                <div class="text-sm txt-tertiary mt-0.5">
+                  {{ processingMetadata?.customMessage || $t('processing.memoriesCompleteDesc') }}
+                </div>
+              </template>
             </div>
           </div>
         </div>
@@ -227,7 +274,15 @@
           </div>
 
           <!-- Message Content -->
-          <MessagePart v-for="(part, index) in contentParts" :key="index" :part="part" />
+          <MessagePart
+            v-for="(part, index) in contentParts"
+            :key="index"
+            :part="part"
+            :memories="memories"
+          />
+
+          <!-- Used Memories (AFTER content, before search results) -->
+          <MessageMemories v-if="role === 'assistant' && memories" :memories="memories" />
 
           <!-- Web Search Results Carousel (AFTER content) -->
           <div
@@ -300,7 +355,6 @@
                   <div
                     v-for="(result, index) in searchResults"
                     :key="index"
-                    :ref="(el) => (sourceRefs[index] = el)"
                     :class="[
                       'group flex flex-col gap-2 p-2 sm:p-3 rounded-lg transition-all cursor-pointer flex-shrink-0',
                       'w-full sm:w-[calc(33.333%-0.5rem)]',
@@ -606,7 +660,9 @@ import { UserIcon, ArrowPathIcon, ChevronDownIcon } from '@heroicons/vue/24/outl
 import { Icon } from '@iconify/vue'
 import { useModelSelection, type ModelOption } from '@/composables/useModelSelection'
 import { getProviderIcon } from '@/utils/providerIcons'
+import { useMemoriesStore } from '@/stores/userMemories'
 import MessagePart from './MessagePart.vue'
+import MessageMemories from './MessageMemories.vue'
 import GroqIcon from '@/components/icons/GroqIcon.vue'
 import type { Part, MessageFile } from '@/stores/history'
 import type { AgainData } from '@/types/ai-models'
@@ -623,7 +679,15 @@ interface Props {
   againData?: AgainData
   backendMessageId?: number
   processingStatus?: string
-  processingMetadata?: any
+  processingMetadata?: {
+    model_name?: string
+    provider?: string
+    topic?: string
+    language?: string
+    customMessage?: string
+    results_count?: number
+    handler?: string
+  } | null
   files?: MessageFile[] // Attached files
   searchResults?: Array<{
     title: string
@@ -654,6 +718,7 @@ interface Props {
     icon: string
     label: string
   } | null // Tool metadata (e.g., web search, file generation)
+  memoryIds?: number[] | null // IDs of memories used (resolved from memoriesStore)
   // Status for failed/pending messages
   status?: 'sent' | 'failed' | 'rate_limited'
   errorType?: 'rate_limit' | 'connection' | 'unknown'
@@ -679,7 +744,6 @@ const sourcesExpanded = ref(false)
 // Carousel state for search results
 const carouselPage = ref(0) // Which "page" we're on (0-based)
 const highlightedSource = ref<number | null>(null)
-const sourceRefs = ref<any[]>([])
 
 // Calculate total badges count (files + webSearch/tool)
 const totalBadgesCount = computed(() => {
@@ -730,7 +794,22 @@ const openSource = (url: string) => {
 // Separate thinking blocks from content
 const thinkingParts = computed(() => props.parts.filter((p) => p.type === 'thinking'))
 
-// Process content parts to make reference numbers [1], [2], etc. clickable
+// Resolve memoryIds to full UserMemory objects from the store
+const memoriesStore = useMemoriesStore()
+const memories = computed(() => {
+  if (!props.memoryIds || props.memoryIds.length === 0) {
+    return null
+  }
+  // Resolve memory IDs to full UserMemory objects
+  const resolved = props.memoryIds
+    .map((id) => memoriesStore.memories.find((m) => m.id === id))
+    .filter((m) => m !== undefined)
+
+  return resolved.length > 0 ? resolved : null
+})
+
+// Process content parts to make reference numbers [1], [2], etc. clickable for search results
+// NOTE: Memory badges ([Memory X]) are handled in MessageText.vue, not here!
 const contentParts = computed(() => {
   const parts = props.parts.filter((p) => p.type !== 'thinking')
 
@@ -739,11 +818,13 @@ const contentParts = computed(() => {
     return parts
   }
 
-  // Process text parts to add clickable references
+  // Process text parts to add clickable search result references
   return parts.map((part) => {
     if (part.type === 'text' && part.content) {
-      // Replace [1], [2], etc. with clickable spans
-      const processedContent = part.content.replace(/\[(\d+)\]/g, (match, num) => {
+      let processedContent = part.content
+
+      // Replace [1], [2], etc. with clickable spans for search results
+      processedContent = processedContent.replace(/\[(\d+)\]/g, (match, num) => {
         const index = parseInt(num) - 1
         if (index >= 0 && index < props.searchResults!.length) {
           return `<a href="#" class="source-ref inline-flex items-center justify-center w-5 h-5 rounded-full bg-[var(--brand-alpha-light)] text-[var(--brand)] text-xs font-bold hover:bg-[var(--brand)] hover:text-white transition-all mx-0.5 no-underline" data-source-index="${index}" onclick="event.preventDefault()">${num}</a>`
@@ -958,10 +1039,31 @@ const downloadFile = async (file: MessageFile) => {
 // Handle clicks on reference numbers in the text
 const handleReferenceClick = (event: MouseEvent) => {
   const target = event.target as HTMLElement
+
+  // Handle source references [1], [2], etc.
   if (target.classList.contains('source-ref')) {
     const index = parseInt(target.dataset.sourceIndex || '-1')
     if (index >= 0 && props.searchResults && index < props.searchResults.length) {
       focusSource(index)
+    }
+  }
+
+  // Handle memory references "Memory 1", "Memory 2", etc.
+  if (target.classList.contains('memory-ref') || target.closest('.memory-ref')) {
+    const memoryLink = target.classList.contains('memory-ref')
+      ? target
+      : target.closest('.memory-ref')
+    if (memoryLink) {
+      const index = parseInt((memoryLink as HTMLElement).dataset.memoryIndex || '-1')
+      const resolvedMemories = memories.value
+      if (index >= 0 && resolvedMemories && index < resolvedMemories.length) {
+        const memory = resolvedMemories[index]
+        // Navigate to memories page with highlight
+        router.push({
+          path: '/memories',
+          query: { highlight: memory.id.toString() },
+        })
+      }
     }
   }
 }
