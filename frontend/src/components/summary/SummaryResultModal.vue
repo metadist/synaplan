@@ -187,6 +187,7 @@
 import { ref, computed } from 'vue'
 import { SparklesIcon, XMarkIcon, ChevronDownIcon, ChevronUpIcon } from '@heroicons/vue/24/outline'
 import { useNotification } from '@/composables/useNotification'
+import { useMarkdown } from '@/composables/useMarkdown'
 import type { SummaryConfig } from '@/mocks/summaries'
 import type { SummaryMetadata } from '@/services/summaryService'
 
@@ -203,6 +204,7 @@ const emit = defineEmits<{
 }>()
 
 const { success, error: showError } = useNotification()
+const { render: renderMarkdown } = useMarkdown()
 
 const showThinking = ref(false)
 
@@ -222,162 +224,14 @@ const parsedContent = computed(() => {
   return { thinking: null, content: props.summary }
 })
 
-// Format summary content with Markdown
-function escapeHtml(text: string): string {
-  const div = document.createElement('div')
-  div.textContent = text
-  return div.innerHTML
-}
-
-function applyInlineFormatting(text: string): string {
-  return text
-    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-    .replace(/\*(.*?)\*/g, '<em>$1</em>')
-    .replace(/~~(.+?)~~/g, '<del>$1</del>')
-    .replace(
-      /`([^`]+)`/g,
-      '<code class="surface-chip px-1.5 py-0.5 text-sm font-mono rounded">$1</code>'
-    )
-    .replace(
-      /\[(.+?)\]\((https?:\/\/[^\s)]+)\)/g,
-      '<a href="$2" class="underline text-[var(--brand)]" target="_blank" rel="noopener noreferrer">$1</a>'
-    )
-}
-
+/**
+ * Format summary content using the shared markdown renderer.
+ * This ensures consistent rendering with the main chat interface.
+ */
 const formattedSummary = computed(() => {
   const content = parsedContent.value.content
   if (!content) return ''
-
-  const htmlParts: string[] = []
-  const codeBlocks: string[] = []
-  let inList = false
-  let inOrderedList = false
-  let inBlockquote = false
-
-  const closeListIfNeeded = () => {
-    if (inList) {
-      htmlParts.push('</ul>')
-      inList = false
-    }
-    if (inOrderedList) {
-      htmlParts.push('</ol>')
-      inOrderedList = false
-    }
-  }
-
-  const closeBlockquoteIfNeeded = () => {
-    if (inBlockquote) {
-      htmlParts.push('</blockquote>')
-      inBlockquote = false
-    }
-  }
-
-  // Handle code blocks first
-  let processedContent = content.replace(/```(\w+)?\n([\s\S]*?)```/g, (_, lang, code) => {
-    const language = lang || 'text'
-    const placeholder = `__CODEBLOCK_${codeBlocks.length}__`
-    codeBlocks.push(
-      `<pre class="surface-chip p-4 overflow-x-auto my-3 rounded-lg"><code class="language-${language} text-sm">${escapeHtml(code.trim())}</code></pre>`
-    )
-    return placeholder
-  })
-
-  const processedLines = processedContent.split(/\r?\n/)
-
-  for (const rawLine of processedLines) {
-    const trimmed = rawLine.trim()
-
-    if (trimmed === '') {
-      closeListIfNeeded()
-      closeBlockquoteIfNeeded()
-      htmlParts.push('<br>')
-      continue
-    }
-
-    // Headings
-    const headingMatch = trimmed.match(/^(#{1,6})\s+(.*)$/)
-    if (headingMatch) {
-      closeListIfNeeded()
-      closeBlockquoteIfNeeded()
-      const level = headingMatch[1].length
-      const content = applyInlineFormatting(escapeHtml(headingMatch[2]))
-      const sizeClass =
-        level === 1 ? 'text-2xl' : level === 2 ? 'text-xl' : level === 3 ? 'text-lg' : 'text-base'
-      htmlParts.push(
-        `<h${level} class="font-semibold ${sizeClass} mt-4 mb-2">${content}</h${level}>`
-      )
-      continue
-    }
-
-    // Blockquotes
-    if (trimmed.startsWith('> ')) {
-      closeListIfNeeded()
-      if (!inBlockquote) {
-        inBlockquote = true
-        htmlParts.push(
-          '<blockquote style="border-left: 4px solid var(--brand); padding-left: 12px; padding-top: 4px; padding-bottom: 4px; margin-top: 8px; margin-bottom: 8px; font-style: italic; opacity: 0.8;">'
-        )
-      }
-      const quoteContent = trimmed.substring(2)
-      htmlParts.push(`<p>${applyInlineFormatting(escapeHtml(quoteContent))}</p>`)
-      continue
-    } else {
-      closeBlockquoteIfNeeded()
-    }
-
-    // Horizontal Rule
-    if (trimmed === '---' || trimmed === '***' || trimmed === '___') {
-      closeListIfNeeded()
-      closeBlockquoteIfNeeded()
-      htmlParts.push('<hr class="my-3 border-t border-light-border/30 dark:border-dark-border/20">')
-      continue
-    }
-
-    // Unordered list
-    if (/^[-*]\s+/.test(trimmed)) {
-      closeBlockquoteIfNeeded()
-      if (!inList) {
-        if (inOrderedList) {
-          htmlParts.push('</ol>')
-          inOrderedList = false
-        }
-        inList = true
-        htmlParts.push('<ul class="list-disc pl-5 space-y-1 my-2">')
-      }
-      const item = trimmed.replace(/^[-*]\s+/, '')
-      htmlParts.push(`<li>${applyInlineFormatting(escapeHtml(item))}</li>`)
-      continue
-    }
-
-    // Ordered list
-    const orderedMatch = trimmed.match(/^(\d+)\.\s+(.*)$/)
-    if (orderedMatch) {
-      closeListIfNeeded()
-      closeBlockquoteIfNeeded()
-      if (!inOrderedList) {
-        inOrderedList = true
-        htmlParts.push('<ol class="list-decimal pl-5 space-y-1 my-2">')
-      }
-      const content = applyInlineFormatting(escapeHtml(orderedMatch[2]))
-      htmlParts.push(`<li>${content}</li>`)
-      continue
-    }
-
-    closeListIfNeeded()
-    closeBlockquoteIfNeeded()
-    htmlParts.push(`<p class="mb-2 last:mb-0">${applyInlineFormatting(escapeHtml(rawLine))}</p>`)
-  }
-
-  closeListIfNeeded()
-  closeBlockquoteIfNeeded()
-  let result = htmlParts.join('')
-
-  // Restore code blocks
-  codeBlocks.forEach((block, index) => {
-    result = result.replace(`__CODEBLOCK_${index}__`, block)
-  })
-
-  return result
+  return renderMarkdown(content)
 })
 
 const close = () => {

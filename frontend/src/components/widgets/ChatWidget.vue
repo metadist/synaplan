@@ -107,6 +107,7 @@
             backgroundColor: widgetTheme === 'dark' ? '#1a1a1a' : '#ffffff',
           }"
           data-testid="section-messages"
+          @click="handleMessagesClick"
         >
           <div
             v-for="message in messages"
@@ -135,9 +136,9 @@
                     :class="widgetTheme === 'dark' ? 'bg-white/15' : 'bg-black/5'"
                   />
                 </div>
-                <p
+                <div
                   v-else
-                  class="text-sm whitespace-pre-wrap break-words"
+                  class="text-sm break-words markdown-content"
                   :style="{
                     color:
                       message.role === 'user'
@@ -147,7 +148,7 @@
                           : '#1f2937',
                   }"
                   v-html="renderMessageContent(message.content)"
-                />
+                ></div>
               </template>
               <div v-else-if="message.type === 'file'" class="flex items-center gap-2">
                 <DocumentIcon
@@ -409,6 +410,7 @@ import {
 import { uploadWidgetFile, sendWidgetMessage } from '@/services/api/widgetsApi'
 import { useI18n } from 'vue-i18n'
 import { parseAIResponse } from '@/utils/responseParser'
+import { getMarkdownRenderer } from '@/composables/useMarkdown'
 
 interface Props {
   widgetId: string
@@ -969,157 +971,121 @@ const loadConversationHistory = async (force = false) => {
   }
 }
 
-const escapeHtml = (value: string): string => {
-  return value
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#039;')
+// Use the shared markdown renderer (singleton for widget performance)
+const markdownRenderer = getMarkdownRenderer()
+
+interface CodeBlock {
+  language: string
+  code: string
+  start: number
+  end: number
 }
 
-const applyInlineFormatting = (text: string): string => {
-  return text
-    .replace(/(\*\*|__)(.+?)\1/g, '<strong>$2</strong>')
-    .replace(/(\*|_)(.+?)\1/g, '<em>$2</em>')
-    .replace(/~~(.+?)~~/g, '<del>$1</del>')
-    .replace(
-      /`([^`]+)`/g,
-      '<code class="px-1 py-0.5 rounded bg-black/10 dark:bg-white/10 text-xs">$1</code>'
-    )
-    .replace(
-      /\[(.+?)\]\((https?:\/\/[^\s)]+)\)/g,
-      '<a href="$2" class="underline" target="_blank" rel="noopener noreferrer">$1</a>'
-    )
+// Extract code blocks from content
+function extractCodeBlocks(content: string): { textParts: string[]; codeBlocks: CodeBlock[] } {
+  const codeBlockRegex = /```(\w+)?\n([\s\S]*?)```/g
+  const codeBlocks: CodeBlock[] = []
+  let lastIndex = 0
+  const textParts: string[] = []
+  let match
+
+  while ((match = codeBlockRegex.exec(content)) !== null) {
+    // Add text before this code block
+    if (match.index > lastIndex) {
+      textParts.push(content.slice(lastIndex, match.index))
+    } else {
+      textParts.push('')
+    }
+
+    codeBlocks.push({
+      language: match[1] || 'text',
+      code: match[2].trim(),
+      start: match.index,
+      end: match.index + match[0].length,
+    })
+
+    lastIndex = match.index + match[0].length
+  }
+
+  // Add remaining text after last code block
+  if (lastIndex < content.length) {
+    textParts.push(content.slice(lastIndex))
+  }
+
+  return { textParts, codeBlocks }
 }
 
+// Decode HTML entities using browser's built-in decoder
+function decodeHtmlEntities(html: string): string {
+  const textarea = document.createElement('textarea')
+  textarea.innerHTML = html
+  return textarea.value
+}
+
+// Handle clicks on messages container (for copy buttons)
+async function handleMessagesClick(event: MouseEvent): Promise<void> {
+  const target = event.target as HTMLElement
+  if (target.classList.contains('widget-copy-btn')) {
+    event.preventDefault()
+    const code = target.getAttribute('data-code') || ''
+    const decodedCode = decodeHtmlEntities(code)
+
+    try {
+      await navigator.clipboard.writeText(decodedCode)
+      const originalText = target.textContent
+      target.textContent = t('commands.copied')
+      setTimeout(() => {
+        target.textContent = originalText
+      }, 2000)
+    } catch (err) {
+      console.error('Failed to copy:', err)
+    }
+  }
+}
+
+// Render message content with enhanced code blocks
 const renderMessageContent = (value: string): string => {
   if (!value) {
     return ''
   }
 
-  // First handle code blocks
-  let content = value
-  const codeBlocks: string[] = []
-  content = content.replace(
-    /```(\w+)?\n([\s\S]*?)```/g,
-    (_: string, lang: string, code: string) => {
-      const language = lang || 'text'
-      const placeholder = `__CODEBLOCK_${codeBlocks.length}__`
-      codeBlocks.push(
-        `<pre class="bg-black/5 dark:bg-white/5 p-3 rounded-lg overflow-x-auto my-2"><code class="language-${language} text-xs font-mono">${escapeHtml(code.trim())}</code></pre>`
-      )
-      return placeholder
-    }
-  )
+  // Parse code blocks and render with copy button
+  const { textParts, codeBlocks } = extractCodeBlocks(value)
 
-  const lines = content.split(/\r?\n/)
-  const htmlParts: string[] = []
-  let inList = false
-  let inOrderedList = false
-  let inBlockquote = false
+  if (codeBlocks.length === 0) {
+    return markdownRenderer.render(value)
+  }
 
-  const closeListIfNeeded = () => {
-    if (inList) {
-      htmlParts.push('</ul>')
-      inList = false
+  // Build HTML with enhanced code blocks
+  let html = ''
+  for (let i = 0; i < textParts.length; i++) {
+    // Render text part
+    if (textParts[i].trim()) {
+      html += markdownRenderer.render(textParts[i])
     }
-    if (inOrderedList) {
-      htmlParts.push('</ol>')
-      inOrderedList = false
-    }
-    if (inBlockquote) {
-      htmlParts.push('</blockquote>')
-      inBlockquote = false
+
+    // Add code block if exists
+    if (i < codeBlocks.length) {
+      const block = codeBlocks[i]
+      const escapedCode = block.code
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+
+      html += `
+        <div class="widget-code-block my-2 rounded-lg overflow-hidden border border-black/10 dark:border-white/10">
+          <div class="flex items-center justify-between px-3 py-1.5 bg-black/5 dark:bg-white/5 border-b border-black/10 dark:border-white/10">
+            <span class="text-xs font-semibold uppercase tracking-wide opacity-70">${block.language}</span>
+            <button class="widget-copy-btn text-xs px-2 py-0.5 rounded hover:bg-black/10 dark:hover:bg-white/10 transition-colors" data-code="${escapedCode.replace(/"/g, '&quot;')}">${t('commands.copy')}</button>
+          </div>
+          <pre class="p-3 overflow-x-auto text-xs"><code class="font-mono">${escapedCode}</code></pre>
+        </div>
+      `
     }
   }
 
-  for (const rawLine of lines) {
-    const trimmed = rawLine.trim()
-
-    if (trimmed === '') {
-      closeListIfNeeded()
-      htmlParts.push('<br>')
-      continue
-    }
-
-    // Check for horizontal rule
-    if (trimmed === '---' || trimmed === '***') {
-      closeListIfNeeded()
-      htmlParts.push('<hr class="my-3 border-t border-gray-300 dark:border-gray-600" />')
-      continue
-    }
-
-    // Check for blockquote
-    if (trimmed.startsWith('> ')) {
-      if (inList) (htmlParts.push('</ul>'), (inList = false))
-      if (inOrderedList) (htmlParts.push('</ol>'), (inOrderedList = false))
-      if (!inBlockquote) {
-        inBlockquote = true
-        htmlParts.push(
-          '<blockquote class="border-l-4 pl-3 py-1 my-2 italic rounded-r" style="border-color: #6b7280; background-color: #f3f4f6; color: #1f2937;">'
-        )
-      }
-      const quoteContent = applyInlineFormatting(escapeHtml(trimmed.substring(2)))
-      htmlParts.push(`<p class="mb-1">${quoteContent}</p>`)
-      continue
-    } else if (inBlockquote) {
-      htmlParts.push('</blockquote>')
-      inBlockquote = false
-    }
-
-    const headingMatch = trimmed.match(/^(#{1,6})\s+(.*)$/)
-    if (headingMatch) {
-      closeListIfNeeded()
-      const level = headingMatch[1].length
-      const content = applyInlineFormatting(escapeHtml(headingMatch[2]))
-      const sizeClass = level <= 2 ? 'text-base' : 'text-sm'
-      htmlParts.push(`<div class="font-semibold ${sizeClass} mt-2">${content}</div>`)
-      continue
-    }
-
-    // Unordered list
-    if (/^[-*]\s+/.test(trimmed)) {
-      if (inOrderedList) (htmlParts.push('</ol>'), (inOrderedList = false))
-      if (inBlockquote) (htmlParts.push('</blockquote>'), (inBlockquote = false))
-      if (!inList) {
-        inList = true
-        htmlParts.push('<ul class="list-disc pl-5 space-y-1 my-2">')
-      }
-      const item = trimmed.replace(/^[-*]\s+/, '')
-      const content = applyInlineFormatting(escapeHtml(item))
-      htmlParts.push(`<li>${content}</li>`)
-      continue
-    }
-
-    // Ordered list
-    const orderedMatch = trimmed.match(/^(\d+)\.\s+(.*)$/)
-    if (orderedMatch) {
-      if (inList) (htmlParts.push('</ul>'), (inList = false))
-      if (inBlockquote) (htmlParts.push('</blockquote>'), (inBlockquote = false))
-      if (!inOrderedList) {
-        inOrderedList = true
-        htmlParts.push('<ol class="list-decimal pl-5 space-y-1 my-2">')
-      }
-      const content = applyInlineFormatting(escapeHtml(orderedMatch[2]))
-      htmlParts.push(`<li>${content}</li>`)
-      continue
-    }
-
-    closeListIfNeeded()
-    const content = applyInlineFormatting(escapeHtml(rawLine))
-    htmlParts.push(`<p class="mb-2 last:mb-0">${content}</p>`)
-  }
-
-  closeListIfNeeded()
-  let result = htmlParts.join('')
-
-  // Restore code blocks
-  codeBlocks.forEach((block, index) => {
-    result = result.replace(`__CODEBLOCK_${index}__`, block)
-  })
-
-  return result
+  return html
 }
 
 // Load session ID from localStorage on mount
@@ -1212,3 +1178,226 @@ function buildWidgetHeaders(includeContentType = true) {
   return headers
 }
 </script>
+
+<style scoped>
+/*
+ * Widget-specific markdown styles
+ *
+ * NOTE: The widget is a separate bundle embedded on external sites,
+ * so it cannot use the global markdown.css from the main app.
+ * These styles are necessary for the widget to render markdown correctly.
+ */
+
+/* Code blocks */
+.markdown-content :deep(.code-block) {
+  padding: 0.75rem;
+  border-radius: 0.5rem;
+  overflow-x: auto;
+  margin-top: 0.5rem;
+  margin-bottom: 0.5rem;
+  background-color: rgba(0, 0, 0, 0.05);
+}
+
+.markdown-content :deep(.code-block code) {
+  font-size: 0.75rem;
+  font-family: ui-monospace, SFMono-Regular, monospace;
+}
+
+/* Inline code */
+.markdown-content :deep(.inline-code) {
+  padding: 0.125rem 0.25rem;
+  border-radius: 0.25rem;
+  font-size: 0.75rem;
+  background-color: rgba(0, 0, 0, 0.1);
+}
+
+/* Headers */
+.markdown-content :deep(h1),
+.markdown-content :deep(h2) {
+  font-size: 1rem;
+  font-weight: 600;
+  margin-top: 0.5rem;
+  margin-bottom: 0.25rem;
+}
+
+.markdown-content :deep(h3),
+.markdown-content :deep(h4),
+.markdown-content :deep(h5),
+.markdown-content :deep(h6) {
+  font-size: 0.875rem;
+  font-weight: 600;
+  margin-top: 0.5rem;
+  margin-bottom: 0.25rem;
+}
+
+/* Lists */
+.markdown-content :deep(ul) {
+  list-style-type: disc;
+  padding-left: 1.25rem;
+  margin-top: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.markdown-content :deep(ol) {
+  list-style-type: decimal;
+  padding-left: 1.25rem;
+  margin-top: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.markdown-content :deep(li) {
+  margin-top: 0.25rem;
+  margin-bottom: 0.25rem;
+}
+
+/* Task lists */
+.markdown-content :deep(li > input[type='checkbox']) {
+  margin-right: 0.375rem;
+}
+
+/* Blockquotes */
+.markdown-content :deep(.markdown-blockquote) {
+  border-left-width: 4px;
+  border-left-style: solid;
+  padding-left: 0.75rem;
+  padding-top: 0.25rem;
+  padding-bottom: 0.25rem;
+  margin-top: 0.5rem;
+  margin-bottom: 0.5rem;
+  font-style: italic;
+  border-top-right-radius: 0.25rem;
+  border-bottom-right-radius: 0.25rem;
+  border-color: #6b7280;
+  background-color: rgba(0, 0, 0, 0.03);
+}
+
+/* Tables */
+.markdown-content :deep(.markdown-table) {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 0.5rem;
+  margin-bottom: 0.5rem;
+  font-size: 0.875rem;
+}
+
+.markdown-content :deep(.markdown-table th),
+.markdown-content :deep(.markdown-table td) {
+  border-width: 1px;
+  border-style: solid;
+  padding: 0.25rem 0.5rem;
+  border-color: rgba(0, 0, 0, 0.1);
+}
+
+.markdown-content :deep(.markdown-table th) {
+  font-weight: 600;
+  background-color: rgba(0, 0, 0, 0.05);
+}
+
+/* Horizontal rule */
+.markdown-content :deep(hr) {
+  margin-top: 0.75rem;
+  margin-bottom: 0.75rem;
+  border-top-width: 1px;
+  border-color: #d1d5db;
+}
+
+/* Links */
+.markdown-content :deep(a) {
+  color: #2563eb;
+  text-decoration: underline;
+}
+
+/* Paragraphs */
+.markdown-content :deep(p) {
+  margin-top: 0.25rem;
+  margin-bottom: 0.5rem;
+}
+
+.markdown-content :deep(p:first-child) {
+  margin-top: 0;
+}
+
+.markdown-content :deep(p:last-child) {
+  margin-bottom: 0;
+}
+
+/* Strikethrough */
+.markdown-content :deep(del) {
+  text-decoration: line-through;
+  opacity: 0.6;
+}
+
+/* Bold */
+.markdown-content :deep(strong) {
+  font-weight: 600;
+}
+
+/* Italic */
+.markdown-content :deep(em) {
+  font-style: italic;
+}
+
+/* Mermaid diagrams */
+.markdown-content :deep(.mermaid-diagram) {
+  margin-top: 0.5rem;
+  margin-bottom: 0.5rem;
+  overflow-x: auto;
+}
+
+.markdown-content :deep(.mermaid-diagram svg) {
+  max-width: 100%;
+  height: auto;
+}
+
+.markdown-content :deep(.mermaid-block) {
+  padding: 0.75rem;
+  overflow-x: auto;
+  margin: 0.5rem 0;
+  border-radius: 0.5rem;
+  background: rgba(0, 0, 0, 0.05);
+}
+
+/* KaTeX math */
+.markdown-content :deep(.katex-block) {
+  margin-top: 0.5rem;
+  margin-bottom: 0.5rem;
+  overflow-x: auto;
+  text-align: center;
+}
+
+.markdown-content :deep(.katex-inline) {
+  display: inline;
+}
+
+.markdown-content :deep(.katex) {
+  font-size: 1em;
+}
+
+/* Widget code block with copy button */
+.markdown-content :deep(.widget-code-block) {
+  margin: 0.5rem 0;
+  border-radius: 0.5rem;
+  overflow: hidden;
+}
+
+.markdown-content :deep(.widget-code-block pre) {
+  margin: 0;
+  padding: 0.75rem;
+  overflow-x: auto;
+  background: rgba(0, 0, 0, 0.03);
+}
+
+.markdown-content :deep(.widget-code-block code) {
+  font-size: 0.75rem;
+  font-family: ui-monospace, SFMono-Regular, monospace;
+}
+
+.markdown-content :deep(.widget-copy-btn) {
+  cursor: pointer;
+  opacity: 0.7;
+}
+
+.markdown-content :deep(.widget-copy-btn:hover) {
+  opacity: 1;
+}
+</style>

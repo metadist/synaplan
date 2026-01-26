@@ -14,6 +14,10 @@ parameters:
     log_level_default: 'info'     # Production: less verbose
     log_level_dev: 'debug'        # Development: show everything
 
+    # Qdrant/Memory Service defaults (empty = disabled)
+    env(QDRANT_SERVICE_URL): ''
+    env(QDRANT_SERVICE_API_KEY): ''
+
     # Plugins - mounted at /plugins in Docker, relative path for CI
     plugins_dir: '/plugins'
 
@@ -345,6 +349,7 @@ services:
     App\Service\File\VectorizationService: ~
 
     # Qdrant Vector Search Client (User Memories)
+    # Defaults to empty string when env vars not set (disables memory service gracefully)
     App\Service\VectorSearch\QdrantClientHttp:
         arguments:
             $httpClient: '@Symfony\Contracts\HttpClient\HttpClientInterface'
