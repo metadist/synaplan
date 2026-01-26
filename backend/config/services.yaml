@@ -7,8 +7,12 @@ parameters:
     synaplan_url: '%env(SYNAPLAN_URL)%'
 
     # Logging
+    # LOG_FORMAT: json (default) or line (human-readable)
+    # LOG_LEVEL: debug, info, notice, warning, error (see monolog.yaml)
     env(LOG_FORMAT): ''
     default_log_format: 'json'
+    log_level_default: 'info'     # Production: less verbose
+    log_level_dev: 'debug'        # Development: show everything
 
     # Plugins - mounted at /plugins in Docker, relative path for CI
     plugins_dir: '/plugins'
