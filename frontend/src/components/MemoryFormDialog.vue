@@ -3,19 +3,22 @@
     <Transition name="fade">
       <div
         v-if="isOpen"
-        class="fixed inset-0 bg-black/50 z-[10000] flex items-center justify-center p-4"
+        class="fixed inset-0 bg-black/50 z-[10000] flex items-center justify-center p-2 sm:p-4"
         @click.self="close"
       >
-        <div class="surface-card rounded-xl shadow-2xl max-w-lg w-full overflow-hidden" @click.stop>
+        <div
+          class="surface-card rounded-xl shadow-2xl max-w-lg w-full max-h-[95vh] sm:max-h-[90vh] overflow-y-auto scroll-thin"
+          @click.stop
+        >
           <!-- Header -->
           <div
-            class="flex items-center justify-between p-6 border-b border-light-border/10 dark:border-dark-border/10"
+            class="flex items-center justify-between p-4 sm:p-6 border-b border-light-border/10 dark:border-dark-border/10"
           >
-            <h3 class="text-lg font-semibold txt-primary">
+            <h3 class="text-base sm:text-lg font-semibold txt-primary">
               {{ memory ? $t('memories.edit.title') : $t('memories.create.title') }}
             </h3>
             <button
-              class="w-8 h-8 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 flex items-center justify-center transition-colors"
+              class="w-8 h-8 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 flex items-center justify-center transition-colors shrink-0"
               @click="close"
             >
               <Icon icon="mdi:close" class="w-5 h-5 txt-secondary" />
@@ -23,7 +26,7 @@
           </div>
 
           <!-- Form -->
-          <form class="p-6 space-y-4" @submit.prevent="handleSubmit">
+          <form class="p-4 sm:p-6 space-y-4" @submit.prevent="handleSubmit">
             <div>
               <label class="block text-sm font-medium txt-primary mb-2">
                 {{ $t('memories.create.category') }}
@@ -34,7 +37,7 @@
                 :placeholder="$t('memories.create.categoryPlaceholder')"
                 required
                 list="category-suggestions"
-                class="w-full px-4 py-2.5 rounded-lg surface-chip txt-primary placeholder:txt-secondary focus:outline-none focus:ring-2 focus:ring-brand/50 transition-all"
+                class="w-full px-3 sm:px-4 py-2 sm:py-2.5 rounded-lg surface-chip txt-primary placeholder:txt-secondary focus:outline-none focus:ring-2 focus:ring-brand/50 transition-all text-sm sm:text-base"
               />
               <datalist id="category-suggestions">
                 <option v-for="category in availableCategories" :key="category" :value="category" />
@@ -51,7 +54,7 @@
                 type="text"
                 required
                 :placeholder="$t('memories.create.keyPlaceholder')"
-                class="w-full px-4 py-2.5 rounded-lg surface-chip txt-primary placeholder:txt-secondary focus:outline-none focus:ring-2 focus:ring-brand/50 transition-all"
+                class="w-full px-3 sm:px-4 py-2 sm:py-2.5 rounded-lg surface-chip txt-primary placeholder:txt-secondary focus:outline-none focus:ring-2 focus:ring-brand/50 transition-all text-sm sm:text-base"
               />
             </div>
 
@@ -64,20 +67,23 @@
                 required
                 :placeholder="$t('memories.create.valuePlaceholder')"
                 rows="4"
-                class="w-full px-4 py-2.5 rounded-lg surface-chip txt-primary placeholder:txt-secondary focus:outline-none focus:ring-2 focus:ring-brand/50 resize-none transition-all"
+                class="w-full px-3 sm:px-4 py-2 sm:py-2.5 rounded-lg surface-chip txt-primary placeholder:txt-secondary focus:outline-none focus:ring-2 focus:ring-brand/50 resize-none transition-all text-sm sm:text-base"
               ></textarea>
             </div>
 
             <!-- Actions -->
-            <div class="flex items-center gap-3 pt-4">
+            <div class="flex items-center gap-2 sm:gap-3 pt-4">
               <button
                 type="button"
-                class="flex-1 btn-secondary px-4 py-2.5 rounded-lg font-medium transition-all"
+                class="flex-1 btn-secondary px-3 sm:px-4 py-2 sm:py-2.5 rounded-lg font-medium transition-all text-sm sm:text-base"
                 @click="close"
               >
                 {{ $t('common.cancel') }}
               </button>
-              <button type="submit" class="flex-1 btn-primary px-4 py-2.5 rounded-lg font-medium">
+              <button
+                type="submit"
+                class="flex-1 btn-primary px-3 sm:px-4 py-2 sm:py-2.5 rounded-lg font-medium text-sm sm:text-base"
+              >
                 {{ $t('common.save') }}
               </button>
             </div>
