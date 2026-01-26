@@ -60,7 +60,8 @@ class TritonProvider implements ChatProviderInterface
     private function initClient(): bool
     {
         if (empty($this->serverUrl)) {
-            $this->logger->warning('Triton server URL not configured');
+            // Debug level: Triton is optional, no need to warn on every request
+            $this->logger->debug('Triton server URL not configured');
 
             return false;
         }
