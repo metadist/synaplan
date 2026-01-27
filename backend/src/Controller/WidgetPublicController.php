@@ -101,7 +101,7 @@ class WidgetPublicController extends AbstractController
         }
 
         $config = $widget->getConfig();
-        if ($domainError = $this->ensureDomainAllowed($config, $request)) {
+        if ($domainError = $this->ensureDomainAllowed($config, $request, $widget->getOwnerId())) {
             return $domainError;
         }
 
@@ -177,7 +177,7 @@ class WidgetPublicController extends AbstractController
         }
 
         $config = $widget->getConfig();
-        if ($domainError = $this->ensureDomainAllowed($config, $request)) {
+        if ($domainError = $this->ensureDomainAllowed($config, $request, $widget->getOwnerId())) {
             return $domainError;
         }
 
@@ -238,6 +238,32 @@ class WidgetPublicController extends AbstractController
                 $this->em->persist($chat);
                 $this->em->flush();
 
+                // Create welcome message if configured
+                $autoMessage = $config['autoMessage'] ?? '';
+                if (!empty($autoMessage)) {
+                    // Use timestamp 10 seconds before current time to ensure welcome message comes first.
+                    // This is combined with secondary sort by ID in MessageRepository for reliable ordering.
+                    $welcomeTimestamp = time() - 10;
+                    $welcomeMessage = new Message();
+                    $welcomeMessage->setUserId($owner->getId());
+                    $welcomeMessage->setChat($chat);
+                    $welcomeMessage->setText($autoMessage);
+                    $welcomeMessage->setDirection('OUT');
+                    $welcomeMessage->setStatus('complete');
+                    $welcomeMessage->setMessageType('WDGT');
+                    $welcomeMessage->setTrackingId($welcomeTimestamp);
+                    $welcomeMessage->setUnixTimestamp($welcomeTimestamp);
+                    $welcomeMessage->setDateTime(date('YmdHis', $welcomeTimestamp));
+                    $welcomeMessage->setProviderIndex('widget');
+                    $this->em->persist($welcomeMessage);
+                    $this->em->flush();
+
+                    $this->logger->info('Widget welcome message created', [
+                        'widget_id' => $widget->getWidgetId(),
+                        'chat_id' => $chat->getId(),
+                    ]);
+                }
+
                 $this->logger->info('Widget chat created', [
                     'widget_id' => $widget->getWidgetId(),
                     'chat_id' => $chat->getId(),
@@ -259,7 +285,7 @@ class WidgetPublicController extends AbstractController
             $incomingMessage->setTrackingId(time());
             $incomingMessage->setUnixTimestamp(time());
             $incomingMessage->setDateTime(date('YmdHis'));
-            $incomingMessage->setProviderIndex(999); // Special provider index for widgets
+            $incomingMessage->setProviderIndex('widget'); // Special provider index for widgets
 
             $this->em->persist($incomingMessage);
             $this->em->flush();
@@ -479,6 +505,16 @@ class WidgetPublicController extends AbstractController
                         $tokens = array_sum(array_map(static fn ($value) => is_numeric($value) ? (int) $value : 0, $tokens));
                     }
 
+                    // Get classification data (topic, language) from result
+                    $classification = $result['classification'] ?? [];
+                    $topic = $classification['topic'] ?? 'WIDGET';
+                    $language = $classification['language'] ?? 'en';
+
+                    // Update incoming message with classification
+                    $incomingMessage->setTopic($topic);
+                    $incomingMessage->setLanguage($language);
+                    $incomingMessage->setStatus('complete');
+
                     $outgoingMessage = new Message();
                     $outgoingMessage->setUserId($owner->getId());
                     $outgoingMessage->setChat($chat);
@@ -490,13 +526,11 @@ class WidgetPublicController extends AbstractController
                     $outgoingMessage->setFile(0);
                     $outgoingMessage->setFilePath('');
                     $outgoingMessage->setFileType('');
-                    $outgoingMessage->setTopic($incomingMessage->getTopic());
-                    $outgoingMessage->setLanguage($incomingMessage->getLanguage());
+                    $outgoingMessage->setTopic($topic);
+                    $outgoingMessage->setLanguage($language);
                     $outgoingMessage->setText($responseText);
                     $outgoingMessage->setDirection('OUT');
                     $outgoingMessage->setStatus('complete');
-
-                    $incomingMessage->setStatus('complete');
 
                     $this->em->persist($outgoingMessage);
                     $this->em->flush();
@@ -610,7 +644,7 @@ class WidgetPublicController extends AbstractController
 
         // Check domain whitelist
         $config = $widget->getConfig();
-        if ($domainError = $this->ensureDomainAllowed($config, $request)) {
+        if ($domainError = $this->ensureDomainAllowed($config, $request, $widget->getOwnerId())) {
             return $domainError;
         }
 
@@ -627,16 +661,6 @@ class WidgetPublicController extends AbstractController
         $owner = $widget->getOwner();
         if (!$owner) {
             $owner = $this->em->getRepository(\App\Entity\User::class)->find($widget->getOwnerId());
-        }
-
-        if ($owner) {
-            $ownerLimit = $this->rateLimitService->checkLimit($owner, 'FILE_UPLOADS');
-            if (!($ownerLimit['allowed'] ?? true)) {
-                return $this->json([
-                    'error' => 'Owner file upload limit exceeded',
-                    'reason' => $ownerLimit['reason'] ?? 'limit_exceeded',
-                ], Response::HTTP_TOO_MANY_REQUESTS);
-            }
         }
 
         $fileLimit = (int) ($config['fileUploadLimit'] ?? WidgetSessionService::DEFAULT_MAX_FILES);
@@ -656,6 +680,20 @@ class WidgetPublicController extends AbstractController
             return $this->json([
                 'error' => 'No file uploaded. Use form-data with file field',
             ], Response::HTTP_BAD_REQUEST);
+        }
+
+        // Check FILE_ANALYSIS rate limit for widget owner
+        if ($owner) {
+            $fileAnalysisLimit = $this->rateLimitService->checkLimit($owner, 'FILE_ANALYSIS');
+            if (!($fileAnalysisLimit['allowed'] ?? true)) {
+                return $this->json([
+                    'error' => 'Rate limit exceeded for FILE_ANALYSIS',
+                    'rate_limit_exceeded' => true,
+                    'action' => 'FILE_ANALYSIS',
+                    'used' => $fileAnalysisLimit['used'],
+                    'limit' => $fileAnalysisLimit['limit'],
+                ], Response::HTTP_TOO_MANY_REQUESTS);
+            }
         }
 
         // Check file size limit (from widget config)
@@ -678,12 +716,14 @@ class WidgetPublicController extends AbstractController
             if ($result['success']) {
                 $this->sessionService->incrementFileCount($widgetSession);
 
-                // Record usage for widget owner
+                // Record FILE_ANALYSIS usage for widget owner
                 if ($owner) {
-                    $this->rateLimitService->recordUsage($owner, 'FILE_UPLOADS', [
+                    $this->rateLimitService->recordUsage($owner, 'FILE_ANALYSIS', [
                         'file_id' => $result['file']['id'],
                         'widget_id' => $widgetId,
                         'session_id' => $sessionId,
+                        'filename' => $uploadedFile->getClientOriginalName(),
+                        'source' => 'WIDGET',
                     ]);
                 }
 
@@ -886,7 +926,7 @@ class WidgetPublicController extends AbstractController
         }
 
         $config = $widget->getConfig();
-        if ($domainError = $this->ensureDomainAllowed($config, $request)) {
+        if ($domainError = $this->ensureDomainAllowed($config, $request, $widget->getOwnerId())) {
             return $domainError;
         }
 
@@ -943,12 +983,28 @@ class WidgetPublicController extends AbstractController
         );
 
         $history = array_map(static function (Message $message) {
+            // Include attached files if any
+            $filesData = [];
+            if ($message->hasFiles()) {
+                foreach ($message->getFiles() as $file) {
+                    $filesData[] = [
+                        'id' => $file->getId(),
+                        'filename' => $file->getFileName(),
+                        'fileType' => $file->getFileType(),
+                        'filePath' => $file->getFilePath(),
+                        'fileSize' => $file->getFileSize(),
+                        'fileMime' => $file->getFileMime(),
+                    ];
+                }
+            }
+
             return [
                 'id' => $message->getId(),
                 'direction' => $message->getDirection(),
                 'text' => $message->getText(),
                 'timestamp' => $message->getUnixTimestamp(),
                 'messageType' => $message->getMessageType(),
+                'files' => $filesData,
                 'metadata' => [
                     'topic' => $message->getTopic(),
                     'language' => $message->getLanguage(),
@@ -969,8 +1025,131 @@ class WidgetPublicController extends AbstractController
         ]);
     }
 
-    private function ensureDomainAllowed(array $config, Request $request): ?JsonResponse
+    /**
+     * Download a file uploaded via widget.
+     *
+     * PUBLIC endpoint - validates session ownership instead of user auth.
+     */
+    #[Route('/{widgetId}/files/{fileId}/download', name: 'file_download', methods: ['GET'])]
+    #[OA\Get(
+        path: '/api/v1/widget/{widgetId}/files/{fileId}/download',
+        summary: 'Download a widget file',
+        tags: ['Widget (Public)']
+    )]
+    #[OA\Parameter(name: 'widgetId', in: 'path', required: true, schema: new OA\Schema(type: 'string'))]
+    #[OA\Parameter(name: 'fileId', in: 'path', required: true, schema: new OA\Schema(type: 'integer'))]
+    #[OA\Parameter(name: 'sessionId', in: 'query', required: true, schema: new OA\Schema(type: 'string'))]
+    #[OA\Response(response: 200, description: 'File content')]
+    #[OA\Response(response: 403, description: 'Access denied')]
+    #[OA\Response(response: 404, description: 'File not found')]
+    public function downloadWidgetFile(string $widgetId, int $fileId, Request $request): Response
     {
+        $sessionId = $request->query->getString('sessionId');
+
+        if ('' === $sessionId) {
+            return $this->json(['error' => 'Session ID required'], Response::HTTP_BAD_REQUEST);
+        }
+
+        // Get the widget
+        $widget = $this->widgetService->getWidgetById($widgetId);
+        if (!$widget) {
+            return $this->json(['error' => 'Widget not found'], Response::HTTP_NOT_FOUND);
+        }
+
+        // Check domain restrictions
+        $config = $widget->getConfig();
+        if ($domainError = $this->ensureDomainAllowed($config, $request, $widget->getOwnerId())) {
+            return $domainError;
+        }
+
+        // Get the session
+        $session = $this->sessionService->getSession($widgetId, $sessionId);
+        if (!$session) {
+            return $this->json(['error' => 'Session not found'], Response::HTTP_NOT_FOUND);
+        }
+
+        // Get the file
+        $file = $this->fileRepository->find($fileId);
+        if (!$file) {
+            return $this->json(['error' => 'File not found'], Response::HTTP_NOT_FOUND);
+        }
+
+        // Security: Widget files are uploaded with userId=0 and linked to widget session
+        // Verify file was uploaded via widget (userId=0) and belongs to this session
+        $isWidgetFile = 0 === $file->getUserId() && $file->getUserSessionId() === $session->getId();
+        $isOwnerFile = $file->getUserId() === $widget->getOwnerId();
+
+        if (!$isWidgetFile && !$isOwnerFile) {
+            $this->logger->warning('Widget file download: access denied', [
+                'file_id' => $fileId,
+                'file_user_id' => $file->getUserId(),
+                'file_session_id' => $file->getUserSessionId(),
+                'widget_session_id' => $session->getId(),
+                'widget_owner' => $widget->getOwnerId(),
+            ]);
+
+            return $this->json(['error' => 'Access denied'], Response::HTTP_FORBIDDEN);
+        }
+
+        // Get the chat ID from the session
+        $chatId = $session->getChatId();
+        if (!$chatId) {
+            return $this->json(['error' => 'Chat not found'], Response::HTTP_NOT_FOUND);
+        }
+
+        // Verify file is attached to a message in this chat
+        $fileInChat = $this->messageRepository->isFileInChat($chatId, $fileId);
+        if (!$fileInChat) {
+            $this->logger->warning('Widget file download: file not in chat', [
+                'file_id' => $fileId,
+                'chat_id' => $chatId,
+            ]);
+
+            return $this->json(['error' => 'File not associated with this chat'], Response::HTTP_FORBIDDEN);
+        }
+
+        $filePath = $file->getFilePath();
+        if (!$filePath) {
+            return $this->json(['error' => 'File path not found'], Response::HTTP_NOT_FOUND);
+        }
+
+        $absolutePath = $this->uploadDir.'/'.$filePath;
+
+        if (!file_exists($absolutePath)) {
+            $this->logger->error('Widget file download: file not on disk', [
+                'file_id' => $fileId,
+                'path' => $absolutePath,
+            ]);
+
+            return $this->json(['error' => 'File not found on disk'], Response::HTTP_NOT_FOUND);
+        }
+
+        // Return file as download
+        $response = new \Symfony\Component\HttpFoundation\BinaryFileResponse($absolutePath);
+        $response->setContentDisposition(
+            \Symfony\Component\HttpFoundation\ResponseHeaderBag::DISPOSITION_ATTACHMENT,
+            $file->getFileName()
+        );
+
+        return $response;
+    }
+
+    private function ensureDomainAllowed(array $config, Request $request, ?int $widgetOwnerId = null): ?JsonResponse
+    {
+        // Check for test mode: if X-Widget-Test-Mode header is set
+        // and the authenticated user is the widget owner, skip domain check
+        if ('true' === $request->headers->get('X-Widget-Test-Mode') && $widgetOwnerId) {
+            $user = $this->getUser();
+            if ($user && method_exists($user, 'getId') && $user->getId() === $widgetOwnerId) {
+                $this->logger->info('Widget domain check bypassed for owner in test mode', [
+                    'user_id' => $user->getId(),
+                    'widget_owner_id' => $widgetOwnerId,
+                ]);
+
+                return null; // Allow - owner is testing their own widget
+            }
+        }
+
         $allowedDomains = $config['allowedDomains'] ?? [];
         if (empty($allowedDomains)) {
             $this->logger->warning('Widget request blocked: no domains configured', [

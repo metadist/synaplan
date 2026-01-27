@@ -657,9 +657,11 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import { UserIcon, ArrowPathIcon, ChevronDownIcon } from '@heroicons/vue/24/outline'
 import { Icon } from '@iconify/vue'
 import { useModelSelection, type ModelOption } from '@/composables/useModelSelection'
+import { useNotification } from '@/composables/useNotification'
 import { getProviderIcon } from '@/utils/providerIcons'
 import { useMemoriesStore } from '@/stores/userMemories'
 import MessagePart from './MessagePart.vue'
@@ -667,6 +669,9 @@ import MessageMemories from './MessageMemories.vue'
 import GroqIcon from '@/components/icons/GroqIcon.vue'
 import type { Part, MessageFile } from '@/stores/history'
 import type { AgainData } from '@/types/ai-models'
+
+const { t } = useI18n()
+const { error: showError } = useNotification()
 
 interface Props {
   role: 'user' | 'assistant'
@@ -1033,11 +1038,16 @@ const formatFileSize = (bytes: number): string => {
 }
 
 const downloadFile = async (file: MessageFile) => {
+  if (!file.id) {
+    console.error('Download failed: No file ID')
+    return
+  }
   try {
     const filesService = await import('@/services/filesService')
     await filesService.downloadFile(file.id, file.filename)
   } catch (error) {
     console.error('Download failed:', error)
+    showError(t('files.downloadFailed'))
   }
 }
 

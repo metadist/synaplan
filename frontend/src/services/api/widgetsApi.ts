@@ -194,10 +194,14 @@ export async function sendWidgetMessage(
     payload.files = fileIds
   }
 
+  // Include credentials when in test mode (X-Widget-Test-Mode header is present)
+  const isTestMode = extraHeaders?.['X-Widget-Test-Mode'] === 'true'
+
   const response = await fetch(`${apiUrl}/api/v1/widget/${widgetId}/message`, {
     method: 'POST',
     headers,
     body: JSON.stringify(payload),
+    credentials: isTestMode ? 'include' : 'omit',
   })
 
   if (!response.ok) {
@@ -350,7 +354,7 @@ export async function uploadWidgetFile(
   widgetId: string,
   sessionId: string,
   file: File,
-  apiUrl?: string
+  options?: { apiUrl?: string; headers?: Record<string, string> }
 ): Promise<{
   success: boolean
   file: {
@@ -363,29 +367,35 @@ export async function uploadWidgetFile(
   remainingUploads?: number
 }> {
   const config = useConfigStore()
-  const baseUrl = apiUrl ?? config.apiBaseUrl
+  const baseUrl = options?.apiUrl ?? config.apiBaseUrl
 
   const formData = new FormData()
   formData.append('file', file)
 
   const headers: Record<string, string> = {
     'X-Widget-Session': sessionId,
+    ...(options?.headers ?? {}),
   }
 
   if (typeof window !== 'undefined' && window.location?.host) {
     headers['X-Widget-Host'] = window.location.host
   }
 
+  // Include credentials when in test mode (X-Widget-Test-Mode header is present)
+  const isTestMode = options?.headers?.['X-Widget-Test-Mode'] === 'true'
+
   console.log('🌐 Widget file upload request:', {
     url: `${baseUrl}/api/v1/widget/${widgetId}/upload`,
     method: 'POST',
     bodyPreview: 'FormData with file',
+    isTestMode,
   })
 
   const response = await fetch(`${baseUrl}/api/v1/widget/${widgetId}/upload`, {
     method: 'POST',
     headers,
     body: formData,
+    credentials: isTestMode ? 'include' : 'omit',
   })
 
   console.log('🌐 Widget file upload response:', {
