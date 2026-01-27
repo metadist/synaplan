@@ -1056,6 +1056,12 @@ class WidgetPublicController extends AbstractController
             return $this->json(['error' => 'Widget not found'], Response::HTTP_NOT_FOUND);
         }
 
+        // Check domain restrictions
+        $config = $widget->getConfig();
+        if ($domainError = $this->ensureDomainAllowed($config, $request, $widget->getOwnerId())) {
+            return $domainError;
+        }
+
         // Get the session
         $session = $this->sessionService->getSession($widgetId, $sessionId);
         if (!$session) {

@@ -945,11 +945,8 @@ const handleFileSelect = (event: Event) => {
   for (let i = 0; i < files.length; i++) {
     const file = files[i]
 
-    // Check if we've reached the limit (considering already selected + new)
-    if (
-      selectedFiles.value.length + filesToAdd.length >=
-      remainingFileSlots.value + selectedFiles.value.length
-    ) {
+    // Check if we've reached the limit
+    if (filesToAdd.length >= remainingFileSlots.value) {
       fileUploadError.value = t('widget.fileUploadLimitReached')
       break
     }
