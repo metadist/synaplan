@@ -241,8 +241,9 @@ class WidgetPublicController extends AbstractController
                 // Create welcome message if configured
                 $autoMessage = $config['autoMessage'] ?? '';
                 if (!empty($autoMessage)) {
-                    // Use timestamp 1 second before current time to ensure welcome message comes first
-                    $welcomeTimestamp = time() - 1;
+                    // Use timestamp 10 seconds before current time to ensure welcome message comes first.
+                    // This is combined with secondary sort by ID in MessageRepository for reliable ordering.
+                    $welcomeTimestamp = time() - 10;
                     $welcomeMessage = new Message();
                     $welcomeMessage->setUserId($owner->getId());
                     $welcomeMessage->setChat($chat);
