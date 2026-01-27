@@ -725,13 +725,21 @@ const escapeHtml = (text: string): string => {
   return div.innerHTML
 }
 
+// Validate and sanitize hex color to prevent CSS injection
+const sanitizeHexColor = (color: string, fallback: string): string => {
+  // Match valid hex colors: #RGB, #RRGGBB, #RRGGBBAA
+  const hexPattern = /^#([0-9A-Fa-f]{3}|[0-9A-Fa-f]{6}|[0-9A-Fa-f]{8})$/
+  return hexPattern.test(color) ? color : fallback
+}
+
 // Export chat as PDF (via print dialog)
 const exportChat = () => {
   if (messages.value.length === 0) return
 
   const exportDate = new Date()
   const chatTitle = props.widgetTitle || t('widget.title')
-  const themeColor = props.primaryColor || '#6366f1'
+  const defaultColor = '#6366f1'
+  const themeColor = sanitizeHexColor(props.primaryColor || defaultColor, defaultColor)
 
   // Build HTML content
   let html = `
