@@ -566,7 +566,9 @@ const allowFileUploads = computed(
   () => !!props.allowFileUpload && (!props.isPreview || props.testMode)
 )
 const fileUploadLimit = computed(() => props.fileUploadLimit ?? 0)
-const testModeHeaders = computed(() => (props.testMode ? { 'X-Widget-Test-Mode': 'true' } : {}))
+const testModeHeaders = computed(
+  (): Record<string, string> => (props.testMode ? { 'X-Widget-Test-Mode': 'true' } : {})
+)
 const fileUploadCount = ref(0)
 const uploadingFile = ref(false)
 const fileUploadError = ref<string | null>(null)
@@ -1249,13 +1251,6 @@ const downloadFileById = async (fileId: number | undefined, filename: string | u
     // Show error in chat instead of alert
     addBotMessage(t('widget.downloadFailed'))
   }
-}
-
-const downloadFile = async (message: Message) => {
-  // Get file ID from message
-  const fileId = message.fileId || (message.files && message.files[0]?.id)
-  const filename = message.fileName || (message.files && message.files[0]?.filename) || 'file'
-  await downloadFileById(fileId, filename)
 }
 
 const getSessionStorageKey = () => `synaplan_widget_session_${props.widgetId}`
