@@ -5,6 +5,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import type { Part } from '../stores/history'
+import type { UserMemory } from '@/services/api/userMemoriesApi'
 import MessageText from './MessageText.vue'
 import MessageImage from './MessageImage.vue'
 import MessageVideo from './MessageVideo.vue'
@@ -20,6 +21,8 @@ import MessageThinking from './MessageThinking.vue'
 
 interface Props {
   part: Part
+  isStreaming?: boolean
+  memories?: UserMemory[] | null // Full memory objects (resolved from IDs)
 }
 
 const props = defineProps<Props>()
@@ -58,7 +61,11 @@ const componentType = computed(() => {
 const componentProps = computed(() => {
   switch (props.part.type) {
     case 'text':
-      return { content: props.part.content || '' }
+      return {
+        content: props.part.content || '',
+        isStreaming: props.isStreaming,
+        memories: props.memories,
+      }
     case 'image':
       return { url: props.part.url || '', alt: props.part.alt }
     case 'video':
@@ -96,7 +103,7 @@ const componentProps = computed(() => {
         thinkingTime: props.part.thinkingTime,
       }
     default:
-      return { content: props.part.content || '' }
+      return { content: props.part.content || '', memories: props.memories }
   }
 })
 </script>

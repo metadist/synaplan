@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { normalizeMediaUrl } from '@/utils/urlHelper'
 import { extractBTextPayload } from '@/utils/jsonResponse'
+import { parseAIResponse } from '@/utils/responseParser'
 import type { AgainData } from '@/types/ai-models'
 import { authService } from '@/services/authService'
 
@@ -110,16 +111,22 @@ export interface Message {
     resultsCount?: number
   } | null // Web search metadata
   tool?: {
-    command: string // The command name (e.g., 'search', 'pic', 'vid')
-    label: string // Display label (e.g., 'Web Search', 'Image Generation', 'Video Generation')
-    icon: string // Icon identifier
-  } | null // Tool/command metadata
+    icon: string
+    label: string
+  } | null // Tool metadata (e.g., web search, file generation)
+  memoryIds?: number[] | null // IDs of memories used (resolved from memoriesStore)
+  processingStatus?: string
+  processingMetadata?: any
 }
 
 /**
- * Parse content to extract thinking blocks and regular text
+ * Parse content to extract thinking blocks, code blocks, and regular text.
+ * This ensures consistent rendering between streaming and loaded messages.
  */
-function parseContentWithThinking(content: string): Part[] {
+function parseContentWithThinking(
+  content: string,
+  role: 'user' | 'assistant' = 'assistant'
+): Part[] {
   // Handle special file generation markers from backend
   if (content.startsWith('__FILE_GENERATED__:')) {
     const filename = content.replace('__FILE_GENERATED__:', '').trim()
@@ -153,7 +160,7 @@ function parseContentWithThinking(content: string): Part[] {
 
   const parts: Part[] = []
 
-  // Extract thinking blocks
+  // Extract thinking blocks first
   const thinkRegex = /<think>([\s\S]*?)<\/think>/g
   const thinkingBlocks: Array<{ content: string; index: number }> = []
   let match
@@ -182,8 +189,35 @@ function parseContentWithThinking(content: string): Part[] {
     content = content.replace(/<think>[\s\S]*?<\/think>/g, '').trim()
   }
 
-  // Add remaining text content
-  if (content) {
+  // For assistant messages, use parseAIResponse to extract code blocks
+  // This ensures consistent rendering between streaming and loaded messages
+  if (role === 'assistant' && content) {
+    const parsed = parseAIResponse(content)
+    parsed.parts.forEach((part) => {
+      if (part.type === 'code') {
+        parts.push({
+          type: 'code',
+          content: part.content,
+          language: part.language,
+        })
+      } else if (part.type === 'text' && part.content.trim()) {
+        parts.push({
+          type: 'text',
+          content: part.content,
+        })
+      } else if (part.type === 'links' && part.links) {
+        parts.push({
+          type: 'links',
+          items: part.links.map((l) => ({
+            title: l.title,
+            url: l.url,
+            desc: l.description,
+          })),
+        })
+      }
+    })
+  } else if (content) {
+    // For user messages, just add as text
     parts.push({
       type: 'text',
       content,
@@ -270,20 +304,8 @@ export const useHistoryStore = defineStore('history', () => {
       else if (message.parts.length === 1 && message.parts[0].type === 'text') {
         const currentContent = message.parts[0]?.content || ''
 
-        console.log('🔍 finishStreamingMessage: Content length:', currentContent.length)
-        console.log('🔍 finishStreamingMessage: Has <think>?', currentContent.includes('<think>'))
-        console.log('🔍 finishStreamingMessage: Content preview:', currentContent.substring(0, 200))
-
         if (currentContent && currentContent.includes('<think>')) {
-          console.log('✅ Parsing <think> tags!')
           message.parts = parseContentWithThinking(currentContent)
-          console.log(
-            '✅ Parsed parts:',
-            message.parts.length,
-            message.parts.map((p) => p.type)
-          )
-        } else {
-          console.log('❌ No <think> tags found or content empty')
         }
       }
     }
@@ -333,6 +355,13 @@ export const useHistoryStore = defineStore('history', () => {
     if (!checkAuthOrRedirect()) return
 
     isLoadingMessages.value = true
+
+    // Reset pagination state when loading from start (prevents stale state on error)
+    if (offset === 0) {
+      currentOffset.value = 0
+      hasMoreMessages.value = false
+    }
+
     try {
       const { chatApi } = await import('@/services/api')
       const response = await chatApi.getChatMessages(chatId, offset, limit)
@@ -341,7 +370,7 @@ export const useHistoryStore = defineStore('history', () => {
         const loadedMessages: Message[] = response.messages.map((m: any) => {
           const role = m.direction === 'IN' ? 'user' : 'assistant'
 
-          const parts = parseContentWithThinking(m.text || '')
+          const parts = parseContentWithThinking(m.text || '', role)
 
           // Add generated file (image/video/audio) as part if present
           if (m.file && m.file.path) {

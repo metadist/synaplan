@@ -1,5 +1,6 @@
 import type { AIModel, Capability } from '@/types/ai-models'
 import { httpClient } from './httpClient'
+import { z } from 'zod'
 
 export interface ModelsResponse {
   success: boolean
@@ -65,4 +66,21 @@ export const configApi = {
   getDefaultModels,
   saveDefaultModels,
   checkModelAvailability,
+}
+
+// Memory Service Check (new)
+const MemoryServiceCheckSchema = z.object({
+  available: z.boolean(),
+  configured: z.boolean(),
+})
+
+export type MemoryServiceCheck = z.infer<typeof MemoryServiceCheckSchema>
+
+/**
+ * Check memory service availability (lightweight, async check)
+ */
+export async function checkMemoryServiceAvailability(): Promise<MemoryServiceCheck> {
+  return httpClient('/api/v1/config/memory-service/check', {
+    schema: MemoryServiceCheckSchema,
+  })
 }

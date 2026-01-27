@@ -41,12 +41,18 @@ export function parseAIResponse(content: string): ParsedResponse {
 
   let lastIndex = 0
 
-  // Extract code blocks first
+  // Extract code blocks first (except mermaid - those stay in markdown for diagram rendering)
   const codeBlocks: Array<{ start: number; end: number; language?: string; code: string }> = []
   let codeMatch
   while ((codeMatch = CODE_BLOCK_REGEX.exec(content)) !== null) {
     const language = codeMatch[1] || 'text'
     const code = codeMatch[2].trim()
+
+    // Skip mermaid blocks - they should stay in markdown for diagram rendering
+    if (language.toLowerCase() === 'mermaid') {
+      continue
+    }
+
     codeBlocks.push({
       start: codeMatch.index,
       end: codeMatch.index + codeMatch[0].length,

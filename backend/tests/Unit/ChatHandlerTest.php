@@ -9,10 +9,12 @@ use App\Entity\Prompt;
 use App\Repository\ModelRepository;
 use App\Repository\PromptRepository;
 use App\Service\File\UserUploadPathBuilder;
+use App\Service\MemoryExtractionService;
 use App\Service\Message\Handler\ChatHandler;
 use App\Service\ModelConfigService;
 use App\Service\PromptService;
 use App\Service\RAG\VectorSearchService;
+use App\Service\UserMemoryService;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
@@ -28,6 +30,8 @@ class ChatHandlerTest extends TestCase
     private VectorSearchService $vectorSearchService;
     private EntityManagerInterface $em;
     private UserUploadPathBuilder $userUploadPathBuilder;
+    private UserMemoryService $userMemoryService;
+    private MemoryExtractionService $memoryExtractionService;
     private ChatHandler $handler;
 
     protected function setUp(): void
@@ -41,6 +45,8 @@ class ChatHandlerTest extends TestCase
         $this->vectorSearchService = $this->createMock(VectorSearchService::class);
         $this->em = $this->createMock(EntityManagerInterface::class);
         $this->userUploadPathBuilder = new UserUploadPathBuilder();
+        $this->userMemoryService = $this->createMock(UserMemoryService::class);
+        $this->memoryExtractionService = $this->createMock(MemoryExtractionService::class);
 
         $this->handler = new ChatHandler(
             $this->aiFacade,
@@ -52,7 +58,9 @@ class ChatHandlerTest extends TestCase
             $this->vectorSearchService,
             $this->em,
             '/tmp/uploads',
-            $this->userUploadPathBuilder
+            $this->userUploadPathBuilder,
+            $this->userMemoryService,
+            $this->memoryExtractionService
         );
     }
 
@@ -315,11 +323,16 @@ class ChatHandlerTest extends TestCase
             ->method('chatStream')
             ->with(
                 $this->anything(),
-                $streamCallback,
+                $this->callback(static fn ($cb) => is_callable($cb)),
                 1,
                 $this->anything()
             )
-            ->willReturn(['provider' => 'test', 'model' => 'test']);
+            ->willReturnCallback(static function ($messages, $cb, $userId, $options) {
+                // Simulate one streamed chunk coming from the provider.
+                $cb('hello');
+
+                return ['provider' => 'test', 'model' => 'test'];
+            });
 
         $this->handler->handleStream(
             $message,
@@ -327,6 +340,8 @@ class ChatHandlerTest extends TestCase
             ['topic' => 'CHAT', 'language' => 'en'],
             $streamCallback
         );
+
+        self::assertNotEmpty($chunks);
     }
 
     public function testHandleStreamLoadsPromptMetadataForTaskPrompt(): void

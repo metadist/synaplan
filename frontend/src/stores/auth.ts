@@ -13,6 +13,7 @@ export interface User {
   created?: string
   isAdmin?: boolean
   emailVerified?: boolean
+  memoriesEnabled?: boolean
 }
 
 // Promise that resolves when initial auth check is complete

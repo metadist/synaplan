@@ -152,6 +152,26 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
         return $this;
     }
 
+    /**
+     * Per-user toggle: if false, Synaplan will not use or auto-update memories for this user.
+     * Stored in BUSERDETAILS JSON to avoid schema changes.
+     */
+    public function isMemoriesEnabled(): bool
+    {
+        $value = $this->userDetails['memories_enabled'] ?? true;
+
+        return false !== $value;
+    }
+
+    public function setMemoriesEnabled(bool $enabled): self
+    {
+        $details = $this->getUserDetails();
+        $details['memories_enabled'] = $enabled;
+        $this->setUserDetails($details);
+
+        return $this;
+    }
+
     public function getPaymentDetails(): array
     {
         return $this->paymentDetails;

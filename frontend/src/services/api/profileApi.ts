@@ -18,6 +18,7 @@ export interface Profile {
   language: string
   timezone: string
   invoiceEmail: string
+  memoriesEnabled: boolean
   emailKeyword?: string | null
   personalEmailAddress: string
   canChangePassword?: boolean
