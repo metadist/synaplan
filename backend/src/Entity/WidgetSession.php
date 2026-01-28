@@ -41,9 +41,6 @@ class WidgetSession
     #[ORM\Column(name: 'BEXPIRES', type: 'bigint')]
     private int $expires;
 
-    #[ORM\Column(name: 'BISTEST', type: 'boolean')]
-    private bool $isTest = false;
-
     public function __construct()
     {
         $this->created = time();
@@ -176,16 +173,13 @@ class WidgetSession
         return time() > $this->expires;
     }
 
+    /**
+     * Check if this is a test session based on session ID prefix.
+     * Test sessions have IDs starting with 'test_'.
+     */
     public function isTest(): bool
     {
-        return $this->isTest;
-    }
-
-    public function setIsTest(bool $isTest): self
-    {
-        $this->isTest = $isTest;
-
-        return $this;
+        return str_starts_with($this->sessionId, 'test_');
     }
 
     /**
