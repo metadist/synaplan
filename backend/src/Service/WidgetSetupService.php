@@ -5,12 +5,9 @@ declare(strict_types=1);
 namespace App\Service;
 
 use App\AI\Service\AiFacade;
-use App\Entity\Chat;
-use App\Entity\Message;
 use App\Entity\Prompt;
 use App\Entity\User;
 use App\Entity\Widget;
-use App\Repository\ChatRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 
@@ -29,7 +26,6 @@ final class WidgetSetupService
         private EntityManagerInterface $em,
         private AiFacade $aiFacade,
         private PromptService $promptService,
-        private ChatRepository $chatRepository,
         private WidgetService $widgetService,
         private ModelConfigService $modelConfigService,
         private LoggerInterface $logger,
@@ -307,72 +303,6 @@ PROMPT;
     }
 
     /**
-     * Convert a string to a URL-friendly slug.
-     */
-    private function slugify(string $text): string
-    {
-        // Transliterate
-        $text = transliterator_transliterate('Any-Latin; Latin-ASCII; Lower()', $text);
-        // Remove non-alphanumeric
-        $text = preg_replace('/[^a-z0-9]+/', '-', $text);
-        // Trim dashes
-        $text = trim($text, '-');
-
-        // Limit length
-        return mb_substr($text, 0, 30) ?: 'custom';
-    }
-
-    /**
-     * Build the conversation messages array for the AI.
-     * The AI decides if the user's answer is valid and what question to ask next.
-     *
-     * @return array<array{role: string, content: string}>
-     */
-    private function buildConversationMessages(Chat $chat, string $systemPrompt, string $newUserMessage): array
-    {
-        $messages = [];
-
-        // Get conversation history
-        $historyMessages = $this->em->getRepository(Message::class)->findBy(
-            ['chat' => $chat],
-            ['id' => 'ASC']
-        );
-
-        // Extract answered questions from history (based on AI's previous decisions)
-        // An answer is only "collected" if the AI moved to the next question
-        $collectedAnswers = $this->extractCollectedAnswers($historyMessages);
-
-        // Build enhanced system prompt - tell AI what we've already collected
-        // The AI will decide if the NEW user message is valid
-        $enhancedSystemPrompt = $systemPrompt;
-        $enhancedSystemPrompt .= $this->buildInstructionBlock($collectedAnswers);
-
-        $messages[] = [
-            'role' => 'system',
-            'content' => $enhancedSystemPrompt,
-        ];
-
-        // Add conversation history
-        foreach ($historyMessages as $msg) {
-            $role = 'IN' === $msg->getDirection() ? 'user' : 'assistant';
-            $messages[] = [
-                'role' => $role,
-                'content' => $msg->getText(),
-            ];
-        }
-
-        // Add new user message (unless it's the start marker)
-        if (self::START_MARKER !== $newUserMessage) {
-            $messages[] = [
-                'role' => 'user',
-                'content' => $newUserMessage,
-            ];
-        }
-
-        return $messages;
-    }
-
-    /**
      * Build conversation messages from array-based history (no database).
      *
      * @param array<array{role: string, content: string}> $history
@@ -450,77 +380,6 @@ PROMPT;
                     }
                 }
             } elseif ('user' === $role) {
-                // Store this as a pending answer (will be confirmed when AI moves forward)
-                if (!$this->isStartMarker($text) && $pendingQuestion >= 1) {
-                    $pendingAnswer = $text;
-                }
-            }
-        }
-
-        return $answers;
-    }
-
-    /**
-     * Find the last question number asked by the AI.
-     *
-     * @param Message[] $historyMessages
-     */
-    private function getLastAskedQuestion(array $historyMessages): int
-    {
-        $lastAsked = 0;
-
-        foreach ($historyMessages as $msg) {
-            if ('OUT' === $msg->getDirection()) {
-                // Match the [QUESTION:X] or [FRAGE:X] marker at the end of AI responses
-                if (preg_match('/\[(QUESTION|FRAGE):(\d)\]/i', $msg->getText(), $matches)) {
-                    $questionNum = (int) $matches[2];
-                    if ($questionNum >= 1 && $questionNum <= 5) {
-                        $lastAsked = $questionNum;
-                    }
-                }
-            }
-        }
-
-        return $lastAsked;
-    }
-
-    /**
-     * Extract answered questions and their answers from conversation history.
-     * An answer is only considered "collected" if the AI moved to a HIGHER question.
-     *
-     * @param Message[] $historyMessages
-     *
-     * @return array<int, string> Question number => answer text
-     */
-    private function extractCollectedAnswers(array $historyMessages): array
-    {
-        $answers = [];
-        $pendingAnswer = null;
-        $pendingQuestion = 0;
-
-        foreach ($historyMessages as $msg) {
-            $text = $msg->getText();
-            $direction = $msg->getDirection();
-
-            if ('OUT' === $direction) {
-                // Check which question the AI asked via [QUESTION:X] or [FRAGE:X] marker
-                if (preg_match('/\[(QUESTION|FRAGE):(\d)\]/i', $text, $matches)) {
-                    $currentQuestion = (int) $matches[2];
-
-                    // If AI moved to a higher question, the previous answer was accepted
-                    if (null !== $pendingAnswer && $currentQuestion > $pendingQuestion) {
-                        $answers[$pendingQuestion] = $pendingAnswer;
-                    }
-
-                    $pendingAnswer = null;
-                    $pendingQuestion = $currentQuestion;
-                } elseif (preg_match('/\[(QUESTION|FRAGE):DONE\]/i', $text)) {
-                    // AI says all done - accept the pending answer if there was one
-                    if (null !== $pendingAnswer && $pendingQuestion >= 1) {
-                        $answers[$pendingQuestion] = $pendingAnswer;
-                    }
-                }
-            } elseif ('IN' === $direction) {
                 // Store this as a pending answer (will be confirmed when AI moves forward)
                 if (!$this->isStartMarker($text) && $pendingQuestion >= 1) {
                     $pendingAnswer = $text;
