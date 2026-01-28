@@ -622,8 +622,11 @@ class UserMemoryController extends AbstractController
     {
         $actions = [];
 
+        // Clean up the content - extract JSON from markdown code blocks if present
+        $cleanContent = $this->extractJsonFromResponse($content);
+
         // Try standard JSON parse first
-        $parsed = json_decode($content, true);
+        $parsed = json_decode($cleanContent, true);
 
         if (null !== $parsed && \JSON_ERROR_NONE === json_last_error()) {
             // Format 1: {"actions": [...]}
@@ -649,11 +652,39 @@ class UserMemoryController extends AbstractController
             }
         }
 
+        // Try to repair common JSON errors and parse again
+        $repairedContent = $this->repairJson($cleanContent);
+        if ($repairedContent !== $cleanContent) {
+            $parsed = json_decode($repairedContent, true);
+
+            if (null !== $parsed && \JSON_ERROR_NONE === json_last_error()) {
+                if (isset($parsed['actions']) && is_array($parsed['actions'])) {
+                    foreach ($parsed['actions'] as $actionData) {
+                        $action = $this->parseActionData($actionData, $input, $validMemoryIds);
+                        if ($action) {
+                            $actions[] = $action;
+                        }
+                    }
+
+                    return $actions;
+                }
+
+                if (isset($parsed['action'])) {
+                    $action = $this->parseActionData($parsed, $input, $validMemoryIds);
+                    if ($action) {
+                        $actions[] = $action;
+                    }
+
+                    return $actions;
+                }
+            }
+        }
+
         // Format 3: NDJSON - multiple JSON objects on separate lines
         // This handles when AI returns:
         // {"action":"create",...}
         // {"action":"create",...}
-        $lines = preg_split('/\r?\n/', trim($content));
+        $lines = preg_split('/\r?\n/', trim($cleanContent));
         foreach ($lines as $line) {
             $line = trim($line);
             if (empty($line)) {
@@ -661,6 +692,12 @@ class UserMemoryController extends AbstractController
             }
 
             $lineData = json_decode($line, true);
+            if (null === $lineData) {
+                // Try to repair this line
+                $repairedLine = $this->repairJson($line);
+                $lineData = json_decode($repairedLine, true);
+            }
+
             if (null !== $lineData && isset($lineData['action'])) {
                 $action = $this->parseActionData($lineData, $input, $validMemoryIds);
                 if ($action) {
@@ -670,6 +707,62 @@ class UserMemoryController extends AbstractController
         }
 
         return $actions;
+    }
+
+    /**
+     * Extract JSON from AI response, handling markdown code blocks.
+     */
+    private function extractJsonFromResponse(string $content): string
+    {
+        $content = trim($content);
+
+        // Remove markdown code blocks if present
+        if (preg_match('/```(?:json)?\s*([\s\S]*?)\s*```/', $content, $matches)) {
+            $content = trim($matches[1]);
+        }
+
+        return $content;
+    }
+
+    /**
+     * Attempt to repair common JSON errors from AI responses.
+     */
+    private function repairJson(string $json): string
+    {
+        $json = trim($json);
+
+        // Count brackets to find imbalance
+        $openBraces = substr_count($json, '{');
+        $closeBraces = substr_count($json, '}');
+        $openBrackets = substr_count($json, '[');
+        $closeBrackets = substr_count($json, ']');
+
+        // Remove extra closing braces (common AI error: }}} instead of }})
+        while ($closeBraces > $openBraces && str_contains($json, '}}')) {
+            // Find and remove one extra }
+            $json = preg_replace('/\}\}(\]|\})/', '}$1', $json, 1);
+            $closeBraces = substr_count($json, '}');
+        }
+
+        // Remove extra closing brackets
+        while ($closeBrackets > $openBrackets && str_contains($json, ']]')) {
+            $json = preg_replace('/\]\]/', ']', $json, 1);
+            $closeBrackets = substr_count($json, ']');
+        }
+
+        // Add missing closing braces at end
+        while ($openBraces > $closeBraces) {
+            $json .= '}';
+            ++$closeBraces;
+        }
+
+        // Add missing closing brackets at end
+        while ($openBrackets > $closeBrackets) {
+            $json .= ']';
+            ++$closeBrackets;
+        }
+
+        return $json;
     }
 
     /**
