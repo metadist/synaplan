@@ -1240,7 +1240,7 @@ Be friendly, professional, and concise in your responses.`
     const result = await widgetsApi.generateWidgetPrompt(
       props.widget.widgetId,
       defaultPromptContent,
-      null
+      []
     )
 
     // Update local state to show the form
