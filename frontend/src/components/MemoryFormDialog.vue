@@ -33,8 +33,8 @@
                 class="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all"
                 :class="
                   mode === 'easy'
-                    ? 'bg-brand text-white shadow-sm'
-                    : 'txt-primary opacity-70 hover:opacity-100 hover:bg-black/5 dark:hover:bg-white/10'
+                    ? 'mode-toggle-active'
+                    : 'txt-secondary hover:txt-primary hover:bg-black/5 dark:hover:bg-white/10'
                 "
                 @click="switchToEasyMode"
               >
@@ -46,8 +46,8 @@
                 class="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all"
                 :class="
                   mode === 'advanced'
-                    ? 'bg-brand text-white shadow-sm'
-                    : 'txt-primary opacity-70 hover:opacity-100 hover:bg-black/5 dark:hover:bg-white/10'
+                    ? 'mode-toggle-active'
+                    : 'txt-secondary hover:txt-primary hover:bg-black/5 dark:hover:bg-white/10'
                 "
                 @click="mode = 'advanced'"
               >
@@ -68,13 +68,14 @@
               <div
                 class="w-16 h-16 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-brand/20 to-purple-500/20 flex items-center justify-center animate-pulse-slow"
               >
-                <Icon
-                  icon="mdi:head-lightbulb"
-                  class="w-8 h-8 text-brand drop-shadow-lg"
-                />
+                <Icon icon="mdi:head-lightbulb" class="w-8 h-8 text-brand drop-shadow-lg" />
               </div>
               <p class="txt-secondary text-sm leading-relaxed">
-                {{ memory ? $t('memories.form.easyEditDescription') : $t('memories.form.easyDescription') }}
+                {{
+                  memory
+                    ? $t('memories.form.easyEditDescription')
+                    : $t('memories.form.easyDescription')
+                }}
               </p>
             </div>
 
@@ -100,7 +101,11 @@
               </label>
               <textarea
                 v-model="easyInput"
-                :placeholder="memory ? $t('memories.form.easyEditPlaceholder') : $t('memories.form.easyPlaceholder')"
+                :placeholder="
+                  memory
+                    ? $t('memories.form.easyEditPlaceholder')
+                    : $t('memories.form.easyPlaceholder')
+                "
                 rows="4"
                 required
                 class="w-full px-4 py-3 rounded-xl surface-chip txt-primary placeholder:txt-secondary focus:outline-none focus:ring-2 focus:ring-brand/50 resize-none transition-all text-sm sm:text-base"
@@ -171,13 +176,15 @@
                 :disabled="isProcessing || !easyInput.trim()"
                 class="flex-1 btn-primary px-4 py-2.5 rounded-xl font-medium flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                <Icon
-                  v-if="isProcessing"
-                  icon="mdi:loading"
-                  class="w-4 h-4 animate-spin"
-                />
+                <Icon v-if="isProcessing" icon="mdi:loading" class="w-4 h-4 animate-spin" />
                 <Icon v-else icon="mdi:sparkles" class="w-4 h-4" />
-                {{ isProcessing ? $t('common.loading') : (memory ? $t('memories.form.updateWithAI') : $t('memories.form.createWithAI')) }}
+                {{
+                  isProcessing
+                    ? $t('common.loading')
+                    : memory
+                      ? $t('memories.form.updateWithAI')
+                      : $t('memories.form.createWithAI')
+                }}
               </button>
             </div>
           </form>
@@ -202,7 +209,12 @@
             <!-- Actions Summary -->
             <div class="mb-3 text-center">
               <span class="text-sm txt-secondary">
-                {{ parsedActions.length }} {{ parsedActions.length === 1 ? $t('memories.form.oneChange') : $t('memories.form.multipleChanges') }}
+                {{ parsedActions.length }}
+                {{
+                  parsedActions.length === 1
+                    ? $t('memories.form.oneChange')
+                    : $t('memories.form.multipleChanges')
+                }}
               </span>
             </div>
 
@@ -246,9 +258,12 @@
                       <span
                         class="px-2 py-0.5 rounded-full text-xs font-medium"
                         :class="{
-                          'bg-green-500/20 text-green-600 dark:text-green-400': actionItem.action === 'create',
-                          'bg-blue-500/20 text-blue-600 dark:text-blue-400': actionItem.action === 'update',
-                          'bg-red-500/20 text-red-600 dark:text-red-400': actionItem.action === 'delete',
+                          'bg-green-500/20 text-green-600 dark:text-green-400':
+                            actionItem.action === 'create',
+                          'bg-blue-500/20 text-blue-600 dark:text-blue-400':
+                            actionItem.action === 'update',
+                          'bg-red-500/20 text-red-600 dark:text-red-400':
+                            actionItem.action === 'delete',
                         }"
                       >
                         {{
@@ -259,7 +274,9 @@
                               : $t('memories.form.actionDelete')
                         }}
                       </span>
-                      <span v-if="actionItem.memory" class="pill text-xs">{{ actionItem.memory.category }}</span>
+                      <span v-if="actionItem.memory" class="pill text-xs">{{
+                        actionItem.memory.category
+                      }}</span>
                     </div>
 
                     <template v-if="actionItem.memory">
@@ -312,11 +329,7 @@
                 class="w-full px-4 py-2.5 rounded-xl surface-chip txt-primary placeholder:txt-secondary focus:outline-none focus:ring-2 focus:ring-brand/50 transition-all"
               />
               <datalist id="category-suggestions">
-                <option
-                  v-for="category in availableCategories"
-                  :key="category"
-                  :value="category"
-                />
+                <option v-for="category in availableCategories" :key="category" :value="category" />
               </datalist>
               <p class="mt-1 text-xs txt-secondary">
                 {{ $t('memories.create.categoryHint') }}
@@ -358,10 +371,7 @@
               >
                 {{ $t('common.cancel') }}
               </button>
-              <button
-                type="submit"
-                class="flex-1 btn-primary px-4 py-2.5 rounded-xl font-medium"
-              >
+              <button type="submit" class="flex-1 btn-primary px-4 py-2.5 rounded-xl font-medium">
                 {{ $t('common.save') }}
               </button>
             </div>
@@ -595,5 +605,11 @@ function handleAdvancedSubmit() {
 
 .animate-pulse-slow {
   animation: pulse-slow 3s ease-in-out infinite;
+}
+
+.mode-toggle-active {
+  background-color: var(--brand);
+  color: white;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
 }
 </style>

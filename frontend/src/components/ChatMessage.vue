@@ -283,7 +283,11 @@
           />
 
           <!-- Used Memories (AFTER content, before search results) -->
-          <MessageMemories v-if="role === 'assistant' && memories" :memories="memories" />
+          <MessageMemories
+            v-if="role === 'assistant' && memories"
+            :memories="memories"
+            @click-memory="(memory) => emit('click-memory', memory)"
+          />
 
           <!-- Web Search Results Carousel (AFTER content) -->
           <div
@@ -662,6 +666,7 @@ import { Icon } from '@iconify/vue'
 import { useModelSelection, type ModelOption } from '@/composables/useModelSelection'
 import { getProviderIcon } from '@/utils/providerIcons'
 import { useMemoriesStore } from '@/stores/userMemories'
+import type { UserMemory } from '@/services/api/userMemoriesApi'
 import MessagePart from './MessagePart.vue'
 import MessageMemories from './MessageMemories.vue'
 import GroqIcon from '@/components/icons/GroqIcon.vue'
@@ -897,6 +902,7 @@ const emit = defineEmits<{
   regenerate: [model: ModelOption]
   again: [backendMessageId: number, modelId?: number]
   retry: [messageContent: string]
+  'click-memory': [memory: UserMemory]
 }>()
 
 const router = useRouter()
@@ -1063,11 +1069,8 @@ const handleReferenceClick = (event: MouseEvent) => {
       const resolvedMemories = memories.value
       if (index >= 0 && resolvedMemories && index < resolvedMemories.length) {
         const memory = resolvedMemories[index]
-        // Navigate to memories page with highlight
-        router.push({
-          path: '/memories',
-          query: { highlight: memory.id.toString() },
-        })
+        // Emit event to open MemoriesDialog in ChatView (stay in chat!)
+        emit('click-memory', memory)
       }
     }
   }

@@ -686,79 +686,52 @@ PROMPT;
         return <<<'PROMPT'
 # Memory Parse Assistant
 
-Extract ALL information from user input and return as JSON array.
+Parse user input into memories. Keep ALL details the user mentions!
 
-## CRITICAL RULES
+## Rules
 
-1. **Return an ARRAY of actions** - even for single items!
-2. **EXTRACT the actual value, don't repeat the input!**
-   - "My name is John" → value: "John"
-   - "I'm 25 years old" → value: "25"
-3. **UPDATE if same topic exists in the provided memories**
-4. **One action per piece of information**
+1. Return JSON with "actions" array
+2. **KEEP FULL CONTEXT** - never shorten or summarize!
+   - "I like doner but it's too salty" → value: "doner, but it's too salty"
+   - "My favorite color is blue because it calms me" → value: "blue, because it calms me"
+3. UPDATE if same topic exists (use existingId)
+4. DELETE only when user explicitly wants to forget
 
-## Output Format
+## Format
 
-Always return a JSON array:
 ```json
-{
-  "actions": [
-    {"action": "create", "memory": {"category": "personal", "key": "name", "value": "John"}},
-    {"action": "create", "memory": {"category": "personal", "key": "age", "value": "25"}}
-  ]
-}
+{"actions": [{"action": "create|update|delete", "memory": {"category": "...", "key": "...", "value": "..."}, "existingId": 123}]}
 ```
-
-## Action Types
-
-- **create**: New info, nothing similar exists
-- **update**: Similar exists → include existingId
-- **delete**: User wants to forget → include existingId
-
-## Standard Keys
-name, age, location, job, company, favorite_food, favorite_color, hobbies, skills
 
 ## Categories
 personal, preferences, work, projects, general
 
+## Keys (examples)
+name, age, location, job, favorite_food, favorite_color, hobbies, skills, notes
+
 ## Examples
 
-Input: "My name is Sarah and I'm 30 years old"
-Existing: none
+Input: "I like pizza but only with extra cheese"
+```json
+{"actions": [{"action": "create", "memory": {"category": "preferences", "key": "favorite_food", "value": "pizza, but only with extra cheese"}}]}
+```
+
+Input: "My name is Tom, I'm 25, and I work at Google as a developer"
 ```json
 {"actions": [
-  {"action": "create", "memory": {"category": "personal", "key": "name", "value": "Sarah"}},
-  {"action": "create", "memory": {"category": "personal", "key": "age", "value": "30"}}
+  {"action": "create", "memory": {"category": "personal", "key": "name", "value": "Tom"}},
+  {"action": "create", "memory": {"category": "personal", "key": "age", "value": "25"}},
+  {"action": "create", "memory": {"category": "work", "key": "job", "value": "developer at Google"}}
 ]}
 ```
 
-Input: "I'm now called Tom and I'm 25"
-Existing: [{"id": 12, "key": "name", "value": "Sarah"}, {"id": 13, "key": "age", "value": "30"}]
+Input: "Actually I'm 26 now"
+Existing: [{"id": 5, "key": "age", "value": "25"}]
 ```json
-{"actions": [
-  {"action": "update", "existingId": 12, "memory": {"category": "personal", "key": "name", "value": "Tom"}, "reason": "Name changed"},
-  {"action": "update", "existingId": 13, "memory": {"category": "personal", "key": "age", "value": "25"}, "reason": "Age updated"}
-]}
+{"actions": [{"action": "update", "existingId": 5, "memory": {"category": "personal", "key": "age", "value": "26"}}]}
 ```
 
-Input: "Forget my name and age"
-Existing: [{"id": 12, "key": "name", "value": "Tom"}, {"id": 13, "key": "age", "value": "25"}]
-```json
-{"actions": [
-  {"action": "delete", "existingId": 12, "reason": "User wants to forget"},
-  {"action": "delete", "existingId": 13, "reason": "User wants to forget"}
-]}
-```
-
-Input: "I like pizza"
-Existing: none
-```json
-{"actions": [
-  {"action": "create", "memory": {"category": "preferences", "key": "favorite_food", "value": "pizza"}}
-]}
-```
-
-**Return ONLY the JSON object with "actions" array. No explanation.**
+**Return ONLY the JSON. No explanation.**
 PROMPT;
     }
 }

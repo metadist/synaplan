@@ -50,7 +50,6 @@
 
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue'
-import { useRouter } from 'vue-router'
 import { Icon } from '@iconify/vue'
 import type { UserMemory } from '@/services/api/userMemoriesApi'
 
@@ -58,9 +57,13 @@ interface Props {
   memories: UserMemory[]
 }
 
-const props = defineProps<Props>()
+interface Emits {
+  (e: 'click-memory', memory: UserMemory): void
+}
 
-const router = useRouter()
+const props = defineProps<Props>()
+const emit = defineEmits<Emits>()
+
 const isExpanded = ref(false)
 const highlightedMemory = ref<number | null>(null)
 const memoryRefs = ref<HTMLElement[]>([])
@@ -80,10 +83,8 @@ const toggleExpand = () => {
 }
 
 const navigateToMemory = (memory: UserMemory) => {
-  router.push({
-    path: '/memories',
-    query: { highlight: memory.id.toString() },
-  })
+  // Emit event to parent - ChatView will open the MemoriesDialog with this memory highlighted
+  emit('click-memory', memory)
 }
 
 // Listen for memory reference clicks from the message text

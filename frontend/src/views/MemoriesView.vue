@@ -445,32 +445,42 @@ async function handleSaveMultiple(actions: ParsedAction[]) {
   for (const actionItem of actions) {
     try {
       if (actionItem.action === 'create' && actionItem.memory) {
-        await memoriesStore.addMemory({
-          category: actionItem.memory.category,
-          key: actionItem.memory.key,
-          value: actionItem.memory.value,
-        }, { silent: true })
-        successCount++
-      } else if (actionItem.action === 'update' && actionItem.existingId && actionItem.memory) {
-        // Validate that the memory exists before trying to update
-        const memoryExists = memoriesStore.memories.some(m => m.id === actionItem.existingId)
-        if (memoryExists) {
-          await memoriesStore.editMemory(actionItem.existingId, {
-            value: actionItem.memory.value,
-          }, { silent: true })
-          successCount++
-        } else {
-          // Memory doesn't exist locally, create instead
-          await memoriesStore.addMemory({
+        await memoriesStore.addMemory(
+          {
             category: actionItem.memory.category,
             key: actionItem.memory.key,
             value: actionItem.memory.value,
-          }, { silent: true })
+          },
+          { silent: true }
+        )
+        successCount++
+      } else if (actionItem.action === 'update' && actionItem.existingId && actionItem.memory) {
+        // Validate that the memory exists before trying to update
+        const memoryExists = memoriesStore.memories.some((m) => m.id === actionItem.existingId)
+        if (memoryExists) {
+          await memoriesStore.editMemory(
+            actionItem.existingId,
+            {
+              value: actionItem.memory.value,
+            },
+            { silent: true }
+          )
+          successCount++
+        } else {
+          // Memory doesn't exist locally, create instead
+          await memoriesStore.addMemory(
+            {
+              category: actionItem.memory.category,
+              key: actionItem.memory.key,
+              value: actionItem.memory.value,
+            },
+            { silent: true }
+          )
           successCount++
         }
       } else if (actionItem.action === 'delete' && actionItem.existingId) {
         // Validate that the memory exists before trying to delete
-        const memoryExists = memoriesStore.memories.some(m => m.id === actionItem.existingId)
+        const memoryExists = memoriesStore.memories.some((m) => m.id === actionItem.existingId)
         if (memoryExists) {
           await memoriesStore.removeMemory(actionItem.existingId, { silent: true })
           successCount++
@@ -497,7 +507,10 @@ async function handleSaveMultiple(actions: ParsedAction[]) {
       success(t('memories.multipleSuccess', { count: successCount }))
     }
   } else if (successCount > 0 && errorCount > 0) {
-    success(t('memories.multipleSuccess', { count: successCount }) + ` (${errorCount} ${t('common.error').toLowerCase()})`)
+    success(
+      t('memories.multipleSuccess', { count: successCount }) +
+        ` (${errorCount} ${t('common.error').toLowerCase()})`
+    )
   } else if (errorCount > 0) {
     error(t('memories.createError'))
   }

@@ -172,7 +172,11 @@ export const useMemoriesStore = defineStore('memories', () => {
     }
   }
 
-  async function editMemory(id: number, request: UpdateMemoryRequest, options: { silent?: boolean } = {}) {
+  async function editMemory(
+    id: number,
+    request: UpdateMemoryRequest,
+    options: { silent?: boolean } = {}
+  ) {
     loading.value = true
     error.value = null
 

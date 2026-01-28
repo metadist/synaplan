@@ -11,7 +11,6 @@
 <script setup lang="ts">
 import { ref, computed, watch, nextTick, onMounted, onBeforeUnmount } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useRouter } from 'vue-router'
 import { useMarkdown } from '@/composables/useMarkdown'
 import { useTheme } from '@/composables/useTheme'
 import { renderMermaidBlocks, hasMermaidBlocks } from '@/composables/useMarkdownMermaid'
@@ -29,7 +28,6 @@ interface Props {
 
 const props = defineProps<Props>()
 const { t } = useI18n()
-const router = useRouter()
 const { render, renderAsync } = useMarkdown()
 const { theme } = useTheme()
 const configStore = useConfigStore()
@@ -234,8 +232,18 @@ const handleMemoryBadgeClick = (event: MouseEvent) => {
 
     const memoryId = parseInt(memoryBadge.getAttribute('data-memory-id') || '-1')
     if (memoryId > 0) {
+      // Find the memory from props or store
+      const memory =
+        props.memories?.find((m) => m.id === memoryId) ||
+        memoriesStore.memories.find((m) => m.id === memoryId)
+
+      // Dispatch window event to open MemoriesDialog in ChatView (stay in chat!)
+      if (memory) {
+        window.dispatchEvent(new CustomEvent('open-memory-dialog', { detail: { memory } }))
+      }
+
+      // Also dispatch event for MessageMemories component to highlight
       window.dispatchEvent(new CustomEvent('memory-ref-clicked', { detail: { memoryId } }))
-      router.push({ path: '/memories', query: { highlight: memoryId } })
     }
   }
 }

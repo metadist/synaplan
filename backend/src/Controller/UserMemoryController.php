@@ -613,9 +613,9 @@ class UserMemoryController extends AbstractController
      * 2. Legacy single action: {"action": "create", "memory": {...}}
      * 3. NDJSON format: Multiple JSON objects on separate lines
      *
-     * @param string   $content         Raw AI response content
-     * @param string   $input           Original user input
-     * @param int[]    $validMemoryIds  Valid memory IDs for validation
+     * @param string $content        Raw AI response content
+     * @param string $input          Original user input
+     * @param int[]  $validMemoryIds Valid memory IDs for validation
      *
      * @return array Parsed actions
      */
@@ -676,9 +676,9 @@ class UserMemoryController extends AbstractController
     /**
      * Parse a single action from AI response.
      *
-     * @param array    $actionData      The action data from AI
-     * @param string   $input           Original user input
-     * @param int[]    $validMemoryIds  Valid memory IDs from similar memories search
+     * @param array  $actionData     The action data from AI
+     * @param string $input          Original user input
+     * @param int[]  $validMemoryIds Valid memory IDs from similar memories search
      *
      * @return array|null Parsed action or null if invalid
      */
