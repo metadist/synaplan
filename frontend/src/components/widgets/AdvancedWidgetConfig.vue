@@ -551,9 +551,39 @@
 
               <!-- Prompt Editor -->
               <template v-else>
-                <!-- Restart AI Setup Option (only show if not manually created) -->
+                <!-- System Prompt Notice (legacy widgets using shared prompts) -->
                 <div
-                  v-if="!manualPromptCreated"
+                  v-if="isSystemPrompt"
+                  class="p-4 rounded-lg bg-amber-500/10 border border-amber-500/30"
+                >
+                  <div class="flex items-start gap-3">
+                    <Icon
+                      icon="heroicons:information-circle"
+                      class="w-5 h-5 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5"
+                    />
+                    <div class="flex-1">
+                      <p class="text-sm font-medium txt-primary">
+                        {{ $t('widgets.advancedConfig.systemPromptTitle') }}
+                      </p>
+                      <p class="text-xs txt-secondary mt-1">
+                        {{ $t('widgets.advancedConfig.systemPromptDescription') }}
+                      </p>
+                      <button
+                        type="button"
+                        class="mt-3 px-4 py-2 rounded-lg bg-[var(--brand)] text-white text-sm font-medium hover:bg-[var(--brand-hover)] transition-colors flex items-center gap-2"
+                        data-testid="btn-customize-prompt"
+                        @click="emit('startAiSetup')"
+                      >
+                        <Icon icon="heroicons:sparkles" class="w-4 h-4" />
+                        {{ $t('widgets.advancedConfig.customizePrompt') }}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Restart AI Setup Option (only show if not manually created and not system prompt) -->
+                <div
+                  v-else-if="!manualPromptCreated"
                   class="p-4 rounded-lg bg-[var(--brand-alpha-light)] border border-[var(--brand)]/20"
                 >
                   <div class="flex items-center justify-between">
@@ -607,7 +637,11 @@
                   <textarea
                     v-model="promptData.rules"
                     rows="2"
-                    class="w-full px-4 py-3 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)] resize-none"
+                    :readonly="isSystemPrompt"
+                    :class="[
+                      'w-full px-4 py-3 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)] resize-none',
+                      isSystemPrompt ? 'bg-gray-100 dark:bg-gray-800 cursor-not-allowed' : '',
+                    ]"
                     :placeholder="$t('widgets.advancedConfig.selectionRulesPlaceholder')"
                     data-testid="input-selection-rules"
                   ></textarea>
@@ -624,7 +658,11 @@
                   </label>
                   <select
                     v-model="promptData.aiModel"
-                    class="w-full px-4 py-2.5 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+                    :disabled="isSystemPrompt"
+                    :class="[
+                      'w-full px-4 py-2.5 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]',
+                      isSystemPrompt ? 'bg-gray-100 dark:bg-gray-800 cursor-not-allowed' : '',
+                    ]"
                     data-testid="input-ai-model"
                   >
                     <option
@@ -665,13 +703,17 @@
                     <label
                       v-for="tool in availableTools"
                       :key="tool.value"
-                      class="flex items-center gap-3 p-3 rounded-lg surface-chip cursor-pointer hover:bg-[var(--brand)]/5 transition-colors"
+                      :class="[
+                        'flex items-center gap-3 p-3 rounded-lg surface-chip transition-colors',
+                        isSystemPrompt ? 'cursor-not-allowed opacity-60' : 'cursor-pointer hover:bg-[var(--brand)]/5',
+                      ]"
                       data-testid="item-tool"
                     >
                       <input
                         v-model="promptData.availableTools"
                         type="checkbox"
                         :value="tool.value"
+                        :disabled="isSystemPrompt"
                         class="w-5 h-5 rounded border-light-border/30 dark:border-dark-border/20 text-[var(--brand)] focus:ring-2 focus:ring-[var(--brand)]"
                       />
                       <Icon :icon="tool.icon" class="w-5 h-5 txt-secondary" />
@@ -689,7 +731,11 @@
                   <textarea
                     v-model="promptData.content"
                     rows="12"
-                    class="w-full px-4 py-3 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)] resize-y font-mono text-sm"
+                    :readonly="isSystemPrompt"
+                    :class="[
+                      'w-full px-4 py-3 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)] resize-y font-mono text-sm',
+                      isSystemPrompt ? 'bg-gray-100 dark:bg-gray-800 cursor-not-allowed' : '',
+                    ]"
                     :placeholder="$t('widgets.advancedConfig.promptContentPlaceholder')"
                     data-testid="input-prompt-content"
                   ></textarea>
@@ -906,12 +952,17 @@ const emit = defineEmits<{
 const { t } = useI18n()
 const { success, error: showError } = useNotification()
 
-// Check if widget has a custom prompt (not the default)
-// Custom prompts use either 'widget-' prefix (old format) or 'w_' prefix (new format)
+// Check if widget has a custom/configured prompt (not the default)
+// Backward compatible: ANY topic that is not 'widget-default' is considered configured
+// This includes:
+// - Legacy topics from before rework: 'general', 'customer-support', etc.
+// - Old widget prompts: 'widget-xxx' (manually created)
+// - New AI-generated prompts: 'w_xxx' (from setup interview)
 const hasCustomPrompt = computed(() => {
   const topic = props.widget.taskPromptTopic
-  if (!topic || topic === 'widget-default') return false
-  return topic.startsWith('widget-') || topic.startsWith('w_')
+  // Only 'widget-default' or empty/missing = not configured
+  // Everything else = configured (has a prompt)
+  return !!topic && topic !== 'widget-default'
 })
 
 // Check if localhost addresses are in allowed domains
@@ -1092,11 +1143,17 @@ const promptData = reactive({
   aiModel: 'AUTOMATED - Tries to define the best model for the task on SYNAPLAN [System Model]',
   availableTools: [] as string[],
   content: '',
+  isDefault: false, // true = system prompt (read-only), false = user-specific (editable)
 })
 const promptLoading = ref(false)
 const promptError = ref<string | null>(null)
 const creatingManualPrompt = ref(false)
 const manualPromptCreated = ref(false) // Flag to show form after manual creation
+
+// Check if the current prompt is a system prompt (not editable by user)
+// System prompts are shared across all users and cannot be modified
+// Users can "customize" them by running the AI setup to create their own version
+const isSystemPrompt = computed(() => promptData.isDefault && promptData.id > 0)
 
 // File upload for Knowledge Base
 const fileUploadInput = ref<HTMLInputElement | null>(null)
@@ -1322,6 +1379,7 @@ const loadPromptData = async () => {
         aiModel: aiModelString,
         availableTools: tools,
         content: prompt.prompt,
+        isDefault: prompt.isDefault ?? false, // Track if this is a system prompt (read-only)
       })
 
       // Load files for this prompt
