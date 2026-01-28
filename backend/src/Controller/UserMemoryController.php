@@ -531,12 +531,11 @@ class UserMemoryController extends AbstractController
         if (!empty($similarMemories)) {
             $userMessage .= "\n\nExisting memories that might be related:\n";
             foreach ($similarMemories as $mem) {
-                $memArray = is_array($mem) ? $mem : $mem->toArray();
                 $userMessage .= sprintf(
                     "- ID: %d, Key: %s, Value: %s\n",
-                    $memArray['id'] ?? 0,
-                    $memArray['key'] ?? '',
-                    $memArray['value'] ?? ''
+                    $mem['id'] ?? 0,
+                    $mem['key'] ?? '',
+                    $mem['value'] ?? ''
                 );
             }
         } else {
@@ -581,7 +580,7 @@ class UserMemoryController extends AbstractController
 
             $result = [
                 'actions' => $actions,
-                'similarMemories' => array_map(fn ($m) => is_array($m) ? $m : $m->toArray(), $similarMemories),
+                'similarMemories' => $similarMemories,
             ];
 
             // Add debug info for admins

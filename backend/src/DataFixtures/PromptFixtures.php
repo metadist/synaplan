@@ -205,14 +205,17 @@ This is the list, use only this:
    - "Read this text aloud" → BMEDIA: "audio"
    - "Convert to speech" → BMEDIA: "audio"
 
-8. **Detect video duration (BDURATION)**: If BTOPIC is "mediamaker" AND BMEDIA is "video", extract the requested duration in seconds as an integer.
-   - If the user specifies a duration (e.g., "3 seconds", "5 second video", "10-second clip"), set BDURATION to that number
-   - If no duration is mentioned, do NOT include BDURATION (let the system use default)
+8. **Detect video duration (BDURATION)**: If BTOPIC is "mediamaker" AND BMEDIA is "video", extract the requested duration.
+   - Supported durations: **4, 6, or 8 seconds only**
+   - If user requests a duration, round to the nearest supported value (4, 6, or 8)
+   - If no duration is mentioned, do NOT include BDURATION (system uses default of 4)
    Examples:
-   - "Create a 3 second video of a car" → BDURATION: 3
+   - "Create a 4 second video of a car" → BDURATION: 4
    - "Make a 6-second video of a dog" → BDURATION: 6
-   - "Create a 10 second clip" → BDURATION: 10
-   - "Generate a video of a cat" → (no BDURATION, user didn't specify)
+   - "Create an 8 second clip" → BDURATION: 8
+   - "Make a 10 second video" → BDURATION: 8 (rounded down to max)
+   - "Create a 3 second video" → BDURATION: 4 (rounded up to min)
+   - "Generate a video of a cat" → (no BDURATION, use default)
 
 # Answer format
 
