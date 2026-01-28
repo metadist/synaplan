@@ -1401,7 +1401,7 @@ const loadPromptFiles = async () => {
   try {
     const files = await promptsApi.getPromptFiles(props.widget.taskPromptTopic)
     promptFiles.value = files.map((f) => ({
-      id: f.id,
+      id: f.messageId,
       fileName: f.fileName,
       chunks: f.chunks,
     }))

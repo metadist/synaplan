@@ -252,7 +252,7 @@
             :primary-color="testWidget.config?.primaryColor || '#007bff'"
             :icon-color="testWidget.config?.iconColor || '#ffffff'"
             :button-icon="testWidget.config?.buttonIcon || 'chat'"
-            :button-icon-url="testWidget.config?.buttonIconUrl"
+            :button-icon-url="testWidget.config?.buttonIconUrl ?? undefined"
             :auto-message="testWidget.config?.autoMessage || ''"
             :message-limit="testWidget.config?.messageLimit || 50"
             :max-file-size="testWidget.config?.maxFileSize || 10"
@@ -380,13 +380,6 @@ const testWidgetFromSuccess = () => {
     testWidget.value = successWidget.value
     successWidget.value = null // Close success modal
   }
-}
-
-/**
- * Start AI setup for existing widget
- */
-const startAiSetup = (widget: widgetsApi.Widget) => {
-  setupWidget.value = widget
 }
 
 /**

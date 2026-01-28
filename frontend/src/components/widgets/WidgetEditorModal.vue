@@ -814,7 +814,7 @@ const applyWidgetToForm = (widget?: Widget | null) => {
       primaryColor: config.primaryColor || '#007bff',
       iconColor: config.iconColor || '#ffffff',
       buttonIcon: config.buttonIcon || 'chat',
-      buttonIconUrl: config.buttonIconUrl,
+      buttonIconUrl: config.buttonIconUrl ?? undefined,
       defaultTheme: config.defaultTheme || 'light',
       autoOpen: config.autoOpen || false,
       autoMessage: config.autoMessage || 'Hello! How can I help you today?',
