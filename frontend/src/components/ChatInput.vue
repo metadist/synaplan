@@ -606,7 +606,7 @@ const handlePaste = async (event: ClipboardEvent) => {
     try {
       await uploadFiles(filesToUpload)
       success(t('chatInput.filesPasted', { count: filesToUpload.length }))
-    } catch (err) {
+    } catch {
       showError(t('chatInput.uploadError'))
     }
   }
@@ -650,9 +650,10 @@ const uploadFiles = async (files: File[]) => {
       }
 
       console.log('✅ File uploaded and processed:', result)
-    } catch (err: any) {
+    } catch (err) {
       console.error('❌ File upload failed:', err)
-      showError(`File upload failed: ${err.message}`)
+      const errorMessage = err instanceof Error ? err.message : 'Unknown error'
+      showError(`File upload failed: ${errorMessage}`)
 
       // Remove from list
       const index = uploadedFiles.value.findIndex((f) => f.name === file.name)
@@ -936,9 +937,9 @@ const toggleEnhance = async () => {
     enhancedMessage.value = result.enhanced
     message.value = result.enhanced
     enhanceEnabled.value = true
-  } catch (err: any) {
+  } catch (err) {
     // Show detailed error message if available
-    const errorMsg = err.response?.data?.message || err.message || 'Failed to enhance message'
+    const errorMsg = err instanceof Error ? err.message : 'Failed to enhance message'
     showError(errorMsg)
     console.error('Enhancement error:', err)
   } finally {

@@ -244,8 +244,9 @@ class WidgetPublicController extends AbstractController
                 // Create welcome message if configured
                 $autoMessage = $config['autoMessage'] ?? '';
                 if (!empty($autoMessage)) {
-                    // Use timestamp 1 second before current time to ensure welcome message comes first
-                    $welcomeTimestamp = time() - 1;
+                    // Use timestamp 10 seconds before current time to ensure welcome message comes first.
+                    // This is combined with secondary sort by ID in MessageRepository for reliable ordering.
+                    $welcomeTimestamp = time() - 10;
                     $welcomeMessage = new Message();
                     $welcomeMessage->setUserId($owner->getId());
                     $welcomeMessage->setChat($chat);
@@ -1066,6 +1067,12 @@ class WidgetPublicController extends AbstractController
         $widget = $this->widgetService->getWidgetById($widgetId);
         if (!$widget) {
             return $this->json(['error' => 'Widget not found'], Response::HTTP_NOT_FOUND);
+        }
+
+        // Check domain restrictions
+        $config = $widget->getConfig();
+        if ($domainError = $this->ensureDomainAllowed($config, $request, $widget->getOwnerId())) {
+            return $domainError;
         }
 
         // Get the session

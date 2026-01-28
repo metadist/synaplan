@@ -1,17 +1,43 @@
 # Default: JSON formatter for structured logging with context
 # To use human-readable format, set LOG_FORMAT env var to: line, or json (default)
-when@prod: &prod_config
+#
+# Log levels (from most to least verbose):
+#   debug (100) - Very verbose, shows all authenticator checks, SQL queries, etc.
+#   info (200)  - Normal operational messages
+#   notice (250) - Normal but significant events
+#   warning (300) - Exceptional occurrences that are not errors
+#   error (400) - Runtime errors that don't require immediate action
+#
+# Set LOG_LEVEL env var to control verbosity (default: info in prod, debug in dev)
+when@prod:
+    monolog:
+        handlers:
+            # Main handler for app logs
+            main:
+                type: stream
+                path: php://stderr
+                level: '%env(default:log_level_default:LOG_LEVEL)%'
+                formatter: app.monolog_formatter
+                process_psr_3_messages: false
+                channels: ['!event', '!security']
+            # Security channel at higher level (less noise)
+            security:
+                type: stream
+                path: php://stderr
+                level: warning
+                formatter: app.monolog_formatter
+                process_psr_3_messages: false
+                channels: ['security']
+
+when@dev:
     monolog:
         handlers:
             main:
                 type: stream
                 path: php://stderr
-                level: debug
+                level: '%env(default:log_level_dev:LOG_LEVEL)%'
                 formatter: app.monolog_formatter
                 process_psr_3_messages: false
-
-when@dev:
-    <<: *prod_config
 
 when@test:
     monolog:
