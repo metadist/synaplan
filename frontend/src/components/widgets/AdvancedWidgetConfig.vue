@@ -705,7 +705,9 @@
                       :key="tool.value"
                       :class="[
                         'flex items-center gap-3 p-3 rounded-lg surface-chip transition-colors',
-                        isSystemPrompt ? 'cursor-not-allowed opacity-60' : 'cursor-pointer hover:bg-[var(--brand)]/5',
+                        isSystemPrompt
+                          ? 'cursor-not-allowed opacity-60'
+                          : 'cursor-pointer hover:bg-[var(--brand)]/5',
                       ]"
                       data-testid="item-tool"
                     >
