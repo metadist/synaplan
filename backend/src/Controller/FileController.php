@@ -8,11 +8,14 @@ use App\Entity\User;
 use App\Repository\FileRepository;
 use App\Repository\MessageRepository;
 use App\Repository\RagDocumentRepository;
+use App\Repository\WidgetSessionRepository;
 use App\Service\File\FileHelper;
 use App\Service\File\FileProcessor;
 use App\Service\File\FileStorageService;
 use App\Service\File\VectorizationService;
+use App\Service\RateLimitService;
 use App\Service\StorageQuotaService;
+use App\Service\WidgetService;
 use Doctrine\ORM\EntityManagerInterface;
 use OpenApi\Attributes as OA;
 use Psr\Log\LoggerInterface;
@@ -34,9 +37,12 @@ class FileController extends AbstractController
         private FileProcessor $fileProcessor,
         private VectorizationService $vectorizationService,
         private StorageQuotaService $storageQuotaService,
+        private RateLimitService $rateLimitService,
         private MessageRepository $messageRepository,
         private FileRepository $fileRepository,
         private RagDocumentRepository $ragDocumentRepository,
+        private WidgetSessionRepository $widgetSessionRepository,
+        private WidgetService $widgetService,
         private EntityManagerInterface $em,
         private LoggerInterface $logger,
         private string $uploadDir,
@@ -159,7 +165,20 @@ class FileController extends AbstractController
         string $groupKey,
         string $processLevel,
     ): array {
-        // Step 0: Check storage quota BEFORE uploading
+        // Step 0a: Check rate limit for FILE_ANALYSIS BEFORE uploading
+        $rateLimitCheck = $this->rateLimitService->checkLimit($user, 'FILE_ANALYSIS');
+        if (!$rateLimitCheck['allowed']) {
+            return [
+                'success' => false,
+                'error' => "Rate limit exceeded for FILE_ANALYSIS. Used: {$rateLimitCheck['used']}/{$rateLimitCheck['limit']}",
+                'rate_limit_exceeded' => true,
+                'action' => 'FILE_ANALYSIS',
+                'used' => $rateLimitCheck['used'],
+                'limit' => $rateLimitCheck['limit'],
+            ];
+        }
+
+        // Step 0b: Check storage quota BEFORE uploading
         $fileSize = $uploadedFile->getSize();
         try {
             $this->storageQuotaService->checkStorageLimit($user, $fileSize);
@@ -285,6 +304,13 @@ class FileController extends AbstractController
             $result['ai_processing_note'] = 'AI processing not yet implemented';
         }
 
+        // Record FILE_ANALYSIS usage for statistics
+        $this->rateLimitService->recordUsage($user, 'FILE_ANALYSIS', [
+            'file_id' => $messageFile->getId(),
+            'filename' => $uploadedFile->getClientOriginalName(),
+            'source' => 'WEB',
+        ]);
+
         return $result;
     }
 
@@ -325,7 +351,25 @@ class FileController extends AbstractController
         }
 
         // Security check: Only owner can download
-        if ($messageFile->getUserId() !== $user->getId()) {
+        // Also allow widget files (userId=0) if current user is the widget owner
+        $isOwner = $messageFile->getUserId() === $user->getId();
+        $isWidgetFileOwner = false;
+
+        if (!$isOwner && 0 === $messageFile->getUserId()) {
+            // Check if this is a widget file and user is the widget owner
+            $sessionId = $messageFile->getUserSessionId();
+            if ($sessionId) {
+                $widgetSession = $this->widgetSessionRepository->find($sessionId);
+                if ($widgetSession) {
+                    $widget = $this->widgetService->getWidgetById($widgetSession->getWidgetId());
+                    if ($widget && $widget->getOwnerId() === $user->getId()) {
+                        $isWidgetFileOwner = true;
+                    }
+                }
+            }
+        }
+
+        if (!$isOwner && !$isWidgetFileOwner) {
             $this->logger->warning('FileController: Unauthorized download attempt', [
                 'file_id' => $id,
                 'user_id' => $user->getId(),

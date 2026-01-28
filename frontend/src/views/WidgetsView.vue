@@ -140,6 +140,14 @@
                   <span class="sm:hidden">Code</span>
                 </button>
                 <button
+                  class="px-3 py-2 rounded-lg bg-green-500/10 hover:bg-green-500/20 transition-colors"
+                  :title="$t('widgets.testChat')"
+                  data-testid="btn-widget-test"
+                  @click="openTestChat(widget)"
+                >
+                  <Icon icon="heroicons:play" class="w-4 h-4 text-green-600 dark:text-green-400" />
+                </button>
+                <button
                   class="px-3 py-2 rounded-lg hover-surface transition-colors"
                   :title="$t('widgets.edit')"
                   data-testid="btn-widget-edit"
@@ -189,11 +197,43 @@
       data-testid="comp-embed-dialog"
       @close="showEmbedModal = false"
     />
+
+    <!-- Test Chat Overlay -->
+    <Teleport to="body">
+      <div
+        v-if="testWidget"
+        class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
+        data-testid="test-chat-overlay"
+        @click.self="closeTestChat"
+      >
+        <div class="w-full max-w-md h-[600px] max-h-[80vh] rounded-2xl overflow-hidden shadow-2xl">
+          <ChatWidget
+            :widget-id="testWidget.widgetId"
+            :api-url="apiUrl"
+            :primary-color="testWidget.config?.primaryColor || '#007bff'"
+            :icon-color="testWidget.config?.iconColor || '#ffffff'"
+            :button-icon="testWidget.config?.buttonIcon || 'chat'"
+            :auto-message="testWidget.config?.autoMessage || ''"
+            :message-limit="testWidget.config?.messageLimit || 50"
+            :max-file-size="testWidget.config?.maxFileSize || 10"
+            :default-theme="testWidget.config?.defaultTheme || 'light'"
+            :widget-title="testWidget.name"
+            :allow-file-upload="testWidget.config?.allowFileUpload || false"
+            :file-upload-limit="testWidget.config?.fileUploadLimit || 3"
+            :open-immediately="true"
+            is-preview
+            hide-button
+            test-mode
+            @close="closeTestChat"
+          />
+        </div>
+      </div>
+    </Teleport>
   </MainLayout>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { Icon } from '@iconify/vue'
 import MainLayout from '@/components/MainLayout.vue'
 import * as widgetsApi from '@/services/api/widgetsApi'
@@ -202,11 +242,14 @@ import { useDialog } from '@/composables/useDialog'
 import WidgetCreationWizard from '@/components/widgets/WidgetCreationWizard.vue'
 import WidgetEditorModal from '@/components/widgets/WidgetEditorModal.vue'
 import EmbedCodeDialog from '@/components/widgets/EmbedCodeDialog.vue'
+import ChatWidget from '@/components/widgets/ChatWidget.vue'
 import { useI18n } from 'vue-i18n'
+import { useConfigStore } from '@/stores/config'
 
 const { success, error } = useNotification()
 const { confirm } = useDialog()
 const { t } = useI18n()
+const configStore = useConfigStore()
 
 const loading = ref(false)
 const widgets = ref<widgetsApi.Widget[]>([])
@@ -217,6 +260,9 @@ const embedWidget = ref<widgetsApi.Widget | null>(null)
 const embedCode = ref('')
 const legacyEmbedCode = ref('')
 const wordpressShortcode = ref('')
+const testWidget = ref<widgetsApi.Widget | null>(null)
+
+const apiUrl = computed(() => configStore.apiBaseUrl || window.location.origin)
 
 /**
  * Load widgets
@@ -267,6 +313,20 @@ const viewWidget = (widget: widgetsApi.Widget) => {
  */
 const editWidget = (widget: widgetsApi.Widget) => {
   currentWidget.value = widget
+}
+
+/**
+ * Open test chat
+ */
+const openTestChat = (widget: widgetsApi.Widget) => {
+  testWidget.value = widget
+}
+
+/**
+ * Close test chat
+ */
+const closeTestChat = () => {
+  testWidget.value = null
 }
 
 /**
