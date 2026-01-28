@@ -138,6 +138,11 @@ readonly class UserMemoryService
             $finalCategory = $category ?? $existing['category'] ?? 'personal';
             $finalKey = $key ?? $existing['key'] ?? 'unknown';
 
+            // Validate key length (same as createMemory)
+            if (strlen($finalKey) < 3) {
+                throw new \InvalidArgumentException('Key must be at least 3 characters');
+            }
+
             $dto = new UserMemoryDTO(
                 id: $memoryId,
                 userId: $user->getId(),

@@ -231,7 +231,7 @@ const route = useRoute()
 const router = useRouter()
 const authStore = useAuthStore()
 const memoriesStore = useMemoriesStore()
-const { success, error } = useNotification()
+const { success, error, warning } = useNotification()
 const { confirm } = useDialog()
 
 const viewMode = ref<'list' | 'graph' | 'graph3d'>('list')
@@ -507,9 +507,11 @@ async function handleSaveMultiple(actions: ParsedAction[]) {
       success(t('memories.multipleSuccess', { count: successCount }))
     }
   } else if (successCount > 0 && errorCount > 0) {
-    success(
+    // Show partial success with error details
+    const errorDetails = errors.length > 0 ? `: ${errors[0]}` : ''
+    warning(
       t('memories.multipleSuccess', { count: successCount }) +
-        ` (${errorCount} ${t('common.error').toLowerCase()})`
+        ` (${errorCount} ${t('common.error').toLowerCase()}${errorDetails})`
     )
   } else if (errorCount > 0) {
     error(t('memories.createError'))

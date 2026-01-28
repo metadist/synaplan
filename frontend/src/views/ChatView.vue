@@ -270,6 +270,9 @@ onMounted(async () => {
       console.warn('⚠️ ChatInput ref not available for auto-focus')
     }
   }, 100)
+
+  // Setup window event listener for memory dialog (used by MessageText.vue)
+  window.addEventListener('open-memory-dialog', handleOpenMemoryDialogEvent)
 })
 
 // Window event handler for memory dialog (used by MessageText.vue)
@@ -279,11 +282,6 @@ const handleOpenMemoryDialogEvent = (event: Event) => {
     handleClickMemory(customEvent.detail.memory)
   }
 }
-
-// Setup window event listener for memory dialog
-onMounted(() => {
-  window.addEventListener('open-memory-dialog', handleOpenMemoryDialogEvent)
-})
 
 // Cleanup: Stop streaming when component unmounts (user leaves chat)
 onBeforeUnmount(() => {
