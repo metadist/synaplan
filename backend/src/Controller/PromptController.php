@@ -1253,7 +1253,7 @@ PROMPT;
             ]);
 
             return $this->json([
-                'error' => 'Failed to generate summary: '.$e->getMessage(),
+                'error' => 'Failed to generate summary',
             ], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }

@@ -1518,6 +1518,7 @@ const handleFilePickerSelect = async (files: AvailableFile[]) => {
 }
 
 // Build Knowledge Base section from file summaries
+// Uses explicit markers so only the generated block is replaced on save
 const buildKnowledgeBaseSection = (): string => {
   const filesWithSummaries = promptFiles.value.filter((f) => fileSummaries.value.has(f.id))
 
@@ -1525,21 +1526,34 @@ const buildKnowledgeBaseSection = (): string => {
     return ''
   }
 
-  let section = '\n\n## Knowledge Base\nThe following documents are available for reference:\n'
+  let section =
+    '\n\n<!-- KNOWLEDGE_BASE_START -->\n' +
+    '## Knowledge Base\n' +
+    'The following documents are available for reference:\n'
 
   for (const file of filesWithSummaries) {
     const summary = fileSummaries.value.get(file.id)
     section += `\n### ${file.fileName}\n${summary}\n`
   }
 
+  section += '<!-- KNOWLEDGE_BASE_END -->\n'
   return section
 }
 
 // Remove existing Knowledge Base section from prompt content
 const removeKnowledgeBaseSection = (content: string): string => {
-  // Match section starting with "## Knowledge Base" until the end or next top-level heading
-  const regex = /\n\n## Knowledge Base\n[\s\S]*$/
-  return content.replace(regex, '')
+  // First, remove any Knowledge Base block delimited by explicit markers
+  let updated = content.replace(
+    /\n?\s*<!-- KNOWLEDGE_BASE_START -->[\s\S]*?<!-- KNOWLEDGE_BASE_END -->\n?/,
+    ''
+  )
+
+  // Backwards compatibility: also remove older Knowledge Base sections that were not wrapped
+  // in markers. Limit removal to the next top-level heading or end of content.
+  const legacyRegex = /\n\n## Knowledge Base\n[\s\S]*?(?=\n## |\n$|$)/
+  updated = updated.replace(legacyRegex, '')
+
+  return updated
 }
 
 const savePromptData = async () => {
