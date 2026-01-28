@@ -661,11 +661,17 @@ class SortXController extends AbstractController
             ];
         }
 
+        // Normalize metadata: convert empty array to null, ensure it's an object
+        $metadata = $decoded['metadata'] ?? null;
+        if (is_array($metadata) && (empty($metadata) || array_is_list($metadata))) {
+            $metadata = null;
+        }
+
         return [
             'categories' => $decoded['categories'] ?? ['unknown'],
             'confidence' => (float) ($decoded['confidence'] ?? 0.0),
             'reasoning' => $decoded['reasoning'] ?? null,
-            'metadata' => $decoded['metadata'] ?? null,
+            'metadata' => $metadata,
         ];
     }
 }
