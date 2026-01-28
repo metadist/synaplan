@@ -26,7 +26,7 @@
           @click="toggleChat"
         >
           <img
-            v-if="buttonIconUrl"
+            v-if="buttonIcon === 'custom' && buttonIconUrl"
             :src="buttonIconUrl"
             alt="Chat"
             class="w-9 h-9 object-contain"
@@ -132,7 +132,7 @@
               :class="['max-w-[80%] rounded-2xl px-4 py-2', message.role === 'user' ? '' : '']"
               :style="
                 message.role === 'user'
-                  ? { backgroundColor: primaryColor, color: iconColor }
+                  ? { backgroundColor: primaryColor, color: '#ffffff' }
                   : { backgroundColor: widgetTheme === 'dark' ? '#2a2a2a' : '#f3f4f6' }
               "
             >
@@ -156,7 +156,7 @@
                   :style="{
                     color:
                       message.role === 'user'
-                        ? iconColor
+                        ? '#ffffff'
                         : widgetTheme === 'dark'
                           ? '#e5e5e5'
                           : '#1f2937',
@@ -181,7 +181,7 @@
                       :style="{
                         color:
                           message.role === 'user'
-                            ? iconColor
+                            ? '#ffffff'
                             : widgetTheme === 'dark'
                               ? '#e5e5e5'
                               : '#1f2937',
@@ -192,7 +192,7 @@
                       :style="{
                         color:
                           message.role === 'user'
-                            ? iconColor
+                            ? '#ffffff'
                             : widgetTheme === 'dark'
                               ? '#e5e5e5'
                               : '#1f2937',
@@ -209,7 +209,7 @@
                   :style="{
                     color:
                       message.role === 'user'
-                        ? iconColor
+                        ? '#ffffff'
                         : widgetTheme === 'dark'
                           ? '#e5e5e5'
                           : '#1f2937',
@@ -223,7 +223,7 @@
                 :style="{
                   color:
                     message.role === 'user'
-                      ? iconColor
+                      ? '#ffffff'
                       : widgetTheme === 'dark'
                         ? '#9ca3af'
                         : '#6b7280',
@@ -566,8 +566,9 @@ const allowFileUploads = computed(
   () => !!props.allowFileUpload && (!props.isPreview || props.testMode)
 )
 const fileUploadLimit = computed(() => props.fileUploadLimit ?? 0)
+const isTestEnvironment = computed(() => props.testMode || props.isPreview)
 const testModeHeaders = computed(
-  (): Record<string, string> => (props.testMode ? { 'X-Widget-Test-Mode': 'true' } : {})
+  (): Record<string, string> => (isTestEnvironment.value ? { 'X-Widget-Test-Mode': 'true' } : {})
 )
 const fileUploadCount = ref(0)
 const uploadingFile = ref(false)
@@ -1109,9 +1110,12 @@ const sendMessage = async () => {
 
     if (result.chatId && result.chatId > 0) {
       chatId.value = result.chatId
-      const key = getChatStorageKey()
-      if (key) {
-        localStorage.setItem(key, result.chatId.toString())
+      // Skip localStorage in test mode
+      if (!isTestEnvironment.value) {
+        const key = getChatStorageKey()
+        if (key) {
+          localStorage.setItem(key, result.chatId.toString())
+        }
       }
       if (!historyLoaded.value) {
         await loadConversationHistory()
@@ -1328,7 +1332,8 @@ const normalizeServerMessage = (raw: any): Message => {
 }
 
 const loadConversationHistory = async (force = false) => {
-  if (props.isPreview) {
+  // In test/preview mode, skip loading real history but mark as loaded for auto message
+  if (isTestEnvironment.value) {
     historyLoaded.value = true
     ensureAutoMessage()
     return
@@ -1514,7 +1519,7 @@ const renderMessageContent = (value: string): string => {
   return html
 }
 
-// Load session ID from localStorage on mount
+// Load session ID from localStorage on mount (skip for test mode)
 onMounted(() => {
   updateIsMobile()
   if (typeof window !== 'undefined') {
@@ -1525,6 +1530,15 @@ onMounted(() => {
   window.addEventListener('synaplan-widget-open', handleOpenEvent)
   window.addEventListener('synaplan-widget-close', handleCloseEvent)
 
+  // In test mode, create a temporary session without localStorage persistence
+  if (isTestEnvironment.value) {
+    sessionId.value = createSessionId()
+    // Still call loadConversationHistory to trigger ensureAutoMessage (but it won't load actual history)
+    loadConversationHistory()
+    return
+  }
+
+  // Normal mode: use localStorage for session persistence
   const storageKey = getSessionStorageKey()
   let currentSessionId = localStorage.getItem(storageKey)
   if (!currentSessionId) {
@@ -1564,9 +1578,9 @@ const getChatStorageKey = () => {
   return getChatStorageKeyForSession(sessionId.value)
 }
 
-// Save chatId to localStorage when it changes
+// Save chatId to localStorage when it changes (skip for test mode)
 watch(chatId, (newChatId) => {
-  if (!newChatId) return
+  if (!newChatId || isTestEnvironment.value) return
   const key = getChatStorageKey()
   if (key) {
     localStorage.setItem(key, newChatId.toString())

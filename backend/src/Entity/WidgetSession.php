@@ -174,6 +174,15 @@ class WidgetSession
     }
 
     /**
+     * Check if this is a test session based on session ID prefix.
+     * Test sessions have IDs starting with 'test_'.
+     */
+    public function isTest(): bool
+    {
+        return str_starts_with($this->sessionId, 'test_');
+    }
+
+    /**
      * Get messages sent in the last minute.
      */
     public function getMessagesInLastMinute(): int

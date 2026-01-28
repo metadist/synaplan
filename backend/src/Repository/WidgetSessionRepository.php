@@ -63,6 +63,7 @@ class WidgetSessionRepository extends ServiceEntityRepository
      * Count active sessions for a widget.
      *
      * A session is considered "active" if it had activity in the last 5 minutes.
+     * Test sessions (session ID starting with 'test_') are excluded.
      */
     public function countActiveSessionsByWidget(string $widgetId): int
     {
@@ -73,21 +74,26 @@ class WidgetSessionRepository extends ServiceEntityRepository
             ->select('COUNT(ws.id)')
             ->where('ws.widgetId = :widgetId')
             ->andWhere('ws.lastMessage > :threshold')
+            ->andWhere('ws.sessionId NOT LIKE :testPrefix')
             ->setParameter('widgetId', $widgetId)
             ->setParameter('threshold', $activeThreshold)
+            ->setParameter('testPrefix', 'test_%')
             ->getQuery()
             ->getSingleScalarResult();
     }
 
     /**
      * Get total message count for a widget.
+     * Test sessions (session ID starting with 'test_') are excluded.
      */
     public function getTotalMessageCountByWidget(string $widgetId): int
     {
         return $this->createQueryBuilder('ws')
             ->select('SUM(ws.messageCount)')
             ->where('ws.widgetId = :widgetId')
+            ->andWhere('ws.sessionId NOT LIKE :testPrefix')
             ->setParameter('widgetId', $widgetId)
+            ->setParameter('testPrefix', 'test_%')
             ->getQuery()
             ->getSingleScalarResult() ?? 0;
     }

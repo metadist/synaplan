@@ -2,10 +2,16 @@
 
 namespace App\Controller;
 
+use App\AI\Service\AiFacade;
+use App\Entity\Message;
 use App\Entity\Prompt;
 use App\Entity\User;
+use App\Repository\FileRepository;
+use App\Repository\MessageRepository;
 use App\Repository\PromptMetaRepository;
 use App\Repository\PromptRepository;
+use App\Repository\RagDocumentRepository;
+use App\Service\ModelConfigService;
 use App\Service\PromptService;
 use Doctrine\ORM\EntityManagerInterface;
 use OpenApi\Attributes as OA;
@@ -32,6 +38,10 @@ class PromptController extends AbstractController
         private PromptService $promptService,
         private EntityManagerInterface $em,
         private LoggerInterface $logger,
+        private AiFacade $aiFacade,
+        private MessageRepository $messageRepository,
+        private FileRepository $fileRepository,
+        private ModelConfigService $modelConfigService,
     ) {
     }
 
@@ -218,8 +228,8 @@ class PromptController extends AbstractController
     public function getAvailableFiles(
         Request $request,
         #[CurrentUser] ?User $user,
-        \App\Repository\RagDocumentRepository $ragRepository,
-        \App\Repository\FileRepository $fileRepository,
+        RagDocumentRepository $ragRepository,
+        FileRepository $fileRepository,
     ): JsonResponse {
         if (!$user) {
             return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
@@ -227,11 +237,12 @@ class PromptController extends AbstractController
 
         $searchQuery = $request->query->get('search', '');
 
-        // Get all RAG documents for this user
+        $filesByFileId = [];
+
+        // First, get files from RAG documents
         $ragDocs = $ragRepository->findBy(['userId' => $user->getId()]);
 
         // Group by file (using messageId which now references BFILES.BID)
-        $filesByFileId = [];
         foreach ($ragDocs as $doc) {
             $fileId = $doc->getMessageId(); // Actually references File.id now
             if (!isset($filesByFileId[$fileId])) {
@@ -257,6 +268,66 @@ class PromptController extends AbstractController
             }
             if (isset($filesByFileId[$fileId])) {
                 ++$filesByFileId[$fileId]['chunks'];
+            }
+        }
+
+        // Also include files with 'vectorized' or 'extracted' status that may not have RAG docs yet
+        // This catches files that have been processed but RAG entries may be in a different state
+        $vectorizedFiles = $fileRepository->findBy([
+            'userId' => $user->getId(),
+            'status' => 'vectorized',
+        ]);
+
+        foreach ($vectorizedFiles as $file) {
+            $fileId = $file->getId();
+            if (!isset($filesByFileId[$fileId])) {
+                $fileName = $file->getFileName();
+
+                // Apply search filter
+                if (!empty($searchQuery) && false === stripos($fileName, $searchQuery)) {
+                    continue;
+                }
+
+                $filesByFileId[$fileId] = [
+                    'messageId' => $fileId,
+                    'fileName' => $fileName,
+                    'chunks' => 0, // No RAG docs found
+                    'currentGroupKey' => 'default',
+                    'uploadedAt' => $file->getCreatedAt()
+                        ? date('Y-m-d\TH:i:s\Z', $file->getCreatedAt())
+                        : null,
+                ];
+            }
+        }
+
+        // Also include files with 'extracted' status (have text, can be vectorized)
+        $extractedFiles = $fileRepository->findBy([
+            'userId' => $user->getId(),
+            'status' => 'extracted',
+        ]);
+
+        foreach ($extractedFiles as $file) {
+            $fileId = $file->getId();
+            if (!isset($filesByFileId[$fileId])) {
+                $fileName = $file->getFileName();
+
+                // Apply search filter
+                if (!empty($searchQuery) && false === stripos($fileName, $searchQuery)) {
+                    continue;
+                }
+
+                // Only include if file has extracted text
+                if (!empty($file->getFileText())) {
+                    $filesByFileId[$fileId] = [
+                        'messageId' => $fileId,
+                        'fileName' => $fileName,
+                        'chunks' => 0,
+                        'currentGroupKey' => 'default',
+                        'uploadedAt' => $file->getCreatedAt()
+                            ? date('Y-m-d\TH:i:s\Z', $file->getCreatedAt())
+                            : null,
+                    ];
+                }
             }
         }
 
@@ -779,8 +850,8 @@ class PromptController extends AbstractController
     public function getFiles(
         string $topic,
         #[CurrentUser] ?User $user,
-        \App\Repository\RagDocumentRepository $ragRepository,
-        \App\Repository\FileRepository $fileRepository,
+        RagDocumentRepository $ragRepository,
+        FileRepository $fileRepository,
     ): JsonResponse {
         if (!$user) {
             return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
@@ -875,7 +946,7 @@ class PromptController extends AbstractController
         string $topic,
         int $messageId,
         #[CurrentUser] ?User $user,
-        \App\Repository\RagDocumentRepository $ragRepository,
+        RagDocumentRepository $ragRepository,
     ): JsonResponse {
         if (!$user) {
             return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
@@ -955,7 +1026,7 @@ class PromptController extends AbstractController
         string $topic,
         Request $request,
         #[CurrentUser] ?User $user,
-        \App\Repository\RagDocumentRepository $ragRepository,
+        RagDocumentRepository $ragRepository,
     ): JsonResponse {
         if (!$user) {
             return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
@@ -968,17 +1039,19 @@ class PromptController extends AbstractController
             return $this->json(['error' => 'messageId is required'], Response::HTTP_BAD_REQUEST);
         }
 
-        // Get all RAG chunks for this message (any groupKey)
+        // Verify the file exists and belongs to user
+        $file = $this->fileRepository->find($messageId);
+        if (!$file || $file->getUserId() !== $user->getId()) {
+            return $this->json(['error' => 'File not found'], Response::HTTP_NOT_FOUND);
+        }
+
+        // Get all RAG chunks for this file (any groupKey)
         $ragDocs = $ragRepository->findBy([
             'userId' => $user->getId(),
             'messageId' => $messageId,
         ]);
 
-        if (empty($ragDocs)) {
-            return $this->json(['error' => 'No vectorized chunks found for this file'], Response::HTTP_NOT_FOUND);
-        }
-
-        // Update groupKey for all chunks
+        // Update groupKey for all chunks (if any exist)
         $newGroupKey = "TASKPROMPT:{$topic}";
         $chunksLinked = 0;
 
@@ -987,13 +1060,16 @@ class PromptController extends AbstractController
             ++$chunksLinked;
         }
 
-        $this->em->flush();
+        if ($chunksLinked > 0) {
+            $this->em->flush();
+        }
 
         $this->logger->info('Linked file to task prompt', [
             'user_id' => $user->getId(),
             'topic' => $topic,
             'message_id' => $messageId,
             'chunks_linked' => $chunksLinked,
+            'file_name' => $file->getFileName(),
         ]);
 
         return $this->json([
@@ -1001,5 +1077,184 @@ class PromptController extends AbstractController
             'chunksLinked' => $chunksLinked,
             'message' => 'File linked to task prompt successfully',
         ]);
+    }
+
+    /**
+     * Generate AI summary for a file attached to a task prompt.
+     *
+     * POST /api/v1/prompts/{topic}/files/{messageId}/summarize
+     */
+    #[Route('/{topic}/files/{messageId}/summarize', name: 'summarize_file', methods: ['POST'])]
+    #[OA\Post(
+        path: '/api/v1/prompts/{topic}/files/{messageId}/summarize',
+        summary: 'Generate AI summary for a file',
+        description: 'Extracts text from the file and generates a concise AI summary for use in the knowledge base',
+        security: [['Bearer' => []]],
+        tags: ['Task Prompts'],
+        parameters: [
+            new OA\Parameter(
+                name: 'topic',
+                in: 'path',
+                required: true,
+                description: 'Task prompt topic',
+                schema: new OA\Schema(type: 'string')
+            ),
+            new OA\Parameter(
+                name: 'messageId',
+                in: 'path',
+                required: true,
+                description: 'Message ID containing the file',
+                schema: new OA\Schema(type: 'integer')
+            ),
+        ],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Summary generated successfully',
+                content: new OA\JsonContent(
+                    properties: [
+                        new OA\Property(property: 'success', type: 'boolean'),
+                        new OA\Property(property: 'summary', type: 'string', example: 'This document contains product information including prices and specifications.'),
+                        new OA\Property(property: 'fileName', type: 'string', example: 'products.pdf'),
+                    ]
+                )
+            ),
+            new OA\Response(response: 401, description: 'Not authenticated'),
+            new OA\Response(response: 404, description: 'File not found'),
+            new OA\Response(response: 500, description: 'Summary generation failed'),
+        ]
+    )]
+    public function summarizeFile(
+        string $topic,
+        int $messageId,
+        #[CurrentUser] ?User $user,
+        RagDocumentRepository $ragRepository,
+    ): JsonResponse {
+        if (!$user) {
+            return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
+        }
+
+        $fileText = '';
+        $fileName = 'Document';
+
+        // First, try to find in File repository (standalone files)
+        $file = $this->fileRepository->find($messageId);
+        if ($file && $file->getUserId() === $user->getId()) {
+            $fileText = $file->getFileText();
+            $fileName = $file->getFileName();
+        } else {
+            // Fall back to Message repository (message attachments)
+            $message = $this->messageRepository->find($messageId);
+
+            if (!$message || $message->getUserId() !== $user->getId()) {
+                return $this->json(['error' => 'File not found'], Response::HTTP_NOT_FOUND);
+            }
+
+            $fileText = $message->getFileText();
+            $fileName = $message->getFilePath() ? basename($message->getFilePath()) : 'Document';
+        }
+
+        // If no fileText, try to get text from RAG chunks
+        if (empty(trim($fileText))) {
+            $ragDocs = $ragRepository->findBy([
+                'userId' => $user->getId(),
+                'messageId' => $messageId,
+            ]);
+
+            if (!empty($ragDocs)) {
+                $chunks = [];
+                foreach ($ragDocs as $doc) {
+                    $chunks[] = $doc->getText();
+                }
+                $fileText = implode("\n\n", $chunks);
+            }
+        }
+
+        if (empty(trim($fileText))) {
+            return $this->json([
+                'error' => 'No text content found in file',
+            ], Response::HTTP_BAD_REQUEST);
+        }
+
+        // Truncate text if too long (keep first 15000 chars for summary)
+        $maxLength = 15000;
+        if (strlen($fileText) > $maxLength) {
+            $fileText = substr($fileText, 0, $maxLength).'... [truncated]';
+        }
+
+        try {
+            // Get a cheap, fast model for summarization
+            $provider = null;
+            $modelName = null;
+
+            // Try OpenAI gpt-4o-mini first (cheap and fast)
+            $openaiProvider = $this->modelConfigService->getProviderForModel(73);
+            $openaiModel = $this->modelConfigService->getModelName(73);
+
+            if ($openaiProvider && $openaiModel) {
+                $provider = $openaiProvider;
+                $modelName = $openaiModel;
+            } else {
+                // Fallback to user's default chat model
+                $modelId = $this->modelConfigService->getDefaultModel('CHAT', $user->getId());
+                if ($modelId && $modelId > 0) {
+                    $provider = $this->modelConfigService->getProviderForModel($modelId);
+                    $modelName = $this->modelConfigService->getModelName($modelId);
+                }
+            }
+
+            // Build prompt for concise summary
+            $systemPrompt = <<<'PROMPT'
+You are a document summarizer. Your task is to create a brief, informative summary of the provided document.
+
+Rules:
+- Write 2-3 sentences maximum
+- Focus on what the document IS and what information it CONTAINS
+- Be specific about the type of content (prices, FAQs, product info, etc.)
+- Write in the same language as the document
+- Do NOT include any metadata or formatting
+- Just output the plain summary text
+PROMPT;
+
+            $messages = [
+                ['role' => 'system', 'content' => $systemPrompt],
+                ['role' => 'user', 'content' => "Summarize this document:\n\n{$fileText}"],
+            ];
+
+            $aiOptions = ['temperature' => 0.3];
+            if ($provider) {
+                $aiOptions['provider'] = $provider;
+            }
+            if ($modelName) {
+                $aiOptions['model'] = $modelName;
+            }
+
+            $response = $this->aiFacade->chat($messages, $user->getId(), $aiOptions);
+            $summary = trim($response['content'] ?? '');
+
+            $this->logger->info('File summary generated', [
+                'user_id' => $user->getId(),
+                'topic' => $topic,
+                'message_id' => $messageId,
+                'file_name' => $fileName,
+                'summary_length' => strlen($summary),
+            ]);
+
+            return $this->json([
+                'success' => true,
+                'summary' => $summary,
+                'fileName' => $fileName,
+            ]);
+        } catch (\Throwable $e) {
+            $this->logger->error('File summary generation failed', [
+                'user_id' => $user->getId(),
+                'message_id' => $messageId,
+                'error' => $e->getMessage(),
+            ]);
+
+            return $this->json([
+                'error' => 'Failed to generate summary',
+            ], Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
     }
 }
