@@ -382,12 +382,16 @@ class StreamController extends AbstractController
                     ]);
                 }
 
-                // Widget Mode: Force fixed task prompt (no sorting)
-                if ($isWidgetMode && $fixedTaskPromptTopic) {
-                    $processingOptions['fixed_task_prompt'] = $fixedTaskPromptTopic;
-                    $this->logger->info('StreamController: Using fixed task prompt for widget', [
-                        'task_prompt' => $fixedTaskPromptTopic,
-                    ]);
+                // Widget Mode: Force fixed task prompt (no sorting) and disable memories
+                if ($isWidgetMode) {
+                    $processingOptions['is_widget_mode'] = true;
+
+                    if ($fixedTaskPromptTopic) {
+                        $processingOptions['fixed_task_prompt'] = $fixedTaskPromptTopic;
+                        $this->logger->info('StreamController: Using fixed task prompt for widget', [
+                            'task_prompt' => $fixedTaskPromptTopic,
+                        ]);
+                    }
                 }
 
                 // Check if selected model supports streaming
