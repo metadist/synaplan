@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { useNotification } from '@/composables/useNotification'
-import { useI18n } from 'vue-i18n'
+import { i18n } from '@/i18n'
 import {
   getMemories,
   getCategories,
@@ -15,6 +15,9 @@ import {
   type SearchMemoriesRequest,
 } from '@/services/api/userMemoriesApi'
 
+// Use global i18n instance for translations outside Vue setup context
+const t = (key: string) => i18n.global.t(key)
+
 export const useMemoriesStore = defineStore('memories', () => {
   // Lazy-load composables to avoid calling them outside setup context
   const getNotifications = () => {
@@ -25,12 +28,19 @@ export const useMemoriesStore = defineStore('memories', () => {
     }
   }
 
-  const getI18n = () => {
-    try {
-      return useI18n()
-    } catch {
-      return { t: (key: string) => key }
+  /**
+   * Format error message for notification.
+   * Backend only sends debug info to admins, so we just need to combine
+   * the translated message with the technical error (which may contain [Debug] for admins).
+   */
+  const formatErrorMessage = (translationKey: string, technicalError: string): string => {
+    const userMessage = t(translationKey)
+    // If the error contains [Debug], it's from the backend for admins
+    // Otherwise, just show the user-friendly message
+    if (technicalError.includes('[Debug]')) {
+      return `${userMessage}\n\n${technicalError}`
     }
+    return userMessage
   }
 
   // State
@@ -106,8 +116,7 @@ export const useMemoriesStore = defineStore('memories', () => {
           !errorMsg.includes('unavailable')
         ) {
           const { error: showError } = getNotifications()
-          const { t } = getI18n()
-          showError(t('memories.errors.loadFailed') || errorMsg)
+          showError(formatErrorMessage('memories.loadError', errorMsg))
         } else {
           console.warn(
             '⚠️ Memory service unavailable (timeout or down), continuing without memories'
@@ -131,7 +140,7 @@ export const useMemoriesStore = defineStore('memories', () => {
     }
   }
 
-  async function addMemory(request: CreateMemoryRequest) {
+  async function addMemory(request: CreateMemoryRequest, options: { silent?: boolean } = {}) {
     loading.value = true
     error.value = null
 
@@ -139,9 +148,10 @@ export const useMemoriesStore = defineStore('memories', () => {
       const newMemory = await createMemory(request)
       memories.value.unshift(newMemory)
 
-      const { success } = getNotifications()
-      const { t } = getI18n()
-      success(t('memories.create.success'))
+      if (!options.silent) {
+        const { success } = getNotifications()
+        success(t('memories.createSuccess'))
+      }
 
       // Refresh categories
       await fetchCategories()
@@ -151,9 +161,10 @@ export const useMemoriesStore = defineStore('memories', () => {
       const errorMsg = err instanceof Error ? err.message : 'Failed to create memory'
       error.value = errorMsg
 
-      const { error: showError } = getNotifications()
-      const { t } = getI18n()
-      showError(t('memories.create.error') || errorMsg)
+      if (!options.silent) {
+        const { error: showError } = getNotifications()
+        showError(formatErrorMessage('memories.createError', errorMsg))
+      }
 
       throw err
     } finally {
@@ -161,7 +172,7 @@ export const useMemoriesStore = defineStore('memories', () => {
     }
   }
 
-  async function editMemory(id: number, request: UpdateMemoryRequest) {
+  async function editMemory(id: number, request: UpdateMemoryRequest, options: { silent?: boolean } = {}) {
     loading.value = true
     error.value = null
 
@@ -174,18 +185,20 @@ export const useMemoriesStore = defineStore('memories', () => {
         memories.value[index] = updatedMemory
       }
 
-      const { success } = getNotifications()
-      const { t } = getI18n()
-      success(t('memories.edit.success'))
+      if (!options.silent) {
+        const { success } = getNotifications()
+        success(t('memories.editSuccess'))
+      }
 
       return updatedMemory
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : 'Failed to update memory'
       error.value = errorMsg
 
-      const { error: showError } = getNotifications()
-      const { t } = getI18n()
-      showError(t('memories.edit.error') || errorMsg)
+      if (!options.silent) {
+        const { error: showError } = getNotifications()
+        showError(formatErrorMessage('memories.editError', errorMsg))
+      }
 
       throw err
     } finally {
@@ -193,7 +206,7 @@ export const useMemoriesStore = defineStore('memories', () => {
     }
   }
 
-  async function removeMemory(id: number) {
+  async function removeMemory(id: number, options: { silent?: boolean } = {}) {
     loading.value = true
     error.value = null
 
@@ -203,9 +216,10 @@ export const useMemoriesStore = defineStore('memories', () => {
       // Remove from local state
       memories.value = memories.value.filter((m) => m.id !== id)
 
-      const { success } = getNotifications()
-      const { t } = getI18n()
-      success(t('memories.delete.success'))
+      if (!options.silent) {
+        const { success } = getNotifications()
+        success(t('memories.deleteSuccess'))
+      }
 
       // Refresh categories
       await fetchCategories()
@@ -213,9 +227,10 @@ export const useMemoriesStore = defineStore('memories', () => {
       const errorMsg = err instanceof Error ? err.message : 'Failed to delete memory'
       error.value = errorMsg
 
-      const { error: showError } = getNotifications()
-      const { t } = getI18n()
-      showError(t('memories.delete.error') || errorMsg)
+      if (!options.silent) {
+        const { error: showError } = getNotifications()
+        showError(formatErrorMessage('memories.deleteError', errorMsg))
+      }
 
       throw err
     } finally {
@@ -236,7 +251,7 @@ export const useMemoriesStore = defineStore('memories', () => {
       error.value = errorMsg
 
       const { error: showError } = getNotifications()
-      showError(errorMsg)
+      showError(formatErrorMessage('memories.searchError', errorMsg))
 
       return []
     } finally {

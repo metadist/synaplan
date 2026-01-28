@@ -109,32 +109,6 @@
             </div>
 
             <div v-else class="space-y-2 sm:space-y-3">
-              <!-- Show limit notice if not filtering -->
-              <div
-                v-if="
-                  !searchQuery && selectedCategory === 'all' && memoriesStore.memories.length > 10
-                "
-                class="surface-chip rounded-lg p-3 sm:p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3"
-              >
-                <div class="flex items-center gap-3">
-                  <Icon icon="mdi:information" class="w-5 h-5 txt-brand shrink-0" />
-                  <div class="min-w-0">
-                    <p class="text-sm txt-primary font-medium">
-                      {{ $t('memories.showingRecent', { count: 10 }) }}
-                    </p>
-                    <p class="text-xs txt-secondary">
-                      {{ $t('memories.totalCount', { count: memoriesStore.memories.length }) }}
-                    </p>
-                  </div>
-                </div>
-                <button
-                  class="btn-primary px-4 py-2 rounded-lg text-sm w-full sm:w-auto"
-                  @click="viewAllMemories"
-                >
-                  {{ $t('memories.viewAll') }}
-                </button>
-              </div>
-
               <div
                 v-for="memory in filteredMemories"
                 :key="memory.id"
@@ -181,6 +155,26 @@
               </div>
             </div>
           </div>
+
+          <!-- Footer with View All -->
+          <div
+            class="flex items-center justify-between p-3 sm:p-4 border-t border-light-border/10 dark:border-dark-border/10"
+          >
+            <p class="text-xs sm:text-sm txt-secondary">
+              {{
+                $t('memories.totalCount', {
+                  count: memoriesStore.memories.length,
+                })
+              }}
+            </p>
+            <button
+              class="text-sm font-medium text-brand hover:text-brand-light transition-colors flex items-center gap-1.5"
+              @click="viewAllMemories"
+            >
+              {{ $t('memories.viewAll') }}
+              <Icon icon="mdi:arrow-right" class="w-4 h-4" />
+            </button>
+          </div>
         </div>
       </div>
     </Transition>
@@ -202,7 +196,6 @@ import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { Icon } from '@iconify/vue'
 import { useMemoriesStore } from '@/stores/userMemories'
-import { useNotification } from '@/composables/useNotification'
 import { useDialog } from '@/composables/useDialog'
 import type { UserMemory } from '@/services/api/userMemoriesApi'
 import { getCategories } from '@/services/api/userMemoriesApi'
@@ -222,7 +215,6 @@ const emit = defineEmits<Emits>()
 const { t, locale } = useI18n()
 const router = useRouter()
 const memoriesStore = useMemoriesStore()
-const { success, error } = useNotification()
 const { confirm } = useDialog()
 
 const loading = ref(false)
@@ -273,8 +265,8 @@ async function loadMemories() {
   try {
     await memoriesStore.fetchMemories()
     availableCategories.value = await getCategories()
-  } catch (err) {
-    error(t('common.error'))
+  } catch {
+    // Store handles error notifications
   } finally {
     loading.value = false
   }
@@ -304,12 +296,8 @@ async function deleteMemory(memory: UserMemory) {
 
   if (!confirmed) return
 
-  try {
-    await memoriesStore.removeMemory(memory.id)
-    success(t('common.success'))
-  } catch (err) {
-    error(t('common.error'))
-  }
+  // Store handles notifications
+  await memoriesStore.removeMemory(memory.id)
 }
 
 function closeFormDialog() {
@@ -330,10 +318,10 @@ async function handleSaveMemory(memoryData: Partial<UserMemory>) {
         value: memoryData.value || '',
       })
     }
-    success(t('memories.memorySaved'))
+    // Store handles notifications
     closeFormDialog()
-  } catch (err) {
-    error(t('common.error'))
+  } catch {
+    // Store already shows error notification
   }
 }
 

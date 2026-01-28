@@ -91,6 +91,13 @@ class PromptFixtures extends Fixture
                 'shortDescription' => 'Extract user preferences and important information from conversations. Returns JSON array or null.',
                 'prompt' => $this->getMemoryExtractionPrompt(),
             ],
+            [
+                'ownerId' => 0,
+                'language' => 'en',
+                'topic' => 'tools:memory_parse',
+                'shortDescription' => 'Parse natural language input into structured memory format. Can suggest updates or deletions of existing memories.',
+                'prompt' => $this->getMemoryParsePrompt(),
+            ],
         ];
 
         foreach ($prompts as $data) {
@@ -191,7 +198,7 @@ This is the list, use only this:
    - "audio" - if user wants audio, sound, voice, speech, TTS, or text-to-speech
    - "image" - if user wants an image, picture, photo, illustration (this is the default)
    Examples:
-   - "Erstelle ein Video von einem Auto" → BMEDIA: "video"
+   - "Create a video of a car" → BMEDIA: "video"
    - "Make a video of a dog running" → BMEDIA: "video"
    - "Generate an image of a cat" → BMEDIA: "image"
    - "Create a picture of a sunset" → BMEDIA: "image"
@@ -199,10 +206,10 @@ This is the list, use only this:
    - "Convert to speech" → BMEDIA: "audio"
 
 8. **Detect video duration (BDURATION)**: If BTOPIC is "mediamaker" AND BMEDIA is "video", extract the requested duration in seconds as an integer.
-   - If the user specifies a duration (e.g., "3 seconds", "6 Sekunden", "10-second video"), set BDURATION to that number
+   - If the user specifies a duration (e.g., "3 seconds", "5 second video", "10-second clip"), set BDURATION to that number
    - If no duration is mentioned, do NOT include BDURATION (let the system use default)
    Examples:
-   - "Erstelle ein 3 Sekunden Video von einem Auto" → BDURATION: 3
+   - "Create a 3 second video of a car" → BDURATION: 3
    - "Make a 6-second video of a dog" → BDURATION: 6
    - "Create a 10 second clip" → BDURATION: 10
    - "Generate a video of a cat" → (no BDURATION, user didn't specify)
@@ -294,20 +301,20 @@ Respond with ONLY the enhanced prompt text. Do not include any JSON, explanation
 Input: "Generate an image of a cat"
 Output: A detailed image of a cat, photorealistic, soft natural lighting, high resolution, shallow depth of field
 
-Input: "Erstelle ein 3 Sekunden Video von einem Mann der winkt"
+Input: "Create a 3 second video of a man waving"
 Output: Cinematic video of a man waving, natural movement, friendly expression, soft daylight, shallow depth of field, 4K quality
 
 Input: "Make a 5 second video of a dog running in a park"
 Output: Dynamic video of a happy dog running through a lush green park, tracking shot, natural sunlight, playful movement, cinematic quality
 
-Input: "Erstelle ein Video von einem BMW Auto, was gerade fährt"
+Input: "Create a video of a BMW car driving"
 Output: Cinematic video of a modern BMW sedan driving smoothly on an asphalt road, front three-quarter tracking shot, realistic motion blur, reflections on glossy paint, golden-hour lighting, urban background, 4K quality
 
 Input: "Read this aloud: Hello World"
 Output: Hello World
 
-Input: "Erstelle eine audio mit 'Guten Tag!'"
-Output: Guten Tag!
+Input: "Create an audio saying 'Good morning!'"
+Output: Good morning!
 PROMPT;
     }
 
@@ -319,7 +326,7 @@ You receive a request to create an audio/voice output for the user.
 
 Your task:
 - Extract ONLY the exact text that should be spoken.
-- Remove instruction phrases like "say", "speak", "read", "please create an audio", "erstelle eine Audio" etc.
+- Remove instruction phrases like "say", "speak", "read", "please create an audio", "generate audio" etc.
 - Preserve the original language, punctuation, emoji, casing.
 - If the user provides quotes, return the quoted text without the quotes (unless they contain mismatched quotes, then return the meaningful text).
 - Do not add introductions like "Audio Prompt:" or explanations.
@@ -328,9 +335,9 @@ Your task:
 - Return plain text only, without JSON, markdown, quotes, or extra sentences.
 
 Examples:
-- Input: "Bitte sag: Hallo, was geht?" → Output: Hallo, was geht?
+- Input: "Please say: Hello, how are you?" → Output: Hello, how are you?
 - Input: "Read this aloud: 'Good morning!'" → Output: Good morning!
-- Input: "erstelle eine audio wo du hallo sagst" → Output: Hallo
+- Input: "Create an audio where you say hello" → Output: Hello
 PROMPT;
     }
 
@@ -423,8 +430,8 @@ Output: "How can I fix this issue?"
 Input: "need help with code"
 Output: "I need help with my code. Can you assist me?"
 
-Input: "erkläre mir das"
-Output: "Kannst du mir das bitte erklären?"
+Input: "explain this to me"
+Output: "Could you please explain this to me?"
 
 Input: "make pic of cat"
 Output: "Please create an image of a cat."
@@ -454,8 +461,8 @@ Your task is to analyze the user's question and generate a concise, effective se
 
 ## Examples:
 
-Question: "Kannst du mir sagen, wie viel ein Döner in München kostet?"
-Search Query: döner preis münchen
+Question: "Can you tell me how much a kebab costs in Munich?"
+Search Query: kebab price munich
 
 Question: "What's the weather like in Paris this weekend?"
 Search Query: paris weather forecast weekend
@@ -469,8 +476,8 @@ Search Query: tesla model 3 2024 specifications
 Question: "Who won the world cup in 2022?"
 Search Query: world cup 2022 winner
 
-Question: "Wie funktioniert ein Quantencomputer?"
-Search Query: quantencomputer funktionsweise
+Question: "How does a quantum computer work?"
+Search Query: quantum computer how it works
 
 Now generate the search query for the following user question:
 PROMPT;
@@ -621,72 +628,137 @@ PROMPT;
     private function getMemoryExtractionPrompt(): string
     {
         return <<<'PROMPT'
-You are a memory extraction assistant. Extract **only truly important and persistent** user information from conversations.
+You are a memory extraction assistant. Extract user information worth remembering from conversations.
 
-**CRITICAL: Return JSON array if you find something worth remembering, otherwise return: null**
+**Return JSON array if you find something to remember, otherwise return: null**
 
-## ✅ What to Extract:
-- Personal preferences (tech, tools, methodologies)
-- Work context (job, projects, team, company info)
-- Goals & aspirations (learning, building)
-- Dislikes & avoidances
-- Personal facts (age, location, dietary preferences - if explicitly stated)
-- **Research results**: If you researched information about the user, their company, or related topics, extract factual findings!
+## What to Extract:
+- **Names & Identity**: User's name, nicknames, how they introduce themselves
+- **Personal facts**: Age, location, occupation, hobbies, interests
+- **Preferences**: Likes, dislikes, favorite things, preferred tools/methods
+- **Work context**: Job, company, projects, team info
+- **Goals**: What they want to learn, build, achieve
+- **Research findings**: Facts discovered about the user or their context
 
-## ❌ DO NOT Extract:
-- Questions or task requests
-- Temporary states ("tired today", "currently debugging")
-- General statements or small talk
-- One-time events
-- Speculative or uncertain information
-
-## 🎯 Analyzing Conversations:
-The conversation includes YOUR (assistant's) responses. If you researched factual information (about user, their company, projects, etc.), extract it!
-
-**Examples:**
-- User asks about their company → You research it → Extract company info
-- User asks who Max Mustermann is → You find he's a developer → Extract work context
-- User states "I prefer TypeScript" → Extract preference
+## Do NOT Extract:
+- Pure questions without personal info ("What is React?")
+- Temporary states ("I'm tired today")
+- Generic greetings without info ("Hello!", "Thanks!")
 
 ## Output Format:
 
-**Worth remembering:**
 ```json
 [
   {
-    "category": "preferences|personal|work|projects|general",
+    "category": "personal|preferences|work|projects|general",
     "key": "short_identifier",
-    "value": "descriptive text in user's language"
+    "value": "what to remember (in user's language)"
   }
 ]
 ```
 
-**Nothing to remember (80-90% of cases):**
+Or if nothing to remember: `null`
+
+## Guidelines:
+- **Be generous**: If in doubt, extract it. Better to remember than forget.
+- Keep keys short (<= 24 chars), snake_case
+- One memory per fact (atomic)
+- Write values in the user's language
+
+## Examples:
+
+User: "Hi, I'm Tom" → `[{"category": "personal", "key": "name", "value": "Tom"}]`
+
+User: "My name is Sarah and I work at Google" → `[{"category": "personal", "key": "name", "value": "Sarah"}, {"category": "work", "key": "company", "value": "Works at Google"}]`
+
+User: "I prefer dark mode" → `[{"category": "preferences", "key": "ui_theme", "value": "Prefers dark mode"}]`
+
+User: "What time is it?" → `null`
+
+User: "Thanks for the help!" → `null`
+
+**If existing memories are provided, do NOT duplicate. Only extract NEW information.**
+PROMPT;
+    }
+
+    private function getMemoryParsePrompt(): string
+    {
+        return <<<'PROMPT'
+# Memory Parse Assistant
+
+Extract ALL information from user input and return as JSON array.
+
+## CRITICAL RULES
+
+1. **Return an ARRAY of actions** - even for single items!
+2. **EXTRACT the actual value, don't repeat the input!**
+   - "My name is John" → value: "John"
+   - "I'm 25 years old" → value: "25"
+3. **UPDATE if same topic exists in the provided memories**
+4. **One action per piece of information**
+
+## Output Format
+
+Always return a JSON array:
+```json
+{
+  "actions": [
+    {"action": "create", "memory": {"category": "personal", "key": "name", "value": "John"}},
+    {"action": "create", "memory": {"category": "personal", "key": "age", "value": "25"}}
+  ]
+}
 ```
-null
+
+## Action Types
+
+- **create**: New info, nothing similar exists
+- **update**: Similar exists → include existingId
+- **delete**: User wants to forget → include existingId
+
+## Standard Keys
+name, age, location, job, company, favorite_food, favorite_color, hobbies, skills
+
+## Categories
+personal, preferences, work, projects, general
+
+## Examples
+
+Input: "My name is Sarah and I'm 30 years old"
+Existing: none
+```json
+{"actions": [
+  {"action": "create", "memory": {"category": "personal", "key": "name", "value": "Sarah"}},
+  {"action": "create", "memory": {"category": "personal", "key": "age", "value": "30"}}
+]}
 ```
 
-## Guidelines (keep it compact):
-- Keep **category names generic** (e.g. personal, work, preferences, projects, general). Avoid overly specific category names.
-- Keep **keys as short as possible** while still being meaningful (aim for <= 24 characters). Do NOT use IDs, timestamps, or full sentences as keys.
-- ATOMIC RULE: **1 memory = 1 fact / preference**. Do NOT combine multiple facts in one value.
-- If a message contains multiple facts about the same topic, **create multiple memories** and **reuse the same key** (same key is allowed multiple times).
-  - Example: `diet: Eats halal` + `diet: Prefers low-calorie meals for weight loss`
-- Keep values **short** (single sentence, no lists).
+Input: "I'm now called Tom and I'm 25"
+Existing: [{"id": 12, "key": "name", "value": "Sarah"}, {"id": 13, "key": "age", "value": "30"}]
+```json
+{"actions": [
+  {"action": "update", "existingId": 12, "memory": {"category": "personal", "key": "name", "value": "Tom"}, "reason": "Name changed"},
+  {"action": "update", "existingId": 13, "memory": {"category": "personal", "key": "age", "value": "25"}, "reason": "Age updated"}
+]}
+```
 
-## Quick Examples:
+Input: "Forget my name and age"
+Existing: [{"id": 12, "key": "name", "value": "Tom"}, {"id": 13, "key": "age", "value": "25"}]
+```json
+{"actions": [
+  {"action": "delete", "existingId": 12, "reason": "User wants to forget"},
+  {"action": "delete", "existingId": 13, "reason": "User wants to forget"}
+]}
+```
 
-User: "What are good React alternatives?" → `null` (just a question)
+Input: "I like pizza"
+Existing: none
+```json
+{"actions": [
+  {"action": "create", "memory": {"category": "preferences", "key": "favorite_food", "value": "pizza"}}
+]}
+```
 
-User: "I prefer Vue for personal projects" → `[{"category": "preferences", "key": "frontend_framework", "value": "Prefers Vue for personal projects"}]`
-
-User: "Thanks!" → `null` (small talk)
-
-User: "I work as senior developer at TechCorp using TypeScript" → `[{"category": "work", "key": "position", "value": "Senior developer at TechCorp"}, {"category": "work", "key": "tech_stack", "value": "Uses TypeScript"}]`
-
-User: "research my company" + Assistant finds TechCorp info → Extract company details
-
-**IMPORTANT: If existing memories are provided, do NOT duplicate. Only extract NEW information.**
+**Return ONLY the JSON object with "actions" array. No explanation.**
 PROMPT;
     }
 }
