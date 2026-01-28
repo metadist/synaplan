@@ -13,12 +13,12 @@
             v-model="searchQuery"
             type="text"
             :placeholder="$t('memories.search.placeholder')"
-            class="w-full max-w-full min-w-0 pl-10 pr-4 py-2.5 surface-chip txt-primary placeholder:txt-secondary focus:outline-none focus:ring-2 focus:ring-brand/50"
+            class="w-full max-w-full min-w-0 pl-10 pr-4 py-2.5 rounded-lg surface-chip txt-primary placeholder:txt-secondary focus:outline-none focus:ring-2 focus:ring-brand/50"
           />
         </div>
         <select
           v-model="filterValue"
-          class="w-full md:w-auto max-w-full min-w-0 px-4 py-2.5 surface-chip txt-primary cursor-pointer focus:outline-none focus:ring-2 focus:ring-brand/50"
+          class="w-full md:w-auto max-w-full min-w-0 px-4 py-2.5 rounded-lg surface-chip txt-primary cursor-pointer focus:outline-none focus:ring-2 focus:ring-brand/50"
         >
           <option value="">{{ $t('memories.listView.allMemories') }}</option>
 
@@ -46,7 +46,7 @@
         </select>
         <select
           v-model="sortBy"
-          class="w-full md:w-auto max-w-full min-w-0 px-4 py-2.5 surface-chip txt-primary cursor-pointer focus:outline-none focus:ring-2 focus:ring-brand/50"
+          class="w-full md:w-auto max-w-full min-w-0 px-4 py-2.5 rounded-lg surface-chip txt-primary cursor-pointer focus:outline-none focus:ring-2 focus:ring-brand/50"
         >
           <option value="category">{{ $t('memories.listView.sortByCategory') }}</option>
           <option value="key">{{ $t('memories.listView.sortByKey') }}</option>
@@ -83,7 +83,7 @@
           <Icon icon="mdi:checkbox-multiple-marked" class="w-4 h-4 inline mr-1" />
           {{ $t('memories.selectAll') }}
         </button>
-        <button class="btn-primary px-4 py-2.5" @click="$emit('create')">
+        <button class="btn-primary px-4 py-2.5 rounded-lg" @click="$emit('create')">
           <Icon icon="mdi:plus" class="w-4 h-4 inline mr-1" />
           {{ $t('memories.createButton') }}
         </button>
