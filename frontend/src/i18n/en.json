@@ -1772,7 +1772,9 @@
       "preferences": "Preferences",
       "personal": "Personal",
       "work": "Work",
-      "projects": "Projects"
+      "projects": "Projects",
+      "general": "General",
+      "tech": "Technology"
     },
     "source": {
       "auto_detected": "Auto-detected",
@@ -1800,6 +1802,35 @@
     "edit": {
       "title": "Edit Memory"
     },
+    "form": {
+      "easyMode": "Easy",
+      "advancedMode": "Advanced",
+      "easyDescription": "Just describe what you want to remember and AI will structure it for you.",
+      "whatToRemember": "What should I remember?",
+      "easyPlaceholder": "e.g. I prefer dark mode in all applications, My favorite programming language is TypeScript, I work best in the morning...",
+      "easyHint": "Write naturally - the AI will extract the key information.",
+      "easyEditDescription": "Tell me what you want to change about this memory.",
+      "easyEditPlaceholder": "e.g. Change the value to..., Update this to..., Delete this memory...",
+      "easyEditHint": "Describe the change naturally - the AI will understand.",
+      "currentMemory": "Current Memory",
+      "whatToChange": "What would you like to change?",
+      "updateWithAI": "Update with AI",
+      "categoryOptional": "Category (optional)",
+      "customCategory": "Custom",
+      "customCategoryPlaceholder": "Enter custom category...",
+      "createWithAI": "Create with AI",
+      "aiUnavailable": "AI structuring unavailable, saving as note",
+      "previewTitle": "Preview",
+      "previewDescription": "Check if this looks correct before saving.",
+      "actionCreate": "New Memory",
+      "actionUpdate": "Update Existing",
+      "actionDelete": "Delete Memory",
+      "similarFound": "Similar memories found - consider updating instead:",
+      "confirm": "Confirm & Save",
+      "oneChange": "change",
+      "multipleChanges": "changes"
+    },
+    "multipleSuccess": "{count} memories saved successfully",
     "delete": {
       "title": "Delete Memory",
       "message": "Are you sure you want to delete this memory? This action cannot be undone.",
@@ -1822,6 +1853,8 @@
     "createError": "Failed to create memory",
     "editSuccess": "Memory updated successfully",
     "editError": "Failed to update memory",
+    "loadError": "Failed to load memories",
+    "searchError": "Search failed",
     "memorySaved": "New memory saved successfully!",
     "showingRecent": "Showing the {count} most recent memories",
     "totalCount": "{count} memories stored in total",

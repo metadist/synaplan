@@ -39,6 +39,9 @@ export const CreateMemoryResponseSchema = z.object({
 
 export const UpdateMemoryRequestSchema = z.object({
   value: z.string(),
+  category: z.string().optional(),
+  key: z.string().optional(),
+  id: z.number().optional(), // Used by Easy Mode to identify which memory to update
 })
 
 export const UpdateMemoryResponseSchema = z.object({

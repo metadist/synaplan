@@ -375,13 +375,18 @@ async function httpClient<T = unknown, S extends z.Schema | undefined = undefine
     }
 
     let errorMessage = `HTTP ${response.status}: ${response.statusText}`
+    let debugInfo: string | undefined
     try {
       const errorData = await response.json()
       errorMessage = errorData.error || errorData.message || errorMessage
+      // Capture debug info if present (only sent to admins by backend)
+      debugInfo = errorData.debug
     } catch {
       // Use default error message
     }
-    throw new Error(errorMessage)
+    // Include debug info in error message if present
+    const fullMessage = debugInfo ? `${errorMessage}\n[Debug] ${debugInfo}` : errorMessage
+    throw new Error(fullMessage)
   }
 
   // Parse response based on requested type

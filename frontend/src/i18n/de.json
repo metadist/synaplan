@@ -1668,7 +1668,9 @@
       "preferences": "Präferenzen",
       "personal": "Persönlich",
       "work": "Arbeit",
-      "projects": "Projekte"
+      "projects": "Projekte",
+      "general": "Allgemein",
+      "tech": "Technologie"
     },
     "source": {
       "auto_detected": "Automatisch erkannt",
@@ -1696,6 +1698,35 @@
     "edit": {
       "title": "Erinnerung bearbeiten"
     },
+    "form": {
+      "easyMode": "Einfach",
+      "advancedMode": "Erweitert",
+      "easyDescription": "Beschreibe einfach, was du dir merken möchtest und die KI strukturiert es für dich.",
+      "whatToRemember": "Was soll ich mir merken?",
+      "easyPlaceholder": "z.B. Ich bevorzuge den Dark Mode in allen Anwendungen, Meine Lieblingsprogrammiersprache ist TypeScript, Ich arbeite am besten morgens...",
+      "easyHint": "Schreibe natürlich - die KI extrahiert die wichtigen Informationen.",
+      "easyEditDescription": "Sag mir, was du an dieser Erinnerung ändern möchtest.",
+      "easyEditPlaceholder": "z.B. Ändere den Wert auf..., Aktualisiere das zu..., Lösche diese Erinnerung...",
+      "easyEditHint": "Beschreibe die Änderung natürlich - die KI versteht es.",
+      "currentMemory": "Aktuelle Erinnerung",
+      "whatToChange": "Was möchtest du ändern?",
+      "updateWithAI": "Mit KI aktualisieren",
+      "categoryOptional": "Kategorie (optional)",
+      "customCategory": "Eigene",
+      "customCategoryPlaceholder": "Eigene Kategorie eingeben...",
+      "createWithAI": "Mit KI erstellen",
+      "aiUnavailable": "KI-Strukturierung nicht verfügbar, wird als Notiz gespeichert",
+      "previewTitle": "Vorschau",
+      "previewDescription": "Prüfe ob das so passt, bevor es gespeichert wird.",
+      "actionCreate": "Neue Erinnerung",
+      "actionUpdate": "Bestehende aktualisieren",
+      "actionDelete": "Erinnerung löschen",
+      "similarFound": "Ähnliche Erinnerungen gefunden - vielleicht lieber aktualisieren:",
+      "confirm": "Bestätigen & Speichern",
+      "oneChange": "Änderung",
+      "multipleChanges": "Änderungen"
+    },
+    "multipleSuccess": "{count} Erinnerungen erfolgreich gespeichert",
     "delete": {
       "title": "Erinnerung löschen",
       "message": "Bist du sicher, dass du diese Erinnerung löschen möchtest? Diese Aktion kann nicht rückgängig gemacht werden.",
@@ -1718,6 +1749,8 @@
     "createError": "Fehler beim Erstellen der Erinnerung",
     "editSuccess": "Erinnerung erfolgreich aktualisiert",
     "editError": "Fehler beim Aktualisieren der Erinnerung",
+    "loadError": "Fehler beim Laden der Erinnerungen",
+    "searchError": "Suche fehlgeschlagen",
     "memorySaved": "Neue Erinnerung erfolgreich gespeichert!",
     "showingRecent": "Zeige die {count} neuesten Erinnerungen",
     "totalCount": "Insgesamt {count} Erinnerungen gespeichert",

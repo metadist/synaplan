@@ -109,36 +109,20 @@
             </div>
 
             <div v-else class="space-y-2 sm:space-y-3">
-              <!-- Show limit notice if not filtering -->
-              <div
-                v-if="
-                  !searchQuery && selectedCategory === 'all' && memoriesStore.memories.length > 10
-                "
-                class="surface-chip rounded-lg p-3 sm:p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3"
-              >
-                <div class="flex items-center gap-3">
-                  <Icon icon="mdi:information" class="w-5 h-5 txt-brand shrink-0" />
-                  <div class="min-w-0">
-                    <p class="text-sm txt-primary font-medium">
-                      {{ $t('memories.showingRecent', { count: 10 }) }}
-                    </p>
-                    <p class="text-xs txt-secondary">
-                      {{ $t('memories.totalCount', { count: memoriesStore.memories.length }) }}
-                    </p>
-                  </div>
-                </div>
-                <button
-                  class="btn-primary px-4 py-2 rounded-lg text-sm w-full sm:w-auto"
-                  @click="viewAllMemories"
-                >
-                  {{ $t('memories.viewAll') }}
-                </button>
-              </div>
-
               <div
                 v-for="memory in filteredMemories"
                 :key="memory.id"
-                class="surface-chip rounded-lg p-3 sm:p-4 hover-surface transition-colors"
+                :ref="
+                  (el) => {
+                    if (el) memoryRefs[memory.id] = el as HTMLElement
+                  }
+                "
+                :class="[
+                  'surface-chip rounded-lg p-3 sm:p-4 hover-surface transition-all',
+                  highlightMemoryId === memory.id
+                    ? 'ring-2 ring-brand bg-brand/5 dark:bg-brand/10'
+                    : '',
+                ]"
               >
                 <div
                   class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2 sm:gap-3 mb-2"
@@ -181,6 +165,26 @@
               </div>
             </div>
           </div>
+
+          <!-- Footer with View All -->
+          <div
+            class="flex items-center justify-between p-3 sm:p-4 border-t border-light-border/10 dark:border-dark-border/10"
+          >
+            <p class="text-xs sm:text-sm txt-secondary">
+              {{
+                $t('memories.totalCount', {
+                  count: memoriesStore.memories.length,
+                })
+              }}
+            </p>
+            <button
+              class="text-sm font-medium text-brand hover:text-brand-light transition-colors flex items-center gap-1.5"
+              @click="viewAllMemories"
+            >
+              {{ $t('memories.viewAll') }}
+              <Icon icon="mdi:arrow-right" class="w-4 h-4" />
+            </button>
+          </div>
         </div>
       </div>
     </Transition>
@@ -192,38 +196,49 @@
       :available-categories="availableCategories.map((c) => c.category)"
       @close="closeFormDialog"
       @save="handleSaveMemory"
+      @save-multiple="handleSaveMultiple"
     />
   </Teleport>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, nextTick } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { Icon } from '@iconify/vue'
 import { useMemoriesStore } from '@/stores/userMemories'
-import { useNotification } from '@/composables/useNotification'
 import { useDialog } from '@/composables/useDialog'
+import { useNotification } from '@/composables/useNotification'
 import type { UserMemory } from '@/services/api/userMemoriesApi'
 import { getCategories } from '@/services/api/userMemoriesApi'
 import MemoryFormDialog from '@/components/MemoryFormDialog.vue'
 
+interface ParsedAction {
+  action: 'create' | 'update' | 'delete'
+  memory?: { category: string; key: string; value: string }
+  existingId?: number
+  reason?: string
+}
+
 interface Props {
   isOpen: boolean
+  highlightMemoryId?: number | null
 }
 
 interface Emits {
   (e: 'close'): void
 }
 
-const props = defineProps<Props>()
+const props = withDefaults(defineProps<Props>(), {
+  highlightMemoryId: null,
+})
 const emit = defineEmits<Emits>()
 
 const { t, locale } = useI18n()
 const router = useRouter()
 const memoriesStore = useMemoriesStore()
-const { success, error } = useNotification()
 const { confirm } = useDialog()
+const { success, error } = useNotification()
 
 const loading = ref(false)
 const searchQuery = ref('')
@@ -231,6 +246,7 @@ const selectedCategory = ref('all')
 const showFormDialog = ref(false)
 const editingMemory = ref<UserMemory | null>(null)
 const availableCategories = ref<Array<{ category: string; count: number }>>([])
+const memoryRefs = ref<Record<number, HTMLElement | null>>({})
 
 const filteredMemories = computed(() => {
   let memories = memoriesStore.memories
@@ -251,19 +267,30 @@ const filteredMemories = computed(() => {
     )
   }
 
-  // Limit to 10 most recent memories (unless searching/filtering)
-  if (!searchQuery.value && selectedCategory.value === 'all') {
+  // Limit to 10 most recent memories (unless searching/filtering or highlighting a specific memory)
+  if (!searchQuery.value && selectedCategory.value === 'all' && !props.highlightMemoryId) {
     return memories.slice(0, 10)
   }
 
+  // If highlighting a specific memory, show all memories so it's visible
   return memories
 })
 
 watch(
   () => props.isOpen,
-  (isOpen) => {
+  async (isOpen) => {
     if (isOpen) {
-      loadMemories()
+      await loadMemories()
+      // Scroll to highlighted memory if specified
+      if (props.highlightMemoryId) {
+        await nextTick()
+        setTimeout(() => {
+          const el = memoryRefs.value[props.highlightMemoryId!]
+          if (el) {
+            el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+          }
+        }, 100)
+      }
     }
   }
 )
@@ -273,8 +300,8 @@ async function loadMemories() {
   try {
     await memoriesStore.fetchMemories()
     availableCategories.value = await getCategories()
-  } catch (err) {
-    error(t('common.error'))
+  } catch {
+    // Store handles error notifications
   } finally {
     loading.value = false
   }
@@ -304,12 +331,8 @@ async function deleteMemory(memory: UserMemory) {
 
   if (!confirmed) return
 
-  try {
-    await memoriesStore.removeMemory(memory.id)
-    success(t('common.success'))
-  } catch (err) {
-    error(t('common.error'))
-  }
+  // Store handles notifications
+  await memoriesStore.removeMemory(memory.id)
 }
 
 function closeFormDialog() {
@@ -330,10 +353,85 @@ async function handleSaveMemory(memoryData: Partial<UserMemory>) {
         value: memoryData.value || '',
       })
     }
-    success(t('memories.memorySaved'))
+    // Store handles notifications
     closeFormDialog()
-  } catch (err) {
-    error(t('common.error'))
+  } catch {
+    // Store already shows error notification
+  }
+}
+
+async function handleSaveMultiple(actions: ParsedAction[]) {
+  let successCount = 0
+  let errorCount = 0
+
+  // Use silent mode for all operations, we'll show one notification at the end
+  for (const actionItem of actions) {
+    try {
+      if (actionItem.action === 'create' && actionItem.memory) {
+        await memoriesStore.addMemory(
+          {
+            category: actionItem.memory.category,
+            key: actionItem.memory.key,
+            value: actionItem.memory.value,
+          },
+          { silent: true }
+        )
+        successCount++
+      } else if (actionItem.action === 'update' && actionItem.existingId && actionItem.memory) {
+        // Validate that the memory exists before trying to update
+        const memoryExists = memoriesStore.memories.some((m) => m.id === actionItem.existingId)
+        if (memoryExists) {
+          await memoriesStore.editMemory(
+            actionItem.existingId,
+            {
+              value: actionItem.memory.value,
+            },
+            { silent: true }
+          )
+          successCount++
+        } else {
+          // Memory doesn't exist locally, create instead
+          await memoriesStore.addMemory(
+            {
+              category: actionItem.memory.category,
+              key: actionItem.memory.key,
+              value: actionItem.memory.value,
+            },
+            { silent: true }
+          )
+          successCount++
+        }
+      } else if (actionItem.action === 'delete' && actionItem.existingId) {
+        // Validate that the memory exists before trying to delete
+        const memoryExists = memoriesStore.memories.some((m) => m.id === actionItem.existingId)
+        if (memoryExists) {
+          await memoriesStore.removeMemory(actionItem.existingId, { silent: true })
+          successCount++
+        } else {
+          // Memory doesn't exist, skip silently
+          console.warn('Memory to delete not found:', actionItem.existingId)
+        }
+      }
+    } catch (err) {
+      errorCount++
+      console.error('Error processing action:', err)
+    }
+  }
+
+  closeFormDialog()
+  await loadMemories()
+
+  // Show single notification for the batch operation
+  if (successCount > 0 && errorCount === 0) {
+    if (successCount === 1) {
+      success(t('memories.createSuccess'))
+    } else {
+      success(t('memories.multipleSuccess', { count: successCount }))
+    }
+  } else if (successCount > 0 && errorCount > 0) {
+    success(t('memories.partialSuccess', { success: successCount, error: errorCount }))
+  } else if (errorCount > 0) {
+    error(t('memories.createError'))
   }
 }
 
