@@ -1624,7 +1624,9 @@
       "preferences": "Preferences",
       "personal": "Personal",
       "work": "Work",
-      "projects": "Projects"
+      "projects": "Projects",
+      "general": "General",
+      "tech": "Technology"
     },
     "source": {
       "auto_detected": "Auto-detected",

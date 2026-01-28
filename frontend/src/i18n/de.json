@@ -1520,7 +1520,9 @@
       "preferences": "Präferenzen",
       "personal": "Persönlich",
       "work": "Arbeit",
-      "projects": "Projekte"
+      "projects": "Projekte",
+      "general": "Allgemein",
+      "tech": "Technologie"
     },
     "source": {
       "auto_detected": "Automatisch erkannt",
