@@ -1438,6 +1438,7 @@
     "subtitle": "Wir antworten normalerweise innerhalb von Minuten",
     "placeholder": "Ihre Nachricht eingeben...",
     "send": "Senden",
+    "sending": "Wird gesendet...",
     "attachFile": "Datei anhängen",
     "downloadFile": "Datei herunterladen",
     "downloadFailed": "Die Datei konnte leider nicht heruntergeladen werden. Bitte versuchen Sie es später erneut.",

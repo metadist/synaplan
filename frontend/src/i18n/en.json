@@ -1119,6 +1119,7 @@
     "subtitle": "We typically reply in minutes",
     "placeholder": "Type your message...",
     "send": "Send",
+    "sending": "Sending...",
     "attachFile": "Attach file",
     "downloadFile": "Download file",
     "downloadFailed": "Sorry, the file could not be downloaded. Please try again later.",

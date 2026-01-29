@@ -337,7 +337,13 @@
                 >{{ formatFileSize(file.size) }}</span
               >
               <button
-                class="w-6 h-6 rounded hover:bg-black/10 dark:hover:bg-white/10 flex items-center justify-center flex-shrink-0"
+                :disabled="isSending || uploadingFile"
+                :class="[
+                  'w-6 h-6 rounded flex items-center justify-center flex-shrink-0',
+                  isSending || uploadingFile
+                    ? 'opacity-50 cursor-not-allowed'
+                    : 'hover:bg-black/10 dark:hover:bg-white/10',
+                ]"
                 :data-testid="`btn-remove-file-${index}`"
                 @click="removeFile(index)"
               >
@@ -402,20 +408,46 @@
               @keydown.enter.exact.prevent="sendMessage"
             />
             <button
-              :disabled="!canSend"
-              :style="canSend ? { backgroundColor: primaryColor } : {}"
+              :disabled="!canSend || isSending || uploadingFile"
+              :style="canSend && !isSending && !uploadingFile ? { backgroundColor: primaryColor } : {}"
               :class="[
                 'w-10 h-10 rounded-lg transition-all flex items-center justify-center',
-                canSend
+                canSend && !isSending && !uploadingFile
                   ? 'hover:scale-110 shadow-lg'
                   : 'bg-gray-200 dark:bg-gray-600 cursor-not-allowed',
               ]"
-              :aria-label="$t('widget.send')"
+              :aria-label="isSending || uploadingFile ? $t('widget.sending') : $t('widget.send')"
               data-testid="btn-send"
               @click="sendMessage"
             >
               <span class="shrink-0">
-                <PaperAirplaneIcon :class="['w-5 h-5', canSend ? 'text-white' : 'text-gray-400']" />
+                <!-- Loading spinner when sending or uploading files -->
+                <svg
+                  v-if="isSending || uploadingFile"
+                  class="w-5 h-5 text-gray-400 animate-spin"
+                  xmlns="http://www.w3.org/2000/svg"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                >
+                  <circle
+                    class="opacity-25"
+                    cx="12"
+                    cy="12"
+                    r="10"
+                    stroke="currentColor"
+                    stroke-width="4"
+                  />
+                  <path
+                    class="opacity-75"
+                    fill="currentColor"
+                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                  />
+                </svg>
+                <!-- Send icon when not sending -->
+                <PaperAirplaneIcon
+                  v-else
+                  :class="['w-5 h-5', canSend ? 'text-white' : 'text-gray-400']"
+                />
               </span>
             </button>
           </div>
