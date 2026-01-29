@@ -170,7 +170,7 @@ class ChatHandler implements MessageHandlerInterface
             'tokens' => $response['usage'] ?? [],
         ];
 
-        // NEW: Check for file generation format first (for OfficeM maker)
+        // Check for file generation format first (for OfficeM maker)
         $fileData = $this->extractFileGenerationData($content);
         if (null !== $fileData) {
             $this->logger->info('ChatHandler: Detected AI file generation');
@@ -271,7 +271,7 @@ class ChatHandler implements MessageHandlerInterface
             'user_id' => $message->getUserId(),
         ]);
 
-        // ✨ NEW: Load RAG context for task prompt (if files are associated)
+        // Load RAG context for task prompt (if files are associated)
         $ragContext = '';
         $ragResultsCount = 0;
 
@@ -360,7 +360,7 @@ class ChatHandler implements MessageHandlerInterface
             ));
         }
 
-        // ✨ NEW: Load user memories from Qdrant/Microservice
+        // Load user memories from Qdrant/Microservice
         $memoriesContext = '';
         $loadedMemories = [];
         $memoriesDisabledByRequest = !empty($options['disable_memories'])
@@ -509,7 +509,7 @@ class ChatHandler implements MessageHandlerInterface
             ]);
         }
 
-        // ✨ NEW: Append RAG context to system prompt if available
+        // Append RAG context to system prompt if available
         if (!empty($ragContext)) {
             $systemPrompt .= $ragContext;
             $this->logger->info('ChatHandler: RAG context appended to system prompt', [
@@ -518,7 +518,7 @@ class ChatHandler implements MessageHandlerInterface
             ]);
         }
 
-        // ✨ NEW: Append user memories context to system prompt if available
+        // Append user memories context to system prompt if available
         if (!empty($memoriesContext)) {
             $systemPrompt .= $memoriesContext;
             $this->logger->info('ChatHandler: Memories context appended to system prompt', [
@@ -620,16 +620,11 @@ class ChatHandler implements MessageHandlerInterface
             ]);
         } else {
             // Memory Extraction (Option B: After AI-Response, in the same Request)
-        // Memory Extraction (Option B: After AI-Response, in the same Request)
-        // Skip memory extraction for widget mode (anonymous users)
-        if (!$isWidgetMode) {
-            // ✨ NEW: Pass the AI response to memory extraction so it can extract from the answer too!
+            // Pass the AI response to memory extraction so it can extract from the answer too
             $this->logger->info('💾 Loading ALL memories for extraction', ['user_id' => $message->getUserId()]);
             $allMemories = $this->memoryService->searchRelevantMemories($message->getUserId(), $message->getText(), limit: 100, minScore: 0.0);
             $this->extractMemoriesAfterResponse($message, $fullResponseText, $thread, $allMemories, $progressCallback);
             $this->logger->info('✅ Loaded memories for extraction', ['count' => count($allMemories), 'sample' => array_slice($allMemories, 0, 2)]);
-        } else {
-            $this->logger->debug('ChatHandler: Skipping memory extraction for widget mode');
         }
 
         return [
@@ -693,7 +688,7 @@ class ChatHandler implements MessageHandlerInterface
             $content = $msg->getText();
 
             // File Text inkludieren wenn vorhanden (Legacy + NEW MessageFiles)
-            $allFilesText = $msg->getAllFilesText(); // NEW: combines legacy + File texts
+            $allFilesText = $msg->getAllFilesText(); // Combines legacy + file texts
             if (!empty($allFilesText)) {
                 $fileInfo = '';
                 if ($msg->getFiles()->count() > 0) {
@@ -715,7 +710,7 @@ class ChatHandler implements MessageHandlerInterface
 
         // Aktuelle Message
         $content = $currentMessage->getText();
-        $allFilesText = $currentMessage->getAllFilesText(); // NEW: combines all files
+        $allFilesText = $currentMessage->getAllFilesText(); // Combines all files
 
         $this->logger->info('🔍 ChatHandler: File text debug', [
             'message_id' => $currentMessage->getId(),
@@ -1163,7 +1158,7 @@ class ChatHandler implements MessageHandlerInterface
      */
     private function extractMemoriesAfterResponse(
         Message $message,
-        string $aiResponse, // ✨ NEW: Full AI response text
+        string $aiResponse, // Full AI response text
         array $thread,
         array $relevantMemories = [], // The SAME memories that chat AI saw (from microservice)
         ?callable $progressCallback = null,
@@ -1202,7 +1197,7 @@ class ChatHandler implements MessageHandlerInterface
                 'sample_memory' => $relevantMemories[0] ?? null,
             ]);
 
-            // ✨ BUILD ENHANCED THREAD: Include the AI response as the last message
+            // Build enhanced thread: include the AI response as the last message
             // This allows the memory extraction AI to see what was just answered!
             $enhancedThread = $thread;
             $enhancedThread[] = [
