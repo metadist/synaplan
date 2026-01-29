@@ -661,9 +661,10 @@ class SortXController extends AbstractController
             ];
         }
 
-        // Normalize metadata: convert empty array to null, ensure it's an object
+        // Normalize metadata: must be an associative array or null
+        // Handles: scalars (string/number/bool), empty arrays, and sequential arrays
         $metadata = $decoded['metadata'] ?? null;
-        if (is_array($metadata) && (empty($metadata) || array_is_list($metadata))) {
+        if (!is_array($metadata) || empty($metadata) || array_is_list($metadata)) {
             $metadata = null;
         }
 
