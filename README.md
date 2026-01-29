@@ -2,7 +2,7 @@
 
 AI-powered knowledge management with RAG, chat widgets, and multi-channel integration.
 
-[![License](https://img.shields.io/badge/license-AGPL--3.0-blue.svg)](LICENSE)
+[![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 
 > **Live instance**: [web.synaplan.com](https://web.synaplan.com/)
 
@@ -123,4 +123,4 @@ See [AGENTS.md](AGENTS.md) for development guidelines and code standards.
 
 ## License
 
-[AGPL-3.0](LICENSE)
+[Apache-2.0](LICENSE)
