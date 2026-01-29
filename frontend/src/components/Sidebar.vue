@@ -343,6 +343,9 @@ const navItems = computed<NavItem[]>(() => {
     }
     adminChildren.push(featureStatusItem)
 
+    // System Config in Admin
+    adminChildren.push({ path: '/admin/config', label: t('nav.adminSystemConfig') })
+
     items.push({
       path: '/admin',
       label: t('nav.admin'),

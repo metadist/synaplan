@@ -27,6 +27,7 @@
     "profile": "Profil",
     "admin": "Admin-Panel",
     "adminFeatures": "Feature-Status",
+    "adminConfig": "Systemkonfiguration",
     "subscription": "Abonnement",
     "subscriptionSuccess": "Abonnement erfolgreich",
     "subscriptionCancel": "Abonnement gekündigt",
@@ -169,6 +170,22 @@
       "cost": "Kosten",
       "activeSubscriptions": "Aktive Abos",
       "subscriptionOverview": "Abo-Übersicht"
+    },
+    "config": {
+      "title": "Systemkonfiguration",
+      "description": "Umgebungsvariablen und Service-Verbindungen verwalten",
+      "loadError": "Konfiguration konnte nicht geladen werden",
+      "saveError": "Konfiguration konnte nicht gespeichert werden",
+      "saved": "Konfiguration gespeichert",
+      "unsaved": "Nicht gespeicherte Änderungen",
+      "testConnection": "Verbindung testen",
+      "testFailed": "Verbindungstest fehlgeschlagen",
+      "commandCopied": "Befehl in Zwischenablage kopiert",
+      "restartBanner": {
+        "title": "Konfiguration aktualisiert — Neustart erforderlich",
+        "message": "Ihre Änderungen wurden in der .env-Datei gespeichert. Damit die Änderungen wirksam werden, müssen Sie Ihre Docker-Container neu starten.",
+        "copyCommand": "Befehl kopieren"
+      }
     }
   },
   "sidebar": {
@@ -199,7 +216,8 @@
     "upgrade": "Upgrade",
     "admin": "Admin",
     "adminDashboard": "Dashboard",
-    "adminFeatureStatus": "Feature-Status"
+    "adminFeatureStatus": "Feature-Status",
+    "adminSystemConfig": "Systemkonfiguration"
   },
   "chatInput": {
     "attach": "Anhängen",
@@ -987,7 +1005,10 @@
     "add": "Hinzufügen",
     "done": "Fertig",
     "created": "Erstellt",
-    "updated": "Aktualisiert"
+    "updated": "Aktualisiert",
+    "enabled": "Aktiviert",
+    "disabled": "Deaktiviert",
+    "reset": "Zurücksetzen"
   },
   "search": {
     "sources": "Quellen",

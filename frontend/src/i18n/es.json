@@ -26,6 +26,7 @@
     "profile": "Perfil",
     "admin": "Panel de administración",
     "adminFeatures": "Estado de funciones",
+    "adminConfig": "Configuración del Sistema",
     "subscription": "Suscripción",
     "subscriptionSuccess": "Suscripción exitosa",
     "subscriptionCancel": "Suscripción cancelada",
@@ -171,6 +172,22 @@
       "cost": "Costo",
       "activeSubscriptions": "Suscripciones Activas",
       "subscriptionOverview": "Resumen de Suscripciones"
+    },
+    "config": {
+      "title": "Configuración del Sistema",
+      "description": "Gestionar variables de entorno y conexiones de servicios",
+      "loadError": "Error al cargar la configuración",
+      "saveError": "Error al guardar la configuración",
+      "saved": "Configuración guardada",
+      "unsaved": "Cambios sin guardar",
+      "testConnection": "Probar Conexión",
+      "testFailed": "Prueba de conexión fallida",
+      "commandCopied": "Comando copiado al portapapeles",
+      "restartBanner": {
+        "title": "Configuración Actualizada — Reinicio Requerido",
+        "message": "Sus cambios se han guardado en el archivo .env. Para que los cambios surtan efecto, debe reiniciar sus contenedores Docker.",
+        "copyCommand": "Copiar Comando"
+      }
     }
   },
   "sidebar": {
@@ -200,7 +217,8 @@
     "upgrade": "Mejorar",
     "admin": "Admin",
     "adminDashboard": "Panel",
-    "adminFeatureStatus": "Estado de Funciones"
+    "adminFeatureStatus": "Estado de Funciones",
+    "adminSystemConfig": "Configuración del Sistema"
   },
   "chatInput": {
     "placeholder": "Escribe tu mensaje...",
@@ -422,7 +440,10 @@
     "unknown": "Desconocido",
     "leave": "Salir",
     "stay": "Quedarse",
-    "retry": "Reintentar"
+    "retry": "Reintentar",
+    "enabled": "Habilitado",
+    "disabled": "Deshabilitado",
+    "reset": "Restablecer"
   },
   "search": {
     "sources": "Fuentes",

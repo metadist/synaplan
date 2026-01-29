@@ -380,3 +380,8 @@ services:
     Plugin\SortX\Controller\SortXController:
         arguments:
             $uploadDir: '%kernel.project_dir%/var/uploads'
+
+    # System Configuration Service (Admin .env editor)
+    App\Service\Admin\SystemConfigService:
+        arguments:
+            $projectDir: '%kernel.project_dir%'
