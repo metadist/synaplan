@@ -117,6 +117,41 @@ class ChatHandler implements MessageHandlerInterface
             ]);
         }
 
+        // Check if message has images and current model supports vision (non-streaming)
+        $hasImages = $this->hasAttachedImages($message);
+        $includeImagesInMessages = false;
+
+        if ($hasImages) {
+            $currentModel = $modelId ? $this->modelRepository->find($modelId) : null;
+            $supportsVision = $currentModel && $currentModel->hasFeature('vision');
+
+            if ($supportsVision) {
+                $includeImagesInMessages = true;
+                $this->logger->info('ChatHandler: Current model supports vision, including images (non-streaming)');
+            } else {
+                $this->logger->info('ChatHandler: Message has images but model does not support vision, searching for vision model (non-streaming)');
+
+                // Find a vision-capable model
+                $visionModel = $this->modelRepository->findByFeature('vision', 'chat', true);
+
+                if ($visionModel) {
+                    $modelId = $visionModel->getId();
+                    $provider = strtolower($visionModel->getService());
+                    $modelName = $visionModel->getProviderId();
+                    $includeImagesInMessages = true;
+
+                    $this->logger->info('ChatHandler: Switched to vision-capable model (non-streaming)', [
+                        'model_id' => $modelId,
+                        'provider' => $provider,
+                        'model' => $modelName,
+                        'model_name' => $visionModel->getName(),
+                    ]);
+                } else {
+                    $this->logger->warning('ChatHandler: No vision-capable model found, images will not be analyzed (non-streaming)');
+                }
+            }
+        }
+
         $systemPrompt = 'You are the Synaplan.com AI assistant. Please answer in the language of the user.';
         if ($promptData && isset($promptData['prompt'])) {
             $systemPrompt = $promptData['prompt']->getPrompt();
@@ -147,6 +182,7 @@ class ChatHandler implements MessageHandlerInterface
         $messages = $this->buildMessages($systemPrompt, $thread, $message, [
             'search_results' => $searchResults,
             'rag_context' => $ragContext,
+            'include_images' => $includeImagesInMessages,
         ]);
 
         $response = $this->aiFacade->chat(
@@ -497,6 +533,39 @@ class ChatHandler implements MessageHandlerInterface
             ]);
         }
 
+        // Check if message has images and current model supports vision
+        $hasImages = $this->hasAttachedImages($message);
+        $includeImagesInMessages = false;
+
+        if ($hasImages) {
+            $currentModel = $modelId ? $this->modelRepository->find($modelId) : null;
+            $supportsVision = $currentModel && $currentModel->hasFeature('vision');
+
+            if ($supportsVision) {
+                $includeImagesInMessages = true;
+                $this->logger->info('ChatHandler: Current model supports vision, including images (streaming)');
+            } else {
+                $this->logger->info('ChatHandler: Message has images but model does not support vision, searching for vision model');
+
+                // Find a vision-capable model
+                $visionModel = $this->modelRepository->findByFeature('vision', 'chat', true);
+
+                if ($visionModel) {
+                    $modelId = $visionModel->getId();
+                    $includeImagesInMessages = true;
+
+                    $this->logger->info('ChatHandler: Switched to vision-capable model for streaming', [
+                        'model_id' => $modelId,
+                        'provider' => strtolower($visionModel->getService()),
+                        'model' => $visionModel->getProviderId(),
+                        'model_name' => $visionModel->getName(),
+                    ]);
+                } else {
+                    $this->logger->warning('ChatHandler: No vision-capable model found, images will not be analyzed');
+                }
+            }
+        }
+
         // Simple system prompt for streaming (like old system)
         $systemPrompt = 'You are the Synaplan.com AI assistant. Please answer in the language of the user.';
 
@@ -539,6 +608,9 @@ class ChatHandler implements MessageHandlerInterface
                 }
             }
         }
+
+        // Add include_images flag to options for message building
+        $options['include_images'] = $includeImagesInMessages;
 
         // Conversation History bauen (TEXT only for streaming)
         $messages = $this->buildStreamingMessages($systemPrompt, $thread, $message, $options);
@@ -670,6 +742,9 @@ class ChatHandler implements MessageHandlerInterface
     {
         $messages = [];
 
+        // Check if we should include images (only if vision model is available)
+        $includeImages = $options['include_images'] ?? false;
+
         // Add system message if supported (o1 models don't support it)
         if (null !== $systemPrompt) {
             $messages[] = ['role' => 'system', 'content' => $systemPrompt];
@@ -701,9 +776,17 @@ class ChatHandler implements MessageHandlerInterface
                            "\n\n";
             }
 
+            // For user messages, include images as multimodal content (only if enabled)
+            if ('user' === $role && $includeImages) {
+                $imageUrls = $this->extractImageDataUrls($msg);
+                $messageContent = $this->buildMultimodalContent($content, $imageUrls);
+            } else {
+                $messageContent = $content;
+            }
+
             $messages[] = [
                 'role' => $role,
-                'content' => $content,
+                'content' => $messageContent,
             ];
         }
 
@@ -754,9 +837,24 @@ class ChatHandler implements MessageHandlerInterface
             ]);
         }
 
+        // Extract images from current message for vision support (only if enabled)
+        if ($includeImages) {
+            $imageUrls = $this->extractImageDataUrls($currentMessage);
+            $messageContent = $this->buildMultimodalContent($content, $imageUrls);
+
+            if (!empty($imageUrls)) {
+                $this->logger->info('🖼️ ChatHandler: Images included for vision analysis', [
+                    'message_id' => $currentMessage->getId(),
+                    'image_count' => count($imageUrls),
+                ]);
+            }
+        } else {
+            $messageContent = $content;
+        }
+
         $messages[] = [
             'role' => 'user',
-            'content' => $content,
+            'content' => $messageContent,
         ];
 
         return $messages;
@@ -874,14 +972,25 @@ class ChatHandler implements MessageHandlerInterface
             ];
         }
 
+        // Check if we should include images (only if vision model is available)
+        $includeImages = $options['include_images'] ?? false;
+
         // Thread Messages (JSON encoded wie im alten System)
         foreach ($thread as $msg) {
             $role = 'IN' === $msg->getDirection() ? 'user' : 'assistant';
             $content = $msg->getText();
 
+            // For user messages in thread, include images for vision (if enabled)
+            if ('user' === $role && $includeImages) {
+                $imageUrls = $this->extractImageDataUrls($msg);
+                $messageContent = $this->buildMultimodalContent('['.$msg->getDateTime().']: '.$content, $imageUrls);
+            } else {
+                $messageContent = '['.$msg->getDateTime().']: '.$content;
+            }
+
             $messages[] = [
                 'role' => $role,
-                'content' => '['.$msg->getDateTime().']: '.$content,
+                'content' => $messageContent,
             ];
         }
 
@@ -912,9 +1021,26 @@ class ChatHandler implements MessageHandlerInterface
             ]);
         }
 
+        // Extract images from current message for vision support (only if enabled)
+        $textContent = json_encode($msgArr, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+
+        if ($includeImages) {
+            $imageUrls = $this->extractImageDataUrls($currentMessage);
+            $messageContent = $this->buildMultimodalContent($textContent, $imageUrls);
+
+            if (!empty($imageUrls)) {
+                $this->logger->info('🖼️ ChatHandler: Images included for vision (non-streaming)', [
+                    'message_id' => $currentMessage->getId(),
+                    'image_count' => count($imageUrls),
+                ]);
+            }
+        } else {
+            $messageContent = $textContent;
+        }
+
         $messages[] = [
             'role' => 'user',
-            'content' => json_encode($msgArr, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+            'content' => $messageContent,
         ];
 
         return $messages;
@@ -929,6 +1055,175 @@ class ChatHandler implements MessageHandlerInterface
                 'timestamp' => time(),
             ]);
         }
+    }
+
+    /**
+     * Check if a file is an image that can be sent to vision models.
+     */
+    private function isVisionSupportedImage(string $path): bool
+    {
+        $extension = strtolower(pathinfo($path, PATHINFO_EXTENSION));
+
+        // Only these formats are widely supported by vision APIs
+        return in_array($extension, ['jpg', 'jpeg', 'png', 'gif', 'webp']);
+    }
+
+    /**
+     * Get MIME type for an image file.
+     */
+    private function getImageMimeType(string $path): string
+    {
+        $extension = strtolower(pathinfo($path, PATHINFO_EXTENSION));
+
+        return match ($extension) {
+            'jpg', 'jpeg' => 'image/jpeg',
+            'png' => 'image/png',
+            'gif' => 'image/gif',
+            'webp' => 'image/webp',
+            default => 'image/jpeg',
+        };
+    }
+
+    /**
+     * Convert an image file to base64 data URL for vision APIs.
+     *
+     * @return string|null Base64 data URL or null if conversion fails
+     */
+    private function imageToBase64DataUrl(string $relativePath): ?string
+    {
+        $absolutePath = $this->uploadDir.'/'.$relativePath;
+
+        if (!file_exists($absolutePath)) {
+            $this->logger->warning('ChatHandler: Image file not found for vision', [
+                'path' => $relativePath,
+                'absolute' => $absolutePath,
+            ]);
+
+            return null;
+        }
+
+        // Check file size - skip very large images (>10MB)
+        $fileSize = filesize($absolutePath);
+        if ($fileSize > 10 * 1024 * 1024) {
+            $this->logger->warning('ChatHandler: Image too large for vision API', [
+                'path' => $relativePath,
+                'size_mb' => round($fileSize / 1024 / 1024, 2),
+            ]);
+
+            return null;
+        }
+
+        $imageData = file_get_contents($absolutePath);
+        if (false === $imageData) {
+            $this->logger->error('ChatHandler: Failed to read image file', [
+                'path' => $relativePath,
+            ]);
+
+            return null;
+        }
+
+        $mimeType = $this->getImageMimeType($relativePath);
+        $base64 = base64_encode($imageData);
+
+        return 'data:'.$mimeType.';base64,'.$base64;
+    }
+
+    /**
+     * Build multimodal content array with text and images.
+     *
+     * @param string $textContent The text content
+     * @param array  $imageUrls   Array of base64 data URLs for images
+     *
+     * @return array|string Content as multimodal array or plain string if no images
+     */
+    private function buildMultimodalContent(string $textContent, array $imageUrls): array|string
+    {
+        if (empty($imageUrls)) {
+            return $textContent;
+        }
+
+        // Build multimodal content array
+        $content = [];
+
+        // Add text first
+        if (!empty($textContent)) {
+            $content[] = [
+                'type' => 'text',
+                'text' => $textContent,
+            ];
+        }
+
+        // Add images
+        foreach ($imageUrls as $imageUrl) {
+            $content[] = [
+                'type' => 'image_url',
+                'image_url' => [
+                    'url' => $imageUrl,
+                ],
+            ];
+        }
+
+        $this->logger->info('ChatHandler: Built multimodal content', [
+            'text_length' => strlen($textContent),
+            'image_count' => count($imageUrls),
+        ]);
+
+        return $content;
+    }
+
+    /**
+     * Check if a message has attached images.
+     *
+     * @return bool True if message has vision-supported images
+     */
+    private function hasAttachedImages(Message $message): bool
+    {
+        // Check new-style file attachments (File entities)
+        foreach ($message->getFiles() as $file) {
+            if ($this->isVisionSupportedImage($file->getFilePath())) {
+                return true;
+            }
+        }
+
+        // Check legacy file path
+        $legacyPath = $message->getFilePath();
+        if ($legacyPath && $this->isVisionSupportedImage($legacyPath)) {
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * Extract image data URLs from a message's attached files.
+     *
+     * @return array<string> Array of base64 data URLs
+     */
+    private function extractImageDataUrls(Message $message): array
+    {
+        $imageUrls = [];
+
+        // Check new-style file attachments (File entities)
+        foreach ($message->getFiles() as $file) {
+            $filePath = $file->getFilePath();
+            if ($this->isVisionSupportedImage($filePath)) {
+                $dataUrl = $this->imageToBase64DataUrl($filePath);
+                if ($dataUrl) {
+                    $imageUrls[] = $dataUrl;
+                }
+            }
+        }
+
+        // Check legacy file path
+        $legacyPath = $message->getFilePath();
+        if ($legacyPath && $this->isVisionSupportedImage($legacyPath)) {
+            $dataUrl = $this->imageToBase64DataUrl($legacyPath);
+            if ($dataUrl) {
+                $imageUrls[] = $dataUrl;
+            }
+        }
+
+        return $imageUrls;
     }
 
     private function detectFileType(string $path): string
