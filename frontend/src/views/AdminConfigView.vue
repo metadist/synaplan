@@ -176,7 +176,10 @@ onMounted(async () => {
             class="mb-6 p-4 rounded-lg bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800/30"
           >
             <div class="flex items-start gap-3">
-              <Icon icon="mdi:alert" class="w-6 h-6 text-yellow-600 dark:text-yellow-400 flex-shrink-0 mt-0.5" />
+              <Icon
+                icon="mdi:alert"
+                class="w-6 h-6 text-yellow-600 dark:text-yellow-400 flex-shrink-0 mt-0.5"
+              />
               <div class="flex-1">
                 <h4 class="font-semibold text-yellow-800 dark:text-yellow-200">
                   {{ $t('admin.config.restartBanner.title') }}
@@ -185,7 +188,9 @@ onMounted(async () => {
                   {{ $t('admin.config.restartBanner.message') }}
                 </p>
                 <div class="mt-3 flex items-center gap-2">
-                  <code class="flex-1 px-3 py-2 bg-yellow-100 dark:bg-yellow-900/40 rounded text-sm font-mono text-yellow-900 dark:text-yellow-100">
+                  <code
+                    class="flex-1 px-3 py-2 bg-yellow-100 dark:bg-yellow-900/40 rounded text-sm font-mono text-yellow-900 dark:text-yellow-100"
+                  >
                     docker compose restart backend
                   </code>
                   <button
@@ -194,7 +199,10 @@ onMounted(async () => {
                     :title="$t('admin.config.restartBanner.copyCommand')"
                     @click="copyRestartCommand"
                   >
-                    <Icon icon="mdi:content-copy" class="w-5 h-5 text-yellow-700 dark:text-yellow-300" />
+                    <Icon
+                      icon="mdi:content-copy"
+                      class="w-5 h-5 text-yellow-700 dark:text-yellow-300"
+                    />
                   </button>
                 </div>
               </div>
@@ -226,7 +234,9 @@ onMounted(async () => {
         <!-- Content -->
         <div v-else-if="schema" class="space-y-6">
           <!-- Tabs -->
-          <div class="flex gap-2 overflow-x-auto pb-2 border-b border-light-border/30 dark:border-dark-border/20">
+          <div
+            class="flex gap-2 overflow-x-auto pb-2 border-b border-light-border/30 dark:border-dark-border/20"
+          >
             <button
               v-for="tab in tabs"
               :key="tab.id"
@@ -261,7 +271,11 @@ onMounted(async () => {
 
           <!-- Sections -->
           <div class="space-y-8">
-            <div v-for="section in currentSections" :key="section.id" class="surface-card rounded-xl p-6">
+            <div
+              v-for="section in currentSections"
+              :key="section.id"
+              class="surface-card rounded-xl p-6"
+            >
               <h3 class="text-lg font-semibold txt-primary mb-4 flex items-center gap-2">
                 <Icon icon="mdi:folder-cog" class="w-5 h-5 txt-secondary" />
                 {{ section.label }}

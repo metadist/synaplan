@@ -79,13 +79,10 @@ export async function updateConfigValue(
   key: string,
   value: string
 ): Promise<{ success: boolean; requiresRestart: boolean }> {
-  return httpClient<{ success: boolean; requiresRestart: boolean }>(
-    '/api/v1/admin/config/values',
-    {
-      method: 'PUT',
-      body: JSON.stringify({ key, value }),
-    }
-  )
+  return httpClient<{ success: boolean; requiresRestart: boolean }>('/api/v1/admin/config/values', {
+    method: 'PUT',
+    body: JSON.stringify({ key, value }),
+  })
 }
 
 /**
