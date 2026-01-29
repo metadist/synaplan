@@ -99,7 +99,7 @@ final class SystemConfigService
 
         foreach ($this->schema as $key => $field) {
             $rawValue = $this->getEnvValue($key);
-            $isSet = $rawValue !== '' && $rawValue !== null;
+            $isSet = '' !== $rawValue && null !== $rawValue;
 
             if ($field['sensitive'] && $isSet) {
                 $values[$key] = [
@@ -143,7 +143,7 @@ final class SystemConfigService
 
         // Read current file
         $content = file_get_contents($envFile);
-        if ($content === false) {
+        if (false === $content) {
             return ['success' => false, 'requiresRestart' => false, 'message' => 'Failed to read .env file'];
         }
 
@@ -160,7 +160,7 @@ final class SystemConfigService
 
         // Atomic write: write to temp file, then rename
         $tempFile = $envFile.'.tmp';
-        if (file_put_contents($tempFile, $newContent) === false) {
+        if (false === file_put_contents($tempFile, $newContent)) {
             return ['success' => false, 'requiresRestart' => false, 'message' => 'Failed to write temp file'];
         }
 
@@ -205,7 +205,7 @@ final class SystemConfigService
         }
 
         $files = glob($backupDir.'/.env.backup.*');
-        if ($files === false) {
+        if (false === $files) {
             return [];
         }
 
@@ -287,7 +287,7 @@ final class SystemConfigService
     private function cleanupOldBackups(string $dir, int $keep): void
     {
         $files = glob($dir.'/.env.backup.*');
-        if ($files === false || count($files) <= $keep) {
+        if (false === $files || count($files) <= $keep) {
             return;
         }
 
@@ -309,7 +309,7 @@ final class SystemConfigService
 
         $value = getenv($key);
 
-        return $value !== false ? $value : null;
+        return false !== $value ? $value : null;
     }
 
     private function escapeEnvValue(string $value): string
@@ -358,7 +358,7 @@ final class SystemConfigService
             $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
             curl_close($ch);
 
-            if ($httpCode === 200 && $response) {
+            if (200 === $httpCode && $response) {
                 $data = json_decode($response, true);
 
                 return [
@@ -395,7 +395,7 @@ final class SystemConfigService
             $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
             curl_close($ch);
 
-            if ($httpCode === 200) {
+            if (200 === $httpCode) {
                 return ['success' => true, 'message' => 'Connected to Apache Tika'];
             }
 
@@ -430,7 +430,7 @@ final class SystemConfigService
             $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
             curl_close($ch);
 
-            if ($httpCode === 200) {
+            if (200 === $httpCode) {
                 return ['success' => true, 'message' => 'Connected to Qdrant service'];
             }
 
@@ -446,7 +446,7 @@ final class SystemConfigService
     private function testMailer(): array
     {
         $dsn = $this->getEnvValue('MAILER_DSN');
-        if (!$dsn || $dsn === 'null://null') {
+        if (!$dsn || 'null://null' === $dsn) {
             return ['success' => false, 'message' => 'Mailer not configured (using null transport)'];
         }
 

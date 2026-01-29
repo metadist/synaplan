@@ -144,7 +144,7 @@ final class AdminSystemConfigController extends AbstractController
         $key = trim((string) $data['key']);
         $value = (string) $data['value'];
 
-        if ($key === '') {
+        if ('' === $key) {
             return $this->json(['error' => 'Key cannot be empty'], Response::HTTP_BAD_REQUEST);
         }
 
