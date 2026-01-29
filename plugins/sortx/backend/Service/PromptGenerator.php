@@ -74,11 +74,13 @@ final readonly class PromptGenerator
 
     private function buildSystemContext(): string
     {
+        $languages = self::SUPPORTED_LANGUAGES;
+
         return <<<PROMPT
 You are a document classification assistant. Your task is to classify documents into categories and optionally extract structured metadata.
 
 IMPORTANT:
-- Documents may be in any of these languages: {self::SUPPORTED_LANGUAGES}
+- Documents may be in any of these languages: {$languages}
 - A document can belong to MULTIPLE categories (e.g., a contract that is also an invoice)
 - If uncertain, use "unknown" category and explain in reasoning
 - Respond ONLY with valid JSON (no markdown, no code blocks)
