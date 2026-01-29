@@ -292,13 +292,15 @@ class SynaplanWidget {
       await this.ensureVueLoaded()
 
       // Dynamically import the chat widget components
-      const [{ createApp }, ChatWidget, { i18n }, widgetStyles, markdownStyles] = await Promise.all([
-        import('vue'),
-        import('./components/widgets/ChatWidget.vue'),
-        import('./i18n'),
-        import('./style.css?inline'),
-        import('./assets/widget-markdown.css?inline'),
-      ])
+      const [{ createApp }, ChatWidget, { i18n }, widgetStyles, markdownStyles] = await Promise.all(
+        [
+          import('vue'),
+          import('./components/widgets/ChatWidget.vue'),
+          import('./i18n'),
+          import('./style.css?inline'),
+          import('./assets/widget-markdown.css?inline'),
+        ]
+      )
 
       // In lazy mode: hide button but keep it for later
       // In eager mode: remove button completely

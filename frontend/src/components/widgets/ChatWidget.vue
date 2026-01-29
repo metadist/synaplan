@@ -411,7 +411,9 @@
             />
             <button
               :disabled="!canSend || isSending || uploadingFile"
-              :style="canSend && !isSending && !uploadingFile ? { backgroundColor: primaryColor } : {}"
+              :style="
+                canSend && !isSending && !uploadingFile ? { backgroundColor: primaryColor } : {}
+              "
               :class="[
                 'w-10 h-10 rounded-lg transition-all flex items-center justify-center',
                 canSend && !isSending && !uploadingFile
