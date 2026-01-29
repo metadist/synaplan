@@ -1231,7 +1231,7 @@ class ChatHandler implements MessageHandlerInterface
             $userId = $message->getUserId();
 
             $savedMemories = [];
-            $deletedMemories = [];
+            $deleteSuggestions = [];
             foreach ($memories as $memoryAction) {
                 try {
                     $action = $memoryAction['action'] ?? 'create';
@@ -1271,11 +1271,14 @@ class ChatHandler implements MessageHandlerInterface
                         ]);
                     } elseif ('delete' === $action && isset($memoryAction['memory_id'])) {
                         $memoryId = $memoryAction['memory_id'];
-                        $this->memoryService->deleteMemory($memoryId, $user);
-                        $deletedMemories[] = $memoryId;
+                        $memory = $this->memoryService->getMemoryById($memoryId, $user);
+                        if ($memory) {
+                            $deleteSuggestions[] = $memory->toArray();
+                        }
 
-                        $this->logger->info('ChatHandler: Memory deleted', [
+                        $this->logger->info('ChatHandler: Memory delete suggested', [
                             'memory_id' => $memoryId,
+                            'found' => null !== $memory,
                         ]);
                     }
                 } catch (\Exception $e) {
@@ -1316,12 +1319,13 @@ class ChatHandler implements MessageHandlerInterface
                 $this->notify($progressCallback, 'memories_complete', 'Memory analysis complete');
             }
 
-            if (!empty($deletedMemories) && $progressCallback) {
-                foreach ($deletedMemories as $memoryId) {
+            if (!empty($deleteSuggestions) && $progressCallback) {
+                foreach ($deleteSuggestions as $memoryData) {
+                    $memoryData['action'] = 'delete';
                     $progressCallback([
-                        'status' => 'memory_deleted',
-                        'message' => 'Memory deleted',
-                        'metadata' => ['id' => $memoryId],
+                        'status' => 'memory_suggested',
+                        'message' => 'Memory action suggested',
+                        'metadata' => $memoryData,
                         'timestamp' => time(),
                     ]);
                 }

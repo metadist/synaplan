@@ -1778,6 +1778,13 @@
       "editCompact": "Bearbeiten",
       "discarded": "Erinnerung verworfen"
     },
+    "deleteDialog": {
+      "title": "Erinnerung löschen?",
+      "message": "Diese Erinnerung wird aus deinen gespeicherten Daten entfernt.",
+      "undo": "Rückgängig",
+      "confirm": "Löschen",
+      "memoryLabel": "Ausgewählte Erinnerung"
+    },
     "usedInResponse": "{count} Erinnerung verwendet | {count} Erinnerungen verwendet",
     "context": {
       "title": "Aktive Erinnerungen",
