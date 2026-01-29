@@ -44,6 +44,7 @@
               <h3 class="text-xl font-semibold txt-primary mb-3">
                 {{ introTitle }}
               </h3>
+              <!-- eslint-disable-next-line vue/no-v-html -->
               <div class="markdown-content txt-secondary text-sm" v-html="introHtml"></div>
             </div>
 
@@ -51,6 +52,7 @@
               <h4 class="text-lg font-semibold txt-primary mb-3">
                 {{ $t('config.sortingPrompt.yourTasks') }}
               </h4>
+              <!-- eslint-disable-next-line vue/no-v-html -->
               <div class="markdown-content txt-secondary text-sm" v-html="tasksHtml"></div>
             </div>
 
@@ -66,6 +68,7 @@
                 >
                   <span class="font-semibold txt-primary">{{ index + 1 }}.</span>
                   <div>
+                    <!-- eslint-disable-next-line vue/no-v-html -->
                     <div class="markdown-content" v-html="instructionHtml"></div>
                     <ul v-if="index === 1" class="space-y-3 ml-4 mt-3">
                       <li
