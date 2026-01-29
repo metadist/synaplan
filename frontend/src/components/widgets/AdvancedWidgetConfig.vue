@@ -397,6 +397,26 @@
                   class="w-full px-4 py-2.5 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
                   data-testid="input-file-limit"
                 />
+                <!-- Unlimited Warning -->
+                <div
+                  v-if="config.fileUploadLimit === 0"
+                  class="mt-3 p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/30"
+                >
+                  <div class="flex items-start gap-2">
+                    <Icon
+                      icon="heroicons:exclamation-triangle"
+                      class="w-5 h-5 text-yellow-600 dark:text-yellow-400 flex-shrink-0 mt-0.5"
+                    />
+                    <div>
+                      <p class="text-sm font-medium text-yellow-700 dark:text-yellow-300">
+                        {{ $t('widgets.advancedConfig.fileUploadUnlimitedTitle') }}
+                      </p>
+                      <p class="text-xs text-yellow-600 dark:text-yellow-400 mt-1">
+                        {{ $t('widgets.advancedConfig.fileUploadUnlimitedDescription') }}
+                      </p>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -1626,7 +1646,7 @@ onMounted(async () => {
     messageLimit: widgetConfig.messageLimit || 50,
     maxFileSize: widgetConfig.maxFileSize || 10,
     allowFileUpload: widgetConfig.allowFileUpload || false,
-    fileUploadLimit: widgetConfig.fileUploadLimit || 3,
+    fileUploadLimit: widgetConfig.fileUploadLimit ?? 3,
     allowedDomains: widgetConfig.allowedDomains || props.widget.allowedDomains || [],
   })
 

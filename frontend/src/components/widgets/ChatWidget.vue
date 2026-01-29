@@ -1,6 +1,8 @@
 <template>
   <div
     :class="[
+      'synaplan-widget',
+      widgetTheme === 'dark' ? 'dark' : '',
       testMode ? 'relative w-full h-full' : isPreview ? 'absolute' : 'fixed',
       testMode ? '' : 'z-[9999]',
       testMode ? '' : positionClass,
@@ -152,7 +154,7 @@
                 </div>
                 <div
                   v-else
-                  class="text-sm break-words markdown-content"
+                  class="text-sm break-words markdown-content overflow-x-auto"
                   :style="{
                     color:
                       message.role === 'user'
@@ -203,9 +205,9 @@
                   </button>
                 </div>
                 <!-- Text content (question about the file) -->
-                <p
+                <div
                   v-if="message.content && message.content !== message.fileName"
-                  class="text-sm"
+                  class="text-sm markdown-content overflow-x-auto"
                   :style="{
                     color:
                       message.role === 'user'
@@ -337,7 +339,13 @@
                 >{{ formatFileSize(file.size) }}</span
               >
               <button
-                class="w-6 h-6 rounded hover:bg-black/10 dark:hover:bg-white/10 flex items-center justify-center flex-shrink-0"
+                :disabled="isSending || uploadingFile"
+                :class="[
+                  'w-6 h-6 rounded flex items-center justify-center flex-shrink-0',
+                  isSending || uploadingFile
+                    ? 'opacity-50 cursor-not-allowed'
+                    : 'hover:bg-black/10 dark:hover:bg-white/10',
+                ]"
                 :data-testid="`btn-remove-file-${index}`"
                 @click="removeFile(index)"
               >
@@ -402,20 +410,48 @@
               @keydown.enter.exact.prevent="sendMessage"
             />
             <button
-              :disabled="!canSend"
-              :style="canSend ? { backgroundColor: primaryColor } : {}"
+              :disabled="!canSend || isSending || uploadingFile"
+              :style="
+                canSend && !isSending && !uploadingFile ? { backgroundColor: primaryColor } : {}
+              "
               :class="[
                 'w-10 h-10 rounded-lg transition-all flex items-center justify-center',
-                canSend
+                canSend && !isSending && !uploadingFile
                   ? 'hover:scale-110 shadow-lg'
                   : 'bg-gray-200 dark:bg-gray-600 cursor-not-allowed',
               ]"
-              :aria-label="$t('widget.send')"
+              :aria-label="isSending || uploadingFile ? $t('widget.sending') : $t('widget.send')"
               data-testid="btn-send"
               @click="sendMessage"
             >
               <span class="shrink-0">
-                <PaperAirplaneIcon :class="['w-5 h-5', canSend ? 'text-white' : 'text-gray-400']" />
+                <!-- Loading spinner when sending or uploading files -->
+                <svg
+                  v-if="isSending || uploadingFile"
+                  class="w-5 h-5 text-gray-400 animate-spin"
+                  xmlns="http://www.w3.org/2000/svg"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                >
+                  <circle
+                    class="opacity-25"
+                    cx="12"
+                    cy="12"
+                    r="10"
+                    stroke="currentColor"
+                    stroke-width="4"
+                  />
+                  <path
+                    class="opacity-75"
+                    fill="currentColor"
+                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                  />
+                </svg>
+                <!-- Send icon when not sending -->
+                <PaperAirplaneIcon
+                  v-else
+                  :class="['w-5 h-5', canSend ? 'text-white' : 'text-gray-400']"
+                />
               </span>
             </button>
           </div>
@@ -785,15 +821,18 @@ const exportChat = () => {
       border-radius: 12px;
       max-width: 85%;
       page-break-inside: avoid;
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+      color-adjust: exact !important;
     }
     .message-user {
-      background: ${themeColor};
-      color: white;
+      background: ${themeColor} !important;
+      color: white !important;
       margin-left: auto;
       border-bottom-right-radius: 4px;
     }
     .message-assistant {
-      background: #f3f4f6;
+      background: #f3f4f6 !important;
       color: #1a1a1a;
       margin-right: auto;
       border-bottom-left-radius: 4px;
@@ -817,6 +856,76 @@ const exportChat = () => {
       word-wrap: break-word;
     }
     .message-user .message-content { color: white; }
+    /* Markdown styles for export */
+    .message-content p { margin: 0.5rem 0; }
+    .message-content p:first-child { margin-top: 0; }
+    .message-content p:last-child { margin-bottom: 0; }
+    .message-content strong { font-weight: 600; }
+    .message-content em { font-style: italic; }
+    .message-content ul, .message-content ol { padding-left: 1.5rem; margin: 0.5rem 0; }
+    .message-content li { margin: 0.25rem 0; }
+    .message-content code {
+      background: rgba(0,0,0,0.08) !important;
+      padding: 0.125rem 0.375rem;
+      border-radius: 0.25rem;
+      font-family: ui-monospace, monospace;
+      font-size: 0.875em;
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+    }
+    .message-user .message-content code { background: rgba(255,255,255,0.2) !important; }
+    .message-content pre {
+      background: #1e1e1e !important;
+      color: #d4d4d4 !important;
+      padding: 1rem;
+      border-radius: 0.5rem;
+      overflow-x: auto;
+      margin: 0.75rem 0;
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+    }
+    .message-content pre code {
+      background: none;
+      padding: 0;
+      color: inherit;
+    }
+    .message-content table {
+      width: 100%;
+      max-width: 100%;
+      border-collapse: collapse;
+      margin: 0.75rem 0;
+      font-size: 0.75rem;
+      table-layout: fixed;
+    }
+    .message-content th, .message-content td {
+      border: 1px solid #d1d5db;
+      padding: 0.375rem 0.5rem;
+      text-align: left;
+      word-wrap: break-word;
+      overflow-wrap: break-word;
+      hyphens: auto;
+    }
+    .message-content th {
+      background: #f3f4f6 !important;
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+      font-weight: 600;
+    }
+    .message-user .message-content th,
+    .message-user .message-content td { border-color: rgba(255,255,255,0.3); }
+    .message-user .message-content th { background: rgba(255,255,255,0.15); }
+    .message-content blockquote {
+      border-left: 4px solid #9ca3af;
+      padding-left: 1rem;
+      margin: 0.75rem 0;
+      font-style: italic;
+      color: #4b5563;
+    }
+    .message-user .message-content blockquote { border-color: rgba(255,255,255,0.5); color: rgba(255,255,255,0.9); }
+    .message-content a { color: #2563eb; text-decoration: underline; }
+    .message-user .message-content a { color: #93c5fd; }
+    .message-content hr { margin: 1rem 0; border: none; border-top: 1px solid #e5e7eb; }
+    .message-user .message-content hr { border-color: rgba(255,255,255,0.3); }
     .attachment {
       display: inline-flex;
       align-items: center;
@@ -839,6 +948,38 @@ const exportChat = () => {
     @media print {
       body { padding: 20px; }
       .message { break-inside: avoid; }
+      * {
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+        color-adjust: exact !important;
+      }
+      .message-user {
+        background: ${themeColor} !important;
+        color: white !important;
+      }
+      .message-assistant {
+        background: #f3f4f6 !important;
+      }
+      .message-content pre {
+        background: #1e1e1e !important;
+        color: #d4d4d4 !important;
+        white-space: pre-wrap !important;
+        word-wrap: break-word !important;
+      }
+      .message-content th {
+        background: #f3f4f6 !important;
+      }
+      .message-content table {
+        table-layout: fixed !important;
+        width: 100% !important;
+        font-size: 0.7rem !important;
+      }
+      .message-content th, .message-content td {
+        word-wrap: break-word !important;
+        overflow-wrap: break-word !important;
+        hyphens: auto !important;
+        padding: 0.25rem 0.375rem !important;
+      }
     }
   </style>
 </head>
@@ -887,9 +1028,13 @@ const exportChat = () => {
       html += `      <div class="attachment">📎 ${escapeHtml(message.fileName)}</div>\n`
     }
 
-    // Add message content
+    // Add message content (render markdown for assistant messages, escape for user)
     if (message.content) {
-      html += `      <div class="message-content">${escapeHtml(message.content)}</div>\n`
+      const isUserMessage = message.role === 'user'
+      const renderedContent = isUserMessage
+        ? escapeHtml(message.content)
+        : markdownRenderer.render(message.content)
+      html += `      <div class="message-content">${renderedContent}</div>\n`
     }
 
     html += `    </div>\n`
@@ -1628,6 +1773,13 @@ function buildWidgetHeaders(includeContentType = true) {
  * These styles are necessary for the widget to render markdown correctly.
  */
 
+/* Base markdown content container - allows horizontal scrolling for wide content */
+.markdown-content {
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: visible;
+}
+
 /* Code blocks */
 .markdown-content :deep(.code-block) {
   padding: 0.75rem;
@@ -1711,27 +1863,8 @@ function buildWidgetHeaders(includeContentType = true) {
   background-color: rgba(0, 0, 0, 0.03);
 }
 
-/* Tables */
-.markdown-content :deep(.markdown-table) {
-  width: 100%;
-  border-collapse: collapse;
-  margin-top: 0.5rem;
-  margin-bottom: 0.5rem;
-  font-size: 0.875rem;
-}
-
-.markdown-content :deep(.markdown-table th),
-.markdown-content :deep(.markdown-table td) {
-  border-width: 1px;
-  border-style: solid;
-  padding: 0.25rem 0.5rem;
-  border-color: rgba(0, 0, 0, 0.1);
-}
-
-.markdown-content :deep(.markdown-table th) {
-  font-weight: 600;
-  background-color: rgba(0, 0, 0, 0.05);
-}
+/* Tables and markdown content styles are loaded via widget-markdown.css
+   which is injected into the Shadow DOM by widget.ts */
 
 /* Horizontal rule */
 .markdown-content :deep(hr) {
