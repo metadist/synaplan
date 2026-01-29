@@ -819,15 +819,18 @@ const exportChat = () => {
       border-radius: 12px;
       max-width: 85%;
       page-break-inside: avoid;
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+      color-adjust: exact !important;
     }
     .message-user {
-      background: ${themeColor};
-      color: white;
+      background: ${themeColor} !important;
+      color: white !important;
       margin-left: auto;
       border-bottom-right-radius: 4px;
     }
     .message-assistant {
-      background: #f3f4f6;
+      background: #f3f4f6 !important;
       color: #1a1a1a;
       margin-right: auto;
       border-bottom-left-radius: 4px;
@@ -847,10 +850,79 @@ const exportChat = () => {
     .message-user .message-header { color: #333; }
     .message-content {
       font-size: 15px;
-      white-space: pre-wrap;
       word-wrap: break-word;
     }
     .message-user .message-content { color: white; }
+    /* Markdown styles for export */
+    .message-content p { margin: 0.5rem 0; }
+    .message-content p:first-child { margin-top: 0; }
+    .message-content p:last-child { margin-bottom: 0; }
+    .message-content strong { font-weight: 600; }
+    .message-content em { font-style: italic; }
+    .message-content ul, .message-content ol { padding-left: 1.5rem; margin: 0.5rem 0; }
+    .message-content li { margin: 0.25rem 0; }
+    .message-content code {
+      background: rgba(0,0,0,0.08) !important;
+      padding: 0.125rem 0.375rem;
+      border-radius: 0.25rem;
+      font-family: ui-monospace, monospace;
+      font-size: 0.875em;
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+    }
+    .message-user .message-content code { background: rgba(255,255,255,0.2) !important; }
+    .message-content pre {
+      background: #1e1e1e !important;
+      color: #d4d4d4 !important;
+      padding: 1rem;
+      border-radius: 0.5rem;
+      overflow-x: auto;
+      margin: 0.75rem 0;
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+    }
+    .message-content pre code {
+      background: none;
+      padding: 0;
+      color: inherit;
+    }
+    .message-content table {
+      width: 100%;
+      max-width: 100%;
+      border-collapse: collapse;
+      margin: 0.75rem 0;
+      font-size: 0.75rem;
+      table-layout: fixed;
+    }
+    .message-content th, .message-content td {
+      border: 1px solid #d1d5db;
+      padding: 0.375rem 0.5rem;
+      text-align: left;
+      word-wrap: break-word;
+      overflow-wrap: break-word;
+      hyphens: auto;
+    }
+    .message-content th {
+      background: #f3f4f6 !important;
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+      font-weight: 600;
+    }
+    .message-user .message-content th,
+    .message-user .message-content td { border-color: rgba(255,255,255,0.3); }
+    .message-user .message-content th { background: rgba(255,255,255,0.15); }
+    .message-content blockquote {
+      border-left: 4px solid #9ca3af;
+      padding-left: 1rem;
+      margin: 0.75rem 0;
+      font-style: italic;
+      color: #4b5563;
+    }
+    .message-user .message-content blockquote { border-color: rgba(255,255,255,0.5); color: rgba(255,255,255,0.9); }
+    .message-content a { color: #2563eb; text-decoration: underline; }
+    .message-user .message-content a { color: #93c5fd; }
+    .message-content hr { margin: 1rem 0; border: none; border-top: 1px solid #e5e7eb; }
+    .message-user .message-content hr { border-color: rgba(255,255,255,0.3); }
     .attachment {
       display: inline-flex;
       align-items: center;
@@ -873,6 +945,38 @@ const exportChat = () => {
     @media print {
       body { padding: 20px; }
       .message { break-inside: avoid; }
+      * {
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+        color-adjust: exact !important;
+      }
+      .message-user {
+        background: ${themeColor} !important;
+        color: white !important;
+      }
+      .message-assistant {
+        background: #f3f4f6 !important;
+      }
+      .message-content pre {
+        background: #1e1e1e !important;
+        color: #d4d4d4 !important;
+        white-space: pre-wrap !important;
+        word-wrap: break-word !important;
+      }
+      .message-content th {
+        background: #f3f4f6 !important;
+      }
+      .message-content table {
+        table-layout: fixed !important;
+        width: 100% !important;
+        font-size: 0.7rem !important;
+      }
+      .message-content th, .message-content td {
+        word-wrap: break-word !important;
+        overflow-wrap: break-word !important;
+        hyphens: auto !important;
+        padding: 0.25rem 0.375rem !important;
+      }
     }
   </style>
 </head>
@@ -921,9 +1025,13 @@ const exportChat = () => {
       html += `      <div class="attachment">📎 ${escapeHtml(message.fileName)}</div>\n`
     }
 
-    // Add message content
+    // Add message content (render markdown for assistant messages, escape for user)
     if (message.content) {
-      html += `      <div class="message-content">${escapeHtml(message.content)}</div>\n`
+      const isUserMessage = message.role === 'user'
+      const renderedContent = isUserMessage
+        ? escapeHtml(message.content)
+        : markdownRenderer.render(message.content)
+      html += `      <div class="message-content">${renderedContent}</div>\n`
     }
 
     html += `    </div>\n`
