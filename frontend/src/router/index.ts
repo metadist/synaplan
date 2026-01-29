@@ -100,14 +100,8 @@ const router = createRouter({
     },
     {
       path: '/tools',
-      redirect: '/tools/introduction',
+      redirect: '/tools/chat-widget',
       meta: { requiresAuth: true },
-    },
-    {
-      path: '/tools/introduction',
-      name: 'tools-introduction',
-      component: () => import('../views/ToolsView.vue'),
-      meta: { requiresAuth: true, helpId: 'tools.introduction', titleKey: 'pageTitles.tools' },
     },
     {
       path: '/tools/chat-widget',

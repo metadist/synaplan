@@ -1885,6 +1885,13 @@
       "editCompact": "Edit",
       "discarded": "Memory discarded"
     },
+    "deleteDialog": {
+      "title": "Delete memory?",
+      "message": "This will remove the memory from your saved data.",
+      "undo": "Undo",
+      "confirm": "Delete",
+      "memoryLabel": "Selected memory"
+    },
     "usedInResponse": "{count} memory used | {count} memories used",
     "context": {
       "title": "Active Memories",

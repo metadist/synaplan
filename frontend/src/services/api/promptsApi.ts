@@ -1,3 +1,4 @@
+import { z } from 'zod'
 import { httpClient } from './httpClient'
 
 export interface TaskPrompt {
@@ -45,6 +46,35 @@ export interface AvailableFile {
   uploadedAt: string | null
 }
 
+const SortingPromptCategorySchema = z.object({
+  name: z.string(),
+  description: z.string(),
+  type: z.enum(['default', 'custom']),
+})
+
+const SortingPromptSchema = z.object({
+  id: z.number(),
+  topic: z.string(),
+  shortDescription: z.string(),
+  prompt: z.string(),
+  renderedPrompt: z.string(),
+  categories: z.array(SortingPromptCategorySchema),
+})
+
+const GetSortingPromptResponseSchema = z.object({
+  success: z.boolean(),
+  prompt: SortingPromptSchema,
+})
+
+const UpdateSortingPromptResponseSchema = z.object({
+  success: z.boolean(),
+  prompt: SortingPromptSchema.omit({ categories: true, renderedPrompt: true }),
+})
+
+export type SortingPromptCategory = z.infer<typeof SortingPromptCategorySchema>
+export type SortingPromptPayload = z.infer<typeof SortingPromptSchema>
+export type SortingPromptUpdatePayload = z.infer<typeof UpdateSortingPromptResponseSchema>['prompt']
+
 class PromptsApi {
   /**
    * Get all accessible prompts (system + user-specific)
@@ -69,6 +99,30 @@ class PromptsApi {
         method: 'GET',
       }
     )
+    return data.prompt
+  }
+
+  /**
+   * Get sorting prompt (tools:sort) with dynamic categories.
+   */
+  async getSortingPrompt(language: string = 'en'): Promise<SortingPromptPayload> {
+    const data = await httpClient('/api/v1/prompts/sorting', {
+      method: 'GET',
+      params: { language },
+      schema: GetSortingPromptResponseSchema,
+    })
+    return data.prompt
+  }
+
+  /**
+   * Update sorting prompt content (admin only).
+   */
+  async updateSortingPrompt(prompt: string): Promise<SortingPromptUpdatePayload> {
+    const data = await httpClient('/api/v1/prompts/sorting', {
+      method: 'PUT',
+      body: JSON.stringify({ prompt }),
+      schema: UpdateSortingPromptResponseSchema,
+    })
     return data.prompt
   }
 

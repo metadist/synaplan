@@ -1530,10 +1530,11 @@ class ChatHandler implements MessageHandlerInterface
             $memoryCount = count($memories);
             $this->notify($progressCallback, 'saving_memories', "Saving {$memoryCount} ".(1 === $memoryCount ? 'memory' : 'memories').'...');
 
-            // Process memory actions (create/update)
+            // Process memory actions (create/update/delete)
             $userId = $message->getUserId();
 
             $savedMemories = [];
+            $deleteSuggestions = [];
             foreach ($memories as $memoryAction) {
                 try {
                     $action = $memoryAction['action'] ?? 'create';
@@ -1570,6 +1571,17 @@ class ChatHandler implements MessageHandlerInterface
                         $this->logger->info('ChatHandler: Memory updated', [
                             'memory_id' => $memory->id,
                             'key' => $memory->key,
+                        ]);
+                    } elseif ('delete' === $action && isset($memoryAction['memory_id'])) {
+                        $memoryId = $memoryAction['memory_id'];
+                        $memory = $this->memoryService->getMemoryById($memoryId, $user);
+                        if ($memory) {
+                            $deleteSuggestions[] = $memory->toArray();
+                        }
+
+                        $this->logger->info('ChatHandler: Memory delete suggested', [
+                            'memory_id' => $memoryId,
+                            'found' => null !== $memory,
                         ]);
                     }
                 } catch (\Exception $e) {
@@ -1608,6 +1620,18 @@ class ChatHandler implements MessageHandlerInterface
             } else {
                 // 🎯 NOTIFY: No memories were saved (possibly all duplicates)
                 $this->notify($progressCallback, 'memories_complete', 'Memory analysis complete');
+            }
+
+            if (!empty($deleteSuggestions) && $progressCallback) {
+                foreach ($deleteSuggestions as $memoryData) {
+                    $memoryData['action'] = 'delete';
+                    $progressCallback([
+                        'status' => 'memory_suggested',
+                        'message' => 'Memory action suggested',
+                        'metadata' => $memoryData,
+                        'timestamp' => time(),
+                    ]);
+                }
             }
         } catch (\Throwable $e) {
             $this->logger->error('ChatHandler: Memory extraction failed', [

@@ -262,7 +262,6 @@ const navItems = computed<NavItem[]>(() => {
       label: t('nav.tools'),
       icon: WrenchScrewdriverIcon,
       children: [
-        { path: '/tools/introduction', label: t('nav.toolsIntroduction') },
         { path: '/tools/chat-widget', label: t('nav.toolsChatWidget') },
         { path: '/tools/doc-summary', label: t('nav.toolsDocSummary') },
         { path: '/tools/mail-handler', label: t('nav.toolsMailHandler') },

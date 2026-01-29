@@ -51,12 +51,6 @@
             >
             <router-link
               data-testid="link-route"
-              to="/tools/introduction"
-              class="px-4 py-2 rounded surface-chip hover-surface txt-primary text-sm"
-              >/tools/introduction</router-link
-            >
-            <router-link
-              data-testid="link-route"
               to="/tools/chat-widget"
               class="px-4 py-2 rounded surface-chip hover-surface txt-primary text-sm"
               >/tools/chat-widget</router-link

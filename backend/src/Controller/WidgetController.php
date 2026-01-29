@@ -123,7 +123,7 @@ class WidgetController extends AbstractController
             properties: [
                 new OA\Property(property: 'name', type: 'string', example: 'Support Chat'),
                 new OA\Property(property: 'websiteUrl', type: 'string', example: 'https://example.com', description: 'Website URL - domain will be added to allowed domains'),
-                new OA\Property(property: 'taskPromptTopic', type: 'string', example: 'customer-support', description: 'Optional - defaults to widget-default'),
+                new OA\Property(property: 'taskPromptTopic', type: 'string', example: 'customer-support', description: 'Optional - defaults to tools:widget-default'),
                 new OA\Property(property: 'config', type: 'object'),
             ]
         )
