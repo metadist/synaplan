@@ -1227,10 +1227,11 @@ class ChatHandler implements MessageHandlerInterface
             $memoryCount = count($memories);
             $this->notify($progressCallback, 'saving_memories', "Saving {$memoryCount} ".(1 === $memoryCount ? 'memory' : 'memories').'...');
 
-            // Process memory actions (create/update)
+            // Process memory actions (create/update/delete)
             $userId = $message->getUserId();
 
             $savedMemories = [];
+            $deletedMemories = [];
             foreach ($memories as $memoryAction) {
                 try {
                     $action = $memoryAction['action'] ?? 'create';
@@ -1267,6 +1268,14 @@ class ChatHandler implements MessageHandlerInterface
                         $this->logger->info('ChatHandler: Memory updated', [
                             'memory_id' => $memory->id,
                             'key' => $memory->key,
+                        ]);
+                    } elseif ('delete' === $action && isset($memoryAction['memory_id'])) {
+                        $memoryId = $memoryAction['memory_id'];
+                        $this->memoryService->deleteMemory($memoryId, $user);
+                        $deletedMemories[] = $memoryId;
+
+                        $this->logger->info('ChatHandler: Memory deleted', [
+                            'memory_id' => $memoryId,
                         ]);
                     }
                 } catch (\Exception $e) {
@@ -1305,6 +1314,17 @@ class ChatHandler implements MessageHandlerInterface
             } else {
                 // 🎯 NOTIFY: No memories were saved (possibly all duplicates)
                 $this->notify($progressCallback, 'memories_complete', 'Memory analysis complete');
+            }
+
+            if (!empty($deletedMemories) && $progressCallback) {
+                foreach ($deletedMemories as $memoryId) {
+                    $progressCallback([
+                        'status' => 'memory_deleted',
+                        'message' => 'Memory deleted',
+                        'metadata' => ['id' => $memoryId],
+                        'timestamp' => time(),
+                    ]);
+                }
             }
         } catch (\Throwable $e) {
             $this->logger->error('ChatHandler: Memory extraction failed', [

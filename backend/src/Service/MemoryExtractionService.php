@@ -34,7 +34,7 @@ readonly class MemoryExtractionService
      * @param array   $conversationHistory Recent messages for context
      * @param array   $existingMemories    Already loaded memories (with IDs for updates)
      *
-     * @return array Array of memory actions: [['action' => 'create'|'update', 'memory_id' => int|null, 'category' => string, 'key' => string, 'value' => string], ...]
+     * @return array Array of memory actions: [['action' => 'create'|'update'|'delete', 'memory_id' => int|null, 'category' => string|null, 'key' => string|null, 'value' => string|null], ...]
      */
     public function analyzeAndExtract(Message $message, array $conversationHistory, array $existingMemories = []): array
     {
@@ -142,13 +142,15 @@ RESPONSE FORMAT (JSON):
 DECISION RULES:
 1. action: "create" → Use when information is COMPLETELY NEW
 2. action: "update" → Use when information REPLACES or EXTENDS existing memory (must include memory_id)
-3. NO ACTION → If information already exists and hasn't changed, return empty array []
+3. action: "delete" → Use when user explicitly asks to forget/remove info (must include memory_id)
+4. NO ACTION → If information already exists and hasn't changed, return empty array []
 
 EXAMPLES:
-- Existing: "Liebt Döner" → New: "Liebt Döner mit Tzatziki" → UPDATE (more specific)
-- Existing: "Mag Auto fahren" → New: "Findet Fahrrad besser" → UPDATE (preference changed)
-- Existing: "Liebt Döner" → New: "Liebt Döner" → NO ACTION (already stored)
-- No existing → New: "Liebt Pizza" → CREATE (new info)
+- Existing: "Likes kebab" → New: "Likes kebab with tzatziki" → UPDATE (more specific)
+- Existing: "Enjoys driving" → New: "Prefers cycling" → UPDATE (preference changed)
+- Existing: "Likes kebab" → New: "Likes kebab" → NO ACTION (already stored)
+- No existing → New: "Likes pizza" → CREATE (new info)
+- User: "Delete my name" → DELETE (use memory_id from existing list)
 
 Be intelligent and selective!
 PROMPT;
@@ -228,7 +230,7 @@ PROMPT;
      * Parse memories from AI response.
      *
      * Handles both JSON array and null response.
-     * Now supports action field for create/update decisions.
+     * Now supports action field for create/update/delete decisions.
      *
      * @return array Array of memory actions
      */
@@ -259,6 +261,24 @@ PROMPT;
             // Validate structure and handle actions
             $validated = [];
             foreach ($memories as $memory) {
+                $action = $memory['action'] ?? 'create';
+
+                if ('delete' === $action) {
+                    $memoryId = $memory['memory_id'] ?? null;
+                    if (null === $memoryId) {
+                        $this->logger->warning('Delete action missing memory_id, skipping', [
+                            'memory' => $memory,
+                        ]);
+                        continue;
+                    }
+
+                    $validated[] = [
+                        'action' => 'delete',
+                        'memory_id' => (int) $memoryId,
+                    ];
+                    continue;
+                }
+
                 if (!isset($memory['category'], $memory['key'], $memory['value'])) {
                     continue;
                 }
@@ -267,7 +287,6 @@ PROMPT;
                     continue;
                 }
 
-                $action = $memory['action'] ?? 'create';
                 $validatedMemory = [
                     'action' => $action,
                     'category' => $memory['category'],

@@ -793,6 +793,8 @@ You are a memory extraction assistant. Extract only long-term, user-specific inf
 ```json
 [
   {
+    "action": "create|update|delete",
+    "memory_id": 123,
     "category": "personal|preferences|work|projects|general",
     "key": "short_identifier",
     "value": "what to remember (in user's language)"
@@ -805,6 +807,8 @@ Or if nothing to remember: `null`
 ## Guidelines:
 - **Be selective**: Only store durable, user-specific facts
 - Require explicit self-reference ("I", "my", "I'm") for personal memories
+- If user explicitly asks to forget/remove something, use `action: "delete"` with `memory_id`
+- For `delete`, only `action` + `memory_id` are required; omit other fields if unsure
 - Keep keys short (<= 24 chars), snake_case
 - One memory per fact (atomic)
 - Write values in the user's language
@@ -822,6 +826,8 @@ User: "What time is it?" → `null`
 User: "What does the name Cristian mean?" → `null`
 
 User: "Cristian is 22 and lives in Langenfeld" → `null`
+
+User: "Delete my name" → `[{"action": "delete", "memory_id": 123}]`
 
 User: "Thanks for the help!" → `null`
 
