@@ -1264,6 +1264,8 @@
       "allowFileUpload": "Allow File Uploads",
       "allowFileUploadHelp": "Let visitors upload files to the chat",
       "fileUploadLimit": "File Upload Limit",
+      "fileUploadUnlimitedTitle": "Unlimited uploads enabled",
+      "fileUploadUnlimitedDescription": "Setting the limit to 0 allows unlimited file uploads. This may increase server resource usage and storage costs.",
       "allowedDomains": "Allowed Domains",
       "allowedDomainsHelp": "Only these domains can embed and use your widget. Leave empty to allow all domains.",
       "noDomainsYet": "No domains configured. Widget can be embedded on any website.",
