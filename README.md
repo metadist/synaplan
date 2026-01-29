@@ -64,6 +64,28 @@ echo "GROQ_API_KEY=your_key" >> backend/.env && docker compose restart backend
 - **Email** — AI-powered email responses
 - **Audio** — Whisper transcription
 - **Documents** — PDF, Word, Excel, images with OCR
+- **AI Memories** — Optional user profiling (see below)
+
+---
+
+## Optional: AI Memories
+
+> **Want the AI to remember user preferences and context across sessions?**
+
+Install [**synaplan-memories**](https://github.com/metadist/synaplan-memories) — a separate Docker stack with a Rust microservice + Qdrant vector database.
+
+```bash
+# Clone and start the memories service
+git clone https://github.com/metadist/synaplan-memories
+cd synaplan-memories
+docker compose up -d
+
+# Then connect Synaplan to it (in synaplan/backend/.env)
+QDRANT_SERVICE_URL=http://synaplan-qdrant-service:8090
+QDRANT_SERVICE_API_KEY=your_secret_key
+```
+
+This is **completely optional** — Synaplan works fully without it. Licensed under [Apache-2.0](https://github.com/metadist/synaplan-memories/blob/main/LICENSE).
 
 ---
 

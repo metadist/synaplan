@@ -103,14 +103,27 @@ See [Email Integration Guide](EMAIL.md) for full setup.
 
 ---
 
-## Optional: Qdrant Memories
+## Optional: AI Memories (Qdrant)
 
-Connect to [synaplan-memories](https://github.com/metadist/synaplan-memories) for AI memory/profiling:
+> **Requires separate installation**: [synaplan-memories](https://github.com/metadist/synaplan-memories) (Apache-2.0)
+
+Enable user profiling and persistent AI memory:
 
 ```bash
-QDRANT_SERVICE_URL=http://qdrant-service:8080
-QDRANT_SERVICE_API_KEY=your_api_key
+# Install the memories service first
+git clone https://github.com/metadist/synaplan-memories
+cd synaplan-memories
+docker compose up -d
 ```
+
+Then configure connection:
+
+```bash
+QDRANT_SERVICE_URL=http://synaplan-qdrant-service:8090
+QDRANT_SERVICE_API_KEY=your_secret_key
+```
+
+**This is completely optional** — Synaplan works fully without it.
 
 ---
 

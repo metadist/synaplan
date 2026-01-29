@@ -93,8 +93,27 @@ Extract content from:
 
 ## Optional: AI Memories
 
-Connect [synaplan-memories](https://github.com/metadist/synaplan-memories) for:
+> **Requires separate installation**: [synaplan-memories](https://github.com/metadist/synaplan-memories) (Apache-2.0)
 
-- User profiling
-- Conversation memory
-- Qdrant vector storage
+Enable the AI to remember user preferences and context across sessions:
+
+- **User profiling** — Track preferences, interests, interaction patterns
+- **Conversation memory** — Persistent context across chat sessions
+- **Semantic search** — Vector-based memory retrieval via Qdrant
+
+### Quick Setup
+
+```bash
+git clone https://github.com/metadist/synaplan-memories
+cd synaplan-memories
+docker compose up -d
+```
+
+Then configure in `synaplan/backend/.env`:
+
+```bash
+QDRANT_SERVICE_URL=http://synaplan-qdrant-service:8090
+QDRANT_SERVICE_API_KEY=your_secret_key
+```
+
+**This is completely optional** — Synaplan works fully without it.
