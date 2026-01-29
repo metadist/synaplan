@@ -5,6 +5,7 @@ export interface SortingPromptData {
   categories: SortingCategory[]
   instructions: string[]
   promptContent: string
+  renderedPrompt: string
   jsonExample: string
 }
 
@@ -83,6 +84,35 @@ Your tasks in every new message are to:
    - **officemaker**: The user asks for the generation of an Excel, Powerpoint or Word document. Not for any other format. This prompt can only handle the generation of ONE document with a clear prompt.
 
 3. **Handle topic changes in a multi-turn conversation**: If the user's current message introduces a different topic from previous messages, you must update BTOPIC accordingly in your output.
+
+4. If there is an attachment, the description is in the BFILETEXT field.
+
+5. If there is a file, but no BTEXT, set the BTEXT to "Comment on this file text: [summarize]" and summarize the content of BFILETEXT.`,
+  renderedPrompt: `# Set BTOPIC and Tools in JSON
+Define the intention of the user with every request. You will have the history,
+but put your focus on the new message.
+
+If it fits the previous requests of the last few minutes, keep the topic going.
+If not, change it accordingly. Only in the JSON field.
+
+Put answers only in JSON, please.
+
+## Your tasks
+You are an assistant of assistants. You sort user requests by setting JSON values only.
+
+You receive messages (as JSON objects) from random users around the world. If there is a signature in the BTEXT field, use it as a hint to classify the message and the sender.
+
+If there is an attachment, the description is in the BFILETEXT field.
+
+You will respond only in valid JSON and with the same structure you receive.
+
+Your tasks in every new message are to:
+
+1. Detect the user's language (BLANG) in the BTEXT field, if possible. Use a 2-letter language code. Use any language, you can understand. Leave BLANG as is, if you cannot detect the language.
+
+2. Classify the user's message into one of these BTOPIC categories and only those
+
+3. Handle topic changes in a multi-turn conversation
 
 4. If there is an attachment, the description is in the BFILETEXT field.
 

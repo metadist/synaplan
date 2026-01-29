@@ -32,6 +32,11 @@ use Symfony\Component\Security\Http\Attribute\CurrentUser;
 #[Route('/api/v1/prompts', name: 'api_prompts_')]
 class PromptController extends AbstractController
 {
+    /**
+     * Supported languages for sorting prompt rendering.
+     */
+    private const SUPPORTED_LANGUAGES = ['de', 'en', 'it', 'es', 'fr', 'nl', 'pt', 'ru', 'sv', 'tr'];
+
     public function __construct(
         private PromptRepository $promptRepository,
         private PromptMetaRepository $promptMetaRepository,
@@ -174,6 +179,191 @@ class PromptController extends AbstractController
         return $this->json([
             'success' => true,
             'prompts' => array_values($promptsMap),
+        ]);
+    }
+
+    /**
+     * Get sorting prompt with dynamic categories.
+     *
+     * GET /api/v1/prompts/sorting
+     */
+    #[Route('/sorting', name: 'sorting_get', methods: ['GET'])]
+    #[OA\Get(
+        path: '/api/v1/prompts/sorting',
+        summary: 'Get sorting prompt with dynamic categories',
+        description: 'Returns the tools:sort prompt with dynamic topic list and categories for display.',
+        tags: ['Task Prompts'],
+        parameters: [
+            new OA\Parameter(
+                name: 'language',
+                in: 'query',
+                required: false,
+                description: 'Language code (default: en)',
+                schema: new OA\Schema(type: 'string', example: 'en')
+            ),
+        ],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Sorting prompt data',
+                content: new OA\JsonContent(
+                    properties: [
+                        new OA\Property(property: 'success', type: 'boolean'),
+                        new OA\Property(
+                            property: 'prompt',
+                            type: 'object',
+                            properties: [
+                                new OA\Property(property: 'id', type: 'integer', example: 2),
+                                new OA\Property(property: 'topic', type: 'string', example: 'tools:sort'),
+                                new OA\Property(property: 'shortDescription', type: 'string'),
+                                new OA\Property(property: 'prompt', type: 'string'),
+                                new OA\Property(property: 'renderedPrompt', type: 'string'),
+                                new OA\Property(
+                                    property: 'categories',
+                                    type: 'array',
+                                    items: new OA\Items(
+                                        properties: [
+                                            new OA\Property(property: 'name', type: 'string'),
+                                            new OA\Property(property: 'description', type: 'string'),
+                                            new OA\Property(property: 'type', type: 'string', enum: ['default', 'custom']),
+                                        ]
+                                    )
+                                ),
+                            ]
+                        ),
+                    ]
+                )
+            ),
+            new OA\Response(response: 401, description: 'Not authenticated'),
+            new OA\Response(response: 404, description: 'Sorting prompt not found'),
+        ]
+    )]
+    public function getSortingPrompt(
+        Request $request,
+        #[CurrentUser] ?User $user,
+    ): JsonResponse {
+        if (!$user) {
+            return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
+        }
+
+        $language = $request->query->get('language', 'en');
+        $sortingPrompt = $this->promptRepository->findByTopic('tools:sort', 0);
+
+        if (!$sortingPrompt) {
+            return $this->json(['error' => 'Sorting prompt not found'], Response::HTTP_NOT_FOUND);
+        }
+
+        $userId = $user->getId();
+        $topics = $this->promptRepository->getAllTopics(0, $userId, excludeTools: true);
+        $topicsWithDesc = $this->promptRepository->getTopicsWithDescriptions(0, $language, $userId, excludeTools: true);
+
+        $dynamicList = $this->buildDynamicList($topicsWithDesc);
+        $keyList = implode(' | ', array_map(fn ($topic) => '"'.$topic.'"', $topics));
+        $langList = implode(' | ', array_map(fn ($lang) => '"'.$lang.'"', self::SUPPORTED_LANGUAGES));
+
+        $renderedPrompt = $sortingPrompt->getPrompt();
+        $renderedPrompt = str_replace('[DYNAMICLIST]', $dynamicList, $renderedPrompt);
+        $renderedPrompt = str_replace('[KEYLIST]', $keyList, $renderedPrompt);
+        $renderedPrompt = str_replace('[LANGLIST]', $langList, $renderedPrompt);
+
+        return $this->json([
+            'success' => true,
+            'prompt' => [
+                'id' => $sortingPrompt->getId(),
+                'topic' => $sortingPrompt->getTopic(),
+                'shortDescription' => $sortingPrompt->getShortDescription(),
+                'prompt' => $sortingPrompt->getPrompt(),
+                'renderedPrompt' => $renderedPrompt,
+                'categories' => $this->buildSortingCategories($userId, $language),
+            ],
+        ]);
+    }
+
+    /**
+     * Update sorting prompt (admin only).
+     *
+     * PUT /api/v1/prompts/sorting
+     */
+    #[Route('/sorting', name: 'sorting_update', methods: ['PUT'])]
+    #[OA\Put(
+        path: '/api/v1/prompts/sorting',
+        summary: 'Update sorting prompt',
+        description: 'Update the tools:sort prompt content (admin only).',
+        security: [['Bearer' => []]],
+        tags: ['Task Prompts'],
+        requestBody: new OA\RequestBody(
+            required: true,
+            content: new OA\JsonContent(
+                required: ['prompt'],
+                properties: [
+                    new OA\Property(property: 'prompt', type: 'string'),
+                    new OA\Property(property: 'shortDescription', type: 'string'),
+                ]
+            )
+        ),
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Sorting prompt updated',
+                content: new OA\JsonContent(
+                    properties: [
+                        new OA\Property(property: 'success', type: 'boolean'),
+                        new OA\Property(
+                            property: 'prompt',
+                            type: 'object',
+                            properties: [
+                                new OA\Property(property: 'id', type: 'integer'),
+                                new OA\Property(property: 'topic', type: 'string'),
+                                new OA\Property(property: 'shortDescription', type: 'string'),
+                                new OA\Property(property: 'prompt', type: 'string'),
+                            ]
+                        ),
+                    ]
+                )
+            ),
+            new OA\Response(response: 400, description: 'Invalid payload'),
+            new OA\Response(response: 401, description: 'Not authenticated'),
+            new OA\Response(response: 403, description: 'Admin access required'),
+            new OA\Response(response: 404, description: 'Sorting prompt not found'),
+        ]
+    )]
+    public function updateSortingPrompt(
+        Request $request,
+        #[CurrentUser] ?User $user,
+    ): JsonResponse {
+        if (!$user) {
+            return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
+        }
+
+        if (!$user->isAdmin()) {
+            return $this->json(['error' => 'Admin access required'], Response::HTTP_FORBIDDEN);
+        }
+
+        $data = json_decode($request->getContent(), true);
+        if (!is_array($data) || empty($data['prompt']) || !is_string($data['prompt'])) {
+            return $this->json(['error' => 'Missing required field: prompt'], Response::HTTP_BAD_REQUEST);
+        }
+
+        $sortingPrompt = $this->promptRepository->findByTopic('tools:sort', 0);
+        if (!$sortingPrompt) {
+            return $this->json(['error' => 'Sorting prompt not found'], Response::HTTP_NOT_FOUND);
+        }
+
+        $sortingPrompt->setPrompt($data['prompt']);
+        if (!empty($data['shortDescription']) && is_string($data['shortDescription'])) {
+            $sortingPrompt->setShortDescription($data['shortDescription']);
+        }
+
+        $this->em->flush();
+
+        return $this->json([
+            'success' => true,
+            'prompt' => [
+                'id' => $sortingPrompt->getId(),
+                'topic' => $sortingPrompt->getTopic(),
+                'shortDescription' => $sortingPrompt->getShortDescription(),
+                'prompt' => $sortingPrompt->getPrompt(),
+            ],
         ]);
     }
 
@@ -799,6 +989,49 @@ class PromptController extends AbstractController
             : $shortDescription;
 
         return "{$prefix} {$topic} - {$truncatedDesc}";
+    }
+
+    /**
+     * Build dynamic list of topics with descriptions.
+     *
+     * @param array<int, array{topic: string, description: string}> $topicsWithDesc
+     */
+    private function buildDynamicList(array $topicsWithDesc): string
+    {
+        $list = [];
+        foreach ($topicsWithDesc as $item) {
+            $list[] = "- \"{$item['topic']}\": {$item['description']}";
+        }
+
+        return implode("\n", $list);
+    }
+
+    /**
+     * Build sorting categories (default vs custom) for UI display.
+     *
+     * @return array<int, array{name: string, description: string, type: string}>
+     */
+    private function buildSortingCategories(int $userId, string $language): array
+    {
+        $prompts = $this->promptRepository->findAllForUser($userId, $language);
+        $categories = [];
+        $seen = [];
+
+        foreach ($prompts as $prompt) {
+            $topic = $prompt->getTopic();
+            if (isset($seen[$topic])) {
+                continue;
+            }
+
+            $categories[] = [
+                'name' => $topic,
+                'description' => $prompt->getShortDescription(),
+                'type' => 0 === $prompt->getOwnerId() ? 'default' : 'custom',
+            ];
+            $seen[$topic] = true;
+        }
+
+        return $categories;
     }
 
     /**

@@ -1140,6 +1140,7 @@
     "subtitle": "We typically reply in minutes",
     "placeholder": "Type your message...",
     "send": "Send",
+    "sending": "Sending...",
     "attachFile": "Attach file",
     "downloadFile": "Download file",
     "downloadFailed": "Sorry, the file could not be downloaded. Please try again later.",
@@ -1284,6 +1285,8 @@
       "allowFileUpload": "Allow File Uploads",
       "allowFileUploadHelp": "Let visitors upload files to the chat",
       "fileUploadLimit": "File Upload Limit",
+      "fileUploadUnlimitedTitle": "Unlimited uploads enabled",
+      "fileUploadUnlimitedDescription": "Setting the limit to 0 allows unlimited file uploads. This may increase server resource usage and storage costs.",
       "allowedDomains": "Allowed Domains",
       "allowedDomainsHelp": "Only these domains can embed and use your widget. Leave empty to allow all domains.",
       "noDomainsYet": "No domains configured. Widget can be embedded on any website.",
@@ -1902,6 +1905,13 @@
       "edit": "Edit",
       "editCompact": "Edit",
       "discarded": "Memory discarded"
+    },
+    "deleteDialog": {
+      "title": "Delete memory?",
+      "message": "This will remove the memory from your saved data.",
+      "undo": "Undo",
+      "confirm": "Delete",
+      "memoryLabel": "Selected memory"
     },
     "usedInResponse": "{count} memory used | {count} memories used",
     "context": {
