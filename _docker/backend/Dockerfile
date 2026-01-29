@@ -156,7 +156,12 @@ RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 COPY frontend/dist /var/www/frontend
 
 # Copy built widgets (built externally in CI, empty in dev)
+# Verify widget files exist before copying (fail build if missing in CI)
 COPY frontend/dist-widget /var/www/widgets
+RUN if [ -z "$(ls -A /var/www/widgets 2>/dev/null)" ] && [ "${CI:-false}" = "true" ]; then \
+      echo "❌ ERROR: Widget files are missing in CI build!" && \
+      exit 1; \
+    fi || true
 
 # Copy plugins directory (for SortX and other plugins)
 COPY plugins/ /plugins/
