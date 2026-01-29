@@ -213,9 +213,10 @@ final class SystemConfigService
         foreach ($files as $file) {
             $filename = basename($file);
             if (preg_match('/\.env\.backup\.(\d{8}_\d{6})$/', $filename, $matches)) {
+                $dt = \DateTime::createFromFormat('Ymd_His', $matches[1]);
                 $backups[] = [
                     'id' => $matches[1],
-                    'timestamp' => \DateTime::createFromFormat('Ymd_His', $matches[1])?->format('Y-m-d H:i:s') ?? $matches[1],
+                    'timestamp' => $dt !== false ? $dt->format('Y-m-d H:i:s') : $matches[1],
                     'size' => filesize($file) ?: 0,
                 ];
             }
