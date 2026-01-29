@@ -216,7 +216,7 @@ final class SystemConfigService
                 $dt = \DateTime::createFromFormat('Ymd_His', $matches[1]);
                 $backups[] = [
                     'id' => $matches[1],
-                    'timestamp' => $dt !== false ? $dt->format('Y-m-d H:i:s') : $matches[1],
+                    'timestamp' => false !== $dt ? $dt->format('Y-m-d H:i:s') : $matches[1],
                     'size' => filesize($file) ?: 0,
                 ];
             }
