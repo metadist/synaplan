@@ -91,6 +91,7 @@ class MessageProcessor
                     'topic' => $options['fixed_task_prompt'],
                     'language' => 'en', // Default, could be enhanced
                     'source' => 'widget',
+                    'is_widget_mode' => true, // Disable memories for widget
                 ];
 
                 if (!empty($options['rag_group_key'])) {
@@ -102,6 +103,10 @@ class MessageProcessor
                 if (isset($options['rag_min_score'])) {
                     $classification['rag_min_score'] = (float) $options['rag_min_score'];
                 }
+            } elseif (!empty($options['is_widget_mode'])) {
+                // Widget Mode without fixed prompt: still disable memories
+                $classification = $this->classifier->classify($message, $conversationHistory);
+                $classification['is_widget_mode'] = true;
             } elseif ($isAgainRequest) {
                 // Skip sorting but preserve/override topic & language for routing
                 $topic = strtolower($message->getTopic() ?: '');

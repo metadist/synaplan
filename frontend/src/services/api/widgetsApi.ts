@@ -24,7 +24,7 @@ export interface WidgetConfig {
   primaryColor?: string
   iconColor?: string
   buttonIcon?: string
-  buttonIconUrl?: string
+  buttonIconUrl?: string | null
   defaultTheme?: 'light' | 'dark'
   autoOpen?: boolean
   autoMessage?: string
@@ -37,8 +37,14 @@ export interface WidgetConfig {
 
 export interface CreateWidgetRequest {
   name: string
-  taskPromptTopic: string
+  taskPromptTopic?: string
+  websiteUrl?: string
   config?: WidgetConfig
+}
+
+export interface QuickCreateWidgetRequest {
+  name: string
+  websiteUrl: string
 }
 
 export interface UpdateWidgetRequest {
@@ -72,6 +78,21 @@ export async function createWidget(request: CreateWidgetRequest): Promise<Widget
   const data = await httpClient<{ success: boolean; widget: Widget }>('/api/v1/widgets', {
     method: 'POST',
     body: JSON.stringify(request),
+  })
+  return data.widget
+}
+
+/**
+ * Quick create widget with minimal setup (name + website only)
+ * Uses default prompt and auto-adds website domain to allowed list
+ */
+export async function quickCreateWidget(request: QuickCreateWidgetRequest): Promise<Widget> {
+  const data = await httpClient<{ success: boolean; widget: Widget }>('/api/v1/widgets', {
+    method: 'POST',
+    body: JSON.stringify({
+      name: request.name,
+      websiteUrl: request.websiteUrl,
+    }),
   })
   return data.widget
 }
@@ -194,10 +215,14 @@ export async function sendWidgetMessage(
     payload.files = fileIds
   }
 
+  // Include credentials when in test mode (X-Widget-Test-Mode header is present)
+  const isTestMode = extraHeaders?.['X-Widget-Test-Mode'] === 'true'
+
   const response = await fetch(`${apiUrl}/api/v1/widget/${widgetId}/message`, {
     method: 'POST',
     headers,
     body: JSON.stringify(payload),
+    credentials: isTestMode ? 'include' : 'omit',
   })
 
   if (!response.ok) {
@@ -350,7 +375,7 @@ export async function uploadWidgetFile(
   widgetId: string,
   sessionId: string,
   file: File,
-  apiUrl?: string
+  options?: { apiUrl?: string; headers?: Record<string, string> }
 ): Promise<{
   success: boolean
   file: {
@@ -363,29 +388,35 @@ export async function uploadWidgetFile(
   remainingUploads?: number
 }> {
   const config = useConfigStore()
-  const baseUrl = apiUrl ?? config.apiBaseUrl
+  const baseUrl = options?.apiUrl ?? config.apiBaseUrl
 
   const formData = new FormData()
   formData.append('file', file)
 
   const headers: Record<string, string> = {
     'X-Widget-Session': sessionId,
+    ...(options?.headers ?? {}),
   }
 
   if (typeof window !== 'undefined' && window.location?.host) {
     headers['X-Widget-Host'] = window.location.host
   }
 
+  // Include credentials when in test mode (X-Widget-Test-Mode header is present)
+  const isTestMode = options?.headers?.['X-Widget-Test-Mode'] === 'true'
+
   console.log('🌐 Widget file upload request:', {
     url: `${baseUrl}/api/v1/widget/${widgetId}/upload`,
     method: 'POST',
     bodyPreview: 'FormData with file',
+    isTestMode,
   })
 
   const response = await fetch(`${baseUrl}/api/v1/widget/${widgetId}/upload`, {
     method: 'POST',
     headers,
     body: formData,
+    credentials: isTestMode ? 'include' : 'omit',
   })
 
   console.log('🌐 Widget file upload response:', {
@@ -401,6 +432,59 @@ export async function uploadWidgetFile(
   }
 
   return await response.json()
+}
+
+export interface SetupMessage {
+  role: 'user' | 'assistant'
+  content: string
+}
+
+/**
+ * Send a message in the widget setup interview
+ * Note: Conversation is NOT stored in database - history is passed from frontend
+ */
+export async function sendSetupMessage(
+  widgetId: string,
+  text: string,
+  history: SetupMessage[],
+  language?: string
+): Promise<{
+  success: boolean
+  text: string
+  progress: number
+}> {
+  const data = await httpClient<{
+    success: boolean
+    text: string
+    progress: number
+  }>(`/api/v1/widgets/${widgetId}/setup-chat`, {
+    method: 'POST',
+    body: JSON.stringify({ text, history, language }),
+  })
+  return data
+}
+
+/**
+ * Generate and save a custom prompt from the setup interview
+ */
+export async function generateWidgetPrompt(
+  widgetId: string,
+  generatedPrompt: string,
+  history: SetupMessage[]
+): Promise<{
+  success: boolean
+  promptTopic: string
+  promptId: number
+}> {
+  const data = await httpClient<{
+    success: boolean
+    promptTopic: string
+    promptId: number
+  }>(`/api/v1/widgets/${widgetId}/generate-prompt`, {
+    method: 'POST',
+    body: JSON.stringify({ generatedPrompt, history }),
+  })
+  return data
 }
 
 /**

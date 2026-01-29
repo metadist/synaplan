@@ -71,8 +71,8 @@ readonly class UserMemoryService
         if (mb_strlen($key) < 3) {
             throw new \InvalidArgumentException('Memory key must be at least 3 characters');
         }
-        if (mb_strlen($value) < 5) {
-            throw new \InvalidArgumentException('Memory value must be at least 5 characters');
+        if (mb_strlen($value) < 1) {
+            throw new \InvalidArgumentException('Memory value must be at least 1 character');
         }
         if (!in_array($source, ['auto_detected', 'user_created', 'user_edited', 'ai_edited'], true)) {
             throw new \InvalidArgumentException('Invalid source type');
@@ -122,9 +122,11 @@ readonly class UserMemoryService
         string $value,
         string $source = 'user_edited',
         ?int $messageId = null,
+        ?string $category = null,
+        ?string $key = null,
     ): UserMemoryDTO {
-        if (mb_strlen($value) < 5) {
-            throw new \InvalidArgumentException('Memory value must be at least 5 characters');
+        if (mb_strlen($value) < 1) {
+            throw new \InvalidArgumentException('Memory value must be at least 1 character');
         }
         if (!in_array($source, ['auto_detected', 'user_created', 'user_edited', 'ai_edited'], true)) {
             throw new \InvalidArgumentException('Invalid source type');
@@ -138,11 +140,20 @@ readonly class UserMemoryService
                 throw new \InvalidArgumentException('Memory not found');
             }
 
+            // Use provided values or fall back to existing ones
+            $finalCategory = $category ?? $existing['category'] ?? 'personal';
+            $finalKey = $key ?? $existing['key'] ?? 'unknown';
+
+            // Validate key length (same as createMemory)
+            if (strlen($finalKey) < 3) {
+                throw new \InvalidArgumentException('Key must be at least 3 characters');
+            }
+
             $dto = new UserMemoryDTO(
                 id: $memoryId,
                 userId: $user->getId(),
-                category: $existing['category'] ?? 'personal',
-                key: $existing['key'] ?? 'unknown',
+                category: $finalCategory,
+                key: $finalKey,
                 value: $value,
                 source: $source,
                 messageId: $messageId ?? ($existing['message_id'] ?? null),

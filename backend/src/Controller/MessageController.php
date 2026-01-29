@@ -285,6 +285,7 @@ class MessageController extends AbstractController
             ->where('m.userId = :userId')
             ->setParameter('userId', $user->getId())
             ->orderBy('m.unixTimestamp', 'DESC')
+            ->addOrderBy('m.id', 'DESC')
             ->setMaxResults($limit);
 
         if ($trackId) {
@@ -476,6 +477,18 @@ class MessageController extends AbstractController
             return $this->json(['error' => 'No file uploaded'], Response::HTTP_BAD_REQUEST);
         }
 
+        // Check rate limit for FILE_ANALYSIS BEFORE uploading
+        $rateLimitCheck = $this->rateLimitService->checkLimit($user, 'FILE_ANALYSIS');
+        if (!$rateLimitCheck['allowed']) {
+            return $this->json([
+                'error' => 'Rate limit exceeded for FILE_ANALYSIS',
+                'rate_limit_exceeded' => true,
+                'action' => 'FILE_ANALYSIS',
+                'used' => $rateLimitCheck['used'],
+                'limit' => $rateLimitCheck['limit'],
+            ], Response::HTTP_TOO_MANY_REQUESTS);
+        }
+
         try {
             // Store file using FileStorageService
             $storageResult = $this->fileStorageService->storeUploadedFile($uploadedFile, $user->getId());
@@ -538,6 +551,13 @@ class MessageController extends AbstractController
                 'filename' => $uploadedFile->getClientOriginalName(),
                 'size' => $storageResult['size'],
                 'status' => $messageFile->getStatus(),
+            ]);
+
+            // Record FILE_ANALYSIS usage for statistics
+            $this->rateLimitService->recordUsage($user, 'FILE_ANALYSIS', [
+                'file_id' => $messageFile->getId(),
+                'filename' => $uploadedFile->getClientOriginalName(),
+                'source' => 'WEB',
             ]);
 
             $response = [

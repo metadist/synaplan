@@ -620,11 +620,16 @@ class ChatHandler implements MessageHandlerInterface
             ]);
         } else {
             // Memory Extraction (Option B: After AI-Response, in the same Request)
+        // Memory Extraction (Option B: After AI-Response, in the same Request)
+        // Skip memory extraction for widget mode (anonymous users)
+        if (!$isWidgetMode) {
             // ✨ NEW: Pass the AI response to memory extraction so it can extract from the answer too!
             $this->logger->info('💾 Loading ALL memories for extraction', ['user_id' => $message->getUserId()]);
             $allMemories = $this->memoryService->searchRelevantMemories($message->getUserId(), $message->getText(), limit: 100, minScore: 0.0);
             $this->extractMemoriesAfterResponse($message, $fullResponseText, $thread, $allMemories, $progressCallback);
             $this->logger->info('✅ Loaded memories for extraction', ['count' => count($allMemories), 'sample' => array_slice($allMemories, 0, 2)]);
+        } else {
+            $this->logger->debug('ChatHandler: Skipping memory extraction for widget mode');
         }
 
         return [

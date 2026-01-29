@@ -107,6 +107,7 @@
               @again="handleAgain"
               @retry="handleRetryMessage(message, $event)"
               @false-positive="openFalsePositiveModal"
+              @click-memory="handleClickMemory"
             />
           </template>
         </div>
@@ -158,6 +159,22 @@
       @confirm-positive="confirmPositiveFeedback"
       @back="backToFalsePositiveSelection"
     />
+
+    <!-- Memory Edit Dialog (opens in-place, stays in chat) -->
+    <MemoryFormDialog
+      :is-open="isMemoryEditDialogOpen"
+      :memory="editingMemory"
+      :available-categories="availableMemoryCategories"
+      @close="closeMemoryEditDialog"
+      @save="handleMemoryEditSave"
+    />
+
+    <!-- Memories List Dialog (for viewing all memories when clicking a memory badge) -->
+    <MemoriesDialog
+      :is-open="isMemoriesDialogOpen"
+      :highlight-memory-id="highlightedMemoryId"
+      @close="closeMemoriesDialog"
+    />
   </MainLayout>
 </template>
 
@@ -184,6 +201,7 @@ import { parseAIResponse } from '@/utils/responseParser'
 import { normalizeMediaUrl } from '@/utils/urlHelper'
 import { httpClient } from '@/services/api/httpClient'
 import type { UserMemory } from '@/services/api/userMemoriesApi'
+import { getCategories } from '@/services/api/userMemoriesApi'
 import MemoryToast from '@/components/MemoryToast.vue'
 import FalsePositiveModal from '@/components/feedback/FalsePositiveModal.vue'
 import {
@@ -191,6 +209,8 @@ import {
   submitFalsePositive,
   submitPositiveFeedback,
 } from '@/services/api/feedbackApi'
+import MemoryFormDialog from '@/components/MemoryFormDialog.vue'
+import MemoriesDialog from '@/components/MemoriesDialog.vue'
 
 const { t } = useI18n()
 const router = useRouter()
@@ -230,6 +250,14 @@ const falsePositivePreviewLoading = ref(false)
 const falsePositiveStep = ref<'select' | 'confirm'>('select')
 const falsePositiveSummary = ref('')
 const falsePositiveCorrection = ref('')
+// Memory edit dialog state
+const isMemoryEditDialogOpen = ref(false)
+const editingMemory = ref<UserMemory | null>(null)
+const availableMemoryCategories = ref<string[]>([])
+
+// Memories list dialog state (for viewing all memories)
+const isMemoriesDialogOpen = ref(false)
+const highlightedMemoryId = ref<number | null>(null)
 
 // Use mock data in development or when API is not available
 const useMockData = import.meta.env.VITE_USE_MOCK_DATA === 'true' || false
@@ -274,11 +302,23 @@ onMounted(async () => {
       console.warn('⚠️ ChatInput ref not available for auto-focus')
     }
   }, 100)
+
+  // Setup window event listener for memory dialog (used by MessageText.vue)
+  window.addEventListener('open-memory-dialog', handleOpenMemoryDialogEvent)
 })
+
+// Window event handler for memory dialog (used by MessageText.vue)
+const handleOpenMemoryDialogEvent = (event: Event) => {
+  const customEvent = event as CustomEvent<{ memory: UserMemory }>
+  if (customEvent.detail?.memory) {
+    handleClickMemory(customEvent.detail.memory)
+  }
+}
 
 // Cleanup: Stop streaming when component unmounts (user leaves chat)
 onBeforeUnmount(() => {
   handleStopStreaming()
+  window.removeEventListener('open-memory-dialog', handleOpenMemoryDialogEvent)
 })
 
 // Watch for active chat changes and load messages
@@ -1406,15 +1446,65 @@ const handleRetryMessage = async (message: Message, content: string) => {
 }
 
 // Memory toast handlers
-function handleMemoryEdit(memory: UserMemory & { toastId: number }) {
+async function handleMemoryEdit(memory: UserMemory & { toastId: number }) {
   // Close the toast first
   const index = activeMemoryToasts.value.findIndex((m) => m.toastId === memory.toastId)
   if (index !== -1) {
     activeMemoryToasts.value.splice(index, 1)
   }
 
-  // Navigate to memories page (will show edit dialog there)
-  router.push({ path: '/memories', query: { edit: memory.id.toString() } })
+  // Load categories if needed
+  if (availableMemoryCategories.value.length === 0) {
+    try {
+      const categories = await getCategories()
+      availableMemoryCategories.value = categories.map((c) => c.category)
+    } catch {
+      // Continue without categories
+    }
+  }
+
+  // Open the edit dialog in-place (stay in chat!)
+  editingMemory.value = memory
+  isMemoryEditDialogOpen.value = true
+}
+
+function closeMemoryEditDialog() {
+  isMemoryEditDialogOpen.value = false
+  editingMemory.value = null
+}
+
+async function handleMemoryEditSave(memoryData: {
+  category?: string
+  key?: string
+  value: string
+}) {
+  if (!editingMemory.value) return
+
+  try {
+    await memoriesStore.editMemory(
+      editingMemory.value.id,
+      {
+        value: memoryData.value,
+        category: memoryData.category,
+        key: memoryData.key,
+      },
+      { silent: false }
+    )
+    closeMemoryEditDialog()
+  } catch {
+    // Store shows error notification
+  }
+}
+
+// Memory badge click handler - opens MemoriesDialog with highlighted memory
+function handleClickMemory(memory: UserMemory) {
+  highlightedMemoryId.value = memory.id
+  isMemoriesDialogOpen.value = true
+}
+
+function closeMemoriesDialog() {
+  isMemoriesDialogOpen.value = false
+  highlightedMemoryId.value = null
 }
 
 function handleMemoryDiscard(memory: UserMemory & { toastId: number }) {

@@ -19,6 +19,7 @@ class MessageRepository extends ServiceEntityRepository
             ->where('m.trackingId = :trackingId')
             ->setParameter('trackingId', $trackingId)
             ->orderBy('m.unixTimestamp', 'ASC')
+            ->addOrderBy('m.id', 'ASC')
             ->getQuery()
             ->getResult();
     }
@@ -29,6 +30,7 @@ class MessageRepository extends ServiceEntityRepository
             ->where('m.userId = :userId')
             ->setParameter('userId', $userId)
             ->orderBy('m.unixTimestamp', 'DESC')
+            ->addOrderBy('m.id', 'DESC')
             ->setMaxResults($limit)
             ->getQuery()
             ->getResult();
@@ -51,6 +53,7 @@ class MessageRepository extends ServiceEntityRepository
             ->setParameter('currentTime', $message->getUnixTimestamp())
             ->setParameter('currentId', $message->getId())
             ->orderBy('m.unixTimestamp', 'ASC')
+            ->addOrderBy('m.id', 'ASC')
             ->setMaxResults($limit)
             ->getQuery()
             ->getResult();
@@ -69,7 +72,8 @@ class MessageRepository extends ServiceEntityRepository
             ->andWhere('m.trackingId = :trackingId')
             ->setParameter('userId', $userId)
             ->setParameter('trackingId', $trackingId)
-            ->orderBy('m.unixTimestamp', 'ASC') // Oldest first for context
+            ->orderBy('m.unixTimestamp', 'ASC')
+            ->addOrderBy('m.id', 'ASC')
             ->setMaxResults($limit)
             ->getQuery()
             ->getResult();
@@ -95,12 +99,14 @@ class MessageRepository extends ServiceEntityRepository
         int $maxTotalChars = 15000,
     ): array {
         // Get recent messages from this chat
+        // Order by timestamp DESC, then by id DESC to ensure correct order when timestamps are equal
         $messages = $this->createQueryBuilder('m')
             ->where('m.userId = :userId')
             ->andWhere('m.chatId = :chatId')
             ->setParameter('userId', $userId)
             ->setParameter('chatId', $chatId)
-            ->orderBy('m.unixTimestamp', 'DESC') // Newest first to apply limit
+            ->orderBy('m.unixTimestamp', 'DESC')
+            ->addOrderBy('m.id', 'DESC')
             ->setMaxResults($maxMessages)
             ->getQuery()
             ->getResult();
@@ -139,5 +145,25 @@ class MessageRepository extends ServiceEntityRepository
         if ($flush) {
             $this->getEntityManager()->flush();
         }
+    }
+
+    /**
+     * Check if a file is attached to any message in a specific chat.
+     *
+     * Used for security validation in widget file downloads.
+     */
+    public function isFileInChat(int $chatId, int $fileId): bool
+    {
+        $result = $this->createQueryBuilder('m')
+            ->select('COUNT(m.id)')
+            ->innerJoin('m.files', 'f')
+            ->where('m.chatId = :chatId')
+            ->andWhere('f.id = :fileId')
+            ->setParameter('chatId', $chatId)
+            ->setParameter('fileId', $fileId)
+            ->getQuery()
+            ->getSingleScalarResult();
+
+        return (int) $result > 0;
     }
 }

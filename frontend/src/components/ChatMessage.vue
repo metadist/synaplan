@@ -278,11 +278,16 @@
             v-for="(part, index) in contentParts"
             :key="index"
             :part="part"
+            :is-streaming="isStreaming"
             :memories="memories"
           />
 
           <!-- Used Memories (AFTER content, before search results) -->
-          <MessageMemories v-if="role === 'assistant' && memories" :memories="memories" />
+          <MessageMemories
+            v-if="role === 'assistant' && memories"
+            :memories="memories"
+            @click-memory="(memory) => emit('click-memory', memory)"
+          />
 
           <!-- Web Search Results Carousel (AFTER content) -->
           <div
@@ -668,16 +673,22 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import { UserIcon, ArrowPathIcon, ChevronDownIcon } from '@heroicons/vue/24/outline'
 import { Icon } from '@iconify/vue'
 import { useModelSelection, type ModelOption } from '@/composables/useModelSelection'
+import { useNotification } from '@/composables/useNotification'
 import { getProviderIcon } from '@/utils/providerIcons'
 import { useMemoriesStore } from '@/stores/userMemories'
+import type { UserMemory } from '@/services/api/userMemoriesApi'
 import MessagePart from './MessagePart.vue'
 import MessageMemories from './MessageMemories.vue'
 import GroqIcon from '@/components/icons/GroqIcon.vue'
 import type { Part, MessageFile } from '@/stores/history'
 import type { AgainData } from '@/types/ai-models'
+
+const { t } = useI18n()
+const { error: showError } = useNotification()
 
 interface Props {
   role: 'user' | 'assistant'
@@ -909,6 +920,7 @@ const emit = defineEmits<{
   again: [backendMessageId: number, modelId?: number]
   retry: [messageContent: string]
   falsePositive: [text: string, messageId?: number]
+  'click-memory': [memory: UserMemory]
 }>()
 
 const router = useRouter()
@@ -971,12 +983,12 @@ const handleAgain = () => {
     return
   }
 
-  if (props.backendMessageId && (model as any).id) {
+  if (props.backendMessageId && model.id) {
     // New backend-driven again
-    emit('again', props.backendMessageId, (model as any).id)
+    emit('again', props.backendMessageId, model.id)
   } else {
     // Fallback to old regenerate
-    emit('regenerate', model as any)
+    emit('regenerate', model)
   }
 }
 
@@ -1012,20 +1024,24 @@ const selectModel = (model: ModelOption) => {
   modelDropdownOpen.value = false
 }
 
+interface ClickOutsideElement extends HTMLElement {
+  __clickOutsideHandler?: (event: MouseEvent) => void
+}
+
 const vClickOutside = {
-  mounted(el: HTMLElement, binding: any) {
+  mounted(el: ClickOutsideElement, binding: { value: () => void }) {
     const handler = (event: MouseEvent) => {
       if (!(el === event.target || el.contains(event.target as Node))) {
         binding.value()
       }
     }
-    ;(el as any).__clickOutsideHandler = handler
+    el.__clickOutsideHandler = handler
     setTimeout(() => {
       document.addEventListener('click', handler)
     }, 0)
   },
-  unmounted(el: HTMLElement) {
-    const handler = (el as any).__clickOutsideHandler
+  unmounted(el: ClickOutsideElement) {
+    const handler = el.__clickOutsideHandler
     if (handler) {
       document.removeEventListener('click', handler)
     }
@@ -1055,11 +1071,16 @@ const formatFileSize = (bytes: number): string => {
 }
 
 const downloadFile = async (file: MessageFile) => {
+  if (!file.id) {
+    console.error('Download failed: No file ID')
+    return
+  }
   try {
     const filesService = await import('@/services/filesService')
     await filesService.downloadFile(file.id, file.filename)
   } catch (error) {
     console.error('Download failed:', error)
+    showError(t('files.downloadFailed'))
   }
 }
 
@@ -1085,11 +1106,8 @@ const handleReferenceClick = (event: MouseEvent) => {
       const resolvedMemories = memories.value
       if (index >= 0 && resolvedMemories && index < resolvedMemories.length) {
         const memory = resolvedMemories[index]
-        // Navigate to memories page with highlight
-        router.push({
-          path: '/memories',
-          query: { highlight: memory.id.toString() },
-        })
+        // Emit event to open MemoriesDialog in ChatView (stay in chat!)
+        emit('click-memory', memory)
       }
     }
   }

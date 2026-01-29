@@ -168,7 +168,8 @@ class SynaplanWidget {
   private getIconContent(): string {
     const iconColor = this.config?.iconColor || '#ffffff'
 
-    if (this.config?.buttonIconUrl) {
+    // Only show custom icon if buttonIcon is explicitly set to 'custom'
+    if (this.config?.buttonIcon === 'custom' && this.config?.buttonIconUrl) {
       return `<img src="${this.config.buttonIconUrl}" alt="Chat" style="width: 32px; height: 32px; object-fit: contain;" />`
     }
 

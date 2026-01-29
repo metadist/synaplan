@@ -559,12 +559,6 @@ parameters:
 			path: src/Controller/WidgetPublicController.php
 
 		-
-			message: '#^Parameter \#1 \$providerIndex of method App\\Entity\\Message\:\:setProviderIndex\(\) expects string, int given\.$#'
-			identifier: argument.type
-			count: 1
-			path: src/Controller/WidgetPublicController.php
-
-		-
 			message: '#^Parameter \#5 \$fileType of method App\\Service\\File\\VectorizationService\:\:vectorizeAndStore\(\) expects int, string given\.$#'
 			identifier: argument.type
 			count: 1

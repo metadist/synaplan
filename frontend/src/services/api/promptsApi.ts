@@ -180,6 +180,23 @@ class PromptsApi {
       }
     )
   }
+
+  /**
+   * Generate AI summary for a file
+   */
+  async summarizeFile(
+    topic: string,
+    messageId: number
+  ): Promise<{ summary: string; fileName: string }> {
+    const data = await httpClient<{ success: boolean; summary: string; fileName: string }>(
+      `/api/v1/prompts/${topic}/files/${messageId}/summarize`,
+      {
+        method: 'POST',
+      }
+    )
+    return { summary: data.summary, fileName: data.fileName }
+  }
+
   /**
    * List all prompts (alias for getPrompts for consistency)
    */
