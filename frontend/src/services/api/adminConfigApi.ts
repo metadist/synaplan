@@ -25,12 +25,12 @@ const ConfigSectionZ = z.object({
 
 const ConfigTabZ = z.object({
   label: z.string(),
-  sections: z.record(ConfigSectionZ),
+  sections: z.record(z.string(), ConfigSectionZ),
 })
 
 const ConfigSchemaZ = z.object({
-  tabs: z.record(ConfigTabZ),
-  fields: z.record(ConfigFieldSchemaZ),
+  tabs: z.record(z.string(), ConfigTabZ),
+  fields: z.record(z.string(), ConfigFieldSchemaZ),
 })
 
 const ConfigValueZ = z.object({
@@ -48,7 +48,7 @@ const ConfigBackupZ = z.object({
 const TestConnectionResultZ = z.object({
   success: z.boolean(),
   message: z.string(),
-  details: z.record(z.unknown()).optional().nullable(),
+  details: z.record(z.string(), z.unknown()).optional().nullable(),
 })
 
 // API Response schemas
@@ -59,7 +59,7 @@ const GetSchemaResponseZ = z.object({
 
 const GetValuesResponseZ = z.object({
   success: z.literal(true),
-  values: z.record(ConfigValueZ),
+  values: z.record(z.string(), ConfigValueZ),
 })
 
 const UpdateValueResponseZ = z.object({
