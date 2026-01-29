@@ -3,52 +3,90 @@
  *
  * SECURITY: All endpoints require admin access. Sensitive values are always masked.
  */
+import { z } from 'zod'
 import { httpClient } from './httpClient'
 
-// === Types ===
+// === Zod Schemas for Runtime Validation ===
 
-export interface ConfigFieldSchema {
-  tab: string
-  section: string
-  type: 'text' | 'password' | 'url' | 'email' | 'number' | 'boolean' | 'select'
-  sensitive: boolean
-  description: string
-  default: string
-  options?: string[]
-}
+const ConfigFieldSchemaZ = z.object({
+  tab: z.string(),
+  section: z.string(),
+  type: z.enum(['text', 'password', 'url', 'email', 'number', 'boolean', 'select']),
+  sensitive: z.boolean(),
+  description: z.string(),
+  default: z.string(),
+  options: z.array(z.string()).optional(),
+})
 
-export interface ConfigSection {
-  label: string
-  fields: string[]
-}
+const ConfigSectionZ = z.object({
+  label: z.string(),
+  fields: z.array(z.string()),
+})
 
-export interface ConfigTab {
-  label: string
-  sections: Record<string, ConfigSection>
-}
+const ConfigTabZ = z.object({
+  label: z.string(),
+  sections: z.record(ConfigSectionZ),
+})
 
-export interface ConfigSchema {
-  tabs: Record<string, ConfigTab>
-  fields: Record<string, ConfigFieldSchema>
-}
+const ConfigSchemaZ = z.object({
+  tabs: z.record(ConfigTabZ),
+  fields: z.record(ConfigFieldSchemaZ),
+})
 
-export interface ConfigValue {
-  value: string
-  isSet: boolean
-  isMasked: boolean
-}
+const ConfigValueZ = z.object({
+  value: z.string(),
+  isSet: z.boolean(),
+  isMasked: z.boolean(),
+})
 
-export interface ConfigBackup {
-  id: string
-  timestamp: string
-  size: number
-}
+const ConfigBackupZ = z.object({
+  id: z.string(),
+  timestamp: z.string(),
+  size: z.number(),
+})
 
-export interface TestConnectionResult {
-  success: boolean
-  message: string
-  details?: Record<string, unknown>
-}
+const TestConnectionResultZ = z.object({
+  success: z.boolean(),
+  message: z.string(),
+  details: z.record(z.unknown()).optional().nullable(),
+})
+
+// API Response schemas
+const GetSchemaResponseZ = z.object({
+  success: z.literal(true),
+  schema: ConfigSchemaZ,
+})
+
+const GetValuesResponseZ = z.object({
+  success: z.literal(true),
+  values: z.record(ConfigValueZ),
+})
+
+const UpdateValueResponseZ = z.object({
+  success: z.boolean(),
+  requiresRestart: z.boolean().optional(),
+  error: z.string().optional(),
+})
+
+const GetBackupsResponseZ = z.object({
+  success: z.literal(true),
+  backups: z.array(ConfigBackupZ),
+})
+
+const RestoreBackupResponseZ = z.object({
+  success: z.boolean(),
+  message: z.string(),
+})
+
+// === Inferred Types from Schemas ===
+
+export type ConfigFieldSchema = z.infer<typeof ConfigFieldSchemaZ>
+export type ConfigSection = z.infer<typeof ConfigSectionZ>
+export type ConfigTab = z.infer<typeof ConfigTabZ>
+export type ConfigSchema = z.infer<typeof ConfigSchemaZ>
+export type ConfigValue = z.infer<typeof ConfigValueZ>
+export type ConfigBackup = z.infer<typeof ConfigBackupZ>
+export type TestConnectionResult = z.infer<typeof TestConnectionResultZ>
 
 // === API Functions ===
 
@@ -56,9 +94,9 @@ export interface TestConnectionResult {
  * Get configuration schema with field definitions.
  */
 export async function getConfigSchema(): Promise<ConfigSchema> {
-  const response = await httpClient<{ success: boolean; schema: ConfigSchema }>(
-    '/api/v1/admin/config/schema'
-  )
+  const response = await httpClient('/api/v1/admin/config/schema', {
+    schema: GetSchemaResponseZ,
+  })
   return response.schema
 }
 
@@ -66,9 +104,9 @@ export async function getConfigSchema(): Promise<ConfigSchema> {
  * Get current configuration values (sensitive fields masked).
  */
 export async function getConfigValues(): Promise<Record<string, ConfigValue>> {
-  const response = await httpClient<{ success: boolean; values: Record<string, ConfigValue> }>(
-    '/api/v1/admin/config/values'
-  )
+  const response = await httpClient('/api/v1/admin/config/values', {
+    schema: GetValuesResponseZ,
+  })
   return response.values
 }
 
@@ -78,10 +116,11 @@ export async function getConfigValues(): Promise<Record<string, ConfigValue>> {
 export async function updateConfigValue(
   key: string,
   value: string
-): Promise<{ success: boolean; requiresRestart: boolean }> {
-  return httpClient<{ success: boolean; requiresRestart: boolean }>('/api/v1/admin/config/values', {
+): Promise<{ success: boolean; requiresRestart?: boolean; error?: string }> {
+  return httpClient('/api/v1/admin/config/values', {
     method: 'PUT',
     body: JSON.stringify({ key, value }),
+    schema: UpdateValueResponseZ,
   })
 }
 
@@ -89,8 +128,9 @@ export async function updateConfigValue(
  * Test connection to a service.
  */
 export async function testConnection(service: string): Promise<TestConnectionResult> {
-  return httpClient<TestConnectionResult>(`/api/v1/admin/config/test/${service}`, {
+  return httpClient(`/api/v1/admin/config/test/${service}`, {
     method: 'POST',
+    schema: TestConnectionResultZ,
   })
 }
 
@@ -98,9 +138,9 @@ export async function testConnection(service: string): Promise<TestConnectionRes
  * Get list of available backups.
  */
 export async function getConfigBackups(): Promise<ConfigBackup[]> {
-  const response = await httpClient<{ success: boolean; backups: ConfigBackup[] }>(
-    '/api/v1/admin/config/backups'
-  )
+  const response = await httpClient('/api/v1/admin/config/backups', {
+    schema: GetBackupsResponseZ,
+  })
   return response.backups
 }
 
@@ -110,10 +150,8 @@ export async function getConfigBackups(): Promise<ConfigBackup[]> {
 export async function restoreConfigBackup(
   backupId: string
 ): Promise<{ success: boolean; message: string }> {
-  return httpClient<{ success: boolean; message: string }>(
-    `/api/v1/admin/config/restore/${backupId}`,
-    {
-      method: 'POST',
-    }
-  )
+  return httpClient(`/api/v1/admin/config/restore/${backupId}`, {
+    method: 'POST',
+    schema: RestoreBackupResponseZ,
+  })
 }

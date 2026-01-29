@@ -4,22 +4,24 @@ declare(strict_types=1);
 
 namespace App\Controller;
 
-use App\Entity\User;
+use App\DTO\AdminConfigUpdateRequest;
 use App\Service\Admin\SystemConfigService;
 use OpenApi\Attributes as OA;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
-use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\HttpKernel\Attribute\MapRequestPayload;
 use Symfony\Component\Routing\Attribute\Route;
-use Symfony\Component\Security\Http\Attribute\CurrentUser;
+use Symfony\Component\Security\Http\Attribute\IsGranted;
 
 /**
  * Admin System Configuration Controller.
  *
- * SECURITY: All endpoints require ROLE_ADMIN. Sensitive values are NEVER exposed.
+ * SECURITY: All endpoints require ROLE_ADMIN (enforced by class-level IsGranted).
+ * Sensitive values are NEVER exposed.
  */
 #[Route('/api/v1/admin/config')]
+#[IsGranted('ROLE_ADMIN', message: 'Admin access required')]
 #[OA\Tag(name: 'Admin System Config')]
 final class AdminSystemConfigController extends AbstractController
 {
@@ -43,19 +45,25 @@ final class AdminSystemConfigController extends AbstractController
         response: 200,
         description: 'Configuration schema',
         content: new OA\JsonContent(
+            required: ['success', 'schema'],
             properties: [
                 new OA\Property(property: 'success', type: 'boolean', example: true),
-                new OA\Property(property: 'schema', type: 'object'),
+                new OA\Property(
+                    property: 'schema',
+                    type: 'object',
+                    required: ['tabs', 'fields'],
+                    properties: [
+                        new OA\Property(property: 'tabs', type: 'object', additionalProperties: new OA\AdditionalProperties(type: 'object')),
+                        new OA\Property(property: 'fields', type: 'object', additionalProperties: new OA\AdditionalProperties(type: 'object')),
+                    ]
+                ),
             ]
         )
     )]
+    #[OA\Response(response: 401, description: 'Authentication required')]
     #[OA\Response(response: 403, description: 'Admin access required')]
-    public function getSchema(#[CurrentUser] ?User $user): JsonResponse
+    public function getSchema(): JsonResponse
     {
-        if (!$user || !$user->isAdmin()) {
-            return $this->json(['error' => 'Admin access required'], Response::HTTP_FORBIDDEN);
-        }
-
         return $this->json([
             'success' => true,
             'schema' => $this->configService->getSchema(),
@@ -77,19 +85,29 @@ final class AdminSystemConfigController extends AbstractController
         response: 200,
         description: 'Configuration values',
         content: new OA\JsonContent(
+            required: ['success', 'values'],
             properties: [
                 new OA\Property(property: 'success', type: 'boolean', example: true),
-                new OA\Property(property: 'values', type: 'object'),
+                new OA\Property(
+                    property: 'values',
+                    type: 'object',
+                    additionalProperties: new OA\AdditionalProperties(
+                        type: 'object',
+                        required: ['value', 'isSet', 'isMasked'],
+                        properties: [
+                            new OA\Property(property: 'value', type: 'string'),
+                            new OA\Property(property: 'isSet', type: 'boolean'),
+                            new OA\Property(property: 'isMasked', type: 'boolean'),
+                        ]
+                    )
+                ),
             ]
         )
     )]
+    #[OA\Response(response: 401, description: 'Authentication required')]
     #[OA\Response(response: 403, description: 'Admin access required')]
-    public function getValues(#[CurrentUser] ?User $user): JsonResponse
+    public function getValues(): JsonResponse
     {
-        if (!$user || !$user->isAdmin()) {
-            return $this->json(['error' => 'Admin access required'], Response::HTTP_FORBIDDEN);
-        }
-
         return $this->json([
             'success' => true,
             'values' => $this->configService->getValues(),
@@ -121,6 +139,7 @@ final class AdminSystemConfigController extends AbstractController
         response: 200,
         description: 'Value updated',
         content: new OA\JsonContent(
+            required: ['success', 'requiresRestart'],
             properties: [
                 new OA\Property(property: 'success', type: 'boolean', example: true),
                 new OA\Property(property: 'requiresRestart', type: 'boolean', example: true),
@@ -128,27 +147,12 @@ final class AdminSystemConfigController extends AbstractController
         )
     )]
     #[OA\Response(response: 400, description: 'Invalid request')]
+    #[OA\Response(response: 401, description: 'Authentication required')]
     #[OA\Response(response: 403, description: 'Admin access required')]
-    public function updateValue(Request $request, #[CurrentUser] ?User $user): JsonResponse
+    #[OA\Response(response: 422, description: 'Validation error')]
+    public function updateValue(#[MapRequestPayload] AdminConfigUpdateRequest $dto): JsonResponse
     {
-        if (!$user || !$user->isAdmin()) {
-            return $this->json(['error' => 'Admin access required'], Response::HTTP_FORBIDDEN);
-        }
-
-        $data = $request->toArray();
-
-        if (!isset($data['key']) || !isset($data['value'])) {
-            return $this->json(['error' => 'Missing key or value'], Response::HTTP_BAD_REQUEST);
-        }
-
-        $key = trim((string) $data['key']);
-        $value = (string) $data['value'];
-
-        if ('' === $key) {
-            return $this->json(['error' => 'Key cannot be empty'], Response::HTTP_BAD_REQUEST);
-        }
-
-        $result = $this->configService->setValue($key, $value);
+        $result = $this->configService->setValue($dto->key, $dto->value);
 
         if (!$result['success']) {
             return $this->json([
@@ -185,6 +189,7 @@ final class AdminSystemConfigController extends AbstractController
         response: 200,
         description: 'Test result',
         content: new OA\JsonContent(
+            required: ['success', 'message'],
             properties: [
                 new OA\Property(property: 'success', type: 'boolean'),
                 new OA\Property(property: 'message', type: 'string'),
@@ -192,13 +197,10 @@ final class AdminSystemConfigController extends AbstractController
             ]
         )
     )]
+    #[OA\Response(response: 401, description: 'Authentication required')]
     #[OA\Response(response: 403, description: 'Admin access required')]
-    public function testConnection(string $service, #[CurrentUser] ?User $user): JsonResponse
+    public function testConnection(string $service): JsonResponse
     {
-        if (!$user || !$user->isAdmin()) {
-            return $this->json(['error' => 'Admin access required'], Response::HTTP_FORBIDDEN);
-        }
-
         $result = $this->configService->testConnection($service);
 
         return $this->json($result);
@@ -219,12 +221,14 @@ final class AdminSystemConfigController extends AbstractController
         response: 200,
         description: 'List of backups',
         content: new OA\JsonContent(
+            required: ['success', 'backups'],
             properties: [
                 new OA\Property(property: 'success', type: 'boolean', example: true),
                 new OA\Property(
                     property: 'backups',
                     type: 'array',
                     items: new OA\Items(
+                        required: ['id', 'timestamp', 'size'],
                         properties: [
                             new OA\Property(property: 'id', type: 'string', example: '20260129_143022'),
                             new OA\Property(property: 'timestamp', type: 'string', example: '2026-01-29 14:30:22'),
@@ -235,13 +239,10 @@ final class AdminSystemConfigController extends AbstractController
             ]
         )
     )]
+    #[OA\Response(response: 401, description: 'Authentication required')]
     #[OA\Response(response: 403, description: 'Admin access required')]
-    public function getBackups(#[CurrentUser] ?User $user): JsonResponse
+    public function getBackups(): JsonResponse
     {
-        if (!$user || !$user->isAdmin()) {
-            return $this->json(['error' => 'Admin access required'], Response::HTTP_FORBIDDEN);
-        }
-
         return $this->json([
             'success' => true,
             'backups' => $this->configService->getBackups(),
@@ -270,20 +271,18 @@ final class AdminSystemConfigController extends AbstractController
         response: 200,
         description: 'Restore result',
         content: new OA\JsonContent(
+            required: ['success', 'message'],
             properties: [
                 new OA\Property(property: 'success', type: 'boolean'),
                 new OA\Property(property: 'message', type: 'string'),
             ]
         )
     )]
+    #[OA\Response(response: 401, description: 'Authentication required')]
     #[OA\Response(response: 403, description: 'Admin access required')]
     #[OA\Response(response: 404, description: 'Backup not found')]
-    public function restoreBackup(string $backupId, #[CurrentUser] ?User $user): JsonResponse
+    public function restoreBackup(string $backupId): JsonResponse
     {
-        if (!$user || !$user->isAdmin()) {
-            return $this->json(['error' => 'Admin access required'], Response::HTTP_FORBIDDEN);
-        }
-
         // Validate backup ID format (timestamp: YYYYMMDD_HHMMSS)
         if (!preg_match('/^\d{8}_\d{6}$/', $backupId)) {
             return $this->json(['error' => 'Invalid backup ID format'], Response::HTTP_BAD_REQUEST);
