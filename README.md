@@ -1,492 +1,127 @@
-# Synaplan - AI-Powered Knowledge Management System
+# Synaplan
 
-AI-powered knowledge management with chat, document processing, and RAG (Retrieval-Augmented Generation).
+AI-powered knowledge management with RAG, chat widgets, and multi-channel integration.
 
-The official instance is hosted at [web.synaplan.com](https://web.synaplan.com/), where we regularly deploy the latest Docker containers.
+[![License](https://img.shields.io/badge/license-AGPL--3.0-blue.svg)](LICENSE)
 
-## 🚀 Quick Start
+> **Live instance**: [web.synaplan.com](https://web.synaplan.com/)
 
-### Prerequisites
+<!-- Screenshot placeholder: Add a dashboard screenshot here -->
+<!-- ![Synaplan Dashboard](docs/images/dashboard.png) -->
 
-- Docker & Docker Compose
-- Git
+---
 
-### Installation
+## Quick Start
 
 ```bash
 git clone <repository-url>
 cd synaplan
+docker compose up -d
 ```
 
-**Line Endings:** This project enforces LF (Unix-style) line endings via `.gitattributes`, so all platforms will automatically use LF regardless of their Git configuration. If you cloned before this was added, you may need to refresh your working copy:
-
-```bash
-# Only if you experience line ending issues after pulling
-git rm --cached -r .
-git reset --hard
-```
-
-### Choose Your Installation Mode
-
-| Mode | Download Size | Best For | Command |
-|------|---------------|----------|---------|
-| 🔧 **Standard** (Default) | ~9 GB | Full features, local AI, audio transcription | `docker compose up -d` |
-| ⚡ **Minimal** | ~5 GB | Quick start, cloud AI (Groq/OpenAI) | `docker compose -f docker-compose-minimal.yml up -d` |
+Open http://localhost:5173 — ready in ~2 minutes.
 
 ---
 
-### 🔧 Standard Install (Recommended)
+## Install Options
 
-The default installation with all features including local AI models and Whisper audio transcription.
+| Mode | Command | Size | Best For |
+|------|---------|------|----------|
+| **Standard** | `docker compose up -d` | ~9 GB | Full features, local AI |
+| **Minimal** | `docker compose -f docker-compose-minimal.yml up -d` | ~5 GB | Cloud AI only (Groq/OpenAI) |
 
-**Windows users:** Please use **WSL2** (Windows Subsystem for Linux) and run the Linux script.
-
+For minimal install, add your API key:
 ```bash
-# Option 1: Use docker-compose directly
-docker compose up -d
-
-# Option 2: Use the first-install script (Linux / macOS / Windows WSL2)
-./_1st_install_linux.sh
-```
-
-**What's included:**
-- ✅ Full web app and API
-- ✅ Document processing (Tika)
-- ✅ Database (MariaDB)
-- ✅ Local Ollama AI models (gpt-oss:20b, bge-m3)
-- ✅ Whisper audio transcription
-- ✅ Cloud AI support (Groq, OpenAI, Anthropic, Gemini)
-- ✅ Dev tools (phpMyAdmin, MailHog)
-
-After the initial install, subsequent restarts only need:
-
-```bash
-docker compose up -d
+echo "GROQ_API_KEY=your_key" >> backend/.env && docker compose restart backend
 ```
 
 ---
 
-### ⚡ Minimal Install (Cloud AI Only)
+## Access
 
-**Fastest way to get started** - uses cloud AI providers, skips large local models and Whisper compilation.
+| Service | URL |
+|---------|-----|
+| App | http://localhost:5173 |
+| API | http://localhost:8000 |
+| API Docs | http://localhost:8000/api/doc |
+| phpMyAdmin | http://localhost:8082 |
+| MailHog | http://localhost:8025 |
+
+**Test Users:**
+
+| Email | Password |
+|-------|----------|
+| admin@synaplan.com | admin123 |
+| demo@synaplan.com | demo123 |
+
+---
+
+## Features
+
+- **AI Chat** — Ollama, OpenAI, Anthropic, Groq, Gemini
+- **RAG Search** — Semantic document search with MariaDB VECTOR
+- **Chat Widget** — Embed on any website
+- **WhatsApp** — Meta Business API integration
+- **Email** — AI-powered email responses
+- **Audio** — Whisper transcription
+- **Documents** — PDF, Word, Excel, images with OCR
+
+---
+
+## Common Commands
 
 ```bash
-# 1. Start services (~5 GB download, ~2-3 min)
-docker compose -f docker-compose-minimal.yml up -d
+# Logs
+docker compose logs -f backend
 
-# 2. Set your AI API key (get free key at https://console.groq.com)
-echo "GROQ_API_KEY=your_key_here" >> backend/.env
-
-# 3. Restart backend to apply
+# Restart
 docker compose restart backend
+
+# Reset database
+docker compose down -v && docker compose up -d
+
+# Run tests
+make test
+
+# Code quality
+make lint
 ```
 
-**What's included:**
-- ✅ Full web app and API
-- ✅ Document processing (Tika)
-- ✅ Database (MariaDB)
-- ✅ Cloud AI support (Groq, OpenAI, Anthropic, Gemini)
-- ✅ Dev tools (phpMyAdmin, MailHog)
+---
 
-**What's NOT included (saves ~4 GB):**
-- ❌ Ollama (local AI models)
-- ❌ Whisper models (audio transcription)
-- ❌ Local embedding models
+## Documentation
 
-**Upgrade to Standard Install later:**
-```bash
-docker compose -f docker-compose-minimal.yml down
-docker compose up -d  # Starts full stack with Ollama + Whisper
-```
+| Guide | Description |
+|-------|-------------|
+| [Installation](docs/INSTALLATION.md) | Detailed setup instructions |
+| [Configuration](docs/CONFIGURATION.md) | Environment variables, API keys |
+| [Development](docs/DEVELOPMENT.md) | Commands, testing, architecture |
+| [RAG System](docs/RAG.md) | Document search and processing |
+| [Chat Widget](docs/WIDGET.md) | Embed chat on websites |
+| [WhatsApp](docs/WHATSAPP.md) | Meta Business API setup |
+| [Email](docs/EMAIL.md) | Email channel integration |
 
-**What happens automatically:**
-- ✅ Creates `backend/.env` from `.env.example` (stores AI keys and server settings)
-- ✅ Installs dependencies (Composer, npm)
-- ✅ Generates JWT keypair for authentication
-- ✅ Creates database schema (migrations)
-- ✅ Loads test users and fixtures (if database is empty)
-- ✅ Pulls `bge-m3` embedding model (always needed for RAG)
-- ✅ Pulls `gpt-oss:20b` chat model only if Local Ollama option selected
-- ✅ Ensures the schema + fixtures are applied (runs `doctrine:schema:update` + fixtures once)
-- ✅ Starts all services
-- ✅ **System ready in ~1-2 minutes!**
+---
 
-**First startup takes ~1-2 minutes** because:
-- Database initialization and health checks: ~10s
-- Schema creation and migrations: ~5s
-- Fixtures loading: ~5s
-- Cache warming and service startup: ~10s
-- Groq configuration (if selected): ~5s
-
-**Subsequent restarts take ~15-30 seconds** (no fixtures needed).
-
-**AI Model Download Behavior:**
-
-`./_1st_install_linux.sh` guides you through one of two options:
-
-1. **Local Ollama** – downloads `gpt-oss:20b` (chat) + `bge-m3` (vector) so the stack runs fully offline (needs ~24 GB VRAM).
-2. **Groq Cloud (recommended)** – prompts for your free `GROQ_API_KEY`, writes it to `backend/.env`, switches all defaults to Groq's `llama-3.3-70b-versatile`, and only downloads `bge-m3` for local embeddings (much smaller/faster).
-
-Progress (downloads or schema work) streams directly in the script output, so you always know what’s happening.
-
-**Using the Install Script (Recommended)**
-```bash
-./_1st_install_linux.sh
-```
-- ⚡ **Fast startup** for services (~1-2 min) while downloads (if Ollama) or migrations (if Groq) run
-- 📦 **Progress shown live** in the script output
-- ✅ **AI chat + RAG ready** as soon as the selected provider is configured
-- 💡 **Best for**: Development/prod setups that either have local GPU (option 1) or prefer Groq's hosted models (option 2)
-
-**On-demand Downloads (Alternative)**
-```bash
-AUTO_DOWNLOAD_MODELS=false docker compose up -d
-```
-- Pulling on-demand keeps UI usable immediately, but the first chat/search that needs a model will block until the download finishes.
-- 📥 **Models pulled on first use** (login UI stays available meanwhile)
-- 🔁 **Useful** for limited bandwidth / CI runners
-- 📝 Monitor on-demand pulls with `docker compose logs -f backend | grep "[Background]"`
-
-## 🌐 Access
-
-| Service | URL | Description | Standard | Minimal |
-|---------|-----|-------------|:--------:|:-------:|
-| Frontend | http://localhost:5173 | Vue.js Web App | ✅ | ✅ |
-| Backend API | http://localhost:8000 | Symfony REST API | ✅ | ✅ |
-| API Docs | http://localhost:8000/api/doc | Swagger UI / OpenAPI | ✅ | ✅ |
-| phpMyAdmin | http://localhost:8082 | Database Management | ✅ | ✅ |
-| MailHog | http://localhost:8025 | Email Testing | ✅ | ✅ |
-| Ollama | http://localhost:11435 | AI Models API | ✅ | ❌ |
-
-## 👤 Test Users
-
-| Email | Password | Level |
-|-------|----------|-------|
-| admin@synaplan.com | admin123 | BUSINESS |
-| demo@synaplan.com | demo123 | PRO |
-| test@example.com | test123 | NEW |
-
-## 🧠 RAG System
-
-The system includes a full RAG (Retrieval-Augmented Generation) pipeline:
-
-- **Upload**: Multi-level processing (Extract Only, Extract + Vectorize, Full Analysis)
-- **Extraction**: Tika (documents), Tesseract OCR (images), Whisper (audio)
-- **Vectorization**: bge-m3 embeddings (1024 dimensions) via Ollama
-- **Storage**: Native MariaDB VECTOR type with VEC_DISTANCE_COSINE similarity search
-- **Search**: Semantic search UI with configurable thresholds and group filtering
-- **Sharing**: Private by default, public sharing with optional expiry
-
-## 🎙️ Audio Transcription
-
-Audio files are automatically transcribed using **Whisper.cpp** when uploaded:
-
-- **Supported formats**: mp3, wav, ogg, m4a, opus, flac, webm, aac, wma
-- **Automatic conversion**: FFmpeg converts all audio to optimal format (16kHz mono WAV)
-- **Models**: tiny, base (default), small, medium, large - configurable via `backend/.env`
-- **Setup**:
-  - **Docker**: Pre-installed, download models on first run
-  - **Local**: Install [whisper.cpp](https://github.com/ggerganov/whisper.cpp) and FFmpeg, configure paths in `backend/.env`
-
-**Environment variables** (see `backend/.env.example`):
-```bash
-WHISPER_BINARY=/usr/local/bin/whisper    # Whisper.cpp binary path
-WHISPER_MODELS_PATH=/var/www/backend/var/whisper  # Model storage
-WHISPER_DEFAULT_MODEL=base               # tiny|base|small|medium|large
-WHISPER_ENABLED=true                     # Enable/disable transcription
-FFMPEG_BINARY=/usr/bin/ffmpeg           # FFmpeg for audio conversion
-```
-
-If Whisper is unavailable, audio processing is skipped gracefully (no errors).
-
-## 📱 WhatsApp Business API Integration
-
-SynaPlan integrates with **Meta's official WhatsApp Business API** for bidirectional messaging.
-
-### Setup:
-1. **Create WhatsApp Business Account**: [Meta Business Suite](https://business.facebook.com/)
-2. **Get Credentials**: Access Token (supports multiple phone numbers)
-3. **Set Environment Variables**:
-```bash
-WHATSAPP_ACCESS_TOKEN=your_access_token
-WHATSAPP_WEBHOOK_VERIFY_TOKEN=your_verify_token
-WHATSAPP_ENABLED=true
-```
-4. **Configure Webhook in Meta**:
-   - Callback URL: `https://your-domain.com/api/v1/webhooks/whatsapp`
-   - Verify Token: Same as `WHATSAPP_WEBHOOK_VERIFY_TOKEN`
-   - Subscribe to: `messages`
-
-### 🌟 Fully Dynamic Multi-Number Support:
-**No configuration needed!** The system is 100% dynamic:
-
-- ✅ **Zero Configuration**: No Phone Number IDs in config files
-- ✅ **Auto-Detection**: Incoming messages automatically extract `phone_number_id` from webhook payload
-- ✅ **Smart Reply Routing**: Responses are **always** sent from the same number that received the message
-- ✅ **Up to 20 Numbers**: One WhatsApp Business Account can manage up to 20 phone numbers
-- ✅ **Instant Multi-Number**: Add/remove numbers in Meta Portal - works immediately, no code changes needed
-
-**How it works:**
-1. User sends message to **Number A** → Webhook contains `metadata.phone_number_id`
-2. System extracts and stores the Phone Number ID
-3. AI processes and responds → Reply sent **from Number A** automatically
-4. Different user sends to **Number B** → Reply sent **from Number B** automatically
-
-### Anonymous Usage & Phone Verification:
-**No verification required!** Users can immediately use the AI via WhatsApp:
-- 🆓 **Anonymous Users** (no verification): Can use AI with ANONYMOUS rate limits (10 messages, 2 images)
-- ✨ **Verified Users** (optional): Higher rate limits after phone verification (50 messages, 5 images, 2 videos)
-- 💎 **PRO/TEAM/BUSINESS** (subscribers): Full subscription limits
-
-**How it works:**
-1. User sends a WhatsApp message → System automatically creates anonymous account
-2. AI responds immediately, no setup needed
-3. *(Optional)* User can verify phone later for higher limits
-
-**Optional Verification Flow:**
-1. User enters phone number in web interface to request verification
-2. System automatically uses the last contacted number for sending the 6-digit code
-3. User confirms code → Phone linked to account → higher rate limits unlocked
-4. User can remove link anytime
-
-### Supported Features:
-- ✅ Text Messages (send & receive)
-- ✅ Media Messages (images, audio, video, documents)
-- ✅ Audio Transcription (via Whisper.cpp)
-- ✅ Phone Verification System
-- ✅ Full AI Pipeline (PreProcessor → Classifier → Handler)
-- ✅ Rate Limiting per subscription level
-- ✅ Message status tracking
-
-### Message Flow:
-```
-WhatsApp User → Meta Webhook → /api/v1/webhooks/whatsapp
-  → Message Entity → PreProcessor (files, audio transcription)
-  → Classifier (sorting, tool detection) → InferenceRouter
-  → AI Handler (Chat/RAG/Tools) → Response → WhatsApp
-```
-
-## 📧 Email Channel Integration
-
-SynaPlan supports email-based AI conversations with smart chat context management.
-
-### Email Addresses:
-- **General**: `smart@synaplan.net` - Creates general chat conversation
-- **Keyword-based**: `smart+keyword@synaplan.net` - Creates dedicated chat context
-  - Example: `smart+project@synaplan.net` for project discussions
-  - Example: `smart+support@synaplan.net` for support tickets
-
-### Features:
-- ✅ **Automatic User Detection**: Registered users get their own rate limits
-- ✅ **Anonymous Email Support**: Unknown senders get ANONYMOUS limits
-- ✅ **Chat Context**: Email threads become chat conversations
-- ✅ **Spam Protection**:
-  - Max 10 emails/hour per unknown address
-  - Automatic blacklisting for spammers
-- ✅ **Email Threading**: Replies stay in the same chat context
-- ✅ **Unified Rate Limits**: Same limits across Email, WhatsApp, Web
-
-### How It Works:
-```
-User sends email to smart@synaplan.net
-  → System checks if email is registered user
-  → If yes: Use user's rate limits
-  → If no: Create anonymous user with ANONYMOUS limits
-  → Parse keyword from recipient (smart+keyword@)
-  → Find or create chat context
-  → Process through AI pipeline
-  → Send response via email (TODO: requires SMTP)
-```
-
-### Rate Limits (Unified):
-- **Registered User Email** = User's subscription limits
-- **Unknown Email** = ANONYMOUS limits (10 messages total)
-- **Spam Detection**: Auto-blacklist after 10 emails/hour
-
-## 🔌 External Channel Integration (Generic)
-
-The API also supports other external channels via webhooks authenticated with API keys:
-
-### Setup:
-1. **Create API Key**: `POST /api/v1/apikeys` (requires JWT login)
-   ```json
-   { "name": "Email Integration", "scopes": ["webhooks:*"] }
-   ```
-   Returns: `sk_abc123...` (store securely - shown only once!)
-
-2. **Use Webhooks**: Send messages via API key authentication
-   - Header: `X-API-Key: sk_abc123...` or
-   - Query: `?api_key=sk_abc123...`
-
-### Endpoints:
-- **Email**: `POST /api/v1/webhooks/email`
-- **WhatsApp**: `POST /api/v1/webhooks/whatsapp`
-- **Generic**: `POST /api/v1/webhooks/generic`
-
-Example (Email):
-```bash
-curl -X POST https://your-domain.com/api/v1/webhooks/email \
-  -H "X-API-Key: sk_your_key" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "from": "user@example.com",
-    "subject": "Question",
-    "body": "Hello, how can I help?"
-  }'
-```
-
-**Response**: AI-generated reply based on message content
-
-### API Key Management:
-- `GET /api/v1/apikeys` - List keys
-- `POST /api/v1/apikeys` - Create key
-- `PATCH /api/v1/apikeys/{id}` - Update (activate/deactivate)
-- `DELETE /api/v1/apikeys/{id}` - Revoke key
-
-## 📁 Project Structure
+## Project Structure
 
 ```
-synaplan-dev/
-├── _devextras/              # Development extras
-├── _docker/                 # Docker configurations
-│   ├── backend/             # Backend Dockerfile & scripts
-│   └── frontend/            # Frontend Dockerfile & nginx
-├── backend/                 # Symfony Backend (PHP 8.3)
-├── frontend/                # Vue.js Frontend
-├── docker-compose.yml       # Standard install (Ollama + Whisper, recommended)
-└── docker-compose-minimal.yml # Minimal install (cloud AI only)
+synaplan/
+├── backend/        # Symfony PHP API
+├── frontend/       # Vue.js SPA
+├── docs/           # Documentation
+├── _docker/        # Docker configs
+└── plugins/        # Plugin system
 ```
 
-## ⚙️ Environment Configuration
+---
 
-Environment files are auto-generated on first start:
-- `backend/.env` (created from `.env.example` by install script, stores API keys and server settings)
+## Contributing
 
-**Note:** `backend/.env` is never overwritten if it exists. To reset: delete the file and run the install script again.
+See [AGENTS.md](AGENTS.md) for development guidelines and code standards.
 
-Example files provided:
-- `backend/.env.example` (reference)
+---
 
-### Required Configuration for Production
+## License
 
-**`SYNAPLAN_URL`** (backend/.env): The publicly accessible URL where Synaplan is hosted
-- Development: `http://localhost:8000`
-- Production: `https://web.synaplan.com`
-- Used for: Widget embed code generation, public URLs, CORS configuration
-
-## 📚 Developer Documentation
-
-For technical deep-dives and "vibe coding" guides, check the `_devextras/planning/` directory. These documents are kept up to date and cover:
-- **Authentication**: Cookie-based & OIDC flows.
-- **Plugins**: Scalable user plugin architecture.
-- **Development**: Coding standards and quick commands.
-- **Infrastructure**: WSL and Ubuntu setup guides.
-
-## 🛠️ Development
-
-```bash
-# View logs
-docker compose logs -f
-
-# Restart services
-docker compose restart backend
-docker compose restart frontend
-
-# Reset database (deletes all data!)
-docker compose down -v
-docker compose up -d
-
-# Run migrations
-docker compose exec backend php bin/console doctrine:migrations:migrate
-
-# Install packages
-docker compose exec backend composer require <package>
-docker compose exec frontend npm install <package>
-```
-
-## 🤖 AI Models
-
-- **bge-m3 (Ollama)** – Always pulled during install (required for RAG/vector search). This is a small embedding model (~1.5GB).
-- **gpt-oss:20b (Ollama)** – Only pulled if "Local Ollama" option selected during install. Large model (~12GB) for local chat without API keys.
-- **All cloud models (Groq, OpenAI, etc.)** – Instantly available once their respective API keys are set. Groq is recommended (free tier, fast).
-
-Disable the auto download by running:
-```bash
-AUTO_DOWNLOAD_MODELS=false docker compose up -d
-```
-
-## ✨ Features
-
-- ✅ **AI Chat**: Multiple providers (Ollama, OpenAI, Anthropic, Groq, Gemini)
-- ✅ **Embeddable Chat Widget**: Add AI chat to any website with a single script tag
-- ✅ **RAG System**: Semantic search with MariaDB VECTOR + bge-m3 embeddings (1024 dim)
-- ✅ **Optional Memories Backend (Qdrant)**: Connect [synaplan-memories](https://github.com/metadist/synaplan-memories) to enable user profiling / AI memories (separate Rust + Qdrant stack)
-- ✅ **Document Processing**: PDF, Word, Excel, Images (Tika + OCR)
-- ✅ **Audio Transcription**: Whisper.cpp integration
-- ✅ **File Management**: Upload, share (public/private), organize with expiry
-- ✅ **App Modes**: Easy mode (simplified) and Advanced mode (full features)
-- ✅ **Security**: Private files by default, secure sharing with tokens
-- ✅ **Multi-user**: Role-based access with JWT authentication
-- ✅ **Responsive UI**: Vue.js 3 + TypeScript + Tailwind CSS
-
-## 🧠 Optional: synaplan-memories (User Profiling / AI Memories)
-
-Synaplan can run without an external vector DB for memories.
-
-If you want AI “memories” (user profiling) backed by **Qdrant**, install:
-
-- [metadist/synaplan-memories](https://github.com/metadist/synaplan-memories)
-
-It contains a small Rust microservice + Qdrant and can be connected via:
-
-- `QDRANT_SERVICE_URL`
-- `QDRANT_SERVICE_API_KEY`
-
-Benchmarking (Qdrant vs MariaDB VECTOR) is available here:
-
-- [metadist/synaplan-vectordb-test](https://github.com/metadist/synaplan-vectordb-test)
-
-## 💬 Embeddable Chat Widget
-
-Synaplan includes a production-ready chat widget that can be embedded on any website:
-
-### Features
-- **ES Module with Code-Splitting**: Loads only what's needed, when needed
-- **Lazy Loading**: Button loads first, chat loads on click
-- **Automatic Configuration**: Fetches widget settings from server
-- **Customizable**: Colors, icons, position, themes, auto-messages
-- **Smart API Detection**: Automatically detects the correct API URL from script source
-- **CORS-ready**: Designed to work across domains
-
-### Usage Example
-```html
-<script type="module">
-  import SynaplanWidget from 'https://web.synaplan.com/widget.js'
-
-  SynaplanWidget.init({
-    widgetId: 'wdg_abc123',
-    position: 'bottom-right',
-    primaryColor: '#007bff',
-    lazy: true
-  })
-</script>
-```
-
-### Widget Management
-- Create widgets in the web interface (Widgets section)
-- Configure appearance, behavior, and limits
-- Domain whitelisting for security
-- Rate limiting per subscription level
-- Copy embed code directly from UI
-
-### Building Widgets (Development)
-```bash
-cd frontend
-npm run build:widget    # Builds widget to dist-widget/
-```
-
-The widget build is automatically included in CI/CD and Docker images.
-
-## 📄 License
-
-See [LICENSE](LICENSE)
+[AGPL-3.0](LICENSE)
