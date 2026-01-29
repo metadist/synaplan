@@ -1619,5 +1619,27 @@
       "filterByCategory": "Nach Kategorie filtern",
       "filterByLetter": "Nach Anfangsbuchstabe filtern"
     }
+  },
+  "feedback": {
+    "falsePositive": {
+      "button": "Nicht korrekt",
+      "title": "Falschmeldung markieren",
+      "subtitle": "Wähle die falschen Abschnitte oder nutze die ganze Antwort.",
+      "selectAll": "Alle auswählen",
+      "clear": "Auswahl löschen",
+      "useFull": "Ganze Antwort verwenden",
+      "selectedCount": "{count} ausgewählt",
+      "emptyHint": "Wähle mindestens einen Abschnitt oder nutze die ganze Antwort.",
+      "preview": "Weiter",
+      "summaryLabel": "KI-Zusammenfassung der Falschaussage",
+      "correctionLabel": "KI-Korrektur (bei Bedarf anpassen)",
+      "back": "Zurück",
+      "saveNegative": "False Positive speichern",
+      "savePositive": "Korrektur speichern",
+      "cancel": "Abbrechen",
+      "success": "Danke! Das Feedback wurde gespeichert.",
+      "positiveSuccess": "Danke! Die Korrektur wurde gespeichert.",
+      "error": "Feedback konnte nicht gespeichert werden."
+    }
   }
 }

@@ -520,6 +520,18 @@
           >
             <button
               type="button"
+              :disabled="isSuperseded"
+              :class="['pill text-xs', isSuperseded ? 'opacity-50 cursor-not-allowed' : '']"
+              :aria-label="$t('feedback.falsePositive.button')"
+              data-testid="btn-message-false-positive"
+              @click="handleFalsePositive"
+            >
+              <Icon icon="mdi:thumb-down-outline" class="w-4 h-4" />
+              <span class="font-medium hidden sm:inline">{{ $t('feedback.falsePositive.button') }}</span>
+            </button>
+
+            <button
+              type="button"
               :disabled="isSuperseded || !selectedModel || !hasModels"
               :class="[
                 'pill text-xs whitespace-nowrap',
@@ -896,6 +908,7 @@ const emit = defineEmits<{
   regenerate: [model: ModelOption]
   again: [backendMessageId: number, modelId?: number]
   retry: [messageContent: string]
+  falsePositive: [text: string, messageId?: number]
 }>()
 
 const router = useRouter()
@@ -965,6 +978,20 @@ const handleAgain = () => {
     // Fallback to old regenerate
     emit('regenerate', model as any)
   }
+}
+
+const handleFalsePositive = () => {
+  const textContent = props.parts
+    .filter((part) => part.type === 'text' && part.content)
+    .map((part) => (part.content ?? '').trim())
+    .filter(Boolean)
+    .join('\n\n')
+
+  if (!textContent) {
+    return
+  }
+
+  emit('falsePositive', textContent, props.backendMessageId)
 }
 
 const toggleModelDropdown = () => {

@@ -363,12 +363,19 @@ class ChatHandler implements MessageHandlerInterface
         // ✨ NEW: Load user memories from Qdrant/Microservice
         $memoriesContext = '';
         $loadedMemories = [];
+        $memoriesDisabledByRequest = !empty($options['disable_memories'])
+            || ('WIDGET' === ($options['channel'] ?? null))
+            || ('widget' === ($classification['source'] ?? null));
 
         // Load user entity (Message only has userId, not User object)
         $user = $this->em->getRepository(User::class)->find($message->getUserId());
         $memoriesEnabledForUser = $user?->isMemoriesEnabled() ?? true;
 
-        if (!$memoriesEnabledForUser) {
+        if ($memoriesDisabledByRequest) {
+            $this->logger->debug('ChatHandler: Memories disabled for widget request, skipping memories', [
+                'user_id' => $message->getUserId(),
+            ]);
+        } elseif (!$memoriesEnabledForUser) {
             $this->logger->debug('ChatHandler: Memories disabled by user setting, skipping memories', [
                 'user_id' => $message->getUserId(),
             ]);
@@ -607,12 +614,18 @@ class ChatHandler implements MessageHandlerInterface
 
         $this->notify($progressCallback, 'generating', 'Response generated.');
 
-        // Memory Extraction (Option B: After AI-Response, in the same Request)
-        // ✨ NEW: Pass the AI response to memory extraction so it can extract from the answer too!
-        $this->logger->info('💾 Loading ALL memories for extraction', ['user_id' => $message->getUserId()]);
-        $allMemories = $this->memoryService->searchRelevantMemories($message->getUserId(), $message->getText(), limit: 100, minScore: 0.0);
-        $this->extractMemoriesAfterResponse($message, $fullResponseText, $thread, $allMemories, $progressCallback);
-        $this->logger->info('✅ Loaded memories for extraction', ['count' => count($allMemories), 'sample' => array_slice($allMemories, 0, 2)]);
+        if ($memoriesDisabledByRequest) {
+            $this->logger->info('ChatHandler: Skipping memory extraction for widget request', [
+                'user_id' => $message->getUserId(),
+            ]);
+        } else {
+            // Memory Extraction (Option B: After AI-Response, in the same Request)
+            // ✨ NEW: Pass the AI response to memory extraction so it can extract from the answer too!
+            $this->logger->info('💾 Loading ALL memories for extraction', ['user_id' => $message->getUserId()]);
+            $allMemories = $this->memoryService->searchRelevantMemories($message->getUserId(), $message->getText(), limit: 100, minScore: 0.0);
+            $this->extractMemoriesAfterResponse($message, $fullResponseText, $thread, $allMemories, $progressCallback);
+            $this->logger->info('✅ Loaded memories for extraction', ['count' => count($allMemories), 'sample' => array_slice($allMemories, 0, 2)]);
+        }
 
         return [
             'metadata' => [

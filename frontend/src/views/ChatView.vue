@@ -106,6 +106,7 @@
               @regenerate="handleRegenerate(message, $event)"
               @again="handleAgain"
               @retry="handleRetryMessage(message, $event)"
+              @false-positive="openFalsePositiveModal"
             />
           </template>
         </div>
@@ -141,6 +142,22 @@
       @discard="handleMemoryDiscard"
       @edit="handleMemoryEdit"
     />
+
+    <FalsePositiveModal
+      :is-open="falsePositiveModalOpen"
+      :segments="falsePositiveSegments"
+      :full-text="falsePositiveFullText"
+      :is-submitting="falsePositiveSubmitting"
+      :is-preview-loading="falsePositivePreviewLoading"
+      :step="falsePositiveStep"
+      :summary="falsePositiveSummary"
+      :correction="falsePositiveCorrection"
+      @close="closeFalsePositiveModal"
+      @preview="previewFalsePositiveFeedback"
+      @confirm-false-positive="confirmFalsePositiveFeedback"
+      @confirm-positive="confirmPositiveFeedback"
+      @back="backToFalsePositiveSelection"
+    />
   </MainLayout>
 </template>
 
@@ -168,11 +185,17 @@ import { normalizeMediaUrl } from '@/utils/urlHelper'
 import { httpClient } from '@/services/api/httpClient'
 import type { UserMemory } from '@/services/api/userMemoriesApi'
 import MemoryToast from '@/components/MemoryToast.vue'
+import FalsePositiveModal from '@/components/feedback/FalsePositiveModal.vue'
+import {
+  previewFalsePositive,
+  submitFalsePositive,
+  submitPositiveFeedback,
+} from '@/services/api/feedbackApi'
 
 const { t } = useI18n()
 const router = useRouter()
 const { showLimitModal, limitData, checkAndShowLimit, closeLimitModal } = useLimitCheck()
-const { error: showErrorToast } = useNotification()
+const { error: showErrorToast, success: showSuccessToast } = useNotification()
 
 const chatContainer = ref<HTMLElement | null>(null)
 const chatInputRef = ref<InstanceType<typeof ChatInput> | null>(null)
@@ -197,6 +220,16 @@ const processingMetadata = ref<any>({})
 // Memory suggestion toasts
 const activeMemoryToasts = ref<Array<UserMemory & { toastId: number }>>([])
 let memoryToastIdCounter = 0
+
+const falsePositiveModalOpen = ref(false)
+const falsePositiveSegments = ref<string[]>([])
+const falsePositiveFullText = ref('')
+const falsePositiveMessageId = ref<number | null>(null)
+const falsePositiveSubmitting = ref(false)
+const falsePositivePreviewLoading = ref(false)
+const falsePositiveStep = ref<'select' | 'confirm'>('select')
+const falsePositiveSummary = ref('')
+const falsePositiveCorrection = ref('')
 
 // Use mock data in development or when API is not available
 const useMockData = import.meta.env.VITE_USE_MOCK_DATA === 'true' || false
@@ -1403,6 +1436,96 @@ function handleMemoryToastClose(toastId: number) {
   const index = activeMemoryToasts.value.findIndex((m) => m.toastId === toastId)
   if (index !== -1) {
     activeMemoryToasts.value.splice(index, 1)
+  }
+}
+
+function openFalsePositiveModal(text: string, messageId?: number) {
+  const segments = text
+    .split(/\n{2,}/)
+    .map((segment) => segment.trim())
+    .filter(Boolean)
+
+  falsePositiveFullText.value = text.trim()
+  falsePositiveSegments.value = segments.length > 0 ? segments : [text.trim()]
+  falsePositiveMessageId.value = messageId ?? null
+  falsePositiveStep.value = 'select'
+  falsePositiveSummary.value = ''
+  falsePositiveCorrection.value = ''
+  falsePositiveModalOpen.value = true
+}
+
+function closeFalsePositiveModal() {
+  falsePositiveModalOpen.value = false
+  falsePositiveSegments.value = []
+  falsePositiveFullText.value = ''
+  falsePositiveMessageId.value = null
+  falsePositiveStep.value = 'select'
+  falsePositiveSummary.value = ''
+  falsePositiveCorrection.value = ''
+}
+
+async function previewFalsePositiveFeedback(text: string) {
+  if (!text.trim()) {
+    return
+  }
+
+  falsePositivePreviewLoading.value = true
+  try {
+    const preview = await previewFalsePositive({ text })
+    falsePositiveSummary.value = preview.summary
+    falsePositiveCorrection.value = preview.correction
+    falsePositiveStep.value = 'confirm'
+  } catch (err) {
+    const errorMsg = err instanceof Error ? err.message : t('feedback.falsePositive.error')
+    showErrorToast(errorMsg)
+  } finally {
+    falsePositivePreviewLoading.value = false
+  }
+}
+
+function backToFalsePositiveSelection() {
+  falsePositiveStep.value = 'select'
+}
+
+async function confirmFalsePositiveFeedback(summary: string) {
+  if (!summary.trim()) {
+    return
+  }
+
+  falsePositiveSubmitting.value = true
+  try {
+    await submitFalsePositive({
+      summary,
+      messageId: falsePositiveMessageId.value ?? undefined,
+    })
+    showSuccessToast(t('feedback.falsePositive.success'))
+    closeFalsePositiveModal()
+  } catch (err) {
+    const errorMsg = err instanceof Error ? err.message : t('feedback.falsePositive.error')
+    showErrorToast(errorMsg)
+  } finally {
+    falsePositiveSubmitting.value = false
+  }
+}
+
+async function confirmPositiveFeedback(text: string) {
+  if (!text.trim()) {
+    return
+  }
+
+  falsePositiveSubmitting.value = true
+  try {
+    await submitPositiveFeedback({
+      text,
+      messageId: falsePositiveMessageId.value ?? undefined,
+    })
+    showSuccessToast(t('feedback.falsePositive.positiveSuccess'))
+    closeFalsePositiveModal()
+  } catch (err) {
+    const errorMsg = err instanceof Error ? err.message : t('feedback.falsePositive.error')
+    showErrorToast(errorMsg)
+  } finally {
+    falsePositiveSubmitting.value = false
   }
 }
 </script>

@@ -22,6 +22,11 @@ use Psr\Log\LoggerInterface;
 readonly class UserMemoryService
 {
     private const MAX_MEMORIES_PER_USER = 500;
+    private const HIDDEN_CATEGORIES = [
+        'feedback_negative',
+        'feedback_positive',
+        'feedback_false_positive',
+    ];
 
     public function __construct(
         private EntityManagerInterface $em, // Only for Model entity (embedding config)
@@ -60,6 +65,7 @@ readonly class UserMemoryService
         string $value,
         string $source = 'user_created',
         ?int $messageId = null,
+        ?string $namespace = null,
     ): UserMemoryDTO {
         // Validate
         if (mb_strlen($key) < 3) {
@@ -96,7 +102,7 @@ readonly class UserMemoryService
         );
 
         // Store in Qdrant
-        $pointId = $this->storeInQdrant($dto, $user, $memoryId);
+        $pointId = $this->storeInQdrant($dto, $user, $memoryId, $namespace);
 
         $this->logger->info('Memory created', [
             'memory_id' => $memoryId,
@@ -218,10 +224,15 @@ readonly class UserMemoryService
                     continue;
                 }
 
+                $category = $payload['category'] ?? 'personal';
+                if ($this->isHiddenCategory($category)) {
+                    continue;
+                }
+
                 $memories[] = new UserMemoryDTO(
                     id: $memoryId,
                     userId: $userId,
-                    category: $payload['category'] ?? 'personal',
+                    category: $category,
                     key: $payload['key'] ?? '',
                     value: $payload['value'] ?? '',
                     source: $payload['source'] ?? 'unknown',
@@ -359,10 +370,13 @@ readonly class UserMemoryService
             // Convert to arrays (format consumed by ChatHandler + frontend)
             $memories = [];
             foreach ($results as $result) {
-                $memories[] = UserMemoryDTO::fromQdrantPayload(
-                    $result['payload'],
-                    $result['id']
-                )->toArray();
+                $payload = $result['payload'] ?? [];
+                $category = $payload['category'] ?? null;
+                if ($category && $this->isHiddenCategory($category)) {
+                    continue;
+                }
+
+                $memories[] = UserMemoryDTO::fromQdrantPayload($payload, $result['id'])->toArray();
             }
 
             return $memories;
@@ -376,7 +390,7 @@ readonly class UserMemoryService
     /**
      * Store memory in Qdrant with vectorization.
      */
-    private function storeInQdrant(UserMemoryDTO $dto, User $user, int $memoryId): string
+    private function storeInQdrant(UserMemoryDTO $dto, User $user, int $memoryId, ?string $namespace = null): string
     {
         try {
             $textToEmbed = "{$dto->key}: {$dto->value}";
@@ -421,7 +435,8 @@ readonly class UserMemoryService
                     'created' => $dto->created,
                     'updated' => $dto->updated,
                     'active' => $dto->active,
-                ]
+                ],
+                $namespace
             );
 
             return $pointId;
@@ -472,5 +487,10 @@ readonly class UserMemoryService
 
             return [];
         }
+    }
+
+    private function isHiddenCategory(string $category): bool
+    {
+        return in_array($category, self::HIDDEN_CATEGORIES, true);
     }
 }

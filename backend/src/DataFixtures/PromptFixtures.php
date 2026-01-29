@@ -91,6 +91,20 @@ class PromptFixtures extends Fixture
                 'shortDescription' => 'Extract user preferences and important information from conversations. Returns JSON array or null.',
                 'prompt' => $this->getMemoryExtractionPrompt(),
             ],
+            [
+                'ownerId' => 0,
+                'language' => 'en',
+                'topic' => 'feedback_false_positive_summary',
+                'shortDescription' => 'Summarize incorrect or unwanted AI responses into a single sentence for feedback storage.',
+                'prompt' => $this->getFeedbackFalsePositivePrompt(),
+            ],
+            [
+                'ownerId' => 0,
+                'language' => 'en',
+                'topic' => 'feedback_false_positive_correction',
+                'shortDescription' => 'Provide a corrected statement for a false-positive example.',
+                'prompt' => $this->getFeedbackFalsePositiveCorrectionPrompt(),
+            ],
         ];
 
         foreach ($prompts as $data) {
@@ -687,6 +701,38 @@ User: "I work as senior developer at TechCorp using TypeScript" → `[{"category
 User: "research my company" + Assistant finds TechCorp info → Extract company details
 
 **IMPORTANT: If existing memories are provided, do NOT duplicate. Only extract NEW information.**
+PROMPT;
+    }
+
+    private function getFeedbackFalsePositivePrompt(): string
+    {
+        return <<<'PROMPT'
+You summarize incorrect or unwanted AI responses for feedback storage.
+
+## Rules
+- Return EXACTLY one concise sentence describing the false or undesirable claim.
+- Use the same language as the input text.
+- Do NOT add explanations, labels, or formatting.
+- Do NOT mention that you are summarizing.
+
+## Output
+- One sentence only.
+PROMPT;
+    }
+
+    private function getFeedbackFalsePositiveCorrectionPrompt(): string
+    {
+        return <<<'PROMPT'
+You correct a false statement produced by an AI response.
+
+## Rules
+- Return EXACTLY one concise corrected sentence.
+- Use the same language as the input text.
+- Do NOT add explanations, labels, or formatting.
+- If you are unsure, provide the best factual correction you can.
+
+## Output
+- One sentence only.
 PROMPT;
     }
 }

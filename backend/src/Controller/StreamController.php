@@ -370,6 +370,10 @@ class StreamController extends AbstractController
                     'web_search' => $webSearch, // Use snake_case for consistency with backend
                 ];
 
+                if ($isWidgetMode) {
+                    $processingOptions['disable_memories'] = true;
+                }
+
                 // Add model_id if specified (for "Again" functionality)
                 if ($modelId) {
                     $processingOptions['model_id'] = (int) $modelId;

@@ -1723,5 +1723,27 @@
       "filterByCategory": "Filter by Category",
       "filterByLetter": "Filter by First Letter"
     }
+  },
+  "feedback": {
+    "falsePositive": {
+      "button": "Not correct",
+      "title": "Mark false positive",
+      "subtitle": "Select the incorrect parts or use the full answer.",
+      "selectAll": "Select all",
+      "clear": "Clear",
+      "useFull": "Use full answer",
+      "selectedCount": "{count} selected",
+      "emptyHint": "Select at least one section or use the full answer.",
+      "preview": "Continue",
+      "summaryLabel": "AI summary of the false claim",
+      "correctionLabel": "AI correction (adjust if needed)",
+      "back": "Back",
+      "saveNegative": "Save false positive",
+      "savePositive": "Save corrected statement",
+      "cancel": "Cancel",
+      "success": "Thanks! The feedback was saved.",
+      "positiveSuccess": "Thanks! The correction was saved.",
+      "error": "Failed to save feedback."
+    }
   }
 }
