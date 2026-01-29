@@ -42,38 +42,16 @@
           <div class="space-y-6">
             <div>
               <h3 class="text-xl font-semibold txt-primary mb-3">
-                {{ $t('config.sortingPrompt.mainTitle') }}
+                {{ introTitle }}
               </h3>
-              <p class="txt-secondary text-sm mb-4">
-                {{ $t('config.sortingPrompt.mainDescription') }}
-              </p>
-              <p class="txt-secondary text-sm italic">
-                If it fits the previous requests of the last few minutes, keep the topic going. If
-                not, change it accordingly. Only in the JSON field.
-              </p>
-              <p class="txt-secondary text-sm font-medium mt-2">
-                Put answers only in JSON, please.
-              </p>
+              <div class="markdown-content txt-secondary text-sm" v-html="introHtml"></div>
             </div>
 
             <div>
               <h4 class="text-lg font-semibold txt-primary mb-3">
                 {{ $t('config.sortingPrompt.yourTasks') }}
               </h4>
-              <p class="txt-secondary text-sm mb-4">
-                {{ sortingPrompt.tasks }}
-              </p>
-              <p class="txt-secondary text-sm mb-4">
-                You receive messages (as JSON objects) from random users around the world. If there
-                is a signature in the BTEXT field, use it as a hint to classify the message and the
-                sender.
-              </p>
-              <p class="txt-secondary text-sm mb-4">
-                If there is an attachment, the description is in the BFILETEXT field.
-              </p>
-              <p class="txt-secondary text-sm font-medium">
-                You will respond only in valid JSON and with the same structure you receive.
-              </p>
+              <div class="markdown-content txt-secondary text-sm" v-html="tasksHtml"></div>
             </div>
 
             <div>
@@ -81,25 +59,27 @@
                 Your tasks in every new message are to:
               </h4>
               <ol class="space-y-4 txt-secondary text-sm">
-                <li class="flex gap-3">
-                  <span class="font-semibold txt-primary">1.</span>
-                  <span>{{ sortingPrompt.instructions[0] }}</span>
-                </li>
-                <li class="flex gap-3">
-                  <span class="font-semibold txt-primary">2.</span>
+                <li
+                  v-for="(instructionHtml, index) in instructionHtmls"
+                  :key="`instruction-${index}`"
+                  class="flex gap-3"
+                >
+                  <span class="font-semibold txt-primary">{{ index + 1 }}.</span>
                   <div>
-                    <p class="mb-3">
-                      {{ sortingPrompt.instructions[1] }}. The most common is "general". This is the
-                      list, use only this:
-                    </p>
-                    <ul class="space-y-3 ml-4">
+                    <div class="markdown-content" v-html="instructionHtml"></div>
+                    <ul v-if="index === 1" class="space-y-3 ml-4 mt-3">
                       <li
                         v-for="category in sortingPrompt.categories"
                         :key="category.name"
                         class="pl-4 border-l-2 border-[var(--brand)]/30"
                       >
                         <div class="flex items-center gap-2 mb-1">
-                          <span class="font-semibold txt-primary">{{ category.name }}</span>
+                          <router-link
+                            :to="getPromptLink(category.name)"
+                            class="font-semibold txt-primary hover:underline"
+                          >
+                            {{ category.name }}
+                          </router-link>
                           <span v-if="category.type === 'default'" class="text-xs txt-secondary"
                             >(default)</span
                           >
@@ -110,20 +90,9 @@
                     </ul>
                   </div>
                 </li>
-                <li class="flex gap-3">
-                  <span class="font-semibold txt-primary">3.</span>
-                  <span>{{ sortingPrompt.instructions[2] }}.</span>
-                </li>
-                <li class="flex gap-3">
-                  <span class="font-semibold txt-primary">4.</span>
-                  <span>{{ sortingPrompt.instructions[3] }}.</span>
-                </li>
-                <li class="flex gap-3">
-                  <span class="font-semibold txt-primary">5.</span>
-                  <span>{{ sortingPrompt.instructions[4] }}.</span>
-                </li>
               </ol>
             </div>
+            <hr class="border-light-border/30 dark:border-dark-border/20" />
           </div>
         </div>
 
@@ -134,9 +103,10 @@
                 {{ $t('config.sortingPrompt.tabSource') }}
               </h3>
               <button
-                class="px-4 py-2 rounded-lg border border-[var(--brand)] text-[var(--brand)] hover:bg-[var(--brand)]/10 transition-colors text-sm"
+                class="px-4 py-2 rounded-lg border border-[var(--brand)] text-[var(--brand)] hover:bg-[var(--brand)]/10 transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                 data-testid="btn-toggle-mode"
-                @click="editMode = !editMode"
+                :disabled="!canEdit || loading"
+                @click="toggleEditMode"
               >
                 <PencilIcon v-if="!editMode" class="w-4 h-4 inline mr-1" />
                 <EyeIcon v-else class="w-4 h-4 inline mr-1" />
@@ -164,16 +134,18 @@
 
             <div v-if="editMode" class="flex gap-3">
               <button
-                class="btn-primary px-6 py-2.5 rounded-lg flex items-center gap-2"
+                class="btn-primary px-6 py-2.5 rounded-lg flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                 data-testid="btn-save"
+                :disabled="saving || loading"
                 @click="savePrompt"
               >
                 <CheckIcon class="w-5 h-5" />
                 {{ $t('config.sortingPrompt.savePrompt') }}
               </button>
               <button
-                class="px-6 py-2.5 rounded-lg border border-light-border/30 dark:border-dark-border/20 txt-primary hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+                class="px-6 py-2.5 rounded-lg border border-light-border/30 dark:border-dark-border/20 txt-primary hover:bg-black/5 dark:hover:bg-white/5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 data-testid="btn-reset"
+                :disabled="saving || loading"
                 @click="resetPrompt"
               >
                 {{ $t('config.sortingPrompt.resetPrompt') }}
@@ -219,15 +191,96 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { PencilIcon, EyeIcon, CheckIcon, InformationCircleIcon } from '@heroicons/vue/24/outline'
 import { mockSortingPrompt } from '@/mocks/sortingPrompt'
 import type { SortingPromptData } from '@/mocks/sortingPrompt'
+import { promptsApi } from '@/services/api/promptsApi'
+import type { SortingPromptPayload } from '@/services/api/promptsApi'
+import { useNotification } from '@/composables/useNotification'
+import { useAuthStore } from '@/stores/auth'
+import { getMarkdownRenderer } from '@/composables/useMarkdown'
 
 const activeTab = ref('rendered')
 const editMode = ref(false)
 const sortingPrompt = ref<SortingPromptData>({ ...mockSortingPrompt })
 const originalPrompt = ref<SortingPromptData>({ ...mockSortingPrompt })
+const loading = ref(false)
+const saving = ref(false)
+
+const authStore = useAuthStore()
+const canEdit = computed(() => authStore.isAdmin)
+const { success, error: showError, warning } = useNotification()
+const { locale } = useI18n()
+const markdownRenderer = getMarkdownRenderer()
+const getPromptLink = (topic: string) =>
+  `/config/task-prompts?topic=${encodeURIComponent(topic)}`
+
+const renderedPromptText = computed(
+  () => sortingPrompt.value.renderedPrompt || sortingPrompt.value.promptContent || ''
+)
+
+const extractIntroSection = (
+  promptText: string
+): {
+  title: string
+  body: string
+} => {
+  const match = promptText.match(/#+\s*Your tasks/i)
+  const intro = !match || match.index === undefined ? promptText.trim() : promptText.slice(0, match.index).trim()
+  const lines = intro.split('\n')
+  const normalized = lines
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0)
+
+  let title = ''
+  const cleaned: string[] = []
+
+  for (const line of normalized) {
+    const headingMatch = line.match(/^#{1,6}\s+(.*)$/)
+    if (!title && headingMatch?.[1]) {
+      title = headingMatch[1].trim()
+      continue
+    }
+
+    const lower = line.toLowerCase()
+    const last = cleaned[cleaned.length - 1]?.toLowerCase()
+    if (lower === 'set btopic and tools in json' && last === lower) {
+      continue
+    }
+    if (lower === 'set btopic and tools in json' && cleaned.length === 0) {
+      title = title || line
+      continue
+    }
+    cleaned.push(line)
+  }
+
+  return {
+    title: title || 'Preprocessor',
+    body: cleaned.join('\n').trim(),
+  }
+}
+
+const extractTasksBody = (promptText: string): string => {
+  const startMatch = promptText.match(/#+\s*Your tasks/i)
+  if (!startMatch || startMatch.index === undefined) {
+    return ''
+  }
+  const startIndex = startMatch.index + startMatch[0].length
+  const rest = promptText.slice(startIndex)
+  const endMatch = rest.match(/Your tasks in every new message are to:/i)
+  const endIndex = endMatch && endMatch.index !== undefined ? endMatch.index : rest.length
+  return rest.slice(0, endIndex).trim()
+}
+
+const introSection = computed(() => extractIntroSection(renderedPromptText.value))
+const introTitle = computed(() => introSection.value.title)
+const introHtml = computed(() => markdownRenderer.render(introSection.value.body))
+const tasksHtml = computed(() => markdownRenderer.render(extractTasksBody(renderedPromptText.value)))
+const instructionHtmls = computed(() =>
+  sortingPrompt.value.instructions.map((instruction) => markdownRenderer.render(instruction))
+)
 
 const tabs = [
   { id: 'rendered', label: 'Rendered Result' },
@@ -235,15 +288,102 @@ const tabs = [
   { id: 'json', label: 'JSON Object' },
 ]
 
+const extractTasks = (promptText: string): string => {
+  const section = promptText.split('# Your tasks')[1]
+  if (!section) {
+    return ''
+  }
+
+  const lines = section
+    .split('\n')
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0)
+  return lines[0] ?? ''
+}
+
+const extractInstructions = (promptText: string): string[] => {
+  const match = promptText.match(
+    /Your tasks in every new message are to:\s*([\s\S]*?)\n# Answer format/i
+  )
+  if (!match) {
+    return []
+  }
+
+  const section = match[1].trim()
+  const sanitizeInstruction = (instruction: string): string => {
+    const lines = instruction
+      .split('\n')
+      .filter((line) => !line.trim().startsWith('- "'))
+      .map((line) => line.trimEnd())
+    return lines.join('\n').trim()
+  }
+
+  return section
+    .split(/\n(?=\d+\.\s)/)
+    .map((item) => item.replace(/^\d+\.\s*/, '').trim())
+    .map((item) => sanitizeInstruction(item))
+    .filter((item) => item.length > 0)
+}
+
+const mapSortingPrompt = (payload: SortingPromptPayload): SortingPromptData => {
+  const tasks = extractTasks(payload.renderedPrompt)
+  const instructions = extractInstructions(payload.renderedPrompt)
+
+  return {
+    id: payload.id,
+    description: payload.shortDescription || mockSortingPrompt.description,
+    tasks: tasks || mockSortingPrompt.tasks,
+    categories: payload.categories,
+    instructions: instructions.length ? instructions : mockSortingPrompt.instructions,
+    promptContent: payload.prompt,
+    renderedPrompt: payload.renderedPrompt,
+    jsonExample: mockSortingPrompt.jsonExample,
+  }
+}
+
 const loadSortingPrompt = async () => {
-  sortingPrompt.value = { ...mockSortingPrompt }
-  originalPrompt.value = { ...mockSortingPrompt }
+  loading.value = true
+  try {
+    const prompt = await promptsApi.getSortingPrompt(locale.value || 'en')
+    const mapped = mapSortingPrompt(prompt)
+    sortingPrompt.value = { ...mapped }
+    originalPrompt.value = { ...mapped }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Failed to load sorting prompt'
+    showError(message)
+    sortingPrompt.value = { ...mockSortingPrompt }
+    originalPrompt.value = { ...mockSortingPrompt }
+  } finally {
+    loading.value = false
+  }
+}
+
+const toggleEditMode = () => {
+  if (!canEdit.value) {
+    warning('Admin access required to edit the sorting prompt.')
+    return
+  }
+  editMode.value = !editMode.value
 }
 
 const savePrompt = async () => {
-  console.log('Save sorting prompt:', sortingPrompt.value)
-  originalPrompt.value = { ...sortingPrompt.value }
-  editMode.value = false
+  if (!canEdit.value) {
+    warning('Admin access required to edit the sorting prompt.')
+    return
+  }
+
+  saving.value = true
+  try {
+    await promptsApi.updateSortingPrompt(sortingPrompt.value.promptContent)
+    success('Sorting prompt saved.')
+    await loadSortingPrompt()
+    editMode.value = false
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Failed to save sorting prompt'
+    showError(message)
+  } finally {
+    saving.value = false
+  }
 }
 
 const resetPrompt = () => {

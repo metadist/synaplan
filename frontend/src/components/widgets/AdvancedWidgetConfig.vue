@@ -955,16 +955,16 @@ const { t } = useI18n()
 const { success, error: showError } = useNotification()
 
 // Check if widget has a custom/configured prompt (not the default)
-// Backward compatible: ANY topic that is not 'widget-default' is considered configured
+// Backward compatible: ANY topic that is not 'tools:widget-default' is considered configured
 // This includes:
 // - Legacy topics from before rework: 'general', 'customer-support', etc.
 // - Old widget prompts: 'widget-xxx' (manually created)
 // - New AI-generated prompts: 'w_xxx' (from setup interview)
 const hasCustomPrompt = computed(() => {
   const topic = props.widget.taskPromptTopic
-  // Only 'widget-default' or empty/missing = not configured
+  // Only 'tools:widget-default' or empty/missing = not configured
   // Everything else = configured (has a prompt)
-  return !!topic && topic !== 'widget-default'
+  return !!topic && topic !== 'tools:widget-default'
 })
 
 // Check if localhost addresses are in allowed domains

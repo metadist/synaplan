@@ -209,7 +209,7 @@ PROMPT;
     {
         // Load English prompt from database
         $prompt = $this->promptRepository->findOneBy([
-            'topic' => 'memory_extraction',
+            'topic' => 'tools:memory_extraction',
             'language' => 'en',
             'ownerId' => 0, // System prompt
         ]);
