@@ -1,0 +1,210 @@
+---
+description: This is a new rule
+alwaysApply: true
+---
+
+# Playwright Test Guidelines (Furkan / Synaplan)
+
+Goal: simple, readable, stable tests.
+No over-engineering, no unnecessary abstractions.
+
+---
+
+## 1. Style
+
+* Simple code > clever code
+* Only as much logic as needed
+* Readability over brevity
+* No unnecessary TypeScript tricks
+* **Act like a user:** Navigate via UI (nav bar/buttons/links), click only what a user can click. Do not target hidden inputs unless the user can reach them the same way (for example a visible upload button opens the file dialog). Exception: setup/teardown and external systems (for example MailHog) may be used directly if they are not reachable via the UI.
+
+---
+
+## 2. Locator rules
+
+* Always locate elements **fresh**:
+
+  * `await page.locator(...).click();`
+* Prefer: `data-testid` (then role/name, then CSS)
+* Use context:
+
+  ```ts
+  await page.locator(selectors.chat.againDropdown).click();
+  ```
+* No overly complex selectors
+
+---
+
+## 3. Waiting & sync
+
+* Visibility:
+
+  ```ts
+  await page.locator(sel).waitFor({ state: 'visible' });
+  ```
+* If element might be outside viewport, use `attached` then scroll:
+
+  ```ts
+  await locator.waitFor({ state: 'attached' });
+  await locator.scrollIntoViewIfNeeded();
+  await locator.waitFor({ state: 'visible' });
+  ```
+* Loader (optional):
+
+  ```ts
+  const loader = page.locator(selectors.chat.loadIndicator);
+  try {
+    await loader.waitFor({ state: 'visible', timeout: 5000 });
+    await loader.waitFor({ state: 'hidden' });
+  } catch {
+    // Loader was not visible - ok if the flow sometimes ends without it
+  }
+  ```
+* Event listeners (console, response, etc.): Register BEFORE the action that triggers them
+* Do not add custom polling loops when `expect`/`waitFor` is enough
+* `expect.poll` is ok for non-UI events (email, background job, console messages), but keep it short and clear
+
+---
+
+## 4. Assertions
+
+* Always normalize text:
+
+  ```ts
+  const text = (await locator.innerText()).trim().toLowerCase();
+  await expect(text).toContain('success');
+  ```
+* If exact text matters, use `toHaveText`/`toContainText`
+* Critical copy (legal, pricing, onboarding) must be checked with exact text
+* Regex only when needed
+* In loops: `expect.soft(...)` with a meaningful message
+
+---
+
+## 5. Loops & dropdowns
+
+* Use normal `for (let i = 0; i < count; i++)` loops
+* Each iteration:
+
+  1. Get toggle fresh in the right container
+  2. Open dropdown
+  3. Use `nth(i)`
+  4. Read text -> for example skip `"ollama"`
+  5. If matching: click, then check response
+* Only store model names if really needed - otherwise check directly on `nth(i)`
+
+Example pattern:
+
+```ts
+const optionCount = await page.locator('button.dropdown-item').count();
+
+for (let i = 0; i < optionCount; i++) {
+  const toggle = page
+    .locator(selectors.chat.aiAnswerBubble)
+    .last()
+    .locator('[data-testid="btn-message-model-toggle"]');
+
+  await toggle.click();
+
+  const option = page.locator('button.dropdown-item').nth(i);
+  await option.waitFor({ state: 'visible' });
+
+  const label = (await option.innerText()).toLowerCase().trim();
+  if (label.includes('ollama')) {
+    await toggle.click();
+    continue;
+  }
+
+  await option.click();
+  // ... wait for loader + check success
+}
+```
+
+---
+
+## 6. Error handling
+
+* Let errors happen first, then fix them intentionally
+* No global defensive programming layer
+* `console.log` only for targeted debugging
+* If a test fails, check Playwright trace/screenshot/video first before changing test logic
+
+---
+
+## 7. Test data & cleanup
+
+* Create unique data per test (email, names, IDs) - use centralized helpers from `config/test-data.ts` when available
+* Remove previous state (for example clear MailHog inbox)
+* Cleanup in a `finally` block so tests leave no residue
+* Backend/external systems are allowed only for setup/teardown (seed data, clean inbox, delete user)
+* The actual test goal must be validated via UI only
+* Use centralized config: `TIMEOUTS`, `INTERVALS`, `URLS` from `config/config.ts`, `CREDENTIALS` from `config/credentials.ts`
+
+---
+
+## 8. Test scope
+
+* Use E2E only for critical user flows (login, registration, core use-case)
+* Prefer component/unit tests for UI details
+* Fewer, stable smoke tests over many fragile scenarios
+* Assertions should stay UI-based; backend/external systems are for setup/teardown only
+
+---
+
+## 9. Test structure
+
+* Wrap login:
+
+  ```ts
+  await login(page);
+  ```
+* Clear flow:
+
+  1. Arrange (login, start state)
+  2. Act (clicks / inputs)
+  3. Assert (text / states)
+
+---
+
+## 10. Rules for AI helpers
+
+You are writing a Playwright E2E test for Synaplan.
+
+Follow `frontend/tests/e2e/prompts/test_guidelines.md` strictly and match the QA‑readable style of
+`frontend/tests/e2e/tests/registration.spec.ts` (linear, `test.step` blocks, minimal helpers).
+
+Constraints:
+- UI‑only assertions for the actual test goal. Backend/external systems only for setup/teardown
+  or when required to progress the flow (e.g. fetching a verification link).
+- No admin/API checks for validation unless explicitly requested.
+- No hard waits. Prefer `waitFor`/`expect`. Use `expect.poll` only for non‑UI async events
+  (email delivery, background jobs, console messages) and keep it short/clear.
+- Use selectors from `frontend/tests/e2e/helpers/selectors.ts`.
+- Keep helper functions small and obvious; add a short comment only if the intent is not clear.
+- Normalize text before assertions unless exact copy is required.
+- Do not add dependencies or modify unrelated files.
+- **Clean up after debugging**: Remove temporary code, excessive comments, and debug statements after fixing issues. Keep code clean and maintainable.
+
+Deliverable:
+- Provide the complete test file content for the requested test (one file only).
+- Keep it QA‑friendly and easy to read end‑to‑end.
+- Ask clarifying questions only if a selector or required user flow is unknown.
+
+
+# Synaplan GitHub Issue Guidelines
+
+## Templates and Types
+- Use the repository templates in `.github/ISSUE_TEMPLATE/` (Bug or Feature) and select exactly one matching Issue Type.
+- English only.
+
+## Titles and Labels
+- Title format: `<Area>: <short factual description>` — Area must match an existing `area:*` label.
+- Labels: exactly one `area:*` label and exactly one priority label (`prio (line 1|2|3)`); do not create new labels.
+
+## Content Quality
+- Steps: minimal, deterministic, reproducible.
+- Scope: no speculation, discussion, or proposed solutions; one issue equals one clearly scoped problem or feature.
+- Evidence: add screenshots or logs when available; keep notes strictly relevant.
+
+## Missing Information
+- If type, area, priority, exact repro, or expected/actual are missing, ask before creating the issue.
