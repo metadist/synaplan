@@ -310,6 +310,63 @@ class AdminController extends AbstractController
     }
 
     /**
+     * Cleanup user data but keep user account (admin only, for idempotent tests).
+     */
+    #[Route('/users/{id}/cleanup', name: 'admin_cleanup_user_data', methods: ['POST'])]
+    #[OA\Post(
+        path: '/api/v1/admin/users/{id}/cleanup',
+        summary: 'Cleanup user data',
+        description: 'Delete all user data but keep the user account (admin only, for idempotent tests)',
+        security: [['Bearer' => []]],
+        tags: ['Admin']
+    )]
+    #[OA\Parameter(
+        name: 'id',
+        in: 'path',
+        description: 'User ID',
+        required: true,
+        schema: new OA\Schema(type: 'integer')
+    )]
+    #[OA\Response(response: 200, description: 'User data cleaned up')]
+    #[OA\Response(response: 403, description: 'Not authorized')]
+    #[OA\Response(response: 404, description: 'User not found')]
+    public function cleanupUserData(
+        int $id,
+        #[CurrentUser] ?User $user,
+    ): JsonResponse {
+        if (!$user || !$user->isAdmin()) {
+            return $this->json(['error' => 'Admin access required'], Response::HTTP_FORBIDDEN);
+        }
+
+        $targetUser = $this->userRepository->find($id);
+        if (!$targetUser) {
+            return $this->json(['error' => 'User not found'], Response::HTTP_NOT_FOUND);
+        }
+
+        $this->logger->info('Admin initiated user data cleanup', [
+            'admin_id' => $user->getId(),
+            'target_user_id' => $id,
+            'target_email' => $targetUser->getMail(),
+        ]);
+
+        try {
+            $this->userDeletionService->cleanupUserData($targetUser);
+
+            return $this->json(['success' => true, 'message' => 'User data cleaned up']);
+        } catch (\Throwable $e) {
+            $this->logger->error('Admin user data cleanup failed', [
+                'admin_id' => $user->getId(),
+                'target_user_id' => $id,
+                'exception' => $e,
+            ]);
+
+            return $this->json([
+                'error' => 'Failed to cleanup user data. Please contact support.',
+            ], Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    /**
      * Get all system prompts (admin only).
      */
     #[Route('/prompts', name: 'admin_get_prompts', methods: ['GET'])]

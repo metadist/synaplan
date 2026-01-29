@@ -1,6 +1,7 @@
-import { test, expect } from '@playwright/test'
+import { test, expect } from '../test-setup'
 import { selectors } from '../helpers/selectors'
 import { deleteUser } from '../helpers/auth'
+import { URLS } from '../config/config'
 
 test('@auth @smoke registration flow with email verification id=006', async ({
   page,
@@ -9,8 +10,6 @@ test('@auth @smoke registration flow with email verification id=006', async ({
   const uniqueSuffix = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
   const testEmail = `test+${uniqueSuffix}@test.com`
   const testPassword = 'Test1234'
-  const mailhogUrl = process.env.MAILHOG_URL || 'http://localhost:8025'
-  const baseUrl = process.env.BASE_URL || 'http://localhost:5173'
   const decodeQuotedPrintable = (input: string) => {
     const withoutSoftBreaks = input.replace(/=\r?\n/g, '')
     return withoutSoftBreaks.replace(/=([0-9A-Fa-f]{2})/g, (_, hex: string) =>
@@ -53,7 +52,7 @@ test('@auth @smoke registration flow with email verification id=006', async ({
   try {
     let verificationEmail: any = null
     await test.step('Clear MailHog inbox', async () => {
-      const clearResponse = await request.delete(`${mailhogUrl}/api/v1/messages`)
+      const clearResponse = await request.delete(`${URLS.MAILHOG_URL}/api/v1/messages`)
       expect(clearResponse.ok()).toBeTruthy()
     })
 
@@ -95,7 +94,7 @@ test('@auth @smoke registration flow with email verification id=006', async ({
       await expect
         .poll(
           async () => {
-            const mailhogResponse = await request.get(`${mailhogUrl}/api/v2/messages`)
+            const mailhogResponse = await request.get(`${URLS.MAILHOG_URL}/api/v2/messages`)
             if (!mailhogResponse.ok()) {
               return null
             }
@@ -150,7 +149,7 @@ test('@auth @smoke registration flow with email verification id=006', async ({
       if (!verificationPath.startsWith('/')) {
         verificationPath = '/' + verificationPath
       }
-      const normalizedVerificationLink = new URL(verificationPath, baseUrl).toString()
+      const normalizedVerificationLink = new URL(verificationPath, URLS.BASE_URL).toString()
 
       await page.goto(normalizedVerificationLink)
       await page

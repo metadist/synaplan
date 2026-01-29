@@ -1,12 +1,11 @@
+import { test, expect } from '../test-setup'
 import type { APIRequestContext } from '@playwright/test'
-import { test, expect } from '@playwright/test'
 import { deleteUser, login } from '../helpers/auth'
 import { selectors } from '../helpers/selectors'
-
-const MAILHOG_URL = process.env.MAILHOG_URL ?? 'http://localhost:8025'
+import { URLS } from '../config/config'
 
 async function fetchVerificationToken(request: APIRequestContext, email: string): Promise<string> {
-  const searchUrl = `${MAILHOG_URL}/api/v2/search?kind=to&query=${encodeURIComponent(email)}&limit=20`
+  const searchUrl = `${URLS.MAILHOG_URL}/api/v2/search?kind=to&query=${encodeURIComponent(email)}&limit=20`
 
   for (let attempt = 0; attempt < 20; attempt += 1) {
     const response = await request.get(searchUrl)
