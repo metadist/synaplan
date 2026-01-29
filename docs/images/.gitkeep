@@ -1,10 +1,13 @@
-# Placeholder for documentation images
+# Documentation Images
 
-Add screenshots here:
-- dashboard.png - Main dashboard view
-- chat.png - Chat interface
-- widget-embed.png - Embedded widget example
-- rag-search.png - RAG semantic search
-- settings.png - Settings/configuration page
+Screenshots for Synaplan documentation.
+
+| Image | Used In |
+|-------|---------|
+| dashboard.png | README.md |
+| chat.png | FEATURES.md |
+| widget-embed.png | WIDGET.md |
+| rag-search.png | RAG.md |
+| settings.png | CONFIGURATION.md |
 
 Recommended size: 1200px width, PNG or WebP format

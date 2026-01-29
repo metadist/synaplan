@@ -2,6 +2,8 @@
 
 All configuration is done via environment variables in `backend/.env`.
 
+![Settings Page](images/settings.png)
+
 ## Quick Reference
 
 | Variable | Default | Description |

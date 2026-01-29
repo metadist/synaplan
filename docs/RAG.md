@@ -2,6 +2,8 @@
 
 Retrieval-Augmented Generation (RAG) for semantic document search.
 
+![RAG Search Interface](images/rag-search.png)
+
 ## Overview
 
 Synaplan's RAG system lets you:

@@ -2,6 +2,8 @@
 
 Add AI chat to any website with a single script tag.
 
+![Chat Widget Example](images/widget-embed.png)
+
 ## Quick Start
 
 ```html

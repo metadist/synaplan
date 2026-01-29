@@ -6,8 +6,7 @@ AI-powered knowledge management with RAG, chat widgets, and multi-channel integr
 
 > **Live instance**: [web.synaplan.com](https://web.synaplan.com/)
 
-<!-- Screenshot placeholder: Add a dashboard screenshot here -->
-<!-- ![Synaplan Dashboard](docs/images/dashboard.png) -->
+![Synaplan Dashboard](docs/images/dashboard.png)
 
 ---
 

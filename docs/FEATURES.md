@@ -4,6 +4,8 @@ Everything Synaplan can do.
 
 ## AI Chat
 
+![Chat Interface](images/chat.png)
+
 Multi-provider AI conversations:
 
 - **Local**: Ollama (gpt-oss, llama, mistral, etc.)
