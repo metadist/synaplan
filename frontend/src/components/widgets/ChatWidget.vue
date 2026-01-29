@@ -1,6 +1,8 @@
 <template>
   <div
     :class="[
+      'synaplan-widget',
+      widgetTheme === 'dark' ? 'dark' : '',
       testMode ? 'relative w-full h-full' : isPreview ? 'absolute' : 'fixed',
       testMode ? '' : 'z-[9999]',
       testMode ? '' : positionClass,
@@ -152,7 +154,7 @@
                 </div>
                 <div
                   v-else
-                  class="text-sm break-words markdown-content"
+                  class="text-sm break-words markdown-content overflow-x-auto"
                   :style="{
                     color:
                       message.role === 'user'
@@ -203,9 +205,9 @@
                   </button>
                 </div>
                 <!-- Text content (question about the file) -->
-                <p
+                <div
                   v-if="message.content && message.content !== message.fileName"
-                  class="text-sm"
+                  class="text-sm markdown-content overflow-x-auto"
                   :style="{
                     color:
                       message.role === 'user'
@@ -1660,6 +1662,13 @@ function buildWidgetHeaders(includeContentType = true) {
  * These styles are necessary for the widget to render markdown correctly.
  */
 
+/* Base markdown content container - allows horizontal scrolling for wide content */
+.markdown-content {
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: visible;
+}
+
 /* Code blocks */
 .markdown-content :deep(.code-block) {
   padding: 0.75rem;
@@ -1743,27 +1752,8 @@ function buildWidgetHeaders(includeContentType = true) {
   background-color: rgba(0, 0, 0, 0.03);
 }
 
-/* Tables */
-.markdown-content :deep(.markdown-table) {
-  width: 100%;
-  border-collapse: collapse;
-  margin-top: 0.5rem;
-  margin-bottom: 0.5rem;
-  font-size: 0.875rem;
-}
-
-.markdown-content :deep(.markdown-table th),
-.markdown-content :deep(.markdown-table td) {
-  border-width: 1px;
-  border-style: solid;
-  padding: 0.25rem 0.5rem;
-  border-color: rgba(0, 0, 0, 0.1);
-}
-
-.markdown-content :deep(.markdown-table th) {
-  font-weight: 600;
-  background-color: rgba(0, 0, 0, 0.05);
-}
+/* Tables and markdown content styles are loaded via widget-markdown.css
+   which is injected into the Shadow DOM by widget.ts */
 
 /* Horizontal rule */
 .markdown-content :deep(hr) {
