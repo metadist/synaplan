@@ -214,8 +214,7 @@ const canEdit = computed(() => authStore.isAdmin)
 const { success, error: showError, warning } = useNotification()
 const { locale } = useI18n()
 const markdownRenderer = getMarkdownRenderer()
-const getPromptLink = (topic: string) =>
-  `/config/task-prompts?topic=${encodeURIComponent(topic)}`
+const getPromptLink = (topic: string) => `/config/task-prompts?topic=${encodeURIComponent(topic)}`
 
 const renderedPromptText = computed(
   () => sortingPrompt.value.renderedPrompt || sortingPrompt.value.promptContent || ''
@@ -228,11 +227,12 @@ const extractIntroSection = (
   body: string
 } => {
   const match = promptText.match(/#+\s*Your tasks/i)
-  const intro = !match || match.index === undefined ? promptText.trim() : promptText.slice(0, match.index).trim()
+  const intro =
+    !match || match.index === undefined
+      ? promptText.trim()
+      : promptText.slice(0, match.index).trim()
   const lines = intro.split('\n')
-  const normalized = lines
-    .map((line) => line.trim())
-    .filter((line) => line.length > 0)
+  const normalized = lines.map((line) => line.trim()).filter((line) => line.length > 0)
 
   let title = ''
   const cleaned: string[] = []
@@ -277,7 +277,9 @@ const extractTasksBody = (promptText: string): string => {
 const introSection = computed(() => extractIntroSection(renderedPromptText.value))
 const introTitle = computed(() => introSection.value.title)
 const introHtml = computed(() => markdownRenderer.render(introSection.value.body))
-const tasksHtml = computed(() => markdownRenderer.render(extractTasksBody(renderedPromptText.value)))
+const tasksHtml = computed(() =>
+  markdownRenderer.render(extractTasksBody(renderedPromptText.value))
+)
 const instructionHtmls = computed(() =>
   sortingPrompt.value.instructions.map((instruction) => markdownRenderer.render(instruction))
 )

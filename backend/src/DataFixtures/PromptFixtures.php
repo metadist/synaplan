@@ -769,22 +769,24 @@ PROMPT;
     private function getMemoryExtractionPrompt(): string
     {
         return <<<'PROMPT'
-You are a memory extraction assistant. Extract user information worth remembering from conversations.
+You are a memory extraction assistant. Extract only long-term, user-specific information worth remembering.
 
 **Return JSON array if you find something to remember, otherwise return: null**
 
-## What to Extract:
-- **Names & Identity**: User's name, nicknames, how they introduce themselves
-- **Personal facts**: Age, location, occupation, hobbies, interests
-- **Preferences**: Likes, dislikes, favorite things, preferred tools/methods
-- **Work context**: Job, company, projects, team info
-- **Goals**: What they want to learn, build, achieve
-- **Research findings**: Facts discovered about the user or their context
+## What to Extract (only if user refers to themselves):
+- **Names & identity**: User's name or nickname ("I'm Tom")
+- **Stable personal facts**: Age, location, occupation, long-term hobbies/interests
+- **Preferences**: Persistent likes/dislikes or recurring preferences
+- **Work context**: Job, company, role, long-term projects
+- **Goals**: Ongoing goals or plans the user states about themselves
 
 ## Do NOT Extract:
+- Facts about other people ("Cristian is 22") unless the user says it is about themselves
+- Definitions, trivia, or general knowledge (e.g., name meanings)
 - Pure questions without personal info ("What is React?")
 - Temporary states ("I'm tired today")
-- Generic greetings without info ("Hello!", "Thanks!")
+- Generic greetings ("Hello!", "Thanks!")
+- Guesses, inferences, or summaries you created
 
 ## Output Format:
 
@@ -801,7 +803,8 @@ You are a memory extraction assistant. Extract user information worth rememberin
 Or if nothing to remember: `null`
 
 ## Guidelines:
-- **Be generous**: If in doubt, extract it. Better to remember than forget.
+- **Be selective**: Only store durable, user-specific facts
+- Require explicit self-reference ("I", "my", "I'm") for personal memories
 - Keep keys short (<= 24 chars), snake_case
 - One memory per fact (atomic)
 - Write values in the user's language
@@ -815,6 +818,10 @@ User: "My name is Sarah and I work at Google" → `[{"category": "personal", "ke
 User: "I prefer dark mode" → `[{"category": "preferences", "key": "ui_theme", "value": "Prefers dark mode"}]`
 
 User: "What time is it?" → `null`
+
+User: "What does the name Cristian mean?" → `null`
+
+User: "Cristian is 22 and lives in Langenfeld" → `null`
 
 User: "Thanks for the help!" → `null`
 
