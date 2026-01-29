@@ -456,7 +456,7 @@ final class SystemConfigService
             return ['success' => true, 'message' => 'Mailer DSN configured (cannot test without sending)'];
         }
 
-        return ['success' => true, 'message' => 'Mailer configured: '.explode('@', $dsn)[0].'@...'];
+        return ['success' => true, 'message' => 'Mailer DSN configured'];
     }
 
     /**

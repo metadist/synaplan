@@ -41,7 +41,7 @@ ANTHROPIC_API_KEY=sk-ant-your_key_here
 ### Google Gemini
 
 ```bash
-GEMINI_API_KEY=your_key_here
+GOOGLE_GEMINI_API_KEY=your_key_here
 ```
 
 ### Local Ollama
