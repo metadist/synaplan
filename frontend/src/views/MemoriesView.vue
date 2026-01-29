@@ -198,6 +198,7 @@
       :available-categories="availableCategories.map((c) => c.category)"
       @close="handleFormDialogClose"
       @save="handleSaveMemory"
+      @save-multiple="handleSaveMultiple"
     />
   </MainLayout>
 </template>
@@ -230,7 +231,7 @@ const route = useRoute()
 const router = useRouter()
 const authStore = useAuthStore()
 const memoriesStore = useMemoriesStore()
-const { success, error } = useNotification()
+const { success, error, warning } = useNotification()
 const { confirm } = useDialog()
 
 const viewMode = ref<'list' | 'graph' | 'graph3d'>('list')
@@ -404,27 +405,117 @@ async function handleBulkDelete(memoryIds: number[]) {
 }
 
 async function handleSaveMemory(memoryData: CreateMemoryRequest | UpdateMemoryRequest) {
-  if (currentMemoryToEdit.value) {
-    // For updates, we only need the value field
-    await memoriesStore.editMemory(currentMemoryToEdit.value.id, {
-      value: memoryData.value,
-    } as UpdateMemoryRequest)
-    if (!memoriesStore.error) {
-      success(t('memories.editSuccess'))
+  try {
+    // Check if this is an update (either from Advanced mode edit or Easy mode AI suggestion)
+    const memoryDataAny = memoryData as Record<string, unknown>
+    const updateId = currentMemoryToEdit.value?.id || (memoryDataAny.id as number | undefined)
+
+    if (updateId) {
+      // For updates, we need value (and optionally category/key)
+      await memoriesStore.editMemory(updateId, {
+        value: memoryData.value,
+        category: 'category' in memoryData ? memoryData.category : undefined,
+        key: 'key' in memoryData ? memoryData.key : undefined,
+      } as UpdateMemoryRequest)
     } else {
-      error(t('memories.editError'))
+      // For creates, we need category, key, and value
+      await memoriesStore.addMemory(memoryData as CreateMemoryRequest)
     }
-  } else {
-    // For creates, we need category, key, and value
-    await memoriesStore.addMemory(memoryData as CreateMemoryRequest)
-    if (!memoriesStore.error) {
-      success(t('memories.createSuccess'))
-    } else {
-      error(t('memories.createError'))
+    // Store handles notifications - don't show duplicate!
+    isFormDialogOpen.value = false
+    await loadMemories()
+  } catch {
+    // Store already shows error notification
+  }
+}
+
+interface ParsedAction {
+  action: 'create' | 'update' | 'delete'
+  memory?: { category: string; key: string; value: string }
+  existingId?: number
+  reason?: string
+}
+
+async function handleSaveMultiple(actions: ParsedAction[]) {
+  let successCount = 0
+  let errorCount = 0
+  const errors: string[] = []
+
+  // Use silent mode for all operations, we'll show one notification at the end
+  for (const actionItem of actions) {
+    try {
+      if (actionItem.action === 'create' && actionItem.memory) {
+        await memoriesStore.addMemory(
+          {
+            category: actionItem.memory.category,
+            key: actionItem.memory.key,
+            value: actionItem.memory.value,
+          },
+          { silent: true }
+        )
+        successCount++
+      } else if (actionItem.action === 'update' && actionItem.existingId && actionItem.memory) {
+        // Validate that the memory exists before trying to update
+        const memoryExists = memoriesStore.memories.some((m) => m.id === actionItem.existingId)
+        if (memoryExists) {
+          await memoriesStore.editMemory(
+            actionItem.existingId,
+            {
+              value: actionItem.memory.value,
+            },
+            { silent: true }
+          )
+          successCount++
+        } else {
+          // Memory doesn't exist locally, create instead
+          await memoriesStore.addMemory(
+            {
+              category: actionItem.memory.category,
+              key: actionItem.memory.key,
+              value: actionItem.memory.value,
+            },
+            { silent: true }
+          )
+          successCount++
+        }
+      } else if (actionItem.action === 'delete' && actionItem.existingId) {
+        // Validate that the memory exists before trying to delete
+        const memoryExists = memoriesStore.memories.some((m) => m.id === actionItem.existingId)
+        if (memoryExists) {
+          await memoriesStore.removeMemory(actionItem.existingId, { silent: true })
+          successCount++
+        } else {
+          // Memory doesn't exist, skip silently
+          console.warn('Memory to delete not found:', actionItem.existingId)
+        }
+      }
+    } catch (err) {
+      errorCount++
+      errors.push(err instanceof Error ? err.message : 'Unknown error')
+      // Continue with other actions even if one fails
     }
   }
+
   isFormDialogOpen.value = false
   await loadMemories()
+
+  // Show single notification for the batch operation
+  if (successCount > 0 && errorCount === 0) {
+    if (successCount === 1) {
+      success(t('memories.createSuccess'))
+    } else {
+      success(t('memories.multipleSuccess', { count: successCount }))
+    }
+  } else if (successCount > 0 && errorCount > 0) {
+    // Show partial success with error details
+    const errorDetails = errors.length > 0 ? `: ${errors[0]}` : ''
+    warning(
+      t('memories.multipleSuccess', { count: successCount }) +
+        ` (${errorCount} ${t('common.error').toLowerCase()}${errorDetails})`
+    )
+  } else if (errorCount > 0) {
+    error(t('memories.createError'))
+  }
 }
 
 function handleFormDialogClose() {

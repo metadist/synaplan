@@ -25,11 +25,22 @@ class WidgetService
     ) {
     }
 
+    public const DEFAULT_WIDGET_PROMPT = 'widget-default';
+
     /**
      * Create a new widget.
+     *
+     * @param User        $owner           The widget owner
+     * @param string      $name            Widget display name
+     * @param string|null $taskPromptTopic Optional task prompt topic (defaults to 'widget-default')
+     * @param array       $config          Optional widget configuration
+     * @param string|null $websiteUrl      Optional website URL to add to allowed domains
      */
-    public function createWidget(User $owner, string $name, string $taskPromptTopic, array $config = []): Widget
+    public function createWidget(User $owner, string $name, ?string $taskPromptTopic = null, array $config = [], ?string $websiteUrl = null): Widget
     {
+        // Use default prompt if not specified
+        $taskPromptTopic = $taskPromptTopic ?: self::DEFAULT_WIDGET_PROMPT;
+
         // Validate task prompt exists (check user-specific first, then default)
         $prompt = $this->promptRepository->findByTopic($taskPromptTopic, $owner->getId());
         if (!$prompt) {
@@ -42,6 +53,14 @@ class WidgetService
                 'prompt_topic' => $taskPromptTopic,
                 'owner_id' => $owner->getId(),
             ]);
+        }
+
+        // If websiteUrl is provided, add the domain to allowed domains
+        if ($websiteUrl) {
+            $domain = $this->extractDomainFromUrl($websiteUrl);
+            if ($domain && !in_array($domain, $config['allowedDomains'] ?? [], true)) {
+                $config['allowedDomains'] = array_merge($config['allowedDomains'] ?? [], [$domain]);
+            }
         }
 
         $widget = new Widget();
@@ -62,6 +81,46 @@ class WidgetService
         ]);
 
         return $widget;
+    }
+
+    /**
+     * Extract domain from a URL.
+     */
+    private function extractDomainFromUrl(string $url): ?string
+    {
+        // Ensure URL has a scheme for parse_url to work correctly
+        if (!preg_match('~^https?://~i', $url)) {
+            $url = 'https://'.$url;
+        }
+
+        $parsed = parse_url($url);
+        if (!$parsed || empty($parsed['host'])) {
+            return null;
+        }
+
+        $host = strtolower($parsed['host']);
+
+        // Include port if specified
+        if (!empty($parsed['port'])) {
+            $host .= ':'.$parsed['port'];
+        }
+
+        return $host;
+    }
+
+    /**
+     * Update widget's task prompt topic.
+     */
+    public function updateWidgetPrompt(Widget $widget, string $taskPromptTopic): void
+    {
+        $widget->setTaskPromptTopic($taskPromptTopic);
+        $widget->touch();
+        $this->em->flush();
+
+        $this->logger->info('Widget task prompt updated', [
+            'widget_id' => $widget->getWidgetId(),
+            'new_topic' => $taskPromptTopic,
+        ]);
     }
 
     /**

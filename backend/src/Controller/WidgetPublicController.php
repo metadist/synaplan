@@ -181,8 +181,11 @@ class WidgetPublicController extends AbstractController
             return $domainError;
         }
 
+        // Validate test mode: only allow if authenticated user is widget owner
+        $isValidatedTestMode = $this->isValidatedTestMode($request, $widget->getOwnerId());
+
         // Get or create session
-        $session = $this->sessionService->getOrCreateSession($widgetId, $data['sessionId']);
+        $session = $this->sessionService->getOrCreateSession($widgetId, $data['sessionId'], $isValidatedTestMode);
 
         // Check session limits
         $messageLimit = (int) ($config['messageLimit'] ?? WidgetSessionService::DEFAULT_MAX_MESSAGES);
@@ -337,6 +340,7 @@ class WidgetPublicController extends AbstractController
                     ? max(0.0, min(1.0, (float) $config['ragMinScore']))
                     : 0.3,
                 'widget_id' => $widget->getWidgetId(),
+                'is_widget_mode' => true, // Disable memories for widget
             ];
 
             $response = new StreamedResponse(function () use (
@@ -555,9 +559,6 @@ class WidgetPublicController extends AbstractController
                         ],
                     ]);
                 } catch (\Throwable $e) {
-                    $incomingMessage->setStatus('failed');
-                    $this->em->flush();
-
                     $this->logger->error('Widget message streaming failed', [
                         'error' => $e->getMessage(),
                         'trace' => $e->getTraceAsString(),
@@ -565,6 +566,16 @@ class WidgetPublicController extends AbstractController
                         'file' => $e->getFile(),
                         'line' => $e->getLine(),
                     ]);
+
+                    try {
+                        $incomingMessage->setStatus('failed');
+                        $this->em->flush();
+                    } catch (\Throwable $flushException) {
+                        // EntityManager might be closed after database error
+                        $this->logger->warning('Could not update message status after error', [
+                            'error' => $flushException->getMessage(),
+                        ]);
+                    }
 
                     $this->sendSse('error', [
                         'error' => 'Failed to process message',
@@ -655,8 +666,11 @@ class WidgetPublicController extends AbstractController
             ], Response::HTTP_FORBIDDEN);
         }
 
+        // Validate test mode: only allow if authenticated user is widget owner
+        $isValidatedTestMode = $this->isValidatedTestMode($request, $widget->getOwnerId());
+
         // Get or create widget session
-        $widgetSession = $this->sessionService->getOrCreateSession($widgetId, $sessionId);
+        $widgetSession = $this->sessionService->getOrCreateSession($widgetId, $sessionId, $isValidatedTestMode);
 
         $owner = $widget->getOwner();
         if (!$owner) {
@@ -1316,5 +1330,55 @@ class WidgetPublicController extends AbstractController
         }
 
         return $value;
+    }
+
+    /**
+     * Validate test mode request.
+     *
+     * Test mode is only valid if:
+     * 1. X-Widget-Test-Mode header is set to 'true'
+     * 2. User is authenticated (has valid session/token)
+     * 3. Authenticated user is the widget owner
+     *
+     * This prevents malicious users from marking their sessions as test
+     * to avoid being counted in statistics.
+     *
+     * @param Request $request       The HTTP request
+     * @param int     $widgetOwnerId The widget owner's user ID
+     *
+     * @return bool True if test mode is validated, false otherwise
+     */
+    private function isValidatedTestMode(Request $request, int $widgetOwnerId): bool
+    {
+        // Check if test mode is requested
+        if ('true' !== $request->headers->get('X-Widget-Test-Mode')) {
+            return false;
+        }
+
+        // Try to get authenticated user from security context
+        $user = $this->getUser();
+
+        // No authenticated user - test mode not allowed
+        if (!$user instanceof \App\Entity\User) {
+            $this->logger->debug('Test mode rejected: no authenticated user');
+
+            return false;
+        }
+
+        // Check if authenticated user is the widget owner
+        if ($user->getId() !== $widgetOwnerId) {
+            $this->logger->debug('Test mode rejected: user is not widget owner', [
+                'user_id' => $user->getId(),
+                'widget_owner_id' => $widgetOwnerId,
+            ]);
+
+            return false;
+        }
+
+        $this->logger->debug('Test mode validated for widget owner', [
+            'user_id' => $user->getId(),
+        ]);
+
+        return true;
     }
 }

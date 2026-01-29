@@ -87,9 +87,30 @@ class PromptFixtures extends Fixture
             [
                 'ownerId' => 0,
                 'language' => 'en',
+                'topic' => 'widget-default',
+                'shortDescription' => 'Default system prompt for chat widgets. Used when no custom task prompt is specified during widget creation.',
+                'prompt' => $this->getWidgetDefaultPrompt(),
+            ],
+            [
+                'ownerId' => 0,
+                'language' => 'en',
+                'topic' => 'widget-setup-interview',
+                'shortDescription' => 'AI-guided widget configuration interview. Collects information about the business to generate a custom task prompt.',
+                'prompt' => $this->getWidgetSetupInterviewPrompt(),
+            ],
+            [
+                'ownerId' => 0,
+                'language' => 'en',
                 'topic' => 'memory_extraction',
                 'shortDescription' => 'Extract user preferences and important information from conversations. Returns JSON array or null.',
                 'prompt' => $this->getMemoryExtractionPrompt(),
+            ],
+            [
+                'ownerId' => 0,
+                'language' => 'en',
+                'topic' => 'tools:memory_parse',
+                'shortDescription' => 'Parse natural language input into structured memory format. Can suggest updates or deletions of existing memories.',
+                'prompt' => $this->getMemoryParsePrompt(),
             ],
         ];
 
@@ -191,21 +212,24 @@ This is the list, use only this:
    - "audio" - if user wants audio, sound, voice, speech, TTS, or text-to-speech
    - "image" - if user wants an image, picture, photo, illustration (this is the default)
    Examples:
-   - "Erstelle ein Video von einem Auto" → BMEDIA: "video"
+   - "Create a video of a car" → BMEDIA: "video"
    - "Make a video of a dog running" → BMEDIA: "video"
    - "Generate an image of a cat" → BMEDIA: "image"
    - "Create a picture of a sunset" → BMEDIA: "image"
    - "Read this text aloud" → BMEDIA: "audio"
    - "Convert to speech" → BMEDIA: "audio"
 
-8. **Detect video duration (BDURATION)**: If BTOPIC is "mediamaker" AND BMEDIA is "video", extract the requested duration in seconds as an integer.
-   - If the user specifies a duration (e.g., "3 seconds", "6 Sekunden", "10-second video"), set BDURATION to that number
-   - If no duration is mentioned, do NOT include BDURATION (let the system use default)
+8. **Detect video duration (BDURATION)**: If BTOPIC is "mediamaker" AND BMEDIA is "video", extract the requested duration.
+   - Supported durations: **4, 6, or 8 seconds only**
+   - If user requests a duration, round to the nearest supported value (4, 6, or 8)
+   - If no duration is mentioned, do NOT include BDURATION (system uses default of 4)
    Examples:
-   - "Erstelle ein 3 Sekunden Video von einem Auto" → BDURATION: 3
+   - "Create a 4 second video of a car" → BDURATION: 4
    - "Make a 6-second video of a dog" → BDURATION: 6
-   - "Create a 10 second clip" → BDURATION: 10
-   - "Generate a video of a cat" → (no BDURATION, user didn't specify)
+   - "Create an 8 second clip" → BDURATION: 8
+   - "Make a 10 second video" → BDURATION: 8 (rounded down to max)
+   - "Create a 3 second video" → BDURATION: 4 (rounded up to min)
+   - "Generate a video of a cat" → (no BDURATION, use default)
 
 # Answer format
 
@@ -294,20 +318,20 @@ Respond with ONLY the enhanced prompt text. Do not include any JSON, explanation
 Input: "Generate an image of a cat"
 Output: A detailed image of a cat, photorealistic, soft natural lighting, high resolution, shallow depth of field
 
-Input: "Erstelle ein 3 Sekunden Video von einem Mann der winkt"
+Input: "Create a 3 second video of a man waving"
 Output: Cinematic video of a man waving, natural movement, friendly expression, soft daylight, shallow depth of field, 4K quality
 
 Input: "Make a 5 second video of a dog running in a park"
 Output: Dynamic video of a happy dog running through a lush green park, tracking shot, natural sunlight, playful movement, cinematic quality
 
-Input: "Erstelle ein Video von einem BMW Auto, was gerade fährt"
+Input: "Create a video of a BMW car driving"
 Output: Cinematic video of a modern BMW sedan driving smoothly on an asphalt road, front three-quarter tracking shot, realistic motion blur, reflections on glossy paint, golden-hour lighting, urban background, 4K quality
 
 Input: "Read this aloud: Hello World"
 Output: Hello World
 
-Input: "Erstelle eine audio mit 'Guten Tag!'"
-Output: Guten Tag!
+Input: "Create an audio saying 'Good morning!'"
+Output: Good morning!
 PROMPT;
     }
 
@@ -319,7 +343,7 @@ You receive a request to create an audio/voice output for the user.
 
 Your task:
 - Extract ONLY the exact text that should be spoken.
-- Remove instruction phrases like "say", "speak", "read", "please create an audio", "erstelle eine Audio" etc.
+- Remove instruction phrases like "say", "speak", "read", "please create an audio", "generate audio" etc.
 - Preserve the original language, punctuation, emoji, casing.
 - If the user provides quotes, return the quoted text without the quotes (unless they contain mismatched quotes, then return the meaningful text).
 - Do not add introductions like "Audio Prompt:" or explanations.
@@ -328,9 +352,9 @@ Your task:
 - Return plain text only, without JSON, markdown, quotes, or extra sentences.
 
 Examples:
-- Input: "Bitte sag: Hallo, was geht?" → Output: Hallo, was geht?
+- Input: "Please say: Hello, how are you?" → Output: Hello, how are you?
 - Input: "Read this aloud: 'Good morning!'" → Output: Good morning!
-- Input: "erstelle eine audio wo du hallo sagst" → Output: Hallo
+- Input: "Create an audio where you say hello" → Output: Hello
 PROMPT;
     }
 
@@ -423,8 +447,8 @@ Output: "How can I fix this issue?"
 Input: "need help with code"
 Output: "I need help with my code. Can you assist me?"
 
-Input: "erkläre mir das"
-Output: "Kannst du mir das bitte erklären?"
+Input: "explain this to me"
+Output: "Could you please explain this to me?"
 
 Input: "make pic of cat"
 Output: "Please create an image of a cat."
@@ -454,8 +478,8 @@ Your task is to analyze the user's question and generate a concise, effective se
 
 ## Examples:
 
-Question: "Kannst du mir sagen, wie viel ein Döner in München kostet?"
-Search Query: döner preis münchen
+Question: "Can you tell me how much a kebab costs in Munich?"
+Search Query: kebab price munich
 
 Question: "What's the weather like in Paris this weekend?"
 Search Query: paris weather forecast weekend
@@ -469,8 +493,8 @@ Search Query: tesla model 3 2024 specifications
 Question: "Who won the world cup in 2022?"
 Search Query: world cup 2022 winner
 
-Question: "Wie funktioniert ein Quantencomputer?"
-Search Query: quantencomputer funktionsweise
+Question: "How does a quantum computer work?"
+Search Query: quantum computer how it works
 
 Now generate the search query for the following user question:
 PROMPT;
@@ -618,75 +642,237 @@ Now you will receive the incoming email. Analyze it and output ONLY the selected
 PROMPT;
     }
 
+    private function getWidgetDefaultPrompt(): string
+    {
+        return <<<'PROMPT'
+# Chat Widget Assistant
+
+You are a friendly and helpful chat assistant embedded on a website. Your role is to assist visitors with their questions and provide helpful information.
+
+## Guidelines
+
+1. **Be Helpful**: Answer questions clearly and concisely. If you don't know something, be honest about it.
+
+2. **Be Professional**: Maintain a friendly yet professional tone. Adapt your communication style to match the visitor's needs.
+
+3. **Stay On Topic**: Focus on helping visitors with questions related to the website or service you're embedded on.
+
+4. **Provide Value**: Give complete, actionable answers. Don't just acknowledge questions - actually help solve problems.
+
+5. **Language**: Respond in the same language the visitor uses. If they write in German, respond in German; if English, respond in English.
+
+## Response Format
+
+- Keep responses concise but complete
+- Use markdown formatting when helpful (lists, bold for emphasis)
+- Break up long responses into readable paragraphs
+- Offer to provide more details if the topic is complex
+
+You are here to make visitors' experience better. Be the helpful assistant you'd want to chat with!
+PROMPT;
+    }
+
+    private function getWidgetSetupInterviewPrompt(): string
+    {
+        return <<<'PROMPT'
+# Widget Setup Assistant
+
+You are a friendly assistant helping the user configure their chat widget. Have a casual conversation and collect 5 important pieces of information.
+
+## WHAT YOU NEED TO FIND OUT
+
+1. What does the company/website do? What products or services are offered?
+2. Who are the typical visitors? (Customers, business clients, job applicants, etc.)
+3. What should the chat assistant help with? (Support, sales, FAQ, appointments, etc.)
+4. What tone should the assistant use? (Formal, casual, friendly, professional)
+5. Are there topics the assistant should NOT discuss?
+
+## YOUR STYLE
+
+- Be casual and friendly, like a helpful colleague
+- No stiff questions! Keep it natural and conversational
+- Keep responses short (2-3 sentences), don't ramble
+- Briefly acknowledge answers before moving to the next question
+- If the user switches to a different language, follow their lead
+
+## IMPORTANT RULES
+
+- Ask ONE thing at a time
+- NEVER repeat a question that has already been answered
+- After a REAL answer → move to the next question
+- For follow-up questions or unclear answers → briefly explain, then ask again
+
+## ANSWER VALIDATION
+
+Check if the answer FITS the question - not if it's perfect!
+
+VALID ANSWERS (accept and continue):
+- Question 1 (Business): Any description of a company, service, product, or website. Short answers like "car dealership", "online shop", "pizzeria" are totally fine!
+- Question 2 (Visitors): Any description of target groups. "Private customers", "businesses", "everyone" are valid.
+- Question 3 (Tasks): Any description of tasks or topics. "Opening hours", "product questions", "support", "help with prices" are all valid - even with details!
+- Question 4 (Tone): "casual", "friendly", "professional", "like a friend", etc.
+- Question 5 (Taboos): Either specific topics or "nothing", "none", "everything is fine".
+
+IMPORTANT: If the user gives a REAL answer that fits the question → ACCEPT and move on!
+The user doesn't have to answer perfectly. An answer is valid if it somehow addresses the question.
+
+ONLY INVALID (ask again):
+- Completely incomprehensible (e.g., "asdf", "???", only emojis)
+- Pure counter-questions without an answer ("What do you mean?")
+- Obvious nonsense that has nothing to do with the question
+
+When in doubt: ACCEPT and move on! Better too flexible than too strict.
+
+## TRACKING
+
+At the END of each response, add on a new line:
+[QUESTION:X]
+
+X = the number of the question you JUST ASKED (1-5).
+
+IMPORTANT: If you ask the SAME question again (because the answer was invalid), use the SAME marker!
+Example: If answer to question 1 was invalid → ask again with [QUESTION:1]
+
+When all 5 are answered → [QUESTION:DONE]
+
+## AFTER QUESTION 5
+
+When all 5 pieces of information have REALLY been collected:
+
+1. **FIRST**: Show a brief summary with emojis:
+
+"Great, I've got everything! Here's a quick overview:
+
+📋 **Your Business**: [Brief summary of question 1]
+👥 **Your Visitors**: [Brief summary of question 2]
+🎯 **The Assistant Should**: [Brief summary of question 3]
+💬 **Tone**: [Brief summary of question 4]
+🚫 **Off-Limit Topics**: [Brief summary of question 5, or "No special restrictions"]
+
+I'm now creating your personalized assistant..."
+
+2. **THEN**: Generate the prompt:
+
+<<<GENERATED_PROMPT>>>
+[Here the system prompt for the chat assistant based on the collected information]
+<<<END_PROMPT>>>
+
+## START
+
+Greet the user casually and ask about their business/website. Be welcoming!
+Example: "Hey! Great to have you here. Tell me a bit about what you do – what's your business or website about?"
+
+[QUESTION:1]
+PROMPT;
+    }
+
     private function getMemoryExtractionPrompt(): string
     {
         return <<<'PROMPT'
-You are a memory extraction assistant. Extract **only truly important and persistent** user information from conversations.
+You are a memory extraction assistant. Extract user information worth remembering from conversations.
 
-**CRITICAL: Return JSON array if you find something worth remembering, otherwise return: null**
+**Return JSON array if you find something to remember, otherwise return: null**
 
-## ✅ What to Extract:
-- Personal preferences (tech, tools, methodologies)
-- Work context (job, projects, team, company info)
-- Goals & aspirations (learning, building)
-- Dislikes & avoidances
-- Personal facts (age, location, dietary preferences - if explicitly stated)
-- **Research results**: If you researched information about the user, their company, or related topics, extract factual findings!
+## What to Extract:
+- **Names & Identity**: User's name, nicknames, how they introduce themselves
+- **Personal facts**: Age, location, occupation, hobbies, interests
+- **Preferences**: Likes, dislikes, favorite things, preferred tools/methods
+- **Work context**: Job, company, projects, team info
+- **Goals**: What they want to learn, build, achieve
+- **Research findings**: Facts discovered about the user or their context
 
-## ❌ DO NOT Extract:
-- Questions or task requests
-- Temporary states ("tired today", "currently debugging")
-- General statements or small talk
-- One-time events
-- Speculative or uncertain information
-
-## 🎯 Analyzing Conversations:
-The conversation includes YOUR (assistant's) responses. If you researched factual information (about user, their company, projects, etc.), extract it!
-
-**Examples:**
-- User asks about their company → You research it → Extract company info
-- User asks who Max Mustermann is → You find he's a developer → Extract work context
-- User states "I prefer TypeScript" → Extract preference
+## Do NOT Extract:
+- Pure questions without personal info ("What is React?")
+- Temporary states ("I'm tired today")
+- Generic greetings without info ("Hello!", "Thanks!")
 
 ## Output Format:
 
-**Worth remembering:**
 ```json
 [
   {
-    "category": "preferences|personal|work|projects|general",
+    "category": "personal|preferences|work|projects|general",
     "key": "short_identifier",
-    "value": "descriptive text in user's language"
+    "value": "what to remember (in user's language)"
   }
 ]
 ```
 
-**Nothing to remember (80-90% of cases):**
+Or if nothing to remember: `null`
+
+## Guidelines:
+- **Be generous**: If in doubt, extract it. Better to remember than forget.
+- Keep keys short (<= 24 chars), snake_case
+- One memory per fact (atomic)
+- Write values in the user's language
+
+## Examples:
+
+User: "Hi, I'm Tom" → `[{"category": "personal", "key": "name", "value": "Tom"}]`
+
+User: "My name is Sarah and I work at Google" → `[{"category": "personal", "key": "name", "value": "Sarah"}, {"category": "work", "key": "company", "value": "Works at Google"}]`
+
+User: "I prefer dark mode" → `[{"category": "preferences", "key": "ui_theme", "value": "Prefers dark mode"}]`
+
+User: "What time is it?" → `null`
+
+User: "Thanks for the help!" → `null`
+
+**If existing memories are provided, do NOT duplicate. Only extract NEW information.**
+PROMPT;
+    }
+
+    private function getMemoryParsePrompt(): string
+    {
+        return <<<'PROMPT'
+# Memory Parse Assistant
+
+Parse user input into memories. Keep ALL details the user mentions!
+
+## Rules
+
+1. Return JSON with "actions" array
+2. **KEEP FULL CONTEXT** - never shorten or summarize!
+   - "I like doner but it's too salty" → value: "doner, but it's too salty"
+   - "My favorite color is blue because it calms me" → value: "blue, because it calms me"
+3. UPDATE if same topic exists (use existingId)
+4. DELETE only when user explicitly wants to forget
+
+## Format
+
+```json
+{"actions": [{"action": "create|update|delete", "memory": {"category": "...", "key": "...", "value": "..."}, "existingId": 123}]}
 ```
-null
+
+## Categories
+personal, preferences, work, projects, general
+
+## Keys (examples)
+name, age, location, job, favorite_food, favorite_color, hobbies, skills, notes
+
+## Examples
+
+Input: "I like pizza but only with extra cheese"
+```json
+{"actions": [{"action": "create", "memory": {"category": "preferences", "key": "favorite_food", "value": "pizza, but only with extra cheese"}}]}
 ```
 
-## Guidelines (keep it compact):
-- Keep **category names generic** (e.g. personal, work, preferences, projects, general). Avoid overly specific category names.
-- Keep **keys as short as possible** while still being meaningful (aim for <= 24 characters). Do NOT use IDs, timestamps, or full sentences as keys.
-- ATOMIC RULE: **1 memory = 1 fact / preference**. Do NOT combine multiple facts in one value.
-- If a message contains multiple facts about the same topic, **create multiple memories** and **reuse the same key** (same key is allowed multiple times).
-  - Example: `diet: Eats halal` + `diet: Prefers low-calorie meals for weight loss`
-- Keep values **short** (single sentence, no lists).
+Input: "My name is Tom, I'm 25, and I work at Google as a developer"
+```json
+{"actions": [
+  {"action": "create", "memory": {"category": "personal", "key": "name", "value": "Tom"}},
+  {"action": "create", "memory": {"category": "personal", "key": "age", "value": "25"}},
+  {"action": "create", "memory": {"category": "work", "key": "job", "value": "developer at Google"}}
+]}
+```
 
-## Quick Examples:
+Input: "Actually I'm 26 now"
+Existing: [{"id": 5, "key": "age", "value": "25"}]
+```json
+{"actions": [{"action": "update", "existingId": 5, "memory": {"category": "personal", "key": "age", "value": "26"}}]}
+```
 
-User: "What are good React alternatives?" → `null` (just a question)
-
-User: "I prefer Vue for personal projects" → `[{"category": "preferences", "key": "frontend_framework", "value": "Prefers Vue for personal projects"}]`
-
-User: "Thanks!" → `null` (small talk)
-
-User: "I work as senior developer at TechCorp using TypeScript" → `[{"category": "work", "key": "position", "value": "Senior developer at TechCorp"}, {"category": "work", "key": "tech_stack", "value": "Uses TypeScript"}]`
-
-User: "research my company" + Assistant finds TechCorp info → Extract company details
-
-**IMPORTANT: If existing memories are provided, do NOT duplicate. Only extract NEW information.**
+**Return ONLY the JSON. No explanation.**
 PROMPT;
     }
 }

@@ -34,21 +34,33 @@ class WidgetSessionService
 
     /**
      * Get or create a session for a widget.
+     *
+     * @param string $widgetId            The widget ID
+     * @param string $sessionId           The session ID (will be prefixed with 'test_' if isValidatedTestMode is true)
+     * @param bool   $isValidatedTestMode Whether test mode was validated server-side (owner authenticated)
      */
-    public function getOrCreateSession(string $widgetId, string $sessionId): WidgetSession
+    public function getOrCreateSession(string $widgetId, string $sessionId, bool $isValidatedTestMode = false): WidgetSession
     {
-        $session = $this->sessionRepository->findByWidgetAndSession($widgetId, $sessionId);
+        // If validated test mode, ensure session ID has test_ prefix
+        // This is the ONLY place where test_ prefix can be added (server-side validated)
+        $effectiveSessionId = $sessionId;
+        if ($isValidatedTestMode && !str_starts_with($sessionId, 'test_')) {
+            $effectiveSessionId = 'test_'.$sessionId;
+        }
+
+        $session = $this->sessionRepository->findByWidgetAndSession($widgetId, $effectiveSessionId);
 
         if (!$session) {
             $session = new WidgetSession();
             $session->setWidgetId($widgetId);
-            $session->setSessionId($sessionId);
+            $session->setSessionId($effectiveSessionId);
             $this->em->persist($session);
             $this->em->flush();
 
             $this->logger->info('New widget session created', [
                 'widget_id' => $widgetId,
-                'session_id' => substr($sessionId, 0, 8).'...',
+                'session_id' => substr($effectiveSessionId, 0, 12).'...',
+                'is_test' => $session->isTest(),
             ]);
         } elseif ($session->isExpired()) {
             // Reset expired session
@@ -59,7 +71,7 @@ class WidgetSessionService
 
             $this->logger->info('Widget session reset after expiry', [
                 'widget_id' => $widgetId,
-                'session_id' => substr($sessionId, 0, 8).'...',
+                'session_id' => substr($effectiveSessionId, 0, 12).'...',
             ]);
         }
 
