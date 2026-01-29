@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test'
+import { test, expect } from '../test-setup'
 import { login } from '../helpers/auth'
 import { selectors } from '../helpers/selectors'
 

@@ -7,6 +7,7 @@ namespace App\Service;
 use App\Entity\User;
 use App\Repository\ApiKeyRepository;
 use App\Repository\ChatRepository;
+use App\Repository\ConfigRepository;
 use App\Repository\EmailVerificationAttemptRepository;
 use App\Repository\FileRepository;
 use App\Repository\InboundEmailHandlerRepository;
@@ -36,6 +37,7 @@ final readonly class UserDeletionService
         private EmailVerificationAttemptRepository $emailVerificationAttemptRepository,
         private FileRepository $fileRepository,
         private InboundEmailHandlerRepository $inboundEmailHandlerRepository,
+        private ConfigRepository $configRepository,
         private FileStorageService $fileStorageService,
         private VectorStorageFacade $vectorStorageFacade,
         private LoggerInterface $logger,
@@ -99,6 +101,74 @@ final readonly class UserDeletionService
             ]);
 
             throw $e;
+        }
+    }
+
+    /**
+     * Cleanup all user data but keep the user account (for idempotent tests).
+     * This method deletes all related entities but preserves the user itself.
+     *
+     * @throws \Exception if cleanup fails
+     */
+    public function cleanupUserData(User $user): void
+    {
+        $userId = $user->getId();
+        $email = $user->getMail();
+
+        $this->logger->info('User data cleanup initiated', [
+            'user_id' => $userId,
+            'email' => $email,
+        ]);
+
+        // Use transaction for atomic cleanup
+        $this->em->getConnection()->beginTransaction();
+
+        try {
+            // Delete all related entities to avoid foreign key constraint violations
+            // Note: We do NOT delete the user account itself
+            $this->deleteVerificationTokens($userId);
+            $this->deleteAuthTokens($userId);
+            $this->deleteApiKeys($userId);
+            $this->deleteSessions($userId);
+            $this->deleteRagDocuments($userId);
+            $this->deleteUseLogs($userId);
+            $this->deleteWidgets($userId);
+            $this->deleteChats($userId);
+            $this->deleteMessages($userId);
+            $this->deleteEmailVerificationAttempts($email);
+            $this->deleteFiles($userId);
+            $this->deleteInboundEmailHandlers($userId);
+            $this->deleteConfigs($userId);
+
+            $this->em->flush();
+            $this->em->getConnection()->commit();
+
+            // Cleanup empty user directories (best effort, outside transaction)
+            $this->cleanupUserDirectories($userId);
+
+            $this->logger->info('User data cleanup completed successfully', [
+                'user_id' => $userId,
+                'email' => $email,
+            ]);
+        } catch (\Throwable $e) {
+            $this->em->getConnection()->rollBack();
+
+            $this->logger->error('Failed to cleanup user data', [
+                'user_id' => $userId,
+                'email' => $email,
+                'error' => $e->getMessage(),
+                'exception' => $e,
+            ]);
+
+            throw $e;
+        }
+    }
+
+    private function deleteConfigs(int $userId): void
+    {
+        $configs = $this->configRepository->findBy(['ownerId' => $userId]);
+        foreach ($configs as $config) {
+            $this->em->remove($config);
         }
     }
 

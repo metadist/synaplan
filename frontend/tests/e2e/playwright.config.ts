@@ -2,12 +2,13 @@ import { defineConfig, devices } from '@playwright/test'
 import dotenv from 'dotenv'
 import path from 'path'
 import { fileURLToPath } from 'url'
+import { URLS } from './config/config'
 
 // Get __dirname equivalent in ES modules
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 
-// Load .env file from e2e directory
+// Load .env file from e2e directory (loads before config.ts imports)
 dotenv.config({ path: path.join(__dirname, '.env.local') })
 
 /**
@@ -22,9 +23,9 @@ export default defineConfig({
   retries: 0,
   timeout: 60_000,
 
-  // BaseURL from ENV or default
+  // BaseURL from centralized config
   use: {
-    baseURL: process.env.BASE_URL || 'http://localhost:5173',
+    baseURL: URLS.BASE_URL,
     headless: process.env.CI ? true : false,
     screenshot: 'only-on-failure',
     video: 'retain-on-failure',
@@ -52,11 +53,41 @@ export default defineConfig({
   projects: [
     {
       name: 'chromium',
-      use: { ...devices['Desktop Chrome'] },
+      use: {
+        // Extract device config but remove deviceScaleFactor to allow large viewport
+        ...Object.fromEntries(
+          Object.entries(devices['Desktop Chrome']).filter(([key]) => key !== 'deviceScaleFactor')
+        ),
+        // Large viewport to ensure all elements are visible (works in CI and locally)
+        viewport: { width: 1920, height: 1080 },
+        // Only maximize locally (not in headless CI mode)
+        ...(process.env.CI
+          ? {}
+          : {
+              launchOptions: {
+                args: ['--start-maximized'],
+              },
+            }),
+      },
     },
     {
       name: 'firefox',
-      use: { ...devices['Desktop Firefox'] },
+      use: {
+        // Extract device config but remove deviceScaleFactor to allow large viewport
+        ...Object.fromEntries(
+          Object.entries(devices['Desktop Firefox']).filter(([key]) => key !== 'deviceScaleFactor')
+        ),
+        // Large viewport to ensure all elements are visible (works in CI and locally)
+        viewport: { width: 1920, height: 1080 },
+        // Only maximize locally (not in headless CI mode)
+        ...(process.env.CI
+          ? {}
+          : {
+              launchOptions: {
+                args: ['--start-maximized'],
+              },
+            }),
+      },
     },
   ],
 

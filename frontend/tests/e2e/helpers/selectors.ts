@@ -71,5 +71,62 @@ export const selectors = {
     button: '[data-testid="btn-user-menu-toggle"]',
     logoutBtn: '[data-testid="btn-user-logout"]',
   },
+  widgets: {
+    page: '[data-testid="page-widgets"]',
+    createButton: '[data-testid="btn-create-widget"]',
+    simpleForm: {
+      modal: '[data-testid="modal-simple-widget-form"]',
+      nameInput: '[data-testid="input-widget-name"]',
+      websiteInput: '[data-testid="input-website-url"]',
+      taskPromptInput: '[data-testid="input-task-prompt"]',
+      createButton: '[data-testid="btn-create"]',
+      cancelButton: '[data-testid="btn-cancel"]',
+    },
+    successModal: {
+      modal: '[data-testid="modal-widget-success"]',
+      embedCode: '[data-testid="section-embed-code"]',
+      testButton: '[data-testid="btn-test-widget"]',
+      closeButton: '[data-testid="btn-close"]',
+    },
+    widgetCard: {
+      item: '[data-testid="item-widget"]',
+      embedButton: '[data-testid="btn-widget-embed"]',
+      testButton: '[data-testid="btn-widget-test"]',
+      advancedButton: '[data-testid="btn-widget-advanced"]',
+    },
+    advancedConfig: {
+      modal: '[data-testid="modal-advanced-config"]',
+      tabButton: '[data-testid="btn-tab"]',
+      behaviorTab: '[data-testid="section-behavior"]',
+      securityTab: '[data-testid="section-security"]',
+      assistantTab: '[data-testid="section-assistant"]',
+      autoMessageInput: '[data-testid="input-auto-message"]',
+      messageLimitInput: '[data-testid="input-message-limit"]',
+      maxFileSizeInput: '[data-testid="input-max-file-size"]',
+      promptContentInput: '[data-testid="input-prompt-content"]',
+      selectionRulesInput: '[data-testid="input-selection-rules"]',
+      domainInput: '[data-testid="input-domain"]',
+      addDomainButton: '[data-testid="btn-add-domain"]',
+      saveButton: '[data-testid="btn-save"]',
+      closeButton: '[data-testid="btn-close"]',
+    },
+  },
+  widget: {
+    // Shadow DOM Host: The widget creates a shadow root inside this element
+    // Use .locator() to access elements inside Shadow DOM
+    host: '#synaplan-widget-host',
+    // Button is attached directly to body (not in Shadow DOM) for easier styling/positioning
+    button: '#synaplan-widget-button',
+    // Elements inside Shadow DOM - must be accessed via host.locator()
+    chatWindow: '[data-testid="section-chat-window"]',
+    messagesContainer: '[data-testid="section-messages"]',
+    input: '[data-testid="input-message"]',
+    sendButton: '[data-testid="btn-send"]',
+    attachButton: '[data-testid="btn-attach"]',
+    fileInput: '[data-testid="input-file"]',
+    fileUploadError: '[data-testid="text-file-upload-error"]',
+    fileSizeError: '.text-red-600, .text-red-400', // File size error message
+    removeFileButton: (index: number) => `[data-testid="btn-remove-file-${index}"]`,
+  },
   toast: {},
 } as const
