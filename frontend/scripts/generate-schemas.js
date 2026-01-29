@@ -29,7 +29,9 @@ console.log('🔧 Fixing Zod v4 compatibility...')
 
 // Fix z.record() - Zod v4 requires keyType and valueType
 // Replace: z.record(valueSchema) with z.record(z.string(), valueSchema)
+// Handle both multiline (z.record(\n) and single-line (z.record(z.object) patterns
 content = content.replace(/z\.record\(\s*\n/g, 'z.record(z.string(), \n')
+content = content.replace(/z\.record\(z\.object/g, 'z.record(z.string(), z.object')
 
 // Step 4: Add readable aliases
 console.log('✨ Creating readable aliases...')

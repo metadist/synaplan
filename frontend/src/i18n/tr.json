@@ -26,6 +26,7 @@
     "profile": "Profil",
     "admin": "Yönetici Paneli",
     "adminFeatures": "Özellik Durumu",
+    "adminConfig": "Sistem Yapılandırması",
     "subscription": "Abonelik",
     "subscriptionSuccess": "Abonelik Başarılı",
     "subscriptionCancel": "Abonelik İptal Edildi",
@@ -171,6 +172,22 @@
       "cost": "Maliyet",
       "activeSubscriptions": "Aktif Abonelikler",
       "subscriptionOverview": "Abonelik Özeti"
+    },
+    "config": {
+      "title": "Sistem Yapılandırması",
+      "description": "Ortam değişkenlerini ve servis bağlantılarını yönetin",
+      "loadError": "Yapılandırma yüklenemedi",
+      "saveError": "Yapılandırma kaydedilemedi",
+      "saved": "Yapılandırma kaydedildi",
+      "unsaved": "Kaydedilmemiş değişiklikler",
+      "testConnection": "Bağlantıyı Test Et",
+      "testFailed": "Bağlantı testi başarısız",
+      "commandCopied": "Komut panoya kopyalandı",
+      "restartBanner": {
+        "title": "Yapılandırma Güncellendi — Yeniden Başlatma Gerekli",
+        "message": "Değişiklikleriniz .env dosyasına kaydedildi. Değişikliklerin etkili olması için Docker konteynerlerinizi yeniden başlatmanız gerekiyor.",
+        "copyCommand": "Komutu Kopyala"
+      }
     }
   },
   "sidebar": {
@@ -200,7 +217,8 @@
     "upgrade": "Yükselt",
     "admin": "Yönetici",
     "adminDashboard": "Kontrol Paneli",
-    "adminFeatureStatus": "Özellik Durumu"
+    "adminFeatureStatus": "Özellik Durumu",
+    "adminSystemConfig": "Sistem Yapılandırması"
   },
   "chatInput": {
     "placeholder": "Mesajınızı yazın...",
@@ -422,7 +440,10 @@
     "unknown": "Bilinmiyor",
     "leave": "Ayrıl",
     "stay": "Kal",
-    "retry": "Tekrar Dene"
+    "retry": "Tekrar Dene",
+    "enabled": "Etkin",
+    "disabled": "Devre Dışı",
+    "reset": "Sıfırla"
   },
   "search": {
     "sources": "Kaynaklar",

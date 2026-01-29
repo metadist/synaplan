@@ -1,0 +1,13 @@
+# Documentation Images
+
+Screenshots for Synaplan documentation.
+
+| Image | Used In |
+|-------|---------|
+| dashboard.png | README.md |
+| chat.png | FEATURES.md |
+| widget-embed.png | WIDGET.md |
+| rag-search.png | RAG.md |
+| settings.png | CONFIGURATION.md |
+
+Recommended size: 1200px width, PNG or WebP format
