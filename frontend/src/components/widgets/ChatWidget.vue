@@ -852,6 +852,7 @@ const exportChat = () => {
     .message-user .message-header { color: #333; }
     .message-content {
       font-size: 15px;
+      white-space: pre-wrap;
       word-wrap: break-word;
     }
     .message-user .message-content { color: white; }

@@ -103,13 +103,16 @@ class SynaplanWidget {
       return
     }
 
-    // If autoOpen is enabled, load chat immediately without showing button first
+    // Always create button in lazy mode (needed for reopening after close)
+    this.createButton()
+
+    // If autoOpen is enabled, hide button and load chat immediately
     if (this.config?.autoOpen) {
+      if (this.button) {
+        this.button.style.display = 'none'
+      }
       this.shouldOpenImmediately = true
       await this.loadChat()
-    } else {
-      // Normal lazy mode: show button, load chat on click
-      this.createButton()
     }
   }
 

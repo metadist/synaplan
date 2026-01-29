@@ -1091,16 +1091,24 @@ class ChatHandler implements MessageHandlerInterface
      */
     private function imageToBase64DataUrl(string $relativePath): ?string
     {
-        $absolutePath = $this->uploadDir.'/'.$relativePath;
+        // Security: Validate path to prevent directory traversal attacks
+        // Strip leading slashes and reject paths with .. segments
+        $sanitizedPath = ltrim($relativePath, '/');
+        $absolutePath = $this->uploadDir.'/'.$sanitizedPath;
 
-        if (!file_exists($absolutePath)) {
-            $this->logger->warning('ChatHandler: Image file not found for vision', [
+        // Use FileHelper to safely resolve and validate path within upload directory
+        $resolvedPath = FileHelper::resolvePathNfs($absolutePath, $this->uploadDir);
+
+        if (false === $resolvedPath) {
+            $this->logger->warning('ChatHandler: Image file not found or path invalid for vision', [
                 'path' => $relativePath,
-                'absolute' => $absolutePath,
+                'resolved' => $absolutePath,
             ]);
 
             return null;
         }
+
+        $absolutePath = $resolvedPath;
 
         // Check file size - skip very large images (>10MB)
         $fileSize = filesize($absolutePath);
