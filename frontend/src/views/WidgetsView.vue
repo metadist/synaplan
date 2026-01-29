@@ -259,7 +259,7 @@
             :default-theme="testWidget.config?.defaultTheme || 'light'"
             :widget-title="testWidget.name"
             :allow-file-upload="testWidget.config?.allowFileUpload || false"
-            :file-upload-limit="testWidget.config?.fileUploadLimit || 3"
+            :file-upload-limit="testWidget.config?.fileUploadLimit ?? 3"
             :open-immediately="true"
             is-preview
             hide-button

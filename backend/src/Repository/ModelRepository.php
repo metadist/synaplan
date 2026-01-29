@@ -109,4 +109,46 @@ class ModelRepository extends ServiceEntityRepository
 
         return $capabilities;
     }
+
+    /**
+     * Find a model with a specific feature (e.g., 'vision', 'reasoning').
+     *
+     * @param string $feature    Feature name from model's JSON features array
+     * @param string $tag        Model tag/capability (default: 'chat')
+     * @param bool   $activeOnly Only return active/selectable models
+     *
+     * @return Model|null First matching model ordered by quality DESC
+     */
+    public function findByFeature(string $feature, string $tag = 'chat', bool $activeOnly = true): ?Model
+    {
+        // Get all models of the tag and filter by feature in PHP
+        // This is necessary because Doctrine DQL doesn't support JSON_CONTAINS natively
+        $models = $this->findByTag($tag, $activeOnly);
+
+        foreach ($models as $model) {
+            if ($model->hasFeature($feature)) {
+                return $model;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Find all models with a specific feature.
+     *
+     * @param string $feature    Feature name from model's JSON features array
+     * @param string $tag        Model tag/capability (default: 'chat')
+     * @param bool   $activeOnly Only return active/selectable models
+     *
+     * @return Model[] Array of matching models ordered by quality DESC
+     */
+    public function findAllByFeature(string $feature, string $tag = 'chat', bool $activeOnly = true): array
+    {
+        // Get all models of the tag and filter by feature in PHP
+        // This is necessary because Doctrine DQL doesn't support JSON_CONTAINS natively
+        $models = $this->findByTag($tag, $activeOnly);
+
+        return array_filter($models, fn (Model $model) => $model->hasFeature($feature));
+    }
 }
