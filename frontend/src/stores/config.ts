@@ -106,6 +106,19 @@ const config = {
   },
 
   /**
+   * Build and deployment information
+   * Used for debugging which version is deployed on which server
+   */
+  build: {
+    get version(): string {
+      return getConfigSync().build?.version ?? 'unknown'
+    },
+    get ip(): string {
+      return getConfigSync().build?.ip ?? 'dev'
+    },
+  },
+
+  /**
    * Load runtime configuration from backend
    * Call this before accessing config values (e.g., in main.ts)
    *

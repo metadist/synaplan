@@ -148,6 +148,25 @@ class ConfigController extends AbstractController
                         ),
                     ]
                 ),
+                new OA\Property(
+                    property: 'build',
+                    type: 'object',
+                    description: 'Build and deployment information for debugging',
+                    properties: [
+                        new OA\Property(
+                            property: 'version',
+                            type: 'string',
+                            example: '2.1.0',
+                            description: 'Application version'
+                        ),
+                        new OA\Property(
+                            property: 'ip',
+                            type: 'string',
+                            example: '10.0.0.2',
+                            description: 'Internal server IP (not public)'
+                        ),
+                    ]
+                ),
             ]
         )
     )]
@@ -209,13 +228,53 @@ class ConfigController extends AbstractController
             }
         }
 
+        // Build information for debugging deployments (minimal: version + internal IP only)
+        $buildInfo = [
+            'version' => $_ENV['APP_VERSION'] ?? '2.1.0',
+            'ip' => $this->getInternalIp(),
+        ];
+
         return $this->json([
             'recaptcha' => $recaptchaConfig,
             'features' => $features,
             'speech' => $speech,
             'plugins' => $plugins,
             'googleTag' => $googleTagConfig,
+            'build' => $buildInfo,
         ]);
+    }
+
+    /**
+     * Get internal IP address (10.x.x.x range only, for debugging which server handled request).
+     */
+    private function getInternalIp(): string
+    {
+        // Check environment variable first (set by start scripts)
+        $synDbHost = $_ENV['SYNDBHOST'] ?? '';
+        if ('' !== $synDbHost && str_starts_with($synDbHost, '10.')) {
+            return $synDbHost;
+        }
+
+        // Try to find a 10.x.x.x IP from network interfaces
+        $hostname = gethostname();
+        if ($hostname) {
+            $ips = gethostbynamel($hostname);
+            if ($ips) {
+                foreach ($ips as $ip) {
+                    if (str_starts_with($ip, '10.')) {
+                        return $ip;
+                    }
+                }
+            }
+        }
+
+        // Fallback: try to get from SERVER_ADDR if in 10.x range
+        $serverAddr = $_SERVER['SERVER_ADDR'] ?? '';
+        if (str_starts_with($serverAddr, '10.')) {
+            return $serverAddr;
+        }
+
+        return 'dev';
     }
 
     /**
