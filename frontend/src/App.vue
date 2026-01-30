@@ -12,15 +12,17 @@
     </ErrorBoundary>
     <NotificationContainer />
     <Dialog />
+    <!-- Build: {{ buildInfo }} -->
   </div>
 </template>
 
 <script setup lang="ts">
-import { watch } from 'vue'
+import { watch, computed } from 'vue'
 import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useTheme } from './composables/useTheme'
 import { useAuthStore } from '@/stores/auth'
+import { useConfigStore } from '@/stores/config'
 import { APP_NAME } from '@/router'
 import NotificationContainer from '@/components/NotificationContainer.vue'
 import Dialog from '@/components/Dialog.vue'
@@ -28,6 +30,13 @@ import ErrorBoundary from '@/components/ErrorBoundary.vue'
 import LoadingView from '@/views/LoadingView.vue'
 
 useTheme()
+
+// Build info for debugging (visible in HTML source as comment)
+const configStore = useConfigStore()
+const buildInfo = computed(() => {
+  const b = configStore.build
+  return `v${b.version} @ ${b.ip}`
+})
 
 // SECURITY: Clean up any legacy localStorage entries from before cookie-based auth
 // These should NEVER exist - if they do, they're from old code and must be removed
