@@ -1,5 +1,5 @@
 <template>
-  <div class="min-h-screen bg-app txt-primary text-[16px] leading-6">
+  <div class="min-h-screen bg-app txt-primary text-[16px] leading-6" :data-build="buildInfo">
     <ErrorBoundary>
       <Suspense>
         <template #default>
@@ -12,7 +12,6 @@
     </ErrorBoundary>
     <NotificationContainer />
     <Dialog />
-    <!-- Build: {{ buildInfo }} -->
   </div>
 </template>
 
