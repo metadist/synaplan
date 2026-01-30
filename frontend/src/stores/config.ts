@@ -108,12 +108,13 @@ const config = {
   /**
    * Load runtime configuration from backend
    * Call this before accessing config values (e.g., in main.ts)
+   *
+   * Note: Memory service check is NOT done here - it's done in reload()
+   * which is called after successful authentication. This prevents
+   * unnecessary API calls on public pages (shared chats, login, etc.)
    */
   async init(): Promise<void> {
     await loadRuntimeConfig()
-
-    // Start async memory service check (don't await - non-blocking!)
-    this.checkMemoryServiceAsync()
   },
 
   /**
