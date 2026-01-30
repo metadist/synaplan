@@ -78,9 +78,12 @@ export type MemoryServiceCheck = z.infer<typeof MemoryServiceCheckSchema>
 
 /**
  * Check memory service availability (lightweight, async check)
+ * Uses skipAuth because this is called during app init before auth is established
+ * and may run on public pages (shared chats)
  */
 export async function checkMemoryServiceAvailability(): Promise<MemoryServiceCheck> {
   return httpClient('/api/v1/config/memory-service/check', {
     schema: MemoryServiceCheckSchema,
+    skipAuth: true,
   })
 }
