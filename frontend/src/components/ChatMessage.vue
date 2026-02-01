@@ -503,14 +503,15 @@
             </template>
 
             <div :class="['text-xs truncate', role === 'user' ? 'text-white/80' : 'txt-secondary']">
-              <template v-if="role === 'assistant' && modelLabel && provider && !aiModels">
+              <!-- Hide model info during processing states (classifying, analyzing, etc.) -->
+              <template v-if="role === 'assistant' && modelLabel && provider && !aiModels && !isProcessing">
                 <span class="font-medium hidden md:inline">{{ modelLabel }}</span>
                 <span class="mx-1.5 opacity-50 hidden md:inline">·</span>
                 <span class="hidden md:inline">{{ provider }}</span>
                 <span class="mx-1.5 opacity-50 hidden md:inline">·</span>
               </template>
               <span>{{ formattedTime }}</span>
-              <template v-if="role === 'assistant' && modelLabel && !aiModels">
+              <template v-if="role === 'assistant' && modelLabel && !aiModels && !isProcessing">
                 <span class="mx-1.5 opacity-50 md:hidden">·</span>
                 <span class="md:hidden">{{ modelLabel }}</span>
               </template>
@@ -901,6 +902,21 @@ const formattedTime = computed(() => {
   const hours = date.getHours().toString().padStart(2, '0')
   const minutes = date.getMinutes().toString().padStart(2, '0')
   return `${hours}:${minutes}`
+})
+
+// Check if we're in a processing state (hide model info during these states)
+const isProcessing = computed(() => {
+  if (!props.isStreaming || !props.processingStatus) return false
+  const processingStates = [
+    'started',
+    'preprocessing',
+    'classifying',
+    'analyzing',
+    'analyzing_memories',
+    'saving_memories',
+    'generating',
+  ]
+  return processingStates.some((state) => props.processingStatus?.startsWith(state))
 })
 
 const emit = defineEmits<{
