@@ -120,7 +120,12 @@ final class TheHiveProvider implements ImageGenerationProviderInterface
         $modelEndpoint = self::MODEL_ENDPOINTS[$model] ?? self::MODEL_ENDPOINTS['flux-schnell'];
 
         // Parse size option (e.g., "1024x1024")
-        $dimensions = $this->parseDimensions($options['size'] ?? null, $model);
+        $dimensions = $this->parseDimensions(
+            $options['size'] ?? null,
+            $model,
+            isset($options['width']) ? (int) $options['width'] : null,
+            isset($options['height']) ? (int) $options['height'] : null,
+        );
 
         $this->logger->info('TheHive: Generating image', [
             'model' => $model,
@@ -223,8 +228,12 @@ final class TheHiveProvider implements ImageGenerationProviderInterface
     /**
      * Parse size string (e.g., "1024x1024") into width/height array.
      */
-    private function parseDimensions(?string $size, string $model): array
+    private function parseDimensions(?string $size, string $model, ?int $width, ?int $height): array
     {
+        if ($width && $height) {
+            return ['width' => $width, 'height' => $height];
+        }
+
         // Use default dimensions for the model if no size specified
         if (!$size) {
             return self::DEFAULT_DIMENSIONS[$model] ?? ['width' => 1024, 'height' => 1024];

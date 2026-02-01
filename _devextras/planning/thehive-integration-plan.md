@@ -1,6 +1,7 @@
 # TheHive API Integration Plan
 
 **Date:** 2026-01-31  
+**Status:** Draft (subject to change)  
 **Purpose:** Phased integration of TheHive API into Synaplan  
 **Documentation:** https://docs.thehive.ai/reference/api-reference-introduction
 
@@ -43,12 +44,12 @@ Add TheHive as a new provider for image generation in Synaplan, offering SDXL an
 ### API Endpoint
 
 ```
-POST https://api.thehive.ai/api/v3/task/sync
+POST https://api.thehive.ai/api/v3/{vendor}/{model}
 ```
 
 **Authentication:**
 ```http
-Authorization: Token <API_KEY>
+Authorization: Bearer <API_KEY>
 Content-Type: application/json
 ```
 
@@ -56,13 +57,11 @@ Content-Type: application/json
 
 ```json
 {
-  "model_id": "sdxl-enhanced",
   "input": {
     "prompt": "A futuristic city skyline at sunset",
     "negative_prompt": "blurry, low quality, text",
     "num_images": 1,
-    "width": 1024,
-    "height": 1024
+    "image_size": { "width": 1024, "height": 1024 }
   }
 }
 ```
