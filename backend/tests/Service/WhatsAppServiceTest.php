@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace App\Tests\Service;
 
+use App\AI\Service\AiFacade;
+use App\DTO\WhatsApp\IncomingMessageDto;
+use App\Entity\Message;
 use App\Service\File\FileProcessor;
 use App\Service\File\UserUploadPathBuilder;
 use App\Service\Message\MessageProcessor;
@@ -18,6 +21,12 @@ use Symfony\Contracts\HttpClient\ResponseInterface;
 /**
  * Unit tests for WhatsAppService
  * Tests Meta WhatsApp Business API integration with dynamic multi-number support.
+ *
+ * Message Type Handling:
+ * - TEXT: Processed as AI prompt, text response
+ * - AUDIO (voice-only): Transcribed via Whisper, TTS audio response
+ * - IMAGE: Vision AI analysis, brief text comment
+ * - VIDEO: Audio extracted via FFmpeg, transcribed, text response
  */
 class WhatsAppServiceTest extends TestCase
 {
@@ -29,6 +38,7 @@ class WhatsAppServiceTest extends TestCase
     private MessageProcessor $messageProcessor;
     private FileProcessor $fileProcessor;
     private UserUploadPathBuilder $pathBuilder;
+    private AiFacade $aiFacade;
     private string $testPhoneNumberId = '123456789'; // Test phone number ID
 
     protected function setUp(): void
@@ -39,6 +49,7 @@ class WhatsAppServiceTest extends TestCase
         $this->rateLimitService = $this->createMock(RateLimitService::class);
         $this->messageProcessor = $this->createMock(MessageProcessor::class);
         $this->fileProcessor = $this->createMock(FileProcessor::class);
+        $this->aiFacade = $this->createMock(AiFacade::class);
         $this->pathBuilder = new UserUploadPathBuilder(); // Real instance (final class)
 
         // Create service with test configuration (dynamic multi-number support)
@@ -50,10 +61,12 @@ class WhatsAppServiceTest extends TestCase
             $this->messageProcessor,
             $this->fileProcessor,
             $this->pathBuilder,
+            $this->aiFacade,
             'test_token',
             true,
             '/tmp/test_uploads',
-            2
+            2,
+            'https://app.example.com' // APP_URL for TTS audio URLs
         );
     }
 
@@ -72,6 +85,7 @@ class WhatsAppServiceTest extends TestCase
             $this->messageProcessor,
             $this->fileProcessor,
             $this->pathBuilder,
+            $this->aiFacade,
             'test_token',
             false, // disabled
             '/tmp/test_uploads',
@@ -91,6 +105,7 @@ class WhatsAppServiceTest extends TestCase
             $this->messageProcessor,
             $this->fileProcessor,
             $this->pathBuilder,
+            $this->aiFacade,
             'test_token',
             false,
             '/tmp/test_uploads',
@@ -264,6 +279,7 @@ class WhatsAppServiceTest extends TestCase
             $this->messageProcessor,
             $this->fileProcessor,
             $this->pathBuilder,
+            $this->aiFacade,
             'test_token',
             false,
             '/tmp/test_uploads',
@@ -500,5 +516,477 @@ class WhatsAppServiceTest extends TestCase
 
         // Should return null for unknown MIME types
         $this->assertNull($result);
+    }
+
+    // ============================================
+    // Tests for Voice Message TTS Response Flow
+    // ============================================
+
+    /**
+     * Helper to create an IncomingMessageDto for testing.
+     */
+    private function createIncomingMessageDto(string $type, array $messageContent = [], ?string $mediaId = null): IncomingMessageDto
+    {
+        $typeContent = $messageContent;
+        if ($mediaId && in_array($type, ['audio', 'image', 'video', 'document'], true)) {
+            $typeContent['id'] = $mediaId;
+        }
+
+        $incomingMsg = [
+            'from' => '+491754070111',
+            'id' => 'wamid.test'.time(),
+            'timestamp' => time(),
+            'type' => $type,
+            $type => $typeContent,
+        ];
+
+        $value = [
+            'metadata' => [
+                'phone_number_id' => $this->testPhoneNumberId,
+                'display_phone_number' => '+491234567890',
+            ],
+            'messages' => [$incomingMsg],
+        ];
+
+        return IncomingMessageDto::fromPayload($incomingMsg, $value);
+    }
+
+    /**
+     * Test that voice-only messages (audio without caption) are correctly identified.
+     */
+    public function testVoiceOnlyMessageDetection(): void
+    {
+        // Create DTO for audio message without caption
+        $dto = $this->createIncomingMessageDto('audio', [], 'media_audio_123');
+
+        // Use reflection to test private method
+        $reflection = new \ReflectionClass($this->service);
+        $method = $reflection->getMethod('shouldSendAudioResponse');
+        $method->setAccessible(true);
+
+        $shouldSend = $method->invoke($this->service, $dto);
+
+        $this->assertTrue($shouldSend, 'Audio message without caption should trigger audio response');
+    }
+
+    /**
+     * Test that video messages are correctly identified for audio response.
+     */
+    public function testVideoMessageDetectionForAudioResponse(): void
+    {
+        // Create DTO for video message
+        $dto = $this->createIncomingMessageDto('video', [], 'media_video_123');
+
+        $reflection = new \ReflectionClass($this->service);
+        $method = $reflection->getMethod('shouldSendAudioResponse');
+        $method->setAccessible(true);
+
+        $shouldSend = $method->invoke($this->service, $dto);
+
+        $this->assertTrue($shouldSend, 'Video message should trigger audio response');
+    }
+
+    /**
+     * Test that audio messages with captions are NOT identified for audio response.
+     */
+    public function testAudioWithCaptionIsNotAudioResponse(): void
+    {
+        // This would be an unusual case but should be handled
+        // Audio messages in WhatsApp typically don't have captions
+        $dto = $this->createIncomingMessageDto('audio', ['caption' => 'Check this audio'], 'media_audio_123');
+
+        $reflection = new \ReflectionClass($this->service);
+        $method = $reflection->getMethod('shouldSendAudioResponse');
+        $method->setAccessible(true);
+
+        $shouldSend = $method->invoke($this->service, $dto);
+
+        // With a caption, it's not voice-only
+        $this->assertFalse($shouldSend);
+    }
+
+    /**
+     * Test that text messages are NOT identified for audio response.
+     */
+    public function testTextMessageIsNotAudioResponse(): void
+    {
+        $dto = $this->createIncomingMessageDto('text', ['body' => 'Hello world']);
+
+        $reflection = new \ReflectionClass($this->service);
+        $method = $reflection->getMethod('shouldSendAudioResponse');
+        $method->setAccessible(true);
+
+        $shouldSend = $method->invoke($this->service, $dto);
+
+        $this->assertFalse($shouldSend, 'Text messages should not trigger audio response');
+    }
+
+    /**
+     * Test that image messages are NOT identified for audio response.
+     */
+    public function testImageMessageIsNotAudioResponse(): void
+    {
+        $dto = $this->createIncomingMessageDto('image', [], 'media_image_123');
+
+        $reflection = new \ReflectionClass($this->service);
+        $method = $reflection->getMethod('shouldSendAudioResponse');
+        $method->setAccessible(true);
+
+        $shouldSend = $method->invoke($this->service, $dto);
+
+        $this->assertFalse($shouldSend, 'Image messages should not trigger audio response');
+    }
+
+    /**
+     * Test TTS generation is called for voice-only messages.
+     */
+    public function testTtsGenerationForVoiceMessages(): void
+    {
+        // Setup: mock TTS to return a valid path
+        $this->aiFacade
+            ->expects($this->once())
+            ->method('synthesize')
+            ->with(
+                $this->stringContains('AI response text'),
+                $this->anything(),
+                $this->anything()
+            )
+            ->willReturn([
+                'relativePath' => '02/000/00002/2026/02/tts_test.mp3',
+                'provider' => 'openai',
+                'model' => 'tts-1',
+            ]);
+
+        // Use reflection to test private method
+        $reflection = new \ReflectionClass($this->service);
+        $method = $reflection->getMethod('generateTtsResponse');
+        $method->setAccessible(true);
+
+        $result = $method->invoke($this->service, 'AI response text', 2);
+
+        $this->assertNotNull($result);
+        $this->assertArrayHasKey('relativePath', $result);
+        $this->assertStringContainsString('tts_test.mp3', $result['relativePath']);
+    }
+
+    /**
+     * Test TTS generation handles failure gracefully.
+     */
+    public function testTtsGenerationFailureReturnsNull(): void
+    {
+        // Setup: mock TTS to throw an exception
+        $this->aiFacade
+            ->expects($this->once())
+            ->method('synthesize')
+            ->willThrowException(new \RuntimeException('TTS provider unavailable'));
+
+        $reflection = new \ReflectionClass($this->service);
+        $method = $reflection->getMethod('generateTtsResponse');
+        $method->setAccessible(true);
+
+        $result = $method->invoke($this->service, 'Test text', 2);
+
+        $this->assertNull($result, 'TTS failure should return null, not throw exception');
+    }
+
+    /**
+     * Test TTS text is truncated for very long responses.
+     */
+    public function testTtsTextTruncation(): void
+    {
+        $longText = str_repeat('A very long response. ', 500); // ~11,000 chars
+
+        $this->aiFacade
+            ->expects($this->once())
+            ->method('synthesize')
+            ->with(
+                $this->callback(function ($text) {
+                    // Should be truncated to ~4000 chars
+                    return strlen($text) <= 4003; // 4000 + '...'
+                }),
+                $this->anything(),
+                $this->anything()
+            )
+            ->willReturn([
+                'relativePath' => 'test/path/audio.mp3',
+                'provider' => 'openai',
+            ]);
+
+        $reflection = new \ReflectionClass($this->service);
+        $method = $reflection->getMethod('generateTtsResponse');
+        $method->setAccessible(true);
+
+        $method->invoke($this->service, $longText, 2);
+    }
+
+    // ============================================
+    // Tests for Error Message Handling
+    // ============================================
+
+    /**
+     * Test error message formatting for transcription failures.
+     */
+    public function testErrorMessageForTranscriptionFailure(): void
+    {
+        $response = $this->createMock(ResponseInterface::class);
+        $response->method('toArray')->willReturn(['messages' => [['id' => 'test']]]);
+
+        $this->httpClient
+            ->expects($this->once())
+            ->method('request')
+            ->with(
+                'POST',
+                $this->anything(),
+                $this->callback(function ($options) {
+                    // Check that the error message contains German text about transcription
+                    return isset($options['json']['text']['body'])
+                        && str_contains($options['json']['text']['body'], 'Sprachnachricht');
+                })
+            )
+            ->willReturn($response);
+
+        $dto = $this->createIncomingMessageDto('audio', [], 'test_media');
+
+        $reflection = new \ReflectionClass($this->service);
+        $method = $reflection->getMethod('sendErrorMessage');
+        $method->setAccessible(true);
+
+        $method->invoke($this->service, $dto, 'Whisper transcription failed');
+    }
+
+    /**
+     * Test error message formatting for image analysis failures.
+     */
+    public function testErrorMessageForImageFailure(): void
+    {
+        $response = $this->createMock(ResponseInterface::class);
+        $response->method('toArray')->willReturn(['messages' => [['id' => 'test']]]);
+
+        $this->httpClient
+            ->expects($this->once())
+            ->method('request')
+            ->with(
+                'POST',
+                $this->anything(),
+                $this->callback(function ($options) {
+                    return isset($options['json']['text']['body'])
+                        && str_contains($options['json']['text']['body'], 'Bild');
+                })
+            )
+            ->willReturn($response);
+
+        $dto = $this->createIncomingMessageDto('image', [], 'test_media');
+
+        $reflection = new \ReflectionClass($this->service);
+        $method = $reflection->getMethod('sendErrorMessage');
+        $method->setAccessible(true);
+
+        $method->invoke($this->service, $dto, 'Image vision analysis failed');
+    }
+
+    /**
+     * Test error message formatting for file too large.
+     */
+    public function testErrorMessageForFileTooLarge(): void
+    {
+        $response = $this->createMock(ResponseInterface::class);
+        $response->method('toArray')->willReturn(['messages' => [['id' => 'test']]]);
+
+        $this->httpClient
+            ->expects($this->once())
+            ->method('request')
+            ->with(
+                'POST',
+                $this->anything(),
+                $this->callback(function ($options) {
+                    return isset($options['json']['text']['body'])
+                        && str_contains($options['json']['text']['body'], 'groß')
+                        && str_contains($options['json']['text']['body'], '128 MB');
+                })
+            )
+            ->willReturn($response);
+
+        $dto = $this->createIncomingMessageDto('video', [], 'test_media');
+
+        $reflection = new \ReflectionClass($this->service);
+        $method = $reflection->getMethod('sendErrorMessage');
+        $method->setAccessible(true);
+
+        $method->invoke($this->service, $dto, 'File too large: 256 MB');
+    }
+
+    // ============================================
+    // Tests for Message Text Extraction
+    // ============================================
+
+    /**
+     * Test message text extraction for different message types.
+     */
+    public function testExtractMessageTextForTextMessage(): void
+    {
+        $dto = $this->createIncomingMessageDto('text', ['body' => 'Hello, how are you?']);
+
+        $reflection = new \ReflectionClass($this->service);
+        $method = $reflection->getMethod('extractMessageText');
+        $method->setAccessible(true);
+
+        $text = $method->invoke($this->service, $dto);
+
+        $this->assertEquals('Hello, how are you?', $text);
+    }
+
+    /**
+     * Test message text extraction for audio message.
+     */
+    public function testExtractMessageTextForAudioMessage(): void
+    {
+        $dto = $this->createIncomingMessageDto('audio', [], 'media_123');
+
+        $reflection = new \ReflectionClass($this->service);
+        $method = $reflection->getMethod('extractMessageText');
+        $method->setAccessible(true);
+
+        $text = $method->invoke($this->service, $dto);
+
+        $this->assertEquals('[Audio message]', $text);
+    }
+
+    /**
+     * Test message text extraction for image with caption.
+     */
+    public function testExtractMessageTextForImageWithCaption(): void
+    {
+        $dto = $this->createIncomingMessageDto('image', ['caption' => 'What is this?'], 'media_123');
+
+        $reflection = new \ReflectionClass($this->service);
+        $method = $reflection->getMethod('extractMessageText');
+        $method->setAccessible(true);
+
+        $text = $method->invoke($this->service, $dto);
+
+        $this->assertEquals('What is this?', $text);
+    }
+
+    /**
+     * Test message text extraction for image without caption.
+     */
+    public function testExtractMessageTextForImageWithoutCaption(): void
+    {
+        $dto = $this->createIncomingMessageDto('image', [], 'media_123');
+
+        $reflection = new \ReflectionClass($this->service);
+        $method = $reflection->getMethod('extractMessageText');
+        $method->setAccessible(true);
+
+        $text = $method->invoke($this->service, $dto);
+
+        $this->assertEquals('[Image]', $text);
+    }
+
+    /**
+     * Test message text extraction for video with caption.
+     */
+    public function testExtractMessageTextForVideoWithCaption(): void
+    {
+        $dto = $this->createIncomingMessageDto('video', ['caption' => 'Check this video'], 'media_123');
+
+        $reflection = new \ReflectionClass($this->service);
+        $method = $reflection->getMethod('extractMessageText');
+        $method->setAccessible(true);
+
+        $text = $method->invoke($this->service, $dto);
+
+        $this->assertEquals('Check this video', $text);
+    }
+
+    /**
+     * Test message text extraction for video without caption.
+     */
+    public function testExtractMessageTextForVideoWithoutCaption(): void
+    {
+        $dto = $this->createIncomingMessageDto('video', [], 'media_123');
+
+        $reflection = new \ReflectionClass($this->service);
+        $method = $reflection->getMethod('extractMessageText');
+        $method->setAccessible(true);
+
+        $text = $method->invoke($this->service, $dto);
+
+        $this->assertEquals('[Video]', $text);
+    }
+
+    /**
+     * Test message text extraction for unsupported message type.
+     */
+    public function testExtractMessageTextForUnsupportedType(): void
+    {
+        // Create a DTO with an unsupported type manually
+        $incomingMsg = [
+            'from' => '+491754070111',
+            'id' => 'wamid.test'.time(),
+            'timestamp' => time(),
+            'type' => 'sticker',
+            'sticker' => ['id' => 'sticker_123'],
+        ];
+
+        $value = [
+            'metadata' => [
+                'phone_number_id' => $this->testPhoneNumberId,
+                'display_phone_number' => '+491234567890',
+            ],
+            'messages' => [$incomingMsg],
+        ];
+
+        $dto = IncomingMessageDto::fromPayload($incomingMsg, $value);
+
+        $reflection = new \ReflectionClass($this->service);
+        $method = $reflection->getMethod('extractMessageText');
+        $method->setAccessible(true);
+
+        $text = $method->invoke($this->service, $dto);
+
+        $this->assertStringContainsString('Unsupported message type', $text);
+        $this->assertStringContainsString('sticker', $text);
+    }
+
+    // ============================================
+    // Tests for Send Audio Response
+    // ============================================
+
+    /**
+     * Test sending audio media via WhatsApp.
+     */
+    public function testSendAudioMediaSuccess(): void
+    {
+        $response = $this->createMock(ResponseInterface::class);
+        $response->method('toArray')->willReturn([
+            'messages' => [['id' => 'wamid.audio123']],
+        ]);
+
+        $this->httpClient
+            ->expects($this->once())
+            ->method('request')
+            ->with(
+                'POST',
+                $this->stringContains('/messages'),
+                $this->callback(function ($options) {
+                    return isset($options['json']['type'])
+                        && 'audio' === $options['json']['type']
+                        && isset($options['json']['audio']['link'])
+                        && str_contains($options['json']['audio']['link'], 'tts_response.mp3');
+                })
+            )
+            ->willReturn($response);
+
+        $result = $this->service->sendMedia(
+            '+491754070111',
+            'audio',
+            'https://app.example.com/api/v1/files/uploads/02/000/00002/2026/02/tts_response.mp3',
+            $this->testPhoneNumberId
+        );
+
+        $this->assertIsArray($result);
+        $this->assertTrue($result['success']);
+        $this->assertEquals('wamid.audio123', $result['message_id']);
     }
 }
