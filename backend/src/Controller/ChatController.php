@@ -78,6 +78,20 @@ class ChatController extends AbstractController
         $sessionMap = $this->widgetSessionService->getSessionMapForChats($chatIds);
 
         $result = array_map(function (Chat $chat) use ($sessionMap) {
+            // Get first user message preview (first 30 chars)
+            // Direction 'IN' = user message, 'OUT' = assistant message
+            $firstMessagePreview = null;
+            $messages = $chat->getMessages();
+            foreach ($messages as $message) {
+                if ('IN' === $message->getDirection()) {
+                    $content = $message->getText() ?? '';
+                    $firstMessagePreview = mb_strlen($content) > 30
+                        ? mb_substr($content, 0, 30).'…'
+                        : $content;
+                    break;
+                }
+            }
+
             return [
                 'id' => $chat->getId(),
                 'title' => $chat->getTitle() ?? 'New Chat',
@@ -86,6 +100,7 @@ class ChatController extends AbstractController
                 'messageCount' => $sessionMap[$chat->getId()]['messageCount'] ?? $chat->getMessages()->count(),
                 'isShared' => $chat->isPublic(),
                 'widgetSession' => $sessionMap[$chat->getId()] ?? null,
+                'firstMessagePreview' => $firstMessagePreview,
             ];
         }, $chats);
 

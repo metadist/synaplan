@@ -45,6 +45,7 @@ class WhatsAppService
         bool $whatsappEnabled,
         private string $uploadsDir,
         private int $whatsappUserId,
+        private string $appUrl = '',
     ) {
         $this->accessToken = $whatsappAccessToken;
         $this->enabled = $whatsappEnabled;
@@ -400,8 +401,13 @@ class WhatsAppService
         $this->rateLimitService->recordUsage($user, 'MESSAGES');
         $this->markAsRead($dto->messageId, $dto->phoneNumberId);
 
-        // 7. AI Pipeline Processing
-        $result = $this->messageProcessor->process($message);
+        // 7. AI Pipeline Processing (use streaming mode to support TTS/media generation)
+        $collectedResponse = '';
+        $streamCallback = function (string $chunk) use (&$collectedResponse) {
+            $collectedResponse .= $chunk;
+        };
+
+        $result = $this->messageProcessor->processStream($message, $streamCallback);
 
         if (!$result['success']) {
             return [
@@ -411,20 +417,51 @@ class WhatsAppService
             ];
         }
 
-        $responseText = $result['response']['content'] ?? '';
+        $responseText = $result['response']['content'] ?? $collectedResponse;
+        $metadata = $result['response']['metadata'] ?? [];
+        $fileData = $metadata['file'] ?? null;
 
-        // 8. Send Response
-        if (!empty($responseText)) {
+        // 8. Send Response (audio file or text)
+        $responseSent = false;
+
+        // Check if response contains audio file (TTS response)
+        if ($fileData && 'audio' === ($fileData['type'] ?? null)) {
+            $audioPath = $fileData['path'] ?? null;
+            if ($audioPath && !empty($this->appUrl)) {
+                // Build absolute URL for WhatsApp
+                $audioUrl = rtrim($this->appUrl, '/').'/'.ltrim($audioPath, '/');
+
+                $this->logger->info('WhatsApp: Sending audio response', [
+                    'to' => $dto->from,
+                    'audio_url' => $audioUrl,
+                ]);
+
+                $sendResult = $this->sendMedia($dto->from, 'audio', $audioUrl, $dto->phoneNumberId);
+                if ($sendResult['success']) {
+                    // Store the text version as outgoing message for history
+                    $this->storeOutgoingMessage($user, $dto, $responseText ?: '[Audio response]', $sendResult['message_id']);
+                    $responseSent = true;
+                } else {
+                    $this->logger->warning('WhatsApp: Failed to send audio, falling back to text', [
+                        'error' => $sendResult['error'] ?? 'Unknown',
+                    ]);
+                }
+            }
+        }
+
+        // Send text response if no audio was sent (or audio failed)
+        if (!$responseSent && !empty($responseText)) {
             $sendResult = $this->sendMessage($dto->from, $responseText, $dto->phoneNumberId);
             if ($sendResult['success']) {
                 $this->storeOutgoingMessage($user, $dto, $responseText, $sendResult['message_id']);
+                $responseSent = true;
             }
         }
 
         return [
             'success' => true,
             'message_id' => $dto->messageId,
-            'response_sent' => !empty($responseText),
+            'response_sent' => $responseSent,
         ];
     }
 

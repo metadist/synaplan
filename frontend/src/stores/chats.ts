@@ -25,6 +25,7 @@ export interface Chat {
   messageCount?: number
   isShared?: boolean
   widgetSession?: WidgetSessionInfo | null
+  firstMessagePreview?: string | null
 }
 
 export interface WidgetSessionInfo {
