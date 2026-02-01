@@ -453,11 +453,16 @@ class WhatsAppService
             }
         };
 
-        // For image messages, add context to help AI generate a brief description
+        // For image messages WITHOUT caption, force image description mode
+        // If there's a caption (user question), let the classifier route to chat for an answer
         $processingOptions = [];
         if ($isImageMessage) {
-            // Set a special topic to route to brief image description
-            $processingOptions['force_image_description'] = true;
+            $imageCaption = $dto->incomingMsg['image']['caption'] ?? null;
+            if (empty($imageCaption)) {
+                // No caption: force brief image description
+                $processingOptions['force_image_description'] = true;
+            }
+            // With caption: let classifier route normally so AI can ANSWER the question
         }
 
         $result = $this->messageProcessor->processStream($message, $streamCallback, null, $processingOptions);
@@ -842,16 +847,17 @@ class WhatsAppService
                             ]);
                         }
                     } else {
+                        // Extraction failed - return error to user instead of proceeding with placeholder
                         $this->logger->warning('WhatsApp: No text extracted from audio/video', [
                             'type' => $dto->type,
                             'details' => $extractionDetails ?? [],
                         ]);
 
-                        // For video without audio track, this might be expected
                         if ('video' === $dto->type) {
-                            // Check if video has no audio - set a more descriptive message
-                            $message->setText('[Video without audio track]');
+                            return 'Video has no audio track or audio could not be extracted';
                         }
+
+                        return 'Audio transcription failed - no speech detected';
                     }
                 } elseif ('image' === $dto->type) {
                     // For images, extract description via Vision AI
@@ -885,6 +891,13 @@ class WhatsAppService
                                 'description_length' => strlen($extractedText),
                             ]);
                         }
+                    } else {
+                        // Vision extraction failed - return error
+                        $this->logger->warning('WhatsApp: Image analysis failed - no description extracted', [
+                            'details' => $extractionDetails ?? [],
+                        ]);
+
+                        return 'Image analysis failed - could not process the image';
                     }
                 } else {
                     // For documents and other types, use standard extraction
