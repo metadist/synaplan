@@ -81,6 +81,7 @@
             "App\\": "src/",
             "Plugin\\": "/plugins/",
             "Plugin\\SortX\\": "/plugins/sortx/backend/",
+            "Plugin\\Brogent\\": "/plugins/brogent/backend/",
             "Inference\\": "lib/grpc/Inference/",
             "GPBMetadata\\": "lib/grpc/GPBMetadata/"
         }

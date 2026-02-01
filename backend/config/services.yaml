@@ -388,6 +388,11 @@ services:
         arguments:
             $uploadDir: '%kernel.project_dir%/var/uploads'
 
+    # Plugin discovery - BroGent
+    Plugin\Brogent\:
+        resource: '%plugins_dir%/brogent/backend/'
+        exclude: '%plugins_dir%/brogent/backend/{Entity,migrations,tests}'
+
     # System Configuration Service (Admin .env editor)
     App\Service\Admin\SystemConfigService:
         arguments:
