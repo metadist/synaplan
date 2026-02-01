@@ -480,23 +480,38 @@ class WhatsAppService
         // 8. Send Response based on input type
         $responseSent = false;
 
-        // PRIORITY 1: Check if AI already generated audio (TTS response from MediaGenerationHandler)
-        if ($fileData && 'audio' === ($fileData['type'] ?? null)) {
-            $audioPath = $fileData['path'] ?? null;
-            if ($audioPath && !empty($this->appUrl)) {
-                $audioUrl = rtrim($this->appUrl, '/').'/'.ltrim($audioPath, '/');
+        // PRIORITY 1: Check if AI generated media (image, video, or audio from MediaGenerationHandler)
+        if ($fileData) {
+            $generatedMediaType = $fileData['type'] ?? null;
+            $mediaPath = $fileData['path'] ?? null;
 
-                $this->logger->info('WhatsApp: Sending AI-generated audio response', [
+            if ($mediaPath && !empty($this->appUrl) && in_array($generatedMediaType, ['audio', 'video', 'image'], true)) {
+                $mediaUrl = rtrim($this->appUrl, '/').'/'.ltrim($mediaPath, '/');
+
+                $this->logger->info('WhatsApp: Sending AI-generated media response', [
                     'to' => $dto->from,
-                    'audio_url' => $audioUrl,
+                    'media_type' => $generatedMediaType,
+                    'media_url' => $mediaUrl,
                 ]);
 
-                $sendResult = $this->sendMedia($dto->from, 'audio', $audioUrl, $dto->phoneNumberId);
+                // For images and videos, include the response text as caption
+                $caption = in_array($generatedMediaType, ['image', 'video'], true) && !empty($responseText)
+                    ? mb_substr($responseText, 0, 1024) // WhatsApp caption limit
+                    : null;
+
+                $sendResult = $this->sendMedia($dto->from, $generatedMediaType, $mediaUrl, $dto->phoneNumberId, $caption);
                 if ($sendResult['success']) {
-                    $this->storeOutgoingMessage($user, $dto, $responseText ?: '[Audio response]', $sendResult['message_id']);
+                    $placeholderText = match ($generatedMediaType) {
+                        'image' => '[Image response]',
+                        'video' => '[Video response]',
+                        'audio' => '[Audio response]',
+                        default => '[Media response]',
+                    };
+                    $this->storeOutgoingMessage($user, $dto, $responseText ?: $placeholderText, $sendResult['message_id']);
                     $responseSent = true;
                 } else {
-                    $this->logger->warning('WhatsApp: Failed to send AI audio, falling back to TTS', [
+                    $this->logger->warning('WhatsApp: Failed to send AI media, falling back', [
+                        'media_type' => $generatedMediaType,
                         'error' => $sendResult['error'] ?? 'Unknown',
                     ]);
                 }
