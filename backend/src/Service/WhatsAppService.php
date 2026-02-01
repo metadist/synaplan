@@ -549,7 +549,7 @@ class WhatsAppService
             $this->logger->error('WhatsApp: No response sent to user', [
                 'message_id' => $dto->messageId,
                 'from' => $dto->from,
-                'response_text_length' => strlen($responseText ?? ''),
+                'response_text_length' => strlen($responseText),
             ]);
         }
 

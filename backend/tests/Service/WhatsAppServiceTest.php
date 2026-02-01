@@ -31,14 +31,16 @@ use Symfony\Contracts\HttpClient\ResponseInterface;
 class WhatsAppServiceTest extends TestCase
 {
     private WhatsAppService $service;
-    private HttpClientInterface $httpClient;
+    /** @var HttpClientInterface&\PHPUnit\Framework\MockObject\MockObject */
+    private $httpClient;
     private LoggerInterface $logger;
     private EntityManagerInterface $em;
     private RateLimitService $rateLimitService;
     private MessageProcessor $messageProcessor;
     private FileProcessor $fileProcessor;
     private UserUploadPathBuilder $pathBuilder;
-    private AiFacade $aiFacade;
+    /** @var AiFacade&\PHPUnit\Framework\MockObject\MockObject */
+    private $aiFacade;
     private string $testPhoneNumberId = '123456789'; // Test phone number ID
 
     protected function setUp(): void
@@ -144,7 +146,6 @@ class WhatsAppServiceTest extends TestCase
 
         $result = $this->service->sendMessage('+1234567890', 'Hello World', $this->testPhoneNumberId);
 
-        $this->assertIsArray($result);
         $this->assertTrue($result['success']);
         $this->assertEquals('wamid.test123', $result['message_id']);
     }
@@ -343,7 +344,6 @@ class WhatsAppServiceTest extends TestCase
             'Check this out!'
         );
 
-        $this->assertIsArray($result);
         $this->assertTrue($result['success']);
         $this->assertEquals('wamid.media123', $result['message_id']);
     }
@@ -368,7 +368,6 @@ class WhatsAppServiceTest extends TestCase
         $result = $this->service->downloadMedia('media123', $this->testPhoneNumberId, 27);
 
         // downloadMedia now returns an array with file info
-        $this->assertIsArray($result);
         $this->assertArrayHasKey('file_path', $result);
         $this->assertArrayHasKey('file_type', $result);
         $this->assertEquals('jpg', $result['file_type']);
@@ -985,7 +984,6 @@ class WhatsAppServiceTest extends TestCase
             $this->testPhoneNumberId
         );
 
-        $this->assertIsArray($result);
         $this->assertTrue($result['success']);
         $this->assertEquals('wamid.audio123', $result['message_id']);
     }
