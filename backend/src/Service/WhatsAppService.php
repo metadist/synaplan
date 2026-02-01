@@ -574,6 +574,16 @@ class WhatsAppService
 
                         if (!empty($extractedText)) {
                             $message->setFileText($extractedText);
+
+                            // CRITICAL: For audio messages, replace placeholder text with transcription
+                            // This ensures the AI receives the actual spoken content, not "[Audio message]"
+                            $currentText = $message->getText();
+                            if (empty($currentText) || '[Audio message]' === $currentText || '[Audio]' === $currentText) {
+                                $message->setText($extractedText);
+                                $this->logger->info('WhatsApp: Replaced audio placeholder with transcription', [
+                                    'transcription_length' => strlen($extractedText),
+                                ]);
+                            }
                         }
                     } catch (\Throwable $e) {
                         $this->logger->error('WhatsApp file extraction failed', ['error' => $e->getMessage()]);
