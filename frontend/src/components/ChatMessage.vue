@@ -504,7 +504,9 @@
 
             <div :class="['text-xs truncate', role === 'user' ? 'text-white/80' : 'txt-secondary']">
               <!-- Hide model info during processing states (classifying, analyzing, etc.) -->
-              <template v-if="role === 'assistant' && modelLabel && provider && !aiModels && !isProcessing">
+              <template
+                v-if="role === 'assistant' && modelLabel && provider && !aiModels && !isProcessing"
+              >
                 <span class="font-medium hidden md:inline">{{ modelLabel }}</span>
                 <span class="mx-1.5 opacity-50 hidden md:inline">·</span>
                 <span class="hidden md:inline">{{ provider }}</span>

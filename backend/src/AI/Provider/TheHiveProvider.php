@@ -251,9 +251,7 @@ final class TheHiveProvider implements ImageGenerationProviderInterface
 
         // Rate limiting
         if (429 === $statusCode) {
-            throw new ProviderException('TheHive rate limit exceeded. Please try again later.', 'thehive', [
-                'status_code' => $statusCode,
-            ]);
+            throw new ProviderException('TheHive rate limit exceeded. Please try again later.', 'thehive', ['status_code' => $statusCode]);
         }
 
         // Content moderation (code 451)
@@ -272,15 +270,10 @@ final class TheHiveProvider implements ImageGenerationProviderInterface
                 'status_code' => $statusCode,
                 'message' => $message,
             ]);
-            throw new ProviderException("TheHive authentication error: {$message}", 'thehive', [
-                'status_code' => $statusCode,
-            ]);
+            throw new ProviderException("TheHive authentication error: {$message}", 'thehive', ['status_code' => $statusCode]);
         }
 
-        throw new ProviderException("TheHive API error ({$statusCode}): {$message}", 'thehive', [
-            'status_code' => $statusCode,
-            'response' => $responseData,
-        ]);
+        throw new ProviderException("TheHive API error ({$statusCode}): {$message}", 'thehive', ['status_code' => $statusCode, 'response' => $responseData]);
     }
 
     /**

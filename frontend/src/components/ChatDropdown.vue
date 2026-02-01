@@ -63,7 +63,9 @@
             @click="handleChatItemClick(chat.id)"
           >
             <span class="truncate text-sm max-w-[150px]">{{ getDisplayTitle(chat) }}</span>
-            <span class="text-[10px] txt-secondary opacity-70">{{ formatTimestamp(chat.createdAt) }}</span>
+            <span class="text-[10px] txt-secondary opacity-70">{{
+              formatTimestamp(chat.createdAt)
+            }}</span>
           </button>
 
           <!-- Actions Menu -->
@@ -223,7 +225,7 @@ const formatTimestamp = (dateStr: string): string => {
   if (diffMins < 60) return `${diffMins}m ago`
   if (diffHours < 24) return `${diffHours}h ago`
   if (diffDays < 7) return `${diffDays}d ago`
-  
+
   // Fallback to compact date
   const month = String(date.getMonth() + 1).padStart(2, '0')
   const day = String(date.getDate()).padStart(2, '0')
@@ -231,18 +233,23 @@ const formatTimestamp = (dateStr: string): string => {
 }
 
 // Get the display title - prefer first message preview, then title
-const getDisplayTitle = (chat: { title: string; firstMessagePreview?: string | null; messageCount?: number }): string => {
+const getDisplayTitle = (chat: {
+  title: string
+  firstMessagePreview?: string | null
+  messageCount?: number
+}): string => {
   // If we have a first message preview, use it
   if (chat.firstMessagePreview) {
     return chat.firstMessagePreview
   }
-  
+
   // If title is not default, use the title
-  const isDefaultTitle = chat.title === 'New Chat' || chat.title === 'Neuer Chat' || chat.title.startsWith('Chat ')
+  const isDefaultTitle =
+    chat.title === 'New Chat' || chat.title === 'Neuer Chat' || chat.title.startsWith('Chat ')
   if (!isDefaultTitle) {
     return chat.title
   }
-  
+
   // Fallback for empty chats
   return 'Empty chat'
 }
@@ -252,14 +259,14 @@ const allChats = computed(() => {
   return chatsStore.chats.filter((c) => {
     // Exclude widget sessions
     if (c.widgetSession) return false
-    
+
     // Always show the active chat (even if empty, so user sees current context)
     if (c.id === chatsStore.activeChatId) return true
-    
+
     // Filter out truly empty chats (no messages and no content)
     const isEmpty = (!c.messageCount || c.messageCount === 0) && !c.firstMessagePreview
     if (isEmpty) return false
-    
+
     return true
   })
 })
