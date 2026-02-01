@@ -1201,6 +1201,10 @@ const sendMessage = async () => {
     return
   }
 
+  if (limitReached.value) {
+    return
+  }
+
   // Create a single message with both text and files (if any)
   const hasFiles = uploadedFiles.length > 0
   messages.value.push({
@@ -1217,10 +1221,6 @@ const sendMessage = async () => {
 
   inputMessage.value = ''
   await scrollToBottom()
-
-  if (limitReached.value) {
-    return
-  }
 
   isSending.value = true
   isTyping.value = true
