@@ -509,8 +509,7 @@ class WhatsAppService
                     $placeholderText = match ($generatedMediaType) {
                         'image' => '[Image response]',
                         'video' => '[Video response]',
-                        'audio' => '[Audio response]',
-                        default => '[Media response]',
+                        default => '[Audio response]', // audio is the remaining case
                     };
                     $this->storeOutgoingMessage($user, $dto, $responseText ?: $placeholderText, $sendResult['message_id']);
                     $responseSent = true;
