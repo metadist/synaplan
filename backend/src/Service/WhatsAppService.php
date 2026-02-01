@@ -407,14 +407,13 @@ class WhatsAppService
         $message->setDirection('IN');
         $message->setStatus('processing');
 
-        // Store input type metadata for response mode selection
-        $message->setMeta('whatsapp_input_type', $dto->type);
-        $message->setMeta('whatsapp_should_send_audio', $shouldSendAudioResponse ? '1' : '0');
-
         $this->em->persist($message);
         $this->em->flush();
 
-        // 5. Metadata and Media Handling
+        // 5. Metadata and Media Handling (must be after flush so message has ID)
+        // Store input type metadata for response mode selection
+        $message->setMeta('whatsapp_input_type', $dto->type);
+        $message->setMeta('whatsapp_should_send_audio', $shouldSendAudioResponse ? '1' : '0');
         $this->storeMessageMetadata($message, $dto, $user);
 
         $mediaDownloadError = null;
