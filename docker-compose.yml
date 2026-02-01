@@ -56,6 +56,9 @@ services:
   # Symfony PHP Backend
   # Serves both API and production frontend from frontend/dist
   backend:
+    dns:
+    - 8.8.8.8
+    - 8.8.4.4
     image: ghcr.io/metadist/synaplan:latest
     build:
       context: .

@@ -98,6 +98,12 @@ services:
             - { name: 'app.ai.video_generation' }
             - { name: 'app.ai.text_to_speech' }
 
+    App\AI\Provider\TheHiveProvider:
+        arguments:
+            $apiKey: '%env(THEHIVE_API_KEY)%'
+        tags:
+            - { name: 'app.ai.image_generation' }
+
     # AI Facade
     App\AI\Service\AiFacade: ~
 
