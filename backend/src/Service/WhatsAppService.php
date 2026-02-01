@@ -453,11 +453,16 @@ class WhatsAppService
             }
         };
 
-        // For image messages, add context to help AI generate a brief description
+        // For image messages WITHOUT caption, force image description mode
+        // If there's a caption (user question), let the classifier route to chat for an answer
         $processingOptions = [];
         if ($isImageMessage) {
-            // Set a special topic to route to brief image description
-            $processingOptions['force_image_description'] = true;
+            $imageCaption = $dto->incomingMsg['image']['caption'] ?? null;
+            if (empty($imageCaption)) {
+                // No caption: force brief image description
+                $processingOptions['force_image_description'] = true;
+            }
+            // With caption: let classifier route normally so AI can ANSWER the question
         }
 
         $result = $this->messageProcessor->processStream($message, $streamCallback, null, $processingOptions);
@@ -480,23 +485,37 @@ class WhatsAppService
         // 8. Send Response based on input type
         $responseSent = false;
 
-        // PRIORITY 1: Check if AI already generated audio (TTS response from MediaGenerationHandler)
-        if ($fileData && 'audio' === ($fileData['type'] ?? null)) {
-            $audioPath = $fileData['path'] ?? null;
-            if ($audioPath && !empty($this->appUrl)) {
-                $audioUrl = rtrim($this->appUrl, '/').'/'.ltrim($audioPath, '/');
+        // PRIORITY 1: Check if AI generated media (image, video, or audio from MediaGenerationHandler)
+        if ($fileData) {
+            $generatedMediaType = $fileData['type'] ?? null;
+            $mediaPath = $fileData['path'] ?? null;
 
-                $this->logger->info('WhatsApp: Sending AI-generated audio response', [
+            if ($mediaPath && !empty($this->appUrl) && in_array($generatedMediaType, ['audio', 'video', 'image'], true)) {
+                $mediaUrl = rtrim($this->appUrl, '/').'/'.ltrim($mediaPath, '/');
+
+                $this->logger->info('WhatsApp: Sending AI-generated media response', [
                     'to' => $dto->from,
-                    'audio_url' => $audioUrl,
+                    'media_type' => $generatedMediaType,
+                    'media_url' => $mediaUrl,
                 ]);
 
-                $sendResult = $this->sendMedia($dto->from, 'audio', $audioUrl, $dto->phoneNumberId);
+                // For images and videos, include the response text as caption
+                $caption = in_array($generatedMediaType, ['image', 'video'], true) && !empty($responseText)
+                    ? mb_substr($responseText, 0, 1024) // WhatsApp caption limit
+                    : null;
+
+                $sendResult = $this->sendMedia($dto->from, $generatedMediaType, $mediaUrl, $dto->phoneNumberId, $caption);
                 if ($sendResult['success']) {
-                    $this->storeOutgoingMessage($user, $dto, $responseText ?: '[Audio response]', $sendResult['message_id']);
+                    $placeholderText = match ($generatedMediaType) {
+                        'image' => '[Image response]',
+                        'video' => '[Video response]',
+                        default => '[Audio response]', // audio is the remaining case
+                    };
+                    $this->storeOutgoingMessage($user, $dto, $responseText ?: $placeholderText, $sendResult['message_id']);
                     $responseSent = true;
                 } else {
-                    $this->logger->warning('WhatsApp: Failed to send AI audio, falling back to TTS', [
+                    $this->logger->warning('WhatsApp: Failed to send AI media, falling back', [
+                        'media_type' => $generatedMediaType,
                         'error' => $sendResult['error'] ?? 'Unknown',
                     ]);
                 }
@@ -827,16 +846,17 @@ class WhatsAppService
                             ]);
                         }
                     } else {
+                        // Extraction failed - return error to user instead of proceeding with placeholder
                         $this->logger->warning('WhatsApp: No text extracted from audio/video', [
                             'type' => $dto->type,
                             'details' => $extractionDetails ?? [],
                         ]);
 
-                        // For video without audio track, this might be expected
                         if ('video' === $dto->type) {
-                            // Check if video has no audio - set a more descriptive message
-                            $message->setText('[Video without audio track]');
+                            return 'Video has no audio track or audio could not be extracted';
                         }
+
+                        return 'Audio transcription failed - no speech detected';
                     }
                 } elseif ('image' === $dto->type) {
                     // For images, extract description via Vision AI
@@ -870,6 +890,13 @@ class WhatsAppService
                                 'description_length' => strlen($extractedText),
                             ]);
                         }
+                    } else {
+                        // Vision extraction failed - return error
+                        $this->logger->warning('WhatsApp: Image analysis failed - no description extracted', [
+                            'details' => $extractionDetails ?? [],
+                        ]);
+
+                        return 'Image analysis failed - could not process the image';
                     }
                 } else {
                     // For documents and other types, use standard extraction
