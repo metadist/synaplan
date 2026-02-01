@@ -20,6 +20,8 @@ use Psr\Log\LoggerInterface;
  */
 class VectorizationService
 {
+    private const VECTOR_DIMENSION = 1024;
+
     public function __construct(
         private AiFacade $aiFacade,
         private TextChunker $textChunker,
@@ -114,12 +116,28 @@ class VectorizationService
                         continue;
                     }
 
+                    $embeddingLength = count($embedding);
+                    if (self::VECTOR_DIMENSION !== $embeddingLength) {
+                        $this->logger->warning('VectorizationService: Embedding dimension mismatch', [
+                            'expected' => self::VECTOR_DIMENSION,
+                            'actual' => $embeddingLength,
+                            'model' => $modelName,
+                            'provider' => $provider,
+                        ]);
+
+                        if ($embeddingLength > self::VECTOR_DIMENSION) {
+                            $embedding = array_slice($embedding, 0, self::VECTOR_DIMENSION);
+                        } else {
+                            $embedding = array_pad($embedding, self::VECTOR_DIMENSION, 0.0);
+                        }
+                    }
+
                     // MariaDB VECTOR Type: Use native SQL with VEC_FromText()
                     // Doctrine doesn't handle VECTOR type correctly with prepared statements
                     $vectorStr = '['.implode(',', array_map('floatval', $embedding)).']';
 
                     $conn = $this->em->getConnection();
-                    $sql = 'INSERT INTO BRAG (BUID, BMID, BGROUPKEY, BTYPE, BSTART, BEND, BTEXT, BEMBED, BCREATED) 
+                    $sql = 'INSERT INTO BRAG (BUID, BMID, BGROUPKEY, BTYPE, BSTART, BEND, BTEXT, BEMBED, BCREATED)
                             VALUES (:uid, :mid, :gkey, :ftype, :start, :end, :text, VEC_FromText(:vec), :created)';
 
                     $conn->executeStatement($sql, [

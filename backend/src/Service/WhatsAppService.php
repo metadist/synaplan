@@ -403,8 +403,17 @@ class WhatsAppService
 
         // 7. AI Pipeline Processing (use streaming mode to support TTS/media generation)
         $collectedResponse = '';
-        $streamCallback = function (string $chunk) use (&$collectedResponse) {
-            $collectedResponse .= $chunk;
+        $streamCallback = function (string|array $chunk, array $metadata = []) use (&$collectedResponse): void {
+            // Handle both string chunks (old providers) and array chunks (new providers with type/content)
+            if (is_array($chunk)) {
+                // Extract content from array format: ['type' => 'content', 'content' => '...']
+                if (isset($chunk['type']) && 'content' === $chunk['type'] && isset($chunk['content'])) {
+                    $collectedResponse .= $chunk['content'];
+                }
+            } else {
+                // Old format: simple string
+                $collectedResponse .= $chunk;
+            }
         };
 
         $result = $this->messageProcessor->processStream($message, $streamCallback);
@@ -565,6 +574,16 @@ class WhatsAppService
 
                         if (!empty($extractedText)) {
                             $message->setFileText($extractedText);
+
+                            // CRITICAL: For audio messages, replace placeholder text with transcription
+                            // This ensures the AI receives the actual spoken content, not "[Audio message]"
+                            $currentText = $message->getText();
+                            if (empty($currentText) || '[Audio message]' === $currentText || '[Audio]' === $currentText) {
+                                $message->setText($extractedText);
+                                $this->logger->info('WhatsApp: Replaced audio placeholder with transcription', [
+                                    'transcription_length' => strlen($extractedText),
+                                ]);
+                            }
                         }
                     } catch (\Throwable $e) {
                         $this->logger->error('WhatsApp file extraction failed', ['error' => $e->getMessage()]);
