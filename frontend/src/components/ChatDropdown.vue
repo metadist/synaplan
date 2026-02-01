@@ -143,7 +143,6 @@ import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import {
   ChatBubbleLeftRightIcon,
-  ChatBubbleLeftIcon,
   ChevronDownIcon,
   EllipsisVerticalIcon,
   PlusIcon,
