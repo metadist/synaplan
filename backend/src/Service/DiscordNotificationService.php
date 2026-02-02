@@ -16,12 +16,11 @@ class DiscordNotificationService
     private const COLOR_SUCCESS = 0x00FF00; // Green
     private const COLOR_ERROR = 0xFF0000;   // Red
 
-    // Discord API limits (https://discord.com/developers/docs/resources/channel#embed-object-embed-limits)
-    private const MAX_FIELD_VALUE = 1024;      // Max chars per field value
-    private const MAX_TOTAL_EMBED = 6000;      // Max chars across entire embed
-    private const MAX_USER_MESSAGE = 200;      // Truncate user message preview
-    private const MAX_RESPONSE = 300;          // Truncate response preview
-    private const MAX_ERROR = 450;             // Truncate error (leaves room for code block formatting)
+    // Truncation limits (Discord API: field value max 1024, total embed max 6000)
+    // @see https://discord.com/developers/docs/resources/channel#embed-object-embed-limits
+    private const MAX_USER_MESSAGE = 200;  // Truncate user message preview
+    private const MAX_RESPONSE = 300;      // Truncate response preview
+    private const MAX_ERROR = 450;         // Truncate error (leaves room for code block formatting)
 
     public function __construct(
         private HttpClientInterface $httpClient,
