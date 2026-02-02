@@ -170,7 +170,7 @@ class MediaPromptExtractor
         $value = strtolower(trim($value));
 
         return match ($value) {
-            'audio', 'sound', 'voice', 'tts', 'text2sound' => 'audio',
+            'audio', 'sound', 'voice', 'tts', 'text2sound', 'mp3', 'wav', 'ogg' => 'audio',
             'video', 'vid', 'text2vid' => 'video',
             'image', 'img', 'picture', 'pic', 'text2pic' => 'image',
             default => null,
@@ -207,7 +207,7 @@ class MediaPromptExtractor
         $text = $message->getText() ?? '';
 
         return (bool) preg_match(
-            '/\b(audio|tonspur|sound|sprach[a-z]*|voice|tts|sprich|sage|lies|vorlesen|vor|vortragen)\b/i',
+            '/\b(audio|tonspur|sound|sprach[a-z]*|voice|tts|sprich|sage|lies|vorlesen|vor|vortragen|mp3|wav|ogg|musik|music)\b/i',
             $text
         );
     }

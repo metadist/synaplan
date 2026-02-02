@@ -376,7 +376,7 @@ class MessageSorter
         $value = strtolower(trim($value));
 
         return match ($value) {
-            'audio', 'sound', 'voice', 'tts', 'text2sound', 'speech' => 'audio',
+            'audio', 'sound', 'voice', 'tts', 'text2sound', 'speech', 'mp3', 'wav', 'ogg' => 'audio',
             'video', 'vid', 'text2vid', 'film', 'clip', 'animation' => 'video',
             'image', 'img', 'picture', 'pic', 'text2pic', 'photo' => 'image',
             default => null,
