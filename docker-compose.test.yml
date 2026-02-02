@@ -44,6 +44,7 @@ services:
       OPENAI_API_KEY: "test-key"
       ANTHROPIC_API_KEY: "test-key"
       GROQ_API_KEY: "test-key"
+      THEHIVE_API_KEY: "test-key"
     depends_on:
       db_test:
         condition: service_healthy

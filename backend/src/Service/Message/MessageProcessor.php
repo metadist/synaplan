@@ -182,8 +182,19 @@ class MessageProcessor
             }
 
             if (!$isAgainRequest && !$hasFixedPrompt) {
-                // Run classification
-                $classification = $this->classifier->classify($message, $conversationHistory);
+                if (!empty($options['force_image_description'])) {
+                    // Force image description mode (used by WhatsApp for images)
+                    $classification = [
+                        'topic' => 'analyzefile',
+                        'language' => $message->getLanguage() ?: 'en',
+                        'source' => 'forced_image_description',
+                        'intent' => 'file_analysis',
+                    ];
+                    $this->logger->info('MessageProcessor: Forcing image description mode');
+                } else {
+                    // Run classification
+                    $classification = $this->classifier->classify($message, $conversationHistory);
+                }
 
                 // IMPORTANT: Save sorting model info separately (don't pass to ChatHandler!)
                 $sortingModelId = $classification['model_id'] ?? null;
@@ -475,6 +486,21 @@ class MessageProcessor
                 ];
 
                 $this->notify($statusCallback, 'classified', 'Using widget task prompt (skipped classification)', [
+                    'topic' => $classification['topic'],
+                    'language' => $classification['language'],
+                    'source' => $classification['source'],
+                ]);
+            } elseif (!empty($options['force_image_description'])) {
+                // Force image description mode (used by WhatsApp for images)
+                $classification = [
+                    'topic' => 'analyzefile',
+                    'language' => $languageOverride ?? 'en',
+                    'source' => 'forced_image_description',
+                    'intent' => 'file_analysis',
+                ];
+                $this->logger->info('MessageProcessor: Forcing image description mode (non-streaming)');
+
+                $this->notify($statusCallback, 'classified', 'Forced image description mode', [
                     'topic' => $classification['topic'],
                     'language' => $classification['language'],
                     'source' => $classification['source'],

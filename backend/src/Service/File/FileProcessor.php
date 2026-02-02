@@ -4,9 +4,9 @@ namespace App\Service\File;
 
 use App\AI\Exception\ProviderException;
 use App\AI\Service\AiFacade;
-use App\AI\Service\ProviderRegistry;
 use App\Service\WhisperService;
 use Psr\Log\LoggerInterface;
+use Symfony\Component\Process\Process;
 
 /**
  * Universal File Processor.
@@ -47,6 +47,17 @@ class FileProcessor
         'mp4', 'avi', 'mov', 'mkv', 'mpeg', 'mpg',
     ];
 
+    /**
+     * Audio formats supported by external APIs (OpenAI/Groq Whisper).
+     * Formats not in this list need to be converted before sending.
+     *
+     * @see https://console.groq.com/docs/speech-to-text
+     * @see https://platform.openai.com/docs/api-reference/audio
+     */
+    private const API_SUPPORTED_AUDIO_FORMATS = [
+        'flac', 'mp3', 'mp4', 'mpeg', 'mpga', 'm4a', 'ogg', 'wav', 'webm',
+    ];
+
     private const OFFICE_EXT_TO_MIME = [
         'xls' => 'application/vnd.ms-excel',
         'xlsx' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
@@ -66,11 +77,11 @@ class FileProcessor
         private TextCleaner $textCleaner,
         private AiFacade $aiFacade,
         private WhisperService $whisperService,
-        private ProviderRegistry $providerRegistry,
         private LoggerInterface $logger,
         private string $uploadDir,
         private int $tikaMinLength,
         private float $tikaMinEntropy,
+        private string $ffmpegBinary = '/usr/bin/ffmpeg',
     ) {
     }
 
@@ -118,7 +129,7 @@ class FileProcessor
 
         // Strategy 3: Audio/Video files -> Whisper.cpp
         if ($this->isAudioExtension($ext)) {
-            return $this->extractFromAudio($absolutePath, $meta);
+            return $this->extractFromAudio($absolutePath, $meta, $userId);
         }
 
         // Strategy 4: Tika for documents
@@ -374,7 +385,7 @@ class FileProcessor
      *
      * @return array [extractedText, meta]
      */
-    private function extractFromAudio(string $absolutePath, array $baseMeta): array
+    private function extractFromAudio(string $absolutePath, array $baseMeta, ?int $userId = null): array
     {
         // Try local Whisper.cpp first (preferred)
         if ($this->whisperService->isAvailable()) {
@@ -406,54 +417,49 @@ class FileProcessor
             }
         }
 
-        // Try external speech-to-text provider (OpenAI Whisper API)
-        return $this->extractFromAudioExternal($absolutePath, $baseMeta);
+        // Try external speech-to-text provider (user's configured provider or OpenAI)
+        return $this->extractFromAudioExternal($absolutePath, $baseMeta, $userId);
     }
 
     /**
-     * Extract text from audio using external API (OpenAI Whisper API).
+     * Extract text from audio using external API (user's configured provider or OpenAI).
      *
      * Used as fallback when local Whisper.cpp is not available or fails.
+     * Uses AiFacade::transcribe() to respect user's model configuration (e.g., Groq whisper).
      *
-     * @param string $absolutePath Full path to the audio file
-     * @param array  $baseMeta     Base metadata for logging
+     * @param string   $absolutePath Full path to the audio file
+     * @param array    $baseMeta     Base metadata for logging
+     * @param int|null $userId       User ID for provider selection
      *
      * @return array [extractedText, meta]
      */
-    private function extractFromAudioExternal(string $absolutePath, array $baseMeta): array
+    private function extractFromAudioExternal(string $absolutePath, array $baseMeta, ?int $userId = null): array
     {
-        // Check if external speech-to-text providers are available
-        $availableProviders = $this->providerRegistry->getAvailableProviders('speech_to_text', false);
-        if (empty($availableProviders)) {
-            $this->logger->warning('FileProcessor: No speech-to-text providers available', $baseMeta);
-
-            return ['', [
-                'strategy' => 'audio_no_providers',
-                'error' => 'No speech-to-text providers configured. Enable local Whisper.cpp or configure OpenAI API key.',
-            ] + $baseMeta];
-        }
-
         $this->logger->info('FileProcessor: Transcribing audio with external API', [
-            'providers' => $availableProviders,
+            'user_id' => $userId,
         ] + $baseMeta);
 
-        // Try the first available provider (usually OpenAI)
+        // Convert audio if format is not supported by external APIs
+        $processedPath = $this->ensureApiCompatibleFormat($absolutePath);
+        $needsCleanup = $processedPath !== $absolutePath;
+
+        // Use AiFacade::transcribe() which respects user's model configuration
         try {
-            $provider = $this->providerRegistry->getSpeechToTextProvider();
-            $result = $provider->transcribe($absolutePath);
+            $result = $this->aiFacade->transcribe($processedPath, $userId);
 
             $text = $result['text'] ?? '';
             $text = $this->textCleaner->clean($text);
 
             $this->logger->info('FileProcessor: External API transcription success', [
                 'strategy' => 'whisper_api',
-                'provider' => $provider->getName(),
+                'provider' => $result['provider'] ?? 'unknown',
                 'bytes' => strlen($text),
+                'converted' => $needsCleanup,
             ]);
 
             return [$text, [
                 'strategy' => 'whisper_api',
-                'provider' => $provider->getName(),
+                'provider' => $result['provider'] ?? 'unknown',
             ] + $baseMeta];
         } catch (ProviderException $e) {
             $this->logger->error('FileProcessor: External API transcription failed (provider error)', [
@@ -473,6 +479,101 @@ class FileProcessor
                 'strategy' => 'audio_api_failed',
                 'error' => $e->getMessage(),
             ] + $baseMeta];
+        } finally {
+            // Cleanup temporary converted file
+            if ($needsCleanup && file_exists($processedPath)) {
+                @unlink($processedPath);
+            }
+        }
+    }
+
+    /**
+     * Ensure audio file is in a format supported by external APIs.
+     *
+     * WhatsApp and other sources may send audio in formats not supported
+     * by OpenAI/Groq Whisper APIs (e.g., AMR, 3GP). This method converts
+     * unsupported formats to MP3 using FFmpeg.
+     *
+     * @param string $absolutePath Full path to the audio file
+     *
+     * @return string Path to the compatible file (original or converted)
+     */
+    private function ensureApiCompatibleFormat(string $absolutePath): string
+    {
+        $ext = strtolower(pathinfo($absolutePath, PATHINFO_EXTENSION));
+
+        // Check if format is already supported
+        if (in_array($ext, self::API_SUPPORTED_AUDIO_FORMATS, true)) {
+            return $absolutePath;
+        }
+
+        // Check if FFmpeg is available
+        if (!file_exists($this->ffmpegBinary) || !is_executable($this->ffmpegBinary)) {
+            $this->logger->warning('FileProcessor: FFmpeg not available, cannot convert audio', [
+                'format' => $ext,
+                'ffmpeg' => $this->ffmpegBinary,
+            ]);
+
+            return $absolutePath; // Try anyway, API will reject if unsupported
+        }
+
+        // Convert to MP3 (universally supported, good balance of size/quality)
+        $tempPath = sys_get_temp_dir().'/audio_convert_'.uniqid().'.mp3';
+
+        $this->logger->info('FileProcessor: Converting audio for API compatibility', [
+            'from' => $ext,
+            'to' => 'mp3',
+            'original' => basename($absolutePath),
+        ]);
+
+        $process = new Process([
+            $this->ffmpegBinary,
+            '-i', $absolutePath,
+            '-vn',                    // No video (extract audio only)
+            '-ar', '16000',           // 16kHz sample rate (optimal for speech)
+            '-ac', '1',               // Mono
+            '-b:a', '64k',            // 64kbps bitrate (good for speech)
+            '-f', 'mp3',              // Force MP3 format
+            '-y',                     // Overwrite output
+            $tempPath,
+        ]);
+
+        $process->setTimeout(120); // 2 minutes max
+
+        try {
+            $process->run();
+
+            if (!$process->isSuccessful() || !file_exists($tempPath)) {
+                $this->logger->warning('FileProcessor: Audio conversion failed', [
+                    'exit_code' => $process->getExitCode(),
+                    'stderr' => $process->getErrorOutput(),
+                ]);
+
+                // Clean up partial temp file if it exists
+                if (file_exists($tempPath)) {
+                    @unlink($tempPath);
+                }
+
+                return $absolutePath; // Fallback to original
+            }
+
+            $this->logger->info('FileProcessor: Audio converted successfully', [
+                'original_size' => filesize($absolutePath),
+                'converted_size' => filesize($tempPath),
+            ]);
+
+            return $tempPath;
+        } catch (\Throwable $e) {
+            $this->logger->warning('FileProcessor: Audio conversion exception', [
+                'error' => $e->getMessage(),
+            ]);
+
+            // Clean up partial temp file if it exists
+            if (file_exists($tempPath)) {
+                @unlink($tempPath);
+            }
+
+            return $absolutePath;
         }
     }
 }

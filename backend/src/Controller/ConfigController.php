@@ -112,7 +112,13 @@ class ConfigController extends AbstractController
                             property: 'whisperEnabled',
                             type: 'boolean',
                             example: true,
-                            description: 'When true, use local Whisper.cpp. When false, frontend should use Web Speech API.'
+                            description: 'When true, local Whisper.cpp is available for record-then-transcribe mode.'
+                        ),
+                        new OA\Property(
+                            property: 'speechToTextAvailable',
+                            type: 'boolean',
+                            example: true,
+                            description: 'When true, any speech-to-text method is available (local Whisper OR API models like Groq/OpenAI). Frontend should show microphone button.'
                         ),
                     ]
                 ),
@@ -148,6 +154,25 @@ class ConfigController extends AbstractController
                         ),
                     ]
                 ),
+                new OA\Property(
+                    property: 'build',
+                    type: 'object',
+                    description: 'Build and deployment information for debugging',
+                    properties: [
+                        new OA\Property(
+                            property: 'version',
+                            type: 'string',
+                            example: '2.1.0',
+                            description: 'Application version'
+                        ),
+                        new OA\Property(
+                            property: 'ip',
+                            type: 'string',
+                            example: '10.0.0.2',
+                            description: 'Internal server IP (not public)'
+                        ),
+                    ]
+                ),
             ]
         )
     )]
@@ -171,11 +196,21 @@ class ConfigController extends AbstractController
         ];
 
         // Speech-to-text configuration
-        // When whisperEnabled=false, frontend should use Web Speech API
-        // When whisperEnabled=true, use local Whisper.cpp backend
-        $whisperEnabled = ($_ENV['WHISPER_ENABLED'] ?? 'true') === 'true';
+        // whisperEnabled: true when local Whisper.cpp is available (record-then-transcribe mode)
+        // speechToTextAvailable: true when ANY transcription method is available:
+        //   - Local Whisper.cpp, OR
+        //   - API-based providers with valid API keys (Groq Whisper, OpenAI Whisper, etc.)
+        // Frontend shows microphone button when: Web Speech API supported OR speechToTextAvailable
+        $whisperLocalEnabled = ($_ENV['WHISPER_ENABLED'] ?? 'true') === 'true';
+        $whisperLocalAvailable = $whisperLocalEnabled && $this->whisperService->isAvailable();
+
+        // Check if any API-based speech-to-text providers are actually available
+        // (i.e., have valid API keys configured, not just models in DB)
+        $apiProvidersAvailable = count($this->providerRegistry->getAvailableProviders('speech_to_text', false)) > 0;
+
         $speech = [
-            'whisperEnabled' => $whisperEnabled && $this->whisperService->isAvailable(),
+            'whisperEnabled' => $whisperLocalAvailable,
+            'speechToTextAvailable' => $whisperLocalAvailable || $apiProvidersAvailable,
         ];
 
         // Google Tag configuration (read from Config table, ownerId=0 for global config)
@@ -209,13 +244,53 @@ class ConfigController extends AbstractController
             }
         }
 
+        // Build information for debugging deployments (minimal: version + internal IP only)
+        $buildInfo = [
+            'version' => $_ENV['APP_VERSION'] ?? '2.1.0',
+            'ip' => $this->getInternalIp(),
+        ];
+
         return $this->json([
             'recaptcha' => $recaptchaConfig,
             'features' => $features,
             'speech' => $speech,
             'plugins' => $plugins,
             'googleTag' => $googleTagConfig,
+            'build' => $buildInfo,
         ]);
+    }
+
+    /**
+     * Get internal IP address (10.x.x.x range only, for debugging which server handled request).
+     */
+    private function getInternalIp(): string
+    {
+        // Check environment variable first (set by start scripts)
+        $synDbHost = $_ENV['SYNDBHOST'] ?? '';
+        if ('' !== $synDbHost && str_starts_with($synDbHost, '10.')) {
+            return $synDbHost;
+        }
+
+        // Try to find a 10.x.x.x IP from network interfaces
+        $hostname = gethostname();
+        if ($hostname) {
+            $ips = gethostbynamel($hostname);
+            if ($ips) {
+                foreach ($ips as $ip) {
+                    if (str_starts_with($ip, '10.')) {
+                        return $ip;
+                    }
+                }
+            }
+        }
+
+        // Fallback: try to get from SERVER_ADDR if in 10.x range
+        $serverAddr = $_SERVER['SERVER_ADDR'] ?? '';
+        if (str_starts_with($serverAddr, '10.')) {
+            return $serverAddr;
+        }
+
+        return 'dev';
     }
 
     /**

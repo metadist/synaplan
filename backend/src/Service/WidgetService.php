@@ -25,7 +25,7 @@ class WidgetService
     ) {
     }
 
-    public const DEFAULT_WIDGET_PROMPT = 'widget-default';
+    public const DEFAULT_WIDGET_PROMPT = 'tools:widget-default';
 
     /**
      * Create a new widget.

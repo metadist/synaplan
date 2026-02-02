@@ -100,14 +100,8 @@ const router = createRouter({
     },
     {
       path: '/tools',
-      redirect: '/tools/introduction',
+      redirect: '/tools/chat-widget',
       meta: { requiresAuth: true },
-    },
-    {
-      path: '/tools/introduction',
-      name: 'tools-introduction',
-      component: () => import('../views/ToolsView.vue'),
-      meta: { requiresAuth: true, helpId: 'tools.introduction', titleKey: 'pageTitles.tools' },
     },
     {
       path: '/tools/chat-widget',
@@ -237,6 +231,12 @@ const router = createRouter({
       name: 'admin-features',
       component: () => import('../views/FeatureStatusView.vue'),
       meta: { requiresAuth: true, requiresAdmin: true, titleKey: 'pageTitles.adminFeatures' },
+    },
+    {
+      path: '/admin/config',
+      name: 'admin-config',
+      component: () => import('../views/AdminConfigView.vue'),
+      meta: { requiresAuth: true, requiresAdmin: true, titleKey: 'pageTitles.adminConfig' },
     },
     {
       path: '/subscription',

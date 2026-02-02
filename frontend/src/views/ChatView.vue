@@ -169,6 +169,13 @@
       @save="handleMemoryEditSave"
     />
 
+    <MemoryDeleteDialog
+      :is-open="isMemoryDeleteDialogOpen"
+      :memory="deletingMemory"
+      @close="closeMemoryDeleteDialog"
+      @confirm="confirmMemoryDelete"
+    />
+
     <!-- Memories List Dialog (for viewing all memories when clicking a memory badge) -->
     <MemoriesDialog
       :is-open="isMemoriesDialogOpen"
@@ -211,6 +218,7 @@ import {
 } from '@/services/api/feedbackApi'
 import MemoryFormDialog from '@/components/MemoryFormDialog.vue'
 import MemoriesDialog from '@/components/MemoriesDialog.vue'
+import MemoryDeleteDialog from '@/components/memories/MemoryDeleteDialog.vue'
 
 const { t } = useI18n()
 const router = useRouter()
@@ -254,6 +262,13 @@ const falsePositiveCorrection = ref('')
 const isMemoryEditDialogOpen = ref(false)
 const editingMemory = ref<UserMemory | null>(null)
 const availableMemoryCategories = ref<string[]>([])
+
+// Memory delete dialog state
+const isMemoryDeleteDialogOpen = ref(false)
+const deletingMemory = ref<(UserMemory & { toastId: number }) | null>(null)
+let deleteDialogTimer: number | null = null
+const deleteDialogAutoConfirmMs = 8000
+const deleteDialogQueue = ref<Array<UserMemory & { toastId: number }>>([])
 
 // Memories list dialog state (for viewing all memories)
 const isMemoriesDialogOpen = ref(false)
@@ -319,6 +334,7 @@ const handleOpenMemoryDialogEvent = (event: Event) => {
 onBeforeUnmount(() => {
   handleStopStreaming()
   window.removeEventListener('open-memory-dialog', handleOpenMemoryDialogEvent)
+  clearDeleteDialogTimer()
 })
 
 // Watch for active chat changes and load messages
@@ -915,7 +931,6 @@ const streamAIResponse = async (
               return
             }
 
-            // Create toast for the suggested memory
             const toastMemory: UserMemory & { toastId: number } = {
               id: memoryData.id,
               category: memoryData.category,
@@ -928,10 +943,22 @@ const streamAIResponse = async (
               toastId: memoryToastIdCounter++,
             }
 
+            if (memoryData.action === 'delete') {
+              openMemoryDeleteDialog(toastMemory)
+              return
+            }
+
+            // Create toast for the suggested memory
             activeMemoryToasts.value.push(toastMemory)
           } else if (data.status === 'memories_loaded') {
             // Memories loaded event - we now show them per message, not globally
             // No action needed - memories will be attached to the response message
+          } else if (data.status === 'memory_deleted') {
+            // Legacy backend event - remove from local store only
+            const memoryId = data.metadata?.id
+            if (memoryId) {
+              memoriesStore.memories = memoriesStore.memories.filter((m) => m.id !== memoryId)
+            }
           } else if (data.status === 'complete') {
             // Clear processing status
             processingStatus.value = ''
@@ -1508,18 +1535,12 @@ function closeMemoriesDialog() {
 }
 
 function handleMemoryDiscard(memory: UserMemory & { toastId: number }) {
-  // Delete memory via store
-  memoriesStore.removeMemory(memory.id)
-
-  // Close the toast
+  // Close the toast and open delete confirmation dialog
   const index = activeMemoryToasts.value.findIndex((m) => m.toastId === memory.toastId)
   if (index !== -1) {
     activeMemoryToasts.value.splice(index, 1)
   }
-
-  // Show notification
-  const { success } = useNotification()
-  success(t('memories.toast.discarded'))
+  openMemoryDeleteDialog(memory)
 }
 
 function handleMemoryToastClose(toastId: number) {
@@ -1616,6 +1637,54 @@ async function confirmPositiveFeedback(text: string) {
     showErrorToast(errorMsg)
   } finally {
     falsePositiveSubmitting.value = false
+function closeMemoryDeleteDialog() {
+  clearDeleteDialogTimer()
+  isMemoryDeleteDialogOpen.value = false
+  deletingMemory.value = null
+  openNextDeleteDialogFromQueue()
+}
+
+async function confirmMemoryDelete(memory: UserMemory) {
+  try {
+    await memoriesStore.removeMemory(memory.id)
+  } catch {
+    // Store shows error notification
+  } finally {
+    closeMemoryDeleteDialog()
+  }
+}
+
+function openMemoryDeleteDialog(memory: UserMemory & { toastId: number }) {
+  if (isMemoryDeleteDialogOpen.value) {
+    deleteDialogQueue.value.push(memory)
+    return
+  }
+  deletingMemory.value = memory
+  isMemoryDeleteDialogOpen.value = true
+  startDeleteDialogTimer(memory.id)
+}
+
+function startDeleteDialogTimer(memoryId: number) {
+  clearDeleteDialogTimer()
+  deleteDialogTimer = window.setTimeout(() => {
+    if (deletingMemory.value?.id === memoryId) {
+      confirmMemoryDelete(deletingMemory.value)
+    }
+  }, deleteDialogAutoConfirmMs)
+}
+
+function clearDeleteDialogTimer() {
+  if (deleteDialogTimer) {
+    clearTimeout(deleteDialogTimer)
+    deleteDialogTimer = null
+  }
+}
+
+function openNextDeleteDialogFromQueue() {
+  if (isMemoryDeleteDialogOpen.value || deleteDialogQueue.value.length === 0) return
+  const next = deleteDialogQueue.value.shift()
+  if (next) {
+    openMemoryDeleteDialog(next)
   }
 }
 </script>

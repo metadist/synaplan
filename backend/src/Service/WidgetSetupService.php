@@ -19,7 +19,7 @@ use Psr\Log\LoggerInterface;
  */
 final class WidgetSetupService
 {
-    public const SETUP_INTERVIEW_TOPIC = 'widget-setup-interview';
+    public const SETUP_INTERVIEW_TOPIC = 'tools:widget-setup-interview';
     private const START_MARKER = '__START_INTERVIEW__';
 
     public function __construct(

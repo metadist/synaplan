@@ -198,6 +198,40 @@ readonly class UserMemoryService
     }
 
     /**
+     * Fetch a single memory by id for a user.
+     */
+    public function getMemoryById(int $memoryId, User $user): ?UserMemoryDTO
+    {
+        if (!$this->qdrantClient->isAvailable()) {
+            $this->logger->warning('Memory service unavailable - cannot fetch memory', [
+                'memory_id' => $memoryId,
+                'user_id' => $user->getId(),
+            ]);
+
+            return null;
+        }
+
+        $pointId = "mem_{$user->getId()}_{$memoryId}";
+        $payload = $this->qdrantClient->getMemory($pointId);
+
+        if (!$payload) {
+            return null;
+        }
+
+        return new UserMemoryDTO(
+            id: $memoryId,
+            userId: $user->getId(),
+            category: $payload['category'] ?? 'personal',
+            key: $payload['key'] ?? '',
+            value: $payload['value'] ?? '',
+            source: $payload['source'] ?? 'unknown',
+            messageId: $payload['message_id'] ?? null,
+            created: (int) ($payload['created'] ?? time()),
+            updated: (int) ($payload['updated'] ?? time()),
+        );
+    }
+
+    /**
      * Get all memories for user (from Qdrant).
      */
     public function getUserMemories(int $userId, ?string $category = null): array
