@@ -12,8 +12,16 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
  */
 class DiscordNotificationService
 {
+    // Discord embed colors
     private const COLOR_SUCCESS = 0x00FF00; // Green
     private const COLOR_ERROR = 0xFF0000;   // Red
+
+    // Discord API limits (https://discord.com/developers/docs/resources/channel#embed-object-embed-limits)
+    private const MAX_FIELD_VALUE = 1024;      // Max chars per field value
+    private const MAX_TOTAL_EMBED = 6000;      // Max chars across entire embed
+    private const MAX_USER_MESSAGE = 200;      // Truncate user message preview
+    private const MAX_RESPONSE = 300;          // Truncate response preview
+    private const MAX_ERROR = 450;             // Truncate error (leaves room for code block formatting)
 
     public function __construct(
         private HttpClientInterface $httpClient,
@@ -70,12 +78,12 @@ class DiscordNotificationService
             ],
             [
                 'name' => '📥 User Message',
-                'value' => $this->truncate($userMessage, 200),
+                'value' => $this->truncate($userMessage, self::MAX_USER_MESSAGE),
                 'inline' => false,
             ],
             [
                 'name' => '📤 Response',
-                'value' => $this->truncate($responseText, 300),
+                'value' => $this->truncate($responseText, self::MAX_RESPONSE),
                 'inline' => false,
             ],
         ];
@@ -164,12 +172,12 @@ class DiscordNotificationService
             ],
             [
                 'name' => '📥 User Message',
-                'value' => $this->truncate($userMessage, 200),
+                'value' => $this->truncate($userMessage, self::MAX_USER_MESSAGE),
                 'inline' => false,
             ],
             [
                 'name' => '⚠️ Error',
-                'value' => "```\n{$this->truncate($error, 500)}\n```",
+                'value' => "```\n{$this->truncate($error, self::MAX_ERROR)}\n```",
                 'inline' => false,
             ],
         ];
