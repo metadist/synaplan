@@ -7,6 +7,7 @@ namespace App\Tests\Service;
 use App\AI\Service\AiFacade;
 use App\DTO\WhatsApp\IncomingMessageDto;
 use App\Entity\Message;
+use App\Entity\User;
 use App\Service\DiscordNotificationService;
 use App\Service\File\FileProcessor;
 use App\Service\File\UserUploadPathBuilder;
@@ -16,6 +17,10 @@ use App\Service\WhatsAppService;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
+use Symfony\Component\Lock\LockFactory;
+use Symfony\Component\Lock\SharedLockInterface;
+use Symfony\Contracts\Cache\CacheInterface;
+use Symfony\Contracts\Cache\ItemInterface;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 use Symfony\Contracts\HttpClient\ResponseInterface;
 
@@ -44,6 +49,10 @@ class WhatsAppServiceTest extends TestCase
     private $aiFacade;
     /** @var DiscordNotificationService&\PHPUnit\Framework\MockObject\MockObject */
     private $discord;
+    /** @var CacheInterface&\PHPUnit\Framework\MockObject\MockObject */
+    private $cache;
+    /** @var LockFactory&\PHPUnit\Framework\MockObject\MockObject */
+    private $lockFactory;
     private string $testPhoneNumberId = '123456789'; // Test phone number ID
 
     protected function setUp(): void
@@ -58,6 +67,23 @@ class WhatsAppServiceTest extends TestCase
         $this->discord = $this->createMock(DiscordNotificationService::class);
         $this->pathBuilder = new UserUploadPathBuilder(); // Real instance (final class)
 
+        // Create cache mock - by default returns time() (fresh entry = no duplicate)
+        $this->cache = $this->createMock(CacheInterface::class);
+        $this->cache->method('get')->willReturnCallback(function (string $key, callable $callback) {
+            // Simulate fresh cache entry by calling the callback
+            $item = $this->createMock(ItemInterface::class);
+            $item->method('expiresAfter')->willReturnSelf();
+
+            return $callback($item);
+        });
+
+        // Create lock factory mock - by default lock is acquired successfully
+        $this->lockFactory = $this->createMock(LockFactory::class);
+        $lock = $this->createMock(SharedLockInterface::class);
+        $lock->method('acquire')->willReturn(true);
+        // release() returns void, no need to configure return value
+        $this->lockFactory->method('createLock')->willReturn($lock);
+
         // Create service with test configuration (dynamic multi-number support)
         $this->service = new WhatsAppService(
             $this->httpClient,
@@ -69,6 +95,8 @@ class WhatsAppServiceTest extends TestCase
             $this->pathBuilder,
             $this->aiFacade,
             $this->discord,
+            $this->cache,
+            $this->lockFactory,
             'test_token',
             true,
             '/tmp/test_uploads',
@@ -94,6 +122,8 @@ class WhatsAppServiceTest extends TestCase
             $this->pathBuilder,
             $this->aiFacade,
             $this->discord,
+            $this->cache,
+            $this->lockFactory,
             'test_token',
             false, // disabled
             '/tmp/test_uploads',
@@ -115,6 +145,8 @@ class WhatsAppServiceTest extends TestCase
             $this->pathBuilder,
             $this->aiFacade,
             $this->discord,
+            $this->cache,
+            $this->lockFactory,
             'test_token',
             false,
             '/tmp/test_uploads',
@@ -289,6 +321,8 @@ class WhatsAppServiceTest extends TestCase
             $this->pathBuilder,
             $this->aiFacade,
             $this->discord,
+            $this->cache,
+            $this->lockFactory,
             'test_token',
             false,
             '/tmp/test_uploads',
@@ -1050,5 +1084,139 @@ class WhatsAppServiceTest extends TestCase
 
         // Trigger the mock directly to verify it works
         $this->discord->notifyWhatsAppError('processing', '+1234', 'Hello', 'Error message', []);
+    }
+
+    public function testDuplicateMessageDetection(): void
+    {
+        // Create a cache mock that returns an old cached value (message already processed)
+        $cacheWithHit = $this->createMock(CacheInterface::class);
+        $cacheWithHit->method('get')->willReturn(time() - 60); // Cached 60 seconds ago
+
+        // Create lock that allows acquisition
+        $lockFactory = $this->createMock(LockFactory::class);
+        $lock = $this->createMock(SharedLockInterface::class);
+        $lock->method('acquire')->willReturn(true);
+        // release() returns void
+        $lockFactory->method('createLock')->willReturn($lock);
+
+        // Create service with the cache that has the message already
+        $service = new WhatsAppService(
+            $this->httpClient,
+            $this->logger,
+            $this->em,
+            $this->rateLimitService,
+            $this->messageProcessor,
+            $this->fileProcessor,
+            $this->pathBuilder,
+            $this->aiFacade,
+            $this->discord,
+            $cacheWithHit,
+            $lockFactory,
+            'test_token',
+            true,
+            '/tmp/test_uploads',
+            2,
+            'https://app.example.com'
+        );
+
+        // Create a mock user
+        $user = $this->createMock(User::class);
+        $user->method('getId')->willReturn(1);
+
+        // Create incoming message DTO
+        $incomingMsg = [
+            'from' => '+1234567890',
+            'id' => 'wamid.duplicate123',
+            'timestamp' => (string) time(),
+            'type' => 'text',
+            'text' => ['body' => 'Hello duplicate'],
+        ];
+        $value = [
+            'messaging_product' => 'whatsapp',
+            'metadata' => [
+                'phone_number_id' => $this->testPhoneNumberId,
+                'display_phone_number' => '+49123456789',
+            ],
+            'contacts' => [['profile' => ['name' => 'Test User'], 'wa_id' => '+1234567890']],
+            'messages' => [$incomingMsg],
+        ];
+
+        $dto = IncomingMessageDto::fromPayload($incomingMsg, $value);
+
+        // The message processor should NOT be called for duplicates
+        $this->messageProcessor->expects($this->never())->method('processStream');
+
+        // Handle the duplicate message
+        $result = $service->handleIncomingMessage($dto, $user, false);
+
+        // Verify that it was detected as duplicate
+        $this->assertTrue($result['success']);
+        $this->assertTrue($result['duplicate']);
+        $this->assertFalse($result['response_sent']);
+        $this->assertEquals('wamid.duplicate123', $result['message_id']);
+    }
+
+    public function testDuplicateDetectionWhenLockNotAcquired(): void
+    {
+        // Create lock that cannot be acquired (another process holds it)
+        $lockFactory = $this->createMock(LockFactory::class);
+        $lock = $this->createMock(SharedLockInterface::class);
+        $lock->method('acquire')->willReturn(false); // Lock acquisition fails
+        $lockFactory->method('createLock')->willReturn($lock);
+
+        // Create service
+        $service = new WhatsAppService(
+            $this->httpClient,
+            $this->logger,
+            $this->em,
+            $this->rateLimitService,
+            $this->messageProcessor,
+            $this->fileProcessor,
+            $this->pathBuilder,
+            $this->aiFacade,
+            $this->discord,
+            $this->cache,
+            $lockFactory,
+            'test_token',
+            true,
+            '/tmp/test_uploads',
+            2,
+            'https://app.example.com'
+        );
+
+        // Create a mock user
+        $user = $this->createMock(User::class);
+        $user->method('getId')->willReturn(1);
+
+        // Create incoming message DTO
+        $incomingMsg = [
+            'from' => '+1234567890',
+            'id' => 'wamid.locked123',
+            'timestamp' => (string) time(),
+            'type' => 'text',
+            'text' => ['body' => 'Hello locked'],
+        ];
+        $value = [
+            'messaging_product' => 'whatsapp',
+            'metadata' => [
+                'phone_number_id' => $this->testPhoneNumberId,
+                'display_phone_number' => '+49123456789',
+            ],
+            'contacts' => [['profile' => ['name' => 'Test User'], 'wa_id' => '+1234567890']],
+            'messages' => [$incomingMsg],
+        ];
+
+        $dto = IncomingMessageDto::fromPayload($incomingMsg, $value);
+
+        // The message processor should NOT be called when lock is held by another process
+        $this->messageProcessor->expects($this->never())->method('processStream');
+
+        // Handle the message - should be treated as duplicate because lock couldn't be acquired
+        $result = $service->handleIncomingMessage($dto, $user, false);
+
+        // Verify that it was treated as duplicate
+        $this->assertTrue($result['success']);
+        $this->assertTrue($result['duplicate']);
+        $this->assertFalse($result['response_sent']);
     }
 }

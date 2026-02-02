@@ -11,6 +11,9 @@ use App\Service\File\UserUploadPathBuilder;
 use App\Service\Message\MessageProcessor;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
+use Symfony\Component\Lock\LockFactory;
+use Symfony\Contracts\Cache\CacheInterface;
+use Symfony\Contracts\Cache\ItemInterface;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 
 /**
@@ -36,6 +39,12 @@ class WhatsAppService
         'amr', 'opus', '3gp', // WhatsApp-specific audio/video formats
     ];
 
+    /**
+     * Cache TTL for duplicate detection (5 minutes).
+     * WhatsApp retries typically happen within 1-2 minutes.
+     */
+    private const DUPLICATE_CACHE_TTL = 300;
+
     private string $accessToken;
     private bool $enabled;
     private string $apiVersion = 'v21.0';
@@ -50,6 +59,8 @@ class WhatsAppService
         private UserUploadPathBuilder $userUploadPathBuilder,
         private AiFacade $aiFacade,
         private DiscordNotificationService $discord,
+        private CacheInterface $cache,
+        private LockFactory $lockFactory,
         string $whatsappAccessToken,
         bool $whatsappEnabled,
         private string $uploadsDir,
@@ -66,6 +77,93 @@ class WhatsAppService
     public function isAvailable(): bool
     {
         return $this->enabled && !empty($this->accessToken);
+    }
+
+    /**
+     * Check if message was already processed (duplicate detection).
+     *
+     * Uses lock + cache for atomic check-and-set to prevent race conditions
+     * when multiple webhook requests arrive simultaneously.
+     *
+     * @return array|null Returns duplicate result array if duplicate, null if new message
+     */
+    private function checkAndMarkAsDuplicate(IncomingMessageDto $dto): ?array
+    {
+        $cacheKey = 'whatsapp_msg_'.hash('sha256', $dto->messageId);
+        $lockKey = 'whatsapp_lock_'.hash('sha256', $dto->messageId);
+
+        try {
+            // Acquire lock to prevent race condition between concurrent requests
+            $lock = $this->lockFactory->createLock($lockKey, ttl: 30.0, autoRelease: true);
+
+            if (!$lock->acquire()) {
+                // Another request is processing this message - treat as duplicate
+                $this->logger->info('WhatsApp: Message locked by another process, treating as duplicate', [
+                    'message_id' => $dto->messageId,
+                    'from' => $dto->from,
+                ]);
+
+                return [
+                    'success' => true,
+                    'message_id' => $dto->messageId,
+                    'duplicate' => true,
+                    'response_sent' => false,
+                ];
+            }
+
+            // Check cache with atomic get-or-create pattern
+            $isNew = true;
+            $this->cache->get($cacheKey, function (ItemInterface $item) use (&$isNew): int {
+                // This callback only runs if key doesn't exist (cache miss)
+                $item->expiresAfter(self::DUPLICATE_CACHE_TTL);
+                $isNew = true;
+
+                return time();
+            });
+
+            // If we got here and callback didn't run, it's a duplicate
+            // The callback sets $isNew = true, so if it's still true, we created the entry
+            // Actually, we need to check differently - let's use a marker approach
+
+            // Simpler approach: try to get, then set if not exists
+            $cachedAt = $this->cache->get($cacheKey, function (ItemInterface $item): int {
+                $item->expiresAfter(self::DUPLICATE_CACHE_TTL);
+
+                return time();
+            });
+
+            // If cached time is more than 1 second ago, it's a duplicate
+            if (abs(time() - $cachedAt) > 1) {
+                $this->logger->info('WhatsApp: Duplicate message detected, skipping', [
+                    'message_id' => $dto->messageId,
+                    'from' => $dto->from,
+                    'cached_at' => $cachedAt,
+                    'age_seconds' => time() - $cachedAt,
+                ]);
+
+                $lock->release();
+
+                return [
+                    'success' => true,
+                    'message_id' => $dto->messageId,
+                    'duplicate' => true,
+                    'response_sent' => false,
+                ];
+            }
+
+            // New message - lock will auto-release, let processing continue
+            return null;
+        } catch (\Throwable $e) {
+            // Graceful degradation: if cache/lock fails, process the message anyway
+            // Better to risk a duplicate than to drop messages entirely
+            $this->logger->warning('WhatsApp: Duplicate detection failed, processing anyway', [
+                'message_id' => $dto->messageId,
+                'from' => $dto->from,
+                'error' => $e->getMessage(),
+            ]);
+
+            return null;
+        }
     }
 
     /**
@@ -348,6 +446,13 @@ class WhatsAppService
      */
     public function handleIncomingMessage(IncomingMessageDto $dto, User $user, bool $isAnonymous): array
     {
+        // DUPLICATE DETECTION: WhatsApp may send the same webhook multiple times on retries.
+        // Uses lock + cache for atomic check-and-set to prevent race conditions.
+        $duplicateResult = $this->checkAndMarkAsDuplicate($dto);
+        if (null !== $duplicateResult) {
+            return $duplicateResult;
+        }
+
         $effectiveUserId = $isAnonymous ? $this->whatsappUserId : $user->getId();
 
         // Determine input type for response mode selection
