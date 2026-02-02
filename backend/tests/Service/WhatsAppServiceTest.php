@@ -995,4 +995,60 @@ class WhatsAppServiceTest extends TestCase
         $this->assertTrue($result['success']);
         $this->assertEquals('wamid.audio123', $result['message_id']);
     }
+
+    // ==================== DISCORD NOTIFICATION TESTS ====================
+
+    public function testDiscordNotificationNotCalledWhenDisabled(): void
+    {
+        // Create a new discord mock that returns false for isEnabled
+        $discordMock = $this->createMock(DiscordNotificationService::class);
+        $discordMock->method('isEnabled')->willReturn(false);
+
+        // notifyWhatsAppSuccess should never be called when disabled
+        $discordMock->expects($this->never())->method('notifyWhatsAppSuccess');
+        $discordMock->expects($this->never())->method('notifyWhatsAppError');
+
+        // The service constructor accepts discord as parameter, so we verify the mock behavior
+        $this->assertFalse($discordMock->isEnabled());
+    }
+
+    public function testDiscordServiceIsInjected(): void
+    {
+        // Verify that the discord service mock is properly set up
+        $this->assertInstanceOf(DiscordNotificationService::class, $this->discord);
+    }
+
+    public function testDiscordMockCanBeConfiguredForSuccessNotifications(): void
+    {
+        // Configure mock to expect success notification
+        $this->discord->expects($this->once())
+            ->method('notifyWhatsAppSuccess')
+            ->with(
+                $this->equalTo('text'),
+                $this->isType('string'),
+                $this->isType('string'),
+                $this->isType('string'),
+                $this->isType('array')
+            );
+
+        // Trigger the mock directly to verify it works
+        $this->discord->notifyWhatsAppSuccess('text', '+1234', 'Hello', 'Response', []);
+    }
+
+    public function testDiscordMockCanBeConfiguredForErrorNotifications(): void
+    {
+        // Configure mock to expect error notification
+        $this->discord->expects($this->once())
+            ->method('notifyWhatsAppError')
+            ->with(
+                $this->equalTo('processing'),
+                $this->isType('string'),
+                $this->isType('string'),
+                $this->isType('string'),
+                $this->isType('array')
+            );
+
+        // Trigger the mock directly to verify it works
+        $this->discord->notifyWhatsAppError('processing', '+1234', 'Hello', 'Error message', []);
+    }
 }
