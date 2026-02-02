@@ -706,8 +706,10 @@ class OpenAIProvider implements ChatProviderInterface, EmbeddingProviderInterfac
         try {
             $model = $options['model'] ?? 'whisper-1';
 
-            // Build full path
-            $fullPath = $this->uploadDir.'/'.ltrim($audioPath, '/');
+            // Handle both absolute and relative paths
+            $fullPath = str_starts_with($audioPath, '/')
+                ? $audioPath
+                : $this->uploadDir.'/'.ltrim($audioPath, '/');
 
             if (!file_exists($fullPath)) {
                 throw new \Exception("Audio file not found: {$fullPath}");
@@ -716,14 +718,27 @@ class OpenAIProvider implements ChatProviderInterface, EmbeddingProviderInterfac
             $this->logger->info('OpenAI: Transcribing audio', [
                 'model' => $model,
                 'file' => basename($audioPath),
+                'path' => $fullPath,
             ]);
 
-            $response = $this->client->audio()->transcribe([
+            // Open file and ensure it's a valid resource
+            $fileHandle = fopen($fullPath, 'r');
+            if (!$fileHandle) {
+                throw new \Exception("Failed to open audio file: {$fullPath}");
+            }
+
+            // Build request params - only include language if provided
+            $requestParams = [
                 'model' => $model,
-                'file' => fopen($fullPath, 'r'),
+                'file' => $fileHandle,
                 'response_format' => 'verbose_json',
-                'language' => $options['language'] ?? null,
-            ]);
+            ];
+
+            if (!empty($options['language'])) {
+                $requestParams['language'] = $options['language'];
+            }
+
+            $response = $this->client->audio()->transcribe($requestParams);
 
             return [
                 'text' => $response['text'] ?? '',
@@ -743,7 +758,10 @@ class OpenAIProvider implements ChatProviderInterface, EmbeddingProviderInterfac
         }
 
         try {
-            $fullPath = $this->uploadDir.'/'.ltrim($audioPath, '/');
+            // Handle both absolute and relative paths
+            $fullPath = str_starts_with($audioPath, '/')
+                ? $audioPath
+                : $this->uploadDir.'/'.ltrim($audioPath, '/');
 
             if (!file_exists($fullPath)) {
                 throw new \Exception("Audio file not found: {$fullPath}");

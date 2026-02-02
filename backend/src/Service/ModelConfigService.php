@@ -75,13 +75,56 @@ class ModelConfigService
             return $provider;
         }
 
-        // 3. Fallback
-        $fallback = 'test';
+        // 3. Smart Fallback: Try to find a real provider from DB
+        $fallback = $this->findFallbackProvider($capability);
         $item->set($fallback);
         $item->expiresAfter(60);
         $this->cache->save($item);
 
         return $fallback;
+    }
+
+    /**
+     * Find a fallback provider for a capability from the database.
+     *
+     * This prevents using 'test' provider when real providers are available.
+     * Looks for the first active, selectable model with matching tag.
+     *
+     * @param string $capability The capability (chat, speech_to_text, etc.)
+     *
+     * @return string Provider name (lowercase) or 'test' if none found
+     */
+    private function findFallbackProvider(string $capability): string
+    {
+        // Map capability to DB tag
+        $tagMap = [
+            'chat' => 'chat',
+            'embedding' => 'vectorize',
+            'vision' => 'pic2text',
+            'image_generation' => 'text2pic',
+            'video_generation' => 'text2vid',
+            'speech_to_text' => 'sound2text',
+            'text_to_speech' => 'text2sound',
+            'file_analysis' => 'analyze',
+        ];
+
+        $tag = $tagMap[$capability] ?? $capability;
+
+        // Find first active model with this tag
+        $models = $this->modelRepository->findByTag($tag, true);
+
+        if (!empty($models)) {
+            // Return the provider of the first (highest quality) model
+            $provider = strtolower($models[0]->getService());
+
+            // Don't return 'test' as fallback from DB
+            if ('test' !== $provider) {
+                return $provider;
+            }
+        }
+
+        // Last resort fallback
+        return 'test';
     }
 
     /**

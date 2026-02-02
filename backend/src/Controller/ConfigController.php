@@ -112,7 +112,13 @@ class ConfigController extends AbstractController
                             property: 'whisperEnabled',
                             type: 'boolean',
                             example: true,
-                            description: 'When true, use local Whisper.cpp. When false, frontend should use Web Speech API.'
+                            description: 'When true, local Whisper.cpp is available for record-then-transcribe mode.'
+                        ),
+                        new OA\Property(
+                            property: 'speechToTextAvailable',
+                            type: 'boolean',
+                            example: true,
+                            description: 'When true, any speech-to-text method is available (local Whisper OR API models like Groq/OpenAI). Frontend should show microphone button.'
                         ),
                     ]
                 ),
@@ -190,11 +196,20 @@ class ConfigController extends AbstractController
         ];
 
         // Speech-to-text configuration
-        // When whisperEnabled=false, frontend should use Web Speech API
-        // When whisperEnabled=true, use local Whisper.cpp backend
-        $whisperEnabled = ($_ENV['WHISPER_ENABLED'] ?? 'true') === 'true';
+        // whisperEnabled: true when local Whisper.cpp is available (record-then-transcribe mode)
+        // speechToTextAvailable: true when ANY transcription method is available:
+        //   - Local Whisper.cpp, OR
+        //   - API-based models (Groq Whisper, OpenAI Whisper, etc.)
+        // Frontend shows microphone button when: Web Speech API supported OR speechToTextAvailable
+        $whisperLocalEnabled = ($_ENV['WHISPER_ENABLED'] ?? 'true') === 'true';
+        $whisperLocalAvailable = $whisperLocalEnabled && $this->whisperService->isAvailable();
+
+        // Check if any API-based sound2text models are available (active AND selectable)
+        $apiModelsAvailable = count($this->modelRepository->findByTag('sound2text', true)) > 0;
+
         $speech = [
-            'whisperEnabled' => $whisperEnabled && $this->whisperService->isAvailable(),
+            'whisperEnabled' => $whisperLocalAvailable,
+            'speechToTextAvailable' => $whisperLocalAvailable || $apiModelsAvailable,
         ];
 
         // Google Tag configuration (read from Config table, ownerId=0 for global config)
