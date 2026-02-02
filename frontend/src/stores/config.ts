@@ -76,12 +76,17 @@ const config = {
 
   /**
    * Speech-to-text configuration
-   * When whisperEnabled=false, use Web Speech API (browser-based)
-   * When whisperEnabled=true, use local Whisper.cpp backend
+   * whisperEnabled: true when local Whisper.cpp is available (record-then-transcribe)
+   * speechToTextAvailable: true when ANY transcription is available (local OR API models)
    */
   speech: {
+    /** Local Whisper.cpp is available for record-then-transcribe mode */
     get whisperEnabled(): boolean {
-      return getConfigSync().speech?.whisperEnabled ?? true
+      return getConfigSync().speech?.whisperEnabled ?? false
+    },
+    /** Any speech-to-text method is available (local Whisper OR API models like Groq/OpenAI) */
+    get speechToTextAvailable(): boolean {
+      return getConfigSync().speech?.speechToTextAvailable ?? false
     },
   },
 
@@ -103,6 +108,19 @@ const config = {
    */
   get plugins(): NonNullable<ReturnType<typeof getConfigSync>['plugins']> {
     return getConfigSync().plugins ?? []
+  },
+
+  /**
+   * Build and deployment information
+   * Used for debugging which version is deployed on which server
+   */
+  build: {
+    get version(): string {
+      return getConfigSync().build?.version ?? 'unknown'
+    },
+    get ip(): string {
+      return getConfigSync().build?.ip ?? 'dev'
+    },
   },
 
   /**

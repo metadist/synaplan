@@ -1,0 +1,75 @@
+{
+  "id": "sortx",
+  "name": "sortx",
+  "version": "3.0.0",
+  "displayName": "SortX Document Classifier",
+  "description": "AI-powered document classification with multi-label support and metadata extraction",
+  "author": "Synaplan",
+  "homepage": "https://github.com/synaplan/synaplan-sortx",
+  "license": "MIT",
+  "minSynaplanVersion": "1.0.0",
+  "capabilities": ["api", "frontend", "migrations"],
+  "routes": [
+    {
+      "path": "/schema",
+      "method": "GET",
+      "description": "Get category schema, fields, and classification prompt"
+    },
+    {
+      "path": "/categories",
+      "method": "GET",
+      "description": "Get classification categories with metadata field definitions"
+    },
+    {
+      "path": "/classify",
+      "method": "POST",
+      "description": "Classify document text with optional metadata extraction"
+    },
+    {
+      "path": "/extract-text",
+      "method": "POST",
+      "description": "Extract text from document using Tika and Vision AI fallback"
+    },
+    {
+      "path": "/analyze-file",
+      "method": "POST",
+      "description": "Full file analysis with text extraction and classification"
+    }
+  ],
+  "migrations": [
+    "001_setup.sql",
+    "002_categories.sql"
+  ],
+  "hooks": {
+    "onInstall": "Plugin\\SortX\\Service\\SortxInstallService::seedDefaultCategories"
+  },
+  "config": {
+    "group": "P_sortx",
+    "settings": [
+      {
+        "key": "enabled",
+        "type": "boolean",
+        "default": true,
+        "description": "Enable SortX API for this user"
+      },
+      {
+        "key": "confidence_threshold",
+        "type": "number",
+        "default": 0.5,
+        "description": "Minimum confidence threshold for classification"
+      },
+      {
+        "key": "max_text_length",
+        "type": "integer",
+        "default": 10000,
+        "description": "Maximum text length for classification"
+      },
+      {
+        "key": "max_file_size_mb",
+        "type": "integer",
+        "default": 50,
+        "description": "Maximum file size for analysis (MB)"
+      }
+    ]
+  }
+}

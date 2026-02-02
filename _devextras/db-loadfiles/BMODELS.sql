@@ -1,4 +1,4 @@
-/*M!999999\- enable the sandbox mode */ 
+/*M!999999\- enable the sandbox mode */
 -- MariaDB dump 10.19-11.8.2-MariaDB, for debian-linux-gnu (x86_64)
 --
 -- Host: localhost    Database: synaplan
@@ -61,7 +61,8 @@ INSERT INTO `BMODELS` VALUES
 (9,'Groq','Llama 3.3 70b versatile','chat',1,'llama-3.3-70b-versatile',0.59,'per1M',0.79,'per1M',9,1,0,1,NULL,'{\"description\":\"Fast API service via groq\",\"params\":{\"model\":\"llama-3.3-70b-versatile\",\"reasoning_format\":\"hidden\",\"messages\":[]}}'),
 (13,'Ollama','bge-m3','vectorize',0,'bge-m3',0.19,'per1M',0,'-',6,1,0,1,NULL,'{\"description\":\"Vectorize text into synaplans MariaDB vector DB (local) for RAG\",\"params\":{\"model\":\"bge-m3\",\"input\":[]}}'),
 (17,'Groq','Llama 4 Scout Vision','pic2text',1,'meta-llama/llama-4-scout-17b-16e-instruct',0.11,'per1M',0.34,'per1M',8,0,0,1,NULL,'{\"description\":\"Groq Llama 4 Scout vision model - 128K context, up to 5 images, supports tool use and JSON mode\",\"params\":{\"model\":\"meta-llama\\/llama-4-scout-17b-16e-instruct\",\"max_completion_tokens\":1024}}'),
-(21,'Groq','whisper-large-v3','sound2text',1,'whisper-large-v3',0.111,'perhour',0,'-',7,1,0,1,NULL,'{\"description\":\"Groq whisper model to extract text from a sound file.\",\"params\":{\"file\":\"*LOCALFILEPATH*\",\"model\":\"whisper-large-v3\",\"response_format\":\"text\"}}'),
+(21,'Groq','whisper-large-v3','sound2text',1,'whisper-large-v3',0.111,'perhour',0,'-',8,1,0,1,NULL,'{\"description\":\"Groq Whisper Large V3 - Best accuracy for multilingual transcription and translation. Supports 50+ languages.\",\"params\":{\"file\":\"*LOCALFILEPATH*\",\"model\":\"whisper-large-v3\",\"response_format\":\"verbose_json\"}}'),
+(50,'Groq','whisper-large-v3-turbo','sound2text',1,'whisper-large-v3-turbo',0.04,'perhour',0,'-',7,1,0,1,NULL,'{\"description\":\"Groq Whisper Large V3 Turbo - Fast and cost-effective transcription. 3x cheaper than V3. No translation support.\",\"params\":{\"file\":\"*LOCALFILEPATH*\",\"model\":\"whisper-large-v3-turbo\",\"response_format\":\"verbose_json\"}}'),
 (25,'OpenAI','dall-e-3','text2pic',1,'dall-e-3',0,'-',0.12,'perpic',7,1,0,1,NULL,'{\"description\":\"Open AIs famous text to image model on OpenAI cloud. Costs are 1:1 funneled.\",\"params\":{\"model\":\"dall-e-3\",\"size\":\"1024x1024\",\"quality\":\"standard\",\"style\":\"vivid\"}}'),
 (29,'OpenAI','gpt-image-1','text2pic',1,'gpt-image-1',5,'-',0,'per1M',9,1,0,1,NULL,'{\"description\":\"Open AIs powerful image generation model on OpenAI cloud. Costs are 1:1 funneled.\",\"params\":{\"model\":\"gpt-image-1\"}}'),
 (30,'OpenAI','gpt-4.1','chat',1,'gpt-4.1',2,'per1M',8,'per1M',10,1,0,1,NULL,'{\"description\":\"Open AIs text model\",\"params\":{\"model\":\"gpt-4.1\"}}'),

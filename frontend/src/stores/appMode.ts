@@ -4,7 +4,7 @@ import { ref, computed } from 'vue'
 export type AppMode = 'easy' | 'advanced'
 
 export const useAppModeStore = defineStore('appMode', () => {
-  const mode = ref<AppMode>((localStorage.getItem('app_mode') as AppMode) || 'easy')
+  const mode = ref<AppMode>((localStorage.getItem('app_mode') as AppMode) || 'advanced')
 
   const isEasyMode = computed(() => mode.value === 'easy')
   const isAdvancedMode = computed(() => mode.value === 'advanced')

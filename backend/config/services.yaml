@@ -84,6 +84,7 @@ services:
         tags:
             - { name: 'app.ai.chat' }
             - { name: 'app.ai.vision' }
+            - { name: 'app.ai.speech_to_text' }
 
     App\AI\Provider\GoogleProvider:
         arguments:
@@ -97,6 +98,12 @@ services:
             - { name: 'app.ai.image_generation' }
             - { name: 'app.ai.video_generation' }
             - { name: 'app.ai.text_to_speech' }
+
+    App\AI\Provider\TheHiveProvider:
+        arguments:
+            $apiKey: '%env(THEHIVE_API_KEY)%'
+        tags:
+            - { name: 'app.ai.image_generation' }
 
     # AI Facade
     App\AI\Service\AiFacade: ~
@@ -126,6 +133,7 @@ services:
             $whatsappEnabled: '%env(bool:WHATSAPP_ENABLED)%'
             $uploadsDir: '%kernel.project_dir%/var/uploads'
             $whatsappUserId: 2  # WhatsApp messages use User ID 2 for model selection
+            $appUrl: '%env(APP_URL)%'
 
     # Webhook Controller - Bind WhatsApp Verify Token
     App\Controller\WebhookController:
@@ -339,6 +347,7 @@ services:
             $uploadDir: '%kernel.project_dir%/var/uploads'
             $tikaMinLength: '%env(int:TIKA_MIN_LENGTH)%'
             $tikaMinEntropy: '%env(float:TIKA_MIN_ENTROPY)%'
+            $ffmpegBinary: '%env(FFMPEG_BINARY)%'
 
     App\Service\File\TextChunker:
         arguments:

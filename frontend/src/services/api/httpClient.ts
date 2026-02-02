@@ -83,11 +83,15 @@ async function loadRuntimeConfig(): Promise<RuntimeConfig> {
         },
         features: {
           help: false,
-          memoryService: false, // Add this!
+          memoryService: false,
         },
         googleTag: {
           enabled: false,
           tagId: '',
+        },
+        build: {
+          version: 'unknown',
+          ip: 'dev',
         },
       }
       runtimeConfig = defaultConfig
