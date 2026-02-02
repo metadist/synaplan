@@ -1089,8 +1089,10 @@ class WhatsAppServiceTest extends TestCase
     public function testDuplicateMessageDetection(): void
     {
         // Create a cache mock that returns an old cached value (message already processed)
+        // Use a fixed old timestamp to avoid time-dependent test flakiness
+        $oldTimestamp = 1700000000; // Fixed past timestamp (Nov 2023)
         $cacheWithHit = $this->createMock(CacheInterface::class);
-        $cacheWithHit->method('get')->willReturn(time() - 60); // Cached 60 seconds ago
+        $cacheWithHit->method('get')->willReturn($oldTimestamp);
 
         // Create lock that allows acquisition
         $lockFactory = $this->createMock(LockFactory::class);

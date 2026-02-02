@@ -111,21 +111,7 @@ class WhatsAppService
                 ];
             }
 
-            // Check cache with atomic get-or-create pattern
-            $isNew = true;
-            $this->cache->get($cacheKey, function (ItemInterface $item) use (&$isNew): int {
-                // This callback only runs if key doesn't exist (cache miss)
-                $item->expiresAfter(self::DUPLICATE_CACHE_TTL);
-                $isNew = true;
-
-                return time();
-            });
-
-            // If we got here and callback didn't run, it's a duplicate
-            // The callback sets $isNew = true, so if it's still true, we created the entry
-            // Actually, we need to check differently - let's use a marker approach
-
-            // Simpler approach: try to get, then set if not exists
+            // Atomic get-or-create: callback only runs on cache miss (new message)
             $cachedAt = $this->cache->get($cacheKey, function (ItemInterface $item): int {
                 $item->expiresAfter(self::DUPLICATE_CACHE_TTL);
 
