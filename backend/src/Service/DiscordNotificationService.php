@@ -14,8 +14,6 @@ class DiscordNotificationService
 {
     private const COLOR_SUCCESS = 0x00FF00; // Green
     private const COLOR_ERROR = 0xFF0000;   // Red
-    private const COLOR_WARNING = 0xFFA500; // Orange
-    private const COLOR_INFO = 0x0099FF;    // Blue
 
     public function __construct(
         private HttpClientInterface $httpClient,
