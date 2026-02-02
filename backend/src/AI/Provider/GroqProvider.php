@@ -4,16 +4,19 @@ namespace App\AI\Provider;
 
 use App\AI\Exception\ProviderException;
 use App\AI\Interface\ChatProviderInterface;
+use App\AI\Interface\SpeechToTextProviderInterface;
 use App\AI\Interface\VisionProviderInterface;
 use OpenAI;
 use Psr\Log\LoggerInterface;
 
 /**
  * Groq Provider - Fast LLM inference with OpenAI-compatible API
- * Supports Chat and Vision (llama-3.2-90b-vision-preview)
- * https://console.groq.com/docs/.
+ * Supports Chat, Vision, and Speech-to-Text (Whisper).
+ *
+ * @see https://console.groq.com/docs/
+ * @see https://console.groq.com/docs/speech-to-text
  */
-class GroqProvider implements ChatProviderInterface, VisionProviderInterface
+class GroqProvider implements ChatProviderInterface, VisionProviderInterface, SpeechToTextProviderInterface
 {
     private $client;
 
@@ -48,7 +51,7 @@ class GroqProvider implements ChatProviderInterface, VisionProviderInterface
 
     public function getCapabilities(): array
     {
-        return ['chat', 'vision'];
+        return ['chat', 'vision', 'speech_to_text'];
     }
 
     public function getDefaultModels(): array
@@ -348,6 +351,186 @@ class GroqProvider implements ChatProviderInterface, VisionProviderInterface
             ];
         } catch (\Exception $e) {
             throw new ProviderException('Groq image comparison error: '.$e->getMessage(), 'groq');
+        }
+    }
+
+    // ==================== SPEECH TO TEXT (Whisper) ====================
+
+    /**
+     * Transcribe audio file using Groq's Whisper API.
+     *
+     * Supported models:
+     * - whisper-large-v3: Best accuracy, supports translation, $0.111/hour
+     * - whisper-large-v3-turbo: Faster, cheaper ($0.04/hour), no translation
+     *
+     * @see https://console.groq.com/docs/speech-to-text
+     *
+     * @param string $audioPath Relative path to audio file from upload dir
+     * @param array  $options   Options: model, language (ISO-639-1), prompt, temperature
+     *
+     * @return array Transcription result with text, language, duration, segments
+     */
+    public function transcribe(string $audioPath, array $options = []): array
+    {
+        if (!$this->client) {
+            throw ProviderException::missingApiKey('groq', 'GROQ_API_KEY');
+        }
+
+        try {
+            $model = $options['model'] ?? 'whisper-large-v3-turbo';
+
+            // Handle both absolute and relative paths
+            $fullPath = str_starts_with($audioPath, '/')
+                ? $audioPath
+                : $this->uploadDir.'/'.ltrim($audioPath, '/');
+
+            if (!file_exists($fullPath)) {
+                throw new \Exception("Audio file not found: {$fullPath}");
+            }
+
+            // Check file size (Groq limits: 25MB free tier, 100MB dev tier)
+            $fileSize = filesize($fullPath);
+            $maxSize = 25 * 1024 * 1024; // 25MB conservative limit
+            if ($fileSize > $maxSize) {
+                throw new \Exception('Audio file too large: '.round($fileSize / 1024 / 1024, 2).'MB (max 25MB)');
+            }
+
+            $this->logger->info('Groq: Transcribing audio', [
+                'model' => $model,
+                'file' => basename($audioPath),
+                'path' => $fullPath,
+                'size_mb' => round($fileSize / 1024 / 1024, 2),
+            ]);
+
+            // Open file and ensure it's a valid resource
+            $fileHandle = fopen($fullPath, 'r');
+            if (!$fileHandle) {
+                throw new \Exception("Failed to open audio file: {$fullPath}");
+            }
+
+            try {
+                // Build request parameters
+                $requestParams = [
+                    'model' => $model,
+                    'file' => $fileHandle,
+                    'response_format' => 'verbose_json',
+                ];
+
+                // Optional: language hint (ISO-639-1 code) improves accuracy and latency
+                if (!empty($options['language'])) {
+                    $requestParams['language'] = $options['language'];
+                }
+
+                // Optional: prompt for context/spelling guidance (max 224 tokens)
+                if (!empty($options['prompt'])) {
+                    $requestParams['prompt'] = substr($options['prompt'], 0, 1000); // Limit prompt length
+                }
+
+                // Optional: temperature (0-1, default 0)
+                if (isset($options['temperature'])) {
+                    $requestParams['temperature'] = (float) $options['temperature'];
+                }
+
+                $response = $this->client->audio()->transcribe($requestParams);
+
+                $this->logger->info('Groq: Transcription complete', [
+                    'model' => $model,
+                    'duration_seconds' => $response['duration'] ?? 0,
+                    'text_length' => strlen($response['text'] ?? ''),
+                ]);
+
+                return [
+                    'text' => $response['text'] ?? '',
+                    'language' => $response['language'] ?? 'unknown',
+                    'duration' => $response['duration'] ?? 0,
+                    'segments' => $response['segments'] ?? [],
+                ];
+            } finally {
+                if (is_resource($fileHandle)) {
+                    fclose($fileHandle);
+                }
+            }
+        } catch (\Exception $e) {
+            $this->logger->error('Groq transcription error', [
+                'error' => $e->getMessage(),
+                'file' => basename($audioPath),
+            ]);
+
+            throw new ProviderException('Groq transcription error: '.$e->getMessage(), 'groq', null, 0, $e);
+        }
+    }
+
+    /**
+     * Translate audio to English using Groq's Whisper translation endpoint.
+     *
+     * Note: Only whisper-large-v3 supports translation. whisper-large-v3-turbo does NOT.
+     * The translation endpoint always translates TO English.
+     *
+     * @see https://console.groq.com/docs/speech-to-text
+     *
+     * @param string $audioPath  Relative path to audio file from upload dir
+     * @param string $targetLang Target language (only 'en' supported by Whisper)
+     *
+     * @return string Translated text in English
+     */
+    public function translateAudio(string $audioPath, string $targetLang): string
+    {
+        if (!$this->client) {
+            throw ProviderException::missingApiKey('groq', 'GROQ_API_KEY');
+        }
+
+        // Whisper's translate endpoint only supports English output
+        if ('en' !== strtolower($targetLang)) {
+            $this->logger->warning('Groq Whisper translation only supports English output', [
+                'requested_lang' => $targetLang,
+                'using' => 'en',
+            ]);
+        }
+
+        try {
+            // Only whisper-large-v3 supports translation (NOT turbo)
+            $model = 'whisper-large-v3';
+
+            // Handle both absolute and relative paths
+            $fullPath = str_starts_with($audioPath, '/')
+                ? $audioPath
+                : $this->uploadDir.'/'.ltrim($audioPath, '/');
+
+            if (!file_exists($fullPath)) {
+                throw new \Exception("Audio file not found: {$fullPath}");
+            }
+
+            $this->logger->info('Groq: Translating audio to English', [
+                'model' => $model,
+                'file' => basename($audioPath),
+            ]);
+
+            // Open file and ensure it's a valid resource
+            $fileHandle = fopen($fullPath, 'r');
+            if (!$fileHandle) {
+                throw new \Exception("Failed to open audio file: {$fullPath}");
+            }
+
+            try {
+                $response = $this->client->audio()->translate([
+                    'model' => $model,
+                    'file' => $fileHandle,
+                    'response_format' => 'text',
+                ]);
+
+                return $response['text'] ?? '';
+            } finally {
+                if (is_resource($fileHandle)) {
+                    fclose($fileHandle);
+                }
+            }
+        } catch (\Exception $e) {
+            $this->logger->error('Groq audio translation error', [
+                'error' => $e->getMessage(),
+                'file' => basename($audioPath),
+            ]);
+
+            throw new ProviderException('Groq audio translation error: '.$e->getMessage(), 'groq', null, 0, $e);
         }
     }
 }

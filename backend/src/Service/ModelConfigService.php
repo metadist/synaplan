@@ -2,6 +2,7 @@
 
 namespace App\Service;
 
+use App\AI\Service\ProviderRegistry;
 use App\Entity\Message;
 use App\Entity\User;
 use App\Repository\ConfigRepository;
@@ -21,6 +22,7 @@ class ModelConfigService
         private ModelRepository $modelRepository,
         private UserRepository $userRepository,
         private CacheItemPoolInterface $cache,
+        private ProviderRegistry $providerRegistry,
     ) {
     }
 
@@ -75,13 +77,67 @@ class ModelConfigService
             return $provider;
         }
 
-        // 3. Fallback
-        $fallback = 'test';
+        // 3. Smart Fallback: Try to find a real provider from DB
+        $fallback = $this->findFallbackProvider($capability);
         $item->set($fallback);
         $item->expiresAfter(60);
         $this->cache->save($item);
 
         return $fallback;
+    }
+
+    /**
+     * Find a fallback provider for a capability from the database.
+     *
+     * This prevents using 'test' provider when real providers are available.
+     * Looks for the first active, selectable model with matching tag,
+     * but only if the provider is actually available (API key configured).
+     *
+     * @param string $capability The capability (chat, speech_to_text, etc.)
+     *
+     * @return string Provider name (lowercase) or 'test' if none found
+     */
+    private function findFallbackProvider(string $capability): string
+    {
+        // Map capability to DB tag
+        $tagMap = [
+            'chat' => 'chat',
+            'embedding' => 'vectorize',
+            'vision' => 'pic2text',
+            'image_generation' => 'text2pic',
+            'video_generation' => 'text2vid',
+            'speech_to_text' => 'sound2text',
+            'text_to_speech' => 'text2sound',
+            'file_analysis' => 'analyze',
+        ];
+
+        $tag = $tagMap[$capability] ?? $capability;
+
+        // Get actually available providers (with API keys configured)
+        $availableProviders = array_map(
+            'strtolower',
+            $this->providerRegistry->getAvailableProviders($capability, false)
+        );
+
+        // If no real providers are available, fall back to test
+        if (empty($availableProviders)) {
+            return 'test';
+        }
+
+        // Find first active model with this tag where provider is available
+        $models = $this->modelRepository->findByTag($tag, true);
+
+        foreach ($models as $model) {
+            $provider = strtolower($model->getService());
+
+            // Only return providers that are actually available
+            if ('test' !== $provider && in_array($provider, $availableProviders, true)) {
+                return $provider;
+            }
+        }
+
+        // Last resort fallback
+        return 'test';
     }
 
     /**
