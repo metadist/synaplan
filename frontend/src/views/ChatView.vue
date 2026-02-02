@@ -1637,6 +1637,9 @@ async function confirmPositiveFeedback(text: string) {
     showErrorToast(errorMsg)
   } finally {
     falsePositiveSubmitting.value = false
+  }
+}
+
 function closeMemoryDeleteDialog() {
   clearDeleteDialogTimer()
   isMemoryDeleteDialogOpen.value = false

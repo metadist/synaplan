@@ -535,7 +535,9 @@
               @click="handleFalsePositive"
             >
               <Icon icon="mdi:thumb-down-outline" class="w-4 h-4" />
-              <span class="font-medium hidden sm:inline">{{ $t('feedback.falsePositive.button') }}</span>
+              <span class="font-medium hidden sm:inline">{{
+                $t('feedback.falsePositive.button')
+              }}</span>
             </button>
 
             <button

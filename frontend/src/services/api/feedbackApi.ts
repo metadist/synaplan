@@ -75,4 +75,3 @@ export async function submitPositiveFeedback(request: PositiveFeedbackRequest): 
     schema: PositiveFeedbackResponseSchema,
   })
 }
-
