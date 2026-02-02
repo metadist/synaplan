@@ -191,6 +191,14 @@ class DiscordNotificationService
             ];
         }
 
+        if (!empty($metadata['media_type'])) {
+            $fields[] = [
+                'name' => '📁 Media Type',
+                'value' => ucfirst($metadata['media_type']),
+                'inline' => true,
+            ];
+        }
+
         $this->sendEmbed(
             title: "{$emoji} WhatsApp: {$title}",
             color: self::COLOR_ERROR,
