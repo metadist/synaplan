@@ -10,8 +10,13 @@ use Doctrine\ORM\Mapping as ORM;
 #[ORM\UniqueConstraint(name: 'uk_widget_session', columns: ['BWIDGETID', 'BSESSIONID'])]
 #[ORM\Index(columns: ['BWIDGETID'], name: 'idx_session_widget')]
 #[ORM\Index(columns: ['BEXPIRES'], name: 'idx_session_expires')]
+#[ORM\Index(columns: ['BMODE'], name: 'idx_session_mode')]
 class WidgetSession
 {
+    public const MODE_AI = 'ai';
+    public const MODE_HUMAN = 'human';
+    public const MODE_WAITING = 'waiting';
+
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column(name: 'BID', type: 'bigint')]
@@ -40,6 +45,30 @@ class WidgetSession
 
     #[ORM\Column(name: 'BEXPIRES', type: 'bigint')]
     private int $expires;
+
+    /**
+     * Session mode: 'ai' (default), 'human' (operator takeover), 'waiting' (waiting for human response).
+     */
+    #[ORM\Column(name: 'BMODE', length: 16, options: ['default' => 'ai'])]
+    private string $mode = self::MODE_AI;
+
+    /**
+     * User ID of the human operator who took over the session.
+     */
+    #[ORM\Column(name: 'BHUMAN_OPERATOR_ID', type: 'bigint', nullable: true)]
+    private ?int $humanOperatorId = null;
+
+    /**
+     * Unix timestamp of last human operator activity.
+     */
+    #[ORM\Column(name: 'BLAST_HUMAN_ACTIVITY', type: 'bigint', nullable: true)]
+    private ?int $lastHumanActivity = null;
+
+    /**
+     * Preview of the last message (truncated to 200 chars).
+     */
+    #[ORM\Column(name: 'BLAST_MESSAGE_PREVIEW', type: 'string', length: 255, nullable: true)]
+    private ?string $lastMessagePreview = null;
 
     public function __construct()
     {
@@ -190,5 +219,113 @@ class WidgetSession
         // This will be tracked in a separate table or cache
         // For now, we'll implement rate limiting in the service
         return 0;
+    }
+
+    public function getMode(): string
+    {
+        return $this->mode;
+    }
+
+    public function setMode(string $mode): self
+    {
+        if (!in_array($mode, [self::MODE_AI, self::MODE_HUMAN, self::MODE_WAITING], true)) {
+            throw new \InvalidArgumentException(sprintf('Invalid mode: %s', $mode));
+        }
+        $this->mode = $mode;
+
+        return $this;
+    }
+
+    public function isAiMode(): bool
+    {
+        return $this->mode === self::MODE_AI;
+    }
+
+    public function isHumanMode(): bool
+    {
+        return $this->mode === self::MODE_HUMAN;
+    }
+
+    public function isWaitingForHuman(): bool
+    {
+        return $this->mode === self::MODE_WAITING;
+    }
+
+    public function getHumanOperatorId(): ?int
+    {
+        return $this->humanOperatorId;
+    }
+
+    public function setHumanOperatorId(?int $humanOperatorId): self
+    {
+        $this->humanOperatorId = $humanOperatorId;
+
+        return $this;
+    }
+
+    public function getLastHumanActivity(): ?int
+    {
+        return $this->lastHumanActivity;
+    }
+
+    public function setLastHumanActivity(?int $lastHumanActivity): self
+    {
+        $this->lastHumanActivity = $lastHumanActivity;
+
+        return $this;
+    }
+
+    public function updateLastHumanActivity(): self
+    {
+        return $this->setLastHumanActivity(time());
+    }
+
+    public function getLastMessagePreview(): ?string
+    {
+        return $this->lastMessagePreview;
+    }
+
+    public function setLastMessagePreview(?string $preview): self
+    {
+        // Truncate to 200 chars if longer
+        if ($preview !== null && mb_strlen($preview) > 200) {
+            $preview = mb_substr($preview, 0, 197).'...';
+        }
+        $this->lastMessagePreview = $preview;
+
+        return $this;
+    }
+
+    /**
+     * Take over the session with a human operator.
+     */
+    public function takeOver(int $operatorId): self
+    {
+        $this->mode = self::MODE_HUMAN;
+        $this->humanOperatorId = $operatorId;
+        $this->lastHumanActivity = time();
+
+        return $this;
+    }
+
+    /**
+     * Hand back the session to AI.
+     */
+    public function handBackToAi(): self
+    {
+        $this->mode = self::MODE_AI;
+        // Keep humanOperatorId for history
+
+        return $this;
+    }
+
+    /**
+     * Set session to waiting for human response.
+     */
+    public function setWaitingForHuman(): self
+    {
+        $this->mode = self::MODE_WAITING;
+
+        return $this;
     }
 }

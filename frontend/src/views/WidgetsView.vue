@@ -140,6 +140,14 @@
                   <span class="sm:hidden">Code</span>
                 </button>
                 <button
+                  class="px-3 py-2 rounded-lg bg-blue-500/10 hover:bg-blue-500/20 transition-colors"
+                  :title="$t('widgets.viewSessions')"
+                  data-testid="btn-widget-sessions"
+                  @click="viewSessions(widget)"
+                >
+                  <Icon icon="heroicons:users" class="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                </button>
+                <button
                   class="px-3 py-2 rounded-lg bg-green-500/10 hover:bg-green-500/20 transition-colors"
                   :title="$t('widgets.testChat')"
                   data-testid="btn-widget-test"
@@ -274,6 +282,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
+import { useRouter } from 'vue-router'
 import { Icon } from '@iconify/vue'
 import MainLayout from '@/components/MainLayout.vue'
 import * as widgetsApi from '@/services/api/widgetsApi'
@@ -289,6 +298,7 @@ import ChatWidget from '@/components/widgets/ChatWidget.vue'
 import { useI18n } from 'vue-i18n'
 import { useConfigStore } from '@/stores/config'
 
+const router = useRouter()
 const { success, error } = useNotification()
 const { confirm } = useDialog()
 const { t } = useI18n()
@@ -442,6 +452,13 @@ const openTestChat = (widget: widgetsApi.Widget) => {
  */
 const closeTestChat = () => {
   testWidget.value = null
+}
+
+/**
+ * View widget sessions
+ */
+const viewSessions = (widget: widgetsApi.Widget) => {
+  router.push({ name: 'widget-sessions', params: { widgetId: widget.widgetId } })
 }
 
 /**

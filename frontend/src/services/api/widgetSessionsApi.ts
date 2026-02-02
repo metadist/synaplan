@@ -1,0 +1,253 @@
+import { httpClient } from './httpClient'
+
+export interface WidgetSession {
+  id: number
+  sessionId: string
+  sessionIdDisplay?: string
+  chatId: number | null
+  messageCount: number
+  fileCount: number
+  mode: 'ai' | 'human' | 'waiting'
+  humanOperatorId: number | null
+  lastMessage: number
+  lastMessagePreview: string | null
+  lastHumanActivity: number | null
+  created: number
+  expires: number
+  isExpired: boolean
+}
+
+export interface SessionMessage {
+  id: number
+  direction: 'IN' | 'OUT'
+  text: string
+  timestamp: number
+  sender: 'user' | 'ai' | 'human'
+}
+
+export interface WidgetSessionsResponse {
+  success: boolean
+  sessions: WidgetSession[]
+  pagination: {
+    total: number
+    limit: number
+    offset: number
+    hasMore: boolean
+  }
+  stats: {
+    ai: number
+    human: number
+    waiting: number
+  }
+}
+
+export interface WidgetSessionDetailResponse {
+  success: boolean
+  session: WidgetSession
+  messages: SessionMessage[]
+}
+
+export interface ListSessionsParams {
+  limit?: number
+  offset?: number
+  status?: 'active' | 'expired'
+  mode?: 'ai' | 'human' | 'waiting'
+  from?: number
+  to?: number
+  sort?: 'lastMessage' | 'created' | 'messageCount'
+  order?: 'ASC' | 'DESC'
+}
+
+/**
+ * List all sessions for a widget
+ */
+export async function listWidgetSessions(
+  widgetId: string,
+  params: ListSessionsParams = {}
+): Promise<WidgetSessionsResponse> {
+  const queryParams = new URLSearchParams()
+
+  if (params.limit !== undefined) queryParams.set('limit', String(params.limit))
+  if (params.offset !== undefined) queryParams.set('offset', String(params.offset))
+  if (params.status) queryParams.set('status', params.status)
+  if (params.mode) queryParams.set('mode', params.mode)
+  if (params.from !== undefined) queryParams.set('from', String(params.from))
+  if (params.to !== undefined) queryParams.set('to', String(params.to))
+  if (params.sort) queryParams.set('sort', params.sort)
+  if (params.order) queryParams.set('order', params.order)
+
+  const queryString = queryParams.toString()
+  const url = `/api/v1/widgets/${widgetId}/sessions${queryString ? `?${queryString}` : ''}`
+
+  return await httpClient<WidgetSessionsResponse>(url, {
+    method: 'GET',
+  })
+}
+
+/**
+ * Get session details with full chat history
+ */
+export async function getWidgetSession(
+  widgetId: string,
+  sessionId: string
+): Promise<WidgetSessionDetailResponse> {
+  return await httpClient<WidgetSessionDetailResponse>(
+    `/api/v1/widgets/${widgetId}/sessions/${sessionId}`,
+    {
+      method: 'GET',
+    }
+  )
+}
+
+/**
+ * Take over a session (switch from AI to human mode)
+ */
+export async function takeOverSession(
+  widgetId: string,
+  sessionId: string
+): Promise<{ success: boolean; session: WidgetSession }> {
+  return await httpClient<{ success: boolean; session: WidgetSession }>(
+    `/api/v1/widgets/${widgetId}/sessions/${sessionId}/takeover`,
+    {
+      method: 'POST',
+    }
+  )
+}
+
+/**
+ * Hand back session to AI
+ */
+export async function handBackSession(
+  widgetId: string,
+  sessionId: string
+): Promise<{ success: boolean; session: WidgetSession }> {
+  return await httpClient<{ success: boolean; session: WidgetSession }>(
+    `/api/v1/widgets/${widgetId}/sessions/${sessionId}/handback`,
+    {
+      method: 'POST',
+    }
+  )
+}
+
+/**
+ * Send a message as human operator
+ */
+export async function sendHumanMessage(
+  widgetId: string,
+  sessionId: string,
+  text: string
+): Promise<{ success: boolean; messageId: number }> {
+  return await httpClient<{ success: boolean; messageId: number }>(
+    `/api/v1/widgets/${widgetId}/sessions/${sessionId}/reply`,
+    {
+      method: 'POST',
+      body: JSON.stringify({ text }),
+    }
+  )
+}
+
+export interface ExportFormat {
+  id: 'xlsx' | 'csv' | 'json'
+  name: string
+  description: string
+  recommended: boolean
+}
+
+export interface ExportParams {
+  format?: 'xlsx' | 'csv' | 'json'
+  from?: number
+  to?: number
+  mode?: 'ai' | 'human' | 'waiting'
+}
+
+/**
+ * Get available export formats
+ */
+export async function getExportFormats(
+  widgetId: string
+): Promise<{ success: boolean; formats: ExportFormat[] }> {
+  return await httpClient<{ success: boolean; formats: ExportFormat[] }>(
+    `/api/v1/widgets/${widgetId}/export/formats`,
+    {
+      method: 'GET',
+    }
+  )
+}
+
+/**
+ * Export widget sessions
+ * Returns the download URL
+ */
+export function getExportUrl(widgetId: string, params: ExportParams = {}): string {
+  const queryParams = new URLSearchParams()
+
+  if (params.format) queryParams.set('format', params.format)
+  if (params.from !== undefined) queryParams.set('from', String(params.from))
+  if (params.to !== undefined) queryParams.set('to', String(params.to))
+  if (params.mode) queryParams.set('mode', params.mode)
+
+  const queryString = queryParams.toString()
+  return `/api/v1/widgets/${widgetId}/export${queryString ? `?${queryString}` : ''}`
+}
+
+// Summary types
+export interface WidgetSummary {
+  id: number
+  date: number
+  formattedDate: string
+  sessionCount: number
+  messageCount: number
+  topics: string[]
+  faqs: Array<{ question: string; frequency: number }>
+  sentiment: { positive: number; neutral: number; negative: number }
+  issues: string[]
+  recommendations: string[]
+  summary: string
+  created: number
+}
+
+/**
+ * Get recent summaries for a widget
+ */
+export async function getWidgetSummaries(
+  widgetId: string,
+  limit: number = 7
+): Promise<{ success: boolean; summaries: WidgetSummary[] }> {
+  return await httpClient<{ success: boolean; summaries: WidgetSummary[] }>(
+    `/api/v1/widgets/${widgetId}/summaries?limit=${limit}`,
+    {
+      method: 'GET',
+    }
+  )
+}
+
+/**
+ * Get summary for a specific date
+ */
+export async function getWidgetSummaryByDate(
+  widgetId: string,
+  date: number
+): Promise<{ success: boolean; summary: WidgetSummary }> {
+  return await httpClient<{ success: boolean; summary: WidgetSummary }>(
+    `/api/v1/widgets/${widgetId}/summaries/${date}`,
+    {
+      method: 'GET',
+    }
+  )
+}
+
+/**
+ * Generate a summary for a specific date
+ */
+export async function generateWidgetSummary(
+  widgetId: string,
+  date?: number
+): Promise<{ success: boolean; summary: WidgetSummary }> {
+  return await httpClient<{ success: boolean; summary: WidgetSummary }>(
+    `/api/v1/widgets/${widgetId}/summaries/generate`,
+    {
+      method: 'POST',
+      body: JSON.stringify(date ? { date } : {}),
+    }
+  )
+}

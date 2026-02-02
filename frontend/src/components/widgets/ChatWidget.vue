@@ -501,6 +501,7 @@ import { uploadWidgetFile, sendWidgetMessage } from '@/services/api/widgetsApi'
 import { useI18n } from 'vue-i18n'
 import { parseAIResponse } from '@/utils/responseParser'
 import { getMarkdownRenderer } from '@/composables/useMarkdown'
+import { subscribeToSession, type EventSubscription, type WidgetEvent } from '@/services/sseClient'
 
 interface Props {
   widgetId: string
@@ -594,6 +595,11 @@ const isSending = ref(false)
 const chatId = ref<number | null>(null)
 const historyLoaded = ref(false)
 const isLoadingHistory = ref(false)
+
+// Human takeover state
+const chatMode = ref<'ai' | 'human' | 'waiting'>('ai')
+const operatorName = ref<string | null>(null)
+let eventSubscription: EventSubscription | null = null
 
 const isMobile = ref(false)
 const { t } = useI18n()
@@ -1531,6 +1537,18 @@ const loadConversationHistory = async (force = false) => {
         if (typeof data.session.fileCount === 'number') {
           fileUploadCount.value = data.session.fileCount
         }
+
+        // Update chat mode from session and subscribe to SSE only if needed
+        if (data.session.mode) {
+          const previousMode = chatMode.value
+          chatMode.value = data.session.mode
+
+          // Subscribe to SSE only when in human or waiting mode
+          if ((data.session.mode === 'human' || data.session.mode === 'waiting') && previousMode === 'ai') {
+            console.debug('[Widget] Session in human/waiting mode, subscribing to SSE')
+            subscribeToEvents()
+          }
+        }
       } else if (loadedMessages.length > 0) {
         messageCount.value = loadedMessages.filter((m: Message) => m.role === 'user').length
         fileUploadCount.value = 0
@@ -1680,6 +1698,7 @@ onMounted(() => {
     sessionId.value = createSessionId()
     // Still call loadConversationHistory to trigger ensureAutoMessage (but it won't load actual history)
     loadConversationHistory()
+    // Don't subscribe to SSE in test mode - no real session exists
     return
   }
 
@@ -1706,6 +1725,7 @@ onMounted(() => {
   }
 
   loadConversationHistory()
+  // SSE subscription is now handled inside loadConversationHistory based on session mode
 })
 
 onBeforeUnmount(() => {
@@ -1716,7 +1736,97 @@ onBeforeUnmount(() => {
 
   window.removeEventListener('synaplan-widget-open', handleOpenEvent)
   window.removeEventListener('synaplan-widget-close', handleCloseEvent)
+
+  // Unsubscribe from SSE events
+  if (eventSubscription) {
+    eventSubscription.unsubscribe()
+    eventSubscription = null
+  }
 })
+
+/**
+ * Handle incoming SSE events for real-time human operator communication.
+ */
+function handleWidgetEvent(data: WidgetEvent) {
+  switch (data.type) {
+    case 'takeover':
+      // Human operator took over the chat
+      chatMode.value = 'human'
+      operatorName.value = (data.operatorName as string) ?? 'Support'
+      // Add system message
+      messages.value.push({
+        id: `system-${Date.now()}`,
+        role: 'assistant',
+        type: 'text',
+        content: (data.message as string) ?? 'You are now connected with a support agent.',
+        timestamp: new Date(),
+      })
+      scrollToBottom()
+      break
+
+    case 'handback':
+      // Session handed back to AI
+      chatMode.value = 'ai'
+      operatorName.value = null
+      messages.value.push({
+        id: `system-${Date.now()}`,
+        role: 'assistant',
+        type: 'text',
+        content: (data.message as string) ?? 'You are now chatting with our AI assistant.',
+        timestamp: new Date(),
+      })
+      scrollToBottom()
+      break
+
+    case 'message':
+      // New message from human operator (direction 'IN' = incoming to widget = from operator)
+      if (data.sender === 'human') {
+        const text = data.text as string
+        messages.value.push({
+          id: `msg-${data.messageId ?? Date.now()}`,
+          role: 'assistant',
+          type: 'text',
+          content: text,
+          timestamp: new Date((data.timestamp as number) * 1000),
+        })
+        scrollToBottom()
+        if (!isOpen.value) {
+          unreadCount.value++
+        }
+      }
+      break
+
+    case 'typing':
+      // Operator is typing
+      isTyping.value = true
+      setTimeout(() => {
+        isTyping.value = false
+      }, 3000)
+      break
+  }
+}
+
+/**
+ * Subscribe to SSE for real-time messages.
+ */
+function subscribeToEvents() {
+  if (!sessionId.value || !props.widgetId) return
+
+  // Unsubscribe from previous subscription if any
+  if (eventSubscription) {
+    eventSubscription.unsubscribe()
+  }
+
+  eventSubscription = subscribeToSession(
+    props.widgetId,
+    sessionId.value,
+    handleWidgetEvent,
+    (error) => {
+      console.error('[Widget] SSE connection error:', error)
+    },
+    { apiUrl: props.apiUrl }
+  )
+}
 
 const getChatStorageKey = () => {
   if (!sessionId.value) return null

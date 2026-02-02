@@ -5,9 +5,11 @@ namespace App\Controller;
 use App\Entity\Chat;
 use App\Entity\File;
 use App\Entity\Message;
+use App\Entity\WidgetEvent;
 use App\Repository\ChatRepository;
 use App\Repository\FileRepository;
 use App\Repository\MessageRepository;
+use App\Repository\WidgetEventRepository;
 use App\Service\File\FileProcessor;
 use App\Service\File\FileStorageService;
 use App\Service\File\VectorizationService;
@@ -45,6 +47,7 @@ class WidgetPublicController extends AbstractController
         private ChatRepository $chatRepository,
         private MessageRepository $messageRepository,
         private FileRepository $fileRepository,
+        private WidgetEventRepository $widgetEventRepository,
         private EntityManagerInterface $em,
         private LoggerInterface $logger,
         private string $uploadDir,
@@ -187,6 +190,9 @@ class WidgetPublicController extends AbstractController
         // Get or create session
         $session = $this->sessionService->getOrCreateSession($widgetId, $data['sessionId'], $isValidatedTestMode);
 
+        // Check if session is in human takeover mode
+        $isHumanMode = $session->getMode() === 'human' || $session->getMode() === 'waiting';
+
         // Check session limits
         $messageLimit = (int) ($config['messageLimit'] ?? WidgetSessionService::DEFAULT_MAX_MESSAGES);
         $limitCheck = $this->sessionService->checkSessionLimit($session, $messageLimit);
@@ -293,6 +299,20 @@ class WidgetPublicController extends AbstractController
             $this->em->persist($incomingMessage);
             $this->em->flush();
 
+            // Publish event for user message (so admin panel receives it in real-time)
+            $userMessageEvent = new WidgetEvent();
+            $userMessageEvent->setWidgetId($widgetId);
+            $userMessageEvent->setSessionId($session->getSessionId());
+            $userMessageEvent->setType('message');
+            $userMessageEvent->setPayload([
+                'direction' => 'IN',
+                'text' => $data['text'],
+                'messageId' => $incomingMessage->getId(),
+                'timestamp' => $incomingMessage->getUnixTimestamp(),
+                'sender' => 'user',
+            ]);
+            $this->widgetEventRepository->save($userMessageEvent);
+
             // Attach uploaded files if provided
             $fileIds = [];
             if (!empty($data['files']) && is_array($data['files'])) {
@@ -324,8 +344,32 @@ class WidgetPublicController extends AbstractController
             }
 
             // Increment session message count
-            $this->sessionService->incrementMessageCount($session);
+            // Only increment message count for AI mode (human messages don't count against limits)
+            if (!$isHumanMode) {
+                $this->sessionService->incrementMessageCount($session);
+            }
             $this->sessionService->attachChat($session, $chat);
+
+            // If in human takeover mode, just save the message and return success (no AI processing)
+            if ($isHumanMode) {
+                $incomingMessage->setStatus('complete');
+                $session->setLastMessage(time());
+                $session->setLastMessagePreview(mb_substr($data['text'], 0, 100));
+                $this->em->flush();
+
+                $this->logger->info('Widget message saved in human mode (no AI processing)', [
+                    'widget_id' => $widgetId,
+                    'session_id' => $session->getSessionId(),
+                    'mode' => $session->getMode(),
+                ]);
+
+                return $this->json([
+                    'success' => true,
+                    'chatId' => $chat->getId(),
+                    'mode' => $session->getMode(),
+                    'text' => '', // No AI response
+                ]);
+            }
 
             \set_time_limit(0);
 
@@ -349,7 +393,8 @@ class WidgetPublicController extends AbstractController
                 $owner,
                 $chat,
                 $fileIds,
-                $widgetId
+                $widgetId,
+                $session
             ) {
                 $responseText = '';
                 $reasoningBuffer = '';
@@ -538,6 +583,20 @@ class WidgetPublicController extends AbstractController
 
                     $this->em->persist($outgoingMessage);
                     $this->em->flush();
+
+                    // Publish event for AI response (so admin panel receives it in real-time)
+                    $aiResponseEvent = new WidgetEvent();
+                    $aiResponseEvent->setWidgetId($widgetId);
+                    $aiResponseEvent->setSessionId($session->getSessionId());
+                    $aiResponseEvent->setType('message');
+                    $aiResponseEvent->setPayload([
+                        'direction' => 'OUT',
+                        'text' => $responseText,
+                        'messageId' => $outgoingMessage->getId(),
+                        'timestamp' => $outgoingMessage->getUnixTimestamp(),
+                        'sender' => 'ai',
+                    ]);
+                    $this->widgetEventRepository->save($aiResponseEvent);
 
                     $this->rateLimitService->recordUsage($owner, 'MESSAGES', [
                         'provider' => $responseMetadata['provider'] ?? null,
@@ -955,6 +1014,7 @@ class WidgetPublicController extends AbstractController
                     'messageCount' => 0,
                     'fileCount' => 0,
                     'lastMessage' => null,
+                    'mode' => 'ai',
                 ],
             ]);
         }
@@ -970,6 +1030,7 @@ class WidgetPublicController extends AbstractController
                     'messageCount' => $session->getMessageCount(),
                     'fileCount' => $session->getFileCount(),
                     'lastMessage' => $session->getLastMessage() ?: null,
+                    'mode' => $session->getMode(),
                 ],
             ]);
         }
@@ -985,6 +1046,7 @@ class WidgetPublicController extends AbstractController
                     'messageCount' => $session->getMessageCount(),
                     'fileCount' => $session->getFileCount(),
                     'lastMessage' => $session->getLastMessage() ?: null,
+                    'mode' => $session->getMode(),
                 ],
             ]);
         }
@@ -1035,6 +1097,7 @@ class WidgetPublicController extends AbstractController
                 'messageCount' => $session->getMessageCount(),
                 'fileCount' => $session->getFileCount(),
                 'lastMessage' => $session->getLastMessage() ?: null,
+                'mode' => $session->getMode(),
             ],
         ]);
     }
