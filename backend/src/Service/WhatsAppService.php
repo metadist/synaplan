@@ -49,6 +49,7 @@ class WhatsAppService
         private FileProcessor $fileProcessor,
         private UserUploadPathBuilder $userUploadPathBuilder,
         private AiFacade $aiFacade,
+        private DiscordNotificationService $discord,
         string $whatsappAccessToken,
         bool $whatsappEnabled,
         private string $uploadsDir,
@@ -427,6 +428,18 @@ class WhatsAppService
         if ($mediaDownloadError) {
             $this->sendErrorMessage($dto, $mediaDownloadError);
 
+            // Discord notification: Media download failed
+            $this->discord->notifyWhatsAppError(
+                'media_download',
+                $dto->from,
+                $message->getText() ?? '[Media message]',
+                $mediaDownloadError,
+                [
+                    'message_type' => $dto->type,
+                    'file_type' => $dto->incomingMsg[$dto->type]['mime_type'] ?? 'unknown',
+                ]
+            );
+
             return [
                 'success' => false,
                 'message_id' => $dto->messageId,
@@ -471,6 +484,15 @@ class WhatsAppService
             $errorMessage = $result['error'] ?? 'Processing failed';
             $this->sendErrorMessage($dto, $errorMessage);
 
+            // Discord notification: Processing failed
+            $this->discord->notifyWhatsAppError(
+                'processing',
+                $dto->from,
+                $message->getText() ?? '',
+                $errorMessage,
+                ['message_type' => $dto->type]
+            );
+
             return [
                 'success' => false,
                 'message_id' => $dto->messageId,
@@ -513,11 +535,33 @@ class WhatsAppService
                     };
                     $this->storeOutgoingMessage($user, $dto, $responseText ?: $placeholderText, $sendResult['message_id']);
                     $responseSent = true;
+
+                    // Discord notification: AI media generated and sent
+                    $this->discord->notifyWhatsAppSuccess(
+                        $generatedMediaType,
+                        $dto->from,
+                        $message->getText() ?? '',
+                        $responseText ?: $placeholderText,
+                        [
+                            'provider' => $metadata['provider'] ?? null,
+                            'model' => $metadata['model'] ?? null,
+                            'media_type' => $generatedMediaType,
+                        ]
+                    );
                 } else {
                     $this->logger->warning('WhatsApp: Failed to send AI media, falling back', [
                         'media_type' => $generatedMediaType,
                         'error' => $sendResult['error'] ?? 'Unknown',
                     ]);
+
+                    // Discord notification: Failed to send AI media
+                    $this->discord->notifyWhatsAppError(
+                        'send_failed',
+                        $dto->from,
+                        $message->getText() ?? '',
+                        $sendResult['error'] ?? 'Unknown error',
+                        ['media_type' => $generatedMediaType]
+                    );
                 }
             }
         }
@@ -539,13 +583,44 @@ class WhatsAppService
                 if ($sendResult['success']) {
                     $this->storeOutgoingMessage($user, $dto, $responseText, $sendResult['message_id']);
                     $responseSent = true;
+
+                    // Discord notification: TTS response sent
+                    $this->discord->notifyWhatsAppSuccess(
+                        'tts',
+                        $dto->from,
+                        $message->getText() ?? '',
+                        $responseText,
+                        [
+                            'provider' => $ttsResult['provider'] ?? null,
+                            'model' => $ttsResult['model'] ?? null,
+                            'media_type' => 'audio',
+                        ]
+                    );
                 } else {
                     $this->logger->warning('WhatsApp: TTS send failed, falling back to text', [
                         'error' => $sendResult['error'] ?? 'Unknown',
                     ]);
+
+                    // Discord notification: TTS send failed
+                    $this->discord->notifyWhatsAppError(
+                        'send_failed',
+                        $dto->from,
+                        $message->getText() ?? '',
+                        $sendResult['error'] ?? 'Unknown error',
+                        ['media_type' => 'audio']
+                    );
                 }
             } else {
                 $this->logger->warning('WhatsApp: TTS generation failed, falling back to text');
+
+                // Discord notification: TTS generation failed
+                $this->discord->notifyWhatsAppError(
+                    'tts',
+                    $dto->from,
+                    $message->getText() ?? '',
+                    'TTS generation failed',
+                    ['message_type' => $dto->type]
+                );
             }
         }
 
@@ -555,10 +630,31 @@ class WhatsAppService
             if ($sendResult['success']) {
                 $this->storeOutgoingMessage($user, $dto, $responseText, $sendResult['message_id']);
                 $responseSent = true;
+
+                // Discord notification: Text response sent
+                $this->discord->notifyWhatsAppSuccess(
+                    'text',
+                    $dto->from,
+                    $message->getText() ?? '',
+                    $responseText,
+                    [
+                        'provider' => $metadata['provider'] ?? null,
+                        'model' => $metadata['model'] ?? null,
+                    ]
+                );
             } else {
                 $this->logger->error('WhatsApp: Failed to send text response', [
                     'error' => $sendResult['error'] ?? 'Unknown',
                 ]);
+
+                // Discord notification: Text send failed
+                $this->discord->notifyWhatsAppError(
+                    'send_failed',
+                    $dto->from,
+                    $message->getText() ?? '',
+                    $sendResult['error'] ?? 'Unknown error',
+                    ['message_type' => 'text']
+                );
             }
         }
 
@@ -569,6 +665,15 @@ class WhatsAppService
                 'from' => $dto->from,
                 'response_text_length' => strlen($responseText),
             ]);
+
+            // Discord notification: No response sent
+            $this->discord->notifyWhatsAppError(
+                'processing',
+                $dto->from,
+                $message->getText() ?? '',
+                'No response could be sent to user',
+                ['message_type' => $dto->type]
+            );
         }
 
         return [

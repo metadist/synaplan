@@ -7,6 +7,7 @@ namespace App\Tests\Service;
 use App\AI\Service\AiFacade;
 use App\DTO\WhatsApp\IncomingMessageDto;
 use App\Entity\Message;
+use App\Service\DiscordNotificationService;
 use App\Service\File\FileProcessor;
 use App\Service\File\UserUploadPathBuilder;
 use App\Service\Message\MessageProcessor;
@@ -41,6 +42,8 @@ class WhatsAppServiceTest extends TestCase
     private UserUploadPathBuilder $pathBuilder;
     /** @var AiFacade&\PHPUnit\Framework\MockObject\MockObject */
     private $aiFacade;
+    /** @var DiscordNotificationService&\PHPUnit\Framework\MockObject\MockObject */
+    private $discord;
     private string $testPhoneNumberId = '123456789'; // Test phone number ID
 
     protected function setUp(): void
@@ -52,6 +55,7 @@ class WhatsAppServiceTest extends TestCase
         $this->messageProcessor = $this->createMock(MessageProcessor::class);
         $this->fileProcessor = $this->createMock(FileProcessor::class);
         $this->aiFacade = $this->createMock(AiFacade::class);
+        $this->discord = $this->createMock(DiscordNotificationService::class);
         $this->pathBuilder = new UserUploadPathBuilder(); // Real instance (final class)
 
         // Create service with test configuration (dynamic multi-number support)
@@ -64,6 +68,7 @@ class WhatsAppServiceTest extends TestCase
             $this->fileProcessor,
             $this->pathBuilder,
             $this->aiFacade,
+            $this->discord,
             'test_token',
             true,
             '/tmp/test_uploads',
@@ -88,6 +93,7 @@ class WhatsAppServiceTest extends TestCase
             $this->fileProcessor,
             $this->pathBuilder,
             $this->aiFacade,
+            $this->discord,
             'test_token',
             false, // disabled
             '/tmp/test_uploads',
@@ -108,6 +114,7 @@ class WhatsAppServiceTest extends TestCase
             $this->fileProcessor,
             $this->pathBuilder,
             $this->aiFacade,
+            $this->discord,
             'test_token',
             false,
             '/tmp/test_uploads',
@@ -281,6 +288,7 @@ class WhatsAppServiceTest extends TestCase
             $this->fileProcessor,
             $this->pathBuilder,
             $this->aiFacade,
+            $this->discord,
             'test_token',
             false,
             '/tmp/test_uploads',
