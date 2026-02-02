@@ -95,12 +95,20 @@ class GroqProviderSpeechToTextTest extends TestCase
      */
     public function testTranscribeThrowsExceptionForLargeFile(): void
     {
-        // Create a file larger than 25MB (we'll fake it with sparse file on supported systems)
+        // Create a file larger than 25MB using ftruncate (memory-efficient)
         $largeFile = $this->tempDir.'/large_audio.wav';
 
-        // Create a valid WAV header then truncate to 26MB
+        // Create a valid WAV header then extend to 26MB without allocating large buffer
         $this->createTestWavFile($largeFile);
-        file_put_contents($largeFile, str_repeat('x', 26 * 1024 * 1024));
+        $handle = fopen($largeFile, 'c');
+        if (false === $handle) {
+            $this->fail('Failed to open large audio file for writing');
+        }
+        if (!ftruncate($handle, 26 * 1024 * 1024)) {
+            fclose($handle);
+            $this->fail('Failed to set large audio file size');
+        }
+        fclose($handle);
 
         $provider = new GroqProvider(
             new NullLogger(),

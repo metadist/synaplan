@@ -727,25 +727,31 @@ class OpenAIProvider implements ChatProviderInterface, EmbeddingProviderInterfac
                 throw new \Exception("Failed to open audio file: {$fullPath}");
             }
 
-            // Build request params - only include language if provided
-            $requestParams = [
-                'model' => $model,
-                'file' => $fileHandle,
-                'response_format' => 'verbose_json',
-            ];
+            try {
+                // Build request params - only include language if provided
+                $requestParams = [
+                    'model' => $model,
+                    'file' => $fileHandle,
+                    'response_format' => 'verbose_json',
+                ];
 
-            if (!empty($options['language'])) {
-                $requestParams['language'] = $options['language'];
+                if (!empty($options['language'])) {
+                    $requestParams['language'] = $options['language'];
+                }
+
+                $response = $this->client->audio()->transcribe($requestParams);
+
+                return [
+                    'text' => $response['text'] ?? '',
+                    'language' => $response['language'] ?? 'unknown',
+                    'duration' => $response['duration'] ?? 0,
+                    'segments' => $response['segments'] ?? [],
+                ];
+            } finally {
+                if (is_resource($fileHandle)) {
+                    fclose($fileHandle);
+                }
             }
-
-            $response = $this->client->audio()->transcribe($requestParams);
-
-            return [
-                'text' => $response['text'] ?? '',
-                'language' => $response['language'] ?? 'unknown',
-                'duration' => $response['duration'] ?? 0,
-                'segments' => $response['segments'] ?? [],
-            ];
         } catch (\Exception $e) {
             throw new ProviderException('OpenAI transcription error: '.$e->getMessage(), 'openai');
         }
@@ -772,13 +778,25 @@ class OpenAIProvider implements ChatProviderInterface, EmbeddingProviderInterfac
                 'target_lang' => $targetLang,
             ]);
 
-            // Whisper's translate endpoint translates to English only
-            $response = $this->client->audio()->translate([
-                'model' => 'whisper-1',
-                'file' => fopen($fullPath, 'r'),
-            ]);
+            // Open file and ensure it's a valid resource
+            $fileHandle = fopen($fullPath, 'r');
+            if (!$fileHandle) {
+                throw new \Exception("Failed to open audio file: {$fullPath}");
+            }
 
-            return $response['text'] ?? '';
+            try {
+                // Whisper's translate endpoint translates to English only
+                $response = $this->client->audio()->translate([
+                    'model' => 'whisper-1',
+                    'file' => $fileHandle,
+                ]);
+
+                return $response['text'] ?? '';
+            } finally {
+                if (is_resource($fileHandle)) {
+                    fclose($fileHandle);
+                }
+            }
         } catch (\Exception $e) {
             throw new ProviderException('OpenAI audio translation error: '.$e->getMessage(), 'openai');
         }

@@ -408,42 +408,48 @@ class GroqProvider implements ChatProviderInterface, VisionProviderInterface, Sp
                 throw new \Exception("Failed to open audio file: {$fullPath}");
             }
 
-            // Build request parameters
-            $requestParams = [
-                'model' => $model,
-                'file' => $fileHandle,
-                'response_format' => 'verbose_json',
-            ];
+            try {
+                // Build request parameters
+                $requestParams = [
+                    'model' => $model,
+                    'file' => $fileHandle,
+                    'response_format' => 'verbose_json',
+                ];
 
-            // Optional: language hint (ISO-639-1 code) improves accuracy and latency
-            if (!empty($options['language'])) {
-                $requestParams['language'] = $options['language'];
+                // Optional: language hint (ISO-639-1 code) improves accuracy and latency
+                if (!empty($options['language'])) {
+                    $requestParams['language'] = $options['language'];
+                }
+
+                // Optional: prompt for context/spelling guidance (max 224 tokens)
+                if (!empty($options['prompt'])) {
+                    $requestParams['prompt'] = substr($options['prompt'], 0, 1000); // Limit prompt length
+                }
+
+                // Optional: temperature (0-1, default 0)
+                if (isset($options['temperature'])) {
+                    $requestParams['temperature'] = (float) $options['temperature'];
+                }
+
+                $response = $this->client->audio()->transcribe($requestParams);
+
+                $this->logger->info('Groq: Transcription complete', [
+                    'model' => $model,
+                    'duration_seconds' => $response['duration'] ?? 0,
+                    'text_length' => strlen($response['text'] ?? ''),
+                ]);
+
+                return [
+                    'text' => $response['text'] ?? '',
+                    'language' => $response['language'] ?? 'unknown',
+                    'duration' => $response['duration'] ?? 0,
+                    'segments' => $response['segments'] ?? [],
+                ];
+            } finally {
+                if (is_resource($fileHandle)) {
+                    fclose($fileHandle);
+                }
             }
-
-            // Optional: prompt for context/spelling guidance (max 224 tokens)
-            if (!empty($options['prompt'])) {
-                $requestParams['prompt'] = substr($options['prompt'], 0, 1000); // Limit prompt length
-            }
-
-            // Optional: temperature (0-1, default 0)
-            if (isset($options['temperature'])) {
-                $requestParams['temperature'] = (float) $options['temperature'];
-            }
-
-            $response = $this->client->audio()->transcribe($requestParams);
-
-            $this->logger->info('Groq: Transcription complete', [
-                'model' => $model,
-                'duration_seconds' => $response['duration'] ?? 0,
-                'text_length' => strlen($response['text'] ?? ''),
-            ]);
-
-            return [
-                'text' => $response['text'] ?? '',
-                'language' => $response['language'] ?? 'unknown',
-                'duration' => $response['duration'] ?? 0,
-                'segments' => $response['segments'] ?? [],
-            ];
         } catch (\Exception $e) {
             $this->logger->error('Groq transcription error', [
                 'error' => $e->getMessage(),
@@ -499,13 +505,25 @@ class GroqProvider implements ChatProviderInterface, VisionProviderInterface, Sp
                 'file' => basename($audioPath),
             ]);
 
-            $response = $this->client->audio()->translate([
-                'model' => $model,
-                'file' => fopen($fullPath, 'r'),
-                'response_format' => 'text',
-            ]);
+            // Open file and ensure it's a valid resource
+            $fileHandle = fopen($fullPath, 'r');
+            if (!$fileHandle) {
+                throw new \Exception("Failed to open audio file: {$fullPath}");
+            }
 
-            return $response['text'] ?? '';
+            try {
+                $response = $this->client->audio()->translate([
+                    'model' => $model,
+                    'file' => $fileHandle,
+                    'response_format' => 'text',
+                ]);
+
+                return $response['text'] ?? '';
+            } finally {
+                if (is_resource($fileHandle)) {
+                    fclose($fileHandle);
+                }
+            }
         } catch (\Exception $e) {
             $this->logger->error('Groq audio translation error', [
                 'error' => $e->getMessage(),

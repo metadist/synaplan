@@ -2,6 +2,7 @@
 
 namespace App\Service;
 
+use App\AI\Service\ProviderRegistry;
 use App\Entity\Message;
 use App\Entity\User;
 use App\Repository\ConfigRepository;
@@ -21,6 +22,7 @@ class ModelConfigService
         private ModelRepository $modelRepository,
         private UserRepository $userRepository,
         private CacheItemPoolInterface $cache,
+        private ProviderRegistry $providerRegistry,
     ) {
     }
 
@@ -88,7 +90,8 @@ class ModelConfigService
      * Find a fallback provider for a capability from the database.
      *
      * This prevents using 'test' provider when real providers are available.
-     * Looks for the first active, selectable model with matching tag.
+     * Looks for the first active, selectable model with matching tag,
+     * but only if the provider is actually available (API key configured).
      *
      * @param string $capability The capability (chat, speech_to_text, etc.)
      *
@@ -110,15 +113,25 @@ class ModelConfigService
 
         $tag = $tagMap[$capability] ?? $capability;
 
-        // Find first active model with this tag
+        // Get actually available providers (with API keys configured)
+        $availableProviders = array_map(
+            'strtolower',
+            $this->providerRegistry->getAvailableProviders($capability, false)
+        );
+
+        // If no real providers are available, fall back to test
+        if (empty($availableProviders)) {
+            return 'test';
+        }
+
+        // Find first active model with this tag where provider is available
         $models = $this->modelRepository->findByTag($tag, true);
 
-        if (!empty($models)) {
-            // Return the provider of the first (highest quality) model
-            $provider = strtolower($models[0]->getService());
+        foreach ($models as $model) {
+            $provider = strtolower($model->getService());
 
-            // Don't return 'test' as fallback from DB
-            if ('test' !== $provider) {
+            // Only return providers that are actually available
+            if ('test' !== $provider && in_array($provider, $availableProviders, true)) {
                 return $provider;
             }
         }

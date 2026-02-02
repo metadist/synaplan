@@ -549,6 +549,11 @@ class FileProcessor
                     'stderr' => $process->getErrorOutput(),
                 ]);
 
+                // Clean up partial temp file if it exists
+                if (file_exists($tempPath)) {
+                    @unlink($tempPath);
+                }
+
                 return $absolutePath; // Fallback to original
             }
 
@@ -562,6 +567,11 @@ class FileProcessor
             $this->logger->warning('FileProcessor: Audio conversion exception', [
                 'error' => $e->getMessage(),
             ]);
+
+            // Clean up partial temp file if it exists
+            if (file_exists($tempPath)) {
+                @unlink($tempPath);
+            }
 
             return $absolutePath;
         }
