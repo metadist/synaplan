@@ -967,6 +967,40 @@ class WhatsAppServiceTest extends TestCase
     public function testExtractMessageTextForUnsupportedType(): void
     {
         // Create a DTO with an unsupported type manually
+        // Note: sticker is now supported, so we test with 'reaction' which is truly unsupported
+        $incomingMsg = [
+            'from' => '+491754070111',
+            'id' => 'wamid.test'.time(),
+            'timestamp' => time(),
+            'type' => 'reaction',
+            'reaction' => ['message_id' => 'wamid.original123', 'emoji' => '👍'],
+        ];
+
+        $value = [
+            'metadata' => [
+                'phone_number_id' => $this->testPhoneNumberId,
+                'display_phone_number' => '+491234567890',
+            ],
+            'messages' => [$incomingMsg],
+        ];
+
+        $dto = IncomingMessageDto::fromPayload($incomingMsg, $value);
+
+        $reflection = new \ReflectionClass($this->service);
+        $method = $reflection->getMethod('extractMessageText');
+        $method->setAccessible(true);
+
+        $text = $method->invoke($this->service, $dto);
+
+        $this->assertStringContainsString('Unsupported message type', $text);
+        $this->assertStringContainsString('reaction', $text);
+    }
+
+    /**
+     * Test message text extraction for sticker message type.
+     */
+    public function testExtractMessageTextForStickerType(): void
+    {
         $incomingMsg = [
             'from' => '+491754070111',
             'id' => 'wamid.test'.time(),
@@ -991,8 +1025,7 @@ class WhatsAppServiceTest extends TestCase
 
         $text = $method->invoke($this->service, $dto);
 
-        $this->assertStringContainsString('Unsupported message type', $text);
-        $this->assertStringContainsString('sticker', $text);
+        $this->assertEquals('[Sticker]', $text);
     }
 
     // ============================================

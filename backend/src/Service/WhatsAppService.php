@@ -167,6 +167,9 @@ class WhatsAppService
             throw new \InvalidArgumentException('Phone Number ID is required and must be provided dynamically from webhook metadata');
         }
 
+        // Convert standard Markdown to WhatsApp-compatible formatting
+        $formattedMessage = $this->convertToWhatsAppMarkdown($message);
+
         $url = sprintf(
             'https://graph.facebook.com/%s/%s/messages',
             $this->apiVersion,
@@ -186,7 +189,7 @@ class WhatsAppService
                     'type' => 'text',
                     'text' => [
                         'preview_url' => true,
-                        'body' => $message,
+                        'body' => $formattedMessage,
                     ],
                 ],
             ]);
@@ -250,8 +253,9 @@ class WhatsAppService
             'link' => $mediaUrl,
         ];
 
+        // Convert caption markdown to WhatsApp format if present
         if ($caption && in_array($mediaType, ['image', 'video', 'document'])) {
-            $mediaPayload['caption'] = $caption;
+            $mediaPayload['caption'] = $this->convertToWhatsAppMarkdown($caption);
         }
 
         try {
@@ -931,11 +935,99 @@ class WhatsAppService
         return match ($dto->type) {
             'text' => $dto->incomingMsg['text']['body'] ?? '',
             'image' => $dto->incomingMsg['image']['caption'] ?? '[Image]',
+            'sticker' => '[Sticker]', // Treated like images, analyzed via Vision AI
             'audio' => '[Audio message]', // Will be replaced with transcription
             'video' => $dto->incomingMsg['video']['caption'] ?? '[Video]', // Audio track will be transcribed
             'document' => $dto->incomingMsg['document']['caption'] ?? '[Document]',
+            'location' => $this->formatLocationMessage($dto),
+            'contacts' => $this->formatContactsMessage($dto),
             default => "[Unsupported message type: {$dto->type}]",
         };
+    }
+
+    /**
+     * Format a location message into a readable text for AI processing.
+     * WhatsApp location payload: { latitude, longitude, name?, address?, url? }.
+     */
+    private function formatLocationMessage(IncomingMessageDto $dto): string
+    {
+        $location = $dto->incomingMsg['location'] ?? [];
+
+        $latitude = $location['latitude'] ?? null;
+        $longitude = $location['longitude'] ?? null;
+
+        if (null === $latitude || null === $longitude) {
+            return '[Location shared - coordinates not available]';
+        }
+
+        $parts = ["📍 Standort geteilt: {$latitude}, {$longitude}"];
+
+        // Include location name if available (e.g., "Philz Coffee")
+        if (!empty($location['name'])) {
+            $parts[] = "Name: {$location['name']}";
+        }
+
+        // Include address if available
+        if (!empty($location['address'])) {
+            $parts[] = "Adresse: {$location['address']}";
+        }
+
+        // Include Google Maps URL for context
+        if (!empty($location['url'])) {
+            $parts[] = "Maps: {$location['url']}";
+        } else {
+            // Generate a Google Maps URL if not provided
+            $parts[] = "Maps: https://www.google.com/maps?q={$latitude},{$longitude}";
+        }
+
+        return implode("\n", $parts);
+    }
+
+    /**
+     * Format a contacts message into a readable text for AI processing.
+     * WhatsApp contacts payload: array of contact objects with name, phones, etc.
+     */
+    private function formatContactsMessage(IncomingMessageDto $dto): string
+    {
+        $contacts = $dto->incomingMsg['contacts'] ?? [];
+
+        if (empty($contacts)) {
+            return '[Contact shared - details not available]';
+        }
+
+        $parts = ['📇 Kontakt(e) geteilt:'];
+
+        foreach ($contacts as $contact) {
+            $name = $contact['name']['formatted_name']
+                ?? $contact['name']['first_name'] ?? 'Unbekannt';
+            $contactInfo = ["- {$name}"];
+
+            // Add phone numbers
+            if (!empty($contact['phones'])) {
+                foreach ($contact['phones'] as $phone) {
+                    $phoneType = $phone['type'] ?? 'phone';
+                    $phoneNumber = $phone['phone'] ?? $phone['wa_id'] ?? '';
+                    if ($phoneNumber) {
+                        $contactInfo[] = "  {$phoneType}: {$phoneNumber}";
+                    }
+                }
+            }
+
+            // Add emails
+            if (!empty($contact['emails'])) {
+                foreach ($contact['emails'] as $email) {
+                    $emailType = $email['type'] ?? 'email';
+                    $emailAddress = $email['email'] ?? '';
+                    if ($emailAddress) {
+                        $contactInfo[] = "  {$emailType}: {$emailAddress}";
+                    }
+                }
+            }
+
+            $parts[] = implode("\n", $contactInfo);
+        }
+
+        return implode("\n", $parts);
     }
 
     private function extractMediaId(IncomingMessageDto $dto): ?string
@@ -1054,46 +1146,33 @@ class WhatsAppService
 
                         return 'Audio transcription failed - no speech detected';
                     }
-                } elseif ('image' === $dto->type) {
-                    // For images, extract description via Vision AI
-                    $this->logger->info('WhatsApp: Extracting description from image');
+                } elseif ('image' === $dto->type || 'sticker' === $dto->type) {
+                    // For images and stickers: Don't extract text here - let ChatHandler use Vision AI
+                    // The ChatHandler has built-in vision support and will analyze the image
+                    // Stickers are WebP images and can be analyzed the same way
+                    $caption = $dto->incomingMsg[$dto->type]['caption'] ?? null;
 
-                    // Caption should be treated as user prompt input
-                    $caption = $dto->incomingMsg['image']['caption'] ?? null;
-
-                    [$extractedText, $extractionDetails] = $this->fileProcessor->extractText(
-                        $downloadResult['file_path'],
-                        $downloadResult['file_type'],
-                        $effectiveUserId
-                    );
-
-                    if (!empty($extractedText)) {
-                        $message->setFileText($extractedText);
-
-                        $currentText = $message->getText();
-
-                        if (!empty($caption)) {
-                            // Caption becomes the user prompt; image text stays as file context
-                            $message->setText($caption);
-                            $this->logger->info('WhatsApp: Using image caption as prompt', [
-                                'caption_length' => strlen($caption),
-                                'description_length' => strlen($extractedText),
-                            ]);
-                        } elseif (empty($currentText) || '[Image]' === $currentText) {
-                            // No caption: ask for a brief description using extracted context
-                            $message->setText('Describe what you see in this image: '.$extractedText);
-                            $this->logger->info('WhatsApp: Set image description as prompt', [
-                                'description_length' => strlen($extractedText),
-                            ]);
-                        }
-                    } else {
-                        // Vision extraction failed - return error
-                        $this->logger->warning('WhatsApp: Image analysis failed - no description extracted', [
-                            'details' => $extractionDetails ?? [],
+                    if (!empty($caption)) {
+                        // User asked a question about the image - use it as the prompt
+                        $message->setText($caption);
+                        $this->logger->info('WhatsApp: Image/sticker with caption, delegating to ChatHandler vision', [
+                            'type' => $dto->type,
+                            'caption' => $caption,
+                            'file_path' => $downloadResult['file_path'],
                         ]);
-
-                        return 'Image analysis failed - could not process the image';
+                    } else {
+                        // No caption: ask for a description
+                        $prompt = 'sticker' === $dto->type
+                            ? 'Describe this sticker. What does it show and what emotion or message does it convey?'
+                            : 'Describe what you see in this image.';
+                        $message->setText($prompt);
+                        $this->logger->info('WhatsApp: Image/sticker without caption, requesting description', [
+                            'type' => $dto->type,
+                            'file_path' => $downloadResult['file_path'],
+                        ]);
                     }
+                // Note: fileText is intentionally NOT set - ChatHandler will include
+                // the image directly in the Vision API request for proper analysis
                 } else {
                     // For documents and other types, use standard extraction
                     [$extractedText] = $this->fileProcessor->extractText(
@@ -1465,5 +1544,61 @@ class WhatsAppService
 
         // Return 'unknown' for unmapped types - will be caught by ALLOWED_EXTENSIONS check
         return $mimeMap[$mimeType] ?? 'unknown';
+    }
+
+    /**
+     * Convert standard Markdown formatting to WhatsApp-compatible formatting.
+     *
+     * WhatsApp uses different syntax than standard Markdown:
+     * - Bold: *text* (not **text**)
+     * - Italic: _text_ (not *text*)
+     * - Strikethrough: ~text~ (not ~~text~~)
+     * - Monospace: ```text``` or `text` (same as MD)
+     *
+     * @see https://faq.whatsapp.com/539178204879377
+     */
+    private function convertToWhatsAppMarkdown(string $text): string
+    {
+        // Protect code blocks from conversion (they work the same in WhatsApp)
+        $codeBlocks = [];
+        $text = preg_replace_callback('/```[\s\S]*?```/', function ($match) use (&$codeBlocks) {
+            $placeholder = '{{CODE_BLOCK_'.count($codeBlocks).'}}';
+            $codeBlocks[$placeholder] = $match[0];
+
+            return $placeholder;
+        }, $text);
+
+        // Protect inline code from conversion
+        $inlineCode = [];
+        $text = preg_replace_callback('/`[^`]+`/', function ($match) use (&$inlineCode) {
+            $placeholder = '{{INLINE_CODE_'.count($inlineCode).'}}';
+            $inlineCode[$placeholder] = $match[0];
+
+            return $placeholder;
+        }, $text);
+
+        // Convert headers to bold (# Header → *Header*)
+        $text = preg_replace('/^#{1,6}\s+(.+)$/m', '*$1*', $text);
+
+        // Convert **bold** to *bold* (must be done before italic conversion)
+        $text = preg_replace('/\*\*(.+?)\*\*/', '*$1*', $text);
+
+        // Convert ~~strikethrough~~ to ~strikethrough~
+        $text = preg_replace('/~~(.+?)~~/', '~$1~', $text);
+
+        // Convert bullet points to Unicode bullets for cleaner display
+        $text = preg_replace('/^[\-\*]\s+/m', '• ', $text);
+
+        // Restore code blocks
+        foreach ($codeBlocks as $placeholder => $code) {
+            $text = str_replace($placeholder, $code, $text);
+        }
+
+        // Restore inline code
+        foreach ($inlineCode as $placeholder => $code) {
+            $text = str_replace($placeholder, $code, $text);
+        }
+
+        return $text;
     }
 }

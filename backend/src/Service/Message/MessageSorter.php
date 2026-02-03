@@ -4,6 +4,7 @@ namespace App\Service\Message;
 
 use App\AI\Service\AiFacade;
 use App\Repository\PromptRepository;
+use App\Service\DiscordNotificationService;
 use App\Service\ModelConfigService;
 use App\Service\PromptService;
 use Psr\Log\LoggerInterface;
@@ -34,6 +35,7 @@ class MessageSorter
         private ModelConfigService $modelConfigService,
         private PromptService $promptService,
         private LoggerInterface $logger,
+        private DiscordNotificationService $discord,
     ) {
     }
 
@@ -194,8 +196,23 @@ class MessageSorter
                 'topic' => $parsed['topic'],
                 'language' => $parsed['language'],
                 'web_search' => $parsed['web_search'] ?? false,
+                'media_type' => $parsed['media_type'] ?? null,
+                'duration' => $parsed['duration'] ?? null,
                 'raw_ai_response' => $aiResponse,
             ]);
+
+            // Send Discord notification for debugging classification issues
+            $this->discord->notifyClassification(
+                $messageData['BTEXT'] ?? '',
+                [
+                    'topic' => $parsed['topic'],
+                    'language' => $parsed['language'],
+                    'media_type' => $parsed['media_type'] ?? null,
+                    'duration' => $parsed['duration'] ?? null,
+                    'raw_response' => $aiResponse,
+                ],
+                $userId
+            );
 
             $promptMetadata = [];
             if (!empty($parsed['topic'])) {
