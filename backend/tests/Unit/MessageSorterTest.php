@@ -4,6 +4,7 @@ namespace App\Tests\Unit;
 
 use App\AI\Service\AiFacade;
 use App\Repository\PromptRepository;
+use App\Service\DiscordNotificationService;
 use App\Service\Message\MessageSorter;
 use App\Service\ModelConfigService;
 use App\Service\PromptService;
@@ -24,13 +25,15 @@ class MessageSorterTest extends TestCase
         $modelConfigService = $this->createMock(ModelConfigService::class);
         $promptService = $this->createMock(PromptService::class);
         $logger = $this->createMock(LoggerInterface::class);
+        $discord = $this->createMock(DiscordNotificationService::class);
 
         $this->sorter = new MessageSorter(
             $aiFacade,
             $promptRepository,
             $modelConfigService,
             $promptService,
-            $logger
+            $logger,
+            $discord
         );
 
         // Make private methods accessible for testing

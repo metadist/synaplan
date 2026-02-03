@@ -270,7 +270,7 @@
               {{ $t('config.phoneVerification.verified') }}
             </h3>
             <p class="text-sm txt-secondary">
-              {{ status.phone_number }}
+              {{ formatDisplayPhone(status.phone_number) }}
             </p>
             <p class="text-xs txt-secondary mt-2">
               {{
@@ -608,6 +608,12 @@ const removePhone = async () => {
 const formatDate = (timestamp?: number) => {
   if (!timestamp) return '—'
   return new Date(timestamp * 1000).toLocaleDateString()
+}
+
+const formatDisplayPhone = (phone?: string) => {
+  if (!phone) return '—'
+  // Ensure phone number starts with +
+  return phone.startsWith('+') ? phone : `+${phone}`
 }
 
 onMounted(() => {
