@@ -170,6 +170,7 @@ const openMenuChatId = ref<number | null>(null)
 const shareModalOpen = ref(false)
 const shareModalChatId = ref<number | null>(null)
 const shareModalChatTitle = ref<string>('')
+const isCreatingChat = ref(false)
 
 const MAX_RECENT_CHATS = 4
 
@@ -183,12 +184,14 @@ const toggleDropdown = () => {
 const handleMainChatClick = async () => {
   // Check if we have an active chat with messages
   const currentChat = chatsStore.chats.find((c) => c.id === chatsStore.activeChatId)
-  const hasMessages = currentChat && (currentChat.messageCount ?? 0) > 0
+  const hasMessages =
+    currentChat && ((currentChat.messageCount ?? 0) > 0 || currentChat.firstMessagePreview)
 
   // Only create new chat if:
   // 1. Dropdown is currently closed AND
   // 2. Either no active chat OR active chat is empty
-  if (!isOpen.value && !hasMessages) {
+  // 3. Not already creating a chat
+  if (!isOpen.value && !hasMessages && !isCreatingChat.value) {
     await handleNewChat()
   }
 
@@ -233,6 +236,7 @@ const formatTimestamp = (dateStr: string): string => {
 
 // Get the display title - prefer first message preview, then title
 const getDisplayTitle = (chat: {
+  id: number
   title: string
   firstMessagePreview?: string | null
   messageCount?: number
@@ -249,11 +253,25 @@ const getDisplayTitle = (chat: {
     return chat.title
   }
 
-  // Fallback for empty chats
-  return 'Empty chat'
+  // Fallback for empty chats - use localized "New Chat"
+  // Note: Non-active empty chats are filtered out, so this is typically the active chat
+  return t('chat.newChat')
 }
 
-// Get all chats (excluding widget sessions and truly empty chats)
+// Check if a chat is empty (no messages, no content, default title)
+const isChatEmpty = (chat: { messageCount?: number; firstMessagePreview?: string | null; title: string }): boolean => {
+  // Has messages - not empty
+  if (chat.messageCount && chat.messageCount > 0) return false
+  // Has first message preview - not empty
+  if (chat.firstMessagePreview) return false
+  // Has a non-default title - not empty
+  const isDefaultTitle =
+    chat.title === 'New Chat' || chat.title === 'Neuer Chat' || chat.title.startsWith('Chat ')
+  if (!isDefaultTitle) return false
+  return true
+}
+
+// Get all chats (excluding widget sessions and non-active empty chats)
 const allChats = computed(() => {
   return chatsStore.chats.filter((c) => {
     // Exclude widget sessions
@@ -262,9 +280,8 @@ const allChats = computed(() => {
     // Always show the active chat (even if empty, so user sees current context)
     if (c.id === chatsStore.activeChatId) return true
 
-    // Filter out truly empty chats (no messages and no content)
-    const isEmpty = (!c.messageCount || c.messageCount === 0) && !c.firstMessagePreview
-    if (isEmpty) return false
+    // Filter out truly empty chats (only active empty chat is shown above)
+    if (isChatEmpty(c)) return false
 
     return true
   })
@@ -329,12 +346,26 @@ const handleDelete = async (chatId: number) => {
 }
 
 const handleNewChat = async () => {
-  await chatsStore.findOrCreateEmptyChat()
-  if (route.path !== '/') {
-    router.push('/')
+  // Prevent double-click race conditions
+  if (isCreatingChat.value) {
+    console.log('🚫 New chat creation already in progress, ignoring click')
+    return
   }
-  // Don't close dropdown - keep it open
-  openMenuChatId.value = null
+
+  isCreatingChat.value = true
+  try {
+    await chatsStore.findOrCreateEmptyChat()
+    if (route.path !== '/') {
+      router.push('/')
+    }
+    // Don't close dropdown - keep it open
+    openMenuChatId.value = null
+  } finally {
+    // Small delay to prevent rapid successive clicks
+    setTimeout(() => {
+      isCreatingChat.value = false
+    }, 300)
+  }
 }
 
 // Close menu when clicking outside

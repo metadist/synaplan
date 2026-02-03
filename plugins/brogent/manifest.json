@@ -1,0 +1,118 @@
+{
+  "id": "brogent",
+  "name": "brogent",
+  "version": "1.0.0",
+  "displayName": "BroGent Browser Agent",
+  "description": "Browser automation agent - execute tasks in your browser from Synaplan",
+  "author": "Synaplan",
+  "license": "MIT",
+  "minSynaplanVersion": "1.0.0",
+  "capabilities": ["api", "frontend", "migrations"],
+  "routes": [
+    {
+      "path": "/pair/code",
+      "method": "POST",
+      "description": "Generate a pairing code for browser extension"
+    },
+    {
+      "path": "/pair/claim",
+      "method": "POST",
+      "description": "Claim a pairing code and register device"
+    },
+    {
+      "path": "/devices",
+      "method": "GET",
+      "description": "List paired devices"
+    },
+    {
+      "path": "/devices/{deviceId}",
+      "method": "DELETE",
+      "description": "Unpair a device"
+    },
+    {
+      "path": "/tasks",
+      "method": "GET",
+      "description": "List available tasks"
+    },
+    {
+      "path": "/tasks/{taskId}",
+      "method": "GET",
+      "description": "Get task details"
+    },
+    {
+      "path": "/runs",
+      "method": "POST",
+      "description": "Create a new run"
+    },
+    {
+      "path": "/runs/claim",
+      "method": "GET",
+      "description": "Claim a queued run (extension polling)"
+    },
+    {
+      "path": "/runs/{runId}/events",
+      "method": "POST",
+      "description": "Submit run events"
+    },
+    {
+      "path": "/runs/{runId}/heartbeat",
+      "method": "POST",
+      "description": "Extend run lease"
+    },
+    {
+      "path": "/runs/{runId}/request-approval",
+      "method": "POST",
+      "description": "Request user approval for dangerous action"
+    },
+    {
+      "path": "/runs/{runId}/approval",
+      "method": "GET",
+      "description": "Check approval status"
+    },
+    {
+      "path": "/runs/{runId}/approve",
+      "method": "POST",
+      "description": "Approve a pending action (from UI)"
+    },
+    {
+      "path": "/runs/{runId}/reject",
+      "method": "POST",
+      "description": "Reject a pending action (from UI)"
+    }
+  ],
+  "migrations": [
+    "001_setup.sql"
+  ],
+  "hooks": {
+    "onInstall": "Plugin\\Brogent\\Service\\BrogentInstallService::seedDefaultTasks"
+  },
+  "config": {
+    "group": "P_brogent",
+    "settings": [
+      {
+        "key": "enabled",
+        "type": "boolean",
+        "default": true,
+        "description": "Enable BroGent for this user"
+      },
+      {
+        "key": "polling_interval_ms",
+        "type": "integer",
+        "default": 2000,
+        "description": "Extension polling interval in milliseconds"
+      },
+      {
+        "key": "run_lease_seconds",
+        "type": "integer",
+        "default": 300,
+        "description": "Run lease duration before expiry"
+      },
+      {
+        "key": "pairing_code_expiry_seconds",
+        "type": "integer",
+        "default": 300,
+        "description": "Pairing code validity duration"
+      }
+    ]
+  }
+}
