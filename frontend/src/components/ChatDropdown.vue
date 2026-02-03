@@ -259,7 +259,11 @@ const getDisplayTitle = (chat: {
 }
 
 // Check if a chat is empty (no messages, no content, default title)
-const isChatEmpty = (chat: { messageCount?: number; firstMessagePreview?: string | null; title: string }): boolean => {
+const isChatEmpty = (chat: {
+  messageCount?: number
+  firstMessagePreview?: string | null
+  title: string
+}): boolean => {
   // Has messages - not empty
   if (chat.messageCount && chat.messageCount > 0) return false
   // Has first message preview - not empty
