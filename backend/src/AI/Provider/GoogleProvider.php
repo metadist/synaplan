@@ -766,7 +766,9 @@ class GoogleProvider implements ChatProviderInterface, ImageGenerationProviderIn
                     ],
                 ],
                 'generationConfig' => [
-                    'maxOutputTokens' => $options['max_tokens'] ?? 1000,
+                    // Gemini 2.5 Pro uses ~1000 tokens for "thinking", so we need higher limit
+                    // to leave room for actual text output (especially for OCR tasks)
+                    'maxOutputTokens' => $options['max_tokens'] ?? 8192,
                 ],
             ];
 
