@@ -78,7 +78,7 @@ class BrogentController extends AbstractController
 
         $this->logger->info('BroGent pairing code generated', [
             'user_id' => $userId,
-            'code' => $result['pairingCode'],
+            'code_prefix' => substr($result['pairingCode'], 0, 4).'-****',
         ]);
 
         return $this->json([
@@ -144,7 +144,14 @@ class BrogentController extends AbstractController
         int $userId,
     ): JsonResponse {
         // Note: This endpoint doesn't require authentication - it uses the pairing code
-        $data = json_decode($request->getContent(), true);
+        try {
+            $data = $request->toArray();
+        } catch (\JsonException $e) {
+            return $this->json([
+                'protocolVersion' => self::PROTOCOL_VERSION,
+                'error' => 'Invalid JSON payload',
+            ], Response::HTTP_BAD_REQUEST);
+        }
 
         if (empty($data['pairingCode']) || empty($data['device'])) {
             return $this->json([
@@ -348,7 +355,14 @@ class BrogentController extends AbstractController
             return $this->json(['success' => false, 'error' => 'Unauthorized'], Response::HTTP_UNAUTHORIZED);
         }
 
-        $data = json_decode($request->getContent(), true);
+        try {
+            $data = $request->toArray();
+        } catch (\JsonException $e) {
+            return $this->json([
+                'protocolVersion' => self::PROTOCOL_VERSION,
+                'error' => 'Invalid JSON payload',
+            ], Response::HTTP_BAD_REQUEST);
+        }
 
         if (empty($data['taskId'])) {
             return $this->json([
@@ -495,7 +509,16 @@ class BrogentController extends AbstractController
     ): JsonResponse {
         // Authenticate via device token
         $deviceToken = $request->headers->get('X-API-Key');
-        $data = json_decode($request->getContent(), true);
+
+        try {
+            $data = $request->toArray();
+        } catch (\JsonException $e) {
+            return $this->json([
+                'protocolVersion' => self::PROTOCOL_VERSION,
+                'error' => 'Invalid JSON payload',
+            ], Response::HTTP_BAD_REQUEST);
+        }
+
         $leaseId = $data['leaseId'] ?? null;
 
         if (!$deviceToken || !$leaseId) {
@@ -527,12 +550,13 @@ class BrogentController extends AbstractController
                 'user_id' => $userId,
                 'run_id' => $runId,
                 'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
             ]);
 
             return $this->json([
                 'protocolVersion' => self::PROTOCOL_VERSION,
                 'accepted' => false,
-                'error' => $e->getMessage(),
+                'error' => 'Event submission failed',
             ], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
@@ -552,7 +576,16 @@ class BrogentController extends AbstractController
         string $runId,
     ): JsonResponse {
         $deviceToken = $request->headers->get('X-API-Key');
-        $data = json_decode($request->getContent(), true);
+
+        try {
+            $data = $request->toArray();
+        } catch (\JsonException $e) {
+            return $this->json([
+                'protocolVersion' => self::PROTOCOL_VERSION,
+                'error' => 'Invalid JSON payload',
+            ], Response::HTTP_BAD_REQUEST);
+        }
+
         $leaseId = $data['leaseId'] ?? null;
 
         if (!$deviceToken || !$leaseId) {
@@ -597,7 +630,16 @@ class BrogentController extends AbstractController
         string $runId,
     ): JsonResponse {
         $deviceToken = $request->headers->get('X-API-Key');
-        $data = json_decode($request->getContent(), true);
+
+        try {
+            $data = $request->toArray();
+        } catch (\JsonException $e) {
+            return $this->json([
+                'protocolVersion' => self::PROTOCOL_VERSION,
+                'error' => 'Invalid JSON payload',
+            ], Response::HTTP_BAD_REQUEST);
+        }
+
         $leaseId = $data['leaseId'] ?? null;
         $approval = $data['approval'] ?? null;
 
@@ -631,9 +673,16 @@ class BrogentController extends AbstractController
                 'accepted' => true,
             ]);
         } catch (\Throwable $e) {
+            $this->logger->error('BroGent approval request failed', [
+                'user_id' => $userId,
+                'run_id' => $runId,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
             return $this->json([
                 'protocolVersion' => self::PROTOCOL_VERSION,
-                'error' => $e->getMessage(),
+                'error' => 'Approval request failed',
             ], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
@@ -690,7 +739,15 @@ class BrogentController extends AbstractController
             return $this->json(['success' => false, 'error' => 'Unauthorized'], Response::HTTP_UNAUTHORIZED);
         }
 
-        $data = json_decode($request->getContent(), true);
+        try {
+            $data = $request->toArray();
+        } catch (\JsonException $e) {
+            return $this->json([
+                'protocolVersion' => self::PROTOCOL_VERSION,
+                'error' => 'Invalid JSON payload',
+            ], Response::HTTP_BAD_REQUEST);
+        }
+
         $approvalId = $data['approvalId'] ?? null;
 
         if (!$approvalId) {
@@ -734,7 +791,15 @@ class BrogentController extends AbstractController
             return $this->json(['success' => false, 'error' => 'Unauthorized'], Response::HTTP_UNAUTHORIZED);
         }
 
-        $data = json_decode($request->getContent(), true);
+        try {
+            $data = $request->toArray();
+        } catch (\JsonException $e) {
+            return $this->json([
+                'protocolVersion' => self::PROTOCOL_VERSION,
+                'error' => 'Invalid JSON payload',
+            ], Response::HTTP_BAD_REQUEST);
+        }
+
         $approvalId = $data['approvalId'] ?? null;
 
         if (!$approvalId) {
@@ -797,7 +862,7 @@ class BrogentController extends AbstractController
      */
     private function canAccessPlugin(?User $user, int $userId): bool
     {
-        if ($user === null) {
+        if (null === $user) {
             return false;
         }
 
