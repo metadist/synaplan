@@ -208,6 +208,7 @@
                 v-else-if="part.type === 'text'"
                 :content="part.content"
                 :is-streaming="false"
+                :readonly="true"
               />
             </template>
 
