@@ -4,7 +4,9 @@
       <div class="max-w-[1400px] mx-auto w-full px-6 py-8">
         <div class="mb-8" data-testid="section-header">
           <h1 class="text-3xl font-semibold txt-primary mb-2">
-            {{ plugin?.name ? plugin.name.charAt(0).toUpperCase() + plugin.name.slice(1) : 'Plugin' }}
+            {{
+              plugin?.name ? plugin.name.charAt(0).toUpperCase() + plugin.name.slice(1) : 'Plugin'
+            }}
           </h1>
           <p class="txt-secondary">
             {{ plugin?.description || 'Loading plugin...' }}
