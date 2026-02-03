@@ -11,6 +11,9 @@ use App\Service\File\UserUploadPathBuilder;
 use App\Service\Message\MessageProcessor;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
+use Symfony\Component\Lock\LockFactory;
+use Symfony\Contracts\Cache\CacheInterface;
+use Symfony\Contracts\Cache\ItemInterface;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 
 /**
@@ -36,6 +39,12 @@ class WhatsAppService
         'amr', 'opus', '3gp', // WhatsApp-specific audio/video formats
     ];
 
+    /**
+     * Cache TTL for duplicate detection (5 minutes).
+     * WhatsApp retries typically happen within 1-2 minutes.
+     */
+    private const DUPLICATE_CACHE_TTL = 300;
+
     private string $accessToken;
     private bool $enabled;
     private string $apiVersion = 'v21.0';
@@ -49,6 +58,9 @@ class WhatsAppService
         private FileProcessor $fileProcessor,
         private UserUploadPathBuilder $userUploadPathBuilder,
         private AiFacade $aiFacade,
+        private DiscordNotificationService $discord,
+        private CacheInterface $cache,
+        private LockFactory $lockFactory,
         string $whatsappAccessToken,
         bool $whatsappEnabled,
         private string $uploadsDir,
@@ -68,6 +80,79 @@ class WhatsAppService
     }
 
     /**
+     * Check if message was already processed (duplicate detection).
+     *
+     * Uses lock + cache for atomic check-and-set to prevent race conditions
+     * when multiple webhook requests arrive simultaneously.
+     *
+     * @return array|null Returns duplicate result array if duplicate, null if new message
+     */
+    private function checkAndMarkAsDuplicate(IncomingMessageDto $dto): ?array
+    {
+        $cacheKey = 'whatsapp_msg_'.hash('sha256', $dto->messageId);
+        $lockKey = 'whatsapp_lock_'.hash('sha256', $dto->messageId);
+
+        try {
+            // Acquire lock to prevent race condition between concurrent requests
+            $lock = $this->lockFactory->createLock($lockKey, ttl: 30.0, autoRelease: true);
+
+            if (!$lock->acquire()) {
+                // Another request is processing this message - treat as duplicate
+                $this->logger->info('WhatsApp: Message locked by another process, treating as duplicate', [
+                    'message_id' => $dto->messageId,
+                    'from' => $dto->from,
+                ]);
+
+                return [
+                    'success' => true,
+                    'message_id' => $dto->messageId,
+                    'duplicate' => true,
+                    'response_sent' => false,
+                ];
+            }
+
+            // Atomic get-or-create: callback only runs on cache miss (new message)
+            $cachedAt = $this->cache->get($cacheKey, function (ItemInterface $item): int {
+                $item->expiresAfter(self::DUPLICATE_CACHE_TTL);
+
+                return time();
+            });
+
+            // If cached time is more than 1 second ago, it's a duplicate
+            if (abs(time() - $cachedAt) > 1) {
+                $this->logger->info('WhatsApp: Duplicate message detected, skipping', [
+                    'message_id' => $dto->messageId,
+                    'from' => $dto->from,
+                    'cached_at' => $cachedAt,
+                    'age_seconds' => time() - $cachedAt,
+                ]);
+
+                $lock->release();
+
+                return [
+                    'success' => true,
+                    'message_id' => $dto->messageId,
+                    'duplicate' => true,
+                    'response_sent' => false,
+                ];
+            }
+
+            // New message - lock will auto-release, let processing continue
+            return null;
+        } catch (\Throwable $e) {
+            // Graceful degradation: if cache/lock fails, process the message anyway
+            // Better to risk a duplicate than to drop messages entirely
+            $this->logger->warning('WhatsApp: Duplicate detection failed, processing anyway', [
+                'message_id' => $dto->messageId,
+                'from' => $dto->from,
+                'error' => $e->getMessage(),
+            ]);
+
+            return null;
+        }
+    }
+
+    /**
      * Send text message.
      *
      * @param string $phoneNumberId The WhatsApp Phone Number ID to send from (extracted from webhook metadata)
@@ -81,6 +166,9 @@ class WhatsAppService
         if (empty($phoneNumberId)) {
             throw new \InvalidArgumentException('Phone Number ID is required and must be provided dynamically from webhook metadata');
         }
+
+        // Convert standard Markdown to WhatsApp-compatible formatting
+        $formattedMessage = $this->convertToWhatsAppMarkdown($message);
 
         $url = sprintf(
             'https://graph.facebook.com/%s/%s/messages',
@@ -101,7 +189,7 @@ class WhatsAppService
                     'type' => 'text',
                     'text' => [
                         'preview_url' => true,
-                        'body' => $message,
+                        'body' => $formattedMessage,
                     ],
                 ],
             ]);
@@ -165,8 +253,9 @@ class WhatsAppService
             'link' => $mediaUrl,
         ];
 
+        // Convert caption markdown to WhatsApp format if present
         if ($caption && in_array($mediaType, ['image', 'video', 'document'])) {
-            $mediaPayload['caption'] = $caption;
+            $mediaPayload['caption'] = $this->convertToWhatsAppMarkdown($caption);
         }
 
         try {
@@ -347,6 +436,13 @@ class WhatsAppService
      */
     public function handleIncomingMessage(IncomingMessageDto $dto, User $user, bool $isAnonymous): array
     {
+        // DUPLICATE DETECTION: WhatsApp may send the same webhook multiple times on retries.
+        // Uses lock + cache for atomic check-and-set to prevent race conditions.
+        $duplicateResult = $this->checkAndMarkAsDuplicate($dto);
+        if (null !== $duplicateResult) {
+            return $duplicateResult;
+        }
+
         $effectiveUserId = $isAnonymous ? $this->whatsappUserId : $user->getId();
 
         // Determine input type for response mode selection
@@ -427,6 +523,18 @@ class WhatsAppService
         if ($mediaDownloadError) {
             $this->sendErrorMessage($dto, $mediaDownloadError);
 
+            // Discord notification: Media download failed
+            $this->discord->notifyWhatsAppError(
+                'media_download',
+                $dto->from,
+                $message->getText() ?: '[Media message]',
+                $mediaDownloadError,
+                [
+                    'message_type' => $dto->type,
+                    'file_type' => $dto->incomingMsg[$dto->type]['mime_type'] ?? 'unknown',
+                ]
+            );
+
             return [
                 'success' => false,
                 'message_id' => $dto->messageId,
@@ -471,6 +579,15 @@ class WhatsAppService
             $errorMessage = $result['error'] ?? 'Processing failed';
             $this->sendErrorMessage($dto, $errorMessage);
 
+            // Discord notification: Processing failed
+            $this->discord->notifyWhatsAppError(
+                'processing',
+                $dto->from,
+                $message->getText(),
+                $errorMessage,
+                ['message_type' => $dto->type]
+            );
+
             return [
                 'success' => false,
                 'message_id' => $dto->messageId,
@@ -513,11 +630,33 @@ class WhatsAppService
                     };
                     $this->storeOutgoingMessage($user, $dto, $responseText ?: $placeholderText, $sendResult['message_id']);
                     $responseSent = true;
+
+                    // Discord notification: AI media generated and sent
+                    $this->discord->notifyWhatsAppSuccess(
+                        $generatedMediaType,
+                        $dto->from,
+                        $message->getText(),
+                        $responseText ?: $placeholderText,
+                        [
+                            'provider' => $metadata['provider'] ?? null,
+                            'model' => $metadata['model'] ?? null,
+                            'media_type' => $generatedMediaType,
+                        ]
+                    );
                 } else {
                     $this->logger->warning('WhatsApp: Failed to send AI media, falling back', [
                         'media_type' => $generatedMediaType,
                         'error' => $sendResult['error'] ?? 'Unknown',
                     ]);
+
+                    // Discord notification: Failed to send AI media
+                    $this->discord->notifyWhatsAppError(
+                        'send_failed',
+                        $dto->from,
+                        $message->getText(),
+                        $sendResult['error'] ?? 'Unknown error',
+                        ['media_type' => $generatedMediaType]
+                    );
                 }
             }
         }
@@ -539,13 +678,44 @@ class WhatsAppService
                 if ($sendResult['success']) {
                     $this->storeOutgoingMessage($user, $dto, $responseText, $sendResult['message_id']);
                     $responseSent = true;
+
+                    // Discord notification: TTS response sent
+                    $this->discord->notifyWhatsAppSuccess(
+                        'tts',
+                        $dto->from,
+                        $message->getText(),
+                        $responseText,
+                        [
+                            'provider' => $ttsResult['provider'] ?? null,
+                            'model' => $ttsResult['model'] ?? null,
+                            'media_type' => 'audio',
+                        ]
+                    );
                 } else {
                     $this->logger->warning('WhatsApp: TTS send failed, falling back to text', [
                         'error' => $sendResult['error'] ?? 'Unknown',
                     ]);
+
+                    // Discord notification: TTS send failed
+                    $this->discord->notifyWhatsAppError(
+                        'send_failed',
+                        $dto->from,
+                        $message->getText(),
+                        $sendResult['error'] ?? 'Unknown error',
+                        ['media_type' => 'audio']
+                    );
                 }
             } else {
                 $this->logger->warning('WhatsApp: TTS generation failed, falling back to text');
+
+                // Discord notification: TTS generation failed
+                $this->discord->notifyWhatsAppError(
+                    'tts',
+                    $dto->from,
+                    $message->getText(),
+                    'TTS generation failed',
+                    ['message_type' => $dto->type]
+                );
             }
         }
 
@@ -555,10 +725,31 @@ class WhatsAppService
             if ($sendResult['success']) {
                 $this->storeOutgoingMessage($user, $dto, $responseText, $sendResult['message_id']);
                 $responseSent = true;
+
+                // Discord notification: Text response sent
+                $this->discord->notifyWhatsAppSuccess(
+                    'text',
+                    $dto->from,
+                    $message->getText(),
+                    $responseText,
+                    [
+                        'provider' => $metadata['provider'] ?? null,
+                        'model' => $metadata['model'] ?? null,
+                    ]
+                );
             } else {
                 $this->logger->error('WhatsApp: Failed to send text response', [
                     'error' => $sendResult['error'] ?? 'Unknown',
                 ]);
+
+                // Discord notification: Text send failed
+                $this->discord->notifyWhatsAppError(
+                    'send_failed',
+                    $dto->from,
+                    $message->getText(),
+                    $sendResult['error'] ?? 'Unknown error',
+                    ['message_type' => 'text']
+                );
             }
         }
 
@@ -569,6 +760,15 @@ class WhatsAppService
                 'from' => $dto->from,
                 'response_text_length' => strlen($responseText),
             ]);
+
+            // Discord notification: No response sent
+            $this->discord->notifyWhatsAppError(
+                'processing',
+                $dto->from,
+                $message->getText(),
+                'No response could be sent to user',
+                ['message_type' => $dto->type]
+            );
         }
 
         return [
@@ -735,11 +935,99 @@ class WhatsAppService
         return match ($dto->type) {
             'text' => $dto->incomingMsg['text']['body'] ?? '',
             'image' => $dto->incomingMsg['image']['caption'] ?? '[Image]',
+            'sticker' => '[Sticker]', // Treated like images, analyzed via Vision AI
             'audio' => '[Audio message]', // Will be replaced with transcription
             'video' => $dto->incomingMsg['video']['caption'] ?? '[Video]', // Audio track will be transcribed
             'document' => $dto->incomingMsg['document']['caption'] ?? '[Document]',
+            'location' => $this->formatLocationMessage($dto),
+            'contacts' => $this->formatContactsMessage($dto),
             default => "[Unsupported message type: {$dto->type}]",
         };
+    }
+
+    /**
+     * Format a location message into a readable text for AI processing.
+     * WhatsApp location payload: { latitude, longitude, name?, address?, url? }.
+     */
+    private function formatLocationMessage(IncomingMessageDto $dto): string
+    {
+        $location = $dto->incomingMsg['location'] ?? [];
+
+        $latitude = $location['latitude'] ?? null;
+        $longitude = $location['longitude'] ?? null;
+
+        if (null === $latitude || null === $longitude) {
+            return '[Location shared - coordinates not available]';
+        }
+
+        $parts = ["📍 Standort geteilt: {$latitude}, {$longitude}"];
+
+        // Include location name if available (e.g., "Philz Coffee")
+        if (!empty($location['name'])) {
+            $parts[] = "Name: {$location['name']}";
+        }
+
+        // Include address if available
+        if (!empty($location['address'])) {
+            $parts[] = "Adresse: {$location['address']}";
+        }
+
+        // Include Google Maps URL for context
+        if (!empty($location['url'])) {
+            $parts[] = "Maps: {$location['url']}";
+        } else {
+            // Generate a Google Maps URL if not provided
+            $parts[] = "Maps: https://www.google.com/maps?q={$latitude},{$longitude}";
+        }
+
+        return implode("\n", $parts);
+    }
+
+    /**
+     * Format a contacts message into a readable text for AI processing.
+     * WhatsApp contacts payload: array of contact objects with name, phones, etc.
+     */
+    private function formatContactsMessage(IncomingMessageDto $dto): string
+    {
+        $contacts = $dto->incomingMsg['contacts'] ?? [];
+
+        if (empty($contacts)) {
+            return '[Contact shared - details not available]';
+        }
+
+        $parts = ['📇 Kontakt(e) geteilt:'];
+
+        foreach ($contacts as $contact) {
+            $name = $contact['name']['formatted_name']
+                ?? $contact['name']['first_name'] ?? 'Unbekannt';
+            $contactInfo = ["- {$name}"];
+
+            // Add phone numbers
+            if (!empty($contact['phones'])) {
+                foreach ($contact['phones'] as $phone) {
+                    $phoneType = $phone['type'] ?? 'phone';
+                    $phoneNumber = $phone['phone'] ?? $phone['wa_id'] ?? '';
+                    if ($phoneNumber) {
+                        $contactInfo[] = "  {$phoneType}: {$phoneNumber}";
+                    }
+                }
+            }
+
+            // Add emails
+            if (!empty($contact['emails'])) {
+                foreach ($contact['emails'] as $email) {
+                    $emailType = $email['type'] ?? 'email';
+                    $emailAddress = $email['email'] ?? '';
+                    if ($emailAddress) {
+                        $contactInfo[] = "  {$emailType}: {$emailAddress}";
+                    }
+                }
+            }
+
+            $parts[] = implode("\n", $contactInfo);
+        }
+
+        return implode("\n", $parts);
     }
 
     private function extractMediaId(IncomingMessageDto $dto): ?string
@@ -858,46 +1146,33 @@ class WhatsAppService
 
                         return 'Audio transcription failed - no speech detected';
                     }
-                } elseif ('image' === $dto->type) {
-                    // For images, extract description via Vision AI
-                    $this->logger->info('WhatsApp: Extracting description from image');
+                } elseif ('image' === $dto->type || 'sticker' === $dto->type) {
+                    // For images and stickers: Don't extract text here - let ChatHandler use Vision AI
+                    // The ChatHandler has built-in vision support and will analyze the image
+                    // Stickers are WebP images and can be analyzed the same way
+                    $caption = $dto->incomingMsg[$dto->type]['caption'] ?? null;
 
-                    // Caption should be treated as user prompt input
-                    $caption = $dto->incomingMsg['image']['caption'] ?? null;
-
-                    [$extractedText, $extractionDetails] = $this->fileProcessor->extractText(
-                        $downloadResult['file_path'],
-                        $downloadResult['file_type'],
-                        $effectiveUserId
-                    );
-
-                    if (!empty($extractedText)) {
-                        $message->setFileText($extractedText);
-
-                        $currentText = $message->getText();
-
-                        if (!empty($caption)) {
-                            // Caption becomes the user prompt; image text stays as file context
-                            $message->setText($caption);
-                            $this->logger->info('WhatsApp: Using image caption as prompt', [
-                                'caption_length' => strlen($caption),
-                                'description_length' => strlen($extractedText),
-                            ]);
-                        } elseif (empty($currentText) || '[Image]' === $currentText) {
-                            // No caption: ask for a brief description using extracted context
-                            $message->setText('Describe what you see in this image: '.$extractedText);
-                            $this->logger->info('WhatsApp: Set image description as prompt', [
-                                'description_length' => strlen($extractedText),
-                            ]);
-                        }
-                    } else {
-                        // Vision extraction failed - return error
-                        $this->logger->warning('WhatsApp: Image analysis failed - no description extracted', [
-                            'details' => $extractionDetails ?? [],
+                    if (!empty($caption)) {
+                        // User asked a question about the image - use it as the prompt
+                        $message->setText($caption);
+                        $this->logger->info('WhatsApp: Image/sticker with caption, delegating to ChatHandler vision', [
+                            'type' => $dto->type,
+                            'caption' => $caption,
+                            'file_path' => $downloadResult['file_path'],
                         ]);
-
-                        return 'Image analysis failed - could not process the image';
+                    } else {
+                        // No caption: ask for a description
+                        $prompt = 'sticker' === $dto->type
+                            ? 'Describe this sticker. What does it show and what emotion or message does it convey?'
+                            : 'Describe what you see in this image.';
+                        $message->setText($prompt);
+                        $this->logger->info('WhatsApp: Image/sticker without caption, requesting description', [
+                            'type' => $dto->type,
+                            'file_path' => $downloadResult['file_path'],
+                        ]);
                     }
+                // Note: fileText is intentionally NOT set - ChatHandler will include
+                // the image directly in the Vision API request for proper analysis
                 } else {
                     // For documents and other types, use standard extraction
                     [$extractedText] = $this->fileProcessor->extractText(
@@ -1269,5 +1544,61 @@ class WhatsAppService
 
         // Return 'unknown' for unmapped types - will be caught by ALLOWED_EXTENSIONS check
         return $mimeMap[$mimeType] ?? 'unknown';
+    }
+
+    /**
+     * Convert standard Markdown formatting to WhatsApp-compatible formatting.
+     *
+     * WhatsApp uses different syntax than standard Markdown:
+     * - Bold: *text* (not **text**)
+     * - Italic: _text_ (not *text*)
+     * - Strikethrough: ~text~ (not ~~text~~)
+     * - Monospace: ```text``` or `text` (same as MD)
+     *
+     * @see https://faq.whatsapp.com/539178204879377
+     */
+    private function convertToWhatsAppMarkdown(string $text): string
+    {
+        // Protect code blocks from conversion (they work the same in WhatsApp)
+        $codeBlocks = [];
+        $text = preg_replace_callback('/```[\s\S]*?```/', function ($match) use (&$codeBlocks) {
+            $placeholder = '{{CODE_BLOCK_'.count($codeBlocks).'}}';
+            $codeBlocks[$placeholder] = $match[0];
+
+            return $placeholder;
+        }, $text);
+
+        // Protect inline code from conversion
+        $inlineCode = [];
+        $text = preg_replace_callback('/`[^`]+`/', function ($match) use (&$inlineCode) {
+            $placeholder = '{{INLINE_CODE_'.count($inlineCode).'}}';
+            $inlineCode[$placeholder] = $match[0];
+
+            return $placeholder;
+        }, $text);
+
+        // Convert headers to bold (# Header → *Header*)
+        $text = preg_replace('/^#{1,6}\s+(.+)$/m', '*$1*', $text);
+
+        // Convert **bold** to *bold* (must be done before italic conversion)
+        $text = preg_replace('/\*\*(.+?)\*\*/', '*$1*', $text);
+
+        // Convert ~~strikethrough~~ to ~strikethrough~
+        $text = preg_replace('/~~(.+?)~~/', '~$1~', $text);
+
+        // Convert bullet points to Unicode bullets for cleaner display
+        $text = preg_replace('/^[\-\*]\s+/m', '• ', $text);
+
+        // Restore code blocks
+        foreach ($codeBlocks as $placeholder => $code) {
+            $text = str_replace($placeholder, $code, $text);
+        }
+
+        // Restore inline code
+        foreach ($inlineCode as $placeholder => $code) {
+            $text = str_replace($placeholder, $code, $text);
+        }
+
+        return $text;
     }
 }

@@ -1897,6 +1897,8 @@
       "badge": "Memory pending",
       "tooltip": "This memory was just created or updated. It may take a few seconds until it can be loaded."
     },
+    "loginToView": "Log in to view memory details",
+    "memoryUsed": "Memory used",
     "toast": {
       "title": "New Memory Detected",
       "titleCompact": "Memory",

@@ -1,7 +1,7 @@
 {
   "id": "sortx",
   "name": "sortx",
-  "version": "3.0.0",
+  "version": "4.0.0",
   "displayName": "SortX Document Classifier",
   "description": "AI-powered document classification with multi-label support and metadata extraction",
   "author": "Synaplan",
@@ -10,6 +10,26 @@
   "minSynaplanVersion": "1.0.0",
   "capabilities": ["api", "frontend", "migrations"],
   "routes": [
+    {
+      "path": "/setup-check",
+      "method": "GET",
+      "description": "Check if plugin is properly installed and configured"
+    },
+    {
+      "path": "/setup",
+      "method": "POST",
+      "description": "Initialize plugin with default categories"
+    },
+    {
+      "path": "/models",
+      "method": "GET",
+      "description": "List available LLM models for classification"
+    },
+    {
+      "path": "/config",
+      "method": "PUT",
+      "description": "Update plugin configuration (model, threshold, prompt)"
+    },
     {
       "path": "/schema",
       "method": "GET",
@@ -29,6 +49,11 @@
       "path": "/extract-text",
       "method": "POST",
       "description": "Extract text from document using Tika and Vision AI fallback"
+    },
+    {
+      "path": "/ocr",
+      "method": "POST",
+      "description": "Extract text via OCR (Vision AI) for graphical PDFs"
     },
     {
       "path": "/analyze-file",
