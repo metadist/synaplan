@@ -499,14 +499,49 @@ class GoogleProvider implements ChatProviderInterface, ImageGenerationProviderIn
                 $statusData = $statusResponse->toArray();
 
                 if (isset($statusData['done']) && true === $statusData['done']) {
-                    // Operation completed!
+                    // Operation completed - check for error first
+                    $this->logger->info('Google Veo: Operation completed', [
+                        'has_error' => isset($statusData['error']),
+                        'has_response' => isset($statusData['response']),
+                    ]);
+
+                    // Check for error response (content safety rejection, etc.)
+                    if (isset($statusData['error'])) {
+                        $errorCode = $statusData['error']['code'] ?? 'UNKNOWN';
+                        $errorMessage = $statusData['error']['message'] ?? 'Unknown error';
+                        $errorDetails = $statusData['error']['details'] ?? [];
+
+                        $this->logger->error('Google Veo: Operation failed with error', [
+                            'error_code' => $errorCode,
+                            'error_message' => $errorMessage,
+                            'error_details' => $errorDetails,
+                        ]);
+
+                        // Check for common error types
+                        if (str_contains(strtolower($errorMessage), 'safety') || str_contains(strtolower($errorMessage), 'blocked')) {
+                            throw new \Exception('Video generation blocked by safety filters: '.$errorMessage);
+                        }
+
+                        throw new \Exception('Google video generation failed: '.$errorMessage.' (code: '.$errorCode.')');
+                    }
+
                     $this->logger->info('Google Veo: Video generation completed!');
 
-                    // Extract video URI
+                    // Extract video URI - try multiple possible response formats
                     $videoUri = $statusData['response']['generateVideoResponse']['generatedSamples'][0]['video']['uri'] ?? null;
 
+                    // Try alternative response format (generated_videos)
                     if (!$videoUri) {
-                        throw new \Exception('No video URI in completed operation response');
+                        $videoUri = $statusData['response']['generatedVideos'][0]['video']['uri'] ?? null;
+                    }
+
+                    if (!$videoUri) {
+                        // Log the full response for debugging
+                        $this->logger->error('Google Veo: No video URI found in response', [
+                            'response_keys' => array_keys($statusData['response'] ?? []),
+                            'full_response' => json_encode($statusData, JSON_PRETTY_PRINT),
+                        ]);
+                        throw new \Exception('No video URI in completed operation response - check logs for response structure');
                     }
 
                     // Download the video from the URI
