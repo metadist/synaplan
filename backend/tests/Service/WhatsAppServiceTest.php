@@ -39,12 +39,18 @@ class WhatsAppServiceTest extends TestCase
     private WhatsAppService $service;
     /** @var HttpClientInterface&\PHPUnit\Framework\MockObject\MockObject */
     private $httpClient;
-    private LoggerInterface $logger;
-    private EntityManagerInterface $em;
-    private RateLimitService $rateLimitService;
-    private MessageProcessor $messageProcessor;
-    private FileProcessor $fileProcessor;
-    private UserUploadPathBuilder $pathBuilder;
+    /** @var LoggerInterface&\PHPUnit\Framework\MockObject\MockObject */
+    private $logger;
+    /** @var EntityManagerInterface&\PHPUnit\Framework\MockObject\MockObject */
+    private $em;
+    /** @var RateLimitService&\PHPUnit\Framework\MockObject\MockObject */
+    private $rateLimitService;
+    /** @var MessageProcessor&\PHPUnit\Framework\MockObject\MockObject */
+    private $messageProcessor;
+    /** @var FileProcessor&\PHPUnit\Framework\MockObject\MockObject */
+    private $fileProcessor;
+    /** @var UserUploadPathBuilder&\PHPUnit\Framework\MockObject\MockObject */
+    private $pathBuilder;
     /** @var AiFacade&\PHPUnit\Framework\MockObject\MockObject */
     private $aiFacade;
     /** @var DiscordNotificationService&\PHPUnit\Framework\MockObject\MockObject */
