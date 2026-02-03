@@ -6,11 +6,14 @@ namespace Plugin\SortX\Controller;
 
 use App\AI\Service\AiFacade;
 use App\Entity\User;
+use App\Repository\ConfigRepository;
+use App\Repository\ModelRepository;
 use App\Service\File\FileProcessor;
 use App\Service\ModelConfigService;
 use App\Service\PluginDataService;
 use OpenApi\Attributes as OA;
 use Plugin\SortX\Service\PromptGenerator;
+use Plugin\SortX\Service\SortxInstallService;
 use Psr\Log\LoggerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\File\UploadedFile;
@@ -21,7 +24,7 @@ use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\CurrentUser;
 
 /**
- * SortX Plugin API Controller v3.0.
+ * SortX Plugin API Controller v4.0.
  *
  * Provides document classification endpoints with metadata extraction.
  * Uses PluginDataService for non-invasive data storage (no plugin-specific tables).
@@ -34,6 +37,7 @@ class SortXController extends AbstractController
 {
     private const PLUGIN_NAME = 'sortx';
     private const DATA_TYPE_CATEGORY = 'category';
+    private const CONFIG_GROUP = 'P_sortx';
 
     public function __construct(
         private AiFacade $aiFacade,
@@ -41,9 +45,202 @@ class SortXController extends AbstractController
         private ModelConfigService $modelConfigService,
         private PromptGenerator $promptGenerator,
         private PluginDataService $pluginData,
+        private SortxInstallService $installService,
+        private ConfigRepository $configRepository,
+        private ModelRepository $modelRepository,
         private LoggerInterface $logger,
         private string $uploadDir,
     ) {
+    }
+
+    /**
+     * Check if plugin is properly installed and configured.
+     */
+    #[Route('/setup-check', name: 'setup_check', methods: ['GET'])]
+    #[OA\Get(
+        path: '/api/v1/user/{userId}/plugins/sortx/setup-check',
+        summary: 'Check plugin setup status',
+        description: 'Verifies plugin is installed with categories and model configured',
+        security: [['Bearer' => []]],
+        tags: ['SortX Plugin']
+    )]
+    #[OA\Response(response: 200, description: 'Setup status')]
+    public function setupCheck(int $userId, #[CurrentUser] ?User $user): JsonResponse
+    {
+        if (!$this->canAccessPlugin($user, $userId)) {
+            return $this->json(['success' => false, 'error' => 'Unauthorized'], Response::HTTP_UNAUTHORIZED);
+        }
+
+        $hasCategories = $this->installService->userHasCategories($userId);
+        $categoriesCount = $this->pluginData->count($userId, self::PLUGIN_NAME, self::DATA_TYPE_CATEGORY);
+
+        // Get configured or default model
+        $modelId = $this->getConfiguredModelId($userId);
+        $modelInfo = null;
+        if ($modelId) {
+            $model = $this->modelRepository->find($modelId);
+            if ($model) {
+                $modelInfo = [
+                    'id' => $model->getId(),
+                    'name' => $model->getProviderId() ?: $model->getName(),
+                    'provider' => strtolower($model->getService()),
+                ];
+            }
+        }
+
+        $status = $hasCategories ? 'ready' : 'needs_setup';
+
+        return $this->json([
+            'success' => true,
+            'status' => $status,
+            'checks' => [
+                'plugin_installed' => true,
+                'categories_exist' => $hasCategories,
+                'model_configured' => $modelId !== null,
+            ],
+            'user_id' => $userId,
+            'model' => $modelInfo,
+            'categories_count' => $categoriesCount,
+            'message' => $hasCategories ? null : 'No categories configured. Call POST /setup to initialize.',
+        ]);
+    }
+
+    /**
+     * Initialize plugin data for user (seed default categories).
+     */
+    #[Route('/setup', name: 'setup', methods: ['POST'])]
+    #[OA\Post(
+        path: '/api/v1/user/{userId}/plugins/sortx/setup',
+        summary: 'Initialize plugin for user',
+        description: 'Seeds default categories if none exist',
+        security: [['Bearer' => []]],
+        tags: ['SortX Plugin']
+    )]
+    #[OA\Response(response: 200, description: 'Setup result')]
+    public function setup(int $userId, #[CurrentUser] ?User $user): JsonResponse
+    {
+        if (!$this->canAccessPlugin($user, $userId)) {
+            return $this->json(['success' => false, 'error' => 'Unauthorized'], Response::HTTP_UNAUTHORIZED);
+        }
+
+        $hadCategories = $this->installService->userHasCategories($userId);
+        $this->installService->seedDefaultCategories($userId);
+        $count = $this->pluginData->count($userId, self::PLUGIN_NAME, self::DATA_TYPE_CATEGORY);
+
+        return $this->json([
+            'success' => true,
+            'message' => $hadCategories
+                ? 'Categories already exist, no changes made'
+                : "Plugin initialized with {$count} default categories",
+            'categories_count' => $count,
+        ]);
+    }
+
+    /**
+     * Get available LLM models for classification.
+     */
+    #[Route('/models', name: 'models', methods: ['GET'])]
+    #[OA\Get(
+        path: '/api/v1/user/{userId}/plugins/sortx/models',
+        summary: 'List available classification models',
+        description: 'Returns chat models available for document classification',
+        security: [['Bearer' => []]],
+        tags: ['SortX Plugin']
+    )]
+    #[OA\Response(response: 200, description: 'Available models')]
+    public function getModels(int $userId, #[CurrentUser] ?User $user): JsonResponse
+    {
+        if (!$this->canAccessPlugin($user, $userId)) {
+            return $this->json(['success' => false, 'error' => 'Unauthorized'], Response::HTTP_UNAUTHORIZED);
+        }
+
+        $chatModels = $this->modelRepository->findByTag('chat', true);
+        $currentModelId = $this->getConfiguredModelId($userId);
+
+        $models = [];
+        foreach ($chatModels as $model) {
+            $models[] = [
+                'id' => $model->getId(),
+                'name' => $model->getProviderId() ?: $model->getName(),
+                'display_name' => $model->getName(),
+                'provider' => strtolower($model->getService()),
+                'default' => $model->getId() === $currentModelId,
+            ];
+        }
+
+        return $this->json([
+            'success' => true,
+            'models' => $models,
+            'current' => $currentModelId,
+        ]);
+    }
+
+    /**
+     * Update plugin configuration (model, threshold, prompt).
+     */
+    #[Route('/config', name: 'config_update', methods: ['PUT'])]
+    #[OA\Put(
+        path: '/api/v1/user/{userId}/plugins/sortx/config',
+        summary: 'Update plugin configuration',
+        description: 'Set model, confidence threshold, or custom prompt',
+        security: [['Bearer' => []]],
+        tags: ['SortX Plugin']
+    )]
+    #[OA\RequestBody(
+        content: new OA\JsonContent(
+            properties: [
+                new OA\Property(property: 'classification_model_id', type: 'integer', nullable: true),
+                new OA\Property(property: 'confidence_threshold', type: 'number', example: 0.5),
+                new OA\Property(property: 'max_text_length', type: 'integer', example: 10000),
+                new OA\Property(property: 'custom_prompt', type: 'string', nullable: true),
+            ]
+        )
+    )]
+    #[OA\Response(response: 200, description: 'Config updated')]
+    public function updateConfig(
+        Request $request,
+        int $userId,
+        #[CurrentUser] ?User $user,
+    ): JsonResponse {
+        if (!$this->canAccessPlugin($user, $userId)) {
+            return $this->json(['success' => false, 'error' => 'Unauthorized'], Response::HTTP_UNAUTHORIZED);
+        }
+
+        $data = json_decode($request->getContent(), true) ?? [];
+        $updated = [];
+
+        if (array_key_exists('classification_model_id', $data)) {
+            $modelId = $data['classification_model_id'];
+            if ($modelId !== null) {
+                $this->configRepository->setValue($userId, self::CONFIG_GROUP, 'classification_model_id', (string) $modelId);
+            }
+            $updated[] = 'classification_model_id';
+        }
+
+        if (isset($data['confidence_threshold'])) {
+            $this->configRepository->setValue($userId, self::CONFIG_GROUP, 'confidence_threshold', (string) $data['confidence_threshold']);
+            $updated[] = 'confidence_threshold';
+        }
+
+        if (isset($data['max_text_length'])) {
+            $this->configRepository->setValue($userId, self::CONFIG_GROUP, 'max_text_length', (string) $data['max_text_length']);
+            $updated[] = 'max_text_length';
+        }
+
+        if (array_key_exists('custom_prompt', $data)) {
+            $prompt = $data['custom_prompt'];
+            if ($prompt) {
+                $this->configRepository->setValue($userId, self::CONFIG_GROUP, 'custom_prompt', $prompt);
+            }
+            $updated[] = 'custom_prompt';
+        }
+
+        return $this->json([
+            'success' => true,
+            'message' => 'Configuration updated',
+            'updated' => $updated,
+            'config' => $this->getPluginConfig($userId),
+        ]);
     }
 
     /**
@@ -129,15 +326,32 @@ class SortXController extends AbstractController
         // Generate prompt with metadata extraction enabled
         $promptPreview = $this->promptGenerator->generatePrompt($schema, extractMetadata: true);
 
-        // Get config (could be extended to read from BCONFIG)
+        // Get config from BCONFIG
         $config = $this->getPluginConfig($userId);
+
+        // Get current model info
+        $modelId = $this->getConfiguredModelId($userId);
+        $modelInfo = null;
+        if ($modelId) {
+            $model = $this->modelRepository->find($modelId);
+            if ($model) {
+                $modelInfo = [
+                    'id' => $model->getId(),
+                    'name' => $model->getProviderId() ?: $model->getName(),
+                    'provider' => strtolower($model->getService()),
+                ];
+            }
+        }
 
         return $this->json([
             'success' => true,
             'data' => [
+                'user_id' => $userId,
                 'categories' => $schema,
                 'prompt_preview' => $promptPreview,
                 'config' => $config,
+                'model' => $modelInfo,
+                'has_custom_prompt' => !empty($config['custom_prompt']),
             ],
         ]);
     }
@@ -294,10 +508,10 @@ class SortXController extends AbstractController
                 ['role' => 'user', 'content' => $userMessage],
             ];
 
-            // Get user's model config
+            // Get model from plugin config or user default
             $provider = null;
             $modelName = null;
-            $modelId = $this->modelConfigService->getDefaultModel('CHAT', $userId);
+            $modelId = $this->getConfiguredModelId($userId);
             if ($modelId) {
                 $provider = $this->modelConfigService->getProviderForModel($modelId);
                 $modelName = $this->modelConfigService->getModelName($modelId);
@@ -604,6 +818,150 @@ class SortXController extends AbstractController
     }
 
     /**
+     * Force OCR extraction using Vision AI (for graphical PDFs).
+     *
+     * This bypasses local Tika and forces rasterization + Vision AI extraction.
+     * Useful when local extraction returns gibberish or empty text.
+     */
+    #[Route('/ocr', name: 'ocr', methods: ['POST'])]
+    #[OA\Post(
+        path: '/api/v1/user/{userId}/plugins/sortx/ocr',
+        summary: 'Extract text via OCR (Vision AI)',
+        description: 'Forces rasterization + Vision AI for graphical PDFs that have no extractable text',
+        security: [['Bearer' => []]],
+        tags: ['SortX Plugin']
+    )]
+    #[OA\RequestBody(
+        required: true,
+        content: new OA\MediaType(
+            mediaType: 'multipart/form-data',
+            schema: new OA\Schema(
+                required: ['file'],
+                properties: [
+                    new OA\Property(property: 'file', type: 'string', format: 'binary', description: 'PDF or image file'),
+                    new OA\Property(property: 'max_pages', type: 'integer', description: 'Max pages to OCR (default: 5)'),
+                ]
+            )
+        )
+    )]
+    #[OA\Response(
+        response: 200,
+        description: 'OCR result',
+        content: new OA\JsonContent(
+            properties: [
+                new OA\Property(property: 'success', type: 'boolean'),
+                new OA\Property(property: 'text', type: 'string'),
+                new OA\Property(property: 'strategy', type: 'string', example: 'rasterize_vision'),
+                new OA\Property(property: 'pages', type: 'integer'),
+                new OA\Property(property: 'bytes', type: 'integer'),
+            ]
+        )
+    )]
+    public function ocr(
+        Request $request,
+        int $userId,
+        #[CurrentUser] ?User $user,
+    ): JsonResponse {
+        if (!$this->canAccessPlugin($user, $userId)) {
+            return $this->json(['success' => false, 'error' => 'Unauthorized'], Response::HTTP_UNAUTHORIZED);
+        }
+
+        /** @var UploadedFile|null $file */
+        $file = $request->files->get('file');
+
+        if (!$file) {
+            return $this->json(['success' => false, 'error' => 'File is required'], Response::HTTP_BAD_REQUEST);
+        }
+
+        $config = $this->getPluginConfig($userId);
+        $maxSize = $config['max_file_size_mb'] * 1024 * 1024;
+
+        if ($file->getSize() > $maxSize) {
+            return $this->json([
+                'success' => false,
+                'error' => "File too large. Maximum size is {$config['max_file_size_mb']}MB",
+            ], Response::HTTP_BAD_REQUEST);
+        }
+
+        $filename = $file->getClientOriginalName();
+        $extension = strtolower(pathinfo($filename, PATHINFO_EXTENSION));
+
+        // Only allow PDFs and images
+        $allowedExtensions = ['pdf', 'jpg', 'jpeg', 'png', 'gif', 'webp', 'tiff'];
+        if (!in_array($extension, $allowedExtensions)) {
+            return $this->json([
+                'success' => false,
+                'error' => 'Only PDF and image files are supported for OCR',
+            ], Response::HTTP_BAD_REQUEST);
+        }
+
+        $this->logger->info('SortX OCR requested', [
+            'user_id' => $userId,
+            'filename' => $filename,
+            'size' => $file->getSize(),
+        ]);
+
+        try {
+            // Move uploaded file to temp location
+            $tempDir = $this->uploadDir.'/sortx_temp';
+            if (!is_dir($tempDir)) {
+                mkdir($tempDir, 0755, true);
+            }
+
+            $tempFilename = uniqid('sortx_ocr_').'_'.preg_replace('/[^a-zA-Z0-9._-]/', '_', $filename);
+            $tempPath = $tempDir.'/'.$tempFilename;
+            $file->move($tempDir, $tempFilename);
+
+            try {
+                // Force OCR extraction via FileProcessor
+                $relativePath = 'sortx_temp/'.$tempFilename;
+                [$extractedText, $meta] = $this->fileProcessor->extractText($relativePath, $extension, $userId);
+
+                $strategy = $meta['strategy'] ?? 'unknown';
+                $bytes = strlen($extractedText);
+
+                $this->logger->info('SortX OCR completed', [
+                    'user_id' => $userId,
+                    'filename' => $filename,
+                    'strategy' => $strategy,
+                    'bytes' => $bytes,
+                ]);
+
+                // Truncate if too long
+                $maxLen = $config['max_text_length'];
+                if ($bytes > $maxLen) {
+                    $extractedText = mb_substr($extractedText, 0, $maxLen).'... [truncated]';
+                }
+
+                return $this->json([
+                    'success' => true,
+                    'text' => $extractedText,
+                    'strategy' => $strategy,
+                    'bytes' => $bytes,
+                    'pages' => $meta['pages'] ?? 1,
+                    'filename' => $filename,
+                ]);
+            } finally {
+                // Clean up temp file
+                if (file_exists($tempPath)) {
+                    @unlink($tempPath);
+                }
+            }
+        } catch (\Throwable $e) {
+            $this->logger->error('SortX OCR failed', [
+                'user_id' => $userId,
+                'filename' => $filename,
+                'error' => $e->getMessage(),
+            ]);
+
+            return $this->json([
+                'success' => false,
+                'error' => 'OCR extraction failed: '.$e->getMessage(),
+            ], Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    /**
      * Verify user has access to this plugin instance.
      */
     private function canAccessPlugin(?User $user, int $userId): bool
@@ -617,18 +975,49 @@ class SortXController extends AbstractController
     }
 
     /**
-     * Get plugin configuration.
+     * Get plugin configuration from BCONFIG.
      *
-     * @return array{confidence_threshold: float, max_text_length: int, max_file_size_mb: int}
+     * @return array{confidence_threshold: float, max_text_length: int, max_file_size_mb: int, classification_model_id: ?int, custom_prompt: ?string}
      */
     private function getPluginConfig(int $userId): array
     {
-        // TODO: Read from BCONFIG (P_sortx group) if configured
-        return [
+        $defaults = [
             'confidence_threshold' => 0.5,
             'max_text_length' => 10000,
             'max_file_size_mb' => 50,
+            'classification_model_id' => null,
+            'custom_prompt' => null,
         ];
+
+        // Read user-specific config from BCONFIG
+        $threshold = $this->configRepository->getValue($userId, self::CONFIG_GROUP, 'confidence_threshold');
+        $maxLength = $this->configRepository->getValue($userId, self::CONFIG_GROUP, 'max_text_length');
+        $maxSize = $this->configRepository->getValue($userId, self::CONFIG_GROUP, 'max_file_size_mb');
+        $modelId = $this->configRepository->getValue($userId, self::CONFIG_GROUP, 'classification_model_id');
+        $customPrompt = $this->configRepository->getValue($userId, self::CONFIG_GROUP, 'custom_prompt');
+
+        return [
+            'confidence_threshold' => $threshold !== null ? (float) $threshold : $defaults['confidence_threshold'],
+            'max_text_length' => $maxLength !== null ? (int) $maxLength : $defaults['max_text_length'],
+            'max_file_size_mb' => $maxSize !== null ? (int) $maxSize : $defaults['max_file_size_mb'],
+            'classification_model_id' => $modelId !== null ? (int) $modelId : null,
+            'custom_prompt' => $customPrompt,
+        ];
+    }
+
+    /**
+     * Get configured or default model ID for classification.
+     */
+    private function getConfiguredModelId(int $userId): ?int
+    {
+        // First check plugin-specific override
+        $modelId = $this->configRepository->getValue($userId, self::CONFIG_GROUP, 'classification_model_id');
+        if ($modelId !== null) {
+            return (int) $modelId;
+        }
+
+        // Fall back to user's default chat model
+        return $this->modelConfigService->getDefaultModel('CHAT', $userId);
     }
 
     /**

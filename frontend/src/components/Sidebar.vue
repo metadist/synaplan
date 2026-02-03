@@ -277,7 +277,7 @@ const navItems = computed<NavItem[]>(() => {
       icon: PuzzlePieceIcon,
       children: configStore.plugins.map((plugin: { name?: string }) => ({
         path: `/plugins/${plugin.name}`,
-        label: plugin.name ?? 'Unknown',
+        label: plugin.name ? plugin.name.charAt(0).toUpperCase() + plugin.name.slice(1) : 'Unknown',
       })),
     })
   }
