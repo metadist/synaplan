@@ -1793,6 +1793,8 @@
       "badge": "Erinnerung wird geladen",
       "tooltip": "Diese Erinnerung wurde gerade erstellt oder aktualisiert. Es kann ein paar Sekunden dauern, bis sie geladen werden kann."
     },
+    "loginToView": "Anmelden, um Erinnerungsdetails zu sehen",
+    "memoryUsed": "Erinnerung verwendet",
     "toast": {
       "title": "Neue Erinnerung erkannt",
       "titleCompact": "Erinnerung",
