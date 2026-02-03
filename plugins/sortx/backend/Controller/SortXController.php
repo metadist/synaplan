@@ -1037,17 +1037,27 @@ class SortXController extends AbstractController
         $decoded = json_decode($response, true);
 
         if (json_last_error() !== JSON_ERROR_NONE) {
-            $this->logger->warning('Failed to parse AI response as JSON', [
-                'response' => substr($response, 0, 500),
-                'error' => json_last_error_msg(),
-            ]);
+            // Try to repair truncated JSON
+            $decoded = $this->repairTruncatedJson($response);
+            
+            if ($decoded === null) {
+                $this->logger->warning('Failed to parse AI response as JSON', [
+                    'response' => substr($response, 0, 500),
+                    'error' => json_last_error_msg(),
+                ]);
 
-            return [
-                'categories' => ['unknown'],
-                'confidence' => 0.0,
-                'reasoning' => 'Failed to parse AI response',
-                'metadata' => null,
-            ];
+                return [
+                    'categories' => ['unknown'],
+                    'confidence' => 0.0,
+                    'reasoning' => 'Failed to parse AI response',
+                    'metadata' => null,
+                ];
+            }
+            
+            $this->logger->info('Repaired truncated JSON response', [
+                'categories' => $decoded['categories'] ?? [],
+                'has_metadata' => isset($decoded['metadata']),
+            ]);
         }
 
         // Normalize metadata: must be an associative array or null
@@ -1063,5 +1073,108 @@ class SortXController extends AbstractController
             'reasoning' => $decoded['reasoning'] ?? null,
             'metadata' => $metadata,
         ];
+    }
+
+    /**
+     * Attempt to repair truncated JSON by closing open structures.
+     * 
+     * AI responses are sometimes truncated due to token limits. This method
+     * attempts to extract usable data from partial JSON.
+     */
+    private function repairTruncatedJson(string $json): ?array
+    {
+        if (empty($json)) {
+            return null;
+        }
+
+        // Try progressively more aggressive repairs
+        $repairs = [
+            // Just close trailing incomplete string and objects
+            function (string $s): string {
+                // Remove any incomplete string at the end (text after last complete value)
+                $s = preg_replace('/,\s*"[^"]*":\s*"[^"]*$/', '', $s);
+                $s = preg_replace('/,\s*"[^"]*":\s*\{[^}]*$/', '', $s);
+                $s = preg_replace('/,\s*"[^"]*":\s*$/', '', $s);
+                
+                // Count open braces/brackets and close them
+                $openBraces = substr_count($s, '{') - substr_count($s, '}');
+                $openBrackets = substr_count($s, '[') - substr_count($s, ']');
+                
+                // Close any open strings first
+                if ((substr_count($s, '"') % 2) !== 0) {
+                    $s .= '"';
+                }
+                
+                // Close brackets then braces
+                $s .= str_repeat(']', max(0, $openBrackets));
+                $s .= str_repeat('}', max(0, $openBraces));
+                
+                return $s;
+            },
+            // Try to extract just the key fields using regex
+            function (string $s): ?string {
+                $result = [];
+                
+                // Extract categories array
+                if (preg_match('/"categories"\s*:\s*\[([^\]]*)\]/', $s, $m)) {
+                    $cats = array_map(fn ($c) => trim($c, '" '), explode(',', $m[1]));
+                    $result['categories'] = array_filter($cats);
+                }
+                
+                // Extract confidence
+                if (preg_match('/"confidence"\s*:\s*([\d.]+)/', $s, $m)) {
+                    $result['confidence'] = (float) $m[1];
+                }
+                
+                // Extract reasoning
+                if (preg_match('/"reasoning"\s*:\s*"([^"]*)"/', $s, $m)) {
+                    $result['reasoning'] = $m[1];
+                }
+                
+                // Try to extract complete metadata fields
+                if (preg_match('/"metadata"\s*:\s*\{/', $s)) {
+                    $result['metadata'] = [];
+                    
+                    // Extract individual metadata fields that are complete
+                    preg_match_all('/"(\w+)"\s*:\s*\{\s*"value"\s*:\s*("[^"]*"|null|true|false|[\d.]+)\s*,\s*"confidence"\s*:\s*([\d.]+)\s*\}/', $s, $matches, PREG_SET_ORDER);
+                    foreach ($matches as $match) {
+                        $value = $match[2];
+                        if ($value === 'null') {
+                            $value = null;
+                        } elseif ($value === 'true') {
+                            $value = true;
+                        } elseif ($value === 'false') {
+                            $value = false;
+                        } elseif (is_numeric($value)) {
+                            $value = (float) $value;
+                        } else {
+                            $value = trim($value, '"');
+                        }
+                        $result['metadata'][$match[1]] = [
+                            'value' => $value,
+                            'confidence' => (float) $match[3],
+                        ];
+                    }
+                    
+                    if (empty($result['metadata'])) {
+                        unset($result['metadata']);
+                    }
+                }
+                
+                return !empty($result) ? json_encode($result) : null;
+            },
+        ];
+
+        foreach ($repairs as $repair) {
+            $repaired = $repair($json);
+            if ($repaired !== null) {
+                $decoded = json_decode($repaired, true);
+                if (json_last_error() === JSON_ERROR_NONE && !empty($decoded)) {
+                    return $decoded;
+                }
+            }
+        }
+
+        return null;
     }
 }
