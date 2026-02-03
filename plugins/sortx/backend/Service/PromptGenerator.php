@@ -13,13 +13,55 @@ use App\Service\PluginDataService;
  */
 final readonly class PromptGenerator
 {
-    private const SUPPORTED_LANGUAGES = 'English, German, French, Spanish, Italian, Chinese, Arabic';
+    public const SUPPORTED_LANGUAGES = 'English, German, French, Spanish, Italian, Chinese, Arabic';
     private const PLUGIN_NAME = 'sortx';
     private const DATA_TYPE_CATEGORY = 'category';
 
     public function __construct(
         private PluginDataService $pluginData,
     ) {
+    }
+
+    /**
+     * Get the default prompt template with placeholders.
+     */
+    public function getDefaultPromptTemplate(): string
+    {
+        return <<<'PROMPT'
+You are a document classification assistant. Your task is to classify documents into categories and optionally extract structured metadata.
+
+IMPORTANT:
+- Documents may be in any of these languages: {languages}
+- A document can belong to MULTIPLE categories (e.g., a contract that is also an invoice)
+- If uncertain, use "unknown" category and explain in reasoning
+- Respond ONLY with valid JSON (no markdown, no code blocks)
+
+{categories_section}
+
+{fields_section}
+
+OUTPUT FORMAT (JSON only, no markdown):
+{
+  "categories": ["category_key", ...],
+  "confidence": 0.0-1.0,
+  "reasoning": "Brief explanation",
+  "metadata": {
+    "field_key": { "value": "extracted value", "confidence": 0.0-1.0 }
+  }
+}
+PROMPT;
+    }
+
+    /**
+     * Get available template variables.
+     */
+    public function getTemplateVariables(): array
+    {
+        return [
+            '{languages}' => 'Supported document languages',
+            '{categories_section}' => 'List of available categories',
+            '{fields_section}' => 'Metadata fields per category',
+        ];
     }
 
     /**
@@ -146,12 +188,48 @@ PROMPT;
         if ($extractMetadata) {
             $format .= ",\n";
             $format .= '  "metadata": {'."\n";
-            $format .= '    "field_key": { "value": "extracted value", "confidence": 0.0-1.0 }'."\n";
+            $format .= '    "document_date": { "value": "YYYY-MM-DD or null", "confidence": 0.0-1.0 },'."\n";
+            $format .= '    "sender": { "value": "who sent/created", "confidence": 0.0-1.0 },'."\n";
+            $format .= '    "recipient": { "value": "who receives", "confidence": 0.0-1.0 },'."\n";
+            $format .= '    "language": { "value": "ISO 639-1 code", "confidence": 0.0-1.0 },'."\n";
+            $format .= '    "text_quality": { "value": "readable|partial|gibberish|empty", "confidence": 0.0-1.0 },'."\n";
+            $format .= '    "summary": { "value": "1-2 sentence summary", "confidence": 0.0-1.0 },'."\n";
+            $format .= '    "...category_specific_fields...": { "value": "...", "confidence": 0.0-1.0 }'."\n";
             $format .= "  }";
         }
 
         $format .= "\n}\n";
 
+        $format .= $this->buildGdprInstructions();
+
         return $format;
+    }
+
+    private function buildGdprInstructions(): string
+    {
+        return <<<'INSTRUCTIONS'
+
+UNIVERSAL FIELDS (always extract):
+- document_date: Primary date of the document
+- sender: Who created/sent the document  
+- recipient: Who receives the document
+- language, text_quality, summary: Always include
+
+GDPR ASSESSMENT (for "unknown" category):
+When classifying as "unknown", you MUST assess GDPR relevance:
+- gdpr_relevant: true if document contains personal data
+- gdpr_confidence: 0.0-1.0 confidence in assessment
+- gdpr_indicators: What triggered the flag (e.g., "private address", "birthdate", "personal statement")
+- topic: Brief topic description (max 4 words)
+
+Personal data indicators to look for:
+- Private addresses (street, city, postal code of individuals)
+- Birth dates, age, or personal identifiers
+- Health information
+- Financial details of individuals
+- Personal opinions or statements
+- Names with context suggesting private matters
+
+INSTRUCTIONS;
     }
 }
