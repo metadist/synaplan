@@ -600,9 +600,7 @@ class WidgetPublicController extends AbstractController
             return $response;
         } catch (\Exception $e) {
             // Decrement session message count on failure so user can retry
-            if (isset($session)) {
-                $this->sessionService->decrementMessageCount($session);
-            }
+            $this->sessionService->decrementMessageCount($session);
 
             $this->logger->error('Widget message failed', [
                 'error' => $e->getMessage(),

@@ -495,7 +495,7 @@ class HuggingFaceProvider implements ChatProviderInterface, EmbeddingProviderInt
 
         try {
             // Use configured model or default to FLUX.1-Kontext-dev
-            $model = $options['model'] ?? 'black-forest-labs/FLUX.1-Kontext-dev';
+            $model = 'black-forest-labs/FLUX.1-Kontext-dev';
             $provider = 'fal-ai';
 
             // Security check: Prevent path traversal

@@ -309,6 +309,9 @@ class StreamController extends AbstractController
                 }
             };
 
+            $chat = null;
+            $incomingMessage = null;
+
             try {
                 // Load chat
                 $chat = $this->em->getRepository(\App\Entity\Chat::class)->find((int) $chatId);
@@ -1038,7 +1041,7 @@ class StreamController extends AbstractController
                     'context' => $e->getContext(),
                 ]);
 
-                $messageId = $saveError($chat ?? null, $incomingMessage ?? null, $e->getMessage(), $e->getProviderName(), 'provider_error');
+                $messageId = $saveError($chat, $incomingMessage, $e->getMessage(), $e->getProviderName(), 'provider_error');
 
                 $errorData = [
                     'error' => $e->getMessage(),
@@ -1071,7 +1074,7 @@ class StreamController extends AbstractController
                     'error' => $e->getMessage(),
                 ]);
 
-                $messageId = $saveError($chat ?? null, $incomingMessage ?? null, $e->getMessage(), 'system', 'exception');
+                $messageId = $saveError($chat, $incomingMessage, $e->getMessage(), 'system', 'exception');
 
                 $errorData = [
                     'error' => 'Failed to process message: '.$e->getMessage(),
