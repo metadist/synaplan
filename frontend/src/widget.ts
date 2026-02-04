@@ -103,10 +103,16 @@ class SynaplanWidget {
       return
     }
 
+    // Always create button in lazy mode (needed for reopening after close)
     this.createButton()
 
+    // If autoOpen is enabled, hide button and load chat immediately
     if (this.config?.autoOpen) {
-      this.loadChat()
+      if (this.button) {
+        this.button.style.display = 'none'
+      }
+      this.shouldOpenImmediately = true
+      await this.loadChat()
     }
   }
 
@@ -289,12 +295,15 @@ class SynaplanWidget {
       await this.ensureVueLoaded()
 
       // Dynamically import the chat widget components
-      const [{ createApp }, ChatWidget, { i18n }, widgetStyles] = await Promise.all([
-        import('vue'),
-        import('./components/widgets/ChatWidget.vue'),
-        import('./i18n'),
-        import('./style.css?inline'),
-      ])
+      const [{ createApp }, ChatWidget, { i18n }, widgetStyles, markdownStyles] = await Promise.all(
+        [
+          import('vue'),
+          import('./components/widgets/ChatWidget.vue'),
+          import('./i18n'),
+          import('./style.css?inline'),
+          import('./assets/widget-markdown.css?inline'),
+        ]
+      )
 
       // In lazy mode: hide button but keep it for later
       // In eager mode: remove button completely
@@ -340,6 +349,12 @@ class SynaplanWidget {
         .replace(/\bbody\b/g, ':host')
       styleEl.textContent = adaptedCss
       shadow.appendChild(styleEl)
+
+      // Inject markdown-specific styles for tables, code blocks, etc.
+      const markdownStyleEl = document.createElement('style')
+      markdownStyleEl.id = 'synaplan-widget-markdown-styles'
+      markdownStyleEl.textContent = markdownStyles.default
+      shadow.appendChild(markdownStyleEl)
 
       // Create root element inside Shadow DOM for Vue to mount to
       const root = document.createElement('div')

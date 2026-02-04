@@ -124,13 +124,16 @@ class AnthropicProvider implements ChatProviderInterface, VisionProviderInterfac
             $model = $options['model'];
             $reasoning = $options['reasoning'] ?? false;
 
+            // Convert multimodal content (images) to Anthropic format
+            $convertedMessages = $this->convertMessagesToAnthropicFormat($messages);
+
             // Separate system message from conversation
             $systemMessage = null;
             $conversationMessages = [];
 
-            foreach ($messages as $message) {
+            foreach ($convertedMessages as $message) {
                 if (($message['role'] ?? '') === 'system') {
-                    $systemMessage = $message['content'];
+                    $systemMessage = is_string($message['content']) ? $message['content'] : json_encode($message['content']);
                 } else {
                     $conversationMessages[] = $message;
                 }
@@ -230,13 +233,16 @@ class AnthropicProvider implements ChatProviderInterface, VisionProviderInterfac
             $model = $options['model'];
             $reasoning = $options['reasoning'] ?? false;
 
+            // Convert multimodal content (images) to Anthropic format
+            $convertedMessages = $this->convertMessagesToAnthropicFormat($messages);
+
             // Separate system message from conversation
             $systemMessage = null;
             $conversationMessages = [];
 
-            foreach ($messages as $message) {
+            foreach ($convertedMessages as $message) {
                 if (($message['role'] ?? '') === 'system') {
-                    $systemMessage = $message['content'];
+                    $systemMessage = is_string($message['content']) ? $message['content'] : json_encode($message['content']);
                 } else {
                     $conversationMessages[] = $message;
                 }
@@ -651,5 +657,89 @@ class AnthropicProvider implements ChatProviderInterface, VisionProviderInterfac
         }
 
         return $event['type'] ? $event : null;
+    }
+
+    /**
+     * Convert OpenAI-style messages to Anthropic format.
+     *
+     * Handles multimodal content (images) by converting from OpenAI's image_url format
+     * to Anthropic's image source format.
+     *
+     * @param array $messages OpenAI-style messages with potential image_url content
+     *
+     * @return array Anthropic-compatible messages
+     */
+    private function convertMessagesToAnthropicFormat(array $messages): array
+    {
+        $converted = [];
+
+        foreach ($messages as $message) {
+            $role = $message['role'] ?? 'user';
+            $content = $message['content'] ?? '';
+
+            // Skip system messages (handled separately by Anthropic)
+            if ('system' === $role) {
+                $converted[] = $message;
+                continue;
+            }
+
+            // If content is a string, keep as-is
+            if (is_string($content)) {
+                $converted[] = $message;
+                continue;
+            }
+
+            // If content is an array (multimodal), convert to Anthropic format
+            if (is_array($content)) {
+                $anthropicContent = [];
+
+                foreach ($content as $part) {
+                    $type = $part['type'] ?? '';
+
+                    if ('text' === $type) {
+                        $anthropicContent[] = [
+                            'type' => 'text',
+                            'text' => $part['text'] ?? '',
+                        ];
+                    } elseif ('image_url' === $type) {
+                        // Convert OpenAI image_url to Anthropic image source
+                        $imageUrl = $part['image_url']['url'] ?? ($part['image_url'] ?? '');
+
+                        if (str_starts_with($imageUrl, 'data:')) {
+                            // Parse data URL: data:image/jpeg;base64,/9j/4AAQ...
+                            if (preg_match('/^data:([^;]+);base64,(.+)$/', $imageUrl, $matches)) {
+                                $mimeType = $matches[1];
+                                $base64Data = $matches[2];
+
+                                $anthropicContent[] = [
+                                    'type' => 'image',
+                                    'source' => [
+                                        'type' => 'base64',
+                                        'media_type' => $mimeType,
+                                        'data' => $base64Data,
+                                    ],
+                                ];
+                            }
+                        } elseif (str_starts_with($imageUrl, 'http')) {
+                            // URL-based images (Anthropic supports these too)
+                            $anthropicContent[] = [
+                                'type' => 'image',
+                                'source' => [
+                                    'type' => 'url',
+                                    'url' => $imageUrl,
+                                ],
+                            ];
+                        }
+                    }
+                }
+
+                $converted[] = [
+                    'role' => $role,
+                    'content' => $anthropicContent,
+                ];
+            }
+        }
+
+        return $converted;
     }
 }

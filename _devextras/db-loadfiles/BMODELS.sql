@@ -1,4 +1,4 @@
-/*M!999999\- enable the sandbox mode */ 
+/*M!999999\- enable the sandbox mode */
 -- MariaDB dump 10.19-11.8.2-MariaDB, for debian-linux-gnu (x86_64)
 --
 -- Host: localhost    Database: synaplan
@@ -61,7 +61,8 @@ INSERT INTO `BMODELS` VALUES
 (9,'Groq','Llama 3.3 70b versatile','chat',1,'llama-3.3-70b-versatile',0.59,'per1M',0.79,'per1M',9,1,0,1,NULL,'{\"description\":\"Fast API service via groq\",\"params\":{\"model\":\"llama-3.3-70b-versatile\",\"reasoning_format\":\"hidden\",\"messages\":[]}}'),
 (13,'Ollama','bge-m3','vectorize',0,'bge-m3',0.19,'per1M',0,'-',6,1,0,1,NULL,'{\"description\":\"Vectorize text into synaplans MariaDB vector DB (local) for RAG\",\"params\":{\"model\":\"bge-m3\",\"input\":[]}}'),
 (17,'Groq','Llama 4 Scout Vision','pic2text',1,'meta-llama/llama-4-scout-17b-16e-instruct',0.11,'per1M',0.34,'per1M',8,0,0,1,NULL,'{\"description\":\"Groq Llama 4 Scout vision model - 128K context, up to 5 images, supports tool use and JSON mode\",\"params\":{\"model\":\"meta-llama\\/llama-4-scout-17b-16e-instruct\",\"max_completion_tokens\":1024}}'),
-(21,'Groq','whisper-large-v3','sound2text',1,'whisper-large-v3',0.111,'perhour',0,'-',7,1,0,1,NULL,'{\"description\":\"Groq whisper model to extract text from a sound file.\",\"params\":{\"file\":\"*LOCALFILEPATH*\",\"model\":\"whisper-large-v3\",\"response_format\":\"text\"}}'),
+(21,'Groq','whisper-large-v3','sound2text',1,'whisper-large-v3',0.111,'perhour',0,'-',8,1,0,1,NULL,'{\"description\":\"Groq Whisper Large V3 - Best accuracy for multilingual transcription and translation. Supports 50+ languages.\",\"params\":{\"file\":\"*LOCALFILEPATH*\",\"model\":\"whisper-large-v3\",\"response_format\":\"verbose_json\"}}'),
+(50,'Groq','whisper-large-v3-turbo','sound2text',1,'whisper-large-v3-turbo',0.04,'perhour',0,'-',7,1,0,1,NULL,'{\"description\":\"Groq Whisper Large V3 Turbo - Fast and cost-effective transcription. 3x cheaper than V3. No translation support.\",\"params\":{\"file\":\"*LOCALFILEPATH*\",\"model\":\"whisper-large-v3-turbo\",\"response_format\":\"verbose_json\"}}'),
 (25,'OpenAI','dall-e-3','text2pic',1,'dall-e-3',0,'-',0.12,'perpic',7,1,0,1,NULL,'{\"description\":\"Open AIs famous text to image model on OpenAI cloud. Costs are 1:1 funneled.\",\"params\":{\"model\":\"dall-e-3\",\"size\":\"1024x1024\",\"quality\":\"standard\",\"style\":\"vivid\"}}'),
 (29,'OpenAI','gpt-image-1','text2pic',1,'gpt-image-1',5,'-',0,'per1M',9,1,0,1,NULL,'{\"description\":\"Open AIs powerful image generation model on OpenAI cloud. Costs are 1:1 funneled.\",\"params\":{\"model\":\"gpt-image-1\"}}'),
 (30,'OpenAI','gpt-4.1','chat',1,'gpt-4.1',2,'per1M',8,'per1M',10,1,0,1,NULL,'{\"description\":\"Open AIs text model\",\"params\":{\"model\":\"gpt-4.1\"}}'),
@@ -91,7 +92,17 @@ INSERT INTO `BMODELS` VALUES
 (88,'OpenAI','text-embedding-3-large','vectorize',1,'text-embedding-3-large',0.13,'per1M',0,'-',9,1,0,1,NULL,'{\"description\":\"OpenAI large text embedding model (3072 dimensions) for high-accuracy RAG.\",\"params\":{\"model\":\"text-embedding-3-large\"},\"meta\":{\"dimensions\":3072}}'),
 (89,'OpenAI','o1-mini','chat',0,'o1-mini',3,'per1M',12,'per1M',8,1,0,0,NULL,'{\"description\":\"OpenAI o1-mini reasoning model (REQUIRES HIGHER API TIER - Not available for most accounts)\",\"params\":{\"model\":\"o1-mini\"},\"features\":[\"reasoning\"],\"supportsStreaming\":false}'),
 (92,'Anthropic','Claude 3 Haiku','chat',1,'claude-3-haiku-20240307',0.25,'per1M',1.25,'per1M',7,2,0,1,NULL,'{\"description\":\"Claude 3 Haiku - Fast and cost-effective model for everyday tasks. Great for quick responses and simple queries.\",\"params\":{\"model\":\"claude-3-haiku-20240307\"},\"features\":[\"vision\"],\"meta\":{\"context_window\":\"200000\",\"max_output\":\"4096\"}}'),
-(93,'Anthropic','Claude 3 Opus (Vision)','pic2text',1,'claude-3-opus-20240229',15,'per1M',75,'per1M',10,1,0,1,NULL,'{\"description\":\"Claude 3 Opus for image analysis and vision tasks. Excellent at understanding complex images, charts, diagrams, and extracting text.\",\"prompt\":\"Describe the image in detail. Extract any text you see.\",\"params\":{\"model\":\"claude-3-opus-20240229\"},\"meta\":{\"supports_images\":true}}');
+(93,'Anthropic','Claude 3 Opus (Vision)','pic2text',1,'claude-3-opus-20240229',15,'per1M',75,'per1M',10,1,0,1,NULL,'{\"description\":\"Claude 3 Opus for image analysis and vision tasks. Excellent at understanding complex images, charts, diagrams, and extracting text.\",\"prompt\":\"Describe the image in detail. Extract any text you see.\",\"params\":{\"model\":\"claude-3-opus-20240229\"},\"meta\":{\"supports_images\":true}}'),
+-- HuggingFace Inference Providers (added 2026-02-04)
+-- Chat models
+(125,'HuggingFace','DeepSeek R1','chat',1,'deepseek-ai/DeepSeek-R1',0.55,'per1M',2.19,'per1M',10,1,0,1,NULL,'{\"description\":\"DeepSeek R1 reasoning model via HuggingFace. Excellent for logic, math, and coding.\",\"params\":{\"model\":\"deepseek-ai/DeepSeek-R1\",\"provider_strategy\":\"fastest\"},\"features\":[\"reasoning\"]}'),
+(128,'HuggingFace','Qwen2.5 Coder 32B','chat',1,'Qwen/Qwen2.5-Coder-32B-Instruct',0.20,'per1M',0.80,'per1M',9,1,0,1,NULL,'{\"description\":\"Qwen2.5 Coder - Specialized model for code generation and debugging.\",\"params\":{\"model\":\"Qwen/Qwen2.5-Coder-32B-Instruct\"}}'),
+-- Image generation (works via hf-inference provider)
+(126,'HuggingFace','Stable Diffusion XL','text2pic',1,'stabilityai/stable-diffusion-xl-base-1.0',0,'-',0.02,'perpic',9,1,0,1,NULL,'{\"description\":\"Stable Diffusion XL - High quality image generation via HuggingFace.\",\"params\":{\"model\":\"stabilityai/stable-diffusion-xl-base-1.0\",\"provider\":\"hf-inference\"}}'),
+-- Video generation via fal.ai (requires HF prepaid credits)
+(127,'HuggingFace','LTX-Video','text2vid',1,'ltx-video',0,'-',0.25,'pervid',9,1,0,1,NULL,'{\"description\":\"LTX-Video - Fast and high-quality video generation via fal.ai.\",\"params\":{\"model\":\"ltx-video\",\"num_frames\":65,\"num_inference_steps\":25}}'),
+-- Embeddings (free tier)
+(129,'HuggingFace','Multilingual E5 Large','vectorize',1,'intfloat/multilingual-e5-large',0.01,'per1M',0,'-',9,1,0,1,NULL,'{\"description\":\"Multilingual E5 embedding model - supports 100+ languages. Free tier available.\",\"params\":{\"model\":\"intfloat/multilingual-e5-large\",\"provider\":\"hf-inference\"},\"meta\":{\"dimensions\":1024}}');
 /*!40000 ALTER TABLE `BMODELS` ENABLE KEYS */;
 UNLOCK TABLES;
 commit;

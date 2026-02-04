@@ -23,12 +23,12 @@
     <!-- Dropdown Content -->
     <div
       v-if="isOpen && !isCollapsed"
-      class="mt-1 ml-2 pl-6 border-l-2 border-light-border/20 dark:border-dark-border/10 pt-4"
+      class="mt-1 ml-1 pl-2 border-l border-dotted border-gray-400/40 dark:border-gray-500/30 pt-2"
       data-testid="section-chat-dropdown"
     >
       <!-- New Chat Button - Prominent at top with glow effect -->
       <button
-        class="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg btn-primary text-sm font-medium mb-4 min-h-[36px] transition-all duration-200 hover:shadow-lg hover:shadow-brand/30 hover:scale-[1.02]"
+        class="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg btn-primary text-sm font-medium mb-2 min-h-[36px] transition-all duration-200 hover:shadow-lg hover:shadow-brand/30 hover:scale-[1.02]"
         data-testid="btn-chat-new-dropdown"
         @click="handleNewChat"
       >
@@ -37,9 +37,9 @@
       </button>
 
       <!-- Divider with label -->
-      <div class="relative mb-3">
+      <div class="relative mt-2 mb-0.5">
         <div class="absolute inset-0 flex items-center">
-          <div class="w-full border-t border-dashed border-gray-300 dark:border-gray-600" />
+          <div class="w-full border-t border-dotted border-gray-400/50 dark:border-gray-500/40" />
         </div>
         <div class="relative flex justify-center">
           <span class="px-2 text-xs font-medium txt-secondary bg-sidebar flex items-center gap-1.5">
@@ -50,7 +50,7 @@
       </div>
 
       <!-- Chats List -->
-      <div v-if="displayedChats.length > 0" class="flex flex-col gap-1 py-1">
+      <div v-if="displayedChats.length > 0" class="flex flex-col gap-1">
         <div
           v-for="chat in displayedChats"
           :key="chat.id"
@@ -58,12 +58,14 @@
           :class="chat.id === activeChat ? 'bg-brand/10 txt-brand' : 'txt-secondary hover-surface'"
         >
           <button
-            class="flex-1 text-left flex items-center gap-2 min-w-0"
+            class="flex-1 text-left flex flex-col min-w-0 py-0.5"
             :data-testid="`btn-chat-item-${chat.id}`"
             @click="handleChatItemClick(chat.id)"
           >
-            <ChatBubbleLeftIcon class="w-4 h-4 flex-shrink-0 opacity-60" />
-            <span class="flex-1 truncate text-sm max-w-[140px]">{{ chat.title }}</span>
+            <span class="truncate text-sm max-w-[150px]">{{ getDisplayTitle(chat) }}</span>
+            <span class="text-[10px] txt-secondary opacity-70">{{
+              formatTimestamp(chat.createdAt)
+            }}</span>
           </button>
 
           <!-- Actions Menu -->
@@ -141,7 +143,6 @@ import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import {
   ChatBubbleLeftRightIcon,
-  ChatBubbleLeftIcon,
   ChevronDownIcon,
   EllipsisVerticalIcon,
   PlusIcon,
@@ -169,6 +170,7 @@ const openMenuChatId = ref<number | null>(null)
 const shareModalOpen = ref(false)
 const shareModalChatId = ref<number | null>(null)
 const shareModalChatTitle = ref<string>('')
+const isCreatingChat = ref(false)
 
 const MAX_RECENT_CHATS = 4
 
@@ -182,12 +184,14 @@ const toggleDropdown = () => {
 const handleMainChatClick = async () => {
   // Check if we have an active chat with messages
   const currentChat = chatsStore.chats.find((c) => c.id === chatsStore.activeChatId)
-  const hasMessages = currentChat && (currentChat.messageCount ?? 0) > 0
+  const hasMessages =
+    currentChat && ((currentChat.messageCount ?? 0) > 0 || currentChat.firstMessagePreview)
 
   // Only create new chat if:
   // 1. Dropdown is currently closed AND
   // 2. Either no active chat OR active chat is empty
-  if (!isOpen.value && !hasMessages) {
+  // 3. Not already creating a chat
+  if (!isOpen.value && !hasMessages && !isCreatingChat.value) {
     await handleNewChat()
   }
 
@@ -210,9 +214,81 @@ const isActive = computed(() => route.path === '/')
 // Active chat ID
 const activeChat = computed(() => chatsStore.activeChatId)
 
-// Get all chats (excluding widget sessions)
+// Format a date as relative or compact timestamp
+const formatTimestamp = (dateStr: string): string => {
+  const date = new Date(dateStr)
+  const now = new Date()
+  const diffMs = now.getTime() - date.getTime()
+  const diffMins = Math.floor(diffMs / 60000)
+  const diffHours = Math.floor(diffMs / 3600000)
+  const diffDays = Math.floor(diffMs / 86400000)
+
+  if (diffMins < 1) return 'just now'
+  if (diffMins < 60) return `${diffMins}m ago`
+  if (diffHours < 24) return `${diffHours}h ago`
+  if (diffDays < 7) return `${diffDays}d ago`
+
+  // Fallback to compact date
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${month}/${day}`
+}
+
+// Get the display title - prefer first message preview, then title
+const getDisplayTitle = (chat: {
+  id: number
+  title: string
+  firstMessagePreview?: string | null
+  messageCount?: number
+}): string => {
+  // If we have a first message preview, use it
+  if (chat.firstMessagePreview) {
+    return chat.firstMessagePreview
+  }
+
+  // If title is not default, use the title
+  const isDefaultTitle =
+    chat.title === 'New Chat' || chat.title === 'Neuer Chat' || chat.title.startsWith('Chat ')
+  if (!isDefaultTitle) {
+    return chat.title
+  }
+
+  // Fallback for empty chats - use localized "New Chat"
+  // Note: Non-active empty chats are filtered out, so this is typically the active chat
+  return t('chat.newChat')
+}
+
+// Check if a chat is empty (no messages, no content, default title)
+const isChatEmpty = (chat: {
+  messageCount?: number
+  firstMessagePreview?: string | null
+  title: string
+}): boolean => {
+  // Has messages - not empty
+  if (chat.messageCount && chat.messageCount > 0) return false
+  // Has first message preview - not empty
+  if (chat.firstMessagePreview) return false
+  // Has a non-default title - not empty
+  const isDefaultTitle =
+    chat.title === 'New Chat' || chat.title === 'Neuer Chat' || chat.title.startsWith('Chat ')
+  if (!isDefaultTitle) return false
+  return true
+}
+
+// Get all chats (excluding widget sessions and non-active empty chats)
 const allChats = computed(() => {
-  return chatsStore.chats.filter((c) => !c.widgetSession)
+  return chatsStore.chats.filter((c) => {
+    // Exclude widget sessions
+    if (c.widgetSession) return false
+
+    // Always show the active chat (even if empty, so user sees current context)
+    if (c.id === chatsStore.activeChatId) return true
+
+    // Filter out truly empty chats (only active empty chat is shown above)
+    if (isChatEmpty(c)) return false
+
+    return true
+  })
 })
 
 // Display chats based on showAll state
@@ -274,12 +350,26 @@ const handleDelete = async (chatId: number) => {
 }
 
 const handleNewChat = async () => {
-  await chatsStore.findOrCreateEmptyChat()
-  if (route.path !== '/') {
-    router.push('/')
+  // Prevent double-click race conditions
+  if (isCreatingChat.value) {
+    console.log('🚫 New chat creation already in progress, ignoring click')
+    return
   }
-  // Don't close dropdown - keep it open
-  openMenuChatId.value = null
+
+  isCreatingChat.value = true
+  try {
+    await chatsStore.findOrCreateEmptyChat()
+    if (route.path !== '/') {
+      router.push('/')
+    }
+    // Don't close dropdown - keep it open
+    openMenuChatId.value = null
+  } finally {
+    // Small delay to prevent rapid successive clicks
+    setTimeout(() => {
+      isCreatingChat.value = false
+    }, 300)
+  }
 }
 
 // Close menu when clicking outside

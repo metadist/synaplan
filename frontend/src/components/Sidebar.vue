@@ -262,7 +262,6 @@ const navItems = computed<NavItem[]>(() => {
       label: t('nav.tools'),
       icon: WrenchScrewdriverIcon,
       children: [
-        { path: '/tools/introduction', label: t('nav.toolsIntroduction') },
         { path: '/tools/chat-widget', label: t('nav.toolsChatWidget') },
         { path: '/tools/doc-summary', label: t('nav.toolsDocSummary') },
         { path: '/tools/mail-handler', label: t('nav.toolsMailHandler') },
@@ -278,7 +277,7 @@ const navItems = computed<NavItem[]>(() => {
       icon: PuzzlePieceIcon,
       children: configStore.plugins.map((plugin: { name?: string }) => ({
         path: `/plugins/${plugin.name}`,
-        label: plugin.name ?? 'Unknown',
+        label: plugin.name ? plugin.name.charAt(0).toUpperCase() + plugin.name.slice(1) : 'Unknown',
       })),
     })
   }
@@ -342,6 +341,9 @@ const navItems = computed<NavItem[]>(() => {
       featureStatusItem.badge = String(disabledFeaturesCount.value)
     }
     adminChildren.push(featureStatusItem)
+
+    // System Config in Admin
+    adminChildren.push({ path: '/admin/config', label: t('nav.adminSystemConfig') })
 
     items.push({
       path: '/admin',

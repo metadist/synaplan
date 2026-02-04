@@ -27,6 +27,7 @@
     "profile": "Profil",
     "admin": "Admin-Panel",
     "adminFeatures": "Feature-Status",
+    "adminConfig": "Systemkonfiguration",
     "subscription": "Abonnement",
     "subscriptionSuccess": "Abonnement erfolgreich",
     "subscriptionCancel": "Abonnement gekündigt",
@@ -169,6 +170,22 @@
       "cost": "Kosten",
       "activeSubscriptions": "Aktive Abos",
       "subscriptionOverview": "Abo-Übersicht"
+    },
+    "config": {
+      "title": "Systemkonfiguration",
+      "description": "Umgebungsvariablen und Service-Verbindungen verwalten",
+      "loadError": "Konfiguration konnte nicht geladen werden",
+      "saveError": "Konfiguration konnte nicht gespeichert werden",
+      "saved": "Konfiguration gespeichert",
+      "unsaved": "Nicht gespeicherte Änderungen",
+      "testConnection": "Verbindung testen",
+      "testFailed": "Verbindungstest fehlgeschlagen",
+      "commandCopied": "Befehl in Zwischenablage kopiert",
+      "restartBanner": {
+        "title": "Konfiguration aktualisiert — Neustart erforderlich",
+        "message": "Ihre Änderungen wurden in der .env-Datei gespeichert. Damit die Änderungen wirksam werden, müssen Sie Ihre Docker-Container neu starten.",
+        "copyCommand": "Befehl kopieren"
+      }
     }
   },
   "sidebar": {
@@ -199,7 +216,8 @@
     "upgrade": "Upgrade",
     "admin": "Admin",
     "adminDashboard": "Dashboard",
-    "adminFeatureStatus": "Feature-Status"
+    "adminFeatureStatus": "Feature-Status",
+    "adminSystemConfig": "Systemkonfiguration"
   },
   "chatInput": {
     "attach": "Anhängen",
@@ -987,7 +1005,10 @@
     "add": "Hinzufügen",
     "done": "Fertig",
     "created": "Erstellt",
-    "updated": "Aktualisiert"
+    "updated": "Aktualisiert",
+    "enabled": "Aktiviert",
+    "disabled": "Deaktiviert",
+    "reset": "Zurücksetzen"
   },
   "search": {
     "sources": "Quellen",
@@ -1268,6 +1289,8 @@
       "allowFileUpload": "Datei-Uploads erlauben",
       "allowFileUploadHelp": "Besuchern erlauben, Dateien im Chat hochzuladen",
       "fileUploadLimit": "Datei-Upload-Limit",
+      "fileUploadUnlimitedTitle": "Unbegrenzte Uploads aktiviert",
+      "fileUploadUnlimitedDescription": "Ein Limit von 0 erlaubt unbegrenzte Datei-Uploads. Dies kann die Serverressourcen und Speicherkosten erhöhen.",
       "allowedDomains": "Erlaubte Domains",
       "allowedDomainsHelp": "Nur diese Domains können Ihr Widget einbetten und nutzen. Leer lassen, um alle Domains zu erlauben.",
       "noDomainsYet": "Keine Domains konfiguriert. Widget kann auf jeder Website eingebettet werden.",
@@ -1438,6 +1461,7 @@
     "subtitle": "Wir antworten normalerweise innerhalb von Minuten",
     "placeholder": "Ihre Nachricht eingeben...",
     "send": "Senden",
+    "sending": "Wird gesendet...",
     "attachFile": "Datei anhängen",
     "downloadFile": "Datei herunterladen",
     "downloadFailed": "Die Datei konnte leider nicht heruntergeladen werden. Bitte versuchen Sie es später erneut.",
@@ -1769,6 +1793,8 @@
       "badge": "Erinnerung wird geladen",
       "tooltip": "Diese Erinnerung wurde gerade erstellt oder aktualisiert. Es kann ein paar Sekunden dauern, bis sie geladen werden kann."
     },
+    "loginToView": "Anmelden, um Erinnerungsdetails zu sehen",
+    "memoryUsed": "Erinnerung verwendet",
     "toast": {
       "title": "Neue Erinnerung erkannt",
       "titleCompact": "Erinnerung",
@@ -1777,6 +1803,13 @@
       "edit": "Anpassen",
       "editCompact": "Bearbeiten",
       "discarded": "Erinnerung verworfen"
+    },
+    "deleteDialog": {
+      "title": "Erinnerung löschen?",
+      "message": "Diese Erinnerung wird aus deinen gespeicherten Daten entfernt.",
+      "undo": "Rückgängig",
+      "confirm": "Löschen",
+      "memoryLabel": "Ausgewählte Erinnerung"
     },
     "usedInResponse": "{count} Erinnerung verwendet | {count} Erinnerungen verwendet",
     "context": {

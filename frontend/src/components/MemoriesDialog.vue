@@ -178,7 +178,7 @@
               }}
             </p>
             <button
-              class="text-sm font-medium text-brand hover:text-brand-light transition-colors flex items-center gap-1.5"
+              class="pill pill--active px-4 py-2 text-sm font-semibold rounded-lg transition-all flex items-center gap-2 hover:opacity-80"
               @click="viewAllMemories"
             >
               {{ $t('memories.viewAll') }}

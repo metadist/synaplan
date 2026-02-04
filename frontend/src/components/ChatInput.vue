@@ -299,15 +299,15 @@ const speechLanguage = computed(() => {
 
 /**
  * Determine if microphone button should be shown.
- * Show when: Web Speech API is supported OR whisperEnabled is true.
- * Hidden only when: neither is available.
+ * Show when: Web Speech API is supported OR any backend speech-to-text is available.
+ * Backend speech-to-text includes: local Whisper.cpp OR API models (Groq/OpenAI Whisper).
  */
 const showMicrophoneButton = computed(() => {
-  const whisperEnabled = configStore.speech.whisperEnabled
+  const speechToTextAvailable = configStore.speech.speechToTextAvailable
   const webSpeechSupported = isWebSpeechSupported()
 
-  // Show if either option is available
-  return webSpeechSupported || whisperEnabled
+  // Show if either browser API or backend transcription is available
+  return webSpeechSupported || speechToTextAvailable
 })
 
 /**

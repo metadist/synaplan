@@ -267,6 +267,51 @@ class StreamController extends AbstractController
                 return;
             }
 
+            // Helper to save error message
+            $saveError = function ($chat, $incomingMessage, string $errorMessage, string $provider = 'system', string $errorType = 'unknown') use ($user, $trackId) {
+                if (!$chat || !$incomingMessage) {
+                    return null;
+                }
+
+                try {
+                    $outgoingMessage = new Message();
+                    $outgoingMessage->setUserId($user->getId());
+                    $outgoingMessage->setChat($chat);
+                    $outgoingMessage->setTrackingId($trackId);
+                    $outgoingMessage->setProviderIndex($incomingMessage->getProviderIndex());
+                    $outgoingMessage->setUnixTimestamp(time());
+                    $outgoingMessage->setDateTime(date('YmdHis'));
+                    $outgoingMessage->setMessageType('WEB');
+                    $outgoingMessage->setFile(0);
+                    $outgoingMessage->setTopic('ERROR');
+                    $outgoingMessage->setLanguage('en');
+                    $outgoingMessage->setText($errorMessage);
+                    $outgoingMessage->setDirection('OUT');
+                    $outgoingMessage->setStatus('complete');
+
+                    $this->em->persist($outgoingMessage);
+                    $this->em->flush();
+
+                    $outgoingMessage->setMeta('ai_provider', $provider);
+                    $outgoingMessage->setMeta('ai_model', 'error');
+                    $outgoingMessage->setMeta('error_type', $errorType);
+
+                    $incomingMessage->setTopic('ERROR');
+                    $incomingMessage->setStatus('error');
+
+                    $this->em->flush();
+
+                    return $outgoingMessage->getId();
+                } catch (\Exception $e) {
+                    $this->logger->error('Failed to save error message', ['error' => $e->getMessage()]);
+
+                    return null;
+                }
+            };
+
+            $chat = null;
+            $incomingMessage = null;
+
             try {
                 // Load chat
                 $chat = $this->em->getRepository(\App\Entity\Chat::class)->find((int) $chatId);
@@ -382,12 +427,16 @@ class StreamController extends AbstractController
                     ]);
                 }
 
-                // Widget Mode: Force fixed task prompt (no sorting)
-                if ($isWidgetMode && $fixedTaskPromptTopic) {
-                    $processingOptions['fixed_task_prompt'] = $fixedTaskPromptTopic;
-                    $this->logger->info('StreamController: Using fixed task prompt for widget', [
-                        'task_prompt' => $fixedTaskPromptTopic,
-                    ]);
+                // Widget Mode: Force fixed task prompt (no sorting) and disable memories
+                if ($isWidgetMode) {
+                    $processingOptions['is_widget_mode'] = true;
+
+                    if ($fixedTaskPromptTopic) {
+                        $processingOptions['fixed_task_prompt'] = $fixedTaskPromptTopic;
+                        $this->logger->info('StreamController: Using fixed task prompt for widget', [
+                            'task_prompt' => $fixedTaskPromptTopic,
+                        ]);
+                    }
                 }
 
                 // Check if selected model supports streaming
@@ -992,10 +1041,16 @@ class StreamController extends AbstractController
                     'context' => $e->getContext(),
                 ]);
 
+                $messageId = $saveError($chat, $incomingMessage, $e->getMessage(), $e->getProviderName(), 'provider_error');
+
                 $errorData = [
                     'error' => $e->getMessage(),
                     'provider' => $e->getProviderName(),
                 ];
+
+                if ($messageId) {
+                    $errorData['messageId'] = $messageId;
+                }
 
                 // Add installation instructions if available
                 if ($context = $e->getContext()) {
@@ -1019,9 +1074,17 @@ class StreamController extends AbstractController
                     'error' => $e->getMessage(),
                 ]);
 
-                $this->sendSSE('error', [
+                $messageId = $saveError($chat, $incomingMessage, $e->getMessage(), 'system', 'exception');
+
+                $errorData = [
                     'error' => 'Failed to process message: '.$e->getMessage(),
-                ]);
+                ];
+
+                if ($messageId) {
+                    $errorData['messageId'] = $messageId;
+                }
+
+                $this->sendSSE('error', $errorData);
             }
         });
 

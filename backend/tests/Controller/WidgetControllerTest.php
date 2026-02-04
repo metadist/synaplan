@@ -34,7 +34,7 @@ class WidgetControllerTest extends WebTestCase
     {
         $promptsToCreate = [
             [
-                'topic' => 'widget-default',
+                'topic' => 'tools:widget-default',
                 'description' => 'Default widget prompt for tests',
                 'prompt' => 'You are a helpful assistant. Answer questions clearly and concisely.',
             ],
@@ -163,7 +163,7 @@ class WidgetControllerTest extends WebTestCase
         $this->assertArrayHasKey('widget', $responseData);
         $this->assertEquals('Test Widget', $responseData['widget']['name']);
         // Should use default prompt when not specified
-        $this->assertEquals('widget-default', $responseData['widget']['taskPromptTopic']);
+        $this->assertEquals('tools:widget-default', $responseData['widget']['taskPromptTopic']);
     }
 
     public function testCreateWidgetWithWebsiteUrl(): void

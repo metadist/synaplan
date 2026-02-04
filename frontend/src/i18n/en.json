@@ -27,6 +27,7 @@
     "profile": "Profile",
     "admin": "Admin Panel",
     "adminFeatures": "Feature Status",
+    "adminConfig": "System Configuration",
     "subscription": "Subscription",
     "subscriptionSuccess": "Subscription Successful",
     "subscriptionCancel": "Subscription Cancelled",
@@ -174,6 +175,22 @@
       "cost": "Cost",
       "activeSubscriptions": "Active Subscriptions",
       "subscriptionOverview": "Subscription Overview"
+    },
+    "config": {
+      "title": "System Configuration",
+      "description": "Manage environment variables and service connections",
+      "loadError": "Failed to load configuration",
+      "saveError": "Failed to save configuration",
+      "saved": "Configuration saved",
+      "unsaved": "Unsaved changes",
+      "testConnection": "Test Connection",
+      "testFailed": "Connection test failed",
+      "commandCopied": "Command copied to clipboard",
+      "restartBanner": {
+        "title": "Configuration Updated — Restart Required",
+        "message": "Your changes have been saved to the .env file. For the changes to take effect, you need to restart your Docker containers.",
+        "copyCommand": "Copy Command"
+      }
     }
   },
   "sidebar": {
@@ -204,7 +221,8 @@
     "upgrade": "Upgrade",
     "admin": "Admin",
     "adminDashboard": "Dashboard",
-    "adminFeatureStatus": "Feature Status"
+    "adminFeatureStatus": "Feature Status",
+    "adminSystemConfig": "System Config"
   },
   "chatInput": {
     "placeholder": "Type your message...",
@@ -1036,7 +1054,10 @@
     "add": "Add",
     "done": "Done",
     "created": "Created",
-    "updated": "Updated"
+    "updated": "Updated",
+    "enabled": "Enabled",
+    "disabled": "Disabled",
+    "reset": "Reset"
   },
   "search": {
     "sources": "Sources",
@@ -1119,6 +1140,7 @@
     "subtitle": "We typically reply in minutes",
     "placeholder": "Type your message...",
     "send": "Send",
+    "sending": "Sending...",
     "attachFile": "Attach file",
     "downloadFile": "Download file",
     "downloadFailed": "Sorry, the file could not be downloaded. Please try again later.",
@@ -1263,6 +1285,8 @@
       "allowFileUpload": "Allow File Uploads",
       "allowFileUploadHelp": "Let visitors upload files to the chat",
       "fileUploadLimit": "File Upload Limit",
+      "fileUploadUnlimitedTitle": "Unlimited uploads enabled",
+      "fileUploadUnlimitedDescription": "Setting the limit to 0 allows unlimited file uploads. This may increase server resource usage and storage costs.",
       "allowedDomains": "Allowed Domains",
       "allowedDomainsHelp": "Only these domains can embed and use your widget. Leave empty to allow all domains.",
       "noDomainsYet": "No domains configured. Widget can be embedded on any website.",
@@ -1873,6 +1897,8 @@
       "badge": "Memory pending",
       "tooltip": "This memory was just created or updated. It may take a few seconds until it can be loaded."
     },
+    "loginToView": "Log in to view memory details",
+    "memoryUsed": "Memory used",
     "toast": {
       "title": "New Memory Detected",
       "titleCompact": "Memory",
@@ -1881,6 +1907,13 @@
       "edit": "Edit",
       "editCompact": "Edit",
       "discarded": "Memory discarded"
+    },
+    "deleteDialog": {
+      "title": "Delete memory?",
+      "message": "This will remove the memory from your saved data.",
+      "undo": "Undo",
+      "confirm": "Delete",
+      "memoryLabel": "Selected memory"
     },
     "usedInResponse": "{count} memory used | {count} memories used",
     "context": {

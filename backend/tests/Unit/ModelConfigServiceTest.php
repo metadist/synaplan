@@ -2,6 +2,7 @@
 
 namespace App\Tests\Unit;
 
+use App\AI\Service\ProviderRegistry;
 use App\Entity\Config;
 use App\Entity\Model;
 use App\Repository\ConfigRepository;
@@ -18,6 +19,7 @@ class ModelConfigServiceTest extends TestCase
     private ModelRepository $modelRepository;
     private UserRepository $userRepository;
     private CacheItemPoolInterface $cache;
+    private ProviderRegistry $providerRegistry;
     private ModelConfigService $service;
     private CacheItemInterface $cacheItem;
 
@@ -27,13 +29,19 @@ class ModelConfigServiceTest extends TestCase
         $this->modelRepository = $this->createMock(ModelRepository::class);
         $this->userRepository = $this->createMock(UserRepository::class);
         $this->cache = $this->createMock(CacheItemPoolInterface::class);
+        $this->providerRegistry = $this->createMock(ProviderRegistry::class);
         $this->cacheItem = $this->createMock(CacheItemInterface::class);
+
+        // Default: return some available providers for fallback tests
+        $this->providerRegistry->method('getAvailableProviders')
+            ->willReturn(['openai', 'groq']);
 
         $this->service = new ModelConfigService(
             $this->configRepository,
             $this->modelRepository,
             $this->userRepository,
-            $this->cache
+            $this->cache,
+            $this->providerRegistry
         );
     }
 

@@ -274,10 +274,17 @@ class OpenAIProvider implements ChatProviderInterface, EmbeddingProviderInterfac
         }
 
         try {
-            $response = $this->client->embeddings()->create([
+            $params = [
                 'model' => $options['model'],
                 'input' => $text,
-            ]);
+            ];
+
+            // Force 1536 dimensions for v3 models to match MariaDB vector column size
+            if (str_contains($options['model'], 'text-embedding-3')) {
+                $params['dimensions'] = 1536;
+            }
+
+            $response = $this->client->embeddings()->create($params);
 
             return $response['data'][0]['embedding'] ?? [];
         } catch (\Exception $e) {
@@ -296,10 +303,17 @@ class OpenAIProvider implements ChatProviderInterface, EmbeddingProviderInterfac
         }
 
         try {
-            $response = $this->client->embeddings()->create([
+            $params = [
                 'model' => $options['model'],
                 'input' => $texts,
-            ]);
+            ];
+
+            // Force 1536 dimensions for v3 models to match MariaDB vector column size
+            if (str_contains($options['model'], 'text-embedding-3')) {
+                $params['dimensions'] = 1536;
+            }
+
+            $response = $this->client->embeddings()->create($params);
 
             return array_map(fn ($item) => $item['embedding'], $response['data']);
         } catch (\Exception $e) {
@@ -311,7 +325,7 @@ class OpenAIProvider implements ChatProviderInterface, EmbeddingProviderInterfac
     {
         return match (true) {
             str_contains($model, 'text-embedding-3-small') => 1536,
-            str_contains($model, 'text-embedding-3-large') => 3072,
+            str_contains($model, 'text-embedding-3-large') => 1536, // Forced to 1536 for compatibility
             str_contains($model, 'text-embedding-ada-002') => 1536,
             default => 1536,
         };
@@ -706,8 +720,10 @@ class OpenAIProvider implements ChatProviderInterface, EmbeddingProviderInterfac
         try {
             $model = $options['model'] ?? 'whisper-1';
 
-            // Build full path
-            $fullPath = $this->uploadDir.'/'.ltrim($audioPath, '/');
+            // Handle both absolute and relative paths
+            $fullPath = str_starts_with($audioPath, '/')
+                ? $audioPath
+                : $this->uploadDir.'/'.ltrim($audioPath, '/');
 
             if (!file_exists($fullPath)) {
                 throw new \Exception("Audio file not found: {$fullPath}");
@@ -716,21 +732,40 @@ class OpenAIProvider implements ChatProviderInterface, EmbeddingProviderInterfac
             $this->logger->info('OpenAI: Transcribing audio', [
                 'model' => $model,
                 'file' => basename($audioPath),
+                'path' => $fullPath,
             ]);
 
-            $response = $this->client->audio()->transcribe([
-                'model' => $model,
-                'file' => fopen($fullPath, 'r'),
-                'response_format' => 'verbose_json',
-                'language' => $options['language'] ?? null,
-            ]);
+            // Open file and ensure it's a valid resource
+            $fileHandle = fopen($fullPath, 'r');
+            if (!$fileHandle) {
+                throw new \Exception("Failed to open audio file: {$fullPath}");
+            }
 
-            return [
-                'text' => $response['text'] ?? '',
-                'language' => $response['language'] ?? 'unknown',
-                'duration' => $response['duration'] ?? 0,
-                'segments' => $response['segments'] ?? [],
-            ];
+            try {
+                // Build request params - only include language if provided
+                $requestParams = [
+                    'model' => $model,
+                    'file' => $fileHandle,
+                    'response_format' => 'verbose_json',
+                ];
+
+                if (!empty($options['language'])) {
+                    $requestParams['language'] = $options['language'];
+                }
+
+                $response = $this->client->audio()->transcribe($requestParams);
+
+                return [
+                    'text' => $response['text'] ?? '',
+                    'language' => $response['language'] ?? 'unknown',
+                    'duration' => $response['duration'] ?? 0,
+                    'segments' => $response['segments'] ?? [],
+                ];
+            } finally {
+                if (is_resource($fileHandle)) {
+                    fclose($fileHandle);
+                }
+            }
         } catch (\Exception $e) {
             throw new ProviderException('OpenAI transcription error: '.$e->getMessage(), 'openai');
         }
@@ -743,7 +778,10 @@ class OpenAIProvider implements ChatProviderInterface, EmbeddingProviderInterfac
         }
 
         try {
-            $fullPath = $this->uploadDir.'/'.ltrim($audioPath, '/');
+            // Handle both absolute and relative paths
+            $fullPath = str_starts_with($audioPath, '/')
+                ? $audioPath
+                : $this->uploadDir.'/'.ltrim($audioPath, '/');
 
             if (!file_exists($fullPath)) {
                 throw new \Exception("Audio file not found: {$fullPath}");
@@ -754,13 +792,25 @@ class OpenAIProvider implements ChatProviderInterface, EmbeddingProviderInterfac
                 'target_lang' => $targetLang,
             ]);
 
-            // Whisper's translate endpoint translates to English only
-            $response = $this->client->audio()->translate([
-                'model' => 'whisper-1',
-                'file' => fopen($fullPath, 'r'),
-            ]);
+            // Open file and ensure it's a valid resource
+            $fileHandle = fopen($fullPath, 'r');
+            if (!$fileHandle) {
+                throw new \Exception("Failed to open audio file: {$fullPath}");
+            }
 
-            return $response['text'] ?? '';
+            try {
+                // Whisper's translate endpoint translates to English only
+                $response = $this->client->audio()->translate([
+                    'model' => 'whisper-1',
+                    'file' => $fileHandle,
+                ]);
+
+                return $response['text'] ?? '';
+            } finally {
+                if (is_resource($fileHandle)) {
+                    fclose($fileHandle);
+                }
+            }
         } catch (\Exception $e) {
             throw new ProviderException('OpenAI audio translation error: '.$e->getMessage(), 'openai');
         }

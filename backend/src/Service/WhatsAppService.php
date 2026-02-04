@@ -2,6 +2,7 @@
 
 namespace App\Service;
 
+use App\AI\Service\AiFacade;
 use App\DTO\WhatsApp\IncomingMessageDto;
 use App\Entity\Message;
 use App\Entity\User;
@@ -10,12 +11,21 @@ use App\Service\File\UserUploadPathBuilder;
 use App\Service\Message\MessageProcessor;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
+use Symfony\Component\Lock\LockFactory;
+use Symfony\Contracts\Cache\CacheInterface;
+use Symfony\Contracts\Cache\ItemInterface;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 
 /**
  * WhatsApp Business API Service (Meta/Facebook).
  *
  * Handles sending messages via WhatsApp Business API and processing incoming messages.
+ *
+ * Message Type Handling:
+ * - TEXT: Processed as AI prompt, text response
+ * - AUDIO (voice): Transcribed via Whisper, TTS audio response
+ * - IMAGE: Vision AI analysis, brief text comment
+ * - VIDEO: Audio extracted via FFmpeg, transcribed, text response
  */
 class WhatsAppService
 {
@@ -29,6 +39,12 @@ class WhatsAppService
         'amr', 'opus', '3gp', // WhatsApp-specific audio/video formats
     ];
 
+    /**
+     * Cache TTL for duplicate detection (5 minutes).
+     * WhatsApp retries typically happen within 1-2 minutes.
+     */
+    private const DUPLICATE_CACHE_TTL = 300;
+
     private string $accessToken;
     private bool $enabled;
     private string $apiVersion = 'v21.0';
@@ -41,10 +57,15 @@ class WhatsAppService
         private MessageProcessor $messageProcessor,
         private FileProcessor $fileProcessor,
         private UserUploadPathBuilder $userUploadPathBuilder,
+        private AiFacade $aiFacade,
+        private DiscordNotificationService $discord,
+        private CacheInterface $cache,
+        private LockFactory $lockFactory,
         string $whatsappAccessToken,
         bool $whatsappEnabled,
         private string $uploadsDir,
         private int $whatsappUserId,
+        private string $appUrl = '',
     ) {
         $this->accessToken = $whatsappAccessToken;
         $this->enabled = $whatsappEnabled;
@@ -56,6 +77,79 @@ class WhatsAppService
     public function isAvailable(): bool
     {
         return $this->enabled && !empty($this->accessToken);
+    }
+
+    /**
+     * Check if message was already processed (duplicate detection).
+     *
+     * Uses lock + cache for atomic check-and-set to prevent race conditions
+     * when multiple webhook requests arrive simultaneously.
+     *
+     * @return array|null Returns duplicate result array if duplicate, null if new message
+     */
+    private function checkAndMarkAsDuplicate(IncomingMessageDto $dto): ?array
+    {
+        $cacheKey = 'whatsapp_msg_'.hash('sha256', $dto->messageId);
+        $lockKey = 'whatsapp_lock_'.hash('sha256', $dto->messageId);
+
+        try {
+            // Acquire lock to prevent race condition between concurrent requests
+            $lock = $this->lockFactory->createLock($lockKey, ttl: 30.0, autoRelease: true);
+
+            if (!$lock->acquire()) {
+                // Another request is processing this message - treat as duplicate
+                $this->logger->info('WhatsApp: Message locked by another process, treating as duplicate', [
+                    'message_id' => $dto->messageId,
+                    'from' => $dto->from,
+                ]);
+
+                return [
+                    'success' => true,
+                    'message_id' => $dto->messageId,
+                    'duplicate' => true,
+                    'response_sent' => false,
+                ];
+            }
+
+            // Atomic get-or-create: callback only runs on cache miss (new message)
+            $cachedAt = $this->cache->get($cacheKey, function (ItemInterface $item): int {
+                $item->expiresAfter(self::DUPLICATE_CACHE_TTL);
+
+                return time();
+            });
+
+            // If cached time is more than 1 second ago, it's a duplicate
+            if (abs(time() - $cachedAt) > 1) {
+                $this->logger->info('WhatsApp: Duplicate message detected, skipping', [
+                    'message_id' => $dto->messageId,
+                    'from' => $dto->from,
+                    'cached_at' => $cachedAt,
+                    'age_seconds' => time() - $cachedAt,
+                ]);
+
+                $lock->release();
+
+                return [
+                    'success' => true,
+                    'message_id' => $dto->messageId,
+                    'duplicate' => true,
+                    'response_sent' => false,
+                ];
+            }
+
+            // New message - lock will auto-release, let processing continue
+            return null;
+        } catch (\Throwable $e) {
+            // Graceful degradation: if cache/lock fails, process the message anyway
+            // Better to risk a duplicate than to drop messages entirely
+            $this->logger->warning('WhatsApp: Duplicate detection failed, processing anyway', [
+                'message_id' => $dto->messageId,
+                'from' => $dto->from,
+                'error' => $e->getMessage(),
+            ]);
+
+            return null;
+        }
     }
 
     /**
@@ -72,6 +166,9 @@ class WhatsAppService
         if (empty($phoneNumberId)) {
             throw new \InvalidArgumentException('Phone Number ID is required and must be provided dynamically from webhook metadata');
         }
+
+        // Convert standard Markdown to WhatsApp-compatible formatting
+        $formattedMessage = $this->convertToWhatsAppMarkdown($message);
 
         $url = sprintf(
             'https://graph.facebook.com/%s/%s/messages',
@@ -92,7 +189,7 @@ class WhatsAppService
                     'type' => 'text',
                     'text' => [
                         'preview_url' => true,
-                        'body' => $message,
+                        'body' => $formattedMessage,
                     ],
                 ],
             ]);
@@ -156,8 +253,9 @@ class WhatsAppService
             'link' => $mediaUrl,
         ];
 
+        // Convert caption markdown to WhatsApp format if present
         if ($caption && in_array($mediaType, ['image', 'video', 'document'])) {
-            $mediaPayload['caption'] = $caption;
+            $mediaPayload['caption'] = $this->convertToWhatsAppMarkdown($caption);
         }
 
         try {
@@ -329,10 +427,28 @@ class WhatsAppService
     /**
      * Process an incoming WhatsApp message.
      * Handles verification codes, rate limiting, media downloads, and AI processing.
+     *
+     * Response modes:
+     * - TEXT input → TEXT response
+     * - AUDIO input (voice-only) → TTS AUDIO response
+     * - IMAGE input → TEXT description
+     * - VIDEO input → TEXT response (from audio track)
      */
     public function handleIncomingMessage(IncomingMessageDto $dto, User $user, bool $isAnonymous): array
     {
+        // DUPLICATE DETECTION: WhatsApp may send the same webhook multiple times on retries.
+        // Uses lock + cache for atomic check-and-set to prevent race conditions.
+        $duplicateResult = $this->checkAndMarkAsDuplicate($dto);
+        if (null !== $duplicateResult) {
+            return $duplicateResult;
+        }
+
         $effectiveUserId = $isAnonymous ? $this->whatsappUserId : $user->getId();
+
+        // Determine input type for response mode selection
+        $shouldSendAudioResponse = $this->shouldSendAudioResponse($dto);
+        $isImageMessage = 'image' === $dto->type;
+        $isVideoMessage = 'video' === $dto->type;
 
         $this->logger->info('WhatsApp message received', [
             'original_user_id' => $user->getId(),
@@ -343,6 +459,9 @@ class WhatsAppService
             'to_display_phone' => $dto->displayPhoneNumber,
             'type' => $dto->type,
             'message_id' => $dto->messageId,
+            'should_send_audio' => $shouldSendAudioResponse,
+            'is_image' => $isImageMessage,
+            'is_video' => $isVideoMessage,
         ]);
 
         // 1. PRIORITY: Check for verification codes
@@ -387,45 +506,385 @@ class WhatsAppService
         $this->em->persist($message);
         $this->em->flush();
 
-        // 5. Metadata and Media Handling
+        // 5. Metadata and Media Handling (must be after flush so message has ID)
+        // Store input type metadata for response mode selection
+        $message->setMeta('whatsapp_input_type', $dto->type);
+        $message->setMeta('whatsapp_should_send_audio', $shouldSendAudioResponse ? '1' : '0');
         $this->storeMessageMetadata($message, $dto, $user);
 
+        $mediaDownloadError = null;
         if ($mediaId) {
-            $this->handleMediaDownload($message, $dto, $mediaId, $mediaUrl, $effectiveUserId);
+            $mediaDownloadError = $this->handleMediaDownload($message, $dto, $mediaId, $mediaUrl, $effectiveUserId);
         }
 
         $this->em->flush();
+
+        // Check for media download errors and send user-friendly error message
+        if ($mediaDownloadError) {
+            $this->sendErrorMessage($dto, $mediaDownloadError);
+
+            // Discord notification: Media download failed
+            $this->discord->notifyWhatsAppError(
+                'media_download',
+                $dto->from,
+                $message->getText() ?: '[Media message]',
+                $mediaDownloadError,
+                [
+                    'message_type' => $dto->type,
+                    'file_type' => $dto->incomingMsg[$dto->type]['mime_type'] ?? 'unknown',
+                ]
+            );
+
+            return [
+                'success' => false,
+                'message_id' => $dto->messageId,
+                'error' => $mediaDownloadError,
+            ];
+        }
 
         // 6. Usage recording and mark as read
         $this->rateLimitService->recordUsage($user, 'MESSAGES');
         $this->markAsRead($dto->messageId, $dto->phoneNumberId);
 
-        // 7. AI Pipeline Processing
-        $result = $this->messageProcessor->process($message);
+        // 7. AI Pipeline Processing (use streaming mode to support TTS/media generation)
+        $collectedResponse = '';
+        $streamCallback = function (string|array $chunk, array $metadata = []) use (&$collectedResponse): void {
+            // Handle both string chunks (old providers) and array chunks (new providers with type/content)
+            if (is_array($chunk)) {
+                // Extract content from array format: ['type' => 'content', 'content' => '...']
+                if (isset($chunk['type']) && 'content' === $chunk['type'] && isset($chunk['content'])) {
+                    $collectedResponse .= $chunk['content'];
+                }
+            } else {
+                // Old format: simple string
+                $collectedResponse .= $chunk;
+            }
+        };
+
+        // For image messages WITHOUT caption, force image description mode
+        // If there's a caption (user question), let the classifier route to chat for an answer
+        $processingOptions = [];
+        if ($isImageMessage) {
+            $imageCaption = $dto->incomingMsg['image']['caption'] ?? null;
+            if (empty($imageCaption)) {
+                // No caption: force brief image description
+                $processingOptions['force_image_description'] = true;
+            }
+            // With caption: let classifier route normally so AI can ANSWER the question
+        }
+
+        $result = $this->messageProcessor->processStream($message, $streamCallback, null, $processingOptions);
 
         if (!$result['success']) {
+            $errorMessage = $result['error'] ?? 'Processing failed';
+            $this->sendErrorMessage($dto, $errorMessage);
+
+            // Discord notification: Processing failed
+            $this->discord->notifyWhatsAppError(
+                'processing',
+                $dto->from,
+                $message->getText(),
+                $errorMessage,
+                ['message_type' => $dto->type]
+            );
+
             return [
                 'success' => false,
                 'message_id' => $dto->messageId,
-                'error' => $result['error'] ?? 'Processing failed',
+                'error' => $errorMessage,
             ];
         }
 
-        $responseText = $result['response']['content'] ?? '';
+        $responseText = $result['response']['content'] ?? $collectedResponse;
+        $metadata = $result['response']['metadata'] ?? [];
+        $fileData = $metadata['file'] ?? null;
 
-        // 8. Send Response
-        if (!empty($responseText)) {
+        // 8. Send Response based on input type
+        $responseSent = false;
+
+        // PRIORITY 1: Check if AI generated media (image, video, or audio from MediaGenerationHandler)
+        if ($fileData) {
+            $generatedMediaType = $fileData['type'] ?? null;
+            $mediaPath = $fileData['path'] ?? null;
+
+            if ($mediaPath && !empty($this->appUrl) && in_array($generatedMediaType, ['audio', 'video', 'image'], true)) {
+                $mediaUrl = rtrim($this->appUrl, '/').'/'.ltrim($mediaPath, '/');
+
+                $this->logger->info('WhatsApp: Sending AI-generated media response', [
+                    'to' => $dto->from,
+                    'media_type' => $generatedMediaType,
+                    'media_url' => $mediaUrl,
+                ]);
+
+                // For images and videos, include the response text as caption
+                $caption = in_array($generatedMediaType, ['image', 'video'], true) && !empty($responseText)
+                    ? mb_substr($responseText, 0, 1024) // WhatsApp caption limit
+                    : null;
+
+                $sendResult = $this->sendMedia($dto->from, $generatedMediaType, $mediaUrl, $dto->phoneNumberId, $caption);
+                if ($sendResult['success']) {
+                    $placeholderText = match ($generatedMediaType) {
+                        'image' => '[Image response]',
+                        'video' => '[Video response]',
+                        default => '[Audio response]', // audio is the remaining case
+                    };
+                    $this->storeOutgoingMessage($user, $dto, $responseText ?: $placeholderText, $sendResult['message_id']);
+                    $responseSent = true;
+
+                    // Discord notification: AI media generated and sent
+                    $this->discord->notifyWhatsAppSuccess(
+                        $generatedMediaType,
+                        $dto->from,
+                        $message->getText(),
+                        $responseText ?: $placeholderText,
+                        [
+                            'provider' => $metadata['provider'] ?? null,
+                            'model' => $metadata['model'] ?? null,
+                            'media_type' => $generatedMediaType,
+                        ]
+                    );
+                } else {
+                    $this->logger->warning('WhatsApp: Failed to send AI media, falling back', [
+                        'media_type' => $generatedMediaType,
+                        'error' => $sendResult['error'] ?? 'Unknown',
+                    ]);
+
+                    // Discord notification: Failed to send AI media
+                    $this->discord->notifyWhatsAppError(
+                        'send_failed',
+                        $dto->from,
+                        $message->getText(),
+                        $sendResult['error'] ?? 'Unknown error',
+                        ['media_type' => $generatedMediaType]
+                    );
+                }
+            }
+        }
+
+        // PRIORITY 2: Audio/Video input → Generate TTS response
+        if (!$responseSent && $shouldSendAudioResponse && !empty($responseText)) {
+            $ttsResult = $this->generateTtsResponse($responseText, $effectiveUserId);
+
+            if ($ttsResult) {
+                $audioUrl = rtrim($this->appUrl, '/').'/api/v1/files/uploads/'.$ttsResult['relativePath'];
+
+                $this->logger->info('WhatsApp: Sending TTS response for audio/video message', [
+                    'to' => $dto->from,
+                    'audio_url' => $audioUrl,
+                    'response_length' => strlen($responseText),
+                ]);
+
+                $sendResult = $this->sendMedia($dto->from, 'audio', $audioUrl, $dto->phoneNumberId);
+                if ($sendResult['success']) {
+                    $this->storeOutgoingMessage($user, $dto, $responseText, $sendResult['message_id']);
+                    $responseSent = true;
+
+                    // Discord notification: TTS response sent
+                    $this->discord->notifyWhatsAppSuccess(
+                        'tts',
+                        $dto->from,
+                        $message->getText(),
+                        $responseText,
+                        [
+                            'provider' => $ttsResult['provider'] ?? null,
+                            'model' => $ttsResult['model'] ?? null,
+                            'media_type' => 'audio',
+                        ]
+                    );
+                } else {
+                    $this->logger->warning('WhatsApp: TTS send failed, falling back to text', [
+                        'error' => $sendResult['error'] ?? 'Unknown',
+                    ]);
+
+                    // Discord notification: TTS send failed
+                    $this->discord->notifyWhatsAppError(
+                        'send_failed',
+                        $dto->from,
+                        $message->getText(),
+                        $sendResult['error'] ?? 'Unknown error',
+                        ['media_type' => 'audio']
+                    );
+                }
+            } else {
+                $this->logger->warning('WhatsApp: TTS generation failed, falling back to text');
+
+                // Discord notification: TTS generation failed
+                $this->discord->notifyWhatsAppError(
+                    'tts',
+                    $dto->from,
+                    $message->getText(),
+                    'TTS generation failed',
+                    ['message_type' => $dto->type]
+                );
+            }
+        }
+
+        // PRIORITY 3: Send text response (fallback or for text/image/video input)
+        if (!$responseSent && !empty($responseText)) {
             $sendResult = $this->sendMessage($dto->from, $responseText, $dto->phoneNumberId);
             if ($sendResult['success']) {
                 $this->storeOutgoingMessage($user, $dto, $responseText, $sendResult['message_id']);
+                $responseSent = true;
+
+                // Discord notification: Text response sent
+                $this->discord->notifyWhatsAppSuccess(
+                    'text',
+                    $dto->from,
+                    $message->getText(),
+                    $responseText,
+                    [
+                        'provider' => $metadata['provider'] ?? null,
+                        'model' => $metadata['model'] ?? null,
+                    ]
+                );
+            } else {
+                $this->logger->error('WhatsApp: Failed to send text response', [
+                    'error' => $sendResult['error'] ?? 'Unknown',
+                ]);
+
+                // Discord notification: Text send failed
+                $this->discord->notifyWhatsAppError(
+                    'send_failed',
+                    $dto->from,
+                    $message->getText(),
+                    $sendResult['error'] ?? 'Unknown error',
+                    ['message_type' => 'text']
+                );
             }
+        }
+
+        // If no response was sent, log an error
+        if (!$responseSent) {
+            $this->logger->error('WhatsApp: No response sent to user', [
+                'message_id' => $dto->messageId,
+                'from' => $dto->from,
+                'response_text_length' => strlen($responseText),
+            ]);
+
+            // Discord notification: No response sent
+            $this->discord->notifyWhatsAppError(
+                'processing',
+                $dto->from,
+                $message->getText(),
+                'No response could be sent to user',
+                ['message_type' => $dto->type]
+            );
         }
 
         return [
             'success' => true,
             'message_id' => $dto->messageId,
-            'response_sent' => !empty($responseText),
+            'response_sent' => $responseSent,
+            'response_type' => $responseSent ? ($shouldSendAudioResponse && !$fileData ? 'tts' : ($fileData ? 'audio' : 'text')) : 'none',
         ];
+    }
+
+    /**
+     * Determine if we should send an audio response (MP3) back to the user.
+     * This is true for voice messages (audio without meaningful caption)
+     * and video messages (as requested by user).
+     */
+    private function shouldSendAudioResponse(IncomingMessageDto $dto): bool
+    {
+        if ('audio' === $dto->type) {
+            // Check for caption (some audio messages might have text)
+            $caption = $dto->incomingMsg['audio']['caption'] ?? null;
+
+            // Voice-only if no caption or caption is just whitespace
+            return empty(trim((string) $caption));
+        }
+
+        if ('video' === $dto->type) {
+            // User requested that video answers are sent as MP3
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * Generate TTS (text-to-speech) audio response.
+     *
+     * @param string $text   The text to synthesize
+     * @param int    $userId User ID for provider selection
+     *
+     * @return array|null Result with relativePath, or null on failure
+     */
+    private function generateTtsResponse(string $text, int $userId): ?array
+    {
+        // Limit text length for TTS (max ~4000 chars for most providers)
+        $maxLength = 4000;
+        if (strlen($text) > $maxLength) {
+            $text = substr($text, 0, $maxLength - 3).'...';
+            $this->logger->info('WhatsApp: TTS text truncated', [
+                'original_length' => strlen($text),
+                'max_length' => $maxLength,
+            ]);
+        }
+
+        try {
+            $this->logger->info('WhatsApp: Generating TTS response', [
+                'user_id' => $userId,
+                'text_length' => strlen($text),
+            ]);
+
+            $result = $this->aiFacade->synthesize($text, $userId, [
+                'format' => 'mp3',
+            ]);
+
+            $this->logger->info('WhatsApp: TTS generation successful', [
+                'provider' => $result['provider'] ?? 'unknown',
+                'path' => $result['relativePath'] ?? 'unknown',
+            ]);
+
+            return $result;
+        } catch (\Throwable $e) {
+            $this->logger->error('WhatsApp: TTS generation failed', [
+                'user_id' => $userId,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            return null;
+        }
+    }
+
+    /**
+     * Send a user-friendly error message via WhatsApp.
+     */
+    private function sendErrorMessage(IncomingMessageDto $dto, string $error): void
+    {
+        $errorMap = [
+            'transcription' => "⚠️ *Sprachnachricht konnte nicht verarbeitet werden*\n\nDie Sprachnachricht konnte nicht transkribiert werden. Bitte versuche es erneut oder sende eine Textnachricht.",
+            'image' => "⚠️ *Bild konnte nicht analysiert werden*\n\nDas Bild konnte nicht verarbeitet werden. Bitte versuche es erneut.",
+            'video' => "⚠️ *Video konnte nicht verarbeitet werden*\n\nDas Video konnte nicht analysiert werden. Bitte versuche es erneut.",
+            'no_audio' => "⚠️ *Video ohne Audiospur*\n\nDas Video enthält keine Audiospur, die transkribiert werden kann.",
+            'file_too_large' => "⚠️ *Datei zu groß*\n\nDie Datei ist zu groß (max. 128 MB). Bitte sende eine kleinere Datei.",
+            'unsupported_format' => "⚠️ *Format nicht unterstützt*\n\nDieses Dateiformat wird nicht unterstützt.",
+            'default' => "⚠️ *Fehler bei der Verarbeitung*\n\nDeine Nachricht konnte nicht verarbeitet werden. Bitte versuche es erneut.\n\nFehler: {error}",
+        ];
+
+        // Determine error type
+        $errorLower = strtolower($error);
+        $messageTemplate = $errorMap['default'];
+
+        if (str_contains($errorLower, 'transcri') || str_contains($errorLower, 'whisper') || str_contains($errorLower, 'audio')) {
+            $messageTemplate = $errorMap['transcription'];
+        } elseif (str_contains($errorLower, 'image') || str_contains($errorLower, 'vision')) {
+            $messageTemplate = $errorMap['image'];
+        } elseif (str_contains($errorLower, 'video')) {
+            $messageTemplate = $errorMap['video'];
+        } elseif (str_contains($errorLower, 'no audio') || str_contains($errorLower, 'audio track')) {
+            $messageTemplate = $errorMap['no_audio'];
+        } elseif (str_contains($errorLower, 'too large') || str_contains($errorLower, 'size')) {
+            $messageTemplate = $errorMap['file_too_large'];
+        } elseif (str_contains($errorLower, 'format') || str_contains($errorLower, 'unsupported')) {
+            $messageTemplate = $errorMap['unsupported_format'];
+        }
+
+        $errorMessage = str_replace('{error}', $error, $messageTemplate);
+
+        $this->sendMessage($dto->from, $errorMessage, $dto->phoneNumberId);
     }
 
     private function handleRateLimitExceeded(User $user, IncomingMessageDto $dto, array $rateLimitCheck): array
@@ -466,16 +925,109 @@ class WhatsAppService
         ];
     }
 
+    /**
+     * Extract initial message text from the WhatsApp message.
+     * For media messages, this returns captions or placeholders that will be
+     * replaced with transcribed/extracted content during media processing.
+     */
     private function extractMessageText(IncomingMessageDto $dto): string
     {
         return match ($dto->type) {
             'text' => $dto->incomingMsg['text']['body'] ?? '',
             'image' => $dto->incomingMsg['image']['caption'] ?? '[Image]',
-            'audio' => '[Audio message]',
-            'video' => $dto->incomingMsg['video']['caption'] ?? '[Video]',
+            'sticker' => '[Sticker]', // Treated like images, analyzed via Vision AI
+            'audio' => '[Audio message]', // Will be replaced with transcription
+            'video' => $dto->incomingMsg['video']['caption'] ?? '[Video]', // Audio track will be transcribed
             'document' => $dto->incomingMsg['document']['caption'] ?? '[Document]',
+            'location' => $this->formatLocationMessage($dto),
+            'contacts' => $this->formatContactsMessage($dto),
             default => "[Unsupported message type: {$dto->type}]",
         };
+    }
+
+    /**
+     * Format a location message into a readable text for AI processing.
+     * WhatsApp location payload: { latitude, longitude, name?, address?, url? }.
+     */
+    private function formatLocationMessage(IncomingMessageDto $dto): string
+    {
+        $location = $dto->incomingMsg['location'] ?? [];
+
+        $latitude = $location['latitude'] ?? null;
+        $longitude = $location['longitude'] ?? null;
+
+        if (null === $latitude || null === $longitude) {
+            return '[Location shared - coordinates not available]';
+        }
+
+        $parts = ["📍 Standort geteilt: {$latitude}, {$longitude}"];
+
+        // Include location name if available (e.g., "Philz Coffee")
+        if (!empty($location['name'])) {
+            $parts[] = "Name: {$location['name']}";
+        }
+
+        // Include address if available
+        if (!empty($location['address'])) {
+            $parts[] = "Adresse: {$location['address']}";
+        }
+
+        // Include Google Maps URL for context
+        if (!empty($location['url'])) {
+            $parts[] = "Maps: {$location['url']}";
+        } else {
+            // Generate a Google Maps URL if not provided
+            $parts[] = "Maps: https://www.google.com/maps?q={$latitude},{$longitude}";
+        }
+
+        return implode("\n", $parts);
+    }
+
+    /**
+     * Format a contacts message into a readable text for AI processing.
+     * WhatsApp contacts payload: array of contact objects with name, phones, etc.
+     */
+    private function formatContactsMessage(IncomingMessageDto $dto): string
+    {
+        $contacts = $dto->incomingMsg['contacts'] ?? [];
+
+        if (empty($contacts)) {
+            return '[Contact shared - details not available]';
+        }
+
+        $parts = ['📇 Kontakt(e) geteilt:'];
+
+        foreach ($contacts as $contact) {
+            $name = $contact['name']['formatted_name']
+                ?? $contact['name']['first_name'] ?? 'Unbekannt';
+            $contactInfo = ["- {$name}"];
+
+            // Add phone numbers
+            if (!empty($contact['phones'])) {
+                foreach ($contact['phones'] as $phone) {
+                    $phoneType = $phone['type'] ?? 'phone';
+                    $phoneNumber = $phone['phone'] ?? $phone['wa_id'] ?? '';
+                    if ($phoneNumber) {
+                        $contactInfo[] = "  {$phoneType}: {$phoneNumber}";
+                    }
+                }
+            }
+
+            // Add emails
+            if (!empty($contact['emails'])) {
+                foreach ($contact['emails'] as $email) {
+                    $emailType = $email['type'] ?? 'email';
+                    $emailAddress = $email['email'] ?? '';
+                    if ($emailAddress) {
+                        $contactInfo[] = "  {$emailType}: {$emailAddress}";
+                    }
+                }
+            }
+
+            $parts[] = implode("\n", $contactInfo);
+        }
+
+        return implode("\n", $parts);
     }
 
     private function extractMediaId(IncomingMessageDto $dto): ?string
@@ -500,7 +1052,12 @@ class WhatsAppService
         }
     }
 
-    private function handleMediaDownload(Message $message, IncomingMessageDto $dto, string $mediaId, ?string $mediaUrl, int $effectiveUserId): void
+    /**
+     * Handle media download and text extraction.
+     *
+     * @return string|null Error message if failed, null on success
+     */
+    private function handleMediaDownload(Message $message, IncomingMessageDto $dto, string $mediaId, ?string $mediaUrl, int $effectiveUserId): ?string
     {
         $message->setMeta('media_id', $mediaId);
 
@@ -509,33 +1066,150 @@ class WhatsAppService
                 $mediaUrl = $this->getMediaUrl($mediaId, $dto->phoneNumberId);
             }
 
-            if ($mediaUrl) {
-                $message->setMeta('media_url', $mediaUrl);
-                $downloadResult = $this->downloadMedia($mediaId, $dto->phoneNumberId, $effectiveUserId);
+            if (!$mediaUrl) {
+                $this->logger->error('WhatsApp: Failed to get media URL', [
+                    'media_id' => $mediaId,
+                    'type' => $dto->type,
+                ]);
 
-                if ($downloadResult && !empty($downloadResult['file_path'])) {
-                    $message->setFile(1);
-                    $message->setFilePath($downloadResult['file_path']);
-                    $message->setFileType($downloadResult['file_type'] ?? 'unknown');
+                return 'Failed to retrieve media URL from WhatsApp';
+            }
 
-                    // Extract text immediately
-                    try {
-                        [$extractedText] = $this->fileProcessor->extractText(
-                            $downloadResult['file_path'],
-                            $downloadResult['file_type'],
-                            $effectiveUserId
-                        );
+            $message->setMeta('media_url', $mediaUrl);
+            $downloadResult = $this->downloadMedia($mediaId, $dto->phoneNumberId, $effectiveUserId);
 
-                        if (!empty($extractedText)) {
-                            $message->setFileText($extractedText);
+            if (!$downloadResult || empty($downloadResult['file_path'])) {
+                $this->logger->error('WhatsApp: Media download failed', [
+                    'media_id' => $mediaId,
+                    'type' => $dto->type,
+                ]);
+
+                return 'Failed to download media file';
+            }
+
+            $message->setFile(1);
+            $message->setFilePath($downloadResult['file_path']);
+            $message->setFileType($downloadResult['file_type'] ?? 'unknown');
+
+            $this->logger->info('WhatsApp: Media downloaded successfully', [
+                'media_id' => $mediaId,
+                'type' => $dto->type,
+                'file_path' => $downloadResult['file_path'],
+                'file_type' => $downloadResult['file_type'],
+                'size' => $downloadResult['size'] ?? 0,
+            ]);
+
+            // Extract text based on media type
+            $extractedText = null;
+            $extractionError = null;
+
+            try {
+                // For audio and video, extract text via Whisper
+                if (in_array($dto->type, ['audio', 'video'], true)) {
+                    $this->logger->info('WhatsApp: Extracting text from audio/video', [
+                        'type' => $dto->type,
+                        'file_type' => $downloadResult['file_type'],
+                    ]);
+
+                    [$extractedText, $extractionDetails] = $this->fileProcessor->extractText(
+                        $downloadResult['file_path'],
+                        $downloadResult['file_type'],
+                        $effectiveUserId
+                    );
+
+                    if (!empty($extractedText)) {
+                        $message->setFileText($extractedText);
+
+                        // CRITICAL: For audio/video messages, replace placeholder text with transcription
+                        // This ensures the AI receives the actual spoken content
+                        $currentText = $message->getText();
+                        $placeholders = ['[Audio message]', '[Audio]', '[Video]', '[Video message]'];
+
+                        if (empty($currentText) || in_array($currentText, $placeholders, true)) {
+                            $message->setText($extractedText);
+                            $this->logger->info('WhatsApp: Replaced media placeholder with transcription', [
+                                'type' => $dto->type,
+                                'transcription_length' => strlen($extractedText),
+                                'original_placeholder' => $currentText,
+                            ]);
                         }
-                    } catch (\Throwable $e) {
-                        $this->logger->error('WhatsApp file extraction failed', ['error' => $e->getMessage()]);
+                    } else {
+                        // Extraction failed - return error to user instead of proceeding with placeholder
+                        $this->logger->warning('WhatsApp: No text extracted from audio/video', [
+                            'type' => $dto->type,
+                            'details' => $extractionDetails ?? [],
+                        ]);
+
+                        if ('video' === $dto->type) {
+                            return 'Video has no audio track or audio could not be extracted';
+                        }
+
+                        return 'Audio transcription failed - no speech detected';
+                    }
+                } elseif ('image' === $dto->type || 'sticker' === $dto->type) {
+                    // For images and stickers: Don't extract text here - let ChatHandler use Vision AI
+                    // The ChatHandler has built-in vision support and will analyze the image
+                    // Stickers are WebP images and can be analyzed the same way
+                    $caption = $dto->incomingMsg[$dto->type]['caption'] ?? null;
+
+                    if (!empty($caption)) {
+                        // User asked a question about the image - use it as the prompt
+                        $message->setText($caption);
+                        $this->logger->info('WhatsApp: Image/sticker with caption, delegating to ChatHandler vision', [
+                            'type' => $dto->type,
+                            'caption' => $caption,
+                            'file_path' => $downloadResult['file_path'],
+                        ]);
+                    } else {
+                        // No caption: ask for a description
+                        $prompt = 'sticker' === $dto->type
+                            ? 'Describe this sticker. What does it show and what emotion or message does it convey?'
+                            : 'Describe what you see in this image.';
+                        $message->setText($prompt);
+                        $this->logger->info('WhatsApp: Image/sticker without caption, requesting description', [
+                            'type' => $dto->type,
+                            'file_path' => $downloadResult['file_path'],
+                        ]);
+                    }
+                // Note: fileText is intentionally NOT set - ChatHandler will include
+                // the image directly in the Vision API request for proper analysis
+                } else {
+                    // For documents and other types, use standard extraction
+                    [$extractedText] = $this->fileProcessor->extractText(
+                        $downloadResult['file_path'],
+                        $downloadResult['file_type'],
+                        $effectiveUserId
+                    );
+
+                    if (!empty($extractedText)) {
+                        $message->setFileText($extractedText);
                     }
                 }
+            } catch (\Throwable $e) {
+                $extractionError = $e->getMessage();
+                $this->logger->error('WhatsApp: Text extraction failed', [
+                    'type' => $dto->type,
+                    'file_type' => $downloadResult['file_type'],
+                    'error' => $extractionError,
+                    'trace' => $e->getTraceAsString(),
+                ]);
+
+                // For audio messages, extraction failure is critical
+                if ('audio' === $dto->type) {
+                    return "Transcription failed: {$extractionError}";
+                }
             }
+
+            return null; // Success
         } catch (\Exception $e) {
-            $this->logger->error('Failed to download WhatsApp media', ['error' => $e->getMessage()]);
+            $this->logger->error('WhatsApp: Media handling failed', [
+                'media_id' => $mediaId,
+                'type' => $dto->type,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            return "Media processing failed: {$e->getMessage()}";
         }
     }
 
@@ -870,5 +1544,61 @@ class WhatsAppService
 
         // Return 'unknown' for unmapped types - will be caught by ALLOWED_EXTENSIONS check
         return $mimeMap[$mimeType] ?? 'unknown';
+    }
+
+    /**
+     * Convert standard Markdown formatting to WhatsApp-compatible formatting.
+     *
+     * WhatsApp uses different syntax than standard Markdown:
+     * - Bold: *text* (not **text**)
+     * - Italic: _text_ (not *text*)
+     * - Strikethrough: ~text~ (not ~~text~~)
+     * - Monospace: ```text``` or `text` (same as MD)
+     *
+     * @see https://faq.whatsapp.com/539178204879377
+     */
+    private function convertToWhatsAppMarkdown(string $text): string
+    {
+        // Protect code blocks from conversion (they work the same in WhatsApp)
+        $codeBlocks = [];
+        $text = preg_replace_callback('/```[\s\S]*?```/', function ($match) use (&$codeBlocks) {
+            $placeholder = '{{CODE_BLOCK_'.count($codeBlocks).'}}';
+            $codeBlocks[$placeholder] = $match[0];
+
+            return $placeholder;
+        }, $text);
+
+        // Protect inline code from conversion
+        $inlineCode = [];
+        $text = preg_replace_callback('/`[^`]+`/', function ($match) use (&$inlineCode) {
+            $placeholder = '{{INLINE_CODE_'.count($inlineCode).'}}';
+            $inlineCode[$placeholder] = $match[0];
+
+            return $placeholder;
+        }, $text);
+
+        // Convert headers to bold (# Header → *Header*)
+        $text = preg_replace('/^#{1,6}\s+(.+)$/m', '*$1*', $text);
+
+        // Convert **bold** to *bold* (must be done before italic conversion)
+        $text = preg_replace('/\*\*(.+?)\*\*/', '*$1*', $text);
+
+        // Convert ~~strikethrough~~ to ~strikethrough~
+        $text = preg_replace('/~~(.+?)~~/', '~$1~', $text);
+
+        // Convert bullet points to Unicode bullets for cleaner display
+        $text = preg_replace('/^[\-\*]\s+/m', '• ', $text);
+
+        // Restore code blocks
+        foreach ($codeBlocks as $placeholder => $code) {
+            $text = str_replace($placeholder, $code, $text);
+        }
+
+        // Restore inline code
+        foreach ($inlineCode as $placeholder => $code) {
+            $text = str_replace($placeholder, $code, $text);
+        }
+
+        return $text;
     }
 }
