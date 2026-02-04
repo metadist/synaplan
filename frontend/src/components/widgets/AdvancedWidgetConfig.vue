@@ -54,7 +54,7 @@
                 'flex-1 sm:flex-none px-2 sm:px-4 py-3 font-medium text-xs sm:text-sm transition-colors relative whitespace-nowrap',
                 activeTab === tab.id ? 'txt-primary' : 'txt-secondary hover:txt-primary',
               ]"
-              data-testid="btn-tab"
+              :data-testid="`btn-tab-${tab.id}`"
               @click="activeTab = tab.id"
             >
               <span class="flex items-center justify-center sm:justify-start gap-1 sm:gap-2">

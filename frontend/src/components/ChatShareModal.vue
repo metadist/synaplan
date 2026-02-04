@@ -175,6 +175,7 @@
                   </button>
                 </div>
                 <div
+                  data-testid="text-share-url"
                   class="p-3 rounded bg-white dark:bg-black/20 font-mono text-sm break-all txt-primary"
                 >
                   {{ fullShareUrl }}

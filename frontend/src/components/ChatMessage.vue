@@ -32,6 +32,13 @@
         :class="['flex flex-col', role === 'user' ? 'bubble-user' : 'bubble-ai']"
         :data-testid="role === 'user' ? 'user-message-bubble' : 'assistant-message-bubble'"
       >
+        <!-- E2E: visible when streaming finished so tests can wait for message-done -->
+        <span
+          v-if="role === 'assistant' && !isStreaming"
+          data-testid="message-done"
+          class="sr-only"
+          aria-hidden="true"
+        />
         <!-- Processing Status (inside bubble, before content) -->
         <div
           v-if="isStreaming && processingStatus && role === 'assistant'"

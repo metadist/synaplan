@@ -35,6 +35,7 @@ export const WIDGET_DEFAULTS = {
   PRIMARY_COLOR: '#007bff',
   ICON_COLOR: '#ffffff',
   DEFAULT_THEME: 'light',
+  LAZY_LOAD: true,
   AUTO_OPEN: false,
   ALLOW_FILE_UPLOAD: false,
   IS_ACTIVE: true,
@@ -44,8 +45,19 @@ export const WIDGET_DEFAULTS = {
   FILE_UPLOAD_LIMIT: 3,
 } as const
 
-// Widget test messages
 export const WIDGET_MESSAGES = {
   AUTO_MESSAGE: 'Hello! This is a test welcome message.',
   TASK_PROMPT_MESSAGE: 'Test message for task prompt',
+} as const
+
+/** Task prompt for widget test that references uploaded file content (most_important_thing.txt) */
+export const WIDGET_TASK_PROMPT_KNOWLEDGE_BASE = `You are a helpful assistant.
+
+When users ask about the most important thing in the world, you should reference the information from the uploaded files in the knowledge base. Be helpful and provide accurate answers based on the information available in the knowledge base.`
+
+/** User question matching the task prompt test (expects answer from knowledge base) */
+export const WIDGET_TASK_PROMPT_QUESTION = 'What is the most important thing in the world?'
+
+export const WIDGET_TEST_URLS = {
+  EXAMPLE_DOMAIN: 'https://example.com',
 } as const
