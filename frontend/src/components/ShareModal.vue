@@ -273,9 +273,12 @@ const makePublic = async () => {
     }
     showSuccess('File is now public!')
     emit('shared')
-  } catch (error) {
+  } catch (error: any) {
     console.error('Failed to share file:', error)
-    showError('Failed to make file public')
+    // Don't show error toast if it's an auth error (redirecting to login)
+    if (error.message !== 'Authentication required') {
+      showError('Failed to make file public')
+    }
   } finally {
     sharing.value = false
   }
@@ -296,9 +299,11 @@ const revoke = async () => {
     }
     showSuccess('Public access revoked')
     emit('unshared')
-  } catch (error) {
+  } catch (error: any) {
     console.error('Failed to revoke share:', error)
-    showError('Failed to revoke access')
+    if (error.message !== 'Authentication required') {
+      showError('Failed to revoke access')
+    }
   } finally {
     revoking.value = false
   }
