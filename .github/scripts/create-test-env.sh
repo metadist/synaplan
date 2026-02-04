@@ -17,6 +17,7 @@ OIDC_CLIENT_SECRET=test_client_secret
 OIDC_DISCOVERY_URL=https://test.example.com
 OPENAI_API_KEY=test-key
 ANTHROPIC_API_KEY=test-key
+HUGGINGFACE_API_KEY=test-key
 THEHIVE_API_KEY=test-key
 LOCK_DSN=flock
 ENVEOF
