@@ -188,6 +188,12 @@ class WidgetSessionRepository extends ServiceEntityRepository
                 ->setParameter('to', $filters['to']);
         }
 
+        // Filter by favorite status
+        if (isset($filters['favorite'])) {
+            $qb->andWhere('ws.isFavorite = :isFavorite')
+                ->setParameter('isFavorite', $filters['favorite']);
+        }
+
         // Get total count
         $countQb = clone $qb;
         $total = (int) $countQb->select('COUNT(ws.id)')->getQuery()->getSingleScalarResult();

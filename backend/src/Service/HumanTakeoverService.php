@@ -49,13 +49,23 @@ final class HumanTakeoverService
         }
 
         $session->takeOver($operator->getId());
+
+        // Create system message in the chat
+        $systemMessage = 'You are now connected with a support agent.';
+        $message = $this->createSystemMessage($session, $operator, $systemMessage);
+
+        // Update session's last message preview
+        $session->setLastMessage(time());
+        $session->setLastMessagePreview($systemMessage);
         $this->em->flush();
 
-        // Create event for the widget user
+        // Create event for the widget user (include messageId to prevent duplicates)
         $this->publishToSession($widgetId, $sessionId, 'takeover', [
             'mode' => 'human',
             'operatorName' => $this->getOperatorDisplayName($operator),
-            'message' => 'You are now connected with a support agent.',
+            'message' => $systemMessage,
+            'messageId' => $message?->getId(),
+            'timestamp' => time(),
         ]);
 
         $this->logger->info('Human takeover initiated', [
@@ -79,12 +89,22 @@ final class HumanTakeoverService
         }
 
         $session->handBackToAi();
+
+        // Create system message in the chat
+        $systemMessage = 'You are now chatting with our AI assistant.';
+        $message = $this->createSystemMessage($session, $operator, $systemMessage);
+
+        // Update session's last message preview
+        $session->setLastMessage(time());
+        $session->setLastMessagePreview($systemMessage);
         $this->em->flush();
 
-        // Create event for the widget user
+        // Create event for the widget user (include messageId to prevent duplicates)
         $this->publishToSession($widgetId, $sessionId, 'handback', [
             'mode' => 'ai',
-            'message' => 'You are now chatting with our AI assistant.',
+            'message' => $systemMessage,
+            'messageId' => $message?->getId(),
+            'timestamp' => time(),
         ]);
 
         $this->logger->info('Session handed back to AI', [
@@ -255,5 +275,38 @@ final class HumanTakeoverService
         }
 
         return 'Support';
+    }
+
+    /**
+     * Create a system message in the chat (for takeover/handback notifications).
+     */
+    private function createSystemMessage(WidgetSession $session, User $operator, string $text): ?Message
+    {
+        $chatId = $session->getChatId();
+        if (!$chatId) {
+            return null;
+        }
+
+        $chat = $this->chatRepository->find($chatId);
+        if (!$chat) {
+            return null;
+        }
+
+        $message = new Message();
+        $message->setUserId($operator->getId());
+        $message->setChat($chat);
+        $message->setText($text);
+        $message->setDirection('OUT');
+        $message->setStatus('complete');
+        $message->setMessageType('WDGT');
+        $message->setTrackingId(time());
+        $message->setUnixTimestamp(time());
+        $message->setDateTime(date('YmdHis'));
+        $message->setProviderIndex('SYSTEM');
+
+        $this->em->persist($message);
+        $this->em->flush();
+
+        return $message;
     }
 }

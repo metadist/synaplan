@@ -2,8 +2,10 @@
 
 namespace App\Service;
 
+use App\AI\Service\AiFacade;
 use App\Entity\Chat;
 use App\Entity\WidgetSession;
+use App\Repository\MessageRepository;
 use App\Repository\WidgetSessionRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
@@ -28,6 +30,9 @@ class WidgetSessionService
     public function __construct(
         private EntityManagerInterface $em,
         private WidgetSessionRepository $sessionRepository,
+        private MessageRepository $messageRepository,
+        private AiFacade $aiFacade,
+        private ModelConfigService $modelConfigService,
         private LoggerInterface $logger,
     ) {
     }
@@ -136,6 +141,115 @@ class WidgetSessionService
         $session->incrementMessageCount();
         $session->updateLastMessage();
         $this->em->flush();
+    }
+
+    /**
+     * Generate an AI summary title for the session after 5 user messages.
+     * This should be called asynchronously to not block the response.
+     */
+    public function generateTitleIfNeeded(WidgetSession $session, int $ownerId): void
+    {
+        $this->logger->info('Title generation check', [
+            'session_id' => $session->getSessionId(),
+            'message_count' => $session->getMessageCount(),
+            'has_title' => $session->getTitle() !== null,
+        ]);
+
+        // Only generate title if >= 5 messages and no title exists yet
+        if ($session->getMessageCount() < 5 || $session->getTitle() !== null) {
+            $this->logger->debug('Skipping title generation', [
+                'reason' => $session->getMessageCount() < 5 ? 'message_count_below_5' : 'title_already_exists',
+            ]);
+
+            return;
+        }
+
+        $this->logger->info('Proceeding with title generation');
+
+        $chatId = $session->getChatId();
+        if (!$chatId) {
+            $this->logger->warning('No chatId for session, cannot generate title');
+
+            return;
+        }
+
+        $this->logger->debug('ChatId found', ['chat_id' => $chatId]);
+
+        try {
+            // Fetch the conversation messages (use findChatHistory with ownerId)
+            // Use a high character limit since we only need user messages for title generation
+            $messages = $this->messageRepository->findChatHistory($ownerId, $chatId, 20, 50000);
+
+            $this->logger->debug('Fetched messages for title generation', [
+                'total_count' => count($messages),
+                'chat_id' => $chatId,
+            ]);
+
+            if (count($messages) < 3) {
+                $this->logger->debug('Not enough messages for title generation', ['count' => count($messages)]);
+
+                return;
+            }
+
+            // Build conversation text for summarization (only user messages)
+            $userMessages = array_filter($messages, fn ($m) => $m->getDirection() === 'IN');
+            if (count($userMessages) < 3) {
+                $this->logger->debug('Not enough user messages for title generation', ['count' => count($userMessages)]);
+
+                return;
+            }
+
+            $conversationText = '';
+            foreach ($userMessages as $message) {
+                $text = mb_substr($message->getText(), 0, 200);
+                $conversationText .= "- {$text}\n";
+            }
+
+            // Use gpt-4o-mini for cheap, fast summarization
+            $aiOptions = ['temperature' => 0.3];
+            $provider = $this->modelConfigService->getProviderForModel(73);
+            $modelName = $this->modelConfigService->getModelName(73);
+            if ($provider && $modelName) {
+                $aiOptions['provider'] = $provider;
+                $aiOptions['model'] = $modelName;
+            }
+
+            $prompt = <<<PROMPT
+Based on these user questions/messages, create a short title (3-5 words) that describes what the user is asking about.
+Only output the title, nothing else. No quotes, no punctuation at the end.
+
+User messages:
+{$conversationText}
+
+Title:
+PROMPT;
+
+            $response = $this->aiFacade->chat(
+                [['role' => 'user', 'content' => $prompt]],
+                $ownerId,
+                $aiOptions
+            );
+
+            $title = trim($response['content'] ?? '');
+            // Clean up: remove quotes and limit length
+            $title = trim($title, '"\'');
+            $title = mb_substr($title, 0, 50);
+
+            if (!empty($title)) {
+                $session->setTitle($title);
+                $this->em->flush();
+
+                $this->logger->info('Generated AI title for widget session', [
+                    'session_id' => substr($session->getSessionId(), 0, 12).'...',
+                    'title' => $title,
+                ]);
+            }
+        } catch (\Exception $e) {
+            $this->logger->warning('Failed to generate AI title for session', [
+                'session_id' => substr($session->getSessionId(), 0, 12).'...',
+                'error' => $e->getMessage(),
+            ]);
+        }
     }
 
     public function checkFileUploadLimit(WidgetSession $session, ?int $maxFiles = null): array

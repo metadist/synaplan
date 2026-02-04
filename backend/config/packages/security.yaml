@@ -80,6 +80,7 @@ security:
         - { path: ^/api/v1/widget/[^/]+/history, roles: PUBLIC_ACCESS }
         - { path: ^/api/v1/widget/[^/]+/message, roles: PUBLIC_ACCESS }
         - { path: ^/api/v1/widget/[^/]+/upload, roles: PUBLIC_ACCESS }
+        - { path: ^/api/v1/widget/[^/]+/typing, roles: PUBLIC_ACCESS }
         - { path: ^/api/v1/widget/[^/]+/files/[^/]+/download, roles: PUBLIC_ACCESS }
         - { path: ^/api/v1/messages/stream, roles: PUBLIC_ACCESS }
         - { path: ^/api, methods: [OPTIONS], roles: PUBLIC_ACCESS }

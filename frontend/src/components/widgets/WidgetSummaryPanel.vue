@@ -1,7 +1,7 @@
 <template>
-  <div class="surface-card p-4 lg:p-6">
+  <div :class="compact ? '' : 'surface-card p-4 lg:p-6'">
     <!-- Header -->
-    <div class="flex items-center justify-between mb-4">
+    <div v-if="!compact" class="flex items-center justify-between mb-4">
       <h3 class="text-lg font-semibold txt-primary flex items-center gap-2">
         <Icon icon="heroicons:chart-bar" class="w-5 h-5 txt-brand" />
         {{ $t('summary.title') }}
@@ -30,6 +30,29 @@
       </div>
     </div>
 
+    <!-- Compact Header -->
+    <div v-else class="flex items-center gap-2 mb-3">
+      <select
+        v-model="selectedDate"
+        class="flex-1 px-2 py-1.5 rounded-lg surface-chip text-xs txt-primary"
+        @change="loadSummary"
+      >
+        <option v-for="option in dateOptions" :key="option.value" :value="option.value">
+          {{ option.label }}
+        </option>
+      </select>
+      <button
+        :disabled="generating"
+        class="px-2 py-1.5 rounded-lg btn-primary text-xs font-medium flex items-center gap-1 disabled:opacity-50"
+        @click="generateSummary"
+      >
+        <Icon
+          :icon="generating ? 'heroicons:arrow-path' : 'heroicons:sparkles'"
+          :class="['w-3.5 h-3.5', generating && 'animate-spin']"
+        />
+      </button>
+    </div>
+
     <!-- Loading -->
     <div v-if="loading" class="text-center py-8">
       <div
@@ -53,39 +76,39 @@
     <!-- Summary Content -->
     <template v-else>
       <!-- Stats Row -->
-      <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
-        <div class="p-3 surface-chip rounded-lg text-center">
+      <div :class="compact ? 'grid grid-cols-2 gap-2 mb-4' : 'grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6'">
+        <div :class="compact ? 'p-2 surface-chip rounded-lg text-center' : 'p-3 surface-chip rounded-lg text-center'">
           <p class="text-xs txt-secondary">{{ $t('summary.sessions') }}</p>
-          <p class="text-xl font-bold txt-primary">{{ summary.sessionCount }}</p>
+          <p :class="compact ? 'text-lg font-bold txt-primary' : 'text-xl font-bold txt-primary'">{{ summary.sessionCount }}</p>
         </div>
-        <div class="p-3 surface-chip rounded-lg text-center">
+        <div :class="compact ? 'p-2 surface-chip rounded-lg text-center' : 'p-3 surface-chip rounded-lg text-center'">
           <p class="text-xs txt-secondary">{{ $t('summary.messages') }}</p>
-          <p class="text-xl font-bold txt-primary">{{ summary.messageCount }}</p>
+          <p :class="compact ? 'text-lg font-bold txt-primary' : 'text-xl font-bold txt-primary'">{{ summary.messageCount }}</p>
         </div>
-        <div class="p-3 surface-chip rounded-lg text-center">
+        <div :class="compact ? 'p-2 surface-chip rounded-lg text-center' : 'p-3 surface-chip rounded-lg text-center'">
           <p class="text-xs txt-secondary">{{ $t('summary.positive') }}</p>
-          <p class="text-xl font-bold text-green-600">{{ summary.sentiment.positive }}%</p>
+          <p :class="compact ? 'text-lg font-bold text-green-600' : 'text-xl font-bold text-green-600'">{{ summary.sentiment.positive }}%</p>
         </div>
-        <div class="p-3 surface-chip rounded-lg text-center">
+        <div :class="compact ? 'p-2 surface-chip rounded-lg text-center' : 'p-3 surface-chip rounded-lg text-center'">
           <p class="text-xs txt-secondary">{{ $t('summary.negative') }}</p>
-          <p class="text-xl font-bold text-red-600">{{ summary.sentiment.negative }}%</p>
+          <p :class="compact ? 'text-lg font-bold text-red-600' : 'text-xl font-bold text-red-600'">{{ summary.sentiment.negative }}%</p>
         </div>
       </div>
 
       <!-- Executive Summary -->
-      <div class="mb-6">
+      <div :class="compact ? 'mb-4' : 'mb-6'">
         <h4 class="text-sm font-medium txt-primary mb-2">{{ $t('summary.executiveSummary') }}</h4>
-        <p class="txt-secondary text-sm">{{ summary.summary }}</p>
+        <p :class="compact ? 'txt-secondary text-xs' : 'txt-secondary text-sm'">{{ summary.summary }}</p>
       </div>
 
       <!-- Topics -->
-      <div v-if="summary.topics.length > 0" class="mb-6">
+      <div v-if="summary.topics.length > 0" :class="compact ? 'mb-4' : 'mb-6'">
         <h4 class="text-sm font-medium txt-primary mb-2">{{ $t('summary.mainTopics') }}</h4>
-        <div class="flex flex-wrap gap-2">
+        <div class="flex flex-wrap gap-1.5">
           <span
-            v-for="topic in summary.topics"
+            v-for="topic in compact ? summary.topics.slice(0, 5) : summary.topics"
             :key="topic"
-            class="px-2 py-1 rounded-full text-xs font-medium bg-[var(--brand-alpha-light)] txt-brand"
+            class="px-2 py-0.5 rounded-full text-xs font-medium bg-[var(--brand-alpha-light)] txt-brand"
           >
             {{ topic }}
           </span>
@@ -93,30 +116,34 @@
       </div>
 
       <!-- FAQs -->
-      <div v-if="summary.faqs.length > 0" class="mb-6">
+      <div v-if="summary.faqs.length > 0" :class="compact ? 'mb-4' : 'mb-6'">
         <h4 class="text-sm font-medium txt-primary mb-2">{{ $t('summary.frequentQuestions') }}</h4>
-        <ul class="space-y-2">
+        <ul :class="compact ? 'space-y-1' : 'space-y-2'">
           <li
-            v-for="faq in summary.faqs.slice(0, 5)"
+            v-for="faq in summary.faqs.slice(0, compact ? 3 : 5)"
             :key="faq.question"
-            class="flex items-center gap-2 text-sm"
+            :class="compact ? 'flex items-center gap-2 text-xs' : 'flex items-center gap-2 text-sm'"
           >
             <span class="px-1.5 py-0.5 rounded text-xs font-medium bg-blue-500/10 text-blue-600">
               {{ faq.frequency }}x
             </span>
-            <span class="txt-secondary">{{ faq.question }}</span>
+            <span class="txt-secondary line-clamp-1">{{ faq.question }}</span>
           </li>
         </ul>
       </div>
 
       <!-- Issues -->
-      <div v-if="summary.issues.length > 0" class="mb-6">
+      <div v-if="summary.issues.length > 0" :class="compact ? 'mb-4' : 'mb-6'">
         <h4 class="text-sm font-medium txt-primary mb-2 flex items-center gap-1">
           <Icon icon="heroicons:exclamation-triangle" class="w-4 h-4 text-yellow-500" />
           {{ $t('summary.issues') }}
         </h4>
         <ul class="space-y-1">
-          <li v-for="issue in summary.issues" :key="issue" class="text-sm txt-secondary flex items-start gap-2">
+          <li
+            v-for="issue in compact ? summary.issues.slice(0, 3) : summary.issues"
+            :key="issue"
+            :class="compact ? 'text-xs txt-secondary flex items-start gap-2' : 'text-sm txt-secondary flex items-start gap-2'"
+          >
             <span class="text-yellow-500">•</span>
             {{ issue }}
           </li>
@@ -130,7 +157,11 @@
           {{ $t('summary.recommendations') }}
         </h4>
         <ul class="space-y-1">
-          <li v-for="rec in summary.recommendations" :key="rec" class="text-sm txt-secondary flex items-start gap-2">
+          <li
+            v-for="rec in compact ? summary.recommendations.slice(0, 3) : summary.recommendations"
+            :key="rec"
+            :class="compact ? 'text-xs txt-secondary flex items-start gap-2' : 'text-sm txt-secondary flex items-start gap-2'"
+          >
             <span class="text-green-500">•</span>
             {{ rec }}
           </li>
@@ -147,9 +178,12 @@ import { useI18n } from 'vue-i18n'
 import * as widgetSessionsApi from '@/services/api/widgetSessionsApi'
 import { useNotification } from '@/composables/useNotification'
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   widgetId: string
-}>()
+  compact?: boolean
+}>(), {
+  compact: false,
+})
 
 const { t } = useI18n()
 const { error, success } = useNotification()

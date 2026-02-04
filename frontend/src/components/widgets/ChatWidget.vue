@@ -126,7 +126,7 @@
           @click="handleMessagesClick"
         >
           <div
-            v-for="message in messages"
+            v-for="message in sortedMessages"
             :key="message.id"
             :class="['flex', message.role === 'user' ? 'justify-end' : 'justify-start']"
           >
@@ -502,6 +502,7 @@ import { useI18n } from 'vue-i18n'
 import { parseAIResponse } from '@/utils/responseParser'
 import { getMarkdownRenderer } from '@/composables/useMarkdown'
 import { subscribeToSession, type EventSubscription, type WidgetEvent } from '@/services/sseClient'
+import { detectApiUrl } from '@/widget-utils'
 
 interface Props {
   widgetId: string
@@ -612,6 +613,11 @@ const isTestEnvironment = computed(() => props.testMode || props.isPreview)
 const testModeHeaders = computed(
   (): Record<string, string> => (isTestEnvironment.value ? { 'X-Widget-Test-Mode': 'true' } : {})
 )
+
+// Always display messages sorted by timestamp
+const sortedMessages = computed(() => {
+  return [...messages.value].sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime())
+})
 const fileUploadCount = ref(0)
 const uploadingFile = ref(false)
 const fileUploadError = ref<string | null>(null)
@@ -1298,6 +1304,12 @@ const sendMessage = async () => {
     }
 
     isTyping.value = false
+
+    // Subscribe to SSE after first successful message (session now exists on server)
+    if (!eventSubscription && sessionId.value) {
+      console.debug('[Widget] First message sent, subscribing to SSE')
+      subscribeToEvents()
+    }
   } catch (error) {
     console.error('Failed to send message:', error)
     const lastMessage = messages.value.find((m) => m.id === assistantMessageId)
@@ -1538,16 +1550,16 @@ const loadConversationHistory = async (force = false) => {
           fileUploadCount.value = data.session.fileCount
         }
 
-        // Update chat mode from session and subscribe to SSE only if needed
+        // Update chat mode from session
         if (data.session.mode) {
-          const previousMode = chatMode.value
           chatMode.value = data.session.mode
+        }
 
-          // Subscribe to SSE only when in human or waiting mode
-          if ((data.session.mode === 'human' || data.session.mode === 'waiting') && previousMode === 'ai') {
-            console.debug('[Widget] Session in human/waiting mode, subscribing to SSE')
-            subscribeToEvents()
-          }
+        // Only subscribe to SSE if the session has messages (exists on server)
+        // This prevents 404 errors for brand new sessions that aren't persisted yet
+        if (!eventSubscription && data.session.messageCount > 0) {
+          console.debug('[Widget] Subscribing to SSE for real-time events')
+          subscribeToEvents()
         }
       } else if (loadedMessages.length > 0) {
         messageCount.value = loadedMessages.filter((m: Message) => m.role === 'user').length
@@ -1682,12 +1694,21 @@ const renderMessageContent = (value: string): string => {
   return html
 }
 
+// Close SSE connection before page unload to prevent browser warning
+const handleBeforeUnload = () => {
+  if (eventSubscription) {
+    eventSubscription.unsubscribe()
+    eventSubscription = null
+  }
+}
+
 // Load session ID from localStorage on mount (skip for test mode)
 onMounted(() => {
   updateIsMobile()
   if (typeof window !== 'undefined') {
     window.addEventListener('resize', updateIsMobile)
     window.addEventListener('orientationchange', updateIsMobile)
+    window.addEventListener('beforeunload', handleBeforeUnload)
   }
 
   window.addEventListener('synaplan-widget-open', handleOpenEvent)
@@ -1732,6 +1753,7 @@ onBeforeUnmount(() => {
   if (typeof window !== 'undefined') {
     window.removeEventListener('resize', updateIsMobile)
     window.removeEventListener('orientationchange', updateIsMobile)
+    window.removeEventListener('beforeunload', handleBeforeUnload)
   }
 
   window.removeEventListener('synaplan-widget-open', handleOpenEvent)
@@ -1749,52 +1771,66 @@ onBeforeUnmount(() => {
  */
 function handleWidgetEvent(data: WidgetEvent) {
   switch (data.type) {
-    case 'takeover':
+    case 'takeover': {
       // Human operator took over the chat
       chatMode.value = 'human'
       operatorName.value = (data.operatorName as string) ?? 'Support'
-      // Add system message
-      messages.value.push({
-        id: `system-${Date.now()}`,
-        role: 'assistant',
-        type: 'text',
-        content: (data.message as string) ?? 'You are now connected with a support agent.',
-        timestamp: new Date(),
-      })
-      scrollToBottom()
+      // Add system message (use messageId to prevent duplicates)
+      const takeoverMsgId = data.messageId ? String(data.messageId) : `system-${Date.now()}`
+      if (!messages.value.some(m => String(m.id) === takeoverMsgId)) {
+        messages.value.push({
+          id: takeoverMsgId,
+          role: 'assistant',
+          type: 'text',
+          content: (data.message as string) ?? 'You are now connected with a support agent.',
+          timestamp: new Date(),
+        })
+        scrollToBottom()
+      }
       break
+    }
 
-    case 'handback':
+    case 'handback': {
       // Session handed back to AI
       chatMode.value = 'ai'
       operatorName.value = null
-      messages.value.push({
-        id: `system-${Date.now()}`,
-        role: 'assistant',
-        type: 'text',
-        content: (data.message as string) ?? 'You are now chatting with our AI assistant.',
-        timestamp: new Date(),
-      })
-      scrollToBottom()
-      break
-
-    case 'message':
-      // New message from human operator (direction 'IN' = incoming to widget = from operator)
-      if (data.sender === 'human') {
-        const text = data.text as string
+      // Add system message (use messageId to prevent duplicates)
+      const handbackMsgId = data.messageId ? String(data.messageId) : `system-${Date.now()}`
+      if (!messages.value.some(m => String(m.id) === handbackMsgId)) {
         messages.value.push({
-          id: `msg-${data.messageId ?? Date.now()}`,
+          id: handbackMsgId,
           role: 'assistant',
           type: 'text',
-          content: text,
-          timestamp: new Date((data.timestamp as number) * 1000),
+          content: (data.message as string) ?? 'You are now chatting with our AI assistant.',
+          timestamp: new Date(),
         })
         scrollToBottom()
-        if (!isOpen.value) {
-          unreadCount.value++
+      }
+      break
+    }
+
+    case 'message': {
+      // New message from human operator (direction 'IN' = incoming to widget = from operator)
+      if (data.sender === 'human') {
+        const msgId = data.messageId ? String(data.messageId) : `msg-${Date.now()}`
+        // Check for duplicates before adding
+        if (!messages.value.some(m => String(m.id) === msgId)) {
+          const text = data.text as string
+          messages.value.push({
+            id: msgId,
+            role: 'assistant',
+            type: 'text',
+            content: text,
+            timestamp: new Date((data.timestamp as number) * 1000),
+          })
+          scrollToBottom()
+          if (!isOpen.value) {
+            unreadCount.value++
+          }
         }
       }
       break
+    }
 
     case 'typing':
       // Operator is typing
@@ -1858,6 +1894,66 @@ if (props.openImmediately) {
 watch(isOpen, (newVal) => {
   if (newVal) {
     scrollToBottom()
+  }
+})
+
+// Typing indicator - send typing text to admin dashboard
+let lastTypingSent = ''
+let typingDebounceTimer: ReturnType<typeof setTimeout> | null = null
+
+async function sendTypingUpdate(text: string) {
+  if (!sessionId.value || props.isPreview) return
+
+  // Don't send if text hasn't changed
+  if (text === lastTypingSent) return
+  lastTypingSent = text
+
+  try {
+    const apiUrl = props.apiUrl || detectApiUrl()
+    await fetch(`${apiUrl}/api/v1/widget/${props.widgetId}/typing`, {
+      method: 'POST',
+      headers: buildWidgetHeaders(),
+      body: JSON.stringify({
+        sessionId: sessionId.value,
+        text: text,
+      }),
+    })
+  } catch {
+    // Silently ignore typing errors - not critical
+  }
+}
+
+// Watch input and send typing updates (debounced)
+watch(inputMessage, (newValue) => {
+  // Clear any pending timer
+  if (typingDebounceTimer) {
+    clearTimeout(typingDebounceTimer)
+    typingDebounceTimer = null
+  }
+
+  // Only send typing updates if user has sent at least one message (session exists)
+  if (messageCount.value === 0) return
+
+  if (!newValue) {
+    // Text cleared (or message sent) - immediately send empty to clear preview
+    sendTypingUpdate('')
+    return
+  }
+
+  // Debounce: wait 300ms before sending to avoid too many requests
+  typingDebounceTimer = setTimeout(() => {
+    sendTypingUpdate(newValue)
+  }, 300)
+})
+
+// Clear typing when component unmounts
+onBeforeUnmount(() => {
+  if (typingDebounceTimer) {
+    clearTimeout(typingDebounceTimer)
+  }
+  // Send empty typing to clear the preview
+  if (lastTypingSent && sessionId.value) {
+    sendTypingUpdate('')
   }
 })
 

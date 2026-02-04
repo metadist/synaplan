@@ -88,6 +88,12 @@ export function subscribeToSession(
         onEvent({ type: 'message', ...data })
       })
 
+      eventSource.addEventListener('typing', (e) => {
+        const data = JSON.parse(e.data)
+        lastEventId = parseInt(e.lastEventId || '0', 10)
+        onEvent({ type: 'typing', ...data })
+      })
+
       eventSource.addEventListener('reconnect', (e) => {
         const data = JSON.parse(e.data)
         lastEventId = data.lastEventId || lastEventId
@@ -100,8 +106,8 @@ export function subscribeToSession(
         }
       })
 
-      eventSource.onerror = (error) => {
-        console.warn('[SSE] Connection error', error)
+      eventSource.onerror = () => {
+        console.debug('[SSE] Connection closed or error')
         // Retry SSE connection after a delay (no polling fallback)
         eventSource?.close()
         eventSource = null

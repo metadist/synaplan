@@ -56,6 +56,7 @@ class WidgetSessionController extends AbstractController
     #[OA\Parameter(name: 'to', in: 'query', description: 'Unix timestamp', schema: new OA\Schema(type: 'integer'))]
     #[OA\Parameter(name: 'sort', in: 'query', schema: new OA\Schema(type: 'string', enum: ['lastMessage', 'created', 'messageCount'], default: 'lastMessage'))]
     #[OA\Parameter(name: 'order', in: 'query', schema: new OA\Schema(type: 'string', enum: ['ASC', 'DESC'], default: 'DESC'))]
+    #[OA\Parameter(name: 'favorite', in: 'query', description: 'Filter by favorite status', schema: new OA\Schema(type: 'boolean'))]
     #[OA\Response(
         response: 200,
         description: 'List of sessions',
@@ -142,27 +143,44 @@ class WidgetSessionController extends AbstractController
         if ($request->query->has('order')) {
             $filters['order'] = $request->query->get('order');
         }
+        if ($request->query->has('favorite')) {
+            $filters['favorite'] = filter_var($request->query->get('favorite'), FILTER_VALIDATE_BOOLEAN);
+        }
 
         try {
             $result = $this->sessionRepository->findSessionsByWidget($widgetId, $limit, $offset, $filters);
             $modeStats = $this->sessionRepository->countSessionsByMode($widgetId);
 
-            $sessionsData = array_map(function (WidgetSession $session) {
+            // Get chat IDs for all sessions to fetch actual last messages
+            $chatIds = array_filter(array_map(fn (WidgetSession $s) => $s->getChatId(), $result['sessions']));
+            $lastMessages = !empty($chatIds) ? $this->messageRepository->getLastMessageTextForChats($chatIds) : [];
+
+            $sessionsData = array_map(function (WidgetSession $session) use ($lastMessages) {
+                $chatId = $session->getChatId();
+                // Use actual last message from database, truncated to 100 chars
+                $lastMessagePreview = null;
+                if ($chatId && isset($lastMessages[$chatId])) {
+                    $lastMessagePreview = mb_substr($lastMessages[$chatId], 0, 100);
+                }
+
                 return [
                     'id' => $session->getId(),
                     'sessionId' => $session->getSessionId(),
                     'sessionIdDisplay' => $this->anonymizeSessionId($session->getSessionId()),
-                    'chatId' => $session->getChatId(),
+                    'chatId' => $chatId,
                     'messageCount' => $session->getMessageCount(),
                     'fileCount' => $session->getFileCount(),
                     'mode' => $session->getMode(),
                     'humanOperatorId' => $session->getHumanOperatorId(),
                     'lastMessage' => $session->getLastMessage(),
-                    'lastMessagePreview' => $session->getLastMessagePreview(),
+                    'lastMessagePreview' => $lastMessagePreview,
                     'lastHumanActivity' => $session->getLastHumanActivity(),
                     'created' => $session->getCreated(),
                     'expires' => $session->getExpires(),
                     'isExpired' => $session->isExpired(),
+                    'isFavorite' => $session->isFavorite(),
+                    'country' => $session->getCountry(),
+                    'title' => $session->getTitle(),
                 ];
             }, $result['sessions']);
 
@@ -248,6 +266,7 @@ class WidgetSessionController extends AbstractController
 
         // Get chat messages if chat exists
         $messages = [];
+        $chatMessages = [];
         if ($session->getChatId()) {
             $chat = $this->chatRepository->find($session->getChatId());
             if ($chat) {
@@ -259,11 +278,13 @@ class WidgetSessionController extends AbstractController
                 );
                 $messages = array_map(function ($message) {
                     // Determine sender based on direction and provider
-                    // Direction: IN = user message, OUT = system response (AI or human operator)
-                    $isHumanOperator = $message->getProviderIndex() === 'HUMAN_OPERATOR';
+                    // Direction: IN = user message, OUT = system response (AI, human operator, or system)
+                    $providerIndex = $message->getProviderIndex();
                     if ($message->getDirection() === 'IN') {
                         $sender = 'user';
-                    } elseif ($isHumanOperator) {
+                    } elseif ($providerIndex === 'SYSTEM') {
+                        $sender = 'system';
+                    } elseif ($providerIndex === 'HUMAN_OPERATOR') {
                         $sender = 'human';
                     } else {
                         $sender = 'ai';
@@ -280,6 +301,16 @@ class WidgetSessionController extends AbstractController
             }
         }
 
+        // Get last message preview from the transformed messages array
+        $lastMessagePreview = null;
+        if (!empty($messages)) {
+            // Messages array is ordered oldest first, so last element is newest
+            $lastIndex = count($messages) - 1;
+            if (isset($messages[$lastIndex]['text'])) {
+                $lastMessagePreview = mb_substr($messages[$lastIndex]['text'], 0, 100);
+            }
+        }
+
         return $this->json([
             'success' => true,
             'session' => [
@@ -292,14 +323,83 @@ class WidgetSessionController extends AbstractController
                 'mode' => $session->getMode(),
                 'humanOperatorId' => $session->getHumanOperatorId(),
                 'lastMessage' => $session->getLastMessage(),
-                'lastMessagePreview' => $session->getLastMessagePreview(),
+                'lastMessagePreview' => $lastMessagePreview,
                 'lastHumanActivity' => $session->getLastHumanActivity(),
                 'created' => $session->getCreated(),
                 'expires' => $session->getExpires(),
                 'isExpired' => $session->isExpired(),
+                'isFavorite' => $session->isFavorite(),
+                'country' => $session->getCountry(),
+                'title' => $session->getTitle(),
             ],
             'messages' => $messages,
         ]);
+    }
+
+    /**
+     * Toggle favorite status for a session.
+     */
+    #[Route('/{sessionId}/favorite', name: 'toggle_favorite', methods: ['POST'])]
+    #[OA\Post(
+        path: '/api/v1/widgets/{widgetId}/sessions/{sessionId}/favorite',
+        summary: 'Toggle favorite status for a session',
+        security: [['Bearer' => []]],
+        tags: ['Widget Sessions']
+    )]
+    #[OA\Response(
+        response: 200,
+        description: 'Favorite status toggled',
+        content: new OA\JsonContent(
+            properties: [
+                new OA\Property(property: 'success', type: 'boolean'),
+                new OA\Property(property: 'isFavorite', type: 'boolean'),
+            ]
+        )
+    )]
+    public function toggleFavorite(
+        string $widgetId,
+        string $sessionId,
+        #[CurrentUser] ?User $user
+    ): JsonResponse {
+        if (!$user) {
+            return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
+        }
+
+        $widget = $this->widgetRepository->findByWidgetId($widgetId);
+
+        if (!$widget) {
+            return $this->json(['error' => 'Widget not found'], Response::HTTP_NOT_FOUND);
+        }
+
+        if ($widget->getOwnerId() !== $user->getId()) {
+            return $this->json(['error' => 'Access denied'], Response::HTTP_FORBIDDEN);
+        }
+
+        $session = $this->sessionRepository->findByWidgetAndSession($widgetId, $sessionId);
+
+        if (!$session) {
+            return $this->json(['error' => 'Session not found'], Response::HTTP_NOT_FOUND);
+        }
+
+        try {
+            $session->toggleFavorite();
+            $this->sessionRepository->save($session, true);
+
+            return $this->json([
+                'success' => true,
+                'isFavorite' => $session->isFavorite(),
+            ]);
+        } catch (\Exception $e) {
+            $this->logger->error('Failed to toggle favorite', [
+                'widget_id' => $widgetId,
+                'session_id' => $sessionId,
+                'error' => $e->getMessage(),
+            ]);
+
+            return $this->json([
+                'error' => 'Failed to toggle favorite',
+            ], Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
     }
 
     /**

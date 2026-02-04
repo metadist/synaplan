@@ -15,6 +15,9 @@ export interface WidgetSession {
   created: number
   expires: number
   isExpired: boolean
+  isFavorite: boolean
+  country: string | null
+  title: string | null
 }
 
 export interface SessionMessage {
@@ -22,7 +25,7 @@ export interface SessionMessage {
   direction: 'IN' | 'OUT'
   text: string
   timestamp: number
-  sender: 'user' | 'ai' | 'human'
+  sender: 'user' | 'ai' | 'human' | 'system'
 }
 
 export interface WidgetSessionsResponse {
@@ -56,6 +59,7 @@ export interface ListSessionsParams {
   to?: number
   sort?: 'lastMessage' | 'created' | 'messageCount'
   order?: 'ASC' | 'DESC'
+  favorite?: boolean
 }
 
 /**
@@ -75,6 +79,7 @@ export async function listWidgetSessions(
   if (params.to !== undefined) queryParams.set('to', String(params.to))
   if (params.sort) queryParams.set('sort', params.sort)
   if (params.order) queryParams.set('order', params.order)
+  if (params.favorite !== undefined) queryParams.set('favorite', String(params.favorite))
 
   const queryString = queryParams.toString()
   const url = `/api/v1/widgets/${widgetId}/sessions${queryString ? `?${queryString}` : ''}`
@@ -123,6 +128,21 @@ export async function handBackSession(
 ): Promise<{ success: boolean; session: WidgetSession }> {
   return await httpClient<{ success: boolean; session: WidgetSession }>(
     `/api/v1/widgets/${widgetId}/sessions/${sessionId}/handback`,
+    {
+      method: 'POST',
+    }
+  )
+}
+
+/**
+ * Toggle favorite status for a session
+ */
+export async function toggleFavorite(
+  widgetId: string,
+  sessionId: string
+): Promise<{ success: boolean; isFavorite: boolean }> {
+  return await httpClient<{ success: boolean; isFavorite: boolean }>(
+    `/api/v1/widgets/${widgetId}/sessions/${sessionId}/favorite`,
     {
       method: 'POST',
     }

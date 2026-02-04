@@ -70,6 +70,26 @@ class WidgetSession
     #[ORM\Column(name: 'BLAST_MESSAGE_PREVIEW', type: 'string', length: 255, nullable: true)]
     private ?string $lastMessagePreview = null;
 
+    /**
+     * Whether this session is marked as favorite by the widget owner.
+     */
+    #[ORM\Column(name: 'BIS_FAVORITE', type: 'boolean', options: ['default' => false])]
+    private bool $isFavorite = false;
+
+    /**
+     * ISO 3166-1 Alpha-2 country code from Cloudflare geolocation (e.g., "DE", "US").
+     * Null if not detected or if using Tor (T1) or unknown (XX).
+     */
+    #[ORM\Column(name: 'BCOUNTRY', type: 'string', length: 2, nullable: true)]
+    private ?string $country = null;
+
+    /**
+     * AI-generated title summarizing the conversation (max 50 chars).
+     * Generated after 5 user messages.
+     */
+    #[ORM\Column(name: 'BTITLE', type: 'string', length: 100, nullable: true)]
+    private ?string $title = null;
+
     public function __construct()
     {
         $this->created = time();
@@ -325,6 +345,54 @@ class WidgetSession
     public function setWaitingForHuman(): self
     {
         $this->mode = self::MODE_WAITING;
+
+        return $this;
+    }
+
+    public function isFavorite(): bool
+    {
+        return $this->isFavorite;
+    }
+
+    public function setIsFavorite(bool $isFavorite): self
+    {
+        $this->isFavorite = $isFavorite;
+
+        return $this;
+    }
+
+    public function toggleFavorite(): self
+    {
+        $this->isFavorite = !$this->isFavorite;
+
+        return $this;
+    }
+
+    public function getCountry(): ?string
+    {
+        return $this->country;
+    }
+
+    public function setCountry(?string $country): self
+    {
+        // Filter out special Cloudflare codes (XX = unknown, T1 = Tor)
+        if ($country === 'XX' || $country === 'T1' || $country === null || $country === '') {
+            $this->country = null;
+        } else {
+            $this->country = strtoupper($country);
+        }
+
+        return $this;
+    }
+
+    public function getTitle(): ?string
+    {
+        return $this->title;
+    }
+
+    public function setTitle(?string $title): self
+    {
+        $this->title = $title !== null ? mb_substr($title, 0, 100) : null;
 
         return $this;
     }
