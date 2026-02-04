@@ -58,7 +58,7 @@ class Message
     #[ORM\Column(name: 'BFILETYPE', length: 8)]
     private string $fileType = '';
 
-    #[ORM\Column(name: 'BTOPIC', length: 16, options: ['default' => 'UNKNOWN'])]
+    #[ORM\Column(name: 'BTOPIC', length: 255, options: ['default' => 'UNKNOWN'])]
     private string $topic = 'UNKNOWN';
 
     #[ORM\Column(name: 'BLANG', length: 2, options: ['default' => 'NN'])]

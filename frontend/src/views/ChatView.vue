@@ -100,6 +100,7 @@
               :ai-models="message.aiModels"
               :web-search="message.webSearch"
               :memory-ids="message.memoryIds"
+              :feedback-ids="message.feedbackIds"
               :status="message.status"
               :error-type="message.errorType"
               :error-data="message.errorData"
@@ -148,6 +149,7 @@
       :is-open="falsePositiveModalOpen"
       :segments="falsePositiveSegments"
       :full-text="falsePositiveFullText"
+      :user-message="falsePositiveUserMessage"
       :is-submitting="falsePositiveSubmitting"
       :is-preview-loading="falsePositivePreviewLoading"
       :step="falsePositiveStep"
@@ -155,9 +157,9 @@
       :correction="falsePositiveCorrection"
       @close="closeFalsePositiveModal"
       @preview="previewFalsePositiveFeedback"
-      @confirm-false-positive="confirmFalsePositiveFeedback"
-      @confirm-positive="confirmPositiveFeedback"
+      @save="saveFalsePositiveFeedback"
       @back="backToFalsePositiveSelection"
+      @regenerate="regenerateFalsePositiveSummary"
     />
 
     <!-- Memory Edit Dialog (opens in-place, stays in chat) -->
@@ -200,6 +202,7 @@ import { useModelsStore } from '@/stores/models'
 import { useAiConfigStore } from '@/stores/aiConfig'
 import { useAuthStore } from '@/stores/auth'
 import { useMemoriesStore } from '@/stores/userMemories'
+import { useFeedbackStore } from '@/stores/userFeedback'
 import { useLimitCheck } from '@/composables/useLimitCheck'
 import { useNotification } from '@/composables/useNotification'
 import { chatApi } from '@/services/api'
@@ -215,6 +218,7 @@ import {
   previewFalsePositive,
   submitFalsePositive,
   submitPositiveFeedback,
+  regenerateCorrection,
 } from '@/services/api/feedbackApi'
 import MemoryFormDialog from '@/components/MemoryFormDialog.vue'
 import MemoriesDialog from '@/components/MemoriesDialog.vue'
@@ -236,6 +240,7 @@ const modelsStore = useModelsStore()
 const aiConfigStore = useAiConfigStore()
 const authStore = useAuthStore()
 const memoriesStore = useMemoriesStore()
+const feedbackStore = useFeedbackStore()
 let streamingAbortController: AbortController | null = null
 let stopStreamingFn: (() => void) | null = null // Store EventSource close function
 let currentTrackId: number | undefined = undefined // Store current trackId for stop request
@@ -253,6 +258,7 @@ const falsePositiveModalOpen = ref(false)
 const falsePositiveSegments = ref<string[]>([])
 const falsePositiveFullText = ref('')
 const falsePositiveMessageId = ref<number | null>(null)
+const falsePositiveUserMessage = ref<string>('')
 const falsePositiveSubmitting = ref(false)
 const falsePositivePreviewLoading = ref(false)
 const falsePositiveStep = ref<'select' | 'confirm'>('select')
@@ -297,6 +303,11 @@ onMounted(async () => {
     console.warn('⚠️ Failed to load memories in background:', err)
   })
 
+  // Also load feedbacks in background for badge rendering
+  feedbackStore.fetchFeedbacks({ silent: true }).catch((err) => {
+    console.warn('⚠️ Failed to load feedbacks in background:', err)
+  })
+
   // Load chats first
   await chatsStore.loadChats()
 
@@ -320,6 +331,8 @@ onMounted(async () => {
 
   // Setup window event listener for memory dialog (used by MessageText.vue)
   window.addEventListener('open-memory-dialog', handleOpenMemoryDialogEvent)
+  // Setup window event listener for feedback dialog (used by MessageText.vue)
+  window.addEventListener('open-feedback-dialog', handleOpenFeedbackDialogEvent)
 })
 
 // Window event handler for memory dialog (used by MessageText.vue)
@@ -330,10 +343,23 @@ const handleOpenMemoryDialogEvent = (event: Event) => {
   }
 }
 
+// Window event handler for feedback dialog (used by MessageText.vue)
+const handleOpenFeedbackDialogEvent = (event: Event) => {
+  const customEvent = event as CustomEvent<{ feedbackId: number }>
+  if (customEvent.detail?.feedbackId) {
+    // Navigate to feedback page with highlight
+    router.push({
+      name: 'feedbacks',
+      query: { highlight: String(customEvent.detail.feedbackId) },
+    })
+  }
+}
+
 // Cleanup: Stop streaming when component unmounts (user leaves chat)
 onBeforeUnmount(() => {
   handleStopStreaming()
   window.removeEventListener('open-memory-dialog', handleOpenMemoryDialogEvent)
+  window.removeEventListener('open-feedback-dialog', handleOpenFeedbackDialogEvent)
   clearDeleteDialogTimer()
 })
 
@@ -951,8 +977,67 @@ const streamAIResponse = async (
             // Create toast for the suggested memory
             activeMemoryToasts.value.push(toastMemory)
           } else if (data.status === 'memories_loaded') {
-            // Memories loaded event - we now show them per message, not globally
-            // No action needed - memories will be attached to the response message
+            // Memories loaded event - store in memoriesStore for badge rendering
+            const memories = data.metadata?.memories
+            if (memories && Array.isArray(memories)) {
+              // Collect memory IDs for the message
+              const memoryIds: number[] = []
+
+              // Update the memory store with loaded memories so badges can resolve
+              for (const mem of memories) {
+                memoryIds.push(mem.id)
+                const existing = memoriesStore.memories.find((m) => m.id === mem.id)
+                if (!existing) {
+                  // Add to store for badge rendering
+                  memoriesStore.memories.push({
+                    id: mem.id,
+                    category: mem.category || 'personal',
+                    key: mem.key || '',
+                    value: mem.value || '',
+                    source: mem.source || 'auto_detected',
+                    messageId: mem.messageId || null,
+                    created: mem.created || 0,
+                    updated: mem.updated || 0,
+                  })
+                }
+              }
+
+              // Attach memory IDs to the current streaming message
+              const streamingMessage = historyStore.messages.find((m) => m.id === messageId)
+              if (streamingMessage && memoryIds.length > 0) {
+                streamingMessage.memoryIds = memoryIds
+              }
+            }
+          } else if (data.status === 'feedback_loaded') {
+            // Feedback examples loaded - store in feedbackStore for badge rendering
+            const feedbacks = data.metadata?.feedbacks
+            if (feedbacks && Array.isArray(feedbacks)) {
+              // Collect feedback IDs for the message
+              const feedbackIds: number[] = []
+
+              // Update the feedback store with loaded feedbacks so badges can resolve
+              for (const fb of feedbacks) {
+                feedbackIds.push(fb.id)
+                const existing = feedbackStore.getFeedbackById(fb.id)
+                if (!existing) {
+                  // Add to store temporarily for badge rendering
+                  feedbackStore.feedbacks.push({
+                    id: fb.id,
+                    type: fb.type,
+                    value: fb.value,
+                    messageId: null,
+                    created: 0,
+                    updated: 0,
+                  })
+                }
+              }
+
+              // Attach feedback IDs to the current streaming message
+              const streamingMessage = historyStore.messages.find((m) => m.id === messageId)
+              if (streamingMessage && feedbackIds.length > 0) {
+                streamingMessage.feedbackIds = feedbackIds
+              }
+            }
           } else if (data.status === 'memory_deleted') {
             // Legacy backend event - remove from local store only
             const memoryId = data.metadata?.id
@@ -1055,6 +1140,15 @@ const streamAIResponse = async (
               // Store memory IDs if provided (full memories loaded from store)
               if (data.memoryIds && Array.isArray(data.memoryIds) && data.memoryIds.length > 0) {
                 message.memoryIds = data.memoryIds
+              }
+
+              // Store feedback IDs if provided
+              if (
+                data.feedbackIds &&
+                Array.isArray(data.feedbackIds) &&
+                data.feedbackIds.length > 0
+              ) {
+                message.feedbackIds = data.feedbackIds
               }
 
               // Update provider and model from backend metadata
@@ -1559,6 +1653,30 @@ function openFalsePositiveModal(text: string, messageId?: number) {
   falsePositiveFullText.value = text.trim()
   falsePositiveSegments.value = segments.length > 0 ? segments : [text.trim()]
   falsePositiveMessageId.value = messageId ?? null
+
+  // Find the previous user message for context
+  // Look for the user message that came before this assistant message
+  let userMessageText = ''
+  if (messageId) {
+    const messages = historyStore.messages
+    const assistantMsgIndex = messages.findIndex((m) => m.backendMessageId === messageId)
+    if (assistantMsgIndex > 0) {
+      // Search backwards for the first user message
+      for (let i = assistantMsgIndex - 1; i >= 0; i--) {
+        const msg = messages[i]
+        if (msg.role === 'user') {
+          userMessageText = msg.parts
+            .filter((p) => p.type === 'text' && p.content)
+            .map((p) => (p.content ?? '').trim())
+            .filter(Boolean)
+            .join('\n')
+          break
+        }
+      }
+    }
+  }
+  falsePositiveUserMessage.value = userMessageText
+
   falsePositiveStep.value = 'select'
   falsePositiveSummary.value = ''
   falsePositiveCorrection.value = ''
@@ -1570,6 +1688,7 @@ function closeFalsePositiveModal() {
   falsePositiveSegments.value = []
   falsePositiveFullText.value = ''
   falsePositiveMessageId.value = null
+  falsePositiveUserMessage.value = ''
   falsePositiveStep.value = 'select'
   falsePositiveSummary.value = ''
   falsePositiveCorrection.value = ''
@@ -1582,7 +1701,10 @@ async function previewFalsePositiveFeedback(text: string) {
 
   falsePositivePreviewLoading.value = true
   try {
-    const preview = await previewFalsePositive({ text })
+    const preview = await previewFalsePositive({
+      text,
+      userMessage: falsePositiveUserMessage.value || undefined,
+    })
     falsePositiveSummary.value = preview.summary
     falsePositiveCorrection.value = preview.correction
     falsePositiveStep.value = 'confirm'
@@ -1598,17 +1720,45 @@ function backToFalsePositiveSelection() {
   falsePositiveStep.value = 'select'
 }
 
-async function confirmFalsePositiveFeedback(summary: string) {
-  if (!summary.trim()) {
+/**
+ * Save both false positive and correction in a single operation
+ * This prevents double notifications and ensures atomic save
+ */
+async function saveFalsePositiveFeedback(data: { summary: string; correction: string }) {
+  const { summary, correction } = data
+
+  if (!summary.trim() && !correction.trim()) {
     return
   }
 
   falsePositiveSubmitting.value = true
   try {
-    await submitFalsePositive({
-      summary,
-      messageId: falsePositiveMessageId.value ?? undefined,
-    })
+    const promises: Promise<void>[] = []
+
+    // Save false positive (what was wrong)
+    if (summary.trim()) {
+      promises.push(
+        submitFalsePositive({
+          summary: summary.trim(),
+          messageId: falsePositiveMessageId.value ?? undefined,
+        })
+      )
+    }
+
+    // Save positive correction (what is correct)
+    if (correction.trim()) {
+      promises.push(
+        submitPositiveFeedback({
+          text: correction.trim(),
+          messageId: falsePositiveMessageId.value ?? undefined,
+        })
+      )
+    }
+
+    // Execute both in parallel
+    await Promise.all(promises)
+
+    // Single success notification
     showSuccessToast(t('feedback.falsePositive.success'))
     closeFalsePositiveModal()
   } catch (err) {
@@ -1619,24 +1769,37 @@ async function confirmFalsePositiveFeedback(summary: string) {
   }
 }
 
-async function confirmPositiveFeedback(text: string) {
-  if (!text.trim()) {
+/**
+ * Handle "Regenerate" from False Positive Modal
+ * Regenerates the CORRECTION (bottom field) based on the summary (top field)
+ * Uses dedicated backend endpoint - no prompts from frontend
+ * Everything stays in the modal - nothing is sent to chat
+ */
+async function regenerateFalsePositiveSummary(oldCorrection: string) {
+  // We need the summary (false claim) to regenerate a better correction
+  if (!falsePositiveSummary.value.trim()) {
+    showErrorToast(t('feedback.falsePositive.needSummaryFirst'))
     return
   }
 
-  falsePositiveSubmitting.value = true
+  falsePositivePreviewLoading.value = true
   try {
-    await submitPositiveFeedback({
-      text,
-      messageId: falsePositiveMessageId.value ?? undefined,
+    // Call dedicated backend endpoint - prompt is handled server-side
+    const result = await regenerateCorrection({
+      falseClaim: falsePositiveSummary.value.trim(),
+      oldCorrection: oldCorrection.trim() || undefined,
     })
-    showSuccessToast(t('feedback.falsePositive.positiveSuccess'))
-    closeFalsePositiveModal()
+
+    // Update the CORRECTION field (bottom) with the new generated correction
+    if (result.correction) {
+      falsePositiveCorrection.value = result.correction
+    }
+    // Keep the summary as-is (user already has the false claim)
   } catch (err) {
     const errorMsg = err instanceof Error ? err.message : t('feedback.falsePositive.error')
     showErrorToast(errorMsg)
   } finally {
-    falsePositiveSubmitting.value = false
+    falsePositivePreviewLoading.value = false
   }
 }
 

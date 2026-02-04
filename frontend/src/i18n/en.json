@@ -15,6 +15,7 @@
     "plugins": "Plugins",
     "files": "Files",
     "memories": "Memories",
+    "feedback": "Feedback",
     "ragSearch": "Semantic Search",
     "configInbound": "Inbound Channels",
     "configAiModels": "AI Models",
@@ -1034,6 +1035,7 @@
     "inactive": "Inactive",
     "back": "Back",
     "next": "Next",
+    "continue": "Continue",
     "create": "Create",
     "creating": "Creating...",
     "loading": "Loading...",
@@ -1937,6 +1939,14 @@
     }
   },
   "feedback": {
+    "usedInResponse": "{count} feedback example(s) used",
+    "type": {
+      "positive": "Correct",
+      "falsePositive": "Incorrect"
+    },
+    "badge": {
+      "loading": "Feedback..."
+    },
     "falsePositive": {
       "button": "Not correct",
       "title": "Mark false positive",
@@ -1947,15 +1957,43 @@
       "selectedCount": "{count} selected",
       "emptyHint": "Select at least one section or use the full answer.",
       "preview": "Continue",
-      "summaryLabel": "AI summary of the false claim",
-      "correctionLabel": "AI correction (adjust if needed)",
+      "contextLabel": "Your question",
+      "summaryLabel": "What was incorrect?",
+      "summaryPlaceholder": "e.g. The AI claimed that Sydney is the capital of Australia",
+      "correctionLabel": "What is correct?",
+      "correctionPlaceholder": "e.g. The capital of Australia is Canberra",
+      "savedAsNegative": "Will be saved as incorrect example (AI should avoid this)",
+      "savedAsPositive": "Will be saved as correct example (AI should learn this)",
+      "explanation": "The AI will remember this feedback for future conversations. The incorrect statement teaches the AI what to avoid, while the correct statement teaches the right answer.",
       "back": "Back",
+      "again": "Regenerate",
+      "againTooltip": "Regenerate the correction - the current one is not accurate",
+      "needSummaryFirst": "Please enter the false claim first (top field)",
+      "save": "Save Feedback",
       "saveNegative": "Save false positive",
       "savePositive": "Save corrected statement",
       "cancel": "Cancel",
       "success": "Thanks! The feedback was saved.",
       "positiveSuccess": "Thanks! The correction was saved.",
       "error": "Failed to save feedback."
+    },
+    "list": {
+      "title": "Feedback",
+      "subtitle": "Manage your AI corrections and feedback examples.",
+      "empty": "No feedback yet",
+      "emptyHint": "Use the thumbs-down button on AI responses to add corrections.",
+      "filterAll": "All",
+      "filterFalsePositive": "Incorrect",
+      "filterPositive": "Correct",
+      "typeFalsePositive": "Incorrect statement",
+      "typePositive": "Correct statement",
+      "deleteTitle": "Delete Feedback",
+      "deleteConfirm": "Are you sure you want to delete this feedback? This cannot be undone.",
+      "loadError": "Failed to load feedback",
+      "editSuccess": "Feedback updated",
+      "editError": "Failed to update feedback",
+      "deleteSuccess": "Feedback deleted",
+      "deleteError": "Failed to delete feedback"
     }
   }
 }

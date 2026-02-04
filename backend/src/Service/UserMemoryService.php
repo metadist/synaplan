@@ -122,8 +122,9 @@ readonly class UserMemoryService
         string $value,
         string $source = 'user_edited',
         ?int $messageId = null,
-        ?string $category = null,
         ?string $key = null,
+        ?string $category = null,
+        ?string $namespace = null,
     ): UserMemoryDTO {
         if (mb_strlen($value) < 1) {
             throw new \InvalidArgumentException('Memory value must be at least 1 character');
@@ -175,7 +176,7 @@ readonly class UserMemoryService
     /**
      * Delete memory from Qdrant.
      */
-    public function deleteMemory(int $memoryId, User $user): void
+    public function deleteMemory(int $memoryId, User $user, ?string $namespace = null): void
     {
         if (!$this->qdrantClient->isAvailable()) {
             $this->logger->warning('Memory service unavailable - skipping delete', [
@@ -189,12 +190,34 @@ readonly class UserMemoryService
         $pointId = "mem_{$user->getId()}_{$memoryId}";
 
         try {
-            $this->qdrantClient->deleteMemory($pointId);
+            $this->qdrantClient->deleteMemory($pointId, $namespace);
             $this->logger->info('Memory deleted', ['memory_id' => $memoryId]);
         } catch (\Throwable $e) {
             $this->logger->error('Failed to delete memory', ['error' => $e->getMessage()]);
             throw new \InvalidArgumentException('Failed to delete memory: '.$e->getMessage());
         }
+    }
+
+    /**
+     * Scroll through all memories for a user with optional category and namespace filters.
+     *
+     * @return array<array{id: int, key: string, value: string, category: string, messageId: ?int, created: int, updated: int}>
+     */
+    public function scrollMemories(
+        int $userId,
+        ?string $category = null,
+        int $limit = 1000,
+        ?string $namespace = null,
+    ): array {
+        if (!$this->qdrantClient->isAvailable()) {
+            $this->logger->warning('Memory service unavailable - cannot scroll memories', [
+                'user_id' => $userId,
+            ]);
+
+            return [];
+        }
+
+        return $this->qdrantClient->scrollMemories($userId, $category, $limit, $namespace);
     }
 
     /**
@@ -328,6 +351,8 @@ readonly class UserMemoryService
 
     /**
      * Search relevant memories by text similarity.
+     *
+     * @param string|null $namespace Optional namespace filter (e.g., 'feedback_false_positive', 'feedback_positive')
      */
     public function searchRelevantMemories(
         int $userId,
@@ -335,6 +360,8 @@ readonly class UserMemoryService
         ?string $category = null,
         int $limit = 5,
         float $minScore = 0.5,
+        ?string $namespace = null,
+        bool $includeHidden = false,
     ): array {
         // If no query text provided, we can't do semantic search
         // This happens when getUserMemories is called
@@ -402,7 +429,8 @@ readonly class UserMemoryService
                 $userId,
                 $category,
                 $limit,
-                $minScore
+                $minScore,
+                $namespace
             );
 
             $this->logger->info('🎯 Qdrant search results', [
@@ -417,7 +445,8 @@ readonly class UserMemoryService
             foreach ($results as $result) {
                 $payload = $result['payload'] ?? [];
                 $category = $payload['category'] ?? null;
-                if ($category && $this->isHiddenCategory($category)) {
+                // Skip hidden categories unless explicitly included (e.g., for feedback search)
+                if (!$includeHidden && $category && $this->isHiddenCategory($category)) {
                     continue;
                 }
 

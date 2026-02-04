@@ -289,6 +289,9 @@
             @click-memory="(memory) => emit('click-memory', memory)"
           />
 
+          <!-- Used Feedbacks (AFTER memories, before search results) -->
+          <MessageFeedbacks v-if="role === 'assistant' && feedbacks" :feedbacks="feedbacks" />
+
           <!-- Web Search Results Carousel (AFTER content) -->
           <div
             v-if="searchResults && searchResults.length > 0 && role === 'assistant'"
@@ -526,7 +529,9 @@
             v-if="role === 'assistant' && !isStreaming && backendMessageId"
             class="flex items-center gap-2 flex-shrink-0"
           >
+            <!-- False Positive Button - only show if memory/feedback service is available -->
             <button
+              v-if="isFeedbackServiceAvailable"
               type="button"
               :disabled="isSuperseded"
               :class="['pill text-xs', isSuperseded ? 'opacity-50 cursor-not-allowed' : '']"
@@ -685,9 +690,12 @@ import { useModelSelection, type ModelOption } from '@/composables/useModelSelec
 import { useNotification } from '@/composables/useNotification'
 import { getProviderIcon } from '@/utils/providerIcons'
 import { useMemoriesStore } from '@/stores/userMemories'
+import { useFeedbackStore } from '@/stores/userFeedback'
+import { useConfigStore } from '@/stores/config'
 import type { UserMemory } from '@/services/api/userMemoriesApi'
 import MessagePart from './MessagePart.vue'
 import MessageMemories from './MessageMemories.vue'
+import MessageFeedbacks from './MessageFeedbacks.vue'
 import GroqIcon from '@/components/icons/GroqIcon.vue'
 import type { Part, MessageFile } from '@/stores/history'
 import type { AgainData } from '@/types/ai-models'
@@ -747,6 +755,7 @@ interface Props {
     label: string
   } | null // Tool metadata (e.g., web search, file generation)
   memoryIds?: number[] | null // IDs of memories used (resolved from memoriesStore)
+  feedbackIds?: number[] | null // IDs of feedbacks used (resolved from feedbackStore)
   // Status for failed/pending messages
   status?: 'sent' | 'failed' | 'rate_limited'
   errorType?: 'rate_limit' | 'connection' | 'unknown'
@@ -824,6 +833,12 @@ const thinkingParts = computed(() => props.parts.filter((p) => p.type === 'think
 
 // Resolve memoryIds to full UserMemory objects from the store
 const memoriesStore = useMemoriesStore()
+const feedbackStore = useFeedbackStore()
+const config = useConfigStore()
+
+// Check if feedback service (same as memory service) is available
+const isFeedbackServiceAvailable = computed(() => config.features.memoryService)
+
 const memories = computed(() => {
   if (!props.memoryIds || props.memoryIds.length === 0) {
     return null
@@ -832,6 +847,18 @@ const memories = computed(() => {
   const resolved = props.memoryIds
     .map((id) => memoriesStore.memories.find((m) => m.id === id))
     .filter((m) => m !== undefined)
+
+  return resolved.length > 0 ? resolved : null
+})
+
+const feedbacks = computed(() => {
+  if (!props.feedbackIds || props.feedbackIds.length === 0) {
+    return null
+  }
+  // Resolve feedback IDs to full Feedback objects
+  const resolved = props.feedbackIds
+    .map((id) => feedbackStore.getFeedbackById(id))
+    .filter((f) => f !== undefined)
 
   return resolved.length > 0 ? resolved : null
 })

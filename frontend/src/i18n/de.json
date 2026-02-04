@@ -15,6 +15,7 @@
     "plugins": "Plugins",
     "files": "Dateien",
     "memories": "Erinnerungen",
+    "feedback": "Feedback",
     "ragSearch": "Semantische Suche",
     "configInbound": "Eingangskanäle",
     "configAiModels": "KI-Modelle",
@@ -990,6 +991,7 @@
     "daysAgo": "vor {count} Tag | vor {count} Tagen",
     "back": "Zurück",
     "next": "Weiter",
+    "continue": "Weiter",
     "edit": "Bearbeiten",
     "actions": "Aktionen",
     "create": "Erstellen",
@@ -1833,6 +1835,14 @@
     }
   },
   "feedback": {
+    "usedInResponse": "{count} Feedback-Beispiel(e) verwendet",
+    "type": {
+      "positive": "Korrekt",
+      "falsePositive": "Inkorrekt"
+    },
+    "badge": {
+      "loading": "Feedback..."
+    },
     "falsePositive": {
       "button": "Nicht korrekt",
       "title": "Falschmeldung markieren",
@@ -1843,15 +1853,43 @@
       "selectedCount": "{count} ausgewählt",
       "emptyHint": "Wähle mindestens einen Abschnitt oder nutze die ganze Antwort.",
       "preview": "Weiter",
-      "summaryLabel": "KI-Zusammenfassung der Falschaussage",
-      "correctionLabel": "KI-Korrektur (bei Bedarf anpassen)",
+      "contextLabel": "Deine Frage",
+      "summaryLabel": "Was war falsch?",
+      "summaryPlaceholder": "z.B. Die KI behauptete, dass Sydney die Hauptstadt von Australien ist",
+      "correctionLabel": "Was ist richtig?",
+      "correctionPlaceholder": "z.B. Die Hauptstadt von Australien ist Canberra",
+      "savedAsNegative": "Wird als falsches Beispiel gespeichert (KI soll dies vermeiden)",
+      "savedAsPositive": "Wird als korrektes Beispiel gespeichert (KI soll dies lernen)",
+      "explanation": "Die KI wird dieses Feedback für zukünftige Gespräche berücksichtigen. Die falsche Aussage lehrt die KI, was zu vermeiden ist, während die richtige Aussage die korrekte Antwort vermittelt.",
       "back": "Zurück",
+      "again": "Regenerieren",
+      "againTooltip": "Korrektur neu generieren - die aktuelle ist nicht korrekt",
+      "needSummaryFirst": "Bitte gib zuerst die falsche Behauptung ein (oberes Feld)",
+      "save": "Feedback speichern",
       "saveNegative": "False Positive speichern",
       "savePositive": "Korrektur speichern",
       "cancel": "Abbrechen",
       "success": "Danke! Das Feedback wurde gespeichert.",
       "positiveSuccess": "Danke! Die Korrektur wurde gespeichert.",
       "error": "Feedback konnte nicht gespeichert werden."
+    },
+    "list": {
+      "title": "Feedback",
+      "subtitle": "Verwalte deine KI-Korrekturen und Feedback-Beispiele.",
+      "empty": "Noch kein Feedback",
+      "emptyHint": "Nutze den Daumen-runter-Button bei KI-Antworten, um Korrekturen hinzuzufügen.",
+      "filterAll": "Alle",
+      "filterFalsePositive": "Falsch",
+      "filterPositive": "Korrekt",
+      "typeFalsePositive": "Falsche Aussage",
+      "typePositive": "Korrekte Aussage",
+      "deleteTitle": "Feedback löschen",
+      "deleteConfirm": "Möchtest du dieses Feedback wirklich löschen? Das kann nicht rückgängig gemacht werden.",
+      "loadError": "Feedback konnte nicht geladen werden",
+      "editSuccess": "Feedback aktualisiert",
+      "editError": "Feedback konnte nicht aktualisiert werden",
+      "deleteSuccess": "Feedback gelöscht",
+      "deleteError": "Feedback konnte nicht gelöscht werden"
     }
   }
 }

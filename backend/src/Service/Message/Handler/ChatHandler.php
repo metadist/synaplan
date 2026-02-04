@@ -492,6 +492,89 @@ class ChatHandler implements MessageHandlerInterface
             ]);
         }
 
+        // Load feedback examples (false positives and positives) from Qdrant
+        // These help the AI avoid known mistakes and reinforce correct information
+        $feedbackContext = '';
+        $loadedFeedbacks = [];
+        if (!$memoriesDisabledByRequest && $memoriesEnabledForUser && $this->memoryService->isAvailable()) {
+            try {
+                // Search for relevant false positives (things to AVOID saying)
+                $falsePositives = $this->memoryService->searchRelevantMemories(
+                    $message->getUserId(),
+                    $message->getText(),
+                    category: 'feedback_negative',
+                    limit: 5,
+                    minScore: 0.4,
+                    namespace: 'feedback_false_positive',
+                    includeHidden: true  // Feedback categories are hidden from user memory list
+                );
+
+                // Search for relevant positive examples (correct information)
+                $positiveExamples = $this->memoryService->searchRelevantMemories(
+                    $message->getUserId(),
+                    $message->getText(),
+                    category: 'feedback_positive',
+                    limit: 5,
+                    minScore: 0.4,
+                    namespace: 'feedback_positive',
+                    includeHidden: true  // Feedback categories are hidden from user memory list
+                );
+
+                if (!empty($falsePositives) || !empty($positiveExamples)) {
+                    $feedbackContext = "\n\n## User Feedback (corrections from previous conversations):\n";
+
+                    if (!empty($falsePositives)) {
+                        $feedbackContext .= "\n### Things to AVOID (user-reported false positives) - Reference as [Feedback:ID]:\n";
+                        foreach ($falsePositives as $fp) {
+                            $feedbackContext .= sprintf("- ❌ [Feedback:%d] %s\n", $fp['id'], $fp['value']);
+                            $loadedFeedbacks[] = [
+                                'id' => $fp['id'],
+                                'type' => 'false_positive',
+                                'value' => $fp['value'],
+                            ];
+                        }
+                    }
+
+                    if (!empty($positiveExamples)) {
+                        $feedbackContext .= "\n### Correct information (user-confirmed) - Reference as [Feedback:ID]:\n";
+                        foreach ($positiveExamples as $pe) {
+                            $feedbackContext .= sprintf("- ✅ [Feedback:%d] %s\n", $pe['id'], $pe['value']);
+                            $loadedFeedbacks[] = [
+                                'id' => $pe['id'],
+                                'type' => 'positive',
+                                'value' => $pe['value'],
+                            ];
+                        }
+                    }
+
+                    $feedbackContext .= "\nIMPORTANT: Consider this feedback when answering. Avoid repeating false claims and prefer user-confirmed correct information. When referencing feedback, use [Feedback:ID] format.\n";
+
+                    // Send SSE event with loaded feedbacks
+                    if ($progressCallback && !empty($loadedFeedbacks)) {
+                        $progressCallback([
+                            'status' => 'feedback_loaded',
+                            'message' => 'Feedback examples loaded',
+                            'metadata' => [
+                                'feedbacks' => $loadedFeedbacks,
+                                'count' => count($loadedFeedbacks),
+                            ],
+                            'timestamp' => time(),
+                        ]);
+                    }
+
+                    $this->logger->info('ChatHandler: Feedback examples loaded', [
+                        'user_id' => $message->getUserId(),
+                        'false_positives_count' => count($falsePositives),
+                        'positive_examples_count' => count($positiveExamples),
+                    ]);
+                }
+            } catch (\Throwable $e) {
+                $this->logger->warning('ChatHandler: Failed to load feedback examples', [
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
+
         // Get model - Priority: User-selected (Again) > Prompt Metadata > Classification override > DB default
         $modelId = null;
         $provider = null;
@@ -593,6 +676,14 @@ class ChatHandler implements MessageHandlerInterface
             $this->logger->info('ChatHandler: Memories context appended to system prompt', [
                 'memories_count' => count($loadedMemories),
                 'memories_context_length' => strlen($memoriesContext),
+            ]);
+        }
+
+        // Append feedback examples context to system prompt if available
+        if (!empty($feedbackContext)) {
+            $systemPrompt .= $feedbackContext;
+            $this->logger->info('ChatHandler: Feedback context appended to system prompt', [
+                'feedback_context_length' => strlen($feedbackContext),
             ]);
         }
 
@@ -706,6 +797,7 @@ class ChatHandler implements MessageHandlerInterface
                 'model_id' => $modelId, // Include resolved model_id for storage
                 'tokens' => $metadata['usage'] ?? [],
                 'memories' => $loadedMemories, // Include memories used for this response
+                'feedbacks' => $loadedFeedbacks, // Include feedback examples used for this response
             ],
         ];
     }

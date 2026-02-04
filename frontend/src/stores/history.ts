@@ -115,6 +115,7 @@ export interface Message {
     label: string
   } | null // Tool metadata (e.g., web search, file generation)
   memoryIds?: number[] | null // IDs of memories used (resolved from memoriesStore)
+  feedbackIds?: number[] | null // IDs of feedbacks used (resolved from feedbackStore)
   processingStatus?: string
   processingMetadata?: any
 }

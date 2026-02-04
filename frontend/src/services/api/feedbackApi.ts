@@ -8,6 +8,7 @@ export const FalsePositiveRequestSchema = z.object({
 
 export const FalsePositivePreviewRequestSchema = z.object({
   text: z.string(),
+  userMessage: z.string().optional(),
 })
 
 export const FalsePositivePreviewResponseSchema = z.object({
@@ -36,9 +37,19 @@ export const PositiveFeedbackRequestSchema = z.object({
 
 export const PositiveFeedbackResponseSchema = FalsePositiveResponseSchema
 
+export const RegenerateCorrectionRequestSchema = z.object({
+  falseClaim: z.string(),
+  oldCorrection: z.string().optional(),
+})
+
+export const RegenerateCorrectionResponseSchema = z.object({
+  correction: z.string(),
+})
+
 export type FalsePositiveRequest = z.infer<typeof FalsePositiveRequestSchema>
 export type FalsePositivePreviewRequest = z.infer<typeof FalsePositivePreviewRequestSchema>
 export type PositiveFeedbackRequest = z.infer<typeof PositiveFeedbackRequestSchema>
+export type RegenerateCorrectionRequest = z.infer<typeof RegenerateCorrectionRequestSchema>
 
 export interface FalsePositivePreview {
   summary: string
@@ -73,5 +84,19 @@ export async function submitPositiveFeedback(request: PositiveFeedbackRequest): 
     method: 'POST',
     body: JSON.stringify(request),
     schema: PositiveFeedbackResponseSchema,
+  })
+}
+
+/**
+ * Regenerate a correction based on a false claim and optional previous incorrect correction.
+ * The backend handles the prompt - no prompt injection from frontend.
+ */
+export async function regenerateCorrection(
+  request: RegenerateCorrectionRequest
+): Promise<{ correction: string }> {
+  return await httpClient('/api/v1/feedback/false-positive/regenerate', {
+    method: 'POST',
+    body: JSON.stringify(request),
+    schema: RegenerateCorrectionResponseSchema,
   })
 }
