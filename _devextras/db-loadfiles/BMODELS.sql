@@ -92,7 +92,17 @@ INSERT INTO `BMODELS` VALUES
 (88,'OpenAI','text-embedding-3-large','vectorize',1,'text-embedding-3-large',0.13,'per1M',0,'-',9,1,0,1,NULL,'{\"description\":\"OpenAI large text embedding model (3072 dimensions) for high-accuracy RAG.\",\"params\":{\"model\":\"text-embedding-3-large\"},\"meta\":{\"dimensions\":3072}}'),
 (89,'OpenAI','o1-mini','chat',0,'o1-mini',3,'per1M',12,'per1M',8,1,0,0,NULL,'{\"description\":\"OpenAI o1-mini reasoning model (REQUIRES HIGHER API TIER - Not available for most accounts)\",\"params\":{\"model\":\"o1-mini\"},\"features\":[\"reasoning\"],\"supportsStreaming\":false}'),
 (92,'Anthropic','Claude 3 Haiku','chat',1,'claude-3-haiku-20240307',0.25,'per1M',1.25,'per1M',7,2,0,1,NULL,'{\"description\":\"Claude 3 Haiku - Fast and cost-effective model for everyday tasks. Great for quick responses and simple queries.\",\"params\":{\"model\":\"claude-3-haiku-20240307\"},\"features\":[\"vision\"],\"meta\":{\"context_window\":\"200000\",\"max_output\":\"4096\"}}'),
-(93,'Anthropic','Claude 3 Opus (Vision)','pic2text',1,'claude-3-opus-20240229',15,'per1M',75,'per1M',10,1,0,1,NULL,'{\"description\":\"Claude 3 Opus for image analysis and vision tasks. Excellent at understanding complex images, charts, diagrams, and extracting text.\",\"prompt\":\"Describe the image in detail. Extract any text you see.\",\"params\":{\"model\":\"claude-3-opus-20240229\"},\"meta\":{\"supports_images\":true}}');
+(93,'Anthropic','Claude 3 Opus (Vision)','pic2text',1,'claude-3-opus-20240229',15,'per1M',75,'per1M',10,1,0,1,NULL,'{\"description\":\"Claude 3 Opus for image analysis and vision tasks. Excellent at understanding complex images, charts, diagrams, and extracting text.\",\"prompt\":\"Describe the image in detail. Extract any text you see.\",\"params\":{\"model\":\"claude-3-opus-20240229\"},\"meta\":{\"supports_images\":true}}'),
+-- HuggingFace Inference Providers (added 2026-02-04)
+-- Chat models
+(125,'HuggingFace','DeepSeek R1','chat',1,'deepseek-ai/DeepSeek-R1',0.55,'per1M',2.19,'per1M',10,1,0,1,NULL,'{\"description\":\"DeepSeek R1 reasoning model via HuggingFace. Excellent for logic, math, and coding.\",\"params\":{\"model\":\"deepseek-ai/DeepSeek-R1\",\"provider_strategy\":\"fastest\"},\"features\":[\"reasoning\"]}'),
+(128,'HuggingFace','Qwen2.5 Coder 32B','chat',1,'Qwen/Qwen2.5-Coder-32B-Instruct',0.20,'per1M',0.80,'per1M',9,1,0,1,NULL,'{\"description\":\"Qwen2.5 Coder - Specialized model for code generation and debugging.\",\"params\":{\"model\":\"Qwen/Qwen2.5-Coder-32B-Instruct\"}}'),
+-- Image generation (works via hf-inference provider)
+(126,'HuggingFace','Stable Diffusion XL','text2pic',1,'stabilityai/stable-diffusion-xl-base-1.0',0,'-',0.02,'perpic',9,1,0,1,NULL,'{\"description\":\"Stable Diffusion XL - High quality image generation via HuggingFace.\",\"params\":{\"model\":\"stabilityai/stable-diffusion-xl-base-1.0\",\"provider\":\"hf-inference\"}}'),
+-- Video generation via fal.ai (requires HF prepaid credits)
+(127,'HuggingFace','LTX-Video','text2vid',1,'ltx-video',0,'-',0.25,'pervid',9,1,0,1,NULL,'{\"description\":\"LTX-Video - Fast and high-quality video generation via fal.ai.\",\"params\":{\"model\":\"ltx-video\",\"num_frames\":65,\"num_inference_steps\":25}}'),
+-- Embeddings (free tier)
+(129,'HuggingFace','Multilingual E5 Large','vectorize',1,'intfloat/multilingual-e5-large',0.01,'per1M',0,'-',9,1,0,1,NULL,'{\"description\":\"Multilingual E5 embedding model - supports 100+ languages. Free tier available.\",\"params\":{\"model\":\"intfloat/multilingual-e5-large\",\"provider\":\"hf-inference\"},\"meta\":{\"dimensions\":1024}}');
 /*!40000 ALTER TABLE `BMODELS` ENABLE KEYS */;
 UNLOCK TABLES;
 commit;
