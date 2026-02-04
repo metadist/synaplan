@@ -146,25 +146,55 @@ export const useChatsStore = defineStore('chats', () => {
   }
 
   /**
+   * Check if a chat is truly empty (no messages, no content).
+   */
+  function isChatEmpty(chat: Chat): boolean {
+    // Widget sessions are never considered empty for reuse
+    if (chat.widgetSession) return false
+
+    // Has messages - not empty
+    if (chat.messageCount && chat.messageCount > 0) return false
+
+    // Has first message preview - not empty
+    if (chat.firstMessagePreview) return false
+
+    // Has a non-default title - not empty (user renamed it or title was auto-generated)
+    const isDefaultTitle =
+      chat.title === 'New Chat' || chat.title === 'Neuer Chat' || chat.title.startsWith('Chat ')
+    if (!isDefaultTitle) return false
+
+    return true
+  }
+
+  /**
    * Find an existing empty chat or create a new one.
    * Prevents creating multiple empty chats unnecessarily.
+   * Also cleans up stale empty chats to prevent accumulation.
    */
   async function findOrCreateEmptyChat(): Promise<Chat | null> {
     if (!checkAuthOrRedirect()) return null
 
-    // Look for an existing empty chat (no messages, default title)
-    const emptyChat = chats.value.find(
-      (chat) =>
-        !chat.widgetSession &&
-        (chat.messageCount === 0 || chat.messageCount === undefined) &&
-        (chat.title === 'New Chat' || chat.title === 'Neuer Chat' || chat.title.startsWith('Chat '))
-    )
+    // Find all empty chats (not widget sessions, no messages, default title)
+    const emptyChats = chats.value.filter((chat) => isChatEmpty(chat))
 
-    if (emptyChat) {
-      // Found an empty chat - just switch to it
-      console.log('♻️ Reusing existing empty chat:', emptyChat.id)
-      updateActiveChatSelection(emptyChat.id)
-      return emptyChat
+    if (emptyChats.length > 0) {
+      // Use the first (most recent) empty chat
+      const chatToReuse = emptyChats[0]
+      console.log('♻️ Reusing existing empty chat:', chatToReuse.id)
+
+      // Clean up extra empty chats in the background (keep only the one we're using)
+      if (emptyChats.length > 1) {
+        console.log(`🧹 Cleaning up ${emptyChats.length - 1} stale empty chat(s)`)
+        for (let i = 1; i < emptyChats.length; i++) {
+          // Delete silently to avoid UI noise
+          deleteChat(emptyChats[i].id, true).catch((err) => {
+            console.warn('Failed to clean up stale empty chat:', err)
+          })
+        }
+      }
+
+      updateActiveChatSelection(chatToReuse.id)
+      return chatToReuse
     }
 
     // No empty chat found - create a new one

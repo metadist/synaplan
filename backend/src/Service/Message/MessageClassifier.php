@@ -142,6 +142,8 @@ class MessageClassifier
             'topic' => $result['topic'],
             'language' => $result['language'],
             'web_search' => $result['web_search'] ?? false,
+            'media_type' => $result['media_type'] ?? null,
+            'duration' => $result['duration'] ?? null,
             'raw_ai_response' => $result['raw_response'] ?? 'N/A',
         ]);
 

@@ -357,8 +357,13 @@ async function generateChatTitleFromFirstMessage(firstMessage: string) {
   const chat = chatsStore.activeChat
   if (!chat) return
 
-  // Only generate if chat has default title
-  if (chat.title && chat.title !== 'New Chat') return
+  // Only generate if chat has default title (check both English and German)
+  const isDefaultTitle =
+    !chat.title ||
+    chat.title === 'New Chat' ||
+    chat.title === 'Neuer Chat' ||
+    chat.title.startsWith('Chat ')
+  if (!isDefaultTitle) return
 
   // Only generate for user messages from this chat
   const userMessages = historyStore.messages.filter((m) => m.role === 'user')

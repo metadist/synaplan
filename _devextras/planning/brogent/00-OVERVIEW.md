@@ -97,6 +97,40 @@ Key idea: define the **Task DSL** and **Protocol** via Zod/JSON-Schema so it can
 
 This yields fast CI and stability, and makes Chrome→Firefox migration easier.
 
+## Repository Structure
+
+BroGent code lives in a separate repository: `synaplan-extension/`
+
+```
+synaplan-extension/           # Source of truth (checked into GitHub)
+├── brogent-plugin/           # Synaplan plugin source
+│   ├── backend/Controller/
+│   ├── backend/Service/
+│   ├── frontend/
+│   ├── migrations/
+│   └── manifest.json
+├── browser-extension/        # Chrome/Firefox extension
+│   ├── src/background/
+│   ├── src/content/
+│   ├── src/popup/
+│   ├── src/lib/
+│   └── manifest.json
+├── AGENTS.md
+└── README.md
+```
+
+**Development workflow:**
+
+1. Edit files in `synaplan-extension/` (source of truth)
+2. Sync plugin to Synaplan for testing:
+   ```bash
+   rm -rf /wwwroot/synaplan/plugins/brogent && \
+   cp -r /wwwroot/synaplan-extension/brogent-plugin /wwwroot/synaplan/plugins/brogent
+   ```
+3. Clear cache: `docker compose exec backend php bin/console cache:clear`
+
+**Never edit `synaplan/plugins/brogent/` directly!**
+
 ## Deliverable Set (planning docs)
 
 This folder will contain:

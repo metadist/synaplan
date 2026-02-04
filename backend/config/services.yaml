@@ -126,9 +126,17 @@ services:
             $braveSearchCountry: '%env(BRAVE_SEARCH_COUNTRY)%'
             $braveSearchLang: '%env(BRAVE_SEARCH_SEARCH_LANG)%'
 
+    # Discord Webhook Notification Service
+    App\Service\DiscordNotificationService:
+        arguments:
+            $webhookUrl: '%env(default::DISCORD_WEBHOOK_URL)%'
+
     # WhatsApp Business API Service - Fully Dynamic Multi-Number Support
+    # Uses cache + lock for atomic duplicate message detection (WhatsApp webhook retries)
     App\Service\WhatsAppService:
         arguments:
+            $cache: '@cache.app'
+            $lockFactory: '@lock.factory'
             $whatsappAccessToken: '%env(WHATSAPP_ACCESS_TOKEN)%'
             $whatsappEnabled: '%env(bool:WHATSAPP_ENABLED)%'
             $uploadsDir: '%kernel.project_dir%/var/uploads'
