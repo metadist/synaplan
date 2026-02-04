@@ -425,7 +425,7 @@ PROMPT;
     private function getFalsePositivePrompt(): string
     {
         $prompt = $this->promptRepository->findOneBy([
-            'topic' => 'feedback_false_positive_summary',
+            'topic' => 'tools:feedback_false_positive_summary',
             'language' => 'en',
             'ownerId' => 0,
         ]);
@@ -442,7 +442,7 @@ PROMPT;
     private function getFalsePositiveCorrectionPrompt(): string
     {
         $prompt = $this->promptRepository->findOneBy([
-            'topic' => 'feedback_false_positive_correction',
+            'topic' => 'tools:feedback_false_positive_correction',
             'language' => 'en',
             'ownerId' => 0,
         ]);

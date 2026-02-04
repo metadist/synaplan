@@ -108,16 +108,20 @@ class PromptFixtures extends Fixture
             [
                 'ownerId' => 0,
                 'language' => 'en',
-                'topic' => 'feedback_false_positive_summary',
+                'topic' => 'tools:feedback_false_positive_summary',
                 'shortDescription' => 'Summarize incorrect or unwanted AI responses into a single sentence for feedback storage.',
                 'prompt' => $this->getFeedbackFalsePositivePrompt(),
             ],
             [
                 'ownerId' => 0,
                 'language' => 'en',
-                'topic' => 'feedback_false_positive_correction',
+                'topic' => 'tools:feedback_false_positive_correction',
                 'shortDescription' => 'Provide a corrected statement for a false-positive example.',
                 'prompt' => $this->getFeedbackFalsePositiveCorrectionPrompt(),
+            ],
+            [
+                'ownerId' => 0,
+                'language' => 'en',
                 'topic' => 'tools:memory_parse',
                 'shortDescription' => 'Parse natural language input into structured memory format. Can suggest updates or deletions of existing memories.',
                 'prompt' => $this->getMemoryParsePrompt(),
