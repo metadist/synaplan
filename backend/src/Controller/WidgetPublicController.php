@@ -571,7 +571,7 @@ class WidgetPublicController extends AbstractController
                     try {
                         $incomingMessage->setStatus('failed');
                         $this->em->flush();
-                        
+
                         // Decrement session message count on failure so user can retry
                         $this->sessionService->decrementMessageCount($session);
                     } catch (\Throwable $flushException) {

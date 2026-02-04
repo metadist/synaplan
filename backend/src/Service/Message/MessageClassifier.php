@@ -250,7 +250,7 @@ class MessageClassifier
         }
 
         // Check legacy file path
-        if ($message->getFileType() === 'image') {
+        if ('image' === $message->getFileType()) {
             return true;
         }
 
