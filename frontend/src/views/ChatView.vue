@@ -1069,6 +1069,15 @@ const streamAIResponse = async (
             processingStatus.value = ''
             processingMetadata.value = {}
 
+            // If backend provided a messageId for the error message, link it
+            // This allows the "Again" button to work for failed messages
+            if (data.messageId) {
+              const message = historyStore.messages.find((m) => m.id === messageId)
+              if (message) {
+                message.backendMessageId = data.messageId
+              }
+            }
+
             // Handle chat not found errors with toast notification
             if (
               errorMsg.toLowerCase().includes('chat not found') ||

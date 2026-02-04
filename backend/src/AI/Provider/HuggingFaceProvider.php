@@ -30,6 +30,10 @@ class HuggingFaceProvider implements ChatProviderInterface, EmbeddingProviderInt
 {
     private const CHAT_ENDPOINT = 'https://router.huggingface.co/v1/chat/completions';
     private const ROUTER_BASE = 'https://router.huggingface.co';
+    private const BILLING_URL = 'https://huggingface.co/settings/billing';
+    private const DEFAULT_VIDEO_FRAMES = 65;
+    private const DEFAULT_VIDEO_INFERENCE_STEPS = 25;
+    private const VIDEO_TIMEOUT = 600;
 
     public function __construct(
         private readonly HttpClientInterface $httpClient,
@@ -75,6 +79,8 @@ class HuggingFaceProvider implements ChatProviderInterface, EmbeddingProviderInt
 
         return [
             'healthy' => true,
+            // TODO: Replace placeholder metrics with real health monitoring data
+            //       (latency, error rate, active connections) or remove these fields.
             'latency_ms' => 100,
             'error_rate' => 0.0,
             'active_connections' => 0,
@@ -431,7 +437,7 @@ class HuggingFaceProvider implements ChatProviderInterface, EmbeddingProviderInt
 
             // Check for payment required error
             if (402 === $statusCode) {
-                throw new ProviderException('HuggingFace image generation requires prepaid credits. Add credits at https://huggingface.co/settings/billing', 'huggingface');
+                throw new ProviderException(sprintf('HuggingFace image generation requires prepaid credits. Add credits at %s', self::BILLING_URL), 'huggingface');
             }
 
             // Response is binary image data
@@ -482,21 +488,31 @@ class HuggingFaceProvider implements ChatProviderInterface, EmbeddingProviderInt
     {
         // Image editing with mask requires FLUX Kontext or similar
         // This is a simplified implementation using image-to-image
+        // Note: maskUrl is currently ignored as we use image-to-image mode
         if (empty($this->apiKey)) {
             throw ProviderException::missingApiKey('huggingface', 'HUGGINGFACE_API_KEY');
         }
 
         try {
+            // Use configured model or default to FLUX.1-Kontext-dev
             $model = 'black-forest-labs/FLUX.1-Kontext-dev';
             $provider = 'fal-ai';
 
-            // Read source image
-            $imagePath = $this->uploadDir.'/'.ltrim($imageUrl, '/');
-            if (!file_exists($imagePath)) {
-                throw new \Exception("Image file not found: {$imagePath}");
+            // Security check: Prevent path traversal
+            $normalizedPath = $this->uploadDir.'/'.ltrim($imageUrl, '/');
+            $realPath = realpath($normalizedPath);
+            $realUploadDir = realpath($this->uploadDir);
+
+            if (false === $realPath || false === $realUploadDir || !str_starts_with($realPath, $realUploadDir)) {
+                throw new \Exception("Invalid image path: {$imageUrl}");
             }
 
-            $imageData = base64_encode(file_get_contents($imagePath));
+            $imageContents = @file_get_contents($realPath);
+            if (false === $imageContents) {
+                throw new \Exception("Failed to read image file: {$realPath}");
+            }
+
+            $imageData = base64_encode($imageContents);
 
             $this->logger->info('HuggingFace image edit request', [
                 'model' => $model,
@@ -528,11 +544,14 @@ class HuggingFaceProvider implements ChatProviderInterface, EmbeddingProviderInt
             $fullPath = $this->uploadDir.'/'.$relativePath;
 
             $dir = dirname($fullPath);
-            if (!is_dir($dir)) {
-                mkdir($dir, 0755, true);
+            if (!is_dir($dir) && !mkdir($dir, 0755, true) && !is_dir($dir)) {
+                throw new \RuntimeException(sprintf('Failed to create directory "%s" for HuggingFace image edit result.', $dir));
             }
 
-            file_put_contents($fullPath, $resultData);
+            $bytesWritten = file_put_contents($fullPath, $resultData);
+            if (false === $bytesWritten) {
+                throw new \RuntimeException(sprintf('Failed to write edited image to "%s".', $fullPath));
+            }
 
             return $relativePath;
         } catch (\Exception $e) {
@@ -589,13 +608,13 @@ class HuggingFaceProvider implements ChatProviderInterface, EmbeddingProviderInt
             if (isset($options['num_frames'])) {
                 $requestBody['num_frames'] = (int) $options['num_frames'];
             } else {
-                $requestBody['num_frames'] = 65; // Default ~2.5 seconds
+                $requestBody['num_frames'] = self::DEFAULT_VIDEO_FRAMES; // Default ~2.5 seconds
             }
 
             if (isset($options['num_inference_steps'])) {
                 $requestBody['num_inference_steps'] = (int) $options['num_inference_steps'];
             } else {
-                $requestBody['num_inference_steps'] = 25; // Balance quality/speed
+                $requestBody['num_inference_steps'] = self::DEFAULT_VIDEO_INFERENCE_STEPS; // Balance quality/speed
             }
 
             if (isset($options['seed'])) {
@@ -612,14 +631,14 @@ class HuggingFaceProvider implements ChatProviderInterface, EmbeddingProviderInt
                     'Content-Type' => 'application/json',
                 ],
                 'json' => $requestBody,
-                'timeout' => 600, // Video generation can take several minutes
+                'timeout' => self::VIDEO_TIMEOUT, // Video generation can take several minutes
             ]);
 
             $statusCode = $response->getStatusCode();
 
             // Check for payment required error
             if (402 === $statusCode) {
-                throw new ProviderException('HuggingFace video generation requires prepaid credits. Add credits at https://huggingface.co/settings/billing', 'huggingface');
+                throw new ProviderException(sprintf('HuggingFace video generation requires prepaid credits. Add credits at %s', self::BILLING_URL), 'huggingface');
             }
 
             // fal.ai returns JSON with video URL
@@ -629,12 +648,19 @@ class HuggingFaceProvider implements ChatProviderInterface, EmbeddingProviderInt
                 throw new ProviderException('Invalid response from fal.ai: missing video URL', 'huggingface');
             }
 
-            // Download video from fal.ai CDN
+            // Download video from fal.ai CDN using HttpClient
             $videoUrl = $data['video']['url'];
-            $videoData = file_get_contents($videoUrl);
 
-            if (false === $videoData) {
-                throw new ProviderException('Failed to download video from fal.ai CDN', 'huggingface');
+            try {
+                $videoResponse = $this->httpClient->request('GET', $videoUrl);
+
+                if (200 !== $videoResponse->getStatusCode()) {
+                    throw new ProviderException(sprintf('Failed to download video from fal.ai CDN (HTTP %d)', $videoResponse->getStatusCode()), 'huggingface');
+                }
+
+                $videoData = $videoResponse->getContent();
+            } catch (\Throwable $e) {
+                throw new ProviderException('Failed to download video from fal.ai CDN', 'huggingface', null, 0, $e);
             }
 
             // Save video to uploads
@@ -644,11 +670,14 @@ class HuggingFaceProvider implements ChatProviderInterface, EmbeddingProviderInt
 
             // Ensure directory exists
             $dir = dirname($fullPath);
-            if (!is_dir($dir)) {
-                mkdir($dir, 0755, true);
+            if (!is_dir($dir) && !mkdir($dir, 0755, true) && !is_dir($dir)) {
+                throw new ProviderException('Failed to create directory for HuggingFace video output: '.$dir, 'huggingface');
             }
 
-            file_put_contents($fullPath, $videoData);
+            $bytesWritten = file_put_contents($fullPath, $videoData);
+            if (false === $bytesWritten) {
+                throw new ProviderException('Failed to write generated video to '.$fullPath, 'huggingface');
+            }
 
             $this->logger->info('HuggingFace video generated', [
                 'model' => $model,
