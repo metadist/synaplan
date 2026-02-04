@@ -25,7 +25,7 @@ export async function login(page: Page, credentials?: { user: string; pass: stri
   try {
     await page.waitForSelector(selectors.chat.textInput, { timeout: TIMEOUTS.STANDARD })
   } catch {
-    throw new Error(`Login fehlgeschlagen. Aktuelle URL: ${page.url()}`)
+    throw new Error(`Login failed: current URL is ${page.url()}`)
   }
 }
 

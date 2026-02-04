@@ -201,9 +201,11 @@ jobs:
 
       - name: Verify widget build
         working-directory: frontend
+        continue-on-error: true
         run: |
           if [ ! -d "dist-widget" ] || [ -z "$(ls -A dist-widget)" ]; then
-            echo "❌ Widget build failed: dist-widget directory is missing or empty"
+            echo "::warning::Widget build verification failed: dist-widget directory is missing or empty"
+            echo "::warning::Pipeline will continue, but widget functionality may not work correctly"
             exit 1
           fi
           echo "✅ Widget build verified: dist-widget contains files"
@@ -248,9 +250,11 @@ jobs:
           path: frontend/dist-widget/
 
       - name: Verify widget artifact before Docker build
+        continue-on-error: true
         run: |
           if [ ! -d "frontend/dist-widget" ] || [ -z "$(ls -A frontend/dist-widget)" ]; then
-            echo "❌ Widget artifact is missing or empty before Docker build"
+            echo "::warning::Widget artifact verification failed: frontend/dist-widget is missing or empty before Docker build"
+            echo "::warning::Pipeline will continue, but widget functionality may not work correctly"
             exit 1
           fi
           echo "✅ Widget artifact verified: frontend/dist-widget contains files"

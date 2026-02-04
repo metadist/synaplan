@@ -42,7 +42,7 @@
                 'px-4 py-3 font-medium text-sm transition-colors relative',
                 activeTab === tab.id ? 'txt-primary' : 'txt-secondary hover:txt-primary',
               ]"
-              data-testid="btn-tab"
+              :data-testid="`btn-tab-${tab.id}`"
               @click="activeTab = tab.id"
             >
               <span class="flex items-center gap-2">
