@@ -12,10 +12,7 @@
               <Icon icon="heroicons:arrow-down-tray" class="w-5 h-5 txt-brand" />
               {{ $t('export.title') }}
             </h2>
-            <button
-              class="p-2 rounded-lg hover-surface transition-colors"
-              @click="$emit('close')"
-            >
+            <button class="p-2 rounded-lg hover-surface transition-colors" @click="$emit('close')">
               <Icon icon="heroicons:x-mark" class="w-5 h-5 txt-secondary" />
             </button>
           </div>
@@ -39,12 +36,7 @@
                     : 'surface-chip hover:bg-black/5 dark:hover:bg-white/5 border-2 border-transparent',
                 ]"
               >
-                <input
-                  v-model="selectedFormat"
-                  type="radio"
-                  :value="format.id"
-                  class="mt-1"
-                />
+                <input v-model="selectedFormat" type="radio" :value="format.id" class="mt-1" />
                 <div class="flex-1">
                   <div class="flex items-center gap-2">
                     <span class="font-medium txt-primary">{{ format.name }}</span>
@@ -109,7 +101,9 @@
         </div>
 
         <!-- Footer -->
-        <div class="p-4 border-t border-light-border/30 dark:border-dark-border/20 flex justify-end gap-2">
+        <div
+          class="p-4 border-t border-light-border/30 dark:border-dark-border/20 flex justify-end gap-2"
+        >
           <button
             class="px-4 py-2 rounded-lg surface-chip txt-secondary hover-surface transition-colors"
             @click="$emit('close')"
@@ -155,7 +149,12 @@ const { error } = useNotification()
 const configStore = useConfigStore()
 
 const formats = ref<widgetSessionsApi.ExportFormat[]>([
-  { id: 'xlsx', name: 'Excel (XLSX)', description: 'Best for human readability', recommended: true },
+  {
+    id: 'xlsx',
+    name: 'Excel (XLSX)',
+    description: 'Best for human readability',
+    recommended: true,
+  },
   { id: 'csv', name: 'CSV', description: 'Simple format for spreadsheets', recommended: false },
   { id: 'json', name: 'JSON', description: 'For developers and data analysis', recommended: false },
 ])
@@ -197,8 +196,12 @@ const getDateTimestamps = computed(() => {
       }
     case 'custom':
       return {
-        from: customFrom.value ? Math.floor(new Date(customFrom.value).getTime() / 1000) : undefined,
-        to: customTo.value ? Math.floor(new Date(customTo.value).getTime() / 1000) + daySeconds : undefined,
+        from: customFrom.value
+          ? Math.floor(new Date(customFrom.value).getTime() / 1000)
+          : undefined,
+        to: customTo.value
+          ? Math.floor(new Date(customTo.value).getTime() / 1000) + daySeconds
+          : undefined,
       }
     default:
       return {}

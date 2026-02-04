@@ -101,7 +101,11 @@
                       : 'bg-green-500/10 text-green-600',
                   ]"
                 >
-                  {{ session.mode === 'waiting' ? $t('liveSupport.waiting') : $t('liveSupport.active') }}
+                  {{
+                    session.mode === 'waiting'
+                      ? $t('liveSupport.waiting')
+                      : $t('liveSupport.active')
+                  }}
                 </span>
               </div>
               <p class="text-sm txt-primary line-clamp-2 mb-1">
@@ -119,10 +123,13 @@
       <div class="flex-1 flex flex-col">
         <template v-if="selectedSession">
           <!-- Chat Header -->
-          <div class="p-4 border-b border-light-border/30 dark:border-dark-border/20 flex items-center justify-between">
+          <div
+            class="p-4 border-b border-light-border/30 dark:border-dark-border/20 flex items-center justify-between"
+          >
             <div>
               <h2 class="text-base font-semibold txt-primary">
-                {{ $t('liveSupport.chatWith') }} {{ selectedSession.sessionIdDisplay || selectedSession.sessionId }}
+                {{ $t('liveSupport.chatWith') }}
+                {{ selectedSession.sessionIdDisplay || selectedSession.sessionId }}
               </h2>
               <p class="text-xs txt-secondary">
                 {{ selectedSession.messageCount }} {{ $t('liveSupport.messagesCount') }}
@@ -151,13 +158,13 @@
                 :key="message.id"
                 :class="[
                   'p-3 rounded-lg max-w-[80%]',
-                  message.direction === 'IN'
-                    ? 'bg-[var(--brand)]/10 ml-auto'
-                    : 'surface-chip',
+                  message.direction === 'IN' ? 'bg-[var(--brand)]/10 ml-auto' : 'surface-chip',
                 ]"
               >
                 <p class="text-xs txt-secondary mb-1">
-                  {{ message.direction === 'IN' ? $t('liveSupport.visitor') : $t('liveSupport.you') }}
+                  {{
+                    message.direction === 'IN' ? $t('liveSupport.visitor') : $t('liveSupport.you')
+                  }}
                   · {{ formatMessageTime(message.timestamp) }}
                 </p>
                 <p class="txt-primary text-sm whitespace-pre-wrap">{{ message.text }}</p>
@@ -291,7 +298,8 @@ const selectSession = async (session: widgetSessionsApi.WidgetSession) => {
 
   try {
     // Find the widget ID for this session
-    const widgetId = selectedWidgetId.value || (session as any).widgetId || widgets.value[0]?.widgetId
+    const widgetId =
+      selectedWidgetId.value || (session as any).widgetId || widgets.value[0]?.widgetId
     if (!widgetId) return
 
     const response = await widgetSessionsApi.getWidgetSession(widgetId, session.sessionId)
@@ -308,7 +316,8 @@ const selectSession = async (session: widgetSessionsApi.WidgetSession) => {
 const sendReply = async () => {
   if (!replyText.value.trim() || !selectedSession.value) return
 
-  const widgetId = selectedWidgetId.value || (selectedSession.value as any).widgetId || widgets.value[0]?.widgetId
+  const widgetId =
+    selectedWidgetId.value || (selectedSession.value as any).widgetId || widgets.value[0]?.widgetId
   if (!widgetId) return
 
   sending.value = true
@@ -319,7 +328,11 @@ const sendReply = async () => {
       selectedSession.value.mode = 'human'
     }
 
-    await widgetSessionsApi.sendHumanMessage(widgetId, selectedSession.value.sessionId, replyText.value)
+    await widgetSessionsApi.sendHumanMessage(
+      widgetId,
+      selectedSession.value.sessionId,
+      replyText.value
+    )
 
     // Add message to local list
     sessionMessages.value.push({
@@ -344,7 +357,8 @@ const sendReply = async () => {
 const handBackToAi = async () => {
   if (!selectedSession.value) return
 
-  const widgetId = selectedWidgetId.value || (selectedSession.value as any).widgetId || widgets.value[0]?.widgetId
+  const widgetId =
+    selectedWidgetId.value || (selectedSession.value as any).widgetId || widgets.value[0]?.widgetId
   if (!widgetId) return
 
   try {

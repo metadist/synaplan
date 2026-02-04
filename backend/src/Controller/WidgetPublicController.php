@@ -191,16 +191,16 @@ class WidgetPublicController extends AbstractController
         $session = $this->sessionService->getOrCreateSession($widgetId, $data['sessionId'], $isValidatedTestMode);
 
         // Capture country from Cloudflare geolocation header on first message
-        if ($session->getCountry() === null) {
+        if (null === $session->getCountry()) {
             $cfCountry = $request->headers->get('CF-IPCountry');
-            if ($cfCountry !== null && $cfCountry !== '') {
+            if (null !== $cfCountry && '' !== $cfCountry) {
                 $session->setCountry($cfCountry);
                 $this->em->flush();
             }
         }
 
         // Check if session is in human takeover mode
-        $isHumanMode = $session->getMode() === 'human' || $session->getMode() === 'waiting';
+        $isHumanMode = 'human' === $session->getMode() || 'waiting' === $session->getMode();
 
         // Check session limits
         $messageLimit = (int) ($config['messageLimit'] ?? WidgetSessionService::DEFAULT_MAX_MESSAGES);

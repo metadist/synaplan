@@ -104,11 +104,11 @@ final class WidgetSummaryService
             );
 
             foreach ($messages as $message) {
-                $totalMessages++;
+                ++$totalMessages;
                 if ('IN' === $message->getDirection()) {
-                    $userMessages++;
+                    ++$userMessages;
                 } else {
-                    $assistantMessages++;
+                    ++$assistantMessages;
                 }
             }
         }

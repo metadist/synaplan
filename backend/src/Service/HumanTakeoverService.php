@@ -124,7 +124,7 @@ final class HumanTakeoverService
         string $widgetId,
         string $sessionId,
         string $text,
-        User $operator
+        User $operator,
     ): Message {
         $session = $this->sessionRepository->findByWidgetAndSession($widgetId, $sessionId);
 
@@ -267,7 +267,7 @@ final class HumanTakeoverService
         $email = $operator->getMail();
         if ($email) {
             $atPos = strpos($email, '@');
-            if ($atPos !== false) {
+            if (false !== $atPos) {
                 return ucfirst(substr($email, 0, $atPos));
             }
 

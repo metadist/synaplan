@@ -47,7 +47,7 @@ class WidgetEventsController extends AbstractController
     public function sessionEvents(
         string $widgetId,
         string $sessionId,
-        Request $request
+        Request $request,
     ): Response {
         // Validate widget exists
         $widget = $this->widgetRepository->findByWidgetId($widgetId);
@@ -152,7 +152,7 @@ class WidgetEventsController extends AbstractController
     public function pollEvents(
         string $widgetId,
         string $sessionId,
-        Request $request
+        Request $request,
     ): JsonResponse {
         // Validate widget exists
         $widget = $this->widgetRepository->findByWidgetId($widgetId);
@@ -204,7 +204,7 @@ class WidgetEventsController extends AbstractController
     public function notifications(
         string $widgetId,
         Request $request,
-        #[CurrentUser] ?User $user
+        #[CurrentUser] ?User $user,
     ): JsonResponse {
         if (!$user) {
             return new JsonResponse(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);

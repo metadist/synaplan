@@ -66,7 +66,7 @@ class WidgetSummaryController extends AbstractController
     public function list(
         string $widgetId,
         Request $request,
-        #[CurrentUser] ?User $user
+        #[CurrentUser] ?User $user,
     ): JsonResponse {
         if (!$user) {
             return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
@@ -124,7 +124,7 @@ class WidgetSummaryController extends AbstractController
     public function get(
         string $widgetId,
         int $date,
-        #[CurrentUser] ?User $user
+        #[CurrentUser] ?User $user,
     ): JsonResponse {
         if (!$user) {
             return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
@@ -190,7 +190,7 @@ class WidgetSummaryController extends AbstractController
     public function generate(
         string $widgetId,
         Request $request,
-        #[CurrentUser] ?User $user
+        #[CurrentUser] ?User $user,
     ): JsonResponse {
         if (!$user) {
             return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
@@ -209,7 +209,7 @@ class WidgetSummaryController extends AbstractController
         $date = (int) ($data['date'] ?? (int) date('Ymd', strtotime('-1 day')));
 
         // Validate date format
-        if (strlen((string) $date) !== 8) {
+        if (8 !== strlen((string) $date)) {
             return $this->json(['error' => 'Invalid date format. Use YYYYMMDD.'], Response::HTTP_BAD_REQUEST);
         }
 

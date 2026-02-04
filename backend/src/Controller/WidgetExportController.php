@@ -86,7 +86,7 @@ class WidgetExportController extends AbstractController
     public function export(
         string $widgetId,
         Request $request,
-        #[CurrentUser] ?User $user
+        #[CurrentUser] ?User $user,
     ): Response {
         if (!$user) {
             return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);

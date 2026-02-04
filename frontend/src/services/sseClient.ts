@@ -1,6 +1,6 @@
 /**
  * Server-Sent Events client for real-time widget communication.
- * 
+ *
  * Provides real-time updates without requiring an additional container.
  * Falls back to polling if SSE is not supported.
  */
@@ -24,7 +24,7 @@ export interface SubscribeOptions {
 /**
  * Subscribe to session events via SSE.
  * Used by the embedded widget to receive real-time updates.
- * 
+ *
  * @param widgetId - The widget ID
  * @param sessionId - The session ID
  * @param onEvent - Callback for events
@@ -57,7 +57,7 @@ export function subscribeToSession(
     if (!isActive) return
 
     const url = `${baseUrl}/api/v1/widgets/${widgetId}/sessions/${sessionId}/events?lastEventId=${lastEventId}`
-    
+
     try {
       eventSource = new EventSource(url)
 
@@ -135,7 +135,7 @@ export function subscribeToSession(
       isActive = false
       eventSource?.close()
       eventSource = null
-    }
+    },
   }
 }
 
@@ -164,8 +164,8 @@ export function subscribeToNotifications(
       const url = `${baseUrl}/api/v1/widgets/${widgetId}/notifications?lastEventId=${lastEventId}`
       const response = await fetch(url, {
         headers: {
-          'Authorization': `Bearer ${token}`
-        }
+          Authorization: `Bearer ${token}`,
+        },
       })
       const data = await response.json()
 
@@ -187,6 +187,6 @@ export function subscribeToNotifications(
         clearInterval(pollingInterval)
         pollingInterval = null
       }
-    }
+    },
   }
 }

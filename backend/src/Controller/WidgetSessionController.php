@@ -280,11 +280,11 @@ class WidgetSessionController extends AbstractController
                     // Determine sender based on direction and provider
                     // Direction: IN = user message, OUT = system response (AI, human operator, or system)
                     $providerIndex = $message->getProviderIndex();
-                    if ($message->getDirection() === 'IN') {
+                    if ('IN' === $message->getDirection()) {
                         $sender = 'user';
-                    } elseif ($providerIndex === 'SYSTEM') {
+                    } elseif ('SYSTEM' === $providerIndex) {
                         $sender = 'system';
-                    } elseif ($providerIndex === 'HUMAN_OPERATOR') {
+                    } elseif ('HUMAN_OPERATOR' === $providerIndex) {
                         $sender = 'human';
                     } else {
                         $sender = 'ai';
@@ -359,7 +359,7 @@ class WidgetSessionController extends AbstractController
     public function toggleFavorite(
         string $widgetId,
         string $sessionId,
-        #[CurrentUser] ?User $user
+        #[CurrentUser] ?User $user,
     ): JsonResponse {
         if (!$user) {
             return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);

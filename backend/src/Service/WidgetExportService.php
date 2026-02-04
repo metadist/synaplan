@@ -11,7 +11,6 @@ use App\Repository\MessageRepository;
 use App\Repository\WidgetSessionRepository;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Style\Alignment;
-use PhpOffice\PhpSpreadsheet\Style\Border;
 use PhpOffice\PhpSpreadsheet\Style\Fill;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 use Psr\Log\LoggerInterface;
@@ -252,7 +251,7 @@ final class WidgetExportService
 
             foreach ($messages as $message) {
                 // Add separator between sessions
-                if ($lastSessionId !== null && $lastSessionId !== $session->getSessionId()) {
+                if (null !== $lastSessionId && $lastSessionId !== $session->getSessionId()) {
                     $sheet->setCellValue('A'.$row, '---');
                     $sheet->setCellValue('B'.$row, '---');
                     $sheet->setCellValue('C'.$row, '---');
@@ -268,7 +267,7 @@ final class WidgetExportService
                 $sheet->setCellValue('D'.$row, $message['text']);
 
                 // Color coding for sender
-                if ($message['direction'] === 'IN') {
+                if ('IN' === $message['direction']) {
                     $sheet->getStyle('A'.$row.':D'.$row)->getFill()
                         ->setFillType(Fill::FILL_SOLID)
                         ->getStartColor()->setRGB('F0FDF4');
@@ -354,9 +353,9 @@ final class WidgetExportService
 
         return array_map(function ($message) {
             $sender = 'AI';
-            if ($message->getDirection() === 'IN') {
+            if ('IN' === $message->getDirection()) {
                 $sender = 'Visitor';
-            } elseif ($message->getProviderIndex() === 'HUMAN_OPERATOR') {
+            } elseif ('HUMAN_OPERATOR' === $message->getProviderIndex()) {
                 $sender = 'Support';
             }
 

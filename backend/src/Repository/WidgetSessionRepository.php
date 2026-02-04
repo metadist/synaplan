@@ -152,7 +152,7 @@ class WidgetSessionRepository extends ServiceEntityRepository
         string $widgetId,
         int $limit = 20,
         int $offset = 0,
-        array $filters = []
+        array $filters = [],
     ): array {
         $qb = $this->createQueryBuilder('ws')
             ->where('ws.widgetId = :widgetId')
@@ -163,10 +163,10 @@ class WidgetSessionRepository extends ServiceEntityRepository
         // Filter by status (active/expired)
         if (isset($filters['status'])) {
             $now = time();
-            if ($filters['status'] === 'active') {
+            if ('active' === $filters['status']) {
                 $qb->andWhere('ws.expires > :now')
                     ->setParameter('now', $now);
-            } elseif ($filters['status'] === 'expired') {
+            } elseif ('expired' === $filters['status']) {
                 $qb->andWhere('ws.expires <= :now')
                     ->setParameter('now', $now);
             }

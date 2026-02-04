@@ -30,7 +30,7 @@
         "openai-php/client": "^0.17.1",
         "phpdocumentor/reflection-docblock": "^5.6.6",
         "phpoffice/phppresentation": "^1.2",
-        "phpoffice/phpspreadsheet": "^2.4",
+        "phpoffice/phpspreadsheet": "^2.4.3",
         "phpoffice/phpword": "^1.4",
         "phpstan/phpdoc-parser": "^2.3",
         "smalot/pdfparser": "^2.12.3",

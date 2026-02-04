@@ -63,12 +63,12 @@
 
     <!-- No Summary -->
     <div v-else-if="!summary" class="text-center py-8">
-      <Icon icon="heroicons:document-chart-bar" class="w-12 h-12 txt-secondary opacity-30 mx-auto mb-4" />
+      <Icon
+        icon="heroicons:document-chart-bar"
+        class="w-12 h-12 txt-secondary opacity-30 mx-auto mb-4"
+      />
       <p class="txt-secondary text-sm">{{ $t('summary.noSummary') }}</p>
-      <button
-        class="mt-4 px-4 py-2 rounded-lg btn-primary text-sm"
-        @click="generateSummary"
-      >
+      <button class="mt-4 px-4 py-2 rounded-lg btn-primary text-sm" @click="generateSummary">
         {{ $t('summary.generateFirst') }}
       </button>
     </div>
@@ -76,29 +76,71 @@
     <!-- Summary Content -->
     <template v-else>
       <!-- Stats Row -->
-      <div :class="compact ? 'grid grid-cols-2 gap-2 mb-4' : 'grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6'">
-        <div :class="compact ? 'p-2 surface-chip rounded-lg text-center' : 'p-3 surface-chip rounded-lg text-center'">
+      <div
+        :class="
+          compact ? 'grid grid-cols-2 gap-2 mb-4' : 'grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6'
+        "
+      >
+        <div
+          :class="
+            compact
+              ? 'p-2 surface-chip rounded-lg text-center'
+              : 'p-3 surface-chip rounded-lg text-center'
+          "
+        >
           <p class="text-xs txt-secondary">{{ $t('summary.sessions') }}</p>
-          <p :class="compact ? 'text-lg font-bold txt-primary' : 'text-xl font-bold txt-primary'">{{ summary.sessionCount }}</p>
+          <p :class="compact ? 'text-lg font-bold txt-primary' : 'text-xl font-bold txt-primary'">
+            {{ summary.sessionCount }}
+          </p>
         </div>
-        <div :class="compact ? 'p-2 surface-chip rounded-lg text-center' : 'p-3 surface-chip rounded-lg text-center'">
+        <div
+          :class="
+            compact
+              ? 'p-2 surface-chip rounded-lg text-center'
+              : 'p-3 surface-chip rounded-lg text-center'
+          "
+        >
           <p class="text-xs txt-secondary">{{ $t('summary.messages') }}</p>
-          <p :class="compact ? 'text-lg font-bold txt-primary' : 'text-xl font-bold txt-primary'">{{ summary.messageCount }}</p>
+          <p :class="compact ? 'text-lg font-bold txt-primary' : 'text-xl font-bold txt-primary'">
+            {{ summary.messageCount }}
+          </p>
         </div>
-        <div :class="compact ? 'p-2 surface-chip rounded-lg text-center' : 'p-3 surface-chip rounded-lg text-center'">
+        <div
+          :class="
+            compact
+              ? 'p-2 surface-chip rounded-lg text-center'
+              : 'p-3 surface-chip rounded-lg text-center'
+          "
+        >
           <p class="text-xs txt-secondary">{{ $t('summary.positive') }}</p>
-          <p :class="compact ? 'text-lg font-bold text-green-600' : 'text-xl font-bold text-green-600'">{{ summary.sentiment.positive }}%</p>
+          <p
+            :class="
+              compact ? 'text-lg font-bold text-green-600' : 'text-xl font-bold text-green-600'
+            "
+          >
+            {{ summary.sentiment.positive }}%
+          </p>
         </div>
-        <div :class="compact ? 'p-2 surface-chip rounded-lg text-center' : 'p-3 surface-chip rounded-lg text-center'">
+        <div
+          :class="
+            compact
+              ? 'p-2 surface-chip rounded-lg text-center'
+              : 'p-3 surface-chip rounded-lg text-center'
+          "
+        >
           <p class="text-xs txt-secondary">{{ $t('summary.negative') }}</p>
-          <p :class="compact ? 'text-lg font-bold text-red-600' : 'text-xl font-bold text-red-600'">{{ summary.sentiment.negative }}%</p>
+          <p :class="compact ? 'text-lg font-bold text-red-600' : 'text-xl font-bold text-red-600'">
+            {{ summary.sentiment.negative }}%
+          </p>
         </div>
       </div>
 
       <!-- Executive Summary -->
       <div :class="compact ? 'mb-4' : 'mb-6'">
         <h4 class="text-sm font-medium txt-primary mb-2">{{ $t('summary.executiveSummary') }}</h4>
-        <p :class="compact ? 'txt-secondary text-xs' : 'txt-secondary text-sm'">{{ summary.summary }}</p>
+        <p :class="compact ? 'txt-secondary text-xs' : 'txt-secondary text-sm'">
+          {{ summary.summary }}
+        </p>
       </div>
 
       <!-- Topics -->
@@ -142,7 +184,11 @@
           <li
             v-for="issue in compact ? summary.issues.slice(0, 3) : summary.issues"
             :key="issue"
-            :class="compact ? 'text-xs txt-secondary flex items-start gap-2' : 'text-sm txt-secondary flex items-start gap-2'"
+            :class="
+              compact
+                ? 'text-xs txt-secondary flex items-start gap-2'
+                : 'text-sm txt-secondary flex items-start gap-2'
+            "
           >
             <span class="text-yellow-500">•</span>
             {{ issue }}
@@ -160,7 +206,11 @@
           <li
             v-for="rec in compact ? summary.recommendations.slice(0, 3) : summary.recommendations"
             :key="rec"
-            :class="compact ? 'text-xs txt-secondary flex items-start gap-2' : 'text-sm txt-secondary flex items-start gap-2'"
+            :class="
+              compact
+                ? 'text-xs txt-secondary flex items-start gap-2'
+                : 'text-sm txt-secondary flex items-start gap-2'
+            "
           >
             <span class="text-green-500">•</span>
             {{ rec }}
@@ -178,12 +228,15 @@ import { useI18n } from 'vue-i18n'
 import * as widgetSessionsApi from '@/services/api/widgetSessionsApi'
 import { useNotification } from '@/composables/useNotification'
 
-const props = withDefaults(defineProps<{
-  widgetId: string
-  compact?: boolean
-}>(), {
-  compact: false,
-})
+const props = withDefaults(
+  defineProps<{
+    widgetId: string
+    compact?: boolean
+  }>(),
+  {
+    compact: false,
+  }
+)
 
 const { t } = useI18n()
 const { error, success } = useNotification()
@@ -215,7 +268,10 @@ const loadSummary = async () => {
 
   loading.value = true
   try {
-    const response = await widgetSessionsApi.getWidgetSummaryByDate(props.widgetId, selectedDate.value)
+    const response = await widgetSessionsApi.getWidgetSummaryByDate(
+      props.widgetId,
+      selectedDate.value
+    )
     summary.value = response.summary
   } catch (err: any) {
     // Summary might not exist yet

@@ -152,11 +152,11 @@ class WidgetSessionService
         $this->logger->info('Title generation check', [
             'session_id' => $session->getSessionId(),
             'message_count' => $session->getMessageCount(),
-            'has_title' => $session->getTitle() !== null,
+            'has_title' => null !== $session->getTitle(),
         ]);
 
         // Only generate title if >= 5 messages and no title exists yet
-        if ($session->getMessageCount() < 5 || $session->getTitle() !== null) {
+        if ($session->getMessageCount() < 5 || null !== $session->getTitle()) {
             $this->logger->debug('Skipping title generation', [
                 'reason' => $session->getMessageCount() < 5 ? 'message_count_below_5' : 'title_already_exists',
             ]);
@@ -192,7 +192,7 @@ class WidgetSessionService
             }
 
             // Build conversation text for summarization (only user messages)
-            $userMessages = array_filter($messages, fn ($m) => $m->getDirection() === 'IN');
+            $userMessages = array_filter($messages, fn ($m) => 'IN' === $m->getDirection());
             if (count($userMessages) < 3) {
                 $this->logger->debug('Not enough user messages for title generation', ['count' => count($userMessages)]);
 

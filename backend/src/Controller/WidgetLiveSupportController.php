@@ -59,7 +59,7 @@ class WidgetLiveSupportController extends AbstractController
     public function takeover(
         string $widgetId,
         string $sessionId,
-        #[CurrentUser] ?User $user
+        #[CurrentUser] ?User $user,
     ): JsonResponse {
         if (!$user) {
             return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
@@ -114,7 +114,7 @@ class WidgetLiveSupportController extends AbstractController
     public function handback(
         string $widgetId,
         string $sessionId,
-        #[CurrentUser] ?User $user
+        #[CurrentUser] ?User $user,
     ): JsonResponse {
         if (!$user) {
             return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
@@ -186,7 +186,7 @@ class WidgetLiveSupportController extends AbstractController
         string $widgetId,
         string $sessionId,
         Request $request,
-        #[CurrentUser] ?User $user
+        #[CurrentUser] ?User $user,
     ): JsonResponse {
         if (!$user) {
             return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);

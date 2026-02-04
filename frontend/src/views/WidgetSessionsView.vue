@@ -14,22 +14,30 @@
             </button>
             <div>
               <h1 class="text-lg font-semibold txt-primary flex items-center gap-2">
-                <div class="w-8 h-8 rounded-xl bg-gradient-to-br from-[var(--brand)] to-[var(--brand-light)] flex items-center justify-center">
+                <div
+                  class="w-8 h-8 rounded-xl bg-gradient-to-br from-[var(--brand)] to-[var(--brand-light)] flex items-center justify-center"
+                >
                   <Icon icon="heroicons:chat-bubble-left-right" class="w-4 h-4 text-white" />
                 </div>
                 {{ widget?.name || $t('widgetSessions.title') }}
               </h1>
               <div class="flex items-center gap-3 text-xs txt-secondary mt-1 ml-10">
                 <span class="flex items-center gap-1.5">
-                  <span class="w-2 h-2 rounded-full bg-blue-500 shadow-sm shadow-blue-500/50"></span>
+                  <span
+                    class="w-2 h-2 rounded-full bg-blue-500 shadow-sm shadow-blue-500/50"
+                  ></span>
                   {{ stats.ai }} {{ $t('widgetSessions.aiShort') }}
                 </span>
                 <span class="flex items-center gap-1.5">
-                  <span class="w-2 h-2 rounded-full bg-emerald-500 shadow-sm shadow-emerald-500/50"></span>
+                  <span
+                    class="w-2 h-2 rounded-full bg-emerald-500 shadow-sm shadow-emerald-500/50"
+                  ></span>
                   {{ stats.human }} {{ $t('widgetSessions.humanShort') }}
                 </span>
                 <span class="flex items-center gap-1.5">
-                  <span class="w-2 h-2 rounded-full bg-amber-500 shadow-sm shadow-amber-500/50"></span>
+                  <span
+                    class="w-2 h-2 rounded-full bg-amber-500 shadow-sm shadow-amber-500/50"
+                  ></span>
                   {{ stats.waiting }} {{ $t('widgetSessions.waitingShort') }}
                 </span>
               </div>
@@ -47,7 +55,9 @@
             <button
               :class="[
                 'p-2.5 rounded-xl transition-all duration-200',
-                showSummaryPanel ? 'bg-[var(--brand)]/10 text-[var(--brand)]' : 'hover:bg-white/5 dark:hover:bg-white/5 txt-secondary'
+                showSummaryPanel
+                  ? 'bg-[var(--brand)]/10 text-[var(--brand)]'
+                  : 'hover:bg-white/5 dark:hover:bg-white/5 txt-secondary',
               ]"
               :title="$t('widgetSessions.summary')"
               @click="showSummaryPanel = !showSummaryPanel"
@@ -79,7 +89,10 @@
               :title="$t('widgetSessions.favorites')"
               @click="toggleFavoriteFilter"
             >
-              <Icon :icon="filters.favorite ? 'heroicons:star-solid' : 'heroicons:star'" class="w-4 h-4" />
+              <Icon
+                :icon="filters.favorite ? 'heroicons:star-solid' : 'heroicons:star'"
+                class="w-4 h-4"
+              />
             </button>
             <select
               v-model="filters.mode"
@@ -113,7 +126,9 @@
 
             <!-- Empty State -->
             <div v-else-if="sessions.length === 0" class="p-8 text-center">
-              <div class="w-16 h-16 rounded-2xl bg-white/5 dark:bg-white/5 flex items-center justify-center mx-auto mb-4">
+              <div
+                class="w-16 h-16 rounded-2xl bg-white/5 dark:bg-white/5 flex items-center justify-center mx-auto mb-4"
+              >
                 <Icon
                   icon="heroicons:chat-bubble-left-right"
                   class="w-8 h-8 txt-secondary opacity-50"
@@ -155,23 +170,40 @@
                         </span>
                         <button
                           class="p-0.5 rounded transition-all duration-200 flex-shrink-0"
-                          :class="session.isFavorite ? 'text-amber-500' : 'txt-secondary opacity-0 group-hover:opacity-100 hover:text-amber-500'"
-                          :title="session.isFavorite ? $t('widgetSessions.unfavorite') : $t('widgetSessions.favorite')"
+                          :class="
+                            session.isFavorite
+                              ? 'text-amber-500'
+                              : 'txt-secondary opacity-0 group-hover:opacity-100 hover:text-amber-500'
+                          "
+                          :title="
+                            session.isFavorite
+                              ? $t('widgetSessions.unfavorite')
+                              : $t('widgetSessions.favorite')
+                          "
                           @click.stop="toggleSessionFavorite(session)"
                         >
-                          <Icon :icon="session.isFavorite ? 'heroicons:star-solid' : 'heroicons:star'" class="w-3.5 h-3.5" />
+                          <Icon
+                            :icon="session.isFavorite ? 'heroicons:star-solid' : 'heroicons:star'"
+                            class="w-3.5 h-3.5"
+                          />
                         </button>
                       </div>
-                      <span class="text-[11px] txt-secondary flex-shrink-0 whitespace-nowrap">{{ getTimeAgo(session.lastMessage) }}</span>
+                      <span class="text-[11px] txt-secondary flex-shrink-0 whitespace-nowrap">{{
+                        getTimeAgo(session.lastMessage)
+                      }}</span>
                     </div>
                     <p class="text-xs txt-secondary line-clamp-2 leading-relaxed">
-                      {{ stripMarkdown(session.lastMessagePreview) || $t('widgetSessions.noMessages') }}
+                      {{
+                        stripMarkdown(session.lastMessagePreview) || $t('widgetSessions.noMessages')
+                      }}
                     </p>
                   </div>
 
                   <!-- Waiting Indicator -->
                   <div v-if="session.mode === 'waiting'" class="flex-shrink-0 mt-1">
-                    <span class="w-2.5 h-2.5 rounded-full bg-amber-500 block animate-pulse shadow-sm shadow-amber-500/50"></span>
+                    <span
+                      class="w-2.5 h-2.5 rounded-full bg-amber-500 block animate-pulse shadow-sm shadow-amber-500/50"
+                    ></span>
                   </div>
                 </div>
               </button>
@@ -192,12 +224,11 @@
         <!-- Right: Chat View -->
         <div class="flex-1 flex flex-col overflow-hidden rounded-2xl bg-[var(--bg-card)] shadow-sm">
           <!-- No Selection -->
-          <div
-            v-if="!selectedSession"
-            class="flex-1 flex items-center justify-center"
-          >
+          <div v-if="!selectedSession" class="flex-1 flex items-center justify-center">
             <div class="text-center p-8">
-              <div class="w-20 h-20 rounded-2xl bg-gradient-to-br from-white/5 to-white/10 dark:from-white/5 dark:to-white/10 flex items-center justify-center mx-auto mb-5">
+              <div
+                class="w-20 h-20 rounded-2xl bg-gradient-to-br from-white/5 to-white/10 dark:from-white/5 dark:to-white/10 flex items-center justify-center mx-auto mb-5"
+              >
                 <Icon
                   icon="heroicons:chat-bubble-left-right"
                   class="w-10 h-10 txt-secondary opacity-40"
@@ -241,13 +272,16 @@
                     <span
                       class="text-[10px] px-1.5 py-0.5 rounded-md"
                       :class="getModeChipClass(selectedSession.mode)"
-                    >{{ getModeLabel(selectedSession.mode) }}</span>
+                      >{{ getModeLabel(selectedSession.mode) }}</span
+                    >
                   </div>
                   <p class="text-xs txt-secondary">
                     <template v-if="selectedSession.country">
-                      {{ getCountryFlag(selectedSession.country) }} {{ getCountryName(selectedSession.country) }} ·
+                      {{ getCountryFlag(selectedSession.country) }}
+                      {{ getCountryName(selectedSession.country) }} ·
                     </template>
-                    {{ $t('widgetSessions.lastActivity') }}: {{ getTimeAgo(selectedSession.lastMessage) }}
+                    {{ $t('widgetSessions.lastActivity') }}:
+                    {{ getTimeAgo(selectedSession.lastMessage) }}
                   </p>
                 </div>
               </div>
@@ -292,10 +326,7 @@
                 <div
                   v-for="message in sessionMessages"
                   :key="message.id"
-                  :class="[
-                    'max-w-[80%]',
-                    message.direction === 'OUT' ? 'ml-auto' : 'mr-auto',
-                  ]"
+                  :class="['max-w-[80%]', message.direction === 'OUT' ? 'ml-auto' : 'mr-auto']"
                 >
                   <div
                     :class="[
@@ -325,10 +356,7 @@
                 </div>
 
                 <!-- Typing Preview -->
-                <div
-                  v-if="typingPreview?.text"
-                  class="max-w-[80%] mr-auto animate-pulse"
-                >
+                <div v-if="typingPreview?.text" class="max-w-[80%] mr-auto animate-pulse">
                   <div
                     class="px-4 py-3 shadow-sm bg-white/5 dark:bg-white/5 rounded-2xl rounded-bl-md border border-dashed border-white/20"
                   >
@@ -344,11 +372,8 @@
             </div>
 
             <!-- Message Input (Human Mode) -->
-            <div
-              v-if="selectedSession.mode === 'human'"
-              class="p-4 flex-shrink-0"
-            >
-              <form @submit.prevent="sendMessage" class="flex gap-3">
+            <div v-if="selectedSession.mode === 'human'" class="p-4 flex-shrink-0">
+              <form class="flex gap-3" @submit.prevent="sendMessage">
                 <input
                   v-model="messageText"
                   type="text"
@@ -388,7 +413,9 @@
           >
             <div class="p-4 flex items-center justify-between">
               <h3 class="text-sm font-semibold txt-primary flex items-center gap-2">
-                <div class="w-7 h-7 rounded-lg bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center">
+                <div
+                  class="w-7 h-7 rounded-lg bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center"
+                >
                   <Icon icon="heroicons:sparkles" class="w-4 h-4 text-white" />
                 </div>
                 {{ $t('widgetSessions.aiSummary') }}
@@ -550,7 +577,7 @@ const viewSession = async (session: widgetSessionsApi.WidgetSession) => {
     sessionMessages.value = response.messages
 
     // Update session in list with fresh data from server
-    const sessionIndex = sessions.value.findIndex(s => s.id === response.session.id)
+    const sessionIndex = sessions.value.findIndex((s) => s.id === response.session.id)
     if (sessionIndex !== -1) {
       // Update only specific fields, don't replace entire object
       sessions.value[sessionIndex].mode = response.session.mode
@@ -571,7 +598,6 @@ const viewSession = async (session: widgetSessionsApi.WidgetSession) => {
       },
       (err) => console.warn('[Admin SSE] Error:', err)
     )
-
   } catch (err: any) {
     error(err.message || 'Failed to load session details')
   } finally {
@@ -599,7 +625,7 @@ const handleSessionEvent = (event: WidgetEvent) => {
     const direction = event.direction as 'IN' | 'OUT'
     const sender = event.sender as 'user' | 'ai' | 'human' | 'system'
 
-    if (!messageId || sessionMessages.value.some(m => m.id === messageId)) {
+    if (!messageId || sessionMessages.value.some((m) => m.id === messageId)) {
       return
     }
 
@@ -628,11 +654,12 @@ const handleSessionEvent = (event: WidgetEvent) => {
       }
 
       // Also update the session in the list to keep it in sync
-      const sessionIndex = sessions.value.findIndex(s => s.id === selectedSession.value?.id)
+      const sessionIndex = sessions.value.findIndex((s) => s.id === selectedSession.value?.id)
       if (sessionIndex !== -1) {
         sessions.value[sessionIndex].lastMessagePreview = previewText
         if (isUserMessage) {
-          sessions.value[sessionIndex].messageCount = (sessions.value[sessionIndex].messageCount || 0) + 1
+          sessions.value[sessionIndex].messageCount =
+            (sessions.value[sessionIndex].messageCount || 0) + 1
         }
       }
     }
@@ -645,13 +672,13 @@ const handleSessionEvent = (event: WidgetEvent) => {
       // DON'T update lastMessagePreview here - it should only reflect actual messages
 
       // Update mode in the list (but NOT the preview)
-      const sessionIndex = sessions.value.findIndex(s => s.id === selectedSession.value?.id)
+      const sessionIndex = sessions.value.findIndex((s) => s.id === selectedSession.value?.id)
       if (sessionIndex !== -1) {
         sessions.value[sessionIndex].mode = 'human'
       }
     }
     const takeoverMsgId = event.messageId as number
-    if (takeoverMsgId && !sessionMessages.value.some(m => m.id === takeoverMsgId)) {
+    if (takeoverMsgId && !sessionMessages.value.some((m) => m.id === takeoverMsgId)) {
       sessionMessages.value.push({
         id: takeoverMsgId,
         direction: 'OUT',
@@ -668,13 +695,13 @@ const handleSessionEvent = (event: WidgetEvent) => {
       // DON'T update lastMessagePreview here - it should only reflect actual messages
 
       // Update mode in the list (but NOT the preview)
-      const sessionIndex = sessions.value.findIndex(s => s.id === selectedSession.value?.id)
+      const sessionIndex = sessions.value.findIndex((s) => s.id === selectedSession.value?.id)
       if (sessionIndex !== -1) {
         sessions.value[sessionIndex].mode = 'ai'
       }
     }
     const handbackMsgId = event.messageId as number
-    if (handbackMsgId && !sessionMessages.value.some(m => m.id === handbackMsgId)) {
+    if (handbackMsgId && !sessionMessages.value.some((m) => m.id === handbackMsgId)) {
       sessionMessages.value.push({
         id: handbackMsgId,
         direction: 'OUT',
@@ -725,7 +752,7 @@ const takeOver = async (session: widgetSessionsApi.WidgetSession) => {
     }
 
     // Update the session in the list
-    const sessionIndex = sessions.value.findIndex(s => s.id === session.id)
+    const sessionIndex = sessions.value.findIndex((s) => s.id === session.id)
     if (sessionIndex !== -1) {
       sessions.value[sessionIndex].mode = 'human'
     }
@@ -752,7 +779,7 @@ const handBack = async (session: widgetSessionsApi.WidgetSession) => {
     }
 
     // Update the session in the list
-    const sessionIndex = sessions.value.findIndex(s => s.id === session.id)
+    const sessionIndex = sessions.value.findIndex((s) => s.id === session.id)
     if (sessionIndex !== -1) {
       sessions.value[sessionIndex].mode = 'ai'
     }
@@ -793,7 +820,7 @@ const toggleSessionFavorite = async (session: widgetSessionsApi.WidgetSession) =
 
     // If we're filtering by favorites and this session was unfavorited, remove it from the list
     if (filters.value.favorite && !response.isFavorite) {
-      sessions.value = sessions.value.filter(s => s.id !== session.id)
+      sessions.value = sessions.value.filter((s) => s.id !== session.id)
     }
   } catch (err: any) {
     error(err.message || 'Failed to toggle favorite')
@@ -803,37 +830,53 @@ const toggleSessionFavorite = async (session: widgetSessionsApi.WidgetSession) =
 // Helper functions
 const getModeIcon = (mode: string) => {
   switch (mode) {
-    case 'ai': return 'heroicons:cpu-chip'
-    case 'human': return 'heroicons:user'
-    case 'waiting': return 'heroicons:clock'
-    default: return 'heroicons:question-mark-circle'
+    case 'ai':
+      return 'heroicons:cpu-chip'
+    case 'human':
+      return 'heroicons:user'
+    case 'waiting':
+      return 'heroicons:clock'
+    default:
+      return 'heroicons:question-mark-circle'
   }
 }
 
 const getModeGradient = (mode: string) => {
   switch (mode) {
-    case 'ai': return 'bg-gradient-to-br from-blue-500 to-blue-600'
-    case 'human': return 'bg-gradient-to-br from-emerald-500 to-emerald-600'
-    case 'waiting': return 'bg-gradient-to-br from-amber-500 to-amber-600'
-    default: return 'bg-gradient-to-br from-gray-500 to-gray-600'
+    case 'ai':
+      return 'bg-gradient-to-br from-blue-500 to-blue-600'
+    case 'human':
+      return 'bg-gradient-to-br from-emerald-500 to-emerald-600'
+    case 'waiting':
+      return 'bg-gradient-to-br from-amber-500 to-amber-600'
+    default:
+      return 'bg-gradient-to-br from-gray-500 to-gray-600'
   }
 }
 
 const getModeLabel = (mode: string) => {
   switch (mode) {
-    case 'ai': return t('widgetSessions.modeAi')
-    case 'human': return t('widgetSessions.modeHuman')
-    case 'waiting': return t('widgetSessions.modeWaiting')
-    default: return mode
+    case 'ai':
+      return t('widgetSessions.modeAi')
+    case 'human':
+      return t('widgetSessions.modeHuman')
+    case 'waiting':
+      return t('widgetSessions.modeWaiting')
+    default:
+      return mode
   }
 }
 
 const getModeChipClass = (mode: string) => {
   switch (mode) {
-    case 'ai': return 'bg-blue-500/20 text-blue-400'
-    case 'human': return 'bg-emerald-500/20 text-emerald-400'
-    case 'waiting': return 'bg-amber-500/20 text-amber-400'
-    default: return 'bg-gray-500/20 text-gray-400'
+    case 'ai':
+      return 'bg-blue-500/20 text-blue-400'
+    case 'human':
+      return 'bg-emerald-500/20 text-emerald-400'
+    case 'waiting':
+      return 'bg-amber-500/20 text-amber-400'
+    default:
+      return 'bg-gray-500/20 text-gray-400'
   }
 }
 
@@ -842,25 +885,27 @@ const getModeChipClass = (mode: string) => {
  */
 const stripMarkdown = (text: string | null): string => {
   if (!text) return ''
-  return text
-    // Remove headers
-    .replace(/^#{1,6}\s+/gm, '')
-    // Remove bold/italic
-    .replace(/\*\*(.+?)\*\*/g, '$1')
-    .replace(/\*(.+?)\*/g, '$1')
-    .replace(/__(.+?)__/g, '$1')
-    .replace(/_(.+?)_/g, '$1')
-    // Remove inline code
-    .replace(/`(.+?)`/g, '$1')
-    // Remove links, keep text
-    .replace(/\[(.+?)\]\(.+?\)/g, '$1')
-    // Remove bullet points
-    .replace(/^[-*+]\s+/gm, '')
-    // Remove numbered lists
-    .replace(/^\d+\.\s+/gm, '')
-    // Clean up extra whitespace
-    .replace(/\s+/g, ' ')
-    .trim()
+  return (
+    text
+      // Remove headers
+      .replace(/^#{1,6}\s+/gm, '')
+      // Remove bold/italic
+      .replace(/\*\*(.+?)\*\*/g, '$1')
+      .replace(/\*(.+?)\*/g, '$1')
+      .replace(/__(.+?)__/g, '$1')
+      .replace(/_(.+?)_/g, '$1')
+      // Remove inline code
+      .replace(/`(.+?)`/g, '$1')
+      // Remove links, keep text
+      .replace(/\[(.+?)\]\(.+?\)/g, '$1')
+      // Remove bullet points
+      .replace(/^[-*+]\s+/gm, '')
+      // Remove numbered lists
+      .replace(/^\d+\.\s+/gm, '')
+      // Clean up extra whitespace
+      .replace(/\s+/g, ' ')
+      .trim()
+  )
 }
 
 /**
@@ -871,7 +916,7 @@ const getCountryFlag = (countryCode: string | null): string => {
   if (!countryCode || countryCode.length !== 2) return ''
   const code = countryCode.toUpperCase()
   // Regional indicator symbols start at Unicode 0x1F1E6 (🇦)
-  const offset = 0x1F1E6 - 65 // 65 is 'A'
+  const offset = 0x1f1e6 - 65 // 65 is 'A'
   return String.fromCodePoint(code.charCodeAt(0) + offset, code.charCodeAt(1) + offset)
 }
 

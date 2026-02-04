@@ -258,17 +258,17 @@ class WidgetSession
 
     public function isAiMode(): bool
     {
-        return $this->mode === self::MODE_AI;
+        return self::MODE_AI === $this->mode;
     }
 
     public function isHumanMode(): bool
     {
-        return $this->mode === self::MODE_HUMAN;
+        return self::MODE_HUMAN === $this->mode;
     }
 
     public function isWaitingForHuman(): bool
     {
-        return $this->mode === self::MODE_WAITING;
+        return self::MODE_WAITING === $this->mode;
     }
 
     public function getHumanOperatorId(): ?int
@@ -308,7 +308,7 @@ class WidgetSession
     public function setLastMessagePreview(?string $preview): self
     {
         // Truncate to 200 chars if longer
-        if ($preview !== null && mb_strlen($preview) > 200) {
+        if (null !== $preview && mb_strlen($preview) > 200) {
             $preview = mb_substr($preview, 0, 197).'...';
         }
         $this->lastMessagePreview = $preview;
@@ -376,7 +376,7 @@ class WidgetSession
     public function setCountry(?string $country): self
     {
         // Filter out special Cloudflare codes (XX = unknown, T1 = Tor)
-        if ($country === 'XX' || $country === 'T1' || $country === null || $country === '') {
+        if ('XX' === $country || 'T1' === $country || null === $country || '' === $country) {
             $this->country = null;
         } else {
             $this->country = strtoupper($country);
@@ -392,7 +392,7 @@ class WidgetSession
 
     public function setTitle(?string $title): self
     {
-        $this->title = $title !== null ? mb_substr($title, 0, 100) : null;
+        $this->title = null !== $title ? mb_substr($title, 0, 100) : null;
 
         return $this;
     }

@@ -1777,7 +1777,7 @@ function handleWidgetEvent(data: WidgetEvent) {
       operatorName.value = (data.operatorName as string) ?? 'Support'
       // Add system message (use messageId to prevent duplicates)
       const takeoverMsgId = data.messageId ? String(data.messageId) : `system-${Date.now()}`
-      if (!messages.value.some(m => String(m.id) === takeoverMsgId)) {
+      if (!messages.value.some((m) => String(m.id) === takeoverMsgId)) {
         messages.value.push({
           id: takeoverMsgId,
           role: 'assistant',
@@ -1796,7 +1796,7 @@ function handleWidgetEvent(data: WidgetEvent) {
       operatorName.value = null
       // Add system message (use messageId to prevent duplicates)
       const handbackMsgId = data.messageId ? String(data.messageId) : `system-${Date.now()}`
-      if (!messages.value.some(m => String(m.id) === handbackMsgId)) {
+      if (!messages.value.some((m) => String(m.id) === handbackMsgId)) {
         messages.value.push({
           id: handbackMsgId,
           role: 'assistant',
@@ -1814,7 +1814,7 @@ function handleWidgetEvent(data: WidgetEvent) {
       if (data.sender === 'human') {
         const msgId = data.messageId ? String(data.messageId) : `msg-${Date.now()}`
         // Check for duplicates before adding
-        if (!messages.value.some(m => String(m.id) === msgId)) {
+        if (!messages.value.some((m) => String(m.id) === msgId)) {
           const text = data.text as string
           messages.value.push({
             id: msgId,
