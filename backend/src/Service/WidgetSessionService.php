@@ -138,6 +138,15 @@ class WidgetSessionService
         $this->em->flush();
     }
 
+    /**
+     * Decrement message count (e.g. on failure).
+     */
+    public function decrementMessageCount(WidgetSession $session): void
+    {
+        $session->setMessageCount(max(0, $session->getMessageCount() - 1));
+        $this->em->flush();
+    }
+
     public function checkFileUploadLimit(WidgetSession $session, ?int $maxFiles = null): array
     {
         $maxFiles = $maxFiles ?? $this->maxFiles;
