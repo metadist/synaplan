@@ -347,22 +347,6 @@
                 </p>
               </div>
 
-              <div>
-                <label class="block text-sm font-medium txt-primary mb-2">
-                  {{ $t('widgets.advancedConfig.maxFileSize') }}
-                </label>
-                <input
-                  v-model.number="config.maxFileSize"
-                  type="number"
-                  min="1"
-                  max="50"
-                  class="w-full px-4 py-2.5 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
-                  data-testid="input-max-file-size"
-                />
-                <p class="text-xs txt-secondary mt-1">
-                  {{ $t('widgets.advancedConfig.maxFileSizeHelp') }}
-                </p>
-              </div>
             </div>
 
             <div class="surface-chip rounded-lg">
@@ -416,6 +400,25 @@
                       </p>
                     </div>
                   </div>
+                </div>
+
+                <!-- Max File Size -->
+                <div class="mt-4">
+                  <label class="block text-sm font-medium txt-primary mb-2">
+                    {{ $t('widgets.advancedConfig.maxFileSize') }}
+                  </label>
+                  <input
+                    :value="config.maxFileSize"
+                    type="number"
+                    min="1"
+                    max="50"
+                    class="w-full px-4 py-2.5 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+                    data-testid="input-max-file-size"
+                    @input="handleMaxFileSizeInput"
+                  />
+                  <p class="text-xs txt-secondary mt-1">
+                    {{ $t('widgets.advancedConfig.maxFileSizeHelp') }}
+                  </p>
                 </div>
               </div>
             </div>
@@ -1048,6 +1051,21 @@ const config = reactive<widgetsApi.WidgetConfig>({
 // Icon selection
 const iconUploadInput = ref<HTMLInputElement | null>(null)
 const uploadingIcon = ref(false)
+
+// Handle max file size input with automatic clamping to 50
+const handleMaxFileSizeInput = (event: Event) => {
+  const input = event.target as HTMLInputElement
+  let value = parseInt(input.value, 10)
+
+  if (isNaN(value) || value < 1) {
+    value = 1
+  } else if (value > 50) {
+    value = 50
+  }
+
+  config.maxFileSize = value
+  input.value = String(value)
+}
 
 const predefinedIcons = [
   { value: 'chat', label: t('widgets.icons.chat') },
