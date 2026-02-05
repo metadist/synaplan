@@ -507,9 +507,11 @@ final class QdrantClientHttp implements QdrantClientInterface
                 throw new \RuntimeException("Qdrant delete by file failed: {$response->getContent(false)}");
             }
 
-            return (int) $response->getContent();
+            // Response is Json<u64> - a bare JSON number
+            return (int) json_decode($response->getContent(), true);
         } catch (\Throwable $e) {
             $this->logger->error('Failed to delete documents by file', [
+                'user_id' => $userId,
                 'file_id' => $fileId,
                 'error' => $e->getMessage(),
             ]);
@@ -530,9 +532,10 @@ final class QdrantClientHttp implements QdrantClientInterface
                 throw new \RuntimeException("Qdrant delete by group failed: {$response->getContent(false)}");
             }
 
-            return (int) $response->getContent();
+            return (int) json_decode($response->getContent(), true);
         } catch (\Throwable $e) {
             $this->logger->error('Failed to delete documents by group', [
+                'user_id' => $userId,
                 'group_key' => $groupKey,
                 'error' => $e->getMessage(),
             ]);
@@ -552,7 +555,7 @@ final class QdrantClientHttp implements QdrantClientInterface
                 throw new \RuntimeException("Qdrant delete all for user failed: {$response->getContent(false)}");
             }
 
-            return (int) $response->getContent();
+            return (int) json_decode($response->getContent(), true);
         } catch (\Throwable $e) {
             $this->logger->error('Failed to delete all documents for user', [
                 'user_id' => $userId,
@@ -579,9 +582,10 @@ final class QdrantClientHttp implements QdrantClientInterface
                 throw new \RuntimeException("Qdrant update group key failed: {$response->getContent(false)}");
             }
 
-            return (int) $response->getContent();
+            return (int) json_decode($response->getContent(), true);
         } catch (\Throwable $e) {
             $this->logger->error('Failed to update document group key', [
+                'user_id' => $userId,
                 'file_id' => $fileId,
                 'error' => $e->getMessage(),
             ]);

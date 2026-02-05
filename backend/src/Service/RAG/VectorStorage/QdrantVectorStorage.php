@@ -38,7 +38,7 @@ final readonly class QdrantVectorStorage implements VectorStorageInterface
             'start_line' => $chunk->startLine,
             'end_line' => $chunk->endLine,
             'text' => $chunk->text,
-            'created' => $chunk->createdAt,
+            'created' => $chunk->getCreatedTimestamp(),
         ];
 
         $this->qdrantClient->upsertDocument($pointId, $chunk->vector, $payload);
@@ -64,7 +64,7 @@ final readonly class QdrantVectorStorage implements VectorStorageInterface
                 'start_line' => $chunk->startLine,
                 'end_line' => $chunk->endLine,
                 'text' => $chunk->text,
-                'created' => $chunk->createdAt,
+                'created' => $chunk->getCreatedTimestamp(),
             ],
         ], $chunks);
 

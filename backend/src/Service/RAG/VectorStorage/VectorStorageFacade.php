@@ -107,12 +107,23 @@ final readonly class VectorStorageFacade implements VectorStorageInterface
 
     public function isAvailable(): bool
     {
-        return $this->getActiveStorage()->isAvailable();
+        $provider = $this->config->getProvider();
+
+        $storage = match ($provider) {
+            'qdrant' => $this->qdrantStorage,
+            default => $this->mariaDbStorage,
+        };
+
+        return $storage->isAvailable();
     }
 
     public function getProviderName(): string
     {
-        return $this->getActiveStorage()->getProviderName();
+        try {
+            return $this->getActiveStorage()->getProviderName();
+        } catch (ProviderUnavailableException) {
+            return $this->config->getProvider().' (unavailable)';
+        }
     }
 
     /**

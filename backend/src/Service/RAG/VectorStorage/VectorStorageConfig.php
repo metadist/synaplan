@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Service\RAG\VectorStorage;
 
-use App\Service\ConfigService;
+use App\Repository\ConfigRepository;
 
 final readonly class VectorStorageConfig
 {
@@ -12,24 +12,29 @@ final readonly class VectorStorageConfig
     private const ALLOWED_PROVIDERS = ['mariadb', 'qdrant'];
 
     public function __construct(
-        private ConfigService $configService,
-        private string $envProvider,
-        private string $qdrantServiceUrl,
-        private string $qdrantApiKey,
-        private string $qdrantDocumentsCollection,
+        private ConfigRepository $configRepository,
+        private ?string $envProvider = null,
+        private ?string $qdrantServiceUrl = null,
+        private ?string $qdrantApiKey = null,
+        private ?string $qdrantDocumentsCollection = null,
     ) {
     }
 
     public function getProvider(): string
     {
-        // 1. Check BCONFIG for runtime override
-        $runtimeOverride = $this->configService->getSystemSetting('vector_storage_provider');
-        if ($runtimeOverride && in_array($runtimeOverride, self::ALLOWED_PROVIDERS, true)) {
-            return $runtimeOverride;
+        // 1. Check BCONFIG for runtime override (ownerId=0 = global system setting)
+        try {
+            $runtimeOverride = $this->configRepository->getValue(0, 'system', 'vector_storage_provider');
+            if (null !== $runtimeOverride && in_array($runtimeOverride, self::ALLOWED_PROVIDERS, true)) {
+                return $runtimeOverride;
+            }
+        } catch (\Throwable) {
+            // DB may not be available during container compilation
         }
 
         // 2. Check .env
-        if (in_array($this->envProvider, self::ALLOWED_PROVIDERS, true)) {
+        if (null !== $this->envProvider && '' !== $this->envProvider
+            && in_array($this->envProvider, self::ALLOWED_PROVIDERS, true)) {
             return $this->envProvider;
         }
 
@@ -44,16 +49,16 @@ final readonly class VectorStorageConfig
 
     public function getQdrantServiceUrl(): string
     {
-        return $this->qdrantServiceUrl;
+        return $this->qdrantServiceUrl ?? '';
     }
 
     public function getQdrantApiKey(): string
     {
-        return $this->qdrantApiKey;
+        return $this->qdrantApiKey ?? '';
     }
 
     public function getQdrantDocumentsCollection(): string
     {
-        return $this->qdrantDocumentsCollection;
+        return $this->qdrantDocumentsCollection ?? 'user_documents';
     }
 }

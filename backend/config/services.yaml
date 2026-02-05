@@ -419,7 +419,7 @@ services:
             $envProvider: '%env(default::VECTOR_STORAGE_PROVIDER)%'
             $qdrantServiceUrl: '%env(default::QDRANT_SERVICE_URL)%'
             $qdrantApiKey: '%env(default::QDRANT_SERVICE_API_KEY)%'
-            $qdrantDocumentsCollection: '%env(default:user_documents:QDRANT_DOCUMENTS_COLLECTION)%'
+            $qdrantDocumentsCollection: '%env(default::QDRANT_DOCUMENTS_COLLECTION)%'
 
     # Vector Storage Implementations
     App\Service\RAG\VectorStorage\MariaDBVectorStorage: ~

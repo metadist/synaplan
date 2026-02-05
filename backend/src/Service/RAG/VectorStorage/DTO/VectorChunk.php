@@ -22,6 +22,14 @@ final readonly class VectorChunk
     }
 
     /**
+     * Get the creation timestamp, falling back to current time if not set.
+     */
+    public function getCreatedTimestamp(): int
+    {
+        return $this->createdAt ?? time();
+    }
+
+    /**
      * Generate a unique point ID for Qdrant.
      */
     public function getPointId(): string

@@ -4,19 +4,16 @@ declare(strict_types=1);
 
 namespace App\Service\RAG\VectorStorage;
 
-use App\Entity\RagDocument;
 use App\Repository\RagDocumentRepository;
 use App\Service\RAG\VectorStorage\DTO\SearchQuery;
 use App\Service\RAG\VectorStorage\DTO\SearchResult;
 use App\Service\RAG\VectorStorage\DTO\StorageStats;
 use App\Service\RAG\VectorStorage\DTO\VectorChunk;
 use Doctrine\DBAL\Connection;
-use Doctrine\ORM\EntityManagerInterface;
 
 final readonly class MariaDBVectorStorage implements VectorStorageInterface
 {
     public function __construct(
-        private EntityManagerInterface $em,
         private RagDocumentRepository $ragRepository,
         private Connection $connection,
     ) {
@@ -39,7 +36,7 @@ final readonly class MariaDBVectorStorage implements VectorStorageInterface
         $stmt->bindValue('endLine', $chunk->endLine);
         $stmt->bindValue('text', $chunk->text);
         $stmt->bindValue('vector', '['.implode(',', $chunk->vector).']');
-        $stmt->bindValue('created', $chunk->createdAt);
+        $stmt->bindValue('created', $chunk->getCreatedTimestamp());
         $stmt->executeStatement();
 
         return (string) $this->connection->lastInsertId();
@@ -47,10 +44,22 @@ final readonly class MariaDBVectorStorage implements VectorStorageInterface
 
     public function storeChunkBatch(array $chunks): int
     {
+        if (empty($chunks)) {
+            return 0;
+        }
+
         $stored = 0;
-        foreach ($chunks as $chunk) {
-            $this->storeChunk($chunk);
-            ++$stored;
+        $this->connection->beginTransaction();
+
+        try {
+            foreach ($chunks as $chunk) {
+                $this->storeChunk($chunk);
+                ++$stored;
+            }
+            $this->connection->commit();
+        } catch (\Throwable $e) {
+            $this->connection->rollBack();
+            throw $e;
         }
 
         return $stored;
@@ -58,22 +67,31 @@ final readonly class MariaDBVectorStorage implements VectorStorageInterface
 
     public function deleteByFile(int $userId, int $fileId): int
     {
-        return $this->ragRepository->deleteByMessageId($fileId);
+        $sql = 'DELETE FROM BRAG WHERE BUID = :userId AND BMID = :fileId';
+        $stmt = $this->connection->prepare($sql);
+        $stmt->bindValue('userId', $userId);
+        $stmt->bindValue('fileId', $fileId);
+
+        return $stmt->executeStatement();
     }
 
     public function deleteByGroupKey(int $userId, string $groupKey): int
     {
-        return $this->ragRepository->deleteByGroupKey($groupKey);
+        $sql = 'DELETE FROM BRAG WHERE BUID = :userId AND BGROUPKEY = :groupKey';
+        $stmt = $this->connection->prepare($sql);
+        $stmt->bindValue('userId', $userId);
+        $stmt->bindValue('groupKey', $groupKey);
+
+        return $stmt->executeStatement();
     }
 
     public function deleteAllForUser(int $userId): int
     {
-        $qb = $this->em->createQueryBuilder();
-        $qb->delete(RagDocument::class, 'r')
-            ->where('r.userId = :userId')
-            ->setParameter('userId', $userId);
+        $sql = 'DELETE FROM BRAG WHERE BUID = :userId';
+        $stmt = $this->connection->prepare($sql);
+        $stmt->bindValue('userId', $userId);
 
-        return $qb->getQuery()->execute();
+        return $stmt->executeStatement();
     }
 
     public function search(SearchQuery $query): array
@@ -91,7 +109,7 @@ final readonly class MariaDBVectorStorage implements VectorStorageInterface
                 r.BEND as end_line,
                 VEC_DISTANCE_COSINE(r.BEMBED, VEC_FromText(:vector)) as distance,
                 f.BFILENAME as file_name,
-                f.BMIMETYPE as mime_type
+                f.BFILEMIME as mime_type
             FROM BRAG r
             LEFT JOIN BFILES f ON r.BMID = f.BID
             WHERE r.BUID = :userId
