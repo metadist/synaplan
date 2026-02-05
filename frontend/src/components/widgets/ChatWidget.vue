@@ -1321,6 +1321,9 @@ const sendMessage = async () => {
     }
   } catch (error) {
     console.error('Failed to send message:', error)
+    // Decrement message count on failure so user can retry
+    messageCount.value = Math.max(0, messageCount.value - 1)
+
     const lastMessage = messages.value.find((m) => m.id === assistantMessageId)
     let recovered = false
 

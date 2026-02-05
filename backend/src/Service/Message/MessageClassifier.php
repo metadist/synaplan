@@ -133,7 +133,23 @@ class MessageClassifier
             }
         }
 
-        // 3. Use AI-based sorting
+        // 3. Check for image attachments (force file analysis)
+        // This prevents images from being routed to text2pic or chat without vision
+        if ($this->hasImages($message)) {
+            $this->logger->info('MessageClassifier: Image detected, forcing file analysis', [
+                'message_id' => $messageId,
+            ]);
+
+            return [
+                'topic' => 'analyzefile',
+                'language' => $message->getLanguage() ?: 'en',
+                'intent' => 'file_analysis',
+                'source' => 'image_attachment',
+                'skip_sorting' => true,
+            ];
+        }
+
+        // 4. Use AI-based sorting
         $messageData = $this->buildMessageData($message);
         $result = $this->messageSorter->classify($messageData, $conversationHistory, $userId);
 
@@ -219,6 +235,26 @@ class MessageClassifier
         }
 
         return null;
+    }
+
+    /**
+     * Check if message has image attachments.
+     */
+    private function hasImages(Message $message): bool
+    {
+        // Check new-style file attachments
+        foreach ($message->getFiles() as $file) {
+            if (str_starts_with($file->getFileMime(), 'image/')) {
+                return true;
+            }
+        }
+
+        // Check legacy file path
+        if ('image' === $message->getFileType()) {
+            return true;
+        }
+
+        return false;
     }
 
     /**

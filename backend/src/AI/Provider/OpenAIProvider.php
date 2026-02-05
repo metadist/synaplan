@@ -274,10 +274,17 @@ class OpenAIProvider implements ChatProviderInterface, EmbeddingProviderInterfac
         }
 
         try {
-            $response = $this->client->embeddings()->create([
+            $params = [
                 'model' => $options['model'],
                 'input' => $text,
-            ]);
+            ];
+
+            // Force 1536 dimensions for v3 models to match MariaDB vector column size
+            if (str_contains($options['model'], 'text-embedding-3')) {
+                $params['dimensions'] = 1536;
+            }
+
+            $response = $this->client->embeddings()->create($params);
 
             return $response['data'][0]['embedding'] ?? [];
         } catch (\Exception $e) {
@@ -296,10 +303,17 @@ class OpenAIProvider implements ChatProviderInterface, EmbeddingProviderInterfac
         }
 
         try {
-            $response = $this->client->embeddings()->create([
+            $params = [
                 'model' => $options['model'],
                 'input' => $texts,
-            ]);
+            ];
+
+            // Force 1536 dimensions for v3 models to match MariaDB vector column size
+            if (str_contains($options['model'], 'text-embedding-3')) {
+                $params['dimensions'] = 1536;
+            }
+
+            $response = $this->client->embeddings()->create($params);
 
             return array_map(fn ($item) => $item['embedding'], $response['data']);
         } catch (\Exception $e) {
@@ -311,7 +325,7 @@ class OpenAIProvider implements ChatProviderInterface, EmbeddingProviderInterfac
     {
         return match (true) {
             str_contains($model, 'text-embedding-3-small') => 1536,
-            str_contains($model, 'text-embedding-3-large') => 3072,
+            str_contains($model, 'text-embedding-3-large') => 1536, // Forced to 1536 for compatibility
             str_contains($model, 'text-embedding-ada-002') => 1536,
             default => 1536,
         };

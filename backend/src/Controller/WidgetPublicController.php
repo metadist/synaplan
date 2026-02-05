@@ -646,6 +646,9 @@ class WidgetPublicController extends AbstractController
                     try {
                         $incomingMessage->setStatus('failed');
                         $this->em->flush();
+
+                        // Decrement session message count on failure so user can retry
+                        $this->sessionService->decrementMessageCount($session);
                     } catch (\Throwable $flushException) {
                         // EntityManager might be closed after database error
                         $this->logger->warning('Could not update message status after error', [
@@ -671,6 +674,9 @@ class WidgetPublicController extends AbstractController
 
             return $response;
         } catch (\Exception $e) {
+            // Decrement session message count on failure so user can retry
+            $this->sessionService->decrementMessageCount($session);
+
             $this->logger->error('Widget message failed', [
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
