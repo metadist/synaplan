@@ -707,11 +707,15 @@ const canSend = computed(() => {
 })
 
 const showLimitWarning = computed(() => {
+  // No limit warnings during human takeover
+  if (chatMode.value !== 'ai') return false
   const warningThreshold = props.messageLimit * 0.8
   return messageCount.value >= warningThreshold && messageCount.value < props.messageLimit
 })
 
 const limitReached = computed(() => {
+  // No message limit during human takeover
+  if (chatMode.value !== 'ai') return false
   return messageCount.value >= props.messageLimit
 })
 
@@ -1231,7 +1235,10 @@ const sendMessage = async () => {
     files: hasFiles ? uploadedFiles : undefined,
     timestamp: new Date(),
   })
-  messageCount.value++
+  // Only count messages against limit when chatting with AI (not during human takeover)
+  if (chatMode.value === 'ai') {
+    messageCount.value++
+  }
 
   inputMessage.value = ''
   await scrollToBottom()
