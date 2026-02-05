@@ -107,6 +107,16 @@ interface VectorStorageInterface
     public function updateGroupKey(int $userId, int $fileId, string $newGroupKey): int;
 
     /**
+     * Get chunk info for a specific file (count + group key).
+     *
+     * @param int $userId User ID (required for isolation)
+     * @param int $fileId File ID
+     *
+     * @return array{chunks: int, groupKey: string|null} Chunk count and group key
+     */
+    public function getFileChunkInfo(int $userId, int $fileId): array;
+
+    /**
      * Check if the storage backend is available.
      *
      * @return bool True if backend is operational

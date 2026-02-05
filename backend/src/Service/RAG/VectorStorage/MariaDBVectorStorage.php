@@ -240,6 +240,25 @@ final readonly class MariaDBVectorStorage implements VectorStorageInterface
         return $stmt->executeStatement();
     }
 
+    public function getFileChunkInfo(int $userId, int $fileId): array
+    {
+        $sql = <<<'SQL'
+            SELECT COUNT(*) as chunks, MIN(BGROUPKEY) as group_key
+            FROM BRAG
+            WHERE BUID = :userId AND BMID = :fileId
+        SQL;
+
+        $stmt = $this->connection->prepare($sql);
+        $stmt->bindValue('userId', $userId);
+        $stmt->bindValue('fileId', $fileId);
+        $result = $stmt->executeQuery()->fetchAssociative();
+
+        return [
+            'chunks' => (int) ($result['chunks'] ?? 0),
+            'groupKey' => $result['group_key'] ?? null,
+        ];
+    }
+
     public function isAvailable(): bool
     {
         try {
