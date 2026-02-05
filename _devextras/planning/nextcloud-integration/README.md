@@ -37,6 +37,16 @@ graph LR
     end
 ```
 
+## Planning Documents
+
+1.  [**Setup Guide**](./01-SETUP.md) - Local dev environment.
+2.  [**API Specs**](./02-API-SPECS.md) - Synaplan endpoints required.
+3.  [**MVP Plan**](./03-MVP-PLAN.md) - Step-by-step implementation phases.
+4.  [**UX Guide**](./04-UX-GUIDE.md) - Wireframes and user flows.
+5.  [**Publishing**](./05-PUBLISHING.md) - App Store submission guide.
+6.  [**Repo Structure**](./06-REPO-STRUCTURE.md) - `synaplan-nextcloud` layout.
+7.  [**Generic Integration**](./07-GENERIC-INTEGRATION.md) - Strategy for "OpenCloud" and other platforms.
+
 ## Vibe Coding Instructions (Claude/Gemini)
 
 When using AI agents to build this, follow this **Iterative Vibe Coding Protocol**:
