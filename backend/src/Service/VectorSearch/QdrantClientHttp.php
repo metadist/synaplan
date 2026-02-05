@@ -594,6 +594,55 @@ final class QdrantClientHttp implements QdrantClientInterface
         }
     }
 
+    /**
+     * Get chunk info for a specific file from Qdrant.
+     *
+     * Uses the search endpoint with a zero vector and file_id filter
+     * to check if any chunks exist and retrieve the group key.
+     *
+     * @return array{chunks: int, group_key: string|null}
+     */
+    public function getDocumentFileInfo(int $userId, int $fileId): array
+    {
+        try {
+            // Use stats endpoint - scroll user docs and filter locally for this file
+            $stats = $this->getDocumentStats($userId);
+
+            // Stats gives us total chunks but not per-file info
+            // Fall back to checking if file has any point by searching for it
+            // Use the point ID convention: doc_{userId}_{fileId}_0
+            $firstChunkId = sprintf('doc_%d_%d_0', $userId, $fileId);
+            $doc = $this->getDocument($firstChunkId);
+
+            if (null === $doc) {
+                return ['chunks' => 0, 'group_key' => null];
+            }
+
+            $groupKey = $doc['payload']['group_key'] ?? null;
+
+            // Estimate chunk count by probing sequential IDs (fast, no scroll needed)
+            $chunks = 0;
+            for ($i = 0; $i < 100; ++$i) {
+                $chunkId = sprintf('doc_%d_%d_%d', $userId, $fileId, $i);
+                $exists = $this->getDocument($chunkId);
+                if (null === $exists) {
+                    break;
+                }
+                ++$chunks;
+            }
+
+            return ['chunks' => $chunks, 'group_key' => $groupKey];
+        } catch (\Throwable $e) {
+            $this->logger->error('Failed to get document file info', [
+                'user_id' => $userId,
+                'file_id' => $fileId,
+                'error' => $e->getMessage(),
+            ]);
+
+            return ['chunks' => 0, 'group_key' => null];
+        }
+    }
+
     public function getDocumentStats(int $userId): array
     {
         try {

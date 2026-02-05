@@ -1071,7 +1071,6 @@ class FileController extends AbstractController
     public function getGroupKey(
         int $id,
         #[CurrentUser] ?User $user,
-        RagDocumentRepository $ragRepository,
     ): JsonResponse {
         if (!$user) {
             return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
@@ -1088,26 +1087,22 @@ class FileController extends AbstractController
             return $this->json(['error' => 'Access denied'], Response::HTTP_FORBIDDEN);
         }
 
-        // Get RAG documents for this file
-        $ragDocs = $ragRepository->findBy([
-            'userId' => $user->getId(),
-            'messageId' => $messageFile->getId(),
-        ]);
+        // Use VectorStorageFacade to check vectorization (works with both MariaDB and Qdrant)
+        $chunkInfo = $this->vectorStorageFacade->getFileChunkInfo($user->getId(), $messageFile->getId());
+        $chunks = $chunkInfo['chunks'];
+        $groupKey = $chunkInfo['groupKey'];
 
-        $groupKey = null;
-        $chunks = count($ragDocs);
-
-        if ($chunks > 0) {
-            // Get groupKey from first chunk (all should have the same)
-            $groupKey = $ragDocs[0]->getGroupKey();
-        }
+        // Fallback: If facade returns 0 chunks but file status says vectorized,
+        // the file was vectorized with a different provider (e.g., switched from MariaDB to Qdrant)
+        $isVectorized = $chunks > 0 || 'vectorized' === $messageFile->getStatus();
 
         return $this->json([
             'success' => true,
             'groupKey' => $groupKey,
-            'isVectorized' => $chunks > 0,
+            'isVectorized' => $isVectorized,
             'chunks' => $chunks,
             'status' => $messageFile->getStatus(),
+            'provider' => $this->vectorStorageFacade->getProviderName(),
         ]);
     }
 }

@@ -105,6 +105,11 @@ final readonly class VectorStorageFacade implements VectorStorageInterface
         return $this->getActiveStorage()->updateGroupKey($userId, $fileId, $newGroupKey);
     }
 
+    public function getFileChunkInfo(int $userId, int $fileId): array
+    {
+        return $this->getActiveStorage()->getFileChunkInfo($userId, $fileId);
+    }
+
     public function isAvailable(): bool
     {
         $provider = $this->config->getProvider();
