@@ -146,59 +146,54 @@ class WidgetSessionService
     /**
      * Generate an AI summary title for the session after 5 user messages.
      * This should be called asynchronously to not block the response.
+     * Note: Only generates if no title exists (preserves manually set titles).
      */
     public function generateTitleIfNeeded(WidgetSession $session, int $ownerId): void
     {
-        $this->logger->info('Title generation check', [
-            'session_id' => $session->getSessionId(),
-            'message_count' => $session->getMessageCount(),
-            'has_title' => null !== $session->getTitle(),
-        ]);
-
-        // Only generate title if >= 5 messages and no title exists yet
-        if ($session->getMessageCount() < 5 || null !== $session->getTitle()) {
-            $this->logger->debug('Skipping title generation', [
-                'reason' => $session->getMessageCount() < 5 ? 'message_count_below_5' : 'title_already_exists',
+        // Skip if title already exists (includes manually set titles)
+        if (null !== $session->getTitle()) {
+            $this->logger->debug('Skipping title generation - title already exists', [
+                'session_id' => $session->getSessionId(),
+                'title' => $session->getTitle(),
             ]);
 
             return;
         }
-
-        $this->logger->info('Proceeding with title generation');
 
         $chatId = $session->getChatId();
         if (!$chatId) {
-            $this->logger->warning('No chatId for session, cannot generate title');
+            $this->logger->debug('Skipping title generation - no chatId');
 
             return;
         }
 
-        $this->logger->debug('ChatId found', ['chat_id' => $chatId]);
+        // Count actual user messages from DB (not messageCount, which isn't updated in human mode)
+        $messages = $this->messageRepository->findChatHistory($ownerId, $chatId, 20, 50000);
+        $userMessages = array_filter($messages, fn ($m) => 'IN' === $m->getDirection());
+        $userMessageCount = count($userMessages);
 
-        try {
-            // Fetch the conversation messages (use findChatHistory with ownerId)
-            // Use a high character limit since we only need user messages for title generation
-            $messages = $this->messageRepository->findChatHistory($ownerId, $chatId, 20, 50000);
+        $this->logger->info('Title generation check', [
+            'session_id' => $session->getSessionId(),
+            'user_message_count' => $userMessageCount,
+            'has_title' => false,
+        ]);
 
-            $this->logger->debug('Fetched messages for title generation', [
-                'total_count' => count($messages),
-                'chat_id' => $chatId,
+        // Only generate title if >= 5 user messages
+        if ($userMessageCount < 5) {
+            $this->logger->debug('Skipping title generation - not enough user messages', [
+                'count' => $userMessageCount,
             ]);
 
-            if (count($messages) < 3) {
-                $this->logger->debug('Not enough messages for title generation', ['count' => count($messages)]);
+            return;
+        }
 
-                return;
-            }
+        $this->logger->info('Proceeding with title generation', [
+            'session_id' => $session->getSessionId(),
+            'user_message_count' => $userMessageCount,
+        ]);
 
-            // Build conversation text for summarization (only user messages)
-            $userMessages = array_filter($messages, fn ($m) => 'IN' === $m->getDirection());
-            if (count($userMessages) < 3) {
-                $this->logger->debug('Not enough user messages for title generation', ['count' => count($userMessages)]);
-
-                return;
-            }
-
+        try {
+            // Build conversation text for summarization (using already fetched user messages)
             $conversationText = '';
             foreach ($userMessages as $message) {
                 $text = mb_substr($message->getText(), 0, 200);

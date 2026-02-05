@@ -5,16 +5,15 @@ namespace App\Controller;
 use App\Entity\Chat;
 use App\Entity\File;
 use App\Entity\Message;
-use App\Entity\WidgetEvent;
 use App\Repository\ChatRepository;
 use App\Repository\FileRepository;
 use App\Repository\MessageRepository;
-use App\Repository\WidgetEventRepository;
 use App\Service\File\FileProcessor;
 use App\Service\File\FileStorageService;
 use App\Service\File\VectorizationService;
 use App\Service\Message\MessageProcessor;
 use App\Service\RateLimitService;
+use App\Service\WidgetEventCacheService;
 use App\Service\WidgetService;
 use App\Service\WidgetSessionService;
 use Doctrine\ORM\EntityManagerInterface;
@@ -47,7 +46,7 @@ class WidgetPublicController extends AbstractController
         private ChatRepository $chatRepository,
         private MessageRepository $messageRepository,
         private FileRepository $fileRepository,
-        private WidgetEventRepository $widgetEventRepository,
+        private WidgetEventCacheService $eventCache,
         private EntityManagerInterface $em,
         private LoggerInterface $logger,
         private string $uploadDir,
@@ -309,18 +308,13 @@ class WidgetPublicController extends AbstractController
             $this->em->flush();
 
             // Publish event for user message (so admin panel receives it in real-time)
-            $userMessageEvent = new WidgetEvent();
-            $userMessageEvent->setWidgetId($widgetId);
-            $userMessageEvent->setSessionId($session->getSessionId());
-            $userMessageEvent->setType('message');
-            $userMessageEvent->setPayload([
+            $this->eventCache->publish($widgetId, $session->getSessionId(), 'message', [
                 'direction' => 'IN',
                 'text' => $data['text'],
                 'messageId' => $incomingMessage->getId(),
                 'timestamp' => $incomingMessage->getUnixTimestamp(),
                 'sender' => 'user',
             ]);
-            $this->widgetEventRepository->save($userMessageEvent, true);
 
             // Attach uploaded files if provided
             $fileIds = [];
@@ -368,6 +362,9 @@ class WidgetPublicController extends AbstractController
                 $session->setLastMessage(time());
                 $session->setLastMessagePreview(mb_substr($data['text'], 0, 100));
                 $this->em->flush();
+
+                // Generate title if needed (also works in human mode)
+                $this->sessionService->generateTitleIfNeeded($session, $owner->getId());
 
                 $this->logger->info('Widget message saved in human mode (no AI processing)', [
                     'widget_id' => $widgetId,
@@ -607,18 +604,13 @@ class WidgetPublicController extends AbstractController
                     $this->em->flush();
 
                     // Publish event for AI response (so admin panel receives it in real-time)
-                    $aiResponseEvent = new WidgetEvent();
-                    $aiResponseEvent->setWidgetId($widgetId);
-                    $aiResponseEvent->setSessionId($session->getSessionId());
-                    $aiResponseEvent->setType('message');
-                    $aiResponseEvent->setPayload([
+                    $this->eventCache->publish($widgetId, $session->getSessionId(), 'message', [
                         'direction' => 'OUT',
                         'text' => $responseText,
                         'messageId' => $outgoingMessage->getId(),
                         'timestamp' => $outgoingMessage->getUnixTimestamp(),
                         'sender' => 'ai',
                     ]);
-                    $this->widgetEventRepository->save($aiResponseEvent, true);
 
                     // Generate AI title after 5 user messages (async, non-blocking)
                     $this->sessionService->generateTitleIfNeeded($currentSession, $owner->getId());
@@ -1512,16 +1504,12 @@ class WidgetPublicController extends AbstractController
             return $this->json(['error' => 'Session not found'], Response::HTTP_NOT_FOUND);
         }
 
-        // Create typing event (ephemeral - will be consumed and cleaned up)
-        $typingEvent = new WidgetEvent();
-        $typingEvent->setWidgetId($widgetId);
-        $typingEvent->setSessionId($sessionId);
-        $typingEvent->setType('typing');
-        $typingEvent->setPayload([
+        // Publish typing event via cache (ephemeral, auto-expires)
+        // Note: This is user typing (has 'text' field), different from operator typing (no text)
+        $this->eventCache->publish($widgetId, $sessionId, 'typing', [
             'text' => mb_substr($text, 0, 500),
             'timestamp' => time(),
         ]);
-        $this->widgetEventRepository->save($typingEvent, true);
 
         return $this->json(['success' => true]);
     }

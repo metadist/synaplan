@@ -10,6 +10,7 @@ use App\Repository\ChatRepository;
 use App\Repository\MessageRepository;
 use App\Repository\WidgetRepository;
 use App\Repository\WidgetSessionRepository;
+use App\Service\WidgetEventCacheService;
 use OpenApi\Attributes as OA;
 use Psr\Log\LoggerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -34,6 +35,7 @@ class WidgetSessionController extends AbstractController
         private ChatRepository $chatRepository,
         private MessageRepository $messageRepository,
         private LoggerInterface $logger,
+        private WidgetEventCacheService $eventCache,
     ) {
     }
 
@@ -290,13 +292,30 @@ class WidgetSessionController extends AbstractController
                         $sender = 'ai';
                     }
 
-                    return [
+                    // Get attached files
+                    $files = [];
+                    foreach ($message->getFiles() as $file) {
+                        $files[] = [
+                            'id' => $file->getId(),
+                            'filename' => $file->getFileName(),
+                            'mimeType' => $file->getFileMime(),
+                            'size' => $file->getFileSize(),
+                        ];
+                    }
+
+                    $result = [
                         'id' => $message->getId(),
                         'direction' => $message->getDirection(),
                         'text' => $message->getText(),
                         'timestamp' => $message->getUnixTimestamp(),
                         'sender' => $sender,
                     ];
+
+                    if (!empty($files)) {
+                        $result['files'] = $files;
+                    }
+
+                    return $result;
                 }, $chatMessages);
             }
         }
@@ -398,6 +417,182 @@ class WidgetSessionController extends AbstractController
 
             return $this->json([
                 'error' => 'Failed to toggle favorite',
+            ], Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    /**
+     * Rename a session (update the title).
+     */
+    #[Route('/{sessionId}/rename', name: 'rename', methods: ['PATCH'])]
+    #[OA\Patch(
+        path: '/api/v1/widgets/{widgetId}/sessions/{sessionId}/rename',
+        summary: 'Rename a session (update title)',
+        security: [['Bearer' => []]],
+        tags: ['Widget Sessions']
+    )]
+    #[OA\Parameter(name: 'widgetId', in: 'path', required: true, schema: new OA\Schema(type: 'string'))]
+    #[OA\Parameter(name: 'sessionId', in: 'path', required: true, schema: new OA\Schema(type: 'string'))]
+    #[OA\RequestBody(
+        required: true,
+        content: new OA\JsonContent(
+            properties: [
+                new OA\Property(property: 'title', type: 'string', maxLength: 100, description: 'New session title'),
+            ]
+        )
+    )]
+    #[OA\Response(
+        response: 200,
+        description: 'Session renamed successfully',
+        content: new OA\JsonContent(
+            properties: [
+                new OA\Property(property: 'success', type: 'boolean'),
+                new OA\Property(property: 'title', type: 'string'),
+            ]
+        )
+    )]
+    public function rename(
+        string $widgetId,
+        string $sessionId,
+        Request $request,
+        #[CurrentUser] ?User $user,
+    ): JsonResponse {
+        if (!$user) {
+            return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
+        }
+
+        $widget = $this->widgetRepository->findByWidgetId($widgetId);
+
+        if (!$widget) {
+            return $this->json(['error' => 'Widget not found'], Response::HTTP_NOT_FOUND);
+        }
+
+        if ($widget->getOwnerId() !== $user->getId()) {
+            return $this->json(['error' => 'Access denied'], Response::HTTP_FORBIDDEN);
+        }
+
+        $session = $this->sessionRepository->findByWidgetAndSession($widgetId, $sessionId);
+
+        if (!$session) {
+            return $this->json(['error' => 'Session not found'], Response::HTTP_NOT_FOUND);
+        }
+
+        try {
+            $data = json_decode($request->getContent(), true);
+            $title = isset($data['title']) ? trim((string) $data['title']) : null;
+
+            // Allow empty string to clear the title
+            if ('' === $title) {
+                $title = null;
+            }
+
+            // Validate title length
+            if (null !== $title && mb_strlen($title) > 100) {
+                return $this->json([
+                    'error' => 'Title too long (max 100 characters)',
+                ], Response::HTTP_BAD_REQUEST);
+            }
+
+            $session->setTitle($title);
+            $this->sessionRepository->save($session, true);
+
+            return $this->json([
+                'success' => true,
+                'title' => $session->getTitle(),
+            ]);
+        } catch (\Exception $e) {
+            $this->logger->error('Failed to rename session', [
+                'widget_id' => $widgetId,
+                'session_id' => $sessionId,
+                'error' => $e->getMessage(),
+            ]);
+
+            return $this->json([
+                'error' => 'Failed to rename session',
+            ], Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    /**
+     * Send typing indicator from operator to widget user.
+     */
+    #[Route('/{sessionId}/typing', name: 'typing', methods: ['POST'])]
+    #[OA\Post(
+        path: '/api/v1/widgets/{widgetId}/sessions/{sessionId}/typing',
+        summary: 'Send typing indicator from operator to widget',
+        security: [['Bearer' => []]],
+        tags: ['Widget Sessions']
+    )]
+    #[OA\Parameter(name: 'widgetId', in: 'path', required: true, schema: new OA\Schema(type: 'string'))]
+    #[OA\Parameter(name: 'sessionId', in: 'path', required: true, schema: new OA\Schema(type: 'string'))]
+    #[OA\RequestBody(
+        required: true,
+        content: new OA\JsonContent(
+            properties: [
+                new OA\Property(property: 'isTyping', type: 'boolean', description: 'Whether operator is typing'),
+            ]
+        )
+    )]
+    #[OA\Response(
+        response: 200,
+        description: 'Typing indicator sent',
+        content: new OA\JsonContent(
+            properties: [
+                new OA\Property(property: 'success', type: 'boolean'),
+            ]
+        )
+    )]
+    public function typing(
+        string $widgetId,
+        string $sessionId,
+        Request $request,
+        #[CurrentUser] ?User $user,
+    ): JsonResponse {
+        if (!$user) {
+            return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
+        }
+
+        $widget = $this->widgetRepository->findByWidgetId($widgetId);
+
+        if (!$widget) {
+            return $this->json(['error' => 'Widget not found'], Response::HTTP_NOT_FOUND);
+        }
+
+        if ($widget->getOwnerId() !== $user->getId()) {
+            return $this->json(['error' => 'Access denied'], Response::HTTP_FORBIDDEN);
+        }
+
+        $session = $this->sessionRepository->findByWidgetAndSession($widgetId, $sessionId);
+
+        if (!$session) {
+            return $this->json(['error' => 'Session not found'], Response::HTTP_NOT_FOUND);
+        }
+
+        // Only send typing indicator if session is in human mode
+        if ('human' !== $session->getMode()) {
+            return $this->json(['error' => 'Session is not in human mode'], Response::HTTP_BAD_REQUEST);
+        }
+
+        try {
+            $data = json_decode($request->getContent(), true);
+            $isTyping = $data['isTyping'] ?? true;
+
+            if ($isTyping) {
+                $this->eventCache->setTyping($widgetId, $sessionId, $user->getId());
+            } else {
+                $this->eventCache->clearTyping($widgetId, $sessionId);
+            }
+
+            return $this->json(['success' => true]);
+        } catch (\Exception $e) {
+            $this->logger->error('Failed to send typing indicator', [
+                'widget_id' => $widgetId,
+                'session_id' => $sessionId,
+                'error' => $e->getMessage(),
+            ]);
+
+            return $this->json([
+                'error' => 'Failed to send typing indicator',
             ], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }

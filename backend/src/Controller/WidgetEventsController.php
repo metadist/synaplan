@@ -5,9 +5,9 @@ declare(strict_types=1);
 namespace App\Controller;
 
 use App\Entity\User;
-use App\Repository\WidgetEventRepository;
 use App\Repository\WidgetRepository;
 use App\Repository\WidgetSessionRepository;
+use App\Service\WidgetEventCacheService;
 use OpenApi\Attributes as OA;
 use Psr\Log\LoggerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -22,6 +22,7 @@ use Symfony\Component\Security\Http\Attribute\CurrentUser;
  * Widget Events Controller.
  *
  * Provides Server-Sent Events (SSE) for real-time widget communication.
+ * All events are stored in cache (no database persistence).
  */
 #[OA\Tag(name: 'Widget Events')]
 class WidgetEventsController extends AbstractController
@@ -29,7 +30,7 @@ class WidgetEventsController extends AbstractController
     public function __construct(
         private WidgetRepository $widgetRepository,
         private WidgetSessionRepository $sessionRepository,
-        private WidgetEventRepository $eventRepository,
+        private WidgetEventCacheService $eventCache,
         private LoggerInterface $logger,
     ) {
     }
@@ -37,6 +38,7 @@ class WidgetEventsController extends AbstractController
     /**
      * SSE endpoint for widget sessions (used by the embedded widget).
      * Anonymous access allowed for widget users.
+     * All events come from cache (no database persistence).
      */
     #[Route('/api/v1/widgets/{widgetId}/sessions/{sessionId}/events', name: 'api_widget_session_events', methods: ['GET'])]
     #[OA\Get(
@@ -62,10 +64,12 @@ class WidgetEventsController extends AbstractController
         }
 
         $lastEventId = (int) $request->query->get('lastEventId', 0);
+        $eventCache = $this->eventCache;
 
         // For SSE, return a streamed response
-        $response = new StreamedResponse(function () use ($widgetId, $sessionId, $lastEventId) {
+        $response = new StreamedResponse(function () use ($widgetId, $sessionId, $lastEventId, $eventCache) {
             $currentLastEventId = $lastEventId;
+            $lastTypingTimestamp = 0;
 
             // Send initial connection event
             echo "event: connected\n";
@@ -77,38 +81,58 @@ class WidgetEventsController extends AbstractController
 
             // Keep connection open for 5 minutes max
             $startTime = time();
-            $maxDuration = 300; // 5 minutes
-            $heartbeatInterval = 15; // Send heartbeat every 15 seconds
+            $maxDuration = 300;
+            $heartbeatInterval = 15;
             $lastHeartbeat = time();
-            $checkInterval = 2; // Check for events every 2 seconds
+            $checkInterval = 2;
 
             while (time() - $startTime < $maxDuration) {
-                // Check if client disconnected
                 if (connection_aborted()) {
                     break;
                 }
 
-                // Get new events
-                $events = $this->eventRepository->findNewEvents($widgetId, $sessionId, $currentLastEventId);
+                // Get new events from cache
+                $events = $eventCache->getNewEvents($widgetId, $sessionId, $currentLastEventId);
 
                 foreach ($events as $event) {
                     $data = [
-                        'type' => $event->getType(),
-                        ...$event->getPayload(),
+                        'type' => $event['type'],
+                        ...$event['payload'],
                     ];
 
-                    echo 'id: '.$event->getId()."\n";
-                    echo 'event: '.$event->getType()."\n";
+                    echo 'id: '.$event['id']."\n";
+                    echo 'event: '.$event['type']."\n";
                     echo 'data: '.json_encode($data, JSON_UNESCAPED_UNICODE)."\n\n";
                     if (ob_get_level() > 0) {
                         ob_flush();
                     }
                     flush();
 
-                    $currentLastEventId = $event->getId();
+                    $currentLastEventId = $event['id'];
                 }
 
-                // Send heartbeat periodically to keep connection alive
+                // Check for typing indicator
+                $typingData = $eventCache->getTyping($widgetId, $sessionId);
+                if ($typingData) {
+                    $typingTimestamp = $typingData['timestamp'] ?? 0;
+
+                    if ($typingTimestamp > $lastTypingTimestamp) {
+                        $lastTypingTimestamp = $typingTimestamp;
+
+                        echo "event: typing\n";
+                        echo 'data: '.json_encode([
+                            'type' => 'typing',
+                            'timestamp' => $typingTimestamp,
+                            'operatorId' => $typingData['operatorId'] ?? null,
+                        ], JSON_UNESCAPED_UNICODE)."\n\n";
+                        if (ob_get_level() > 0) {
+                            ob_flush();
+                        }
+                        flush();
+                    }
+                }
+
+                // Heartbeat
                 if (time() - $lastHeartbeat >= $heartbeatInterval) {
                     echo ": heartbeat\n\n";
                     if (ob_get_level() > 0) {
@@ -118,11 +142,10 @@ class WidgetEventsController extends AbstractController
                     $lastHeartbeat = time();
                 }
 
-                // Wait before checking again
                 sleep($checkInterval);
             }
 
-            // End with reconnect hint (client should reconnect)
+            // Reconnect hint
             echo "event: reconnect\n";
             echo "data: {\"lastEventId\":$currentLastEventId}\n\n";
             if (ob_get_level() > 0) {
@@ -168,19 +191,19 @@ class WidgetEventsController extends AbstractController
 
         $lastEventId = (int) $request->query->get('lastEventId', 0);
 
-        // Get new events
-        $events = $this->eventRepository->findNewEvents($widgetId, $sessionId, $lastEventId);
+        // Get new events from cache
+        $events = $this->eventCache->getNewEvents($widgetId, $sessionId, $lastEventId);
 
         $eventData = [];
         $newLastEventId = $lastEventId;
 
         foreach ($events as $event) {
             $eventData[] = [
-                'id' => $event->getId(),
-                'type' => $event->getType(),
-                ...$event->getPayload(),
+                'id' => $event['id'],
+                'type' => $event['type'],
+                ...$event['payload'],
             ];
-            $newLastEventId = max($newLastEventId, $event->getId());
+            $newLastEventId = max($newLastEventId, $event['id']);
         }
 
         return new JsonResponse([
@@ -191,7 +214,7 @@ class WidgetEventsController extends AbstractController
     }
 
     /**
-     * SSE endpoint for widget notifications (used by admin UI).
+     * Endpoint for widget notifications (used by admin UI).
      * Requires authentication.
      */
     #[Route('/api/v1/widgets/{widgetId}/notifications', name: 'api_widget_notifications', methods: ['GET'])]
@@ -221,19 +244,19 @@ class WidgetEventsController extends AbstractController
 
         $lastEventId = (int) $request->query->get('lastEventId', 0);
 
-        // Get new notification events
-        $events = $this->eventRepository->findNewNotifications($widgetId, $lastEventId);
+        // Get new notifications from cache
+        $events = $this->eventCache->getNewNotifications($widgetId, $lastEventId);
 
         $eventData = [];
         $newLastEventId = $lastEventId;
 
         foreach ($events as $event) {
             $eventData[] = [
-                'id' => $event->getId(),
-                'type' => $event->getType(),
-                ...$event->getPayload(),
+                'id' => $event['id'],
+                'type' => $event['type'],
+                ...$event['payload'],
             ];
-            $newLastEventId = max($newLastEventId, $event->getId());
+            $newLastEventId = max($newLastEventId, $event['id']);
         }
 
         return new JsonResponse([

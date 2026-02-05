@@ -4,9 +4,12 @@ declare(strict_types=1);
 
 namespace App\Controller;
 
+use App\Entity\File;
 use App\Entity\User;
+use App\Repository\FileRepository;
 use App\Repository\WidgetRepository;
 use App\Repository\WidgetSessionRepository;
+use App\Service\File\FileStorageService;
 use App\Service\HumanTakeoverService;
 use OpenApi\Attributes as OA;
 use Psr\Log\LoggerInterface;
@@ -26,10 +29,14 @@ use Symfony\Component\Security\Http\Attribute\CurrentUser;
 #[OA\Tag(name: 'Widget Live Support')]
 class WidgetLiveSupportController extends AbstractController
 {
+    private const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
+
     public function __construct(
         private WidgetRepository $widgetRepository,
         private WidgetSessionRepository $sessionRepository,
         private HumanTakeoverService $takeoverService,
+        private FileStorageService $fileStorageService,
+        private FileRepository $fileRepository,
         private LoggerInterface $logger,
     ) {
     }
@@ -154,6 +161,118 @@ class WidgetLiveSupportController extends AbstractController
     }
 
     /**
+     * Upload file as operator for a session.
+     */
+    #[Route('/upload', name: 'upload', methods: ['POST'])]
+    #[OA\Post(
+        path: '/api/v1/widgets/{widgetId}/sessions/{sessionId}/upload',
+        summary: 'Upload file as operator',
+        security: [['Bearer' => []]],
+        tags: ['Widget Live Support']
+    )]
+    #[OA\RequestBody(
+        required: true,
+        content: new OA\MediaType(
+            mediaType: 'multipart/form-data',
+            schema: new OA\Schema(
+                required: ['file'],
+                properties: [
+                    new OA\Property(property: 'file', type: 'string', format: 'binary'),
+                ]
+            )
+        )
+    )]
+    #[OA\Response(
+        response: 200,
+        description: 'File uploaded successfully',
+        content: new OA\JsonContent(
+            properties: [
+                new OA\Property(property: 'success', type: 'boolean'),
+                new OA\Property(property: 'fileId', type: 'integer'),
+                new OA\Property(property: 'filename', type: 'string'),
+            ]
+        )
+    )]
+    public function upload(
+        string $widgetId,
+        string $sessionId,
+        Request $request,
+        #[CurrentUser] ?User $user,
+    ): JsonResponse {
+        if (!$user) {
+            return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
+        }
+
+        $widget = $this->widgetRepository->findByWidgetId($widgetId);
+        if (!$widget) {
+            return $this->json(['error' => 'Widget not found'], Response::HTTP_NOT_FOUND);
+        }
+
+        if ($widget->getOwnerId() !== $user->getId()) {
+            return $this->json(['error' => 'Access denied'], Response::HTTP_FORBIDDEN);
+        }
+
+        // Verify session exists and is in human mode
+        $session = $this->sessionRepository->findByWidgetAndSession($widgetId, $sessionId);
+        if (!$session) {
+            return $this->json(['error' => 'Session not found'], Response::HTTP_NOT_FOUND);
+        }
+
+        if (!$session->isHumanMode()) {
+            return $this->json(['error' => 'Session is not in human mode'], Response::HTTP_BAD_REQUEST);
+        }
+
+        $uploadedFile = $request->files->get('file');
+        if (!$uploadedFile || !$uploadedFile->isValid()) {
+            return $this->json(['error' => 'No valid file uploaded'], Response::HTTP_BAD_REQUEST);
+        }
+
+        // Check file size
+        if ($uploadedFile->getSize() > self::MAX_FILE_SIZE) {
+            return $this->json(['error' => 'File size exceeds 10MB limit'], Response::HTTP_BAD_REQUEST);
+        }
+
+        try {
+            // Store the file
+            $storageResult = $this->fileStorageService->storeUploadedFile(
+                $uploadedFile,
+                $user->getId()
+            );
+
+            if (!$storageResult['success']) {
+                return $this->json(['error' => $storageResult['error'] ?? 'Failed to store file'], Response::HTTP_BAD_REQUEST);
+            }
+
+            // Create File entity with correct method names
+            $file = new File();
+            $file->setUserId($user->getId());
+            $file->setFileName($uploadedFile->getClientOriginalName());
+            $file->setFilePath($storageResult['path']);
+            $file->setFileSize($storageResult['size']);
+            $file->setFileMime($storageResult['mime']);
+            $file->setFileType($this->getFileTypeFromMime($storageResult['mime']));
+            $file->setStatus('pending'); // Will be 'attached' when message is sent
+
+            $this->fileRepository->getEntityManager()->persist($file);
+            $this->fileRepository->getEntityManager()->flush();
+
+            return $this->json([
+                'success' => true,
+                'fileId' => $file->getId(),
+                'filename' => $file->getFileName(),
+            ]);
+        } catch (\Exception $e) {
+            $this->logger->error('Operator file upload failed', [
+                'widget_id' => $widgetId,
+                'session_id' => $sessionId,
+                'error' => $e->getMessage(),
+            ]);
+
+            return $this->json(['error' => 'Failed to upload file'], Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    /**
      * Send a message as human operator.
      */
     #[Route('/reply', name: 'reply', methods: ['POST'])]
@@ -169,6 +288,12 @@ class WidgetLiveSupportController extends AbstractController
             required: ['text'],
             properties: [
                 new OA\Property(property: 'text', type: 'string', example: 'Hello! How can I help you?'),
+                new OA\Property(
+                    property: 'files',
+                    type: 'array',
+                    items: new OA\Items(type: 'integer'),
+                    description: 'Array of file IDs to attach'
+                ),
             ]
         )
     )]
@@ -206,12 +331,36 @@ class WidgetLiveSupportController extends AbstractController
             return $this->json(['error' => 'Missing required field: text'], Response::HTTP_BAD_REQUEST);
         }
 
+        // Validate file IDs if provided
+        $fileIds = [];
+        if (!empty($data['files']) && is_array($data['files'])) {
+            foreach ($data['files'] as $fileId) {
+                $fileId = (int) $fileId;
+                if ($fileId <= 0) {
+                    continue;
+                }
+
+                $file = $this->fileRepository->find($fileId);
+                if (!$file) {
+                    return $this->json(['error' => "File not found: {$fileId}"], Response::HTTP_BAD_REQUEST);
+                }
+
+                // Verify file belongs to this user
+                if ($file->getUserId() !== $user->getId()) {
+                    return $this->json(['error' => 'Access denied to file'], Response::HTTP_FORBIDDEN);
+                }
+
+                $fileIds[] = $fileId;
+            }
+        }
+
         try {
             $message = $this->takeoverService->sendHumanMessage(
                 $widgetId,
                 $sessionId,
                 $data['text'],
-                $user
+                $user,
+                $fileIds
             );
 
             return $this->json([
@@ -229,5 +378,29 @@ class WidgetLiveSupportController extends AbstractController
 
             return $this->json(['error' => 'Failed to send message'], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
+    }
+
+    /**
+     * Get file type category from MIME type.
+     */
+    private function getFileTypeFromMime(string $mime): string
+    {
+        if (str_starts_with($mime, 'image/')) {
+            return 'image';
+        }
+        if ('application/pdf' === $mime) {
+            return 'pdf';
+        }
+        if (str_contains($mime, 'spreadsheet') || str_contains($mime, 'excel') || 'text/csv' === $mime) {
+            return 'spreadsheet';
+        }
+        if (str_contains($mime, 'document') || str_contains($mime, 'word')) {
+            return 'document';
+        }
+        if (str_starts_with($mime, 'text/')) {
+            return 'text';
+        }
+
+        return 'other';
     }
 }

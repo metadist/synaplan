@@ -236,7 +236,8 @@
             </div>
           </div>
 
-          <div v-if="isTyping" class="flex justify-start">
+          <!-- Typing indicator for human operator (only show when NOT sending a message to AI) -->
+          <div v-if="isTyping && !isSending && chatMode === 'human'" class="flex justify-start">
             <div
               class="rounded-2xl px-4 py-3"
               :style="{ backgroundColor: widgetTheme === 'dark' ? '#2a2a2a' : '#f3f4f6' }"
@@ -601,6 +602,7 @@ const isLoadingHistory = ref(false)
 const chatMode = ref<'ai' | 'human' | 'waiting'>('ai')
 const operatorName = ref<string | null>(null)
 let eventSubscription: EventSubscription | null = null
+let operatorTypingTimer: ReturnType<typeof setTimeout> | null = null
 
 const isMobile = ref(false)
 const { t } = useI18n()
@@ -1477,9 +1479,9 @@ const normalizeServerMessage = (raw: any): Message => {
         }))
       : []
 
-  // If message has files and is from user, mark as file message but KEEP the text content
+  // If message has files, mark as file message (works for both user and operator files)
   const hasFiles = files.length > 0
-  const isFileMessage = hasFiles && role === 'user'
+  const isFileMessage = hasFiles
 
   return {
     id: String(raw.id ?? crypto.randomUUID()),
@@ -1573,6 +1575,8 @@ const loadConversationHistory = async (force = false) => {
     isLoadingHistory.value = false
     if (isOpen.value) {
       ensureAutoMessage()
+      // Scroll to bottom after history is loaded
+      await scrollToBottom()
     }
   }
 }
@@ -1764,6 +1768,12 @@ onBeforeUnmount(() => {
     eventSubscription.unsubscribe()
     eventSubscription = null
   }
+
+  // Clear operator typing timer
+  if (operatorTypingTimer) {
+    clearTimeout(operatorTypingTimer)
+    operatorTypingTimer = null
+  }
 })
 
 /**
@@ -1816,11 +1826,21 @@ function handleWidgetEvent(data: WidgetEvent) {
         // Check for duplicates before adding
         if (!messages.value.some((m) => String(m.id) === msgId)) {
           const text = data.text as string
+          // Handle files from operator message
+          const files: MessageFile[] = Array.isArray(data.files)
+            ? data.files.map((f: any) => ({
+                id: f.id,
+                filename: f.filename,
+                fileSize: f.size,
+                fileMime: f.mimeType,
+              }))
+            : []
           messages.value.push({
             id: msgId,
             role: 'assistant',
-            type: 'text',
+            type: files.length > 0 ? 'file' : 'text',
             content: text,
+            files: files.length > 0 ? files : undefined,
             timestamp: new Date((data.timestamp as number) * 1000),
           })
           scrollToBottom()
@@ -1833,11 +1853,21 @@ function handleWidgetEvent(data: WidgetEvent) {
     }
 
     case 'typing':
-      // Operator is typing
-      isTyping.value = true
-      setTimeout(() => {
-        isTyping.value = false
-      }, 3000)
+      // Only show typing indicator for operator typing (has operatorId, no text)
+      // User typing events have 'text' field and should be ignored by the widget
+      if (data.operatorId && !data.text) {
+        isTyping.value = true
+        // Scroll to show typing indicator
+        scrollToBottom()
+        // Clear any existing timer and set new one
+        if (operatorTypingTimer) {
+          clearTimeout(operatorTypingTimer)
+        }
+        operatorTypingTimer = setTimeout(() => {
+          isTyping.value = false
+          operatorTypingTimer = null
+        }, 2000)
+      }
       break
   }
 }

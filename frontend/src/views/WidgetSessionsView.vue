@@ -264,13 +264,56 @@
                 >
                   <Icon :icon="getModeIcon(selectedSession.mode)" class="w-5 h-5 text-white" />
                 </div>
-                <div>
+                <div class="min-w-0">
                   <div class="flex items-center gap-2">
-                    <p class="text-sm font-medium txt-primary">
-                      {{ selectedSession.title || getModeLabel(selectedSession.mode) }}
-                    </p>
+                    <!-- Editable title -->
+                    <div v-if="isEditingTitle" class="flex items-center gap-2">
+                      <input
+                        ref="titleInputRef"
+                        v-model="editTitleValue"
+                        type="text"
+                        class="text-sm font-medium txt-primary bg-white/5 dark:bg-white/5 px-2 py-1 rounded-lg border border-white/10 focus:border-[var(--brand)]/50 focus:ring-1 focus:ring-[var(--brand)]/30 outline-none transition-all w-48"
+                        :placeholder="$t('chat.namePlaceholder')"
+                        maxlength="100"
+                        @keydown.enter="saveTitle"
+                        @keydown.escape="cancelEditTitle"
+                        @blur="saveTitle"
+                      />
+                    </div>
+                    <template v-else>
+                      <p class="text-sm font-medium txt-primary truncate max-w-[200px]">
+                        {{ selectedSession.title || getModeLabel(selectedSession.mode) }}
+                      </p>
+                      <button
+                        class="p-1 rounded-lg hover:bg-white/10 transition-colors txt-secondary hover:text-[var(--brand)] flex-shrink-0"
+                        :title="$t('chat.rename')"
+                        @click="startEditTitle"
+                      >
+                        <Icon icon="heroicons:pencil" class="w-3.5 h-3.5" />
+                      </button>
+                    </template>
+                    <!-- Favorite star -->
+                    <button
+                      class="p-1 rounded-lg transition-all duration-200 flex-shrink-0"
+                      :class="
+                        selectedSession.isFavorite
+                          ? 'text-amber-500 hover:bg-amber-500/10'
+                          : 'txt-secondary hover:text-amber-500 hover:bg-white/5'
+                      "
+                      :title="
+                        selectedSession.isFavorite
+                          ? $t('widgetSessions.unfavorite')
+                          : $t('widgetSessions.favorite')
+                      "
+                      @click="toggleSessionFavorite(selectedSession)"
+                    >
+                      <Icon
+                        :icon="selectedSession.isFavorite ? 'heroicons:star-solid' : 'heroicons:star'"
+                        class="w-4 h-4"
+                      />
+                    </button>
                     <span
-                      class="text-[10px] px-1.5 py-0.5 rounded-md"
+                      class="text-[10px] px-1.5 py-0.5 rounded-md flex-shrink-0"
                       :class="getModeChipClass(selectedSession.mode)"
                       >{{ getModeLabel(selectedSession.mode) }}</span
                     >
@@ -344,6 +387,33 @@
                         message.direction === 'OUT' ? 'text-white' : 'txt-primary',
                       ]"
                     />
+                    <!-- Attached Files -->
+                    <div v-if="message.files && message.files.length > 0" class="mt-2 space-y-1.5">
+                      <a
+                        v-for="file in message.files"
+                        :key="file.id"
+                        :href="`/api/v1/files/${file.id}/download`"
+                        target="_blank"
+                        :class="[
+                          'flex items-center gap-2 px-2.5 py-1.5 rounded-lg transition-colors text-xs',
+                          message.direction === 'OUT'
+                            ? 'bg-white/20 hover:bg-white/30 text-white'
+                            : 'bg-white/10 hover:bg-white/20 txt-primary',
+                        ]"
+                      >
+                        <Icon
+                          :icon="getFileIcon(file.mimeType)"
+                          class="w-4 h-4 flex-shrink-0"
+                        />
+                        <span class="truncate max-w-[150px]" :title="file.filename">
+                          {{ file.filename }}
+                        </span>
+                        <span class="opacity-70 flex-shrink-0">
+                          {{ formatFileSize(file.size) }}
+                        </span>
+                        <Icon icon="heroicons:arrow-down-tray" class="w-3.5 h-3.5 flex-shrink-0" />
+                      </a>
+                    </div>
                   </div>
                   <p
                     :class="[
@@ -373,21 +443,72 @@
 
             <!-- Message Input (Human Mode) -->
             <div v-if="selectedSession.mode === 'human'" class="p-4 flex-shrink-0">
+              <!-- File Preview -->
+              <div v-if="selectedFiles.length > 0" class="mb-3 flex flex-wrap gap-2">
+                <div
+                  v-for="(file, index) in selectedFiles"
+                  :key="index"
+                  class="relative group flex items-center gap-2 px-3 py-2 rounded-xl bg-white/5 dark:bg-white/5"
+                >
+                  <Icon
+                    :icon="getFileIcon(file.type)"
+                    class="w-4 h-4 txt-secondary flex-shrink-0"
+                  />
+                  <span class="text-xs txt-primary truncate max-w-[120px]" :title="file.name">
+                    {{ file.name }}
+                  </span>
+                  <span class="text-[10px] txt-secondary">
+                    {{ formatFileSize(file.size) }}
+                  </span>
+                  <button
+                    type="button"
+                    class="ml-1 p-0.5 rounded-full hover:bg-red-500/20 transition-colors"
+                    :title="$t('common.remove')"
+                    @click="removeFile(index)"
+                  >
+                    <Icon icon="heroicons:x-mark" class="w-3.5 h-3.5 text-red-400" />
+                  </button>
+                </div>
+              </div>
+              <!-- Upload Progress -->
+              <div v-if="uploadingFiles" class="mb-3">
+                <div class="flex items-center gap-2 text-xs txt-secondary">
+                  <Icon icon="heroicons:arrow-path" class="w-4 h-4 animate-spin" />
+                  {{ $t('widgetSessions.uploadingFiles') }}
+                </div>
+              </div>
               <form class="flex gap-3" @submit.prevent="sendMessage">
+                <input
+                  ref="fileInputRef"
+                  type="file"
+                  multiple
+                  class="hidden"
+                  accept="image/*,.pdf,.doc,.docx,.txt,.xls,.xlsx,.csv"
+                  @change="handleFileSelect"
+                />
+                <button
+                  type="button"
+                  class="w-12 h-12 rounded-2xl bg-white/5 dark:bg-white/5 flex items-center justify-center hover:bg-white/10 transition-all duration-200"
+                  :title="$t('widgetSessions.attachFile')"
+                  :disabled="sendingMessage || uploadingFiles"
+                  @click="triggerFileSelect"
+                >
+                  <Icon icon="heroicons:paper-clip" class="w-5 h-5 txt-secondary" />
+                </button>
                 <input
                   v-model="messageText"
                   type="text"
                   class="flex-1 px-5 py-3 rounded-2xl bg-white/5 dark:bg-white/5 txt-primary text-sm placeholder:txt-secondary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]/30 transition-all"
                   :placeholder="$t('widgetSessions.typeMessage')"
-                  :disabled="sendingMessage"
+                  :disabled="sendingMessage || uploadingFiles"
                 />
                 <button
                   type="submit"
                   class="w-12 h-12 rounded-2xl bg-gradient-to-br from-[var(--brand)] to-[var(--brand-light)] flex items-center justify-center disabled:opacity-50 transition-all duration-200 shadow-sm shadow-[var(--brand)]/25 hover:shadow-md hover:shadow-[var(--brand)]/30"
-                  :disabled="!messageText.trim() || sendingMessage"
+                  :disabled="(!messageText.trim() && selectedFiles.length === 0) || sendingMessage || uploadingFiles"
                 >
                   <Icon
-                    v-if="sendingMessage"
+                    v-if="sendingMessage || uploadingFiles"
                     icon="heroicons:arrow-path"
                     class="w-5 h-5 text-white animate-spin"
                   />
@@ -445,7 +566,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
+import { ref, computed, onMounted, onUnmounted, onBeforeUnmount, nextTick, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Icon } from '@iconify/vue'
 import { useI18n } from 'vue-i18n'
@@ -479,6 +600,17 @@ const messageText = ref('')
 const sendingMessage = ref(false)
 const eventSubscription = ref<EventSubscription | null>(null)
 const messagesContainer = ref<HTMLElement | null>(null)
+
+// File upload state
+const fileInputRef = ref<HTMLInputElement | null>(null)
+const selectedFiles = ref<File[]>([])
+const uploadingFiles = ref(false)
+const uploadedFileIds = ref<number[]>([])
+
+// Title editing state
+const isEditingTitle = ref(false)
+const editTitleValue = ref('')
+const titleInputRef = ref<HTMLInputElement | null>(null)
 
 const filters = ref({
   status: '' as '' | 'active' | 'expired',
@@ -564,6 +696,10 @@ const viewSession = async (session: widgetSessionsApi.WidgetSession) => {
     eventSubscription.value = null
   }
 
+  // Reset title editing state when switching sessions
+  isEditingTitle.value = false
+  editTitleValue.value = ''
+
   // Set initial session data from list (may be stale)
   selectedSession.value = { ...session }
   loadingDetail.value = true
@@ -635,6 +771,7 @@ const handleSessionEvent = (event: WidgetEvent) => {
       text: event.text as string,
       timestamp: event.timestamp as number,
       sender,
+      files: event.files as widgetSessionsApi.SessionMessageFile[] | undefined,
     })
 
     // Clear typing preview when user sends a message
@@ -734,6 +871,9 @@ const closeSessionDetail = () => {
   typingPreview.value = null
   selectedSession.value = null
   sessionMessages.value = []
+  // Reset title editing state
+  isEditingTitle.value = false
+  editTitleValue.value = ''
 }
 
 const takeOver = async (session: widgetSessionsApi.WidgetSession) => {
@@ -742,6 +882,8 @@ const takeOver = async (session: widgetSessionsApi.WidgetSession) => {
     message: t('widgetSessions.takeOverConfirm'),
   })
   if (!confirmed) return
+
+  const previousMode = session.mode
 
   try {
     await widgetSessionsApi.takeOverSession(widgetId.value, session.sessionId)
@@ -756,6 +898,14 @@ const takeOver = async (session: widgetSessionsApi.WidgetSession) => {
     if (sessionIndex !== -1) {
       sessions.value[sessionIndex].mode = 'human'
     }
+
+    // Update stats: decrement previous mode, increment human
+    if (previousMode === 'ai') {
+      stats.value.ai = Math.max(0, stats.value.ai - 1)
+    } else if (previousMode === 'waiting') {
+      stats.value.waiting = Math.max(0, stats.value.waiting - 1)
+    }
+    stats.value.human++
 
     success(t('widgetSessions.takeOverSuccess'))
   } catch (err: any) {
@@ -784,29 +934,172 @@ const handBack = async (session: widgetSessionsApi.WidgetSession) => {
       sessions.value[sessionIndex].mode = 'ai'
     }
 
+    // Update stats: decrement human, increment ai
+    stats.value.human = Math.max(0, stats.value.human - 1)
+    stats.value.ai++
+
     success(t('widgetSessions.handBackSuccess'))
   } catch (err: any) {
     error(err.message || 'Failed to hand back session')
   }
 }
 
+// File handling functions
+const triggerFileSelect = () => {
+  fileInputRef.value?.click()
+}
+
+const handleFileSelect = (event: Event) => {
+  const input = event.target as HTMLInputElement
+  if (!input.files) return
+
+  const newFiles = Array.from(input.files)
+  const maxSize = 10 * 1024 * 1024 // 10MB limit
+
+  for (const file of newFiles) {
+    if (file.size > maxSize) {
+      error(t('widgetSessions.fileTooLarge', { name: file.name, max: 10 }))
+      continue
+    }
+    if (!selectedFiles.value.some((f) => f.name === file.name && f.size === file.size)) {
+      selectedFiles.value.push(file)
+    }
+  }
+
+  // Clear input so same file can be selected again
+  input.value = ''
+}
+
+const removeFile = (index: number) => {
+  selectedFiles.value.splice(index, 1)
+}
+
+const getFileIcon = (mimeType: string): string => {
+  if (mimeType.startsWith('image/')) return 'heroicons:photo'
+  if (mimeType === 'application/pdf') return 'heroicons:document-text'
+  if (mimeType.includes('spreadsheet') || mimeType.includes('excel') || mimeType.endsWith('.csv'))
+    return 'heroicons:table-cells'
+  if (mimeType.includes('document') || mimeType.includes('word'))
+    return 'heroicons:document'
+  return 'heroicons:paper-clip'
+}
+
+const formatFileSize = (bytes: number): string => {
+  if (bytes < 1024) return bytes + ' B'
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB'
+  return (bytes / (1024 * 1024)).toFixed(1) + ' MB'
+}
+
+const uploadFiles = async (): Promise<number[]> => {
+  if (selectedFiles.value.length === 0) return []
+
+  uploadingFiles.value = true
+  const fileIds: number[] = []
+
+  try {
+    for (const file of selectedFiles.value) {
+      const result = await widgetSessionsApi.uploadOperatorFile(
+        widgetId.value,
+        selectedSession.value!.sessionId,
+        file
+      )
+      fileIds.push(result.fileId)
+    }
+    return fileIds
+  } finally {
+    uploadingFiles.value = false
+  }
+}
+
 const sendMessage = async () => {
-  if (!selectedSession.value || !messageText.value.trim()) return
+  if (!selectedSession.value || (!messageText.value.trim() && selectedFiles.value.length === 0)) return
 
   sendingMessage.value = true
   try {
+    // Upload files first if any
+    let fileIds: number[] = []
+    if (selectedFiles.value.length > 0) {
+      fileIds = await uploadFiles()
+    }
+
+    // Send message with file IDs
     await widgetSessionsApi.sendHumanMessage(
       widgetId.value,
       selectedSession.value.sessionId,
-      messageText.value.trim()
+      messageText.value.trim() || t('widgetSessions.fileAttached'),
+      fileIds
     )
+
+    // Clear state
     messageText.value = ''
+    selectedFiles.value = []
+    uploadedFileIds.value = []
   } catch (err: any) {
     error(err.message || 'Failed to send message')
   } finally {
     sendingMessage.value = false
   }
 }
+
+// Operator typing indicator - send to widget user
+let typingStopTimer: ReturnType<typeof setTimeout> | null = null
+let isCurrentlyTyping = false
+let lastTypingEventTime = 0
+const TYPING_SEND_INTERVAL = 1500 // Send typing event at most every 1.5s
+const TYPING_STOP_DELAY = 2000 // Stop typing after 2s of no input
+
+async function sendOperatorTyping() {
+  if (!selectedSession.value || selectedSession.value.mode !== 'human') return
+
+  try {
+    await widgetSessionsApi.sendOperatorTyping(
+      widgetId.value,
+      selectedSession.value.sessionId,
+      true
+    )
+  } catch {
+    // Silently ignore typing errors - not critical
+  }
+}
+
+// Watch messageText and send typing updates
+watch(messageText, (newValue) => {
+  // Only send typing updates if session is in human mode
+  if (!selectedSession.value || selectedSession.value.mode !== 'human') return
+
+  // Clear stop timer on any input
+  if (typingStopTimer) {
+    clearTimeout(typingStopTimer)
+    typingStopTimer = null
+  }
+
+  if (!newValue) {
+    // Text cleared (message sent or deleted) - stop typing indicator
+    isCurrentlyTyping = false
+    return
+  }
+
+  const now = Date.now()
+
+  // Send immediately on first keystroke, then throttle
+  if (!isCurrentlyTyping || now - lastTypingEventTime >= TYPING_SEND_INTERVAL) {
+    isCurrentlyTyping = true
+    lastTypingEventTime = now
+    sendOperatorTyping()
+  }
+
+  // Set timer to stop typing after 2 seconds of no input
+  typingStopTimer = setTimeout(() => {
+    isCurrentlyTyping = false
+  }, TYPING_STOP_DELAY)
+})
+
+// Cleanup typing timer on unmount
+onBeforeUnmount(() => {
+  if (typingStopTimer) {
+    clearTimeout(typingStopTimer)
+  }
+})
 
 const toggleFavoriteFilter = () => {
   filters.value.favorite = !filters.value.favorite
@@ -818,12 +1111,76 @@ const toggleSessionFavorite = async (session: widgetSessionsApi.WidgetSession) =
     const response = await widgetSessionsApi.toggleFavorite(widgetId.value, session.sessionId)
     session.isFavorite = response.isFavorite
 
+    // Also update selectedSession if it's the same session
+    if (selectedSession.value?.id === session.id) {
+      selectedSession.value.isFavorite = response.isFavorite
+    }
+
+    // Also update the session in the list (for when toggling from chat header)
+    const sessionInList = sessions.value.find((s) => s.id === session.id)
+    if (sessionInList && sessionInList !== session) {
+      sessionInList.isFavorite = response.isFavorite
+    }
+
     // If we're filtering by favorites and this session was unfavorited, remove it from the list
     if (filters.value.favorite && !response.isFavorite) {
       sessions.value = sessions.value.filter((s) => s.id !== session.id)
     }
   } catch (err: any) {
     error(err.message || 'Failed to toggle favorite')
+  }
+}
+
+// Title editing functions
+const startEditTitle = () => {
+  if (!selectedSession.value) return
+  editTitleValue.value = selectedSession.value.title || ''
+  isEditingTitle.value = true
+  nextTick(() => {
+    titleInputRef.value?.focus()
+    titleInputRef.value?.select()
+  })
+}
+
+const cancelEditTitle = () => {
+  isEditingTitle.value = false
+  editTitleValue.value = ''
+}
+
+const saveTitle = async () => {
+  if (!selectedSession.value || !isEditingTitle.value) return
+
+  const newTitle = editTitleValue.value.trim() || null
+  const oldTitle = selectedSession.value.title
+
+  // Skip if title hasn't changed
+  if (newTitle === oldTitle) {
+    cancelEditTitle()
+    return
+  }
+
+  try {
+    const response = await widgetSessionsApi.renameSession(
+      widgetId.value,
+      selectedSession.value.sessionId,
+      newTitle
+    )
+
+    // Update selectedSession
+    selectedSession.value.title = response.title
+
+    // Update session in the list
+    const sessionIndex = sessions.value.findIndex((s) => s.id === selectedSession.value?.id)
+    if (sessionIndex !== -1) {
+      sessions.value[sessionIndex].title = response.title
+    }
+
+    success(t('chat.renameSuccess'))
+  } catch (err: any) {
+    error(err.message || 'Failed to rename session')
+  } finally {
+    isEditingTitle.value = false
+    editTitleValue.value = ''
   }
 }
 

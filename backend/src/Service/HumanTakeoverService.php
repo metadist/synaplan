@@ -6,10 +6,9 @@ namespace App\Service;
 
 use App\Entity\Message;
 use App\Entity\User;
-use App\Entity\WidgetEvent;
 use App\Entity\WidgetSession;
 use App\Repository\ChatRepository;
-use App\Repository\WidgetEventRepository;
+use App\Repository\FileRepository;
 use App\Repository\WidgetSessionRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
@@ -26,7 +25,8 @@ final class HumanTakeoverService
         private EntityManagerInterface $em,
         private WidgetSessionRepository $sessionRepository,
         private ChatRepository $chatRepository,
-        private WidgetEventRepository $eventRepository,
+        private FileRepository $fileRepository,
+        private WidgetEventCacheService $eventCache,
         private LoggerInterface $logger,
     ) {
     }
@@ -119,12 +119,15 @@ final class HumanTakeoverService
     /**
      * Send a message as human operator.
      * Does NOT increment message count (human messages are free).
+     *
+     * @param array<int> $fileIds Optional array of file IDs to attach
      */
     public function sendHumanMessage(
         string $widgetId,
         string $sessionId,
         string $text,
         User $operator,
+        array $fileIds = [],
     ): Message {
         $session = $this->sessionRepository->findByWidgetAndSession($widgetId, $sessionId);
 
@@ -168,6 +171,27 @@ final class HumanTakeoverService
 
         $this->em->persist($message);
 
+        // Attach files if provided
+        $attachedFiles = [];
+        if (!empty($fileIds)) {
+            foreach ($fileIds as $fileId) {
+                $file = $this->fileRepository->find($fileId);
+                if ($file && $file->getUserId() === $operator->getId()) {
+                    $message->addFile($file);
+                    $file->setStatus('attached');
+                    $attachedFiles[] = [
+                        'id' => $file->getId(),
+                        'filename' => $file->getFileName(),
+                        'mimeType' => $file->getFileMime(),
+                        'size' => $file->getFileSize(),
+                    ];
+                }
+            }
+            if (!empty($attachedFiles)) {
+                $message->setFile(count($attachedFiles));
+            }
+        }
+
         // Update session's last message time and preview (but NOT message count)
         $session->setLastMessage(time());
         $session->setLastMessagePreview($text);
@@ -179,20 +203,28 @@ final class HumanTakeoverService
         $this->em->flush();
 
         // Publish message event to widget
-        $this->publishToSession($widgetId, $sessionId, 'message', [
+        $eventData = [
             'direction' => 'OUT',
             'text' => $text,
             'messageId' => $message->getId(),
             'timestamp' => $message->getUnixTimestamp(),
             'sender' => 'human',
             'operatorName' => $this->getOperatorDisplayName($operator),
-        ]);
+        ];
+
+        // Include file info in event if files were attached
+        if (!empty($attachedFiles)) {
+            $eventData['files'] = $attachedFiles;
+        }
+
+        $this->publishToSession($widgetId, $sessionId, 'message', $eventData);
 
         $this->logger->info('Human message sent', [
             'widget_id' => $widgetId,
             'session_id' => $sessionId,
             'operator_id' => $operator->getId(),
             'message_id' => $message->getId(),
+            'file_count' => count($attachedFiles),
         ]);
 
         return $message;
@@ -221,33 +253,21 @@ final class HumanTakeoverService
      */
     public function notifyOperator(string $widgetId, int $operatorId, string $sessionId, string $messagePreview): void
     {
-        $event = new WidgetEvent();
-        $event->setWidgetId($widgetId);
-        $event->setSessionId('notifications'); // Special session ID for notifications
-        $event->setType('notification');
-        $event->setPayload([
+        $this->eventCache->publishNotification($widgetId, [
             'sessionId' => $sessionId,
             'preview' => mb_substr($messagePreview, 0, 100),
             'timestamp' => time(),
         ]);
-
-        $this->eventRepository->save($event, true);
     }
 
     /**
-     * Publish event to a specific session.
+     * Publish event to a specific session via cache.
      *
      * @param array<string, mixed> $data
      */
     private function publishToSession(string $widgetId, string $sessionId, string $type, array $data): void
     {
-        $event = new WidgetEvent();
-        $event->setWidgetId($widgetId);
-        $event->setSessionId($sessionId);
-        $event->setType($type);
-        $event->setPayload($data);
-
-        $this->eventRepository->save($event, true);
+        $this->eventCache->publish($widgetId, $sessionId, $type, $data);
     }
 
     /**

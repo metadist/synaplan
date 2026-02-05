@@ -423,7 +423,11 @@
     "respond": "Antworten",
     "typeMessage": "Nachricht eingeben...",
     "messageSent": "Nachricht gesendet",
-    "typing": "Schreibt"
+    "typing": "Schreibt",
+    "attachFile": "Datei anhängen",
+    "uploadingFiles": "Dateien werden hochgeladen...",
+    "fileTooLarge": "{name} überschreitet {max}MB Limit",
+    "fileAttached": "Datei angehängt"
   },
   "notFound": {
     "title": "Seite nicht gefunden",
@@ -1117,7 +1121,8 @@
     "updated": "Aktualisiert",
     "enabled": "Aktiviert",
     "disabled": "Deaktiviert",
-    "reset": "Zurücksetzen"
+    "reset": "Zurücksetzen",
+    "remove": "Entfernen"
   },
   "search": {
     "sources": "Quellen",

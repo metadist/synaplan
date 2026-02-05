@@ -20,12 +20,20 @@ export interface WidgetSession {
   title: string | null
 }
 
+export interface SessionMessageFile {
+  id: number
+  filename: string
+  mimeType: string
+  size: number
+}
+
 export interface SessionMessage {
   id: number
   direction: 'IN' | 'OUT'
   text: string
   timestamp: number
   sender: 'user' | 'ai' | 'human' | 'system'
+  files?: SessionMessageFile[]
 }
 
 export interface WidgetSessionsResponse {
@@ -155,13 +163,73 @@ export async function toggleFavorite(
 export async function sendHumanMessage(
   widgetId: string,
   sessionId: string,
-  text: string
+  text: string,
+  fileIds: number[] = []
 ): Promise<{ success: boolean; messageId: number }> {
   return await httpClient<{ success: boolean; messageId: number }>(
     `/api/v1/widgets/${widgetId}/sessions/${sessionId}/reply`,
     {
       method: 'POST',
-      body: JSON.stringify({ text }),
+      body: JSON.stringify({ text, files: fileIds }),
+    }
+  )
+}
+
+/**
+ * Upload a file as operator for a session
+ */
+export async function uploadOperatorFile(
+  widgetId: string,
+  sessionId: string,
+  file: File
+): Promise<{ success: boolean; fileId: number; filename: string }> {
+  const formData = new FormData()
+  formData.append('file', file)
+
+  const response = await fetch(`/api/v1/widgets/${widgetId}/sessions/${sessionId}/upload`, {
+    method: 'POST',
+    body: formData,
+    credentials: 'include',
+  })
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({ error: 'Upload failed' }))
+    throw new Error(errorData.error || 'Upload failed')
+  }
+
+  return response.json()
+}
+
+/**
+ * Rename a session (update title)
+ */
+export async function renameSession(
+  widgetId: string,
+  sessionId: string,
+  title: string | null
+): Promise<{ success: boolean; title: string | null }> {
+  return await httpClient<{ success: boolean; title: string | null }>(
+    `/api/v1/widgets/${widgetId}/sessions/${sessionId}/rename`,
+    {
+      method: 'PATCH',
+      body: JSON.stringify({ title }),
+    }
+  )
+}
+
+/**
+ * Send typing indicator from operator to widget user
+ */
+export async function sendOperatorTyping(
+  widgetId: string,
+  sessionId: string,
+  isTyping: boolean = true
+): Promise<{ success: boolean }> {
+  return await httpClient<{ success: boolean }>(
+    `/api/v1/widgets/${widgetId}/sessions/${sessionId}/typing`,
+    {
+      method: 'POST',
+      body: JSON.stringify({ isTyping }),
     }
   )
 }

@@ -1060,7 +1060,8 @@
     "updated": "Updated",
     "enabled": "Enabled",
     "disabled": "Disabled",
-    "reset": "Reset"
+    "reset": "Reset",
+    "remove": "Remove"
   },
   "search": {
     "sources": "Sources",
@@ -1242,7 +1243,11 @@
     "respond": "Respond",
     "typeMessage": "Type your message...",
     "messageSent": "Message sent",
-    "typing": "Typing"
+    "typing": "Typing",
+    "attachFile": "Attach file",
+    "uploadingFiles": "Uploading files...",
+    "fileTooLarge": "{name} exceeds {max}MB limit",
+    "fileAttached": "File attached"
   },
   "widget": {
     "title": "Chat Support",
