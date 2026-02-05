@@ -140,7 +140,7 @@ const props = defineProps<{
   widgetId: string
 }>()
 
-defineEmits<{
+const emit = defineEmits<{
   (e: 'close'): void
 }>()
 
@@ -231,6 +231,9 @@ const startExport = async () => {
     document.body.appendChild(link)
     link.click()
     document.body.removeChild(link)
+
+    // Close modal after download starts
+    emit('close')
   } catch (err: any) {
     error(err.message || 'Export failed')
   } finally {

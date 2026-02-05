@@ -118,10 +118,11 @@ class WidgetExportController extends AbstractController
         }
 
         try {
+            $baseUrl = $request->getSchemeAndHttpHost();
             $filePath = match ($format) {
                 'xlsx' => $this->exportService->exportToExcel($widget, $filters),
                 'csv' => $this->exportService->exportToCsv($widget, $filters),
-                'json' => $this->exportService->exportToJson($widget, $filters),
+                'json' => $this->exportService->exportToJson($widget, $filters, $baseUrl),
             };
 
             $contentType = match ($format) {

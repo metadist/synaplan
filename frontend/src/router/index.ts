@@ -110,10 +110,10 @@ const router = createRouter({
       meta: { requiresAuth: true, helpId: 'tools.chatWidget', titleKey: 'pageTitles.chatWidget' },
     },
     {
-      path: '/tools/chat-widget/:widgetId/sessions',
-      name: 'widget-sessions',
+      path: '/tools/chat-widget/:widgetId/chats',
+      name: 'widget-chats',
       component: () => import('../views/WidgetSessionsView.vue'),
-      meta: { requiresAuth: true, titleKey: 'pageTitles.widgetSessions' },
+      meta: { requiresAuth: true, titleKey: 'pageTitles.widgetChats' },
     },
     {
       path: '/tools/chat-widget/live-support',

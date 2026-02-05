@@ -33,6 +33,7 @@
     "subscriptionCancel": "Abonnement gekündigt",
     "notFound": "Seite nicht gefunden",
     "widgetSessions": "Widget-Sitzungen",
+    "widgetChats": "Widget-Chats",
     "liveSupport": "Live-Support"
   },
   "welcome": "Willkommen bei Synaplan",
@@ -1331,6 +1332,9 @@
     "createNew": "Widget erstellen",
     "aiSetup": "KI-Setup",
     "aiAssistant": "KI-Assistent",
+    "chats": "Chats",
+    "code": "Code",
+    "settings": "Einstellungen",
     "advancedConfigLabel": "Erweiterte Einstellungen",
     "setupComplete": "Widget-Setup erfolgreich abgeschlossen!",
     "simpleSetup": {

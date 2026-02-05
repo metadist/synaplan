@@ -129,50 +129,46 @@
               </div>
 
               <!-- Quick Actions -->
-              <div class="flex items-center gap-2" @click.stop>
+              <div class="flex flex-wrap items-center gap-1.5" @click.stop>
+                <!-- Primary: Chats button -->
                 <button
-                  class="flex-1 px-3 py-2 rounded-lg bg-[var(--brand-alpha-light)] txt-brand hover:bg-[var(--brand)]/20 transition-colors text-xs font-medium flex items-center justify-center gap-2"
-                  data-testid="btn-widget-embed"
-                  @click="showEmbed(widget)"
-                >
-                  <Icon icon="heroicons:code-bracket" class="w-4 h-4" />
-                  <span class="hidden sm:inline">{{ $t('widgets.getCode') }}</span>
-                  <span class="sm:hidden">Code</span>
-                </button>
-                <button
-                  class="px-3 py-2 rounded-lg bg-blue-500/10 hover:bg-blue-500/20 transition-colors"
-                  :title="$t('widgets.viewSessions')"
+                  class="flex-1 min-w-[70px] btn-primary px-3 py-2 rounded-lg transition-colors text-xs font-medium flex items-center justify-center gap-1.5"
                   data-testid="btn-widget-sessions"
                   @click="viewSessions(widget)"
                 >
-                  <Icon icon="heroicons:users" class="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                  <Icon icon="heroicons:chat-bubble-left-right" class="w-4 h-4 flex-shrink-0" />
+                  <span>{{ $t('widgets.chats') }}</span>
                 </button>
+                <!-- Secondary: Get Code -->
                 <button
-                  class="px-3 py-2 rounded-lg bg-green-500/10 hover:bg-green-500/20 transition-colors"
+                  class="flex-1 min-w-[65px] px-3 py-2 rounded-lg bg-[var(--brand-alpha-light)] txt-brand hover:bg-[var(--brand)]/20 transition-colors text-xs font-medium flex items-center justify-center gap-1.5"
+                  data-testid="btn-widget-embed"
+                  @click="showEmbed(widget)"
+                >
+                  <Icon icon="heroicons:code-bracket" class="w-4 h-4 flex-shrink-0" />
+                  <span>{{ $t('widgets.code') }}</span>
+                </button>
+                <!-- Test Chat -->
+                <button
+                  class="p-2 rounded-lg bg-green-500/10 hover:bg-green-500/20 transition-colors flex-shrink-0"
                   :title="$t('widgets.testChat')"
                   data-testid="btn-widget-test"
                   @click="openTestChat(widget)"
                 >
                   <Icon icon="heroicons:play" class="w-4 h-4 text-green-600 dark:text-green-400" />
                 </button>
+                <!-- Settings -->
                 <button
-                  class="px-3 py-2 rounded-lg bg-[var(--brand-alpha-light)] hover:bg-[var(--brand)]/20 transition-colors"
-                  :title="$t('widgets.aiAssistant')"
-                  data-testid="btn-widget-ai-assistant"
-                  @click="openAdvancedConfigWithTab(widget, 'assistant')"
-                >
-                  <Icon icon="heroicons:sparkles" class="w-4 h-4 txt-brand" />
-                </button>
-                <button
-                  class="px-3 py-2 rounded-lg hover-surface transition-colors"
-                  :title="$t('widgets.advancedConfigLabel')"
+                  class="p-2 rounded-lg hover-surface transition-colors flex-shrink-0"
+                  :title="$t('widgets.settings')"
                   data-testid="btn-widget-advanced"
                   @click="openAdvancedConfig(widget)"
                 >
                   <Icon icon="heroicons:cog-6-tooth" class="w-4 h-4 txt-secondary" />
                 </button>
+                <!-- Delete -->
                 <button
-                  class="px-3 py-2 rounded-lg hover:bg-red-500/10 transition-colors"
+                  class="p-2 rounded-lg hover:bg-red-500/10 transition-colors flex-shrink-0"
                   :title="$t('widgets.delete')"
                   data-testid="btn-widget-delete"
                   @click="confirmDelete(widget)"
@@ -401,14 +397,6 @@ const openAdvancedConfig = (widget: widgetsApi.Widget) => {
 }
 
 /**
- * Open advanced config with specific tab
- */
-const openAdvancedConfigWithTab = (widget: widgetsApi.Widget, tab: string) => {
-  advancedWidgetInitialTab.value = tab
-  advancedWidget.value = widget
-}
-
-/**
  * Close advanced config and reset initial tab
  */
 const closeAdvancedConfig = () => {
@@ -458,7 +446,7 @@ const closeTestChat = () => {
  * View widget sessions
  */
 const viewSessions = (widget: widgetsApi.Widget) => {
-  router.push({ name: 'widget-sessions', params: { widgetId: widget.widgetId } })
+  router.push({ name: 'widget-chats', params: { widgetId: widget.widgetId } })
 }
 
 /**

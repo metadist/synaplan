@@ -97,13 +97,14 @@ final class WidgetExportService
 
         foreach ($result['sessions'] as $session) {
             $messages = $this->getSessionMessages($session);
+            $messageCount = count($messages);
 
             foreach ($messages as $message) {
                 fputcsv($handle, [
                     $session->getSessionId(),
                     date('Y-m-d H:i:s', $session->getCreated()),
                     date('Y-m-d H:i:s', $session->getLastMessage()),
-                    $session->getMessageCount(),
+                    $messageCount,
                     $session->getMode(),
                     date('Y-m-d H:i:s', $message['timestamp']),
                     $message['sender'],
@@ -122,7 +123,7 @@ final class WidgetExportService
      *
      * @param array{from?: int, to?: int, mode?: string} $filters
      */
-    public function exportToJson(Widget $widget, array $filters = []): string
+    public function exportToJson(Widget $widget, array $filters = [], string $baseUrl = ''): string
     {
         $result = $this->sessionRepository->findSessionsByWidget(
             $widget->getWidgetId(),
@@ -138,8 +139,8 @@ final class WidgetExportService
                 'exported_at' => date('c'),
             ],
             'export_range' => [
-                'from' => isset($filters['from']) ? date('c', $filters['from']) : null,
-                'to' => isset($filters['to']) ? date('c', $filters['to']) : null,
+                'from' => null,
+                'to' => null,
             ],
             'sessions' => [],
             'statistics' => [
@@ -150,34 +151,59 @@ final class WidgetExportService
         ];
 
         $totalMessages = 0;
+        $totalFiles = 0;
+        $earliestCreated = null;
+        $latestActivity = null;
 
         foreach ($result['sessions'] as $session) {
             $messages = $this->getSessionMessages($session);
-            $totalMessages += count($messages);
+            $messageCount = count($messages);
+            $fileCount = $this->countFilesInMessages($messages);
+            $totalMessages += $messageCount;
+            $totalFiles += $fileCount;
+
+            // Track earliest and latest timestamps
+            $created = $session->getCreated();
+            $lastMessage = $session->getLastMessage();
+            if (null === $earliestCreated || $created < $earliestCreated) {
+                $earliestCreated = $created;
+            }
+            if (null === $latestActivity || $lastMessage > $latestActivity) {
+                $latestActivity = $lastMessage;
+            }
 
             $exportData['sessions'][] = [
                 'session_id' => $session->getSessionId(),
                 'created' => date('c', $session->getCreated()),
                 'last_activity' => date('c', $session->getLastMessage()),
-                'message_count' => $session->getMessageCount(),
-                'file_count' => $session->getFileCount(),
+                'message_count' => $messageCount,
+                'file_count' => $fileCount,
                 'mode' => $session->getMode(),
                 'messages' => array_map(fn ($m) => [
                     'direction' => $m['direction'],
                     'text' => $m['text'],
                     'timestamp' => date('c', $m['timestamp']),
                     'sender' => $m['sender'],
+                    'files' => array_map(fn ($f) => [
+                        ...$f,
+                        'download_url' => $baseUrl.$f['download_url'],
+                    ], $m['files']),
                 ], $messages),
             ];
         }
 
+        // Set actual date range from exported sessions
+        $exportData['export_range']['from'] = $earliestCreated ? date('c', $earliestCreated) : null;
+        $exportData['export_range']['to'] = $latestActivity ? date('c', $latestActivity) : null;
+
         $exportData['statistics']['total_messages'] = $totalMessages;
+        $exportData['statistics']['total_files'] = $totalFiles;
         if ($result['total'] > 0) {
             $exportData['statistics']['avg_messages_per_session'] = round($totalMessages / $result['total'], 1);
         }
 
         $tempFile = tempnam(sys_get_temp_dir(), 'widget_export_').'.json';
-        file_put_contents($tempFile, json_encode($exportData, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+        file_put_contents($tempFile, json_encode($exportData, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
 
         return $tempFile;
     }
@@ -309,12 +335,15 @@ final class WidgetExportService
         foreach ($result['sessions'] as $session) {
             $duration = $session->getLastMessage() - $session->getCreated();
             $durationStr = $this->formatDuration($duration);
+            $messages = $this->getSessionMessages($session);
+            $messageCount = count($messages);
+            $fileCount = $this->countFilesInMessages($messages);
 
             $sheet->setCellValue('A'.$row, substr($session->getSessionId(), 0, 12).'...');
             $sheet->setCellValue('B'.$row, date('Y-m-d H:i', $session->getCreated()));
             $sheet->setCellValue('C'.$row, date('Y-m-d H:i', $session->getLastMessage()));
-            $sheet->setCellValue('D'.$row, $session->getMessageCount());
-            $sheet->setCellValue('E'.$row, $session->getFileCount());
+            $sheet->setCellValue('D'.$row, $messageCount);
+            $sheet->setCellValue('E'.$row, $fileCount);
             $sheet->setCellValue('F'.$row, ucfirst($session->getMode()));
             $sheet->setCellValue('G'.$row, $durationStr);
 
@@ -330,7 +359,7 @@ final class WidgetExportService
     /**
      * Get messages for a session.
      *
-     * @return array<array{direction: string, text: string, timestamp: int, sender: string}>
+     * @return array<array{direction: string, text: string, timestamp: int, sender: string, files: array}>
      */
     private function getSessionMessages(WidgetSession $session): array
     {
@@ -359,13 +388,40 @@ final class WidgetExportService
                 $sender = 'Support';
             }
 
+            // Extract files from message
+            $files = [];
+            foreach ($message->getFiles() as $file) {
+                $files[] = [
+                    'id' => $file->getId(),
+                    'filename' => $file->getFileName(),
+                    'type' => $file->getFileType(),
+                    'mime' => $file->getFileMime(),
+                    'size' => $file->getFileSize(),
+                    'download_url' => '/api/v1/files/'.$file->getId().'/download',
+                ];
+            }
+
             return [
                 'direction' => $message->getDirection(),
                 'text' => $message->getText(),
                 'timestamp' => $message->getUnixTimestamp(),
                 'sender' => $sender,
+                'files' => $files,
             ];
         }, $messages);
+    }
+
+    /**
+     * Count total files in messages.
+     */
+    private function countFilesInMessages(array $messages): int
+    {
+        $count = 0;
+        foreach ($messages as $message) {
+            $count += count($message['files'] ?? []);
+        }
+
+        return $count;
     }
 
     private function formatDuration(int $seconds): string

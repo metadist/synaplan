@@ -33,6 +33,7 @@
     "subscriptionCancel": "Subscription Cancelled",
     "notFound": "Page Not Found",
     "widgetSessions": "Widget Sessions",
+    "widgetChats": "Widget Chats",
     "liveSupport": "Live Support"
   },
   "welcome": "Welcome",
@@ -1327,6 +1328,9 @@
     "createNew": "Create Widget",
     "aiSetup": "AI Setup",
     "aiAssistant": "AI Assistant",
+    "chats": "Chats",
+    "code": "Code",
+    "settings": "Settings",
     "advancedConfigLabel": "Advanced Settings",
     "setupComplete": "Widget setup completed successfully!",
     "simpleSetup": {
