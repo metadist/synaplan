@@ -14,7 +14,6 @@ final readonly class QdrantVectorStorage implements VectorStorageInterface
 {
     public function __construct(
         private QdrantClientHttp $qdrantClient,
-        private VectorStorageConfig $config,
     ) {
     }
 
