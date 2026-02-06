@@ -35,4 +35,16 @@ class ChatRepository extends ServiceEntityRepository
             'isPublic' => true,
         ]);
     }
+
+    /**
+     * Remove a chat entity.
+     */
+    public function remove(Chat $chat, bool $flush = false): void
+    {
+        $this->getEntityManager()->remove($chat);
+
+        if ($flush) {
+            $this->getEntityManager()->flush();
+        }
+    }
 }

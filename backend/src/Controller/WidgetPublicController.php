@@ -13,6 +13,7 @@ use App\Service\File\FileStorageService;
 use App\Service\File\VectorizationService;
 use App\Service\Message\MessageProcessor;
 use App\Service\RateLimitService;
+use App\Service\WidgetEventCacheService;
 use App\Service\WidgetService;
 use App\Service\WidgetSessionService;
 use Doctrine\ORM\EntityManagerInterface;
@@ -45,6 +46,7 @@ class WidgetPublicController extends AbstractController
         private ChatRepository $chatRepository,
         private MessageRepository $messageRepository,
         private FileRepository $fileRepository,
+        private WidgetEventCacheService $eventCache,
         private EntityManagerInterface $em,
         private LoggerInterface $logger,
         private string $uploadDir,
@@ -187,6 +189,18 @@ class WidgetPublicController extends AbstractController
         // Get or create session
         $session = $this->sessionService->getOrCreateSession($widgetId, $data['sessionId'], $isValidatedTestMode);
 
+        // Capture country from Cloudflare geolocation header on first message
+        if (null === $session->getCountry()) {
+            $cfCountry = $request->headers->get('CF-IPCountry');
+            if (null !== $cfCountry && '' !== $cfCountry) {
+                $session->setCountry($cfCountry);
+                $this->em->flush();
+            }
+        }
+
+        // Check if session is in human takeover mode
+        $isHumanMode = 'human' === $session->getMode() || 'waiting' === $session->getMode();
+
         // Check session limits
         $messageLimit = (int) ($config['messageLimit'] ?? WidgetSessionService::DEFAULT_MAX_MESSAGES);
         $limitCheck = $this->sessionService->checkSessionLimit($session, $messageLimit);
@@ -293,6 +307,15 @@ class WidgetPublicController extends AbstractController
             $this->em->persist($incomingMessage);
             $this->em->flush();
 
+            // Publish event for user message (so admin panel receives it in real-time)
+            $this->eventCache->publish($widgetId, $session->getSessionId(), 'message', [
+                'direction' => 'IN',
+                'text' => $data['text'],
+                'messageId' => $incomingMessage->getId(),
+                'timestamp' => $incomingMessage->getUnixTimestamp(),
+                'sender' => 'user',
+            ]);
+
             // Attach uploaded files if provided
             $fileIds = [];
             if (!empty($data['files']) && is_array($data['files'])) {
@@ -323,9 +346,39 @@ class WidgetPublicController extends AbstractController
                 }
             }
 
-            // Increment session message count
-            $this->sessionService->incrementMessageCount($session);
+            // Increment session message count and update last message preview
+            // Only increment message count for AI mode (human messages don't count against limits)
+            if (!$isHumanMode) {
+                $this->sessionService->incrementMessageCount($session);
+                // Save user message as last message preview
+                $session->setLastMessagePreview(mb_substr($data['text'], 0, 100));
+                $this->em->flush();
+            }
             $this->sessionService->attachChat($session, $chat);
+
+            // If in human takeover mode, just save the message and return success (no AI processing)
+            if ($isHumanMode) {
+                $incomingMessage->setStatus('complete');
+                $session->setLastMessage(time());
+                $session->setLastMessagePreview(mb_substr($data['text'], 0, 100));
+                $this->em->flush();
+
+                // Generate title if needed (also works in human mode)
+                $this->sessionService->generateTitleIfNeeded($session, $owner->getId());
+
+                $this->logger->info('Widget message saved in human mode (no AI processing)', [
+                    'widget_id' => $widgetId,
+                    'session_id' => $session->getSessionId(),
+                    'mode' => $session->getMode(),
+                ]);
+
+                return $this->json([
+                    'success' => true,
+                    'chatId' => $chat->getId(),
+                    'mode' => $session->getMode(),
+                    'text' => '', // No AI response
+                ]);
+            }
 
             \set_time_limit(0);
 
@@ -515,6 +568,9 @@ class WidgetPublicController extends AbstractController
                     $topic = $classification['topic'] ?? 'WIDGET';
                     $language = $classification['language'] ?? 'en';
 
+                    // Truncate topic to fit database column (max 64 chars)
+                    $topic = mb_substr($topic, 0, 64);
+
                     // Update incoming message with classification
                     $incomingMessage->setTopic($topic);
                     $incomingMessage->setLanguage($language);
@@ -539,6 +595,25 @@ class WidgetPublicController extends AbstractController
 
                     $this->em->persist($outgoingMessage);
                     $this->em->flush();
+
+                    // Update session's last message time and preview with AI response
+                    // Re-fetch session to ensure it's managed by the EntityManager
+                    $currentSession = $this->sessionService->getOrCreateSession($widgetId, $session->getSessionId());
+                    $currentSession->setLastMessage(time());
+                    $currentSession->setLastMessagePreview(mb_substr($responseText, 0, 100));
+                    $this->em->flush();
+
+                    // Publish event for AI response (so admin panel receives it in real-time)
+                    $this->eventCache->publish($widgetId, $session->getSessionId(), 'message', [
+                        'direction' => 'OUT',
+                        'text' => $responseText,
+                        'messageId' => $outgoingMessage->getId(),
+                        'timestamp' => $outgoingMessage->getUnixTimestamp(),
+                        'sender' => 'ai',
+                    ]);
+
+                    // Generate AI title after 5 user messages (async, non-blocking)
+                    $this->sessionService->generateTitleIfNeeded($currentSession, $owner->getId());
 
                     $this->rateLimitService->recordUsage($owner, 'MESSAGES', [
                         'provider' => $responseMetadata['provider'] ?? null,
@@ -962,6 +1037,7 @@ class WidgetPublicController extends AbstractController
                     'messageCount' => 0,
                     'fileCount' => 0,
                     'lastMessage' => null,
+                    'mode' => 'ai',
                 ],
             ]);
         }
@@ -977,6 +1053,7 @@ class WidgetPublicController extends AbstractController
                     'messageCount' => $session->getMessageCount(),
                     'fileCount' => $session->getFileCount(),
                     'lastMessage' => $session->getLastMessage() ?: null,
+                    'mode' => $session->getMode(),
                 ],
             ]);
         }
@@ -992,6 +1069,7 @@ class WidgetPublicController extends AbstractController
                     'messageCount' => $session->getMessageCount(),
                     'fileCount' => $session->getFileCount(),
                     'lastMessage' => $session->getLastMessage() ?: null,
+                    'mode' => $session->getMode(),
                 ],
             ]);
         }
@@ -1042,6 +1120,7 @@ class WidgetPublicController extends AbstractController
                 'messageCount' => $session->getMessageCount(),
                 'fileCount' => $session->getFileCount(),
                 'lastMessage' => $session->getLastMessage() ?: null,
+                'mode' => $session->getMode(),
             ],
         ]);
     }
@@ -1387,5 +1466,54 @@ class WidgetPublicController extends AbstractController
         ]);
 
         return true;
+    }
+
+    /**
+     * Send typing indicator (live preview for admin dashboard).
+     *
+     * PUBLIC endpoint - no authentication required
+     */
+    #[Route('/{widgetId}/typing', name: 'typing', methods: ['POST'])]
+    #[OA\Post(
+        path: '/api/v1/widget/{widgetId}/typing',
+        summary: 'Send typing indicator (public)',
+        tags: ['Widget (Public)']
+    )]
+    #[OA\RequestBody(
+        content: new OA\JsonContent(
+            required: ['sessionId'],
+            properties: [
+                new OA\Property(property: 'sessionId', type: 'string'),
+                new OA\Property(property: 'text', type: 'string', description: 'Current input text (empty to clear)'),
+            ]
+        )
+    )]
+    #[OA\Response(response: 200, description: 'Typing indicator sent')]
+    public function typing(string $widgetId, Request $request): JsonResponse
+    {
+        $widget = $this->widgetService->getWidgetById($widgetId);
+        if (!$widget) {
+            return $this->json(['error' => 'Widget not found'], Response::HTTP_NOT_FOUND);
+        }
+
+        $data = $request->toArray();
+        $sessionId = $data['sessionId'] ?? null;
+        $text = $data['text'] ?? '';
+
+        if (!$sessionId) {
+            return $this->json(['error' => 'Session ID required'], Response::HTTP_BAD_REQUEST);
+        }
+
+        // Get or create session
+        $session = $this->sessionService->getOrCreateSession($widgetId, $sessionId);
+
+        // Publish typing event via cache (ephemeral, auto-expires)
+        // Note: This is user typing (has 'text' field), different from operator typing (no text)
+        $this->eventCache->publish($widgetId, $sessionId, 'typing', [
+            'text' => mb_substr($text, 0, 500),
+            'timestamp' => time(),
+        ]);
+
+        return $this->json(['success' => true]);
     }
 }
