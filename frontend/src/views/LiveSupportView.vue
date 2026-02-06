@@ -217,12 +217,10 @@ import MainLayout from '@/components/MainLayout.vue'
 import * as widgetsApi from '@/services/api/widgetsApi'
 import * as widgetSessionsApi from '@/services/api/widgetSessionsApi'
 import { useNotification } from '@/composables/useNotification'
-import { useAuthStore } from '@/stores/auth'
 import { subscribeToNotifications, type EventSubscription } from '@/services/sseClient'
 
 const { t } = useI18n()
 const { success, error } = useNotification()
-const authStore = useAuthStore()
 
 const widgets = ref<widgetsApi.Widget[]>([])
 const selectedWidgetId = ref('')
@@ -255,8 +253,7 @@ const loadWidgets = async () => {
     for (const widget of widgets.value) {
       const sub = subscribeToNotifications(
         widget.widgetId,
-        handleNotification,
-        () => authStore.accessToken
+        handleNotification
       )
       notificationSubscriptions.push(sub)
     }
