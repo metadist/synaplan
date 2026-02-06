@@ -36,8 +36,8 @@ final readonly class VectorMigrationService
     public function getFileMigrationStatus(int $userId, int $fileId): array
     {
         $mariaInfo = $this->mariaDbStorage->getFileChunkInfo($userId, $fileId);
-        $mariaChunks = $mariaInfo['chunks'] ?? 0;
-        $groupKey = $mariaInfo['groupKey'] ?? null;
+        $mariaChunks = $mariaInfo['chunks'];
+        $groupKey = $mariaInfo['groupKey'];
 
         $qdrantChunks = 0;
         if ($this->config->isQdrantEnabled() && $this->qdrantClient->isAvailable()) {

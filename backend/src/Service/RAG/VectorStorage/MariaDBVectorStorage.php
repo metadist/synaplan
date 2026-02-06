@@ -164,7 +164,7 @@ final readonly class MariaDBVectorStorage implements VectorStorageInterface
         // Use existing search with source vector
         $query = new SearchQuery(
             userId: $userId,
-            vector: $sourceDoc->getEmbed(),
+            vector: $sourceDoc->getEmbedding(),
             groupKey: null, // Search across all groups
             limit: $limit + 1, // +1 to exclude self
             minScore: $minScore,

@@ -9,20 +9,13 @@ use App\Service\RAG\VectorStorage\DTO\SearchResult;
 use App\Service\RAG\VectorStorage\DTO\StorageStats;
 use App\Service\RAG\VectorStorage\DTO\VectorChunk;
 use App\Service\VectorSearch\QdrantClientHttp;
-use Psr\Log\LoggerInterface;
 
 final readonly class QdrantVectorStorage implements VectorStorageInterface
 {
     public function __construct(
         private QdrantClientHttp $qdrantClient,
         private VectorStorageConfig $config,
-        private LoggerInterface $logger,
     ) {
-    }
-
-    private function getCollection(): string
-    {
-        return $this->config->getQdrantDocumentsCollection();
     }
 
     public function storeChunk(VectorChunk $chunk): string
@@ -167,8 +160,8 @@ final readonly class QdrantVectorStorage implements VectorStorageInterface
         $stats = $this->qdrantClient->getDocumentFileInfo($userId, $fileId);
 
         return [
-            'chunks' => $stats['chunks'] ?? 0,
-            'groupKey' => $stats['group_key'] ?? null,
+            'chunks' => $stats['chunks'],
+            'groupKey' => $stats['group_key'],
         ];
     }
 

@@ -280,13 +280,13 @@
                       @change="toggleSelectAll"
                     />
                   </th>
-                  <th class="text-left py-3 px-3 txt-secondary text-xs font-medium w-12">
-                    ID
-                  </th>
+                  <th class="text-left py-3 px-3 txt-secondary text-xs font-medium w-12">ID</th>
                   <th class="text-left py-3 px-3 txt-secondary text-xs font-medium">
                     {{ $t('files.name') }}
                   </th>
-                  <th class="text-left py-3 px-3 txt-secondary text-xs font-medium whitespace-nowrap">
+                  <th
+                    class="text-left py-3 px-3 txt-secondary text-xs font-medium whitespace-nowrap"
+                  >
                     {{ $t('files.groupKey') }}
                   </th>
                   <th class="text-left py-3 px-3 txt-secondary text-xs font-medium">
@@ -316,13 +316,16 @@
                   <td class="py-3 px-3">
                     <div class="txt-primary text-sm truncate max-w-xs">{{ file.filename }}</div>
                     <div class="flex items-center gap-2 mt-0.5">
-                      <span class="txt-secondary text-xs">{{ formatFileSize(file.file_size) }}</span>
+                      <span class="txt-secondary text-xs">{{
+                        formatFileSize(file.file_size)
+                      }}</span>
                       <span class="txt-secondary text-xs">·</span>
-                      <span
-                        v-if="file.status === 'vectorized'"
-                        class="text-xs text-emerald-500"
-                      >
-                        Vectorized<template v-if="fileGroupKeys[file.id]?.qdrantChunks > 0">: Qdrant</template><template v-else-if="fileGroupKeys[file.id]?.mariadbChunks > 0">: MariaDB</template>
+                      <span v-if="file.status === 'vectorized'" class="text-xs text-emerald-500">
+                        Vectorized<template v-if="fileGroupKeys[file.id]?.qdrantChunks > 0"
+                          >: Qdrant</template
+                        ><template v-else-if="fileGroupKeys[file.id]?.mariadbChunks > 0"
+                          >: MariaDB</template
+                        >
                       </span>
                       <span
                         v-else
@@ -409,7 +412,9 @@
                       </button>
                     </div>
                   </td>
-                  <td class="py-3 px-3 txt-secondary text-xs whitespace-nowrap align-top">{{ file.uploaded_date }}</td>
+                  <td class="py-3 px-3 txt-secondary text-xs whitespace-nowrap align-top">
+                    {{ file.uploaded_date }}
+                  </td>
                   <td class="py-3 px-3 align-top">
                     <div class="flex gap-1">
                       <!-- Migrate to Qdrant (MariaDB data exists, Qdrant empty) -->
@@ -629,7 +634,18 @@ const dragCounter = ref(0)
 
 // GroupKey management
 const fileGroupKeys = ref<
-  Record<number, { groupKey: string | null; isVectorized: boolean; chunks: number; status: string; needsMigration: boolean; mariadbChunks: number; qdrantChunks: number }>
+  Record<
+    number,
+    {
+      groupKey: string | null
+      isVectorized: boolean
+      chunks: number
+      status: string
+      needsMigration: boolean
+      mariadbChunks: number
+      qdrantChunks: number
+    }
+  >
 >({})
 const editingGroupKey = ref<number | null>(null)
 const tempGroupKey = ref('')
@@ -1013,10 +1029,7 @@ const loadFileGroupKey = async (fileId: number) => {
     const timeoutPromise = new Promise<never>((_, reject) =>
       setTimeout(() => reject(new Error('Timeout')), 8000)
     )
-    const result = await Promise.race([
-      filesService.getFileGroupKey(fileId),
-      timeoutPromise,
-    ])
+    const result = await Promise.race([filesService.getFileGroupKey(fileId), timeoutPromise])
     fileGroupKeys.value[fileId] = {
       groupKey: result.groupKey,
       isVectorized: result.isVectorized,

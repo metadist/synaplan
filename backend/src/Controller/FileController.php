@@ -7,7 +7,6 @@ use App\Entity\Message;
 use App\Entity\User;
 use App\Repository\FileRepository;
 use App\Repository\MessageRepository;
-use App\Repository\RagDocumentRepository;
 use App\Repository\WidgetSessionRepository;
 use App\Service\File\FileHelper;
 use App\Service\File\FileProcessor;
@@ -42,7 +41,6 @@ class FileController extends AbstractController
         private RateLimitService $rateLimitService,
         private MessageRepository $messageRepository,
         private FileRepository $fileRepository,
-        private RagDocumentRepository $ragDocumentRepository,
         private WidgetSessionRepository $widgetSessionRepository,
         private WidgetService $widgetService,
         private VectorStorageFacade $vectorStorageFacade,

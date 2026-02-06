@@ -11,7 +11,6 @@ use App\Repository\EmailVerificationAttemptRepository;
 use App\Repository\FileRepository;
 use App\Repository\InboundEmailHandlerRepository;
 use App\Repository\MessageRepository;
-use App\Repository\RagDocumentRepository;
 use App\Repository\SessionRepository;
 use App\Repository\TokenRepository;
 use App\Repository\UseLogRepository;
@@ -30,7 +29,6 @@ final readonly class UserDeletionService
         private TokenRepository $tokenRepository,
         private ApiKeyRepository $apiKeyRepository,
         private SessionRepository $sessionRepository,
-        private RagDocumentRepository $ragDocumentRepository,
         private UseLogRepository $useLogRepository,
         private WidgetRepository $widgetRepository,
         private ChatRepository $chatRepository,
