@@ -15,8 +15,15 @@
         >
           <div>
             <h2 class="text-xl font-semibold txt-primary flex items-center gap-2">
-              <Icon icon="heroicons:cog-6-tooth" class="w-6 h-6 txt-brand" />
-              {{ $t('widgets.advancedConfig.title') }}
+              <Icon
+                :icon="promptOnly ? 'heroicons:sparkles' : 'heroicons:cog-6-tooth'"
+                class="w-6 h-6 txt-brand"
+              />
+              {{
+                promptOnly
+                  ? $t('widgets.advancedConfig.editPrompt')
+                  : $t('widgets.advancedConfig.title')
+              }}
             </h2>
             <p class="text-sm txt-secondary mt-1">
               {{ widget.name }}
@@ -32,8 +39,11 @@
           </button>
         </div>
 
-        <!-- Tabs -->
-        <div class="px-6 border-b border-light-border/30 dark:border-dark-border/20 flex-shrink-0">
+        <!-- Tabs (hidden in promptOnly mode) -->
+        <div
+          v-if="!promptOnly"
+          class="px-6 border-b border-light-border/30 dark:border-dark-border/20 flex-shrink-0"
+        >
           <div class="flex gap-1">
             <button
               v-for="tab in tabs"
@@ -59,8 +69,12 @@
 
         <!-- Content -->
         <div class="flex-1 overflow-y-auto scroll-thin p-6">
-          <!-- Branding Tab -->
-          <div v-if="activeTab === 'branding'" class="space-y-6" data-testid="section-branding">
+          <!-- Branding Tab (hidden in promptOnly mode) -->
+          <div
+            v-if="!promptOnly && activeTab === 'branding'"
+            class="space-y-6"
+            data-testid="section-branding"
+          >
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
                 <label class="block text-sm font-medium txt-primary mb-2">
@@ -258,9 +272,9 @@
             </div>
           </div>
 
-          <!-- Behavior Tab -->
+          <!-- Behavior Tab (hidden in promptOnly mode) -->
           <div
-            v-else-if="activeTab === 'behavior'"
+            v-else-if="!promptOnly && activeTab === 'behavior'"
             class="space-y-6"
             data-testid="section-behavior"
           >
@@ -424,9 +438,9 @@
             </div>
           </div>
 
-          <!-- Security Tab -->
+          <!-- Security Tab (hidden in promptOnly mode) -->
           <div
-            v-else-if="activeTab === 'security'"
+            v-else-if="!promptOnly && activeTab === 'security'"
             class="space-y-6"
             data-testid="section-security"
           >
@@ -506,13 +520,15 @@
 
           <!-- AI Assistant Tab -->
           <div
-            v-else-if="activeTab === 'assistant'"
+            v-if="promptOnly || activeTab === 'assistant'"
             class="space-y-6"
             data-testid="section-assistant"
           >
-            <!-- Not Configured State -->
+            <!-- Not Configured State (hidden in promptOnly mode) -->
             <div
-              v-if="!hasCustomPrompt && !creatingManualPrompt && !manualPromptCreated"
+              v-if="
+                !promptOnly && !hasCustomPrompt && !creatingManualPrompt && !manualPromptCreated
+              "
               class="flex flex-col items-center justify-center py-12 text-center"
             >
               <div
@@ -548,9 +564,9 @@
               </div>
             </div>
 
-            <!-- Creating Manual Prompt Loading State -->
+            <!-- Creating Manual Prompt Loading State (hidden in promptOnly mode) -->
             <div
-              v-else-if="creatingManualPrompt"
+              v-else-if="!promptOnly && creatingManualPrompt"
               class="flex flex-col items-center justify-center py-12"
             >
               <Icon icon="heroicons:arrow-path" class="w-8 h-8 txt-secondary animate-spin mb-4" />
@@ -574,9 +590,9 @@
 
               <!-- Prompt Editor -->
               <template v-else>
-                <!-- System Prompt Notice (legacy widgets using shared prompts) -->
+                <!-- System Prompt Notice (legacy widgets using shared prompts, hidden in promptOnly mode) -->
                 <div
-                  v-if="isSystemPrompt"
+                  v-if="!promptOnly && isSystemPrompt"
                   class="p-4 rounded-lg bg-amber-500/10 border border-amber-500/30"
                 >
                   <div class="flex items-start gap-3">
@@ -604,9 +620,9 @@
                   </div>
                 </div>
 
-                <!-- Restart AI Setup Option (only show if not manually created and not system prompt) -->
+                <!-- Restart AI Setup Option (only show if not manually created and not system prompt, hidden in promptOnly mode) -->
                 <div
-                  v-else-if="!manualPromptCreated"
+                  v-else-if="!promptOnly && !manualPromptCreated"
                   class="p-4 rounded-lg bg-[var(--brand-alpha-light)] border border-[var(--brand)]/20"
                 >
                   <div class="flex items-center justify-between">
@@ -963,10 +979,16 @@ defineOptions({
   inheritAttrs: false,
 })
 
-const props = defineProps<{
-  widget: widgetsApi.Widget
-  initialTab?: string
-}>()
+const props = withDefaults(
+  defineProps<{
+    widget: widgetsApi.Widget
+    initialTab?: string
+    promptOnly?: boolean
+  }>(),
+  {
+    promptOnly: false,
+  }
+)
 
 const emit = defineEmits<{
   close: []
