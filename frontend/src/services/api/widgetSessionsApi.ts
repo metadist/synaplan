@@ -283,9 +283,9 @@ export function getExportUrl(widgetId: string, params: ExportParams = {}): strin
 }
 
 /**
- * Delete multiple widget sessions
+ * Delete multiple sessions
  */
-export async function deleteWidgetSessions(
+export async function deleteSessions(
   widgetId: string,
   sessionIds: string[]
 ): Promise<{ success: boolean; deleted: number }> {

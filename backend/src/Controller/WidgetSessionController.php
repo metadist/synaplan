@@ -210,77 +210,6 @@ class WidgetSessionController extends AbstractController
     }
 
     /**
-     * Delete multiple sessions.
-     */
-    #[Route('', name: 'delete_bulk', methods: ['DELETE'])]
-    #[OA\Delete(
-        path: '/api/v1/widgets/{widgetId}/sessions',
-        summary: 'Delete multiple sessions',
-        security: [['Bearer' => []]],
-        tags: ['Widget Sessions']
-    )]
-    #[OA\Parameter(name: 'widgetId', in: 'path', required: true, schema: new OA\Schema(type: 'string'))]
-    #[OA\RequestBody(
-        required: true,
-        content: new OA\JsonContent(
-            properties: [
-                new OA\Property(property: 'sessionIds', type: 'array', items: new OA\Items(type: 'string')),
-            ]
-        )
-    )]
-    #[OA\Response(
-        response: 200,
-        description: 'Sessions deleted',
-        content: new OA\JsonContent(
-            properties: [
-                new OA\Property(property: 'success', type: 'boolean'),
-                new OA\Property(property: 'deleted', type: 'integer'),
-            ]
-        )
-    )]
-    public function deleteBulk(string $widgetId, Request $request, #[CurrentUser] ?User $user): JsonResponse
-    {
-        if (!$user) {
-            return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
-        }
-
-        $widget = $this->widgetRepository->findByWidgetId($widgetId);
-
-        if (!$widget) {
-            return $this->json(['error' => 'Widget not found'], Response::HTTP_NOT_FOUND);
-        }
-
-        if ($widget->getOwnerId() !== $user->getId()) {
-            return $this->json(['error' => 'Access denied'], Response::HTTP_FORBIDDEN);
-        }
-
-        try {
-            $data = json_decode($request->getContent(), true);
-            $sessionIds = $data['sessionIds'] ?? [];
-
-            if (empty($sessionIds)) {
-                return $this->json(['error' => 'No session IDs provided'], Response::HTTP_BAD_REQUEST);
-            }
-
-            $deleted = $this->sessionRepository->deleteBySessionIds($widgetId, $sessionIds);
-
-            return $this->json([
-                'success' => true,
-                'deleted' => $deleted,
-            ]);
-        } catch (\Exception $e) {
-            $this->logger->error('Failed to delete widget sessions', [
-                'widget_id' => $widgetId,
-                'error' => $e->getMessage(),
-            ]);
-
-            return $this->json([
-                'error' => 'Failed to delete sessions',
-            ], Response::HTTP_INTERNAL_SERVER_ERROR);
-        }
-    }
-
-    /**
      * Get a single session details with full chat history.
      */
     #[Route('/{sessionId}', name: 'get', methods: ['GET'])]
@@ -664,6 +593,122 @@ class WidgetSessionController extends AbstractController
 
             return $this->json([
                 'error' => 'Failed to send typing indicator',
+            ], Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    /**
+     * Delete multiple sessions.
+     */
+    #[Route('', name: 'delete_bulk', methods: ['DELETE'])]
+    #[OA\Delete(
+        path: '/api/v1/widgets/{widgetId}/sessions',
+        summary: 'Delete multiple sessions',
+        security: [['Bearer' => []]],
+        tags: ['Widget Sessions']
+    )]
+    #[OA\Parameter(name: 'widgetId', in: 'path', required: true, schema: new OA\Schema(type: 'string'))]
+    #[OA\RequestBody(
+        required: true,
+        content: new OA\JsonContent(
+            properties: [
+                new OA\Property(
+                    property: 'sessionIds',
+                    type: 'array',
+                    items: new OA\Items(type: 'string'),
+                    description: 'Array of session IDs to delete'
+                ),
+            ]
+        )
+    )]
+    #[OA\Response(
+        response: 200,
+        description: 'Sessions deleted successfully',
+        content: new OA\JsonContent(
+            properties: [
+                new OA\Property(property: 'success', type: 'boolean'),
+                new OA\Property(property: 'deleted', type: 'integer'),
+            ]
+        )
+    )]
+    public function deleteSessions(
+        string $widgetId,
+        Request $request,
+        #[CurrentUser] ?User $user,
+    ): JsonResponse {
+        if (!$user) {
+            return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
+        }
+
+        $widget = $this->widgetRepository->findByWidgetId($widgetId);
+
+        if (!$widget) {
+            return $this->json(['error' => 'Widget not found'], Response::HTTP_NOT_FOUND);
+        }
+
+        if ($widget->getOwnerId() !== $user->getId()) {
+            return $this->json(['error' => 'Access denied'], Response::HTTP_FORBIDDEN);
+        }
+
+        try {
+            $data = json_decode($request->getContent(), true);
+            $sessionIds = $data['sessionIds'] ?? [];
+
+            if (empty($sessionIds) || !is_array($sessionIds)) {
+                return $this->json(['error' => 'No session IDs provided'], Response::HTTP_BAD_REQUEST);
+            }
+
+            // Find sessions to delete
+            $sessions = $this->sessionRepository->findBySessionIds($widgetId, $sessionIds);
+
+            if (empty($sessions)) {
+                return $this->json([
+                    'success' => true,
+                    'deleted' => 0,
+                ]);
+            }
+
+            // Collect chat IDs for deletion
+            $chatIds = [];
+            foreach ($sessions as $session) {
+                if ($session->getChatId()) {
+                    $chatIds[] = $session->getChatId();
+                }
+            }
+
+            // Delete messages associated with the chats
+            if (!empty($chatIds)) {
+                $this->messageRepository->deleteByChatIds($chatIds);
+            }
+
+            // Delete chats
+            foreach ($chatIds as $chatId) {
+                $chat = $this->chatRepository->find($chatId);
+                if ($chat) {
+                    $this->chatRepository->remove($chat);
+                }
+            }
+
+            // Delete sessions
+            foreach ($sessions as $session) {
+                $this->sessionRepository->remove($session);
+            }
+
+            // Flush all changes
+            $this->sessionRepository->getEntityManager()->flush();
+
+            return $this->json([
+                'success' => true,
+                'deleted' => count($sessions),
+            ]);
+        } catch (\Exception $e) {
+            $this->logger->error('Failed to delete sessions', [
+                'widget_id' => $widgetId,
+                'error' => $e->getMessage(),
+            ]);
+
+            return $this->json([
+                'error' => 'Failed to delete sessions',
             ], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }

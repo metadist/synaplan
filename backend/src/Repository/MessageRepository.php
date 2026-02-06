@@ -210,4 +210,26 @@ class MessageRepository extends ServiceEntityRepository
 
         return $messages;
     }
+
+    /**
+     * Delete all messages for the given chat IDs.
+     *
+     * @param array<int> $chatIds
+     *
+     * @return int Number of deleted messages
+     */
+    public function deleteByChatIds(array $chatIds): int
+    {
+        if (empty($chatIds)) {
+            return 0;
+        }
+
+        $qb = $this->getEntityManager()->createQueryBuilder();
+
+        return $qb->delete(\App\Entity\Message::class, 'm')
+            ->where($qb->expr()->in('m.chatId', ':chatIds'))
+            ->setParameter('chatIds', $chatIds)
+            ->getQuery()
+            ->execute();
+    }
 }

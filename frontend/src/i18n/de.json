@@ -436,8 +436,9 @@
     "selectAll": "Alle auswählen",
     "deselectAll": "Auswahl aufheben",
     "deleteSelectedTitle": "Ausgewählte Chats löschen?",
-    "deleteSelectedConfirm": "Möchten Sie wirklich {count} Chat(s) löschen? Diese Aktion kann nicht rückgängig gemacht werden. Besucher verlieren ihren Chatverlauf.",
-    "deleteSuccess": "{count} Chat(s) erfolgreich gelöscht"
+    "deleteSelectedConfirm": "Möchten Sie wirklich {count} ausgewählte(n) Chat(s) löschen? Diese Aktion kann nicht rückgängig gemacht werden.",
+    "deleteSuccess": "{count} Chat(s) erfolgreich gelöscht",
+    "deleteFailed": "Chats konnten nicht gelöscht werden"
   },
   "notFound": {
     "title": "Seite nicht gefunden",

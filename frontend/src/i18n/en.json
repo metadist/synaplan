@@ -1254,11 +1254,12 @@
     "fileAttached": "File attached",
     "selected": "selected",
     "clickToSelect": "Click to select for export",
-    "selectAll": "Select All",
-    "deselectAll": "Deselect All",
-    "deleteSelectedTitle": "Delete Selected Chats?",
-    "deleteSelectedConfirm": "Are you sure you want to delete {count} chat(s)? This action cannot be undone. Visitors will lose their chat history.",
-    "deleteSuccess": "{count} chat(s) deleted successfully"
+    "selectAll": "Select all",
+    "deselectAll": "Deselect all",
+    "deleteSelectedTitle": "Delete selected chats?",
+    "deleteSelectedConfirm": "Are you sure you want to delete {count} selected chat(s)? This action cannot be undone.",
+    "deleteSuccess": "{count} chat(s) deleted successfully",
+    "deleteFailed": "Failed to delete chats"
   },
   "widget": {
     "title": "Chat Support",
