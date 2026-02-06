@@ -679,10 +679,7 @@
         v-if="showExportDialog"
         :widget-id="widgetId"
         :selected-session-ids="Array.from(selectedSessionIds)"
-        @close="
-          showExportDialog = false
-          clearSelection()
-        "
+        @close="handleExportDialogClose"
       />
 
       <!-- Widget Config Modal (for editing prompt) -->
@@ -692,10 +689,7 @@
         initial-tab="assistant"
         :prompt-only="true"
         @close="showWidgetConfig = false"
-        @saved="
-          showWidgetConfig = false
-          loadWidget()
-        "
+        @saved="handleWidgetConfigSaved"
       />
     </div>
   </MainLayout>
@@ -843,6 +837,16 @@ const toggleSessionSelection = (session: widgetSessionsApi.WidgetSession) => {
 
 const clearSelection = () => {
   selectedSessionIds.value = new Set()
+}
+
+const handleExportDialogClose = () => {
+  showExportDialog.value = false
+  clearSelection()
+}
+
+const handleWidgetConfigSaved = () => {
+  showWidgetConfig.value = false
+  loadWidget()
 }
 
 const allSelected = computed(() => {

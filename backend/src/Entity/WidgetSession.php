@@ -48,9 +48,10 @@ class WidgetSession
 
     /**
      * Session mode: 'ai' (default), 'human' (operator takeover), 'waiting' (waiting for human response).
+     * Nullable for backward compatibility with existing sessions.
      */
-    #[ORM\Column(name: 'BMODE', length: 16, options: ['default' => 'ai'])]
-    private string $mode = self::MODE_AI;
+    #[ORM\Column(name: 'BMODE', length: 16, nullable: true, options: ['default' => 'ai'])]
+    private ?string $mode = self::MODE_AI;
 
     /**
      * User ID of the human operator who took over the session.
@@ -72,9 +73,10 @@ class WidgetSession
 
     /**
      * Whether this session is marked as favorite by the widget owner.
+     * Nullable for backward compatibility with existing sessions.
      */
-    #[ORM\Column(name: 'BIS_FAVORITE', type: 'boolean', options: ['default' => false])]
-    private bool $isFavorite = false;
+    #[ORM\Column(name: 'BIS_FAVORITE', type: 'boolean', nullable: true, options: ['default' => false])]
+    private ?bool $isFavorite = false;
 
     /**
      * ISO 3166-1 Alpha-2 country code from Cloudflare geolocation (e.g., "DE", "US").
@@ -243,7 +245,8 @@ class WidgetSession
 
     public function getMode(): string
     {
-        return $this->mode;
+        // Fallback to 'ai' for backward compatibility with existing sessions
+        return $this->mode ?? self::MODE_AI;
     }
 
     public function setMode(string $mode): self
@@ -258,17 +261,17 @@ class WidgetSession
 
     public function isAiMode(): bool
     {
-        return self::MODE_AI === $this->mode;
+        return self::MODE_AI === $this->getMode();
     }
 
     public function isHumanMode(): bool
     {
-        return self::MODE_HUMAN === $this->mode;
+        return self::MODE_HUMAN === $this->getMode();
     }
 
     public function isWaitingForHuman(): bool
     {
-        return self::MODE_WAITING === $this->mode;
+        return self::MODE_WAITING === $this->getMode();
     }
 
     public function getHumanOperatorId(): ?int
@@ -351,7 +354,8 @@ class WidgetSession
 
     public function isFavorite(): bool
     {
-        return $this->isFavorite;
+        // Fallback to false for backward compatibility with existing sessions
+        return $this->isFavorite ?? false;
     }
 
     public function setIsFavorite(bool $isFavorite): self
@@ -363,7 +367,7 @@ class WidgetSession
 
     public function toggleFavorite(): self
     {
-        $this->isFavorite = !$this->isFavorite;
+        $this->isFavorite = !$this->isFavorite();
 
         return $this;
     }
