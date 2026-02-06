@@ -98,6 +98,10 @@ class WidgetSummaryController extends AbstractController
                 'issues' => $s->getIssues(),
                 'recommendations' => $s->getRecommendations(),
                 'summary' => $s->getSummaryText(),
+                'promptSuggestions' => $s->getPromptSuggestions(),
+                'fromDate' => $s->getFromDate(),
+                'toDate' => $s->getToDate(),
+                'dateRange' => $s->getFormattedDateRange(),
                 'created' => $s->getCreated(),
             ], $summaries),
         ]);
@@ -242,6 +246,107 @@ class WidgetSummaryController extends AbstractController
 
             return $this->json([
                 'error' => 'Failed to generate summary: '.$e->getMessage(),
+            ], Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    /**
+     * Generate an AI-powered custom summary for specific sessions or date range.
+     */
+    #[Route('/analyze', name: 'analyze', methods: ['POST'])]
+    #[OA\Post(
+        path: '/api/v1/widgets/{widgetId}/summaries/analyze',
+        summary: 'Generate AI analysis for selected sessions or date range',
+        security: [['Bearer' => []]],
+        tags: ['Widget Summaries']
+    )]
+    #[OA\RequestBody(
+        required: false,
+        content: new OA\JsonContent(
+            properties: [
+                new OA\Property(
+                    property: 'sessionIds',
+                    type: 'array',
+                    items: new OA\Items(type: 'string'),
+                    description: 'Specific session IDs to analyze'
+                ),
+                new OA\Property(
+                    property: 'fromDate',
+                    type: 'integer',
+                    description: 'Start date in YYYYMMDD format',
+                    example: 20240101
+                ),
+                new OA\Property(
+                    property: 'toDate',
+                    type: 'integer',
+                    description: 'End date in YYYYMMDD format',
+                    example: 20240115
+                ),
+            ]
+        )
+    )]
+    #[OA\Response(
+        response: 200,
+        description: 'AI-generated analysis',
+        content: new OA\JsonContent(
+            properties: [
+                new OA\Property(property: 'success', type: 'boolean'),
+                new OA\Property(property: 'summary', type: 'object'),
+            ]
+        )
+    )]
+    public function analyze(
+        string $widgetId,
+        Request $request,
+        #[CurrentUser] ?User $user,
+    ): JsonResponse {
+        if (!$user) {
+            return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
+        }
+
+        $widget = $this->widgetRepository->findByWidgetId($widgetId);
+        if (!$widget) {
+            return $this->json(['error' => 'Widget not found'], Response::HTTP_NOT_FOUND);
+        }
+
+        if ($widget->getOwnerId() !== $user->getId()) {
+            return $this->json(['error' => 'Access denied'], Response::HTTP_FORBIDDEN);
+        }
+
+        $data = json_decode($request->getContent(), true) ?? [];
+        $sessionIds = $data['sessionIds'] ?? null;
+        $fromDate = isset($data['fromDate']) ? (int) $data['fromDate'] : null;
+        $toDate = isset($data['toDate']) ? (int) $data['toDate'] : null;
+        $summaryId = isset($data['summaryId']) ? (int) $data['summaryId'] : null;
+
+        // Validate at least one filter is provided
+        if (empty($sessionIds) && !$fromDate && !$toDate) {
+            return $this->json([
+                'error' => 'Please provide sessionIds or a date range (fromDate/toDate)',
+            ], Response::HTTP_BAD_REQUEST);
+        }
+
+        try {
+            $summary = $this->summaryService->generateCustomSummary(
+                $widget,
+                $sessionIds,
+                $fromDate,
+                $toDate,
+                $summaryId
+            );
+
+            return $this->json([
+                'success' => true,
+                'summary' => $summary,
+            ]);
+        } catch (\Exception $e) {
+            $this->logger->error('Custom summary generation failed', [
+                'widget_id' => $widgetId,
+                'error' => $e->getMessage(),
+            ]);
+
+            return $this->json([
+                'error' => 'Failed to generate analysis: '.$e->getMessage(),
             ], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }

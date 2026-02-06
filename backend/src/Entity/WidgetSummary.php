@@ -14,7 +14,6 @@ use Doctrine\ORM\Mapping as ORM;
 #[ORM\Table(name: 'BWIDGET_SUMMARIES')]
 #[ORM\Index(columns: ['BWIDGETID'], name: 'idx_summary_widget')]
 #[ORM\Index(columns: ['BDATE'], name: 'idx_summary_date')]
-#[ORM\UniqueConstraint(name: 'uk_widget_date', columns: ['BWIDGETID', 'BDATE'])]
 class WidgetSummary
 {
     #[ORM\Id]
@@ -78,6 +77,24 @@ class WidgetSummary
      */
     #[ORM\Column(name: 'BSUMMARY_TEXT', type: 'text')]
     private string $summaryText = '';
+
+    /**
+     * Prompt improvement suggestions (JSON array).
+     */
+    #[ORM\Column(name: 'BPROMPT_SUGGESTIONS', type: 'text', nullable: true)]
+    private ?string $promptSuggestions = null;
+
+    /**
+     * Start date of the analysis period (YYYYMMDD format).
+     */
+    #[ORM\Column(name: 'BFROM_DATE', type: 'integer', nullable: true)]
+    private ?int $fromDate = null;
+
+    /**
+     * End date of the analysis period (YYYYMMDD format).
+     */
+    #[ORM\Column(name: 'BTO_DATE', type: 'integer', nullable: true)]
+    private ?int $toDate = null;
 
     /**
      * When the summary was generated (Unix timestamp).
@@ -244,6 +261,68 @@ class WidgetSummary
         $this->summaryText = $summaryText;
 
         return $this;
+    }
+
+    /**
+     * @return array<array{type: string, suggestion: string}>
+     */
+    public function getPromptSuggestions(): array
+    {
+        return $this->promptSuggestions ? (json_decode($this->promptSuggestions, true) ?? []) : [];
+    }
+
+    /**
+     * @param array<array{type: string, suggestion: string}> $suggestions
+     */
+    public function setPromptSuggestions(array $suggestions): self
+    {
+        $this->promptSuggestions = json_encode($suggestions, JSON_UNESCAPED_UNICODE);
+
+        return $this;
+    }
+
+    public function getFromDate(): ?int
+    {
+        return $this->fromDate;
+    }
+
+    public function setFromDate(?int $fromDate): self
+    {
+        $this->fromDate = $fromDate;
+
+        return $this;
+    }
+
+    public function getToDate(): ?int
+    {
+        return $this->toDate;
+    }
+
+    public function setToDate(?int $toDate): self
+    {
+        $this->toDate = $toDate;
+
+        return $this;
+    }
+
+    /**
+     * Get formatted date range string.
+     */
+    public function getFormattedDateRange(): ?string
+    {
+        if (!$this->fromDate || !$this->toDate) {
+            return null;
+        }
+
+        $formatDate = function (int $date): string {
+            $year = (int) substr((string) $date, 0, 4);
+            $month = (int) substr((string) $date, 4, 2);
+            $day = (int) substr((string) $date, 6, 2);
+
+            return sprintf('%02d.%02d.%04d', $day, $month, $year);
+        };
+
+        return $formatDate($this->fromDate).' - '.$formatDate($this->toDate);
     }
 
     public function getCreated(): int

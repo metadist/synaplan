@@ -300,18 +300,31 @@ export async function deleteSessions(
 
 // Summary types
 export interface WidgetSummary {
-  id: number
-  date: number
-  formattedDate: string
+  id?: number
+  date?: number
+  formattedDate?: string
   sessionCount: number
   messageCount: number
+  userMessages?: number
+  assistantMessages?: number
   topics: string[]
   faqs: Array<{ question: string; frequency: number }>
   sentiment: { positive: number; neutral: number; negative: number }
   issues: string[]
   recommendations: string[]
   summary: string
-  created: number
+  promptSuggestions?: Array<{ type: string; suggestion: string }>
+  fromDate?: number
+  toDate?: number
+  dateRange?: string
+  created?: number
+}
+
+export interface AnalyzeSummaryParams {
+  sessionIds?: string[]
+  fromDate?: number
+  toDate?: number
+  summaryId?: number
 }
 
 /**
@@ -356,6 +369,22 @@ export async function generateWidgetSummary(
     {
       method: 'POST',
       body: JSON.stringify(date ? { date } : {}),
+    }
+  )
+}
+
+/**
+ * Generate AI analysis for selected sessions or date range
+ */
+export async function analyzeWidgetSessions(
+  widgetId: string,
+  params: AnalyzeSummaryParams
+): Promise<{ success: boolean; summary: WidgetSummary }> {
+  return await httpClient<{ success: boolean; summary: WidgetSummary }>(
+    `/api/v1/widgets/${widgetId}/summaries/analyze`,
+    {
+      method: 'POST',
+      body: JSON.stringify(params),
     }
   )
 }

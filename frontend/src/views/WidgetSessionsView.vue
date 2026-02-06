@@ -109,7 +109,7 @@
         <div
           :class="[
             'flex-shrink-0 flex flex-col overflow-hidden transition-all duration-300 rounded-2xl bg-[var(--bg-card)] shadow-sm',
-            selectedSession ? 'w-80 hidden md:flex' : 'w-full md:w-80',
+            selectedSession ? 'w-80 hidden lg:flex' : 'w-full lg:w-80',
           ]"
         >
           <!-- Filters -->
@@ -310,7 +310,7 @@
               <div class="flex items-center gap-3">
                 <!-- Back button on mobile -->
                 <button
-                  class="p-2 rounded-xl hover:bg-white/5 transition-all duration-200 md:hidden"
+                  class="p-2 rounded-xl hover:bg-white/5 transition-all duration-200 lg:hidden"
                   @click="closeSessionDetail"
                 >
                   <Icon icon="heroicons:arrow-left" class="w-5 h-5 txt-secondary" />
@@ -579,7 +579,7 @@
           </template>
         </div>
 
-        <!-- AI Summary Slide Panel -->
+        <!-- AI Summary Slide Panel (desktop only, xl+) -->
         <Transition
           enter-active-class="transition-all duration-300 ease-out"
           enter-from-class="opacity-0 translate-x-4"
@@ -590,7 +590,7 @@
         >
           <div
             v-if="showSummaryPanel"
-            class="w-80 lg:w-96 flex-shrink-0 rounded-2xl bg-[var(--bg-card)] shadow-sm overflow-hidden flex flex-col"
+            class="hidden xl:flex w-80 2xl:w-96 flex-shrink-0 rounded-2xl bg-[var(--bg-card)] shadow-sm overflow-hidden flex-col"
           >
             <div class="p-4 flex items-center justify-between">
               <h3 class="text-sm font-semibold txt-primary flex items-center gap-2">
@@ -609,11 +609,65 @@
               </button>
             </div>
             <div class="flex-1 overflow-y-auto px-4 pb-4 scroll-thin">
-              <WidgetSummaryPanel :widget-id="widgetId" :compact="true" />
+              <WidgetSummaryPanel
+                :widget-id="widgetId"
+                :compact="true"
+                :selected-session-ids="Array.from(selectedSessionIds)"
+                @edit-prompt="showWidgetConfig = true"
+              />
             </div>
           </div>
         </Transition>
       </div>
+
+      <!-- Mobile/Tablet Summary Panel Overlay (< xl) -->
+      <Teleport to="body">
+        <Transition
+          enter-active-class="transition-all duration-300 ease-out"
+          enter-from-class="opacity-0"
+          enter-to-class="opacity-100"
+          leave-active-class="transition-all duration-200 ease-in"
+          leave-from-class="opacity-100"
+          leave-to-class="opacity-0"
+        >
+          <div
+            v-if="showSummaryPanel"
+            class="xl:hidden fixed inset-0 z-50 bg-black/50 backdrop-blur-sm"
+            @click.self="showSummaryPanel = false"
+          >
+            <div
+              class="absolute right-0 top-0 bottom-0 w-full max-w-md bg-[var(--bg-card)] shadow-2xl flex flex-col"
+            >
+              <div
+                class="p-4 flex items-center justify-between border-b border-light-border/30 dark:border-dark-border/20"
+              >
+                <h3 class="text-lg font-semibold txt-primary flex items-center gap-2">
+                  <div
+                    class="w-8 h-8 rounded-lg bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center"
+                  >
+                    <Icon icon="heroicons:sparkles" class="w-5 h-5 text-white" />
+                  </div>
+                  {{ $t('widgetSessions.aiSummary') }}
+                </h3>
+                <button
+                  class="p-2 rounded-lg hover:bg-white/5 transition-colors"
+                  @click="showSummaryPanel = false"
+                >
+                  <Icon icon="heroicons:x-mark" class="w-5 h-5 txt-secondary" />
+                </button>
+              </div>
+              <div class="flex-1 overflow-y-auto p-4 scroll-thin">
+                <WidgetSummaryPanel
+                  :widget-id="widgetId"
+                  :compact="false"
+                  :selected-session-ids="Array.from(selectedSessionIds)"
+                  @edit-prompt="showWidgetConfig = true"
+                />
+              </div>
+            </div>
+          </div>
+        </Transition>
+      </Teleport>
 
       <!-- Export Dialog -->
       <WidgetExportDialog
@@ -621,6 +675,16 @@
         :widget-id="widgetId"
         :selected-session-ids="Array.from(selectedSessionIds)"
         @close="showExportDialog = false; clearSelection()"
+      />
+
+      <!-- Widget Config Modal (for editing prompt) -->
+      <AdvancedWidgetConfig
+        v-if="showWidgetConfig && widget"
+        :widget="widget"
+        initial-tab="assistant"
+        :prompt-only="true"
+        @close="showWidgetConfig = false"
+        @saved="showWidgetConfig = false; loadWidget()"
       />
     </div>
   </MainLayout>
@@ -635,6 +699,7 @@ import MainLayout from '@/components/MainLayout.vue'
 import MessageText from '@/components/MessageText.vue'
 import WidgetExportDialog from '@/components/widgets/WidgetExportDialog.vue'
 import WidgetSummaryPanel from '@/components/widgets/WidgetSummaryPanel.vue'
+import AdvancedWidgetConfig from '@/components/widgets/AdvancedWidgetConfig.vue'
 import * as widgetSessionsApi from '@/services/api/widgetSessionsApi'
 import * as widgetsApi from '@/services/api/widgetsApi'
 import { useNotification } from '@/composables/useNotification'
@@ -656,7 +721,9 @@ const selectedSession = ref<widgetSessionsApi.WidgetSession | null>(null)
 const sessionMessages = ref<widgetSessionsApi.SessionMessage[]>([])
 const typingPreview = ref<{ text: string; timestamp: number } | null>(null)
 const showExportDialog = ref(false)
-const showSummaryPanel = ref(true)
+// Default to hidden on smaller screens, shown on xl+
+const showSummaryPanel = ref(window.innerWidth >= 1280)
+const showWidgetConfig = ref(false)
 const selectedSessionIds = ref<Set<string>>(new Set())
 const deletingSessions = ref(false)
 const messageText = ref('')

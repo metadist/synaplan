@@ -277,8 +277,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, onMounted, computed, watch } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 import { Icon } from '@iconify/vue'
 import MainLayout from '@/components/MainLayout.vue'
 import * as widgetsApi from '@/services/api/widgetsApi'
@@ -295,6 +295,7 @@ import { useI18n } from 'vue-i18n'
 import { useConfigStore } from '@/stores/config'
 
 const router = useRouter()
+const route = useRoute()
 const { success, error } = useNotification()
 const { confirm } = useDialog()
 const { t } = useI18n()
@@ -504,6 +505,34 @@ const confirmDelete = async (widget: widgetsApi.Widget) => {
     }
   }
 }
+
+/**
+ * Check query params and open widget settings if specified
+ */
+const checkQueryParams = () => {
+  const widgetId = route.query.widget as string | undefined
+  const tab = route.query.tab as string | undefined
+
+  if (widgetId && widgets.value.length > 0) {
+    const widget = widgets.value.find((w) => w.widgetId === widgetId)
+    if (widget) {
+      advancedWidgetInitialTab.value = tab
+      advancedWidget.value = widget
+      // Clear query params
+      router.replace({ query: {} })
+    }
+  }
+}
+
+// Watch for widgets loaded and check query params
+watch(
+  () => widgets.value,
+  () => {
+    if (widgets.value.length > 0) {
+      checkQueryParams()
+    }
+  }
+)
 
 onMounted(() => {
   loadWidgets()
