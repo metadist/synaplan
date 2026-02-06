@@ -85,8 +85,9 @@
             </div>
           </div>
           <div class="flex items-center gap-2">
+            <!-- Export button disabled - functionality preserved for future use -->
             <button
-              v-if="messages.length > 0"
+              v-if="false"
               class="w-8 h-8 rounded-lg bg-white/10 hover:bg-white/20 transition-colors flex items-center justify-center"
               :aria-label="$t('widget.exportChat')"
               :title="$t('widget.exportChat')"
