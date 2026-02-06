@@ -412,3 +412,36 @@ services:
     App\Service\Admin\SystemConfigService:
         arguments:
             $projectDir: '%kernel.project_dir%'
+
+    # Vector Storage Configuration
+    App\Service\RAG\VectorStorage\VectorStorageConfig:
+        arguments:
+            $envProvider: '%env(default::VECTOR_STORAGE_PROVIDER)%'
+            $qdrantServiceUrl: '%env(default::QDRANT_SERVICE_URL)%'
+            $qdrantApiKey: '%env(default::QDRANT_SERVICE_API_KEY)%'
+            $qdrantDocumentsCollection: '%env(default::QDRANT_DOCUMENTS_COLLECTION)%'
+
+    # Vector Storage Implementations
+    App\Service\RAG\VectorStorage\MariaDBVectorStorage: ~
+
+    App\Service\RAG\VectorStorage\QdrantVectorStorage:
+        arguments:
+            $qdrantClient: '@App\Service\VectorSearch\QdrantClientHttp'
+
+    # Vector Migration Service (MariaDB → Qdrant)
+    App\Service\RAG\VectorStorage\VectorMigrationService:
+        arguments:
+            $qdrantStorage: '@App\Service\RAG\VectorStorage\QdrantVectorStorage'
+            $qdrantClient: '@App\Service\VectorSearch\QdrantClientHttp'
+            $mariaDbStorage: '@App\Service\RAG\VectorStorage\MariaDBVectorStorage'
+
+    # Vector Storage Facade
+    App\Service\RAG\VectorStorage\VectorStorageFacade:
+        arguments:
+            $mariaDbStorage: '@App\Service\RAG\VectorStorage\MariaDBVectorStorage'
+            $qdrantStorage: '@App\Service\RAG\VectorStorage\QdrantVectorStorage'
+            $config: '@App\Service\RAG\VectorStorage\VectorStorageConfig'
+
+    # Alias for injection
+    App\Service\RAG\VectorStorage\VectorStorageInterface:
+        alias: App\Service\RAG\VectorStorage\VectorStorageFacade

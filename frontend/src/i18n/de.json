@@ -1234,7 +1234,14 @@
     "uploading": "Wird hochgeladen...",
     "uploadProgress": "Upload-Fortschritt",
     "uploadingBytes": "{loaded} von {total} hochgeladen",
-    "processingFiles": "Dateien werden auf dem Server verarbeitet..."
+    "processingFiles": "Dateien werden auf dem Server verarbeitet...",
+    "groupKey": "Gruppe / Tag",
+    "migrateToQdrant": "Vektoren zu Qdrant migrieren",
+    "migratingToQdrant": "Vektoren werden zu Qdrant migriert...",
+    "migrationSuccess": "{count} Chunks erfolgreich zu Qdrant migriert",
+    "migrationPartial": "Migration teilweise abgeschlossen: {migrated} migriert, {errors} Fehler",
+    "migrationFailed": "Migration fehlgeschlagen",
+    "reVectorize": "Datei neu vektorisieren"
   },
   "fileSelection": {
     "title": "Dateien auswählen oder hochladen",

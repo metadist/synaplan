@@ -339,7 +339,7 @@ final class QdrantClientHttp implements QdrantClientInterface
     public function getServiceInfo(): array
     {
         try {
-            $response = $this->httpClient->request('GET', "{$this->baseUrl}/info", [
+            $response = $this->httpClient->request('GET', "{$this->baseUrl}/service/info", [
                 'headers' => $this->getHeaders(),
                 'timeout' => 5,
             ]);
@@ -360,6 +360,332 @@ final class QdrantClientHttp implements QdrantClientInterface
                 'status' => 'error',
                 'error' => $e->getMessage(),
             ];
+        }
+    }
+
+    // --- Document Methods ---
+
+    public function upsertDocument(string $pointId, array $vector, array $payload): void
+    {
+        try {
+            $response = $this->httpClient->request('POST', "{$this->baseUrl}/documents", [
+                'json' => [
+                    'point_id' => $pointId,
+                    'vector' => $vector,
+                    'payload' => $payload,
+                ],
+                'headers' => $this->getHeaders(),
+            ]);
+
+            if (200 !== $response->getStatusCode()) {
+                throw new \RuntimeException("Qdrant document upsert failed: {$response->getContent(false)}");
+            }
+        } catch (\Throwable $e) {
+            $this->logger->error('Failed to upsert document to Qdrant', [
+                'point_id' => $pointId,
+                'error' => $e->getMessage(),
+            ]);
+            throw $e;
+        }
+    }
+
+    public function batchUpsertDocuments(array $documents): array
+    {
+        try {
+            $response = $this->httpClient->request('POST', "{$this->baseUrl}/documents/batch", [
+                'json' => ['documents' => $documents],
+                'headers' => $this->getHeaders(),
+            ]);
+
+            if (200 !== $response->getStatusCode()) {
+                throw new \RuntimeException("Qdrant batch upsert failed: {$response->getContent(false)}");
+            }
+
+            return $response->toArray();
+        } catch (\Throwable $e) {
+            $this->logger->error('Failed to batch upsert documents', [
+                'count' => count($documents),
+                'error' => $e->getMessage(),
+            ]);
+            throw $e;
+        }
+    }
+
+    public function searchDocuments(
+        array $vector,
+        int $userId,
+        ?string $groupKey = null,
+        int $limit = 10,
+        float $minScore = 0.3,
+    ): array {
+        try {
+            $payload = [
+                'vector' => $vector,
+                'user_id' => $userId,
+                'limit' => $limit,
+                'min_score' => $minScore,
+            ];
+
+            if (null !== $groupKey) {
+                $payload['group_key'] = $groupKey;
+            }
+
+            $response = $this->httpClient->request('POST', "{$this->baseUrl}/documents/search", [
+                'json' => $payload,
+                'headers' => $this->getHeaders(),
+            ]);
+
+            if (200 !== $response->getStatusCode()) {
+                throw new \RuntimeException("Qdrant document search failed: {$response->getContent(false)}");
+            }
+
+            return $response->toArray();
+        } catch (\Throwable $e) {
+            $this->logger->error('Failed to search documents', [
+                'user_id' => $userId,
+                'error' => $e->getMessage(),
+            ]);
+
+            return [];
+        }
+    }
+
+    public function getDocument(string $pointId): ?array
+    {
+        try {
+            $response = $this->httpClient->request('GET', "{$this->baseUrl}/documents/{$pointId}", [
+                'headers' => $this->getHeaders(),
+                'timeout' => 5,
+            ]);
+
+            if (404 === $response->getStatusCode()) {
+                return null;
+            }
+
+            if (200 !== $response->getStatusCode()) {
+                throw new \RuntimeException("Qdrant get document failed: {$response->getContent(false)}");
+            }
+
+            return $response->toArray();
+        } catch (\Throwable $e) {
+            $this->logger->error('Failed to get document', [
+                'point_id' => $pointId,
+                'error' => $e->getMessage(),
+            ]);
+
+            return null;
+        }
+    }
+
+    public function deleteDocument(string $pointId): void
+    {
+        try {
+            $response = $this->httpClient->request('DELETE', "{$this->baseUrl}/documents/{$pointId}", [
+                'headers' => $this->getHeaders(),
+            ]);
+
+            if (200 !== $response->getStatusCode()) {
+                throw new \RuntimeException("Qdrant delete document failed: {$response->getContent(false)}");
+            }
+        } catch (\Throwable $e) {
+            $this->logger->error('Failed to delete document', [
+                'point_id' => $pointId,
+                'error' => $e->getMessage(),
+            ]);
+            throw $e;
+        }
+    }
+
+    public function deleteDocumentsByFile(int $userId, int $fileId): int
+    {
+        try {
+            $response = $this->httpClient->request('POST', "{$this->baseUrl}/documents/delete-by-file", [
+                'json' => ['user_id' => $userId, 'file_id' => $fileId],
+                'headers' => $this->getHeaders(),
+            ]);
+
+            if (200 !== $response->getStatusCode()) {
+                throw new \RuntimeException("Qdrant delete by file failed: {$response->getContent(false)}");
+            }
+
+            // Response is Json<u64> - a bare JSON number
+            return (int) json_decode($response->getContent(), true);
+        } catch (\Throwable $e) {
+            $this->logger->error('Failed to delete documents by file', [
+                'user_id' => $userId,
+                'file_id' => $fileId,
+                'error' => $e->getMessage(),
+            ]);
+
+            return 0;
+        }
+    }
+
+    public function deleteDocumentsByGroupKey(int $userId, string $groupKey): int
+    {
+        try {
+            $response = $this->httpClient->request('POST', "{$this->baseUrl}/documents/delete-by-group", [
+                'json' => ['user_id' => $userId, 'group_key' => $groupKey],
+                'headers' => $this->getHeaders(),
+            ]);
+
+            if (200 !== $response->getStatusCode()) {
+                throw new \RuntimeException("Qdrant delete by group failed: {$response->getContent(false)}");
+            }
+
+            return (int) json_decode($response->getContent(), true);
+        } catch (\Throwable $e) {
+            $this->logger->error('Failed to delete documents by group', [
+                'user_id' => $userId,
+                'group_key' => $groupKey,
+                'error' => $e->getMessage(),
+            ]);
+
+            return 0;
+        }
+    }
+
+    public function deleteAllDocumentsForUser(int $userId): int
+    {
+        try {
+            $response = $this->httpClient->request('DELETE', "{$this->baseUrl}/documents/user/{$userId}", [
+                'headers' => $this->getHeaders(),
+            ]);
+
+            if (200 !== $response->getStatusCode()) {
+                throw new \RuntimeException("Qdrant delete all for user failed: {$response->getContent(false)}");
+            }
+
+            return (int) json_decode($response->getContent(), true);
+        } catch (\Throwable $e) {
+            $this->logger->error('Failed to delete all documents for user', [
+                'user_id' => $userId,
+                'error' => $e->getMessage(),
+            ]);
+
+            return 0;
+        }
+    }
+
+    public function updateDocumentGroupKey(int $userId, int $fileId, string $newGroupKey): int
+    {
+        try {
+            $response = $this->httpClient->request('POST', "{$this->baseUrl}/documents/update-group-key", [
+                'json' => [
+                    'user_id' => $userId,
+                    'file_id' => $fileId,
+                    'new_group_key' => $newGroupKey,
+                ],
+                'headers' => $this->getHeaders(),
+            ]);
+
+            if (200 !== $response->getStatusCode()) {
+                throw new \RuntimeException("Qdrant update group key failed: {$response->getContent(false)}");
+            }
+
+            return (int) json_decode($response->getContent(), true);
+        } catch (\Throwable $e) {
+            $this->logger->error('Failed to update document group key', [
+                'user_id' => $userId,
+                'file_id' => $fileId,
+                'error' => $e->getMessage(),
+            ]);
+
+            return 0;
+        }
+    }
+
+    /**
+     * Get chunk info for a specific file from Qdrant.
+     *
+     * Uses the search endpoint with a zero vector and file_id filter
+     * to check if any chunks exist and retrieve the group key.
+     *
+     * @return array{chunks: int, group_key: string|null}
+     */
+    public function getDocumentFileInfo(int $userId, int $fileId): array
+    {
+        try {
+            // Use stats endpoint - scroll user docs and filter locally for this file
+            $stats = $this->getDocumentStats($userId);
+
+            // Stats gives us total chunks but not per-file info
+            // Fall back to checking if file has any point by searching for it
+            // Use the point ID convention: doc_{userId}_{fileId}_0
+            $firstChunkId = sprintf('doc_%d_%d_0', $userId, $fileId);
+            $doc = $this->getDocument($firstChunkId);
+
+            if (null === $doc) {
+                return ['chunks' => 0, 'group_key' => null];
+            }
+
+            $groupKey = $doc['payload']['group_key'] ?? null;
+
+            // Estimate chunk count by probing sequential IDs (fast, no scroll needed)
+            $chunks = 0;
+            for ($i = 0; $i < 100; ++$i) {
+                $chunkId = sprintf('doc_%d_%d_%d', $userId, $fileId, $i);
+                $exists = $this->getDocument($chunkId);
+                if (null === $exists) {
+                    break;
+                }
+                ++$chunks;
+            }
+
+            return ['chunks' => $chunks, 'group_key' => $groupKey];
+        } catch (\Throwable $e) {
+            $this->logger->error('Failed to get document file info', [
+                'user_id' => $userId,
+                'file_id' => $fileId,
+                'error' => $e->getMessage(),
+            ]);
+
+            return ['chunks' => 0, 'group_key' => null];
+        }
+    }
+
+    public function getDocumentStats(int $userId): array
+    {
+        try {
+            $response = $this->httpClient->request('GET', "{$this->baseUrl}/documents/stats/{$userId}", [
+                'headers' => $this->getHeaders(),
+                'timeout' => 5,
+            ]);
+
+            if (200 !== $response->getStatusCode()) {
+                throw new \RuntimeException("Qdrant stats failed: {$response->getContent(false)}");
+            }
+
+            return $response->toArray();
+        } catch (\Throwable $e) {
+            $this->logger->error('Failed to get document stats', [
+                'user_id' => $userId,
+                'error' => $e->getMessage(),
+            ]);
+
+            return [];
+        }
+    }
+
+    public function getDocumentGroupKeys(int $userId): array
+    {
+        try {
+            $response = $this->httpClient->request('GET', "{$this->baseUrl}/documents/groups/{$userId}", [
+                'headers' => $this->getHeaders(),
+            ]);
+
+            if (200 !== $response->getStatusCode()) {
+                throw new \RuntimeException("Qdrant group keys failed: {$response->getContent(false)}");
+            }
+
+            return $response->toArray();
+        } catch (\Throwable $e) {
+            $this->logger->error('Failed to get document group keys', [
+                'user_id' => $userId,
+                'error' => $e->getMessage(),
+            ]);
+
+            return [];
         }
     }
 

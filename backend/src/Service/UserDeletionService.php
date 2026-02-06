@@ -11,13 +11,13 @@ use App\Repository\EmailVerificationAttemptRepository;
 use App\Repository\FileRepository;
 use App\Repository\InboundEmailHandlerRepository;
 use App\Repository\MessageRepository;
-use App\Repository\RagDocumentRepository;
 use App\Repository\SessionRepository;
 use App\Repository\TokenRepository;
 use App\Repository\UseLogRepository;
 use App\Repository\VerificationTokenRepository;
 use App\Repository\WidgetRepository;
 use App\Service\File\FileStorageService;
+use App\Service\RAG\VectorStorage\VectorStorageFacade;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 
@@ -29,7 +29,6 @@ final readonly class UserDeletionService
         private TokenRepository $tokenRepository,
         private ApiKeyRepository $apiKeyRepository,
         private SessionRepository $sessionRepository,
-        private RagDocumentRepository $ragDocumentRepository,
         private UseLogRepository $useLogRepository,
         private WidgetRepository $widgetRepository,
         private ChatRepository $chatRepository,
@@ -38,6 +37,7 @@ final readonly class UserDeletionService
         private FileRepository $fileRepository,
         private InboundEmailHandlerRepository $inboundEmailHandlerRepository,
         private FileStorageService $fileStorageService,
+        private VectorStorageFacade $vectorStorageFacade,
         private LoggerInterface $logger,
     ) {
     }
@@ -136,10 +136,8 @@ final readonly class UserDeletionService
 
     private function deleteRagDocuments(int $userId): void
     {
-        $ragDocs = $this->ragDocumentRepository->findBy(['userId' => $userId]);
-        foreach ($ragDocs as $ragDoc) {
-            $this->em->remove($ragDoc);
-        }
+        // Delete all RAG documents via facade
+        $this->vectorStorageFacade->deleteAllForUser($userId);
     }
 
     private function deleteUseLogs(int $userId): void

@@ -4,21 +4,20 @@ namespace App\Service\RAG;
 
 use App\AI\Service\AiFacade;
 use App\Service\ModelConfigService;
-use Doctrine\DBAL\Connection;
+use App\Service\RAG\VectorStorage\DTO\SearchQuery;
+use App\Service\RAG\VectorStorage\VectorStorageFacade;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 
 class VectorSearchService
 {
-    private Connection $connection;
-
     public function __construct(
         private EntityManagerInterface $em,
         private AiFacade $aiFacade,
         private ModelConfigService $modelConfigService,
+        private VectorStorageFacade $vectorStorage,
         private LoggerInterface $logger,
     ) {
-        $this->connection = $em->getConnection();
     }
 
     /**
@@ -65,6 +64,7 @@ class VectorSearchService
             'model_id' => $embeddingModelId,
             'model_name' => $modelName,
             'provider' => $provider,
+            'storage_provider' => $this->vectorStorage->getProviderName(),
         ]);
 
         // 2. Embed the query with model details
@@ -79,98 +79,34 @@ class VectorSearchService
             return [];
         }
 
-        // 2. Convert to MariaDB VECTOR format
-        $vectorStr = '['.implode(',', array_map('floatval', $queryEmbedding)).']';
+        // 3. Search via Facade
+        $searchQuery = new SearchQuery(
+            userId: $userId,
+            vector: array_map('floatval', $queryEmbedding),
+            groupKey: $groupKey,
+            limit: $limit,
+            minScore: $minScore,
+        );
 
-        // 3. Build SQL with VEC_DISTANCE_COSINE (native MariaDB)
-        $sql = '
-            SELECT
-                r.BID as chunk_id,
-                r.BMID as message_id,
-                r.BTEXT as chunk_text,
-                r.BSTART as start_line,
-                r.BEND as end_line,
-                r.BGROUPKEY as group_key,
-                VEC_DISTANCE_COSINE(r.BEMBED, VEC_FromText(:query_vector)) as distance,
-                m.BTEXT as message_text,
-                m.BFILEPATH as message_file_path,
-                m.BFILETYPE as message_file_type,
-                f.BFILENAME as file_name,
-                f.BFILEPATH as file_path,
-                f.BFILEMIME as file_mime,
-                f.BFILETEXT as file_text
-            FROM BRAG r
-            LEFT JOIN BMESSAGES m ON r.BMID = m.BID
-            LEFT JOIN BFILES f ON r.BMID = f.BID
-            WHERE r.BUID = :user_id
-                AND (m.BID IS NOT NULL OR f.BID IS NOT NULL)
-        ';
+        $results = $this->vectorStorage->search($searchQuery);
 
-        $params = [
-            'query_vector' => $vectorStr,
-            'user_id' => $userId,
-        ];
-
-        // 4. Optional: Filter by group
-        if ($groupKey) {
-            $sql .= ' AND r.BGROUPKEY = :group_key';
-            $params['group_key'] = $groupKey;
-        }
-
-        // 5. Filter by min_score (convert to max distance)
-        // VEC_DISTANCE_COSINE: 0 = identical, 1 = different
-        // So minScore=0.7 means we want distance <= 0.3
-        $maxDistance = 1.0 - $minScore;
-        $sql .= ' HAVING distance <= :max_distance';
-        $params['max_distance'] = $maxDistance;
-
-        // 6. Order by distance (lower = more similar) and limit
-        $sql .= '
-            ORDER BY distance ASC
-            LIMIT :limit
-        ';
-        $params['limit'] = $limit;
-
-        // 7. Execute query
-        try {
-            $stmt = $this->connection->prepare($sql);
-
-            // Bind parameters
-            foreach ($params as $key => $value) {
-                if ('limit' === $key) {
-                    $stmt->bindValue($key, $value, \PDO::PARAM_INT);
-                } else {
-                    $stmt->bindValue($key, $value);
-                }
-            }
-
-            $result = $stmt->executeQuery();
-            $results = $result->fetchAllAssociative();
-
-            // Transform: Convert distance (0=identical) to score (1=identical)
-            $results = array_map(function ($row) {
-                $row['distance'] = 1.0 - (float) $row['distance'];
-
-                return $row;
-            }, $results);
-
-            $this->logger->info('VectorSearchService: Semantic search completed', [
-                'user_id' => $userId,
-                'query_length' => strlen($query),
-                'results_count' => count($results),
-                'group_key' => $groupKey,
-                'min_score' => $minScore,
-            ]);
-
-            return $results;
-        } catch (\Throwable $e) {
-            $this->logger->error('VectorSearchService: Search failed', [
-                'error' => $e->getMessage(),
-                'user_id' => $userId,
-            ]);
-
-            return [];
-        }
+        // 4. Map DTOs to arrays for backward compatibility
+        return array_map(function ($result) {
+            return [
+                'chunk_id' => $result->chunkId,
+                'file_id' => $result->fileId, // Mapped from BMID/file_id
+                'message_id' => $result->fileId, // Legacy key
+                'chunk_text' => $result->text,
+                'start_line' => $result->startLine,
+                'end_line' => $result->endLine,
+                'group_key' => $result->groupKey,
+                'distance' => $result->score, // Legacy: 'distance' key contained similarity score (1.0 = identical)
+                'score' => $result->score, // Add score explicitly
+                'file_name' => $result->fileName,
+                'mime_type' => $result->mimeType,
+                // Add other fields if needed by consumers
+            ];
+        }, $results);
     }
 
     /**
@@ -179,26 +115,14 @@ class VectorSearchService
     public function getUserStats(int $userId): array
     {
         try {
-            $sql = '
-                SELECT
-                    COUNT(DISTINCT r.BMID) as total_documents,
-                    COUNT(r.BID) as total_chunks,
-                    COUNT(DISTINCT r.BGROUPKEY) as total_groups,
-                    AVG(CHAR_LENGTH(r.BTEXT)) as avg_chunk_size
-                FROM BRAG r
-                WHERE r.BUID = :user_id
-            ';
-
-            $stmt = $this->connection->prepare($sql);
-            $stmt->bindValue('user_id', $userId, \PDO::PARAM_INT);
-            $result = $stmt->executeQuery();
-            $stats = $result->fetchAssociative();
+            $stats = $this->vectorStorage->getStats($userId);
 
             return [
-                'total_documents' => (int) ($stats['total_documents'] ?? 0),
-                'total_chunks' => (int) ($stats['total_chunks'] ?? 0),
-                'total_groups' => (int) ($stats['total_groups'] ?? 0),
-                'avg_chunk_size' => (int) ($stats['avg_chunk_size'] ?? 0),
+                'total_documents' => $stats->totalFiles,
+                'total_chunks' => $stats->totalChunks,
+                'total_groups' => $stats->totalGroups,
+                'avg_chunk_size' => 0, // Not supported by facade yet
+                'chunks_by_group' => $stats->chunksByGroup,
             ];
         } catch (\Exception $e) {
             $this->logger->error('VectorSearchService: getUserStats failed', [
@@ -228,40 +152,20 @@ class VectorSearchService
         int $sourceMessageId,
         int $userId,
         int $limit = 10,
+        float $minScore = 0.3, // Added minScore parameter to match interface
     ): array {
         try {
-            // Get the embedding of the source message's first chunk
-            $sql = '
-                SELECT
-                    r2.BID as chunk_id,
-                    r2.BMID as message_id,
-                    r2.BTEXT as chunk_text,
-                    VEC_DISTANCE_COSINE(r2.BEMBED, r1.BEMBED) as distance
-                FROM BRAG r1
-                CROSS JOIN BRAG r2
-                WHERE r1.BMID = :source_mid
-                    AND r2.BUID = :user_id
-                    AND r2.BMID != :source_mid
-                ORDER BY distance ASC
-                LIMIT :limit
-            ';
+            $results = $this->vectorStorage->findSimilar($userId, $sourceMessageId, $limit, $minScore);
 
-            $stmt = $this->connection->prepare($sql);
-            $stmt->bindValue('source_mid', $sourceMessageId, \PDO::PARAM_INT);
-            $stmt->bindValue('user_id', $userId, \PDO::PARAM_INT);
-            $stmt->bindValue('limit', $limit, \PDO::PARAM_INT);
-
-            $result = $stmt->executeQuery();
-            $results = $result->fetchAllAssociative();
-
-            // Transform: Convert distance to score
-            $results = array_map(function ($row) {
-                $row['distance'] = 1.0 - (float) $row['distance'];
-
-                return $row;
+            return array_map(function ($result) {
+                return [
+                    'chunk_id' => $result->chunkId,
+                    'message_id' => $result->fileId,
+                    'chunk_text' => $result->text,
+                    'distance' => $result->score, // Legacy: 'distance' key contained similarity score
+                    'score' => $result->score,
+                ];
             }, $results);
-
-            return $results;
         } catch (\Throwable $e) {
             $this->logger->error('VectorSearchService: Find similar failed', [
                 'error' => $e->getMessage(),
@@ -271,5 +175,18 @@ class VectorSearchService
 
             return [];
         }
+    }
+
+    /**
+     * Get distinct group keys for a user.
+     */
+    public function getGroupKeys(int $userId): array
+    {
+        return $this->vectorStorage->getGroupKeys($userId);
+    }
+
+    public function getProviderName(): string
+    {
+        return $this->vectorStorage->getProviderName();
     }
 }
