@@ -390,6 +390,9 @@ export async function getFileGroupKey(fileId: number): Promise<{
   isVectorized: boolean
   chunks: number
   status: string
+  needsMigration: boolean
+  mariadbChunks: number
+  qdrantChunks: number
 }> {
   const response = await httpClient<{
     success: boolean
@@ -397,7 +400,28 @@ export async function getFileGroupKey(fileId: number): Promise<{
     isVectorized: boolean
     chunks: number
     status: string
+    needsMigration: boolean
+    mariadbChunks: number
+    qdrantChunks: number
   }>(`/api/v1/files/${fileId}/group-key`)
+  return response
+}
+
+/**
+ * Migrate file vectors from MariaDB to Qdrant
+ */
+export async function migrateFileToQdrant(fileId: number): Promise<{
+  success: boolean
+  migrated: number
+  errors: number
+}> {
+  const response = await httpClient<{
+    success: boolean
+    migrated: number
+    errors: number
+  }>(`/api/v1/files/${fileId}/migrate`, {
+    method: 'POST',
+  })
   return response
 }
 
@@ -464,4 +488,5 @@ export default {
   getFileGroupKey,
   updateFileGroupKey,
   reVectorizeFile,
+  migrateFileToQdrant,
 }

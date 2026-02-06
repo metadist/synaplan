@@ -13,6 +13,7 @@ use App\Service\File\FileHelper;
 use App\Service\File\FileProcessor;
 use App\Service\File\FileStorageService;
 use App\Service\File\VectorizationService;
+use App\Service\RAG\VectorStorage\VectorMigrationService;
 use App\Service\RAG\VectorStorage\VectorStorageFacade;
 use App\Service\RateLimitService;
 use App\Service\StorageQuotaService;
@@ -45,6 +46,7 @@ class FileController extends AbstractController
         private WidgetSessionRepository $widgetSessionRepository,
         private WidgetService $widgetService,
         private VectorStorageFacade $vectorStorageFacade,
+        private VectorMigrationService $migrationService,
         private EntityManagerInterface $em,
         private LoggerInterface $logger,
         private string $uploadDir,
@@ -791,6 +793,96 @@ class FileController extends AbstractController
     }
 
     /**
+     * Get groupKey, vectorization info, and migration status for a file.
+     *
+     * GET /api/v1/files/{id}/group-key
+     */
+    #[Route('/{id}/group-key', name: 'get_group_key', methods: ['GET'])]
+    public function getFileGroupKey(
+        int $id,
+        #[CurrentUser] ?User $user,
+    ): JsonResponse {
+        if (!$user) {
+            return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
+        }
+
+        $messageFile = $this->fileRepository->find($id);
+        if (!$messageFile || $messageFile->getUserId() !== $user->getId()) {
+            return $this->json(['error' => 'File not found'], Response::HTTP_NOT_FOUND);
+        }
+
+        try {
+            $status = $this->migrationService->getFileMigrationStatus($user->getId(), $id);
+
+            return $this->json([
+                'success' => true,
+                'groupKey' => $status['groupKey'],
+                'isVectorized' => ($status['qdrantChunks'] > 0) || ($status['mariadbChunks'] > 0),
+                'chunks' => max($status['qdrantChunks'], $status['mariadbChunks']),
+                'status' => $messageFile->getStatus(),
+                'needsMigration' => $status['needsMigration'],
+                'mariadbChunks' => $status['mariadbChunks'],
+                'qdrantChunks' => $status['qdrantChunks'],
+            ]);
+        } catch (\Throwable $e) {
+            $this->logger->warning('FileController: Failed to get group key', [
+                'file_id' => $id,
+                'error' => $e->getMessage(),
+            ]);
+
+            return $this->json([
+                'success' => true,
+                'groupKey' => null,
+                'isVectorized' => 'vectorized' === $messageFile->getStatus(),
+                'chunks' => 0,
+                'status' => $messageFile->getStatus(),
+                'needsMigration' => false,
+                'mariadbChunks' => 0,
+                'qdrantChunks' => 0,
+            ]);
+        }
+    }
+
+    /**
+     * Migrate file vectors from MariaDB to Qdrant.
+     *
+     * POST /api/v1/files/{id}/migrate
+     */
+    #[Route('/{id}/migrate', name: 'migrate_vectors', methods: ['POST'])]
+    public function migrateFileVectors(
+        int $id,
+        #[CurrentUser] ?User $user,
+    ): JsonResponse {
+        if (!$user) {
+            return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
+        }
+
+        $messageFile = $this->fileRepository->find($id);
+        if (!$messageFile || $messageFile->getUserId() !== $user->getId()) {
+            return $this->json(['error' => 'File not found'], Response::HTTP_NOT_FOUND);
+        }
+
+        try {
+            $result = $this->migrationService->migrateFile($user->getId(), $id);
+
+            return $this->json([
+                'success' => true,
+                'migrated' => $result['migrated'],
+                'errors' => $result['errors'],
+            ]);
+        } catch (\Throwable $e) {
+            $this->logger->error('FileController: Migration failed', [
+                'file_id' => $id,
+                'error' => $e->getMessage(),
+            ]);
+
+            return $this->json([
+                'error' => 'Migration failed: '.$e->getMessage(),
+            ], Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    /**
      * Update groupKey for an existing file.
      *
      * PUT /api/v1/files/{id}/group-key
@@ -1037,72 +1129,5 @@ class FileController extends AbstractController
                 'error' => 'Vectorization failed: '.$e->getMessage(),
             ], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
-    }
-
-    /**
-     * Get groupKey for a file.
-     *
-     * GET /api/v1/files/{id}/group-key
-     */
-    #[Route('/{id}/group-key', name: 'get_group_key', methods: ['GET'])]
-    #[OA\Get(
-        path: '/api/v1/files/{id}/group-key',
-        summary: 'Get the groupKey for a file',
-        description: 'Returns the groupKey from RAG documents, or null if not vectorized',
-        tags: ['Files'],
-        responses: [
-            new OA\Response(
-                response: 200,
-                description: 'GroupKey retrieved successfully',
-                content: new OA\JsonContent(
-                    properties: [
-                        new OA\Property(property: 'success', type: 'boolean'),
-                        new OA\Property(property: 'groupKey', type: 'string', example: 'customer-support', nullable: true),
-                        new OA\Property(property: 'isVectorized', type: 'boolean'),
-                        new OA\Property(property: 'chunks', type: 'integer', example: 15),
-                    ]
-                )
-            ),
-            new OA\Response(response: 401, description: 'Not authenticated'),
-            new OA\Response(response: 403, description: 'Access denied'),
-            new OA\Response(response: 404, description: 'File not found'),
-        ]
-    )]
-    public function getGroupKey(
-        int $id,
-        #[CurrentUser] ?User $user,
-    ): JsonResponse {
-        if (!$user) {
-            return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
-        }
-
-        $messageFile = $this->fileRepository->find($id);
-
-        if (!$messageFile) {
-            return $this->json(['error' => 'File not found'], Response::HTTP_NOT_FOUND);
-        }
-
-        // Security check: Only owner can view
-        if ($messageFile->getUserId() !== $user->getId()) {
-            return $this->json(['error' => 'Access denied'], Response::HTTP_FORBIDDEN);
-        }
-
-        // Use VectorStorageFacade to check vectorization (works with both MariaDB and Qdrant)
-        $chunkInfo = $this->vectorStorageFacade->getFileChunkInfo($user->getId(), $messageFile->getId());
-        $chunks = $chunkInfo['chunks'];
-        $groupKey = $chunkInfo['groupKey'];
-
-        // Fallback: If facade returns 0 chunks but file status says vectorized,
-        // the file was vectorized with a different provider (e.g., switched from MariaDB to Qdrant)
-        $isVectorized = $chunks > 0 || 'vectorized' === $messageFile->getStatus();
-
-        return $this->json([
-            'success' => true,
-            'groupKey' => $groupKey,
-            'isVectorized' => $isVectorized,
-            'chunks' => $chunks,
-            'status' => $messageFile->getStatus(),
-            'provider' => $this->vectorStorageFacade->getProviderName(),
-        ]);
     }
 }

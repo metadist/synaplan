@@ -565,7 +565,14 @@
     "uploading": "Uploading...",
     "uploadProgress": "Upload progress",
     "uploadingBytes": "{loaded} of {total} uploaded",
-    "processingFiles": "Processing files on server..."
+    "processingFiles": "Processing files on server...",
+    "groupKey": "Group / Tag",
+    "migrateToQdrant": "Migrate vectors to Qdrant",
+    "migratingToQdrant": "Migrating vectors to Qdrant...",
+    "migrationSuccess": "Successfully migrated {count} chunks to Qdrant",
+    "migrationPartial": "Migration partially complete: {migrated} migrated, {errors} errors",
+    "migrationFailed": "Migration failed",
+    "reVectorize": "Re-vectorize this file"
   },
   "fileSelection": {
     "title": "Select or Upload Files",

@@ -455,6 +455,7 @@ final class QdrantClientHttp implements QdrantClientInterface
         try {
             $response = $this->httpClient->request('GET', "{$this->baseUrl}/documents/{$pointId}", [
                 'headers' => $this->getHeaders(),
+                'timeout' => 5,
             ]);
 
             if (404 === $response->getStatusCode()) {
@@ -648,6 +649,7 @@ final class QdrantClientHttp implements QdrantClientInterface
         try {
             $response = $this->httpClient->request('GET', "{$this->baseUrl}/documents/stats/{$userId}", [
                 'headers' => $this->getHeaders(),
+                'timeout' => 5,
             ]);
 
             if (200 !== $response->getStatusCode()) {
