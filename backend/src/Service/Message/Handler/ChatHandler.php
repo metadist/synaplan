@@ -169,6 +169,18 @@ class ChatHandler implements MessageHandlerInterface
             ]);
         }
 
+        // Append explicit language directive based on detected language from classification.
+        $languageNames = [
+            'en' => 'English', 'de' => 'German', 'fr' => 'French', 'es' => 'Spanish',
+            'it' => 'Italian', 'pt' => 'Portuguese', 'nl' => 'Dutch', 'pl' => 'Polish',
+            'ru' => 'Russian', 'ja' => 'Japanese', 'ko' => 'Korean', 'zh' => 'Chinese',
+            'ar' => 'Arabic', 'tr' => 'Turkish', 'sv' => 'Swedish', 'da' => 'Danish',
+            'no' => 'Norwegian', 'fi' => 'Finnish', 'cs' => 'Czech', 'ro' => 'Romanian',
+            'hu' => 'Hungarian', 'uk' => 'Ukrainian', 'hi' => 'Hindi', 'th' => 'Thai',
+        ];
+        $languageName = $languageNames[$language] ?? $language;
+        $systemPrompt .= "\n\n**IMPORTANT: The user's current message is in {$languageName}. You MUST respond in {$languageName}.**";
+
         if ($modelId) {
             $model = $this->modelRepository->find($modelId);
             if ($model) {
@@ -595,6 +607,22 @@ class ChatHandler implements MessageHandlerInterface
                 'memories_context_length' => strlen($memoriesContext),
             ]);
         }
+
+        // Append explicit language directive based on detected language from classification.
+        // The sort prompt detects the user's language (BLANG), but the system prompt only says
+        // "answer in the user's language" without specifying WHICH language was detected.
+        // When conversation history contains mixed languages, the AI may default to the wrong one.
+        $detectedLanguage = $classification['language'] ?? 'en';
+        $languageNames = [
+            'en' => 'English', 'de' => 'German', 'fr' => 'French', 'es' => 'Spanish',
+            'it' => 'Italian', 'pt' => 'Portuguese', 'nl' => 'Dutch', 'pl' => 'Polish',
+            'ru' => 'Russian', 'ja' => 'Japanese', 'ko' => 'Korean', 'zh' => 'Chinese',
+            'ar' => 'Arabic', 'tr' => 'Turkish', 'sv' => 'Swedish', 'da' => 'Danish',
+            'no' => 'Norwegian', 'fi' => 'Finnish', 'cs' => 'Czech', 'ro' => 'Romanian',
+            'hu' => 'Hungarian', 'uk' => 'Ukrainian', 'hi' => 'Hindi', 'th' => 'Thai',
+        ];
+        $languageName = $languageNames[$detectedLanguage] ?? $detectedLanguage;
+        $systemPrompt .= "\n\n**IMPORTANT: The user's current message is in {$languageName}. You MUST respond in {$languageName}.**";
 
         // Check if model supports system messages (o1 models don't)
         if ($modelId) {
