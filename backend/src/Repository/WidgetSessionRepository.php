@@ -197,7 +197,7 @@ class WidgetSessionRepository extends ServiceEntityRepository
         }
 
         // Filter by specific session IDs
-        if (isset($filters['sessionIds']) && is_array($filters['sessionIds']) && count($filters['sessionIds']) > 0) {
+        if (isset($filters['sessionIds']) && count($filters['sessionIds']) > 0) {
             $qb->andWhere('ws.sessionId IN (:sessionIds)')
                 ->setParameter('sessionIds', $filters['sessionIds']);
         }
