@@ -493,7 +493,7 @@ PROMPT;
 
         // Ensure sentiment sums to 100
         $total = $result['sentiment']['positive'] + $result['sentiment']['neutral'] + $result['sentiment']['negative'];
-        if ($total > 0 && $total !== 100) {
+        if ($total > 0 && 100 !== $total) {
             $factor = 100 / $total;
             $result['sentiment']['positive'] = (int) round($result['sentiment']['positive'] * $factor);
             $result['sentiment']['negative'] = (int) round($result['sentiment']['negative'] * $factor);

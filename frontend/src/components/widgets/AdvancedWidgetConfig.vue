@@ -19,7 +19,11 @@
                 :icon="promptOnly ? 'heroicons:sparkles' : 'heroicons:cog-6-tooth'"
                 class="w-6 h-6 txt-brand"
               />
-              {{ promptOnly ? $t('widgets.advancedConfig.editPrompt') : $t('widgets.advancedConfig.title') }}
+              {{
+                promptOnly
+                  ? $t('widgets.advancedConfig.editPrompt')
+                  : $t('widgets.advancedConfig.title')
+              }}
             </h2>
             <p class="text-sm txt-secondary mt-1">
               {{ widget.name }}
@@ -522,7 +526,9 @@
           >
             <!-- Not Configured State (hidden in promptOnly mode) -->
             <div
-              v-if="!promptOnly && !hasCustomPrompt && !creatingManualPrompt && !manualPromptCreated"
+              v-if="
+                !promptOnly && !hasCustomPrompt && !creatingManualPrompt && !manualPromptCreated
+              "
               class="flex flex-col items-center justify-center py-12 text-center"
             >
               <div

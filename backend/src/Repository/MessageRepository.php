@@ -226,7 +226,7 @@ class MessageRepository extends ServiceEntityRepository
 
         $qb = $this->getEntityManager()->createQueryBuilder();
 
-        return $qb->delete(\App\Entity\Message::class, 'm')
+        return $qb->delete(Message::class, 'm')
             ->where($qb->expr()->in('m.chatId', ':chatIds'))
             ->setParameter('chatIds', $chatIds)
             ->getQuery()

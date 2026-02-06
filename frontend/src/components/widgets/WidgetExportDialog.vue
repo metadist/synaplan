@@ -216,8 +216,9 @@ const getDateTimestamps = computed(() => {
         from: customFrom.value
           ? Math.floor(new Date(customFrom.value).getTime() / 1000)
           : undefined,
+        // Add 23:59:59 (daySeconds - 1) to include the full end day
         to: customTo.value
-          ? Math.floor(new Date(customTo.value).getTime() / 1000) + daySeconds
+          ? Math.floor(new Date(customTo.value).getTime() / 1000) + daySeconds - 1
           : undefined,
       }
     default:

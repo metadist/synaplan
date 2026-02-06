@@ -122,7 +122,9 @@
                   ? 'bg-[var(--brand)]/20 text-[var(--brand)]'
                   : 'bg-white/5 txt-secondary hover:text-[var(--brand)]',
               ]"
-              :title="allSelected ? $t('widgetSessions.deselectAll') : $t('widgetSessions.selectAll')"
+              :title="
+                allSelected ? $t('widgetSessions.deselectAll') : $t('widgetSessions.selectAll')
+              "
               @click="toggleSelectAll"
             >
               <Icon
@@ -368,7 +370,9 @@
                       @click="toggleSessionFavorite(selectedSession)"
                     >
                       <Icon
-                        :icon="selectedSession.isFavorite ? 'heroicons:star-solid' : 'heroicons:star'"
+                        :icon="
+                          selectedSession.isFavorite ? 'heroicons:star-solid' : 'heroicons:star'
+                        "
                         class="w-4 h-4"
                       />
                     </button>
@@ -461,10 +465,7 @@
                             : 'bg-white/10 hover:bg-white/20 txt-primary',
                         ]"
                       >
-                        <Icon
-                          :icon="getFileIcon(file.mimeType)"
-                          class="w-4 h-4 flex-shrink-0"
-                        />
+                        <Icon :icon="getFileIcon(file.mimeType)" class="w-4 h-4 flex-shrink-0" />
                         <span class="truncate max-w-[150px]" :title="file.filename">
                           {{ file.filename }}
                         </span>
@@ -565,7 +566,11 @@
                 <button
                   type="submit"
                   class="w-12 h-12 rounded-2xl bg-gradient-to-br from-[var(--brand)] to-[var(--brand-light)] flex items-center justify-center disabled:opacity-50 transition-all duration-200 shadow-sm shadow-[var(--brand)]/25 hover:shadow-md hover:shadow-[var(--brand)]/30"
-                  :disabled="(!messageText.trim() && selectedFiles.length === 0) || sendingMessage || uploadingFiles"
+                  :disabled="
+                    (!messageText.trim() && selectedFiles.length === 0) ||
+                    sendingMessage ||
+                    uploadingFiles
+                  "
                 >
                   <Icon
                     v-if="sendingMessage || uploadingFiles"
@@ -674,7 +679,10 @@
         v-if="showExportDialog"
         :widget-id="widgetId"
         :selected-session-ids="Array.from(selectedSessionIds)"
-        @close="showExportDialog = false; clearSelection()"
+        @close="
+          showExportDialog = false
+          clearSelection()
+        "
       />
 
       <!-- Widget Config Modal (for editing prompt) -->
@@ -684,7 +692,10 @@
         initial-tab="assistant"
         :prompt-only="true"
         @close="showWidgetConfig = false"
-        @saved="showWidgetConfig = false; loadWidget()"
+        @saved="
+          showWidgetConfig = false
+          loadWidget()
+        "
       />
     </div>
   </MainLayout>
@@ -1178,8 +1189,7 @@ const getFileIcon = (mimeType: string): string => {
   if (mimeType === 'application/pdf') return 'heroicons:document-text'
   if (mimeType.includes('spreadsheet') || mimeType.includes('excel') || mimeType.endsWith('.csv'))
     return 'heroicons:table-cells'
-  if (mimeType.includes('document') || mimeType.includes('word'))
-    return 'heroicons:document'
+  if (mimeType.includes('document') || mimeType.includes('word')) return 'heroicons:document'
   return 'heroicons:paper-clip'
 }
 
@@ -1211,7 +1221,8 @@ const uploadFiles = async (): Promise<number[]> => {
 }
 
 const sendMessage = async () => {
-  if (!selectedSession.value || (!messageText.value.trim() && selectedFiles.value.length === 0)) return
+  if (!selectedSession.value || (!messageText.value.trim() && selectedFiles.value.length === 0))
+    return
 
   sendingMessage.value = true
   try {
