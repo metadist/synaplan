@@ -251,10 +251,7 @@ const loadWidgets = async () => {
     widgets.value = await widgetsApi.listWidgets()
     // Subscribe to notifications for all widgets
     for (const widget of widgets.value) {
-      const sub = subscribeToNotifications(
-        widget.widgetId,
-        handleNotification
-      )
+      const sub = subscribeToNotifications(widget.widgetId, handleNotification)
       notificationSubscriptions.push(sub)
     }
   } catch (err: any) {
