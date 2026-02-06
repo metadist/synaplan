@@ -231,6 +231,18 @@ PROMPT;
             $title = mb_substr($title, 0, 50);
 
             if (!empty($title)) {
+                // Re-fetch session to check for race condition (another request may have set title)
+                $this->em->refresh($session);
+                if (null !== $session->getTitle()) {
+                    $this->logger->debug('Title already set by another process, discarding generated title', [
+                        'session_id' => substr($session->getSessionId(), 0, 12).'...',
+                        'existing_title' => $session->getTitle(),
+                        'discarded_title' => $title,
+                    ]);
+
+                    return;
+                }
+
                 $session->setTitle($title);
                 $this->em->flush();
 

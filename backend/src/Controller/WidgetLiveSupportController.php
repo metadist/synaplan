@@ -231,7 +231,7 @@ class WidgetLiveSupportController extends AbstractController
 
         // Check file size
         if ($uploadedFile->getSize() > self::MAX_FILE_SIZE) {
-            return $this->json(['error' => 'File size exceeds 10MB limit'], Response::HTTP_BAD_REQUEST);
+            return $this->json(['error' => 'File size exceeds 50MB limit'], Response::HTTP_BAD_REQUEST);
         }
 
         try {
