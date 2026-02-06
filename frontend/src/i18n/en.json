@@ -1062,7 +1062,8 @@
     "enabled": "Enabled",
     "disabled": "Disabled",
     "reset": "Reset",
-    "remove": "Remove"
+    "remove": "Remove",
+    "clearSelection": "Clear selection"
   },
   "search": {
     "sources": "Sources",
@@ -1159,7 +1160,7 @@
     "recommendations": "Recommendations"
   },
   "export": {
-    "title": "Export Sessions",
+    "title": "Export",
     "format": "Format",
     "recommended": "Recommended",
     "dateRange": "Date Range",
@@ -1173,7 +1174,9 @@
     "aiOnly": "AI Chats Only",
     "humanOnly": "Human Chats Only",
     "download": "Download",
-    "exporting": "Exporting..."
+    "exporting": "Exporting...",
+    "selectedChats": "{count} chats selected",
+    "selectedChatsHint": "Only these selected chats will be exported"
   },
   "liveSupport": {
     "title": "Live Support",
@@ -1248,7 +1251,14 @@
     "attachFile": "Attach file",
     "uploadingFiles": "Uploading files...",
     "fileTooLarge": "{name} exceeds {max}MB limit",
-    "fileAttached": "File attached"
+    "fileAttached": "File attached",
+    "selected": "selected",
+    "clickToSelect": "Click to select for export",
+    "selectAll": "Select All",
+    "deselectAll": "Deselect All",
+    "deleteSelectedTitle": "Delete Selected Chats?",
+    "deleteSelectedConfirm": "Are you sure you want to delete {count} chat(s)? This action cannot be undone. Visitors will lose their chat history.",
+    "deleteSuccess": "{count} chat(s) deleted successfully"
   },
   "widget": {
     "title": "Chat Support",

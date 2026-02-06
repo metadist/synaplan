@@ -60,6 +60,27 @@ class WidgetSessionRepository extends ServiceEntityRepository
     }
 
     /**
+     * Delete sessions by their session IDs.
+     *
+     * @param string[] $sessionIds
+     */
+    public function deleteBySessionIds(string $widgetId, array $sessionIds): int
+    {
+        if (empty($sessionIds)) {
+            return 0;
+        }
+
+        return $this->createQueryBuilder('ws')
+            ->delete()
+            ->where('ws.widgetId = :widgetId')
+            ->andWhere('ws.sessionId IN (:sessionIds)')
+            ->setParameter('widgetId', $widgetId)
+            ->setParameter('sessionIds', $sessionIds)
+            ->getQuery()
+            ->execute();
+    }
+
+    /**
      * Count active sessions for a widget.
      *
      * A session is considered "active" if it had activity in the last 5 minutes.
@@ -192,6 +213,12 @@ class WidgetSessionRepository extends ServiceEntityRepository
         if (isset($filters['favorite'])) {
             $qb->andWhere('ws.isFavorite = :isFavorite')
                 ->setParameter('isFavorite', $filters['favorite']);
+        }
+
+        // Filter by specific session IDs
+        if (isset($filters['sessionIds']) && is_array($filters['sessionIds']) && count($filters['sessionIds']) > 0) {
+            $qb->andWhere('ws.sessionId IN (:sessionIds)')
+                ->setParameter('sessionIds', $filters['sessionIds']);
         }
 
         // Get total count

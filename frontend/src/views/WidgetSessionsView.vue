@@ -44,25 +44,71 @@
             </div>
           </div>
 
-          <div class="flex items-center gap-1">
-            <button
-              class="p-2.5 rounded-xl hover:bg-white/5 dark:hover:bg-white/5 transition-all duration-200"
-              :title="$t('export.title')"
-              @click="showExportDialog = true"
+          <div class="flex items-center gap-2">
+            <!-- Selection controls (when sessions are selected) -->
+            <div
+              v-if="selectedSessionIds.size > 0"
+              class="flex items-center gap-2"
             >
-              <Icon icon="heroicons:arrow-down-tray" class="w-5 h-5 txt-secondary" />
+              <div class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[var(--brand)]/10">
+                <span class="text-sm font-medium txt-brand">
+                  {{ selectedSessionIds.size }} {{ $t('widgetSessions.selected') }}
+                </span>
+                <button
+                  class="p-1 rounded-lg hover:bg-[var(--brand)]/20 transition-colors"
+                  :title="$t('common.clearSelection')"
+                  @click="clearSelection"
+                >
+                  <Icon icon="heroicons:x-mark" class="w-4 h-4 txt-brand" />
+                </button>
+              </div>
+              <!-- Delete selected -->
+              <button
+                class="flex items-center gap-2 px-3 py-2 rounded-xl bg-red-500/10 text-red-500 hover:bg-red-500/20 transition-all duration-200 text-sm font-medium"
+                @click="confirmDeleteSelected"
+              >
+                <Icon icon="heroicons:trash" class="w-4 h-4" />
+                <span class="hidden sm:inline">{{ $t('common.delete') }}</span>
+              </button>
+            </div>
+
+            <!-- Select All Button -->
+            <button
+              v-if="sessions.length > 0"
+              class="flex items-center gap-2 px-3 py-2 rounded-xl bg-white/5 txt-secondary hover:bg-white/10 transition-all duration-200 text-sm font-medium"
+              :title="allSelected ? $t('widgetSessions.deselectAll') : $t('widgetSessions.selectAll')"
+              @click="toggleSelectAll"
+            >
+              <Icon :icon="allSelected ? 'heroicons:check-circle' : 'heroicons:check-circle'" class="w-4 h-4" />
+              <span class="hidden sm:inline">{{ allSelected ? $t('widgetSessions.deselectAll') : $t('widgetSessions.selectAll') }}</span>
             </button>
+
+            <!-- Export Button -->
             <button
               :class="[
-                'p-2.5 rounded-xl transition-all duration-200',
-                showSummaryPanel
-                  ? 'bg-[var(--brand)]/10 text-[var(--brand)]'
-                  : 'hover:bg-white/5 dark:hover:bg-white/5 txt-secondary',
+                'flex items-center gap-2 px-3 py-2 rounded-xl transition-all duration-200 text-sm font-medium',
+                selectedSessionIds.size > 0
+                  ? 'bg-[var(--brand)] text-white hover:bg-[var(--brand-dark)]'
+                  : 'bg-white/5 txt-secondary hover:bg-white/10',
               ]"
-              :title="$t('widgetSessions.summary')"
+              @click="showExportDialog = true"
+            >
+              <Icon icon="heroicons:arrow-down-tray" class="w-4 h-4" />
+              <span class="hidden sm:inline">{{ $t('export.title') }}</span>
+            </button>
+
+            <!-- Summary Button -->
+            <button
+              :class="[
+                'flex items-center gap-2 px-3 py-2 rounded-xl transition-all duration-200 text-sm font-medium',
+                showSummaryPanel
+                  ? 'bg-[var(--brand)] text-white'
+                  : 'bg-white/5 txt-secondary hover:bg-white/10',
+              ]"
               @click="showSummaryPanel = !showSummaryPanel"
             >
-              <Icon icon="heroicons:sparkles" class="w-5 h-5" />
+              <Icon icon="heroicons:sparkles" class="w-4 h-4" />
+              <span class="hidden sm:inline">{{ $t('widgetSessions.summary') }}</span>
             </button>
           </div>
         </div>
@@ -151,14 +197,23 @@
                 @click="viewSession(session)"
               >
                 <div class="flex items-start gap-3">
-                  <!-- Mode Icon -->
+                  <!-- Mode Icon (clickable for selection) -->
                   <div
                     :class="[
-                      'w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 shadow-sm',
-                      getModeGradient(session.mode),
+                      'w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 shadow-sm cursor-pointer transition-all duration-200 relative',
+                      selectedSessionIds.has(session.sessionId)
+                        ? 'bg-[var(--brand)] ring-2 ring-[var(--brand)] ring-offset-2 ring-offset-[var(--bg-card)]'
+                        : getModeGradient(session.mode),
                     ]"
+                    :title="$t('widgetSessions.clickToSelect')"
+                    @click.stop="toggleSessionSelection(session)"
                   >
-                    <Icon :icon="getModeIcon(session.mode)" class="w-5 h-5 text-white" />
+                    <Icon
+                      v-if="selectedSessionIds.has(session.sessionId)"
+                      icon="heroicons:check"
+                      class="w-5 h-5 text-white"
+                    />
+                    <Icon v-else :icon="getModeIcon(session.mode)" class="w-5 h-5 text-white" />
                   </div>
 
                   <!-- Content -->
@@ -559,7 +614,8 @@
       <WidgetExportDialog
         v-if="showExportDialog"
         :widget-id="widgetId"
-        @close="showExportDialog = false"
+        :selected-session-ids="Array.from(selectedSessionIds)"
+        @close="showExportDialog = false; clearSelection()"
       />
     </div>
   </MainLayout>
@@ -596,6 +652,7 @@ const sessionMessages = ref<widgetSessionsApi.SessionMessage[]>([])
 const typingPreview = ref<{ text: string; timestamp: number } | null>(null)
 const showExportDialog = ref(false)
 const showSummaryPanel = ref(false)
+const selectedSessionIds = ref<Set<string>>(new Set())
 const messageText = ref('')
 const sendingMessage = ref(false)
 const eventSubscription = ref<EventSubscription | null>(null)
@@ -686,6 +743,74 @@ const loadMore = async () => {
     pagination.value = response.pagination
   } catch (err: any) {
     error(err.message || 'Failed to load more sessions')
+  }
+}
+
+const toggleSessionSelection = (session: widgetSessionsApi.WidgetSession) => {
+  const sessionId = session.sessionId
+  if (selectedSessionIds.value.has(sessionId)) {
+    selectedSessionIds.value.delete(sessionId)
+  } else {
+    selectedSessionIds.value.add(sessionId)
+  }
+  // Trigger reactivity
+  selectedSessionIds.value = new Set(selectedSessionIds.value)
+}
+
+const clearSelection = () => {
+  selectedSessionIds.value = new Set()
+}
+
+const allSelected = computed(() => {
+  return sessions.value.length > 0 && selectedSessionIds.value.size === sessions.value.length
+})
+
+const toggleSelectAll = () => {
+  if (allSelected.value) {
+    clearSelection()
+  } else {
+    selectedSessionIds.value = new Set(sessions.value.map((s) => s.sessionId))
+  }
+}
+
+const confirmDeleteSelected = async () => {
+  const count = selectedSessionIds.value.size
+  const confirmed = await confirm({
+    title: t('widgetSessions.deleteSelectedTitle'),
+    message: t('widgetSessions.deleteSelectedConfirm', { count }),
+    confirmText: t('common.delete'),
+    cancelText: t('common.cancel'),
+    destructive: true,
+  })
+
+  if (confirmed) {
+    await deleteSelectedSessions()
+  }
+}
+
+const deleteSelectedSessions = async () => {
+  try {
+    const sessionIds = Array.from(selectedSessionIds.value)
+    await widgetSessionsApi.deleteWidgetSessions(widgetId.value, sessionIds)
+
+    // Remove deleted sessions from list
+    sessions.value = sessions.value.filter((s) => !selectedSessionIds.value.has(s.sessionId))
+
+    // Clear selection
+    clearSelection()
+
+    // If current session was deleted, clear it
+    if (selectedSession.value && selectedSessionIds.value.has(selectedSession.value.sessionId)) {
+      selectedSession.value = null
+      sessionMessages.value = []
+    }
+
+    success(t('widgetSessions.deleteSuccess', { count: sessionIds.length }))
+
+    // Reload to update stats
+    await loadSessions()
+  } catch (err: any) {
+    error(err.message || 'Failed to delete sessions')
   }
 }
 

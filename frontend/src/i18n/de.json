@@ -339,7 +339,7 @@
     "recommendations": "Empfehlungen"
   },
   "export": {
-    "title": "Sitzungen exportieren",
+    "title": "Export",
     "format": "Format",
     "recommended": "Empfohlen",
     "dateRange": "Zeitraum",
@@ -353,7 +353,9 @@
     "aiOnly": "Nur KI-Chats",
     "humanOnly": "Nur Mensch-Chats",
     "download": "Herunterladen",
-    "exporting": "Exportiere..."
+    "exporting": "Exportiere...",
+    "selectedChats": "{count} Chats ausgewählt",
+    "selectedChatsHint": "Nur diese ausgewählten Chats werden exportiert"
   },
   "liveSupport": {
     "title": "Live-Support",
@@ -428,7 +430,14 @@
     "attachFile": "Datei anhängen",
     "uploadingFiles": "Dateien werden hochgeladen...",
     "fileTooLarge": "{name} überschreitet {max}MB Limit",
-    "fileAttached": "Datei angehängt"
+    "fileAttached": "Datei angehängt",
+    "selected": "ausgewählt",
+    "clickToSelect": "Klicken zum Auswählen für Export",
+    "selectAll": "Alle auswählen",
+    "deselectAll": "Auswahl aufheben",
+    "deleteSelectedTitle": "Ausgewählte Chats löschen?",
+    "deleteSelectedConfirm": "Möchten Sie wirklich {count} Chat(s) löschen? Diese Aktion kann nicht rückgängig gemacht werden. Besucher verlieren ihren Chatverlauf.",
+    "deleteSuccess": "{count} Chat(s) erfolgreich gelöscht"
   },
   "notFound": {
     "title": "Seite nicht gefunden",
@@ -1123,7 +1132,8 @@
     "enabled": "Aktiviert",
     "disabled": "Deaktiviert",
     "reset": "Zurücksetzen",
-    "remove": "Entfernen"
+    "remove": "Entfernen",
+    "clearSelection": "Auswahl aufheben"
   },
   "search": {
     "sources": "Quellen",

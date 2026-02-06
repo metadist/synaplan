@@ -116,6 +116,10 @@ class WidgetExportController extends AbstractController
         if ($request->query->has('mode')) {
             $filters['mode'] = $request->query->getString('mode');
         }
+        if ($request->query->has('sessionIds')) {
+            $sessionIdsStr = $request->query->getString('sessionIds');
+            $filters['sessionIds'] = array_filter(explode(',', $sessionIdsStr));
+        }
 
         try {
             $baseUrl = $request->getSchemeAndHttpHost();

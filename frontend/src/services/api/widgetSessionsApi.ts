@@ -246,6 +246,7 @@ export interface ExportParams {
   from?: number
   to?: number
   mode?: 'ai' | 'human' | 'waiting'
+  sessionIds?: string[]
 }
 
 /**
@@ -273,9 +274,28 @@ export function getExportUrl(widgetId: string, params: ExportParams = {}): strin
   if (params.from !== undefined) queryParams.set('from', String(params.from))
   if (params.to !== undefined) queryParams.set('to', String(params.to))
   if (params.mode) queryParams.set('mode', params.mode)
+  if (params.sessionIds && params.sessionIds.length > 0) {
+    queryParams.set('sessionIds', params.sessionIds.join(','))
+  }
 
   const queryString = queryParams.toString()
   return `/api/v1/widgets/${widgetId}/export${queryString ? `?${queryString}` : ''}`
+}
+
+/**
+ * Delete multiple widget sessions
+ */
+export async function deleteWidgetSessions(
+  widgetId: string,
+  sessionIds: string[]
+): Promise<{ success: boolean; deleted: number }> {
+  return await httpClient<{ success: boolean; deleted: number }>(
+    `/api/v1/widgets/${widgetId}/sessions`,
+    {
+      method: 'DELETE',
+      body: JSON.stringify({ sessionIds }),
+    }
+  )
 }
 
 // Summary types

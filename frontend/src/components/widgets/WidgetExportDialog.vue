@@ -20,6 +20,22 @@
 
         <!-- Content -->
         <div class="p-4 space-y-4">
+          <!-- Selected Sessions Info -->
+          <div
+            v-if="props.selectedSessionIds && props.selectedSessionIds.length > 0"
+            class="p-3 rounded-lg bg-[var(--brand-alpha-light)] border border-[var(--brand)]/30"
+          >
+            <div class="flex items-center gap-2">
+              <Icon icon="heroicons:check-circle" class="w-5 h-5 txt-brand" />
+              <span class="text-sm font-medium txt-brand">
+                {{ $t('export.selectedChats', { count: props.selectedSessionIds.length }) }}
+              </span>
+            </div>
+            <p class="text-xs txt-secondary mt-1 ml-7">
+              {{ $t('export.selectedChatsHint') }}
+            </p>
+          </div>
+
           <!-- Format Selection -->
           <div>
             <label class="block text-sm font-medium txt-primary mb-2">
@@ -53,8 +69,8 @@
             </div>
           </div>
 
-          <!-- Date Range -->
-          <div>
+          <!-- Date Range (only show if no sessions selected) -->
+          <div v-if="!props.selectedSessionIds || props.selectedSessionIds.length === 0">
             <label class="block text-sm font-medium txt-primary mb-2">
               {{ $t('export.dateRange') }}
             </label>
@@ -84,8 +100,8 @@
             </div>
           </div>
 
-          <!-- Mode Filter -->
-          <div>
+          <!-- Mode Filter (only show if no sessions selected) -->
+          <div v-if="!props.selectedSessionIds || props.selectedSessionIds.length === 0">
             <label class="block text-sm font-medium txt-primary mb-2">
               {{ $t('export.sessionType') }}
             </label>
@@ -138,6 +154,7 @@ import { useNotification } from '@/composables/useNotification'
 
 const props = defineProps<{
   widgetId: string
+  selectedSessionIds?: string[]
 }>()
 
 const emit = defineEmits<{
@@ -214,11 +231,17 @@ const startExport = async () => {
   try {
     const params: widgetSessionsApi.ExportParams = {
       format: selectedFormat.value,
-      ...getDateTimestamps.value,
     }
 
-    if (modeFilter.value) {
-      params.mode = modeFilter.value as 'ai' | 'human'
+    // If sessions are selected, use them instead of date/mode filters
+    if (props.selectedSessionIds && props.selectedSessionIds.length > 0) {
+      params.sessionIds = props.selectedSessionIds
+    } else {
+      // Use date and mode filters
+      Object.assign(params, getDateTimestamps.value)
+      if (modeFilter.value) {
+        params.mode = modeFilter.value as 'ai' | 'human'
+      }
     }
 
     const exportUrl = widgetSessionsApi.getExportUrl(props.widgetId, params)
