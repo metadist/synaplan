@@ -9,7 +9,6 @@ use App\Repository\WidgetRepository;
 use App\Repository\WidgetSessionRepository;
 use App\Service\WidgetEventCacheService;
 use OpenApi\Attributes as OA;
-use Psr\Log\LoggerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
@@ -31,7 +30,6 @@ class WidgetEventsController extends AbstractController
         private WidgetRepository $widgetRepository,
         private WidgetSessionRepository $sessionRepository,
         private WidgetEventCacheService $eventCache,
-        private LoggerInterface $logger,
     ) {
     }
 
@@ -114,7 +112,7 @@ class WidgetEventsController extends AbstractController
                 // Check for typing indicator
                 $typingData = $eventCache->getTyping($widgetId, $sessionId);
                 if ($typingData) {
-                    $typingTimestamp = $typingData['timestamp'] ?? 0;
+                    $typingTimestamp = $typingData['timestamp'];
 
                     if ($typingTimestamp > $lastTypingTimestamp) {
                         $lastTypingTimestamp = $typingTimestamp;
@@ -123,7 +121,7 @@ class WidgetEventsController extends AbstractController
                         echo 'data: '.json_encode([
                             'type' => 'typing',
                             'timestamp' => $typingTimestamp,
-                            'operatorId' => $typingData['operatorId'] ?? null,
+                            'operatorId' => $typingData['operatorId'],
                         ], JSON_UNESCAPED_UNICODE)."\n\n";
                         if (ob_get_level() > 0) {
                             ob_flush();

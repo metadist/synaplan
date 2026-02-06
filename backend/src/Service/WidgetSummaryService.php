@@ -475,7 +475,7 @@ PROMPT;
                 $result['topics'] = array_map('trim', explode(',', $topicsText));
             } else {
                 preg_match_all('/[-•*]\s*(.+)/m', $topicsText, $topicMatches);
-                $result['topics'] = array_map('trim', $topicMatches[1] ?? []);
+                $result['topics'] = array_map('trim', $topicMatches[1]);
             }
             $result['topics'] = array_filter($result['topics']);
         }
@@ -516,14 +516,14 @@ PROMPT;
         if (preg_match('/###?\s*5\.?\s*ISSUES.*?\n(.*?)(?=###?\s*6\.|RECOMMENDATIONS|$)/si', $response, $m)) {
             $issuesText = $m[1];
             preg_match_all('/[-•*]\s*(.+)/m', $issuesText, $issueMatches);
-            $result['issues'] = array_map('trim', $issueMatches[1] ?? []);
+            $result['issues'] = array_map('trim', $issueMatches[1]);
         }
 
         // Extract Recommendations (section 6)
         if (preg_match('/###?\s*6\.?\s*RECOMMENDATIONS.*?\n(.*?)(?=###?\s*7\.|PROMPT IMPROVEMENT|$)/si', $response, $m)) {
             $recsText = $m[1];
             preg_match_all('/[-•*]\s*(.+)/m', $recsText, $recMatches);
-            $result['recommendations'] = array_map('trim', $recMatches[1] ?? []);
+            $result['recommendations'] = array_map('trim', $recMatches[1]);
         }
 
         // Extract Prompt Suggestions (section 7)

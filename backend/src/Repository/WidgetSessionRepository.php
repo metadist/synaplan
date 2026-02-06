@@ -143,7 +143,9 @@ class WidgetSessionRepository extends ServiceEntityRepository
      *     from?: int,
      *     to?: int,
      *     sort?: string,
-     *     order?: string
+     *     order?: string,
+     *     favorite?: bool,
+     *     sessionIds?: array<string>
      * } $filters
      *
      * @return array{sessions: WidgetSession[], total: int}

@@ -1504,11 +1504,8 @@ class WidgetPublicController extends AbstractController
             return $this->json(['error' => 'Session ID required'], Response::HTTP_BAD_REQUEST);
         }
 
-        // Validate session exists
+        // Get or create session
         $session = $this->sessionService->getOrCreateSession($widgetId, $sessionId);
-        if (!$session) {
-            return $this->json(['error' => 'Session not found'], Response::HTTP_NOT_FOUND);
-        }
 
         // Publish typing event via cache (ephemeral, auto-expires)
         // Note: This is user typing (has 'text' field), different from operator typing (no text)

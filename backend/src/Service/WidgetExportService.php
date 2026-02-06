@@ -13,7 +13,6 @@ use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Style\Alignment;
 use PhpOffice\PhpSpreadsheet\Style\Fill;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
-use Psr\Log\LoggerInterface;
 
 /**
  * Service for exporting widget chat data in various formats.
@@ -26,7 +25,6 @@ final class WidgetExportService
         private WidgetSessionRepository $sessionRepository,
         private ChatRepository $chatRepository,
         private MessageRepository $messageRepository,
-        private LoggerInterface $logger,
     ) {
     }
 
