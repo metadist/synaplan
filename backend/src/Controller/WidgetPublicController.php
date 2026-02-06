@@ -568,8 +568,8 @@ class WidgetPublicController extends AbstractController
                     $topic = $classification['topic'] ?? 'WIDGET';
                     $language = $classification['language'] ?? 'en';
 
-                    // Truncate topic to fit database column (max 16 chars)
-                    $topic = mb_substr($topic, 0, 16);
+                    // Truncate topic to fit database column (max 64 chars)
+                    $topic = mb_substr($topic, 0, 64);
 
                     // Update incoming message with classification
                     $incomingMessage->setTopic($topic);
