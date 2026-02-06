@@ -50,6 +50,7 @@ export default defineConfig({
 
   // Browser projects
   // Both browsers defined for CI, but local dev uses --project=chromium for speed
+  // Local: fullscreen (viewport: null + --start-maximized). CI: fixed viewport for stability.
   projects: [
     {
       name: 'chromium',
@@ -58,9 +59,8 @@ export default defineConfig({
         ...Object.fromEntries(
           Object.entries(devices['Desktop Chrome']).filter(([key]) => key !== 'deviceScaleFactor')
         ),
-        // Large viewport to ensure all elements are visible (works in CI and locally)
-        viewport: { width: 1920, height: 1080 },
-        // Only maximize locally (not in headless CI mode)
+        // Local: full window (no pixel viewport). CI: fixed size for headless stability
+        viewport: process.env.CI ? { width: 1920, height: 1080 } : null,
         ...(process.env.CI
           ? {}
           : {
@@ -77,9 +77,8 @@ export default defineConfig({
         ...Object.fromEntries(
           Object.entries(devices['Desktop Firefox']).filter(([key]) => key !== 'deviceScaleFactor')
         ),
-        // Large viewport to ensure all elements are visible (works in CI and locally)
-        viewport: { width: 1920, height: 1080 },
-        // Only maximize locally (not in headless CI mode)
+        // Local: full window (no pixel viewport). CI: fixed size for headless stability
+        viewport: process.env.CI ? { width: 1920, height: 1080 } : null,
         ...(process.env.CI
           ? {}
           : {
