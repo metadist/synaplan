@@ -5,7 +5,7 @@
       data-testid="modal-widget-success"
     >
       <div
-        class="surface-card rounded-2xl w-full max-w-2xl overflow-hidden shadow-2xl"
+        class="surface-card rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden shadow-2xl flex flex-col"
         data-testid="section-success-container"
       >
         <!-- Header -->
@@ -28,7 +28,7 @@
         </div>
 
         <!-- Content -->
-        <div class="p-6 space-y-6">
+        <div class="p-6 space-y-6 overflow-y-auto flex-1 min-h-0">
           <!-- Status Badge -->
           <div class="flex items-center gap-2">
             <span

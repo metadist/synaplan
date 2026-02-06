@@ -9,7 +9,6 @@ use App\Repository\WidgetRepository;
 use App\Repository\WidgetSessionRepository;
 use App\Service\WidgetEventCacheService;
 use OpenApi\Attributes as OA;
-use Psr\Log\LoggerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
@@ -31,7 +30,6 @@ class WidgetEventsController extends AbstractController
         private WidgetRepository $widgetRepository,
         private WidgetSessionRepository $sessionRepository,
         private WidgetEventCacheService $eventCache,
-        private LoggerInterface $logger,
     ) {
     }
 
@@ -39,6 +37,12 @@ class WidgetEventsController extends AbstractController
      * SSE endpoint for widget sessions (used by the embedded widget).
      * Anonymous access allowed for widget users.
      * All events come from cache (no database persistence).
+     *
+     * Security note: This endpoint is intentionally unauthenticated as it's used by
+     * anonymous visitors on customer websites. Security relies on:
+     * 1. SessionId is a random UUID that's difficult to guess
+     * 2. SessionId is only known to the original session creator
+     * 3. Events only contain chat-related data, no sensitive information
      */
     #[Route('/api/v1/widgets/{widgetId}/sessions/{sessionId}/events', name: 'api_widget_session_events', methods: ['GET'])]
     #[OA\Get(
@@ -114,7 +118,7 @@ class WidgetEventsController extends AbstractController
                 // Check for typing indicator
                 $typingData = $eventCache->getTyping($widgetId, $sessionId);
                 if ($typingData) {
-                    $typingTimestamp = $typingData['timestamp'] ?? 0;
+                    $typingTimestamp = $typingData['timestamp'];
 
                     if ($typingTimestamp > $lastTypingTimestamp) {
                         $lastTypingTimestamp = $typingTimestamp;
@@ -123,7 +127,7 @@ class WidgetEventsController extends AbstractController
                         echo 'data: '.json_encode([
                             'type' => 'typing',
                             'timestamp' => $typingTimestamp,
-                            'operatorId' => $typingData['operatorId'] ?? null,
+                            'operatorId' => $typingData['operatorId'],
                         ], JSON_UNESCAPED_UNICODE)."\n\n";
                         if (ob_get_level() > 0) {
                             ob_flush();

@@ -11,6 +11,7 @@ use App\Repository\MessageRepository;
 use App\Repository\WidgetRepository;
 use App\Repository\WidgetSessionRepository;
 use App\Service\WidgetEventCacheService;
+use Doctrine\ORM\EntityManagerInterface;
 use OpenApi\Attributes as OA;
 use Psr\Log\LoggerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -36,6 +37,7 @@ class WidgetSessionController extends AbstractController
         private MessageRepository $messageRepository,
         private LoggerInterface $logger,
         private WidgetEventCacheService $eventCache,
+        private EntityManagerInterface $em,
     ) {
     }
 
@@ -695,7 +697,7 @@ class WidgetSessionController extends AbstractController
             }
 
             // Flush all changes
-            $this->sessionRepository->getEntityManager()->flush();
+            $this->em->flush();
 
             return $this->json([
                 'success' => true,

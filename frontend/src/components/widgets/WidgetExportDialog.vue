@@ -147,7 +147,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { Icon } from '@iconify/vue'
-import { useI18n } from 'vue-i18n'
 import { useConfigStore } from '@/stores/config'
 import * as widgetSessionsApi from '@/services/api/widgetSessionsApi'
 import { useNotification } from '@/composables/useNotification'
@@ -161,7 +160,6 @@ const emit = defineEmits<{
   (e: 'close'): void
 }>()
 
-const { t } = useI18n()
 const { error } = useNotification()
 const configStore = useConfigStore()
 

@@ -145,8 +145,7 @@ export function subscribeToSession(
  */
 export function subscribeToNotifications(
   widgetId: string,
-  onNotification: (event: WidgetEvent) => void,
-  getAuthToken: () => string | null
+  onNotification: (event: WidgetEvent) => void
 ): EventSubscription {
   const configStore = useConfigStore()
   const baseUrl = configStore.apiBaseUrl
@@ -157,15 +156,10 @@ export function subscribeToNotifications(
   pollingInterval = setInterval(async () => {
     if (!isActive) return
 
-    const token = getAuthToken()
-    if (!token) return
-
     try {
       const url = `${baseUrl}/api/v1/widgets/${widgetId}/notifications?lastEventId=${lastEventId}`
       const response = await fetch(url, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+        credentials: 'include', // Use HttpOnly cookies for auth
       })
       const data = await response.json()
 
