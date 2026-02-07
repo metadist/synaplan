@@ -18,6 +18,7 @@ import MessageTranslation from './MessageTranslation.vue'
 import MessageLink from './MessageLink.vue'
 import MessageCommandList from './MessageCommandList.vue'
 import MessageThinking from './MessageThinking.vue'
+import MessageTtsLoading from './MessageTtsLoading.vue'
 
 interface Props {
   part: Part
@@ -53,6 +54,8 @@ const componentType = computed(() => {
       return MessageCommandList
     case 'thinking':
       return MessageThinking
+    case 'tts_loading':
+      return MessageTtsLoading
     default:
       return MessageText
   }

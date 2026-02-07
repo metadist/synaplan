@@ -502,6 +502,7 @@ const handleSendMessage = async (
     webSearch?: boolean
     modelId?: number
     fileIds?: number[]
+    voiceReply?: boolean
   }
 ) => {
   autoScroll.value = true
@@ -594,6 +595,7 @@ const streamAIResponse = async (
     webSearch?: boolean
     modelId?: number
     fileIds?: number[]
+    voiceReply?: boolean
   }
 ) => {
   streamingAbortController = new AbortController()
@@ -869,6 +871,24 @@ const streamAIResponse = async (
                 message.parts.push({ type: 'audio', url: absoluteUrl })
               }
             }
+          } else if (data.status === 'tts_generating') {
+            // TTS synthesis started — show loading animation in message
+            const message = historyStore.messages.find((m) => m.id === messageId)
+            if (message) {
+              message.parts.push({ type: 'tts_loading' })
+            }
+          } else if (data.status === 'audio') {
+            // Handle TTS audio response (voice reply)
+            const message = historyStore.messages.find((m) => m.id === messageId)
+            if (message && data.url) {
+              // Remove tts_loading part and replace with audio player
+              const loadingIdx = message.parts.findIndex((p) => p.type === 'tts_loading')
+              if (loadingIdx !== -1) {
+                message.parts.splice(loadingIdx, 1)
+              }
+              const absoluteUrl = normalizeMediaUrl(data.url)
+              message.parts.push({ type: 'audio', url: absoluteUrl })
+            }
           } else if (data.status === 'links') {
             // Handle web search results
             const message = historyStore.messages.find((m) => m.id === messageId)
@@ -940,6 +960,8 @@ const streamAIResponse = async (
             // Update message metadata
             const message = historyStore.messages.find((m) => m.id === messageId)
             if (message) {
+              // Clean up any leftover tts_loading indicator (TTS may have failed silently)
+              message.parts = message.parts.filter((p) => p.type !== 'tts_loading')
               // ✨ NEW: Handle generated file from backend
               if (data.generatedFile) {
                 // Add file to message FIRST
@@ -1195,7 +1217,8 @@ const streamAIResponse = async (
         includeReasoning,
         webSearch,
         finalModelId,
-        fileIds // Pass array of fileIds
+        fileIds, // Pass array of fileIds
+        options?.voiceReply // Pass voice reply flag
       )
 
       // Store EventSource cleanup function globally

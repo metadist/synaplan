@@ -5,6 +5,14 @@
     :class="isActive ? 'nav-item--active' : ''"
     data-testid="item-chat-list-entry"
   >
+    <!-- Channel icon -->
+    <Icon
+      v-if="channelIcon"
+      :icon="channelIcon"
+      class="w-4 h-4 flex-shrink-0"
+      :class="channelIconClass"
+    />
+
     <button
       class="flex-1 text-left text-sm truncate min-h-[36px] flex flex-col justify-center"
       data-testid="btn-chat-entry-open"
@@ -52,18 +60,38 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onBeforeUnmount } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
+import { Icon } from '@iconify/vue'
 
 interface Chat {
   id: string
   title: string
   timestamp: string
+  source?: 'web' | 'whatsapp' | 'email' | 'widget'
 }
 
 const props = defineProps<{
   chat: Chat
   isActive?: boolean
 }>()
+
+const channelIcon = computed(() => {
+  switch (props.chat.source) {
+    case 'whatsapp': return 'mdi:whatsapp'
+    case 'email': return 'mdi:email-outline'
+    case 'widget': return 'mdi:widgets-outline'
+    default: return null // web chats don't need an icon
+  }
+})
+
+const channelIconClass = computed(() => {
+  switch (props.chat.source) {
+    case 'whatsapp': return 'text-green-500'
+    case 'email': return 'text-blue-500'
+    case 'widget': return 'text-purple-500'
+    default: return ''
+  }
+})
 
 const emit = defineEmits<{
   open: [id: string]

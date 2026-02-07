@@ -266,6 +266,7 @@ const interimTranscript = ref('')
 const speechBaseMessage = ref('') // Message content before recording started
 const speechFinalTranscript = ref('') // Accumulated final transcripts during recording
 const fileSelectionModalVisible = ref(false)
+const voiceReply = ref(false)
 
 const aiConfigStore = useAiConfigStore()
 const chatsStore = useChatsStore()
@@ -333,7 +334,7 @@ const { clearInput: clearPersistedInput } = useAutoPersist(
 const emit = defineEmits<{
   send: [
     message: string,
-    options?: { includeReasoning?: boolean; webSearch?: boolean; fileIds?: number[] },
+    options?: { includeReasoning?: boolean; webSearch?: boolean; fileIds?: number[]; voiceReply?: boolean },
   ]
   stop: []
 }>()
@@ -448,12 +449,14 @@ const sendMessage = () => {
       includeReasoning: thinkingEnabled.value,
       webSearch: hasWebSearch,
       fileIds: uploadedFiles.value.filter((f) => !f.processing).map((f) => f.file_id),
+      voiceReply: voiceReply.value,
     }
     emit('send', messageToSend, options)
     message.value = ''
     uploadedFiles.value = []
     paletteVisible.value = false
     activeCommand.value = null
+    voiceReply.value = false // Reset after send
     // Reset enhance state after sending
     enhanceEnabled.value = false
     originalMessage.value = ''
@@ -685,6 +688,9 @@ const toggleRecording = async () => {
     isRecording.value = false
     return
   }
+
+  // Auto-enable voice reply when mic is used
+  voiceReply.value = true
 
   // Start recording - Web Speech API has priority for real-time streaming
   if (useWebSpeech.value) {

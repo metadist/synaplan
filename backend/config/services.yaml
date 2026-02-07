@@ -18,6 +18,9 @@ parameters:
     env(QDRANT_SERVICE_URL): ''
     env(QDRANT_SERVICE_API_KEY): ''
 
+    # Piper TTS Service default (empty = use hardcoded default in provider)
+    env(SYNAPLAN_TTS_URL): ''
+
     # Plugins - mounted at /plugins in Docker, relative path for CI
     plugins_dir: '/plugins'
 
@@ -104,6 +107,13 @@ services:
             $apiKey: '%env(THEHIVE_API_KEY)%'
         tags:
             - { name: 'app.ai.image_generation' }
+
+    App\AI\Provider\PiperProvider:
+        arguments:
+            $uploadDir: '%kernel.project_dir%/var/uploads'
+            $ttsUrl: '%env(default::SYNAPLAN_TTS_URL)%'
+        tags:
+            - { name: 'app.ai.text_to_speech' }
 
     App\AI\Provider\HuggingFaceProvider:
         arguments:

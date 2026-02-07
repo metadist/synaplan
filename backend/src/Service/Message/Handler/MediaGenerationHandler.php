@@ -288,6 +288,7 @@ class MediaGenerationHandler implements MessageHandlerInterface
                         'provider' => $provider,
                         'model' => $modelName,
                         'format' => 'mp3',
+                        'language' => $classification['language'] ?? $message->getLanguage() ?? 'en',
                     ]
                 );
 

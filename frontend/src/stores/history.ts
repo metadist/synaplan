@@ -30,6 +30,7 @@ export type PartType =
   | 'link'
   | 'commandList'
   | 'thinking'
+  | 'tts_loading'
 
 export interface Part {
   type: PartType
