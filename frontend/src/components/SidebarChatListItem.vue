@@ -77,19 +77,27 @@ const props = defineProps<{
 
 const channelIcon = computed(() => {
   switch (props.chat.source) {
-    case 'whatsapp': return 'mdi:whatsapp'
-    case 'email': return 'mdi:email-outline'
-    case 'widget': return 'mdi:widgets-outline'
-    default: return null // web chats don't need an icon
+    case 'whatsapp':
+      return 'mdi:whatsapp'
+    case 'email':
+      return 'mdi:email-outline'
+    case 'widget':
+      return 'mdi:widgets-outline'
+    default:
+      return null // web chats don't need an icon
   }
 })
 
 const channelIconClass = computed(() => {
   switch (props.chat.source) {
-    case 'whatsapp': return 'text-green-500'
-    case 'email': return 'text-blue-500'
-    case 'widget': return 'text-purple-500'
-    default: return ''
+    case 'whatsapp':
+      return 'text-green-500'
+    case 'email':
+      return 'text-blue-500'
+    case 'widget':
+      return 'text-purple-500'
+    default:
+      return ''
   }
 })
 

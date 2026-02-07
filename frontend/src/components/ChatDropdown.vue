@@ -270,18 +270,26 @@ const getDisplayTitle = (chat: {
 // Channel icon for non-web sources
 const getChannelIcon = (chat: StoreChat): string | null => {
   switch (chat.source) {
-    case 'whatsapp': return 'mdi:whatsapp'
-    case 'email': return 'mdi:email-outline'
-    case 'widget': return 'mdi:widgets-outline'
-    default: return null
+    case 'whatsapp':
+      return 'mdi:whatsapp'
+    case 'email':
+      return 'mdi:email-outline'
+    case 'widget':
+      return 'mdi:widgets-outline'
+    default:
+      return null
   }
 }
 const getChannelIconClass = (chat: StoreChat): string => {
   switch (chat.source) {
-    case 'whatsapp': return 'text-green-500'
-    case 'email': return 'text-blue-500'
-    case 'widget': return 'text-purple-500'
-    default: return ''
+    case 'whatsapp':
+      return 'text-green-500'
+    case 'email':
+      return 'text-blue-500'
+    case 'widget':
+      return 'text-purple-500'
+    default:
+      return ''
   }
 }
 

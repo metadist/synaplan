@@ -334,7 +334,12 @@ const { clearInput: clearPersistedInput } = useAutoPersist(
 const emit = defineEmits<{
   send: [
     message: string,
-    options?: { includeReasoning?: boolean; webSearch?: boolean; fileIds?: number[]; voiceReply?: boolean },
+    options?: {
+      includeReasoning?: boolean
+      webSearch?: boolean
+      fileIds?: number[]
+      voiceReply?: boolean
+    },
   ]
   stop: []
 }>()
