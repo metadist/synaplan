@@ -519,8 +519,8 @@ class StreamController extends AbstractController
                             }
 
                             // ✨ JSON detection and buffering during streaming
-                            // Detect and buffer JSON responses
-                            if (is_string($chunk) && !empty(trim($chunk))) {
+                            // Detect and buffer JSON responses (use !== '' to avoid PHP's empty("0") quirk)
+                            if (is_string($chunk) && '' !== trim($chunk)) {
                                 // Start buffering if this is the FIRST chunk and it starts with {
                                 if (!$isBufferingJson && 0 === $chunkCount && str_starts_with(trim($chunk), '{')) {
                                     $isBufferingJson = true;
@@ -581,7 +581,9 @@ class StreamController extends AbstractController
                                 error_log('🧠 StreamController: <think> tag detected in chunk: '.substr($chunk, 0, 100));
                             }
 
-                            if (!empty($chunk)) {
+                            // FIX: Use !== '' instead of !empty() because PHP considers "0" as empty,
+                            // which silently drops the character "0" when it arrives as a standalone chunk
+                            if ('' !== $chunk) {
                                 $this->sendSSE('data', ['chunk' => $chunk]);
                             }
                         }
