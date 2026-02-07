@@ -624,6 +624,11 @@ class ChatHandler implements MessageHandlerInterface
         $languageName = $languageNames[$detectedLanguage] ?? $detectedLanguage;
         $systemPrompt .= "\n\n**IMPORTANT: The user's current message is in {$languageName}. You MUST respond in {$languageName}.**";
 
+        // Voice reply mode: enforce concise answers for TTS (spoken responses should be brief)
+        if (!empty($options['voice_reply'])) {
+            $systemPrompt .= "\n\n**VOICE MODE: Your response will be spoken aloud as audio. Keep your answer concise and conversational — maximum 4-5 sentences. Avoid markdown formatting, code blocks, bullet lists, and tables. Write in natural, flowing prose suitable for speech.**";
+        }
+
         // Check if model supports system messages (o1 models don't)
         if ($modelId) {
             $model = $this->modelRepository->find($modelId);

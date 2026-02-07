@@ -50,6 +50,7 @@
     "showLess": "Show less",
     "showAll": "Show All",
     "recent": "Recent Conversations",
+    "ttsGenerating": "Adding spoken answer…",
     "rename": "Rename Chat",
     "enterNewName": "Enter a new title for this chat:",
     "renameNote": "This change only affects your view. The widget user won't see this title.",
@@ -254,6 +255,8 @@
     "dropFiles": "Drop files here",
     "dropFilesHint": "Images, documents, audio files...",
     "filesPasted": "{count} file pasted | {count} files pasted",
+    "voiceReply": "Voice reply",
+    "voiceReplyTooltip": "Include audio response (MP3)",
     "send": "Send message",
     "share": "Share",
     "tools": {

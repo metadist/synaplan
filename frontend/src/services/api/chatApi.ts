@@ -181,7 +181,8 @@ export const chatApi = {
     includeReasoning: boolean = false,
     webSearch: boolean = false,
     modelId?: number,
-    fileIds?: number[]
+    fileIds?: number[],
+    voiceReply?: boolean
   ): () => void {
     // Build params object
     const paramsObj: Record<string, string> = {
@@ -194,6 +195,7 @@ export const chatApi = {
     if (includeReasoning) paramsObj.reasoning = '1'
     if (webSearch) paramsObj.webSearch = '1'
     if (modelId) paramsObj.modelId = modelId.toString()
+    if (voiceReply) paramsObj.voiceReply = '1'
 
     // Multiple fileIds as comma-separated list
     if (fileIds && fileIds.length > 0) {

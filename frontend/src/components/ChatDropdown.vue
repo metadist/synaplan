@@ -57,6 +57,14 @@
           class="group/item relative flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors min-h-[36px]"
           :class="chat.id === activeChat ? 'bg-brand/10 txt-brand' : 'txt-secondary hover-surface'"
         >
+          <!-- Channel icon for non-web sources -->
+          <Icon
+            v-if="getChannelIcon(chat)"
+            :icon="getChannelIcon(chat)!"
+            class="w-3.5 h-3.5 flex-shrink-0"
+            :class="getChannelIconClass(chat)"
+          />
+
           <button
             class="flex-1 text-left flex flex-col min-w-0 py-0.5"
             :data-testid="`btn-chat-item-${chat.id}`"
@@ -148,7 +156,8 @@ import {
   PlusIcon,
   ClockIcon,
 } from '@heroicons/vue/24/outline'
-import { useChatsStore } from '@/stores/chats'
+import { Icon } from '@iconify/vue'
+import { useChatsStore, type Chat as StoreChat } from '@/stores/chats'
 import { useDialog } from '@/composables/useDialog'
 import { useRouter } from 'vue-router'
 import ChatShareModal from './ChatShareModal.vue'
@@ -256,6 +265,32 @@ const getDisplayTitle = (chat: {
   // Fallback for empty chats - use localized "New Chat"
   // Note: Non-active empty chats are filtered out, so this is typically the active chat
   return t('chat.newChat')
+}
+
+// Channel icon for non-web sources
+const getChannelIcon = (chat: StoreChat): string | null => {
+  switch (chat.source) {
+    case 'whatsapp':
+      return 'mdi:whatsapp'
+    case 'email':
+      return 'mdi:email-outline'
+    case 'widget':
+      return 'mdi:widgets-outline'
+    default:
+      return null
+  }
+}
+const getChannelIconClass = (chat: StoreChat): string => {
+  switch (chat.source) {
+    case 'whatsapp':
+      return 'text-green-500'
+    case 'email':
+      return 'text-blue-500'
+    case 'widget':
+      return 'text-purple-500'
+    default:
+      return ''
+  }
 }
 
 // Check if a chat is empty (no messages, no content, default title)

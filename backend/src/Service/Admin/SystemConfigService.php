@@ -40,7 +40,7 @@ final class SystemConfigService
                     'ollama' => ['label' => 'Local AI (Ollama)', 'fields' => ['OLLAMA_BASE_URL']],
                     'cloud' => ['label' => 'Cloud AI Providers', 'fields' => ['OPENAI_API_KEY', 'ANTHROPIC_API_KEY', 'GROQ_API_KEY', 'GOOGLE_GEMINI_API_KEY']],
                     'selfhosted' => ['label' => 'Self-Hosted AI', 'fields' => ['TRITON_SERVER_URL']],
-                    'tts' => ['label' => 'Text-to-Speech', 'fields' => ['ELEVENLABS_API_KEY']],
+                    'tts' => ['label' => 'Text-to-Speech', 'fields' => ['SYNAPLAN_TTS_URL', 'ELEVENLABS_API_KEY']],
                 ],
             ],
             'email' => [
@@ -497,6 +497,11 @@ final class SystemConfigService
                 'tab' => 'ai', 'section' => 'selfhosted', 'type' => 'url',
                 'sensitive' => false, 'description' => 'NVIDIA Triton gRPC endpoint',
                 'default' => '',
+            ],
+            'SYNAPLAN_TTS_URL' => [
+                'tab' => 'ai', 'section' => 'tts', 'type' => 'url',
+                'sensitive' => false, 'description' => 'Synaplan TTS service URL (self-hosted, Piper-based)',
+                'default' => 'http://host.docker.internal:10200',
             ],
             'ELEVENLABS_API_KEY' => [
                 'tab' => 'ai', 'section' => 'tts', 'type' => 'password',

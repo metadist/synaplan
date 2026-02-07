@@ -106,6 +106,7 @@ import { ref, computed, onUnmounted } from 'vue'
 interface Props {
   url: string
   poster?: string
+  autoplay?: boolean
 }
 
 const props = defineProps<Props>()
@@ -161,7 +162,22 @@ const updateProgress = () => {
 const updateDuration = () => {
   if (!audioRef.value) return
   durationSeconds.value = audioRef.value.duration || 0
+
+  // Autoplay for voice reply audio (only on first load)
+  if (props.autoplay && !hasAutoPlayed.value) {
+    hasAutoPlayed.value = true
+    audioRef.value
+      .play()
+      .then(() => {
+        isPlaying.value = true
+      })
+      .catch(() => {
+        // Browser may block autoplay — user can click play manually
+      })
+  }
 }
+
+const hasAutoPlayed = ref(false)
 
 const seek = (event: MouseEvent) => {
   if (!audioRef.value) return

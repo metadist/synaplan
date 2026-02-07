@@ -1143,6 +1143,29 @@ class ModelFixtures extends Fixture
                     ],
                 ],
             ],
+            // ==================== PIPER TTS (Self-hosted) ====================
+            [
+                'id' => 140,
+                'service' => 'Piper',
+                'name' => 'Piper Multi-Language',
+                'tag' => 'text2sound',
+                'selectable' => 1,
+                'active' => 1,
+                'providerId' => 'piper-multi',
+                'priceIn' => 0,
+                'inUnit' => 'free',
+                'priceOut' => 0,
+                'outUnit' => 'free',
+                'quality' => 7,
+                'rating' => 0.8,
+                'json' => [
+                    'description' => 'Self-hosted Piper TTS via synaplan-tts. Multi-language (en, de, es, tr, ru, fa). Free, no API key required.',
+                    'params' => [
+                        'voices' => ['en_US-lessac-medium', 'de_DE-thorsten-medium', 'es_ES-davefx-medium', 'tr_TR-dfki-medium', 'ru_RU-irina-medium', 'fa_IR-reza_ibrahim-medium'],
+                    ],
+                    'features' => ['multilingual', 'self-hosted', 'free'],
+                ],
+            ],
             [
                 'id' => 134,
                 'service' => 'TheHive',

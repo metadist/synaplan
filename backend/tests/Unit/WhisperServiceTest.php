@@ -60,14 +60,14 @@ class WhisperServiceTest extends TestCase
 
     public function testIsAvailableReturnsTrueWhenBothExist(): void
     {
-        // Create fake binary
+        // Create fake binary (must be a real script that exits 0 for --help check)
         $fakeBinary = $this->tempDir.'/whisper';
-        touch($fakeBinary);
+        file_put_contents($fakeBinary, "#!/bin/sh\nexit 0\n");
         chmod($fakeBinary, 0755);
 
         // Create fake ffmpeg
         $fakeFfmpeg = $this->tempDir.'/ffmpeg';
-        touch($fakeFfmpeg);
+        file_put_contents($fakeFfmpeg, "#!/bin/sh\nexit 0\n");
         chmod($fakeFfmpeg, 0755);
 
         // Create models directory and model file
@@ -336,14 +336,14 @@ class WhisperServiceTest extends TestCase
      */
     public function testIsAvailableChecksAllComponents(): void
     {
-        // Create complete setup
+        // Create complete setup (must be real scripts that exit 0 for --help check)
         $fakeBinary = $this->tempDir.'/whisper';
         $fakeFfmpeg = $this->tempDir.'/ffmpeg';
         $modelsDir = $this->tempDir.'/models';
 
-        touch($fakeBinary);
+        file_put_contents($fakeBinary, "#!/bin/sh\nexit 0\n");
         chmod($fakeBinary, 0755);
-        touch($fakeFfmpeg);
+        file_put_contents($fakeFfmpeg, "#!/bin/sh\nexit 0\n");
         chmod($fakeFfmpeg, 0755);
         mkdir($modelsDir);
         touch($modelsDir.'/ggml-base.bin');
