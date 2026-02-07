@@ -57,7 +57,7 @@ Register `synaplan-tts` (Piper) as a provider in the AI system so it can be sele
 **Deliverables:**
 - `PiperProvider.php` implementing `TextToSpeechProviderInterface`
 - BMODELS fixture entry (tag `text2sound`, service `Piper`)
-- Config: `PIPER_TTS_URL` env var (default `http://host.docker.internal:10200`)
+- Config: `SYNAPLAN_TTS_URL` env var (dev: `http://host.docker.internal:10200`, prod: `http://10.0.1.10:10200`)
 - WAV→MP3 conversion (ffmpeg) since Piper outputs WAV
 - Set as default TTS model via BCONFIG seed
 
@@ -149,9 +149,11 @@ Phase 1 is prerequisite (need a working free TTS provider). Phases 4 and 5 can s
 
 ## Environment Changes
 
-| Variable | Default | Where |
-|----------|---------|-------|
-| `PIPER_TTS_URL` | `http://host.docker.internal:10200` | `.env` / docker-compose |
+| Variable | Dev default | Production | Where |
+|----------|-------------|------------|-------|
+| `SYNAPLAN_TTS_URL` | `http://host.docker.internal:10200` | `http://10.0.1.10:10200` | `docker-compose.yml` (dev default), `backend/.env` (prod override), Admin UI |
+
+Named after the service (`synaplan-tts`), not the engine (Piper). Follows the same pattern as `OLLAMA_BASE_URL`, `TIKA_BASE_URL`, `QDRANT_SERVICE_URL`. See `piper-provider.md` §5 for all 4 config layers.
 
 ## Memory Integration
 

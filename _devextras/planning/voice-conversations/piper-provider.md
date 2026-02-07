@@ -32,7 +32,7 @@ final class PiperProvider implements TextToSpeechProviderInterface
         private HttpClientInterface $httpClient,
         private LoggerInterface $logger,
         private string $uploadDir,
-        private string $piperUrl = self::DEFAULT_URL,
+        private string $ttsUrl = self::DEFAULT_URL,
     ) {}
 
     public function getName(): string { return 'piper'; }
@@ -89,14 +89,52 @@ VALUES (
 
 Add Piper entry to the fixtures array (same data as SQL above).
 
-### 5. Environment: `.env` / `docker-compose.yml`
+### 5. Configuration (3 layers, following existing patterns)
 
+The `synaplan-tts` service is an external HTTP service (like Ollama, Tika, Qdrant) — **not** a local binary like Whisper.cpp.
+
+| Service | Type | Config pattern |
+|---------|------|----------------|
+| Whisper.cpp | Local binary in container | `WHISPER_BINARY=/usr/local/bin/whisper` (path) |
+| synaplan-tts (Piper) | External HTTP service | `SYNAPLAN_TTS_URL=http://...` (URL) |
+| Ollama | External HTTP service | `OLLAMA_BASE_URL=http://ollama:11434` (URL) |
+
+Variable name: **`SYNAPLAN_TTS_URL`** (named after the service, not the engine — if we swap Piper for another TTS engine later, the variable stays).
+
+**Layer 1: `docker-compose.yml`** (dev default):
+```yaml
+# In services.backend.environment:
+SYNAPLAN_TTS_URL: ${SYNAPLAN_TTS_URL:-http://host.docker.internal:10200}
+```
+`extra_hosts: ["host.docker.internal:host-gateway"]` is already present on the backend service.
+
+**Layer 2: `backend/.env`** (production, gitignored):
 ```env
-# Use service name 'synaplan-tts' if in same network, else 'host.docker.internal'
-PIPER_TTS_URL=http://host.docker.internal:10200
+# Production: TTS service on GPU server 10.0.1.10
+SYNAPLAN_TTS_URL=http://10.0.1.10:10200
 ```
 
-In `docker-compose.yml`, add `extra_hosts: ["host.docker.internal:host-gateway"]` to the backend service (likely already present).
+**Layer 3: `SystemConfigService` schema** (Admin UI):
+```php
+// In buildSchema(), tab 'ai', section 'tts':
+'SYNAPLAN_TTS_URL' => [
+    'tab' => 'ai', 'section' => 'tts', 'type' => 'url',
+    'sensitive' => false, 'description' => 'Synaplan TTS service URL (self-hosted, Piper-based)',
+    'default' => 'http://host.docker.internal:10200',
+],
+```
+
+**Layer 4: `config/services.yaml`** (DI wiring):
+```yaml
+App\AI\Provider\PiperProvider:
+    arguments:
+        $uploadDir: '%env(UPLOAD_DIR)%'
+        $ttsUrl: '%env(default::SYNAPLAN_TTS_URL)%'
+    tags:
+        - { name: 'app.ai.text_to_speech_provider' }
+```
+
+**Resolution order:** `SystemConfigService` DB value → `backend/.env` → `docker-compose.yml` env → hardcoded default.
 
 ## Security & Validation
 
@@ -161,7 +199,7 @@ The message's detected language (`BLANG` column) should be passed through `$opti
 public function isAvailable(): bool
 {
     try {
-        $response = $this->httpClient->request('GET', $this->piperUrl.'/health');
+        $response = $this->httpClient->request('GET', $this->ttsUrl.'/health');
         $data = $response->toArray();
         return 'ok' === ($data['status'] ?? '');
     } catch (\Throwable) {
@@ -189,6 +227,9 @@ docker compose exec backend curl -X POST http://host.docker.internal:10200/api/t
 # 3. Test ffmpeg conversion
 docker compose exec backend ffmpeg -i /tmp/test.wav -codec:a libmp3lame -qscale:a 4 -y /tmp/test.mp3
 
-# 4. Check model is in DB
+# 4. Check env variable is set
+docker compose exec backend env | grep SYNAPLAN_TTS
+
+# 5. Check model is in DB
 docker compose exec backend php bin/console dbal:run-sql "SELECT * FROM BMODELS WHERE BSERVICE='Piper'"
 ```
