@@ -426,6 +426,7 @@ class StreamController extends AbstractController
                 $processingOptions = [
                     'reasoning' => $includeReasoning,
                     'web_search' => $webSearch, // Use snake_case for consistency with backend
+                    'voice_reply' => $voiceReply, // Hint for ChatHandler to enforce concise answers
                 ];
 
                 // Add model_id if specified (for "Again" functionality)

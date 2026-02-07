@@ -883,11 +883,12 @@ const streamAIResponse = async (
             if (message && data.url) {
               // Remove tts_loading part and replace with audio player
               const loadingIdx = message.parts.findIndex((p) => p.type === 'tts_loading')
-              if (loadingIdx !== -1) {
+              const isVoiceReply = loadingIdx !== -1
+              if (isVoiceReply) {
                 message.parts.splice(loadingIdx, 1)
               }
               const absoluteUrl = normalizeMediaUrl(data.url)
-              message.parts.push({ type: 'audio', url: absoluteUrl })
+              message.parts.push({ type: 'audio', url: absoluteUrl, autoplay: isVoiceReply })
             }
           } else if (data.status === 'links') {
             // Handle web search results

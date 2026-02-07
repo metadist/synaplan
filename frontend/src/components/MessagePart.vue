@@ -74,7 +74,7 @@ const componentProps = computed(() => {
     case 'video':
       return { url: props.part.url || '', poster: props.part.poster }
     case 'audio':
-      return { url: props.part.url || '' }
+      return { url: props.part.url || '', autoplay: props.part.autoplay }
     case 'code':
       return {
         content: props.part.content || '',

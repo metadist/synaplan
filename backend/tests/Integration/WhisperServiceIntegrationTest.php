@@ -3,13 +3,16 @@
 namespace App\Tests\Integration;
 
 use App\Service\WhisperService;
+use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 
 /**
  * Integration tests for WhisperService.
  * These tests verify the actual behavior with file system operations.
+ * Requires a working whisper binary — skipped automatically if unavailable.
  */
+#[Group('integration')]
 class WhisperServiceIntegrationTest extends TestCase
 {
     private WhisperService $service;
@@ -32,6 +35,21 @@ class WhisperServiceIntegrationTest extends TestCase
             'base',
             '/usr/bin/ffmpeg'
         );
+
+        // Skip if whisper binary is not functional (architecture mismatch, missing libs, etc.)
+        // isAvailable() checks --help, but the binary may still crash on actual work (SIGILL on ARM)
+        if (!$this->service->isAvailable()) {
+            $this->markTestSkipped('Whisper binary is not available or not functional in this environment.');
+        }
+
+        // Probe with a real transcription to catch architecture mismatches (SIGILL)
+        try {
+            $this->service->transcribe($this->testAudioFile);
+        } catch (\Symfony\Component\Process\Exception\ProcessSignaledException $e) {
+            $this->markTestSkipped('Whisper binary crashes on this platform (signal '.$e->getSignal().'): likely architecture mismatch.');
+        } catch (\Exception $e) {
+            // Other errors (missing model, etc.) are fine — individual tests will handle them
+        }
     }
 
     protected function tearDown(): void

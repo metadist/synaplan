@@ -49,6 +49,7 @@ export interface Part {
   expiresAt?: string
   thinkingTime?: number // Time in seconds for thinking process
   isStreaming?: boolean // For reasoning parts that are still being streamed
+  autoplay?: boolean // Auto-play audio (voice reply)
 }
 
 export interface MessageFile {
