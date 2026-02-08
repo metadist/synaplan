@@ -37,12 +37,15 @@ final class PiperProvider implements TextToSpeechProviderInterface
     /** @var array<string> Allowed language codes (whitelist for input validation) */
     private const ALLOWED_LANGUAGES = ['en', 'de', 'es', 'tr', 'ru', 'fa'];
 
+    private readonly string $ttsUrl;
+
     public function __construct(
         private readonly HttpClientInterface $httpClient,
         private readonly LoggerInterface $logger,
         private readonly string $uploadDir,
-        private readonly string $ttsUrl = self::DEFAULT_URL,
+        ?string $ttsUrl = null,
     ) {
+        $this->ttsUrl = !empty($ttsUrl) ? $ttsUrl : self::DEFAULT_URL;
     }
 
     public function getName(): string

@@ -188,6 +188,7 @@ final class SystemConfigService
             'tika' => $this->testTika(),
             'qdrant' => $this->testQdrant(),
             'mailer' => $this->testMailer(),
+            'piper' => $this->testPiperTts(),
             default => ['success' => false, 'message' => 'Unknown service: '.$service],
         };
     }
@@ -436,6 +437,47 @@ final class SystemConfigService
             }
 
             return ['success' => false, 'message' => 'Qdrant returned HTTP '.$httpCode];
+        } catch (\Throwable $e) {
+            return ['success' => false, 'message' => 'Connection failed: '.$e->getMessage()];
+        }
+    }
+
+    /**
+     * @return array{success: bool, message: string, details?: array<string, mixed>}
+     */
+    private function testPiperTts(): array
+    {
+        $url = $this->getEnvValue('SYNAPLAN_TTS_URL');
+        if (!$url) {
+            // Fall back to default URL (same as PiperProvider::DEFAULT_URL)
+            $url = 'http://host.docker.internal:10200';
+        }
+
+        try {
+            $ch = curl_init($url.'/health');
+            curl_setopt_array($ch, [
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_TIMEOUT => 5,
+                CURLOPT_CONNECTTIMEOUT => 3,
+            ]);
+            $response = curl_exec($ch);
+            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            curl_close($ch);
+
+            if (200 === $httpCode && $response) {
+                $data = json_decode($response, true);
+
+                return [
+                    'success' => true,
+                    'message' => 'Connected to Piper TTS',
+                    'details' => [
+                        'status' => $data['status'] ?? 'unknown',
+                        'voices' => $data['voices'] ?? [],
+                    ],
+                ];
+            }
+
+            return ['success' => false, 'message' => 'Piper TTS returned HTTP '.$httpCode];
         } catch (\Throwable $e) {
             return ['success' => false, 'message' => 'Connection failed: '.$e->getMessage()];
         }

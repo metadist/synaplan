@@ -68,9 +68,9 @@ const currentSections = computed(() => {
   }))
 })
 
-// Service test mapping
+// Service test mapping (multiple services per tab are tested sequentially)
 const testableServices: Record<string, string[]> = {
-  ai: ['ollama'],
+  ai: ['ollama', 'piper'],
   processing: ['tika'],
   vectordb: ['qdrant'],
   email: ['mailer'],
@@ -121,15 +121,36 @@ async function handleTestConnection() {
   const services = testableServices[activeTab.value]
   if (!services?.length) return
 
-  const service = services[0]
-  testingService.value = service
+  testingService.value = services[0]
 
   try {
-    const result: TestConnectionResult = await testConnection(service)
-    if (result.success) {
-      success(result.message)
+    const results = await Promise.allSettled(
+      services.map((svc) => testConnection(svc)),
+    )
+
+    const succeeded: string[] = []
+    const failed: string[] = []
+
+    results.forEach((result, i) => {
+      const svc = services[i]
+      if (result.status === 'fulfilled' && result.value.success) {
+        succeeded.push(result.value.message)
+      } else {
+        const msg =
+          result.status === 'fulfilled'
+            ? result.value.message
+            : t('admin.config.testFailed')
+        failed.push(`${svc}: ${msg}`)
+      }
+    })
+
+    if (failed.length === 0) {
+      success(succeeded.join(' | '))
+    } else if (succeeded.length === 0) {
+      showError(failed.join(' | '))
     } else {
-      showError(result.message)
+      success(succeeded.join(' | '))
+      showError(failed.join(' | '))
     }
   } catch (err) {
     console.error('Connection test failed:', err)
