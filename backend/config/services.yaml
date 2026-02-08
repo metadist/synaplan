@@ -18,8 +18,9 @@ parameters:
     env(QDRANT_SERVICE_URL): ''
     env(QDRANT_SERVICE_API_KEY): ''
 
-    # Piper TTS Service default (empty = use hardcoded default in provider)
+    # Piper TTS Service default
     env(SYNAPLAN_TTS_URL): ''
+    synaplan_tts_url_default: 'http://host.docker.internal:10200'
 
     # Plugins - mounted at /plugins in Docker, relative path for CI
     plugins_dir: '/plugins'
@@ -111,7 +112,7 @@ services:
     App\AI\Provider\PiperProvider:
         arguments:
             $uploadDir: '%kernel.project_dir%/var/uploads'
-            $ttsUrl: '%env(default::SYNAPLAN_TTS_URL)%'
+            $ttsUrl: '%env(default:synaplan_tts_url_default:SYNAPLAN_TTS_URL)%'
         tags:
             - { name: 'app.ai.text_to_speech' }
 
@@ -329,6 +330,10 @@ services:
     App\Controller\FileController:
         arguments:
             $uploadDir: '%kernel.project_dir%/var/uploads'
+
+    App\Controller\TtsController:
+        arguments:
+            $ttsUrl: '%env(default:synaplan_tts_url_default:SYNAPLAN_TTS_URL)%'
 
     App\Controller\StreamController:
         arguments:

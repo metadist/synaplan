@@ -146,6 +146,7 @@ class InternalEmailService
         ?string $provider = null,
         ?string $model = null,
         ?float $processingTime = null,
+        ?string $attachmentPath = null,
     ): void {
         $fromEmail = $_ENV['APP_SENDER_EMAIL'] ?? 'smart@synaplan.net';
         $fromName = $_ENV['APP_SENDER_NAME'] ?? 'Synaplan AI';
@@ -209,6 +210,11 @@ class InternalEmailService
             $email->getHeaders()->addTextHeader('References', $inReplyTo);
         }
 
+        // Add attachment if provided
+        if ($attachmentPath && file_exists($attachmentPath)) {
+            $email->attachFromPath($attachmentPath);
+        }
+
         try {
             $this->mailer->send($email);
             $this->logger->info('AI response email sent', [
@@ -216,6 +222,7 @@ class InternalEmailService
                 'subject' => $subject,
                 'provider' => $provider,
                 'model' => $model,
+                'has_attachment' => (bool) $attachmentPath,
             ]);
         } catch (\Exception $e) {
             $this->logger->error('Failed to send AI response email', [

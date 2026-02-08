@@ -188,6 +188,16 @@
             $t('chatInput.thinking')
           }}</span>
         </button>
+        <button
+          type="button"
+          :class="['pill flex-shrink-0', voiceReply && 'pill--active']"
+          aria-label="Voice Reply"
+          data-testid="btn-chat-voice-reply"
+          @click="toggleVoiceReply"
+        >
+          <Icon icon="mdi:volume-high" class="w-4 h-4 md:w-5 md:h-5" />
+          <span class="text-xs md:text-sm font-medium hidden sm:inline">Voice</span>
+        </button>
       </div>
     </div>
 
@@ -479,6 +489,10 @@ const toggleThinking = () => {
   }
 
   thinkingEnabled.value = !thinkingEnabled.value
+}
+
+const toggleVoiceReply = () => {
+  voiceReply.value = !voiceReply.value
 }
 
 const handleCommandSelect = (cmd: Command) => {
