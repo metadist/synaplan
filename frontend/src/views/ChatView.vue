@@ -658,7 +658,7 @@ const streamAIResponse = async (
         currentAudioStreamer.stop()
         currentAudioStreamer = null
       }
-      
+
       let spokenLength = 0
       let detectedLanguage = 'en'
 

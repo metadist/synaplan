@@ -8,7 +8,7 @@
  * This avoids MSE complexity and works reliably in all browsers.
  */
 export class AudioStreamer {
-  private queue: Array<{ text: string, language?: string }> = []
+  private queue: Array<{ text: string; language?: string }> = []
   private isPlaying = false
   private stopped = false
   private currentAudio: HTMLAudioElement | null = null

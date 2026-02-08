@@ -190,10 +190,7 @@
         </button>
         <button
           type="button"
-          :class="[
-            'pill flex-shrink-0',
-            voiceReply && 'pill--active',
-          ]"
+          :class="['pill flex-shrink-0', voiceReply && 'pill--active']"
           aria-label="Voice Reply"
           data-testid="btn-chat-voice-reply"
           @click="toggleVoiceReply"
