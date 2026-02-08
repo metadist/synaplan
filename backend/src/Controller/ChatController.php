@@ -99,6 +99,7 @@ class ChatController extends AbstractController
                 'updatedAt' => $chat->getUpdatedAt()->format('c'),
                 'messageCount' => $sessionMap[$chat->getId()]['messageCount'] ?? $chat->getMessages()->count(),
                 'isShared' => $chat->isPublic(),
+                'source' => $chat->getSource(),
                 'widgetSession' => $sessionMap[$chat->getId()] ?? null,
                 'firstMessagePreview' => $firstMessagePreview,
             ];

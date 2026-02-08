@@ -250,6 +250,7 @@ class WidgetPublicController extends AbstractController
                 $chat->setUserId($owner->getId());
                 $sessionSuffix = substr($session->getSessionId(), -6);
                 $chat->setTitle(sprintf('Widget: %s • %s', $widget->getName(), $sessionSuffix));
+                $chat->setSource('widget');
                 $chat->setCreatedAt($now);
                 $chat->setUpdatedAt($now);
                 $this->em->persist($chat);

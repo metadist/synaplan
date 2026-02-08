@@ -40,7 +40,7 @@ final class SystemConfigService
                     'ollama' => ['label' => 'Local AI (Ollama)', 'fields' => ['OLLAMA_BASE_URL']],
                     'cloud' => ['label' => 'Cloud AI Providers', 'fields' => ['OPENAI_API_KEY', 'ANTHROPIC_API_KEY', 'GROQ_API_KEY', 'GOOGLE_GEMINI_API_KEY']],
                     'selfhosted' => ['label' => 'Self-Hosted AI', 'fields' => ['TRITON_SERVER_URL']],
-                    'tts' => ['label' => 'Text-to-Speech', 'fields' => ['ELEVENLABS_API_KEY']],
+                    'tts' => ['label' => 'Text-to-Speech', 'fields' => ['SYNAPLAN_TTS_URL', 'ELEVENLABS_API_KEY']],
                 ],
             ],
             'email' => [
@@ -188,6 +188,7 @@ final class SystemConfigService
             'tika' => $this->testTika(),
             'qdrant' => $this->testQdrant(),
             'mailer' => $this->testMailer(),
+            'piper' => $this->testPiperTts(),
             default => ['success' => false, 'message' => 'Unknown service: '.$service],
         };
     }
@@ -442,6 +443,47 @@ final class SystemConfigService
     }
 
     /**
+     * @return array{success: bool, message: string, details?: array<string, mixed>}
+     */
+    private function testPiperTts(): array
+    {
+        $url = $this->getEnvValue('SYNAPLAN_TTS_URL');
+        if (!$url) {
+            // Fall back to default URL (same as PiperProvider::DEFAULT_URL)
+            $url = 'http://host.docker.internal:10200';
+        }
+
+        try {
+            $ch = curl_init($url.'/health');
+            curl_setopt_array($ch, [
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_TIMEOUT => 5,
+                CURLOPT_CONNECTTIMEOUT => 3,
+            ]);
+            $response = curl_exec($ch);
+            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            curl_close($ch);
+
+            if (200 === $httpCode && $response) {
+                $data = json_decode($response, true);
+
+                return [
+                    'success' => true,
+                    'message' => 'Connected to Piper TTS',
+                    'details' => [
+                        'status' => $data['status'] ?? 'unknown',
+                        'voices' => $data['voices'] ?? [],
+                    ],
+                ];
+            }
+
+            return ['success' => false, 'message' => 'Piper TTS returned HTTP '.$httpCode];
+        } catch (\Throwable $e) {
+            return ['success' => false, 'message' => 'Connection failed: '.$e->getMessage()];
+        }
+    }
+
+    /**
      * @return array{success: bool, message: string}
      */
     private function testMailer(): array
@@ -497,6 +539,11 @@ final class SystemConfigService
                 'tab' => 'ai', 'section' => 'selfhosted', 'type' => 'url',
                 'sensitive' => false, 'description' => 'NVIDIA Triton gRPC endpoint',
                 'default' => '',
+            ],
+            'SYNAPLAN_TTS_URL' => [
+                'tab' => 'ai', 'section' => 'tts', 'type' => 'url',
+                'sensitive' => false, 'description' => 'Synaplan TTS service URL (self-hosted, Piper-based)',
+                'default' => 'http://host.docker.internal:10200',
             ],
             'ELEVENLABS_API_KEY' => [
                 'tab' => 'ai', 'section' => 'tts', 'type' => 'password',
