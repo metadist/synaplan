@@ -14,7 +14,6 @@ import {
   testConnection,
   type ConfigSchema,
   type ConfigValue,
-  type TestConnectionResult,
 } from '@/services/api/adminConfigApi'
 
 const { t } = useI18n()
