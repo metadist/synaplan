@@ -127,6 +127,46 @@ Show WhatsApp and Email conversations in the web UI sidebar and chat view.
 - `ChatController::messages()`: include file attachments from WhatsApp/Email messages
 - Frontend history store: render attached files (images, audio, documents) for all channels
 
+### Phase 6: Low-Latency Streaming (Version 2)
+
+Enhance `synaplan-tts` and Frontend to support instant audio streaming via Opus/WebM and Media Source Extensions (MSE). This eliminates the wait for full WAV generation.
+
+**Goal:** "Instant" voice response by streaming audio chunks as soon as text is available.
+
+**Strategy:**
+1.  **Backend (`synaplan-tts`)**: Stream Opus/WebM via `ffmpeg` pipe.
+2.  **Frontend**: Buffer text sentences and request audio segments sequentially.
+3.  **Playback**: Use MSE (`SourceBuffer`) to play segments smoothly.
+
+**Step 1: `synaplan-tts` Enhancements**
+- **Dockerfile**: Install `ffmpeg` (required for on-the-fly transcoding).
+- **API**: Add `stream=true` flag to `POST /api/tts` and `GET /api/tts`.
+- **Implementation**:
+  - Use `voice.synthesize_stream_raw()` to yield PCM bytes.
+  - Pipe PCM to `ffmpeg -f s16le -ar 22050 -ac 1 -i - -c:a libopus -f webm -`.
+  - Return `StreamingResponse` with `media_type="audio/webm"`.
+
+**Step 2: Frontend Audio Streamer**
+- **`AudioStreamer.ts`**:
+  - Manages `MediaSource` and `SourceBuffer`.
+  - Queue system: `fetch(text_chunk)` -> `buffer.appendBuffer(data)`.
+  - Handles sentence boundary detection (regex `/[.?!]+ /`).
+- **Integration**:
+  - In `ChatView.vue`, when `voiceReply` is active:
+    - Observe incoming text stream.
+    - When a sentence completes, send it to `AudioStreamer`.
+    - `AudioStreamer` calls `synaplan-tts` (via backend proxy or direct if possible/safe).
+    - *Note: For security/CORS, we likely need a backend proxy endpoint `GET /api/v1/tts/stream?text=...`.*
+
+**Step 3: Testing Plan**
+1.  **Local Browser Test**: Create `synaplan-tts/test-streaming.html`.
+    - Simple input field + "Stream" button.
+    - Uses `fetch` + `SourceBuffer` to verify `synaplan-tts` streaming directly.
+2.  **Integration Test**:
+    - Enable `voiceReply` in Chat.
+    - Send message.
+    - Verify audio starts playing before text finishes generating.
+
 ## Dependencies
 
 ```
@@ -134,10 +174,12 @@ Phase 1 ──► Phase 2 ──► Phase 3
                               │
 Phase 4 (parallel) ──────────┤
                               │
-Phase 5 (parallel) ──────────┘
+Phase 5 (parallel) ──────────┤
+                              │
+Phase 6 (Streaming) ─────────┘
 ```
 
-Phase 1 is prerequisite (need a working free TTS provider). Phases 4 and 5 can start in parallel with Phase 2/3.
+Phase 1 is prerequisite (need a working free TTS provider). Phases 4 and 5 can start in parallel with Phase 2/3. Phase 6 is an enhancement on top of Phase 1.
 
 ## Database Changes
 
