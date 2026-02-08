@@ -124,9 +124,7 @@ async function handleTestConnection() {
   testingService.value = services[0]
 
   try {
-    const results = await Promise.allSettled(
-      services.map((svc) => testConnection(svc)),
-    )
+    const results = await Promise.allSettled(services.map((svc) => testConnection(svc)))
 
     const succeeded: string[] = []
     const failed: string[] = []
@@ -137,9 +135,7 @@ async function handleTestConnection() {
         succeeded.push(result.value.message)
       } else {
         const msg =
-          result.status === 'fulfilled'
-            ? result.value.message
-            : t('admin.config.testFailed')
+          result.status === 'fulfilled' ? result.value.message : t('admin.config.testFailed')
         failed.push(`${svc}: ${msg}`)
       }
     })
