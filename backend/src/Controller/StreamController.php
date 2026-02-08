@@ -1066,9 +1066,14 @@ class StreamController extends AbstractController
                         $ttsText = mb_substr($ttsText, 0, 4000);
 
                         if (!empty(trim($ttsText))) {
+                            // Resolve provider from user's default TEXT2SOUND model
+                            $ttsModelId = $this->modelConfigService->getDefaultModel('TEXT2SOUND', $user->getId());
+                            $ttsProvider = $ttsModelId ? $this->modelConfigService->getProviderForModel($ttsModelId) : null;
+
                             $ttsResult = $this->aiFacade->synthesize($ttsText, $user->getId(), [
                                 'format' => 'mp3',
                                 'language' => $language,
+                                'provider' => $ttsProvider ? strtolower($ttsProvider) : null,
                             ]);
 
                             $audioUrl = '/api/v1/files/uploads/'.$ttsResult['relativePath'];
