@@ -13,7 +13,6 @@ export class AudioStreamer {
   private stopped = false
   private currentAudio: HTMLAudioElement | null = null
   private prefetchedBlobs: Map<number, string> = new Map() // index → blob URL
-  private nextIndex = 0
   private playIndex = 0
 
   /**
