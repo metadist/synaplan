@@ -768,7 +768,14 @@
       "deletePrompt": "Delete Prompt",
       "saveChanges": "Save Changes",
       "noPrompts": "No prompts available",
-      "language": "Language"
+      "language": "Language",
+      "workingLanguage": "Working in: {language}",
+      "workingLanguageHint": "Prompts shown are based on your current interface language. Custom prompts you create will only appear in this language.",
+      "systemPromptAdminTitle": "System Prompt (Admin Edit)",
+      "systemPromptAdminDesc": "You have admin access. Changes will update this system prompt for ALL users across all languages.",
+      "systemPromptLanguageFixed": "System prompt — language is locked to the original value and cannot be changed.",
+      "customPromptLanguageNote": "This custom prompt is language-specific. It will only appear when the interface matches this language.",
+      "selectPromptHelpAdmin": "Select a prompt to edit. System prompts apply to all users. Use 'Create New' for personal overrides."
     },
     "sortingPrompt": {
       "title": "Preprocessor",

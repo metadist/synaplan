@@ -542,8 +542,7 @@ class WhatsAppService
             ];
         }
 
-        // 6. Usage recording and mark as read
-        $this->rateLimitService->recordUsage($user, 'MESSAGES');
+        // 6. Mark as read (usage recording moved to after AI response for token estimation)
         $this->markAsRead($dto->messageId, $dto->phoneNumberId);
 
         // 7. AI Pipeline Processing (use streaming mode to support TTS/media generation)
@@ -598,6 +597,16 @@ class WhatsAppService
         $responseText = $result['response']['content'] ?? $collectedResponse;
         $metadata = $result['response']['metadata'] ?? [];
         $fileData = $metadata['file'] ?? null;
+
+        // Record usage with response content for token estimation
+        $this->rateLimitService->recordUsage($user, 'MESSAGES', [
+            'provider' => $metadata['provider'] ?? 'unknown',
+            'model' => $metadata['model'] ?? 'unknown',
+            'tokens' => 0,
+            'source' => 'WHATSAPP',
+            'response_text' => $responseText,
+            'input_text' => $message->getText(),
+        ]);
 
         // 8. Send Response based on input type
         $responseSent = false;

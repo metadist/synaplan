@@ -82,10 +82,63 @@ class RateLimitService
     }
 
     /**
+     * Estimate token count from byte length.
+     *
+     * Uses a simple heuristic: ~1.3 bytes per token on average for mixed-language text.
+     * For media content (images/audio/video), the byte count is used as-is.
+     * This provides a rough but useful estimate when providers don't return exact token counts.
+     *
+     * @param int $bytes Total bytes of content (text + media)
+     *
+     * @return int Estimated token count (rounded up)
+     */
+    public static function estimateTokens(int $bytes): int
+    {
+        if ($bytes <= 0) {
+            return 0;
+        }
+
+        return (int) ceil($bytes / 1.3);
+    }
+
+    /**
      * Record usage of an action.
+     *
+     * If 'tokens' is 0 and 'response_text' or 'response_bytes' is provided,
+     * tokens are auto-estimated using the bytes/1.3 heuristic.
      */
     public function recordUsage(User $user, string $action, array $metadata = []): void
     {
+        $tokens = $metadata['tokens'] ?? 0;
+
+        // Auto-estimate tokens if provider didn't return real token counts
+        if (0 === $tokens || empty($tokens)) {
+            $totalBytes = 0;
+
+            // Count text response bytes
+            if (!empty($metadata['response_text'])) {
+                $totalBytes += strlen($metadata['response_text']);
+            }
+
+            // Count input prompt bytes (if provided)
+            if (!empty($metadata['input_text'])) {
+                $totalBytes += strlen($metadata['input_text']);
+            }
+
+            // Add explicit byte count for media (images, audio, video)
+            if (!empty($metadata['response_bytes'])) {
+                $totalBytes += (int) $metadata['response_bytes'];
+            }
+
+            if ($totalBytes > 0) {
+                $tokens = self::estimateTokens($totalBytes);
+            }
+        }
+
+        // Remove internal-only fields from stored metadata (keep it clean)
+        $storedMetadata = $metadata;
+        unset($storedMetadata['response_text'], $storedMetadata['input_text'], $storedMetadata['response_bytes']);
+
         $this->em->getConnection()->executeStatement(
             'INSERT INTO BUSELOG (BUSERID, BUNIXTIMES, BACTION, BPROVIDER, BMODEL, BTOKENS, BCOST, BLATENCY, BSTATUS, BERROR, BMETADATA) 
              VALUES (:user_id, :timestamp, :action, :provider, :model, :tokens, :cost, :latency, :status, :error, :metadata)',
@@ -95,18 +148,20 @@ class RateLimitService
                 'action' => $action,
                 'provider' => $metadata['provider'] ?? '',
                 'model' => $metadata['model'] ?? '',
-                'tokens' => $metadata['tokens'] ?? 0,
+                'tokens' => $tokens,
                 'cost' => $metadata['cost'] ?? 0,
                 'latency' => $metadata['latency'] ?? 0,
                 'status' => 'success',
                 'error' => '',
-                'metadata' => json_encode($metadata),
+                'metadata' => json_encode($storedMetadata),
             ]
         );
 
         $this->logger->info('Rate limit usage recorded', [
             'user_id' => $user->getId(),
             'action' => $action,
+            'tokens' => $tokens,
+            'estimated' => (0 === ($metadata['tokens'] ?? 0)),
         ]);
     }
 

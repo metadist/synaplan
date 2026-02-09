@@ -218,9 +218,6 @@ class WebhookController extends AbstractController
             }
             $this->em->flush(); // Flush metadata
 
-            // Record usage (unified across all sources)
-            $this->rateLimitService->recordUsage($user, 'MESSAGES');
-
             // Track processing time
             $startTime = microtime(true);
 
@@ -244,6 +241,17 @@ class WebhookController extends AbstractController
             // Extract provider and model from metadata
             $provider = $metadata['provider'] ?? null;
             $model = $metadata['model'] ?? null;
+
+            // Record usage with response content for token estimation
+            $this->rateLimitService->recordUsage($user, 'MESSAGES', [
+                'provider' => $provider ?? 'unknown',
+                'model' => $model ?? 'unknown',
+                'tokens' => 0,
+                'latency' => (int) ($processingTime * 1000),
+                'source' => 'EMAIL',
+                'response_text' => $responseText,
+                'input_text' => $message->getText(),
+            ]);
 
             // Generate TTS if voice_reply is set
             $attachmentPath = null;
@@ -523,9 +531,6 @@ class WebhookController extends AbstractController
             }
             $this->em->flush(); // Flush metadata
 
-            // Record usage
-            $this->rateLimitService->recordUsage($user, 'MESSAGES');
-
             $result = $this->messageProcessor->process($message);
 
             if (!$result['success']) {
@@ -536,13 +541,25 @@ class WebhookController extends AbstractController
             }
 
             $response = $result['response'];
+            $responseContent = $response['content'] ?? '';
+            $responseMeta = $response['metadata'] ?? [];
+
+            // Record usage with response content for token estimation
+            $this->rateLimitService->recordUsage($user, 'MESSAGES', [
+                'provider' => $responseMeta['provider'] ?? 'unknown',
+                'model' => $responseMeta['model'] ?? 'unknown',
+                'tokens' => 0,
+                'source' => 'WEBHOOK',
+                'response_text' => $responseContent,
+                'input_text' => $message->getText(),
+            ]);
 
             return $this->json([
                 'success' => true,
                 'message_id' => $message->getId(),
                 'response' => [
-                    'text' => $response['content'] ?? '',
-                    'metadata' => $response['metadata'] ?? [],
+                    'text' => $responseContent,
+                    'metadata' => $responseMeta,
                 ],
             ]);
         } catch (\Exception $e) {

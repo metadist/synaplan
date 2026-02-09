@@ -869,7 +869,14 @@
       "deletePrompt": "Prompt löschen",
       "saveChanges": "Änderungen speichern",
       "noPrompts": "Keine Prompts verfügbar",
-      "language": "Sprache"
+      "language": "Sprache",
+      "workingLanguage": "Arbeitssprache: {language}",
+      "workingLanguageHint": "Die angezeigten Prompts basieren auf Ihrer aktuellen Oberflächensprache. Eigene Prompts, die Sie hier erstellen, erscheinen nur in dieser Sprache.",
+      "systemPromptAdminTitle": "System-Prompt (Admin-Bearbeitung)",
+      "systemPromptAdminDesc": "Sie haben Admin-Zugriff. Änderungen aktualisieren diesen System-Prompt für ALLE Benutzer in allen Sprachen.",
+      "systemPromptLanguageFixed": "System-Prompt — die Sprache ist auf den Originalwert festgelegt und kann nicht geändert werden.",
+      "customPromptLanguageNote": "Dieser eigene Prompt ist sprachspezifisch. Er wird nur angezeigt, wenn die Oberfläche dieser Sprache entspricht.",
+      "selectPromptHelpAdmin": "Wählen Sie einen Prompt zum Bearbeiten. System-Prompts gelten für alle Benutzer. Verwenden Sie 'Neu erstellen' für persönliche Anpassungen."
     },
     "sortingPrompt": {
       "title": "Preprocessor",
