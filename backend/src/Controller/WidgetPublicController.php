@@ -623,7 +623,7 @@ class WidgetPublicController extends AbstractController
                         'channel' => 'WIDGET',
                         'files' => $fileIds,
                         'response_text' => $responseText,
-                        'input_text' => $data['text'] ?? '',
+                        'input_text' => $incomingMessage->getText(),
                     ]);
 
                     $this->sendSse('complete', [
