@@ -357,6 +357,8 @@ jobs:
 
       - name: Start test services and show logs
         run: |
+          # app_test entrypoint loads fixtures on first run (APP_ENV=test, empty DB)
+          # so TestProvider model (id 900) and admin user exist for E2E (e.g. id=003).
           echo "Starting services..."
           docker compose -f docker-compose.test.yml -f docker-compose.test.ci.yml up -d
 
