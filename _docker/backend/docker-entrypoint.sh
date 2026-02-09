@@ -10,12 +10,15 @@ if [ ! -f /var/www/backend/.env ]; then
     touch /var/www/backend/.env
 fi
 
-# Source .env file if it exists
-if [ -f /var/www/backend/.env ]; then
+# In test env: use only Docker Compose environment (same as CI, which has no backend volume mount).
+# Do not source .env/.env.test so BASE_URL, DATABASE_*, MAILER_DSN etc. come from compose only.
+if [ "${APP_ENV:-}" != "test" ]; then
+  if [ -f /var/www/backend/.env ]; then
     echo "📄 Loading environment from .env file..."
-    set -a  # automatically export all variables
+    set -a
     source /var/www/backend/.env
     set +a
+  fi
 fi
 
 # Validate required environment variables
@@ -116,6 +119,14 @@ echo "✅ Database schema ready!"
 FIXTURES_MARKER="/var/www/backend/var/.fixtures_loaded"
 
 if [ "$APP_ENV" = "dev" ] || [ "$APP_ENV" = "test" ]; then
+    # Guard: if marker exists but DB is empty (e.g. tmpfs wipe), remove stale marker
+    if [ -f "$FIXTURES_MARKER" ]; then
+        _uc=$(php bin/console dbal:run-sql "SELECT COUNT(*) as count FROM BUSER" 2>/dev/null | grep -oE '[0-9]+' | tail -1)
+        if [ "${_uc:-0}" -eq 0 ]; then
+            rm -f "$FIXTURES_MARKER" 2>/dev/null || true
+        fi
+    fi
+
     if [ -f "$FIXTURES_MARKER" ]; then
         echo "✅ Fixtures already loaded (marker present)"
         echo "   👤 Login: admin@synaplan.com / admin123"

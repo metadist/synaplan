@@ -69,9 +69,9 @@
 		file_server
 	}
 
-	# Backend static files third (bundles, uploads, etc.)
+	# Backend static files third (bundles, uploads, widget-test page for E2E)
 	@backend_file {
-		path /bundles/* /uploads/*
+		path /bundles/* /uploads/* /widget-test.html
 		file {
 			root /var/www/backend/public
 			try_files {path}
