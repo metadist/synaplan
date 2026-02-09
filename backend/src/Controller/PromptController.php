@@ -852,7 +852,10 @@ class PromptController extends AbstractController
         }
 
         if (isset($data['language'])) {
-            $prompt->setLanguage(trim($data['language']));
+            $lang = strtolower(trim($data['language']));
+            if ('' !== $lang && 2 === strlen($lang)) {
+                $prompt->setLanguage($lang);
+            }
         }
 
         try {
@@ -901,7 +904,7 @@ class PromptController extends AbstractController
                 'shortDescription' => $prompt->getShortDescription(),
                 'prompt' => $prompt->getPrompt(),
                 'language' => $prompt->getLanguage(),
-                'isDefault' => false,
+                'isDefault' => 0 === $prompt->getOwnerId(),
             ],
         ]);
     }

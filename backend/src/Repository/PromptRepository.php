@@ -84,10 +84,11 @@ class PromptRepository extends ServiceEntityRepository
      */
     public function getTopicsWithDescriptions(int $ownerId = 0, string $lang = 'en', ?int $userId = null, bool $excludeTools = true): array
     {
-        // System prompts: always included regardless of language
+        // System/owner prompts: always included regardless of language
         $sysQb = $this->createQueryBuilder('p')
             ->select('p.topic', 'p.shortDescription', 'p.ownerId')
-            ->where('p.ownerId = 0');
+            ->where('p.ownerId = :ownerId')
+            ->setParameter('ownerId', $ownerId);
 
         if ($excludeTools) {
             $sysQb->andWhere('p.topic NOT LIKE :toolsPrefix')
@@ -96,15 +97,18 @@ class PromptRepository extends ServiceEntityRepository
 
         $systemPrompts = $sysQb->getQuery()->getResult();
 
-        // User prompts: filtered by language
+        // User prompts: filtered by language (unless $lang is empty, then include all)
         $userPrompts = [];
         if (null !== $userId && $userId > 0) {
             $userQb = $this->createQueryBuilder('p')
                 ->select('p.topic', 'p.shortDescription', 'p.ownerId')
                 ->where('p.ownerId = :userId')
-                ->andWhere('p.language = :lang')
-                ->setParameter('userId', $userId)
-                ->setParameter('lang', $lang);
+                ->setParameter('userId', $userId);
+
+            if ('' !== $lang) {
+                $userQb->andWhere('p.language = :lang')
+                    ->setParameter('lang', $lang);
+            }
 
             if ($excludeTools) {
                 $userQb->andWhere('p.topic NOT LIKE :toolsPrefix')
@@ -233,17 +237,22 @@ class PromptRepository extends ServiceEntityRepository
             ->getQuery()
             ->getResult();
 
-        // User prompts: filtered by language
-        $userPrompts = $this->createQueryBuilder('p')
+        // User prompts: filtered by language (unless $lang is empty, then include all)
+        $userQb = $this->createQueryBuilder('p')
             ->where('p.ownerId = :userId')
-            ->andWhere('p.language = :lang')
             ->andWhere('p.topic NOT LIKE :toolsPrefix')
             ->andWhere('p.selectionRules IS NOT NULL')
             ->andWhere('p.selectionRules != :empty')
             ->setParameter('userId', $userId)
-            ->setParameter('lang', $lang)
             ->setParameter('toolsPrefix', 'tools:%')
-            ->setParameter('empty', '')
+            ->setParameter('empty', '');
+
+        if ('' !== $lang) {
+            $userQb->andWhere('p.language = :lang')
+                ->setParameter('lang', $lang);
+        }
+
+        $userPrompts = $userQb
             ->getQuery()
             ->getResult();
 

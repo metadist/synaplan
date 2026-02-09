@@ -118,7 +118,7 @@
           <div>
             <label class="block text-sm font-semibold txt-primary mb-2 flex items-center gap-2">
               <Icon icon="heroicons:language" class="w-4 h-4" />
-              {{ $t('config.taskPrompts.language') || 'Language' }}
+              {{ $t('config.taskPrompts.language', 'Language') }}
             </label>
             <select
               v-model="formData.language"
@@ -559,7 +559,7 @@
             <div>
               <label class="block text-sm font-semibold txt-primary mb-2 flex items-center gap-2">
                 <Icon icon="heroicons:language" class="w-4 h-4" />
-                {{ $t('config.taskPrompts.language') || 'Language' }}
+                {{ $t('config.taskPrompts.language', 'Language') }}
               </label>
               <select
                 v-model="newPromptLanguage"
@@ -812,8 +812,8 @@ const isAdmin = computed(() => authStore.isAdmin)
 const PROMPT_LANGUAGES = [
   { value: 'en', label: 'English' },
   { value: 'de', label: 'Deutsch' },
-  { value: 'es', label: 'Espanol' },
-  { value: 'tr', label: 'Turkce' },
+  { value: 'es', label: 'Español' },
+  { value: 'tr', label: 'Türkçe' },
 ]
 
 const prompts = ref<TaskPrompt[]>([])
@@ -1131,7 +1131,7 @@ const handleSave = saveChanges(async () => {
         topic: currentPrompt.value.topic,
         shortDescription: currentPrompt.value.shortDescription,
         prompt: formData.value.content || '',
-        language: currentPrompt.value.language || locale.value || 'en',
+        language: formData.value.language || locale.value || 'en',
         selectionRules: formData.value.rules || null,
         metadata,
       })

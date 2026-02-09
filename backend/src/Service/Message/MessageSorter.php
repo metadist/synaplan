@@ -102,9 +102,9 @@ class MessageSorter
         // Load prompts for ALL supported languages to ensure user prompts are included
         $topics = $this->promptRepository->getAllTopics(0, $userId, excludeTools: true);
 
-        // Get topics with descriptions - system prompts are always included
-        // regardless of language, user prompts are filtered by 'en' default
-        $topicsWithDesc = $this->promptRepository->getTopicsWithDescriptions(0, 'en', $userId, excludeTools: true);
+        // Get topics with descriptions - all prompts included regardless of language
+        // so the sorter knows every available routing target
+        $topicsWithDesc = $this->promptRepository->getTopicsWithDescriptions(0, '', $userId, excludeTools: true);
 
         // Build dynamic list and key list for prompt
         $dynamicList = $this->buildDynamicList($topicsWithDesc);
@@ -269,8 +269,8 @@ class MessageSorter
         }
 
         // Get all prompts with selection rules (user-specific + system)
-        // System prompts are always included regardless of language
-        $prompts = $this->promptRepository->findPromptsWithSelectionRules($userId, 'en');
+        // All prompts included regardless of language so rules always apply
+        $prompts = $this->promptRepository->findPromptsWithSelectionRules($userId, '');
 
         $this->logger->info('MessageSorter: Checking rule-based routing', [
             'user_id' => $userId,
