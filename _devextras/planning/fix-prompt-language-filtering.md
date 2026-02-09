@@ -2,7 +2,7 @@
 
 **Date:** 2026-02-09
 **Branch:** fix/sorting-prompt
-**Status:** Planning
+**Status:** In Progress
 
 ## Problem
 
@@ -143,11 +143,63 @@ Change `listPrompts()` to `listPrompts(locale.value || 'en')`.
 - **WhatsApp flows**: WhatsApp uses the standard message pipeline which uses `findByTopicAndUser()` -- no language filter
 - **SortX plugin**: Uses its own endpoints and references prompts by topic
 
-## Testing Checklist
+## Phase 1 Testing Checklist (Language Filtering -- DONE)
 
-- [ ] Switch UI to DE, navigate to `/config/sorting-prompt` -- categories should show
-- [ ] Switch UI to DE, navigate to `/config/task-prompts` -- system prompts should appear
-- [ ] Create a custom prompt in DE, switch to EN -- custom prompt should not appear, system prompts should
-- [ ] Widget creation wizard in DE -- system prompts should appear in dropdown
-- [ ] Widget editor modal in DE -- prompt selection should work
-- [ ] Switch language while on sorting-prompt page -- content should reload
+- [x] Switch UI to DE, navigate to `/config/sorting-prompt` -- categories should show
+- [x] Switch UI to DE, navigate to `/config/task-prompts` -- system prompts should appear
+- [x] Create a custom prompt in DE, switch to EN -- custom prompt should not appear, system prompts should
+- [x] Widget creation wizard in DE -- system prompts should appear in dropdown
+- [x] Widget editor modal in DE -- prompt selection should work
+- [x] Switch language while on sorting-prompt page -- content should reload
+
+---
+
+## Phase 2: Language Dropdown + Admin Editing
+
+### Problem
+
+1. **No language selector for custom prompts**: When creating a new task prompt, the language is hardcoded to `'en'` (line 1217 of TaskPromptsConfiguration.vue). Users cannot choose what language a custom prompt belongs to.
+
+2. **System prompts are read-only**: Even admins cannot edit or delete system prompts (ownerId=0) via the UI. The backend ownership check blocks all modifications. Only `tools:sort` has a special admin endpoint.
+
+3. **Admin editing gap**: The sorting prompt page (`/config/sorting-prompt`) shows system prompt categories (general, mediamaker, etc.) but clicking through to them in the prompt editor shows read-only views -- admins should be able to edit these.
+
+### Solution
+
+#### A. Language Dropdown for Prompt Creation
+
+**Frontend (`TaskPromptsConfiguration.vue`):**
+- Add a language dropdown to the create-prompt modal with options: `en`, `de`, `es`, `tr`
+- Default to the current UI locale (`locale.value`)
+- Send the selected language in the `createPrompt()` API call instead of hardcoded `'en'`
+- When creating a user override of a system prompt, also use the current locale
+
+**Supported languages for the dropdown:** `en`, `de`, `es`, `tr` (matching the frontend i18n config)
+
+#### B. Admin Edit/Delete of System Prompts
+
+**Backend (`PromptController.php`):**
+- `update()` method: Add admin bypass to ownership check. If `$user->isAdmin()`, allow updating prompts with `ownerId = 0`.
+- `delete()` method: Add admin bypass to ownership check. If `$user->isAdmin()`, allow deleting prompts with `ownerId = 0`.
+
+**Frontend (`TaskPromptsConfiguration.vue`):**
+- Import `useAuthStore` and check `isAdmin`
+- When admin views a system prompt: enable the form fields (remove `disabled` when `isDefault && isAdmin`)
+- Show delete button for system prompts when user is admin (with a confirmation warning)
+- Add "(Admin)" badge next to the "System Prompt" badge when admin is editing
+- Save directly updates the system prompt instead of creating a user override
+
+### Files Affected (Phase 2)
+
+- `backend/src/Controller/PromptController.php` -- admin bypass in `update()` and `delete()`
+- `frontend/src/components/config/TaskPromptsConfiguration.vue` -- language dropdown + admin editing
+
+### Phase 2 Testing Checklist
+
+- [ ] Create a custom prompt and select "de" from language dropdown -- prompt should have language "de"
+- [ ] Create a custom prompt with default locale (non-en) -- language should match locale
+- [ ] Admin views system prompt -- fields should be editable
+- [ ] Admin edits system prompt content and saves -- changes persist
+- [ ] Admin deletes system prompt -- prompt is removed (with confirmation)
+- [ ] Non-admin views system prompt -- fields remain read-only
+- [ ] Non-admin cannot see delete button on system prompts

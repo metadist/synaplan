@@ -62,7 +62,7 @@
         <div class="space-y-5">
           <!-- System Prompt Badge (if default) -->
           <div
-            v-if="currentPrompt.isDefault"
+            v-if="currentPrompt.isDefault && !isAdmin"
             class="p-3 bg-blue-500/10 border border-blue-500/30 rounded-lg"
           >
             <div class="flex items-center gap-2">
@@ -78,6 +78,25 @@
               </div>
             </div>
           </div>
+          <div
+            v-else-if="currentPrompt.isDefault && isAdmin"
+            class="p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg"
+          >
+            <div class="flex items-center gap-2">
+              <Icon
+                icon="heroicons:shield-check"
+                class="w-5 h-5 text-amber-600 dark:text-amber-400"
+              />
+              <div>
+                <p class="text-sm font-medium text-amber-600 dark:text-amber-400">
+                  System Prompt (Admin Edit)
+                </p>
+                <p class="text-xs text-amber-600/70 dark:text-amber-400/70">
+                  You have admin access. Changes will modify the system prompt for all users.
+                </p>
+              </div>
+            </div>
+          </div>
 
           <!-- Rules / Description -->
           <div>
@@ -87,12 +106,34 @@
             </label>
             <textarea
               v-model="formData.rules"
-              :disabled="currentPrompt.isDefault"
+              :disabled="currentPrompt.isDefault && !isAdmin"
               rows="3"
               class="w-full px-4 py-3 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] resize-none disabled:opacity-50 disabled:cursor-not-allowed"
               :placeholder="$t('config.taskPrompts.rulesHelp')"
               data-testid="input-rules"
             />
+          </div>
+
+          <!-- Language Selection -->
+          <div>
+            <label class="block text-sm font-semibold txt-primary mb-2 flex items-center gap-2">
+              <Icon icon="heroicons:language" class="w-4 h-4" />
+              {{ $t('config.taskPrompts.language') || 'Language' }}
+            </label>
+            <select
+              v-model="formData.language"
+              :disabled="currentPrompt.isDefault && !isAdmin"
+              class="w-full px-4 py-3 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] disabled:opacity-50 disabled:cursor-not-allowed"
+              data-testid="input-language"
+            >
+              <option v-for="lang in PROMPT_LANGUAGES" :key="lang.value" :value="lang.value">
+                {{ lang.label }}
+              </option>
+            </select>
+            <p class="text-xs txt-secondary mt-1.5 flex items-center gap-1">
+              <Icon icon="heroicons:information-circle" class="w-3.5 h-3.5" />
+              The language this prompt is associated with. Custom prompts are filtered by language.
+            </p>
           </div>
 
           <!-- AI Model Selection -->
@@ -103,7 +144,7 @@
             </label>
             <select
               v-model="formData.aiModel"
-              :disabled="currentPrompt.isDefault"
+              :disabled="currentPrompt.isDefault && !isAdmin"
               class="w-full px-4 py-3 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] disabled:opacity-50 disabled:cursor-not-allowed"
               data-testid="input-ai-model"
             >
@@ -157,7 +198,7 @@
                   v-model="formData.availableTools"
                   type="checkbox"
                   :value="tool.value"
-                  :disabled="currentPrompt.isDefault"
+                  :disabled="currentPrompt.isDefault && !isAdmin"
                   class="w-5 h-5 rounded border-light-border/30 dark:border-dark-border/20 text-[var(--brand)] focus:ring-2 focus:ring-[var(--brand)] disabled:opacity-50 disabled:cursor-not-allowed"
                 />
                 <Icon :icon="tool.icon" class="w-5 h-5 txt-secondary" />
@@ -178,7 +219,7 @@
 
           <!-- Markdown Toolbar -->
           <div
-            v-if="!currentPrompt.isDefault"
+            v-if="!currentPrompt.isDefault || isAdmin"
             class="flex items-center gap-1 p-1 surface-chip rounded-lg"
           >
             <button
@@ -197,7 +238,7 @@
         <textarea
           ref="contentTextarea"
           v-model="formData.content"
-          :disabled="currentPrompt.isDefault"
+          :disabled="currentPrompt.isDefault && !isAdmin"
           rows="16"
           class="w-full px-4 py-3 surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] resize-none font-mono disabled:opacity-50 disabled:cursor-not-allowed"
           :placeholder="$t('config.taskPrompts.contentPlaceholder')"
@@ -212,7 +253,7 @@
 
       <!-- Knowledge Base Files Card -->
       <div
-        v-if="!currentPrompt.isDefault"
+        v-if="!currentPrompt.isDefault || isAdmin"
         class="surface-card p-6"
         data-testid="section-knowledge-base"
       >
@@ -401,9 +442,9 @@
         </div>
       </div>
 
-      <!-- Delete Prompt (only for custom prompts) -->
+      <!-- Delete Prompt (custom prompts or admin for system prompts) -->
       <div
-        v-if="!currentPrompt.isDefault"
+        v-if="!currentPrompt.isDefault || isAdmin"
         class="surface-card p-6 border-2 border-red-500/20"
         data-testid="section-danger"
       >
@@ -413,7 +454,12 @@
           <Icon icon="heroicons:trash" class="w-5 h-5" />
           {{ $t('config.taskPrompts.dangerZone') }}
         </h3>
-        <p class="text-sm txt-secondary mb-4">{{ $t('config.taskPrompts.deleteWarning') }}</p>
+        <p v-if="currentPrompt.isDefault && isAdmin" class="text-sm text-red-500 mb-4 font-medium">
+          Warning: Deleting a system prompt affects ALL users!
+        </p>
+        <p v-else class="text-sm txt-secondary mb-4">
+          {{ $t('config.taskPrompts.deleteWarning') }}
+        </p>
         <button
           :disabled="loading"
           class="btn-secondary px-6 py-2.5 rounded-lg text-red-600 dark:text-red-400 hover:bg-red-500/10 border-red-500/30 font-medium flex items-center gap-2"
@@ -483,7 +529,7 @@
             </button>
           </div>
 
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
               <label class="block text-sm font-semibold txt-primary mb-2 flex items-center gap-2">
                 <Icon icon="heroicons:tag" class="w-4 h-4" />
@@ -509,6 +555,21 @@
                 :placeholder="$t('config.taskPrompts.namePlaceholder')"
                 data-testid="input-new-name"
               />
+            </div>
+            <div>
+              <label class="block text-sm font-semibold txt-primary mb-2 flex items-center gap-2">
+                <Icon icon="heroicons:language" class="w-4 h-4" />
+                {{ $t('config.taskPrompts.language') || 'Language' }}
+              </label>
+              <select
+                v-model="newPromptLanguage"
+                class="w-full px-4 py-2.5 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+                data-testid="input-new-language"
+              >
+                <option v-for="lang in PROMPT_LANGUAGES" :key="lang.value" :value="lang.value">
+                  {{ lang.label }}
+                </option>
+              </select>
             </div>
           </div>
 
@@ -705,6 +766,7 @@ import type { AIModel, Capability } from '@/types/ai-models'
 import { useNotification } from '@/composables/useNotification'
 import { useUnsavedChanges } from '@/composables/useUnsavedChanges'
 import { useDialog } from '@/composables/useDialog'
+import { useAuthStore } from '@/stores/auth'
 import UnsavedChangesBar from '@/components/UnsavedChangesBar.vue'
 
 // Template texts for new prompt creation
@@ -744,6 +806,15 @@ interface ToolOption {
 const { success, error: showError } = useNotification()
 const dialog = useDialog()
 const { locale } = useI18n()
+const authStore = useAuthStore()
+const isAdmin = computed(() => authStore.isAdmin)
+
+const PROMPT_LANGUAGES = [
+  { value: 'en', label: 'English' },
+  { value: 'de', label: 'Deutsch' },
+  { value: 'es', label: 'Espanol' },
+  { value: 'tr', label: 'Turkce' },
+]
 
 const prompts = ref<TaskPrompt[]>([])
 const selectedPromptId = ref<number | null>(null)
@@ -754,6 +825,7 @@ const newPromptName = ref('')
 const newPromptTopic = ref('')
 const newPromptContent = ref('')
 const newPromptRules = ref('')
+const newPromptLanguage = ref(locale.value || 'en')
 const newPromptSelectedFiles = ref<number[]>([])
 const newPromptFilesSearch = ref('')
 const showCreateModal = ref(false)
@@ -961,6 +1033,7 @@ const loadPrompt = () => {
       aiModel: prompt.aiModel,
       availableTools: prompt.availableTools,
       content: prompt.content,
+      language: prompt.language || 'en',
     }
     originalData.value = { ...formData.value }
 
@@ -1049,15 +1122,16 @@ const handleSave = saveChanges(async () => {
     metadata.tool_files_search = (formData.value.availableTools || []).includes('files-search')
     metadata.tool_url_screenshot = (formData.value.availableTools || []).includes('url-screenshot')
 
-    // If it's a system prompt (isDefault=true and no user override),
-    // we need to CREATE a user override instead of UPDATE
-    if (currentPrompt.value.isDefault && !currentPrompt.value.isUserOverride) {
-      // Create user override
+    // If it's a system prompt (isDefault=true and no user override):
+    // - Admins: update the system prompt directly
+    // - Regular users: create a user override instead of updating
+    if (currentPrompt.value.isDefault && !currentPrompt.value.isUserOverride && !isAdmin.value) {
+      // Create user override (non-admin flow)
       const newPrompt = await promptsApi.createPrompt({
         topic: currentPrompt.value.topic,
         shortDescription: currentPrompt.value.shortDescription,
         prompt: formData.value.content || '',
-        language: currentPrompt.value.language || 'en',
+        language: currentPrompt.value.language || locale.value || 'en',
         selectionRules: formData.value.rules || null,
         metadata,
       })
@@ -1080,10 +1154,11 @@ const handleSave = saveChanges(async () => {
 
       success('User override created successfully!')
     } else {
-      // Update existing user prompt
+      // Update existing user prompt (or system prompt for admins)
       const updated = await promptsApi.updatePrompt(currentPrompt.value.id, {
         shortDescription: currentPrompt.value.shortDescription, // Keep original name
         prompt: formData.value.content || '',
+        language: formData.value.language || 'en',
         selectionRules: formData.value.rules || null,
         metadata,
       })
@@ -1214,7 +1289,7 @@ const handleCreateNew = async () => {
       topic: newPromptTopic.value.trim().toLowerCase().replace(/\s+/g, '-'),
       shortDescription: newPromptName.value.trim(),
       prompt: newPromptContent.value.trim(),
-      language: 'en',
+      language: newPromptLanguage.value || locale.value || 'en',
       selectionRules: newPromptRules.value.trim() || null,
       metadata,
     }
@@ -1267,6 +1342,7 @@ const handleCreateNew = async () => {
     newPromptTopic.value = ''
     newPromptContent.value = ''
     newPromptRules.value = ''
+    newPromptLanguage.value = locale.value || 'en'
     newPromptSelectedFiles.value = []
     newPromptFilesSearch.value = ''
 
@@ -1297,13 +1373,23 @@ const handleCreateNew = async () => {
  * Delete a custom prompt
  */
 const handleDelete = async () => {
-  if (!currentPrompt.value || currentPrompt.value.isDefault || loading.value) {
+  if (!currentPrompt.value || loading.value) {
     return
   }
 
+  // Non-admins cannot delete system prompts
+  if (currentPrompt.value.isDefault && !isAdmin.value) {
+    return
+  }
+
+  const isSystemPrompt = currentPrompt.value.isDefault
+  const confirmMessage = isSystemPrompt
+    ? `WARNING: You are about to delete the system prompt "${currentPrompt.value.name}". This affects ALL users and cannot be undone!`
+    : `Are you sure you want to delete "${currentPrompt.value.name}"? This action cannot be undone.`
+
   const confirmed = await dialog.confirm({
-    title: 'Delete Prompt',
-    message: `Are you sure you want to delete "${currentPrompt.value.name}"? This action cannot be undone.`,
+    title: isSystemPrompt ? 'Delete System Prompt' : 'Delete Prompt',
+    message: confirmMessage,
     confirmText: 'Delete',
     cancelText: 'Cancel',
     danger: true,

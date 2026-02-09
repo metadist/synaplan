@@ -817,8 +817,8 @@ class PromptController extends AbstractController
             return $this->json(['error' => 'Prompt not found'], Response::HTTP_NOT_FOUND);
         }
 
-        // Check ownership: only user's own prompts can be updated
-        if ($prompt->getOwnerId() !== $user->getId()) {
+        // Check ownership: only user's own prompts can be updated (admins can also update system prompts)
+        if ($prompt->getOwnerId() !== $user->getId() && !($user->isAdmin() && 0 === $prompt->getOwnerId())) {
             $this->logger->warning('User tried to update prompt they don\'t own', [
                 'user_id' => $user->getId(),
                 'prompt_owner' => $prompt->getOwnerId(),
@@ -849,6 +849,10 @@ class PromptController extends AbstractController
 
         if (isset($data['selectionRules'])) {
             $prompt->setSelectionRules(trim($data['selectionRules']) ?: null);
+        }
+
+        if (isset($data['language'])) {
+            $prompt->setLanguage(trim($data['language']));
         }
 
         try {
@@ -943,8 +947,8 @@ class PromptController extends AbstractController
             return $this->json(['error' => 'Prompt not found'], Response::HTTP_NOT_FOUND);
         }
 
-        // Check ownership: only user's own prompts can be deleted
-        if ($prompt->getOwnerId() !== $user->getId()) {
+        // Check ownership: only user's own prompts can be deleted (admins can also delete system prompts)
+        if ($prompt->getOwnerId() !== $user->getId() && !($user->isAdmin() && 0 === $prompt->getOwnerId())) {
             return $this->json([
                 'error' => 'Cannot delete this prompt. You can only delete your own custom prompts.',
             ], Response::HTTP_FORBIDDEN);
