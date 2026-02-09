@@ -1002,7 +1002,7 @@ const emit = defineEmits<{
   startAiSetup: []
 }>()
 
-const { t } = useI18n()
+const { t, locale } = useI18n()
 const { success, error: showError } = useNotification()
 
 // Check if widget has a custom/configured prompt (not the default)
@@ -1412,7 +1412,7 @@ const loadPromptData = async () => {
   promptError.value = null
 
   try {
-    const prompts = await promptsApi.getPrompts('en')
+    const prompts = await promptsApi.getPrompts(locale.value || 'en')
     const prompt = prompts.find((p) => p.topic === props.widget.taskPromptTopic)
 
     if (prompt) {

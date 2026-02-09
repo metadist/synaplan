@@ -767,7 +767,8 @@
       "deleteWarning": "Deleting this prompt is permanent and cannot be undone.",
       "deletePrompt": "Delete Prompt",
       "saveChanges": "Save Changes",
-      "noPrompts": "No prompts available"
+      "noPrompts": "No prompts available",
+      "language": "Language"
     },
     "sortingPrompt": {
       "title": "Preprocessor",

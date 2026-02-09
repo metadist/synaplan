@@ -114,11 +114,10 @@ class PromptController extends AbstractController
         $language = $request->query->get('language', 'en');
 
         // Get all system prompts (ownerId = 0, excluding tools:*)
+        // No language filter: system prompts are always visible regardless of UI language
         $systemPrompts = $this->promptRepository->createQueryBuilder('p')
             ->where('p.ownerId = 0')
-            ->andWhere('p.language = :lang')
             ->andWhere('p.topic NOT LIKE :toolsPrefix')
-            ->setParameter('lang', $language)
             ->setParameter('toolsPrefix', 'tools:%')
             ->orderBy('p.topic', 'ASC')
             ->getQuery()
@@ -818,8 +817,8 @@ class PromptController extends AbstractController
             return $this->json(['error' => 'Prompt not found'], Response::HTTP_NOT_FOUND);
         }
 
-        // Check ownership: only user's own prompts can be updated
-        if ($prompt->getOwnerId() !== $user->getId()) {
+        // Check ownership: only user's own prompts can be updated (admins can also update system prompts)
+        if ($prompt->getOwnerId() !== $user->getId() && !($user->isAdmin() && 0 === $prompt->getOwnerId())) {
             $this->logger->warning('User tried to update prompt they don\'t own', [
                 'user_id' => $user->getId(),
                 'prompt_owner' => $prompt->getOwnerId(),
@@ -850,6 +849,13 @@ class PromptController extends AbstractController
 
         if (isset($data['selectionRules'])) {
             $prompt->setSelectionRules(trim($data['selectionRules']) ?: null);
+        }
+
+        if (isset($data['language'])) {
+            $lang = strtolower(trim($data['language']));
+            if ('' !== $lang && 2 === strlen($lang)) {
+                $prompt->setLanguage($lang);
+            }
         }
 
         try {
@@ -898,7 +904,7 @@ class PromptController extends AbstractController
                 'shortDescription' => $prompt->getShortDescription(),
                 'prompt' => $prompt->getPrompt(),
                 'language' => $prompt->getLanguage(),
-                'isDefault' => false,
+                'isDefault' => 0 === $prompt->getOwnerId(),
             ],
         ]);
     }
@@ -944,8 +950,8 @@ class PromptController extends AbstractController
             return $this->json(['error' => 'Prompt not found'], Response::HTTP_NOT_FOUND);
         }
 
-        // Check ownership: only user's own prompts can be deleted
-        if ($prompt->getOwnerId() !== $user->getId()) {
+        // Check ownership: only user's own prompts can be deleted (admins can also delete system prompts)
+        if ($prompt->getOwnerId() !== $user->getId() && !($user->isAdmin() && 0 === $prompt->getOwnerId())) {
             return $this->json([
                 'error' => 'Cannot delete this prompt. You can only delete your own custom prompts.',
             ], Response::HTTP_FORBIDDEN);

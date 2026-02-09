@@ -868,7 +868,8 @@
       "deleteWarning": "Das Löschen dieses Prompts ist dauerhaft und kann nicht rückgängig gemacht werden.",
       "deletePrompt": "Prompt löschen",
       "saveChanges": "Änderungen speichern",
-      "noPrompts": "Keine Prompts verfügbar"
+      "noPrompts": "Keine Prompts verfügbar",
+      "language": "Sprache"
     },
     "sortingPrompt": {
       "title": "Preprocessor",
