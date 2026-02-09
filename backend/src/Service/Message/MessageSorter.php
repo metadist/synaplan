@@ -85,7 +85,7 @@ class MessageSorter
         }
 
         // STEP 2: Get sorting prompt
-        $sortingPrompt = $this->promptRepository->findByTopic('tools:sort', 0, 'en');
+        $sortingPrompt = $this->promptRepository->findByTopic('tools:sort', 0);
 
         if (!$sortingPrompt) {
             $this->logger->error('MessageSorter: Sorting prompt not found');
@@ -102,18 +102,9 @@ class MessageSorter
         // Load prompts for ALL supported languages to ensure user prompts are included
         $topics = $this->promptRepository->getAllTopics(0, $userId, excludeTools: true);
 
-        // For descriptions, we need to load from multiple languages
-        $topicsWithDesc = [];
-        foreach (self::SUPPORTED_LANGUAGES as $lang) {
-            $langTopics = $this->promptRepository->getTopicsWithDescriptions(0, $lang, $userId, excludeTools: true);
-            foreach ($langTopics as $topic) {
-                // Use first description found for each topic (prefer 'en' if available)
-                if (!isset($topicsWithDesc[$topic['topic']])) {
-                    $topicsWithDesc[$topic['topic']] = $topic;
-                }
-            }
-        }
-        $topicsWithDesc = array_values($topicsWithDesc);
+        // Get topics with descriptions - system prompts are always included
+        // regardless of language, user prompts are filtered by 'en' default
+        $topicsWithDesc = $this->promptRepository->getTopicsWithDescriptions(0, 'en', $userId, excludeTools: true);
 
         // Build dynamic list and key list for prompt
         $dynamicList = $this->buildDynamicList($topicsWithDesc);
@@ -278,30 +269,26 @@ class MessageSorter
         }
 
         // Get all prompts with selection rules (user-specific + system)
-        // Check ALL languages, not just 'en'
-        foreach (self::SUPPORTED_LANGUAGES as $lang) {
-            $prompts = $this->promptRepository->findPromptsWithSelectionRules($userId, $lang);
+        // System prompts are always included regardless of language
+        $prompts = $this->promptRepository->findPromptsWithSelectionRules($userId, 'en');
 
-            $this->logger->info('MessageSorter: Checking rule-based routing', [
-                'user_id' => $userId,
-                'language' => $lang,
-                'prompts_with_rules' => count($prompts),
-                'message_text' => substr($messageText, 0, 100),
-            ]);
+        $this->logger->info('MessageSorter: Checking rule-based routing', [
+            'user_id' => $userId,
+            'prompts_with_rules' => count($prompts),
+            'message_text' => substr($messageText, 0, 100),
+        ]);
 
-            // Check each prompt's selection rules
-            foreach ($prompts as $prompt) {
-                $selectionRules = $prompt->getSelectionRules();
+        // Check each prompt's selection rules
+        foreach ($prompts as $prompt) {
+            $selectionRules = $prompt->getSelectionRules();
 
-                if ($this->promptService->matchesSelectionRules($selectionRules, $messageText, $conversationHistory)) {
-                    $this->logger->info('MessageSorter: Selection rules matched', [
-                        'topic' => $prompt->getTopic(),
-                        'language' => $lang,
-                        'rules' => substr($selectionRules ?? '', 0, 100),
-                    ]);
+            if ($this->promptService->matchesSelectionRules($selectionRules, $messageText, $conversationHistory)) {
+                $this->logger->info('MessageSorter: Selection rules matched', [
+                    'topic' => $prompt->getTopic(),
+                    'rules' => substr($selectionRules ?? '', 0, 100),
+                ]);
 
-                    return $prompt->getTopic();
-                }
+                return $prompt->getTopic();
             }
         }
 

@@ -114,11 +114,10 @@ class PromptController extends AbstractController
         $language = $request->query->get('language', 'en');
 
         // Get all system prompts (ownerId = 0, excluding tools:*)
+        // No language filter: system prompts are always visible regardless of UI language
         $systemPrompts = $this->promptRepository->createQueryBuilder('p')
             ->where('p.ownerId = 0')
-            ->andWhere('p.language = :lang')
             ->andWhere('p.topic NOT LIKE :toolsPrefix')
-            ->setParameter('lang', $language)
             ->setParameter('toolsPrefix', 'tools:%')
             ->orderBy('p.topic', 'ASC')
             ->getQuery()

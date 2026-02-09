@@ -194,7 +194,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, computed, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { PencilIcon, EyeIcon, CheckIcon, InformationCircleIcon } from '@heroicons/vue/24/outline'
 import { mockSortingPrompt } from '@/mocks/sortingPrompt'
@@ -395,6 +395,10 @@ const resetPrompt = () => {
   sortingPrompt.value = { ...originalPrompt.value }
   editMode.value = false
 }
+
+watch(locale, () => {
+  loadSortingPrompt()
+})
 
 onMounted(() => {
   loadSortingPrompt()

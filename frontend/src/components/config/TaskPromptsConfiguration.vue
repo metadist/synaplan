@@ -691,7 +691,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { Icon } from '@iconify/vue'
 import {
   promptsApi,
@@ -742,6 +743,7 @@ interface ToolOption {
 
 const { success, error: showError } = useNotification()
 const dialog = useDialog()
+const { locale } = useI18n()
 
 const prompts = ref<TaskPrompt[]>([])
 const selectedPromptId = ref<number | null>(null)
@@ -900,7 +902,7 @@ const loadPrompts = async () => {
   error.value = null
 
   try {
-    const data = await promptsApi.getPrompts('en')
+    const data = await promptsApi.getPrompts(locale.value || 'en')
     prompts.value = data.map((p) => {
       // Parse metadata from backend
       const metadata = p.metadata || {}
@@ -1436,6 +1438,10 @@ const handleLinkFile = async (messageId: number) => {
     showError(errorMessage)
   }
 }
+
+watch(locale, () => {
+  loadPrompts()
+})
 
 onMounted(() => {
   cleanupGuard = setupNavigationGuard()

@@ -71,11 +71,12 @@ class PromptRepository extends ServiceEntityRepository
     }
 
     /**
-     * Get all topics with their descriptions for sorting prompt
-     * Includes both system (ownerId=0) AND user-specific prompts.
+     * Get all topics with their descriptions for sorting prompt.
+     * System prompts (ownerId=0) are NOT filtered by language -- always included.
+     * User prompts are filtered by language.
      *
      * @param int      $ownerId      Owner ID (0 for system)
-     * @param string   $lang         Language code
+     * @param string   $lang         Language code (applied to user prompts only)
      * @param int|null $userId       User ID for including user-specific prompts
      * @param bool     $excludeTools Exclude tool topics (tools:*) from result
      *
@@ -83,36 +84,53 @@ class PromptRepository extends ServiceEntityRepository
      */
     public function getTopicsWithDescriptions(int $ownerId = 0, string $lang = 'en', ?int $userId = null, bool $excludeTools = true): array
     {
-        $qb = $this->createQueryBuilder('p')
-            ->select('p.topic', 'p.shortDescription');
-
-        if (null !== $userId && $userId > 0) {
-            // Include both system prompts AND user-specific prompts
-            // For user prompts, prioritize user's own prompts over system prompts
-            $qb->where('(p.ownerId = 0 OR p.ownerId = :userId)')
-                ->andWhere('p.language = :lang')
-                ->setParameter('userId', $userId)
-                ->setParameter('lang', $lang)
-                ->orderBy('p.ownerId', 'DESC'); // User prompts first
-        } else {
-            // Only system prompts
-            $qb->where('p.ownerId = :ownerId')
-            ->andWhere('p.language = :lang')
-            ->setParameter('ownerId', $ownerId)
-            ->setParameter('lang', $lang);
-        }
+        // System prompts: always included regardless of language
+        $sysQb = $this->createQueryBuilder('p')
+            ->select('p.topic', 'p.shortDescription', 'p.ownerId')
+            ->where('p.ownerId = 0');
 
         if ($excludeTools) {
-            $qb->andWhere('p.topic NOT LIKE :toolsPrefix')
+            $sysQb->andWhere('p.topic NOT LIKE :toolsPrefix')
                 ->setParameter('toolsPrefix', 'tools:%');
         }
 
-        $prompts = $qb->getQuery()->getResult();
+        $systemPrompts = $sysQb->getQuery()->getResult();
 
-        // Remove duplicates, keeping user-specific prompts over system prompts
+        // User prompts: filtered by language
+        $userPrompts = [];
+        if (null !== $userId && $userId > 0) {
+            $userQb = $this->createQueryBuilder('p')
+                ->select('p.topic', 'p.shortDescription', 'p.ownerId')
+                ->where('p.ownerId = :userId')
+                ->andWhere('p.language = :lang')
+                ->setParameter('userId', $userId)
+                ->setParameter('lang', $lang);
+
+            if ($excludeTools) {
+                $userQb->andWhere('p.topic NOT LIKE :toolsPrefix')
+                    ->setParameter('toolsPrefix', 'tools:%');
+            }
+
+            $userPrompts = $userQb->getQuery()->getResult();
+        }
+
+        // Merge: user prompts override system prompts for the same topic
         $seen = [];
         $result = [];
-        foreach ($prompts as $p) {
+
+        // Add user prompts first (they take priority)
+        foreach ($userPrompts as $p) {
+            if (!isset($seen[$p['topic']])) {
+                $result[] = [
+                    'topic' => $p['topic'],
+                    'description' => $p['shortDescription'],
+                ];
+                $seen[$p['topic']] = true;
+            }
+        }
+
+        // Then add system prompts (only if not already overridden)
+        foreach ($systemPrompts as $p) {
             if (!isset($seen[$p['topic']])) {
                 $result[] = [
                     'topic' => $p['topic'],
@@ -148,41 +166,76 @@ class PromptRepository extends ServiceEntityRepository
     }
 
     /**
-     * Get all user-accessible prompts (global + user-specific) WITH selection rules.
+     * Get all user-accessible prompts (global + user-specific).
+     * System prompts (ownerId=0) are NOT filtered by language -- they are always included.
+     * User prompts are filtered by language so only the user's current-language prompts appear.
      *
      * @param int    $userId User ID
-     * @param string $lang   Language code
+     * @param string $lang   Language code (applied to user prompts only)
      *
      * @return Prompt[]
      */
     public function findAllForUser(int $userId, string $lang = 'en'): array
     {
-        return $this->createQueryBuilder('p')
-            ->where('p.ownerId = 0 OR p.ownerId = :userId')
+        // System prompts: always included regardless of language
+        $systemPrompts = $this->createQueryBuilder('p')
+            ->where('p.ownerId = 0')
+            ->andWhere('p.topic NOT LIKE :toolsPrefix')
+            ->setParameter('toolsPrefix', 'tools:%')
+            ->orderBy('p.topic', 'ASC')
+            ->getQuery()
+            ->getResult();
+
+        // User prompts: filtered by language
+        $userPrompts = $this->createQueryBuilder('p')
+            ->where('p.ownerId = :userId')
             ->andWhere('p.language = :lang')
             ->andWhere('p.topic NOT LIKE :toolsPrefix')
             ->setParameter('userId', $userId)
             ->setParameter('lang', $lang)
             ->setParameter('toolsPrefix', 'tools:%')
-            ->orderBy('p.ownerId', 'DESC') // User-specific first
-            ->addOrderBy('p.topic', 'ASC')
+            ->orderBy('p.topic', 'ASC')
             ->getQuery()
             ->getResult();
+
+        // Merge: user prompts override system prompts for the same topic
+        $map = [];
+        foreach ($systemPrompts as $p) {
+            $map[$p->getTopic()] = $p;
+        }
+        foreach ($userPrompts as $p) {
+            $map[$p->getTopic()] = $p;
+        }
+
+        return array_values($map);
     }
 
     /**
-     * Get prompts with selection rules for automatic routing during sorting
-     * Returns prompts that have BSELECTION_RULES defined.
+     * Get prompts with selection rules for automatic routing during sorting.
+     * System prompts (ownerId=0) are NOT filtered by language -- always included.
+     * User prompts are filtered by language.
      *
      * @param int    $userId User ID
-     * @param string $lang   Language code
+     * @param string $lang   Language code (applied to user prompts only)
      *
      * @return Prompt[]
      */
     public function findPromptsWithSelectionRules(int $userId, string $lang = 'en'): array
     {
-        return $this->createQueryBuilder('p')
-            ->where('p.ownerId = 0 OR p.ownerId = :userId')
+        // System prompts: always included regardless of language
+        $systemPrompts = $this->createQueryBuilder('p')
+            ->where('p.ownerId = 0')
+            ->andWhere('p.topic NOT LIKE :toolsPrefix')
+            ->andWhere('p.selectionRules IS NOT NULL')
+            ->andWhere('p.selectionRules != :empty')
+            ->setParameter('toolsPrefix', 'tools:%')
+            ->setParameter('empty', '')
+            ->getQuery()
+            ->getResult();
+
+        // User prompts: filtered by language
+        $userPrompts = $this->createQueryBuilder('p')
+            ->where('p.ownerId = :userId')
             ->andWhere('p.language = :lang')
             ->andWhere('p.topic NOT LIKE :toolsPrefix')
             ->andWhere('p.selectionRules IS NOT NULL')
@@ -191,8 +244,18 @@ class PromptRepository extends ServiceEntityRepository
             ->setParameter('lang', $lang)
             ->setParameter('toolsPrefix', 'tools:%')
             ->setParameter('empty', '')
-            ->orderBy('p.ownerId', 'DESC') // User-specific prompts take priority
             ->getQuery()
             ->getResult();
+
+        // Merge: user prompts override system prompts for the same topic
+        $map = [];
+        foreach ($systemPrompts as $p) {
+            $map[$p->getTopic()] = $p;
+        }
+        foreach ($userPrompts as $p) {
+            $map[$p->getTopic()] = $p;
+        }
+
+        return array_values($map);
     }
 }

@@ -502,7 +502,7 @@ const emit = defineEmits<{
 const isEdit = computed(() => !!props.widget)
 
 const taskPrompts = ref<any[]>([])
-const { t } = useI18n()
+const { t, locale } = useI18n()
 const { error, success } = useNotification()
 
 const MAX_ALLOWED_DOMAINS = 20
@@ -848,7 +848,7 @@ const canSave = computed(() => {
  */
 const loadTaskPrompts = async () => {
   try {
-    const prompts = await promptsApi.listPrompts()
+    const prompts = await promptsApi.listPrompts(locale.value || 'en')
     taskPrompts.value = prompts
   } catch (error) {
     console.error('Failed to load task prompts:', error)
