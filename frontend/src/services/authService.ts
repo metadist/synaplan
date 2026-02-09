@@ -24,6 +24,39 @@ const isRefreshing = ref(false)
 const isLoggingOut = ref(false) // Prevent auth checks during logout
 let refreshPromise: Promise<boolean> | null = null
 
+/**
+ * Session hint key in localStorage.
+ * NOT security-sensitive - purely an optimization flag to avoid unnecessary
+ * 401 requests (GET /auth/me + POST /auth/refresh) for users who have
+ * never logged in. Set on successful auth, cleared on logout.
+ */
+const SESSION_HINT_KEY = 'sh'
+
+function setSessionHint(): void {
+  try {
+    localStorage.setItem(SESSION_HINT_KEY, '1')
+  } catch {
+    // localStorage unavailable - graceful degradation
+  }
+}
+
+function clearSessionHint(): void {
+  try {
+    localStorage.removeItem(SESSION_HINT_KEY)
+  } catch {
+    // localStorage unavailable - graceful degradation
+  }
+}
+
+function hasSessionHint(): boolean {
+  try {
+    return localStorage.getItem(SESSION_HINT_KEY) === '1'
+  } catch {
+    // localStorage unavailable - assume session might exist to avoid breaking auth
+    return true
+  }
+}
+
 export const authService = {
   /**
    * Login User - cookies are set by backend
@@ -51,6 +84,7 @@ export const authService = {
 
       // Store user info only in memory (not localStorage for security)
       user.value = data.user
+      setSessionHint()
 
       return { success: true }
     } catch (error) {
@@ -116,6 +150,7 @@ export const authService = {
       user.value = null
       // Clear SSE token cache
       clearSseToken()
+      clearSessionHint()
       isLoggingOut.value = false
     }
   },
@@ -128,6 +163,12 @@ export const authService = {
   async getCurrentUser(retries = 0, retryDelay = 200): Promise<any | null> {
     // Don't check auth during logout process
     if (isLoggingOut.value) {
+      return null
+    }
+
+    // Optimization: skip API calls for users who have never logged in.
+    // OAuth callbacks pass retries > 0, so always check those.
+    if (!hasSessionHint() && retries === 0) {
       return null
     }
 
@@ -176,6 +217,7 @@ export const authService = {
 
       const data = await response.json()
       user.value = data.user
+      setSessionHint()
 
       return data.user
     } catch (error) {
@@ -218,6 +260,7 @@ export const authService = {
 
       if (!response.ok) {
         // Refresh token invalid/expired (expected behavior, don't spam console)
+        clearSessionHint()
         await this.logout(true) // Silent logout
         return false
       }
@@ -229,7 +272,7 @@ export const authService = {
         user.value = data.user
       }
 
-      console.log('✅ Token refreshed successfully')
+      setSessionHint()
       return true
     } catch (error) {
       // Network error - this is unexpected, log it
@@ -272,7 +315,7 @@ export const authService = {
       const currentUser = await this.getCurrentUser(3, 200)
 
       if (currentUser) {
-        console.log('✅ OAuth callback successful, user authenticated')
+        setSessionHint()
         return { success: true }
       }
 
@@ -302,6 +345,7 @@ export const authService = {
 
       // Clear local state (memory only)
       user.value = null
+      clearSessionHint()
 
       return { success: true, sessionsRevoked: data.sessions_revoked }
     } catch (error) {

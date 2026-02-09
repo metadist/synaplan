@@ -256,7 +256,7 @@ async function refreshAccessToken(): Promise<RefreshResult> {
  * Handle authentication failure - clear state and redirect using router (not full page reload)
  */
 async function handleAuthFailure(): Promise<never> {
-  console.warn('🔒 Authentication failed - logging out user')
+  if (import.meta.env.DEV) console.debug('Authentication failed - logging out user')
 
   // Record this failure for loop detection
   recordAuthFailure()
