@@ -61,3 +61,8 @@ export const WIDGET_TASK_PROMPT_QUESTION = 'What is the most important thing in 
 export const WIDGET_TEST_URLS = {
   EXAMPLE_DOMAIN: 'https://example.com',
 } as const
+
+/** Paths to test fixture files (relative to e2e dir). Use with path.join(e2eDir, path). */
+export const FIXTURE_PATHS = {
+  VISION_PATTERN_64: 'test_data/vision-pattern-64.png',
+} as const
