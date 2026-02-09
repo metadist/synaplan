@@ -14,6 +14,24 @@ class ModelFixtures extends Fixture
     {
         $models = [
             [
+                'id' => 900,
+                'service' => 'test',
+                'name' => 'test-model',
+                'tag' => 'chat',
+                'selectable' => 1,
+                'active' => 1,
+                'providerId' => 'test-model',
+                'priceIn' => 0,
+                'inUnit' => '-',
+                'priceOut' => 0,
+                'outUnit' => '-',
+                'quality' => 1,
+                'rating' => 0,
+                'json' => [
+                    'description' => 'Mock model for E2E/CI (TestProvider). No API key required.',
+                ],
+            ],
+            [
                 'id' => 1,
                 'service' => 'Ollama',
                 'name' => 'deepseek-r1:14b',

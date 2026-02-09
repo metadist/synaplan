@@ -191,7 +191,9 @@ services:
     App\Service\CircuitBreaker: ~
 
     # Model Configuration Service
-    App\Service\ModelConfigService: ~
+    App\Service\ModelConfigService:
+        arguments:
+            $appEnv: '%kernel.environment%'
 
     # Rate Limiter Service
     App\Service\RateLimiterService: ~
