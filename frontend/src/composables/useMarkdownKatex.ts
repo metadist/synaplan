@@ -11,23 +11,24 @@
  * Usage:
  * 1. Call processKatexInMarkdown() before rendering markdown to convert math syntax
  * 2. Or call renderKatexBlocks() after mounting to process rendered HTML
+ *
+ * Both CSS and JS are loaded dynamically on first use to keep the main bundle small.
  */
-
-// Import KaTeX CSS from installed package (ensures version consistency)
-import 'katex/dist/katex.min.css'
 
 let katexModule: typeof import('katex') | null = null
 
 /**
- * Lazy-load KaTeX module (CSS is already loaded via import)
+ * Lazy-load KaTeX module and CSS together
  */
 async function loadKatex(): Promise<typeof import('katex')> {
   if (katexModule) {
     return katexModule
   }
 
-  // Dynamic import for code-splitting
-  katexModule = await import('katex')
+  // Dynamic import for code-splitting — load CSS and JS in parallel
+  const [, katex] = await Promise.all([import('katex/dist/katex.min.css'), import('katex')])
+
+  katexModule = katex
   return katexModule
 }
 

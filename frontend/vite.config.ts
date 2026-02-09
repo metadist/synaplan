@@ -45,6 +45,44 @@ export default defineConfig(({ mode }) => {
     build: {
       outDir: 'dist',
       emptyOutDir: true,
+      rollupOptions: {
+        output: {
+          manualChunks(id: string) {
+            if (!id.includes('node_modules')) return undefined
+
+            // Core framework — changes infrequently, loaded on every page
+            if (
+              /\/node_modules\/(vue|@vue|vue-router|pinia|vue-demi|vue-i18n|@intlify|zod)\//.test(
+                id
+              )
+            ) {
+              return 'vendor-core'
+            }
+
+            // Markdown processing — loaded with chat views
+            if (/\/node_modules\/(marked|dompurify)\//.test(id)) {
+              return 'vendor-markdown'
+            }
+
+            // Syntax highlighting — dynamically loaded when code blocks are rendered
+            if (id.includes('/node_modules/highlight.js/')) {
+              return 'vendor-highlight'
+            }
+
+            // Charts — only used in admin/statistics views
+            if (/\/node_modules\/(chart\.js|vue-chartjs)\//.test(id)) {
+              return 'vendor-charts'
+            }
+
+            // 3D graphics — only used in memory graph visualization
+            if (id.includes('/node_modules/three/')) {
+              return 'vendor-three'
+            }
+
+            return undefined
+          },
+        },
+      },
     },
     resolve: {
       alias: {

@@ -1,8 +1,14 @@
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, beforeAll } from 'vitest'
 import { mount } from '@vue/test-utils'
 import MessageCode from '@/components/MessageCode.vue'
+import { ensureHighlighter } from '@/composables/useHighlight'
 
 describe('MessageCode', () => {
+  // Ensure highlight.js is loaded before all tests
+  beforeAll(async () => {
+    await ensureHighlighter()
+  })
+
   it('should render code content', () => {
     const wrapper = mount(MessageCode, {
       props: {

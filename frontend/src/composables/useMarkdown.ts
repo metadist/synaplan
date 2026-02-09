@@ -9,100 +9,7 @@
  */
 import { marked, type MarkedExtension, type Tokens } from 'marked'
 import DOMPurify from 'dompurify'
-import hljs from 'highlight.js/lib/core'
-
-// Import languages for syntax highlighting
-import javascript from 'highlight.js/lib/languages/javascript'
-import typescript from 'highlight.js/lib/languages/typescript'
-import python from 'highlight.js/lib/languages/python'
-import java from 'highlight.js/lib/languages/java'
-import cpp from 'highlight.js/lib/languages/cpp'
-import csharp from 'highlight.js/lib/languages/csharp'
-import php from 'highlight.js/lib/languages/php'
-import ruby from 'highlight.js/lib/languages/ruby'
-import go from 'highlight.js/lib/languages/go'
-import rust from 'highlight.js/lib/languages/rust'
-import sql from 'highlight.js/lib/languages/sql'
-import bash from 'highlight.js/lib/languages/bash'
-import json from 'highlight.js/lib/languages/json'
-import xml from 'highlight.js/lib/languages/xml'
-import css from 'highlight.js/lib/languages/css'
-import yaml from 'highlight.js/lib/languages/yaml'
-import markdown from 'highlight.js/lib/languages/markdown'
-
-// Import highlight.js theme
-import 'highlight.js/styles/atom-one-dark.css'
-
-// Register languages once
-let languagesRegistered = false
-
-function registerLanguages(): void {
-  if (languagesRegistered) return
-
-  hljs.registerLanguage('javascript', javascript)
-  hljs.registerLanguage('js', javascript)
-  hljs.registerLanguage('typescript', typescript)
-  hljs.registerLanguage('ts', typescript)
-  hljs.registerLanguage('python', python)
-  hljs.registerLanguage('py', python)
-  hljs.registerLanguage('java', java)
-  hljs.registerLanguage('cpp', cpp)
-  hljs.registerLanguage('c++', cpp)
-  hljs.registerLanguage('csharp', csharp)
-  hljs.registerLanguage('c#', csharp)
-  hljs.registerLanguage('php', php)
-  hljs.registerLanguage('ruby', ruby)
-  hljs.registerLanguage('rb', ruby)
-  hljs.registerLanguage('go', go)
-  hljs.registerLanguage('golang', go)
-  hljs.registerLanguage('rust', rust)
-  hljs.registerLanguage('rs', rust)
-  hljs.registerLanguage('sql', sql)
-  hljs.registerLanguage('bash', bash)
-  hljs.registerLanguage('shell', bash)
-  hljs.registerLanguage('sh', bash)
-  hljs.registerLanguage('zsh', bash)
-  hljs.registerLanguage('json', json)
-  hljs.registerLanguage('xml', xml)
-  hljs.registerLanguage('html', xml)
-  hljs.registerLanguage('css', css)
-  hljs.registerLanguage('yaml', yaml)
-  hljs.registerLanguage('yml', yaml)
-  hljs.registerLanguage('markdown', markdown)
-  hljs.registerLanguage('md', markdown)
-
-  languagesRegistered = true
-}
-
-// HTML escaping for code content
-function escapeHtml(text: string): string {
-  const div = document.createElement('div')
-  div.textContent = text
-  return div.innerHTML
-}
-
-// Highlight code with fallback
-function highlightCode(code: string, language: string): string {
-  registerLanguages()
-
-  const lang = language.toLowerCase()
-
-  // Special case: mermaid code blocks should not be highlighted
-  if (lang === 'mermaid') {
-    return escapeHtml(code)
-  }
-
-  try {
-    if (hljs.getLanguage(lang)) {
-      return hljs.highlight(code, { language: lang, ignoreIllegals: true }).value
-    }
-    // Try auto-detection for unknown languages
-    return hljs.highlightAuto(code).value
-  } catch {
-    // Fallback to escaped HTML
-    return escapeHtml(code)
-  }
-}
+import { escapeHtml, highlightCode, preloadHighlighter, ensureHighlighter } from './useHighlight'
 
 // Custom renderer for marked
 function createRenderer(): MarkedExtension {
@@ -431,6 +338,10 @@ let markedConfigured = false
 function configureMarked(): void {
   if (markedConfigured) return
 
+  // Start loading highlight.js in the background so it is ready
+  // by the time a code block needs to be rendered
+  preloadHighlighter()
+
   marked.use(createRenderer())
   marked.use(createMarkExtension())
   marked.use(createFootnoteExtension())
@@ -524,6 +435,9 @@ export function useMarkdown(): UseMarkdownReturn {
     if (!markdown) {
       return ''
     }
+
+    // Ensure highlight.js is available for code block rendering
+    await ensureHighlighter()
 
     // Clear footnote definitions from previous render
     footnoteDefinitions = new Map()
