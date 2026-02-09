@@ -1,7 +1,12 @@
 import type { Page, APIRequestContext } from '@playwright/test'
 import { selectors } from '../helpers/selectors'
-import { URLS, TIMEOUTS } from '../config/config'
+import { TIMEOUTS, getApiUrl } from '../config/config'
 import { CREDENTIALS } from '../config/credentials'
+
+/** Base URL for API requests (backend port). Use this for all /api/* calls. */
+function apiBaseUrl(): string {
+  return getApiUrl()
+}
 
 interface AdminUserSummary {
   id: number
@@ -38,7 +43,7 @@ export async function loginViaApi(
 ): Promise<string> {
   const creds = CREDENTIALS.getCredentials(credentials)
 
-  const response = await request.post(`${URLS.BASE_URL}/api/v1/auth/login`, {
+  const response = await request.post(`${apiBaseUrl()}/api/v1/auth/login`, {
     data: {
       email: creds.user,
       password: creds.pass,
@@ -49,13 +54,8 @@ export async function loginViaApi(
     throw new Error(`Login failed with status ${response.status()}`)
   }
 
-  // Extract cookies from response headers
-  // Set-Cookie headers can be an array or single string
   const setCookieHeaders = response.headers()['set-cookie'] || []
   const cookieHeaders = Array.isArray(setCookieHeaders) ? setCookieHeaders : [setCookieHeaders]
-
-  // Parse cookies: extract name=value pairs from Set-Cookie headers
-  // Format: "name=value; Path=/; HttpOnly; SameSite=Lax"
   const cookies = cookieHeaders
     .map((header) => {
       const match = header.match(/^([^=]+)=([^;]+)/)
@@ -67,16 +67,25 @@ export async function loginViaApi(
 }
 
 /**
+ * Get headers with auth cookie for API requests (e.g. in API-only tests).
+ * Calls loginViaApi and returns { Cookie: '...' } for use with request.get/post etc.
+ */
+export async function getAuthHeaders(
+  request: APIRequestContext,
+  credentials?: { user?: string; pass?: string }
+): Promise<{ Cookie: string }> {
+  const cookie = await loginViaApi(request, credentials)
+  return { Cookie: cookie }
+}
+
+/**
  * Delete user by email via admin API
  */
 export async function deleteUser(request: APIRequestContext, userEmail: string): Promise<boolean> {
   try {
-    // Login as admin via API and get cookie header
     const cookieHeader = await loginViaApi(request)
-
-    // Find user by email via admin API
     const usersResponse = await request.get(
-      `${URLS.BASE_URL}/api/v1/admin/users?search=${encodeURIComponent(userEmail)}`,
+      `${apiBaseUrl()}/api/v1/admin/users?search=${encodeURIComponent(userEmail)}`,
       {
         headers: {
           Cookie: cookieHeader,
@@ -97,8 +106,7 @@ export async function deleteUser(request: APIRequestContext, userEmail: string):
       return false
     }
 
-    // Delete user via admin API
-    const deleteResponse = await request.delete(`${URLS.BASE_URL}/api/v1/admin/users/${targetUser.id}`, {
+    const deleteResponse = await request.delete(`${apiBaseUrl()}/api/v1/admin/users/${targetUser.id}`, {
       headers: {
         Cookie: cookieHeader,
       },
@@ -125,12 +133,9 @@ export async function cleanupUserData(
   userEmail: string
 ): Promise<boolean> {
   try {
-    // Login as admin via API and get cookie header
     const cookieHeader = await loginViaApi(request)
-
-    // Find user by email via admin API
     const usersResponse = await request.get(
-      `${URLS.BASE_URL}/api/v1/admin/users?search=${encodeURIComponent(userEmail)}`,
+      `${apiBaseUrl()}/api/v1/admin/users?search=${encodeURIComponent(userEmail)}`,
       {
         headers: {
           Cookie: cookieHeader,
@@ -151,9 +156,8 @@ export async function cleanupUserData(
       return false
     }
 
-    // Cleanup user data via admin API
     const cleanupResponse = await request.post(
-      `${URLS.BASE_URL}/api/v1/admin/users/${targetUser.id}/cleanup`,
+      `${apiBaseUrl()}/api/v1/admin/users/${targetUser.id}/cleanup`,
       {
         headers: {
           Cookie: cookieHeader,
