@@ -132,6 +132,7 @@ export const selectors = {
       testButton: '[data-testid="btn-widget-test"]',
       advancedButton: '[data-testid="btn-widget-advanced"]',
     },
+    testChatOverlay: '[data-testid="test-chat-overlay"]',
     advancedConfig: {
       modal: '[data-testid="modal-advanced-config"]',
       tabButton: '[data-testid="btn-tab"]',
