@@ -1,7 +1,29 @@
 import { test, expect } from '../test-setup'
 import { selectors } from '../helpers/selectors'
 import { deleteUser } from '../helpers/auth'
-import { URLS } from '../config/config'
+import {
+  clearMailHog,
+  getDecodedEmailBody,
+  extractVerificationLink,
+  normalizeVerificationUrl,
+  waitForVerificationEmail,
+} from '../helpers/email'
+import { TIMEOUTS, INTERVALS } from '../config/config'
+
+test.beforeEach(async ({ request }) => {
+  await clearMailHog(request)
+})
+
+/** Dismiss cookie banner if visible (waitFor, no fixed sleep). */
+async function acceptCookiesIfShown(page: import('@playwright/test').Page) {
+  const button = page.locator('[data-testid="btn-cookie-accept"]')
+  try {
+    await button.waitFor({ state: 'visible', timeout: TIMEOUTS.SHORT })
+    await button.click()
+  } catch {
+    // Cookie banner not shown in this run
+  }
+}
 
 test('@auth @smoke registration flow with email verification id=006', async ({
   page,
@@ -10,56 +32,12 @@ test('@auth @smoke registration flow with email verification id=006', async ({
   const uniqueSuffix = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
   const testEmail = `test+${uniqueSuffix}@test.com`
   const testPassword = 'Test1234'
-  const decodeQuotedPrintable = (input: string) => {
-    const withoutSoftBreaks = input.replace(/=\r?\n/g, '')
-    return withoutSoftBreaks.replace(/=([0-9A-Fa-f]{2})/g, (_, hex: string) =>
-      String.fromCharCode(parseInt(hex, 16))
-    )
-  }
-  const acceptCookiesIfShown = async () => {
-    const button = page.locator('[data-testid="btn-cookie-accept"]')
-    try {
-      await button.waitFor({ state: 'visible', timeout: 2000 })
-      await button.click()
-    } catch {
-      // Cookie banner not shown in this run
-    }
-  }
-  // Email content can be HTML, plain text, or token-only, so try each format.
-  const extractVerificationLink = (decodedBody: string) => {
-    const linkFromHref = decodedBody.match(
-      /href=["']([^"']*\/verify-email-callback\?token=[^"']*)["']/i
-    )?.[1]
-    if (linkFromHref) {
-      return linkFromHref
-    }
-
-    const linkFromUrl = decodedBody.match(
-      /(https?:\/\/[^\s<>"]+\/verify-email-callback\?token=[^\s<>"]+)/i
-    )?.[1]
-    if (linkFromUrl) {
-      return linkFromUrl
-    }
-
-    const token = decodedBody.match(/token=([a-zA-Z0-9_-]+)/i)?.[1]
-    if (token) {
-      return `/verify-email-callback?token=${token}`
-    }
-
-    return null
-  }
 
   try {
-    let verificationEmail: any = null
-    await test.step('Clear MailHog inbox', async () => {
-      const clearResponse = await request.delete(`${URLS.MAILHOG_URL}/api/v1/messages`)
-      expect(clearResponse.ok()).toBeTruthy()
-    })
-
     await test.step('Open registration page', async () => {
       await page.goto('/login')
       await page.locator(selectors.login.email).waitFor({ state: 'visible', timeout: 10_000 })
-      await acceptCookiesIfShown()
+      await acceptCookiesIfShown(page)
 
       await page.locator(selectors.login.signUpLink).click()
       await expect(page).toHaveURL(/\/register/)
@@ -90,67 +68,22 @@ test('@auth @smoke registration flow with email verification id=006', async ({
       await expect(page).toHaveURL(/\/login/)
     })
 
+    let verificationEmail: import('../helpers/email').MailHogMessage
     await test.step('Wait for verification email', async () => {
-      await expect
-        .poll(
-          async () => {
-            const mailhogResponse = await request.get(`${URLS.MAILHOG_URL}/api/v2/messages`)
-            if (!mailhogResponse.ok()) {
-              return null
-            }
-
-            const messages = await mailhogResponse.json()
-            const items = Array.isArray(messages.items) ? messages.items : []
-            verificationEmail = items.find((msg: any) => {
-              const toHeader = msg.Content?.Headers?.To || []
-              const toList = Array.isArray(toHeader) ? toHeader : [toHeader]
-              const toMatches = toList.some((to: string) => to.includes(testEmail))
-
-              const body = msg.Content?.Body || ''
-              const partBodies = Array.isArray(msg.Content?.Parts)
-                ? msg.Content.Parts.map((part: any) => part.Body || '').join(' ')
-                : ''
-              const contentLower = `${body} ${partBodies}`.toLowerCase()
-              const hasVerificationLink = contentLower.includes('verify-email-callback')
-
-              return toMatches && hasVerificationLink
-            })
-
-            return verificationEmail ?? null
-          },
-          { timeout: 60_000, intervals: [500] }
-        )
-        .not.toBeNull()
+      verificationEmail = await waitForVerificationEmail(request, testEmail, {
+        timeout: 60_000,
+        intervals: INTERVALS.FAST(),
+      })
     })
 
     await test.step('Open verification link', async () => {
-      if (!verificationEmail) {
-        throw new Error('Verification email not found')
-      }
-
-      const emailBody = verificationEmail.Content?.Body || ''
-      const emailParts = Array.isArray(verificationEmail.Content?.Parts)
-        ? verificationEmail.Content.Parts.map((part: any) => part.Body).filter(Boolean)
-        : []
-      const emailHtml = emailParts.join('\n')
-      const fullBody = emailHtml || emailBody
-      const decodedBody = decodeQuotedPrintable(fullBody)
-
+      const decodedBody = getDecodedEmailBody(verificationEmail)
       const verificationLink = extractVerificationLink(decodedBody)
       if (!verificationLink) {
         throw new Error('Could not extract verification link from email')
       }
 
-      let verificationPath = verificationLink
-      if (verificationPath.startsWith('http://') || verificationPath.startsWith('https://')) {
-        const url = new URL(verificationPath)
-        verificationPath = url.pathname + url.search
-      }
-      if (!verificationPath.startsWith('/')) {
-        verificationPath = '/' + verificationPath
-      }
-      const normalizedVerificationLink = new URL(verificationPath, URLS.BASE_URL).toString()
-
+      const normalizedVerificationLink = normalizeVerificationUrl(verificationLink)
       await page.goto(normalizedVerificationLink)
       await page
         .locator(selectors.verifyEmail.successState)
