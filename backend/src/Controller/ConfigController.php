@@ -36,6 +36,8 @@ class ConfigController extends AbstractController
         private UserMemoryService $memoryService,
         #[Autowire('%env(string:default::QDRANT_SERVICE_URL)%')]
         private readonly string $qdrantServiceUrl,
+        #[Autowire('%kernel.environment%')]
+        private readonly string $kernelEnvironment,
     ) {
     }
 
@@ -415,6 +417,37 @@ class ConfigController extends AbstractController
                         $grouped[$cap][] = $model;
                     }
                     break;
+            }
+        }
+
+        // In test/CI: add TestProvider (900) to every capability so UI shows "test-model (test)" for all
+        if ($this->kernelEnvironment === 'test') {
+            $testModel = $this->modelRepository->find(900);
+            if ($testModel) {
+                $testModelEntry = [
+                    'id' => $testModel->getId(),
+                    'service' => $testModel->getService(),
+                    'name' => $testModel->getName(),
+                    'providerId' => $testModel->getProviderId(),
+                    'description' => $testModel->getDescription(),
+                    'quality' => $testModel->getQuality(),
+                    'rating' => $testModel->getRating(),
+                    'tag' => strtoupper($testModel->getTag()),
+                    'isSystemModel' => $testModel->isSystemModel(),
+                    'features' => $testModel->getFeatures(),
+                ];
+                foreach (array_keys($grouped) as $cap) {
+                    $hasTest = false;
+                    foreach ($grouped[$cap] as $m) {
+                        if (($m['id'] ?? null) === 900) {
+                            $hasTest = true;
+                            break;
+                        }
+                    }
+                    if (!$hasTest) {
+                        $grouped[$cap][] = $testModelEntry;
+                    }
+                }
             }
         }
 
