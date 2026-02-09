@@ -5,6 +5,7 @@ import { selectors } from '../helpers/selectors'
 test('@noci @smoke semantic search completes and shows results summary id=007', async ({ page }) => {
   await login(page)
 
+  // RAG search is in sidebar only in advanced mode
   const modeToggle = page.locator(selectors.header.modeToggle)
   await modeToggle.waitFor({ state: 'visible' })
   const modeLabel = (await modeToggle.innerText()).toLowerCase()

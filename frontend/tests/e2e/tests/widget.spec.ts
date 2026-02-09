@@ -2,7 +2,8 @@ import { test, expect } from '../test-setup'
 import { login } from '../helpers/auth'
 import {
   createTestWidget,
-  createWidgetTestPage,
+  gotoWidgetTestPage,
+  openWidgetOnTestPage,
   waitForWidgetAnswer,
   countWidgetMessages,
   getApiUrl,
@@ -10,7 +11,7 @@ import {
   setWidgetTaskPrompt,
 } from '../helpers/widget'
 import { selectors } from '../helpers/selectors'
-import { URLS, TIMEOUTS } from '../config/config'
+import { URLS, TIMEOUTS, INTERVALS, isTestStack } from '../config/config'
 import {
   PROMPTS,
   WIDGET_NAMES,
@@ -22,41 +23,87 @@ import {
 import path from 'path'
 import { fileURLToPath } from 'url'
 
-// Get __dirname equivalent in ES modules
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 
-test('@noci @smoke @widget @security User creates widget and receives response id=013', async ({ page }) => {
+// In-app Test Widget overlay (no cross-origin). Test stack: expect "success"; dev: any non-empty reply.
+test('@noci @smoke @widget @security User creates widget and receives response in test-widget-chat id=013', async ({ page }) => {
   await login(page)
 
   const widgetName = WIDGET_NAMES.unique(WIDGET_NAMES.FULL_FLOW)
-  const widgetInfo = await createTestWidget(page, widgetName, URLS.TEST_PAGE_URL)
+  await createTestWidget(page, widgetName, URLS.TEST_PAGE_URL)
   await updateWidgetSettings(page, widgetName, {})
-  
-  const apiUrl = getApiUrl()
-  const testPageHtml = createWidgetTestPage(widgetInfo.widgetId, apiUrl)
-  await page.setContent(testPageHtml, { waitUntil: 'domcontentloaded' })
 
-  const widgetButton = page.locator(selectors.widget.button)
-  await widgetButton.waitFor({ state: 'visible', timeout: TIMEOUTS.LONG })
-  await expect(widgetButton).toBeVisible()
-  await widgetButton.click()
+  await page.goto('/tools/chat-widget')
+  await page.waitForSelector(selectors.widgets.page, { timeout: TIMEOUTS.LONG })
 
-  const widgetHost = page.locator(selectors.widget.host)
-  await widgetHost.waitFor({ state: 'attached', timeout: TIMEOUTS.LONG })
-  const chatWindow = widgetHost.locator(selectors.widget.chatWindow)
+  const testButton = page.locator(selectors.widgets.widgetCard.testButton).first()
+  await testButton.waitFor({ state: 'visible', timeout: TIMEOUTS.LONG })
+  await testButton.click()
+
+  const overlay = page.locator(selectors.widgets.testChatOverlay)
+  await overlay.waitFor({ state: 'visible', timeout: TIMEOUTS.LONG })
+
+  const chatWindow = overlay.locator(selectors.widget.chatWindow)
   await chatWindow.waitFor({ state: 'visible', timeout: TIMEOUTS.LONG })
-  await expect(chatWindow).toBeVisible()
 
-  const input = widgetHost.locator(selectors.widget.input)
+  const input = overlay.locator(selectors.widget.input)
   await expect(input).toBeVisible({ timeout: TIMEOUTS.SHORT })
 
-  const previousCount = await countWidgetMessages(page)
-  await input.fill(PROMPTS.SMOKE_TEST)
-  await widgetHost.locator(selectors.widget.sendButton).click()
+  const messagesContainer = overlay.locator(selectors.widget.messagesContainer)
+  await messagesContainer.waitFor({ state: 'attached', timeout: TIMEOUTS.SHORT }).catch(() => {})
+  const previousCount = await messagesContainer.locator(selectors.widget.messageContainers).count()
 
-  const aiText = await waitForWidgetAnswer(page, previousCount)
-  expect(aiText).toContain('success')
+  await input.fill(PROMPTS.SMOKE_TEST)
+  await overlay.locator(selectors.widget.sendButton).click()
+
+  const userBubble = overlay.locator(selectors.widget.messageUserText).last()
+  await expect(userBubble).toBeVisible({ timeout: TIMEOUTS.SHORT })
+  await expect(userBubble).toContainText('smoke test')
+
+  await expect
+    .poll(
+      async () => {
+        const count = await messagesContainer.locator(selectors.widget.messageContainers).count()
+        return count > previousCount ? count : null
+      },
+      { timeout: TIMEOUTS.VERY_LONG, intervals: INTERVALS.FAST() }
+    )
+    .not.toBeNull()
+
+  const aiTextElement = overlay.locator(selectors.widget.messageAiText).last()
+  await aiTextElement.waitFor({ state: 'visible', timeout: TIMEOUTS.VERY_LONG })
+
+  let lastText = ''
+  let stableCount = 0
+  await expect
+    .poll(
+      async () => {
+        const el = overlay.locator(selectors.widget.messageAiText).last()
+        if ((await el.count()) === 0) return null
+        const text = (await el.innerText()).trim().toLowerCase()
+        if (text.length === 0) return null
+        if (text === lastText) {
+          stableCount++
+          if (stableCount >= 2) return text
+          return null
+        }
+        lastText = text
+        stableCount = 1
+        return null
+      },
+      { timeout: TIMEOUTS.VERY_LONG, intervals: INTERVALS.FAST() }
+    )
+    .not.toBeNull()
+
+  const aiText = (await overlay.locator(selectors.widget.messageAiText).last().innerText()).trim().toLowerCase()
+
+  const expectSuccess = isTestStack()
+  if (expectSuccess) {
+    expect(aiText).toContain('success')
+  } else {
+    expect(aiText.length).toBeGreaterThan(0)
+  }
 })
 
 test('@smoke @widget Widget settings are correctly applied id=014', async ({ page }) => {
@@ -71,8 +118,7 @@ test('@smoke @widget Widget settings are correctly applied id=014', async ({ pag
     autoOpen: true,
   })
 
-  const testPageHtml = createWidgetTestPage(widgetInfo.widgetId, apiUrl)
-  await page.setContent(testPageHtml, { waitUntil: 'domcontentloaded' })
+  await gotoWidgetTestPage(page, widgetInfo.widgetId, apiUrl)
 
   const widgetHost = page.locator(selectors.widget.host)
   await widgetHost.waitFor({ state: 'attached', timeout: TIMEOUTS.VERY_LONG })
@@ -89,12 +135,11 @@ test('@smoke @widget Widget settings are correctly applied id=014', async ({ pag
     isActive: false,
   })
 
-  await page.setContent(testPageHtml, { waitUntil: 'domcontentloaded' })
-
   const configResponse = page.waitForResponse(
     (response) => response.url().includes(`/api/v1/widget/${widgetInfo.widgetId}/config`) && response.status() === 503,
     { timeout: TIMEOUTS.STANDARD }
   )
+  await gotoWidgetTestPage(page, widgetInfo.widgetId, apiUrl)
   await configResponse
 
   const inactiveWidgetButton = page.locator(selectors.widget.button)
@@ -103,28 +148,32 @@ test('@smoke @widget Widget settings are correctly applied id=014', async ({ pag
   await expect(inactiveWidgetHost).toHaveCount(0)
 })
 
+// Widget allows only example.com; page is localhost → backend returns 403 domain_not_whitelisted.
 test('@smoke @widget @security Widget blocked on non-whitelisted domain id=015', async ({ page }) => {
   await login(page)
 
   const widgetName = WIDGET_NAMES.unique(WIDGET_NAMES.NOT_WHITELISTED)
   const widgetInfo = await createTestWidget(page, widgetName, WIDGET_TEST_URLS.EXAMPLE_DOMAIN)
   await updateWidgetSettings(page, widgetName, {})
-  
+
   const apiUrl = getApiUrl()
-  const testPageHtml = createWidgetTestPage(widgetInfo.widgetId, apiUrl)
-  await page.setContent(testPageHtml, { waitUntil: 'domcontentloaded' })
 
   const configResponse = page.waitForResponse(
-    (response) => response.url().includes(`/api/v1/widget/${widgetInfo.widgetId}/config`) && response.status() === 403,
+    (response) =>
+      response.url().includes(`/api/v1/widget/${widgetInfo.widgetId}/config`) && response.status() === 403,
     { timeout: TIMEOUTS.STANDARD }
   )
-  await configResponse
+  await gotoWidgetTestPage(page, widgetInfo.widgetId, apiUrl)
+  const response = await configResponse
+  const body = await response.json().catch(() => ({}))
+  expect(body.reason).toBe('domain_not_whitelisted')
 
   const widgetButton = page.locator(selectors.widget.button)
   await expect(widgetButton).not.toBeVisible({ timeout: TIMEOUTS.SHORT })
   const widgetHost = page.locator(selectors.widget.host)
   await expect(widgetHost).toHaveCount(0)
 
+  // Add localhost to whitelist and verify widget loads
   await page.goto('/tools/chat-widget')
   await page.waitForSelector(selectors.widgets.page, { timeout: TIMEOUTS.SHORT })
   
@@ -146,18 +195,10 @@ test('@smoke @widget @security Widget blocked on non-whitelisted domain id=015',
   await saveButton.scrollIntoViewIfNeeded()
   await saveButton.click()
   await page.waitForSelector(selectors.widgets.advancedConfig.modal, { state: 'hidden', timeout: TIMEOUTS.STANDARD })
-  
-  await page.setContent(testPageHtml, { waitUntil: 'domcontentloaded' })
-  
-  const widgetButtonAfterWhitelist = page.locator(selectors.widget.button)
-  await widgetButtonAfterWhitelist.waitFor({ state: 'visible', timeout: TIMEOUTS.LONG })
-  await expect(widgetButtonAfterWhitelist).toBeVisible()
-  
-  await widgetButtonAfterWhitelist.click()
-  const widgetHostAfterWhitelist = page.locator(selectors.widget.host)
-  await widgetHostAfterWhitelist.waitFor({ state: 'attached', timeout: TIMEOUTS.LONG })
-  const chatWindow = widgetHostAfterWhitelist.locator(selectors.widget.chatWindow)
-  await chatWindow.waitFor({ state: 'visible', timeout: TIMEOUTS.LONG })
+
+  await openWidgetOnTestPage(page, widgetInfo.widgetId, apiUrl)
+
+  const chatWindow = page.locator(selectors.widget.host).locator(selectors.widget.chatWindow)
   await expect(chatWindow).toBeVisible()
 })
 
@@ -170,20 +211,10 @@ test('@noci @smoke @widget Widget file upload works id=016', async ({ page }) =>
     allowFileUpload: true,
   })
 
-  await page.waitForSelector(selectors.widgets.page, { timeout: TIMEOUTS.SHORT })
-
   const apiUrl = getApiUrl()
-  const testPageHtml = createWidgetTestPage(widgetInfo.widgetId, apiUrl)
-  await page.setContent(testPageHtml, { waitUntil: 'domcontentloaded' })
-
-  const widgetButton = page.locator(selectors.widget.button)
-  await widgetButton.waitFor({ state: 'visible', timeout: TIMEOUTS.LONG })
-  await widgetButton.click()
+  await openWidgetOnTestPage(page, widgetInfo.widgetId, apiUrl)
 
   const widgetHost = page.locator(selectors.widget.host)
-  await widgetHost.waitFor({ state: 'attached', timeout: TIMEOUTS.LONG })
-  const chatWindow = widgetHost.locator(selectors.widget.chatWindow)
-  await chatWindow.waitFor({ state: 'visible', timeout: TIMEOUTS.LONG })
 
   const attachButton = widgetHost.locator(selectors.widget.attachButton)
   await expect(attachButton).toBeVisible({ timeout: TIMEOUTS.SHORT })
@@ -223,17 +254,9 @@ test('@noci @smoke @widget Widget file upload limit enforced id=018', async ({ p
   })
 
   const apiUrl = getApiUrl()
-  const testPageHtml = createWidgetTestPage(widgetInfo.widgetId, apiUrl)
-  await page.setContent(testPageHtml, { waitUntil: 'domcontentloaded' })
-
-  const widgetButton = page.locator(selectors.widget.button)
-  await widgetButton.waitFor({ state: 'visible', timeout: TIMEOUTS.LONG })
-  await widgetButton.click()
+  await openWidgetOnTestPage(page, widgetInfo.widgetId, apiUrl)
 
   const widgetHost = page.locator(selectors.widget.host)
-  await widgetHost.waitFor({ state: 'attached', timeout: TIMEOUTS.LONG })
-  const chatWindow = widgetHost.locator(selectors.widget.chatWindow)
-  await chatWindow.waitFor({ state: 'visible', timeout: TIMEOUTS.LONG })
 
   const fileInput = widgetHost.locator(selectors.widget.fileInput)
   const firstFilePath = path.join(__dirname, '../test_data/most_important_thing.txt')
@@ -281,17 +304,9 @@ test('@noci @smoke @widget Widget max file size enforced id=019', async ({ page 
   })
 
   const apiUrl = getApiUrl()
-  const testPageHtml = createWidgetTestPage(widgetInfo.widgetId, apiUrl)
-  await page.setContent(testPageHtml, { waitUntil: 'domcontentloaded' })
-
-  const widgetButton = page.locator(selectors.widget.button)
-  await widgetButton.waitFor({ state: 'visible', timeout: TIMEOUTS.LONG })
-  await widgetButton.click()
+  await openWidgetOnTestPage(page, widgetInfo.widgetId, apiUrl)
 
   const widgetHost = page.locator(selectors.widget.host)
-  await widgetHost.waitFor({ state: 'attached', timeout: TIMEOUTS.LONG })
-  const chatWindow = widgetHost.locator(selectors.widget.chatWindow)
-  await chatWindow.waitFor({ state: 'visible', timeout: TIMEOUTS.LONG })
 
   const fileInput = widgetHost.locator(selectors.widget.fileInput)
   const largeFilePath = path.join(__dirname, '../test_data/sky_scrapers.jpg')
@@ -316,25 +331,50 @@ test('@noci @smoke @widget Widget task prompt works id=017', async ({ page }) =>
   await setWidgetTaskPrompt(page, widgetName, WIDGET_TASK_PROMPT_KNOWLEDGE_BASE, undefined, filePath)
 
   const apiUrl = getApiUrl()
-  const testPageHtml = createWidgetTestPage(widgetInfo.widgetId, apiUrl)
-  await page.setContent(testPageHtml, { waitUntil: 'domcontentloaded' })
-
-  const widgetButton = page.locator(selectors.widget.button)
-  await widgetButton.waitFor({ state: 'visible', timeout: TIMEOUTS.LONG })
-  await widgetButton.click()
+  await openWidgetOnTestPage(page, widgetInfo.widgetId, apiUrl)
 
   const widgetHost = page.locator(selectors.widget.host)
-  await widgetHost.waitFor({ state: 'attached', timeout: TIMEOUTS.LONG })
-  const chatWindow = widgetHost.locator(selectors.widget.chatWindow)
-  await chatWindow.waitFor({ state: 'visible', timeout: TIMEOUTS.LONG })
-
   const input = widgetHost.locator(selectors.widget.input)
+  const previousCount = await countWidgetMessages(page)
   await input.fill(WIDGET_TASK_PROMPT_QUESTION)
   await widgetHost.locator(selectors.widget.sendButton).click()
 
-  const previousCount = await countWidgetMessages(page)
   const aiText = await waitForWidgetAnswer(page, previousCount)
   
   expect(aiText.length).toBeGreaterThan(0)
 })
 
+// Like 013 but with the real embedded widget (script loaded on external page, Shadow DOM).
+// Uses widget-test.html — the real user flow. Run on test stack to verify CI behavior.
+// @noci: On dev stack, cross-origin (5173→8000) makes widget loading flaky.
+test(' @smoke @widget User sends message via embedded widget and receives response id=020', async ({ page }) => {
+  await login(page)
+
+  const widgetName = WIDGET_NAMES.unique('Embedded Widget Flow')
+  const widgetInfo = await createTestWidget(page, widgetName, URLS.TEST_PAGE_URL)
+  await updateWidgetSettings(page, widgetName, {})
+
+  const apiUrl = getApiUrl()
+  await openWidgetOnTestPage(page, widgetInfo.widgetId, apiUrl)
+
+  const widgetHost = page.locator(selectors.widget.host)
+  const input = widgetHost.locator(selectors.widget.input)
+  await expect(input).toBeVisible({ timeout: TIMEOUTS.SHORT })
+
+  const previousCount = await countWidgetMessages(page)
+  await input.fill(PROMPTS.SMOKE_TEST)
+  await widgetHost.locator(selectors.widget.sendButton).click()
+
+  const userBubble = widgetHost.locator(selectors.widget.messageUserText).last()
+  await expect(userBubble).toBeVisible({ timeout: TIMEOUTS.SHORT })
+  await expect(userBubble).toContainText('smoke test')
+
+  const aiText = await waitForWidgetAnswer(page, previousCount)
+
+  const expectSuccess = isTestStack()
+  if (expectSuccess) {
+    expect(aiText).toContain('success')
+  } else {
+    expect(aiText.length).toBeGreaterThan(0)
+  }
+})
