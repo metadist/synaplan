@@ -155,6 +155,9 @@ RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 # Copy built frontend (built externally in CI, empty in dev)
 COPY frontend/dist /var/www/frontend
 
+# Widget E2E test page (served by Caddy from backend public so it's always available in test stack)
+COPY frontend/public/widget-test.html /var/www/backend/public/widget-test.html
+
 # Copy built widgets (built externally in CI, empty in dev)
 # Note: In CI, widget files should exist (verified in workflow), but we don't fail the build if missing
 # to allow local development where dist-widget might be empty

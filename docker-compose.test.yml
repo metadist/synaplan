@@ -1,11 +1,14 @@
 # Docker Compose configuration for testing
 #
-# Usage:
-#   Local dev:  docker compose -f docker-compose.test.yml up
-#               (uses volume mounts for live code reloading)
+# Prerequisite (local only): The backend image COPYs frontend/dist and frontend/dist-widget.
+# Build them first or the app on :8001 will have no login page / widget:
+#   make test-stack-build   # or: cd frontend && npm run build && npm run build:widget && cd .. && docker compose -f docker-compose.test.yml build
 #
-#   CI:         docker compose -f docker-compose.test.yml -f docker-compose.test.ci.yml up
-#               (docker-compose.test.ci.yml removes volume mounts to use baked image)
+# Usage:
+#   Local:  docker compose -f docker-compose.test.yml up -d
+#           (MailHog on 8025/1025; stop dev stack first if it uses the same ports)
+#   CI:     docker compose -f docker-compose.test.yml -f docker-compose.test.ci.yml up
+#           (docker-compose.test.ci.yml removes volume mounts to use baked image)
 
 services:
   # Symfony Backend for Testing
@@ -30,7 +33,6 @@ services:
       DATABASE_READ_URL: mysql://synaplan_test:synaplan_test@db_test:3306/synaplan?serverVersion=11.8&charset=utf8mb4
       OLLAMA_BASE_URL: http://ollama_test:11434
       TIKA_BASE_URL: http://tika_test:9998
-      AI_DEFAULT_PROVIDER: test
       MAILER_DSN: smtp://mailhog_test:1025
       AUTO_DOWNLOAD_MODELS: "false"
       TOKEN_SECRET: "test_token_secret"
