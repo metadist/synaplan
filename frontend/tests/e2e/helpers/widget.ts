@@ -7,26 +7,28 @@ import path from 'path'
 
 export { getApiUrl }
 
-export function createWidgetTestPage(widgetId: string, apiUrl: string): string {
-  return `<!DOCTYPE html>
-<html>
-<head><meta charset="UTF-8"><title>Widget Test</title></head>
-<body>
-  <h1>Widget Test Page</h1>
-  <script type="module">
-    import SynaplanWidget from '${apiUrl}/widget.js'
-    SynaplanWidget.init({
-      widgetId: '${widgetId}',
-      position: '${WIDGET_DEFAULTS.POSITION}',
-      primaryColor: '${WIDGET_DEFAULTS.PRIMARY_COLOR}',
-      iconColor: '${WIDGET_DEFAULTS.ICON_COLOR}',
-      defaultTheme: '${WIDGET_DEFAULTS.DEFAULT_THEME}',
-      lazy: ${WIDGET_DEFAULTS.LAZY_LOAD},
-      apiUrl: '${apiUrl}'
-    })
-  </script>
-</body>
-</html>`
+/** Go to widget-test.html with widgetId and apiUrl in query; works on dev (5173→8000) and test stack (8001). */
+export async function gotoWidgetTestPage(page: Page, widgetId: string, apiUrl: string): Promise<void> {
+  const url = `/widget-test.html?widgetId=${encodeURIComponent(widgetId)}&apiUrl=${encodeURIComponent(apiUrl)}`
+  await page.goto(url, { waitUntil: 'load' })
+}
+
+/** Open widget on test page: goto, click button, wait for chat window (Shadow DOM). */
+export async function openWidgetOnTestPage(
+  page: Page,
+  widgetId: string,
+  apiUrl: string
+): Promise<void> {
+  await gotoWidgetTestPage(page, widgetId, apiUrl)
+
+  const widgetButton = page.locator(selectors.widget.button)
+  await widgetButton.waitFor({ state: 'visible', timeout: TIMEOUTS.LONG })
+  await widgetButton.click()
+
+  const widgetHost = page.locator(selectors.widget.host)
+  await widgetHost.waitFor({ state: 'attached', timeout: TIMEOUTS.LONG })
+  const chatWindow = widgetHost.locator(selectors.widget.chatWindow)
+  await chatWindow.waitFor({ state: 'visible', timeout: TIMEOUTS.LONG })
 }
 
 export async function countWidgetMessages(page: Page): Promise<number> {
@@ -37,6 +39,7 @@ export async function countWidgetMessages(page: Page): Promise<number> {
 }
 
 export async function waitForWidgetAnswer(page: Page, previousCount: number): Promise<string> {
+  // Wait for a new message to appear
   await expect
     .poll(
       async () => {
@@ -51,30 +54,31 @@ export async function waitForWidgetAnswer(page: Page, previousCount: number): Pr
   const aiTextElement = widgetHost.locator(selectors.widget.messageAiText).last()
   await aiTextElement.waitFor({ state: 'visible', timeout: TIMEOUTS.VERY_LONG })
 
-  let previousText = ''
-  let stableText = ''
+  // Wait for stable text (tolerate empty reads from history reload flicker)
+  let lastNonEmpty = ''
+  let stableCount = 0
   await expect
     .poll(
       async () => {
-        const widgetHost = page.locator(selectors.widget.host)
-        const aiTextElement = widgetHost.locator(selectors.widget.messageAiText).last()
-        
-        const exists = await aiTextElement.count() > 0
-        if (!exists) return null
-        
-        const currentText = (await aiTextElement.innerText()).trim().toLowerCase()
-        if (currentText.length > 0 && currentText === previousText) {
-          stableText = currentText
-          return currentText
+        const host = page.locator(selectors.widget.host)
+        const el = host.locator(selectors.widget.messageAiText).last()
+        if ((await el.count()) === 0) return null
+        const text = (await el.innerText()).trim().toLowerCase()
+        if (text.length === 0) return null
+        if (text === lastNonEmpty) {
+          stableCount++
+          if (stableCount >= 2) return text
+          return null
         }
-        previousText = currentText
+        lastNonEmpty = text
+        stableCount = 1
         return null
       },
-      { timeout: TIMEOUTS.STANDARD, intervals: INTERVALS.FAST() }
+      { timeout: TIMEOUTS.VERY_LONG, intervals: INTERVALS.FAST() }
     )
     .not.toBeNull()
 
-  return stableText
+  return lastNonEmpty
 }
 
 export async function createTestWidget(
