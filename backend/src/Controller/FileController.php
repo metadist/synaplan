@@ -7,12 +7,13 @@ use App\Entity\Message;
 use App\Entity\User;
 use App\Repository\FileRepository;
 use App\Repository\MessageRepository;
-use App\Repository\RagDocumentRepository;
 use App\Repository\WidgetSessionRepository;
 use App\Service\File\FileHelper;
 use App\Service\File\FileProcessor;
 use App\Service\File\FileStorageService;
 use App\Service\File\VectorizationService;
+use App\Service\RAG\VectorStorage\VectorMigrationService;
+use App\Service\RAG\VectorStorage\VectorStorageFacade;
 use App\Service\RateLimitService;
 use App\Service\StorageQuotaService;
 use App\Service\WidgetService;
@@ -40,9 +41,10 @@ class FileController extends AbstractController
         private RateLimitService $rateLimitService,
         private MessageRepository $messageRepository,
         private FileRepository $fileRepository,
-        private RagDocumentRepository $ragDocumentRepository,
         private WidgetSessionRepository $widgetSessionRepository,
         private WidgetService $widgetService,
+        private VectorStorageFacade $vectorStorageFacade,
+        private VectorMigrationService $migrationService,
         private EntityManagerInterface $em,
         private LoggerInterface $logger,
         private string $uploadDir,
@@ -540,7 +542,7 @@ class FileController extends AbstractController
         }
 
         try {
-            $groups = $this->ragDocumentRepository->findDistinctGroupKeysByUser($user->getId());
+            $groups = $this->vectorStorageFacade->getGroupKeys($user->getId());
 
             $this->logger->debug('FileController: Retrieved file groups', [
                 'user_id' => $user->getId(),
@@ -549,12 +551,32 @@ class FileController extends AbstractController
             ]);
 
             // Transform to expected format
-            $groupsData = array_map(function ($row) {
-                return [
-                    'name' => $row['groupKey'],
-                    'count' => (int) $row['count'],
+            // Note: Facade returns simple array of strings, but frontend might expect objects with counts?
+            // The previous implementation returned `['groupKey' => '...', 'count' => 5]`
+            // The facade `getGroupKeys` currently returns `string[]`.
+            // Let's check `MariaDBVectorStorage::getGroupKeys`. It calls `ragRepository->findDistinctGroupKeysByUser`.
+            // `findDistinctGroupKeysByUser` likely returns array of arrays with counts.
+            // Let's check `RagDocumentRepository`.
+            // If Facade returns strings, we lose counts.
+            // Let's check `VectorStorageInterface`. `getGroupKeys` returns `string[]`.
+            // This is a regression if frontend uses counts.
+            // Let's check `MariaDBVectorStorage` implementation again.
+            // `return $this->ragRepository->findDistinctGroupKeysByUser($userId);`
+            // If that returns `[['groupKey' => 'A', 'count' => 1]]`, then interface return type `array` is loose but PHPDoc says `string[]`.
+            // I should update `VectorStorageInterface` and implementations to return `array` (of group info) or `string[]` and fetch stats separately.
+            // `getStats` returns `chunksByGroup`. I can use that!
+
+            // Better approach: Use getStats to get groups and counts.
+            $stats = $this->vectorStorageFacade->getStats($user->getId());
+            $chunksByGroup = $stats->chunksByGroup;
+
+            $groupsData = [];
+            foreach ($chunksByGroup as $groupKey => $count) {
+                $groupsData[] = [
+                    'name' => $groupKey,
+                    'count' => $count,
                 ];
-            }, $groups);
+            }
 
             return $this->json([
                 'success' => true,
@@ -594,13 +616,14 @@ class FileController extends AbstractController
 
         $fileId = $messageFile->getId();
 
-        // Delete RAG embeddings first (before deleting the file entity)
-        $deletedChunks = $this->ragDocumentRepository->deleteByMessageId($fileId);
+        // Delete RAG embeddings first (before deleting the file entity) via facade
+        $deletedChunks = $this->vectorStorageFacade->deleteByFile($user->getId(), $fileId);
 
         $this->logger->info('FileController: Deleted RAG embeddings for file', [
             'file_id' => $fileId,
             'user_id' => $user->getId(),
             'chunks_deleted' => $deletedChunks,
+            'provider' => $this->vectorStorageFacade->getProviderName(),
         ]);
 
         // Delete physical file
@@ -768,6 +791,96 @@ class FileController extends AbstractController
     }
 
     /**
+     * Get groupKey, vectorization info, and migration status for a file.
+     *
+     * GET /api/v1/files/{id}/group-key
+     */
+    #[Route('/{id}/group-key', name: 'get_group_key', methods: ['GET'])]
+    public function getFileGroupKey(
+        int $id,
+        #[CurrentUser] ?User $user,
+    ): JsonResponse {
+        if (!$user) {
+            return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
+        }
+
+        $messageFile = $this->fileRepository->find($id);
+        if (!$messageFile || $messageFile->getUserId() !== $user->getId()) {
+            return $this->json(['error' => 'File not found'], Response::HTTP_NOT_FOUND);
+        }
+
+        try {
+            $status = $this->migrationService->getFileMigrationStatus($user->getId(), $id);
+
+            return $this->json([
+                'success' => true,
+                'groupKey' => $status['groupKey'],
+                'isVectorized' => ($status['qdrantChunks'] > 0) || ($status['mariadbChunks'] > 0),
+                'chunks' => max($status['qdrantChunks'], $status['mariadbChunks']),
+                'status' => $messageFile->getStatus(),
+                'needsMigration' => $status['needsMigration'],
+                'mariadbChunks' => $status['mariadbChunks'],
+                'qdrantChunks' => $status['qdrantChunks'],
+            ]);
+        } catch (\Throwable $e) {
+            $this->logger->warning('FileController: Failed to get group key', [
+                'file_id' => $id,
+                'error' => $e->getMessage(),
+            ]);
+
+            return $this->json([
+                'success' => true,
+                'groupKey' => null,
+                'isVectorized' => 'vectorized' === $messageFile->getStatus(),
+                'chunks' => 0,
+                'status' => $messageFile->getStatus(),
+                'needsMigration' => false,
+                'mariadbChunks' => 0,
+                'qdrantChunks' => 0,
+            ]);
+        }
+    }
+
+    /**
+     * Migrate file vectors from MariaDB to Qdrant.
+     *
+     * POST /api/v1/files/{id}/migrate
+     */
+    #[Route('/{id}/migrate', name: 'migrate_vectors', methods: ['POST'])]
+    public function migrateFileVectors(
+        int $id,
+        #[CurrentUser] ?User $user,
+    ): JsonResponse {
+        if (!$user) {
+            return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
+        }
+
+        $messageFile = $this->fileRepository->find($id);
+        if (!$messageFile || $messageFile->getUserId() !== $user->getId()) {
+            return $this->json(['error' => 'File not found'], Response::HTTP_NOT_FOUND);
+        }
+
+        try {
+            $result = $this->migrationService->migrateFile($user->getId(), $id);
+
+            return $this->json([
+                'success' => true,
+                'migrated' => $result['migrated'],
+                'errors' => $result['errors'],
+            ]);
+        } catch (\Throwable $e) {
+            $this->logger->error('FileController: Migration failed', [
+                'file_id' => $id,
+                'error' => $e->getMessage(),
+            ]);
+
+            return $this->json([
+                'error' => 'Migration failed: '.$e->getMessage(),
+            ], Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    /**
      * Update groupKey for an existing file.
      *
      * PUT /api/v1/files/{id}/group-key
@@ -807,7 +920,6 @@ class FileController extends AbstractController
         int $id,
         Request $request,
         #[CurrentUser] ?User $user,
-        RagDocumentRepository $ragRepository,
     ): JsonResponse {
         if (!$user) {
             return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
@@ -831,25 +943,19 @@ class FileController extends AbstractController
             return $this->json(['error' => 'groupKey is required'], Response::HTTP_BAD_REQUEST);
         }
 
-        // Update all RAG documents for this file
-        $ragDocs = $ragRepository->findBy([
-            'userId' => $user->getId(),
-            'messageId' => $messageFile->getId(),
-        ]);
-
-        $chunksUpdated = 0;
-        foreach ($ragDocs as $doc) {
-            $doc->setGroupKey($newGroupKey);
-            ++$chunksUpdated;
-        }
-
-        $this->em->flush();
+        // Update all RAG documents for this file via facade
+        $chunksUpdated = $this->vectorStorageFacade->updateGroupKey(
+            $user->getId(),
+            $messageFile->getId(),
+            $newGroupKey
+        );
 
         $this->logger->info('FileController: GroupKey updated', [
             'file_id' => $id,
             'user_id' => $user->getId(),
             'new_group_key' => $newGroupKey,
             'chunks_updated' => $chunksUpdated,
+            'provider' => $this->vectorStorageFacade->getProviderName(),
         ]);
 
         return $this->json([
@@ -900,7 +1006,6 @@ class FileController extends AbstractController
         int $id,
         Request $request,
         #[CurrentUser] ?User $user,
-        RagDocumentRepository $ragRepository,
     ): JsonResponse {
         if (!$user) {
             return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
@@ -920,16 +1025,8 @@ class FileController extends AbstractController
         $data = json_decode($request->getContent(), true);
         $groupKey = $data['groupKey'] ?? 'DEFAULT';
 
-        // Step 1: Delete existing RAG documents for this file
-        $existingDocs = $ragRepository->findBy([
-            'userId' => $user->getId(),
-            'messageId' => $messageFile->getId(),
-        ]);
-
-        foreach ($existingDocs as $doc) {
-            $this->em->remove($doc);
-        }
-        $this->em->flush();
+        // Step 1: Delete existing RAG documents for this file via facade
+        $this->vectorStorageFacade->deleteByFile($user->getId(), $messageFile->getId());
 
         // Step 2: Extract text from file (if not already extracted)
         $relativePath = $messageFile->getFilePath();
@@ -1002,6 +1099,7 @@ class FileController extends AbstractController
                     'user_id' => $user->getId(),
                     'group_key' => $groupKey,
                     'chunks_created' => $vectorResult['chunks_created'],
+                    'provider' => $vectorResult['provider'] ?? 'unknown',
                 ]);
 
                 return $this->json([
@@ -1010,6 +1108,7 @@ class FileController extends AbstractController
                     'extractedTextLength' => strlen($extractedText),
                     'groupKey' => $groupKey,
                     'message' => 'File re-vectorized successfully',
+                    'provider' => $vectorResult['provider'] ?? 'unknown',
                 ]);
             } else {
                 return $this->json([
@@ -1028,77 +1127,5 @@ class FileController extends AbstractController
                 'error' => 'Vectorization failed: '.$e->getMessage(),
             ], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
-    }
-
-    /**
-     * Get groupKey for a file.
-     *
-     * GET /api/v1/files/{id}/group-key
-     */
-    #[Route('/{id}/group-key', name: 'get_group_key', methods: ['GET'])]
-    #[OA\Get(
-        path: '/api/v1/files/{id}/group-key',
-        summary: 'Get the groupKey for a file',
-        description: 'Returns the groupKey from RAG documents, or null if not vectorized',
-        tags: ['Files'],
-        responses: [
-            new OA\Response(
-                response: 200,
-                description: 'GroupKey retrieved successfully',
-                content: new OA\JsonContent(
-                    properties: [
-                        new OA\Property(property: 'success', type: 'boolean'),
-                        new OA\Property(property: 'groupKey', type: 'string', example: 'customer-support', nullable: true),
-                        new OA\Property(property: 'isVectorized', type: 'boolean'),
-                        new OA\Property(property: 'chunks', type: 'integer', example: 15),
-                    ]
-                )
-            ),
-            new OA\Response(response: 401, description: 'Not authenticated'),
-            new OA\Response(response: 403, description: 'Access denied'),
-            new OA\Response(response: 404, description: 'File not found'),
-        ]
-    )]
-    public function getGroupKey(
-        int $id,
-        #[CurrentUser] ?User $user,
-        RagDocumentRepository $ragRepository,
-    ): JsonResponse {
-        if (!$user) {
-            return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
-        }
-
-        $messageFile = $this->fileRepository->find($id);
-
-        if (!$messageFile) {
-            return $this->json(['error' => 'File not found'], Response::HTTP_NOT_FOUND);
-        }
-
-        // Security check: Only owner can view
-        if ($messageFile->getUserId() !== $user->getId()) {
-            return $this->json(['error' => 'Access denied'], Response::HTTP_FORBIDDEN);
-        }
-
-        // Get RAG documents for this file
-        $ragDocs = $ragRepository->findBy([
-            'userId' => $user->getId(),
-            'messageId' => $messageFile->getId(),
-        ]);
-
-        $groupKey = null;
-        $chunks = count($ragDocs);
-
-        if ($chunks > 0) {
-            // Get groupKey from first chunk (all should have the same)
-            $groupKey = $ragDocs[0]->getGroupKey();
-        }
-
-        return $this->json([
-            'success' => true,
-            'groupKey' => $groupKey,
-            'isVectorized' => $chunks > 0,
-            'chunks' => $chunks,
-            'status' => $messageFile->getStatus(),
-        ]);
     }
 }

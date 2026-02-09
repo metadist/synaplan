@@ -166,4 +166,70 @@ class MessageRepository extends ServiceEntityRepository
 
         return (int) $result > 0;
     }
+
+    /**
+     * Get the last message for each of the given chat IDs.
+     * Returns an array keyed by chatId with the message text.
+     *
+     * @param int[] $chatIds
+     *
+     * @return array<int, string>
+     */
+    public function getLastMessageTextForChats(array $chatIds): array
+    {
+        if (empty($chatIds)) {
+            return [];
+        }
+
+        // Use a subquery to get the max timestamp per chat, then join to get the message
+        $conn = $this->getEntityManager()->getConnection();
+
+        // Use MAX(BID) to get the actual last message (BID is auto-increment)
+        $sql = '
+            SELECT m.BCHATID as chat_id, m.BTEXT as text
+            FROM BMESSAGES m
+            INNER JOIN (
+                SELECT BCHATID, MAX(BID) as max_id
+                FROM BMESSAGES
+                WHERE BCHATID IN (?)
+                GROUP BY BCHATID
+            ) latest ON m.BCHATID = latest.BCHATID AND m.BID = latest.max_id
+            WHERE m.BCHATID IN (?)
+        ';
+
+        $result = $conn->executeQuery(
+            $sql,
+            [$chatIds, $chatIds],
+            [\Doctrine\DBAL\ArrayParameterType::INTEGER, \Doctrine\DBAL\ArrayParameterType::INTEGER]
+        );
+
+        $messages = [];
+        foreach ($result->fetchAllAssociative() as $row) {
+            $messages[(int) $row['chat_id']] = (string) $row['text'];
+        }
+
+        return $messages;
+    }
+
+    /**
+     * Delete all messages for the given chat IDs.
+     *
+     * @param array<int> $chatIds
+     *
+     * @return int Number of deleted messages
+     */
+    public function deleteByChatIds(array $chatIds): int
+    {
+        if (empty($chatIds)) {
+            return 0;
+        }
+
+        $qb = $this->getEntityManager()->createQueryBuilder();
+
+        return $qb->delete(Message::class, 'm')
+            ->where($qb->expr()->in('m.chatId', ':chatIds'))
+            ->setParameter('chatIds', $chatIds)
+            ->getQuery()
+            ->execute();
+    }
 }

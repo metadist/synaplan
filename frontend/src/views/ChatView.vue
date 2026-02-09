@@ -189,6 +189,7 @@ import { chatApi } from '@/services/api'
 import type { ModelOption } from '@/composables/useModelSelection'
 import { parseAIResponse } from '@/utils/responseParser'
 import { normalizeMediaUrl } from '@/utils/urlHelper'
+import { AudioStreamer } from '@/utils/AudioStreamer'
 import { httpClient } from '@/services/api/httpClient'
 import type { UserMemory } from '@/services/api/userMemoriesApi'
 import { getCategories } from '@/services/api/userMemoriesApi'
@@ -217,6 +218,7 @@ let streamingAbortController: AbortController | null = null
 let stopStreamingFn: (() => void) | null = null // Store EventSource close function
 let currentTrackId: number | undefined = undefined // Store current trackId for stop request
 let currentStreamingChatId: number | undefined = undefined // Store chatId where stream was started
+let currentAudioStreamer: AudioStreamer | null = null
 
 // Processing status for real-time feedback
 const processingStatus = ref<string>('')
@@ -301,6 +303,10 @@ const handleOpenMemoryDialogEvent = (event: Event) => {
 // Cleanup: Stop streaming when component unmounts (user leaves chat)
 onBeforeUnmount(() => {
   handleStopStreaming()
+  if (currentAudioStreamer) {
+    currentAudioStreamer.stop()
+    currentAudioStreamer = null
+  }
   window.removeEventListener('open-memory-dialog', handleOpenMemoryDialogEvent)
   clearDeleteDialogTimer()
 })
@@ -502,6 +508,7 @@ const handleSendMessage = async (
     webSearch?: boolean
     modelId?: number
     fileIds?: number[]
+    voiceReply?: boolean
   }
 ) => {
   autoScroll.value = true
@@ -594,6 +601,7 @@ const streamAIResponse = async (
     webSearch?: boolean
     modelId?: number
     fileIds?: number[]
+    voiceReply?: boolean
   }
 ) => {
   streamingAbortController = new AbortController()
@@ -645,6 +653,19 @@ const streamAIResponse = async (
       const finalModelId = options?.modelId // Don't fallback to current model!
       const fileIds = options?.fileIds || [] // Array of fileIds
 
+      // Initialize AudioStreamer if voice reply is requested
+      if (currentAudioStreamer) {
+        currentAudioStreamer.stop()
+        currentAudioStreamer = null
+      }
+
+      let spokenLength = 0
+      let detectedLanguage = 'en'
+
+      if (options?.voiceReply) {
+        currentAudioStreamer = new AudioStreamer()
+      }
+
       const stopStreaming = chatApi.streamMessage(
         userId,
         userMessage,
@@ -685,6 +706,10 @@ const streamAIResponse = async (
             const meta = data.metadata || {}
             processingMetadata.value = meta
             processingStatus.value = 'classified'
+            // Capture language for TTS streaming
+            if (meta.language) {
+              detectedLanguage = meta.language
+            }
           } else if (data.status === 'searching') {
             processingStatus.value = 'searching'
             processingMetadata.value = { customMessage: data.message }
@@ -745,6 +770,27 @@ const streamAIResponse = async (
 
             // AI gibt nur TEXT zurück (keine JSON!)
             fullContent += data.chunk
+
+            // Stream audio if enabled
+            if (currentAudioStreamer) {
+              while (true) {
+                const currentUnprocessed = fullContent.slice(spokenLength)
+                // Match sentence ending punctuation followed by space or end of string
+                // Also handle newlines as boundaries
+                const boundaryMatch = currentUnprocessed.match(/([.?!]+)(\s+|$)|(\n+)/)
+
+                if (!boundaryMatch || boundaryMatch.index === undefined) break
+
+                const endIdx = boundaryMatch.index + boundaryMatch[0].length
+                const sentence = currentUnprocessed.substring(0, endIdx)
+
+                if (sentence.trim()) {
+                  currentAudioStreamer.streamText(sentence, undefined, detectedLanguage)
+                }
+
+                spokenLength += endIdx
+              }
+            }
 
             // Don't parse JSON during streaming - it's incomplete!
             // We'll parse it at the end in the 'complete' event
@@ -869,6 +915,27 @@ const streamAIResponse = async (
                 message.parts.push({ type: 'audio', url: absoluteUrl })
               }
             }
+          } else if (data.status === 'tts_generating') {
+            // TTS synthesis started — show loading animation in message
+            const message = historyStore.messages.find((m) => m.id === messageId)
+            if (message) {
+              message.parts.push({ type: 'tts_loading' })
+            }
+          } else if (data.status === 'audio') {
+            // Handle TTS audio response (voice reply)
+            const message = historyStore.messages.find((m) => m.id === messageId)
+            if (message && data.url) {
+              // Remove tts_loading part and replace with audio player
+              const loadingIdx = message.parts.findIndex((p) => p.type === 'tts_loading')
+              const isVoiceReply = loadingIdx !== -1
+              if (isVoiceReply) {
+                message.parts.splice(loadingIdx, 1)
+              }
+              const absoluteUrl = normalizeMediaUrl(data.url)
+              // If we are already streaming audio (currentAudioStreamer exists), don't autoplay the file
+              const shouldAutoplay = isVoiceReply && !currentAudioStreamer
+              message.parts.push({ type: 'audio', url: absoluteUrl, autoplay: shouldAutoplay })
+            }
           } else if (data.status === 'links') {
             // Handle web search results
             const message = historyStore.messages.find((m) => m.id === messageId)
@@ -933,6 +1000,15 @@ const streamAIResponse = async (
               memoriesStore.memories = memoriesStore.memories.filter((m) => m.id !== memoryId)
             }
           } else if (data.status === 'complete') {
+            // Speak remaining text
+            if (currentAudioStreamer) {
+              const remaining = fullContent.slice(spokenLength)
+              if (remaining.trim()) {
+                currentAudioStreamer.streamText(remaining, undefined, detectedLanguage)
+              }
+              // Don't stop streamer immediately, it has a queue
+            }
+
             // Clear processing status
             processingStatus.value = ''
             processingMetadata.value = {}
@@ -940,6 +1016,8 @@ const streamAIResponse = async (
             // Update message metadata
             const message = historyStore.messages.find((m) => m.id === messageId)
             if (message) {
+              // Clean up any leftover tts_loading indicator (TTS may have failed silently)
+              message.parts = message.parts.filter((p) => p.type !== 'tts_loading')
               // ✨ NEW: Handle generated file from backend
               if (data.generatedFile) {
                 // Add file to message FIRST
@@ -1195,7 +1273,8 @@ const streamAIResponse = async (
         includeReasoning,
         webSearch,
         finalModelId,
-        fileIds // Pass array of fileIds
+        fileIds, // Pass array of fileIds
+        options?.voiceReply // Pass voice reply flag
       )
 
       // Store EventSource cleanup function globally
@@ -1242,6 +1321,12 @@ const handleStopStreaming = async () => {
     }
   } else {
     console.warn('⚠️ No currentTrackId - skipping backend notification')
+  }
+
+  // Stop streaming audio
+  if (currentAudioStreamer) {
+    currentAudioStreamer.stop()
+    currentAudioStreamer = null
   }
 
   // Clear processing status

@@ -663,7 +663,8 @@ class WhatsAppService
 
         // PRIORITY 2: Audio/Video input → Generate TTS response
         if (!$responseSent && $shouldSendAudioResponse && !empty($responseText)) {
-            $ttsResult = $this->generateTtsResponse($responseText, $effectiveUserId);
+            $detectedLanguage = $message->getLanguage() ?: 'en';
+            $ttsResult = $this->generateTtsResponse($responseText, $effectiveUserId, $detectedLanguage);
 
             if ($ttsResult) {
                 $audioUrl = rtrim($this->appUrl, '/').'/api/v1/files/uploads/'.$ttsResult['relativePath'];
@@ -805,13 +806,17 @@ class WhatsAppService
     /**
      * Generate TTS (text-to-speech) audio response.
      *
-     * @param string $text   The text to synthesize
-     * @param int    $userId User ID for provider selection
+     * @param string $text     The text to synthesize
+     * @param int    $userId   User ID for provider selection
+     * @param string $language Language code (en, de, es, etc.) for voice selection
      *
      * @return array|null Result with relativePath, or null on failure
      */
-    private function generateTtsResponse(string $text, int $userId): ?array
+    private function generateTtsResponse(string $text, int $userId, string $language = 'en'): ?array
     {
+        // Sanitize: strip [Memory:ID], markdown, code blocks, <think> tags
+        $text = TtsTextSanitizer::sanitize($text);
+
         // Limit text length for TTS (max ~4000 chars for most providers)
         $maxLength = 4000;
         if (strlen($text) > $maxLength) {
@@ -826,10 +831,12 @@ class WhatsAppService
             $this->logger->info('WhatsApp: Generating TTS response', [
                 'user_id' => $userId,
                 'text_length' => strlen($text),
+                'language' => $language,
             ]);
 
             $result = $this->aiFacade->synthesize($text, $userId, [
                 'format' => 'mp3',
+                'language' => $language,
             ]);
 
             $this->logger->info('WhatsApp: TTS generation successful', [

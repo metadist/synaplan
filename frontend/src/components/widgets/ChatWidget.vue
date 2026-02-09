@@ -85,8 +85,9 @@
             </div>
           </div>
           <div class="flex items-center gap-2">
+            <!-- Export button disabled - functionality preserved for future use -->
             <button
-              v-if="messages.length > 0"
+              v-if="false"
               class="w-8 h-8 rounded-lg bg-white/10 hover:bg-white/20 transition-colors flex items-center justify-center"
               :aria-label="$t('widget.exportChat')"
               :title="$t('widget.exportChat')"
@@ -126,7 +127,7 @@
           @click="handleMessagesClick"
         >
           <div
-            v-for="message in messages"
+            v-for="message in sortedMessages"
             :key="message.id"
             :class="['flex', message.role === 'user' ? 'justify-end' : 'justify-start']"
             :data-testid="`message-${message.role}`"
@@ -238,7 +239,8 @@
             </div>
           </div>
 
-          <div v-if="isTyping" class="flex justify-start">
+          <!-- Typing indicator for human operator (only show when NOT sending a message to AI) -->
+          <div v-if="isTyping && !isSending && chatMode === 'human'" class="flex justify-start">
             <div
               class="rounded-2xl px-4 py-3"
               :style="{ backgroundColor: widgetTheme === 'dark' ? '#2a2a2a' : '#f3f4f6' }"
@@ -507,6 +509,8 @@ import { uploadWidgetFile, sendWidgetMessage } from '@/services/api/widgetsApi'
 import { useI18n } from 'vue-i18n'
 import { parseAIResponse } from '@/utils/responseParser'
 import { getMarkdownRenderer } from '@/composables/useMarkdown'
+import { subscribeToSession, type EventSubscription, type WidgetEvent } from '@/services/sseClient'
+import { detectApiUrl } from '@/widget-utils'
 
 interface Props {
   widgetId: string
@@ -601,6 +605,12 @@ const chatId = ref<number | null>(null)
 const historyLoaded = ref(false)
 const isLoadingHistory = ref(false)
 
+// Human takeover state
+const chatMode = ref<'ai' | 'human' | 'waiting'>('ai')
+const operatorName = ref<string | null>(null)
+let eventSubscription: EventSubscription | null = null
+let operatorTypingTimer: ReturnType<typeof setTimeout> | null = null
+
 const isMobile = ref(false)
 const { t } = useI18n()
 
@@ -612,6 +622,11 @@ const isTestEnvironment = computed(() => props.testMode || props.isPreview)
 const testModeHeaders = computed(
   (): Record<string, string> => (isTestEnvironment.value ? { 'X-Widget-Test-Mode': 'true' } : {})
 )
+
+// Always display messages sorted by timestamp
+const sortedMessages = computed(() => {
+  return [...messages.value].sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime())
+})
 const fileUploadCount = ref(0)
 const uploadingFile = ref(false)
 const fileUploadError = ref<string | null>(null)
@@ -699,11 +714,15 @@ const canSend = computed(() => {
 })
 
 const showLimitWarning = computed(() => {
+  // No limit warnings during human takeover
+  if (chatMode.value !== 'ai') return false
   const warningThreshold = props.messageLimit * 0.8
   return messageCount.value >= warningThreshold && messageCount.value < props.messageLimit
 })
 
 const limitReached = computed(() => {
+  // No message limit during human takeover
+  if (chatMode.value !== 'ai') return false
   return messageCount.value >= props.messageLimit
 })
 
@@ -1223,7 +1242,10 @@ const sendMessage = async () => {
     files: hasFiles ? uploadedFiles : undefined,
     timestamp: new Date(),
   })
-  messageCount.value++
+  // Only count messages against limit when chatting with AI (not during human takeover)
+  if (chatMode.value === 'ai') {
+    messageCount.value++
+  }
 
   inputMessage.value = ''
   await scrollToBottom()
@@ -1298,6 +1320,12 @@ const sendMessage = async () => {
     }
 
     isTyping.value = false
+
+    // Subscribe to SSE after first successful message (session now exists on server)
+    if (!eventSubscription && sessionId.value) {
+      console.debug('[Widget] First message sent, subscribing to SSE')
+      subscribeToEvents()
+    }
   } catch (error) {
     console.error('Failed to send message:', error)
     // Decrement message count on failure so user can retry
@@ -1468,9 +1496,9 @@ const normalizeServerMessage = (raw: any): Message => {
         }))
       : []
 
-  // If message has files and is from user, mark as file message but KEEP the text content
+  // If message has files, mark as file message (works for both user and operator files)
   const hasFiles = files.length > 0
-  const isFileMessage = hasFiles && role === 'user'
+  const isFileMessage = hasFiles
 
   return {
     id: String(raw.id ?? crypto.randomUUID()),
@@ -1540,6 +1568,18 @@ const loadConversationHistory = async (force = false) => {
         if (typeof data.session.fileCount === 'number') {
           fileUploadCount.value = data.session.fileCount
         }
+
+        // Update chat mode from session
+        if (data.session.mode) {
+          chatMode.value = data.session.mode
+        }
+
+        // Only subscribe to SSE if the session has messages (exists on server)
+        // This prevents 404 errors for brand new sessions that aren't persisted yet
+        if (!eventSubscription && data.session.messageCount > 0) {
+          console.debug('[Widget] Subscribing to SSE for real-time events')
+          subscribeToEvents()
+        }
       } else if (loadedMessages.length > 0) {
         messageCount.value = loadedMessages.filter((m: Message) => m.role === 'user').length
         fileUploadCount.value = 0
@@ -1552,6 +1592,8 @@ const loadConversationHistory = async (force = false) => {
     isLoadingHistory.value = false
     if (isOpen.value) {
       ensureAutoMessage()
+      // Scroll to bottom after history is loaded
+      await scrollToBottom()
     }
   }
 }
@@ -1673,12 +1715,21 @@ const renderMessageContent = (value: string): string => {
   return html
 }
 
+// Close SSE connection before page unload to prevent browser warning
+const handleBeforeUnload = () => {
+  if (eventSubscription) {
+    eventSubscription.unsubscribe()
+    eventSubscription = null
+  }
+}
+
 // Load session ID from localStorage on mount (skip for test mode)
 onMounted(() => {
   updateIsMobile()
   if (typeof window !== 'undefined') {
     window.addEventListener('resize', updateIsMobile)
     window.addEventListener('orientationchange', updateIsMobile)
+    window.addEventListener('beforeunload', handleBeforeUnload)
   }
 
   window.addEventListener('synaplan-widget-open', handleOpenEvent)
@@ -1689,6 +1740,7 @@ onMounted(() => {
     sessionId.value = createSessionId()
     // Still call loadConversationHistory to trigger ensureAutoMessage (but it won't load actual history)
     loadConversationHistory()
+    // Don't subscribe to SSE in test mode - no real session exists
     return
   }
 
@@ -1715,17 +1767,149 @@ onMounted(() => {
   }
 
   loadConversationHistory()
+  // SSE subscription is now handled inside loadConversationHistory based on session mode
 })
 
 onBeforeUnmount(() => {
   if (typeof window !== 'undefined') {
     window.removeEventListener('resize', updateIsMobile)
     window.removeEventListener('orientationchange', updateIsMobile)
+    window.removeEventListener('beforeunload', handleBeforeUnload)
   }
 
   window.removeEventListener('synaplan-widget-open', handleOpenEvent)
   window.removeEventListener('synaplan-widget-close', handleCloseEvent)
+
+  // Unsubscribe from SSE events
+  if (eventSubscription) {
+    eventSubscription.unsubscribe()
+    eventSubscription = null
+  }
+
+  // Clear operator typing timer
+  if (operatorTypingTimer) {
+    clearTimeout(operatorTypingTimer)
+    operatorTypingTimer = null
+  }
 })
+
+/**
+ * Handle incoming SSE events for real-time human operator communication.
+ */
+function handleWidgetEvent(data: WidgetEvent) {
+  switch (data.type) {
+    case 'takeover': {
+      // Human operator took over the chat
+      chatMode.value = 'human'
+      operatorName.value = (data.operatorName as string) ?? 'Support'
+      // Add system message (use messageId to prevent duplicates)
+      const takeoverMsgId = data.messageId ? String(data.messageId) : `system-${Date.now()}`
+      if (!messages.value.some((m) => String(m.id) === takeoverMsgId)) {
+        messages.value.push({
+          id: takeoverMsgId,
+          role: 'assistant',
+          type: 'text',
+          content: (data.message as string) ?? 'You are now connected with a support agent.',
+          timestamp: new Date(),
+        })
+        scrollToBottom()
+      }
+      break
+    }
+
+    case 'handback': {
+      // Session handed back to AI
+      chatMode.value = 'ai'
+      operatorName.value = null
+      // Add system message (use messageId to prevent duplicates)
+      const handbackMsgId = data.messageId ? String(data.messageId) : `system-${Date.now()}`
+      if (!messages.value.some((m) => String(m.id) === handbackMsgId)) {
+        messages.value.push({
+          id: handbackMsgId,
+          role: 'assistant',
+          type: 'text',
+          content: (data.message as string) ?? 'You are now chatting with our AI assistant.',
+          timestamp: new Date(),
+        })
+        scrollToBottom()
+      }
+      break
+    }
+
+    case 'message': {
+      // New message from human operator (direction 'IN' = incoming to widget = from operator)
+      if (data.sender === 'human') {
+        const msgId = data.messageId ? String(data.messageId) : `msg-${Date.now()}`
+        // Check for duplicates before adding
+        if (!messages.value.some((m) => String(m.id) === msgId)) {
+          const text = data.text as string
+          // Handle files from operator message
+          const files: MessageFile[] = Array.isArray(data.files)
+            ? data.files.map((f: any) => ({
+                id: f.id,
+                filename: f.filename,
+                fileSize: f.size,
+                fileMime: f.mimeType,
+              }))
+            : []
+          messages.value.push({
+            id: msgId,
+            role: 'assistant',
+            type: files.length > 0 ? 'file' : 'text',
+            content: text,
+            files: files.length > 0 ? files : undefined,
+            timestamp: new Date((data.timestamp as number) * 1000),
+          })
+          scrollToBottom()
+          if (!isOpen.value) {
+            unreadCount.value++
+          }
+        }
+      }
+      break
+    }
+
+    case 'typing':
+      // Only show typing indicator for operator typing (has operatorId, no text)
+      // User typing events have 'text' field and should be ignored by the widget
+      if (data.operatorId && !data.text) {
+        isTyping.value = true
+        // Scroll to show typing indicator
+        scrollToBottom()
+        // Clear any existing timer and set new one
+        if (operatorTypingTimer) {
+          clearTimeout(operatorTypingTimer)
+        }
+        operatorTypingTimer = setTimeout(() => {
+          isTyping.value = false
+          operatorTypingTimer = null
+        }, 2000)
+      }
+      break
+  }
+}
+
+/**
+ * Subscribe to SSE for real-time messages.
+ */
+function subscribeToEvents() {
+  if (!sessionId.value || !props.widgetId) return
+
+  // Unsubscribe from previous subscription if any
+  if (eventSubscription) {
+    eventSubscription.unsubscribe()
+  }
+
+  eventSubscription = subscribeToSession(
+    props.widgetId,
+    sessionId.value,
+    handleWidgetEvent,
+    (error) => {
+      console.error('[Widget] SSE connection error:', error)
+    },
+    { apiUrl: props.apiUrl }
+  )
+}
 
 const getChatStorageKey = () => {
   if (!sessionId.value) return null
@@ -1757,6 +1941,66 @@ if (props.openImmediately) {
 watch(isOpen, (newVal) => {
   if (newVal) {
     scrollToBottom()
+  }
+})
+
+// Typing indicator - send typing text to admin dashboard
+let lastTypingSent = ''
+let typingDebounceTimer: ReturnType<typeof setTimeout> | null = null
+
+async function sendTypingUpdate(text: string) {
+  if (!sessionId.value || props.isPreview) return
+
+  // Don't send if text hasn't changed
+  if (text === lastTypingSent) return
+  lastTypingSent = text
+
+  try {
+    const apiUrl = props.apiUrl || detectApiUrl()
+    await fetch(`${apiUrl}/api/v1/widget/${props.widgetId}/typing`, {
+      method: 'POST',
+      headers: buildWidgetHeaders(),
+      body: JSON.stringify({
+        sessionId: sessionId.value,
+        text: text,
+      }),
+    })
+  } catch {
+    // Silently ignore typing errors - not critical
+  }
+}
+
+// Watch input and send typing updates (debounced)
+watch(inputMessage, (newValue) => {
+  // Clear any pending timer
+  if (typingDebounceTimer) {
+    clearTimeout(typingDebounceTimer)
+    typingDebounceTimer = null
+  }
+
+  // Only send typing updates if user has sent at least one message (session exists)
+  if (messageCount.value === 0) return
+
+  if (!newValue) {
+    // Text cleared (or message sent) - immediately send empty to clear preview
+    sendTypingUpdate('')
+    return
+  }
+
+  // Debounce: wait 300ms before sending to avoid too many requests
+  typingDebounceTimer = setTimeout(() => {
+    sendTypingUpdate(newValue)
+  }, 300)
+})
+
+// Clear typing when component unmounts
+onBeforeUnmount(() => {
+  if (typingDebounceTimer) {
+    clearTimeout(typingDebounceTimer)
+  }
+  // Send empty typing to clear the preview
+  if (lastTypingSent && sessionId.value) {
+    sendTypingUpdate('')
   }
 })
 

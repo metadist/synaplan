@@ -13,6 +13,7 @@ export function useAuth() {
     isAuthenticated: computed(() => authStore.isAuthenticated),
     userLevel: computed(() => authStore.userLevel),
     isPro: computed(() => authStore.isPro),
+    isTeam: computed(() => authStore.isTeam),
     isAdmin: computed(() => authStore.isAdmin),
 
     // Actions

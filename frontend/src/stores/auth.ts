@@ -33,6 +33,7 @@ export const useAuthStore = defineStore('auth', () => {
   const isAuthenticated = computed(() => !!user.value)
   const userLevel = computed(() => user.value?.level || 'NEW')
   const isPro = computed(() => ['PRO', 'TEAM', 'BUSINESS'].includes(userLevel.value))
+  const isTeam = computed(() => ['TEAM', 'BUSINESS'].includes(userLevel.value))
   const isAdmin = computed(() => user.value?.isAdmin === true || user.value?.level === 'ADMIN')
 
   // Actions
@@ -212,6 +213,7 @@ export const useAuthStore = defineStore('auth', () => {
     isAuthenticated,
     userLevel,
     isPro,
+    isTeam,
     isAdmin,
     // Actions
     login,

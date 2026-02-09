@@ -26,6 +26,7 @@ export interface CreatePromptRequest {
 export interface UpdatePromptRequest {
   shortDescription?: string
   prompt?: string
+  language?: string
   selectionRules?: string | null
   metadata?: Record<string, any>
 }

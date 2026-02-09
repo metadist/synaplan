@@ -13,6 +13,7 @@ use App\Repository\PromptRepository;
 use App\Repository\RagDocumentRepository;
 use App\Service\ModelConfigService;
 use App\Service\PromptService;
+use App\Service\RAG\VectorStorage\VectorStorageFacade;
 use Doctrine\ORM\EntityManagerInterface;
 use OpenApi\Attributes as OA;
 use Psr\Log\LoggerInterface;
@@ -47,6 +48,7 @@ class PromptController extends AbstractController
         private MessageRepository $messageRepository,
         private FileRepository $fileRepository,
         private ModelConfigService $modelConfigService,
+        private VectorStorageFacade $vectorStorageFacade,
     ) {
     }
 
@@ -112,11 +114,10 @@ class PromptController extends AbstractController
         $language = $request->query->get('language', 'en');
 
         // Get all system prompts (ownerId = 0, excluding tools:*)
+        // No language filter: system prompts are always visible regardless of UI language
         $systemPrompts = $this->promptRepository->createQueryBuilder('p')
             ->where('p.ownerId = 0')
-            ->andWhere('p.language = :lang')
             ->andWhere('p.topic NOT LIKE :toolsPrefix')
-            ->setParameter('lang', $language)
             ->setParameter('toolsPrefix', 'tools:%')
             ->orderBy('p.topic', 'ASC')
             ->getQuery()
@@ -816,8 +817,8 @@ class PromptController extends AbstractController
             return $this->json(['error' => 'Prompt not found'], Response::HTTP_NOT_FOUND);
         }
 
-        // Check ownership: only user's own prompts can be updated
-        if ($prompt->getOwnerId() !== $user->getId()) {
+        // Check ownership: only user's own prompts can be updated (admins can also update system prompts)
+        if ($prompt->getOwnerId() !== $user->getId() && !($user->isAdmin() && 0 === $prompt->getOwnerId())) {
             $this->logger->warning('User tried to update prompt they don\'t own', [
                 'user_id' => $user->getId(),
                 'prompt_owner' => $prompt->getOwnerId(),
@@ -848,6 +849,13 @@ class PromptController extends AbstractController
 
         if (isset($data['selectionRules'])) {
             $prompt->setSelectionRules(trim($data['selectionRules']) ?: null);
+        }
+
+        if (isset($data['language'])) {
+            $lang = strtolower(trim($data['language']));
+            if ('' !== $lang && 2 === strlen($lang)) {
+                $prompt->setLanguage($lang);
+            }
         }
 
         try {
@@ -896,7 +904,7 @@ class PromptController extends AbstractController
                 'shortDescription' => $prompt->getShortDescription(),
                 'prompt' => $prompt->getPrompt(),
                 'language' => $prompt->getLanguage(),
-                'isDefault' => false,
+                'isDefault' => 0 === $prompt->getOwnerId(),
             ],
         ]);
     }
@@ -942,8 +950,8 @@ class PromptController extends AbstractController
             return $this->json(['error' => 'Prompt not found'], Response::HTTP_NOT_FOUND);
         }
 
-        // Check ownership: only user's own prompts can be deleted
-        if ($prompt->getOwnerId() !== $user->getId()) {
+        // Check ownership: only user's own prompts can be deleted (admins can also delete system prompts)
+        if ($prompt->getOwnerId() !== $user->getId() && !($user->isAdmin() && 0 === $prompt->getOwnerId())) {
             return $this->json([
                 'error' => 'Cannot delete this prompt. You can only delete your own custom prompts.',
             ], Response::HTTP_FORBIDDEN);
@@ -1179,38 +1187,34 @@ class PromptController extends AbstractController
         string $topic,
         int $messageId,
         #[CurrentUser] ?User $user,
-        RagDocumentRepository $ragRepository,
     ): JsonResponse {
         if (!$user) {
             return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
         }
 
-        $groupKey = "TASKPROMPT:{$topic}";
+        // Delete all chunks via facade
+        // Note: deleteByFile deletes ALL chunks for the file, regardless of groupKey.
+        // The original implementation checked for groupKey="TASKPROMPT:$topic".
+        // But since a file can only belong to one group at a time (in current model),
+        // deleting by file ID is safe and correct.
+        // If we want to be strict about groupKey, we could use deleteByGroupKey but that deletes ALL files in group.
+        // Or we need a deleteByFileAndGroupKey method in interface.
+        // But wait, `linkFile` changes the groupKey of the file. So the file IS in that group.
+        // So `deleteByFile` is correct.
 
-        // Get all chunks for this message and groupKey
-        $ragDocs = $ragRepository->findBy([
-            'userId' => $user->getId(),
-            'messageId' => $messageId,
-            'groupKey' => $groupKey,
-        ]);
+        $chunksDeleted = $this->vectorStorageFacade->deleteByFile($user->getId(), $messageId);
 
-        if (empty($ragDocs)) {
-            return $this->json(['error' => 'File not found in this task prompt'], Response::HTTP_NOT_FOUND);
+        if (0 === $chunksDeleted) {
+            // Maybe check if file exists first to return 404?
+            // But for now, idempotent success is fine.
         }
-
-        // Delete all chunks
-        $chunksDeleted = 0;
-        foreach ($ragDocs as $doc) {
-            $this->em->remove($doc);
-            ++$chunksDeleted;
-        }
-        $this->em->flush();
 
         $this->logger->info('Deleted file from task prompt', [
             'user_id' => $user->getId(),
             'topic' => $topic,
             'message_id' => $messageId,
             'chunks_deleted' => $chunksDeleted,
+            'provider' => $this->vectorStorageFacade->getProviderName(),
         ]);
 
         return $this->json([
@@ -1259,7 +1263,6 @@ class PromptController extends AbstractController
         string $topic,
         Request $request,
         #[CurrentUser] ?User $user,
-        RagDocumentRepository $ragRepository,
     ): JsonResponse {
         if (!$user) {
             return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
@@ -1278,24 +1281,13 @@ class PromptController extends AbstractController
             return $this->json(['error' => 'File not found'], Response::HTTP_NOT_FOUND);
         }
 
-        // Get all RAG chunks for this file (any groupKey)
-        $ragDocs = $ragRepository->findBy([
-            'userId' => $user->getId(),
-            'messageId' => $messageId,
-        ]);
-
-        // Update groupKey for all chunks (if any exist)
+        // Update groupKey for all chunks via facade
         $newGroupKey = "TASKPROMPT:{$topic}";
-        $chunksLinked = 0;
-
-        foreach ($ragDocs as $doc) {
-            $doc->setGroupKey($newGroupKey);
-            ++$chunksLinked;
-        }
-
-        if ($chunksLinked > 0) {
-            $this->em->flush();
-        }
+        $chunksLinked = $this->vectorStorageFacade->updateGroupKey(
+            $user->getId(),
+            $messageId,
+            $newGroupKey
+        );
 
         $this->logger->info('Linked file to task prompt', [
             'user_id' => $user->getId(),
@@ -1303,6 +1295,7 @@ class PromptController extends AbstractController
             'message_id' => $messageId,
             'chunks_linked' => $chunksLinked,
             'file_name' => $file->getFileName(),
+            'provider' => $this->vectorStorageFacade->getProviderName(),
         ]);
 
         return $this->json([

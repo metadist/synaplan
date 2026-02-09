@@ -34,6 +34,13 @@
         <!-- Qdrant / Memory Service (defaults for testing) -->
         <env name="QDRANT_SERVICE_URL" value="" />
         <env name="QDRANT_SERVICE_API_KEY" value="" />
+        <!-- Whisper / TTS (defaults for testing) -->
+        <env name="WHISPER_BINARY" value="/usr/local/bin/whisper" />
+        <env name="WHISPER_MODELS_PATH" value="/tmp/whisper-models" />
+        <env name="WHISPER_DEFAULT_MODEL" value="base" />
+        <env name="WHISPER_ENABLED" value="false" />
+        <env name="FFMPEG_BINARY" value="/usr/bin/ffmpeg" />
+        <env name="SYNAPLAN_TTS_URL" value="" />
     </php>
 
     <testsuites>

@@ -117,12 +117,13 @@ class RagController extends AbstractController
                     'chunk_id' => $r['chunk_id'],
                     'message_id' => $r['message_id'],
                     'text' => $r['chunk_text'],
-                    'score' => $r['distance'],
+                    'score' => $r['distance'], // Note: VectorSearchService maps score to distance key for compatibility
                     'start_line' => $r['start_line'] ?? null,
                     'end_line' => $r['end_line'] ?? null,
                 ], $results),
                 'total_results' => count($results),
                 'search_time_ms' => $searchTime,
+                'provider' => $this->vectorSearchService->getProviderName(),
                 'parameters' => [
                     'limit' => $limit,
                     'min_score' => $minScore,
