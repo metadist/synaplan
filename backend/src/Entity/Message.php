@@ -58,7 +58,7 @@ class Message
     #[ORM\Column(name: 'BFILETYPE', length: 8)]
     private string $fileType = '';
 
-    #[ORM\Column(name: 'BTOPIC', length: 16, options: ['default' => 'UNKNOWN'])]
+    #[ORM\Column(name: 'BTOPIC', length: 64, options: ['default' => 'UNKNOWN'])]
     private string $topic = 'UNKNOWN';
 
     #[ORM\Column(name: 'BLANG', length: 2, options: ['default' => 'NN'])]
@@ -185,7 +185,8 @@ class Message
 
     public function setTopic(string $topic): self
     {
-        $this->topic = $topic;
+        // Truncate to column length (64) to prevent DB errors
+        $this->topic = mb_substr($topic, 0, 64);
 
         return $this;
     }
