@@ -126,6 +126,8 @@ services:
       db:
         condition: service_healthy
     restart: unless-stopped
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost/api/health"]
       interval: 30s

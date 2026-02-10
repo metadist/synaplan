@@ -712,6 +712,27 @@ class ChatHandler implements MessageHandlerInterface
             ]);
         }
 
+        // Append explicit language directive based on detected language from classification.
+        // The sort prompt detects the user's language (BLANG), but the system prompt only says
+        // "answer in the user's language" without specifying WHICH language was detected.
+        // When conversation history contains mixed languages, the AI may default to the wrong one.
+        $detectedLanguage = $classification['language'] ?? 'en';
+        $languageNames = [
+            'en' => 'English', 'de' => 'German', 'fr' => 'French', 'es' => 'Spanish',
+            'it' => 'Italian', 'pt' => 'Portuguese', 'nl' => 'Dutch', 'pl' => 'Polish',
+            'ru' => 'Russian', 'ja' => 'Japanese', 'ko' => 'Korean', 'zh' => 'Chinese',
+            'ar' => 'Arabic', 'tr' => 'Turkish', 'sv' => 'Swedish', 'da' => 'Danish',
+            'no' => 'Norwegian', 'fi' => 'Finnish', 'cs' => 'Czech', 'ro' => 'Romanian',
+            'hu' => 'Hungarian', 'uk' => 'Ukrainian', 'hi' => 'Hindi', 'th' => 'Thai',
+        ];
+        $languageName = $languageNames[$detectedLanguage] ?? $detectedLanguage;
+        $systemPrompt .= "\n\n**IMPORTANT: The user's current message is in {$languageName}. You MUST respond in {$languageName}.**";
+
+        // Voice reply mode: enforce concise answers for TTS (spoken responses should be brief)
+        if (!empty($options['voice_reply'])) {
+            $systemPrompt .= "\n\n**VOICE MODE: Your response will be spoken aloud as audio. Keep your answer concise and conversational — maximum 4-5 sentences. Avoid markdown formatting, code blocks, bullet lists, and tables. Write in natural, flowing prose suitable for speech.**";
+        }
+
         // Check if model supports system messages (o1 models don't)
         if ($modelId) {
             $model = $this->modelRepository->find($modelId);
