@@ -83,6 +83,43 @@ class WidgetSessionRepository extends ServiceEntityRepository
     }
 
     /**
+     * Count sessions by mode for a widget.
+     * Only counts non-expired sessions (expires > now).
+     * Test sessions are excluded.
+     *
+     * @return array{ai: int, human: int, waiting: int}
+     */
+    public function countSessionsByMode(string $widgetId): array
+    {
+        $now = time();
+
+        $results = $this->createQueryBuilder('ws')
+            ->select('ws.mode, COUNT(ws.id) as cnt')
+            ->where('ws.widgetId = :widgetId')
+            ->andWhere('ws.expires > :now')
+            ->andWhere('ws.sessionId NOT LIKE :testPrefix')
+            ->setParameter('widgetId', $widgetId)
+            ->setParameter('now', $now)
+            ->setParameter('testPrefix', 'test_%')
+            ->groupBy('ws.mode')
+            ->getQuery()
+            ->getArrayResult();
+
+        $counts = ['ai' => 0, 'human' => 0, 'waiting' => 0];
+        foreach ($results as $row) {
+            $mode = $row['mode'] ?? 'ai'; // null mode defaults to 'ai'
+            if (isset($counts[$mode])) {
+                $counts[$mode] = (int) $row['cnt'];
+            } else {
+                // Unknown modes count as 'ai'
+                $counts['ai'] += (int) $row['cnt'];
+            }
+        }
+
+        return $counts;
+    }
+
+    /**
      * Get total message count for a widget.
      * Test sessions (session ID starting with 'test_') are excluded.
      */
@@ -266,35 +303,6 @@ class WidgetSessionRepository extends ServiceEntityRepository
             ->orderBy('ws.lastMessage', 'DESC')
             ->getQuery()
             ->getResult();
-    }
-
-    /**
-     * Count sessions by mode for a widget.
-     *
-     * @return array{ai: int, human: int, waiting: int}
-     */
-    public function countSessionsByMode(string $widgetId): array
-    {
-        $now = time();
-
-        $result = $this->createQueryBuilder('ws')
-            ->select('ws.mode, COUNT(ws.id) as count')
-            ->where('ws.widgetId = :widgetId')
-            ->andWhere('ws.expires > :now')
-            ->andWhere('ws.sessionId NOT LIKE :testPrefix')
-            ->setParameter('widgetId', $widgetId)
-            ->setParameter('now', $now)
-            ->setParameter('testPrefix', 'test_%')
-            ->groupBy('ws.mode')
-            ->getQuery()
-            ->getResult();
-
-        $counts = ['ai' => 0, 'human' => 0, 'waiting' => 0];
-        foreach ($result as $row) {
-            $counts[$row['mode']] = (int) $row['count'];
-        }
-
-        return $counts;
     }
 
     /**

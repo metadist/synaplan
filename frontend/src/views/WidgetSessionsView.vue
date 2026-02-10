@@ -404,15 +404,10 @@
                   {{ $t('widgetSessions.takeOver') }}
                 </button>
                 <button
-                  v-else-if="selectedSession.mode === 'waiting' && !selectedSession.isExpired"
-                  class="px-4 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white text-xs font-medium transition-all duration-200 shadow-sm shadow-amber-500/25 flex items-center gap-1.5"
-                  @click="takeOver(selectedSession)"
-                >
-                  <Icon icon="heroicons:chat-bubble-left-ellipsis" class="w-4 h-4" />
-                  {{ $t('widgetSessions.respond') }}
-                </button>
-                <button
-                  v-else-if="selectedSession.mode === 'human'"
+                  v-else-if="
+                    (selectedSession.mode === 'human' || selectedSession.mode === 'waiting') &&
+                    !selectedSession.isExpired
+                  "
                   class="px-4 py-2 rounded-xl bg-blue-500/10 hover:bg-blue-500/20 text-blue-500 text-xs font-medium transition-all duration-200 flex items-center gap-1.5"
                   @click="handBack(selectedSession)"
                 >
@@ -502,8 +497,11 @@
               </div>
             </div>
 
-            <!-- Message Input (Human Mode) -->
-            <div v-if="selectedSession.mode === 'human'" class="p-4 flex-shrink-0">
+            <!-- Message Input (Human/Waiting Mode) -->
+            <div
+              v-if="selectedSession.mode === 'human' || selectedSession.mode === 'waiting'"
+              class="p-4 flex-shrink-0"
+            >
               <!-- File Preview -->
               <div v-if="selectedFiles.length > 0" class="mb-3 flex flex-wrap gap-2">
                 <div
@@ -1002,6 +1000,13 @@ const handleSessionEvent = (event: WidgetEvent) => {
       const isUserMessage = direction === 'IN' && sender === 'user'
       if (isUserMessage) {
         selectedSession.value.messageCount = (selectedSession.value.messageCount || 0) + 1
+
+        // Visitor sent a message while in human mode → set to waiting
+        if (selectedSession.value.mode === 'human') {
+          selectedSession.value.mode = 'waiting'
+          stats.value.human = Math.max(0, stats.value.human - 1)
+          stats.value.waiting++
+        }
       }
 
       // Also update the session in the list to keep it in sync
@@ -1011,6 +1016,10 @@ const handleSessionEvent = (event: WidgetEvent) => {
         if (isUserMessage) {
           sessions.value[sessionIndex].messageCount =
             (sessions.value[sessionIndex].messageCount || 0) + 1
+          // Keep list mode in sync
+          if (sessions.value[sessionIndex].mode === 'human') {
+            sessions.value[sessionIndex].mode = 'waiting'
+          }
         }
       }
     }
@@ -1134,6 +1143,8 @@ const handBack = async (session: widgetSessionsApi.WidgetSession) => {
   })
   if (!confirmed) return
 
+  const previousMode = session.mode
+
   try {
     await widgetSessionsApi.handBackSession(widgetId.value, session.sessionId)
 
@@ -1148,8 +1159,12 @@ const handBack = async (session: widgetSessionsApi.WidgetSession) => {
       sessions.value[sessionIndex].mode = 'ai'
     }
 
-    // Update stats: decrement human, increment ai
-    stats.value.human = Math.max(0, stats.value.human - 1)
+    // Update stats: decrement previous mode, increment ai
+    if (previousMode === 'human') {
+      stats.value.human = Math.max(0, stats.value.human - 1)
+    } else if (previousMode === 'waiting') {
+      stats.value.waiting = Math.max(0, stats.value.waiting - 1)
+    }
     stats.value.ai++
 
     success(t('widgetSessions.handBackSuccess'))
@@ -1244,6 +1259,18 @@ const sendMessage = async () => {
       fileIds
     )
 
+    // Update mode: operator replied, so mode goes back to 'human' (was 'waiting')
+    if (selectedSession.value.mode === 'waiting') {
+      selectedSession.value.mode = 'human'
+      const sessionIndex = sessions.value.findIndex((s) => s.id === selectedSession.value?.id)
+      if (sessionIndex !== -1) {
+        sessions.value[sessionIndex].mode = 'human'
+      }
+      // Update stats
+      stats.value.waiting = Math.max(0, stats.value.waiting - 1)
+      stats.value.human++
+    }
+
     // Clear state
     messageText.value = ''
     selectedFiles.value = []
@@ -1263,7 +1290,11 @@ const TYPING_SEND_INTERVAL = 1500 // Send typing event at most every 1.5s
 const TYPING_STOP_DELAY = 2000 // Stop typing after 2s of no input
 
 async function sendOperatorTyping() {
-  if (!selectedSession.value || selectedSession.value.mode !== 'human') return
+  if (
+    !selectedSession.value ||
+    (selectedSession.value.mode !== 'human' && selectedSession.value.mode !== 'waiting')
+  )
+    return
 
   try {
     await widgetSessionsApi.sendOperatorTyping(
@@ -1278,8 +1309,12 @@ async function sendOperatorTyping() {
 
 // Watch messageText and send typing updates
 watch(messageText, (newValue) => {
-  // Only send typing updates if session is in human mode
-  if (!selectedSession.value || selectedSession.value.mode !== 'human') return
+  // Only send typing updates if session is in human or waiting mode
+  if (
+    !selectedSession.value ||
+    (selectedSession.value.mode !== 'human' && selectedSession.value.mode !== 'waiting')
+  )
+    return
 
   // Clear stop timer on any input
   if (typingStopTimer) {

@@ -362,6 +362,12 @@ class WidgetPublicController extends AbstractController
                 $incomingMessage->setStatus('complete');
                 $session->setLastMessage(time());
                 $session->setLastMessagePreview(mb_substr($data['text'], 0, 100));
+
+                // Set mode to 'waiting' when visitor sends a message (operator needs to respond)
+                if ('human' === $session->getMode()) {
+                    $session->setWaitingForHuman();
+                }
+
                 $this->em->flush();
 
                 // Generate title if needed (also works in human mode)
@@ -387,7 +393,6 @@ class WidgetPublicController extends AbstractController
                 'fixed_task_prompt' => $widget->getTaskPromptTopic(),
                 'skipSorting' => true,
                 'channel' => 'WIDGET',
-                'language' => 'en',
                 'rag_group_key' => sprintf('WIDGET:%s', $widget->getWidgetId()),
                 'rag_limit' => (int) ($config['ragResultLimit'] ?? 5),
                 'rag_min_score' => isset($config['ragMinScore'])
@@ -1100,12 +1105,25 @@ class WidgetPublicController extends AbstractController
                 }
             }
 
+            // Determine sender type based on direction and provider
+            $providerIndex = $message->getProviderIndex();
+            if ('IN' === $message->getDirection()) {
+                $sender = 'user';
+            } elseif ('SYSTEM' === $providerIndex) {
+                $sender = 'system';
+            } elseif ('HUMAN_OPERATOR' === $providerIndex) {
+                $sender = 'human';
+            } else {
+                $sender = 'ai';
+            }
+
             return [
                 'id' => $message->getId(),
                 'direction' => $message->getDirection(),
                 'text' => $message->getText(),
                 'timestamp' => $message->getUnixTimestamp(),
                 'messageType' => $message->getMessageType(),
+                'sender' => $sender,
                 'files' => $filesData,
                 'metadata' => [
                     'topic' => $message->getTopic(),

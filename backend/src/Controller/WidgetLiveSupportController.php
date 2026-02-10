@@ -220,7 +220,7 @@ class WidgetLiveSupportController extends AbstractController
             return $this->json(['error' => 'Session not found'], Response::HTTP_NOT_FOUND);
         }
 
-        if (!$session->isHumanMode()) {
+        if (!$session->isHumanMode() && !$session->isWaitingForHuman()) {
             return $this->json(['error' => 'Session is not in human mode'], Response::HTTP_BAD_REQUEST);
         }
 

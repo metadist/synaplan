@@ -79,20 +79,28 @@ class MessageProcessor
             $promptMetadata = [];
 
             if ($hasFixedPrompt) {
-                // Widget Mode: Use fixed task prompt, no classification needed
-                $this->logger->info('MessageProcessor: Using fixed task prompt (Widget mode)', [
+                // Widget Mode: Run AI classification for language detection, override topic with fixed prompt
+                $this->logger->info('MessageProcessor: Widget mode with fixed task prompt', [
                     'task_prompt' => $options['fixed_task_prompt'],
                 ]);
 
-                $this->notify($statusCallback, 'classified', 'Using widget task prompt (skipped classification)');
+                // Run classification (same as normal chat) to detect language via AI
+                $classification = $this->classifier->classify($message, $conversationHistory);
 
-                // Minimal classification with fixed topic
-                $classification = [
-                    'topic' => $options['fixed_task_prompt'],
-                    'language' => 'en', // Default, could be enhanced
-                    'source' => 'widget',
-                    'is_widget_mode' => true, // Disable memories for widget
-                ];
+                // Override topic with the fixed task prompt (skip routing result)
+                $classification['topic'] = $options['fixed_task_prompt'];
+                $classification['source'] = 'widget';
+                $classification['is_widget_mode'] = true;
+
+                $this->logger->info('MessageProcessor: Widget AI classification complete', [
+                    'detected_language' => $classification['language'] ?? 'en',
+                    'fixed_topic' => $options['fixed_task_prompt'],
+                ]);
+
+                $this->notify($statusCallback, 'classified', sprintf(
+                    'Widget: Language %s detected, using fixed prompt',
+                    $classification['language'] ?? 'en'
+                ));
 
                 if (!empty($options['rag_group_key'])) {
                     $classification['rag_group_key'] = $options['rag_group_key'];
