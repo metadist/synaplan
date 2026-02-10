@@ -17,17 +17,25 @@
     if (!widgetId) {
       document.body.innerHTML += '<p style="color:red">Missing ?widgetId= parameter</p>'
     } else {
-      const mod = await import(apiUrl + '/widget.js')
-      const SynaplanWidget = mod.default || mod
-      SynaplanWidget.init({
-        widgetId,
-        position: params.get('position') || 'bottom-right',
-        primaryColor: params.get('primaryColor') || '#007bff',
-        iconColor: params.get('iconColor') || '#ffffff',
-        defaultTheme: params.get('defaultTheme') || 'light',
-        lazy: params.get('lazy') !== 'false',
-        apiUrl,
-      })
+      try {
+        const widgetUrl = apiUrl + '/widget.js'
+        const mod = await import(widgetUrl)
+        const SynaplanWidget = mod.default || mod
+        SynaplanWidget.init({
+          widgetId,
+          position: params.get('position') || 'bottom-right',
+          primaryColor: params.get('primaryColor') || '#007bff',
+          iconColor: params.get('iconColor') || '#ffffff',
+          defaultTheme: params.get('defaultTheme') || 'light',
+          lazy: params.get('lazy') !== 'false',
+          apiUrl,
+        })
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err)
+        console.error('[widget-test] Failed to load widget:', msg)
+        document.body.innerHTML += '<p data-testid="widget-load-error" style="color:red;font-family:monospace">'
+          + 'Widget load error: ' + msg + '</p>'
+      }
     }
   </script>
 </body>

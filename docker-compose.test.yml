@@ -19,34 +19,20 @@ services:
     container_name: synaplan-app-test
     ports:
       - "8001:80"
+    env_file:
+      - backend/.env.test
     volumes:
       # Volume mounts for local development (overridden in CI via docker-compose.test.ci.yml)
       - ./backend:/var/www/backend
       - ./plugins:/plugins
       - ./_docker/backend/docker-entrypoint.sh:/usr/local/bin/docker-entrypoint.sh:ro
     environment:
-      APP_ENV: test
-      APP_SECRET: test_secret_not_for_production
+      # Overrides: .env.test is the single source; only Docker-specific or host-overridable vars here
       APP_URL: ${APP_URL:-http://localhost:8001}
       SYNAPLAN_URL: ${APP_URL:-http://localhost:8001}
-      PLUGINS_DIR: /plugins
-      DATABASE_WRITE_URL: mysql://synaplan_test:synaplan_test@db_test:3306/synaplan?serverVersion=11.8&charset=utf8mb4
-      DATABASE_READ_URL: mysql://synaplan_test:synaplan_test@db_test:3306/synaplan?serverVersion=11.8&charset=utf8mb4
-      OLLAMA_BASE_URL: http://ollama_test:11434
-      TIKA_BASE_URL: http://tika_test:9998
       MAILER_DSN: smtp://mailhog_test:1025
+      PLUGINS_DIR: /plugins
       AUTO_DOWNLOAD_MODELS: "false"
-      TOKEN_SECRET: "test_token_secret"
-      OIDC_CLIENT_ID: "test_client_id"
-      OIDC_CLIENT_SECRET: "test_client_secret"
-      OIDC_DISCOVERY_URL: "https://test.example.com"
-      LOCK_DSN: flock
-      # FIXME: these shouldnt be required
-      GOOGLE_GEMINI_API_KEY: "test-key"
-      OPENAI_API_KEY: "test-key"
-      ANTHROPIC_API_KEY: "test-key"
-      GROQ_API_KEY: "test-key"
-      THEHIVE_API_KEY: "test-key"
     depends_on:
       db_test:
         condition: service_healthy
