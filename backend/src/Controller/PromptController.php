@@ -851,7 +851,9 @@ class PromptController extends AbstractController
             $prompt->setSelectionRules(trim($data['selectionRules']) ?: null);
         }
 
-        if (isset($data['language'])) {
+        // Only update language for user-owned prompts (not system prompts)
+        // System prompts (ownerId=0) should keep their original language to prevent corruption
+        if (isset($data['language']) && 0 !== $prompt->getOwnerId()) {
             $lang = strtolower(trim($data['language']));
             if ('' !== $lang && 2 === strlen($lang)) {
                 $prompt->setLanguage($lang);
@@ -894,17 +896,19 @@ class PromptController extends AbstractController
             'topic' => $prompt->getTopic(),
         ]);
 
+        $isSystemPrompt = 0 === $prompt->getOwnerId();
+
         return $this->json([
             'success' => true,
             'message' => 'Prompt updated successfully',
             'prompt' => [
                 'id' => $prompt->getId(),
                 'topic' => $prompt->getTopic(),
-                'name' => $this->formatPromptName($prompt->getTopic(), $prompt->getShortDescription(), false),
+                'name' => $this->formatPromptName($prompt->getTopic(), $prompt->getShortDescription(), $isSystemPrompt),
                 'shortDescription' => $prompt->getShortDescription(),
                 'prompt' => $prompt->getPrompt(),
                 'language' => $prompt->getLanguage(),
-                'isDefault' => 0 === $prompt->getOwnerId(),
+                'isDefault' => $isSystemPrompt,
             ],
         ]);
     }

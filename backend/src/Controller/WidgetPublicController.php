@@ -622,6 +622,8 @@ class WidgetPublicController extends AbstractController
                         'tokens' => $tokens,
                         'channel' => 'WIDGET',
                         'files' => $fileIds,
+                        'response_text' => $responseText,
+                        'input_text' => $incomingMessage->getText(),
                     ]);
 
                     $this->sendSse('complete', [

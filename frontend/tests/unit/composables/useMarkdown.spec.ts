@@ -1,10 +1,13 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { useMarkdown, getMarkdownRenderer } from '@/composables/useMarkdown'
+import { ensureHighlighter } from '@/composables/useHighlight'
 
 describe('useMarkdown', () => {
   let markdown: ReturnType<typeof useMarkdown>
 
-  beforeEach(() => {
+  beforeEach(async () => {
+    // Ensure highlight.js is loaded before tests that check for syntax highlighting
+    await ensureHighlighter()
     markdown = useMarkdown()
   })
 

@@ -12,6 +12,24 @@
         </div>
       </div>
 
+      <!-- Language Indicator Banner -->
+      <div
+        class="p-3 mb-4 bg-[var(--brand)]/5 border border-[var(--brand)]/20 rounded-lg"
+        data-testid="section-language-indicator"
+      >
+        <div class="flex items-center gap-2">
+          <Icon icon="heroicons:language" class="w-5 h-5 text-[var(--brand)]" />
+          <div>
+            <p class="text-sm font-medium text-[var(--brand)]">
+              {{ $t('config.taskPrompts.workingLanguage', { language: currentLanguageLabel }) }}
+            </p>
+            <p class="text-xs txt-secondary mt-0.5">
+              {{ $t('config.taskPrompts.workingLanguageHint') }}
+            </p>
+          </div>
+        </div>
+      </div>
+
       <!-- Prompt Selector with New Button -->
       <div class="flex flex-col sm:flex-row sm:items-start gap-3">
         <div class="flex-1 w-full">
@@ -32,7 +50,11 @@
           </select>
           <p class="text-xs txt-secondary mt-1.5 flex items-center gap-1">
             <Icon icon="heroicons:information-circle" class="w-3.5 h-3.5" />
-            {{ $t('config.taskPrompts.selectPromptHelp') }}
+            {{
+              isAdmin
+                ? $t('config.taskPrompts.selectPromptHelpAdmin')
+                : $t('config.taskPrompts.selectPromptHelp')
+            }}
           </p>
         </div>
 
@@ -89,10 +111,13 @@
               />
               <div>
                 <p class="text-sm font-medium text-amber-600 dark:text-amber-400">
-                  System Prompt (Admin Edit)
+                  {{ $t('config.taskPrompts.systemPromptAdminTitle') }}
                 </p>
                 <p class="text-xs text-amber-600/70 dark:text-amber-400/70">
-                  You have admin access. Changes will modify the system prompt for all users.
+                  {{ $t('config.taskPrompts.systemPromptAdminDesc') }}
+                </p>
+                <p class="text-xs text-amber-600/70 dark:text-amber-400/70 mt-1">
+                  {{ $t('config.taskPrompts.selectPromptHelpAdmin') }}
                 </p>
               </div>
             </div>
@@ -122,7 +147,7 @@
             </label>
             <select
               v-model="formData.language"
-              :disabled="currentPrompt.isDefault && !isAdmin"
+              :disabled="currentPrompt.isDefault"
               class="w-full px-4 py-3 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] disabled:opacity-50 disabled:cursor-not-allowed"
               data-testid="input-language"
             >
@@ -130,9 +155,16 @@
                 {{ lang.label }}
               </option>
             </select>
-            <p class="text-xs txt-secondary mt-1.5 flex items-center gap-1">
+            <p
+              v-if="currentPrompt.isDefault"
+              class="text-xs text-amber-600 dark:text-amber-400 mt-1.5 flex items-center gap-1"
+            >
+              <Icon icon="heroicons:lock-closed" class="w-3.5 h-3.5" />
+              {{ $t('config.taskPrompts.systemPromptLanguageFixed') }}
+            </p>
+            <p v-else class="text-xs txt-secondary mt-1.5 flex items-center gap-1">
               <Icon icon="heroicons:information-circle" class="w-3.5 h-3.5" />
-              The language this prompt is associated with. Custom prompts are filtered by language.
+              {{ $t('config.taskPrompts.customPromptLanguageNote') }}
             </p>
           </div>
 
@@ -816,6 +848,13 @@ const PROMPT_LANGUAGES = [
   { value: 'tr', label: 'Türkçe' },
 ]
 
+// Readable label for the current locale
+const currentLanguageLabel = computed(() => {
+  const currentLang = locale.value || 'en'
+  const found = PROMPT_LANGUAGES.find((l) => l.value === currentLang)
+  return found ? `${found.label} (${found.value})` : currentLang
+})
+
 const prompts = ref<TaskPrompt[]>([])
 const selectedPromptId = ref<number | null>(null)
 const currentPrompt = ref<TaskPrompt | null>(null)
@@ -1155,13 +1194,19 @@ const handleSave = saveChanges(async () => {
       success('User override created successfully!')
     } else {
       // Update existing user prompt (or system prompt for admins)
-      const updated = await promptsApi.updatePrompt(currentPrompt.value.id, {
+      // For system prompts: do NOT send language (backend will preserve original)
+      // For custom prompts: send the language from the form
+      const isSystemPrompt = currentPrompt.value.isDefault
+      const updatePayload: Record<string, any> = {
         shortDescription: currentPrompt.value.shortDescription, // Keep original name
         prompt: formData.value.content || '',
-        language: formData.value.language || 'en',
         selectionRules: formData.value.rules || null,
         metadata,
-      })
+      }
+      if (!isSystemPrompt) {
+        updatePayload.language = formData.value.language || 'en'
+      }
+      const updated = await promptsApi.updatePrompt(currentPrompt.value.id, updatePayload)
 
       // Update local state
       const index = prompts.value.findIndex((p) => p.id === currentPrompt.value!.id)

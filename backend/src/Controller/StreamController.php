@@ -941,6 +941,8 @@ class StreamController extends AbstractController
                 $this->em->flush();
 
                 // Record usage for rate limiting and statistics
+                // Provider token counts are preferred; if unavailable, tokens are auto-estimated
+                // from content bytes (input + output) using the ~1.3 bytes/token heuristic
                 $this->rateLimitService->recordUsage($user, 'MESSAGES', [
                     'provider' => $response['metadata']['provider'] ?? 'unknown',
                     'model' => $response['metadata']['model'] ?? 'unknown',
@@ -948,6 +950,8 @@ class StreamController extends AbstractController
                     'latency' => $response['metadata']['latency'] ?? 0,
                     'chat_id' => $chatId,
                     'source' => $isWidgetMode ? 'WIDGET' : 'WEB',
+                    'response_text' => $finalText,
+                    'input_text' => $messageText,
                 ]);
 
                 // Record AI-generated media usage (IMAGES, VIDEOS, AUDIOS) separately
@@ -961,11 +965,16 @@ class StreamController extends AbstractController
                     };
 
                     if ($mediaAction) {
+                        // Include generated file size for token estimation (bytes / 1.3)
+                        $mediaBytes = $generatedFile ? $generatedFile->getFileSize() : 0;
+
                         $this->rateLimitService->recordUsage($user, $mediaAction, [
                             'provider' => $response['metadata']['provider'] ?? 'unknown',
                             'model' => $response['metadata']['model'] ?? 'unknown',
                             'chat_id' => $chatId,
                             'source' => $isWidgetMode ? 'WIDGET' : 'WEB',
+                            'response_bytes' => $mediaBytes,
+                            'input_text' => $messageText,
                         ]);
                     }
                 }
