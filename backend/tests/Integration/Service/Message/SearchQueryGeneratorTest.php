@@ -28,29 +28,6 @@ class SearchQueryGeneratorTest extends KernelTestCase
     public function testGenerateOptimizedQuery(): void
     {
         $this->markTestSkipped('Integration test requires AI provider for query optimization');
-        $userQuestion = 'Kannst du mir sagen, wie viel ein Döner in München kostet?';
-
-        $searchQuery = $this->generator->generate($userQuestion);
-
-        // Query should be shorter than original question
-        $this->assertLessThan(
-            strlen($userQuestion),
-            strlen($searchQuery),
-            'Generated query should be more concise than original question'
-        );
-
-        // Query should not be empty
-        $this->assertNotEmpty($searchQuery, 'Generated query should not be empty');
-
-        // Query should contain key terms (language-independent check)
-        $this->assertGreaterThan(
-            0,
-            strlen($searchQuery),
-            'Query should have meaningful content'
-        );
-
-        echo "\n✅ Original: {$userQuestion}";
-        echo "\n✅ Generated: {$searchQuery}\n";
     }
 
     /**
@@ -59,15 +36,6 @@ class SearchQueryGeneratorTest extends KernelTestCase
     public function testGenerateEnglishQuery(): void
     {
         $this->markTestSkipped('Integration test requires AI provider for query optimization');
-        $userQuestion = "What's the weather like in Paris this weekend?";
-
-        $searchQuery = $this->generator->generate($userQuestion);
-
-        $this->assertNotEmpty($searchQuery);
-        $this->assertLessThan(strlen($userQuestion), strlen($searchQuery));
-
-        echo "\n✅ English Original: {$userQuestion}";
-        echo "\n✅ English Generated: {$searchQuery}\n";
     }
 
     /**
@@ -92,8 +60,7 @@ class SearchQueryGeneratorTest extends KernelTestCase
      */
     public function testFallbackExtraction(): void
     {
-        $this->markTestSkipped('Integration test requires real AI provider – TestProvider echoes the raw input');
-        // Use null userId to potentially trigger fallback
+        // TestProvider detects tools:search context and returns mockSearchQueryExtraction (same as fallback)
         $userQuestion = '/search test query';
 
         $searchQuery = $this->generator->generate($userQuestion, null);
@@ -126,7 +93,7 @@ class SearchQueryGeneratorTest extends KernelTestCase
      */
     public function testRemovesQuotes(): void
     {
-        $this->markTestSkipped('Integration test requires real AI provider – TestProvider echoes the raw input');
+        // TestProvider detects tools:search context and returns mockSearchQueryExtraction (strips quotes)
         $userQuestion = '"was kostet ein döner"';
 
         $searchQuery = $this->generator->generate($userQuestion);
