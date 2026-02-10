@@ -38,7 +38,7 @@ class ModelConfigService
      */
     public function getDefaultProvider(?int $userId, string $capability = 'chat'): string
     {
-        if (($this->getAppEnv()) === 'test') {
+        if ('test' === $this->getAppEnv()) {
             return 'test';
         }
 
@@ -286,7 +286,7 @@ class ModelConfigService
      */
     public function getDefaultModel(string $capability, ?int $userId = null): ?int
     {
-        if ($this->getAppEnv() === 'test') {
+        if ('test' === $this->getAppEnv()) {
             return 900; // TestProvider (ModelFixtures) – all capabilities mocked in CI/test stack
         }
 
