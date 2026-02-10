@@ -15,6 +15,7 @@ TIKA_BASE_URL=http://localhost:9998
 OIDC_CLIENT_ID=test_client_id
 OIDC_CLIENT_SECRET=test_client_secret
 OIDC_DISCOVERY_URL=https://test.example.com
+SYNAPLAN_URL=http://localhost:8001
 OPENAI_API_KEY=test-key
 ANTHROPIC_API_KEY=test-key
 HUGGINGFACE_API_KEY=test-key

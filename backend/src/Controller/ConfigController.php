@@ -472,6 +472,19 @@ class ConfigController extends AbstractController
 
         $defaults = [];
 
+        // In test environment: return TestProvider (900) for all capabilities
+        // so CI/E2E tests never accidentally use real AI providers with dummy keys
+        if ('test' === $this->kernelEnvironment) {
+            foreach ($capabilities as $capability) {
+                $defaults[$capability] = 900;
+            }
+
+            return $this->json([
+                'success' => true,
+                'defaults' => $defaults,
+            ]);
+        }
+
         foreach ($capabilities as $capability) {
             // Try user-specific config first
             $config = $this->configRepository->findOneBy([

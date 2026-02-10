@@ -5,8 +5,13 @@
 }
 
 :80 {
-	# Enable compression
-	encode zstd gzip
+	# Enable compression — but NOT for SSE streaming endpoints.
+	# Caddy's encode directive buffers output for gzip/zstd, which breaks
+	# real-time Server-Sent Events delivery.
+	@not_sse {
+		not path /api/v1/messages/stream /api/v1/widget/*/message
+	}
+	encode @not_sse zstd gzip
 
 	# Security headers (applied to all responses)
 	header {
