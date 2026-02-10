@@ -11,6 +11,7 @@ use App\Service\File\UserUploadPathBuilder;
 use App\Service\Message\MessageProcessor;
 use App\Service\ModelConfigService;
 use App\Service\RateLimitService;
+use App\Service\TtsTextSanitizer;
 use App\Service\WidgetService;
 use App\Service\WidgetSessionService;
 use Doctrine\ORM\EntityManagerInterface;
@@ -97,6 +98,13 @@ class StreamController extends AbstractController
         required: false,
         description: 'Comma-separated list of file IDs to attach',
         schema: new OA\Schema(type: 'string', example: '1,2,3')
+    )]
+    #[OA\Parameter(
+        name: 'voiceReply',
+        in: 'query',
+        required: false,
+        description: 'Generate audio (MP3) voice reply in addition to text (1 or 0)',
+        schema: new OA\Schema(type: 'string', enum: ['0', '1'], example: '0')
     )]
     #[OA\Response(
         response: 200,
@@ -196,6 +204,7 @@ class StreamController extends AbstractController
         $webSearch = '1' === $request->query->get('webSearch', '0');
         $modelId = $request->query->get('modelId', null);
 
+        $voiceReply = '1' === $request->query->get('voiceReply', '0');
         $fileIds = $request->query->get('fileIds', ''); // NEW: comma-separated list or single ID
 
         // Parse fileIds (can be comma-separated string or single ID)
@@ -249,7 +258,7 @@ class StreamController extends AbstractController
         $response->headers->set('X-Accel-Buffering', 'no');
         $response->headers->set('Connection', 'keep-alive');
 
-        $response->setCallback(function () use ($user, $messageText, $trackId, $chatId, $includeReasoning, $webSearch, $modelId, $fileIdArray, $isWidgetMode, $fixedTaskPromptTopic, $widgetSession, $rateLimitError) {
+        $response->setCallback(function () use ($user, $messageText, $trackId, $chatId, $includeReasoning, $webSearch, $modelId, $fileIdArray, $isWidgetMode, $fixedTaskPromptTopic, $widgetSession, $rateLimitError, $voiceReply) {
             // Disable output buffering
             while (ob_get_level()) {
                 ob_end_clean();
@@ -266,6 +275,51 @@ class StreamController extends AbstractController
 
                 return;
             }
+
+            // Helper to save error message
+            $saveError = function ($chat, $incomingMessage, string $errorMessage, string $provider = 'system', string $errorType = 'unknown') use ($user, $trackId) {
+                if (!$chat || !$incomingMessage) {
+                    return null;
+                }
+
+                try {
+                    $outgoingMessage = new Message();
+                    $outgoingMessage->setUserId($user->getId());
+                    $outgoingMessage->setChat($chat);
+                    $outgoingMessage->setTrackingId($trackId);
+                    $outgoingMessage->setProviderIndex($incomingMessage->getProviderIndex());
+                    $outgoingMessage->setUnixTimestamp(time());
+                    $outgoingMessage->setDateTime(date('YmdHis'));
+                    $outgoingMessage->setMessageType('WEB');
+                    $outgoingMessage->setFile(0);
+                    $outgoingMessage->setTopic('ERROR');
+                    $outgoingMessage->setLanguage('en');
+                    $outgoingMessage->setText($errorMessage);
+                    $outgoingMessage->setDirection('OUT');
+                    $outgoingMessage->setStatus('complete');
+
+                    $this->em->persist($outgoingMessage);
+                    $this->em->flush();
+
+                    $outgoingMessage->setMeta('ai_provider', $provider);
+                    $outgoingMessage->setMeta('ai_model', 'error');
+                    $outgoingMessage->setMeta('error_type', $errorType);
+
+                    $incomingMessage->setTopic('ERROR');
+                    $incomingMessage->setStatus('error');
+
+                    $this->em->flush();
+
+                    return $outgoingMessage->getId();
+                } catch (\Exception $e) {
+                    $this->logger->error('Failed to save error message', ['error' => $e->getMessage()]);
+
+                    return null;
+                }
+            };
+
+            $chat = null;
+            $incomingMessage = null;
 
             try {
                 // Load chat
@@ -372,6 +426,7 @@ class StreamController extends AbstractController
                 $processingOptions = [
                     'reasoning' => $includeReasoning,
                     'web_search' => $webSearch, // Use snake_case for consistency with backend
+                    'voice_reply' => $voiceReply, // Hint for ChatHandler to enforce concise answers
                 ];
 
                 if ($isWidgetMode) {
@@ -469,8 +524,8 @@ class StreamController extends AbstractController
                             }
 
                             // ✨ JSON detection and buffering during streaming
-                            // Detect and buffer JSON responses
-                            if (is_string($chunk) && !empty(trim($chunk))) {
+                            // Detect and buffer JSON responses (use !== '' to avoid PHP's empty("0") quirk)
+                            if (is_string($chunk) && '' !== trim($chunk)) {
                                 // Start buffering if this is the FIRST chunk and it starts with {
                                 if (!$isBufferingJson && 0 === $chunkCount && str_starts_with(trim($chunk), '{')) {
                                     $isBufferingJson = true;
@@ -531,7 +586,9 @@ class StreamController extends AbstractController
                                 error_log('🧠 StreamController: <think> tag detected in chunk: '.substr($chunk, 0, 100));
                             }
 
-                            if (!empty($chunk)) {
+                            // FIX: Use !== '' instead of !empty() because PHP considers "0" as empty,
+                            // which silently drops the character "0" when it arrives as a standalone chunk
+                            if ('' !== $chunk) {
                                 $this->sendSSE('data', ['chunk' => $chunk]);
                             }
                         }
@@ -888,6 +945,8 @@ class StreamController extends AbstractController
                 $this->em->flush();
 
                 // Record usage for rate limiting and statistics
+                // Provider token counts are preferred; if unavailable, tokens are auto-estimated
+                // from content bytes (input + output) using the ~1.3 bytes/token heuristic
                 $this->rateLimitService->recordUsage($user, 'MESSAGES', [
                     'provider' => $response['metadata']['provider'] ?? 'unknown',
                     'model' => $response['metadata']['model'] ?? 'unknown',
@@ -895,6 +954,8 @@ class StreamController extends AbstractController
                     'latency' => $response['metadata']['latency'] ?? 0,
                     'chat_id' => $chatId,
                     'source' => $isWidgetMode ? 'WIDGET' : 'WEB',
+                    'response_text' => $finalText,
+                    'input_text' => $messageText,
                 ]);
 
                 // Record AI-generated media usage (IMAGES, VIDEOS, AUDIOS) separately
@@ -908,11 +969,16 @@ class StreamController extends AbstractController
                     };
 
                     if ($mediaAction) {
+                        // Include generated file size for token estimation (bytes / 1.3)
+                        $mediaBytes = $generatedFile ? $generatedFile->getFileSize() : 0;
+
                         $this->rateLimitService->recordUsage($user, $mediaAction, [
                             'provider' => $response['metadata']['provider'] ?? 'unknown',
                             'model' => $response['metadata']['model'] ?? 'unknown',
                             'chat_id' => $chatId,
                             'source' => $isWidgetMode ? 'WIDGET' : 'WEB',
+                            'response_bytes' => $mediaBytes,
+                            'input_text' => $messageText,
                         ]);
                     }
                 }
@@ -983,6 +1049,79 @@ class StreamController extends AbstractController
                     ]);
                 }
 
+                // === Voice Reply: TTS Generation (Phase 3) ===
+                // Generate MP3 audio BEFORE sending complete event
+                // (frontend closes EventSource on 'complete', so audio must arrive first)
+                if ($voiceReply && !empty($responseText)) {
+                    // GUARD 1: Skip voice reply for media generation (image/video/audio)
+                    $handlerIntent = $classification['intent'] ?? $classification['topic'] ?? 'chat';
+                    if (in_array($handlerIntent, ['image_generation', 'video_generation', 'audio_generation', 'mediamaker'], true)) {
+                        $this->logger->info('StreamController: Skipping voice reply for media generation', [
+                            'intent' => $handlerIntent,
+                        ]);
+                        $voiceReply = false;
+                    }
+
+                    // GUARD 2: Rate limit check for AUDIOS
+                    if ($voiceReply) {
+                        $limitCheck = $this->rateLimitService->checkLimit($user, 'AUDIOS');
+                        if (!$limitCheck['allowed']) {
+                            $this->logger->warning('StreamController: Voice reply skipped - rate limit exceeded', [
+                                'user_id' => $user->getId(),
+                            ]);
+                            $voiceReply = false;
+                        } else {
+                            $this->rateLimitService->recordUsage($user, 'AUDIOS');
+                        }
+                    }
+                }
+
+                if ($voiceReply && !empty($responseText)) {
+                    try {
+                        $language = $classification['language'] ?? 'en';
+
+                        // Notify frontend that TTS is being generated
+                        $this->sendSSE('tts_generating', ['language' => $language]);
+
+                        // Sanitize: strip [Memory:ID], markdown, code blocks, <think> tags
+                        $ttsText = TtsTextSanitizer::sanitize($responseText);
+                        $ttsText = mb_substr($ttsText, 0, 4000);
+
+                        if (!empty(trim($ttsText))) {
+                            // Resolve provider from user's default TEXT2SOUND model
+                            $ttsModelId = $this->modelConfigService->getDefaultModel('TEXT2SOUND', $user->getId());
+                            $ttsProvider = $ttsModelId ? $this->modelConfigService->getProviderForModel($ttsModelId) : null;
+
+                            $ttsResult = $this->aiFacade->synthesize($ttsText, $user->getId(), [
+                                'format' => 'mp3',
+                                'language' => $language,
+                                'provider' => $ttsProvider ? strtolower($ttsProvider) : null,
+                            ]);
+
+                            $audioUrl = '/api/v1/files/uploads/'.$ttsResult['relativePath'];
+
+                            // Store audio on outgoing message
+                            $outgoingMessage->setFile(1);
+                            $outgoingMessage->setFilePath($audioUrl);
+                            $outgoingMessage->setFileType('audio');
+                            $this->em->flush();
+
+                            // Send audio SSE event BEFORE complete
+                            $this->sendSSE('audio', ['url' => $audioUrl]);
+
+                            $this->logger->info('StreamController: Voice reply generated', [
+                                'url' => $audioUrl,
+                                'provider' => $ttsResult['provider'] ?? 'unknown',
+                            ]);
+                        }
+                    } catch (\Throwable $e) {
+                        $this->logger->warning('StreamController: Voice reply TTS failed', [
+                            'error' => $e->getMessage(),
+                        ]);
+                        // Don't fail the response — text was already delivered
+                    }
+                }
+
                 $this->sendSSE('complete', $completeData);
 
                 usleep(100000);
@@ -1009,10 +1148,16 @@ class StreamController extends AbstractController
                     'context' => $e->getContext(),
                 ]);
 
+                $messageId = $saveError($chat, $incomingMessage, $e->getMessage(), $e->getProviderName(), 'provider_error');
+
                 $errorData = [
                     'error' => $e->getMessage(),
                     'provider' => $e->getProviderName(),
                 ];
+
+                if ($messageId) {
+                    $errorData['messageId'] = $messageId;
+                }
 
                 // Add installation instructions if available
                 if ($context = $e->getContext()) {
@@ -1036,9 +1181,17 @@ class StreamController extends AbstractController
                     'error' => $e->getMessage(),
                 ]);
 
-                $this->sendSSE('error', [
+                $messageId = $saveError($chat, $incomingMessage, $e->getMessage(), 'system', 'exception');
+
+                $errorData = [
                     'error' => 'Failed to process message: '.$e->getMessage(),
-                ]);
+                ];
+
+                if ($messageId) {
+                    $errorData['messageId'] = $messageId;
+                }
+
+                $this->sendSSE('error', $errorData);
             }
         });
 

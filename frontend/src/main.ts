@@ -32,7 +32,7 @@ import { useConfigStore } from './stores/config'
         },
       },
     })
-    console.log('✅ reCAPTCHA v3 enabled')
+    console.debug('reCAPTCHA v3 enabled')
 
     const style = document.createElement('style')
     style.id = 'recaptcha-badge-control'
@@ -49,7 +49,7 @@ import { useConfigStore } from './stores/config'
   `
     document.head.appendChild(style)
   } else {
-    console.log('ℹ️ reCAPTCHA v3 disabled (not configured on backend)')
+    console.debug('reCAPTCHA v3 disabled (not configured on backend)')
   }
 
   app.mount('#app')

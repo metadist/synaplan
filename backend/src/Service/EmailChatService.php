@@ -236,6 +236,7 @@ class EmailChatService
                 $chat = new Chat();
                 $chat->setUserId($user->getId());
                 $chat->setTitle('Email: '.$keyword);
+                $chat->setSource('email');
 
                 $this->em->persist($chat);
                 $this->em->flush();
@@ -260,6 +261,7 @@ class EmailChatService
             $chat = new Chat();
             $chat->setUserId($user->getId());
             $chat->setTitle('Email Conversation');
+            $chat->setSource('email');
 
             $this->em->persist($chat);
             $this->em->flush();

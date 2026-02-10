@@ -25,16 +25,17 @@ class DiscordNotificationService
     public function __construct(
         private HttpClientInterface $httpClient,
         private LoggerInterface $logger,
-        private string $webhookUrl = '',
+        private ?string $webhookUrl = null,
     ) {
     }
 
     /**
      * Check if Discord notifications are enabled.
+     * Returns false if DISCORD_WEBHOOK_URL is not set or empty.
      */
     public function isEnabled(): bool
     {
-        return !empty($this->webhookUrl);
+        return null !== $this->webhookUrl && '' !== $this->webhookUrl;
     }
 
     /**
@@ -254,6 +255,85 @@ class DiscordNotificationService
                 'error' => $e->getMessage(),
             ]);
         }
+    }
+
+    /**
+     * Notify AI classification/sorting result (for debugging).
+     */
+    public function notifyClassification(
+        string $userMessage,
+        array $classificationResult,
+        ?int $userId = null,
+    ): void {
+        if (!$this->isEnabled()) {
+            return;
+        }
+
+        $topic = $classificationResult['topic'] ?? 'unknown';
+        $language = $classificationResult['language'] ?? 'unknown';
+        $mediaType = $classificationResult['media_type'] ?? null;
+        $duration = $classificationResult['duration'] ?? null;
+        $rawResponse = $classificationResult['raw_response'] ?? '';
+
+        $fields = [
+            [
+                'name' => '👤 User ID',
+                'value' => (string) ($userId ?? 'N/A'),
+                'inline' => true,
+            ],
+            [
+                'name' => '📥 User Message',
+                'value' => $this->truncate($userMessage, self::MAX_USER_MESSAGE),
+                'inline' => false,
+            ],
+            [
+                'name' => '🏷️ Topic',
+                'value' => $topic,
+                'inline' => true,
+            ],
+            [
+                'name' => '🌍 Language',
+                'value' => $language,
+                'inline' => true,
+            ],
+        ];
+
+        if (null !== $mediaType) {
+            $fields[] = [
+                'name' => '🎬 Media Type',
+                'value' => $mediaType,
+                'inline' => true,
+            ];
+        } else {
+            $fields[] = [
+                'name' => '🎬 Media Type',
+                'value' => '❌ NOT DETECTED',
+                'inline' => true,
+            ];
+        }
+
+        if (null !== $duration) {
+            $fields[] = [
+                'name' => '⏱️ Duration',
+                'value' => $duration.'s',
+                'inline' => true,
+            ];
+        }
+
+        if (!empty($rawResponse)) {
+            $fields[] = [
+                'name' => '🤖 Raw AI Response',
+                'value' => '```json'."\n".$this->truncate($rawResponse, 400)."\n".'```',
+                'inline' => false,
+            ];
+        }
+
+        $this->sendEmbed(
+            title: '🔍 AI Classification Result',
+            color: null !== $mediaType ? self::COLOR_SUCCESS : 0xFFA500, // Orange if no media type
+            fields: $fields,
+            footer: 'Synaplan Classifier'
+        );
     }
 
     /**

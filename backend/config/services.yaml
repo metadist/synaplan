@@ -18,6 +18,10 @@ parameters:
     env(QDRANT_SERVICE_URL): ''
     env(QDRANT_SERVICE_API_KEY): ''
 
+    # Piper TTS Service default
+    env(SYNAPLAN_TTS_URL): ''
+    synaplan_tts_url_default: 'http://host.docker.internal:10200'
+
     # Plugins - mounted at /plugins in Docker, relative path for CI
     plugins_dir: '/plugins'
 
@@ -105,6 +109,23 @@ services:
         tags:
             - { name: 'app.ai.image_generation' }
 
+    App\AI\Provider\PiperProvider:
+        arguments:
+            $uploadDir: '%kernel.project_dir%/var/uploads'
+            $ttsUrl: '%env(default:synaplan_tts_url_default:SYNAPLAN_TTS_URL)%'
+        tags:
+            - { name: 'app.ai.text_to_speech' }
+
+    App\AI\Provider\HuggingFaceProvider:
+        arguments:
+            $apiKey: '%env(HUGGINGFACE_API_KEY)%'
+            $uploadDir: '%kernel.project_dir%/var/uploads'
+        tags:
+            - { name: 'app.ai.chat' }
+            - { name: 'app.ai.embedding' }
+            - { name: 'app.ai.image_generation' }
+            - { name: 'app.ai.video_generation' }
+
     # AI Facade
     App\AI\Service\AiFacade: ~
 
@@ -132,8 +153,11 @@ services:
             $webhookUrl: '%env(default::DISCORD_WEBHOOK_URL)%'
 
     # WhatsApp Business API Service - Fully Dynamic Multi-Number Support
+    # Uses cache + lock for atomic duplicate message detection (WhatsApp webhook retries)
     App\Service\WhatsAppService:
         arguments:
+            $cache: '@cache.app'
+            $lockFactory: '@lock.factory'
             $whatsappAccessToken: '%env(WHATSAPP_ACCESS_TOKEN)%'
             $whatsappEnabled: '%env(bool:WHATSAPP_ENABLED)%'
             $uploadsDir: '%kernel.project_dir%/var/uploads'
@@ -307,6 +331,10 @@ services:
         arguments:
             $uploadDir: '%kernel.project_dir%/var/uploads'
 
+    App\Controller\TtsController:
+        arguments:
+            $ttsUrl: '%env(default:synaplan_tts_url_default:SYNAPLAN_TTS_URL)%'
+
     App\Controller\StreamController:
         arguments:
             $uploadDir: '%kernel.project_dir%/var/uploads'
@@ -399,3 +427,36 @@ services:
     App\Service\Admin\SystemConfigService:
         arguments:
             $projectDir: '%kernel.project_dir%'
+
+    # Vector Storage Configuration
+    App\Service\RAG\VectorStorage\VectorStorageConfig:
+        arguments:
+            $envProvider: '%env(default::VECTOR_STORAGE_PROVIDER)%'
+            $qdrantServiceUrl: '%env(default::QDRANT_SERVICE_URL)%'
+            $qdrantApiKey: '%env(default::QDRANT_SERVICE_API_KEY)%'
+            $qdrantDocumentsCollection: '%env(default::QDRANT_DOCUMENTS_COLLECTION)%'
+
+    # Vector Storage Implementations
+    App\Service\RAG\VectorStorage\MariaDBVectorStorage: ~
+
+    App\Service\RAG\VectorStorage\QdrantVectorStorage:
+        arguments:
+            $qdrantClient: '@App\Service\VectorSearch\QdrantClientHttp'
+
+    # Vector Migration Service (MariaDB → Qdrant)
+    App\Service\RAG\VectorStorage\VectorMigrationService:
+        arguments:
+            $qdrantStorage: '@App\Service\RAG\VectorStorage\QdrantVectorStorage'
+            $qdrantClient: '@App\Service\VectorSearch\QdrantClientHttp'
+            $mariaDbStorage: '@App\Service\RAG\VectorStorage\MariaDBVectorStorage'
+
+    # Vector Storage Facade
+    App\Service\RAG\VectorStorage\VectorStorageFacade:
+        arguments:
+            $mariaDbStorage: '@App\Service\RAG\VectorStorage\MariaDBVectorStorage'
+            $qdrantStorage: '@App\Service\RAG\VectorStorage\QdrantVectorStorage'
+            $config: '@App\Service\RAG\VectorStorage\VectorStorageConfig'
+
+    # Alias for injection
+    App\Service\RAG\VectorStorage\VectorStorageInterface:
+        alias: App\Service\RAG\VectorStorage\VectorStorageFacade

@@ -6,7 +6,7 @@
       @click.self="handleClose"
     >
       <div
-        class="surface-card rounded-2xl w-full max-w-6xl overflow-hidden shadow-2xl"
+        class="surface-card rounded-2xl w-full max-w-lg lg:max-w-6xl max-h-[90vh] overflow-hidden shadow-2xl flex flex-col"
         data-testid="section-form-container"
       >
         <!-- Header -->
@@ -33,10 +33,10 @@
         </div>
 
         <!-- Form Content -->
-        <form class="p-6" @submit.prevent="handleSubmit">
-          <div class="flex gap-8">
+        <form class="p-6 overflow-y-auto flex-1 min-h-0" @submit.prevent="handleSubmit">
+          <div class="flex flex-col lg:flex-row gap-8">
             <!-- Left: Form Fields -->
-            <div class="w-2/5 space-y-5">
+            <div class="w-full lg:w-2/5 space-y-5">
               <!-- Widget Name -->
               <div>
                 <label class="block text-sm font-medium txt-primary mb-2">
@@ -107,8 +107,8 @@
               </div>
             </div>
 
-            <!-- Right: Website Preview (always visible) -->
-            <div class="w-3/5 space-y-2">
+            <!-- Right: Website Preview (hidden on mobile) -->
+            <div class="hidden lg:block lg:w-3/5 space-y-2">
               <label class="block text-sm font-medium txt-primary flex items-center gap-2">
                 <Icon icon="heroicons:eye" class="w-4 h-4 txt-brand" />
                 {{ $t('widgets.simpleSetup.previewLabel') }}

@@ -129,42 +129,46 @@
               </div>
 
               <!-- Quick Actions -->
-              <div class="flex items-center gap-2" @click.stop>
+              <div class="flex flex-wrap items-center gap-1.5" @click.stop>
+                <!-- Primary: Chats button -->
                 <button
-                  class="flex-1 px-3 py-2 rounded-lg bg-[var(--brand-alpha-light)] txt-brand hover:bg-[var(--brand)]/20 transition-colors text-xs font-medium flex items-center justify-center gap-2"
+                  class="flex-1 min-w-[70px] btn-primary px-3 py-2 rounded-lg transition-colors text-xs font-medium flex items-center justify-center gap-1.5"
+                  data-testid="btn-widget-sessions"
+                  @click="viewSessions(widget)"
+                >
+                  <Icon icon="heroicons:chat-bubble-left-right" class="w-4 h-4 flex-shrink-0" />
+                  <span>{{ $t('widgets.chats') }}</span>
+                </button>
+                <!-- Secondary: Get Code -->
+                <button
+                  class="flex-1 min-w-[65px] px-3 py-2 rounded-lg bg-[var(--brand-alpha-light)] txt-brand hover:bg-[var(--brand)]/20 transition-colors text-xs font-medium flex items-center justify-center gap-1.5"
                   data-testid="btn-widget-embed"
                   @click="showEmbed(widget)"
                 >
-                  <Icon icon="heroicons:code-bracket" class="w-4 h-4" />
-                  <span class="hidden sm:inline">{{ $t('widgets.getCode') }}</span>
-                  <span class="sm:hidden">Code</span>
+                  <Icon icon="heroicons:code-bracket" class="w-4 h-4 flex-shrink-0" />
+                  <span>{{ $t('widgets.code') }}</span>
                 </button>
+                <!-- Test Chat -->
                 <button
-                  class="px-3 py-2 rounded-lg bg-green-500/10 hover:bg-green-500/20 transition-colors"
+                  class="p-2 rounded-lg bg-green-500/10 hover:bg-green-500/20 transition-colors flex-shrink-0"
                   :title="$t('widgets.testChat')"
                   data-testid="btn-widget-test"
                   @click="openTestChat(widget)"
                 >
                   <Icon icon="heroicons:play" class="w-4 h-4 text-green-600 dark:text-green-400" />
                 </button>
+                <!-- Settings -->
                 <button
-                  class="px-3 py-2 rounded-lg bg-[var(--brand-alpha-light)] hover:bg-[var(--brand)]/20 transition-colors"
-                  :title="$t('widgets.aiAssistant')"
-                  data-testid="btn-widget-ai-assistant"
-                  @click="openAdvancedConfigWithTab(widget, 'assistant')"
-                >
-                  <Icon icon="heroicons:sparkles" class="w-4 h-4 txt-brand" />
-                </button>
-                <button
-                  class="px-3 py-2 rounded-lg hover-surface transition-colors"
-                  :title="$t('widgets.advancedConfigLabel')"
+                  class="p-2 rounded-lg hover-surface transition-colors flex-shrink-0"
+                  :title="$t('widgets.settings')"
                   data-testid="btn-widget-advanced"
                   @click="openAdvancedConfig(widget)"
                 >
                   <Icon icon="heroicons:cog-6-tooth" class="w-4 h-4 txt-secondary" />
                 </button>
+                <!-- Delete -->
                 <button
-                  class="px-3 py-2 rounded-lg hover:bg-red-500/10 transition-colors"
+                  class="p-2 rounded-lg hover:bg-red-500/10 transition-colors flex-shrink-0"
                   :title="$t('widgets.delete')"
                   data-testid="btn-widget-delete"
                   @click="confirmDelete(widget)"
@@ -273,7 +277,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, computed, watch } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 import { Icon } from '@iconify/vue'
 import MainLayout from '@/components/MainLayout.vue'
 import * as widgetsApi from '@/services/api/widgetsApi'
@@ -289,6 +294,8 @@ import ChatWidget from '@/components/widgets/ChatWidget.vue'
 import { useI18n } from 'vue-i18n'
 import { useConfigStore } from '@/stores/config'
 
+const router = useRouter()
+const route = useRoute()
 const { success, error } = useNotification()
 const { confirm } = useDialog()
 const { t } = useI18n()
@@ -391,14 +398,6 @@ const openAdvancedConfig = (widget: widgetsApi.Widget) => {
 }
 
 /**
- * Open advanced config with specific tab
- */
-const openAdvancedConfigWithTab = (widget: widgetsApi.Widget, tab: string) => {
-  advancedWidgetInitialTab.value = tab
-  advancedWidget.value = widget
-}
-
-/**
  * Close advanced config and reset initial tab
  */
 const closeAdvancedConfig = () => {
@@ -442,6 +441,13 @@ const openTestChat = (widget: widgetsApi.Widget) => {
  */
 const closeTestChat = () => {
   testWidget.value = null
+}
+
+/**
+ * View widget sessions
+ */
+const viewSessions = (widget: widgetsApi.Widget) => {
+  router.push({ name: 'widget-chats', params: { widgetId: widget.widgetId } })
 }
 
 /**
@@ -499,6 +505,34 @@ const confirmDelete = async (widget: widgetsApi.Widget) => {
     }
   }
 }
+
+/**
+ * Check query params and open widget settings if specified
+ */
+const checkQueryParams = () => {
+  const widgetId = route.query.widget as string | undefined
+  const tab = route.query.tab as string | undefined
+
+  if (widgetId && widgets.value.length > 0) {
+    const widget = widgets.value.find((w) => w.widgetId === widgetId)
+    if (widget) {
+      advancedWidgetInitialTab.value = tab
+      advancedWidget.value = widget
+      // Clear query params
+      router.replace({ query: {} })
+    }
+  }
+}
+
+// Watch for widgets loaded and check query params
+watch(
+  () => widgets.value,
+  () => {
+    if (widgets.value.length > 0) {
+      checkQueryParams()
+    }
+  }
+)
 
 onMounted(() => {
   loadWidgets()

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Controller;
 
 use App\Entity\User;
+use App\Service\FeedbackContradictionService;
 use App\Service\FeedbackExampleService;
 use OpenApi\Attributes as OA;
 use Psr\Log\LoggerInterface;
@@ -20,6 +21,7 @@ use Symfony\Component\Security\Http\Attribute\CurrentUser;
 final class FeedbackController extends AbstractController
 {
     public function __construct(
+        private readonly FeedbackContradictionService $feedbackContradictionService,
         private readonly FeedbackExampleService $feedbackExampleService,
         private readonly LoggerInterface $logger,
     ) {
@@ -84,6 +86,142 @@ final class FeedbackController extends AbstractController
 
             return $this->json(['error' => 'Failed to list feedbacks'], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
+    }
+
+    #[Route('/check-contradictions', methods: ['POST'])]
+    #[OA\Post(
+        path: '/api/v1/feedback/check-contradictions',
+        summary: 'Check for contradictions before saving feedback',
+        description: 'Vectorizes the text, searches Qdrant for related memories and feedback, asks AI if contradictions exist. Returns contradictions if any.',
+        requestBody: new OA\RequestBody(
+            required: true,
+            content: new OA\JsonContent(
+                required: ['text', 'type'],
+                properties: [
+                    new OA\Property(property: 'text', type: 'string', example: 'The capital of Australia is Canberra.'),
+                    new OA\Property(property: 'type', type: 'string', enum: ['false_positive', 'positive']),
+                ]
+            )
+        ),
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Contradiction check result',
+                content: new OA\JsonContent(
+                    required: ['hasContradictions', 'contradictions'],
+                    properties: [
+                        new OA\Property(property: 'hasContradictions', type: 'boolean', example: true),
+                        new OA\Property(
+                            property: 'contradictions',
+                            type: 'array',
+                            items: new OA\Items(
+                                properties: [
+                                    new OA\Property(property: 'id', type: 'integer', example: 123),
+                                    new OA\Property(property: 'type', type: 'string', enum: ['memory', 'false_positive', 'positive']),
+                                    new OA\Property(property: 'value', type: 'string', example: 'Sydney is the capital of Australia'),
+                                    new OA\Property(property: 'reason', type: 'string', example: 'User previously confirmed Sydney; now marks Canberra as correct'),
+                                ]
+                            )
+                        ),
+                    ]
+                )
+            ),
+            new OA\Response(response: 400, description: 'Validation error'),
+            new OA\Response(response: 401, description: 'Not authenticated'),
+        ]
+    )]
+    public function checkContradictions(
+        Request $request,
+        #[CurrentUser] ?User $user,
+    ): JsonResponse {
+        if (!$user) {
+            return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
+        }
+
+        $data = json_decode($request->getContent(), true);
+        if (!is_array($data)) {
+            return $this->json(['error' => 'Invalid JSON'], Response::HTTP_BAD_REQUEST);
+        }
+
+        $text = trim((string) ($data['text'] ?? ''));
+        $type = (string) ($data['type'] ?? '');
+        if (!in_array($type, ['false_positive', 'positive'], true)) {
+            return $this->json(['error' => 'type must be false_positive or positive'], Response::HTTP_BAD_REQUEST);
+        }
+        if (mb_strlen($text) < 5) {
+            return $this->json(['error' => 'Text must be at least 5 characters'], Response::HTTP_BAD_REQUEST);
+        }
+
+        $result = $this->feedbackContradictionService->checkContradictions($user, $text, $type);
+
+        return $this->json($result);
+    }
+
+    #[Route('/check-contradictions-batch', methods: ['POST'])]
+    #[OA\Post(
+        path: '/api/v1/feedback/check-contradictions-batch',
+        summary: 'Batch check contradictions for summary + correction',
+        description: 'Checks both summary and correction for contradictions in a single operation (one vector search + one AI call)',
+        requestBody: new OA\RequestBody(
+            required: true,
+            content: new OA\JsonContent(
+                required: ['summary', 'correction'],
+                properties: [
+                    new OA\Property(property: 'summary', type: 'string', example: 'Claims Sydney is the capital of Australia.'),
+                    new OA\Property(property: 'correction', type: 'string', example: 'The capital of Australia is Canberra.'),
+                ]
+            )
+        ),
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Batch contradiction check result',
+                content: new OA\JsonContent(
+                    required: ['hasContradictions', 'contradictions'],
+                    properties: [
+                        new OA\Property(property: 'hasContradictions', type: 'boolean'),
+                        new OA\Property(
+                            property: 'contradictions',
+                            type: 'array',
+                            items: new OA\Items(
+                                properties: [
+                                    new OA\Property(property: 'id', type: 'integer'),
+                                    new OA\Property(property: 'type', type: 'string', enum: ['memory', 'false_positive', 'positive']),
+                                    new OA\Property(property: 'value', type: 'string'),
+                                    new OA\Property(property: 'reason', type: 'string'),
+                                ]
+                            )
+                        ),
+                    ]
+                )
+            ),
+            new OA\Response(response: 400, description: 'Validation error'),
+            new OA\Response(response: 401, description: 'Not authenticated'),
+        ]
+    )]
+    public function checkContradictionsBatch(
+        Request $request,
+        #[CurrentUser] ?User $user,
+    ): JsonResponse {
+        if (!$user) {
+            return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
+        }
+
+        $data = json_decode($request->getContent(), true);
+        if (!is_array($data)) {
+            return $this->json(['error' => 'Invalid JSON'], Response::HTTP_BAD_REQUEST);
+        }
+
+        $summary = trim((string) ($data['summary'] ?? ''));
+        $correction = trim((string) ($data['correction'] ?? ''));
+
+        if (mb_strlen($summary) < 5 && mb_strlen($correction) < 5) {
+            return $this->json(['error' => 'At least one of summary or correction must be at least 5 characters'], Response::HTTP_BAD_REQUEST);
+        }
+
+        $result = $this->feedbackContradictionService->checkContradictionsBatch($user, $summary, $correction);
+
+        return $this->json($result);
     }
 
     #[Route('/{id}', methods: ['PUT'])]
@@ -270,8 +408,8 @@ final class FeedbackController extends AbstractController
     #[Route('/false-positive/preview', methods: ['POST'])]
     #[OA\Post(
         path: '/api/v1/feedback/false-positive/preview',
-        summary: 'Preview a false-positive summary and correction',
-        description: 'Generates a summary and a corrected statement for user confirmation. Optionally accepts the user message for better context.',
+        summary: 'Preview false-positive summary and correction options',
+        description: 'Generates multiple summary and correction options for user selection. Optionally accepts the user message for better context.',
         requestBody: new OA\RequestBody(
             required: true,
             content: new OA\JsonContent(
@@ -285,11 +423,35 @@ final class FeedbackController extends AbstractController
         responses: [
             new OA\Response(
                 response: 200,
-                description: 'Preview data',
+                description: 'Preview options with classification',
                 content: new OA\JsonContent(
                     properties: [
-                        new OA\Property(property: 'summary', type: 'string', example: 'Claims Sydney is the capital of Australia.'),
-                        new OA\Property(property: 'correction', type: 'string', example: 'The capital of Australia is Canberra.'),
+                        new OA\Property(
+                            property: 'classification',
+                            type: 'string',
+                            enum: ['memory', 'feedback'],
+                            example: 'feedback',
+                            description: 'Whether the error is about personal user data (memory) or general knowledge (feedback)'
+                        ),
+                        new OA\Property(
+                            property: 'summaryOptions',
+                            type: 'array',
+                            items: new OA\Items(type: 'string'),
+                            example: ['Claims Sydney is the capital of Australia.', 'Incorrectly states Sydney as capital.']
+                        ),
+                        new OA\Property(
+                            property: 'correctionOptions',
+                            type: 'array',
+                            items: new OA\Items(type: 'string'),
+                            example: ['The capital of Australia is Canberra.', 'Canberra, not Sydney, is the capital of Australia.']
+                        ),
+                        new OA\Property(
+                            property: 'relatedMemoryIds',
+                            type: 'array',
+                            items: new OA\Items(type: 'integer'),
+                            description: 'IDs of user memories found to be related to the marked text. Used by the frontend to target specific memories for update/deletion.',
+                            example: [42, 87]
+                        ),
                     ]
                 )
             ),
@@ -456,6 +618,163 @@ final class FeedbackController extends AbstractController
             ]);
 
             return $this->json(['error' => 'Failed to store feedback'], Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    #[Route('/false-positive/research', methods: ['POST'])]
+    #[OA\Post(
+        path: '/api/v1/feedback/false-positive/research',
+        summary: 'Research sources from user data for a false-positive claim',
+        description: 'Searches the user\'s uploaded documents, existing feedbacks, and personal memories for relevant content and returns AI-summarized source entries. Each source includes a sourceType to distinguish the data origin.',
+        requestBody: new OA\RequestBody(
+            required: true,
+            content: new OA\JsonContent(
+                required: ['text'],
+                properties: [
+                    new OA\Property(
+                        property: 'text',
+                        type: 'string',
+                        description: 'The claim or summary text to research',
+                        example: 'The capital of Australia is Sydney.'
+                    ),
+                ]
+            )
+        ),
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Research results with source summaries',
+                content: new OA\JsonContent(
+                    required: ['sources'],
+                    properties: [
+                        new OA\Property(
+                            property: 'sources',
+                            type: 'array',
+                            items: new OA\Items(
+                                properties: [
+                                    new OA\Property(property: 'id', type: 'integer', example: 42),
+                                    new OA\Property(property: 'sourceType', type: 'string', enum: ['file', 'feedback_false', 'feedback_correct', 'memory'], example: 'file', description: 'Origin type: file=uploaded document, feedback_false=previously marked incorrect, feedback_correct=previously confirmed, memory=personal memory'),
+                                    new OA\Property(property: 'fileName', type: 'string', example: 'geography-notes.pdf', description: 'Only populated for sourceType=file'),
+                                    new OA\Property(property: 'excerpt', type: 'string', example: 'The capital of Australia is Canberra, not Sydney...'),
+                                    new OA\Property(property: 'summary', type: 'string', example: 'This source states that Canberra is the capital of Australia.'),
+                                    new OA\Property(property: 'score', type: 'number', format: 'float', example: 0.87),
+                                ]
+                            )
+                        ),
+                    ]
+                )
+            ),
+            new OA\Response(response: 400, description: 'Validation error'),
+            new OA\Response(response: 401, description: 'Not authenticated'),
+        ]
+    )]
+    public function researchSources(
+        Request $request,
+        #[CurrentUser] ?User $user,
+    ): JsonResponse {
+        if (!$user) {
+            return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
+        }
+
+        $data = json_decode($request->getContent(), true);
+        if (!is_array($data)) {
+            return $this->json(['error' => 'Invalid JSON'], Response::HTTP_BAD_REQUEST);
+        }
+
+        $text = trim((string) ($data['text'] ?? ''));
+        if (mb_strlen($text) < 10) {
+            return $this->json(['error' => 'Text must be at least 10 characters'], Response::HTTP_BAD_REQUEST);
+        }
+
+        try {
+            $result = $this->feedbackExampleService->researchSources($user, $text);
+
+            return $this->json($result);
+        } catch (\Throwable $e) {
+            $this->logger->error('Source research failed', [
+                'user_id' => $user->getId(),
+                'error' => $e->getMessage(),
+            ]);
+
+            return $this->json(['error' => 'Research failed'], Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    #[Route('/false-positive/web-research', methods: ['POST'])]
+    #[OA\Post(
+        path: '/api/v1/feedback/false-positive/web-research',
+        summary: 'Research sources from the web for a false-positive claim',
+        description: 'Searches the web via Brave Search for relevant sources and returns AI-summarized entries. The user can then select which sources are correct.',
+        requestBody: new OA\RequestBody(
+            required: true,
+            content: new OA\JsonContent(
+                required: ['text'],
+                properties: [
+                    new OA\Property(
+                        property: 'text',
+                        type: 'string',
+                        description: 'The claim or summary text to fact-check on the web',
+                        example: 'The capital of Australia is Sydney.'
+                    ),
+                ]
+            )
+        ),
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Web research results with source summaries',
+                content: new OA\JsonContent(
+                    required: ['sources'],
+                    properties: [
+                        new OA\Property(
+                            property: 'sources',
+                            type: 'array',
+                            items: new OA\Items(
+                                properties: [
+                                    new OA\Property(property: 'id', type: 'integer', example: 0),
+                                    new OA\Property(property: 'title', type: 'string', example: 'Capital of Australia - Wikipedia'),
+                                    new OA\Property(property: 'url', type: 'string', example: 'https://en.wikipedia.org/wiki/Canberra'),
+                                    new OA\Property(property: 'summary', type: 'string', example: 'This source confirms that Canberra is the capital of Australia.'),
+                                    new OA\Property(property: 'snippet', type: 'string', example: 'Canberra is the capital city of Australia...'),
+                                ]
+                            )
+                        ),
+                    ]
+                )
+            ),
+            new OA\Response(response: 400, description: 'Validation error'),
+            new OA\Response(response: 401, description: 'Not authenticated'),
+        ]
+    )]
+    public function webResearchSources(
+        Request $request,
+        #[CurrentUser] ?User $user,
+    ): JsonResponse {
+        if (!$user) {
+            return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
+        }
+
+        $data = json_decode($request->getContent(), true);
+        if (!is_array($data)) {
+            return $this->json(['error' => 'Invalid JSON'], Response::HTTP_BAD_REQUEST);
+        }
+
+        $text = trim((string) ($data['text'] ?? ''));
+        if (mb_strlen($text) < 10) {
+            return $this->json(['error' => 'Text must be at least 10 characters'], Response::HTTP_BAD_REQUEST);
+        }
+
+        try {
+            $result = $this->feedbackExampleService->webResearchSources($text);
+
+            return $this->json($result);
+        } catch (\Throwable $e) {
+            $this->logger->error('Web research failed', [
+                'user_id' => $user->getId(),
+                'error' => $e->getMessage(),
+            ]);
+
+            return $this->json(['error' => 'Web research failed'], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
 }

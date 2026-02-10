@@ -2,13 +2,16 @@
 
 namespace App\Controller;
 
+use App\AI\Service\AiFacade;
 use App\DTO\WhatsApp\IncomingMessageDto;
 use App\Entity\Message;
 use App\Entity\User;
 use App\Service\EmailChatService;
 use App\Service\InternalEmailService;
 use App\Service\Message\MessageProcessor;
+use App\Service\ModelConfigService;
 use App\Service\RateLimitService;
+use App\Service\TtsTextSanitizer;
 use App\Service\WhatsAppService;
 use Doctrine\ORM\EntityManagerInterface;
 use OpenApi\Attributes as OA;
@@ -33,6 +36,8 @@ class WebhookController extends AbstractController
         private InternalEmailService $internalEmailService,
         private LoggerInterface $logger,
         private string $whatsappWebhookVerifyToken,
+        private AiFacade $aiFacade,
+        private ModelConfigService $modelConfigService,
     ) {
     }
 
@@ -201,11 +206,17 @@ class WebhookController extends AbstractController
             }
             if (!empty($data['attachments'])) {
                 $message->setMeta('has_attachments', 'true');
+
+                // Check for audio attachments to enable voice reply
+                foreach ($data['attachments'] as $attachment) {
+                    $mime = $attachment['content_type'] ?? '';
+                    if (str_starts_with($mime, 'audio/')) {
+                        $message->setMeta('voice_reply', '1');
+                        break;
+                    }
+                }
             }
             $this->em->flush(); // Flush metadata
-
-            // Record usage (unified across all sources)
-            $this->rateLimitService->recordUsage($user, 'MESSAGES');
 
             // Track processing time
             $startTime = microtime(true);
@@ -231,6 +242,38 @@ class WebhookController extends AbstractController
             $provider = $metadata['provider'] ?? null;
             $model = $metadata['model'] ?? null;
 
+            // Record usage with response content for token estimation
+            $this->rateLimitService->recordUsage($user, 'MESSAGES', [
+                'provider' => $provider ?? 'unknown',
+                'model' => $model ?? 'unknown',
+                'tokens' => 0,
+                'latency' => (int) ($processingTime * 1000),
+                'source' => 'EMAIL',
+                'response_text' => $responseText,
+                'input_text' => $message->getText(),
+            ]);
+
+            // Generate TTS if voice_reply is set
+            $attachmentPath = null;
+            if ('1' === $message->getMeta('voice_reply')) {
+                try {
+                    $ttsText = TtsTextSanitizer::sanitize($responseText);
+                    if (!empty(trim($ttsText))) {
+                        $ttsModelId = $this->modelConfigService->getDefaultModel('TEXT2SOUND', $user->getId());
+                        $ttsProvider = $ttsModelId ? $this->modelConfigService->getProviderForModel($ttsModelId) : null;
+
+                        $ttsResult = $this->aiFacade->synthesize($ttsText, $user->getId(), [
+                            'format' => 'mp3',
+                            'provider' => $ttsProvider ? strtolower($ttsProvider) : null,
+                        ]);
+                        // Get absolute path for attachment
+                        $attachmentPath = $this->getParameter('kernel.project_dir').'/var/uploads/'.$ttsResult['relativePath'];
+                    }
+                } catch (\Exception $e) {
+                    $this->logger->error('Failed to generate TTS for email', ['error' => $e->getMessage()]);
+                }
+            }
+
             // Send email response back to user
             try {
                 $this->internalEmailService->sendAiResponseEmail(
@@ -240,7 +283,8 @@ class WebhookController extends AbstractController
                     $messageId,
                     $provider,
                     $model,
-                    $processingTime
+                    $processingTime,
+                    $attachmentPath
                 );
 
                 $this->logger->info('Email response sent', [
@@ -487,9 +531,6 @@ class WebhookController extends AbstractController
             }
             $this->em->flush(); // Flush metadata
 
-            // Record usage
-            $this->rateLimitService->recordUsage($user, 'MESSAGES');
-
             $result = $this->messageProcessor->process($message);
 
             if (!$result['success']) {
@@ -500,13 +541,25 @@ class WebhookController extends AbstractController
             }
 
             $response = $result['response'];
+            $responseContent = $response['content'] ?? '';
+            $responseMeta = $response['metadata'] ?? [];
+
+            // Record usage with response content for token estimation
+            $this->rateLimitService->recordUsage($user, 'MESSAGES', [
+                'provider' => $responseMeta['provider'] ?? 'unknown',
+                'model' => $responseMeta['model'] ?? 'unknown',
+                'tokens' => 0,
+                'source' => 'WEBHOOK',
+                'response_text' => $responseContent,
+                'input_text' => $message->getText(),
+            ]);
 
             return $this->json([
                 'success' => true,
                 'message_id' => $message->getId(),
                 'response' => [
-                    'text' => $response['content'] ?? '',
-                    'metadata' => $response['metadata'] ?? [],
+                    'text' => $responseContent,
+                    'metadata' => $responseMeta,
                 ],
             ]);
         } catch (\Exception $e) {

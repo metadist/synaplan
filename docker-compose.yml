@@ -120,6 +120,8 @@ services:
       WHISPER_DEFAULT_MODEL: tiny
       WHISPER_ENABLED: "true"
       FFMPEG_BINARY: /usr/bin/ffmpeg
+      # Piper TTS Service (self-hosted, voice conversations)
+      SYNAPLAN_TTS_URL: ${SYNAPLAN_TTS_URL:-http://host.docker.internal:10200}
     depends_on:
       db:
         condition: service_healthy

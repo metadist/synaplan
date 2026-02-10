@@ -110,6 +110,18 @@ const router = createRouter({
       meta: { requiresAuth: true, helpId: 'tools.chatWidget', titleKey: 'pageTitles.chatWidget' },
     },
     {
+      path: '/tools/chat-widget/:widgetId/chats',
+      name: 'widget-chats',
+      component: () => import('../views/WidgetSessionsView.vue'),
+      meta: { requiresAuth: true, titleKey: 'pageTitles.widgetChats' },
+    },
+    {
+      path: '/tools/chat-widget/live-support',
+      name: 'live-support',
+      component: () => import('../views/LiveSupportView.vue'),
+      meta: { requiresAuth: true, titleKey: 'pageTitles.liveSupport' },
+    },
+    {
       path: '/tools/doc-summary',
       name: 'tools-doc-summary',
       component: () => import('@/views/ToolsView.vue'),
@@ -368,7 +380,8 @@ router.beforeEach(async (to, from, next) => {
       return
     }
 
-    console.warn('🔒 Protected route accessed without auth - redirecting to login')
+    // Expected for non-logged-in users visiting protected routes - not an error
+    if (import.meta.env.DEV) console.debug('🔒 Redirecting unauthenticated user to login')
     next({
       name: 'login',
       query: { redirect: to.fullPath, reason: 'auth_required' },

@@ -128,14 +128,6 @@
           </template>
         </nav>
 
-        <div
-          v-if="!sidebarStore.isCollapsed"
-          class="mt-6 px-1"
-          data-testid="section-sidebar-chatlist"
-        >
-          <SidebarChatList />
-        </div>
-
         <div class="h-20"></div>
       </div>
 
@@ -179,7 +171,6 @@ import { useTheme } from '../composables/useTheme'
 import { getFeaturesStatus } from '../services/featuresService'
 import { useI18n } from 'vue-i18n'
 import ChatDropdown from './ChatDropdown.vue'
-import SidebarChatList from './SidebarChatList.vue'
 import UserMenu from './UserMenu.vue'
 import MemoriesDialog from './MemoriesDialog.vue'
 
@@ -277,7 +268,7 @@ const navItems = computed<NavItem[]>(() => {
       icon: PuzzlePieceIcon,
       children: configStore.plugins.map((plugin: { name?: string }) => ({
         path: `/plugins/${plugin.name}`,
-        label: plugin.name ?? 'Unknown',
+        label: plugin.name ? plugin.name.charAt(0).toUpperCase() + plugin.name.slice(1) : 'Unknown',
       })),
     })
   }

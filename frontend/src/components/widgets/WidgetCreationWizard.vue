@@ -693,7 +693,7 @@ const emit = defineEmits<{
 
 const config = useConfigStore()
 const { error: showError } = useNotification()
-const { t } = useI18n()
+const { t, locale } = useI18n()
 
 const currentStep = ref(0)
 const creating = ref(false)
@@ -983,7 +983,7 @@ const handleClose = async () => {
 
 const loadTaskPrompts = async () => {
   try {
-    taskPrompts.value = await promptsApi.listPrompts()
+    taskPrompts.value = await promptsApi.listPrompts(locale.value || 'en')
   } catch (error) {
     console.error('Failed to load task prompts:', error)
   }

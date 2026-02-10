@@ -17,8 +17,15 @@ OIDC_CLIENT_SECRET=test_client_secret
 OIDC_DISCOVERY_URL=https://test.example.com
 OPENAI_API_KEY=test-key
 ANTHROPIC_API_KEY=test-key
+HUGGINGFACE_API_KEY=test-key
 THEHIVE_API_KEY=test-key
 LOCK_DSN=flock
+SYNAPLAN_TTS_URL=
+WHISPER_BINARY=/usr/local/bin/whisper
+WHISPER_MODELS_PATH=/tmp/whisper-models
+WHISPER_DEFAULT_MODEL=base
+WHISPER_ENABLED=false
+FFMPEG_BINARY=/usr/bin/ffmpeg
 ENVEOF
 
 echo "✅ Created .env file for CI"

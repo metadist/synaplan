@@ -103,59 +103,24 @@ readonly class MemoryExtractionService
 
         // AI call
         $userPrompt = <<<PROMPT
-Conversation Context:
+Conversation:
 {$contextText}
 
 Current Message:
 {$message->getText()}
 {$existingMemoriesText}
 
-TASK: Analyze this conversation and decide what to do with memories.
-
-KEY NAMING (IMPORTANT):
-- Keep memory keys as short as possible while still being meaningful (aim for <= 24 characters).
-- Use stable, reusable identifiers (e.g. "frontend_framework", "diet", "timezone").
-- Do NOT include IDs, timestamps, or full sentences in keys.
-
-ATOMIC MEMORIES (VERY IMPORTANT):
-- Store **at most ONE fact** per memory value (single sentence, no lists, no "and ...").
-- If multiple facts belong under the same key, **create multiple memories with the same key** (same key can appear multiple times).
-  - Example: `diet: Eats halal` and `diet: Prefers low-calorie meals for weight loss`
-
-RESPONSE FORMAT (JSON):
-[
-  {
-    "action": "create",
-    "category": "category_name",
-    "key": "key_name",
-    "value": "the information"
-  },
-  {
-    "action": "update",
-    "memory_id": 123,
-    "category": "category_name",
-    "key": "key_name",
-    "value": "updated information"
-  }
-]
-
-DECISION RULES:
-1. action: "create" → Use when information is COMPLETELY NEW
-2. action: "update" → Use when information REPLACES or EXTENDS existing memory (must include memory_id)
-3. action: "delete" → Use when user explicitly asks to forget/remove info (must include memory_id)
-4. NO ACTION → If information already exists and hasn't changed, return empty array []
-
-EXAMPLES:
-- Existing: "Likes kebab" → New: "Likes kebab with tzatziki" → UPDATE (more specific)
-- Existing: "Enjoys driving" → New: "Prefers cycling" → UPDATE (preference changed)
-- Existing: "Likes kebab" → New: "Likes kebab" → NO ACTION (already stored)
-- No existing → New: "Likes pizza" → CREATE (new info)
-- User: "Delete my name" → DELETE (use memory_id from existing list)
-
-Be intelligent and selective!
+RULES:
+- Only save facts the user states about THEMSELVES (name, age, preferences, skills, etc.)
+- Questions about topics are NOT memories ("Who is X?" → null, "Is Y true?" → null)
+- One fact per memory, short keys (snake_case, <= 24 chars)
+- create = new fact, update = changed fact (needs memory_id), delete = user asks to forget (needs memory_id)
+- Already stored and unchanged → return []
 PROMPT;
 
         try {
+            $extractionConfig = $this->getExtractionModelConfig($message->getUserId());
+
             $response = $this->aiFacade->chat(
                 [
                     ['role' => 'system', 'content' => $systemPrompt],
@@ -164,7 +129,8 @@ PROMPT;
                 $message->getUserId(),
                 [
                     'temperature' => 0.3, // Low temperature for consistent extraction
-                    'model' => $this->getExtractionModel($message->getUserId()),
+                    'model' => $extractionConfig['model'],
+                    'provider' => $extractionConfig['provider'],
                 ]
             );
 
@@ -172,7 +138,8 @@ PROMPT;
 
             $this->logger->debug('Memory extraction AI response received', [
                 'message_id' => $message->getId(),
-                'model' => $this->getExtractionModel($message->getUserId()),
+                'provider' => $extractionConfig['provider'],
+                'model' => $extractionConfig['model'],
                 'content_length' => strlen($content),
                 'existing_memories_count' => count($existingMemories),
             ]);
@@ -327,19 +294,32 @@ PROMPT;
     }
 
     /**
-     * Get model for memory extraction (fast model preferred).
+     * Get model and provider for memory extraction.
+     *
+     * Resolves both the model name AND the matching provider from the model ID
+     * to avoid provider/model mismatch (e.g., sending an OpenAI model to Groq).
+     *
+     * @return array{model: string|null, provider: string|null}
      */
-    private function getExtractionModel(int $userId): ?string
+    private function getExtractionModelConfig(int $userId): array
     {
         // Try to get user's default chat model
         $modelId = $this->modelConfigService->getDefaultModel('CHAT', $userId);
 
         if ($modelId) {
             $model = $this->modelConfigService->getModelName($modelId);
+            $provider = $this->modelConfigService->getProviderForModel($modelId);
 
-            return $model;
+            $this->logger->debug('Memory extraction model resolved', [
+                'user_id' => $userId,
+                'model_id' => $modelId,
+                'model' => $model,
+                'provider' => $provider,
+            ]);
+
+            return ['model' => $model, 'provider' => $provider];
         }
 
-        return null; // Use system default
+        return ['model' => null, 'provider' => null]; // Use system default
     }
 }

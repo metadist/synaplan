@@ -169,6 +169,18 @@ class ChatHandler implements MessageHandlerInterface
             ]);
         }
 
+        // Append explicit language directive based on detected language from classification.
+        $languageNames = [
+            'en' => 'English', 'de' => 'German', 'fr' => 'French', 'es' => 'Spanish',
+            'it' => 'Italian', 'pt' => 'Portuguese', 'nl' => 'Dutch', 'pl' => 'Polish',
+            'ru' => 'Russian', 'ja' => 'Japanese', 'ko' => 'Korean', 'zh' => 'Chinese',
+            'ar' => 'Arabic', 'tr' => 'Turkish', 'sv' => 'Swedish', 'da' => 'Danish',
+            'no' => 'Norwegian', 'fi' => 'Finnish', 'cs' => 'Czech', 'ro' => 'Romanian',
+            'hu' => 'Hungarian', 'uk' => 'Ukrainian', 'hi' => 'Hindi', 'th' => 'Thai',
+        ];
+        $languageName = $languageNames[$language] ?? $language;
+        $systemPrompt .= "\n\n**IMPORTANT: The user's current message is in {$languageName}. You MUST respond in {$languageName}.**";
+
         if ($modelId) {
             $model = $this->modelRepository->find($modelId);
             if ($model) {
@@ -426,19 +438,26 @@ class ChatHandler implements MessageHandlerInterface
                 // Balance between precision and recall
                 // Lower than 0.5 to catch semantically related queries (e.g., "wie heiße ich?" → "full name")
                 // Higher than 0.2 to avoid completely unrelated memories
-                $loadedMemories = $this->memoryService->searchRelevantMemories(
+                $rawMemories = $this->memoryService->searchRelevantMemories(
                     $message->getUserId(),
                     $message->getText(),
-                    limit: 15, // Moderate limit - enough context without overwhelming
-                    minScore: 0.35 // Balanced threshold - catches related concepts without noise
+                    limit: 10,
+                    minScore: 0.4
                 );
+
+                // Post-filter: only keep memories with actual relevance (Qdrant may return low-score results)
+                $loadedMemories = array_values(array_filter(
+                    $rawMemories,
+                    fn (array $m) => ($m['score'] ?? 0) >= 0.4
+                ));
 
                 $this->logger->debug('ChatHandler: Memories loaded from Qdrant', [
                     'count' => count($loadedMemories),
+                    'filtered_out' => count($rawMemories) - count($loadedMemories),
                     'memories' => array_map(fn ($m) => [
                         'id' => $m['id'] ?? null,
                         'key' => $m['key'] ?? null,
-                        'category' => $m['category'] ?? null,
+                        'score' => $m['score'] ?? 0,
                     ], $loadedMemories),
                 ]);
             } catch (\Throwable $e) {
@@ -462,12 +481,9 @@ class ChatHandler implements MessageHandlerInterface
                 );
             }
             $memoriesContext .= "\nUse these memories to personalize your response.\n";
-            $memoriesContext .= "IMPORTANT (MEMORY REFERENCES):\n";
-            $memoriesContext .= "- Only reference memories using the format [Memory:ID] where ID is a numeric ID that appears in the list above.\n";
-            $memoriesContext .= "- NEVER invent IDs or placeholders (no 'new', 'neu', arrows, or free text inside [Memory:...]).\n";
-            $memoriesContext .= "- If you mention information that is NOT in the list above (e.g. something that will be saved after this reply), do NOT add a [Memory:...] reference.\n";
-            $memoriesContext .= "Examples: 'According to [Memory:42], you prefer...' or 'Based on [Memory:15], your name is...'\n";
-            $memoriesContext .= "The [Memory:ID] references are clickable for the user.\n";
+            $memoriesContext .= "REFERENCES: Use [Memory:ID] (clickable). Rules:\n";
+            $memoriesContext .= "- ONE ID per bracket. Good: [Memory:42] and [Memory:15]. Bad: [Memory:42, 15].\n";
+            $memoriesContext .= "- Only use IDs from the list above. Never invent IDs.\n";
 
             $this->logger->info('ChatHandler: User memories loaded', [
                 'user_id' => $message->getUserId(),
@@ -499,26 +515,32 @@ class ChatHandler implements MessageHandlerInterface
         if (!$memoriesDisabledByRequest && $memoriesEnabledForUser && $this->memoryService->isAvailable()) {
             try {
                 // Search for relevant false positives (things to AVOID saying)
-                $falsePositives = $this->memoryService->searchRelevantMemories(
-                    $message->getUserId(),
-                    $message->getText(),
-                    category: 'feedback_negative',
-                    limit: 5,
-                    minScore: 0.4,
-                    namespace: 'feedback_false_positive',
-                    includeHidden: true  // Feedback categories are hidden from user memory list
-                );
+                $falsePositives = array_values(array_filter(
+                    $this->memoryService->searchRelevantMemories(
+                        $message->getUserId(),
+                        $message->getText(),
+                        category: 'feedback_negative',
+                        limit: 5,
+                        minScore: 0.4,
+                        namespace: 'feedback_false_positive',
+                        includeHidden: true
+                    ),
+                    fn (array $fp) => ($fp['score'] ?? 0) >= 0.4
+                ));
 
                 // Search for relevant positive examples (correct information)
-                $positiveExamples = $this->memoryService->searchRelevantMemories(
-                    $message->getUserId(),
-                    $message->getText(),
-                    category: 'feedback_positive',
-                    limit: 5,
-                    minScore: 0.4,
-                    namespace: 'feedback_positive',
-                    includeHidden: true  // Feedback categories are hidden from user memory list
-                );
+                $positiveExamples = array_values(array_filter(
+                    $this->memoryService->searchRelevantMemories(
+                        $message->getUserId(),
+                        $message->getText(),
+                        category: 'feedback_positive',
+                        limit: 5,
+                        minScore: 0.4,
+                        namespace: 'feedback_positive',
+                        includeHidden: true
+                    ),
+                    fn (array $pe) => ($pe['score'] ?? 0) >= 0.4
+                ));
 
                 if (!empty($falsePositives) || !empty($positiveExamples)) {
                     $feedbackContext = "\n\n## User Feedback (corrections from previous conversations):\n";
@@ -547,7 +569,10 @@ class ChatHandler implements MessageHandlerInterface
                         }
                     }
 
-                    $feedbackContext .= "\nIMPORTANT: Consider this feedback when answering. Avoid repeating false claims and prefer user-confirmed correct information. When referencing feedback, use [Feedback:ID] format.\n";
+                    $feedbackContext .= "\nREFERENCES: Use [Feedback:ID] (clickable). Rules:\n";
+                    $feedbackContext .= "- ONE ID per bracket. Good: [Feedback:123] and [Feedback:456]. Bad: [Feedback:123, 456].\n";
+                    $feedbackContext .= "- Avoid repeating ❌ claims. Prefer ✅ information.\n";
+                    $feedbackContext .= "- If ❌ and ✅ entries contradict each other, mention the conflict to the user.\n";
 
                     // Send SSE event with loaded feedbacks
                     if ($progressCallback && !empty($loadedFeedbacks)) {
@@ -784,10 +809,10 @@ class ChatHandler implements MessageHandlerInterface
         } else {
             // Memory Extraction (Option B: After AI-Response, in the same Request)
             // Pass the AI response to memory extraction so it can extract from the answer too
-            $this->logger->info('💾 Loading ALL memories for extraction', ['user_id' => $message->getUserId()]);
-            $allMemories = $this->memoryService->searchRelevantMemories($message->getUserId(), $message->getText(), limit: 100, minScore: 0.0);
+            $this->logger->info('💾 Loading relevant memories for extraction', ['user_id' => $message->getUserId()]);
+            $allMemories = $this->memoryService->searchRelevantMemories($message->getUserId(), $message->getText(), limit: 20, minScore: 0.25);
             $this->extractMemoriesAfterResponse($message, $fullResponseText, $thread, $allMemories, $progressCallback);
-            $this->logger->info('✅ Loaded memories for extraction', ['count' => count($allMemories), 'sample' => array_slice($allMemories, 0, 2)]);
+            $this->logger->info('✅ Loaded memories for extraction', ['count' => count($allMemories)]);
         }
 
         return [

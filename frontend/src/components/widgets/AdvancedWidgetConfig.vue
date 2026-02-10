@@ -1,53 +1,65 @@
 <template>
   <Teleport to="body">
     <div
-      class="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4"
+      class="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4"
       data-testid="modal-advanced-config"
       @click.self="handleClose"
     >
       <div
-        class="surface-card rounded-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden shadow-2xl flex flex-col"
+        class="surface-card rounded-xl sm:rounded-2xl w-full max-w-4xl max-h-[95vh] sm:max-h-[90vh] overflow-hidden shadow-2xl flex flex-col"
         data-testid="section-config-container"
       >
         <!-- Header -->
         <div
-          class="px-6 py-4 border-b border-light-border/30 dark:border-dark-border/20 flex items-center justify-between flex-shrink-0"
+          class="px-4 sm:px-6 py-3 sm:py-4 border-b border-light-border/30 dark:border-dark-border/20 flex items-center justify-between flex-shrink-0 gap-3"
         >
-          <div>
-            <h2 class="text-xl font-semibold txt-primary flex items-center gap-2">
-              <Icon icon="heroicons:cog-6-tooth" class="w-6 h-6 txt-brand" />
-              {{ $t('widgets.advancedConfig.title') }}
+          <div class="min-w-0 flex-1">
+            <h2 class="text-lg sm:text-xl font-semibold txt-primary flex items-center gap-2">
+              <Icon
+                :icon="promptOnly ? 'heroicons:sparkles' : 'heroicons:cog-6-tooth'"
+                class="w-5 h-5 sm:w-6 sm:h-6 txt-brand flex-shrink-0"
+              />
+              <span class="truncate">
+                {{
+                  promptOnly
+                    ? $t('widgets.advancedConfig.editPrompt')
+                    : $t('widgets.advancedConfig.title')
+                }}
+              </span>
             </h2>
-            <p class="text-sm txt-secondary mt-1">
+            <p class="text-sm txt-secondary mt-0.5 sm:mt-1 truncate">
               {{ widget.name }}
             </p>
           </div>
           <button
-            class="w-10 h-10 rounded-lg hover-surface transition-colors flex items-center justify-center"
+            class="w-9 h-9 sm:w-10 sm:h-10 rounded-lg hover-surface transition-colors flex items-center justify-center flex-shrink-0"
             :aria-label="$t('common.close')"
             data-testid="btn-close"
             @click="handleClose"
           >
-            <Icon icon="heroicons:x-mark" class="w-6 h-6 txt-secondary" />
+            <Icon icon="heroicons:x-mark" class="w-5 h-5 sm:w-6 sm:h-6 txt-secondary" />
           </button>
         </div>
 
-        <!-- Tabs -->
-        <div class="px-6 border-b border-light-border/30 dark:border-dark-border/20 flex-shrink-0">
-          <div class="flex gap-1">
+        <!-- Tabs (hidden in promptOnly mode) -->
+        <div
+          v-if="!promptOnly"
+          class="px-2 sm:px-6 border-b border-light-border/30 dark:border-dark-border/20 flex-shrink-0 overflow-x-auto"
+        >
+          <div class="flex gap-0 sm:gap-1">
             <button
               v-for="tab in tabs"
               :key="tab.id"
               :class="[
-                'px-4 py-3 font-medium text-sm transition-colors relative',
+                'flex-1 sm:flex-none px-2 sm:px-4 py-3 font-medium text-xs sm:text-sm transition-colors relative whitespace-nowrap',
                 activeTab === tab.id ? 'txt-primary' : 'txt-secondary hover:txt-primary',
               ]"
               data-testid="btn-tab"
               @click="activeTab = tab.id"
             >
-              <span class="flex items-center gap-2">
-                <Icon :icon="tab.icon" class="w-4 h-4" />
-                {{ $t(tab.labelKey) }}
+              <span class="flex items-center justify-center sm:justify-start gap-1 sm:gap-2">
+                <Icon :icon="tab.icon" class="w-4 h-4 flex-shrink-0" />
+                <span class="truncate">{{ $t(tab.labelKey) }}</span>
               </span>
               <div
                 v-if="activeTab === tab.id"
@@ -58,9 +70,13 @@
         </div>
 
         <!-- Content -->
-        <div class="flex-1 overflow-y-auto scroll-thin p-6">
-          <!-- Branding Tab -->
-          <div v-if="activeTab === 'branding'" class="space-y-6" data-testid="section-branding">
+        <div class="flex-1 overflow-y-auto scroll-thin p-4 sm:p-6">
+          <!-- Branding Tab (hidden in promptOnly mode) -->
+          <div
+            v-if="!promptOnly && activeTab === 'branding'"
+            class="space-y-6"
+            data-testid="section-branding"
+          >
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
                 <label class="block text-sm font-medium txt-primary mb-2">
@@ -138,7 +154,7 @@
               </label>
 
               <!-- Predefined Icons + Custom Icon Option -->
-              <div class="grid grid-cols-3 md:grid-cols-6 gap-3 mb-4">
+              <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2 sm:gap-3 mb-4">
                 <!-- Standard Icons -->
                 <button
                   v-for="icon in predefinedIcons"
@@ -258,9 +274,9 @@
             </div>
           </div>
 
-          <!-- Behavior Tab -->
+          <!-- Behavior Tab (hidden in promptOnly mode) -->
           <div
-            v-else-if="activeTab === 'behavior'"
+            v-else-if="!promptOnly && activeTab === 'behavior'"
             class="space-y-6"
             data-testid="section-behavior"
           >
@@ -329,40 +345,21 @@
               ></textarea>
             </div>
 
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <label class="block text-sm font-medium txt-primary mb-2">
-                  {{ $t('widgets.advancedConfig.messageLimit') }}
-                </label>
-                <input
-                  v-model.number="config.messageLimit"
-                  type="number"
-                  min="1"
-                  max="100"
-                  class="w-full px-4 py-2.5 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
-                  data-testid="input-message-limit"
-                />
-                <p class="text-xs txt-secondary mt-1">
-                  {{ $t('widgets.advancedConfig.messageLimitHelp') }}
-                </p>
-              </div>
-
-              <div>
-                <label class="block text-sm font-medium txt-primary mb-2">
-                  {{ $t('widgets.advancedConfig.maxFileSize') }}
-                </label>
-                <input
-                  v-model.number="config.maxFileSize"
-                  type="number"
-                  min="1"
-                  max="50"
-                  class="w-full px-4 py-2.5 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
-                  data-testid="input-max-file-size"
-                />
-                <p class="text-xs txt-secondary mt-1">
-                  {{ $t('widgets.advancedConfig.maxFileSizeHelp') }}
-                </p>
-              </div>
+            <div>
+              <label class="block text-sm font-medium txt-primary mb-2">
+                {{ $t('widgets.advancedConfig.messageLimit') }}
+              </label>
+              <input
+                v-model.number="config.messageLimit"
+                type="number"
+                min="1"
+                max="100"
+                class="w-full px-4 py-2.5 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+                data-testid="input-message-limit"
+              />
+              <p class="text-xs txt-secondary mt-1">
+                {{ $t('widgets.advancedConfig.messageLimitHelp') }}
+              </p>
             </div>
 
             <div class="surface-chip rounded-lg">
@@ -386,17 +383,39 @@
               </label>
 
               <div v-if="config.allowFileUpload" class="px-4 pb-4">
-                <label class="block text-sm font-medium txt-primary mb-2">
-                  {{ $t('widgets.advancedConfig.fileUploadLimit') }}
-                </label>
-                <input
-                  v-model.number="config.fileUploadLimit"
-                  type="number"
-                  min="0"
-                  max="20"
-                  class="w-full px-4 py-2.5 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
-                  data-testid="input-file-limit"
-                />
+                <!-- File Upload Limit & Max File Size - side by side -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label class="block text-sm font-medium txt-primary mb-2">
+                      {{ $t('widgets.advancedConfig.fileUploadLimit') }}
+                    </label>
+                    <input
+                      v-model.number="config.fileUploadLimit"
+                      type="number"
+                      min="0"
+                      max="20"
+                      class="w-full px-4 py-2.5 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+                      data-testid="input-file-limit"
+                    />
+                  </div>
+                  <div>
+                    <label class="block text-sm font-medium txt-primary mb-2">
+                      {{ $t('widgets.advancedConfig.maxFileSize') }}
+                    </label>
+                    <input
+                      :value="config.maxFileSize"
+                      type="number"
+                      min="1"
+                      max="50"
+                      class="w-full px-4 py-2.5 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+                      data-testid="input-max-file-size"
+                      @input="handleMaxFileSizeInput"
+                    />
+                    <p class="text-xs txt-secondary mt-1">
+                      {{ $t('widgets.advancedConfig.maxFileSizeHelp') }}
+                    </p>
+                  </div>
+                </div>
                 <!-- Unlimited Warning -->
                 <div
                   v-if="config.fileUploadLimit === 0"
@@ -421,9 +440,9 @@
             </div>
           </div>
 
-          <!-- Security Tab -->
+          <!-- Security Tab (hidden in promptOnly mode) -->
           <div
-            v-else-if="activeTab === 'security'"
+            v-else-if="!promptOnly && activeTab === 'security'"
             class="space-y-6"
             data-testid="section-security"
           >
@@ -440,7 +459,7 @@
                 <Icon icon="heroicons:shield-check" class="w-8 h-8 txt-secondary opacity-60" />
               </div>
 
-              <div class="flex gap-2">
+              <div class="flex flex-col sm:flex-row gap-2">
                 <input
                   v-model="newDomain"
                   type="text"
@@ -450,7 +469,7 @@
                   @keydown.enter.prevent="addDomain"
                 />
                 <button
-                  class="btn-primary px-4 py-2.5 rounded-lg font-medium flex items-center gap-2"
+                  class="btn-primary px-4 py-2.5 rounded-lg font-medium flex items-center justify-center gap-2 w-full sm:w-auto"
                   data-testid="btn-add-domain"
                   @click="addDomain"
                 >
@@ -503,13 +522,15 @@
 
           <!-- AI Assistant Tab -->
           <div
-            v-else-if="activeTab === 'assistant'"
+            v-if="promptOnly || activeTab === 'assistant'"
             class="space-y-6"
             data-testid="section-assistant"
           >
-            <!-- Not Configured State -->
+            <!-- Not Configured State (hidden in promptOnly mode) -->
             <div
-              v-if="!hasCustomPrompt && !creatingManualPrompt && !manualPromptCreated"
+              v-if="
+                !promptOnly && !hasCustomPrompt && !creatingManualPrompt && !manualPromptCreated
+              "
               class="flex flex-col items-center justify-center py-12 text-center"
             >
               <div
@@ -545,9 +566,9 @@
               </div>
             </div>
 
-            <!-- Creating Manual Prompt Loading State -->
+            <!-- Creating Manual Prompt Loading State (hidden in promptOnly mode) -->
             <div
-              v-else-if="creatingManualPrompt"
+              v-else-if="!promptOnly && creatingManualPrompt"
               class="flex flex-col items-center justify-center py-12"
             >
               <Icon icon="heroicons:arrow-path" class="w-8 h-8 txt-secondary animate-spin mb-4" />
@@ -571,9 +592,9 @@
 
               <!-- Prompt Editor -->
               <template v-else>
-                <!-- System Prompt Notice (legacy widgets using shared prompts) -->
+                <!-- System Prompt Notice (legacy widgets using shared prompts, hidden in promptOnly mode) -->
                 <div
-                  v-if="isSystemPrompt"
+                  v-if="!promptOnly && isSystemPrompt"
                   class="p-4 rounded-lg bg-amber-500/10 border border-amber-500/30"
                 >
                   <div class="flex items-start gap-3">
@@ -601,9 +622,9 @@
                   </div>
                 </div>
 
-                <!-- Restart AI Setup Option (only show if not manually created and not system prompt) -->
+                <!-- Restart AI Setup Option (only show if not manually created and not system prompt, hidden in promptOnly mode) -->
                 <div
-                  v-else-if="!manualPromptCreated"
+                  v-else-if="!promptOnly && !manualPromptCreated"
                   class="p-4 rounded-lg bg-[var(--brand-alpha-light)] border border-[var(--brand)]/20"
                 >
                   <div class="flex items-center justify-between">
@@ -911,10 +932,10 @@
 
         <!-- Footer -->
         <div
-          class="px-6 py-4 border-t border-light-border/30 dark:border-dark-border/20 flex items-center justify-end gap-3 flex-shrink-0"
+          class="px-4 sm:px-6 py-3 sm:py-4 border-t border-light-border/30 dark:border-dark-border/20 flex items-center justify-end gap-2 sm:gap-3 flex-shrink-0"
         >
           <button
-            class="px-5 py-2.5 rounded-lg hover-surface transition-colors txt-secondary font-medium"
+            class="px-4 sm:px-5 py-2 sm:py-2.5 rounded-lg hover-surface transition-colors txt-secondary font-medium text-sm sm:text-base"
             data-testid="btn-cancel"
             @click="handleClose"
           >
@@ -922,12 +943,16 @@
           </button>
           <button
             :disabled="saving"
-            class="btn-primary px-6 py-2.5 rounded-lg transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+            class="btn-primary px-4 sm:px-6 py-2 sm:py-2.5 rounded-lg transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 text-sm sm:text-base"
             data-testid="btn-save"
             @click="handleSave"
           >
-            <Icon v-if="saving" icon="heroicons:arrow-path" class="w-5 h-5 animate-spin" />
-            <Icon v-else icon="heroicons:check" class="w-5 h-5" />
+            <Icon
+              v-if="saving"
+              icon="heroicons:arrow-path"
+              class="w-4 h-4 sm:w-5 sm:h-5 animate-spin"
+            />
+            <Icon v-else icon="heroicons:check" class="w-4 h-4 sm:w-5 sm:h-5" />
             {{ saving ? $t('common.saving') : $t('common.save') }}
           </button>
         </div>
@@ -960,10 +985,16 @@ defineOptions({
   inheritAttrs: false,
 })
 
-const props = defineProps<{
-  widget: widgetsApi.Widget
-  initialTab?: string
-}>()
+const props = withDefaults(
+  defineProps<{
+    widget: widgetsApi.Widget
+    initialTab?: string
+    promptOnly?: boolean
+  }>(),
+  {
+    promptOnly: false,
+  }
+)
 
 const emit = defineEmits<{
   close: []
@@ -971,7 +1002,7 @@ const emit = defineEmits<{
   startAiSetup: []
 }>()
 
-const { t } = useI18n()
+const { t, locale } = useI18n()
 const { success, error: showError } = useNotification()
 
 // Check if widget has a custom/configured prompt (not the default)
@@ -1048,6 +1079,21 @@ const config = reactive<widgetsApi.WidgetConfig>({
 // Icon selection
 const iconUploadInput = ref<HTMLInputElement | null>(null)
 const uploadingIcon = ref(false)
+
+// Handle max file size input with automatic clamping to 50
+const handleMaxFileSizeInput = (event: Event) => {
+  const input = event.target as HTMLInputElement
+  let value = parseInt(input.value, 10)
+
+  if (isNaN(value) || value < 1) {
+    value = 1
+  } else if (value > 50) {
+    value = 50
+  }
+
+  config.maxFileSize = value
+  input.value = String(value)
+}
 
 const predefinedIcons = [
   { value: 'chat', label: t('widgets.icons.chat') },
@@ -1366,7 +1412,7 @@ const loadPromptData = async () => {
   promptError.value = null
 
   try {
-    const prompts = await promptsApi.getPrompts('en')
+    const prompts = await promptsApi.getPrompts(locale.value || 'en')
     const prompt = prompts.find((p) => p.topic === props.widget.taskPromptTopic)
 
     if (prompt) {

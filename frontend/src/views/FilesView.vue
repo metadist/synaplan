@@ -272,7 +272,7 @@
             <table class="w-full">
               <thead>
                 <tr class="border-b border-light-border/30 dark:border-dark-border/20">
-                  <th class="text-left py-3 px-2 txt-secondary text-xs font-medium">
+                  <th class="text-left py-3 px-2 txt-secondary text-xs font-medium w-8">
                     <input
                       type="checkbox"
                       :checked="allSelected"
@@ -280,23 +280,14 @@
                       @change="toggleSelectAll"
                     />
                   </th>
-                  <th class="text-left py-3 px-3 txt-secondary text-xs font-medium">
-                    {{ $t('files.fileId') }}
-                  </th>
+                  <th class="text-left py-3 px-3 txt-secondary text-xs font-medium w-12">ID</th>
                   <th class="text-left py-3 px-3 txt-secondary text-xs font-medium">
                     {{ $t('files.name') }}
                   </th>
-                  <th class="text-left py-3 px-3 txt-secondary text-xs font-medium">
-                    {{ $t('files.size') }}
-                  </th>
-                  <th class="text-left py-3 px-3 txt-secondary text-xs font-medium">
-                    {{ $t('files.status') }}
-                  </th>
-                  <th class="text-left py-3 px-3 txt-secondary text-xs font-medium">
-                    GroupKey / Tag
-                  </th>
-                  <th class="text-left py-3 px-3 txt-secondary text-xs font-medium">
-                    {{ $t('files.attachment') }}
+                  <th
+                    class="text-left py-3 px-3 txt-secondary text-xs font-medium whitespace-nowrap"
+                  >
+                    {{ $t('files.groupKey') }}
                   </th>
                   <th class="text-left py-3 px-3 txt-secondary text-xs font-medium">
                     {{ $t('files.uploaded') }}
@@ -321,27 +312,41 @@
                       @change="toggleFileSelection(file.id)"
                     />
                   </td>
-                  <td class="py-3 px-3 txt-primary text-sm">{{ file.id }}</td>
-                  <td class="py-3 px-3 txt-primary text-sm max-w-xs truncate">
-                    {{ file.filename }}
-                  </td>
-                  <td class="py-3 px-3 txt-secondary text-xs">
-                    {{ formatFileSize(file.file_size) }}
-                  </td>
+                  <td class="py-3 px-3 txt-secondary text-xs align-top">{{ file.id }}</td>
                   <td class="py-3 px-3">
-                    <span
-                      :class="{
-                        'pill pill--success': file.status === 'vectorized',
-                        'pill pill--warning': file.status === 'extracted',
-                        'pill pill--default': file.status === 'uploaded',
-                      }"
-                      class="text-xs"
-                    >
-                      {{ $t(`files.status_${file.status}`) }}
-                    </span>
+                    <div class="txt-primary text-sm truncate max-w-xs">{{ file.filename }}</div>
+                    <div class="flex items-center gap-2 mt-0.5">
+                      <span class="txt-secondary text-xs">{{
+                        formatFileSize(file.file_size)
+                      }}</span>
+                      <span class="txt-secondary text-xs">·</span>
+                      <span v-if="file.status === 'vectorized'" class="text-xs text-emerald-500">
+                        Vectorized<template v-if="fileGroupKeys[file.id]?.qdrantChunks > 0"
+                          >: Qdrant</template
+                        ><template v-else-if="fileGroupKeys[file.id]?.mariadbChunks > 0"
+                          >: MariaDB</template
+                        >
+                      </span>
+                      <span
+                        v-else
+                        :class="{
+                          'text-amber-500': file.status === 'extracted',
+                          'txt-secondary': file.status === 'uploaded',
+                        }"
+                        class="text-xs"
+                      >
+                        {{ $t(`files.status_${file.status}`) }}
+                      </span>
+                      <template v-if="file.is_attached">
+                        <span class="txt-secondary text-xs">·</span>
+                        <span class="text-xs text-blue-400" :title="$t('files.attachedToMessage')">
+                          {{ $t('files.attached') }}
+                        </span>
+                      </template>
+                    </div>
                   </td>
                   <!-- GroupKey Column with inline edit -->
-                  <td class="py-3 px-3">
+                  <td class="py-3 px-3 align-top">
                     <div v-if="editingGroupKey === file.id" class="flex items-center gap-2">
                       <input
                         :ref="
@@ -389,6 +394,13 @@
                       >
                         Not vectorized
                       </span>
+                      <span
+                        v-else-if="fileGroupKeys[file.id] !== undefined"
+                        class="pill pill--warning text-xs"
+                        title="No vector data found"
+                      >
+                        —
+                      </span>
                       <span v-else class="pill text-xs opacity-50"> Loading... </span>
                       <button
                         v-if="fileGroupKeys[file.id]?.groupKey"
@@ -400,63 +412,49 @@
                       </button>
                     </div>
                   </td>
-                  <td class="py-3 px-3">
-                    <span
-                      v-if="file.is_attached"
-                      class="pill pill--active text-xs"
-                      :title="$t('files.attachedToMessage')"
-                    >
-                      {{ $t('files.attached') }}
-                    </span>
-                    <span v-else class="pill text-xs" :title="$t('files.standaloneFile')">
-                      {{ $t('files.standalone') }}
-                    </span>
+                  <td class="py-3 px-3 txt-secondary text-xs whitespace-nowrap align-top">
+                    {{ file.uploaded_date }}
                   </td>
-                  <td class="py-3 px-3 txt-secondary text-xs">{{ file.uploaded_date }}</td>
-                  <td class="py-3 px-3">
-                    <div class="flex gap-2">
-                      <!-- Re-Vectorize Button (only if not vectorized) -->
+                  <td class="py-3 px-3 align-top">
+                    <div class="flex gap-1">
+                      <!-- Migrate to Qdrant (MariaDB data exists, Qdrant empty) -->
                       <button
-                        v-if="fileGroupKeys[file.id]?.isVectorized === false"
-                        class="p-2 rounded hover:bg-purple-500/10 text-purple-600 dark:text-purple-400 transition-colors"
-                        title="Re-vectorize this file with extracted text"
+                        v-if="fileGroupKeys[file.id]?.needsMigration"
+                        class="p-1.5 rounded hover:bg-amber-500/10 text-amber-500 transition-colors"
+                        :title="$t('files.migrateToQdrant')"
+                        data-testid="btn-migrate"
+                        @click="migrateToQdrant(file.id)"
+                      >
+                        <Icon icon="heroicons:arrow-up-tray" class="w-4 h-4" />
+                      </button>
+                      <!-- Re-Vectorize (no vectors anywhere) -->
+                      <button
+                        v-else-if="fileGroupKeys[file.id]?.isVectorized === false"
+                        class="p-1.5 rounded hover:bg-purple-500/10 text-purple-600 dark:text-purple-400 transition-colors"
+                        :title="$t('files.reVectorize')"
                         data-testid="btn-revectorize"
                         @click="reVectorize(file.id)"
                       >
                         <Icon icon="heroicons:arrow-path" class="w-4 h-4" />
                       </button>
                       <button
-                        class="p-2 rounded hover:bg-[var(--brand)]/10 text-[var(--brand)] transition-colors"
+                        class="p-1.5 rounded hover:bg-[var(--brand)]/10 text-[var(--brand)] transition-colors"
                         title="View content"
                         data-testid="btn-view"
                         @click="viewFileContent(file.id)"
                       >
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path
-                            stroke-linecap="round"
-                            stroke-linejoin="round"
-                            stroke-width="2"
-                            d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-                          />
-                          <path
-                            stroke-linecap="round"
-                            stroke-linejoin="round"
-                            stroke-width="2"
-                            d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
-                          />
-                        </svg>
+                        <Icon icon="heroicons:eye" class="w-4 h-4" />
                       </button>
                       <button
-                        class="icon-ghost icon-ghost--info"
+                        class="p-1.5 rounded hover:bg-blue-500/10 text-blue-400 transition-colors"
                         title="Download file"
                         data-testid="btn-download"
                         @click="downloadFile(file.id, file.filename)"
                       >
                         <ArrowDownTrayIcon class="w-4 h-4" />
                       </button>
-                      <!-- Share button removed - MessageFile doesn't support public sharing -->
                       <button
-                        class="icon-ghost icon-ghost--danger"
+                        class="p-1.5 rounded hover:bg-red-500/10 text-red-400 transition-colors"
                         title="Delete file"
                         data-testid="btn-delete"
                         @click="deleteFile(file.id)"
@@ -636,7 +634,18 @@ const dragCounter = ref(0)
 
 // GroupKey management
 const fileGroupKeys = ref<
-  Record<number, { groupKey: string | null; isVectorized: boolean; chunks: number; status: string }>
+  Record<
+    number,
+    {
+      groupKey: string | null
+      isVectorized: boolean
+      chunks: number
+      status: string
+      needsMigration: boolean
+      mariadbChunks: number
+      qdrantChunks: number
+    }
+  >
 >({})
 const editingGroupKey = ref<number | null>(null)
 const tempGroupKey = ref('')
@@ -1017,12 +1026,18 @@ const formatFileSize = (bytes: number): string => {
  */
 const loadFileGroupKey = async (fileId: number) => {
   try {
-    const result = await filesService.getFileGroupKey(fileId)
+    const timeoutPromise = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error('Timeout')), 8000)
+    )
+    const result = await Promise.race([filesService.getFileGroupKey(fileId), timeoutPromise])
     fileGroupKeys.value[fileId] = {
       groupKey: result.groupKey,
       isVectorized: result.isVectorized,
       chunks: result.chunks,
       status: result.status,
+      needsMigration: result.needsMigration ?? false,
+      mariadbChunks: result.mariadbChunks ?? 0,
+      qdrantChunks: result.qdrantChunks ?? 0,
     }
   } catch (err: any) {
     console.error(`Failed to load groupKey for file ${fileId}:`, err)
@@ -1031,6 +1046,9 @@ const loadFileGroupKey = async (fileId: number) => {
       isVectorized: false,
       chunks: 0,
       status: 'unknown',
+      needsMigration: false,
+      mariadbChunks: 0,
+      qdrantChunks: 0,
     }
   }
 }
@@ -1039,8 +1057,9 @@ const loadFileGroupKey = async (fileId: number) => {
  * Load groupKeys for all visible files
  */
 const loadAllFileGroupKeys = async () => {
-  const promises = paginatedFiles.value.map((file) => loadFileGroupKey(file.id))
-  await Promise.all(promises)
+  for (const file of paginatedFiles.value) {
+    await loadFileGroupKey(file.id)
+  }
 }
 
 /**
@@ -1121,11 +1140,32 @@ const reVectorize = async (fileId: number) => {
   }
 }
 
+/**
+ * Migrate file vectors from MariaDB to Qdrant
+ */
+const migrateToQdrant = async (fileId: number) => {
+  try {
+    showInfo(t('files.migratingToQdrant'))
+
+    const result = await filesService.migrateFileToQdrant(fileId)
+
+    if (result.errors > 0) {
+      showError(t('files.migrationPartial', { migrated: result.migrated, errors: result.errors }))
+    } else {
+      showSuccess(t('files.migrationSuccess', { count: result.migrated }))
+    }
+
+    await loadFileGroupKey(fileId)
+    await loadFileGroups()
+  } catch (err: any) {
+    showError(err.message || t('files.migrationFailed'))
+  }
+}
+
 // Load initial data
 onMounted(async () => {
   await loadFiles()
   await loadFileGroups()
-  await loadAllFileGroupKeys()
 
   // Check for persisted file metadata (from before potential auth refresh)
   const persistedFiles = loadFileMetadata()

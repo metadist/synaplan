@@ -2,8 +2,10 @@
 
 namespace App\Service;
 
+use App\AI\Service\AiFacade;
 use App\Entity\Chat;
 use App\Entity\WidgetSession;
+use App\Repository\MessageRepository;
 use App\Repository\WidgetSessionRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
@@ -28,6 +30,9 @@ class WidgetSessionService
     public function __construct(
         private EntityManagerInterface $em,
         private WidgetSessionRepository $sessionRepository,
+        private MessageRepository $messageRepository,
+        private AiFacade $aiFacade,
+        private ModelConfigService $modelConfigService,
         private LoggerInterface $logger,
     ) {
     }
@@ -135,6 +140,131 @@ class WidgetSessionService
     {
         $session->incrementMessageCount();
         $session->updateLastMessage();
+        $this->em->flush();
+    }
+
+    /**
+     * Generate an AI summary title for the session after 5 user messages.
+     * This should be called asynchronously to not block the response.
+     * Note: Only generates if no title exists (preserves manually set titles).
+     */
+    public function generateTitleIfNeeded(WidgetSession $session, int $ownerId): void
+    {
+        // Skip if title already exists (includes manually set titles)
+        if (null !== $session->getTitle()) {
+            $this->logger->debug('Skipping title generation - title already exists', [
+                'session_id' => $session->getSessionId(),
+                'title' => $session->getTitle(),
+            ]);
+
+            return;
+        }
+
+        $chatId = $session->getChatId();
+        if (!$chatId) {
+            $this->logger->debug('Skipping title generation - no chatId');
+
+            return;
+        }
+
+        // Count actual user messages from DB (not messageCount, which isn't updated in human mode)
+        $messages = $this->messageRepository->findChatHistory($ownerId, $chatId, 20, 50000);
+        $userMessages = array_filter($messages, fn ($m) => 'IN' === $m->getDirection());
+        $userMessageCount = count($userMessages);
+
+        $this->logger->info('Title generation check', [
+            'session_id' => $session->getSessionId(),
+            'user_message_count' => $userMessageCount,
+            'has_title' => false,
+        ]);
+
+        // Only generate title if >= 5 user messages
+        if ($userMessageCount < 5) {
+            $this->logger->debug('Skipping title generation - not enough user messages', [
+                'count' => $userMessageCount,
+            ]);
+
+            return;
+        }
+
+        $this->logger->info('Proceeding with title generation', [
+            'session_id' => $session->getSessionId(),
+            'user_message_count' => $userMessageCount,
+        ]);
+
+        try {
+            // Build conversation text for summarization (using already fetched user messages)
+            $conversationText = '';
+            foreach ($userMessages as $message) {
+                $text = mb_substr($message->getText(), 0, 200);
+                $conversationText .= "- {$text}\n";
+            }
+
+            // Use gpt-4o-mini for cheap, fast summarization
+            $aiOptions = ['temperature' => 0.3];
+            $provider = $this->modelConfigService->getProviderForModel(73);
+            $modelName = $this->modelConfigService->getModelName(73);
+            if ($provider && $modelName) {
+                $aiOptions['provider'] = $provider;
+                $aiOptions['model'] = $modelName;
+            }
+
+            $prompt = <<<PROMPT
+Based on these user questions/messages, create a short title (3-5 words) that describes what the user is asking about.
+Only output the title, nothing else. No quotes, no punctuation at the end.
+
+User messages:
+{$conversationText}
+
+Title:
+PROMPT;
+
+            $response = $this->aiFacade->chat(
+                [['role' => 'user', 'content' => $prompt]],
+                $ownerId,
+                $aiOptions
+            );
+
+            $title = trim($response['content'] ?? '');
+            // Clean up: remove quotes and limit length
+            $title = trim($title, '"\'');
+            $title = mb_substr($title, 0, 50);
+
+            if (!empty($title)) {
+                // Re-fetch session to check for race condition (another request may have set title)
+                $this->em->refresh($session);
+                if (null !== $session->getTitle()) {
+                    $this->logger->debug('Title already set by another process, discarding generated title', [
+                        'session_id' => substr($session->getSessionId(), 0, 12).'...',
+                        'existing_title' => $session->getTitle(),
+                        'discarded_title' => $title,
+                    ]);
+
+                    return;
+                }
+
+                $session->setTitle($title);
+                $this->em->flush();
+
+                $this->logger->info('Generated AI title for widget session', [
+                    'session_id' => substr($session->getSessionId(), 0, 12).'...',
+                    'title' => $title,
+                ]);
+            }
+        } catch (\Exception $e) {
+            $this->logger->warning('Failed to generate AI title for session', [
+                'session_id' => substr($session->getSessionId(), 0, 12).'...',
+                'error' => $e->getMessage(),
+            ]);
+        }
+    }
+
+    /**
+     * Decrement message count (e.g. on failure).
+     */
+    public function decrementMessageCount(WidgetSession $session): void
+    {
+        $session->setMessageCount(max(0, $session->getMessageCount() - 1));
         $this->em->flush();
     }
 

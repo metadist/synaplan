@@ -138,6 +138,39 @@ export const useFeedbackStore = defineStore('feedback', () => {
     }
   }
 
+  /**
+   * Bulk-delete multiple feedbacks. Uses a single loading state and one toast.
+   */
+  async function bulkRemoveFeedbacks(ids: number[]) {
+    if (ids.length === 0) return
+
+    loading.value = true
+    error.value = null
+    let deletedCount = 0
+
+    try {
+      for (const id of ids) {
+        try {
+          await deleteFeedback(id)
+          feedbacks.value = feedbacks.value.filter((f) => f.id !== id)
+          deletedCount++
+        } catch {
+          // Best effort — continue with remaining items
+        }
+      }
+
+      const { success } = getNotifications()
+      success(t('feedback.list.bulkDeleteSuccess').replace('{count}', String(deletedCount)))
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : 'Failed to delete feedbacks'
+      error.value = errorMsg
+      const { error: showError } = getNotifications()
+      showError(t('feedback.list.deleteError'))
+    } finally {
+      loading.value = false
+    }
+  }
+
   function selectType(type: 'all' | 'false_positive' | 'positive') {
     selectedType.value = type
   }
@@ -170,6 +203,7 @@ export const useFeedbackStore = defineStore('feedback', () => {
     fetchFeedbacks,
     editFeedback,
     removeFeedback,
+    bulkRemoveFeedbacks,
     selectType,
     clearError,
     getFeedbackById,

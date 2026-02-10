@@ -153,13 +153,25 @@
       :is-submitting="falsePositiveSubmitting"
       :is-preview-loading="falsePositivePreviewLoading"
       :step="falsePositiveStep"
-      :summary="falsePositiveSummary"
-      :correction="falsePositiveCorrection"
+      :classification="falsePositiveClassification"
+      :summary-options="falsePositiveSummaryOptions"
+      :correction-options="falsePositiveCorrectionOptions"
       @close="closeFalsePositiveModal"
       @preview="previewFalsePositiveFeedback"
       @save="saveFalsePositiveFeedback"
       @back="backToFalsePositiveSelection"
       @regenerate="regenerateFalsePositiveSummary"
+    />
+
+    <ContradictionModal
+      :is-open="contradictionModalOpen"
+      :contradictions="contradictionList"
+      :new-statement-summary="contradictionNewSummary"
+      :new-statement-correction="contradictionNewCorrection"
+      :classification="pendingSaveData?.classification ?? 'feedback'"
+      :is-submitting="falsePositiveSubmitting"
+      @close="closeContradictionModal"
+      @resolve="handleContradictionResolve"
     />
 
     <!-- Memory Edit Dialog (opens in-place, stays in chat) -->
@@ -209,17 +221,22 @@ import { chatApi } from '@/services/api'
 import type { ModelOption } from '@/composables/useModelSelection'
 import { parseAIResponse } from '@/utils/responseParser'
 import { normalizeMediaUrl } from '@/utils/urlHelper'
+import { AudioStreamer } from '@/utils/AudioStreamer'
 import { httpClient } from '@/services/api/httpClient'
 import type { UserMemory } from '@/services/api/userMemoriesApi'
-import { getCategories } from '@/services/api/userMemoriesApi'
+import { getCategories, deleteMemory as deleteMemoryApi } from '@/services/api/userMemoriesApi'
+import { deleteFeedback as deleteFeedbackApi } from '@/services/api/userFeedbackApi'
 import MemoryToast from '@/components/MemoryToast.vue'
 import FalsePositiveModal from '@/components/feedback/FalsePositiveModal.vue'
+import ContradictionModal from '@/components/feedback/ContradictionModal.vue'
 import {
   previewFalsePositive,
   submitFalsePositive,
   submitPositiveFeedback,
   regenerateCorrection,
+  checkContradictionsBatch,
 } from '@/services/api/feedbackApi'
+import type { Contradiction } from '@/services/api/feedbackApi'
 import MemoryFormDialog from '@/components/MemoryFormDialog.vue'
 import MemoriesDialog from '@/components/MemoriesDialog.vue'
 import MemoryDeleteDialog from '@/components/memories/MemoryDeleteDialog.vue'
@@ -245,6 +262,7 @@ let streamingAbortController: AbortController | null = null
 let stopStreamingFn: (() => void) | null = null // Store EventSource close function
 let currentTrackId: number | undefined = undefined // Store current trackId for stop request
 let currentStreamingChatId: number | undefined = undefined // Store chatId where stream was started
+let currentAudioStreamer: AudioStreamer | null = null
 
 // Processing status for real-time feedback
 const processingStatus = ref<string>('')
@@ -262,8 +280,23 @@ const falsePositiveUserMessage = ref<string>('')
 const falsePositiveSubmitting = ref(false)
 const falsePositivePreviewLoading = ref(false)
 const falsePositiveStep = ref<'select' | 'confirm'>('select')
-const falsePositiveSummary = ref('')
-const falsePositiveCorrection = ref('')
+const falsePositiveSummaryOptions = ref<string[]>([])
+const falsePositiveCorrectionOptions = ref<string[]>([])
+const falsePositiveClassification = ref<'memory' | 'feedback'>('feedback')
+const falsePositiveRelatedMemoryIds = ref<number[]>([])
+
+// Contradiction modal state (when saving feedback would conflict with existing data)
+const contradictionModalOpen = ref(false)
+const contradictionList = ref<Contradiction[]>([])
+const contradictionNewSummary = ref('')
+const contradictionNewCorrection = ref('')
+const pendingSaveData = ref<{
+  summary: string
+  correction: string
+  classification: 'memory' | 'feedback'
+  relatedMemoryIds: number[]
+} | null>(null)
+
 // Memory edit dialog state
 const isMemoryEditDialogOpen = ref(false)
 const editingMemory = ref<UserMemory | null>(null)
@@ -358,6 +391,10 @@ const handleOpenFeedbackDialogEvent = (event: Event) => {
 // Cleanup: Stop streaming when component unmounts (user leaves chat)
 onBeforeUnmount(() => {
   handleStopStreaming()
+  if (currentAudioStreamer) {
+    currentAudioStreamer.stop()
+    currentAudioStreamer = null
+  }
   window.removeEventListener('open-memory-dialog', handleOpenMemoryDialogEvent)
   window.removeEventListener('open-feedback-dialog', handleOpenFeedbackDialogEvent)
   clearDeleteDialogTimer()
@@ -415,8 +452,13 @@ async function generateChatTitleFromFirstMessage(firstMessage: string) {
   const chat = chatsStore.activeChat
   if (!chat) return
 
-  // Only generate if chat has default title
-  if (chat.title && chat.title !== 'New Chat') return
+  // Only generate if chat has default title (check both English and German)
+  const isDefaultTitle =
+    !chat.title ||
+    chat.title === 'New Chat' ||
+    chat.title === 'Neuer Chat' ||
+    chat.title.startsWith('Chat ')
+  if (!isDefaultTitle) return
 
   // Only generate for user messages from this chat
   const userMessages = historyStore.messages.filter((m) => m.role === 'user')
@@ -555,6 +597,7 @@ const handleSendMessage = async (
     webSearch?: boolean
     modelId?: number
     fileIds?: number[]
+    voiceReply?: boolean
   }
 ) => {
   autoScroll.value = true
@@ -647,6 +690,7 @@ const streamAIResponse = async (
     webSearch?: boolean
     modelId?: number
     fileIds?: number[]
+    voiceReply?: boolean
   }
 ) => {
   streamingAbortController = new AbortController()
@@ -698,6 +742,19 @@ const streamAIResponse = async (
       const finalModelId = options?.modelId // Don't fallback to current model!
       const fileIds = options?.fileIds || [] // Array of fileIds
 
+      // Initialize AudioStreamer if voice reply is requested
+      if (currentAudioStreamer) {
+        currentAudioStreamer.stop()
+        currentAudioStreamer = null
+      }
+
+      let spokenLength = 0
+      let detectedLanguage = 'en'
+
+      if (options?.voiceReply) {
+        currentAudioStreamer = new AudioStreamer()
+      }
+
       const stopStreaming = chatApi.streamMessage(
         userId,
         userMessage,
@@ -738,6 +795,10 @@ const streamAIResponse = async (
             const meta = data.metadata || {}
             processingMetadata.value = meta
             processingStatus.value = 'classified'
+            // Capture language for TTS streaming
+            if (meta.language) {
+              detectedLanguage = meta.language
+            }
           } else if (data.status === 'searching') {
             processingStatus.value = 'searching'
             processingMetadata.value = { customMessage: data.message }
@@ -798,6 +859,27 @@ const streamAIResponse = async (
 
             // AI gibt nur TEXT zurück (keine JSON!)
             fullContent += data.chunk
+
+            // Stream audio if enabled
+            if (currentAudioStreamer) {
+              while (true) {
+                const currentUnprocessed = fullContent.slice(spokenLength)
+                // Match sentence ending punctuation followed by space or end of string
+                // Also handle newlines as boundaries
+                const boundaryMatch = currentUnprocessed.match(/([.?!]+)(\s+|$)|(\n+)/)
+
+                if (!boundaryMatch || boundaryMatch.index === undefined) break
+
+                const endIdx = boundaryMatch.index + boundaryMatch[0].length
+                const sentence = currentUnprocessed.substring(0, endIdx)
+
+                if (sentence.trim()) {
+                  currentAudioStreamer.streamText(sentence, undefined, detectedLanguage)
+                }
+
+                spokenLength += endIdx
+              }
+            }
 
             // Don't parse JSON during streaming - it's incomplete!
             // We'll parse it at the end in the 'complete' event
@@ -922,6 +1004,27 @@ const streamAIResponse = async (
                 message.parts.push({ type: 'audio', url: absoluteUrl })
               }
             }
+          } else if (data.status === 'tts_generating') {
+            // TTS synthesis started — show loading animation in message
+            const message = historyStore.messages.find((m) => m.id === messageId)
+            if (message) {
+              message.parts.push({ type: 'tts_loading' })
+            }
+          } else if (data.status === 'audio') {
+            // Handle TTS audio response (voice reply)
+            const message = historyStore.messages.find((m) => m.id === messageId)
+            if (message && data.url) {
+              // Remove tts_loading part and replace with audio player
+              const loadingIdx = message.parts.findIndex((p) => p.type === 'tts_loading')
+              const isVoiceReply = loadingIdx !== -1
+              if (isVoiceReply) {
+                message.parts.splice(loadingIdx, 1)
+              }
+              const absoluteUrl = normalizeMediaUrl(data.url)
+              // If we are already streaming audio (currentAudioStreamer exists), don't autoplay the file
+              const shouldAutoplay = isVoiceReply && !currentAudioStreamer
+              message.parts.push({ type: 'audio', url: absoluteUrl, autoplay: shouldAutoplay })
+            }
           } else if (data.status === 'links') {
             // Handle web search results
             const message = historyStore.messages.find((m) => m.id === messageId)
@@ -1045,6 +1148,15 @@ const streamAIResponse = async (
               memoriesStore.memories = memoriesStore.memories.filter((m) => m.id !== memoryId)
             }
           } else if (data.status === 'complete') {
+            // Speak remaining text
+            if (currentAudioStreamer) {
+              const remaining = fullContent.slice(spokenLength)
+              if (remaining.trim()) {
+                currentAudioStreamer.streamText(remaining, undefined, detectedLanguage)
+              }
+              // Don't stop streamer immediately, it has a queue
+            }
+
             // Clear processing status
             processingStatus.value = ''
             processingMetadata.value = {}
@@ -1052,6 +1164,8 @@ const streamAIResponse = async (
             // Update message metadata
             const message = historyStore.messages.find((m) => m.id === messageId)
             if (message) {
+              // Clean up any leftover tts_loading indicator (TTS may have failed silently)
+              message.parts = message.parts.filter((p) => p.type !== 'tts_loading')
               // ✨ NEW: Handle generated file from backend
               if (data.generatedFile) {
                 // Add file to message FIRST
@@ -1190,6 +1304,15 @@ const streamAIResponse = async (
             processingStatus.value = ''
             processingMetadata.value = {}
 
+            // If backend provided a messageId for the error message, link it
+            // This allows the "Again" button to work for failed messages
+            if (data.messageId) {
+              const message = historyStore.messages.find((m) => m.id === messageId)
+              if (message) {
+                message.backendMessageId = data.messageId
+              }
+            }
+
             // Handle chat not found errors with toast notification
             if (
               errorMsg.toLowerCase().includes('chat not found') ||
@@ -1307,7 +1430,8 @@ const streamAIResponse = async (
         includeReasoning,
         webSearch,
         finalModelId,
-        fileIds // Pass array of fileIds
+        fileIds, // Pass array of fileIds
+        options?.voiceReply // Pass voice reply flag
       )
 
       // Store EventSource cleanup function globally
@@ -1354,6 +1478,12 @@ const handleStopStreaming = async () => {
     }
   } else {
     console.warn('⚠️ No currentTrackId - skipping backend notification')
+  }
+
+  // Stop streaming audio
+  if (currentAudioStreamer) {
+    currentAudioStreamer.stop()
+    currentAudioStreamer = null
   }
 
   // Clear processing status
@@ -1678,8 +1808,10 @@ function openFalsePositiveModal(text: string, messageId?: number) {
   falsePositiveUserMessage.value = userMessageText
 
   falsePositiveStep.value = 'select'
-  falsePositiveSummary.value = ''
-  falsePositiveCorrection.value = ''
+  falsePositiveSummaryOptions.value = []
+  falsePositiveCorrectionOptions.value = []
+  falsePositiveClassification.value = 'feedback'
+  falsePositiveRelatedMemoryIds.value = []
   falsePositiveModalOpen.value = true
 }
 
@@ -1690,8 +1822,10 @@ function closeFalsePositiveModal() {
   falsePositiveMessageId.value = null
   falsePositiveUserMessage.value = ''
   falsePositiveStep.value = 'select'
-  falsePositiveSummary.value = ''
-  falsePositiveCorrection.value = ''
+  falsePositiveSummaryOptions.value = []
+  falsePositiveCorrectionOptions.value = []
+  falsePositiveClassification.value = 'feedback'
+  falsePositiveRelatedMemoryIds.value = []
 }
 
 async function previewFalsePositiveFeedback(text: string) {
@@ -1705,8 +1839,10 @@ async function previewFalsePositiveFeedback(text: string) {
       text,
       userMessage: falsePositiveUserMessage.value || undefined,
     })
-    falsePositiveSummary.value = preview.summary
-    falsePositiveCorrection.value = preview.correction
+    falsePositiveClassification.value = preview.classification
+    falsePositiveSummaryOptions.value = preview.summaryOptions
+    falsePositiveCorrectionOptions.value = preview.correctionOptions
+    falsePositiveRelatedMemoryIds.value = preview.relatedMemoryIds ?? []
     falsePositiveStep.value = 'confirm'
   } catch (err) {
     const errorMsg = err instanceof Error ? err.message : t('feedback.falsePositive.error')
@@ -1721,8 +1857,8 @@ function backToFalsePositiveSelection() {
 }
 
 /**
- * Save both false positive and correction in a single operation
- * This prevents double notifications and ensures atomic save
+ * Save both false positive and correction in a single operation.
+ * Checks for contradictions first; if any, opens ContradictionModal.
  */
 async function saveFalsePositiveFeedback(data: { summary: string; correction: string }) {
   const { summary, correction } = data
@@ -1733,34 +1869,242 @@ async function saveFalsePositiveFeedback(data: { summary: string; correction: st
 
   falsePositiveSubmitting.value = true
   try {
-    const promises: Promise<void>[] = []
+    // Check both summary and correction for contradictions in a single batch call
+    const result = await checkContradictionsBatch({
+      summary: summary.trim(),
+      correction: correction.trim(),
+    })
 
-    // Save false positive (what was wrong)
-    if (summary.trim()) {
+    if (result.hasContradictions && result.contradictions.length > 0) {
+      // Store pending data (including classification + related memory IDs) for after contradiction resolution
+      pendingSaveData.value = {
+        summary: summary.trim(),
+        correction: correction.trim(),
+        classification: falsePositiveClassification.value,
+        relatedMemoryIds: falsePositiveRelatedMemoryIds.value,
+      }
+      contradictionList.value = result.contradictions
+      contradictionNewSummary.value = summary.trim()
+      contradictionNewCorrection.value = correction.trim()
+      // Close FP modal first, then open contradiction modal
+      closeFalsePositiveModal()
+      falsePositiveSubmitting.value = false
+      contradictionModalOpen.value = true
+      return
+    }
+
+    await doSaveFeedback(
+      { summary: summary.trim(), correction: correction.trim() },
+      undefined,
+      falsePositiveRelatedMemoryIds.value,
+    )
+    if (falsePositiveClassification.value === 'memory') {
+      showSuccessToast(t(
+        correction.trim()
+          ? 'feedback.falsePositive.memoryUpdated'
+          : 'feedback.falsePositive.memoryDeleted'
+      ))
+    } else {
+      showSuccessToast(t('feedback.falsePositive.success'))
+    }
+    closeFalsePositiveModal()
+  } catch (err) {
+    const errorMsg = err instanceof Error ? err.message : t('feedback.falsePositive.error')
+    showErrorToast(errorMsg)
+  } finally {
+    falsePositiveSubmitting.value = false
+  }
+}
+
+/**
+ * Execute the actual save. Branches based on classification:
+ * - "memory": Update/delete memories using contradiction IDs or related memory IDs (never save as feedback)
+ * - "feedback": Save as false positive + positive feedback (original behavior)
+ *
+ * relatedMemoryIds: IDs from the preview step's vector search — used as fallback when
+ * the contradiction check didn't find the relevant memory (e.g., different phrasing).
+ */
+async function doSaveFeedback(
+  data: { summary: string; correction: string },
+  itemsToDelete?: Contradiction[],
+  relatedMemoryIds?: number[],
+) {
+  const isMemory = falsePositiveClassification.value === 'memory'
+
+  if (isMemory) {
+    // Memory flow: update, delete, or create memories (never save as feedback)
+    const memoryContradictions = (itemsToDelete ?? []).filter((c) => c.type === 'memory')
+    const hasCorrection = data.correction.trim().length > 0
+
+    // Build the list of target memory IDs: contradiction IDs take priority, then related IDs from preview
+    const targetIds: number[] = memoryContradictions.length > 0
+      ? memoryContradictions.map((c) => c.id)
+      : [...(relatedMemoryIds ?? [])]
+
+    if (targetIds.length > 0 && hasCorrection) {
+      // User provided a correction → update the first target memory, delete the rest
+      await memoriesStore.editMemory(
+        targetIds[0],
+        { value: data.correction },
+        { silent: true }
+      )
+      // Delete remaining target memories via raw API (avoids loading/error churn + fetchCategories per item)
+      const deletedIds: number[] = []
+      for (let i = 1; i < targetIds.length; i++) {
+        try {
+          await deleteMemoryApi(targetIds[i])
+          deletedIds.push(targetIds[i])
+        } catch {
+          // Best effort
+        }
+      }
+      if (deletedIds.length > 0) {
+        const idSet = new Set(deletedIds)
+        memoriesStore.memories = memoriesStore.memories.filter((m) => !idSet.has(m.id))
+      }
+    } else if (targetIds.length > 0 && !hasCorrection) {
+      // No correction provided → delete all target memories via raw API
+      const deletedIds: number[] = []
+      for (const id of targetIds) {
+        try {
+          await deleteMemoryApi(id)
+          deletedIds.push(id)
+        } catch {
+          // Best effort
+        }
+      }
+      if (deletedIds.length > 0) {
+        const idSet = new Set(deletedIds)
+        memoriesStore.memories = memoriesStore.memories.filter((m) => !idSet.has(m.id))
+      }
+    } else if (hasCorrection) {
+      // No target memories found at all but user gave a correction → create new memory
+      await memoriesStore.addMemory(
+        { value: data.correction, category: 'user_correction', key: 'correction' },
+        { silent: true }
+      )
+    }
+    // If no target memories AND no correction → nothing to do (user just acknowledged the error)
+
+    // Delete non-memory contradictions (feedback entries) via raw API
+    const feedbackContradictions = (itemsToDelete ?? []).filter((c) => c.type !== 'memory')
+    if (feedbackContradictions.length > 0) {
+      const deletedFbIds: number[] = []
+      for (const c of feedbackContradictions) {
+        try {
+          await deleteFeedbackApi(c.id)
+          deletedFbIds.push(c.id)
+        } catch {
+          // Best effort
+        }
+      }
+      if (deletedFbIds.length > 0) {
+        const idSet = new Set(deletedFbIds)
+        feedbackStore.feedbacks = feedbackStore.feedbacks.filter((f) => !idSet.has(f.id))
+      }
+    }
+  } else {
+    // Feedback flow: original behavior
+    const promises: Promise<void>[] = []
+    if (data.summary) {
       promises.push(
         submitFalsePositive({
-          summary: summary.trim(),
+          summary: data.summary,
           messageId: falsePositiveMessageId.value ?? undefined,
         })
       )
     }
-
-    // Save positive correction (what is correct)
-    if (correction.trim()) {
+    if (data.correction) {
       promises.push(
         submitPositiveFeedback({
-          text: correction.trim(),
+          text: data.correction,
           messageId: falsePositiveMessageId.value ?? undefined,
         })
       )
     }
-
-    // Execute both in parallel
     await Promise.all(promises)
 
-    // Single success notification
-    showSuccessToast(t('feedback.falsePositive.success'))
-    closeFalsePositiveModal()
+    // Delete contradicted items for feedback flow
+    if (itemsToDelete && itemsToDelete.length > 0) {
+      await deleteContradictedItems(itemsToDelete)
+    }
+  }
+}
+
+/**
+ * Delete contradicted items (memories or feedback).
+ * Uses raw API calls to avoid store loading/error state churn per item,
+ * then syncs the store state in one batch at the end.
+ */
+async function deleteContradictedItems(contradictions: Contradiction[]) {
+  const deletedMemoryIds: number[] = []
+  const deletedFeedbackIds: number[] = []
+
+  // Phase 1: Delete via API (best effort per item)
+  for (const c of contradictions) {
+    try {
+      if (c.type === 'memory') {
+        await deleteMemoryApi(c.id)
+        deletedMemoryIds.push(c.id)
+      } else {
+        await deleteFeedbackApi(c.id)
+        deletedFeedbackIds.push(c.id)
+      }
+    } catch {
+      // Best effort — continue with remaining items
+    }
+  }
+
+  // Phase 2: Sync store state in one batch (no loading flicker)
+  if (deletedMemoryIds.length > 0) {
+    const idSet = new Set(deletedMemoryIds)
+    memoriesStore.memories = memoriesStore.memories.filter((m) => !idSet.has(m.id))
+  }
+  if (deletedFeedbackIds.length > 0) {
+    const idSet = new Set(deletedFeedbackIds)
+    feedbackStore.feedbacks = feedbackStore.feedbacks.filter((f) => !idSet.has(f.id))
+  }
+}
+
+function closeContradictionModal() {
+  contradictionModalOpen.value = false
+  contradictionList.value = []
+  contradictionNewSummary.value = ''
+  contradictionNewCorrection.value = ''
+  pendingSaveData.value = null
+  falsePositiveSubmitting.value = false
+}
+
+async function handleContradictionResolve(
+  data: { action: 'save' | 'cancel'; itemsToDelete: Contradiction[] }
+) {
+  const pending = pendingSaveData.value
+  if (!pending) {
+    closeContradictionModal()
+    return
+  }
+
+  if (data.action === 'cancel') {
+    closeContradictionModal()
+    return
+  }
+
+  falsePositiveSubmitting.value = true
+  // Restore classification from pending data (FP modal may have been closed, resetting the ref)
+  falsePositiveClassification.value = pending.classification
+  try {
+    // Pass items to delete + related memory IDs into doSaveFeedback so it can handle memory updates vs deletions
+    await doSaveFeedback(pending, data.itemsToDelete, pending.relatedMemoryIds)
+    if (pending.classification === 'memory') {
+      showSuccessToast(t(
+        pending.correction.trim()
+          ? 'feedback.falsePositive.memoryUpdated'
+          : 'feedback.falsePositive.memoryDeleted'
+      ))
+    } else {
+      showSuccessToast(t('feedback.falsePositive.success'))
+    }
+    closeContradictionModal()
   } catch (err) {
     const errorMsg = err instanceof Error ? err.message : t('feedback.falsePositive.error')
     showErrorToast(errorMsg)
@@ -1775,9 +2119,8 @@ async function saveFalsePositiveFeedback(data: { summary: string; correction: st
  * Uses dedicated backend endpoint - no prompts from frontend
  * Everything stays in the modal - nothing is sent to chat
  */
-async function regenerateFalsePositiveSummary(oldCorrection: string) {
-  // We need the summary (false claim) to regenerate a better correction
-  if (!falsePositiveSummary.value.trim()) {
+async function regenerateFalsePositiveSummary(data: { summary: string; correction: string }) {
+  if (!data.summary.trim()) {
     showErrorToast(t('feedback.falsePositive.needSummaryFirst'))
     return
   }
@@ -1786,15 +2129,17 @@ async function regenerateFalsePositiveSummary(oldCorrection: string) {
   try {
     // Call dedicated backend endpoint - prompt is handled server-side
     const result = await regenerateCorrection({
-      falseClaim: falsePositiveSummary.value.trim(),
-      oldCorrection: oldCorrection.trim() || undefined,
+      falseClaim: data.summary.trim(),
+      oldCorrection: data.correction.trim() || undefined,
     })
 
-    // Update the CORRECTION field (bottom) with the new generated correction
+    // Add the new correction as a new option at the top
     if (result.correction) {
-      falsePositiveCorrection.value = result.correction
+      falsePositiveCorrectionOptions.value = [
+        result.correction,
+        ...falsePositiveCorrectionOptions.value,
+      ]
     }
-    // Keep the summary as-is (user already has the false claim)
   } catch (err) {
     const errorMsg = err instanceof Error ? err.message : t('feedback.falsePositive.error')
     showErrorToast(errorMsg)

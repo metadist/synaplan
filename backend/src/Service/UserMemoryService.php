@@ -450,7 +450,9 @@ readonly class UserMemoryService
                     continue;
                 }
 
-                $memories[] = UserMemoryDTO::fromQdrantPayload($payload, $result['id'])->toArray();
+                $memory = UserMemoryDTO::fromQdrantPayload($payload, $result['id'])->toArray();
+                $memory['score'] = (float) ($result['score'] ?? 0.0);
+                $memories[] = $memory;
             }
 
             return $memories;

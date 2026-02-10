@@ -20,3 +20,10 @@ framework:
             cache.user_config:
                 adapter: cache.adapter.filesystem
                 default_lifetime: 1800
+            
+            # Widget events cache (replaces BWIDGET_EVENTS table)
+            # All real-time events (takeover, handback, message, typing, notification)
+            # Events auto-expire after 10 minutes (enough for reconnects)
+            cache.widget_events:
+                adapter: cache.adapter.filesystem
+                default_lifetime: 600

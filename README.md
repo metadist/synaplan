@@ -58,7 +58,7 @@ echo "GROQ_API_KEY=your_key" >> backend/.env && docker compose restart backend
 ## Features
 
 - **AI Chat** — Ollama, OpenAI, Anthropic, Groq, Gemini
-- **RAG Search** — Semantic document search with MariaDB VECTOR
+- **RAG Search** — Semantic document search with MariaDB VECTOR (or [Qdrant](https://github.com/metadist/synaplan-memories) as alternative)
 - **Chat Widget** — Embed on any website
 - **WhatsApp** — Meta Business API integration
 - **Email** — AI-powered email responses

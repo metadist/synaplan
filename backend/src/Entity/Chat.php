@@ -11,6 +11,7 @@ use Doctrine\ORM\Mapping as ORM;
 #[ORM\Table(name: 'BCHATS')]
 #[ORM\Index(columns: ['BUSERID'], name: 'idx_chat_user')]
 #[ORM\Index(columns: ['BSHARETOKEN'], name: 'idx_chat_share')]
+#[ORM\Index(columns: ['BSOURCE'], name: 'idx_chat_source')]
 class Chat
 {
     #[ORM\Id]
@@ -35,6 +36,10 @@ class Chat
 
     #[ORM\Column(name: 'BISPUBLIC', type: 'boolean', options: ['default' => false])]
     private bool $isPublic = false;
+
+    /** @var string Channel source: web, whatsapp, email, widget */
+    #[ORM\Column(name: 'BSOURCE', type: 'string', length: 16, options: ['default' => 'web'])]
+    private string $source = 'web';
 
     /**
      * Path to the OG image for social media sharing.
@@ -139,6 +144,18 @@ class Chat
     public function setIsPublic(bool $isPublic): self
     {
         $this->isPublic = $isPublic;
+
+        return $this;
+    }
+
+    public function getSource(): string
+    {
+        return $this->source;
+    }
+
+    public function setSource(string $source): self
+    {
+        $this->source = $source;
 
         return $this;
     }
