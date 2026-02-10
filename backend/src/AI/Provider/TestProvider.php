@@ -67,7 +67,7 @@ class TestProvider implements ChatProviderInterface, EmbeddingProviderInterface,
         $userMessage = strtolower($userContent);
 
         // Search-query-style request (e.g. SearchQueryGenerator with tools:search prompt): return cleaned query like fallbackExtraction
-        $systemContent = $messages[0]['role'] === 'system' ? ($messages[0]['content'] ?? '') : '';
+        $systemContent = 'system' === $messages[0]['role'] ? ($messages[0]['content'] ?? '') : '';
         if (str_contains($systemContent, 'search') && str_contains($systemContent, 'query')) {
             return $this->mockSearchQueryExtraction($userContent);
         }
