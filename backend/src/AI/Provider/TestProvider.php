@@ -63,7 +63,14 @@ class TestProvider implements ChatProviderInterface, EmbeddingProviderInterface,
     public function chat(array $messages, array $options = []): string
     {
         $lastMessage = end($messages);
-        $userMessage = strtolower($lastMessage['content'] ?? 'hello');
+        $userContent = $lastMessage['content'] ?? 'hello';
+        $userMessage = strtolower($userContent);
+
+        // Search-query-style request (e.g. SearchQueryGenerator with tools:search prompt): return cleaned query like fallbackExtraction
+        $systemContent = $messages[0]['role'] === 'system' ? ($messages[0]['content'] ?? '') : '';
+        if (str_contains($systemContent, 'search') && str_contains($systemContent, 'query')) {
+            return $this->mockSearchQueryExtraction($userContent);
+        }
 
         // Image generation keywords
         if (preg_match('/(bild|image|picture|foto|photo|draw|zeichne|erstelle.*bild)/i', $userMessage)) {
@@ -96,6 +103,21 @@ class TestProvider implements ChatProviderInterface, EmbeddingProviderInterface,
         $contextInfo = count($messages) > 1 ? ' (Message #'.count($messages).' in conversation)' : '';
 
         return "TestProvider response: I received your message '{$userMessage}'{$contextInfo}. This is a mock response to test the system. Try asking me to create an image or video!";
+    }
+
+    /**
+     * Mock search-query extraction: same logic as SearchQueryGenerator::fallbackExtraction
+     * so integration tests (SearchQueryGeneratorTest) pass with TestProvider.
+     */
+    private function mockSearchQueryExtraction(string $text): string
+    {
+        $text = preg_replace('/^\/(search|web|google|find)\s+/i', '', $text);
+        $text = trim($text);
+        if (preg_match('/^(["\'])(.+)\1$/s', $text, $matches)) {
+            $text = $matches[2];
+        }
+
+        return $text;
     }
 
     public function chatStream(array $messages, callable $callback, array $options = []): void

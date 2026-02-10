@@ -120,11 +120,10 @@ test('@smoke @widget Widget settings are correctly applied id=014', async ({ pag
 
   await gotoWidgetTestPage(page, widgetInfo.widgetId, apiUrl)
 
+  // autoOpen: true → widget opens itself, no button click needed
   const widgetHost = page.locator(selectors.widget.host)
-  await widgetHost.waitFor({ state: 'attached', timeout: TIMEOUTS.VERY_LONG })
   const chatWindow = widgetHost.locator(selectors.widget.chatWindow)
   await chatWindow.waitFor({ state: 'visible', timeout: TIMEOUTS.LONG })
-  await expect(chatWindow).toBeVisible()
 
   const autoMessage = widgetHost.locator(selectors.widget.messageAutoText)
   await expect(autoMessage).toHaveText(WIDGET_MESSAGES.AUTO_MESSAGE, { timeout: TIMEOUTS.STANDARD })

@@ -10,7 +10,7 @@ export { getApiUrl }
 /** Go to widget-test.html with widgetId and apiUrl in query; works on dev (5173→8000) and test stack (8001). */
 export async function gotoWidgetTestPage(page: Page, widgetId: string, apiUrl: string): Promise<void> {
   const url = `/widget-test.html?widgetId=${encodeURIComponent(widgetId)}&apiUrl=${encodeURIComponent(apiUrl)}`
-  await page.goto(url, { waitUntil: 'load' })
+  await page.goto(url, { waitUntil: 'networkidle' })
 }
 
 /** Open widget on test page: goto, click button, wait for chat window (Shadow DOM). */
@@ -161,22 +161,21 @@ export async function updateWidgetSettings(
   
   await page.locator(selectors.widgets.advancedConfig.autoMessageInput).fill(finalSettings.autoMessage)
   await page.locator(selectors.widgets.advancedConfig.messageLimitInput).fill(finalSettings.messageLimit.toString())
-  await page.locator(selectors.widgets.advancedConfig.maxFileSizeInput).fill(finalSettings.maxFileSize.toString())
-  
-  const fileUploadLabel = behaviorSection.locator('label').filter({ hasText: /file.*upload|datei.*upload/i })
-  const fileUploadCheckbox = fileUploadLabel.locator('input[type="checkbox"]')
+  // Toggle allowFileUpload – maxFileSize and fileUploadLimit are inside v-if="config.allowFileUpload"
+  const fileUploadCheckbox = behaviorSection.locator(selectors.widgets.advancedConfig.allowFileUploadCheckbox)
   const fileUploadChecked = await fileUploadCheckbox.isChecked()
   if (fileUploadChecked !== finalSettings.allowFileUpload) {
-    await fileUploadLabel.click()
+    await behaviorSection.locator(selectors.widgets.advancedConfig.allowFileUploadLabel).click()
     if (finalSettings.allowFileUpload) {
       await behaviorSection.locator('[data-testid="input-file-limit"]').waitFor({ state: 'visible', timeout: TIMEOUTS.SHORT })
     }
   }
-  
+
   if (finalSettings.allowFileUpload) {
     const fileUploadLimitInput = behaviorSection.locator('[data-testid="input-file-limit"]')
     await fileUploadLimitInput.waitFor({ state: 'visible', timeout: TIMEOUTS.SHORT })
     await fileUploadLimitInput.fill(finalSettings.fileUploadLimit.toString())
+    await page.locator(selectors.widgets.advancedConfig.maxFileSizeInput).fill(finalSettings.maxFileSize.toString())
   }
   
   const autoOpenLabel = behaviorSection.locator('label').filter({ hasText: /auto.*open|automatisch.*öffnen/i })
@@ -230,7 +229,7 @@ export async function setWidgetTaskPrompt(
   
   if (isManualCreateVisible) {
     await manualCreateButton.click()
-    await page.locator('[data-testid="section-assistant"]').locator('.animate-spin').waitFor({ state: 'hidden', timeout: TIMEOUTS.STANDARD }).catch(() => {})
+    // Wait for prompt content to appear (skip spinner – just wait for the target element)
     await page.locator(selectors.widgets.advancedConfig.promptContentInput).waitFor({ state: 'visible', timeout: TIMEOUTS.STANDARD })
   }
   
@@ -268,10 +267,9 @@ export async function setWidgetTaskPrompt(
     await fileInput.waitFor({ state: 'attached', timeout: TIMEOUTS.SHORT })
     await fileInput.setInputFiles(filePath)
     
-    await assistantSection.locator('.animate-spin').waitFor({ state: 'hidden', timeout: TIMEOUTS.VERY_LONG }).catch(() => {})
-    
+    // Wait for file to appear in the list (implicitly waits for upload/spinner to finish)
     const fileName = path.basename(filePath)
-    await assistantSection.locator('text=' + fileName).waitFor({ state: 'visible', timeout: TIMEOUTS.STANDARD })
+    await assistantSection.locator(`text=${fileName}`).waitFor({ state: 'visible', timeout: TIMEOUTS.STANDARD })
   }
   
   if (!needsSaveForFileUpload || filePath) {
