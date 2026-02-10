@@ -156,8 +156,14 @@
                 </div>
                 <div
                   v-else
-                  class="text-sm break-words markdown-content"
-                  :data-testid="message.role === 'assistant' && message.content === autoMessage ? 'message-auto-text' : message.role === 'assistant' ? 'message-ai-text' : 'message-user-text'"
+                  class="text-sm break-words markdown-content overflow-x-auto"
+                  :data-testid="
+                    message.role === 'assistant' && message.content === autoMessage
+                      ? 'message-auto-text'
+                      : message.role === 'assistant'
+                        ? 'message-ai-text'
+                        : 'message-user-text'
+                  "
                   :style="{
                     color:
                       message.role === 'user'
@@ -283,7 +289,10 @@
 
           <!-- Limit Reached -->
           <div v-if="limitReached" class="flex justify-center">
-            <div data-testid="error-message-limit-reached" class="bg-red-500/10 border border-red-500/30 rounded-xl px-4 py-3 max-w-[90%]">
+            <div
+              data-testid="error-message-limit-reached"
+              class="bg-red-500/10 border border-red-500/30 rounded-xl px-4 py-3 max-w-[90%]"
+            >
               <div class="flex items-start gap-2">
                 <XCircleIcon class="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
                 <div>

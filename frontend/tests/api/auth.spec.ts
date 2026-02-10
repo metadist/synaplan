@@ -10,7 +10,9 @@ test('@noci @api @smoke health endpoint returns 200 id=api-001', async ({ reques
   expect(res.status()).toBe(200)
 })
 
-test('@noci @api @smoke login returns 200 and sets auth cookies id=api-002', async ({ request }) => {
+test('@noci @api @smoke login returns 200 and sets auth cookies id=api-002', async ({
+  request,
+}) => {
   const res = await request.post(`${apiBase()}/api/v1/auth/login`, {
     data: {
       email: CREDENTIALS.DEFAULT_USER,
@@ -24,7 +26,9 @@ test('@noci @api @smoke login returns 200 and sets auth cookies id=api-002', asy
   expect(cookieStr).toMatch(/access_token|refresh_token|SESSION/)
 })
 
-test('@noci @api authenticated request with getAuthHeaders succeeds id=api-003', async ({ request }) => {
+test('@noci @api authenticated request with getAuthHeaders succeeds id=api-003', async ({
+  request,
+}) => {
   const headers = await getAuthHeaders(request)
   const res = await request.get(`${apiBase()}/api/v1/chats`, { headers })
   expect(res.status()).toBe(200)

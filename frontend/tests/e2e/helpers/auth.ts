@@ -106,11 +106,14 @@ export async function deleteUser(request: APIRequestContext, userEmail: string):
       return false
     }
 
-    const deleteResponse = await request.delete(`${apiBaseUrl()}/api/v1/admin/users/${targetUser.id}`, {
-      headers: {
-        Cookie: cookieHeader,
-      },
-    })
+    const deleteResponse = await request.delete(
+      `${apiBaseUrl()}/api/v1/admin/users/${targetUser.id}`,
+      {
+        headers: {
+          Cookie: cookieHeader,
+        },
+      }
+    )
 
     if (deleteResponse.status() === 200) {
       console.log(`User ${userEmail} successfully deleted`)

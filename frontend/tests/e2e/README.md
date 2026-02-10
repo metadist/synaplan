@@ -36,27 +36,27 @@ docker compose up -d                                    # Start dev stack
 
 ### When do I need `make test-stack-build`?
 
-| What changed | Rebuild needed? |
-|---|---|
-| Backend PHP code | **No** — volume-mounted, live changes |
-| Frontend / Widget code | **Yes** — image COPYs `dist/` and `dist-widget/` |
-| Docker / Compose config | **Yes** — image needs rebuild |
+| What changed               | Rebuild needed?                                              |
+| -------------------------- | ------------------------------------------------------------ |
+| Backend PHP code           | **No** — volume-mounted, live changes                        |
+| Frontend / Widget code     | **Yes** — image COPYs `dist/` and `dist-widget/`             |
+| Docker / Compose config    | **Yes** — image needs rebuild                                |
 | Database schema / fixtures | **No** — just `down` + `up` (test DB is tmpfs, always fresh) |
 
 Permission error on `frontend/dist/` (container creates it as root): `sudo rm -rf frontend/dist frontend/dist-widget` then re-run `make test-stack-build`.
 
 ## Test stack details
 
-| | Dev stack | Test stack |
-|---|---|---|
-| **Start** | `docker compose up -d` | `make test-stack-build` |
-| **Backend** | http://localhost:8000 | http://localhost:8001 |
-| **Frontend** | http://localhost:5173 (Vite) | Served by backend (:8001) |
-| **APP_ENV** | `dev` | `test` |
+|               | Dev stack                       | Test stack                                     |
+| ------------- | ------------------------------- | ---------------------------------------------- |
+| **Start**     | `docker compose up -d`          | `make test-stack-build`                        |
+| **Backend**   | http://localhost:8000           | http://localhost:8001                          |
+| **Frontend**  | http://localhost:5173 (Vite)    | Served by backend (:8001)                      |
+| **APP_ENV**   | `dev`                           | `test`                                         |
 | **AI models** | Real providers (needs API keys) | **TestProvider** (model 900, all capabilities) |
-| **DB** | Persistent volume | **tmpfs** (fresh on every `up`) |
-| **MailHog** | :8025 / :1025 | :8025 / :1025 (shared ports!) |
-| **Login** | admin@synaplan.com / admin123 | admin@synaplan.com / admin123 |
+| **DB**        | Persistent volume               | **tmpfs** (fresh on every `up`)                |
+| **MailHog**   | :8025 / :1025                   | :8025 / :1025 (shared ports!)                  |
+| **Login**     | admin@synaplan.com / admin123   | admin@synaplan.com / admin123                  |
 
 ### TestProvider auch lokal (Dev-Stack) nutzen
 
@@ -67,15 +67,15 @@ Permission error on `frontend/dist/` (container creates it as root): `sudo rm -r
 
 From the **frontend** directory:
 
-| What | Command |
-|------|---------|
-| **Dev stack**: all tests | `npm run test:e2e` |
-| **Dev stack**: single test | `npm run test:e2e -- -g "id=013"` |
-| **Test stack**: all tests | `npm run test:e2e:teststack` |
-| **Test stack**: CI-like (no @noci) | `npm run test:e2e:teststack -- --grep-invert "@noci"` |
-| **Test stack**: single test | `npm run test:e2e:teststack -- -g "id=020"` |
-| **Test stack**: Playwright UI | `npm run test:e2e:teststack:ui` |
-| **API tests only** | `npm run test:e2e -- --grep "@api"` (or `test:e2e:teststack`) |
+| What                               | Command                                                       |
+| ---------------------------------- | ------------------------------------------------------------- |
+| **Dev stack**: all tests           | `npm run test:e2e`                                            |
+| **Dev stack**: single test         | `npm run test:e2e -- -g "id=013"`                             |
+| **Test stack**: all tests          | `npm run test:e2e:teststack`                                  |
+| **Test stack**: CI-like (no @noci) | `npm run test:e2e:teststack -- --grep-invert "@noci"`         |
+| **Test stack**: single test        | `npm run test:e2e:teststack -- -g "id=020"`                   |
+| **Test stack**: Playwright UI      | `npm run test:e2e:teststack:ui`                               |
+| **API tests only**                 | `npm run test:e2e -- --grep "@api"` (or `test:e2e:teststack`) |
 
 Everything after `--` is passed through to Playwright. API tests live in `tests/api/` and use the same config and helpers; they hit the backend via `getApiUrl()` and can use `getAuthHeaders(request)` for authenticated calls.
 

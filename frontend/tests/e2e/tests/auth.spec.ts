@@ -56,7 +56,9 @@ test('@auth deleted user cannot login id=011', async ({ page, request }) => {
 
   const normalizedVerificationLink = normalizeVerificationUrl(verificationLink!)
   await page.goto(normalizedVerificationLink)
-  await page.locator(selectors.verifyEmail.successState).waitFor({ state: 'visible', timeout: TIMEOUTS.STANDARD })
+  await page
+    .locator(selectors.verifyEmail.successState)
+    .waitFor({ state: 'visible', timeout: TIMEOUTS.STANDARD })
 
   await page.locator(selectors.verifyEmail.goToLoginLink).click()
   await expect(page).toHaveURL(/\/login/)

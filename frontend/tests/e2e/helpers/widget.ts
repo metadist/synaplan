@@ -8,7 +8,11 @@ import path from 'path'
 export { getApiUrl }
 
 /** Go to widget-test.html with widgetId and apiUrl in query; works on dev (5173→8000) and test stack (8001). */
-export async function gotoWidgetTestPage(page: Page, widgetId: string, apiUrl: string): Promise<void> {
+export async function gotoWidgetTestPage(
+  page: Page,
+  widgetId: string,
+  apiUrl: string
+): Promise<void> {
   const url = `/widget-test.html?widgetId=${encodeURIComponent(widgetId)}&apiUrl=${encodeURIComponent(apiUrl)}`
   await page.goto(url, { waitUntil: 'networkidle' })
 }
@@ -114,10 +118,16 @@ export async function createTestWidget(
     throw new Error('Could not extract widgetId from embed code')
   }
 
-  const closeButton = page.locator(selectors.widgets.successModal.modal).locator(selectors.widgets.successModal.closeButton).last()
+  const closeButton = page
+    .locator(selectors.widgets.successModal.modal)
+    .locator(selectors.widgets.successModal.closeButton)
+    .last()
   await closeButton.scrollIntoViewIfNeeded()
   await closeButton.click()
-  await page.waitForSelector(selectors.widgets.successModal.modal, { state: 'hidden', timeout: TIMEOUTS.SHORT })
+  await page.waitForSelector(selectors.widgets.successModal.modal, {
+    state: 'hidden',
+    timeout: TIMEOUTS.SHORT,
+  })
 
   return { widgetId: widgetIdMatch[1], name }
 }
@@ -146,28 +156,39 @@ export async function updateWidgetSettings(
   }
 
   // Find widget by name and open advanced config
-  const widgetCard = page.locator(selectors.widgets.widgetCard.item).filter({ hasText: widgetName }).first()
+  const widgetCard = page
+    .locator(selectors.widgets.widgetCard.item)
+    .filter({ hasText: widgetName })
+    .first()
   await widgetCard.waitFor({ state: 'visible', timeout: TIMEOUTS.SHORT })
-  
+
   await widgetCard.locator(selectors.widgets.widgetCard.advancedButton).click()
   await page.waitForSelector(selectors.widgets.advancedConfig.modal, { timeout: TIMEOUTS.STANDARD })
-  
+
   const behaviorSection = page.locator(selectors.widgets.advancedConfig.behaviorTab)
   const isBehaviorTabVisible = await behaviorSection.isVisible().catch(() => false)
   if (!isBehaviorTabVisible) {
     await page.locator(selectors.widgets.advancedConfig.tabButtonBehavior).click()
     await behaviorSection.waitFor({ state: 'visible', timeout: TIMEOUTS.SHORT })
   }
-  
-  await page.locator(selectors.widgets.advancedConfig.autoMessageInput).fill(finalSettings.autoMessage)
-  await page.locator(selectors.widgets.advancedConfig.messageLimitInput).fill(finalSettings.messageLimit.toString())
+
+  await page
+    .locator(selectors.widgets.advancedConfig.autoMessageInput)
+    .fill(finalSettings.autoMessage)
+  await page
+    .locator(selectors.widgets.advancedConfig.messageLimitInput)
+    .fill(finalSettings.messageLimit.toString())
   // Toggle allowFileUpload – maxFileSize and fileUploadLimit are inside v-if="config.allowFileUpload"
-  const fileUploadCheckbox = behaviorSection.locator(selectors.widgets.advancedConfig.allowFileUploadCheckbox)
+  const fileUploadCheckbox = behaviorSection.locator(
+    selectors.widgets.advancedConfig.allowFileUploadCheckbox
+  )
   const fileUploadChecked = await fileUploadCheckbox.isChecked()
   if (fileUploadChecked !== finalSettings.allowFileUpload) {
     await behaviorSection.locator(selectors.widgets.advancedConfig.allowFileUploadLabel).click()
     if (finalSettings.allowFileUpload) {
-      await behaviorSection.locator('[data-testid="input-file-limit"]').waitFor({ state: 'visible', timeout: TIMEOUTS.SHORT })
+      await behaviorSection
+        .locator('[data-testid="input-file-limit"]')
+        .waitFor({ state: 'visible', timeout: TIMEOUTS.SHORT })
     }
   }
 
@@ -175,33 +196,45 @@ export async function updateWidgetSettings(
     const fileUploadLimitInput = behaviorSection.locator('[data-testid="input-file-limit"]')
     await fileUploadLimitInput.waitFor({ state: 'visible', timeout: TIMEOUTS.SHORT })
     await fileUploadLimitInput.fill(finalSettings.fileUploadLimit.toString())
-    await page.locator(selectors.widgets.advancedConfig.maxFileSizeInput).fill(finalSettings.maxFileSize.toString())
+    await page
+      .locator(selectors.widgets.advancedConfig.maxFileSizeInput)
+      .fill(finalSettings.maxFileSize.toString())
   }
-  
-  const autoOpenLabel = behaviorSection.locator('label').filter({ hasText: /auto.*open|automatisch.*öffnen/i })
+
+  const autoOpenLabel = behaviorSection
+    .locator('label')
+    .filter({ hasText: /auto.*open|automatisch.*öffnen/i })
   const autoOpenCheckbox = autoOpenLabel.locator('input[type="checkbox"]')
   const autoOpenChecked = await autoOpenCheckbox.isChecked()
   if (autoOpenChecked !== finalSettings.autoOpen) {
     await autoOpenLabel.click()
   }
-  
-  const activeLabel = behaviorSection.locator('label').filter({ hasText: /widget.*active|widget.*aktiv/i }).first()
+
+  const activeLabel = behaviorSection
+    .locator('label')
+    .filter({ hasText: /widget.*active|widget.*aktiv/i })
+    .first()
   const activeCheckbox = activeLabel.locator('input[type="checkbox"]')
   const activeChecked = await activeCheckbox.isChecked()
   if (activeChecked !== finalSettings.isActive) {
     await activeLabel.click()
   }
-  
+
   await page.locator(selectors.widgets.advancedConfig.saveButton).scrollIntoViewIfNeeded()
   await page.locator(selectors.widgets.advancedConfig.saveButton).click()
-  await page.waitForSelector(selectors.widgets.advancedConfig.modal, { state: 'hidden', timeout: TIMEOUTS.STANDARD })
+  await page.waitForSelector(selectors.widgets.advancedConfig.modal, {
+    state: 'hidden',
+    timeout: TIMEOUTS.STANDARD,
+  })
 }
-
 
 async function saveAdvancedConfig(page: Page): Promise<void> {
   await page.locator(selectors.widgets.advancedConfig.saveButton).scrollIntoViewIfNeeded()
   await page.locator(selectors.widgets.advancedConfig.saveButton).click()
-  await page.waitForSelector(selectors.widgets.advancedConfig.modal, { state: 'hidden', timeout: TIMEOUTS.STANDARD })
+  await page.waitForSelector(selectors.widgets.advancedConfig.modal, {
+    state: 'hidden',
+    timeout: TIMEOUTS.STANDARD,
+  })
 }
 
 export async function setWidgetTaskPrompt(
@@ -211,45 +244,52 @@ export async function setWidgetTaskPrompt(
   selectionRules?: string,
   filePath?: string
 ): Promise<void> {
-  const widgetCard = page.locator(selectors.widgets.widgetCard.item).filter({ hasText: widgetName }).first()
+  const widgetCard = page
+    .locator(selectors.widgets.widgetCard.item)
+    .filter({ hasText: widgetName })
+    .first()
   await widgetCard.waitFor({ state: 'visible', timeout: TIMEOUTS.SHORT })
-  
+
   await widgetCard.locator(selectors.widgets.widgetCard.advancedButton).click()
   await page.waitForSelector(selectors.widgets.advancedConfig.modal, { timeout: TIMEOUTS.STANDARD })
-  
+
   const assistantTab = page.locator(selectors.widgets.advancedConfig.assistantTab)
   const isAssistantTabVisible = await assistantTab.isVisible().catch(() => false)
   if (!isAssistantTabVisible) {
     await page.locator(selectors.widgets.advancedConfig.tabButtonAssistant).click()
     await assistantTab.waitFor({ state: 'visible', timeout: TIMEOUTS.SHORT })
   }
-  
+
   const manualCreateButton = page.locator('[data-testid="btn-manual-create"]')
   const isManualCreateVisible = await manualCreateButton.isVisible().catch(() => false)
-  
+
   if (isManualCreateVisible) {
     await manualCreateButton.click()
     // Wait for prompt content to appear (skip spinner – just wait for the target element)
-    await page.locator(selectors.widgets.advancedConfig.promptContentInput).waitFor({ state: 'visible', timeout: TIMEOUTS.STANDARD })
+    await page
+      .locator(selectors.widgets.advancedConfig.promptContentInput)
+      .waitFor({ state: 'visible', timeout: TIMEOUTS.STANDARD })
   }
-  
+
   const promptContentInput = page.locator(selectors.widgets.advancedConfig.promptContentInput)
   await promptContentInput.waitFor({ state: 'visible', timeout: TIMEOUTS.SHORT })
   await promptContentInput.fill(promptContent)
-  
+
   if (selectionRules) {
     const selectionRulesInput = page.locator(selectors.widgets.advancedConfig.selectionRulesInput)
     await selectionRulesInput.waitFor({ state: 'visible', timeout: TIMEOUTS.SHORT })
     await selectionRulesInput.fill(selectionRules)
   }
-  
+
   const needsSaveForFileUpload = isManualCreateVisible && filePath
-  
+
   if (needsSaveForFileUpload) {
     await saveAdvancedConfig(page)
-    
+
     await widgetCard.locator(selectors.widgets.widgetCard.advancedButton).click()
-    await page.waitForSelector(selectors.widgets.advancedConfig.modal, { timeout: TIMEOUTS.STANDARD })
+    await page.waitForSelector(selectors.widgets.advancedConfig.modal, {
+      timeout: TIMEOUTS.STANDARD,
+    })
     const assistantTab = page.locator(selectors.widgets.advancedConfig.assistantTab)
     const isAssistantTabVisible = await assistantTab.isVisible().catch(() => false)
     if (!isAssistantTabVisible) {
@@ -257,21 +297,26 @@ export async function setWidgetTaskPrompt(
       await assistantTab.waitFor({ state: 'visible', timeout: TIMEOUTS.SHORT })
     }
   }
-  
+
   if (filePath) {
     const assistantSection = page.locator(selectors.widgets.advancedConfig.assistantTab)
-    const knowledgeBaseSection = assistantSection.locator('label').filter({ hasText: /knowledge.*base|wissensbasis/i }).first()
+    const knowledgeBaseSection = assistantSection
+      .locator('label')
+      .filter({ hasText: /knowledge.*base|wissensbasis/i })
+      .first()
     await knowledgeBaseSection.scrollIntoViewIfNeeded()
-    
+
     const fileInput = assistantSection.locator('input[type="file"]').first()
     await fileInput.waitFor({ state: 'attached', timeout: TIMEOUTS.SHORT })
     await fileInput.setInputFiles(filePath)
-    
+
     // Wait for file to appear in the list (implicitly waits for upload/spinner to finish)
     const fileName = path.basename(filePath)
-    await assistantSection.locator(`text=${fileName}`).waitFor({ state: 'visible', timeout: TIMEOUTS.STANDARD })
+    await assistantSection
+      .locator(`text=${fileName}`)
+      .waitFor({ state: 'visible', timeout: TIMEOUTS.STANDARD })
   }
-  
+
   if (!needsSaveForFileUpload || filePath) {
     await saveAdvancedConfig(page)
   }

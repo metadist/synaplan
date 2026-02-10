@@ -84,17 +84,18 @@ export async function waitForVerificationEmail(
         if (!res.ok()) return null
         const data = await res.json()
         const items: MailHogMessage[] = Array.isArray(data.items) ? data.items : []
-        found = items.find((msg) => {
-          const toHeader = msg.Content?.Headers?.To ?? []
-          const toList = Array.isArray(toHeader) ? toHeader : [toHeader]
-          const toMatches = toList.some((to: string) => to.includes(recipientEmail))
-          const body = msg.Content?.Body || ''
-          const partBodies = Array.isArray(msg.Content?.Parts)
-            ? msg.Content.Parts.map((p) => p.Body || '').join(' ')
-            : ''
-          const contentLower = `${body} ${partBodies}`.toLowerCase()
-          return toMatches && contentLower.includes('verify-email-callback')
-        }) ?? null
+        found =
+          items.find((msg) => {
+            const toHeader = msg.Content?.Headers?.To ?? []
+            const toList = Array.isArray(toHeader) ? toHeader : [toHeader]
+            const toMatches = toList.some((to: string) => to.includes(recipientEmail))
+            const body = msg.Content?.Body || ''
+            const partBodies = Array.isArray(msg.Content?.Parts)
+              ? msg.Content.Parts.map((p) => p.Body || '').join(' ')
+              : ''
+            const contentLower = `${body} ${partBodies}`.toLowerCase()
+            return toMatches && contentLower.includes('verify-email-callback')
+          }) ?? null
         return found
       },
       { timeout, intervals }

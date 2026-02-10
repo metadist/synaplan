@@ -170,8 +170,7 @@ export const selectors = {
     attachButton: '[data-testid="btn-attach"]',
     fileInput: '[data-testid="input-file"]',
     // Outer message containers (user + assistant) – use these for counting
-    messageContainers:
-      '[data-testid="message-user"], [data-testid="message-assistant"]',
+    messageContainers: '[data-testid="message-user"], [data-testid="message-assistant"]',
     messageContainerByRole: (role: string) => `[data-testid="message-${role}"]`,
     // Message text selectors
     messageAiText: '[data-testid="message-ai-text"]',

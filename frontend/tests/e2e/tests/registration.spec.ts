@@ -25,10 +25,7 @@ async function acceptCookiesIfShown(page: import('@playwright/test').Page) {
   }
 }
 
-test('@auth @smoke registration flow with email verification id=006', async ({
-  page,
-  request,
-}) => {
+test('@auth @smoke registration flow with email verification id=006', async ({ page, request }) => {
   const uniqueSuffix = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
   const testEmail = `test+${uniqueSuffix}@test.com`
   const testPassword = 'Test1234'

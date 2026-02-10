@@ -2,7 +2,9 @@ import { test, expect } from '../test-setup'
 import { login } from '../helpers/auth'
 import { selectors } from '../helpers/selectors'
 
-test('@noci @smoke semantic search completes and shows results summary id=007', async ({ page }) => {
+test('@noci @smoke semantic search completes and shows results summary id=007', async ({
+  page,
+}) => {
   await login(page)
 
   // RAG search is in sidebar only in advanced mode
