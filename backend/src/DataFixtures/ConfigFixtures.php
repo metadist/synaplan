@@ -14,11 +14,16 @@ class ConfigFixtures extends Fixture implements DependentFixtureInterface
 {
     public function load(ObjectManager $manager): void
     {
+        $isTest = 'test' === (getenv('APP_ENV') ?: '');
+        $chatModel = $isTest ? '900' : '76';  // TestProvider in test, Groq in dev/prod
+        $sortModel = $isTest ? '900' : '9';
+        $defaultProvider = $isTest ? 'test' : 'groq';
+
         $configs = [
-            // Default AI Models - Using Groq models (free tier, fast)
-            ['ownerId' => 0, 'group' => 'DEFAULTMODEL', 'setting' => 'CHAT', 'value' => '76'],       // Groq model
-            ['ownerId' => 0, 'group' => 'DEFAULTMODEL', 'setting' => 'SORT', 'value' => '9'],        // Groq Llama 70b
-            ['ownerId' => 0, 'group' => 'DEFAULTMODEL', 'setting' => 'SUMMARIZE', 'value' => '9'],   // Groq Llama 70b
+            // Default AI Models - TestProvider (900) in test env, Groq in dev/prod
+            ['ownerId' => 0, 'group' => 'DEFAULTMODEL', 'setting' => 'CHAT', 'value' => $chatModel],
+            ['ownerId' => 0, 'group' => 'DEFAULTMODEL', 'setting' => 'SORT', 'value' => $sortModel],
+            ['ownerId' => 0, 'group' => 'DEFAULTMODEL', 'setting' => 'SUMMARIZE', 'value' => $sortModel],
             ['ownerId' => 0, 'group' => 'DEFAULTMODEL', 'setting' => 'TEXT2PIC', 'value' => '29'],
             ['ownerId' => 0, 'group' => 'DEFAULTMODEL', 'setting' => 'TEXT2VID', 'value' => '45'],
             ['ownerId' => 0, 'group' => 'DEFAULTMODEL', 'setting' => 'TEXT2SOUND', 'value' => '140'],
@@ -27,7 +32,7 @@ class ConfigFixtures extends Fixture implements DependentFixtureInterface
             ['ownerId' => 0, 'group' => 'DEFAULTMODEL', 'setting' => 'VECTORIZE', 'value' => '13'],
 
             // AI Provider Config
-            ['ownerId' => 0, 'group' => 'ai', 'setting' => 'default_chat_provider', 'value' => 'groq'],
+            ['ownerId' => 0, 'group' => 'ai', 'setting' => 'default_chat_provider', 'value' => $defaultProvider],
 
             // Example Widget Config (for user 2)
             ['ownerId' => 2, 'group' => 'widget_1', 'setting' => 'color', 'value' => '#007bff'],
