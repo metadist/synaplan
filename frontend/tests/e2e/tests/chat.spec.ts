@@ -238,7 +238,9 @@ async function runAgainOptions(
           await toggle.click()
           await dropdown.waitFor({ state: 'hidden', timeout: TIMEOUTS.SHORT }).catch(() => {})
         }
-      } catch {}
+      } catch {
+        // Dropdown closed or timeout – ignore
+      }
     }
   }
 }
