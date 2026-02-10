@@ -4,6 +4,8 @@ import { useI18n } from 'vue-i18n'
 import { Icon } from '@iconify/vue'
 import { useMarkdown } from '@/composables/useMarkdown'
 import { useNotification } from '@/composables/useNotification'
+import { useExternalLink } from '@/composables/useExternalLink'
+import ExternalLinkWarning from '@/components/common/ExternalLinkWarning.vue'
 import { chatApi } from '@/services/api/chatApi'
 import { researchKbSources, researchWebSources, type KbSource, type WebSource } from '@/services/api/feedbackApi'
 
@@ -38,6 +40,7 @@ const emit = defineEmits<{
 const { t } = useI18n()
 const { render: renderMarkdown } = useMarkdown()
 const { error: showErrorToast } = useNotification()
+const { pendingUrl, warningOpen, openExternalLink, closeWarning } = useExternalLink()
 const selectedIndexes = ref<Set<number>>(new Set())
 const useFullText = ref(false)
 
@@ -844,16 +847,14 @@ const isMemory = computed(() => props.classification === 'memory')
                                       </div>
                                     </div>
                                     <p class="text-sm txt-primary leading-relaxed pl-6">{{ source.summary }}</p>
-                                    <a
-                                      :href="source.url"
-                                      target="_blank"
-                                      rel="noopener noreferrer"
+                                    <button
+                                      type="button"
                                       class="text-[11px] text-blue-500 hover:underline pl-6 inline-flex items-center gap-1"
-                                      @click.stop
+                                      @click.stop="openExternalLink(source.url)"
                                     >
                                       <Icon icon="mdi:open-in-new" class="w-3 h-3" />
                                       {{ source.url.replace(/^https?:\/\//, '').split('/')[0] }}
-                                    </a>
+                                    </button>
                                   </div>
                                 </div>
                               </div>
@@ -1021,6 +1022,12 @@ const isMemory = computed(() => props.classification === 'memory')
       </div>
     </Transition>
   </Teleport>
+
+  <ExternalLinkWarning
+    :url="pendingUrl"
+    :is-open="warningOpen"
+    @close="closeWarning"
+  />
 </template>
 
 <style scoped>

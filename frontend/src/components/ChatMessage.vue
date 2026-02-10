@@ -678,6 +678,12 @@
       <UserIcon class="w-5 h-5 txt-secondary" />
     </div>
   </div>
+
+  <ExternalLinkWarning
+    :url="pendingUrl"
+    :is-open="warningOpen"
+    @close="closeWarning"
+  />
 </template>
 
 <script setup lang="ts">
@@ -697,11 +703,14 @@ import MessagePart from './MessagePart.vue'
 import MessageMemories from './MessageMemories.vue'
 import MessageFeedbacks from './MessageFeedbacks.vue'
 import GroqIcon from '@/components/icons/GroqIcon.vue'
+import ExternalLinkWarning from '@/components/common/ExternalLinkWarning.vue'
+import { useExternalLink } from '@/composables/useExternalLink'
 import type { Part, MessageFile } from '@/stores/history'
 import type { AgainData } from '@/types/ai-models'
 
 const { t } = useI18n()
 const { error: showError } = useNotification()
+const { pendingUrl, warningOpen, openExternalLink, closeWarning } = useExternalLink()
 
 interface Props {
   role: 'user' | 'assistant'
@@ -823,9 +832,9 @@ const focusSource = (index: number) => {
   }
 }
 
-// Open source URL (separate action)
+// Open source URL (with external link warning)
 const openSource = (url: string) => {
-  window.open(url, '_blank', 'noopener,noreferrer')
+  openExternalLink(url)
 }
 
 // Separate thinking blocks from content

@@ -59,8 +59,6 @@ services:
     dns:
     - 8.8.8.8
     - 8.8.4.4
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
     image: ghcr.io/metadist/synaplan:latest
     build:
       context: .

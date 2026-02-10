@@ -2136,5 +2136,13 @@
       "deleteSuccess": "Feedback gelöscht",
       "deleteError": "Feedback konnte nicht gelöscht werden"
     }
+  },
+  "externalLink": {
+    "title": "Externe Website",
+    "subtitle": "Du verlässt jetzt Synaplan",
+    "disclaimer": "Du wirst auf eine externe Website weitergeleitet. Wir haben keinen Einfluss auf deren Inhalte und übernehmen keine Haftung für Datenschutz oder Sicherheit auf Drittanbieter-Seiten. Weiter auf eigene Verantwortung.",
+    "dontAskAgain": "Diese Warnung nicht mehr anzeigen",
+    "cancel": "Abbrechen",
+    "open": "Link öffnen"
   }
 }

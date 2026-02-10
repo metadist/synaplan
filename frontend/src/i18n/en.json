@@ -2240,5 +2240,13 @@
       "deleteSuccess": "Feedback deleted",
       "deleteError": "Failed to delete feedback"
     }
+  },
+  "externalLink": {
+    "title": "External Website",
+    "subtitle": "You are about to leave Synaplan",
+    "disclaimer": "You are being redirected to an external website. We have no control over the content and are not responsible for data protection or security on third-party sites. Proceed at your own risk.",
+    "dontAskAgain": "Don't show this warning again",
+    "cancel": "Cancel",
+    "open": "Open link"
   }
 }
