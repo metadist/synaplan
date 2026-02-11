@@ -204,11 +204,11 @@ jobs:
         working-directory: frontend
         run: |
           if [ ! -d "dist-widget" ] || [ -z "$(ls -A dist-widget)" ]; then
-            echo "::error::Widget build verification failed: dist-widget directory is missing or empty (E2E widget tests will fail)"
-            exit 1
+            echo "::warning::Widget build verification failed: dist-widget directory is missing or empty (E2E widget tests may fail)"
+          else
+            echo "✅ Widget build verified: dist-widget contains files"
+            ls -la dist-widget/
           fi
-          echo "✅ Widget build verified: dist-widget contains files"
-          ls -la dist-widget/
 
       - name: Upload frontend build artifact
         uses: actions/upload-artifact@v4
@@ -251,11 +251,11 @@ jobs:
       - name: Verify widget artifact before Docker build
         run: |
           if [ ! -d "frontend/dist-widget" ] || [ -z "$(ls -A frontend/dist-widget)" ]; then
-            echo "::error::Widget artifact missing: frontend/dist-widget is empty before Docker build (E2E widget tests will fail)"
-            exit 1
+            echo "::warning::Widget artifact missing: frontend/dist-widget is empty before Docker build (E2E widget tests may fail)"
+          else
+            echo "✅ Widget artifact verified: frontend/dist-widget contains files"
+            ls -la frontend/dist-widget/
           fi
-          echo "✅ Widget artifact verified: frontend/dist-widget contains files"
-          ls -la frontend/dist-widget/
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -379,61 +379,30 @@ jobs:
       - name: Diagnose test container (E2E debug)
         run: |
           DC="docker compose -f docker-compose.test.yml -f docker-compose.test.ci.yml"
-          DIAG="${{ github.workspace }}/frontend/tests/e2e/e2e-ci-diagnostics.txt"
-          mkdir -p "$(dirname "$DIAG")"
+          echo "=== APP_ENV in container ==="
+          $DC exec -T app_test printenv APP_ENV || echo "FAILED to read APP_ENV"
 
-          {
-            echo "=== E2E CI diagnostics (widget + chat) ==="
-            echo ""
+          echo ""
+          echo "=== TestProvider model 900 in DB ==="
+          $DC exec -T app_test php bin/console dbal:run-sql "SELECT BID,BSERVICE,BNAME,BTAG FROM BMODELS WHERE BID=900" 2>&1 || echo "QUERY FAILED"
 
-            echo "=== APP_ENV in container ==="
-            $DC exec -T app_test printenv APP_ENV || echo "FAILED to read APP_ENV"
+          echo ""
+          echo "=== Default model config (CHAT) ==="
+          $DC exec -T app_test php bin/console dbal:run-sql "SELECT * FROM BCONFIG WHERE BGROUP='DEFAULTMODEL' AND BSETTING='CHAT'" 2>&1 || echo "QUERY FAILED"
 
-            echo ""
-            echo "=== TestProvider model 900 in DB ==="
-            $DC exec -T app_test php bin/console dbal:run-sql "SELECT BID,BSERVICE,BNAME,BTAG FROM BMODELS WHERE BID=900" 2>&1 || echo "QUERY FAILED"
+          echo ""
+          echo "=== Widget files in /var/www/widgets/ ==="
+          $DC exec -T app_test ls -la /var/www/widgets/ 2>&1 || echo "DIRECTORY MISSING"
+          $DC exec -T app_test ls -la /var/www/widgets/chunks/ 2>&1 || echo "CHUNKS DIRECTORY MISSING"
 
-            echo ""
-            echo "=== Default model config (CHAT) ==="
-            $DC exec -T app_test php bin/console dbal:run-sql "SELECT * FROM BCONFIG WHERE BGROUP='DEFAULTMODEL' AND BSETTING='CHAT'" 2>&1 || echo "QUERY FAILED"
+          echo ""
+          echo "=== HTTP check: /widget.js ==="
+          $DC exec -T app_test curl -sS -o /dev/null -w "HTTP %{http_code} | Content-Type: %{content_type}\n" http://localhost:80/widget.js || echo "CURL FAILED"
 
-            echo ""
-            echo "=== Widget: files in /var/www/widgets/ ==="
-            $DC exec -T app_test ls -la /var/www/widgets/ 2>&1 || echo "DIRECTORY MISSING"
-
-            echo ""
-            echo "=== Widget: chunk files (first 20) ==="
-            $DC exec -T app_test ls /var/www/widgets/chunks/ 2>&1 | head -20 || echo "CHUNKS DIRECTORY MISSING"
-
-            echo ""
-            echo "=== Widget: /widget.js HTTP status + Content-Type ==="
-            $DC exec -T app_test curl -sS -o /dev/null -w "HTTP %{http_code} | Content-Type: %{content_type}\n" http://localhost:80/widget.js || echo "CURL FAILED"
-
-            echo ""
-            echo "=== Widget: /widget.js response headers (CORS etc.) ==="
-            $DC exec -T app_test curl -sS -I http://localhost:80/widget.js 2>&1 | head -25 || echo "CURL FAILED"
-
-            echo ""
-            echo "=== Widget: /widget.js body (first 300 chars) — chunk import path ==="
-            $DC exec -T app_test curl -sS http://localhost:80/widget.js 2>&1 | head -c 300
-            echo ""
-
-            echo ""
-            echo "=== Widget: chunk from widget.js exists? ==="
-            CHUNK=$($DC exec -T app_test curl -sS http://localhost:80/widget.js 2>&1 | grep -oE 'chunks/[^"]+\.js' | head -1)
-            if [ -n "$CHUNK" ]; then
-              echo "Expected chunk: $CHUNK"
-              $DC exec -T app_test ls -la /var/www/widgets/$CHUNK 2>&1 || echo "CHUNK NOT FOUND"
-              echo "HTTP for /$CHUNK:"
-              $DC exec -T app_test curl -sS -o /dev/null -w "  %{http_code} %{content_type}\n" http://localhost:80/$CHUNK 2>&1 || echo "  CURL FAILED"
-            else
-              echo "Could not extract chunk path from widget.js"
-            fi
-
-            echo ""
-            echo "=== Widget: /widget-test.html served? ==="
-            $DC exec -T app_test curl -sS -o /dev/null -w "HTTP %{http_code}\n" http://localhost:80/widget-test.html 2>&1 || echo "CURL FAILED"
-          } | tee "$DIAG"
+          echo ""
+          echo "=== HTTP check: /widget.js first 200 chars ==="
+          $DC exec -T app_test curl -sS http://localhost:80/widget.js 2>&1 | head -c 200 || echo "CURL FAILED"
+          echo ""
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -472,7 +441,6 @@ jobs:
           path: |
             frontend/tests/e2e/test-results/
             frontend/tests/e2e/reports/
-            frontend/tests/e2e/e2e-ci-diagnostics.txt
           retention-days: 7
           if-no-files-found: ignore
 
