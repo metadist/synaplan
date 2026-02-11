@@ -135,8 +135,8 @@ final class HumanTakeoverService
             throw new \InvalidArgumentException('Session not found');
         }
 
-        if (!$session->isHumanMode()) {
-            throw new \InvalidArgumentException('Session is not in human mode. Take over first.');
+        if (!$session->isHumanMode() && !$session->isWaitingForHuman()) {
+            throw new \InvalidArgumentException(sprintf('Session must be in "human" or "waiting" mode, current mode: "%s"', (string) $session->getMode()));
         }
 
         if ($session->isExpired()) {
@@ -196,6 +196,11 @@ final class HumanTakeoverService
         $session->setLastMessage(time());
         $session->setLastMessagePreview($text);
         $session->updateLastHumanActivity();
+
+        // Set mode back to 'human' when operator responds (was 'waiting' while visitor was waiting)
+        if ($session->isWaitingForHuman()) {
+            $session->setMode(WidgetSession::MODE_HUMAN);
+        }
 
         // Update chat timestamp
         $chat->updateTimestamp();

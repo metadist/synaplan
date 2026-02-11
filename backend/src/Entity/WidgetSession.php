@@ -310,13 +310,46 @@ class WidgetSession
 
     public function setLastMessagePreview(?string $preview): self
     {
-        // Truncate to 200 chars if longer
-        if (null !== $preview && mb_strlen($preview) > 200) {
-            $preview = mb_substr($preview, 0, 197).'...';
+        if (null !== $preview) {
+            $preview = self::sanitizePreviewText($preview);
         }
         $this->lastMessagePreview = $preview;
 
         return $this;
+    }
+
+    /**
+     * Sanitize text for use as a message preview.
+     *
+     * Converts Markdown to HTML via Parsedown, then strips all tags to produce
+     * safe plaintext. Truncates to 200 chars on a word boundary to avoid
+     * cutting mid-word.
+     */
+    private static function sanitizePreviewText(string $text, int $maxLength = 200): string
+    {
+        // Convert Markdown → HTML → plaintext (handles all MD features correctly)
+        $html = (new \Parsedown())->setSafeMode(true)->text($text);
+        $text = strip_tags($html);
+
+        // Decode HTML entities (e.g. &amp; → &) to avoid truncating mid-entity
+        $text = html_entity_decode($text, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+
+        // Collapse whitespace (newlines, tabs, multiple spaces → single space)
+        $text = (string) preg_replace('/\s+/', ' ', $text);
+        $text = trim($text);
+
+        // Truncate on word boundary
+        if (mb_strlen($text) > $maxLength) {
+            $truncated = mb_substr($text, 0, $maxLength);
+            // Try to break at last space to avoid cutting mid-word
+            $lastSpace = mb_strrpos($truncated, ' ');
+            if (false !== $lastSpace && $lastSpace > $maxLength * 0.7) {
+                $truncated = mb_substr($truncated, 0, $lastSpace);
+            }
+            $text = $truncated.'…';
+        }
+
+        return $text;
     }
 
     /**

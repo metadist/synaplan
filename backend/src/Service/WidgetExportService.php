@@ -152,6 +152,7 @@ final class WidgetExportService
         $totalFiles = 0;
         $earliestCreated = null;
         $latestActivity = null;
+        $modeCounts = ['ai' => 0, 'human' => 0, 'waiting' => 0];
 
         foreach ($result['sessions'] as $session) {
             $messages = $this->getSessionMessages($session);
@@ -159,6 +160,14 @@ final class WidgetExportService
             $fileCount = $this->countFilesInMessages($messages);
             $totalMessages += $messageCount;
             $totalFiles += $fileCount;
+
+            // Count modes from exported sessions
+            $mode = $session->getMode();
+            if (isset($modeCounts[$mode])) {
+                ++$modeCounts[$mode];
+            } else {
+                ++$modeCounts['ai'];
+            }
 
             // Track earliest and latest timestamps
             $created = $session->getCreated();
@@ -199,6 +208,11 @@ final class WidgetExportService
         if ($result['total'] > 0) {
             $exportData['statistics']['avg_messages_per_session'] = round($totalMessages / $result['total'], 1);
         }
+
+        // Add mode counts (computed from the actually exported sessions, respecting filters)
+        $exportData['statistics']['ai_sessions'] = $modeCounts['ai'];
+        $exportData['statistics']['human_sessions'] = $modeCounts['human'];
+        $exportData['statistics']['waiting_sessions'] = $modeCounts['waiting'];
 
         $tempFile = tempnam(sys_get_temp_dir(), 'widget_export_').'.json';
         file_put_contents($tempFile, json_encode($exportData, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));

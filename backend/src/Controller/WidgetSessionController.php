@@ -570,9 +570,11 @@ class WidgetSessionController extends AbstractController
             return $this->json(['error' => 'Session not found'], Response::HTTP_NOT_FOUND);
         }
 
-        // Only send typing indicator if session is in human mode
-        if ('human' !== $session->getMode()) {
-            return $this->json(['error' => 'Session is not in human mode'], Response::HTTP_BAD_REQUEST);
+        // Only send typing indicator if session is in human or waiting mode
+        if (!in_array($session->getMode(), ['human', 'waiting'], true)) {
+            return $this->json([
+                'error' => sprintf('Session must be in "human" or "waiting" mode, current mode: "%s"', (string) $session->getMode()),
+            ], Response::HTTP_BAD_REQUEST);
         }
 
         try {
