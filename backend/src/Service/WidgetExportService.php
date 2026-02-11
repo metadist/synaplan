@@ -162,7 +162,7 @@ final class WidgetExportService
             $totalFiles += $fileCount;
 
             // Count modes from exported sessions
-            $mode = $session->getMode() ?? 'ai';
+            $mode = $session->getMode();
             if (isset($modeCounts[$mode])) {
                 ++$modeCounts[$mode];
             } else {
