@@ -352,7 +352,7 @@ class WidgetPublicController extends AbstractController
             if (!$isHumanMode) {
                 $this->sessionService->incrementMessageCount($session);
                 // Save user message as last message preview
-                $session->setLastMessagePreview(mb_substr($data['text'], 0, 100));
+                $session->setLastMessagePreview($data['text']);
                 $this->em->flush();
             }
             $this->sessionService->attachChat($session, $chat);
@@ -361,7 +361,7 @@ class WidgetPublicController extends AbstractController
             if ($isHumanMode) {
                 $incomingMessage->setStatus('complete');
                 $session->setLastMessage(time());
-                $session->setLastMessagePreview(mb_substr($data['text'], 0, 100));
+                $session->setLastMessagePreview($data['text']);
 
                 // Set mode to 'waiting' when visitor sends a message (operator needs to respond)
                 if ('human' === $session->getMode()) {
@@ -606,7 +606,7 @@ class WidgetPublicController extends AbstractController
                     // Re-fetch session to ensure it's managed by the EntityManager
                     $currentSession = $this->sessionService->getOrCreateSession($widgetId, $session->getSessionId());
                     $currentSession->setLastMessage(time());
-                    $currentSession->setLastMessagePreview(mb_substr($responseText, 0, 100));
+                    $currentSession->setLastMessagePreview($responseText);
                     $this->em->flush();
 
                     // Publish event for AI response (so admin panel receives it in real-time)

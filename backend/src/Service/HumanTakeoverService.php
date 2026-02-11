@@ -136,7 +136,7 @@ final class HumanTakeoverService
         }
 
         if (!$session->isHumanMode() && !$session->isWaitingForHuman()) {
-            throw new \InvalidArgumentException('Session is not in human mode. Take over first.');
+            throw new \InvalidArgumentException(sprintf('Session must be in "human" or "waiting" mode, current mode: "%s"', (string) $session->getMode()));
         }
 
         if ($session->isExpired()) {

@@ -1009,6 +1009,14 @@ const handleSessionEvent = (event: WidgetEvent) => {
         }
       }
 
+      // Operator replied via SSE (e.g. from another client) → set waiting back to human
+      const isOperatorMessage = direction === 'OUT' && sender === 'human'
+      if (isOperatorMessage && selectedSession.value.mode === 'waiting') {
+        selectedSession.value.mode = 'human'
+        stats.value.waiting = Math.max(0, stats.value.waiting - 1)
+        stats.value.human++
+      }
+
       // Also update the session in the list to keep it in sync
       const sessionIndex = sessions.value.findIndex((s) => s.id === selectedSession.value?.id)
       if (sessionIndex !== -1) {
@@ -1021,6 +1029,9 @@ const handleSessionEvent = (event: WidgetEvent) => {
             sessions.value[sessionIndex].mode = 'waiting'
           }
         }
+        if (isOperatorMessage && sessions.value[sessionIndex].mode === 'waiting') {
+          sessions.value[sessionIndex].mode = 'human'
+        }
       }
     }
 
@@ -1028,8 +1039,19 @@ const handleSessionEvent = (event: WidgetEvent) => {
   } else if (event.type === 'takeover') {
     const takeoverText = (event.message as string) ?? 'You are now connected with a support agent.'
     if (selectedSession.value) {
+      const previousMode = selectedSession.value.mode
       selectedSession.value.mode = 'human'
       // DON'T update lastMessagePreview here - it should only reflect actual messages
+
+      // Update stats: previous mode → human
+      if (previousMode === 'ai') {
+        stats.value.ai = Math.max(0, stats.value.ai - 1)
+      } else if (previousMode === 'waiting') {
+        stats.value.waiting = Math.max(0, stats.value.waiting - 1)
+      }
+      if (previousMode !== 'human') {
+        stats.value.human++
+      }
 
       // Update mode in the list (but NOT the preview)
       const sessionIndex = sessions.value.findIndex((s) => s.id === selectedSession.value?.id)
@@ -1051,8 +1073,19 @@ const handleSessionEvent = (event: WidgetEvent) => {
   } else if (event.type === 'handback') {
     const handbackText = (event.message as string) ?? 'You are now chatting with our AI assistant.'
     if (selectedSession.value) {
+      const previousMode = selectedSession.value.mode
       selectedSession.value.mode = 'ai'
       // DON'T update lastMessagePreview here - it should only reflect actual messages
+
+      // Update stats: previous mode → ai
+      if (previousMode === 'human') {
+        stats.value.human = Math.max(0, stats.value.human - 1)
+      } else if (previousMode === 'waiting') {
+        stats.value.waiting = Math.max(0, stats.value.waiting - 1)
+      }
+      if (previousMode !== 'ai') {
+        stats.value.ai++
+      }
 
       // Update mode in the list (but NOT the preview)
       const sessionIndex = sessions.value.findIndex((s) => s.id === selectedSession.value?.id)
