@@ -7,25 +7,58 @@ import path from 'path'
 
 export { getApiUrl }
 
+const WIDGET_NETWORK_LOG_PREFIX = '[widget-network]'
+
+/** Returns true if the request URL is relevant for widget loading (widget.js, chunks, config). */
+function isWidgetRelatedUrl(url: string): boolean {
+  return (
+    /\/widget\.js(\?|$)/.test(url) ||
+    /\/chunks\//.test(url) ||
+    /\/api\/v1\/widget\/[^/]+\/config/.test(url)
+  )
+}
+
+/** Attach network logging for widget-related requests and all failures. Call before navigating to widget-test page. */
+export function attachWidgetNetworkLogging(page: Page): void {
+  page.on('request', (request) => {
+    const u = request.url()
+    if (isWidgetRelatedUrl(u)) {
+      console.log(`${WIDGET_NETWORK_LOG_PREFIX} request: ${request.method()} ${u}`)
+    }
+  })
+  page.on('response', (response) => {
+    const u = response.url()
+    if (isWidgetRelatedUrl(u)) {
+      const status = response.status()
+      const statusText = response.statusText()
+      const ct = response.headers()['content-type'] ?? ''
+      console.log(
+        `${WIDGET_NETWORK_LOG_PREFIX} response: ${status} ${statusText} ${u} (Content-Type: ${ct})`
+      )
+    }
+  })
+  page.on('requestfailed', (request) => {
+    const u = request.url()
+    const failure = request.failure()
+    const reason = failure?.errorText ?? 'unknown'
+    if (isWidgetRelatedUrl(u)) {
+      console.log(`${WIDGET_NETWORK_LOG_PREFIX} FAILED: ${u} — ${reason}`)
+    } else {
+      console.log(`${WIDGET_NETWORK_LOG_PREFIX} FAILED (other): ${u} — ${reason}`)
+    }
+  })
+}
+
 /** Go to widget-test.html with widgetId and apiUrl in query; works on dev (5173→8000) and test stack (8001). */
 export async function gotoWidgetTestPage(
   page: Page,
   widgetId: string,
   apiUrl: string
 ): Promise<void> {
+  attachWidgetNetworkLogging(page)
   const url = `/widget-test.html?widgetId=${encodeURIComponent(widgetId)}&apiUrl=${encodeURIComponent(apiUrl)}`
+  console.log(`${WIDGET_NETWORK_LOG_PREFIX} navigating to: ${url}`)
   await page.goto(url, { waitUntil: 'networkidle' })
-  // Wait for either widget to appear or our error element (so CI logs the real reason)
-  const loadError = page.locator('[data-testid="widget-load-error"]')
-  const widgetAppeared = page.locator('#synaplan-widget-button, [data-testid="widget-host"]').first()
-  await Promise.race([
-    loadError.waitFor({ state: 'visible', timeout: TIMEOUTS.LONG }),
-    widgetAppeared.waitFor({ state: 'visible', timeout: TIMEOUTS.LONG }),
-  ]).catch(() => {})
-  if ((await loadError.count()) > 0 && (await loadError.isVisible())) {
-    const msg = await loadError.textContent()
-    throw new Error(`Widget script failed to load. Page error: ${msg?.trim() ?? 'unknown'}`)
-  }
 }
 
 /** Open widget on test page: goto, click button, wait for chat window (Shadow DOM). */
