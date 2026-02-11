@@ -112,7 +112,7 @@ final class WidgetSetupService
             'ko' => 'Korean',
         ];
         $languageName = $languageNames[$language] ?? 'English';
-        $languageInstruction = "**LANGUAGE SETTING**: The user's application is set to {$languageName}. Start the conversation in {$languageName}. Only switch languages if the user explicitly requests a different language or starts writing in a different language.\n\n";
+        $languageInstruction = "**CRITICAL LANGUAGE RULE**: You MUST detect the language the user writes in and ALWAYS respond in that same language. If the user writes in German, respond in German. If the user writes in French, respond in French. The application language is {$languageName}, so start in {$languageName}, but IMMEDIATELY switch to whatever language the user uses. This rule overrides everything else.\n\n";
         $systemPromptWithLanguage = $languageInstruction.$systemPrompt;
 
         // Build conversation history from passed messages

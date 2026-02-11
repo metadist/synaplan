@@ -15,6 +15,9 @@ export interface Widget {
   stats?: {
     active_sessions: number
     total_messages: number
+    ai_sessions: number
+    human_sessions: number
+    waiting_sessions: number
   }
   allowedDomains?: string[]
 }

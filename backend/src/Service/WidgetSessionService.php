@@ -383,9 +383,14 @@ PROMPT;
      */
     public function getWidgetStats(string $widgetId): array
     {
+        $modeCounts = $this->sessionRepository->countSessionsByMode($widgetId);
+
         return [
             'active_sessions' => $this->sessionRepository->countActiveSessionsByWidget($widgetId),
             'total_messages' => $this->sessionRepository->getTotalMessageCountByWidget($widgetId),
+            'ai_sessions' => $modeCounts['ai'],
+            'human_sessions' => $modeCounts['human'],
+            'waiting_sessions' => $modeCounts['waiting'],
         ];
     }
 }
