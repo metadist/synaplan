@@ -17,7 +17,9 @@ export async function gotoWidgetTestPage(
   await page.goto(url, { waitUntil: 'networkidle' })
   // Wait for either widget to appear or our error element (so CI logs the real reason)
   const loadError = page.locator('[data-testid="widget-load-error"]')
-  const widgetAppeared = page.locator('#synaplan-widget-button, [data-testid="widget-host"]').first()
+  const widgetAppeared = page
+    .locator('#synaplan-widget-button, [data-testid="widget-host"]')
+    .first()
   await Promise.race([
     loadError.waitFor({ state: 'visible', timeout: TIMEOUTS.LONG }),
     widgetAppeared.waitFor({ state: 'visible', timeout: TIMEOUTS.LONG }),
