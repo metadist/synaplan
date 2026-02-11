@@ -780,10 +780,21 @@ const uploadFiles = async () => {
     if (result.success) {
       showSuccess(`Successfully uploaded ${result.files.length} file(s)`)
 
-      // Show processing details
+      // Pre-populate fileGroupKeys from upload response to avoid Qdrant lookup race
       result.files.forEach((file) => {
         const details = `${file.filename}: ${file.extracted_text_length} chars extracted, ${file.chunks_created || 0} chunks created`
         console.log(details)
+
+        // Immediately set group key from upload response — this is authoritative
+        fileGroupKeys.value[file.id] = {
+          groupKey: file.group_key || groupKey,
+          isVectorized: file.vectorized ?? (file.chunks_created ?? 0) > 0,
+          chunks: file.chunks_created || 0,
+          status: file.vectorized ? 'vectorized' : 'processed',
+          needsMigration: false,
+          mariadbChunks: 0,
+          qdrantChunks: file.chunks_created || 0,
+        }
       })
 
       // Clear form
@@ -1041,25 +1052,27 @@ const loadFileGroupKey = async (fileId: number) => {
     }
   } catch (err: any) {
     console.error(`Failed to load groupKey for file ${fileId}:`, err)
-    fileGroupKeys.value[fileId] = {
-      groupKey: null,
-      isVectorized: false,
-      chunks: 0,
-      status: 'unknown',
-      needsMigration: false,
-      mariadbChunks: 0,
-      qdrantChunks: 0,
+    // Preserve existing data (e.g. from upload response) instead of overwriting with error state
+    const existing = fileGroupKeys.value[fileId]
+    if (!existing || !existing.groupKey) {
+      fileGroupKeys.value[fileId] = {
+        groupKey: null,
+        isVectorized: false,
+        chunks: 0,
+        status: 'unknown',
+        needsMigration: false,
+        mariadbChunks: 0,
+        qdrantChunks: 0,
+      }
     }
   }
 }
 
 /**
- * Load groupKeys for all visible files
+ * Load groupKeys for all visible files — parallel for speed
  */
 const loadAllFileGroupKeys = async () => {
-  for (const file of paginatedFiles.value) {
-    await loadFileGroupKey(file.id)
-  }
+  await Promise.allSettled(paginatedFiles.value.map((file) => loadFileGroupKey(file.id)))
 }
 
 /**

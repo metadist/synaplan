@@ -606,33 +606,21 @@ final class QdrantClientHttp implements QdrantClientInterface
     public function getDocumentFileInfo(int $userId, int $fileId): array
     {
         try {
-            // Use stats endpoint - scroll user docs and filter locally for this file
+            // Use stats endpoint which now includes per-file breakdown (chunks_by_file)
             $stats = $this->getDocumentStats($userId);
+            $chunksByFile = $stats['chunks_by_file'] ?? [];
 
-            // Stats gives us total chunks but not per-file info
-            // Fall back to checking if file has any point by searching for it
-            // Use the point ID convention: doc_{userId}_{fileId}_0
-            $firstChunkId = sprintf('doc_%d_%d_0', $userId, $fileId);
-            $doc = $this->getDocument($firstChunkId);
+            $fileIdStr = (string) $fileId;
+            if (isset($chunksByFile[$fileIdStr])) {
+                $fileInfo = $chunksByFile[$fileIdStr];
 
-            if (null === $doc) {
-                return ['chunks' => 0, 'group_key' => null];
+                return [
+                    'chunks' => (int) ($fileInfo['chunks'] ?? 0),
+                    'group_key' => $fileInfo['group_key'] ?? null,
+                ];
             }
 
-            $groupKey = $doc['payload']['group_key'] ?? null;
-
-            // Estimate chunk count by probing sequential IDs (fast, no scroll needed)
-            $chunks = 0;
-            for ($i = 0; $i < 100; ++$i) {
-                $chunkId = sprintf('doc_%d_%d_%d', $userId, $fileId, $i);
-                $exists = $this->getDocument($chunkId);
-                if (null === $exists) {
-                    break;
-                }
-                ++$chunks;
-            }
-
-            return ['chunks' => $chunks, 'group_key' => $groupKey];
+            return ['chunks' => 0, 'group_key' => null];
         } catch (\Throwable $e) {
             $this->logger->error('Failed to get document file info', [
                 'user_id' => $userId,
@@ -681,6 +669,58 @@ final class QdrantClientHttp implements QdrantClientInterface
             return $response->toArray();
         } catch (\Throwable $e) {
             $this->logger->error('Failed to get document group keys', [
+                'user_id' => $userId,
+                'error' => $e->getMessage(),
+            ]);
+
+            return [];
+        }
+    }
+
+    /**
+     * Get file IDs that have chunks in a specific group key.
+     *
+     * Uses the stats endpoint (which already scrolls all docs) and derives per-file info.
+     *
+     * @return int[] Array of file IDs
+     */
+    public function getFileIdsByGroupKey(int $userId, string $groupKey): array
+    {
+        $filesInfo = $this->getFilesWithChunks($userId);
+        $fileIds = [];
+        foreach ($filesInfo as $fileId => $info) {
+            if ($info['groupKey'] === $groupKey) {
+                $fileIds[] = $fileId;
+            }
+        }
+
+        return $fileIds;
+    }
+
+    /**
+     * Get all files with chunks for a user, with per-file chunk count and group key.
+     *
+     * Uses the stats endpoint which includes per-file breakdown (chunks_by_file).
+     *
+     * @return array<int, array{chunks: int, groupKey: string|null}> Map of fileId => info
+     */
+    public function getFilesWithChunks(int $userId): array
+    {
+        try {
+            $stats = $this->getDocumentStats($userId);
+            $chunksByFile = $stats['chunks_by_file'] ?? [];
+
+            $result = [];
+            foreach ($chunksByFile as $fileId => $info) {
+                $result[(int) $fileId] = [
+                    'chunks' => (int) ($info['chunks'] ?? 0),
+                    'groupKey' => $info['group_key'] ?? null,
+                ];
+            }
+
+            return $result;
+        } catch (\Throwable $e) {
+            $this->logger->error('Failed to get files with chunks', [
                 'user_id' => $userId,
                 'error' => $e->getMessage(),
             ]);
