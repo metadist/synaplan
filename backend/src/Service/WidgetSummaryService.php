@@ -229,6 +229,7 @@ final class WidgetSummaryService
         // Collect all messages from sessions
         // Only include chats with 5-30 visitor messages for meaningful analysis
         $allConversations = [];
+        $allMessagePairs = []; // Collect user→assistant pairs for matching sentiment messages
         $totalMessages = 0;
         $userMessages = 0;
         $assistantMessages = 0;
@@ -245,12 +246,13 @@ final class WidgetSummaryService
                 continue;
             }
 
-            $messages = $this->messageRepository->findChatHistory($ownerId, $chatId, 100, 10000);
+            // Get ALL messages without any limits (findChatHistory truncates by character count)
+            $messages = $this->messageRepository->findAllByChatId($ownerId, $chatId);
 
-            // Count visitor messages for this session
+            // Count visitor messages for this session (exclude system messages)
             $visitorMessageCount = 0;
             foreach ($messages as $message) {
-                if ('IN' === $message->getDirection()) {
+                if ('IN' === $message->getDirection() && 'SYSTEM' !== $message->getProviderIndex()) {
                     ++$visitorMessageCount;
                 }
             }
@@ -262,14 +264,29 @@ final class WidgetSummaryService
 
             ++$filteredSessionCount;
             $conversationText = [];
+            $lastUserMessage = null;
 
             foreach ($messages as $message) {
+                // Skip system messages (takeover/handback notifications)
+                if ('SYSTEM' === $message->getProviderIndex()) {
+                    continue;
+                }
+
                 ++$totalMessages;
                 $role = 'IN' === $message->getDirection() ? 'User' : 'Assistant';
                 if ('IN' === $message->getDirection()) {
                     ++$userMessages;
+                    $lastUserMessage = $message->getText();
                 } else {
                     ++$assistantMessages;
+                    // Pair this assistant response with the last user message
+                    if (null !== $lastUserMessage) {
+                        $allMessagePairs[] = [
+                            'userMessage' => $lastUserMessage,
+                            'assistantResponse' => $message->getText(),
+                        ];
+                        $lastUserMessage = null;
+                    }
                 }
                 $conversationText[] = "{$role}: {$message->getText()}";
             }
@@ -300,6 +317,15 @@ final class WidgetSummaryService
         // Generate AI summary
         $aiSummary = $this->generateAiAnalysis($allConversations, $systemPrompt, $ownerId);
 
+        // Replace AI-quoted responses with original full-text responses from the database.
+        // The AI may truncate or paraphrase long responses; the originals are always more accurate.
+        if (!empty($aiSummary['sentimentMessages']) && !empty($allMessagePairs)) {
+            $aiSummary['sentimentMessages'] = $this->matchOriginalResponses(
+                $aiSummary['sentimentMessages'],
+                $allMessagePairs
+            );
+        }
+
         // Create or update summary entity
         if ($summaryId) {
             $summary = $this->summaryRepository->find($summaryId);
@@ -314,7 +340,7 @@ final class WidgetSummaryService
 
         $summary->setDate((int) date('Ymd'));
         $summary->setSessionCount($filteredSessionCount);
-        $summary->setMessageCount($totalMessages);
+        $summary->setMessageCount($userMessages);
         $summary->setTopics($aiSummary['topics'] ?? []);
         $summary->setFaqs($aiSummary['faqs'] ?? []);
         $summary->setSentiment($aiSummary['sentiment'] ?? ['positive' => 0, 'neutral' => 100, 'negative' => 0]);
@@ -322,6 +348,7 @@ final class WidgetSummaryService
         $summary->setRecommendations($aiSummary['recommendations'] ?? []);
         $summary->setSummaryText($aiSummary['summary'] ?? '');
         $summary->setPromptSuggestions($aiSummary['promptSuggestions'] ?? []);
+        $summary->setSentimentMessages($aiSummary['sentimentMessages'] ?? []);
         $summary->setFromDate($fromDate);
         $summary->setToDate($toDate);
         $summary->setCreated(time());
@@ -334,7 +361,7 @@ final class WidgetSummaryService
             'date' => $summary->getDate(),
             'formattedDate' => $summary->getFormattedDate(),
             'sessionCount' => $filteredSessionCount,
-            'messageCount' => $totalMessages,
+            'messageCount' => $userMessages,
             'userMessages' => $userMessages,
             'assistantMessages' => $assistantMessages,
             'topics' => $aiSummary['topics'] ?? [],
@@ -344,6 +371,7 @@ final class WidgetSummaryService
             'recommendations' => $aiSummary['recommendations'] ?? [],
             'summary' => $aiSummary['summary'] ?? '',
             'promptSuggestions' => $aiSummary['promptSuggestions'] ?? [],
+            'sentimentMessages' => $aiSummary['sentimentMessages'] ?? [],
             'fromDate' => $fromDate,
             'toDate' => $toDate,
             'dateRange' => $summary->getFormattedDateRange(),
@@ -381,10 +409,20 @@ What are users asking about? How well is the assistant helping them?
 List the 3-5 main topics discussed.
 
 ### 3. SENTIMENT ANALYSIS
-Rate the overall sentiment. The three values MUST add up to exactly 100.
+First, classify EVERY user message from the conversations as POSITIVE, NEUTRAL, or NEGATIVE using these rules:
+- NEGATIVE: The user shows frustration, confusion, or dissatisfaction. Also classify as NEGATIVE when the assistant gave an unhelpful, incomplete, or repetitive response, when the user was bounced between AI and support agent, or when the assistant could not fulfill the request.
+- NEUTRAL: Simple greetings, factual questions without emotion, basic small talk.
+- POSITIVE: User expresses satisfaction, gratitude, or the assistant successfully helped them.
+
+Then provide the percentages (MUST add up to 100):
 - Positive: [number]%
-- Neutral: [number]%  
+- Neutral: [number]%
 - Negative: [number]%
+
+Now list ALL neutral and negative user messages with the EXACT text from the conversations.
+Format each entry EXACTLY as follows (one per line):
+- [NEUTRAL] User: "exact user message" | Response: "exact assistant response"
+- [NEGATIVE] User: "exact user message" | Response: "exact assistant response"
 
 ### 4. FREQUENTLY ASKED QUESTIONS
 List each question with how many times it was asked:
@@ -411,7 +449,7 @@ PROMPT;
             // Use gpt-4o-mini (model ID 73) for cost-effective analysis
             $aiOptions = [
                 'temperature' => 0.3,
-                'max_tokens' => 2000,
+                'max_tokens' => 4000,
             ];
             $provider = $this->modelConfigService->getProviderForModel(73);
             $modelName = $this->modelConfigService->getModelName(73);
@@ -441,6 +479,7 @@ PROMPT;
                 'issues' => [],
                 'recommendations' => [],
                 'promptSuggestions' => [],
+                'sentimentMessages' => [],
             ];
         }
     }
@@ -458,6 +497,7 @@ PROMPT;
             'issues' => [],
             'recommendations' => [],
             'promptSuggestions' => [],
+            'sentimentMessages' => [],
         ];
 
         // Extract Executive Summary (section 1)
@@ -539,11 +579,87 @@ PROMPT;
             }
         }
 
+        // Extract Sentiment-Tagged Messages (embedded in section 3, search whole response)
+        preg_match_all(
+            '/\[(NEUTRAL|NEGATIVE)\]\s*User:\s*"(.+?)"\s*\|\s*Response:\s*"(.+?)"/si',
+            $response,
+            $taggedMatches,
+            PREG_SET_ORDER
+        );
+        foreach ($taggedMatches as $match) {
+            $result['sentimentMessages'][] = [
+                'sentiment' => strtolower(trim($match[1])),
+                'userMessage' => trim($match[2]),
+                'assistantResponse' => trim($match[3]),
+            ];
+        }
+
         // If no summary was parsed, use the full response as fallback
         if (empty($result['summary'])) {
             $result['summary'] = substr($response, 0, 500);
         }
 
         return $result;
+    }
+
+    /**
+     * Match AI-quoted sentiment messages back to the original full-text messages.
+     *
+     * The AI may truncate or paraphrase long responses. This method finds the
+     * best-matching original message pair and replaces the AI's quotes with the
+     * actual full text from the database.
+     *
+     * @param array<array{sentiment: string, userMessage: string, assistantResponse: string}> $taggedMessages
+     * @param array<array{userMessage: string, assistantResponse: string}>                    $originalPairs
+     *
+     * @return array<array{sentiment: string, userMessage: string, assistantResponse: string}>
+     */
+    private function matchOriginalResponses(array $taggedMessages, array $originalPairs): array
+    {
+        foreach ($taggedMessages as &$tagged) {
+            $bestMatch = null;
+            $bestScore = 0;
+
+            foreach ($originalPairs as $pair) {
+                // Try exact match first
+                if ($pair['userMessage'] === $tagged['userMessage']) {
+                    $bestMatch = $pair;
+                    break;
+                }
+
+                // Fuzzy match: check if the AI's quoted text is contained in the original or vice versa
+                $taggedNorm = mb_strtolower(trim($tagged['userMessage']));
+                $originalNorm = mb_strtolower(trim($pair['userMessage']));
+
+                if ($taggedNorm === $originalNorm) {
+                    $bestMatch = $pair;
+                    break;
+                }
+
+                // Substring match (AI might have trimmed the message)
+                if (str_contains($originalNorm, $taggedNorm) || str_contains($taggedNorm, $originalNorm)) {
+                    $score = min(mb_strlen($taggedNorm), mb_strlen($originalNorm));
+                    if ($score > $bestScore) {
+                        $bestScore = $score;
+                        $bestMatch = $pair;
+                    }
+                }
+
+                // Similar text match for slight paraphrasing
+                similar_text($taggedNorm, $originalNorm, $percent);
+                if ($percent > 70 && $percent > $bestScore) {
+                    $bestScore = $percent;
+                    $bestMatch = $pair;
+                }
+            }
+
+            if ($bestMatch) {
+                $tagged['userMessage'] = $bestMatch['userMessage'];
+                $tagged['assistantResponse'] = $bestMatch['assistantResponse'];
+            }
+        }
+        unset($tagged);
+
+        return $taggedMessages;
     }
 }

@@ -56,6 +56,7 @@ export interface WidgetSessionDetailResponse {
   success: boolean
   session: WidgetSession
   messages: SessionMessage[]
+  latestEventId?: number
 }
 
 export interface ListSessionsParams {
@@ -314,6 +315,11 @@ export interface WidgetSummary {
   recommendations: string[]
   summary: string
   promptSuggestions?: Array<{ type: string; suggestion: string }>
+  sentimentMessages?: Array<{
+    sentiment: 'neutral' | 'negative'
+    userMessage: string
+    assistantResponse: string
+  }>
   fromDate?: number
   toDate?: number
   dateRange?: string

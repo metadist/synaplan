@@ -85,6 +85,12 @@ class WidgetSummary
     private ?string $promptSuggestions = null;
 
     /**
+     * Sentiment-tagged messages with visitor message and assistant response (JSON array).
+     */
+    #[ORM\Column(name: 'BSENTIMENT_MESSAGES', type: 'text', nullable: true)]
+    private ?string $sentimentMessages = null;
+
+    /**
      * Start date of the analysis period (YYYYMMDD format).
      */
     #[ORM\Column(name: 'BFROM_DATE', type: 'integer', nullable: true)]
@@ -277,6 +283,24 @@ class WidgetSummary
     public function setPromptSuggestions(array $suggestions): self
     {
         $this->promptSuggestions = json_encode($suggestions, JSON_UNESCAPED_UNICODE);
+
+        return $this;
+    }
+
+    /**
+     * @return array<array{sentiment: string, userMessage: string, assistantResponse: string}>
+     */
+    public function getSentimentMessages(): array
+    {
+        return $this->sentimentMessages ? (json_decode($this->sentimentMessages, true) ?? []) : [];
+    }
+
+    /**
+     * @param array<array{sentiment: string, userMessage: string, assistantResponse: string}> $messages
+     */
+    public function setSentimentMessages(array $messages): self
+    {
+        $this->sentimentMessages = json_encode($messages, JSON_UNESCAPED_UNICODE);
 
         return $this;
     }

@@ -1,5 +1,5 @@
 <template>
-  <div :class="compact ? '' : 'surface-card p-4 lg:p-6'">
+  <div :class="[compact ? '' : 'surface-card p-4 lg:p-6', 'min-w-0 overflow-hidden']">
     <!-- Upgrade Required Notice (for non-Team and non-Admin users) -->
     <div v-if="!isTeam && !isAdmin" class="text-center py-8">
       <div
@@ -23,12 +23,12 @@
     <!-- Main Content (for Team+ users and Admins) -->
     <template v-else>
       <!-- Header with saved summaries toggle -->
-      <div class="flex items-center justify-between mb-4">
-        <h3 v-if="!compact" class="text-lg font-semibold txt-primary flex items-center gap-2">
-          <Icon icon="heroicons:chart-bar" class="w-5 h-5 txt-brand" />
-          {{ $t('summary.title') }}
+      <div class="flex items-center justify-between gap-2 mb-4 min-w-0">
+        <h3 v-if="!compact" class="text-lg font-semibold txt-primary flex items-center gap-2 truncate min-w-0">
+          <Icon icon="heroicons:chart-bar" class="w-5 h-5 txt-brand flex-shrink-0" />
+          <span class="truncate">{{ $t('summary.title') }}</span>
         </h3>
-        <div class="flex items-center gap-2">
+        <div class="flex items-center gap-2 flex-shrink-0">
           <!-- Saved Summaries Button -->
           <button
             v-if="savedSummaries.length > 0"
@@ -84,15 +84,15 @@
             "
             @click="selectSavedSummary(s)"
           >
-            <div class="flex items-center justify-between gap-2 mb-1">
-              <div class="text-sm font-medium txt-primary">
+            <div class="mb-1">
+              <div class="text-sm font-medium txt-primary truncate">
                 {{ s.dateRange || s.formattedDate || formatDateNumber(s.date!) }}
               </div>
-              <div class="text-xs txt-secondary whitespace-nowrap">
+              <div class="text-[10px] txt-secondary truncate">
                 {{ formatTimestamp(s.created!) }}
               </div>
             </div>
-            <div class="text-xs txt-secondary">
+            <div class="text-xs txt-secondary truncate">
               {{ s.sessionCount }} {{ $t('summary.sessions') }} · {{ s.messageCount }}
               {{ $t('summary.messages') }}
             </div>
@@ -115,21 +115,21 @@
 
       <!-- Date Range Selection (only when no sessions selected and not viewing saved) -->
       <div v-if="selectedSessionIds.length === 0 && !selectedSavedSummary" class="mb-4 space-y-3">
-        <div class="flex items-center gap-2">
-          <div class="flex-1">
+        <div class="flex flex-wrap gap-2">
+          <div class="flex-1" style="min-width: 140px">
             <label class="block text-xs txt-secondary mb-1">{{ $t('summary.from') }}</label>
             <input
               v-model="fromDate"
               type="date"
-              class="w-full px-3 py-2 rounded-lg surface-chip text-sm txt-primary"
+              class="w-full px-2 py-2 rounded-lg surface-chip text-sm txt-primary"
             />
           </div>
-          <div class="flex-1">
+          <div class="flex-1" style="min-width: 140px">
             <label class="block text-xs txt-secondary mb-1">{{ $t('summary.to') }}</label>
             <input
               v-model="toDate"
               type="date"
-              class="w-full px-3 py-2 rounded-lg surface-chip text-sm txt-primary"
+              class="w-full px-2 py-2 rounded-lg surface-chip text-sm txt-primary"
             />
           </div>
         </div>
@@ -223,7 +223,7 @@
                 : 'p-3 surface-chip rounded-lg text-center'
             "
           >
-            <p class="text-xs txt-secondary">{{ $t('summary.messages') }}</p>
+            <p class="text-xs txt-secondary">{{ $t('summary.visitorMessages') }}</p>
             <p :class="compact ? 'text-lg font-bold txt-primary' : 'text-xl font-bold txt-primary'">
               {{ summary.messageCount }}
             </p>
@@ -252,19 +252,131 @@
               :title="$t('summary.negative') + ': ' + summary.sentiment.negative + '%'"
             ></div>
           </div>
-          <div class="flex justify-between mt-2 text-xs">
-            <span class="flex items-center gap-1.5">
-              <span class="w-2.5 h-2.5 rounded-full bg-green-500"></span>
-              {{ $t('summary.positive') }}: {{ summary.sentiment.positive }}%
+          <div class="flex flex-wrap gap-x-3 gap-y-1 mt-2 text-xs">
+            <span class="flex items-center gap-1">
+              <span class="w-2 h-2 rounded-full bg-green-500 flex-shrink-0"></span>
+              <span class="truncate">{{ $t('summary.positive') }}: {{ summary.sentiment.positive }}%</span>
             </span>
-            <span class="flex items-center gap-1.5">
-              <span class="w-2.5 h-2.5 rounded-full bg-gray-400"></span>
-              {{ $t('summary.neutral') }}: {{ summary.sentiment.neutral }}%
+            <span class="flex items-center gap-1">
+              <span class="w-2 h-2 rounded-full bg-gray-400 flex-shrink-0"></span>
+              <span class="truncate">{{ $t('summary.neutral') }}: {{ summary.sentiment.neutral }}%</span>
             </span>
-            <span class="flex items-center gap-1.5">
-              <span class="w-2.5 h-2.5 rounded-full bg-red-500"></span>
-              {{ $t('summary.negative') }}: {{ summary.sentiment.negative }}%
+            <span class="flex items-center gap-1">
+              <span class="w-2 h-2 rounded-full bg-red-500 flex-shrink-0"></span>
+              <span class="truncate">{{ $t('summary.negative') }}: {{ summary.sentiment.negative }}%</span>
             </span>
+          </div>
+
+          <!-- Sentiment Message Dropdowns -->
+          <div
+            v-if="summary.sentimentMessages && summary.sentimentMessages.length > 0"
+            class="mt-3 space-y-2"
+          >
+            <!-- Negative Messages -->
+            <div
+              v-if="negativeMessages.length > 0"
+              class="rounded-lg border border-red-500/20 overflow-hidden"
+            >
+              <button
+                class="w-full flex items-center gap-2 px-3 py-2 text-left text-xs font-medium transition-colors hover:bg-red-500/5"
+                :class="showNegativeMessages ? 'bg-red-500/10 text-red-600 dark:text-red-400' : 'text-red-500/80'"
+                @click="showNegativeMessages = !showNegativeMessages"
+              >
+                <Icon
+                  icon="heroicons:chevron-right"
+                  class="w-3.5 h-3.5 transition-transform duration-200 flex-shrink-0"
+                  :class="showNegativeMessages && 'rotate-90'"
+                />
+                <span class="w-2 h-2 rounded-full bg-red-500 flex-shrink-0"></span>
+                <span class="flex-1 truncate">{{ $t('summary.negativeMessages') }}</span>
+                <span class="px-1.5 py-0.5 rounded-full bg-red-500/20 text-red-600 dark:text-red-400 text-[10px] font-semibold flex-shrink-0">
+                  {{ negativeMessages.length }}
+                </span>
+              </button>
+              <Transition
+                enter-active-class="transition-all duration-200 ease-out"
+                enter-from-class="max-h-0 opacity-0"
+                enter-to-class="max-h-[500px] opacity-100"
+                leave-active-class="transition-all duration-150 ease-in"
+                leave-from-class="max-h-[500px] opacity-100"
+                leave-to-class="max-h-0 opacity-0"
+              >
+                <div v-if="showNegativeMessages" class="overflow-hidden">
+                  <div class="px-3 pb-3 space-y-3 max-h-64 overflow-y-auto scroll-thin">
+                    <div
+                      v-for="(msg, idx) in negativeMessages"
+                      :key="'neg-' + idx"
+                      class="space-y-1.5"
+                    >
+                      <!-- Visitor message -->
+                      <div class="flex items-start gap-2">
+                        <span class="text-[10px] font-medium text-red-500/70 uppercase flex-shrink-0 mt-1">{{ $t('summary.visitor') }}</span>
+                        <p class="text-xs txt-primary bg-red-500/5 rounded-lg px-2.5 py-1.5 leading-relaxed">{{ msg.userMessage }}</p>
+                      </div>
+                      <!-- Response -->
+                      <div class="flex items-start gap-2 pl-4">
+                        <span class="text-[10px] font-medium txt-secondary uppercase flex-shrink-0 mt-1">{{ $t('summary.response') }}</span>
+                        <p class="text-xs txt-secondary bg-white/5 dark:bg-white/5 rounded-lg px-2.5 py-1.5 leading-relaxed">{{ msg.assistantResponse }}</p>
+                      </div>
+                      <div v-if="idx < negativeMessages.length - 1" class="border-t border-red-500/10"></div>
+                    </div>
+                  </div>
+                </div>
+              </Transition>
+            </div>
+
+            <!-- Neutral Messages -->
+            <div
+              v-if="neutralMessages.length > 0"
+              class="rounded-lg border border-gray-400/20 overflow-hidden"
+            >
+              <button
+                class="w-full flex items-center gap-2 px-3 py-2 text-left text-xs font-medium transition-colors hover:bg-gray-400/5"
+                :class="showNeutralMessages ? 'bg-gray-400/10 txt-primary' : 'txt-secondary'"
+                @click="showNeutralMessages = !showNeutralMessages"
+              >
+                <Icon
+                  icon="heroicons:chevron-right"
+                  class="w-3.5 h-3.5 transition-transform duration-200 flex-shrink-0"
+                  :class="showNeutralMessages && 'rotate-90'"
+                />
+                <span class="w-2 h-2 rounded-full bg-gray-400 flex-shrink-0"></span>
+                <span class="flex-1 truncate">{{ $t('summary.neutralMessages') }}</span>
+                <span class="px-1.5 py-0.5 rounded-full bg-gray-400/20 txt-secondary text-[10px] font-semibold flex-shrink-0">
+                  {{ neutralMessages.length }}
+                </span>
+              </button>
+              <Transition
+                enter-active-class="transition-all duration-200 ease-out"
+                enter-from-class="max-h-0 opacity-0"
+                enter-to-class="max-h-[500px] opacity-100"
+                leave-active-class="transition-all duration-150 ease-in"
+                leave-from-class="max-h-[500px] opacity-100"
+                leave-to-class="max-h-0 opacity-0"
+              >
+                <div v-if="showNeutralMessages" class="overflow-hidden">
+                  <div class="px-3 pb-3 space-y-3 max-h-64 overflow-y-auto scroll-thin">
+                    <div
+                      v-for="(msg, idx) in neutralMessages"
+                      :key="'neu-' + idx"
+                      class="space-y-1.5"
+                    >
+                      <!-- Visitor message -->
+                      <div class="flex items-start gap-2">
+                        <span class="text-[10px] font-medium txt-secondary uppercase flex-shrink-0 mt-1">{{ $t('summary.visitor') }}</span>
+                        <p class="text-xs txt-primary bg-gray-400/5 rounded-lg px-2.5 py-1.5 leading-relaxed">{{ msg.userMessage }}</p>
+                      </div>
+                      <!-- Response -->
+                      <div class="flex items-start gap-2 pl-4">
+                        <span class="text-[10px] font-medium txt-secondary uppercase flex-shrink-0 mt-1">{{ $t('summary.response') }}</span>
+                        <p class="text-xs txt-secondary bg-white/5 dark:bg-white/5 rounded-lg px-2.5 py-1.5 leading-relaxed">{{ msg.assistantResponse }}</p>
+                      </div>
+                      <div v-if="idx < neutralMessages.length - 1" class="border-t border-gray-400/10"></div>
+                    </div>
+                  </div>
+                </div>
+              </Transition>
+            </div>
           </div>
         </div>
 
@@ -360,17 +472,17 @@
           v-if="summary.promptSuggestions && summary.promptSuggestions.length > 0"
           class="p-4 rounded-lg bg-purple-500/10 border border-purple-500/30"
         >
-          <div class="flex items-center justify-between mb-3">
-            <h4 class="text-sm font-medium txt-primary flex items-center gap-2">
-              <Icon icon="heroicons:wrench-screwdriver" class="w-4 h-4 text-purple-500" />
-              {{ $t('summary.promptSuggestions') }}
+          <div class="flex items-center justify-between gap-2 mb-3 min-w-0">
+            <h4 class="text-sm font-medium txt-primary flex items-center gap-2 truncate min-w-0">
+              <Icon icon="heroicons:wrench-screwdriver" class="w-4 h-4 text-purple-500 flex-shrink-0" />
+              <span class="truncate">{{ $t('summary.promptSuggestions') }}</span>
             </h4>
             <button
-              class="px-3 py-1.5 rounded-lg text-xs font-medium bg-purple-500 text-white hover:bg-purple-600 transition-colors flex items-center gap-1.5"
+              class="px-3 py-1.5 rounded-lg text-xs font-medium bg-purple-500 text-white hover:bg-purple-600 transition-colors flex items-center gap-1.5 flex-shrink-0"
               @click="openPromptEditor"
             >
               <Icon icon="heroicons:pencil-square" class="w-3.5 h-3.5" />
-              {{ $t('summary.editPrompt') }}
+              <span class="hidden sm:inline">{{ $t('summary.editPrompt') }}</span>
             </button>
           </div>
           <div class="space-y-4">
@@ -406,7 +518,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, onMounted } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { Icon } from '@iconify/vue'
 import { useI18n } from 'vue-i18n'
@@ -448,6 +560,17 @@ const savedSummaries = ref<widgetSessionsApi.WidgetSummary[]>([])
 const loadingSummaries = ref(false)
 const showSavedSummaries = ref(false)
 const selectedSavedSummary = ref<widgetSessionsApi.WidgetSummary | null>(null)
+
+// Sentiment message dropdowns
+const showNegativeMessages = ref(false)
+const showNeutralMessages = ref(false)
+
+const negativeMessages = computed(() =>
+  summary.value?.sentimentMessages?.filter((m) => m.sentiment === 'negative') ?? []
+)
+const neutralMessages = computed(() =>
+  summary.value?.sentimentMessages?.filter((m) => m.sentiment === 'neutral') ?? []
+)
 
 // Date range for analysis
 const fromDate = ref<string>('')
@@ -501,12 +624,16 @@ const selectSavedSummary = (s: widgetSessionsApi.WidgetSummary) => {
   selectedSavedSummary.value = s
   summary.value = s
   showSavedSummaries.value = false
+  showNegativeMessages.value = false
+  showNeutralMessages.value = false
 }
 
 // Clear selected summary and go back to generator
 const clearSummary = () => {
   summary.value = null
   selectedSavedSummary.value = null
+  showNegativeMessages.value = false
+  showNeutralMessages.value = false
 }
 
 const generateAnalysis = async (forceRegenerate = false) => {
@@ -572,14 +699,15 @@ const generateAnalysis = async (forceRegenerate = false) => {
   }
 }
 
-// Reset summary when selected sessions change
+// Reset summary when selected sessions actually change (compare content, not reference)
 watch(
-  () => props.selectedSessionIds,
-  () => {
-    summary.value = null
-    selectedSavedSummary.value = null
-  },
-  { deep: true }
+  () => [...props.selectedSessionIds].sort().join(','),
+  (newVal, oldVal) => {
+    if (newVal !== oldVal) {
+      summary.value = null
+      selectedSavedSummary.value = null
+    }
+  }
 )
 
 // Initialize

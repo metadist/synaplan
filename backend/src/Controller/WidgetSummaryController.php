@@ -99,6 +99,7 @@ class WidgetSummaryController extends AbstractController
                 'recommendations' => $s->getRecommendations(),
                 'summary' => $s->getSummaryText(),
                 'promptSuggestions' => $s->getPromptSuggestions(),
+                'sentimentMessages' => $s->getSentimentMessages(),
                 'fromDate' => $s->getFromDate(),
                 'toDate' => $s->getToDate(),
                 'dateRange' => $s->getFormattedDateRange(),
@@ -163,6 +164,7 @@ class WidgetSummaryController extends AbstractController
                 'issues' => $summary->getIssues(),
                 'recommendations' => $summary->getRecommendations(),
                 'summary' => $summary->getSummaryText(),
+                'sentimentMessages' => $summary->getSentimentMessages(),
                 'created' => $summary->getCreated(),
             ],
         ]);
@@ -234,6 +236,7 @@ class WidgetSummaryController extends AbstractController
                     'issues' => $summary->getIssues(),
                     'recommendations' => $summary->getRecommendations(),
                     'summary' => $summary->getSummaryText(),
+                    'sentimentMessages' => $summary->getSentimentMessages(),
                     'created' => $summary->getCreated(),
                 ],
             ]);
