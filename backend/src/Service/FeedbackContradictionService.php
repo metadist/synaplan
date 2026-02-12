@@ -15,10 +15,6 @@ use Psr\Log\LoggerInterface;
  */
 final readonly class FeedbackContradictionService
 {
-    private const NAMESPACE_FALSE_POSITIVE = 'feedback_false_positive';
-    private const NAMESPACE_POSITIVE = 'feedback_positive';
-    private const MIN_SCORE = 0.4;
-    private const LIMIT_PER_NAMESPACE = 5;
 
     public function __construct(
         private AiFacade $aiFacade,
@@ -120,14 +116,14 @@ final readonly class FeedbackContradictionService
             $userId,
             $queryText,
             null,
-            self::LIMIT_PER_NAMESPACE,
-            self::MIN_SCORE,
+            FeedbackConstants::LIMIT_PER_NAMESPACE,
+            FeedbackConstants::MIN_CONTRADICTION_SCORE,
             null,
             false
         );
         foreach ($memories as $m) {
             $score = (float) ($m['score'] ?? 0);
-            if ($score < self::MIN_SCORE) {
+            if ($score < FeedbackConstants::MIN_CONTRADICTION_SCORE) {
                 continue;
             }
             $id = (int) ($m['id'] ?? 0);
@@ -149,14 +145,14 @@ final readonly class FeedbackContradictionService
             $userId,
             $queryText,
             'feedback_negative',
-            self::LIMIT_PER_NAMESPACE,
-            self::MIN_SCORE,
-            self::NAMESPACE_FALSE_POSITIVE,
+            FeedbackConstants::LIMIT_PER_NAMESPACE,
+            FeedbackConstants::MIN_CONTRADICTION_SCORE,
+            FeedbackConstants::NAMESPACE_FALSE_POSITIVE,
             true
         );
         foreach ($falsePositives as $fp) {
             $score = (float) ($fp['score'] ?? 0);
-            if ($score < self::MIN_SCORE) {
+            if ($score < FeedbackConstants::MIN_CONTRADICTION_SCORE) {
                 continue;
             }
             $id = (int) ($fp['id'] ?? 0);
@@ -176,14 +172,14 @@ final readonly class FeedbackContradictionService
             $userId,
             $queryText,
             'feedback_positive',
-            self::LIMIT_PER_NAMESPACE,
-            self::MIN_SCORE,
-            self::NAMESPACE_POSITIVE,
+            FeedbackConstants::LIMIT_PER_NAMESPACE,
+            FeedbackConstants::MIN_CONTRADICTION_SCORE,
+            FeedbackConstants::NAMESPACE_POSITIVE,
             true
         );
         foreach ($positives as $p) {
             $score = (float) ($p['score'] ?? 0);
-            if ($score < self::MIN_SCORE) {
+            if ($score < FeedbackConstants::MIN_CONTRADICTION_SCORE) {
                 continue;
             }
             $id = (int) ($p['id'] ?? 0);

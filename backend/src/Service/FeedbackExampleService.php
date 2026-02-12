@@ -16,12 +16,7 @@ final readonly class FeedbackExampleService
 {
     private const MAX_SUMMARY_LENGTH = 500;
     private const MAX_INPUT_LENGTH = 2000;
-    private const NAMESPACE_FALSE_POSITIVE = 'feedback_false_positive';
-    private const NAMESPACE_POSITIVE = 'feedback_positive';
-
     private const MAX_RESEARCH_SOURCES = 6;
-    private const MIN_RESEARCH_SCORE = 0.35;
-    private const MIN_MEMORY_RESEARCH_SCORE = 0.55;
     private const MAX_WEB_RESULTS = 5;
 
     public function __construct(
@@ -60,7 +55,7 @@ final readonly class FeedbackExampleService
                     $user->getId(),
                     'feedback_negative',
                     1000,
-                    self::NAMESPACE_FALSE_POSITIVE
+                    FeedbackConstants::NAMESPACE_FALSE_POSITIVE
                 );
                 foreach ($falsePositives as $fp) {
                     $feedbacks[] = $this->mapMemoryToFeedback($fp, 'false_positive');
@@ -73,7 +68,7 @@ final readonly class FeedbackExampleService
                     $user->getId(),
                     'feedback_positive',
                     1000,
-                    self::NAMESPACE_POSITIVE
+                    FeedbackConstants::NAMESPACE_POSITIVE
                 );
                 foreach ($positives as $p) {
                     $feedbacks[] = $this->mapMemoryToFeedback($p, 'positive');
@@ -161,7 +156,7 @@ final readonly class FeedbackExampleService
 
         // Determine the type based on namespace/category
         $type = 'feedback_negative' === $memory->category ? 'false_positive' : 'positive';
-        $namespace = 'false_positive' === $type ? self::NAMESPACE_FALSE_POSITIVE : self::NAMESPACE_POSITIVE;
+        $namespace = 'false_positive' === $type ? FeedbackConstants::NAMESPACE_FALSE_POSITIVE : FeedbackConstants::NAMESPACE_POSITIVE;
 
         // Update the memory
         $updated = $this->memoryService->updateMemory(
@@ -201,7 +196,7 @@ final readonly class FeedbackExampleService
             throw new \InvalidArgumentException('Feedback not found');
         }
 
-        $namespace = 'feedback_negative' === $memory->category ? self::NAMESPACE_FALSE_POSITIVE : self::NAMESPACE_POSITIVE;
+        $namespace = 'feedback_negative' === $memory->category ? FeedbackConstants::NAMESPACE_FALSE_POSITIVE : FeedbackConstants::NAMESPACE_POSITIVE;
 
         $this->memoryService->deleteMemory($id, $user, $namespace);
     }
@@ -382,7 +377,7 @@ PROMPT;
             $summary,
             'user_created',
             $messageId,
-            self::NAMESPACE_FALSE_POSITIVE
+            FeedbackConstants::NAMESPACE_FALSE_POSITIVE
         );
     }
 
@@ -401,7 +396,7 @@ PROMPT;
             $value,
             'user_created',
             $messageId,
-            self::NAMESPACE_POSITIVE
+            FeedbackConstants::NAMESPACE_POSITIVE
         );
     }
 
@@ -579,8 +574,8 @@ PROMPT;
                 $user->getId(),
                 $queryText,
                 null,
-                5,
-                0.4,
+                FeedbackConstants::LIMIT_PER_NAMESPACE,
+                FeedbackConstants::MIN_CONTRADICTION_SCORE,
                 null,
                 false
             );
@@ -592,7 +587,7 @@ PROMPT;
             $lines = [];
             $ids = [];
             foreach ($memories as $m) {
-                if (($m['score'] ?? 0) < 0.4) {
+                if (($m['score'] ?? 0) < FeedbackConstants::MIN_CONTRADICTION_SCORE) {
                     continue;
                 }
                 $id = (int) ($m['id'] ?? 0);
@@ -701,7 +696,7 @@ PROMPT;
                 $userId,
                 null,
                 self::MAX_RESEARCH_SOURCES,
-                self::MIN_RESEARCH_SCORE,
+                FeedbackConstants::MIN_RESEARCH_SCORE,
             );
 
             foreach ($ragResults as $result) {
@@ -728,8 +723,8 @@ PROMPT;
         // 2. Search existing feedbacks (false_positive + positive namespaces)
         if ($this->memoryService->isAvailable()) {
             $namespaces = [
-                ['category' => 'feedback_negative', 'namespace' => self::NAMESPACE_FALSE_POSITIVE, 'sourceType' => 'feedback_false'],
-                ['category' => 'feedback_positive', 'namespace' => self::NAMESPACE_POSITIVE, 'sourceType' => 'feedback_correct'],
+                ['category' => 'feedback_negative', 'namespace' => FeedbackConstants::NAMESPACE_FALSE_POSITIVE, 'sourceType' => 'feedback_false'],
+                ['category' => 'feedback_positive', 'namespace' => FeedbackConstants::NAMESPACE_POSITIVE, 'sourceType' => 'feedback_correct'],
             ];
 
             foreach ($namespaces as $ns) {
@@ -739,7 +734,7 @@ PROMPT;
                         $claimText,
                         $ns['category'],
                         3,
-                        self::MIN_RESEARCH_SCORE,
+                        FeedbackConstants::MIN_RESEARCH_SCORE,
                         $ns['namespace'],
                         true
                     );
@@ -774,7 +769,7 @@ PROMPT;
                     $claimText,
                     null,
                     3,
-                    self::MIN_MEMORY_RESEARCH_SCORE,
+                    FeedbackConstants::MIN_MEMORY_RESEARCH_SCORE,
                     null,
                     false
                 );
@@ -806,7 +801,7 @@ PROMPT;
         // Post-filter: remove sources below minimum score (Qdrant may return low-score results)
         $rawSources = array_values(array_filter(
             $rawSources,
-            fn (array $src) => $src['score'] >= self::MIN_RESEARCH_SCORE
+            fn (array $src) => $src['score'] >= FeedbackConstants::MIN_RESEARCH_SCORE
         ));
 
         if ([] === $rawSources) {

@@ -132,12 +132,15 @@ const researchCorrection = computed(() => {
   if (selectedSourceKeys.value.size === 0) return ''
   const parts: string[] = []
   for (const key of selectedSourceKeys.value) {
-    const [type, idStr] = key.split('-')
-    const id = parseInt(idStr, 10)
+    const dashIdx = key.indexOf('-')
+    if (dashIdx === -1) continue
+    const type = key.slice(0, dashIdx)
+    const id = parseInt(key.slice(dashIdx + 1), 10)
+    if (!Number.isFinite(id)) continue
     if (type === 'kb') {
       const src = kbSources.value.find((s: KbSource) => s.id === id)
       if (src) parts.push(src.summary)
-    } else {
+    } else if (type === 'web') {
       const src = webSources.value.find((s: WebSource) => s.id === id)
       if (src) parts.push(src.summary)
     }
@@ -241,49 +244,46 @@ const handleSave = () => {
   })
 }
 
-// Enhance custom text via AI
-async function enhanceSummary() {
-  if (!customSummary.value.trim() || enhancingSummary.value) return
-  enhancingSummary.value = true
+// Enhance custom text via AI (shared logic)
+const ENHANCE_HINT_THRESHOLD = 15
+
+async function enhanceText(
+  textRef: typeof customSummary,
+  loadingRef: typeof enhancingSummary,
+  hintRef: typeof summaryEnhanceHintShown
+) {
+  if (!textRef.value.trim() || loadingRef.value) return
+  loadingRef.value = true
   try {
-    const result = await chatApi.enhanceMessage(customSummary.value.trim())
-    customSummary.value = result.enhanced
-    summaryEnhanceHintShown.value = false
+    const result = await chatApi.enhanceMessage(textRef.value.trim())
+    textRef.value = result.enhanced
+    hintRef.value = false
   } catch {
     showErrorToast(t('feedback.falsePositive.enhanceFailed'))
   } finally {
-    enhancingSummary.value = false
+    loadingRef.value = false
   }
 }
 
-async function enhanceCorrection() {
-  if (!customCorrection.value.trim() || enhancingCorrection.value) return
-  enhancingCorrection.value = true
-  try {
-    const result = await chatApi.enhanceMessage(customCorrection.value.trim())
-    customCorrection.value = result.enhanced
-    correctionEnhanceHintShown.value = false
-  } catch {
-    showErrorToast(t('feedback.falsePositive.enhanceFailed'))
-  } finally {
-    enhancingCorrection.value = false
-  }
-}
+const enhanceSummary = () => enhanceText(customSummary, enhancingSummary, summaryEnhanceHintShown)
+const enhanceCorrection = () => enhanceText(customCorrection, enhancingCorrection, correctionEnhanceHintShown)
 
-// Show enhance hint after 15+ chars typed
+// Show enhance hint after typing threshold
 function onCustomSummaryInput() {
-  if (customSummary.value.length > 15 && !summaryEnhanceHintShown.value && !enhancingSummary.value) {
+  if (customSummary.value.length > ENHANCE_HINT_THRESHOLD && !summaryEnhanceHintShown.value && !enhancingSummary.value) {
     summaryEnhanceHintShown.value = true
   }
 }
 
 function onCustomCorrectionInput() {
-  if (customCorrection.value.length > 15 && !correctionEnhanceHintShown.value && !enhancingCorrection.value) {
+  if (customCorrection.value.length > ENHANCE_HINT_THRESHOLD && !correctionEnhanceHintShown.value && !enhancingCorrection.value) {
     correctionEnhanceHintShown.value = true
   }
 }
 
 // Research: search knowledge base (Qdrant) or web (Brave)
+const AUTO_SELECT_SCORE = 0.5
+
 async function startKbSearch() {
   if (researchLoading.value || !activeSummary.value.trim()) return
   researchLoading.value = true
@@ -295,11 +295,11 @@ async function startKbSearch() {
     // Auto-select sources with high relevance
     const autoKeys = new Set(selectedSourceKeys.value)
     for (const src of result.sources) {
-      if (src.score >= 0.5) autoKeys.add(`kb-${src.id}`)
+      if (src.score >= AUTO_SELECT_SCORE) autoKeys.add(`kb-${src.id}`)
     }
     selectedSourceKeys.value = autoKeys
   } catch {
-    showErrorToast(t('feedback.falsePositive.enhanceFailed'))
+    showErrorToast(t('feedback.falsePositive.researchNoResultsKb'))
   } finally {
     researchLoading.value = false
   }
@@ -320,7 +320,7 @@ async function startWebSearch() {
       selectedSourceKeys.value = autoKeys
     }
   } catch {
-    showErrorToast(t('feedback.falsePositive.enhanceFailed'))
+    showErrorToast(t('feedback.falsePositive.researchNoResultsWeb'))
   } finally {
     researchLoading.value = false
   }

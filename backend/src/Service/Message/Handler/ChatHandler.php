@@ -13,6 +13,7 @@ use App\Service\File\UserUploadPathBuilder;
 use App\Service\MemoryExtractionService;
 use App\Service\ModelConfigService;
 use App\Service\PromptService;
+use App\Service\FeedbackConstants;
 use App\Service\RAG\VectorSearchService;
 use App\Service\UserMemoryService;
 use Doctrine\ORM\EntityManagerInterface;
@@ -436,20 +437,15 @@ class ChatHandler implements MessageHandlerInterface
 
                 // Search for relevant memories using Qdrant
                 // Balance between precision and recall
-                // Lower than 0.5 to catch semantically related queries (e.g., "wie heiße ich?" → "full name")
-                // Higher than 0.2 to avoid completely unrelated memories
                 $rawMemories = $this->memoryService->searchRelevantMemories(
                     $message->getUserId(),
                     $message->getText(),
                     limit: 10,
-                    minScore: 0.4
+                    minScore: FeedbackConstants::MIN_CHAT_MEMORY_SCORE
                 );
 
-                // Post-filter: only keep memories with actual relevance (Qdrant may return low-score results)
-                $loadedMemories = array_values(array_filter(
-                    $rawMemories,
-                    fn (array $m) => ($m['score'] ?? 0) >= 0.4
-                ));
+                // Post-filter: Qdrant may return low-score results despite minScore
+                $loadedMemories = $this->filterByScore($rawMemories, FeedbackConstants::MIN_CHAT_MEMORY_SCORE);
 
                 $this->logger->debug('ChatHandler: Memories loaded from Qdrant', [
                     'count' => count($loadedMemories),
@@ -515,32 +511,20 @@ class ChatHandler implements MessageHandlerInterface
         if (!$memoriesDisabledByRequest && $memoriesEnabledForUser && $this->memoryService->isAvailable()) {
             try {
                 // Search for relevant false positives (things to AVOID saying)
-                $falsePositives = array_values(array_filter(
-                    $this->memoryService->searchRelevantMemories(
-                        $message->getUserId(),
-                        $message->getText(),
-                        category: 'feedback_negative',
-                        limit: 5,
-                        minScore: 0.4,
-                        namespace: 'feedback_false_positive',
-                        includeHidden: true
-                    ),
-                    fn (array $fp) => ($fp['score'] ?? 0) >= 0.4
-                ));
+                $falsePositives = $this->searchFeedback(
+                    $message->getUserId(),
+                    $message->getText(),
+                    'feedback_negative',
+                    FeedbackConstants::NAMESPACE_FALSE_POSITIVE
+                );
 
                 // Search for relevant positive examples (correct information)
-                $positiveExamples = array_values(array_filter(
-                    $this->memoryService->searchRelevantMemories(
-                        $message->getUserId(),
-                        $message->getText(),
-                        category: 'feedback_positive',
-                        limit: 5,
-                        minScore: 0.4,
-                        namespace: 'feedback_positive',
-                        includeHidden: true
-                    ),
-                    fn (array $pe) => ($pe['score'] ?? 0) >= 0.4
-                ));
+                $positiveExamples = $this->searchFeedback(
+                    $message->getUserId(),
+                    $message->getText(),
+                    'feedback_positive',
+                    FeedbackConstants::NAMESPACE_POSITIVE
+                );
 
                 if (!empty($falsePositives) || !empty($positiveExamples)) {
                     $feedbackContext = "\n\n## User Feedback (corrections from previous conversations):\n";
@@ -831,7 +815,7 @@ class ChatHandler implements MessageHandlerInterface
             // Memory Extraction (Option B: After AI-Response, in the same Request)
             // Pass the AI response to memory extraction so it can extract from the answer too
             $this->logger->info('💾 Loading relevant memories for extraction', ['user_id' => $message->getUserId()]);
-            $allMemories = $this->memoryService->searchRelevantMemories($message->getUserId(), $message->getText(), limit: 20, minScore: 0.25);
+            $allMemories = $this->memoryService->searchRelevantMemories($message->getUserId(), $message->getText(), limit: 20, minScore: FeedbackConstants::MIN_EXTRACTION_SCORE);
             $this->extractMemoriesAfterResponse($message, $fullResponseText, $thread, $allMemories, $progressCallback);
             $this->logger->info('✅ Loaded memories for extraction', ['count' => count($allMemories)]);
         }
@@ -1801,5 +1785,40 @@ class ChatHandler implements MessageHandlerInterface
             'pdf' => 'application/pdf',
             default => 'application/octet-stream',
         };
+    }
+
+    /**
+     * Search feedback entries from Qdrant with score filtering.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    private function searchFeedback(int $userId, string $queryText, string $category, string $namespace): array
+    {
+        return $this->filterByScore(
+            $this->memoryService->searchRelevantMemories(
+                $userId,
+                $queryText,
+                category: $category,
+                limit: FeedbackConstants::LIMIT_PER_NAMESPACE,
+                minScore: FeedbackConstants::MIN_CHAT_FEEDBACK_SCORE,
+                namespace: $namespace,
+                includeHidden: true
+            ),
+            FeedbackConstants::MIN_CHAT_FEEDBACK_SCORE
+        );
+    }
+
+    /**
+     * Post-filter results by score (safety net — Qdrant may return below-threshold results).
+     *
+     * @param array<int, array<string, mixed>> $items
+     * @return array<int, array<string, mixed>>
+     */
+    private function filterByScore(array $items, float $minScore): array
+    {
+        return array_values(array_filter(
+            $items,
+            static fn (array $item) => ($item['score'] ?? 0) >= $minScore
+        ));
     }
 }

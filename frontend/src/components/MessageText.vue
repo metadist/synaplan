@@ -481,6 +481,15 @@ function processFeedbackBadges(html: string): string {
   })
 }
 
+// Normalize reference markers so they stay inline (prevent markdown paragraph breaks)
+function normalizeInlineReferences(text: string): string {
+  // Remove newlines directly before/after [Feedback:ID] and [Memory:ID] so markdown
+  // does not wrap them in separate <p> blocks
+  return text
+    .replace(/\n+(\[(?:Feedback|Memory)\s*:\s*\d+\.{0,3}\])/gi, ' $1')
+    .replace(/(\[(?:Feedback|Memory)\s*:\s*\d+\.{0,3}\])\n+/gi, '$1 ')
+}
+
 // Process content - sync for regular markdown, async for math formulas
 async function processContent(content: string, version: number): Promise<string | null> {
   // Handle special file generation markers from backend with i18n
@@ -490,6 +499,9 @@ async function processContent(content: string, version: number): Promise<string 
   } else if (content === '__FILE_GENERATION_FAILED__') {
     content = t('message.fileGenerationFailed')
   }
+
+  // Keep reference markers inline to prevent markdown paragraph breaks
+  content = normalizeInlineReferences(content)
 
   let html: string
 
