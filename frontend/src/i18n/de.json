@@ -182,10 +182,12 @@
       "loadError": "Konfiguration konnte nicht geladen werden",
       "saveError": "Konfiguration konnte nicht gespeichert werden",
       "saved": "Konfiguration gespeichert",
+      "savedLive": "Gespeichert — sofort wirksam",
       "unsaved": "Nicht gespeicherte Änderungen",
       "testConnection": "Verbindung testen",
       "testFailed": "Verbindungstest fehlgeschlagen",
       "commandCopied": "Befehl in Zwischenablage kopiert",
+      "liveHint": "Änderungen werden sofort wirksam, kein Neustart erforderlich.",
       "restartBanner": {
         "title": "Konfiguration aktualisiert — Neustart erforderlich",
         "message": "Ihre Änderungen wurden in der .env-Datei gespeichert. Damit die Änderungen wirksam werden, müssen Sie Ihre Docker-Container neu starten.",

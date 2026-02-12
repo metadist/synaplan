@@ -56,15 +56,15 @@ const currentTab = computed(() => {
 
 const currentSections = computed(() => {
   if (!currentTab.value || !schema.value) return []
-  return Object.entries(currentTab.value.sections).map(([id, section]) => ({
-    id,
-    label: section.label,
-    fields: section.fields.map((fieldKey) => ({
+  return Object.entries(currentTab.value.sections).map(([id, section]) => {
+    const fields = section.fields.map((fieldKey) => ({
       key: fieldKey,
       schema: schema.value!.fields[fieldKey],
       value: values.value[fieldKey] || { value: '', isSet: false, isMasked: false },
-    })),
-  }))
+    }))
+    const isLive = fields.some((f) => f.schema?.source === 'database')
+    return { id, label: section.label, fields, isLive }
+  })
 })
 
 // Service test mapping (multiple services per tab are tested sequentially)
@@ -98,14 +98,15 @@ async function handleUpdate(key: string, value: string) {
   try {
     const result = await updateConfigValue(key, value)
     if (result.success) {
-      success(t('admin.config.saved'))
+      const isLive = schema.value?.fields[key]?.source === 'database'
+      success(t(isLive ? 'admin.config.savedLive' : 'admin.config.saved'))
       // Update local value
       values.value[key] = {
         value: schema.value?.fields[key]?.sensitive ? '' : value,
         isSet: true,
         isMasked: schema.value?.fields[key]?.sensitive || false,
       }
-      // Show restart banner
+      // Show restart banner only for env-based fields
       if (result.requiresRestart) {
         showRestartBanner.value = true
       }
@@ -292,10 +293,26 @@ onMounted(async () => {
               :key="section.id"
               class="surface-card rounded-xl p-6"
             >
-              <h3 class="text-lg font-semibold txt-primary mb-4 flex items-center gap-2">
-                <Icon icon="mdi:folder-cog" class="w-5 h-5 txt-secondary" />
-                {{ section.label }}
-              </h3>
+              <div class="flex items-center justify-between mb-4">
+                <h3 class="text-lg font-semibold txt-primary flex items-center gap-2">
+                  <Icon icon="mdi:folder-cog" class="w-5 h-5 txt-secondary" />
+                  {{ section.label }}
+                </h3>
+                <span
+                  v-if="section.isLive"
+                  class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300"
+                  :title="$t('admin.config.liveHint')"
+                >
+                  <span class="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
+                  Live
+                </span>
+              </div>
+              <p
+                v-if="section.isLive"
+                class="text-xs txt-secondary mb-4 -mt-2"
+              >
+                {{ $t('admin.config.liveHint') }}
+              </p>
               <div class="space-y-4">
                 <ConfigField
                   v-for="field in section.fields"

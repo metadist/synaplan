@@ -22,6 +22,7 @@ final readonly class FeedbackContradictionService
         private UserMemoryService $memoryService,
         private PromptRepository $promptRepository,
         private LoggerInterface $logger,
+        private FeedbackConfigService $feedbackConfig,
     ) {
     }
 
@@ -110,20 +111,22 @@ final readonly class FeedbackContradictionService
     {
         $userId = $user->getId();
         $related = [];
+        $limit = $this->feedbackConfig->getLimitPerNamespace();
+        $minScore = $this->feedbackConfig->getMinContradictionScore();
 
         // User memories (namespace null, excludes hidden feedback categories)
         $memories = $this->memoryService->searchRelevantMemories(
             $userId,
             $queryText,
             null,
-            FeedbackConstants::LIMIT_PER_NAMESPACE,
-            FeedbackConstants::MIN_CONTRADICTION_SCORE,
+            $limit,
+            $minScore,
             null,
             false
         );
         foreach ($memories as $m) {
             $score = (float) ($m['score'] ?? 0);
-            if ($score < FeedbackConstants::MIN_CONTRADICTION_SCORE) {
+            if ($score < $minScore) {
                 continue;
             }
             $id = (int) ($m['id'] ?? 0);
@@ -145,14 +148,14 @@ final readonly class FeedbackContradictionService
             $userId,
             $queryText,
             'feedback_negative',
-            FeedbackConstants::LIMIT_PER_NAMESPACE,
-            FeedbackConstants::MIN_CONTRADICTION_SCORE,
+            $limit,
+            $minScore,
             FeedbackConstants::NAMESPACE_FALSE_POSITIVE,
             true
         );
         foreach ($falsePositives as $fp) {
             $score = (float) ($fp['score'] ?? 0);
-            if ($score < FeedbackConstants::MIN_CONTRADICTION_SCORE) {
+            if ($score < $minScore) {
                 continue;
             }
             $id = (int) ($fp['id'] ?? 0);
@@ -172,14 +175,14 @@ final readonly class FeedbackContradictionService
             $userId,
             $queryText,
             'feedback_positive',
-            FeedbackConstants::LIMIT_PER_NAMESPACE,
-            FeedbackConstants::MIN_CONTRADICTION_SCORE,
+            $limit,
+            $minScore,
             FeedbackConstants::NAMESPACE_POSITIVE,
             true
         );
         foreach ($positives as $p) {
             $score = (float) ($p['score'] ?? 0);
-            if ($score < FeedbackConstants::MIN_CONTRADICTION_SCORE) {
+            if ($score < $minScore) {
                 continue;
             }
             $id = (int) ($p['id'] ?? 0);

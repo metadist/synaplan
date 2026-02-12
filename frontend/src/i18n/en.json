@@ -187,10 +187,12 @@
       "loadError": "Failed to load configuration",
       "saveError": "Failed to save configuration",
       "saved": "Configuration saved",
+      "savedLive": "Saved — takes effect immediately",
       "unsaved": "Unsaved changes",
       "testConnection": "Test Connection",
       "testFailed": "Connection test failed",
       "commandCopied": "Command copied to clipboard",
+      "liveHint": "Changes take effect immediately, no restart required.",
       "restartBanner": {
         "title": "Configuration Updated — Restart Required",
         "message": "Your changes have been saved to the .env file. For the changes to take effect, you need to restart your Docker containers.",

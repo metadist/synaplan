@@ -15,6 +15,7 @@ const ConfigFieldSchemaZ = z.object({
   sensitive: z.boolean(),
   description: z.string(),
   default: z.string(),
+  source: z.enum(['env', 'database']).optional(),
   options: z.array(z.string()).optional(),
 })
 

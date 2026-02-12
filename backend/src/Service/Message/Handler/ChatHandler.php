@@ -13,6 +13,7 @@ use App\Service\File\UserUploadPathBuilder;
 use App\Service\MemoryExtractionService;
 use App\Service\ModelConfigService;
 use App\Service\PromptService;
+use App\Service\FeedbackConfigService;
 use App\Service\FeedbackConstants;
 use App\Service\RAG\VectorSearchService;
 use App\Service\UserMemoryService;
@@ -41,6 +42,7 @@ class ChatHandler implements MessageHandlerInterface
         private UserUploadPathBuilder $userUploadPathBuilder,
         private UserMemoryService $memoryService,
         private MemoryExtractionService $memoryExtractionService,
+        private FeedbackConfigService $feedbackConfig,
     ) {
     }
 
@@ -441,11 +443,11 @@ class ChatHandler implements MessageHandlerInterface
                     $message->getUserId(),
                     $message->getText(),
                     limit: 10,
-                    minScore: FeedbackConstants::MIN_CHAT_MEMORY_SCORE
+                    minScore: $this->feedbackConfig->getMinChatMemoryScore()
                 );
 
                 // Post-filter: Qdrant may return low-score results despite minScore
-                $loadedMemories = $this->filterByScore($rawMemories, FeedbackConstants::MIN_CHAT_MEMORY_SCORE);
+                $loadedMemories = $this->filterByScore($rawMemories, $this->feedbackConfig->getMinChatMemoryScore());
 
                 $this->logger->debug('ChatHandler: Memories loaded from Qdrant', [
                     'count' => count($loadedMemories),
@@ -815,7 +817,7 @@ class ChatHandler implements MessageHandlerInterface
             // Memory Extraction (Option B: After AI-Response, in the same Request)
             // Pass the AI response to memory extraction so it can extract from the answer too
             $this->logger->info('💾 Loading relevant memories for extraction', ['user_id' => $message->getUserId()]);
-            $allMemories = $this->memoryService->searchRelevantMemories($message->getUserId(), $message->getText(), limit: 20, minScore: FeedbackConstants::MIN_EXTRACTION_SCORE);
+            $allMemories = $this->memoryService->searchRelevantMemories($message->getUserId(), $message->getText(), limit: 20, minScore: $this->feedbackConfig->getMinExtractionScore());
             $this->extractMemoriesAfterResponse($message, $fullResponseText, $thread, $allMemories, $progressCallback);
             $this->logger->info('✅ Loaded memories for extraction', ['count' => count($allMemories)]);
         }
@@ -1794,17 +1796,19 @@ class ChatHandler implements MessageHandlerInterface
      */
     private function searchFeedback(int $userId, string $queryText, string $category, string $namespace): array
     {
+        $minScore = $this->feedbackConfig->getMinChatFeedbackScore();
+
         return $this->filterByScore(
             $this->memoryService->searchRelevantMemories(
                 $userId,
                 $queryText,
                 category: $category,
-                limit: FeedbackConstants::LIMIT_PER_NAMESPACE,
-                minScore: FeedbackConstants::MIN_CHAT_FEEDBACK_SCORE,
+                limit: $this->feedbackConfig->getLimitPerNamespace(),
+                minScore: $minScore,
                 namespace: $namespace,
                 includeHidden: true
             ),
-            FeedbackConstants::MIN_CHAT_FEEDBACK_SCORE
+            $minScore
         );
     }
 

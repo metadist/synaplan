@@ -27,6 +27,7 @@ final readonly class FeedbackExampleService
         private BraveSearchService $braveSearchService,
         private PromptRepository $promptRepository,
         private LoggerInterface $logger,
+        private FeedbackConfigService $feedbackConfig,
     ) {
     }
 
@@ -570,12 +571,13 @@ PROMPT;
         }
 
         try {
+            $minScore = $this->feedbackConfig->getMinContradictionScore();
             $memories = $this->memoryService->searchRelevantMemories(
                 $user->getId(),
                 $queryText,
                 null,
-                FeedbackConstants::LIMIT_PER_NAMESPACE,
-                FeedbackConstants::MIN_CONTRADICTION_SCORE,
+                $this->feedbackConfig->getLimitPerNamespace(),
+                $minScore,
                 null,
                 false
             );
@@ -587,7 +589,7 @@ PROMPT;
             $lines = [];
             $ids = [];
             foreach ($memories as $m) {
-                if (($m['score'] ?? 0) < FeedbackConstants::MIN_CONTRADICTION_SCORE) {
+                if (($m['score'] ?? 0) < $minScore) {
                     continue;
                 }
                 $id = (int) ($m['id'] ?? 0);
@@ -688,6 +690,8 @@ PROMPT;
 
         $rawSources = [];
         $idCounter = 0;
+        $minResearch = $this->feedbackConfig->getMinResearchScore();
+        $minMemoryResearch = $this->feedbackConfig->getMinMemoryResearchScore();
 
         // 1. Search user's uploaded documents (RAG vector search)
         try {
@@ -696,7 +700,7 @@ PROMPT;
                 $userId,
                 null,
                 self::MAX_RESEARCH_SOURCES,
-                FeedbackConstants::MIN_RESEARCH_SCORE,
+                $minResearch,
             );
 
             foreach ($ragResults as $result) {
@@ -734,7 +738,7 @@ PROMPT;
                         $claimText,
                         $ns['category'],
                         3,
-                        FeedbackConstants::MIN_RESEARCH_SCORE,
+                        $minResearch,
                         $ns['namespace'],
                         true
                     );
@@ -769,7 +773,7 @@ PROMPT;
                     $claimText,
                     null,
                     3,
-                    FeedbackConstants::MIN_MEMORY_RESEARCH_SCORE,
+                    $minMemoryResearch,
                     null,
                     false
                 );
@@ -801,7 +805,7 @@ PROMPT;
         // Post-filter: remove sources below minimum score (Qdrant may return low-score results)
         $rawSources = array_values(array_filter(
             $rawSources,
-            fn (array $src) => $src['score'] >= FeedbackConstants::MIN_RESEARCH_SCORE
+            fn (array $src) => $src['score'] >= $minResearch
         ));
 
         if ([] === $rawSources) {
