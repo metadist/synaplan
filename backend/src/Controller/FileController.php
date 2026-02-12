@@ -497,9 +497,14 @@ class FileController extends AbstractController
                     'group_key' => $groupKey,
                     'error' => $e->getMessage(),
                 ]);
-                // Fallback: filter by vectorized status only
-                $qb->andWhere('mf.status = :vectorized')
-                   ->setParameter('vectorized', 'vectorized');
+
+                // Return empty result instead of showing files from wrong group
+                return $this->json([
+                    'success' => false,
+                    'error' => 'Failed to filter files by group key',
+                    'files' => [],
+                    'pagination' => ['page' => $page, 'limit' => $limit, 'total' => 0, 'pages' => 0],
+                ]);
             }
         }
 

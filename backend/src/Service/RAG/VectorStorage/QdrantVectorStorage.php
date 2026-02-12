@@ -160,7 +160,7 @@ final readonly class QdrantVectorStorage implements VectorStorageInterface
 
         return [
             'chunks' => $stats['chunks'],
-            'groupKey' => $stats['group_key'],
+            'groupKey' => $stats['groupKey'],
         ];
     }
 

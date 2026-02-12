@@ -1018,6 +1018,46 @@ class PromptController extends AbstractController
     }
 
     /**
+     * Reconstruct file text from RAG chunks (legacy fallback).
+     *
+     * For files uploaded before fileText was stored in the entity,
+     * the extracted text may only exist as RAG chunks in the BRAG table.
+     * This method assembles them back into a single string.
+     */
+    private function reconstructTextFromRagChunks(int $userId, int $fileId): string
+    {
+        try {
+            $conn = $this->em->getConnection();
+            $sql = 'SELECT BTEXT FROM BRAG WHERE BUID = :userId AND BMID = :fileId ORDER BY BCHUNK ASC';
+            $stmt = $conn->prepare($sql);
+            $stmt->bindValue('userId', $userId);
+            $stmt->bindValue('fileId', $fileId);
+            $rows = $stmt->executeQuery()->fetchAllAssociative();
+
+            if (empty($rows)) {
+                return '';
+            }
+
+            $this->logger->info('PromptController: Reconstructed text from RAG chunks (legacy fallback)', [
+                'file_id' => $fileId,
+                'user_id' => $userId,
+                'chunks' => count($rows),
+            ]);
+
+            return implode("\n\n", array_filter(
+                array_map(fn (array $row) => $row['BTEXT'] ?? '', $rows)
+            ));
+        } catch (\Throwable $e) {
+            $this->logger->warning('PromptController: Failed to reconstruct text from RAG chunks', [
+                'file_id' => $fileId,
+                'error' => $e->getMessage(),
+            ]);
+
+            return '';
+        }
+    }
+
+    /**
      * Build sorting categories (default vs custom) for UI display.
      *
      * @return array<int, array{name: string, description: string, type: string}>
@@ -1108,39 +1148,34 @@ class PromptController extends AbstractController
         // Build groupKey for this task prompt
         $groupKey = "TASKPROMPT:{$topic}";
 
-        // Get file IDs from active vector storage (Qdrant or MariaDB) for this groupKey
+        // Get all files with chunks in a single request, then filter by groupKey.
+        // This avoids the N+1 query problem: one call instead of per-file lookups.
         try {
-            $fileIds = $this->vectorStorageFacade->getFileIdsByGroupKey($user->getId(), $groupKey);
+            $filesWithChunks = $this->vectorStorageFacade->getFilesWithChunks($user->getId());
         } catch (\Throwable $e) {
-            $this->logger->warning('PromptController: Failed to get file IDs by group key', [
+            $this->logger->warning('PromptController: Failed to get files with chunks', [
                 'group_key' => $groupKey,
                 'error' => $e->getMessage(),
             ]);
-            $fileIds = [];
+            $filesWithChunks = [];
         }
 
-        // Build file list from vector storage results
+        // Build file list, filtering by groupKey and reusing chunk info from the same call
         $filesByFileId = [];
-        foreach ($fileIds as $fileId) {
-            if (isset($filesByFileId[$fileId])) {
+        foreach ($filesWithChunks as $fileId => $info) {
+            if ($info['groupKey'] !== $groupKey) {
                 continue;
             }
+
             $file = $this->fileRepository->find($fileId);
             if (!$file || $file->getUserId() !== $user->getId()) {
                 continue;
             }
 
-            // Get per-file chunk info from the facade
-            try {
-                $chunkInfo = $this->vectorStorageFacade->getFileChunkInfo($user->getId(), $fileId);
-            } catch (\Throwable) {
-                $chunkInfo = ['chunks' => 0, 'groupKey' => $groupKey];
-            }
-
             $filesByFileId[$fileId] = [
                 'messageId' => $fileId, // Keep as messageId for frontend compatibility
                 'fileName' => $file->getFileName(),
-                'chunks' => $chunkInfo['chunks'],
+                'chunks' => $info['chunks'],
                 'uploadedAt' => $file->getCreatedAt()
                     ? date('Y-m-d\TH:i:s\Z', $file->getCreatedAt())
                     : null,
@@ -1391,17 +1426,15 @@ class PromptController extends AbstractController
             $fileName = $message->getFilePath() ? basename($message->getFilePath()) : 'Document';
         }
 
-        // If no fileText from the file entity, log a warning.
-        // Extracted text is always stored in BFILES during upload, so this should not happen.
-        // Previously this fell back to BRAG table which breaks when Qdrant is the active provider.
+        // If no fileText from the file entity, fall back to reconstructing from RAG chunks.
+        // This handles legacy files uploaded before fileText was stored in the entity.
         if (empty(trim($fileText))) {
-            $this->logger->warning('PromptController: No extracted text found for file', [
+            $this->logger->warning('PromptController: No extracted text in entity, attempting RAG chunk fallback', [
                 'message_id' => $messageId,
                 'user_id' => $user->getId(),
             ]);
 
-            // Future: when vector storage supports getChunkTexts(), retrieve text from active provider.
-            // For now, the extracted text should always be in the file/message entity.
+            $fileText = $this->reconstructTextFromRagChunks($user->getId(), $messageId);
         }
 
         if (empty(trim($fileText))) {

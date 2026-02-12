@@ -647,6 +647,8 @@ const fileGroupKeys = ref<
     }
   >
 >({})
+// Track recently uploaded file IDs to prevent race condition with loadAllFileGroupKeys
+const recentlyUploadedFileIds = ref<Set<number>>(new Set())
 const editingGroupKey = ref<number | null>(null)
 const tempGroupKey = ref('')
 const groupKeyInput = ref<HTMLInputElement | null>(null)
@@ -795,7 +797,11 @@ const uploadFiles = async () => {
           mariadbChunks: 0,
           qdrantChunks: file.chunks_created || 0,
         }
+        // Mark as recently uploaded so loadAllFileGroupKeys won't overwrite
+        recentlyUploadedFileIds.value.add(file.id)
       })
+      // Clear recently uploaded markers after a delay (allow Qdrant replication to settle)
+      setTimeout(() => recentlyUploadedFileIds.value.clear(), 30000)
 
       // Clear form
       selectedFiles.value = []
@@ -1036,6 +1042,12 @@ const formatFileSize = (bytes: number): string => {
  * Load groupKey for a file
  */
 const loadFileGroupKey = async (fileId: number) => {
+  // Skip if recently uploaded — upload response data is authoritative and fresher
+  // than what the API might return (Qdrant replication lag)
+  if (recentlyUploadedFileIds.value.has(fileId)) {
+    return
+  }
+
   try {
     const timeoutPromise = new Promise<never>((_, reject) =>
       setTimeout(() => reject(new Error('Timeout')), 8000)

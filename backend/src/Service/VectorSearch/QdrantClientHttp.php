@@ -598,15 +598,13 @@ final class QdrantClientHttp implements QdrantClientInterface
     /**
      * Get chunk info for a specific file from Qdrant.
      *
-     * Uses the search endpoint with a zero vector and file_id filter
-     * to check if any chunks exist and retrieve the group key.
+     * Uses the stats endpoint which includes per-file breakdown (chunks_by_file).
      *
-     * @return array{chunks: int, group_key: string|null}
+     * @return array{chunks: int, groupKey: string|null}
      */
     public function getDocumentFileInfo(int $userId, int $fileId): array
     {
         try {
-            // Use stats endpoint which now includes per-file breakdown (chunks_by_file)
             $stats = $this->getDocumentStats($userId);
             $chunksByFile = $stats['chunks_by_file'] ?? [];
 
@@ -616,11 +614,11 @@ final class QdrantClientHttp implements QdrantClientInterface
 
                 return [
                     'chunks' => (int) ($fileInfo['chunks'] ?? 0),
-                    'group_key' => $fileInfo['group_key'] ?? null,
+                    'groupKey' => $fileInfo['group_key'] ?? null,
                 ];
             }
 
-            return ['chunks' => 0, 'group_key' => null];
+            return ['chunks' => 0, 'groupKey' => null];
         } catch (\Throwable $e) {
             $this->logger->error('Failed to get document file info', [
                 'user_id' => $userId,
@@ -628,31 +626,27 @@ final class QdrantClientHttp implements QdrantClientInterface
                 'error' => $e->getMessage(),
             ]);
 
-            return ['chunks' => 0, 'group_key' => null];
+            return ['chunks' => 0, 'groupKey' => null];
         }
     }
 
+    /**
+     * Get document stats for a user from Qdrant.
+     *
+     * @throws \RuntimeException On HTTP or network failure
+     */
     public function getDocumentStats(int $userId): array
     {
-        try {
-            $response = $this->httpClient->request('GET', "{$this->baseUrl}/documents/stats/{$userId}", [
-                'headers' => $this->getHeaders(),
-                'timeout' => 5,
-            ]);
+        $response = $this->httpClient->request('GET', "{$this->baseUrl}/documents/stats/{$userId}", [
+            'headers' => $this->getHeaders(),
+            'timeout' => 5,
+        ]);
 
-            if (200 !== $response->getStatusCode()) {
-                throw new \RuntimeException("Qdrant stats failed: {$response->getContent(false)}");
-            }
-
-            return $response->toArray();
-        } catch (\Throwable $e) {
-            $this->logger->error('Failed to get document stats', [
-                'user_id' => $userId,
-                'error' => $e->getMessage(),
-            ]);
-
-            return [];
+        if (200 !== $response->getStatusCode()) {
+            throw new \RuntimeException("Qdrant stats failed: {$response->getContent(false)}");
         }
+
+        return $response->toArray();
     }
 
     public function getDocumentGroupKeys(int $userId): array
@@ -703,30 +697,23 @@ final class QdrantClientHttp implements QdrantClientInterface
      * Uses the stats endpoint which includes per-file breakdown (chunks_by_file).
      *
      * @return array<int, array{chunks: int, groupKey: string|null}> Map of fileId => info
+     *
+     * @throws \RuntimeException On HTTP or network failure (callers must handle errors)
      */
     public function getFilesWithChunks(int $userId): array
     {
-        try {
-            $stats = $this->getDocumentStats($userId);
-            $chunksByFile = $stats['chunks_by_file'] ?? [];
+        $stats = $this->getDocumentStats($userId);
+        $chunksByFile = $stats['chunks_by_file'] ?? [];
 
-            $result = [];
-            foreach ($chunksByFile as $fileId => $info) {
-                $result[(int) $fileId] = [
-                    'chunks' => (int) ($info['chunks'] ?? 0),
-                    'groupKey' => $info['group_key'] ?? null,
-                ];
-            }
-
-            return $result;
-        } catch (\Throwable $e) {
-            $this->logger->error('Failed to get files with chunks', [
-                'user_id' => $userId,
-                'error' => $e->getMessage(),
-            ]);
-
-            return [];
+        $result = [];
+        foreach ($chunksByFile as $fileId => $info) {
+            $result[(int) $fileId] = [
+                'chunks' => (int) ($info['chunks'] ?? 0),
+                'groupKey' => $info['group_key'] ?? null,
+            ];
         }
+
+        return $result;
     }
 
     /**
