@@ -232,7 +232,8 @@
                         : '#6b7280',
                 }"
               >
-                {{ formatTime(message.timestamp) }}
+                <span class="font-medium">{{ getSenderLabel(message) }}</span>
+                · {{ formatTime(message.timestamp) }}
               </p>
             </div>
           </div>
@@ -568,6 +569,7 @@ interface Message {
   fileId?: number
   files?: MessageFile[]
   timestamp: Date
+  sender?: 'user' | 'ai' | 'human' | 'system'
 }
 
 const isOpen = ref(false)
@@ -1025,9 +1027,14 @@ const exportChat = () => {
 
   // Add messages
   for (const message of messages.value) {
-    const isUser = message.role === 'user'
-    const sender = isUser ? t('widget.you') : t('widget.assistant')
-    const icon = isUser ? '👤' : '🤖'
+    const sender = getSenderLabel(message)
+    const iconMap: Record<string, string> = {
+      user: '👤',
+      ai: '🤖',
+      human: '🧑‍💼',
+      system: 'ℹ️',
+    }
+    const icon = iconMap[message.sender ?? 'ai'] ?? '🤖'
     const time = formatExportDate(message.timestamp)
 
     html += `
@@ -1235,6 +1242,7 @@ const sendMessage = async () => {
     fileId: hasFiles ? uploadedFiles[0].id : undefined,
     files: hasFiles ? uploadedFiles : undefined,
     timestamp: new Date(),
+    sender: 'user',
   })
   // Only count messages against limit when chatting with AI (not during human takeover)
   if (chatMode.value === 'ai') {
@@ -1254,6 +1262,7 @@ const sendMessage = async () => {
     type: 'text',
     content: '',
     timestamp: new Date(),
+    sender: 'ai',
   })
 
   try {
@@ -1370,6 +1379,7 @@ const addBotMessage = (text: string) => {
     type: 'text',
     content: text,
     timestamp: new Date(),
+    sender: 'ai',
   })
 
   if (!isOpen.value) {
@@ -1388,6 +1398,20 @@ const scrollToBottom = async () => {
 
 const formatTime = (date: Date): string => {
   return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
+}
+
+const getSenderLabel = (message: Message): string => {
+  switch (message.sender) {
+    case 'user':
+      return t('widget.senderVisitor')
+    case 'human':
+      return t('widget.senderAgent')
+    case 'system':
+      return t('widget.senderSystem')
+    case 'ai':
+    default:
+      return t('widget.senderAi')
+  }
 }
 
 const formatFileSize = (bytes: number): string => {
@@ -1494,6 +1518,9 @@ const normalizeServerMessage = (raw: any): Message => {
   const hasFiles = files.length > 0
   const isFileMessage = hasFiles
 
+  // Determine sender from server data
+  const sender: Message['sender'] = raw.sender ?? (role === 'user' ? 'user' : 'ai')
+
   return {
     id: String(raw.id ?? crypto.randomUUID()),
     role,
@@ -1504,6 +1531,7 @@ const normalizeServerMessage = (raw: any): Message => {
     fileId: isFileMessage && files[0] ? files[0].id : undefined,
     files,
     timestamp: new Date(timestampSeconds * 1000),
+    sender,
   }
 }
 
@@ -1805,6 +1833,7 @@ function handleWidgetEvent(data: WidgetEvent) {
           type: 'text',
           content: (data.message as string) ?? 'You are now connected with a support agent.',
           timestamp: new Date(),
+          sender: 'system',
         })
         scrollToBottom()
       }
@@ -1824,6 +1853,7 @@ function handleWidgetEvent(data: WidgetEvent) {
           type: 'text',
           content: (data.message as string) ?? 'You are now chatting with our AI assistant.',
           timestamp: new Date(),
+          sender: 'system',
         })
         scrollToBottom()
       }
@@ -1853,6 +1883,7 @@ function handleWidgetEvent(data: WidgetEvent) {
             content: text,
             files: files.length > 0 ? files : undefined,
             timestamp: new Date((data.timestamp as number) * 1000),
+            sender: 'human',
           })
           scrollToBottom()
           if (!isOpen.value) {

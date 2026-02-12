@@ -220,8 +220,10 @@ class WidgetLiveSupportController extends AbstractController
             return $this->json(['error' => 'Session not found'], Response::HTTP_NOT_FOUND);
         }
 
-        if (!$session->isHumanMode()) {
-            return $this->json(['error' => 'Session is not in human mode'], Response::HTTP_BAD_REQUEST);
+        if (!$session->isHumanMode() && !$session->isWaitingForHuman()) {
+            return $this->json([
+                'error' => sprintf('Session must be in "human" or "waiting" mode, current mode: "%s"', (string) $session->getMode()),
+            ], Response::HTTP_BAD_REQUEST);
         }
 
         $uploadedFile = $request->files->get('file');

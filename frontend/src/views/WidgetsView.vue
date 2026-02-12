@@ -113,18 +113,48 @@
               </div>
 
               <!-- Stats -->
-              <div class="grid grid-cols-2 gap-3 mb-4 p-3 surface-chip rounded-lg">
-                <div>
-                  <p class="text-xs txt-secondary mb-1">{{ $t('widgets.activeSessions') }}</p>
-                  <p class="text-lg font-bold txt-primary">
-                    {{ widget.stats?.active_sessions ?? 0 }}
-                  </p>
+              <div class="mb-4 p-3 surface-chip rounded-lg space-y-3">
+                <div class="grid grid-cols-2 gap-3">
+                  <div>
+                    <p class="text-xs txt-secondary mb-1">{{ $t('widgets.activeSessions') }}</p>
+                    <p class="text-lg font-bold txt-primary">
+                      {{ widget.stats?.active_sessions ?? 0 }}
+                    </p>
+                  </div>
+                  <div>
+                    <p class="text-xs txt-secondary mb-1">{{ $t('widgets.totalMessages') }}</p>
+                    <p class="text-lg font-bold txt-primary">
+                      {{ widget.stats?.total_messages ?? 0 }}
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <p class="text-xs txt-secondary mb-1">{{ $t('widgets.totalMessages') }}</p>
-                  <p class="text-lg font-bold txt-primary">
-                    {{ widget.stats?.total_messages ?? 0 }}
-                  </p>
+                <!-- Mode Counts -->
+                <div
+                  class="flex flex-wrap items-center gap-1.5 pt-2 border-t border-light-border/20 dark:border-dark-border/10"
+                >
+                  <span
+                    class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-600 dark:text-blue-400 text-xs font-medium whitespace-nowrap"
+                  >
+                    <Icon icon="heroicons:cpu-chip" class="w-3 h-3 flex-shrink-0" />
+                    {{ widget.stats?.ai_sessions ?? 0 }} {{ $t('widgets.modeAi') }}
+                  </span>
+                  <span
+                    class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-green-500/10 text-green-600 dark:text-green-400 text-xs font-medium whitespace-nowrap"
+                  >
+                    <Icon icon="heroicons:user" class="w-3 h-3 flex-shrink-0" />
+                    {{ widget.stats?.human_sessions ?? 0 }} {{ $t('widgets.modeHuman') }}
+                  </span>
+                  <span
+                    :class="[
+                      'inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium whitespace-nowrap',
+                      (widget.stats?.waiting_sessions ?? 0) > 0
+                        ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400 animate-pulse'
+                        : 'bg-amber-500/10 text-amber-600 dark:text-amber-400',
+                    ]"
+                  >
+                    <Icon icon="heroicons:clock" class="w-3 h-3" />
+                    {{ widget.stats?.waiting_sessions ?? 0 }} {{ $t('widgets.modeWaiting') }}
+                  </span>
                 </div>
               </div>
 

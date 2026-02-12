@@ -1,52 +1,156 @@
 # Step 1: Local Development Setup
 
-To develop the Nextcloud app, we need a running Nextcloud instance that can talk to our local Synaplan instance.
+## Current Environment (Verified)
 
-## 1. Docker Compose Configuration
-We will add a Nextcloud service to a separate `docker-compose.nextcloud.yml` to keep the main stack clean, or append to the main `docker-compose.yml` temporarily.
+| Component | Value |
+|-----------|-------|
+| Nextcloud | v34.0.0 dev (git channel) |
+| Install Type | Direct on host (not Docker) |
+| Location | `/wwwroot/nextcloud/server/` |
+| URL | `http://localhost/nextcloud/server/` |
+| Web Server | Apache on port 80 |
+| PHP | 8.2+ |
+| Database | MySQL on `127.0.0.1:3306`, db: `nextcloud`, user: `nextcloud` |
+| Data Dir | `/wwwroot/nextcloud/server/data` |
+| Apps Dir | `/wwwroot/nextcloud/server/apps/` (31 bundled apps) |
+| Admin Login | admin / admin |
+| Synaplan | Docker Compose at `http://localhost:8000` |
 
-**Requirements:**
-- **Image:** `nextcloud:latest` (or target version, e.g., 28/29).
-- **Network:** Must be on the same Docker network as `synaplan-backend` (`synaplan_default` usually).
-- **Volumes:**
-    - Map a local folder `./nextcloud-apps/synaplan_integration` to `/var/www/html/custom_apps/synaplan_integration`.
-    - This allows editing code locally and seeing changes immediately.
+## 1. Create Custom Apps Directory
 
-## 2. Setup Instructions
+Nextcloud's default `apps/` directory contains bundled apps and should not be used for custom development. We need a separate `custom_apps/` directory.
 
-1.  **Create App Directory:**
-    ```bash
-    mkdir -p nextcloud-apps/synaplan_integration
-    ```
+```bash
+# Create the custom_apps directory
+mkdir -p /wwwroot/nextcloud/server/custom_apps
+chown www-data:www-data /wwwroot/nextcloud/server/custom_apps
+```
 
-2.  **Start Nextcloud:**
-    ```yaml
-    # docker-compose.nextcloud.yml (Example)
-    services:
-      nextcloud:
-        image: nextcloud:29
-        ports:
-          - "8081:80"
-        volumes:
-          - ./nextcloud-apps:/var/www/html/custom_apps
-        environment:
-          - MYSQL_HOST=db
-          - ...
-        networks:
-          - default
-    ```
+### Register in Nextcloud Config
 
-3.  **Install App:**
-    - Access Nextcloud at `http://localhost:8081`.
-    - Enable "External storage" (optional, for testing RAG).
-    - Go to Apps -> Your Apps -> Enable "Synaplan Integration" (once skeleton is created).
+Edit `/wwwroot/nextcloud/server/config/config.php` and add:
 
-4.  **Connectivity Test:**
-    - Enter the Synaplan container IP or service name (`http://backend:8000`) in the App Settings.
-    - Test connection.
+```php
+'apps_paths' => [
+    [
+        'path' => '/wwwroot/nextcloud/server/apps',
+        'url' => '/apps',
+        'writable' => false,
+    ],
+    [
+        'path' => '/wwwroot/nextcloud/server/custom_apps',
+        'url' => '/custom_apps',
+        'writable' => true,
+    ],
+],
+```
 
-## 3. Scaffolding the App
-Use the `occ` tool inside the container to generate the skeleton if starting from scratch, or manually create:
-- `appinfo/info.xml`
-- `appinfo/routes.php`
-- `appinfo/app.php` (if needed for older versions, prefer `boot` in `Application.php`)
+## 2. Create the App Source Repository
+
+```bash
+# Create the synaplan-nextcloud repo
+mkdir -p /wwwroot/synaplan-nextcloud
+cd /wwwroot/synaplan-nextcloud
+git init
+```
+
+## 3. Symlink for Development
+
+During development, symlink the app into Nextcloud's custom_apps:
+
+```bash
+ln -s /wwwroot/synaplan-nextcloud /wwwroot/nextcloud/server/custom_apps/synaplan_integration
+```
+
+This way, changes in the source repo are immediately visible to Nextcloud without copying.
+
+## 4. Enable the App
+
+Once the app skeleton is in place:
+
+```bash
+# Via occ command
+cd /wwwroot/nextcloud/server
+sudo -u www-data php occ app:enable synaplan_integration
+
+# Or via the Nextcloud admin UI:
+# Settings → Apps → "Your apps" → Enable "Synaplan Integration"
+```
+
+## 5. Connectivity: Nextcloud → Synaplan
+
+Since both services run on the same host:
+
+| From | To | URL |
+|------|----|-----|
+| Nextcloud PHP → Synaplan API | HTTP | `http://localhost:8000` |
+| Browser → Nextcloud | HTTP | `http://localhost/nextcloud/server/` |
+| Browser → Synaplan | HTTP | `http://localhost:8000` or `http://localhost:5173` (dev) |
+
+**Important**: Nextcloud's PHP backend makes server-side HTTP requests to Synaplan. The browser never calls Synaplan directly — all requests are proxied through Nextcloud's backend. This avoids CORS issues entirely.
+
+## 6. Trusted Domains
+
+Current config already includes `localhost` and `127.0.0.1` as trusted domains. No changes needed.
+
+## 7. Development Tools
+
+| Tool | URL | Purpose |
+|------|-----|---------|
+| Nextcloud | `http://localhost/nextcloud/server/` | Test the app |
+| Synaplan Swagger UI | `http://localhost:8000/api/doc` | Test API endpoints |
+| phpMyAdmin | `http://localhost:8082` | Inspect Synaplan DB |
+| Nextcloud occ | `php /wwwroot/nextcloud/server/occ` | CLI management |
+
+## 8. Create a Synaplan API Key
+
+For the Nextcloud app to communicate with Synaplan, we need an API key:
+
+```bash
+# Option 1: Via Synaplan UI
+# Log into Synaplan → Settings → API Keys → Create
+
+# Option 2: Direct SQL (for dev/testing)
+docker compose exec backend php bin/console app:apikey:create \
+  --user=1 --name="Nextcloud Integration" --scopes='["nextcloud:*"]'
+```
+
+The API key will look like `sk_...` and should be configured in the Nextcloud app's admin settings.
+
+## 9. Frontend Build Setup
+
+The app's Vue.js frontend needs Node.js for building:
+
+```bash
+cd /wwwroot/synaplan-nextcloud
+
+# Initialize package.json with Nextcloud build tooling
+npm init -y
+npm install --save-dev \
+  @nextcloud/webpack-vue-config \
+  @nextcloud/vue \
+  @nextcloud/axios \
+  @nextcloud/router \
+  @nextcloud/initial-state \
+  @nextcloud/l10n \
+  vue \
+  vue-loader
+```
+
+**Build command:**
+```bash
+npm run build    # Production build → js/
+npm run dev      # Watch mode for development
+```
+
+## 10. Quick Verification Checklist
+
+After setup, verify:
+
+- [ ] `http://localhost/nextcloud/server/` loads and you can log in
+- [ ] `http://localhost:8000/api/doc` shows Swagger UI
+- [ ] `http://localhost:8000/api/health` returns healthy status
+- [ ] Custom apps directory exists and is registered in config
+- [ ] Symlink from `custom_apps/synaplan_integration` → source repo
+- [ ] Synaplan API key created and accessible
+- [ ] `occ app:list` shows `synaplan_integration` (after skeleton is created)

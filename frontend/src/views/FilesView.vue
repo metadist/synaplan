@@ -647,6 +647,8 @@ const fileGroupKeys = ref<
     }
   >
 >({})
+// Track recently uploaded file IDs to prevent race condition with loadAllFileGroupKeys
+const recentlyUploadedFileIds = ref<Set<number>>(new Set())
 const editingGroupKey = ref<number | null>(null)
 const tempGroupKey = ref('')
 const groupKeyInput = ref<HTMLInputElement | null>(null)
@@ -780,11 +782,26 @@ const uploadFiles = async () => {
     if (result.success) {
       showSuccess(`Successfully uploaded ${result.files.length} file(s)`)
 
-      // Show processing details
+      // Pre-populate fileGroupKeys from upload response to avoid Qdrant lookup race
       result.files.forEach((file) => {
         const details = `${file.filename}: ${file.extracted_text_length} chars extracted, ${file.chunks_created || 0} chunks created`
         console.log(details)
+
+        // Immediately set group key from upload response — this is authoritative
+        fileGroupKeys.value[file.id] = {
+          groupKey: file.group_key || groupKey,
+          isVectorized: file.vectorized ?? (file.chunks_created ?? 0) > 0,
+          chunks: file.chunks_created || 0,
+          status: file.vectorized ? 'vectorized' : 'processed',
+          needsMigration: false,
+          mariadbChunks: 0,
+          qdrantChunks: file.chunks_created || 0,
+        }
+        // Mark as recently uploaded so loadAllFileGroupKeys won't overwrite
+        recentlyUploadedFileIds.value.add(file.id)
       })
+      // Clear recently uploaded markers after a delay (allow Qdrant replication to settle)
+      setTimeout(() => recentlyUploadedFileIds.value.clear(), 30000)
 
       // Clear form
       selectedFiles.value = []
@@ -1025,6 +1042,12 @@ const formatFileSize = (bytes: number): string => {
  * Load groupKey for a file
  */
 const loadFileGroupKey = async (fileId: number) => {
+  // Skip if recently uploaded — upload response data is authoritative and fresher
+  // than what the API might return (Qdrant replication lag)
+  if (recentlyUploadedFileIds.value.has(fileId)) {
+    return
+  }
+
   try {
     const timeoutPromise = new Promise<never>((_, reject) =>
       setTimeout(() => reject(new Error('Timeout')), 8000)
@@ -1041,25 +1064,27 @@ const loadFileGroupKey = async (fileId: number) => {
     }
   } catch (err: any) {
     console.error(`Failed to load groupKey for file ${fileId}:`, err)
-    fileGroupKeys.value[fileId] = {
-      groupKey: null,
-      isVectorized: false,
-      chunks: 0,
-      status: 'unknown',
-      needsMigration: false,
-      mariadbChunks: 0,
-      qdrantChunks: 0,
+    // Preserve existing data (e.g. from upload response) instead of overwriting with error state
+    const existing = fileGroupKeys.value[fileId]
+    if (!existing || !existing.groupKey) {
+      fileGroupKeys.value[fileId] = {
+        groupKey: null,
+        isVectorized: false,
+        chunks: 0,
+        status: 'unknown',
+        needsMigration: false,
+        mariadbChunks: 0,
+        qdrantChunks: 0,
+      }
     }
   }
 }
 
 /**
- * Load groupKeys for all visible files
+ * Load groupKeys for all visible files — parallel for speed
  */
 const loadAllFileGroupKeys = async () => {
-  for (const file of paginatedFiles.value) {
-    await loadFileGroupKey(file.id)
-  }
+  await Promise.allSettled(paginatedFiles.value.map((file) => loadFileGroupKey(file.id)))
 }
 
 /**
