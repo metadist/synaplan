@@ -11,6 +11,7 @@
 export { authApi } from './authApi'
 export { profileApi } from './profileApi'
 export { chatApi } from './chatApi'
+export * from './feedbackApi'
 export { legacyApi } from './legacyApi'
 export * from './configApi'
 export * from './apiKeysApi'

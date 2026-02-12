@@ -6,8 +6,10 @@ use App\AI\Service\AiFacade;
 use App\Entity\Message;
 use App\Entity\Model;
 use App\Entity\Prompt;
+use App\Repository\ConfigRepository;
 use App\Repository\ModelRepository;
 use App\Repository\PromptRepository;
+use App\Service\FeedbackConfigService;
 use App\Service\File\UserUploadPathBuilder;
 use App\Service\MemoryExtractionService;
 use App\Service\Message\Handler\ChatHandler;
@@ -32,6 +34,7 @@ class ChatHandlerTest extends TestCase
     private UserUploadPathBuilder $userUploadPathBuilder;
     private UserMemoryService $userMemoryService;
     private MemoryExtractionService $memoryExtractionService;
+    private FeedbackConfigService $feedbackConfigService;
     private ChatHandler $handler;
 
     protected function setUp(): void
@@ -47,6 +50,7 @@ class ChatHandlerTest extends TestCase
         $this->userUploadPathBuilder = new UserUploadPathBuilder();
         $this->userMemoryService = $this->createMock(UserMemoryService::class);
         $this->memoryExtractionService = $this->createMock(MemoryExtractionService::class);
+        $this->feedbackConfigService = new FeedbackConfigService($this->createStub(ConfigRepository::class));
 
         $this->handler = new ChatHandler(
             $this->aiFacade,
@@ -60,7 +64,8 @@ class ChatHandlerTest extends TestCase
             '/tmp/uploads',
             $this->userUploadPathBuilder,
             $this->userMemoryService,
-            $this->memoryExtractionService
+            $this->memoryExtractionService,
+            $this->feedbackConfigService
         );
     }
 

@@ -30,15 +30,19 @@ final class QdrantClientHttp implements QdrantClientInterface
     ) {
     }
 
-    public function upsertMemory(string $pointId, array $vector, array $payload): void
+    public function upsertMemory(string $pointId, array $vector, array $payload, ?string $namespace = null): void
     {
         try {
+            $requestPayload = [
+                'point_id' => $pointId,
+                'vector' => $vector,
+                'payload' => $payload,
+            ];
+            if (null !== $namespace) {
+                $requestPayload['namespace'] = $namespace;
+            }
             $response = $this->httpClient->request('POST', "{$this->baseUrl}/memories", [
-                'json' => [
-                    'point_id' => $pointId,
-                    'vector' => $vector,
-                    'payload' => $payload,
-                ],
+                'json' => $requestPayload,
                 'headers' => $this->getHeaders(),
             ]);
 
@@ -59,10 +63,14 @@ final class QdrantClientHttp implements QdrantClientInterface
         }
     }
 
-    public function getMemory(string $pointId): ?array
+    public function getMemory(string $pointId, ?string $namespace = null): ?array
     {
         try {
-            $response = $this->httpClient->request('GET', "{$this->baseUrl}/memories/{$pointId}", [
+            $url = "{$this->baseUrl}/memories/{$pointId}";
+            if (null !== $namespace) {
+                $url .= '?'.http_build_query(['namespace' => $namespace]);
+            }
+            $response = $this->httpClient->request('GET', $url, [
                 'headers' => $this->getHeaders(),
             ]);
 
@@ -93,6 +101,7 @@ final class QdrantClientHttp implements QdrantClientInterface
         ?string $category = null,
         int $limit = 5,
         float $minScore = 0.7,
+        ?string $namespace = null,
     ): array {
         try {
             $payload = [
@@ -104,6 +113,9 @@ final class QdrantClientHttp implements QdrantClientInterface
 
             if (null !== $category) {
                 $payload['category'] = $category;
+            }
+            if (null !== $namespace) {
+                $payload['namespace'] = $namespace;
             }
 
             $response = $this->httpClient->request('POST', "{$this->baseUrl}/memories/search", [
@@ -132,6 +144,7 @@ final class QdrantClientHttp implements QdrantClientInterface
         int $userId,
         ?string $category = null,
         int $limit = 1000,
+        ?string $namespace = null,
     ): array {
         try {
             $payload = [
@@ -141,6 +154,9 @@ final class QdrantClientHttp implements QdrantClientInterface
 
             if (null !== $category) {
                 $payload['category'] = $category;
+            }
+            if (null !== $namespace) {
+                $payload['namespace'] = $namespace;
             }
 
             $response = $this->httpClient->request('POST', "{$this->baseUrl}/memories/scroll", [
@@ -172,10 +188,14 @@ final class QdrantClientHttp implements QdrantClientInterface
         }
     }
 
-    public function deleteMemory(string $pointId): void
+    public function deleteMemory(string $pointId, ?string $namespace = null): void
     {
         try {
-            $response = $this->httpClient->request('DELETE', "{$this->baseUrl}/memories/{$pointId}", [
+            $url = "{$this->baseUrl}/memories/{$pointId}";
+            if (null !== $namespace) {
+                $url .= '?'.http_build_query(['namespace' => $namespace]);
+            }
+            $response = $this->httpClient->request('DELETE', $url, [
                 'headers' => $this->getHeaders(),
             ]);
 

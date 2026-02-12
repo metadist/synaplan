@@ -16,6 +16,7 @@ import { useTheme } from '@/composables/useTheme'
 import { renderMermaidBlocks, hasMermaidBlocks } from '@/composables/useMarkdownMermaid'
 import { hasMathFormulas } from '@/composables/useMarkdownKatex'
 import { useMemoriesStore } from '@/stores/userMemories'
+import { useFeedbackStore } from '@/stores/userFeedback'
 import { useConfigStore } from '@/stores/config'
 import { useNotification } from '@/composables/useNotification'
 import type { UserMemory } from '@/services/api/userMemoriesApi'
@@ -37,6 +38,7 @@ const { warning } = useNotification()
 const containerRef = ref<HTMLElement | null>(null)
 const renderedContent = ref('')
 const memoriesStore = useMemoriesStore()
+const feedbackStore = useFeedbackStore()
 
 // Counter to prevent race conditions in async rendering
 let renderVersion = 0
@@ -107,7 +109,8 @@ function normalizeMemoryLine(value: string): string {
 
 function extractReferencedMemoryIds(content: string): number[] {
   const ids: number[] = []
-  const regex = /\[Memory\s*:\s*(\d+)\]/gi
+  // Match [Memory:123] or [Memory:123...] (AI sometimes adds trailing dots)
+  const regex = /\[Memory\s*:\s*(\d+)\.{0,3}\]/gi
   let match: RegExpExecArray | null = null
   while ((match = regex.exec(content)) !== null) {
     const id = parseInt(match[1] || '', 10)
@@ -208,7 +211,16 @@ async function fetchMemoriesWithRetryBestEffort(): Promise<void> {
     if (missingReferencedMemoryIds.value.length === 0) return
     if (isMemoryServiceDefinitelyUnavailable.value) return
 
+    // First try bulk fetch
     await memoriesStore.fetchMemories(undefined, { timeoutMs: 8000, silent: true }).catch(() => {})
+
+    // If still missing, try to fetch individual memories by ID
+    const stillMissing = missingReferencedMemoryIds.value
+    if (stillMissing.length > 0) {
+      // Fetch each missing memory individually (in parallel, max 5 at a time)
+      const toFetch = stillMissing.slice(0, 5)
+      await Promise.all(toFetch.map((id) => memoriesStore.fetchMemoryById(id))).catch(() => {})
+    }
 
     if (missingReferencedMemoryIds.value.length === 0) {
       return
@@ -254,16 +266,40 @@ const handleMemoryBadgeClick = (event: MouseEvent) => {
   }
 }
 
-// Handle tooltip positioning on hover
+// Handle feedback badge clicks (feedback badges use .memory-ref class but have data-feedback-id attribute)
+const handleFeedbackBadgeClick = (event: MouseEvent) => {
+  const target = event.target as HTMLElement
+  // Look for .memory-ref that has data-feedback-id (not data-memory-id)
+  const feedbackBadge = target.closest('.memory-ref[data-feedback-id]')
+  if (feedbackBadge) {
+    event.preventDefault()
+
+    if (feedbackBadge.classList.contains('memory-ref--disabled')) {
+      warning(t('feedback.list.loadError'))
+      return
+    }
+
+    const feedbackId = parseInt(feedbackBadge.getAttribute('data-feedback-id') || '-1')
+    if (feedbackId > 0) {
+      // Navigate to feedback page with highlight
+      window.dispatchEvent(new CustomEvent('open-feedback-dialog', { detail: { feedbackId } }))
+    }
+  }
+}
+
+// Handle tooltip positioning on hover - use mouseover for better compatibility with dynamic content
 const handleTooltipPosition = (event: MouseEvent) => {
   const target = event.target as HTMLElement
-  const badge = target.closest('.memory-badge-wrapper')
+  // Find the badge wrapper - could be the target itself or an ancestor
+  const badge =
+    target.closest('.memory-badge-wrapper') || target.querySelector('.memory-badge-wrapper')
   if (badge) {
     const tooltip = badge.querySelector('.memory-tooltip') as HTMLElement
     if (tooltip) {
       const badgeRect = (badge as HTMLElement).getBoundingClientRect()
+      // Position tooltip above the badge, centered horizontally
       tooltip.style.left = `${badgeRect.left + badgeRect.width / 2}px`
-      tooltip.style.top = `${badgeRect.top - 10}px`
+      tooltip.style.top = `${badgeRect.top - 8}px`
       tooltip.style.transform = 'translate(-50%, -100%)'
     }
   }
@@ -341,7 +377,18 @@ function processMemoryBadges(html: string): string {
       const memoryIdNum = numericMatch ? parseInt(numericMatch[1] || '0', 10) : -1
       const memoryId = numericMatch ? numericMatch[1] || token : token
 
-      const memory = availableMemories.find((m) => m.id === memoryIdNum)
+      // Exact match first
+      let memory = availableMemories.find((m) => m.id === memoryIdNum)
+
+      // If no exact match, try prefix matching (AI sometimes truncates long IDs)
+      if (!memory && memoryId.length >= 10) {
+        // Only match if the provided ID is a prefix of a real ID (truncated by AI)
+        // Do NOT match if a real ID is a prefix of the provided ID — that causes false matches
+        memory = availableMemories.find((m) => {
+          const memIdStr = String(m.id)
+          return memIdStr.startsWith(memoryId)
+        })
+      }
 
       if (memory) {
         return buildMemoryBadgeHtml(memory, memoryId)
@@ -390,6 +437,60 @@ function processMemoryBadges(html: string): string {
   return content
 }
 
+// Build feedback badge HTML - using EXACT same style as memory badges for consistency
+function buildFeedbackBadgeHtml(
+  feedback: { id: number; type: string; value: string },
+  feedbackId: string
+): string {
+  const isPositive = feedback.type === 'positive'
+  // Use checkmark for positive, X for negative
+  const icon = isPositive
+    ? '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="currentColor" class="flex-shrink-0"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z"/></svg>'
+    : '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="currentColor" class="flex-shrink-0"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12 19 6.41z"/></svg>'
+
+  // Truncate value for badge display (same as memory badges with key)
+  const shortLabel =
+    feedback.value.length > 40 ? feedback.value.substring(0, 40) + '...' : feedback.value
+  const escapedShortLabel = escapeHtmlForBadge(shortLabel)
+  const escapedFullValue = escapeHtmlForBadge(feedback.value)
+  const typeLabel = isPositive ? t('feedback.type.positive') : t('feedback.type.falsePositive')
+
+  // Tooltip structure: surface-elevated > category pill + key > value
+  return `<span class="memory-badge-wrapper inline relative group"><button class="memory-ref inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-[var(--brand-alpha-light)] text-[var(--brand)] text-xs font-medium hover:bg-[var(--brand)] hover:text-white transition-all border border-[var(--brand)]/20 hover:border-[var(--brand)] cursor-pointer align-middle" data-feedback-id="${feedbackId}" onclick="event.preventDefault()">${icon}<span class="font-medium max-w-[160px] truncate">${escapedShortLabel}</span></button><div class="memory-tooltip fixed opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 pointer-events-none z-[9999] whitespace-nowrap"><div class="surface-elevated px-3 py-2 rounded-lg"><div class="flex items-center gap-2"><span class="pill text-[10px] px-1.5 py-0.5">${typeLabel}</span><span class="text-xs font-medium txt-primary">${escapedShortLabel}</span></div><div class="text-[11px] txt-secondary mt-1 max-w-[200px] truncate">${escapedFullValue}</div></div></div></span>`
+}
+
+// Process feedback badges in the content [Feedback:ID]
+function processFeedbackBadges(html: string): string {
+  // Skip if no feedback references
+  if (!html.includes('[Feedback:') && !html.includes('[feedback:')) {
+    return html
+  }
+
+  // Match [Feedback:123] or [Feedback:123...] pattern (AI sometimes adds trailing dots)
+  const feedbackRefPattern = /\[Feedback\s*:\s*(\d+)\.{0,3}\]/gi
+
+  return html.replace(feedbackRefPattern, (_match, id) => {
+    const feedbackId = parseInt(id, 10)
+    const feedback = feedbackStore.getFeedbackById(feedbackId)
+
+    if (feedback) {
+      return buildFeedbackBadgeHtml(feedback, String(feedbackId))
+    }
+
+    // Show placeholder for unresolved feedbacks - same style as missing memory badges
+    return `<span class="memory-badge-wrapper inline relative group"><button class="memory-ref memory-ref--missing inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 text-xs font-medium hover:bg-gray-200 dark:hover:bg-gray-700 transition-all border border-gray-200 dark:border-gray-700 cursor-pointer align-middle" data-feedback-id="${feedbackId}" onclick="event.preventDefault()"><svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="currentColor" class="flex-shrink-0"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg><span class="font-medium">${escapeHtmlForBadge(t('feedback.badge.loading'))}</span></button></span>`
+  })
+}
+
+// Normalize reference markers so they stay inline (prevent markdown paragraph breaks)
+function normalizeInlineReferences(text: string): string {
+  // Remove newlines directly before/after [Feedback:ID] and [Memory:ID] so markdown
+  // does not wrap them in separate <p> blocks
+  return text
+    .replace(/\n+(\[(?:Feedback|Memory)\s*:\s*\d+\.{0,3}\])/gi, ' $1')
+    .replace(/(\[(?:Feedback|Memory)\s*:\s*\d+\.{0,3}\])\n+/gi, '$1 ')
+}
+
 // Process content - sync for regular markdown, async for math formulas
 async function processContent(content: string, version: number): Promise<string | null> {
   // Handle special file generation markers from backend with i18n
@@ -399,6 +500,9 @@ async function processContent(content: string, version: number): Promise<string 
   } else if (content === '__FILE_GENERATION_FAILED__') {
     content = t('message.fileGenerationFailed')
   }
+
+  // Keep reference markers inline to prevent markdown paragraph breaks
+  content = normalizeInlineReferences(content)
 
   let html: string
 
@@ -411,8 +515,8 @@ async function processContent(content: string, version: number): Promise<string 
     html = render(content, { processFileMarkers: false })
   }
 
-  // Process memory badges after markdown rendering
-  return processMemoryBadges(html)
+  // Process memory and feedback badges after markdown rendering
+  return processFeedbackBadges(processMemoryBadges(html))
 }
 
 // Update rendered content when props change
@@ -480,15 +584,17 @@ onBeforeUnmount(() => {
   // Remove event listeners to prevent memory leaks
   if (containerRef.value) {
     containerRef.value.removeEventListener('click', handleMemoryBadgeClick)
-    containerRef.value.removeEventListener('mouseenter', handleTooltipPosition, true)
+    containerRef.value.removeEventListener('click', handleFeedbackBadgeClick)
+    containerRef.value.removeEventListener('mouseover', handleTooltipPosition)
   }
 })
 
 onMounted(() => {
-  // Setup memory badge event listeners
+  // Setup memory and feedback badge event listeners
   if (containerRef.value) {
     containerRef.value.addEventListener('click', handleMemoryBadgeClick)
-    containerRef.value.addEventListener('mouseenter', handleTooltipPosition, true)
+    containerRef.value.addEventListener('click', handleFeedbackBadgeClick)
+    containerRef.value.addEventListener('mouseover', handleTooltipPosition)
   }
 
   // Fetch memories if needed
@@ -535,6 +641,36 @@ watch(
     }
     void fetchMemoriesWithRetryBestEffort()
   }
+)
+
+// Re-render content when feedback store changes (so badges resolve after SSE load)
+watch(
+  () => feedbackStore.feedbacks,
+  async () => {
+    if (props.content.includes('[Feedback:') || props.content.includes('[feedback:')) {
+      const currentVersion = ++renderVersion
+      const result = await processContent(props.content, currentVersion)
+      if (result !== null) {
+        renderedContent.value = result
+      }
+    }
+  },
+  { deep: true }
+)
+
+// Re-render content when memory store changes (so badges resolve after SSE load)
+watch(
+  () => memoriesStore.memories,
+  async () => {
+    if (props.content.includes('[Memory:') || props.content.includes('[memory:')) {
+      const currentVersion = ++renderVersion
+      const result = await processContent(props.content, currentVersion)
+      if (result !== null) {
+        renderedContent.value = result
+      }
+    }
+  },
+  { deep: true }
 )
 </script>
 

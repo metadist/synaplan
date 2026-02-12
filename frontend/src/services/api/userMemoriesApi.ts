@@ -88,6 +88,20 @@ export async function getMemories(category?: string): Promise<UserMemory[]> {
 }
 
 /**
+ * Get a single memory by ID.
+ */
+export async function getMemoryById(id: number): Promise<UserMemory | null> {
+  try {
+    const data = await httpClient(`/api/v1/user/memories/${id}`, {
+      schema: UserMemorySchema,
+    })
+    return data
+  } catch {
+    return null
+  }
+}
+
+/**
  * Get categories with memory counts.
  */
 export async function getCategories(): Promise<Array<{ category: string; count: number }>> {

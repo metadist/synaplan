@@ -19,7 +19,7 @@ interface QdrantClientInterface
      * @param array  $vector  Embedding vector (1024 floats)
      * @param array  $payload Metadata (user_id, category, key, value, created)
      */
-    public function upsertMemory(string $pointId, array $vector, array $payload): void;
+    public function upsertMemory(string $pointId, array $vector, array $payload, ?string $namespace = null): void;
 
     /**
      * Get a specific memory by point ID.
@@ -28,7 +28,7 @@ interface QdrantClientInterface
      *
      * @return array|null Payload data or null if not found
      */
-    public function getMemory(string $pointId): ?array;
+    public function getMemory(string $pointId, ?string $namespace = null): ?array;
 
     /**
      * Search for similar memories using vector similarity.
@@ -47,6 +47,7 @@ interface QdrantClientInterface
         ?string $category = null,
         int $limit = 5,
         float $minScore = 0.7,
+        ?string $namespace = null,
     ): array;
 
     /**
@@ -63,6 +64,7 @@ interface QdrantClientInterface
         int $userId,
         ?string $category = null,
         int $limit = 1000,
+        ?string $namespace = null,
     ): array;
 
     /**
@@ -70,7 +72,7 @@ interface QdrantClientInterface
      *
      * @param string $pointId Point ID
      */
-    public function deleteMemory(string $pointId): void;
+    public function deleteMemory(string $pointId, ?string $namespace = null): void;
 
     /**
      * Check if Qdrant service is available.
