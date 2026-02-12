@@ -192,6 +192,7 @@
       "testConnection": "Test Connection",
       "testFailed": "Connection test failed",
       "commandCopied": "Command copied to clipboard",
+      "liveBadge": "Live",
       "liveHint": "Changes take effect immediately, no restart required.",
       "restartBanner": {
         "title": "Configuration Updated — Restart Required",

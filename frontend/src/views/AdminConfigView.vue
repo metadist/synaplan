@@ -304,7 +304,7 @@ onMounted(async () => {
                   :title="$t('admin.config.liveHint')"
                 >
                   <span class="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
-                  Live
+                  {{ $t('admin.config.liveBadge') }}
                 </span>
               </div>
               <p v-if="section.isLive" class="text-xs txt-secondary mb-4 -mt-2">

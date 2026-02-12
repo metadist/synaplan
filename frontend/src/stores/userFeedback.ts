@@ -11,7 +11,7 @@ import {
 } from '@/services/api/userFeedbackApi'
 
 // Use global i18n instance for translations outside Vue setup context
-const t = (key: string) => i18n.global.t(key)
+const t = (key: string, params?: Record<string, unknown>) => i18n.global.t(key, params ?? {})
 
 export const useFeedbackStore = defineStore('feedback', () => {
   // Lazy-load composables to avoid calling them outside setup context
@@ -160,7 +160,7 @@ export const useFeedbackStore = defineStore('feedback', () => {
       }
 
       const { success } = getNotifications()
-      success(t('feedback.list.bulkDeleteSuccess').replace('{count}', String(deletedCount)))
+      success(t('feedback.list.bulkDeleteSuccess', { count: deletedCount }))
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : 'Failed to delete feedbacks'
       error.value = errorMsg

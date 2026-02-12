@@ -129,11 +129,11 @@ const handleFeedbackRefClick = (event: CustomEvent) => {
 }
 
 onMounted(() => {
-  window.addEventListener('feedback-ref-clicked' as any, handleFeedbackRefClick as any)
+  window.addEventListener('open-feedback-dialog', handleFeedbackRefClick as EventListener)
 })
 
 onUnmounted(() => {
-  window.removeEventListener('feedback-ref-clicked' as any, handleFeedbackRefClick as any)
+  window.removeEventListener('open-feedback-dialog', handleFeedbackRefClick as EventListener)
 })
 </script>
 

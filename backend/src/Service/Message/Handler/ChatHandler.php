@@ -442,7 +442,7 @@ class ChatHandler implements MessageHandlerInterface
                 $rawMemories = $this->memoryService->searchRelevantMemories(
                     $message->getUserId(),
                     $message->getText(),
-                    limit: 10,
+                    limit: $this->feedbackConfig->getMaxChatMemories(),
                     minScore: $this->feedbackConfig->getMinChatMemoryScore()
                 );
 
