@@ -92,7 +92,7 @@ class FeedbackConfigServiceTest extends TestCase
     {
         $callCount = 0;
         $this->configRepository->method('getValue')
-            ->willReturnCallback(function () use (&$callCount): ?string {
+            ->willReturnCallback(function () use (&$callCount): string {
                 ++$callCount;
 
                 return '0.6';

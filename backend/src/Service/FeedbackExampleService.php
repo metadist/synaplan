@@ -110,23 +110,23 @@ final readonly class FeedbackExampleService
         $value = $memory['value']
             ?? $memory['text']
             ?? $memory['content']
-            ?? ($memory['payload']['value'] ?? '')
-            ?? ($memory['payload']['text'] ?? '')
+            ?? $memory['payload']['value']
+            ?? $memory['payload']['text']
             ?? '';
 
         $messageId = $memory['messageId']
             ?? $memory['message_id']
-            ?? ($memory['payload']['message_id'] ?? null)
+            ?? $memory['payload']['message_id']
             ?? null;
 
         $created = $memory['created']
             ?? $memory['created_at']
-            ?? ($memory['payload']['created'] ?? 0)
+            ?? $memory['payload']['created']
             ?? 0;
 
         $updated = $memory['updated']
             ?? $memory['updated_at']
-            ?? ($memory['payload']['updated'] ?? 0)
+            ?? $memory['payload']['updated']
             ?? 0;
 
         return [

@@ -561,7 +561,7 @@ class ChatHandler implements MessageHandlerInterface
                     $feedbackContext .= "- If ❌ and ✅ entries contradict each other, mention the conflict to the user.\n";
 
                     // Send SSE event with loaded feedbacks
-                    if ($progressCallback && !empty($loadedFeedbacks)) {
+                    if ($progressCallback) {
                         $progressCallback([
                             'status' => 'feedback_loaded',
                             'message' => 'Feedback examples loaded',
