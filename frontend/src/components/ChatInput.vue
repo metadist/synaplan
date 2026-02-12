@@ -972,13 +972,20 @@ const toggleEnhance = async () => {
   }
 }
 
-// Expose textarea ref and uploadFiles for parent component
+// Set input text programmatically (e.g., from False Positive modal)
+const setInputText = (text: string) => {
+  message.value = text
+}
+
+// Expose textarea ref, uploadFiles, and setInputText for parent component
 // ATTENTION: needs to be typed when using vue-tsc -b
 defineExpose<{
   textareaRef: Ref<InstanceType<typeof Textarea> | null>
   uploadFiles: (files: File[]) => Promise<void>
+  setInputText: (text: string) => void
 }>({
   textareaRef,
   uploadFiles,
+  setInputText,
 })
 </script>

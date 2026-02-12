@@ -22,6 +22,11 @@ use Psr\Log\LoggerInterface;
 readonly class UserMemoryService
 {
     private const MAX_MEMORIES_PER_USER = 500;
+    private const HIDDEN_CATEGORIES = [
+        'feedback_negative',
+        'feedback_positive',
+        'feedback_false_positive',
+    ];
 
     public function __construct(
         private EntityManagerInterface $em, // Only for Model entity (embedding config)
@@ -60,6 +65,7 @@ readonly class UserMemoryService
         string $value,
         string $source = 'user_created',
         ?int $messageId = null,
+        ?string $namespace = null,
     ): UserMemoryDTO {
         // Validate
         if (mb_strlen($key) < 3) {
@@ -96,7 +102,7 @@ readonly class UserMemoryService
         );
 
         // Store in Qdrant
-        $pointId = $this->storeInQdrant($dto, $user, $memoryId);
+        $pointId = $this->storeInQdrant($dto, $user, $memoryId, $namespace);
 
         $this->logger->info('Memory created', [
             'memory_id' => $memoryId,
@@ -116,8 +122,9 @@ readonly class UserMemoryService
         string $value,
         string $source = 'user_edited',
         ?int $messageId = null,
-        ?string $category = null,
         ?string $key = null,
+        ?string $category = null,
+        ?string $namespace = null,
     ): UserMemoryDTO {
         if (mb_strlen($value) < 1) {
             throw new \InvalidArgumentException('Memory value must be at least 1 character');
@@ -169,7 +176,7 @@ readonly class UserMemoryService
     /**
      * Delete memory from Qdrant.
      */
-    public function deleteMemory(int $memoryId, User $user): void
+    public function deleteMemory(int $memoryId, User $user, ?string $namespace = null): void
     {
         if (!$this->qdrantClient->isAvailable()) {
             $this->logger->warning('Memory service unavailable - skipping delete', [
@@ -183,12 +190,34 @@ readonly class UserMemoryService
         $pointId = "mem_{$user->getId()}_{$memoryId}";
 
         try {
-            $this->qdrantClient->deleteMemory($pointId);
+            $this->qdrantClient->deleteMemory($pointId, $namespace);
             $this->logger->info('Memory deleted', ['memory_id' => $memoryId]);
         } catch (\Throwable $e) {
             $this->logger->error('Failed to delete memory', ['error' => $e->getMessage()]);
             throw new \InvalidArgumentException('Failed to delete memory: '.$e->getMessage());
         }
+    }
+
+    /**
+     * Scroll through all memories for a user with optional category and namespace filters.
+     *
+     * @return array<array{id: int, key: string, value: string, category: string, messageId: ?int, created: int, updated: int}>
+     */
+    public function scrollMemories(
+        int $userId,
+        ?string $category = null,
+        int $limit = 1000,
+        ?string $namespace = null,
+    ): array {
+        if (!$this->qdrantClient->isAvailable()) {
+            $this->logger->warning('Memory service unavailable - cannot scroll memories', [
+                'user_id' => $userId,
+            ]);
+
+            return [];
+        }
+
+        return $this->qdrantClient->scrollMemories($userId, $category, $limit, $namespace);
     }
 
     /**
@@ -263,10 +292,15 @@ readonly class UserMemoryService
                     continue;
                 }
 
+                $category = $payload['category'] ?? 'personal';
+                if ($this->isHiddenCategory($category)) {
+                    continue;
+                }
+
                 $memories[] = new UserMemoryDTO(
                     id: $memoryId,
                     userId: $userId,
-                    category: $payload['category'] ?? 'personal',
+                    category: $category,
                     key: $payload['key'] ?? '',
                     value: $payload['value'] ?? '',
                     source: $payload['source'] ?? 'unknown',
@@ -317,6 +351,8 @@ readonly class UserMemoryService
 
     /**
      * Search relevant memories by text similarity.
+     *
+     * @param string|null $namespace Optional namespace filter (e.g., 'feedback_false_positive', 'feedback_positive')
      */
     public function searchRelevantMemories(
         int $userId,
@@ -324,6 +360,8 @@ readonly class UserMemoryService
         ?string $category = null,
         int $limit = 5,
         float $minScore = 0.5,
+        ?string $namespace = null,
+        bool $includeHidden = false,
     ): array {
         // If no query text provided, we can't do semantic search
         // This happens when getUserMemories is called
@@ -391,7 +429,8 @@ readonly class UserMemoryService
                 $userId,
                 $category,
                 $limit,
-                $minScore
+                $minScore,
+                $namespace
             );
 
             $this->logger->info('🎯 Qdrant search results', [
@@ -404,10 +443,16 @@ readonly class UserMemoryService
             // Convert to arrays (format consumed by ChatHandler + frontend)
             $memories = [];
             foreach ($results as $result) {
-                $memories[] = UserMemoryDTO::fromQdrantPayload(
-                    $result['payload'],
-                    $result['id']
-                )->toArray();
+                $payload = $result['payload'] ?? [];
+                $category = $payload['category'] ?? null;
+                // Skip hidden categories unless explicitly included (e.g., for feedback search)
+                if (!$includeHidden && $category && $this->isHiddenCategory($category)) {
+                    continue;
+                }
+
+                $memory = UserMemoryDTO::fromQdrantPayload($payload, $result['id'])->toArray();
+                $memory['score'] = (float) ($result['score'] ?? 0.0);
+                $memories[] = $memory;
             }
 
             return $memories;
@@ -421,7 +466,7 @@ readonly class UserMemoryService
     /**
      * Store memory in Qdrant with vectorization.
      */
-    private function storeInQdrant(UserMemoryDTO $dto, User $user, int $memoryId): string
+    private function storeInQdrant(UserMemoryDTO $dto, User $user, int $memoryId, ?string $namespace = null): string
     {
         try {
             $textToEmbed = "{$dto->key}: {$dto->value}";
@@ -466,7 +511,8 @@ readonly class UserMemoryService
                     'created' => $dto->created,
                     'updated' => $dto->updated,
                     'active' => $dto->active,
-                ]
+                ],
+                $namespace
             );
 
             return $pointId;
@@ -517,5 +563,10 @@ readonly class UserMemoryService
 
             return [];
         }
+    }
+
+    private function isHiddenCategory(string $category): bool
+    {
+        return in_array($category, self::HIDDEN_CATEGORIES, true);
     }
 }

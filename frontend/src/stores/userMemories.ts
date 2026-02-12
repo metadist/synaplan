@@ -4,6 +4,7 @@ import { useNotification } from '@/composables/useNotification'
 import { i18n } from '@/i18n'
 import {
   getMemories,
+  getMemoryById,
   getCategories,
   createMemory,
   updateMemory,
@@ -276,6 +277,52 @@ export const useMemoriesStore = defineStore('memories', () => {
     await Promise.all([fetchMemories(), fetchCategories()])
   }
 
+  // Track IDs we've already tried to fetch individually (to avoid repeated requests)
+  const fetchedIndividualIds = new Set<number>()
+
+  // Fetch a single memory by ID and add to store if not present
+  // Also supports fuzzy matching for truncated IDs (AI sometimes drops trailing digits)
+  async function fetchMemoryById(id: number): Promise<UserMemory | null> {
+    const idStr = String(id)
+
+    // Skip if already in store (exact match)
+    let existing = memories.value.find((m) => m.id === id)
+    if (existing) {
+      return existing
+    }
+
+    // Try fuzzy match (for truncated IDs)
+    if (idStr.length >= 10) {
+      existing = memories.value.find((m) => {
+        const memIdStr = String(m.id)
+        return memIdStr.startsWith(idStr) || idStr.startsWith(memIdStr.slice(0, -1))
+      })
+      if (existing) {
+        return existing
+      }
+    }
+
+    // Skip if we already tried and failed
+    if (fetchedIndividualIds.has(id)) {
+      return null
+    }
+
+    fetchedIndividualIds.add(id)
+
+    try {
+      const memory = await getMemoryById(id)
+      if (memory) {
+        // Add to store
+        memories.value.push(memory)
+        return memory
+      }
+    } catch {
+      // Silently fail - memory doesn't exist or service unavailable
+    }
+
+    return null
+  }
+
   return {
     // State
     memories,
@@ -292,6 +339,7 @@ export const useMemoriesStore = defineStore('memories', () => {
 
     // Actions
     fetchMemories,
+    fetchMemoryById,
     fetchCategories,
     addMemory,
     editMemory,

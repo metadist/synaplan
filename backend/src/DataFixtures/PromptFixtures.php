@@ -108,9 +108,30 @@ class PromptFixtures extends Fixture
             [
                 'ownerId' => 0,
                 'language' => 'en',
+                'topic' => 'tools:feedback_false_positive_summary',
+                'shortDescription' => 'Summarize incorrect or unwanted AI responses into a single sentence for feedback storage.',
+                'prompt' => $this->getFeedbackFalsePositivePrompt(),
+            ],
+            [
+                'ownerId' => 0,
+                'language' => 'en',
+                'topic' => 'tools:feedback_false_positive_correction',
+                'shortDescription' => 'Provide a corrected statement for a false-positive example.',
+                'prompt' => $this->getFeedbackFalsePositiveCorrectionPrompt(),
+            ],
+            [
+                'ownerId' => 0,
+                'language' => 'en',
                 'topic' => 'tools:memory_parse',
                 'shortDescription' => 'Parse natural language input into structured memory format. Can suggest updates or deletions of existing memories.',
                 'prompt' => $this->getMemoryParsePrompt(),
+            ],
+            [
+                'ownerId' => 0,
+                'language' => 'en',
+                'topic' => 'tools:feedback_contradiction_check',
+                'shortDescription' => 'Detect contradictions between a new feedback statement and existing memories or feedback.',
+                'prompt' => $this->getFeedbackContradictionCheckPrompt(),
             ],
         ];
 
@@ -426,34 +447,17 @@ PROMPT;
     private function getEnhancePrompt(): string
     {
         return <<<'PROMPT'
-# Message Enhancement
+Improve the user's text: fix grammar, complete fragments, make it clear and well-written.
+Keep the same language, meaning, and tone. Do NOT add questions, greetings, or conversational filler.
+Output ONLY the improved text.
 
-You are an expert at improving user messages for better clarity and completeness.
-
-Your task is to enhance the user's input message while:
-- Keeping the exact same intent and meaning
-- Maintaining the original language
-- Making it clearer and more complete
-- Keeping it concise and actionable
-- NOT adding explanations or meta-commentary
-
-Only return the improved message text, nothing else.
-
-## Examples:
-
-Input: "how do i fix this?"
-Output: "How can I fix this issue?"
-
-Input: "need help with code"
-Output: "I need help with my code. Can you assist me?"
-
-Input: "explain this to me"
-Output: "Could you please explain this to me?"
-
-Input: "make pic of cat"
-Output: "Please create an image of a cat."
-
-Now enhance the following user message:
+Examples:
+"how do i fix this?" → "How do I fix this?"
+"need help with code" → "I need help with my code."
+"the bot said i know php but i dont" → "The bot claimed I know PHP, but that's not correct."
+"claims sydney is capital" → "The AI claims Sydney is the capital of Australia, which is incorrect."
+"Döner mag ich nicht mehr" → "Döner mag ich nicht mehr."
+"putin ist kein muslim die ki hat das behauptet" → "Die KI hat behauptet, Putin sei Muslim. Das ist nicht korrekt."
 PROMPT;
     }
 
@@ -769,69 +773,38 @@ PROMPT;
     private function getMemoryExtractionPrompt(): string
     {
         return <<<'PROMPT'
-You are a memory extraction assistant. Extract only long-term, user-specific information worth remembering.
+Extract ONLY personal facts the user states about THEMSELVES. Return JSON array or null.
 
-**Return JSON array if you find something to remember, otherwise return: null**
+## Save:
+- User's name, age, location, job, company
+- Persistent preferences ("I prefer dark mode", "I like pizza")
+- Skills, hobbies, goals the user states about themselves
 
-## What to Extract (only if user refers to themselves):
-- **Names & identity**: User's name or nickname ("I'm Tom")
-- **Stable personal facts**: Age, location, occupation, long-term hobbies/interests
-- **Preferences**: Persistent likes/dislikes or recurring preferences
-- **Work context**: Job, company, role, long-term projects
-- **Goals**: Ongoing goals or plans the user states about themselves
+## Do NOT save:
+- Questions the user asks ("Who is X?", "Is Y true?") — these are NOT interests or memories
+- Facts about other people, celebrities, or topics
+- Temporary states ("I'm tired")
+- Greetings, thanks
+- Anything the user did NOT explicitly say about themselves
 
-## Do NOT Extract:
-- Facts about other people ("Cristian is 22") unless the user says it is about themselves
-- Definitions, trivia, or general knowledge (e.g., name meanings)
-- Pure questions without personal info ("What is React?")
-- Temporary states ("I'm tired today")
-- Generic greetings ("Hello!", "Thanks!")
-- Guesses, inferences, or summaries you created
+## Key rule: The user asking about a topic does NOT mean they are interested in it. Only save if the user explicitly says "I like X" or "I'm interested in X".
 
-## Output Format:
-
+## Format:
 ```json
-[
-  {
-    "action": "create|update|delete",
-    "memory_id": 123,
-    "category": "personal|preferences|work|projects|general",
-    "key": "short_identifier",
-    "value": "what to remember (in user's language)"
-  }
-]
+[{"action":"create","category":"personal|preferences|work|skills|general","key":"short_key","value":"fact in user's language"}]
 ```
-
-Or if nothing to remember: `null`
-
-## Guidelines:
-- **Be selective**: Only store durable, user-specific facts
-- Require explicit self-reference ("I", "my", "I'm") for personal memories
-- If user explicitly asks to forget/remove something, use `action: "delete"` with `memory_id`
-- For `delete`, only `action` + `memory_id` are required; omit other fields if unsure
-- Keep keys short (<= 24 chars), snake_case
-- One memory per fact (atomic)
-- Write values in the user's language
+Or: `null`
 
 ## Examples:
+"I'm Tom, 25, from Berlin" → `[{"action":"create","category":"personal","key":"name","value":"Tom"},{"action":"create","category":"personal","key":"age","value":"25"},{"action":"create","category":"personal","key":"location","value":"Berlin"}]`
+"I prefer dark mode" → `[{"action":"create","category":"preferences","key":"ui_theme","value":"Prefers dark mode"}]`
+"Who is Madison Beer?" → `null`
+"Is Putin a Muslim?" → `null`
+"What does React do?" → `null`
+"Cristian is 22" → `null`
+"Delete my name" → `[{"action":"delete","memory_id":123}]`
 
-User: "Hi, I'm Tom" → `[{"category": "personal", "key": "name", "value": "Tom"}]`
-
-User: "My name is Sarah and I work at Google" → `[{"category": "personal", "key": "name", "value": "Sarah"}, {"category": "work", "key": "company", "value": "Works at Google"}]`
-
-User: "I prefer dark mode" → `[{"category": "preferences", "key": "ui_theme", "value": "Prefers dark mode"}]`
-
-User: "What time is it?" → `null`
-
-User: "What does the name Cristian mean?" → `null`
-
-User: "Cristian is 22 and lives in Langenfeld" → `null`
-
-User: "Delete my name" → `[{"action": "delete", "memory_id": 123}]`
-
-User: "Thanks for the help!" → `null`
-
-**If existing memories are provided, do NOT duplicate. Only extract NEW information.**
+If existing memories are provided, do NOT duplicate. Only extract NEW information.
 PROMPT;
     }
 
@@ -886,6 +859,68 @@ Existing: [{"id": 5, "key": "age", "value": "25"}]
 ```
 
 **Return ONLY the JSON. No explanation.**
+PROMPT;
+    }
+
+    private function getFeedbackFalsePositivePrompt(): string
+    {
+        return <<<'PROMPT'
+You summarize incorrect or unwanted AI responses for feedback storage.
+
+## Rules
+- Return EXACTLY one concise sentence describing the false or undesirable claim.
+- Use the same language as the input text.
+- Do NOT add explanations, labels, or formatting.
+- Do NOT mention that you are summarizing.
+
+## Output
+- One sentence only.
+PROMPT;
+    }
+
+    private function getFeedbackFalsePositiveCorrectionPrompt(): string
+    {
+        return <<<'PROMPT'
+You correct a false statement produced by an AI response.
+
+## Rules
+- Return EXACTLY one concise corrected sentence.
+- Use the same language as the input text.
+- Do NOT add explanations, labels, or formatting.
+- If you are unsure, provide the best factual correction you can.
+
+## Output
+- One sentence only.
+PROMPT;
+    }
+
+    private function getFeedbackContradictionCheckPrompt(): string
+    {
+        return <<<'PROMPT'
+You analyze whether a new statement (that the user wants to save as feedback) contradicts existing stored items (memories or feedback).
+
+## Output format
+Respond ONLY with valid JSON in this exact format:
+{"contradictions":[{"id":123,"type":"memory","value":"old text","reason":"brief reason why it contradicts"}]}
+
+## Understanding item types
+- "memory" items = stored facts the user considers TRUE
+- "positive" items = statements the user CONFIRMED as CORRECT
+- "false_positive" items = statements the user marked as INCORRECT. The user believes the OPPOSITE is true.
+  Example: false_positive "Putin is Orthodox" means the user previously said "Putin is Orthodox" is WRONG.
+  So if a new statement says "Putin is Orthodox" is correct, that CONTRADICTS this false_positive.
+
+## Rules
+- Only include items that CLEARLY contradict the new statement:
+  - Same topic but opposite or conflicting information
+  - Same fact with different values
+  - Implied contradictions via type inversion (a false_positive is the semantic opposite of what it says)
+- type must be exactly one of: memory, false_positive, positive
+- id must be the numeric ID from the existing items list
+- value should be the existing item's value (for display)
+- reason: one short sentence explaining the contradiction
+- If no contradictions exist, return: {"contradictions":[]}
+- Output ONLY the JSON. No markdown, no explanation, no other text.
 PROMPT;
     }
 }

@@ -19,21 +19,23 @@ final readonly class QdrantClientMock implements QdrantClientInterface
     ) {
     }
 
-    public function upsertMemory(string $pointId, array $vector, array $payload): void
+    public function upsertMemory(string $pointId, array $vector, array $payload, ?string $namespace = null): void
     {
         $this->logger->info('QdrantClientMock: upsertMemory called', [
             'point_id' => $pointId,
             'vector_dim' => count($vector),
             'payload' => $payload,
+            'namespace' => $namespace,
         ]);
 
         // TODO: Will be replaced with actual gRPC call to Qdrant
     }
 
-    public function getMemory(string $pointId): ?array
+    public function getMemory(string $pointId, ?string $namespace = null): ?array
     {
         $this->logger->info('QdrantClientMock: getMemory called', [
             'point_id' => $pointId,
+            'namespace' => $namespace,
         ]);
 
         // TODO: Will fetch from Qdrant
@@ -46,12 +48,14 @@ final readonly class QdrantClientMock implements QdrantClientInterface
         ?string $category = null,
         int $limit = 5,
         float $minScore = 0.7,
+        ?string $namespace = null,
     ): array {
         $this->logger->info('QdrantClientMock: searchMemories called', [
             'user_id' => $userId,
             'category' => $category,
             'limit' => $limit,
             'min_score' => $minScore,
+            'namespace' => $namespace,
         ]);
 
         // TODO: Will return actual search results from Qdrant
@@ -62,21 +66,24 @@ final readonly class QdrantClientMock implements QdrantClientInterface
         int $userId,
         ?string $category = null,
         int $limit = 1000,
+        ?string $namespace = null,
     ): array {
         $this->logger->info('QdrantClientMock: scrollMemories called', [
             'user_id' => $userId,
             'category' => $category,
             'limit' => $limit,
+            'namespace' => $namespace,
         ]);
 
         // TODO: Will return all memories from Qdrant
         return [];
     }
 
-    public function deleteMemory(string $pointId): void
+    public function deleteMemory(string $pointId, ?string $namespace = null): void
     {
         $this->logger->info('QdrantClientMock: deleteMemory called', [
             'point_id' => $pointId,
+            'namespace' => $namespace,
         ]);
 
         // TODO: Will delete from Qdrant

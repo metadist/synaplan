@@ -52,6 +52,9 @@ frontend/tests/e2e/tests/test-results/
 frontend/tests/e2e/tests/reports/
 frontend/tests/e2e/prompts/*
 
+# Editor artifacts
+*.code-workspace
+
 # Platform configs
 platform/
 _devextras/agents_yusuf.md

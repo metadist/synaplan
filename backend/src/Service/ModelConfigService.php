@@ -309,6 +309,31 @@ class ModelConfigService
     }
 
     /**
+     * Get provider + model config for internal/tools tasks (feedback, memories, contradiction checks).
+     * Uses DEFAULTMODEL/TOOLS config. Falls back to global CHAT default.
+     *
+     * @return array{provider: ?string, model: ?string}
+     */
+    public function getToolsModelConfig(): array
+    {
+        $modelId = $this->getDefaultModel('TOOLS');
+
+        // Fallback to global CHAT default
+        if (!$modelId) {
+            $modelId = $this->getDefaultModel('CHAT', 0);
+        }
+
+        if (!$modelId) {
+            return ['provider' => null, 'model' => null];
+        }
+
+        return [
+            'provider' => $this->getProviderForModel($modelId),
+            'model' => $this->getModelName($modelId),
+        ];
+    }
+
+    /**
      * Get provider name for a specific model ID
      * Returns provider name from BMODELS.BSERVICE (e.g., 'Ollama', 'OpenAI').
      */

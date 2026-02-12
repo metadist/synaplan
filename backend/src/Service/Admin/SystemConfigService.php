@@ -4,24 +4,30 @@ declare(strict_types=1);
 
 namespace App\Service\Admin;
 
+use App\Repository\ConfigRepository;
+use App\Service\FeedbackConstants;
 use Psr\Log\LoggerInterface;
 
 /**
  * System Configuration Service.
  *
  * Manages reading and writing of .env configuration with security masking.
+ * Supports database-backed fields (source=database) that take effect immediately.
  * SECURITY: Sensitive fields are NEVER returned in plain text via API.
  */
 final class SystemConfigService
 {
     private const MASK = '••••••••';
+    private const DB_GROUP = 'QDRANT_SEARCH';
+    private const DB_OWNER_ID = 0;
 
-    /** @var array<string, array{tab: string, section: string, type: string, sensitive: bool, description: string, default: string, options?: array<string>}> */
+    /** @var array<string, array{tab: string, section: string, type: string, sensitive: bool, description: string, default: string, source?: string, options?: array<string>}> */
     private array $schema;
 
     public function __construct(
         private readonly string $projectDir,
         private readonly LoggerInterface $logger,
+        private readonly ConfigRepository $configRepository,
     ) {
         $this->schema = $this->buildSchema();
     }
@@ -78,6 +84,11 @@ final class SystemConfigService
                 'label' => 'Vector DB',
                 'sections' => [
                     'qdrant' => ['label' => 'Qdrant Service', 'fields' => ['QDRANT_SERVICE_URL', 'QDRANT_SERVICE_API_KEY']],
+                    'qdrant_search' => ['label' => 'Search Thresholds', 'fields' => [
+                        'MIN_CHAT_FEEDBACK_SCORE', 'MIN_CHAT_MEMORY_SCORE', 'MIN_CONTRADICTION_SCORE',
+                        'MIN_RESEARCH_SCORE', 'MIN_MEMORY_RESEARCH_SCORE', 'MIN_EXTRACTION_SCORE',
+                        'LIMIT_PER_NAMESPACE', 'MAX_CHAT_MEMORIES',
+                    ]],
                 ],
             ],
         ];
@@ -98,21 +109,33 @@ final class SystemConfigService
         $values = [];
 
         foreach ($this->schema as $key => $field) {
-            $rawValue = $this->getEnvValue($key);
-            $isSet = '' !== $rawValue && null !== $rawValue;
+            $source = $field['source'] ?? 'env';
 
-            if ($field['sensitive'] && $isSet) {
-                $values[$key] = [
-                    'value' => self::MASK,
-                    'isSet' => true,
-                    'isMasked' => true,
-                ];
-            } else {
+            if ('database' === $source) {
+                $rawValue = $this->configRepository->getValue(self::DB_OWNER_ID, self::DB_GROUP, $key);
+                $isSet = null !== $rawValue && '' !== $rawValue;
                 $values[$key] = [
                     'value' => $rawValue ?? $field['default'],
                     'isSet' => $isSet,
                     'isMasked' => false,
                 ];
+            } else {
+                $rawValue = $this->getEnvValue($key);
+                $isSet = '' !== $rawValue && null !== $rawValue;
+
+                if ($field['sensitive'] && $isSet) {
+                    $values[$key] = [
+                        'value' => self::MASK,
+                        'isSet' => true,
+                        'isMasked' => true,
+                    ];
+                } else {
+                    $values[$key] = [
+                        'value' => $rawValue ?? $field['default'],
+                        'isSet' => $isSet,
+                        'isMasked' => false,
+                    ];
+                }
             }
         }
 
@@ -128,6 +151,14 @@ final class SystemConfigService
     {
         if (!isset($this->schema[$key])) {
             return ['success' => false, 'requiresRestart' => false, 'message' => 'Unknown configuration key'];
+        }
+
+        $field = $this->schema[$key];
+        $source = $field['source'] ?? 'env';
+
+        // Database-backed fields: write to BCONFIG, no restart needed
+        if ('database' === $source) {
+            return $this->setDatabaseValue($key, $value, $field);
         }
 
         $envFile = $this->projectDir.'/.env';
@@ -174,6 +205,48 @@ final class SystemConfigService
         $this->logChange($key, $value);
 
         return ['success' => true, 'requiresRestart' => true];
+    }
+
+    /**
+     * Save a database-backed configuration value with validation.
+     *
+     * @param array{type: string, default: string} $field
+     *
+     * @return array{success: bool, requiresRestart: bool, message?: string}
+     */
+    private function setDatabaseValue(string $key, string $value, array $field): array
+    {
+        // Validate numeric fields
+        if ('number' === $field['type']) {
+            if (!is_numeric($value)) {
+                return ['success' => false, 'requiresRestart' => false, 'message' => 'Value must be numeric'];
+            }
+
+            $numericValue = (float) $value;
+
+            // Score fields must be between 0.0 and 1.0
+            if (str_starts_with($key, 'MIN_') && ($numericValue < 0.0 || $numericValue > 1.0)) {
+                return ['success' => false, 'requiresRestart' => false, 'message' => 'Score must be between 0.0 and 1.0'];
+            }
+
+            // Limit fields must be positive integers
+            if (str_starts_with($key, 'LIMIT_') || str_starts_with($key, 'MAX_')) {
+                if ($numericValue < 1 || floor($numericValue) !== $numericValue) {
+                    return ['success' => false, 'requiresRestart' => false, 'message' => 'Limit must be a positive integer'];
+                }
+            }
+        }
+
+        try {
+            $this->configRepository->setValue(self::DB_OWNER_ID, self::DB_GROUP, $key, $value);
+            $this->logChange($key, $value);
+
+            return ['success' => true, 'requiresRestart' => false];
+        } catch (\Throwable $e) {
+            $this->logger->error('Failed to save DB config', ['key' => $key, 'error' => $e->getMessage()]);
+
+            return ['success' => false, 'requiresRestart' => false, 'message' => 'Database write failed'];
+        }
     }
 
     /**
@@ -735,6 +808,56 @@ final class SystemConfigService
                 'tab' => 'vectordb', 'section' => 'qdrant', 'type' => 'password',
                 'sensitive' => true, 'description' => 'Qdrant service API key',
                 'default' => '',
+            ],
+
+            // === Search Thresholds (database-backed, no restart required) ===
+            'MIN_CHAT_FEEDBACK_SCORE' => [
+                'tab' => 'vectordb', 'section' => 'qdrant_search', 'type' => 'number',
+                'sensitive' => false, 'description' => 'Min score for feedback in chat context (0.0–1.0)',
+                'default' => (string) FeedbackConstants::MIN_CHAT_FEEDBACK_SCORE,
+                'source' => 'database',
+            ],
+            'MIN_CHAT_MEMORY_SCORE' => [
+                'tab' => 'vectordb', 'section' => 'qdrant_search', 'type' => 'number',
+                'sensitive' => false, 'description' => 'Min score for memories in chat context (0.0–1.0)',
+                'default' => (string) FeedbackConstants::MIN_CHAT_MEMORY_SCORE,
+                'source' => 'database',
+            ],
+            'MIN_CONTRADICTION_SCORE' => [
+                'tab' => 'vectordb', 'section' => 'qdrant_search', 'type' => 'number',
+                'sensitive' => false, 'description' => 'Min score for contradiction detection (0.0–1.0)',
+                'default' => (string) FeedbackConstants::MIN_CONTRADICTION_SCORE,
+                'source' => 'database',
+            ],
+            'MIN_RESEARCH_SCORE' => [
+                'tab' => 'vectordb', 'section' => 'qdrant_search', 'type' => 'number',
+                'sensitive' => false, 'description' => 'Min score for KB/document research (0.0–1.0)',
+                'default' => (string) FeedbackConstants::MIN_RESEARCH_SCORE,
+                'source' => 'database',
+            ],
+            'MIN_MEMORY_RESEARCH_SCORE' => [
+                'tab' => 'vectordb', 'section' => 'qdrant_search', 'type' => 'number',
+                'sensitive' => false, 'description' => 'Min score for memory research (0.0–1.0)',
+                'default' => (string) FeedbackConstants::MIN_MEMORY_RESEARCH_SCORE,
+                'source' => 'database',
+            ],
+            'MIN_EXTRACTION_SCORE' => [
+                'tab' => 'vectordb', 'section' => 'qdrant_search', 'type' => 'number',
+                'sensitive' => false, 'description' => 'Min score for memory extraction context (0.0–1.0)',
+                'default' => (string) FeedbackConstants::MIN_EXTRACTION_SCORE,
+                'source' => 'database',
+            ],
+            'LIMIT_PER_NAMESPACE' => [
+                'tab' => 'vectordb', 'section' => 'qdrant_search', 'type' => 'number',
+                'sensitive' => false, 'description' => 'Max results per Qdrant namespace',
+                'default' => (string) FeedbackConstants::LIMIT_PER_NAMESPACE,
+                'source' => 'database',
+            ],
+            'MAX_CHAT_MEMORIES' => [
+                'tab' => 'vectordb', 'section' => 'qdrant_search', 'type' => 'number',
+                'sensitive' => false, 'description' => 'Max memories loaded into chat context',
+                'default' => '10',
+                'source' => 'database',
             ],
         ];
     }

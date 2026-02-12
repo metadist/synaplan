@@ -16,7 +16,8 @@ class ConfigFixtures extends Fixture implements DependentFixtureInterface
     {
         $configs = [
             // Default AI Models - Using Groq models (free tier, fast)
-            ['ownerId' => 0, 'group' => 'DEFAULTMODEL', 'setting' => 'CHAT', 'value' => '76'],       // Groq model
+            ['ownerId' => 0, 'group' => 'DEFAULTMODEL', 'setting' => 'CHAT', 'value' => '76'],       // Groq GPT-OSS-120B
+            ['ownerId' => 0, 'group' => 'DEFAULTMODEL', 'setting' => 'TOOLS', 'value' => '76'],      // Groq GPT-OSS-120B (internal tasks: feedback, memories, contradictions)
             ['ownerId' => 0, 'group' => 'DEFAULTMODEL', 'setting' => 'SORT', 'value' => '9'],        // Groq Llama 70b
             ['ownerId' => 0, 'group' => 'DEFAULTMODEL', 'setting' => 'SUMMARIZE', 'value' => '9'],   // Groq Llama 70b
             ['ownerId' => 0, 'group' => 'DEFAULTMODEL', 'setting' => 'TEXT2PIC', 'value' => '29'],
