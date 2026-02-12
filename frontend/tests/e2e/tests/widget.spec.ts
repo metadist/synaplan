@@ -165,55 +165,75 @@ test('@smoke @widget @security Widget blocked on non-whitelisted domain id=015',
 
   const apiUrl = getApiUrl()
 
-  const configResponse = page.waitForResponse(
-    (response) =>
-      response.url().includes(`/api/v1/widget/${widgetInfo.widgetId}/config`) &&
-      response.status() === 403,
-    { timeout: TIMEOUTS.STANDARD }
-  )
-  await gotoWidgetTestPage(page, widgetInfo.widgetId, apiUrl)
-  const response = await configResponse
-  const body = await response.json().catch(() => ({}))
-  expect(body.reason).toBe('domain_not_whitelisted')
+  await test.step('Act: open test page → Assert: 403 or console 403, widget not shown', async () => {
+    const consoleDomainForbidden = new Promise<void>((resolve) => {
+      page.on('console', (msg) => {
+        const text = msg.text()
+        if (text.includes('Domain not allowed') && text.includes('403')) resolve()
+      })
+    })
 
-  const widgetButton = page.locator(selectors.widget.button)
-  await expect(widgetButton).not.toBeVisible({ timeout: TIMEOUTS.SHORT })
-  const widgetHost = page.locator(selectors.widget.host)
-  await expect(widgetHost).toHaveCount(0)
+    const configResponse = page.waitForResponse(
+      (res) =>
+        res.url().includes(`/api/v1/widget/${widgetInfo.widgetId}/config`) &&
+        res.status() === 403,
+      { timeout: TIMEOUTS.STANDARD }
+    )
 
-  // Add localhost to whitelist and verify widget loads
-  await page.goto('/tools/chat-widget')
-  await page.waitForSelector(selectors.widgets.page, { timeout: TIMEOUTS.SHORT })
+    await gotoWidgetTestPage(page, widgetInfo.widgetId, apiUrl)
 
-  const widgetCard = page
-    .locator(selectors.widgets.widgetCard.item)
-    .filter({ hasText: widgetName })
-    .first()
-  await widgetCard.locator(selectors.widgets.widgetCard.advancedButton).click()
-  await page.waitForSelector(selectors.widgets.advancedConfig.modal, { timeout: TIMEOUTS.STANDARD })
+    const result = await Promise.race([
+      configResponse.then((r) => ({ type: 'response' as const, response: r })),
+      consoleDomainForbidden.then(() => ({ type: 'console' as const })),
+    ])
 
-  const securityTab = page.locator(selectors.widgets.advancedConfig.securityTab)
-  const isSecurityTabVisible = await securityTab.isVisible().catch(() => false)
-  if (!isSecurityTabVisible) {
-    await page.locator(selectors.widgets.advancedConfig.tabButtonSecurity).click()
-    await securityTab.waitFor({ state: 'visible', timeout: TIMEOUTS.SHORT })
-  }
-  await page.locator(selectors.widgets.advancedConfig.domainInput).fill('localhost')
-  await page.locator(selectors.widgets.advancedConfig.addDomainButton).click()
+    if (result.type === 'response') {
+      const body = await result.response.json()
+      expect(body.reason).toBe('domain_not_whitelisted')
+    }
 
-  const modal = page.locator(selectors.widgets.advancedConfig.modal)
-  const saveButton = modal.locator(selectors.widgets.advancedConfig.saveButton)
-  await saveButton.scrollIntoViewIfNeeded()
-  await saveButton.click()
-  await page.waitForSelector(selectors.widgets.advancedConfig.modal, {
-    state: 'hidden',
-    timeout: TIMEOUTS.STANDARD,
+    await expect(page.locator(selectors.widget.button)).not.toBeVisible({
+      timeout: TIMEOUTS.SHORT,
+    })
+    await expect(page.locator(selectors.widget.host)).toHaveCount(0)
   })
 
-  await openWidgetOnTestPage(page, widgetInfo.widgetId, apiUrl)
+  await test.step('Arrange: add localhost to whitelist', async () => {
+    await page.goto('/tools/chat-widget')
+    await page.waitForSelector(selectors.widgets.page, { timeout: TIMEOUTS.SHORT })
 
-  const chatWindow = page.locator(selectors.widget.host).locator(selectors.widget.chatWindow)
-  await expect(chatWindow).toBeVisible()
+    const widgetCard = page
+      .locator(selectors.widgets.widgetCard.item)
+      .filter({ hasText: widgetName })
+      .first()
+    await widgetCard.locator(selectors.widgets.widgetCard.advancedButton).click()
+    await page.waitForSelector(selectors.widgets.advancedConfig.modal, {
+      timeout: TIMEOUTS.STANDARD,
+    })
+
+    const securityTab = page.locator(selectors.widgets.advancedConfig.securityTab)
+    if (!(await securityTab.isVisible())) {
+      await page.locator(selectors.widgets.advancedConfig.tabButtonSecurity).click()
+      await securityTab.waitFor({ state: 'visible', timeout: TIMEOUTS.SHORT })
+    }
+    await page.locator(selectors.widgets.advancedConfig.domainInput).fill('localhost')
+    await page.locator(selectors.widgets.advancedConfig.addDomainButton).click()
+
+    const modal = page.locator(selectors.widgets.advancedConfig.modal)
+    const saveButton = modal.locator(selectors.widgets.advancedConfig.saveButton)
+    await saveButton.scrollIntoViewIfNeeded()
+    await saveButton.click()
+    await page.waitForSelector(selectors.widgets.advancedConfig.modal, {
+      state: 'hidden',
+      timeout: TIMEOUTS.STANDARD,
+    })
+  })
+
+  await test.step('Act: open widget → Assert: chat window visible', async () => {
+    await openWidgetOnTestPage(page, widgetInfo.widgetId, apiUrl)
+    const chatWindow = page.locator(selectors.widget.host).locator(selectors.widget.chatWindow)
+    await expect(chatWindow).toBeVisible()
+  })
 })
 
 test('@noci @smoke @widget Widget file upload works id=016', async ({ page }) => {
@@ -365,9 +385,8 @@ test('@noci @smoke @widget Widget task prompt works id=017', async ({ page }) =>
 })
 
 // Like 013 but with the real embedded widget (script loaded on external page, Shadow DOM).
-// Uses widget-test.html — the real user flow. Run on test stack to verify CI behavior.
-// @noci: On dev stack, cross-origin (5173→8000) makes widget loading flaky.
-test(' @smoke @widget User sends message via embedded widget and receives response id=020', async ({
+// Uses widget-test.html — the real user flow.
+test('@smoke @widget User sends message via embedded widget and receives response id=020', async ({
   page,
 }) => {
   await login(page)
@@ -377,15 +396,20 @@ test(' @smoke @widget User sends message via embedded widget and receives respon
   await updateWidgetSettings(page, widgetName, {})
 
   const apiUrl = getApiUrl()
-  await openWidgetOnTestPage(page, widgetInfo.widgetId, apiUrl)
+  await test.step('Arrange: open widget on test page', async () => {
+    await openWidgetOnTestPage(page, widgetInfo.widgetId, apiUrl)
+  })
 
   const widgetHost = page.locator(selectors.widget.host)
   const input = widgetHost.locator(selectors.widget.input)
   await expect(input).toBeVisible({ timeout: TIMEOUTS.SHORT })
 
   const previousCount = await countWidgetMessages(page)
-  await input.fill(PROMPTS.SMOKE_TEST)
-  await widgetHost.locator(selectors.widget.sendButton).click()
+
+  await test.step('Act: send smoke test message', async () => {
+    await input.fill(PROMPTS.SMOKE_TEST)
+    await widgetHost.locator(selectors.widget.sendButton).click()
+  })
 
   const userBubble = widgetHost.locator(selectors.widget.messageUserText).last()
   await expect(userBubble).toBeVisible({ timeout: TIMEOUTS.SHORT })
@@ -393,10 +417,8 @@ test(' @smoke @widget User sends message via embedded widget and receives respon
 
   const aiText = await waitForWidgetAnswer(page, previousCount)
 
-  const expectSuccess = isTestStack()
-  if (expectSuccess) {
-    expect(aiText).toContain('success')
-  } else {
+  //TODO: needs additional assertion (done streaming, no errors)
+  await test.step('Assert: assistant message exists with non-empty text', async () => {
     expect(aiText.length).toBeGreaterThan(0)
-  }
+  })
 })

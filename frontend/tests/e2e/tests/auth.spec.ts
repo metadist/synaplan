@@ -35,7 +35,7 @@ test('@smoke @auth logout should clear session id=005', async ({ page }) => {
 })
 
 // TODO: Use a pre-verified DB fixture + delete before test, then assert login fails (avoids MailHog/verify flow).
-test('@auth deleted user cannot login id=011', async ({ page, request }) => {
+test('@auth @smoke deleted user cannot login id=011', async ({ page, request }) => {
   const email = `deleted-user-${Date.now()}@example.test`
   const password = 'DeleteMe123!'
 

@@ -14,17 +14,10 @@ export async function gotoWidgetTestPage(
   apiUrl: string
 ): Promise<void> {
   const url = `/widget-test.html?widgetId=${encodeURIComponent(widgetId)}&apiUrl=${encodeURIComponent(apiUrl)}`
-  await page.goto(url, { waitUntil: 'networkidle' })
-  // Wait for either widget to appear or our error element (so CI logs the real reason)
+  await page.goto(url, { waitUntil: 'domcontentloaded' })
+
   const loadError = page.locator('[data-testid="widget-load-error"]')
-  const widgetAppeared = page
-    .locator('#synaplan-widget-button, [data-testid="widget-host"]')
-    .first()
-  await Promise.race([
-    loadError.waitFor({ state: 'visible', timeout: TIMEOUTS.LONG }),
-    widgetAppeared.waitFor({ state: 'visible', timeout: TIMEOUTS.LONG }),
-  ]).catch(() => {})
-  if ((await loadError.count()) > 0 && (await loadError.isVisible())) {
+  if (await loadError.isVisible()) {
     const msg = await loadError.textContent()
     throw new Error(`Widget script failed to load. Page error: ${msg?.trim() ?? 'unknown'}`)
   }
