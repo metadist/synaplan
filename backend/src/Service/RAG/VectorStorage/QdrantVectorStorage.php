@@ -160,8 +160,18 @@ final readonly class QdrantVectorStorage implements VectorStorageInterface
 
         return [
             'chunks' => $stats['chunks'],
-            'groupKey' => $stats['group_key'],
+            'groupKey' => $stats['groupKey'],
         ];
+    }
+
+    public function getFileIdsByGroupKey(int $userId, string $groupKey): array
+    {
+        return $this->qdrantClient->getFileIdsByGroupKey($userId, $groupKey);
+    }
+
+    public function getFilesWithChunks(int $userId): array
+    {
+        return $this->qdrantClient->getFilesWithChunks($userId);
     }
 
     public function isAvailable(): bool

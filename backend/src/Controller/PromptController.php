@@ -10,7 +10,6 @@ use App\Repository\FileRepository;
 use App\Repository\MessageRepository;
 use App\Repository\PromptMetaRepository;
 use App\Repository\PromptRepository;
-use App\Repository\RagDocumentRepository;
 use App\Service\ModelConfigService;
 use App\Service\PromptService;
 use App\Service\RAG\VectorStorage\VectorStorageFacade;
@@ -419,8 +418,6 @@ class PromptController extends AbstractController
     public function getAvailableFiles(
         Request $request,
         #[CurrentUser] ?User $user,
-        RagDocumentRepository $ragRepository,
-        FileRepository $fileRepository,
     ): JsonResponse {
         if (!$user) {
             return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
@@ -430,41 +427,43 @@ class PromptController extends AbstractController
 
         $filesByFileId = [];
 
-        // First, get files from RAG documents
-        $ragDocs = $ragRepository->findBy(['userId' => $user->getId()]);
-
-        // Group by file (using messageId which now references BFILES.BID)
-        foreach ($ragDocs as $doc) {
-            $fileId = $doc->getMessageId(); // Actually references File.id now
-            if (!isset($filesByFileId[$fileId])) {
-                $file = $fileRepository->find($fileId);
-                if ($file) {
-                    $fileName = $file->getFileName();
-
-                    // Apply search filter
-                    if (!empty($searchQuery) && false === stripos($fileName, $searchQuery)) {
-                        continue;
-                    }
-
-                    $filesByFileId[$fileId] = [
-                        'messageId' => $fileId, // Keep as messageId for frontend compatibility
-                        'fileName' => $fileName,
-                        'chunks' => 0,
-                        'currentGroupKey' => $doc->getGroupKey(),
-                        'uploadedAt' => $file->getCreatedAt()
-                            ? date('Y-m-d\TH:i:s\Z', $file->getCreatedAt())
-                            : null,
-                    ];
-                }
-            }
-            if (isset($filesByFileId[$fileId])) {
-                ++$filesByFileId[$fileId]['chunks'];
-            }
+        // Get per-file chunk info from active vector storage (Qdrant or MariaDB)
+        try {
+            $filesWithChunks = $this->vectorStorageFacade->getFilesWithChunks($user->getId());
+        } catch (\Throwable $e) {
+            $this->logger->warning('PromptController: Failed to get files with chunks from vector storage', [
+                'error' => $e->getMessage(),
+            ]);
+            $filesWithChunks = [];
         }
 
-        // Also include files with 'vectorized' or 'extracted' status that may not have RAG docs yet
-        // This catches files that have been processed but RAG entries may be in a different state
-        $vectorizedFiles = $fileRepository->findBy([
+        // Build file list from vector storage results
+        foreach ($filesWithChunks as $fileId => $info) {
+            $file = $this->fileRepository->find($fileId);
+            if (!$file || $file->getUserId() !== $user->getId()) {
+                continue;
+            }
+
+            $fileName = $file->getFileName();
+
+            // Apply search filter
+            if (!empty($searchQuery) && false === stripos($fileName, $searchQuery)) {
+                continue;
+            }
+
+            $filesByFileId[$fileId] = [
+                'messageId' => $fileId, // Keep as messageId for frontend compatibility
+                'fileName' => $fileName,
+                'chunks' => $info['chunks'],
+                'currentGroupKey' => $info['groupKey'] ?? 'default',
+                'uploadedAt' => $file->getCreatedAt()
+                    ? date('Y-m-d\TH:i:s\Z', $file->getCreatedAt())
+                    : null,
+            ];
+        }
+
+        // Also include files with 'vectorized' status that may not appear in vector storage yet
+        $vectorizedFiles = $this->fileRepository->findBy([
             'userId' => $user->getId(),
             'status' => 'vectorized',
         ]);
@@ -482,7 +481,7 @@ class PromptController extends AbstractController
                 $filesByFileId[$fileId] = [
                     'messageId' => $fileId,
                     'fileName' => $fileName,
-                    'chunks' => 0, // No RAG docs found
+                    'chunks' => 0,
                     'currentGroupKey' => 'default',
                     'uploadedAt' => $file->getCreatedAt()
                         ? date('Y-m-d\TH:i:s\Z', $file->getCreatedAt())
@@ -492,7 +491,7 @@ class PromptController extends AbstractController
         }
 
         // Also include files with 'extracted' status (have text, can be vectorized)
-        $extractedFiles = $fileRepository->findBy([
+        $extractedFiles = $this->fileRepository->findBy([
             'userId' => $user->getId(),
             'status' => 'extracted',
         ]);
@@ -1019,6 +1018,46 @@ class PromptController extends AbstractController
     }
 
     /**
+     * Reconstruct file text from RAG chunks (legacy fallback).
+     *
+     * For files uploaded before fileText was stored in the entity,
+     * the extracted text may only exist as RAG chunks in the BRAG table.
+     * This method assembles them back into a single string.
+     */
+    private function reconstructTextFromRagChunks(int $userId, int $fileId): string
+    {
+        try {
+            $conn = $this->em->getConnection();
+            $sql = 'SELECT BTEXT FROM BRAG WHERE BUID = :userId AND BMID = :fileId ORDER BY BCHUNK ASC';
+            $stmt = $conn->prepare($sql);
+            $stmt->bindValue('userId', $userId);
+            $stmt->bindValue('fileId', $fileId);
+            $rows = $stmt->executeQuery()->fetchAllAssociative();
+
+            if (empty($rows)) {
+                return '';
+            }
+
+            $this->logger->info('PromptController: Reconstructed text from RAG chunks (legacy fallback)', [
+                'file_id' => $fileId,
+                'user_id' => $userId,
+                'chunks' => count($rows),
+            ]);
+
+            return implode("\n\n", array_filter(
+                array_map(fn (array $row) => $row['BTEXT'] ?? '', $rows)
+            ));
+        } catch (\Throwable $e) {
+            $this->logger->warning('PromptController: Failed to reconstruct text from RAG chunks', [
+                'file_id' => $fileId,
+                'error' => $e->getMessage(),
+            ]);
+
+            return '';
+        }
+    }
+
+    /**
      * Build sorting categories (default vs custom) for UI display.
      *
      * @return array<int, array{name: string, description: string, type: string}>
@@ -1095,8 +1134,6 @@ class PromptController extends AbstractController
     public function getFiles(
         string $topic,
         #[CurrentUser] ?User $user,
-        RagDocumentRepository $ragRepository,
-        FileRepository $fileRepository,
     ): JsonResponse {
         if (!$user) {
             return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
@@ -1111,32 +1148,38 @@ class PromptController extends AbstractController
         // Build groupKey for this task prompt
         $groupKey = "TASKPROMPT:{$topic}";
 
-        // Get all RAG documents for this groupKey
-        $ragDocs = $ragRepository->findBy([
-            'userId' => $user->getId(),
-            'groupKey' => $groupKey,
-        ]);
+        // Get all files with chunks in a single request, then filter by groupKey.
+        // This avoids the N+1 query problem: one call instead of per-file lookups.
+        try {
+            $filesWithChunks = $this->vectorStorageFacade->getFilesWithChunks($user->getId());
+        } catch (\Throwable $e) {
+            $this->logger->warning('PromptController: Failed to get files with chunks', [
+                'group_key' => $groupKey,
+                'error' => $e->getMessage(),
+            ]);
+            $filesWithChunks = [];
+        }
 
-        // Group by file (messageId now references BFILES.BID)
+        // Build file list, filtering by groupKey and reusing chunk info from the same call
         $filesByFileId = [];
-        foreach ($ragDocs as $doc) {
-            $fileId = $doc->getMessageId(); // Actually references File.id now
-            if (!isset($filesByFileId[$fileId])) {
-                $file = $fileRepository->find($fileId);
-                if ($file) {
-                    $filesByFileId[$fileId] = [
-                        'messageId' => $fileId, // Keep as messageId for frontend compatibility
-                        'fileName' => $file->getFileName(),
-                        'chunks' => 0,
-                        'uploadedAt' => $file->getCreatedAt()
-                            ? date('Y-m-d\TH:i:s\Z', $file->getCreatedAt())
-                            : null,
-                    ];
-                }
+        foreach ($filesWithChunks as $fileId => $info) {
+            if ($info['groupKey'] !== $groupKey) {
+                continue;
             }
-            if (isset($filesByFileId[$fileId])) {
-                ++$filesByFileId[$fileId]['chunks'];
+
+            $file = $this->fileRepository->find($fileId);
+            if (!$file || $file->getUserId() !== $user->getId()) {
+                continue;
             }
+
+            $filesByFileId[$fileId] = [
+                'messageId' => $fileId, // Keep as messageId for frontend compatibility
+                'fileName' => $file->getFileName(),
+                'chunks' => $info['chunks'],
+                'uploadedAt' => $file->getCreatedAt()
+                    ? date('Y-m-d\TH:i:s\Z', $file->getCreatedAt())
+                    : null,
+            ];
         }
 
         return $this->json([
@@ -1358,7 +1401,6 @@ class PromptController extends AbstractController
         string $topic,
         int $messageId,
         #[CurrentUser] ?User $user,
-        RagDocumentRepository $ragRepository,
     ): JsonResponse {
         if (!$user) {
             return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
@@ -1384,20 +1426,15 @@ class PromptController extends AbstractController
             $fileName = $message->getFilePath() ? basename($message->getFilePath()) : 'Document';
         }
 
-        // If no fileText, try to get text from RAG chunks
+        // If no fileText from the file entity, fall back to reconstructing from RAG chunks.
+        // This handles legacy files uploaded before fileText was stored in the entity.
         if (empty(trim($fileText))) {
-            $ragDocs = $ragRepository->findBy([
-                'userId' => $user->getId(),
-                'messageId' => $messageId,
+            $this->logger->warning('PromptController: No extracted text in entity, attempting RAG chunk fallback', [
+                'message_id' => $messageId,
+                'user_id' => $user->getId(),
             ]);
 
-            if (!empty($ragDocs)) {
-                $chunks = [];
-                foreach ($ragDocs as $doc) {
-                    $chunks[] = $doc->getText();
-                }
-                $fileText = implode("\n\n", $chunks);
-            }
+            $fileText = $this->reconstructTextFromRagChunks($user->getId(), $messageId);
         }
 
         if (empty(trim($fileText))) {
