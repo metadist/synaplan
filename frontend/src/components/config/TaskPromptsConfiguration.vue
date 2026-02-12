@@ -1276,14 +1276,15 @@ const loadTemplates = () => {
 }
 
 /**
- * Toggle file selection for new prompt
+ * Toggle file selection for new prompt.
+ * Uses array replacement (instead of in-place splice/push) to ensure
+ * Vue reactivity is triggered reliably for all dependent computed/template bindings.
  */
 const toggleFileForNewPrompt = (fileId: number) => {
-  const index = newPromptSelectedFiles.value.indexOf(fileId)
-  if (index > -1) {
-    newPromptSelectedFiles.value.splice(index, 1)
+  if (newPromptSelectedFiles.value.includes(fileId)) {
+    newPromptSelectedFiles.value = newPromptSelectedFiles.value.filter((id) => id !== fileId)
   } else {
-    newPromptSelectedFiles.value.push(fileId)
+    newPromptSelectedFiles.value = [...newPromptSelectedFiles.value, fileId]
   }
 }
 
@@ -1291,10 +1292,7 @@ const toggleFileForNewPrompt = (fileId: number) => {
  * Remove file from new prompt selection
  */
 const removeFileFromNewPrompt = (fileId: number) => {
-  const index = newPromptSelectedFiles.value.indexOf(fileId)
-  if (index > -1) {
-    newPromptSelectedFiles.value.splice(index, 1)
-  }
+  newPromptSelectedFiles.value = newPromptSelectedFiles.value.filter((id) => id !== fileId)
 }
 
 /**
@@ -1367,16 +1365,34 @@ const handleCreateNew = async () => {
 
     // Link selected files to the new prompt (if any)
     if (newPromptSelectedFiles.value.length > 0) {
-      try {
-        for (const fileId of newPromptSelectedFiles.value) {
-          await promptsApi.linkFileToPrompt(newPrompt.topic, fileId)
+      let linkedCount = 0
+      const failedFiles: number[] = []
+
+      // Link each file individually so one failure doesn't abort the rest
+      for (const fileId of newPromptSelectedFiles.value) {
+        try {
+          const result = await promptsApi.linkFileToPrompt(newPrompt.topic, fileId)
+          // Check if chunks were actually linked (0 chunks = file not vectorized yet)
+          if (result && result.chunksLinked === 0) {
+            console.warn(`File ${fileId} linked but 0 chunks updated - file may not be vectorized yet`)
+            failedFiles.push(fileId)
+          } else {
+            linkedCount++
+          }
+        } catch (linkErr: any) {
+          console.error(`Failed to link file ${fileId}:`, linkErr)
+          failedFiles.push(fileId)
         }
+      }
+
+      if (failedFiles.length === 0) {
+        success(`Custom prompt created successfully with ${linkedCount} file(s) linked!`)
+      } else if (linkedCount > 0) {
         success(
-          `Custom prompt created successfully with ${newPromptSelectedFiles.value.length} file(s) linked!`
+          `Custom prompt created. ${linkedCount} file(s) linked, ${failedFiles.length} could not be linked.`
         )
-      } catch (linkErr: any) {
-        console.error('Failed to link files:', linkErr)
-        success('Custom prompt created successfully, but some files could not be linked.')
+      } else {
+        success('Custom prompt created successfully, but files could not be linked.')
       }
     } else {
       success('Custom prompt created successfully!')
@@ -1559,8 +1575,15 @@ const handleLinkFile = async (messageId: number) => {
   if (!currentPrompt.value?.topic) return
 
   try {
-    await promptsApi.linkFileToPrompt(currentPrompt.value.topic, messageId)
-    success('File linked successfully!')
+    const result = await promptsApi.linkFileToPrompt(currentPrompt.value.topic, messageId)
+
+    if (result.chunksLinked === 0) {
+      showError(
+        'File could not be linked: no vectorized chunks found. Please ensure the file has been fully processed.'
+      )
+    } else {
+      success(`File linked successfully! (${result.chunksLinked} chunks)`)
+    }
 
     // Reload both lists
     await Promise.all([loadPromptFiles(), loadAvailableFiles()])

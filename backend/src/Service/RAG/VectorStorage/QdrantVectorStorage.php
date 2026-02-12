@@ -169,6 +169,17 @@ final readonly class QdrantVectorStorage implements VectorStorageInterface
         return $this->qdrantClient->getFileIdsByGroupKey($userId, $groupKey);
     }
 
+    /**
+     * Get files with chunk counts for a specific group key.
+     * More efficient than getFilesWithChunks + filtering.
+     *
+     * @return array<int, array{chunks: int, groupKey: string}> Map of fileId => info
+     */
+    public function getFilesWithChunksByGroupKey(int $userId, string $groupKey): array
+    {
+        return $this->qdrantClient->getFilesWithChunksByGroupKey($userId, $groupKey);
+    }
+
     public function getFilesWithChunks(int $userId): array
     {
         return $this->qdrantClient->getFilesWithChunks($userId);
