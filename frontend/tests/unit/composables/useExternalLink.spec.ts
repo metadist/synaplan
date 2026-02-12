@@ -4,11 +4,11 @@ import { useExternalLink } from '@/composables/useExternalLink'
 const STORAGE_KEY = 'synaplan-skip-external-link-warning'
 
 describe('useExternalLink', () => {
-  let windowOpenSpy: ReturnType<typeof vi.spyOn>
+  let windowOpenSpy: ReturnType<typeof vi.spyOn<typeof window, 'open'>>
 
   beforeEach(() => {
     localStorage.clear()
-    windowOpenSpy = vi.spyOn(window, 'open').mockImplementation(() => null)
+    windowOpenSpy = vi.spyOn(window, 'open').mockReturnValue(null)
   })
 
   afterEach(() => {

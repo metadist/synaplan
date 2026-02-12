@@ -470,7 +470,7 @@ function processFeedbackBadges(html: string): string {
   // Match [Feedback:123] or [Feedback:123...] pattern (AI sometimes adds trailing dots)
   const feedbackRefPattern = /\[Feedback\s*:\s*(\d+)\.{0,3}\]/gi
 
-  return html.replace(feedbackRefPattern, (match, id) => {
+  return html.replace(feedbackRefPattern, (_match, id) => {
     const feedbackId = parseInt(id, 10)
     const feedback = feedbackStore.getFeedbackById(feedbackId)
 
