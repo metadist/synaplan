@@ -48,9 +48,9 @@ final class MemoryExtractionServicePromptRulesTest extends TestCase
                     $user = $messages[1]['content'] ?? '';
 
                     return str_contains($system, 'SYSTEM PROMPT (EN)')
-                        && str_contains($user, 'ATOMIC MEMORIES (VERY IMPORTANT):')
-                        && str_contains($user, 'Store **at most ONE fact** per memory value')
-                        && str_contains($user, 'create multiple memories with the same key');
+                        && str_contains($user, 'RULES:')
+                        && str_contains($user, 'Only save facts the user states about THEMSELVES')
+                        && str_contains($user, 'One fact per memory');
                 }),
                 1,
                 self::callback(static function (array $options): bool {
