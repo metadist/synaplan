@@ -29,6 +29,8 @@ export const TIMEOUTS = {
   LONG: 15_000,
   VERY_LONG: 30_000,
   EXTREME: 60_000,
+  /** Only for email delivery (e.g. verification email); keep other steps fast-fail */
+  EMAIL: 60_000,
 } as const
 
 // Poll [min, max] ms per check (randomized to reduce flakiness). Use FAST() etc. for expect.poll().
