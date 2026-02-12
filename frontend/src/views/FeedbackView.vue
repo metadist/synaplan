@@ -518,10 +518,10 @@ watch(
   { immediate: true }
 )
 
-// Handle query params for editing
+// Handle query params for editing (also re-checks after feedbacks load)
 watch(
-  () => route.query.edit,
-  (id) => {
+  [() => route.query.edit, () => feedbackStore.feedbacks],
+  ([id]) => {
     if (id) {
       const feedbackId = parseInt(id as string, 10)
       const feedback = feedbackStore.getFeedbackById(feedbackId)

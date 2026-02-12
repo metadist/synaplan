@@ -102,6 +102,9 @@ const navigateToFeedback = (feedback: FeedbackItem) => {
 }
 
 // Listen for feedback reference clicks from the message text
+let scrollTimer: ReturnType<typeof setTimeout> | null = null
+let highlightTimer: ReturnType<typeof setTimeout> | null = null
+
 const handleFeedbackRefClick = (event: CustomEvent) => {
   const { feedbackId } = event.detail as { feedbackId: number }
   const feedbackIndex = props.feedbacks.findIndex((f) => f.id === feedbackId)
@@ -114,7 +117,8 @@ const handleFeedbackRefClick = (event: CustomEvent) => {
     }
 
     // Scroll to the feedback after expansion
-    setTimeout(() => {
+    if (scrollTimer) clearTimeout(scrollTimer)
+    scrollTimer = setTimeout(() => {
       const feedbackEl = feedbackRefs.value[feedbackIndex]
       if (feedbackEl) {
         feedbackEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
@@ -122,7 +126,8 @@ const handleFeedbackRefClick = (event: CustomEvent) => {
     }, 300)
 
     // Remove highlight after 2 seconds
-    setTimeout(() => {
+    if (highlightTimer) clearTimeout(highlightTimer)
+    highlightTimer = setTimeout(() => {
       highlightedFeedback.value = null
     }, 2000)
   }
@@ -134,6 +139,8 @@ onMounted(() => {
 
 onUnmounted(() => {
   window.removeEventListener('open-feedback-dialog', handleFeedbackRefClick as EventListener)
+  if (scrollTimer) clearTimeout(scrollTimer)
+  if (highlightTimer) clearTimeout(highlightTimer)
 })
 </script>
 

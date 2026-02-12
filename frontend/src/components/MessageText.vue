@@ -382,12 +382,11 @@ function processMemoryBadges(html: string): string {
 
       // If no exact match, try prefix matching (AI sometimes truncates long IDs)
       if (!memory && memoryId.length >= 10) {
-        // Find memory where ID starts with the same digits (fuzzy match for truncated IDs)
+        // Only match if the provided ID is a prefix of a real ID (truncated by AI)
+        // Do NOT match if a real ID is a prefix of the provided ID — that causes false matches
         memory = availableMemories.find((m) => {
           const memIdStr = String(m.id)
-          // Check if the provided ID is a prefix of the actual ID (truncated)
-          // or if the actual ID is a prefix of the provided ID
-          return memIdStr.startsWith(memoryId) || memoryId.startsWith(memIdStr.slice(0, -1))
+          return memIdStr.startsWith(memoryId)
         })
       }
 
