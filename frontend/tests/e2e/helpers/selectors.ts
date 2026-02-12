@@ -176,6 +176,8 @@ export const selectors = {
     messageAiText: '[data-testid="message-ai-text"]',
     messageAutoText: '[data-testid="message-auto-text"]',
     messageUserText: '[data-testid="message-user-text"]',
+    /** E2E: present in assistant bubble when streaming finished */
+    messageDone: '[data-testid="message-done"]',
     // Error and warning selectors
     warningMessageLimit: '[data-testid="warning-message-limit"]',
     errorMessageLimitReached: '[data-testid="error-message-limit-reached"]',

@@ -2,7 +2,7 @@ import { test, expect } from '../test-setup'
 import { type Locator, type Page } from '@playwright/test'
 import { selectors } from '../helpers/selectors'
 import { login } from '../helpers/auth'
-import { TIMEOUTS, INTERVALS } from '../config/config'
+import { TIMEOUTS } from '../config/config'
 import { FIXTURE_PATHS } from '../config/test-data'
 import { readFileSync } from 'fs'
 import { fileURLToPath } from 'url'
@@ -19,7 +19,7 @@ function conversationBubbles(page: Page) {
   return page.locator(selectors.chat.messageContainer).locator(selectors.chat.aiAnswerBubble)
 }
 
-// attached → scroll → visible avoids viewport flakiness; then wait for loader hidden and text stable (2 same reads).
+// Wait for new bubble, then for stream end (message-done), then return text.
 async function waitForAnswer(
   page: Page,
   previousCount: number,
@@ -27,36 +27,20 @@ async function waitForAnswer(
 ): Promise<string> {
   const bubbles = page.locator(selectors.chat.aiAnswerBubble)
   const newBubble = bubbles.nth(previousCount)
-  const loaderTimeout = longTimeout ? TIMEOUTS.EXTREME : TIMEOUTS.VERY_LONG
-  const textStabilizeTimeout = longTimeout ? TIMEOUTS.VERY_LONG : TIMEOUTS.STANDARD
+  const streamTimeout = longTimeout ? TIMEOUTS.EXTREME : TIMEOUTS.VERY_LONG
 
-  await newBubble.waitFor({ state: 'attached', timeout: loaderTimeout })
+  await newBubble.waitFor({ state: 'attached', timeout: streamTimeout })
   await newBubble.scrollIntoViewIfNeeded()
   await newBubble.waitFor({ state: 'visible', timeout: TIMEOUTS.SHORT })
   await expect(bubbles).toHaveCount(previousCount + 1, { timeout: TIMEOUTS.SHORT })
 
+  await newBubble.locator(selectors.chat.messageDone).waitFor({
+    state: 'visible',
+    timeout: streamTimeout,
+  })
+
   const answer = newBubble.locator(selectors.chat.messageText)
-  const bubbleLoader = newBubble.locator(selectors.chat.loadIndicator)
-  await bubbleLoader.waitFor({ state: 'hidden', timeout: loaderTimeout }).catch(() => {})
-
-  let previousText = ''
-  let stableText = ''
-  await expect
-    .poll(
-      async () => {
-        const currentText = (await answer.innerText()).trim().toLowerCase()
-        if (currentText.length > 0 && currentText === previousText) {
-          stableText = currentText
-          return currentText
-        }
-        previousText = currentText
-        return null
-      },
-      { timeout: textStabilizeTimeout, intervals: INTERVALS.FAST() }
-    )
-    .not.toBeNull()
-
-  return stableText
+  return (await answer.innerText()).trim().toLowerCase()
 }
 
 async function ensureAdvancedMode(page: Page) {

@@ -270,6 +270,7 @@ test('@noci @smoke @widget Widget file upload works id=016', async ({ page }) =>
 
   const previousCount = await countWidgetMessages(page)
   const aiText = await waitForWidgetAnswer(page, previousCount)
+  await expect(widgetHost.locator(selectors.widget.messageDone).last()).toBeVisible()
   expect(aiText.length).toBeGreaterThan(0)
 
   await expect(widgetHost.locator(selectors.widget.errorFileUpload)).toHaveCount(0)
@@ -315,6 +316,7 @@ test('@noci @smoke @widget Widget file upload limit enforced id=018', async ({ p
 
   const previousCount = await countWidgetMessages(page)
   await waitForWidgetAnswer(page, previousCount)
+  await expect(widgetHost.locator(selectors.widget.messageDone).last()).toBeVisible()
 
   await fileInput.setInputFiles(secondFilePath)
 
@@ -380,7 +382,7 @@ test('@noci @smoke @widget Widget task prompt works id=017', async ({ page }) =>
   await widgetHost.locator(selectors.widget.sendButton).click()
 
   const aiText = await waitForWidgetAnswer(page, previousCount)
-
+  await expect(widgetHost.locator(selectors.widget.messageDone).last()).toBeVisible()
   expect(aiText.length).toBeGreaterThan(0)
 })
 
@@ -417,8 +419,8 @@ test('@smoke @widget User sends message via embedded widget and receives respons
 
   const aiText = await waitForWidgetAnswer(page, previousCount)
 
-  //TODO: needs additional assertion (done streaming, no errors)
-  await test.step('Assert: assistant message exists with non-empty text', async () => {
+  await test.step('Assert: stream ended (message-done) and assistant reply non-empty', async () => {
+    await expect(widgetHost.locator(selectors.widget.messageDone).last()).toBeVisible()
     expect(aiText.length).toBeGreaterThan(0)
   })
 })

@@ -58,7 +58,6 @@ export async function countWidgetMessages(page: Page): Promise<number> {
 }
 
 export async function waitForWidgetAnswer(page: Page, previousCount: number): Promise<string> {
-  // Wait for a new message to appear
   await expect
     .poll(
       async () => {
@@ -70,34 +69,13 @@ export async function waitForWidgetAnswer(page: Page, previousCount: number): Pr
     .not.toBeNull()
 
   const widgetHost = page.locator(selectors.widget.host)
+  await widgetHost
+    .locator(selectors.widget.messageDone)
+    .last()
+    .waitFor({ state: 'visible', timeout: TIMEOUTS.VERY_LONG })
+
   const aiTextElement = widgetHost.locator(selectors.widget.messageAiText).last()
-  await aiTextElement.waitFor({ state: 'visible', timeout: TIMEOUTS.VERY_LONG })
-
-  // Wait for stable text (tolerate empty reads from history reload flicker)
-  let lastNonEmpty = ''
-  let stableCount = 0
-  await expect
-    .poll(
-      async () => {
-        const host = page.locator(selectors.widget.host)
-        const el = host.locator(selectors.widget.messageAiText).last()
-        if ((await el.count()) === 0) return null
-        const text = (await el.innerText()).trim().toLowerCase()
-        if (text.length === 0) return null
-        if (text === lastNonEmpty) {
-          stableCount++
-          if (stableCount >= 2) return text
-          return null
-        }
-        lastNonEmpty = text
-        stableCount = 1
-        return null
-      },
-      { timeout: TIMEOUTS.VERY_LONG, intervals: INTERVALS.FAST() }
-    )
-    .not.toBeNull()
-
-  return lastNonEmpty
+  return (await aiTextElement.innerText()).trim().toLowerCase()
 }
 
 export async function createTestWidget(

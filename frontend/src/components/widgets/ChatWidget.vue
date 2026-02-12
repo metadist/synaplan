@@ -140,6 +140,12 @@
                   : { backgroundColor: widgetTheme === 'dark' ? '#2a2a2a' : '#f3f4f6' }
               "
             >
+              <span
+                v-if="message.role === 'assistant' && !isTyping"
+                data-testid="message-done"
+                class="sr-only"
+                aria-hidden="true"
+              />
               <template v-if="message.type === 'text'">
                 <div
                   v-if="message.role === 'assistant' && message.content === '' && isTyping"
