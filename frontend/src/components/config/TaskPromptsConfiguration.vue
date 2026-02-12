@@ -1374,7 +1374,9 @@ const handleCreateNew = async () => {
           const result = await promptsApi.linkFileToPrompt(newPrompt.topic, fileId)
           // Check if chunks were actually linked (0 chunks = file not vectorized yet)
           if (result && result.chunksLinked === 0) {
-            console.warn(`File ${fileId} linked but 0 chunks updated - file may not be vectorized yet`)
+            console.warn(
+              `File ${fileId} linked but 0 chunks updated - file may not be vectorized yet`
+            )
             failedFiles.push(fileId)
           } else {
             linkedCount++
