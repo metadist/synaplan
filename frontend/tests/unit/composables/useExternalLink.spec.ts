@@ -8,7 +8,9 @@ describe('useExternalLink', () => {
 
   beforeEach(() => {
     localStorage.clear()
-    windowOpenSpy = vi.spyOn(window, 'open').mockReturnValue(null) as unknown as ReturnType<typeof vi.fn>
+    windowOpenSpy = vi.spyOn(window, 'open').mockReturnValue(null) as unknown as ReturnType<
+      typeof vi.fn
+    >
   })
 
   afterEach(() => {
