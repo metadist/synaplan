@@ -18,7 +18,9 @@ const props = withDefaults(defineProps<Props>(), {
   isSubmitting: false,
 })
 
-const isDeleteOnly = computed(() => props.classification === 'memory' && !props.newStatementCorrection.trim())
+const isDeleteOnly = computed(
+  () => props.classification === 'memory' && !props.newStatementCorrection.trim()
+)
 
 const emit = defineEmits<{
   close: []
@@ -113,9 +115,7 @@ function handleCancel() {
           <div class="bg-amber-500/5 border-b border-amber-500/20 shrink-0">
             <div class="flex items-center justify-between p-4 sm:p-5">
               <div class="flex items-center gap-3">
-                <div
-                  class="w-11 h-11 rounded-xl bg-amber-500/10 flex items-center justify-center"
-                >
+                <div class="w-11 h-11 rounded-xl bg-amber-500/10 flex items-center justify-center">
                   <Icon icon="mdi:swap-horizontal-circle-outline" class="w-6 h-6 text-amber-500" />
                 </div>
                 <div>
@@ -143,8 +143,13 @@ function handleCancel() {
           <div class="overflow-y-auto flex-1 scroll-thin">
             <!-- Explanation -->
             <div class="px-4 sm:px-5 pt-4 sm:pt-5">
-              <div class="flex items-start gap-3 rounded-xl bg-amber-500/5 border border-amber-500/15 p-3">
-                <Icon icon="mdi:information-outline" class="w-4.5 h-4.5 text-amber-500 shrink-0 mt-0.5" />
+              <div
+                class="flex items-start gap-3 rounded-xl bg-amber-500/5 border border-amber-500/15 p-3"
+              >
+                <Icon
+                  icon="mdi:information-outline"
+                  class="w-4.5 h-4.5 text-amber-500 shrink-0 mt-0.5"
+                />
                 <p class="text-xs txt-secondary leading-relaxed">
                   {{ t('feedback.contradiction.explanation') }}
                 </p>
@@ -154,26 +159,34 @@ function handleCancel() {
             <div class="p-4 sm:px-5 sm:py-4 space-y-5">
               <!-- What you want to save -->
               <div>
-                <div class="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide txt-secondary mb-2">
+                <div
+                  class="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide txt-secondary mb-2"
+                >
                   <Icon icon="mdi:arrow-right-circle" class="w-3.5 h-3.5 text-brand" />
                   {{ t('feedback.contradiction.newStatement') }}
                 </div>
                 <div class="rounded-xl border-2 border-brand/25 bg-brand/5 p-3.5 space-y-2">
                   <div v-if="newStatementSummary" class="flex items-start gap-2">
-                    <div class="w-5 h-5 rounded-full bg-red-500/10 flex items-center justify-center shrink-0 mt-0.5">
+                    <div
+                      class="w-5 h-5 rounded-full bg-red-500/10 flex items-center justify-center shrink-0 mt-0.5"
+                    >
                       <Icon icon="mdi:close" class="w-3 h-3 text-red-500" />
                     </div>
                     <p class="text-sm txt-primary leading-relaxed">{{ newStatementSummary }}</p>
                   </div>
                   <div v-if="newStatementCorrection" class="flex items-start gap-2">
-                    <div class="w-5 h-5 rounded-full bg-green-500/10 flex items-center justify-center shrink-0 mt-0.5">
+                    <div
+                      class="w-5 h-5 rounded-full bg-green-500/10 flex items-center justify-center shrink-0 mt-0.5"
+                    >
                       <Icon icon="mdi:check" class="w-3 h-3 text-green-500" />
                     </div>
                     <p class="text-sm txt-primary leading-relaxed">{{ newStatementCorrection }}</p>
                   </div>
                   <!-- Delete-only indicator for memory classification -->
                   <div v-if="isDeleteOnly" class="flex items-start gap-2">
-                    <div class="w-5 h-5 rounded-full bg-red-500/10 flex items-center justify-center shrink-0 mt-0.5">
+                    <div
+                      class="w-5 h-5 rounded-full bg-red-500/10 flex items-center justify-center shrink-0 mt-0.5"
+                    >
                       <Icon icon="mdi:delete-outline" class="w-3 h-3 text-red-500" />
                     </div>
                     <p class="text-sm text-red-600 dark:text-red-400 font-medium leading-relaxed">
@@ -186,7 +199,9 @@ function handleCancel() {
               <!-- Conflicting items with individual controls -->
               <div>
                 <div class="flex items-center justify-between mb-2">
-                  <div class="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide txt-secondary">
+                  <div
+                    class="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide txt-secondary"
+                  >
                     <Icon icon="mdi:alert-outline" class="w-3.5 h-3.5 text-amber-500" />
                     {{ t('feedback.contradiction.existingItems') }}
                     <span class="text-[10px] font-normal txt-secondary/70">
@@ -198,9 +213,11 @@ function handleCancel() {
                     <button
                       type="button"
                       class="text-[10px] font-medium px-2 py-1 rounded-md transition-colors"
-                      :class="allSelected
-                        ? 'bg-red-500/10 text-red-500'
-                        : 'txt-secondary hover:txt-primary hover:bg-black/5 dark:hover:bg-white/5'"
+                      :class="
+                        allSelected
+                          ? 'bg-red-500/10 text-red-500'
+                          : 'txt-secondary hover:txt-primary hover:bg-black/5 dark:hover:bg-white/5'
+                      "
                       @click="selectAll"
                     >
                       {{ t('feedback.contradiction.replaceAll') }}
@@ -208,9 +225,11 @@ function handleCancel() {
                     <button
                       type="button"
                       class="text-[10px] font-medium px-2 py-1 rounded-md transition-colors"
-                      :class="noneSelected
-                        ? 'bg-green-500/10 text-green-500'
-                        : 'txt-secondary hover:txt-primary hover:bg-black/5 dark:hover:bg-white/5'"
+                      :class="
+                        noneSelected
+                          ? 'bg-green-500/10 text-green-500'
+                          : 'txt-secondary hover:txt-primary hover:bg-black/5 dark:hover:bg-white/5'
+                      "
                       @click="deselectAll"
                     >
                       {{ t('feedback.contradiction.keepAll') }}
@@ -223,16 +242,16 @@ function handleCancel() {
                     v-for="(c, idx) in contradictions"
                     :key="`${c.type}-${c.id}-${idx}`"
                     class="rounded-xl surface-chip overflow-hidden transition-all"
-                    :class="itemsToReplace.has(keyOf(c))
-                      ? 'ring-1 ring-red-500/25'
-                      : 'ring-1 ring-green-500/25'"
+                    :class="
+                      itemsToReplace.has(keyOf(c))
+                        ? 'ring-1 ring-red-500/25'
+                        : 'ring-1 ring-green-500/25'
+                    "
                   >
                     <!-- Item header with toggle -->
                     <div
                       class="flex items-center gap-3 px-3.5 py-2.5 cursor-pointer transition-colors"
-                      :class="itemsToReplace.has(keyOf(c))
-                        ? 'bg-red-500/5'
-                        : 'bg-green-500/5'"
+                      :class="itemsToReplace.has(keyOf(c)) ? 'bg-red-500/5' : 'bg-green-500/5'"
                       @click="toggleItem(c)"
                     >
                       <div class="flex items-center gap-2 flex-1 min-w-0">
@@ -259,25 +278,36 @@ function handleCancel() {
                       <!-- Decision badge -->
                       <span
                         class="text-[10px] font-semibold px-2.5 py-1 rounded-full shrink-0 flex items-center gap-1"
-                        :class="itemsToReplace.has(keyOf(c))
-                          ? 'bg-red-500/10 text-red-600 dark:text-red-400'
-                          : 'bg-green-500/10 text-green-600 dark:text-green-400'"
+                        :class="
+                          itemsToReplace.has(keyOf(c))
+                            ? 'bg-red-500/10 text-red-600 dark:text-red-400'
+                            : 'bg-green-500/10 text-green-600 dark:text-green-400'
+                        "
                       >
                         <Icon
                           :icon="itemsToReplace.has(keyOf(c)) ? 'mdi:delete-outline' : 'mdi:check'"
                           class="w-3 h-3"
                         />
-                        {{ itemsToReplace.has(keyOf(c))
-                          ? t('feedback.contradiction.willReplace')
-                          : t('feedback.contradiction.willKeep')
+                        {{
+                          itemsToReplace.has(keyOf(c))
+                            ? t('feedback.contradiction.willReplace')
+                            : t('feedback.contradiction.willKeep')
                         }}
                       </span>
                     </div>
                     <!-- Item content -->
-                    <div class="px-3.5 py-2.5 border-t border-light-border/5 dark:border-dark-border/5">
+                    <div
+                      class="px-3.5 py-2.5 border-t border-light-border/5 dark:border-dark-border/5"
+                    >
                       <p class="text-sm txt-primary leading-relaxed">{{ c.value }}</p>
-                      <p v-if="c.reason" class="text-xs txt-secondary mt-1.5 flex items-start gap-1.5">
-                        <Icon icon="mdi:information-outline" class="w-3.5 h-3.5 shrink-0 mt-0.5 text-amber-500" />
+                      <p
+                        v-if="c.reason"
+                        class="text-xs txt-secondary mt-1.5 flex items-start gap-1.5"
+                      >
+                        <Icon
+                          icon="mdi:information-outline"
+                          class="w-3.5 h-3.5 shrink-0 mt-0.5 text-amber-500"
+                        />
                         <span>{{ c.reason }}</span>
                       </p>
                     </div>
@@ -288,9 +318,7 @@ function handleCancel() {
           </div>
 
           <!-- Footer with summary + actions -->
-          <div
-            class="border-t border-light-border/10 dark:border-dark-border/10 shrink-0"
-          >
+          <div class="border-t border-light-border/10 dark:border-dark-border/10 shrink-0">
             <!-- Decision summary -->
             <div class="px-4 sm:px-5 pt-3.5 pb-2 flex items-center gap-3 text-xs txt-secondary">
               <span v-if="replaceCount > 0" class="flex items-center gap-1 text-red-500">

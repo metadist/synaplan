@@ -1896,14 +1896,16 @@ async function saveFalsePositiveFeedback(data: { summary: string; correction: st
     await doSaveFeedback(
       { summary: summary.trim(), correction: correction.trim() },
       undefined,
-      falsePositiveRelatedMemoryIds.value,
+      falsePositiveRelatedMemoryIds.value
     )
     if (falsePositiveClassification.value === 'memory') {
-      showSuccessToast(t(
-        correction.trim()
-          ? 'feedback.falsePositive.memoryUpdated'
-          : 'feedback.falsePositive.memoryDeleted'
-      ))
+      showSuccessToast(
+        t(
+          correction.trim()
+            ? 'feedback.falsePositive.memoryUpdated'
+            : 'feedback.falsePositive.memoryDeleted'
+        )
+      )
     } else {
       showSuccessToast(t('feedback.falsePositive.success'))
     }
@@ -1927,7 +1929,7 @@ async function saveFalsePositiveFeedback(data: { summary: string; correction: st
 async function doSaveFeedback(
   data: { summary: string; correction: string },
   itemsToDelete?: Contradiction[],
-  relatedMemoryIds?: number[],
+  relatedMemoryIds?: number[]
 ) {
   const isMemory = falsePositiveClassification.value === 'memory'
 
@@ -1937,17 +1939,14 @@ async function doSaveFeedback(
     const hasCorrection = data.correction.trim().length > 0
 
     // Build the list of target memory IDs: contradiction IDs take priority, then related IDs from preview
-    const targetIds: number[] = memoryContradictions.length > 0
-      ? memoryContradictions.map((c) => c.id)
-      : [...(relatedMemoryIds ?? [])]
+    const targetIds: number[] =
+      memoryContradictions.length > 0
+        ? memoryContradictions.map((c) => c.id)
+        : [...(relatedMemoryIds ?? [])]
 
     if (targetIds.length > 0 && hasCorrection) {
       // User provided a correction → update the first target memory, delete the rest
-      await memoriesStore.editMemory(
-        targetIds[0],
-        { value: data.correction },
-        { silent: true }
-      )
+      await memoriesStore.editMemory(targetIds[0], { value: data.correction }, { silent: true })
       // Delete remaining target memories via raw API (avoids loading/error churn + fetchCategories per item)
       const deletedIds: number[] = []
       for (let i = 1; i < targetIds.length; i++) {
@@ -2075,9 +2074,10 @@ function closeContradictionModal() {
   falsePositiveSubmitting.value = false
 }
 
-async function handleContradictionResolve(
-  data: { action: 'save' | 'cancel'; itemsToDelete: Contradiction[] }
-) {
+async function handleContradictionResolve(data: {
+  action: 'save' | 'cancel'
+  itemsToDelete: Contradiction[]
+}) {
   const pending = pendingSaveData.value
   if (!pending) {
     closeContradictionModal()
@@ -2096,11 +2096,13 @@ async function handleContradictionResolve(
     // Pass items to delete + related memory IDs into doSaveFeedback so it can handle memory updates vs deletions
     await doSaveFeedback(pending, data.itemsToDelete, pending.relatedMemoryIds)
     if (pending.classification === 'memory') {
-      showSuccessToast(t(
-        pending.correction.trim()
-          ? 'feedback.falsePositive.memoryUpdated'
-          : 'feedback.falsePositive.memoryDeleted'
-      ))
+      showSuccessToast(
+        t(
+          pending.correction.trim()
+            ? 'feedback.falsePositive.memoryUpdated'
+            : 'feedback.falsePositive.memoryDeleted'
+        )
+      )
     } else {
       showSuccessToast(t('feedback.falsePositive.success'))
     }

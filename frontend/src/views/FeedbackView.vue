@@ -86,7 +86,10 @@
         </div>
 
         <!-- Loading State -->
-        <div v-if="loading && feedbackStore.feedbacks.length === 0" class="flex items-center justify-center py-12">
+        <div
+          v-if="loading && feedbackStore.feedbacks.length === 0"
+          class="flex items-center justify-center py-12"
+        >
           <Icon icon="mdi:loading" class="w-8 h-8 animate-spin txt-secondary" />
         </div>
 
@@ -135,18 +138,21 @@
                 @change="toggleSelectAllOnPage"
               />
               <span class="text-xs txt-secondary group-hover:txt-primary transition-colors">
-                {{ isAllOnPageSelected
-                  ? $t('feedback.list.deselectAll')
-                  : $t('feedback.list.selectAllOnPage')
+                {{
+                  isAllOnPageSelected
+                    ? $t('feedback.list.deselectAll')
+                    : $t('feedback.list.selectAllOnPage')
                 }}
               </span>
             </label>
             <span class="text-xs txt-secondary">
-              {{ $t('feedback.list.showing', {
-                from: (currentPage - 1) * pageSize + 1,
-                to: Math.min(currentPage * pageSize, searchedFeedbacks.length),
-                total: searchedFeedbacks.length,
-              }) }}
+              {{
+                $t('feedback.list.showing', {
+                  from: (currentPage - 1) * pageSize + 1,
+                  to: Math.min(currentPage * pageSize, searchedFeedbacks.length),
+                  total: searchedFeedbacks.length,
+                })
+              }}
             </span>
           </div>
 
@@ -157,8 +163,10 @@
               class="surface-card rounded-xl transition-all group"
               :class="{
                 'ring-2 ring-brand/50 shadow-brand/10 shadow-lg': highlightedId === feedback.id,
-                'ring-1 ring-brand/20': selectedIds.has(feedback.id) && highlightedId !== feedback.id,
-                'hover:ring-1 hover:ring-brand/10': !selectedIds.has(feedback.id) && highlightedId !== feedback.id,
+                'ring-1 ring-brand/20':
+                  selectedIds.has(feedback.id) && highlightedId !== feedback.id,
+                'hover:ring-1 hover:ring-brand/10':
+                  !selectedIds.has(feedback.id) && highlightedId !== feedback.id,
               }"
             >
               <div class="flex items-start gap-3 p-4">
@@ -272,14 +280,15 @@
           </div>
 
           <!-- Pagination -->
-          <div
-            v-if="totalPages > 1"
-            class="flex items-center justify-center gap-1.5 pt-2"
-          >
+          <div v-if="totalPages > 1" class="flex items-center justify-center gap-1.5 pt-2">
             <button
               type="button"
               class="w-8 h-8 rounded-lg surface-chip flex items-center justify-center transition-colors"
-              :class="currentPage === 1 ? 'opacity-40 cursor-not-allowed' : 'hover:bg-black/5 dark:hover:bg-white/5'"
+              :class="
+                currentPage === 1
+                  ? 'opacity-40 cursor-not-allowed'
+                  : 'hover:bg-black/5 dark:hover:bg-white/5'
+              "
               :disabled="currentPage === 1"
               @click="currentPage = currentPage - 1"
             >
@@ -287,16 +296,21 @@
             </button>
 
             <template v-for="page in visiblePages" :key="page">
-              <span v-if="page === '...'" class="w-8 h-8 flex items-center justify-center text-xs txt-secondary">
+              <span
+                v-if="page === '...'"
+                class="w-8 h-8 flex items-center justify-center text-xs txt-secondary"
+              >
                 …
               </span>
               <button
                 v-else
                 type="button"
                 class="w-8 h-8 rounded-lg text-xs font-medium transition-colors"
-                :class="currentPage === page
-                  ? 'bg-brand text-white'
-                  : 'surface-chip txt-secondary hover:txt-primary hover:bg-black/5 dark:hover:bg-white/5'"
+                :class="
+                  currentPage === page
+                    ? 'bg-brand text-white'
+                    : 'surface-chip txt-secondary hover:txt-primary hover:bg-black/5 dark:hover:bg-white/5'
+                "
                 @click="currentPage = page as number"
               >
                 {{ page }}
@@ -306,7 +320,11 @@
             <button
               type="button"
               class="w-8 h-8 rounded-lg surface-chip flex items-center justify-center transition-colors"
-              :class="currentPage === totalPages ? 'opacity-40 cursor-not-allowed' : 'hover:bg-black/5 dark:hover:bg-white/5'"
+              :class="
+                currentPage === totalPages
+                  ? 'opacity-40 cursor-not-allowed'
+                  : 'hover:bg-black/5 dark:hover:bg-white/5'
+              "
               :disabled="currentPage === totalPages"
               @click="currentPage = currentPage + 1"
             >
@@ -332,9 +350,10 @@
               </div>
               <div>
                 <h3 class="text-lg font-semibold txt-primary">
-                  {{ isBulkDelete
-                    ? $t('feedback.list.bulkDeleteTitle')
-                    : $t('feedback.list.deleteTitle')
+                  {{
+                    isBulkDelete
+                      ? $t('feedback.list.bulkDeleteTitle')
+                      : $t('feedback.list.deleteTitle')
                   }}
                 </h3>
                 <p v-if="isBulkDelete" class="text-xs txt-secondary mt-0.5">
@@ -343,9 +362,10 @@
               </div>
             </div>
             <p class="txt-secondary text-sm mb-6">
-              {{ isBulkDelete
-                ? $t('feedback.list.bulkDeleteConfirm')
-                : $t('feedback.list.deleteConfirm')
+              {{
+                isBulkDelete
+                  ? $t('feedback.list.bulkDeleteConfirm')
+                  : $t('feedback.list.deleteConfirm')
               }}
             </p>
             <div class="flex justify-end gap-2">
@@ -468,8 +488,8 @@ const isAllOnPageSelected = computed(
   () => pageIds.value.size > 0 && [...pageIds.value].every((id) => selectedIds.value.has(id))
 )
 
-const isSomeOnPageSelected = computed(
-  () => [...pageIds.value].some((id) => selectedIds.value.has(id))
+const isSomeOnPageSelected = computed(() =>
+  [...pageIds.value].some((id) => selectedIds.value.has(id))
 )
 
 // ── Watchers ───────────────────────────────────────────

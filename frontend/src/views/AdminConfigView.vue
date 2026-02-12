@@ -307,10 +307,7 @@ onMounted(async () => {
                   Live
                 </span>
               </div>
-              <p
-                v-if="section.isLive"
-                class="text-xs txt-secondary mb-4 -mt-2"
-              >
+              <p v-if="section.isLive" class="text-xs txt-secondary mb-4 -mt-2">
                 {{ $t('admin.config.liveHint') }}
               </p>
               <div class="space-y-4">

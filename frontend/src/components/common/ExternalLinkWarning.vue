@@ -58,7 +58,9 @@ defineExpose({ shouldShowWarning })
         class="fixed inset-0 z-[9999] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4"
         @click.self="cancel"
       >
-        <div class="w-full max-w-md rounded-2xl surface-primary shadow-2xl border border-light-border/10 dark:border-dark-border/10 overflow-hidden">
+        <div
+          class="w-full max-w-md rounded-2xl surface-primary shadow-2xl border border-light-border/10 dark:border-dark-border/10 overflow-hidden"
+        >
           <!-- Header -->
           <div class="flex items-center gap-3 px-5 pt-5 pb-3">
             <div class="flex items-center justify-center w-10 h-10 rounded-full bg-amber-500/10">
@@ -72,7 +74,9 @@ defineExpose({ shouldShowWarning })
 
           <!-- Body -->
           <div class="px-5 py-3 space-y-3">
-            <div class="rounded-lg surface-chip px-3.5 py-2.5 flex items-center gap-2.5 overflow-hidden">
+            <div
+              class="rounded-lg surface-chip px-3.5 py-2.5 flex items-center gap-2.5 overflow-hidden"
+            >
               <Icon icon="mdi:web" class="w-4 h-4 text-blue-400 shrink-0" />
               <span class="text-sm txt-primary font-medium truncate">{{ hostname }}</span>
             </div>
@@ -95,7 +99,9 @@ defineExpose({ shouldShowWarning })
           </div>
 
           <!-- Actions -->
-          <div class="flex items-center justify-end gap-2 px-5 py-4 border-t border-light-border/10 dark:border-dark-border/10">
+          <div
+            class="flex items-center justify-end gap-2 px-5 py-4 border-t border-light-border/10 dark:border-dark-border/10"
+          >
             <button
               type="button"
               class="px-4 py-2 rounded-lg text-sm font-medium txt-secondary hover:surface-chip transition-colors"

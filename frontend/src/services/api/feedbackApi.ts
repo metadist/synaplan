@@ -116,9 +116,7 @@ export const KbSourcesResponseSchema = z.object({
 
 export type KbSource = z.infer<typeof KbSourceSchema>
 
-export async function researchKbSources(
-  text: string
-): Promise<{ sources: KbSource[] }> {
+export async function researchKbSources(text: string): Promise<{ sources: KbSource[] }> {
   return await httpClient('/api/v1/feedback/false-positive/research', {
     method: 'POST',
     body: JSON.stringify({ text }),
@@ -141,9 +139,7 @@ export const WebSourcesResponseSchema = z.object({
 
 export type WebSource = z.infer<typeof WebSourceSchema>
 
-export async function researchWebSources(
-  text: string
-): Promise<{ sources: WebSource[] }> {
+export async function researchWebSources(text: string): Promise<{ sources: WebSource[] }> {
   return await httpClient('/api/v1/feedback/false-positive/web-research', {
     method: 'POST',
     body: JSON.stringify({ text }),

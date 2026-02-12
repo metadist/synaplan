@@ -15,7 +15,6 @@ use Psr\Log\LoggerInterface;
  */
 final readonly class FeedbackContradictionService
 {
-
     public function __construct(
         private AiFacade $aiFacade,
         private ModelConfigService $modelConfigService,

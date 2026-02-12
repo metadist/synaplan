@@ -679,11 +679,7 @@
     </div>
   </div>
 
-  <ExternalLinkWarning
-    :url="pendingUrl"
-    :is-open="warningOpen"
-    @close="closeWarning"
-  />
+  <ExternalLinkWarning :url="pendingUrl" :is-open="warningOpen" @close="closeWarning" />
 </template>
 
 <script setup lang="ts">

@@ -7,7 +7,12 @@ import { useNotification } from '@/composables/useNotification'
 import { useExternalLink } from '@/composables/useExternalLink'
 import ExternalLinkWarning from '@/components/common/ExternalLinkWarning.vue'
 import { chatApi } from '@/services/api/chatApi'
-import { researchKbSources, researchWebSources, type KbSource, type WebSource } from '@/services/api/feedbackApi'
+import {
+  researchKbSources,
+  researchWebSources,
+  type KbSource,
+  type WebSource,
+} from '@/services/api/feedbackApi'
 
 interface Props {
   isOpen: boolean
@@ -68,7 +73,10 @@ const selectedSourceKeys = ref<Set<string>>(new Set())
 
 // Source type display helpers
 function sourceTypeDisplay(sourceType: string) {
-  const map: Record<string, { icon: string; label: string; iconColor: string; badgeColor: string }> = {
+  const map: Record<
+    string,
+    { icon: string; label: string; iconColor: string; badgeColor: string }
+  > = {
     file: {
       icon: 'mdi:file-document-outline',
       label: t('feedback.falsePositive.sourceTypeFile'),
@@ -266,17 +274,26 @@ async function enhanceText(
 }
 
 const enhanceSummary = () => enhanceText(customSummary, enhancingSummary, summaryEnhanceHintShown)
-const enhanceCorrection = () => enhanceText(customCorrection, enhancingCorrection, correctionEnhanceHintShown)
+const enhanceCorrection = () =>
+  enhanceText(customCorrection, enhancingCorrection, correctionEnhanceHintShown)
 
 // Show enhance hint after typing threshold
 function onCustomSummaryInput() {
-  if (customSummary.value.length > ENHANCE_HINT_THRESHOLD && !summaryEnhanceHintShown.value && !enhancingSummary.value) {
+  if (
+    customSummary.value.length > ENHANCE_HINT_THRESHOLD &&
+    !summaryEnhanceHintShown.value &&
+    !enhancingSummary.value
+  ) {
     summaryEnhanceHintShown.value = true
   }
 }
 
 function onCustomCorrectionInput() {
-  if (customCorrection.value.length > ENHANCE_HINT_THRESHOLD && !correctionEnhanceHintShown.value && !enhancingCorrection.value) {
+  if (
+    customCorrection.value.length > ENHANCE_HINT_THRESHOLD &&
+    !correctionEnhanceHintShown.value &&
+    !enhancingCorrection.value
+  ) {
     correctionEnhanceHintShown.value = true
   }
 }
@@ -480,13 +497,23 @@ const isMemory = computed(() => props.classification === 'memory')
               <!-- Step indicator -->
               <div class="flex items-center gap-2 text-xs font-medium txt-secondary">
                 <div class="flex items-center gap-1.5">
-                  <div class="w-5 h-5 rounded-full bg-brand/10 text-brand flex items-center justify-center text-[10px] font-bold">1</div>
+                  <div
+                    class="w-5 h-5 rounded-full bg-brand/10 text-brand flex items-center justify-center text-[10px] font-bold"
+                  >
+                    1
+                  </div>
                   <span class="txt-secondary">{{ t('feedback.falsePositive.stepSelect') }}</span>
                 </div>
                 <Icon icon="mdi:chevron-right" class="w-3.5 h-3.5 txt-secondary/50" />
                 <div class="flex items-center gap-1.5">
-                  <div class="w-5 h-5 rounded-full bg-brand text-white flex items-center justify-center text-[10px] font-bold">2</div>
-                  <span class="font-semibold txt-primary">{{ t('feedback.falsePositive.stepConfirm') }}</span>
+                  <div
+                    class="w-5 h-5 rounded-full bg-brand text-white flex items-center justify-center text-[10px] font-bold"
+                  >
+                    2
+                  </div>
+                  <span class="font-semibold txt-primary">{{
+                    t('feedback.falsePositive.stepConfirm')
+                  }}</span>
                 </div>
               </div>
 
@@ -518,9 +545,11 @@ const isMemory = computed(() => props.classification === 'memory')
                     v-for="(option, idx) in summaryOptions"
                     :key="`sum-${idx}`"
                     class="flex items-start gap-2.5 p-2.5 rounded-lg cursor-pointer transition-all"
-                    :class="selectedSummaryIdx === idx
-                      ? 'bg-red-500/5 ring-1 ring-red-500/25'
-                      : 'hover:bg-black/[0.02] dark:hover:bg-white/[0.02]'"
+                    :class="
+                      selectedSummaryIdx === idx
+                        ? 'bg-red-500/5 ring-1 ring-red-500/25'
+                        : 'hover:bg-black/[0.02] dark:hover:bg-white/[0.02]'
+                    "
                   >
                     <input
                       type="radio"
@@ -531,7 +560,10 @@ const isMemory = computed(() => props.classification === 'memory')
                     />
                     <div class="flex-1 min-w-0">
                       <p class="text-sm txt-primary leading-relaxed">{{ option }}</p>
-                      <span v-if="idx === 0" class="text-[10px] font-medium text-red-500/70 mt-0.5 inline-block">
+                      <span
+                        v-if="idx === 0"
+                        class="text-[10px] font-medium text-red-500/70 mt-0.5 inline-block"
+                      >
                         {{ t('feedback.falsePositive.recommended') }}
                       </span>
                     </div>
@@ -539,9 +571,11 @@ const isMemory = computed(() => props.classification === 'memory')
                   <!-- Custom option -->
                   <label
                     class="flex items-start gap-2.5 p-2.5 rounded-lg cursor-pointer transition-all"
-                    :class="selectedSummaryIdx === 'custom'
-                      ? 'bg-red-500/5 ring-1 ring-red-500/25'
-                      : 'hover:bg-black/[0.02] dark:hover:bg-white/[0.02]'"
+                    :class="
+                      selectedSummaryIdx === 'custom'
+                        ? 'bg-red-500/5 ring-1 ring-red-500/25'
+                        : 'hover:bg-black/[0.02] dark:hover:bg-white/[0.02]'
+                    "
                   >
                     <input
                       type="radio"
@@ -551,7 +585,9 @@ const isMemory = computed(() => props.classification === 'memory')
                       @change="selectedSummaryIdx = 'custom'"
                     />
                     <div class="flex-1 min-w-0">
-                      <span class="text-sm txt-secondary">{{ t('feedback.falsePositive.customOption') }}</span>
+                      <span class="text-sm txt-secondary">{{
+                        t('feedback.falsePositive.customOption')
+                      }}</span>
                       <div v-if="selectedSummaryIdx === 'custom'" class="mt-1.5">
                         <div class="relative">
                           <textarea
@@ -564,11 +600,13 @@ const isMemory = computed(() => props.classification === 'memory')
                           <button
                             type="button"
                             class="absolute right-1.5 bottom-1.5 flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-medium transition-all"
-                            :class="enhancingSummary
-                              ? 'bg-brand/20 text-brand cursor-wait'
-                              : customSummary.trim()
-                                ? 'bg-brand/10 text-brand hover:bg-brand/20'
-                                : 'bg-gray-500/5 txt-secondary/40 cursor-not-allowed'"
+                            :class="
+                              enhancingSummary
+                                ? 'bg-brand/20 text-brand cursor-wait'
+                                : customSummary.trim()
+                                  ? 'bg-brand/10 text-brand hover:bg-brand/20'
+                                  : 'bg-gray-500/5 txt-secondary/40 cursor-not-allowed'
+                            "
                             :disabled="!customSummary.trim() || enhancingSummary"
                             @click.stop="enhanceSummary"
                           >
@@ -601,13 +639,17 @@ const isMemory = computed(() => props.classification === 'memory')
               <!-- What is correct - Correction options -->
               <div class="rounded-xl border border-green-500/15 overflow-hidden">
                 <div class="px-4 py-2.5 bg-green-500/5 flex items-center gap-2">
-                  <div class="w-6 h-6 rounded-full bg-green-500/10 flex items-center justify-center">
+                  <div
+                    class="w-6 h-6 rounded-full bg-green-500/10 flex items-center justify-center"
+                  >
                     <Icon icon="mdi:check" class="w-3.5 h-3.5 text-green-500" />
                   </div>
                   <span class="text-sm font-semibold txt-primary">
                     {{ t('feedback.falsePositive.correctionLabel') }}
                   </span>
-                  <span class="text-[10px] px-1.5 py-0.5 rounded-full bg-green-500/10 text-green-600 dark:text-green-400 font-medium ml-auto">
+                  <span
+                    class="text-[10px] px-1.5 py-0.5 rounded-full bg-green-500/10 text-green-600 dark:text-green-400 font-medium ml-auto"
+                  >
                     {{ t('feedback.falsePositive.optional') }}
                   </span>
                 </div>
@@ -620,9 +662,11 @@ const isMemory = computed(() => props.classification === 'memory')
                     v-for="(option, idx) in correctionOptions"
                     :key="`cor-${idx}`"
                     class="flex items-start gap-2.5 p-2.5 rounded-lg cursor-pointer transition-all"
-                    :class="selectedCorrectionIdx === idx
-                      ? 'bg-green-500/5 ring-1 ring-green-500/25'
-                      : 'hover:bg-black/[0.02] dark:hover:bg-white/[0.02]'"
+                    :class="
+                      selectedCorrectionIdx === idx
+                        ? 'bg-green-500/5 ring-1 ring-green-500/25'
+                        : 'hover:bg-black/[0.02] dark:hover:bg-white/[0.02]'
+                    "
                   >
                     <input
                       type="radio"
@@ -633,7 +677,10 @@ const isMemory = computed(() => props.classification === 'memory')
                     />
                     <div class="flex-1 min-w-0">
                       <p class="text-sm txt-primary leading-relaxed">{{ option }}</p>
-                      <span v-if="idx === 0" class="text-[10px] font-medium text-green-500/70 mt-0.5 inline-block">
+                      <span
+                        v-if="idx === 0"
+                        class="text-[10px] font-medium text-green-500/70 mt-0.5 inline-block"
+                      >
                         {{ t('feedback.falsePositive.recommended') }}
                       </span>
                     </div>
@@ -642,9 +689,11 @@ const isMemory = computed(() => props.classification === 'memory')
                   <label
                     v-if="isMemory"
                     class="flex items-start gap-2.5 p-2.5 rounded-lg cursor-pointer transition-all"
-                    :class="selectedCorrectionIdx === 'delete'
-                      ? 'bg-red-500/5 ring-1 ring-red-500/25'
-                      : 'hover:bg-black/[0.02] dark:hover:bg-white/[0.02]'"
+                    :class="
+                      selectedCorrectionIdx === 'delete'
+                        ? 'bg-red-500/5 ring-1 ring-red-500/25'
+                        : 'hover:bg-black/[0.02] dark:hover:bg-white/[0.02]'
+                    "
                   >
                     <input
                       type="radio"
@@ -656,7 +705,9 @@ const isMemory = computed(() => props.classification === 'memory')
                     <div class="flex-1 min-w-0">
                       <div class="flex items-center gap-2">
                         <Icon icon="mdi:delete-outline" class="w-4 h-4 text-red-500" />
-                        <span class="text-sm font-medium txt-primary">{{ t('feedback.falsePositive.deleteMemoryOption') }}</span>
+                        <span class="text-sm font-medium txt-primary">{{
+                          t('feedback.falsePositive.deleteMemoryOption')
+                        }}</span>
                       </div>
                       <p class="text-[11px] txt-secondary mt-1 leading-relaxed">
                         {{ t('feedback.falsePositive.deleteMemoryOptionHint') }}
@@ -666,9 +717,11 @@ const isMemory = computed(() => props.classification === 'memory')
                   <!-- Research option -->
                   <label
                     class="flex items-start gap-2.5 p-2.5 rounded-lg cursor-pointer transition-all"
-                    :class="selectedCorrectionIdx === 'research'
-                      ? 'bg-blue-500/5 ring-1 ring-blue-500/25'
-                      : 'hover:bg-black/[0.02] dark:hover:bg-white/[0.02]'"
+                    :class="
+                      selectedCorrectionIdx === 'research'
+                        ? 'bg-blue-500/5 ring-1 ring-blue-500/25'
+                        : 'hover:bg-black/[0.02] dark:hover:bg-white/[0.02]'
+                    "
                   >
                     <input
                       type="radio"
@@ -680,22 +733,30 @@ const isMemory = computed(() => props.classification === 'memory')
                     <div class="flex-1 min-w-0">
                       <div class="flex items-center gap-2">
                         <Icon icon="mdi:book-search-outline" class="w-4 h-4 text-blue-500" />
-                        <span class="text-sm font-medium txt-primary">{{ t('feedback.falsePositive.researchOption') }}</span>
+                        <span class="text-sm font-medium txt-primary">{{
+                          t('feedback.falsePositive.researchOption')
+                        }}</span>
                       </div>
                       <p class="text-[11px] txt-secondary mt-1 leading-relaxed">
                         {{ t('feedback.falsePositive.researchOptionHint') }}
                       </p>
 
                       <!-- Research panel (visible when selected) -->
-                      <div v-if="selectedCorrectionIdx === 'research'" class="mt-3 space-y-3" @click.stop>
+                      <div
+                        v-if="selectedCorrectionIdx === 'research'"
+                        class="mt-3 space-y-3"
+                        @click.stop
+                      >
                         <!-- Tabs: Your files / Web search -->
                         <div class="flex rounded-lg surface-chip overflow-hidden">
                           <button
                             type="button"
                             class="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium transition-colors"
-                            :class="researchTab === 'kb'
-                              ? 'bg-blue-500/15 text-blue-600 dark:text-blue-400'
-                              : 'txt-secondary hover:txt-primary'"
+                            :class="
+                              researchTab === 'kb'
+                                ? 'bg-blue-500/15 text-blue-600 dark:text-blue-400'
+                                : 'txt-secondary hover:txt-primary'
+                            "
                             @click="researchTab = 'kb'"
                           >
                             <Icon icon="mdi:database-search-outline" class="w-3.5 h-3.5" />
@@ -704,9 +765,11 @@ const isMemory = computed(() => props.classification === 'memory')
                           <button
                             type="button"
                             class="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium transition-colors"
-                            :class="researchTab === 'web'
-                              ? 'bg-blue-500/15 text-blue-600 dark:text-blue-400'
-                              : 'txt-secondary hover:txt-primary'"
+                            :class="
+                              researchTab === 'web'
+                                ? 'bg-blue-500/15 text-blue-600 dark:text-blue-400'
+                                : 'txt-secondary hover:txt-primary'
+                            "
                             @click="researchTab = 'web'"
                           >
                             <Icon icon="mdi:web" class="w-3.5 h-3.5" />
@@ -724,27 +787,44 @@ const isMemory = computed(() => props.classification === 'memory')
                             @click="startKbSearch"
                           >
                             <Icon
-                              :icon="researchLoading ? 'mdi:loading' : 'mdi:database-search-outline'"
+                              :icon="
+                                researchLoading ? 'mdi:loading' : 'mdi:database-search-outline'
+                              "
                               :class="['w-4 h-4', researchLoading ? 'animate-spin' : '']"
                             />
-                            {{ researchLoading ? t('feedback.falsePositive.researchLoadingKb') : t('feedback.falsePositive.researchButtonKb') }}
+                            {{
+                              researchLoading
+                                ? t('feedback.falsePositive.researchLoadingKb')
+                                : t('feedback.falsePositive.researchButtonKb')
+                            }}
                           </button>
                           <template v-if="kbDone">
                             <div v-if="kbSources.length === 0" class="text-center py-4">
-                              <Icon icon="mdi:file-search-outline" class="w-8 h-8 txt-secondary/40 mx-auto mb-2" />
-                              <p class="text-sm txt-secondary">{{ t('feedback.falsePositive.researchNoResultsKb') }}</p>
-                              <p class="text-[11px] txt-secondary/70 mt-1">{{ t('feedback.falsePositive.researchNoResultsHintKb') }}</p>
+                              <Icon
+                                icon="mdi:file-search-outline"
+                                class="w-8 h-8 txt-secondary/40 mx-auto mb-2"
+                              />
+                              <p class="text-sm txt-secondary">
+                                {{ t('feedback.falsePositive.researchNoResultsKb') }}
+                              </p>
+                              <p class="text-[11px] txt-secondary/70 mt-1">
+                                {{ t('feedback.falsePositive.researchNoResultsHintKb') }}
+                              </p>
                             </div>
                             <template v-else>
-                              <p class="text-[11px] txt-secondary font-medium">{{ t('feedback.falsePositive.researchSelectHint') }}</p>
+                              <p class="text-[11px] txt-secondary font-medium">
+                                {{ t('feedback.falsePositive.researchSelectHint') }}
+                              </p>
                               <div class="space-y-2 max-h-[30vh] overflow-y-auto scroll-thin">
                                 <div
                                   v-for="source in kbSources"
                                   :key="`kb-${source.id}`"
                                   class="rounded-lg border transition-all cursor-pointer"
-                                  :class="selectedSourceKeys.has(`kb-${source.id}`)
-                                    ? 'border-green-500/30 bg-green-500/5'
-                                    : 'border-light-border/10 dark:border-dark-border/10 hover:border-blue-500/20'"
+                                  :class="
+                                    selectedSourceKeys.has(`kb-${source.id}`)
+                                      ? 'border-green-500/30 bg-green-500/5'
+                                      : 'border-light-border/10 dark:border-dark-border/10 hover:border-blue-500/20'
+                                  "
                                   @click="toggleSourceKey(`kb-${source.id}`)"
                                 >
                                   <div class="p-3 space-y-1.5">
@@ -764,7 +844,8 @@ const isMemory = computed(() => props.classification === 'memory')
                                         <span
                                           v-if="source.sourceType === 'file' && source.fileName"
                                           class="text-xs font-medium txt-primary truncate"
-                                        >{{ source.fileName }}</span>
+                                          >{{ source.fileName }}</span
+                                        >
                                         <span
                                           class="text-[10px] px-1.5 py-0.5 rounded-full font-medium shrink-0"
                                           :class="sourceTypeDisplay(source.sourceType).badgeColor"
@@ -772,18 +853,28 @@ const isMemory = computed(() => props.classification === 'memory')
                                           {{ sourceTypeDisplay(source.sourceType).label }}
                                         </span>
                                       </div>
-                                      <span class="text-[10px] px-1.5 py-0.5 rounded-full font-medium shrink-0"
-                                        :class="source.score >= 0.7
-                                          ? 'bg-green-500/10 text-green-600 dark:text-green-400'
-                                          : source.score >= 0.5
-                                            ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400'
-                                            : 'bg-gray-500/10 txt-secondary'"
+                                      <span
+                                        class="text-[10px] px-1.5 py-0.5 rounded-full font-medium shrink-0"
+                                        :class="
+                                          source.score >= 0.7
+                                            ? 'bg-green-500/10 text-green-600 dark:text-green-400'
+                                            : source.score >= 0.5
+                                              ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400'
+                                              : 'bg-gray-500/10 txt-secondary'
+                                        "
                                       >
                                         {{ Math.round(source.score * 100) }}%
                                       </span>
                                     </div>
-                                    <p class="text-sm txt-primary leading-relaxed pl-6">{{ source.summary }}</p>
-                                    <p v-if="source.excerpt !== source.summary" class="text-[11px] txt-secondary/70 leading-relaxed pl-6 line-clamp-2">{{ source.excerpt }}</p>
+                                    <p class="text-sm txt-primary leading-relaxed pl-6">
+                                      {{ source.summary }}
+                                    </p>
+                                    <p
+                                      v-if="source.excerpt !== source.summary"
+                                      class="text-[11px] txt-secondary/70 leading-relaxed pl-6 line-clamp-2"
+                                    >
+                                      {{ source.excerpt }}
+                                    </p>
                                   </div>
                                 </div>
                               </div>
@@ -813,24 +904,39 @@ const isMemory = computed(() => props.classification === 'memory')
                               :icon="researchLoading ? 'mdi:loading' : 'mdi:web'"
                               :class="['w-4 h-4', researchLoading ? 'animate-spin' : '']"
                             />
-                            {{ researchLoading ? t('feedback.falsePositive.researchLoadingWeb') : t('feedback.falsePositive.researchButtonWeb') }}
+                            {{
+                              researchLoading
+                                ? t('feedback.falsePositive.researchLoadingWeb')
+                                : t('feedback.falsePositive.researchButtonWeb')
+                            }}
                           </button>
                           <template v-if="webDone">
                             <div v-if="webSources.length === 0" class="text-center py-4">
-                              <Icon icon="mdi:web-off" class="w-8 h-8 txt-secondary/40 mx-auto mb-2" />
-                              <p class="text-sm txt-secondary">{{ t('feedback.falsePositive.researchNoResultsWeb') }}</p>
-                              <p class="text-[11px] txt-secondary/70 mt-1">{{ t('feedback.falsePositive.researchNoResultsHintWeb') }}</p>
+                              <Icon
+                                icon="mdi:web-off"
+                                class="w-8 h-8 txt-secondary/40 mx-auto mb-2"
+                              />
+                              <p class="text-sm txt-secondary">
+                                {{ t('feedback.falsePositive.researchNoResultsWeb') }}
+                              </p>
+                              <p class="text-[11px] txt-secondary/70 mt-1">
+                                {{ t('feedback.falsePositive.researchNoResultsHintWeb') }}
+                              </p>
                             </div>
                             <template v-else>
-                              <p class="text-[11px] txt-secondary font-medium">{{ t('feedback.falsePositive.researchSelectHint') }}</p>
+                              <p class="text-[11px] txt-secondary font-medium">
+                                {{ t('feedback.falsePositive.researchSelectHint') }}
+                              </p>
                               <div class="space-y-2 max-h-[30vh] overflow-y-auto scroll-thin">
                                 <div
                                   v-for="source in webSources"
                                   :key="`web-${source.id}`"
                                   class="rounded-lg border transition-all cursor-pointer"
-                                  :class="selectedSourceKeys.has(`web-${source.id}`)
-                                    ? 'border-green-500/30 bg-green-500/5'
-                                    : 'border-light-border/10 dark:border-dark-border/10 hover:border-blue-500/20'"
+                                  :class="
+                                    selectedSourceKeys.has(`web-${source.id}`)
+                                      ? 'border-green-500/30 bg-green-500/5'
+                                      : 'border-light-border/10 dark:border-dark-border/10 hover:border-blue-500/20'
+                                  "
                                   @click="toggleSourceKey(`web-${source.id}`)"
                                 >
                                   <div class="p-3 space-y-1.5">
@@ -842,11 +948,18 @@ const isMemory = computed(() => props.classification === 'memory')
                                         @change.stop="toggleSourceKey(`web-${source.id}`)"
                                       />
                                       <div class="flex items-center gap-1.5 min-w-0 flex-1">
-                                        <Icon icon="mdi:web" class="w-3.5 h-3.5 text-blue-400 shrink-0" />
-                                        <span class="text-xs font-medium txt-primary truncate">{{ source.title }}</span>
+                                        <Icon
+                                          icon="mdi:web"
+                                          class="w-3.5 h-3.5 text-blue-400 shrink-0"
+                                        />
+                                        <span class="text-xs font-medium txt-primary truncate">{{
+                                          source.title
+                                        }}</span>
                                       </div>
                                     </div>
-                                    <p class="text-sm txt-primary leading-relaxed pl-6">{{ source.summary }}</p>
+                                    <p class="text-sm txt-primary leading-relaxed pl-6">
+                                      {{ source.summary }}
+                                    </p>
                                     <button
                                       type="button"
                                       class="text-[11px] text-blue-500 hover:underline pl-6 inline-flex items-center gap-1"
@@ -872,9 +985,14 @@ const isMemory = computed(() => props.classification === 'memory')
                         </template>
 
                         <!-- Global selected count (across both tabs) -->
-                        <div v-if="selectedSourceCount > 0" class="flex items-center gap-2 text-[11px] text-green-600 dark:text-green-400 font-medium">
+                        <div
+                          v-if="selectedSourceCount > 0"
+                          class="flex items-center gap-2 text-[11px] text-green-600 dark:text-green-400 font-medium"
+                        >
                           <Icon icon="mdi:check-circle" class="w-3.5 h-3.5" />
-                          {{ t('feedback.falsePositive.researchSelectedCount', selectedSourceCount) }}
+                          {{
+                            t('feedback.falsePositive.researchSelectedCount', selectedSourceCount)
+                          }}
                         </div>
                       </div>
                     </div>
@@ -882,9 +1000,11 @@ const isMemory = computed(() => props.classification === 'memory')
                   <!-- Custom option -->
                   <label
                     class="flex items-start gap-2.5 p-2.5 rounded-lg cursor-pointer transition-all"
-                    :class="selectedCorrectionIdx === 'custom'
-                      ? 'bg-green-500/5 ring-1 ring-green-500/25'
-                      : 'hover:bg-black/[0.02] dark:hover:bg-white/[0.02]'"
+                    :class="
+                      selectedCorrectionIdx === 'custom'
+                        ? 'bg-green-500/5 ring-1 ring-green-500/25'
+                        : 'hover:bg-black/[0.02] dark:hover:bg-white/[0.02]'
+                    "
                   >
                     <input
                       type="radio"
@@ -894,7 +1014,9 @@ const isMemory = computed(() => props.classification === 'memory')
                       @change="selectedCorrectionIdx = 'custom'"
                     />
                     <div class="flex-1 min-w-0">
-                      <span class="text-sm txt-secondary">{{ t('feedback.falsePositive.customOption') }}</span>
+                      <span class="text-sm txt-secondary">{{
+                        t('feedback.falsePositive.customOption')
+                      }}</span>
                       <div v-if="selectedCorrectionIdx === 'custom'" class="mt-1.5">
                         <div class="relative">
                           <textarea
@@ -907,11 +1029,13 @@ const isMemory = computed(() => props.classification === 'memory')
                           <button
                             type="button"
                             class="absolute right-1.5 bottom-1.5 flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-medium transition-all"
-                            :class="enhancingCorrection
-                              ? 'bg-brand/20 text-brand cursor-wait'
-                              : customCorrection.trim()
-                                ? 'bg-brand/10 text-brand hover:bg-brand/20'
-                                : 'bg-gray-500/5 txt-secondary/40 cursor-not-allowed'"
+                            :class="
+                              enhancingCorrection
+                                ? 'bg-brand/20 text-brand cursor-wait'
+                                : customCorrection.trim()
+                                  ? 'bg-brand/10 text-brand hover:bg-brand/20'
+                                  : 'bg-gray-500/5 txt-secondary/40 cursor-not-allowed'
+                            "
                             :disabled="!customCorrection.trim() || enhancingCorrection"
                             @click.stop="enhanceCorrection"
                           >
@@ -958,18 +1082,21 @@ const isMemory = computed(() => props.classification === 'memory')
               <!-- Info Box - different explanation based on classification -->
               <div
                 class="rounded-xl p-3.5 flex items-start gap-3"
-                :class="isMemory
-                  ? 'bg-blue-500/5 border border-blue-500/10'
-                  : 'bg-brand/5 border border-brand/10'"
+                :class="
+                  isMemory
+                    ? 'bg-blue-500/5 border border-blue-500/10'
+                    : 'bg-brand/5 border border-brand/10'
+                "
               >
                 <Icon
                   :icon="isMemory ? 'mdi:brain' : 'mdi:lightbulb-outline'"
                   :class="['w-5 h-5 shrink-0 mt-0.5', isMemory ? 'text-blue-500' : 'text-brand']"
                 />
                 <p class="text-xs txt-secondary leading-relaxed">
-                  {{ isMemory
-                    ? t('feedback.falsePositive.memoryExplanation')
-                    : t('feedback.falsePositive.explanation')
+                  {{
+                    isMemory
+                      ? t('feedback.falsePositive.memoryExplanation')
+                      : t('feedback.falsePositive.explanation')
                   }}
                 </p>
               </div>
@@ -1023,11 +1150,7 @@ const isMemory = computed(() => props.classification === 'memory')
     </Transition>
   </Teleport>
 
-  <ExternalLinkWarning
-    :url="pendingUrl"
-    :is-open="warningOpen"
-    @close="closeWarning"
-  />
+  <ExternalLinkWarning :url="pendingUrl" :is-open="warningOpen" @close="closeWarning" />
 </template>
 
 <style scoped>

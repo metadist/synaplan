@@ -8,13 +8,13 @@ use App\Entity\Message;
 use App\Entity\User;
 use App\Repository\ModelRepository;
 use App\Repository\PromptRepository;
+use App\Service\FeedbackConfigService;
+use App\Service\FeedbackConstants;
 use App\Service\File\FileHelper;
 use App\Service\File\UserUploadPathBuilder;
 use App\Service\MemoryExtractionService;
 use App\Service\ModelConfigService;
 use App\Service\PromptService;
-use App\Service\FeedbackConfigService;
-use App\Service\FeedbackConstants;
 use App\Service\RAG\VectorSearchService;
 use App\Service\UserMemoryService;
 use Doctrine\ORM\EntityManagerInterface;
@@ -1816,6 +1816,7 @@ class ChatHandler implements MessageHandlerInterface
      * Post-filter results by score (safety net — Qdrant may return below-threshold results).
      *
      * @param array<int, array<string, mixed>> $items
+     *
      * @return array<int, array<string, mixed>>
      */
     private function filterByScore(array $items, float $minScore): array
