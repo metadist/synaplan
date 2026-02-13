@@ -837,7 +837,7 @@ interface ToolOption {
 
 const { success, error: showError } = useNotification()
 const dialog = useDialog()
-const { locale } = useI18n()
+const { t, locale } = useI18n()
 const authStore = useAuthStore()
 const isAdmin = computed(() => authStore.isAdmin)
 
@@ -998,7 +998,7 @@ const loadAIModels = async () => {
     if (response.success) {
       allModels.value = response.models
     }
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error('Failed to load AI models:', err)
   } finally {
     loadingModels.value = false
@@ -1051,8 +1051,8 @@ const loadPrompts = async () => {
     })
 
     // Don't auto-select any prompt - let user choose or use URL parameter
-  } catch (err: any) {
-    const errorMessage = err.message || 'Failed to load prompts'
+  } catch (err: unknown) {
+    const errorMessage = err instanceof Error ? err.message : 'Failed to load prompts'
     error.value = errorMessage
     showError(errorMessage)
   } finally {
@@ -1224,8 +1224,8 @@ const handleSave = saveChanges(async () => {
 
       success('Prompt updated successfully!')
     }
-  } catch (err: any) {
-    let errorMessage = err.message || 'Failed to save prompt'
+  } catch (err: unknown) {
+    let errorMessage = err instanceof Error ? err.message : 'Failed to save prompt'
 
     // Handle specific errors
     if (errorMessage.includes('Validation failed')) {
@@ -1381,20 +1381,20 @@ const handleCreateNew = async () => {
           } else {
             linkedCount++
           }
-        } catch (linkErr: any) {
+        } catch (linkErr: unknown) {
           console.error(`Failed to link file ${fileId}:`, linkErr)
           failedFiles.push(fileId)
         }
       }
 
       if (failedFiles.length === 0) {
-        success(`Custom prompt created successfully with ${linkedCount} file(s) linked!`)
+        success(t('config.taskPrompts.createSuccessWithFiles', { count: linkedCount }))
       } else if (linkedCount > 0) {
         success(
-          `Custom prompt created. ${linkedCount} file(s) linked, ${failedFiles.length} could not be linked.`
+          t('config.taskPrompts.createSuccessPartialFiles', { linked: linkedCount, failed: failedFiles.length })
         )
       } else {
-        success('Custom prompt created successfully, but files could not be linked.')
+        success(t('config.taskPrompts.createSuccessNoFilesLinked'))
       }
     } else {
       success('Custom prompt created successfully!')
@@ -1414,8 +1414,8 @@ const handleCreateNew = async () => {
 
     // Reload files for the new prompt
     await loadPromptFiles()
-  } catch (err: any) {
-    let errorMessage = err.message || 'Failed to create prompt'
+  } catch (err: unknown) {
+    let errorMessage = err instanceof Error ? err.message : 'Failed to create prompt'
 
     // Handle specific errors
     if (errorMessage.includes('already have a prompt with this topic')) {
@@ -1479,8 +1479,8 @@ const handleDelete = async () => {
     }
 
     success('Prompt deleted successfully!')
-  } catch (err: any) {
-    const errorMessage = err.message || 'Failed to delete prompt'
+  } catch (err: unknown) {
+    const errorMessage = err instanceof Error ? err.message : 'Failed to delete prompt'
     showError(errorMessage)
   } finally {
     loading.value = false
@@ -1498,7 +1498,7 @@ const loadPromptFiles = async () => {
 
   try {
     promptFiles.value = await promptsApi.getPromptFiles(currentPrompt.value.topic)
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error('Failed to load prompt files:', err)
     promptFiles.value = []
   }
@@ -1527,8 +1527,8 @@ const handleDeleteFile = async (messageId: number) => {
 
     // Reload files list
     await loadPromptFiles()
-  } catch (err: any) {
-    const errorMessage = err.message || 'Failed to delete file'
+  } catch (err: unknown) {
+    const errorMessage = err instanceof Error ? err.message : 'Failed to delete file'
     showError(errorMessage)
   }
 }
@@ -1555,7 +1555,7 @@ const loadAvailableFiles = async () => {
   loadingAvailableFiles.value = true
   try {
     availableFiles.value = await promptsApi.getAvailableFiles(availableFilesSearch.value)
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error('Failed to load available files:', err)
     availableFiles.value = []
   } finally {
@@ -1580,17 +1580,15 @@ const handleLinkFile = async (messageId: number) => {
     const result = await promptsApi.linkFileToPrompt(currentPrompt.value.topic, messageId)
 
     if (result.chunksLinked === 0) {
-      showError(
-        'File could not be linked: no vectorized chunks found. Please ensure the file has been fully processed.'
-      )
+      showError(t('config.taskPrompts.fileLinkErrorNoChunks'))
     } else {
-      success(`File linked successfully! (${result.chunksLinked} chunks)`)
+      success(t('config.taskPrompts.fileLinkSuccess', { count: result.chunksLinked }))
     }
 
     // Reload both lists
     await Promise.all([loadPromptFiles(), loadAvailableFiles()])
-  } catch (err: any) {
-    const errorMessage = err.message || 'Failed to link file'
+  } catch (err: unknown) {
+    const errorMessage = err instanceof Error ? err.message : 'Failed to link file'
     showError(errorMessage)
   }
 }
