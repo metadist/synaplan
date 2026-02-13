@@ -1148,25 +1148,25 @@ class PromptController extends AbstractController
         // Build groupKey for this task prompt
         $groupKey = "TASKPROMPT:{$topic}";
 
-        // Get all files with chunks in a single request, then filter by groupKey.
-        // This avoids the N+1 query problem: one call instead of per-file lookups.
+        // Get files with chunks for this specific group key directly.
+        // This uses a targeted query (by groupKey) instead of fetching ALL files
+        // and filtering, which avoids stale groupKey issues with Qdrant.
         try {
-            $filesWithChunks = $this->vectorStorageFacade->getFilesWithChunks($user->getId());
+            $filesWithChunks = $this->vectorStorageFacade->getFilesWithChunksByGroupKey(
+                $user->getId(),
+                $groupKey
+            );
         } catch (\Throwable $e) {
-            $this->logger->warning('PromptController: Failed to get files with chunks', [
+            $this->logger->warning('PromptController: Failed to get files for group key', [
                 'group_key' => $groupKey,
                 'error' => $e->getMessage(),
             ]);
             $filesWithChunks = [];
         }
 
-        // Build file list, filtering by groupKey and reusing chunk info from the same call
+        // Build file list from targeted query results
         $filesByFileId = [];
         foreach ($filesWithChunks as $fileId => $info) {
-            if ($info['groupKey'] !== $groupKey) {
-                continue;
-            }
-
             $file = $this->fileRepository->find($fileId);
             if (!$file || $file->getUserId() !== $user->getId()) {
                 continue;
