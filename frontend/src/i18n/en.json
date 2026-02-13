@@ -779,7 +779,12 @@
       "systemPromptAdminDesc": "You have admin access. Changes will update this system prompt for ALL users across all languages.",
       "systemPromptLanguageFixed": "System prompt — language is locked to the original value and cannot be changed.",
       "customPromptLanguageNote": "This custom prompt is language-specific. It will only appear when the interface matches this language.",
-      "selectPromptHelpAdmin": "Select a prompt to edit. System prompts apply to all users. Use 'Create New' for personal overrides."
+      "selectPromptHelpAdmin": "Select a prompt to edit. System prompts apply to all users. Use 'Create New' for personal overrides.",
+      "createSuccessWithFiles": "Custom prompt created successfully with {count} file(s) linked!",
+      "createSuccessPartialFiles": "Custom prompt created. {linked} file(s) linked, {failed} could not be linked.",
+      "createSuccessNoFilesLinked": "Custom prompt created successfully, but files could not be linked.",
+      "fileLinkErrorNoChunks": "File could not be linked: no vectorized chunks found. Please ensure the file has been fully processed.",
+      "fileLinkSuccess": "File linked successfully! ({count} chunks)"
     },
     "sortingPrompt": {
       "title": "Preprocessor",
