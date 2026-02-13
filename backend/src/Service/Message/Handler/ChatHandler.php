@@ -8,6 +8,8 @@ use App\Entity\Message;
 use App\Entity\User;
 use App\Repository\ModelRepository;
 use App\Repository\PromptRepository;
+use App\Service\FeedbackConfigService;
+use App\Service\FeedbackConstants;
 use App\Service\File\FileHelper;
 use App\Service\File\UserUploadPathBuilder;
 use App\Service\MemoryExtractionService;
@@ -40,6 +42,7 @@ class ChatHandler implements MessageHandlerInterface
         private UserUploadPathBuilder $userUploadPathBuilder,
         private UserMemoryService $memoryService,
         private MemoryExtractionService $memoryExtractionService,
+        private FeedbackConfigService $feedbackConfig,
     ) {
     }
 
@@ -218,7 +221,7 @@ class ChatHandler implements MessageHandlerInterface
             'tokens' => $response['usage'] ?? [],
         ];
 
-        // NEW: Check for file generation format first (for OfficeM maker)
+        // Check for file generation format first (for OfficeM maker)
         $fileData = $this->extractFileGenerationData($content);
         if (null !== $fileData) {
             $this->logger->info('ChatHandler: Detected AI file generation');
@@ -319,7 +322,7 @@ class ChatHandler implements MessageHandlerInterface
             'user_id' => $message->getUserId(),
         ]);
 
-        // ✨ NEW: Load RAG context for task prompt (if files are associated)
+        // Load RAG context for task prompt (if files are associated)
         $ragContext = '';
         $ragResultsCount = 0;
 
@@ -408,19 +411,19 @@ class ChatHandler implements MessageHandlerInterface
             ));
         }
 
-        // ✨ NEW: Load user memories from Qdrant/Microservice
+        // Load user memories from Qdrant/Microservice
         $memoriesContext = '';
         $loadedMemories = [];
+        $memoriesDisabledByRequest = !empty($options['disable_memories'])
+            || ('WIDGET' === ($options['channel'] ?? null))
+            || ('widget' === ($classification['source'] ?? null));
 
         // Load user entity (Message only has userId, not User object)
         $user = $this->em->getRepository(User::class)->find($message->getUserId());
         $memoriesEnabledForUser = $user?->isMemoriesEnabled() ?? true;
 
-        // Widget mode: Memories are disabled for anonymous widget users
-        $isWidgetMode = $classification['is_widget_mode'] ?? false;
-
-        if ($isWidgetMode) {
-            $this->logger->debug('ChatHandler: Widget mode detected, skipping memories', [
+        if ($memoriesDisabledByRequest) {
+            $this->logger->debug('ChatHandler: Memories disabled for widget request, skipping memories', [
                 'user_id' => $message->getUserId(),
             ]);
         } elseif (!$memoriesEnabledForUser) {
@@ -436,21 +439,23 @@ class ChatHandler implements MessageHandlerInterface
 
                 // Search for relevant memories using Qdrant
                 // Balance between precision and recall
-                // Lower than 0.5 to catch semantically related queries (e.g., "wie heiße ich?" → "full name")
-                // Higher than 0.2 to avoid completely unrelated memories
-                $loadedMemories = $this->memoryService->searchRelevantMemories(
+                $rawMemories = $this->memoryService->searchRelevantMemories(
                     $message->getUserId(),
                     $message->getText(),
-                    limit: 15, // Moderate limit - enough context without overwhelming
-                    minScore: 0.35 // Balanced threshold - catches related concepts without noise
+                    limit: $this->feedbackConfig->getMaxChatMemories(),
+                    minScore: $this->feedbackConfig->getMinChatMemoryScore()
                 );
+
+                // Post-filter: Qdrant may return low-score results despite minScore
+                $loadedMemories = $this->filterByScore($rawMemories, $this->feedbackConfig->getMinChatMemoryScore());
 
                 $this->logger->debug('ChatHandler: Memories loaded from Qdrant', [
                     'count' => count($loadedMemories),
+                    'filtered_out' => count($rawMemories) - count($loadedMemories),
                     'memories' => array_map(fn ($m) => [
                         'id' => $m['id'] ?? null,
                         'key' => $m['key'] ?? null,
-                        'category' => $m['category'] ?? null,
+                        'score' => $m['score'] ?? 0,
                     ], $loadedMemories),
                 ]);
             } catch (\Throwable $e) {
@@ -474,12 +479,9 @@ class ChatHandler implements MessageHandlerInterface
                 );
             }
             $memoriesContext .= "\nUse these memories to personalize your response.\n";
-            $memoriesContext .= "IMPORTANT (MEMORY REFERENCES):\n";
-            $memoriesContext .= "- Only reference memories using the format [Memory:ID] where ID is a numeric ID that appears in the list above.\n";
-            $memoriesContext .= "- NEVER invent IDs or placeholders (no 'new', 'neu', arrows, or free text inside [Memory:...]).\n";
-            $memoriesContext .= "- If you mention information that is NOT in the list above (e.g. something that will be saved after this reply), do NOT add a [Memory:...] reference.\n";
-            $memoriesContext .= "Examples: 'According to [Memory:42], you prefer...' or 'Based on [Memory:15], your name is...'\n";
-            $memoriesContext .= "The [Memory:ID] references are clickable for the user.\n";
+            $memoriesContext .= "REFERENCES: Use [Memory:ID] (clickable). Rules:\n";
+            $memoriesContext .= "- ONE ID per bracket. Good: [Memory:42] and [Memory:15]. Bad: [Memory:42, 15].\n";
+            $memoriesContext .= "- Only use IDs from the list above. Never invent IDs.\n";
 
             $this->logger->info('ChatHandler: User memories loaded', [
                 'user_id' => $message->getUserId(),
@@ -502,6 +504,86 @@ class ChatHandler implements MessageHandlerInterface
             $this->logger->debug('ChatHandler: No relevant memories found', [
                 'user_id' => $message->getUserId(),
             ]);
+        }
+
+        // Load feedback examples (false positives and positives) from Qdrant
+        // These help the AI avoid known mistakes and reinforce correct information
+        $feedbackContext = '';
+        $loadedFeedbacks = [];
+        if (!$memoriesDisabledByRequest && $memoriesEnabledForUser && $this->memoryService->isAvailable()) {
+            try {
+                // Search for relevant false positives (things to AVOID saying)
+                $falsePositives = $this->searchFeedback(
+                    $message->getUserId(),
+                    $message->getText(),
+                    'feedback_negative',
+                    FeedbackConstants::NAMESPACE_FALSE_POSITIVE
+                );
+
+                // Search for relevant positive examples (correct information)
+                $positiveExamples = $this->searchFeedback(
+                    $message->getUserId(),
+                    $message->getText(),
+                    'feedback_positive',
+                    FeedbackConstants::NAMESPACE_POSITIVE
+                );
+
+                if (!empty($falsePositives) || !empty($positiveExamples)) {
+                    $feedbackContext = "\n\n## User Feedback (corrections from previous conversations):\n";
+
+                    if (!empty($falsePositives)) {
+                        $feedbackContext .= "\n### Things to AVOID (user-reported false positives) - Reference as [Feedback:ID]:\n";
+                        foreach ($falsePositives as $fp) {
+                            $feedbackContext .= sprintf("- ❌ [Feedback:%d] %s\n", $fp['id'], $fp['value']);
+                            $loadedFeedbacks[] = [
+                                'id' => $fp['id'],
+                                'type' => 'false_positive',
+                                'value' => $fp['value'],
+                            ];
+                        }
+                    }
+
+                    if (!empty($positiveExamples)) {
+                        $feedbackContext .= "\n### Correct information (user-confirmed) - Reference as [Feedback:ID]:\n";
+                        foreach ($positiveExamples as $pe) {
+                            $feedbackContext .= sprintf("- ✅ [Feedback:%d] %s\n", $pe['id'], $pe['value']);
+                            $loadedFeedbacks[] = [
+                                'id' => $pe['id'],
+                                'type' => 'positive',
+                                'value' => $pe['value'],
+                            ];
+                        }
+                    }
+
+                    $feedbackContext .= "\nREFERENCES: Use [Feedback:ID] (clickable). Rules:\n";
+                    $feedbackContext .= "- ONE ID per bracket. Good: [Feedback:123] and [Feedback:456]. Bad: [Feedback:123, 456].\n";
+                    $feedbackContext .= "- Avoid repeating ❌ claims. Prefer ✅ information.\n";
+                    $feedbackContext .= "- If ❌ and ✅ entries contradict each other, mention the conflict to the user.\n";
+
+                    // Send SSE event with loaded feedbacks
+                    if ($progressCallback) {
+                        $progressCallback([
+                            'status' => 'feedback_loaded',
+                            'message' => 'Feedback examples loaded',
+                            'metadata' => [
+                                'feedbacks' => $loadedFeedbacks,
+                                'count' => count($loadedFeedbacks),
+                            ],
+                            'timestamp' => time(),
+                        ]);
+                    }
+
+                    $this->logger->info('ChatHandler: Feedback examples loaded', [
+                        'user_id' => $message->getUserId(),
+                        'false_positives_count' => count($falsePositives),
+                        'positive_examples_count' => count($positiveExamples),
+                    ]);
+                }
+            } catch (\Throwable $e) {
+                $this->logger->warning('ChatHandler: Failed to load feedback examples', [
+                    'error' => $e->getMessage(),
+                ]);
+            }
         }
 
         // Get model - Priority: User-selected (Again) > Prompt Metadata > Classification override > DB default
@@ -590,7 +672,7 @@ class ChatHandler implements MessageHandlerInterface
             ]);
         }
 
-        // ✨ NEW: Append RAG context to system prompt if available
+        // Append RAG context to system prompt if available
         if (!empty($ragContext)) {
             $systemPrompt .= $ragContext;
             $this->logger->info('ChatHandler: RAG context appended to system prompt', [
@@ -599,12 +681,20 @@ class ChatHandler implements MessageHandlerInterface
             ]);
         }
 
-        // ✨ NEW: Append user memories context to system prompt if available
+        // Append user memories context to system prompt if available
         if (!empty($memoriesContext)) {
             $systemPrompt .= $memoriesContext;
             $this->logger->info('ChatHandler: Memories context appended to system prompt', [
                 'memories_count' => count($loadedMemories),
                 'memories_context_length' => strlen($memoriesContext),
+            ]);
+        }
+
+        // Append feedback examples context to system prompt if available
+        if (!empty($feedbackContext)) {
+            $systemPrompt .= $feedbackContext;
+            $this->logger->info('ChatHandler: Feedback context appended to system prompt', [
+                'feedback_context_length' => strlen($feedbackContext),
             ]);
         }
 
@@ -719,16 +809,17 @@ class ChatHandler implements MessageHandlerInterface
 
         $this->notify($progressCallback, 'generating', 'Response generated.');
 
-        // Memory Extraction (Option B: After AI-Response, in the same Request)
-        // Skip memory extraction for widget mode (anonymous users)
-        if (!$isWidgetMode) {
-            // ✨ NEW: Pass the AI response to memory extraction so it can extract from the answer too!
-            $this->logger->info('💾 Loading ALL memories for extraction', ['user_id' => $message->getUserId()]);
-            $allMemories = $this->memoryService->searchRelevantMemories($message->getUserId(), $message->getText(), limit: 100, minScore: 0.0);
-            $this->extractMemoriesAfterResponse($message, $fullResponseText, $thread, $allMemories, $progressCallback);
-            $this->logger->info('✅ Loaded memories for extraction', ['count' => count($allMemories), 'sample' => array_slice($allMemories, 0, 2)]);
+        if ($memoriesDisabledByRequest) {
+            $this->logger->info('ChatHandler: Skipping memory extraction for widget request', [
+                'user_id' => $message->getUserId(),
+            ]);
         } else {
-            $this->logger->debug('ChatHandler: Skipping memory extraction for widget mode');
+            // Memory Extraction (Option B: After AI-Response, in the same Request)
+            // Pass the AI response to memory extraction so it can extract from the answer too
+            $this->logger->info('💾 Loading relevant memories for extraction', ['user_id' => $message->getUserId()]);
+            $allMemories = $this->memoryService->searchRelevantMemories($message->getUserId(), $message->getText(), limit: 20, minScore: $this->feedbackConfig->getMinExtractionScore());
+            $this->extractMemoriesAfterResponse($message, $fullResponseText, $thread, $allMemories, $progressCallback);
+            $this->logger->info('✅ Loaded memories for extraction', ['count' => count($allMemories)]);
         }
 
         return [
@@ -738,6 +829,7 @@ class ChatHandler implements MessageHandlerInterface
                 'model_id' => $modelId, // Include resolved model_id for storage
                 'tokens' => $metadata['usage'] ?? [],
                 'memories' => $loadedMemories, // Include memories used for this response
+                'feedbacks' => $loadedFeedbacks, // Include feedback examples used for this response
             ],
         ];
     }
@@ -795,7 +887,7 @@ class ChatHandler implements MessageHandlerInterface
             $content = $msg->getText();
 
             // File Text inkludieren wenn vorhanden (Legacy + NEW MessageFiles)
-            $allFilesText = $msg->getAllFilesText(); // NEW: combines legacy + File texts
+            $allFilesText = $msg->getAllFilesText(); // Combines legacy + file texts
             if (!empty($allFilesText)) {
                 $fileInfo = '';
                 if ($msg->getFiles()->count() > 0) {
@@ -825,7 +917,7 @@ class ChatHandler implements MessageHandlerInterface
 
         // Aktuelle Message
         $content = $currentMessage->getText();
-        $allFilesText = $currentMessage->getAllFilesText(); // NEW: combines all files
+        $allFilesText = $currentMessage->getAllFilesText(); // Combines all files
 
         $this->logger->info('🔍 ChatHandler: File text debug', [
             'message_id' => $currentMessage->getId(),
@@ -1493,7 +1585,7 @@ class ChatHandler implements MessageHandlerInterface
      */
     private function extractMemoriesAfterResponse(
         Message $message,
-        string $aiResponse, // ✨ NEW: Full AI response text
+        string $aiResponse, // Full AI response text
         array $thread,
         array $relevantMemories = [], // The SAME memories that chat AI saw (from microservice)
         ?callable $progressCallback = null,
@@ -1532,7 +1624,7 @@ class ChatHandler implements MessageHandlerInterface
                 'sample_memory' => $relevantMemories[0] ?? null,
             ]);
 
-            // ✨ BUILD ENHANCED THREAD: Include the AI response as the last message
+            // Build enhanced thread: include the AI response as the last message
             // This allows the memory extraction AI to see what was just answered!
             $enhancedThread = $thread;
             $enhancedThread[] = [
@@ -1695,5 +1787,43 @@ class ChatHandler implements MessageHandlerInterface
             'pdf' => 'application/pdf',
             default => 'application/octet-stream',
         };
+    }
+
+    /**
+     * Search feedback entries from Qdrant with score filtering.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    private function searchFeedback(int $userId, string $queryText, string $category, string $namespace): array
+    {
+        $minScore = $this->feedbackConfig->getMinChatFeedbackScore();
+
+        return $this->filterByScore(
+            $this->memoryService->searchRelevantMemories(
+                $userId,
+                $queryText,
+                category: $category,
+                limit: $this->feedbackConfig->getLimitPerNamespace(),
+                minScore: $minScore,
+                namespace: $namespace,
+                includeHidden: true
+            ),
+            $minScore
+        );
+    }
+
+    /**
+     * Post-filter results by score (safety net — Qdrant may return below-threshold results).
+     *
+     * @param array<int, array<string, mixed>> $items
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    private function filterByScore(array $items, float $minScore): array
+    {
+        return array_values(array_filter(
+            $items,
+            static fn (array $item) => ($item['score'] ?? 0) >= $minScore
+        ));
     }
 }

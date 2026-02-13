@@ -429,6 +429,10 @@ class StreamController extends AbstractController
                     'voice_reply' => $voiceReply, // Hint for ChatHandler to enforce concise answers
                 ];
 
+                if ($isWidgetMode) {
+                    $processingOptions['disable_memories'] = true;
+                }
+
                 // Add model_id if specified (for "Again" functionality)
                 if ($modelId) {
                     $processingOptions['model_id'] = (int) $modelId;
@@ -1016,6 +1020,18 @@ class StreamController extends AbstractController
                     $completeData['memoryIds'] = array_map(fn ($m) => $m['id'], $response['metadata']['memories']);
                     $this->logger->info('StreamController: Including memory IDs in complete event', [
                         'count' => count($response['metadata']['memories']),
+                    ]);
+                }
+
+                // Include feedbacks used for this response
+                // Send only feedback IDs (frontend loads full feedbacks from store)
+                if (isset($response['metadata']['feedbacks']) && is_array($response['metadata']['feedbacks'])) {
+                    $completeData['feedbackIds'] = array_filter(
+                        array_map(fn ($f) => $f['id'] ?? null, $response['metadata']['feedbacks']),
+                        fn ($id) => null !== $id
+                    );
+                    $this->logger->debug('StreamController: Including feedback IDs in complete event', [
+                        'count' => count($completeData['feedbackIds']),
                     ]);
                 }
 

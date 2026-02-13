@@ -399,6 +399,7 @@ class WidgetPublicController extends AbstractController
                     ? max(0.0, min(1.0, (float) $config['ragMinScore']))
                     : 0.3,
                 'widget_id' => $widget->getWidgetId(),
+                'disable_memories' => true,
                 'is_widget_mode' => true, // Disable memories for widget
             ];
 
