@@ -1391,7 +1391,10 @@ const handleCreateNew = async () => {
         success(t('config.taskPrompts.createSuccessWithFiles', { count: linkedCount }))
       } else if (linkedCount > 0) {
         success(
-          t('config.taskPrompts.createSuccessPartialFiles', { linked: linkedCount, failed: failedFiles.length })
+          t('config.taskPrompts.createSuccessPartialFiles', {
+            linked: linkedCount,
+            failed: failedFiles.length,
+          })
         )
       } else {
         success(t('config.taskPrompts.createSuccessNoFilesLinked'))
