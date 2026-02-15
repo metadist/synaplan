@@ -55,15 +55,21 @@
                 </svg>
                 <div class="flex-1 min-w-0">
                   <div class="font-medium txt-primary truncate">{{ chatTitle }}</div>
-                  <div class="text-sm txt-secondary">
-                    {{ $t('chatShare.chatId') }}: {{ chatId }}
-                  </div>
                 </div>
               </div>
             </div>
 
+            <!-- Share error (deterministic for E2E) -->
+            <div
+              v-if="shareErrorMessage"
+              class="p-4 rounded-lg bg-red-500/10 border border-red-500/20 text-red-600 dark:text-red-400"
+              data-testid="share-error"
+            >
+              {{ shareErrorMessage }}
+            </div>
+
             <!-- Not Public Yet -->
-            <div v-if="!shareInfo?.isShared" class="space-y-4">
+            <div v-if="!shareInfo?.isShared && !shareErrorMessage" class="space-y-4">
               <p class="txt-secondary">
                 {{ $t('chatShare.notPublic') }}
                 <span class="font-semibold text-[var(--brand)]">{{ $t('chatShare.private') }}</span
@@ -138,8 +144,8 @@
               </button>
             </div>
 
-            <!-- Already Public -->
-            <div v-else class="space-y-4">
+            <!-- Already Public (E2E: share-done) -->
+            <div v-else-if="shareInfo?.isShared" class="space-y-4" data-testid="share-done">
               <div class="flex items-center gap-2 text-green-600 dark:text-green-400">
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path
@@ -175,7 +181,7 @@
                   </button>
                 </div>
                 <div
-                  data-testid="text-share-url"
+                  data-testid="share-link-input"
                   class="p-3 rounded bg-white dark:bg-black/20 font-mono text-sm break-all txt-primary"
                 >
                   {{ fullShareUrl }}
@@ -253,6 +259,7 @@ const loading = ref(false)
 const sharing = ref(false)
 const revoking = ref(false)
 const copied = ref(false)
+const shareErrorMessage = ref('')
 const shareInfo = ref<{
   isShared: boolean
   shareUrl: string | null
@@ -268,6 +275,7 @@ const fullShareUrl = computed(() => {
 watch(
   () => props.isOpen,
   async (open) => {
+    shareErrorMessage.value = ''
     if (open && props.chatId) {
       await loadShareInfo()
     }
@@ -283,6 +291,7 @@ const loadShareInfo = async () => {
     shareInfo.value = await chatsStore.getShareInfo(props.chatId)
   } catch (error) {
     console.error('Failed to load share info:', error)
+    shareErrorMessage.value = 'Failed to load share information'
     showError('Failed to load share information')
   } finally {
     loading.value = false
@@ -296,9 +305,11 @@ const makePublic = async () => {
   try {
     const result = await chatsStore.shareChat(props.chatId, true)
     if (!result) {
+      shareErrorMessage.value = 'Unable to share chat. Please sign in again.'
       showError('Unable to share chat. Please sign in again.')
       return
     }
+    shareErrorMessage.value = ''
     shareInfo.value = {
       isShared: result.isShared,
       shareUrl: result.shareUrl,
@@ -308,6 +319,7 @@ const makePublic = async () => {
     emit('shared')
   } catch (error) {
     console.error('Failed to share chat:', error)
+    shareErrorMessage.value = 'Failed to make chat public'
     showError('Failed to make chat public')
   } finally {
     sharing.value = false

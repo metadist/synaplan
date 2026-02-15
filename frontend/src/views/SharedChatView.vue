@@ -1,5 +1,6 @@
 <template>
-  <div class="min-h-screen bg-chat" data-testid="page-shared-chat">
+  <div data-testid="shared-chat-root" class="shared-chat-root">
+    <div class="min-h-screen bg-chat" data-testid="page-shared-chat">
     <!-- Header -->
     <header
       class="sticky top-0 z-10 backdrop-blur-lg bg-surface/80 border-b border-light-border dark:border-dark-border"
@@ -133,7 +134,7 @@
       </div>
 
       <!-- Messages -->
-      <div class="space-y-6" data-testid="section-messages">
+      <div data-testid="shared-message-list" class="space-y-6">
         <div
           v-for="message in messages"
           :key="message.id"
@@ -295,6 +296,7 @@
 
     <!-- GDPR Cookie Consent Banner -->
     <CookieConsent @consent="handleCookieConsent" />
+    </div>
   </div>
 </template>
 
