@@ -249,9 +249,19 @@ class MessageClassifier
             }
         }
 
-        // Check legacy file path
-        if ('image' === $message->getFileType()) {
+        // Check legacy file type (stores extensions like 'jpg', 'png', not 'image')
+        $imageExtensions = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'image'];
+        if (in_array($message->getFileType(), $imageExtensions, true)) {
             return true;
+        }
+
+        // Check file path extension as fallback
+        $filePath = $message->getFilePath();
+        if (!empty($filePath)) {
+            $ext = strtolower(pathinfo($filePath, PATHINFO_EXTENSION));
+            if (in_array($ext, $imageExtensions, true)) {
+                return true;
+            }
         }
 
         return false;

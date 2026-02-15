@@ -450,7 +450,8 @@ const isMemory = computed(() => props.classification === 'memory')
                       type="checkbox"
                       class="mt-1 rounded border-gray-300 text-brand focus:ring-brand"
                       :disabled="useFullText"
-                      @change.stop="toggleSegment(index)"
+                      @click.stop
+                      @change="toggleSegment(index)"
                     />
                     <div
                       class="text-sm txt-primary prose prose-sm dark:prose-invert max-w-none"
