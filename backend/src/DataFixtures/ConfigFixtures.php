@@ -14,14 +14,16 @@ class ConfigFixtures extends Fixture implements DependentFixtureInterface
 {
     public function load(ObjectManager $manager): void
     {
+        // Use TestProvider (model 900) in test env so tests don't call real APIs; Groq elsewhere.
         $isTest = 'test' === (getenv('APP_ENV') ?: '');
-        $chatModel = $isTest ? '900' : '76';  // TestProvider in test, Groq in dev/prod
+        $chatModel = $isTest ? '900' : '76';
         $sortModel = $isTest ? '900' : '9';
         $defaultProvider = $isTest ? 'test' : 'groq';
 
         $configs = [
-            // Default AI Models - TestProvider (900) in test env, Groq in dev/prod
+            // DEFAULTMODEL: value = ModelFixtures id. TestProvider (900) in test, Groq (76/9) in dev/prod.
             ['ownerId' => 0, 'group' => 'DEFAULTMODEL', 'setting' => 'CHAT', 'value' => $chatModel],
+            ['ownerId' => 0, 'group' => 'DEFAULTMODEL', 'setting' => 'TOOLS', 'value' => $chatModel],  // Feedback, memories, contradictions
             ['ownerId' => 0, 'group' => 'DEFAULTMODEL', 'setting' => 'SORT', 'value' => $sortModel],
             ['ownerId' => 0, 'group' => 'DEFAULTMODEL', 'setting' => 'SUMMARIZE', 'value' => $sortModel],
             ['ownerId' => 0, 'group' => 'DEFAULTMODEL', 'setting' => 'TEXT2PIC', 'value' => '29'],

@@ -298,6 +298,9 @@
             @click-memory="(memory) => emit('click-memory', memory)"
           />
 
+          <!-- Used Feedbacks (AFTER memories, before search results) -->
+          <MessageFeedbacks v-if="role === 'assistant' && feedbacks" :feedbacks="feedbacks" />
+
           <!-- Web Search Results Carousel (AFTER content) -->
           <div
             v-if="searchResults && searchResults.length > 0 && role === 'assistant'"
@@ -536,6 +539,22 @@
             v-if="role === 'assistant' && !isStreaming && backendMessageId"
             class="flex items-center gap-2 flex-shrink-0"
           >
+            <!-- False Positive Button - only show if memory/feedback service is available -->
+            <button
+              v-if="isFeedbackServiceAvailable"
+              type="button"
+              :disabled="isSuperseded"
+              :class="['pill text-xs', isSuperseded ? 'opacity-50 cursor-not-allowed' : '']"
+              :aria-label="$t('feedback.falsePositive.button')"
+              data-testid="btn-message-false-positive"
+              @click="handleFalsePositive"
+            >
+              <Icon icon="mdi:thumb-down-outline" class="w-4 h-4" />
+              <span class="font-medium hidden sm:inline">{{
+                $t('feedback.falsePositive.button')
+              }}</span>
+            </button>
+
             <button
               type="button"
               :disabled="isSuperseded || !selectedModel || !hasModels"
@@ -669,6 +688,8 @@
       <UserIcon class="w-5 h-5 txt-secondary" />
     </div>
   </div>
+
+  <ExternalLinkWarning :url="pendingUrl" :is-open="warningOpen" @close="closeWarning" />
 </template>
 
 <script setup lang="ts">
@@ -681,15 +702,21 @@ import { useModelSelection, type ModelOption } from '@/composables/useModelSelec
 import { useNotification } from '@/composables/useNotification'
 import { getProviderIcon } from '@/utils/providerIcons'
 import { useMemoriesStore } from '@/stores/userMemories'
+import { useFeedbackStore } from '@/stores/userFeedback'
+import { useConfigStore } from '@/stores/config'
 import type { UserMemory } from '@/services/api/userMemoriesApi'
 import MessagePart from './MessagePart.vue'
 import MessageMemories from './MessageMemories.vue'
+import MessageFeedbacks from './MessageFeedbacks.vue'
 import GroqIcon from '@/components/icons/GroqIcon.vue'
+import ExternalLinkWarning from '@/components/common/ExternalLinkWarning.vue'
+import { useExternalLink } from '@/composables/useExternalLink'
 import type { Part, MessageFile } from '@/stores/history'
 import type { AgainData } from '@/types/ai-models'
 
 const { t } = useI18n()
 const { error: showError } = useNotification()
+const { pendingUrl, warningOpen, openExternalLink, closeWarning } = useExternalLink()
 
 interface Props {
   role: 'user' | 'assistant'
@@ -743,6 +770,7 @@ interface Props {
     label: string
   } | null // Tool metadata (e.g., web search, file generation)
   memoryIds?: number[] | null // IDs of memories used (resolved from memoriesStore)
+  feedbackIds?: number[] | null // IDs of feedbacks used (resolved from feedbackStore)
   // Status for failed/pending messages
   status?: 'sent' | 'failed' | 'rate_limited'
   errorType?: 'rate_limit' | 'connection' | 'unknown'
@@ -810,9 +838,9 @@ const focusSource = (index: number) => {
   }
 }
 
-// Open source URL (separate action)
+// Open source URL (with external link warning)
 const openSource = (url: string) => {
-  window.open(url, '_blank', 'noopener,noreferrer')
+  openExternalLink(url)
 }
 
 // Separate thinking blocks from content
@@ -820,6 +848,12 @@ const thinkingParts = computed(() => props.parts.filter((p) => p.type === 'think
 
 // Resolve memoryIds to full UserMemory objects from the store
 const memoriesStore = useMemoriesStore()
+const feedbackStore = useFeedbackStore()
+const config = useConfigStore()
+
+// Check if feedback service (same as memory service) is available
+const isFeedbackServiceAvailable = computed(() => config.features.memoryService)
+
 const memories = computed(() => {
   if (!props.memoryIds || props.memoryIds.length === 0) {
     return null
@@ -828,6 +862,18 @@ const memories = computed(() => {
   const resolved = props.memoryIds
     .map((id) => memoriesStore.memories.find((m) => m.id === id))
     .filter((m) => m !== undefined)
+
+  return resolved.length > 0 ? resolved : null
+})
+
+const feedbacks = computed(() => {
+  if (!props.feedbackIds || props.feedbackIds.length === 0) {
+    return null
+  }
+  // Resolve feedback IDs to full Feedback objects
+  const resolved = props.feedbackIds
+    .map((id) => feedbackStore.getFeedbackById(id))
+    .filter((f) => f !== undefined)
 
   return resolved.length > 0 ? resolved : null
 })
@@ -935,6 +981,7 @@ const emit = defineEmits<{
   regenerate: [model: ModelOption]
   again: [backendMessageId: number, modelId?: number]
   retry: [messageContent: string]
+  falsePositive: [text: string, messageId?: number]
   'click-memory': [memory: UserMemory]
 }>()
 
@@ -1005,6 +1052,20 @@ const handleAgain = () => {
     // Fallback to old regenerate
     emit('regenerate', model)
   }
+}
+
+const handleFalsePositive = () => {
+  const textContent = props.parts
+    .filter((part) => part.type === 'text' && part.content)
+    .map((part) => (part.content ?? '').trim())
+    .filter(Boolean)
+    .join('\n\n')
+
+  if (!textContent) {
+    return
+  }
+
+  emit('falsePositive', textContent, props.backendMessageId)
 }
 
 const toggleModelDropdown = () => {

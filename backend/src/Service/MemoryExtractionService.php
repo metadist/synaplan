@@ -103,56 +103,19 @@ readonly class MemoryExtractionService
 
         // AI call
         $userPrompt = <<<PROMPT
-Conversation Context:
+Conversation:
 {$contextText}
 
 Current Message:
 {$message->getText()}
 {$existingMemoriesText}
 
-TASK: Analyze this conversation and decide what to do with memories.
-
-KEY NAMING (IMPORTANT):
-- Keep memory keys as short as possible while still being meaningful (aim for <= 24 characters).
-- Use stable, reusable identifiers (e.g. "frontend_framework", "diet", "timezone").
-- Do NOT include IDs, timestamps, or full sentences in keys.
-
-ATOMIC MEMORIES (VERY IMPORTANT):
-- Store **at most ONE fact** per memory value (single sentence, no lists, no "and ...").
-- If multiple facts belong under the same key, **create multiple memories with the same key** (same key can appear multiple times).
-  - Example: `diet: Eats halal` and `diet: Prefers low-calorie meals for weight loss`
-
-RESPONSE FORMAT (JSON):
-[
-  {
-    "action": "create",
-    "category": "category_name",
-    "key": "key_name",
-    "value": "the information"
-  },
-  {
-    "action": "update",
-    "memory_id": 123,
-    "category": "category_name",
-    "key": "key_name",
-    "value": "updated information"
-  }
-]
-
-DECISION RULES:
-1. action: "create" → Use when information is COMPLETELY NEW
-2. action: "update" → Use when information REPLACES or EXTENDS existing memory (must include memory_id)
-3. action: "delete" → Use when user explicitly asks to forget/remove info (must include memory_id)
-4. NO ACTION → If information already exists and hasn't changed, return empty array []
-
-EXAMPLES:
-- Existing: "Likes kebab" → New: "Likes kebab with tzatziki" → UPDATE (more specific)
-- Existing: "Enjoys driving" → New: "Prefers cycling" → UPDATE (preference changed)
-- Existing: "Likes kebab" → New: "Likes kebab" → NO ACTION (already stored)
-- No existing → New: "Likes pizza" → CREATE (new info)
-- User: "Delete my name" → DELETE (use memory_id from existing list)
-
-Be intelligent and selective!
+RULES:
+- Only save facts the user states about THEMSELVES (name, age, preferences, skills, etc.)
+- Questions about topics are NOT memories ("Who is X?" → null, "Is Y true?" → null)
+- One fact per memory, short keys (snake_case, <= 24 chars)
+- create = new fact, update = changed fact (needs memory_id), delete = user asks to forget (needs memory_id)
+- Already stored and unchanged → return []
 PROMPT;
 
         try {

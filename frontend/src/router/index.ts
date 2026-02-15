@@ -14,43 +14,43 @@ const router = createRouter({
     {
       path: '/login',
       name: 'login',
-      component: () => import('../views/LoginView.vue'),
+      component: () => import('@/views/LoginView.vue'),
       meta: { requiresAuth: false, public: true, titleKey: 'pageTitles.login' },
     },
     {
       path: '/register',
       name: 'register',
-      component: () => import('../views/RegisterView.vue'),
+      component: () => import('@/views/RegisterView.vue'),
       meta: { requiresAuth: false, public: true, titleKey: 'pageTitles.register' },
     },
     {
       path: '/forgot-password',
       name: 'forgot-password',
-      component: () => import('../views/ForgotPasswordView.vue'),
+      component: () => import('@/views/ForgotPasswordView.vue'),
       meta: { requiresAuth: false, public: true, titleKey: 'pageTitles.forgotPassword' },
     },
     {
       path: '/reset-password',
       name: 'reset-password',
-      component: () => import('../views/ResetPasswordView.vue'),
+      component: () => import('@/views/ResetPasswordView.vue'),
       meta: { requiresAuth: false, public: true, titleKey: 'pageTitles.resetPassword' },
     },
     {
       path: '/verify-email',
       name: 'verify-email',
-      component: () => import('../views/VerifyEmailView.vue'),
+      component: () => import('@/views/VerifyEmailView.vue'),
       meta: { requiresAuth: false, public: true, titleKey: 'pageTitles.verifyEmail' },
     },
     {
       path: '/verify-email-callback',
       name: 'verify-email-callback',
-      component: () => import('../views/VerifyEmailCallbackView.vue'),
+      component: () => import('@/views/VerifyEmailCallbackView.vue'),
       meta: { requiresAuth: false, public: true, titleKey: 'pageTitles.verifyEmail' },
     },
     {
       path: '/email-verified',
       name: 'email-verified',
-      component: () => import('../views/EmailVerifiedView.vue'),
+      component: () => import('@/views/EmailVerifiedView.vue'),
       meta: { requiresAuth: false, public: true, titleKey: 'pageTitles.emailVerified' },
     },
     {
@@ -67,13 +67,13 @@ const router = createRouter({
     {
       path: '/shared/:lang([a-z]{2})/:token',
       name: 'shared-chat-lang',
-      component: () => import('../views/SharedChatView.vue'),
+      component: () => import('@/views/SharedChatView.vue'),
       meta: { requiresAuth: false, public: true },
     },
     {
       path: '/shared/:token',
       name: 'shared-chat',
-      component: () => import('../views/SharedChatView.vue'),
+      component: () => import('@/views/SharedChatView.vue'),
       meta: { requiresAuth: false, public: true },
     },
 
@@ -81,7 +81,7 @@ const router = createRouter({
     {
       path: '/error',
       name: 'error',
-      component: () => import('../views/ErrorView.vue'),
+      component: () => import('@/views/ErrorView.vue'),
       meta: { requiresAuth: false, titleKey: 'pageTitles.error' },
     },
     {
@@ -95,7 +95,7 @@ const router = createRouter({
     {
       path: '/',
       name: 'chat',
-      component: () => import('../views/ChatView.vue'),
+      component: () => import('@/views/ChatView.vue'),
       meta: { requiresAuth: true, titleKey: 'pageTitles.chat' },
     },
     {
@@ -106,7 +106,7 @@ const router = createRouter({
     {
       path: '/tools/chat-widget',
       name: 'tools-chat-widget',
-      component: () => import('../views/WidgetsView.vue'),
+      component: () => import('@/views/WidgetsView.vue'),
       meta: { requiresAuth: true, helpId: 'tools.chatWidget', titleKey: 'pageTitles.chatWidget' },
     },
     {
@@ -124,31 +124,31 @@ const router = createRouter({
     {
       path: '/tools/doc-summary',
       name: 'tools-doc-summary',
-      component: () => import('../views/ToolsView.vue'),
+      component: () => import('@/views/ToolsView.vue'),
       meta: { requiresAuth: true, helpId: 'tools.docSummary', titleKey: 'pageTitles.docSummary' },
     },
     {
       path: '/tools/mail-handler',
       name: 'tools-mail-handler',
-      component: () => import('../views/ToolsView.vue'),
+      component: () => import('@/views/ToolsView.vue'),
       meta: { requiresAuth: true, helpId: 'tools.mailHandler', titleKey: 'pageTitles.mailHandler' },
     },
     {
       path: '/plugins/:pluginName',
       name: 'plugin-view',
-      component: () => import('../views/PluginView.vue'),
+      component: () => import('@/views/PluginView.vue'),
       meta: { requiresAuth: true, titleKey: 'pageTitles.plugins' },
     },
     {
       path: '/files',
       name: 'files',
-      component: () => import('../views/FilesView.vue'),
+      component: () => import('@/views/FilesView.vue'),
       meta: { requiresAuth: true, titleKey: 'pageTitles.files' },
     },
     {
       path: '/memories',
       name: 'memories',
-      component: () => import('../views/MemoriesView.vue'),
+      component: () => import('@/views/MemoriesView.vue'),
       meta: { requiresAuth: true, titleKey: 'pageTitles.memories' },
       beforeEnter: (_to, _from, next) => {
         // Check if memory service is available
@@ -162,9 +162,24 @@ const router = createRouter({
       },
     },
     {
+      path: '/feedbacks',
+      name: 'feedbacks',
+      component: () => import('@/views/FeedbackView.vue'),
+      meta: { requiresAuth: true, titleKey: 'pageTitles.feedback' },
+      beforeEnter: (_to, _from, next) => {
+        // Check if memory service is available (feedbacks stored in same service)
+        const configStore = useConfigStore()
+        if (configStore.features?.memoryService === false) {
+          next({ name: 'chat' })
+        } else {
+          next()
+        }
+      },
+    },
+    {
       path: '/rag',
       name: 'rag',
-      component: () => import('../views/RagSearchView.vue'),
+      component: () => import('@/views/RagSearchView.vue'),
       meta: { requiresAuth: true, titleKey: 'pageTitles.ragSearch' },
     },
     {
@@ -175,104 +190,104 @@ const router = createRouter({
     {
       path: '/config/inbound',
       name: 'config-inbound',
-      component: () => import('../views/ConfigView.vue'),
+      component: () => import('@/views/ConfigView.vue'),
       meta: { requiresAuth: true, titleKey: 'pageTitles.configInbound' },
     },
     {
       path: '/config/ai-models',
       name: 'config-ai-models',
-      component: () => import('../views/ConfigView.vue'),
+      component: () => import('@/views/ConfigView.vue'),
       meta: { requiresAuth: true, titleKey: 'pageTitles.configAiModels' },
     },
     {
       path: '/config/task-prompts',
       name: 'config-task-prompts',
-      component: () => import('../views/ConfigView.vue'),
+      component: () => import('@/views/ConfigView.vue'),
       meta: { requiresAuth: true, titleKey: 'pageTitles.configTaskPrompts' },
     },
     {
       path: '/config/sorting-prompt',
       name: 'config-sorting-prompt',
-      component: () => import('../views/ConfigView.vue'),
+      component: () => import('@/views/ConfigView.vue'),
       meta: { requiresAuth: true, titleKey: 'pageTitles.configSortingPrompt' },
     },
     {
       path: '/config/api-keys',
       name: 'config-api-keys',
-      component: () => import('../views/ConfigView.vue'),
+      component: () => import('@/views/ConfigView.vue'),
       meta: { requiresAuth: true, titleKey: 'pageTitles.configApiKeys' },
     },
     {
       path: '/config/api-documentation',
       name: 'config-api-documentation',
-      component: () => import('../views/ConfigView.vue'),
+      component: () => import('@/views/ConfigView.vue'),
       meta: { requiresAuth: true, titleKey: 'pageTitles.configApiDocs' },
     },
     {
       path: '/statistics',
       name: 'statistics',
-      component: () => import('../views/StatisticsView.vue'),
+      component: () => import('@/views/StatisticsView.vue'),
       meta: { requiresAuth: true, titleKey: 'pageTitles.statistics' },
     },
     {
       path: '/settings',
       name: 'settings',
-      component: () => import('../views/SettingsView.vue'),
+      component: () => import('@/views/SettingsView.vue'),
       meta: { requiresAuth: true, titleKey: 'pageTitles.settings' },
     },
     {
       path: '/testv',
       name: 'test',
-      component: () => import('../views/TestView.vue'),
+      component: () => import('@/views/TestView.vue'),
       meta: { requiresAuth: false }, // Test page accessible without auth
     },
     {
       path: '/profile',
       name: 'profile',
-      component: () => import('../views/ProfileView.vue'),
+      component: () => import('@/views/ProfileView.vue'),
       meta: { requiresAuth: true, titleKey: 'pageTitles.profile' },
     },
     {
       path: '/admin',
       name: 'admin',
-      component: () => import('../views/AdminView.vue'),
+      component: () => import('@/views/AdminView.vue'),
       meta: { requiresAuth: true, requiresAdmin: true, titleKey: 'pageTitles.admin' },
     },
     {
       path: '/admin/features',
       name: 'admin-features',
-      component: () => import('../views/FeatureStatusView.vue'),
+      component: () => import('@/views/FeatureStatusView.vue'),
       meta: { requiresAuth: true, requiresAdmin: true, titleKey: 'pageTitles.adminFeatures' },
     },
     {
       path: '/admin/config',
       name: 'admin-config',
-      component: () => import('../views/AdminConfigView.vue'),
+      component: () => import('@/views/AdminConfigView.vue'),
       meta: { requiresAuth: true, requiresAdmin: true, titleKey: 'pageTitles.adminConfig' },
     },
     {
       path: '/subscription',
       name: 'subscription',
-      component: () => import('../views/SubscriptionView.vue'),
+      component: () => import('@/views/SubscriptionView.vue'),
       meta: { requiresAuth: true, titleKey: 'pageTitles.subscription' },
     },
     {
       path: '/subscription/success',
       name: 'subscription-success',
-      component: () => import('../views/SubscriptionSuccessView.vue'),
+      component: () => import('@/views/SubscriptionSuccessView.vue'),
       meta: { requiresAuth: true, titleKey: 'pageTitles.subscriptionSuccess' },
     },
     {
       path: '/subscription/cancel',
       name: 'subscription-cancel',
-      component: () => import('../views/SubscriptionCancelView.vue'),
+      component: () => import('@/views/SubscriptionCancelView.vue'),
       meta: { requiresAuth: true, titleKey: 'pageTitles.subscriptionCancel' },
     },
     // 404 - Must be last
     {
       path: '/:pathMatch(.*)*',
       name: 'not-found',
-      component: () => import('../views/NotFoundView.vue'),
+      component: () => import('@/views/NotFoundView.vue'),
       meta: { requiresAuth: false, titleKey: 'pageTitles.notFound' },
     },
   ],

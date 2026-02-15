@@ -253,6 +253,11 @@ class WhatsAppService
             'link' => $mediaUrl,
         ];
 
+        // WhatsApp API requires 'filename' for document type
+        if ('document' === $mediaType) {
+            $mediaPayload['filename'] = basename(parse_url($mediaUrl, PHP_URL_PATH)) ?: 'document';
+        }
+
         // Convert caption markdown to WhatsApp format if present
         if ($caption && in_array($mediaType, ['image', 'video', 'document'])) {
             $mediaPayload['caption'] = $this->convertToWhatsAppMarkdown($caption);
@@ -1531,6 +1536,9 @@ class WhatsAppService
      */
     private function getExtensionFromMimeType(string $mimeType): string
     {
+        // Strip MIME parameters (e.g., "audio/ogg; codecs=opus" → "audio/ogg")
+        $baseMimeType = trim(explode(';', $mimeType)[0]);
+
         $mimeMap = [
             'image/jpeg' => 'jpg',
             'image/png' => 'png',
@@ -1559,7 +1567,7 @@ class WhatsAppService
         ];
 
         // Return 'unknown' for unmapped types - will be caught by ALLOWED_EXTENSIONS check
-        return $mimeMap[$mimeType] ?? 'unknown';
+        return $mimeMap[$baseMimeType] ?? 'unknown';
     }
 
     /**

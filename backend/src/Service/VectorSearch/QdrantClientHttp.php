@@ -30,15 +30,19 @@ final class QdrantClientHttp implements QdrantClientInterface
     ) {
     }
 
-    public function upsertMemory(string $pointId, array $vector, array $payload): void
+    public function upsertMemory(string $pointId, array $vector, array $payload, ?string $namespace = null): void
     {
         try {
+            $requestPayload = [
+                'point_id' => $pointId,
+                'vector' => $vector,
+                'payload' => $payload,
+            ];
+            if (null !== $namespace) {
+                $requestPayload['namespace'] = $namespace;
+            }
             $response = $this->httpClient->request('POST', "{$this->baseUrl}/memories", [
-                'json' => [
-                    'point_id' => $pointId,
-                    'vector' => $vector,
-                    'payload' => $payload,
-                ],
+                'json' => $requestPayload,
                 'headers' => $this->getHeaders(),
             ]);
 
@@ -59,10 +63,14 @@ final class QdrantClientHttp implements QdrantClientInterface
         }
     }
 
-    public function getMemory(string $pointId): ?array
+    public function getMemory(string $pointId, ?string $namespace = null): ?array
     {
         try {
-            $response = $this->httpClient->request('GET', "{$this->baseUrl}/memories/{$pointId}", [
+            $url = "{$this->baseUrl}/memories/{$pointId}";
+            if (null !== $namespace) {
+                $url .= '?'.http_build_query(['namespace' => $namespace]);
+            }
+            $response = $this->httpClient->request('GET', $url, [
                 'headers' => $this->getHeaders(),
             ]);
 
@@ -93,6 +101,7 @@ final class QdrantClientHttp implements QdrantClientInterface
         ?string $category = null,
         int $limit = 5,
         float $minScore = 0.7,
+        ?string $namespace = null,
     ): array {
         try {
             $payload = [
@@ -104,6 +113,9 @@ final class QdrantClientHttp implements QdrantClientInterface
 
             if (null !== $category) {
                 $payload['category'] = $category;
+            }
+            if (null !== $namespace) {
+                $payload['namespace'] = $namespace;
             }
 
             $response = $this->httpClient->request('POST', "{$this->baseUrl}/memories/search", [
@@ -132,6 +144,7 @@ final class QdrantClientHttp implements QdrantClientInterface
         int $userId,
         ?string $category = null,
         int $limit = 1000,
+        ?string $namespace = null,
     ): array {
         try {
             $payload = [
@@ -141,6 +154,9 @@ final class QdrantClientHttp implements QdrantClientInterface
 
             if (null !== $category) {
                 $payload['category'] = $category;
+            }
+            if (null !== $namespace) {
+                $payload['namespace'] = $namespace;
             }
 
             $response = $this->httpClient->request('POST', "{$this->baseUrl}/memories/scroll", [
@@ -172,10 +188,14 @@ final class QdrantClientHttp implements QdrantClientInterface
         }
     }
 
-    public function deleteMemory(string $pointId): void
+    public function deleteMemory(string $pointId, ?string $namespace = null): void
     {
         try {
-            $response = $this->httpClient->request('DELETE', "{$this->baseUrl}/memories/{$pointId}", [
+            $url = "{$this->baseUrl}/memories/{$pointId}";
+            if (null !== $namespace) {
+                $url .= '?'.http_build_query(['namespace' => $namespace]);
+            }
+            $response = $this->httpClient->request('DELETE', $url, [
                 'headers' => $this->getHeaders(),
             ]);
 
@@ -598,41 +618,27 @@ final class QdrantClientHttp implements QdrantClientInterface
     /**
      * Get chunk info for a specific file from Qdrant.
      *
-     * Uses the search endpoint with a zero vector and file_id filter
-     * to check if any chunks exist and retrieve the group key.
+     * Uses the stats endpoint which includes per-file breakdown (chunks_by_file).
      *
-     * @return array{chunks: int, group_key: string|null}
+     * @return array{chunks: int, groupKey: string|null}
      */
     public function getDocumentFileInfo(int $userId, int $fileId): array
     {
         try {
-            // Use stats endpoint - scroll user docs and filter locally for this file
             $stats = $this->getDocumentStats($userId);
+            $chunksByFile = $stats['chunks_by_file'] ?? [];
 
-            // Stats gives us total chunks but not per-file info
-            // Fall back to checking if file has any point by searching for it
-            // Use the point ID convention: doc_{userId}_{fileId}_0
-            $firstChunkId = sprintf('doc_%d_%d_0', $userId, $fileId);
-            $doc = $this->getDocument($firstChunkId);
+            $fileIdStr = (string) $fileId;
+            if (isset($chunksByFile[$fileIdStr])) {
+                $fileInfo = $chunksByFile[$fileIdStr];
 
-            if (null === $doc) {
-                return ['chunks' => 0, 'group_key' => null];
+                return [
+                    'chunks' => (int) ($fileInfo['chunks'] ?? 0),
+                    'groupKey' => $fileInfo['group_key'] ?? null,
+                ];
             }
 
-            $groupKey = $doc['payload']['group_key'] ?? null;
-
-            // Estimate chunk count by probing sequential IDs (fast, no scroll needed)
-            $chunks = 0;
-            for ($i = 0; $i < 100; ++$i) {
-                $chunkId = sprintf('doc_%d_%d_%d', $userId, $fileId, $i);
-                $exists = $this->getDocument($chunkId);
-                if (null === $exists) {
-                    break;
-                }
-                ++$chunks;
-            }
-
-            return ['chunks' => $chunks, 'group_key' => $groupKey];
+            return ['chunks' => 0, 'groupKey' => null];
         } catch (\Throwable $e) {
             $this->logger->error('Failed to get document file info', [
                 'user_id' => $userId,
@@ -640,31 +646,27 @@ final class QdrantClientHttp implements QdrantClientInterface
                 'error' => $e->getMessage(),
             ]);
 
-            return ['chunks' => 0, 'group_key' => null];
+            return ['chunks' => 0, 'groupKey' => null];
         }
     }
 
+    /**
+     * Get document stats for a user from Qdrant.
+     *
+     * @throws \RuntimeException On HTTP or network failure
+     */
     public function getDocumentStats(int $userId): array
     {
-        try {
-            $response = $this->httpClient->request('GET', "{$this->baseUrl}/documents/stats/{$userId}", [
-                'headers' => $this->getHeaders(),
-                'timeout' => 5,
-            ]);
+        $response = $this->httpClient->request('GET', "{$this->baseUrl}/documents/stats/{$userId}", [
+            'headers' => $this->getHeaders(),
+            'timeout' => 5,
+        ]);
 
-            if (200 !== $response->getStatusCode()) {
-                throw new \RuntimeException("Qdrant stats failed: {$response->getContent(false)}");
-            }
-
-            return $response->toArray();
-        } catch (\Throwable $e) {
-            $this->logger->error('Failed to get document stats', [
-                'user_id' => $userId,
-                'error' => $e->getMessage(),
-            ]);
-
-            return [];
+        if (200 !== $response->getStatusCode()) {
+            throw new \RuntimeException("Qdrant stats failed: {$response->getContent(false)}");
         }
+
+        return $response->toArray();
     }
 
     public function getDocumentGroupKeys(int $userId): array
@@ -687,6 +689,102 @@ final class QdrantClientHttp implements QdrantClientInterface
 
             return [];
         }
+    }
+
+    /**
+     * Get file IDs that have chunks in a specific group key.
+     *
+     * Uses the dedicated files-by-group endpoint for accurate, targeted results.
+     *
+     * @return int[] Array of file IDs
+     */
+    public function getFileIdsByGroupKey(int $userId, string $groupKey): array
+    {
+        $filesInfo = $this->getFilesWithChunksByGroupKey($userId, $groupKey);
+
+        return array_keys($filesInfo);
+    }
+
+    /**
+     * Get files with chunk counts for a specific group key.
+     *
+     * Uses the dedicated /documents/files-by-group endpoint which scrolls
+     * only documents matching the group_key filter, avoiding stale data from stats.
+     *
+     * @return array<int, array{chunks: int, groupKey: string}> Map of fileId => info
+     */
+    public function getFilesWithChunksByGroupKey(int $userId, string $groupKey): array
+    {
+        try {
+            $response = $this->httpClient->request('POST', "{$this->baseUrl}/documents/files-by-group", [
+                'json' => ['user_id' => $userId, 'group_key' => $groupKey],
+                'headers' => $this->getHeaders(),
+                'timeout' => 10,
+            ]);
+
+            if (200 !== $response->getStatusCode()) {
+                throw new \RuntimeException("Qdrant files-by-group failed: {$response->getContent(false)}");
+            }
+
+            $data = $response->toArray();
+            $files = $data['files'] ?? [];
+
+            $result = [];
+            foreach ($files as $fileId => $chunkCount) {
+                $result[(int) $fileId] = [
+                    'chunks' => (int) $chunkCount,
+                    'groupKey' => $groupKey,
+                ];
+            }
+
+            return $result;
+        } catch (\Throwable $e) {
+            // TODO: Remove this fallback once synaplan-memories is updated with the /documents/files-by-group endpoint.
+            // The stats-based fallback returns potentially stale data, which is the bug this method was created to fix.
+            $this->logger->warning('Qdrant /documents/files-by-group endpoint unavailable, falling back to stats-based approach (may return stale data)', [
+                'user_id' => $userId,
+                'group_key' => $groupKey,
+                'error' => $e->getMessage(),
+            ]);
+
+            $filesInfo = $this->getFilesWithChunks($userId);
+            $result = [];
+            foreach ($filesInfo as $fileId => $info) {
+                if ($info['groupKey'] === $groupKey) {
+                    $result[$fileId] = [
+                        'chunks' => $info['chunks'],
+                        'groupKey' => $groupKey,
+                    ];
+                }
+            }
+
+            return $result;
+        }
+    }
+
+    /**
+     * Get all files with chunks for a user, with per-file chunk count and group key.
+     *
+     * Uses the stats endpoint which includes per-file breakdown (chunks_by_file).
+     *
+     * @return array<int, array{chunks: int, groupKey: string|null}> Map of fileId => info
+     *
+     * @throws \RuntimeException On HTTP or network failure (callers must handle errors)
+     */
+    public function getFilesWithChunks(int $userId): array
+    {
+        $stats = $this->getDocumentStats($userId);
+        $chunksByFile = $stats['chunks_by_file'] ?? [];
+
+        $result = [];
+        foreach ($chunksByFile as $fileId => $info) {
+            $result[(int) $fileId] = [
+                'chunks' => (int) ($info['chunks'] ?? 0),
+                'groupKey' => $info['group_key'] ?? null,
+            ];
+        }
+
+        return $result;
     }
 
     /**

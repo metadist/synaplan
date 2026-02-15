@@ -100,12 +100,14 @@
               :ai-models="message.aiModels"
               :web-search="message.webSearch"
               :memory-ids="message.memoryIds"
+              :feedback-ids="message.feedbackIds"
               :status="message.status"
               :error-type="message.errorType"
               :error-data="message.errorData"
               @regenerate="handleRegenerate(message, $event)"
               @again="handleAgain"
               @retry="handleRetryMessage(message, $event)"
+              @false-positive="openFalsePositiveModal"
               @click-memory="handleClickMemory"
             />
           </template>
@@ -141,6 +143,35 @@
       @dismiss="handleMemoryToastClose"
       @discard="handleMemoryDiscard"
       @edit="handleMemoryEdit"
+    />
+
+    <FalsePositiveModal
+      :is-open="falsePositiveModalOpen"
+      :segments="falsePositiveSegments"
+      :full-text="falsePositiveFullText"
+      :user-message="falsePositiveUserMessage"
+      :is-submitting="falsePositiveSubmitting"
+      :is-preview-loading="falsePositivePreviewLoading"
+      :step="falsePositiveStep"
+      :classification="falsePositiveClassification"
+      :summary-options="falsePositiveSummaryOptions"
+      :correction-options="falsePositiveCorrectionOptions"
+      @close="closeFalsePositiveModal"
+      @preview="previewFalsePositiveFeedback"
+      @save="saveFalsePositiveFeedback"
+      @back="backToFalsePositiveSelection"
+      @regenerate="regenerateFalsePositiveSummary"
+    />
+
+    <ContradictionModal
+      :is-open="contradictionModalOpen"
+      :contradictions="contradictionList"
+      :new-statement-summary="contradictionNewSummary"
+      :new-statement-correction="contradictionNewCorrection"
+      :classification="pendingSaveData?.classification ?? 'feedback'"
+      :is-submitting="falsePositiveSubmitting"
+      @close="closeContradictionModal"
+      @resolve="handleContradictionResolve"
     />
 
     <!-- Memory Edit Dialog (opens in-place, stays in chat) -->
@@ -183,6 +214,7 @@ import { useModelsStore } from '@/stores/models'
 import { useAiConfigStore } from '@/stores/aiConfig'
 import { useAuthStore } from '@/stores/auth'
 import { useMemoriesStore } from '@/stores/userMemories'
+import { useFeedbackStore } from '@/stores/userFeedback'
 import { useLimitCheck } from '@/composables/useLimitCheck'
 import { useNotification } from '@/composables/useNotification'
 import { chatApi } from '@/services/api'
@@ -192,8 +224,19 @@ import { normalizeMediaUrl } from '@/utils/urlHelper'
 import { AudioStreamer } from '@/utils/AudioStreamer'
 import { httpClient } from '@/services/api/httpClient'
 import type { UserMemory } from '@/services/api/userMemoriesApi'
-import { getCategories } from '@/services/api/userMemoriesApi'
+import { getCategories, deleteMemory as deleteMemoryApi } from '@/services/api/userMemoriesApi'
+import { deleteFeedback as deleteFeedbackApi } from '@/services/api/userFeedbackApi'
 import MemoryToast from '@/components/MemoryToast.vue'
+import FalsePositiveModal from '@/components/feedback/FalsePositiveModal.vue'
+import ContradictionModal from '@/components/feedback/ContradictionModal.vue'
+import {
+  previewFalsePositive,
+  submitFalsePositive,
+  submitPositiveFeedback,
+  regenerateCorrection,
+  checkContradictionsBatch,
+} from '@/services/api/feedbackApi'
+import type { Contradiction } from '@/services/api/feedbackApi'
 import MemoryFormDialog from '@/components/MemoryFormDialog.vue'
 import MemoriesDialog from '@/components/MemoriesDialog.vue'
 import MemoryDeleteDialog from '@/components/memories/MemoryDeleteDialog.vue'
@@ -201,7 +244,7 @@ import MemoryDeleteDialog from '@/components/memories/MemoryDeleteDialog.vue'
 const { t } = useI18n()
 const router = useRouter()
 const { showLimitModal, limitData, checkAndShowLimit, closeLimitModal } = useLimitCheck()
-const { error: showErrorToast } = useNotification()
+const { error: showErrorToast, success: showSuccessToast } = useNotification()
 
 const chatContainer = ref<HTMLElement | null>(null)
 const chatInputRef = ref<InstanceType<typeof ChatInput> | null>(null)
@@ -214,6 +257,7 @@ const modelsStore = useModelsStore()
 const aiConfigStore = useAiConfigStore()
 const authStore = useAuthStore()
 const memoriesStore = useMemoriesStore()
+const feedbackStore = useFeedbackStore()
 let streamingAbortController: AbortController | null = null
 let stopStreamingFn: (() => void) | null = null // Store EventSource close function
 let currentTrackId: number | undefined = undefined // Store current trackId for stop request
@@ -227,6 +271,31 @@ const processingMetadata = ref<any>({})
 // Memory suggestion toasts
 const activeMemoryToasts = ref<Array<UserMemory & { toastId: number }>>([])
 let memoryToastIdCounter = 0
+
+const falsePositiveModalOpen = ref(false)
+const falsePositiveSegments = ref<string[]>([])
+const falsePositiveFullText = ref('')
+const falsePositiveMessageId = ref<number | null>(null)
+const falsePositiveUserMessage = ref<string>('')
+const falsePositiveSubmitting = ref(false)
+const falsePositivePreviewLoading = ref(false)
+const falsePositiveStep = ref<'select' | 'confirm'>('select')
+const falsePositiveSummaryOptions = ref<string[]>([])
+const falsePositiveCorrectionOptions = ref<string[]>([])
+const falsePositiveClassification = ref<'memory' | 'feedback'>('feedback')
+const falsePositiveRelatedMemoryIds = ref<number[]>([])
+
+// Contradiction modal state (when saving feedback would conflict with existing data)
+const contradictionModalOpen = ref(false)
+const contradictionList = ref<Contradiction[]>([])
+const contradictionNewSummary = ref('')
+const contradictionNewCorrection = ref('')
+const pendingSaveData = ref<{
+  summary: string
+  correction: string
+  classification: 'memory' | 'feedback'
+  relatedMemoryIds: number[]
+} | null>(null)
 
 // Memory edit dialog state
 const isMemoryEditDialogOpen = ref(false)
@@ -267,6 +336,11 @@ onMounted(async () => {
     console.warn('⚠️ Failed to load memories in background:', err)
   })
 
+  // Also load feedbacks in background for badge rendering
+  feedbackStore.fetchFeedbacks({ silent: true }).catch((err) => {
+    console.warn('⚠️ Failed to load feedbacks in background:', err)
+  })
+
   // Load chats first
   await chatsStore.loadChats()
 
@@ -290,6 +364,8 @@ onMounted(async () => {
 
   // Setup window event listener for memory dialog (used by MessageText.vue)
   window.addEventListener('open-memory-dialog', handleOpenMemoryDialogEvent)
+  // Setup window event listener for feedback dialog (used by MessageText.vue)
+  window.addEventListener('open-feedback-dialog', handleOpenFeedbackDialogEvent)
 })
 
 // Window event handler for memory dialog (used by MessageText.vue)
@@ -297,6 +373,18 @@ const handleOpenMemoryDialogEvent = (event: Event) => {
   const customEvent = event as CustomEvent<{ memory: UserMemory }>
   if (customEvent.detail?.memory) {
     handleClickMemory(customEvent.detail.memory)
+  }
+}
+
+// Window event handler for feedback dialog (used by MessageText.vue)
+const handleOpenFeedbackDialogEvent = (event: Event) => {
+  const customEvent = event as CustomEvent<{ feedbackId: number }>
+  if (customEvent.detail?.feedbackId) {
+    // Navigate to feedback page with highlight
+    router.push({
+      name: 'feedbacks',
+      query: { highlight: String(customEvent.detail.feedbackId) },
+    })
   }
 }
 
@@ -308,6 +396,7 @@ onBeforeUnmount(() => {
     currentAudioStreamer = null
   }
   window.removeEventListener('open-memory-dialog', handleOpenMemoryDialogEvent)
+  window.removeEventListener('open-feedback-dialog', handleOpenFeedbackDialogEvent)
   clearDeleteDialogTimer()
 })
 
@@ -991,8 +1080,67 @@ const streamAIResponse = async (
             // Create toast for the suggested memory
             activeMemoryToasts.value.push(toastMemory)
           } else if (data.status === 'memories_loaded') {
-            // Memories loaded event - we now show them per message, not globally
-            // No action needed - memories will be attached to the response message
+            // Memories loaded event - store in memoriesStore for badge rendering
+            const memories = data.metadata?.memories
+            if (memories && Array.isArray(memories)) {
+              // Collect memory IDs for the message
+              const memoryIds: number[] = []
+
+              // Update the memory store with loaded memories so badges can resolve
+              for (const mem of memories) {
+                memoryIds.push(mem.id)
+                const existing = memoriesStore.memories.find((m) => m.id === mem.id)
+                if (!existing) {
+                  // Add to store for badge rendering
+                  memoriesStore.memories.push({
+                    id: mem.id,
+                    category: mem.category || 'personal',
+                    key: mem.key || '',
+                    value: mem.value || '',
+                    source: mem.source || 'auto_detected',
+                    messageId: mem.messageId || null,
+                    created: mem.created || 0,
+                    updated: mem.updated || 0,
+                  })
+                }
+              }
+
+              // Attach memory IDs to the current streaming message
+              const streamingMessage = historyStore.messages.find((m) => m.id === messageId)
+              if (streamingMessage && memoryIds.length > 0) {
+                streamingMessage.memoryIds = memoryIds
+              }
+            }
+          } else if (data.status === 'feedback_loaded') {
+            // Feedback examples loaded - store in feedbackStore for badge rendering
+            const feedbacks = data.metadata?.feedbacks
+            if (feedbacks && Array.isArray(feedbacks)) {
+              // Collect feedback IDs for the message
+              const feedbackIds: number[] = []
+
+              // Update the feedback store with loaded feedbacks so badges can resolve
+              for (const fb of feedbacks) {
+                feedbackIds.push(fb.id)
+                const existing = feedbackStore.getFeedbackById(fb.id)
+                if (!existing) {
+                  // Add to store temporarily for badge rendering
+                  feedbackStore.feedbacks.push({
+                    id: fb.id,
+                    type: fb.type,
+                    value: fb.value,
+                    messageId: null,
+                    created: 0,
+                    updated: 0,
+                  })
+                }
+              }
+
+              // Attach feedback IDs to the current streaming message
+              const streamingMessage = historyStore.messages.find((m) => m.id === messageId)
+              if (streamingMessage && feedbackIds.length > 0) {
+                streamingMessage.feedbackIds = feedbackIds
+              }
+            }
           } else if (data.status === 'memory_deleted') {
             // Legacy backend event - remove from local store only
             const memoryId = data.metadata?.id
@@ -1106,6 +1254,15 @@ const streamAIResponse = async (
               // Store memory IDs if provided (full memories loaded from store)
               if (data.memoryIds && Array.isArray(data.memoryIds) && data.memoryIds.length > 0) {
                 message.memoryIds = data.memoryIds
+              }
+
+              // Store feedback IDs if provided
+              if (
+                data.feedbackIds &&
+                Array.isArray(data.feedbackIds) &&
+                data.feedbackIds.length > 0
+              ) {
+                message.feedbackIds = data.feedbackIds
               }
 
               // Update provider and model from backend metadata
@@ -1614,6 +1771,382 @@ function handleMemoryToastClose(toastId: number) {
   const index = activeMemoryToasts.value.findIndex((m) => m.toastId === toastId)
   if (index !== -1) {
     activeMemoryToasts.value.splice(index, 1)
+  }
+}
+
+function openFalsePositiveModal(text: string, messageId?: number) {
+  const segments = text
+    .split(/\n{2,}/)
+    .map((segment) => segment.trim())
+    .filter(Boolean)
+
+  falsePositiveFullText.value = text.trim()
+  falsePositiveSegments.value = segments.length > 0 ? segments : [text.trim()]
+  falsePositiveMessageId.value = messageId ?? null
+
+  // Find the previous user message for context
+  // Look for the user message that came before this assistant message
+  let userMessageText = ''
+  if (messageId) {
+    const messages = historyStore.messages
+    const assistantMsgIndex = messages.findIndex((m) => m.backendMessageId === messageId)
+    if (assistantMsgIndex > 0) {
+      // Search backwards for the first user message
+      for (let i = assistantMsgIndex - 1; i >= 0; i--) {
+        const msg = messages[i]
+        if (msg.role === 'user') {
+          userMessageText = msg.parts
+            .filter((p) => p.type === 'text' && p.content)
+            .map((p) => (p.content ?? '').trim())
+            .filter(Boolean)
+            .join('\n')
+          break
+        }
+      }
+    }
+  }
+  falsePositiveUserMessage.value = userMessageText
+
+  falsePositiveStep.value = 'select'
+  falsePositiveSummaryOptions.value = []
+  falsePositiveCorrectionOptions.value = []
+  falsePositiveClassification.value = 'feedback'
+  falsePositiveRelatedMemoryIds.value = []
+  falsePositiveModalOpen.value = true
+}
+
+function closeFalsePositiveModal() {
+  falsePositiveModalOpen.value = false
+  falsePositiveSegments.value = []
+  falsePositiveFullText.value = ''
+  falsePositiveMessageId.value = null
+  falsePositiveUserMessage.value = ''
+  falsePositiveStep.value = 'select'
+  falsePositiveSummaryOptions.value = []
+  falsePositiveCorrectionOptions.value = []
+  falsePositiveClassification.value = 'feedback'
+  falsePositiveRelatedMemoryIds.value = []
+}
+
+async function previewFalsePositiveFeedback(text: string) {
+  if (!text.trim()) {
+    return
+  }
+
+  falsePositivePreviewLoading.value = true
+  try {
+    const preview = await previewFalsePositive({
+      text,
+      userMessage: falsePositiveUserMessage.value || undefined,
+    })
+    falsePositiveClassification.value = preview.classification
+    falsePositiveSummaryOptions.value = preview.summaryOptions
+    falsePositiveCorrectionOptions.value = preview.correctionOptions
+    falsePositiveRelatedMemoryIds.value = preview.relatedMemoryIds ?? []
+    falsePositiveStep.value = 'confirm'
+  } catch (err) {
+    const errorMsg = err instanceof Error ? err.message : t('feedback.falsePositive.error')
+    showErrorToast(errorMsg)
+  } finally {
+    falsePositivePreviewLoading.value = false
+  }
+}
+
+function backToFalsePositiveSelection() {
+  falsePositiveStep.value = 'select'
+}
+
+/**
+ * Save both false positive and correction in a single operation.
+ * Checks for contradictions first; if any, opens ContradictionModal.
+ */
+async function saveFalsePositiveFeedback(data: { summary: string; correction: string }) {
+  const { summary, correction } = data
+
+  if (!summary.trim() && !correction.trim()) {
+    return
+  }
+
+  falsePositiveSubmitting.value = true
+  try {
+    // Check both summary and correction for contradictions in a single batch call
+    const result = await checkContradictionsBatch({
+      summary: summary.trim(),
+      correction: correction.trim(),
+    })
+
+    if (result.hasContradictions && result.contradictions.length > 0) {
+      // Store pending data (including classification + related memory IDs) for after contradiction resolution
+      pendingSaveData.value = {
+        summary: summary.trim(),
+        correction: correction.trim(),
+        classification: falsePositiveClassification.value,
+        relatedMemoryIds: falsePositiveRelatedMemoryIds.value,
+      }
+      contradictionList.value = result.contradictions
+      contradictionNewSummary.value = summary.trim()
+      contradictionNewCorrection.value = correction.trim()
+      // Close FP modal first, then open contradiction modal
+      closeFalsePositiveModal()
+      falsePositiveSubmitting.value = false
+      contradictionModalOpen.value = true
+      return
+    }
+
+    await doSaveFeedback(
+      { summary: summary.trim(), correction: correction.trim() },
+      undefined,
+      falsePositiveRelatedMemoryIds.value
+    )
+    if (falsePositiveClassification.value === 'memory') {
+      showSuccessToast(
+        t(
+          correction.trim()
+            ? 'feedback.falsePositive.memoryUpdated'
+            : 'feedback.falsePositive.memoryDeleted'
+        )
+      )
+    } else {
+      showSuccessToast(t('feedback.falsePositive.success'))
+    }
+    closeFalsePositiveModal()
+  } catch (err) {
+    const errorMsg = err instanceof Error ? err.message : t('feedback.falsePositive.error')
+    showErrorToast(errorMsg)
+  } finally {
+    falsePositiveSubmitting.value = false
+  }
+}
+
+/**
+ * Execute the actual save. Branches based on classification:
+ * - "memory": Update/delete memories using contradiction IDs or related memory IDs (never save as feedback)
+ * - "feedback": Save as false positive + positive feedback (original behavior)
+ *
+ * relatedMemoryIds: IDs from the preview step's vector search — used as fallback when
+ * the contradiction check didn't find the relevant memory (e.g., different phrasing).
+ */
+async function doSaveFeedback(
+  data: { summary: string; correction: string },
+  itemsToDelete?: Contradiction[],
+  relatedMemoryIds?: number[]
+) {
+  const isMemory = falsePositiveClassification.value === 'memory'
+
+  if (isMemory) {
+    // Memory flow: update, delete, or create memories (never save as feedback)
+    const memoryContradictions = (itemsToDelete ?? []).filter((c) => c.type === 'memory')
+    const hasCorrection = data.correction.trim().length > 0
+
+    // Build the list of target memory IDs: contradiction IDs take priority, then related IDs from preview
+    const targetIds: number[] =
+      memoryContradictions.length > 0
+        ? memoryContradictions.map((c) => c.id)
+        : [...(relatedMemoryIds ?? [])]
+
+    if (targetIds.length > 0 && hasCorrection) {
+      // User provided a correction → update the first target memory, delete the rest
+      await memoriesStore.editMemory(targetIds[0], { value: data.correction }, { silent: true })
+      // Delete remaining target memories via raw API (avoids loading/error churn + fetchCategories per item)
+      const deletedIds: number[] = []
+      for (let i = 1; i < targetIds.length; i++) {
+        try {
+          await deleteMemoryApi(targetIds[i])
+          deletedIds.push(targetIds[i])
+        } catch {
+          // Best effort
+        }
+      }
+      if (deletedIds.length > 0) {
+        const idSet = new Set(deletedIds)
+        memoriesStore.memories = memoriesStore.memories.filter((m) => !idSet.has(m.id))
+      }
+    } else if (targetIds.length > 0 && !hasCorrection) {
+      // No correction provided → delete all target memories via raw API
+      const deletedIds: number[] = []
+      for (const id of targetIds) {
+        try {
+          await deleteMemoryApi(id)
+          deletedIds.push(id)
+        } catch {
+          // Best effort
+        }
+      }
+      if (deletedIds.length > 0) {
+        const idSet = new Set(deletedIds)
+        memoriesStore.memories = memoriesStore.memories.filter((m) => !idSet.has(m.id))
+      }
+    } else if (hasCorrection) {
+      // No target memories found at all but user gave a correction → create new memory
+      await memoriesStore.addMemory(
+        { value: data.correction, category: 'user_correction', key: 'correction' },
+        { silent: true }
+      )
+    }
+    // If no target memories AND no correction → nothing to do (user just acknowledged the error)
+
+    // Delete non-memory contradictions (feedback entries) via raw API
+    const feedbackContradictions = (itemsToDelete ?? []).filter((c) => c.type !== 'memory')
+    if (feedbackContradictions.length > 0) {
+      const deletedFbIds: number[] = []
+      for (const c of feedbackContradictions) {
+        try {
+          await deleteFeedbackApi(c.id)
+          deletedFbIds.push(c.id)
+        } catch {
+          // Best effort
+        }
+      }
+      if (deletedFbIds.length > 0) {
+        const idSet = new Set(deletedFbIds)
+        feedbackStore.feedbacks = feedbackStore.feedbacks.filter((f) => !idSet.has(f.id))
+      }
+    }
+  } else {
+    // Feedback flow: original behavior
+    const promises: Promise<void>[] = []
+    if (data.summary) {
+      promises.push(
+        submitFalsePositive({
+          summary: data.summary,
+          messageId: falsePositiveMessageId.value ?? undefined,
+        })
+      )
+    }
+    if (data.correction) {
+      promises.push(
+        submitPositiveFeedback({
+          text: data.correction,
+          messageId: falsePositiveMessageId.value ?? undefined,
+        })
+      )
+    }
+    await Promise.all(promises)
+
+    // Delete contradicted items for feedback flow
+    if (itemsToDelete && itemsToDelete.length > 0) {
+      await deleteContradictedItems(itemsToDelete)
+    }
+  }
+}
+
+/**
+ * Delete contradicted items (memories or feedback).
+ * Uses raw API calls to avoid store loading/error state churn per item,
+ * then syncs the store state in one batch at the end.
+ */
+async function deleteContradictedItems(contradictions: Contradiction[]) {
+  const deletedMemoryIds: number[] = []
+  const deletedFeedbackIds: number[] = []
+
+  // Phase 1: Delete via API (best effort per item)
+  for (const c of contradictions) {
+    try {
+      if (c.type === 'memory') {
+        await deleteMemoryApi(c.id)
+        deletedMemoryIds.push(c.id)
+      } else {
+        await deleteFeedbackApi(c.id)
+        deletedFeedbackIds.push(c.id)
+      }
+    } catch {
+      // Best effort — continue with remaining items
+    }
+  }
+
+  // Phase 2: Sync store state in one batch (no loading flicker)
+  if (deletedMemoryIds.length > 0) {
+    const idSet = new Set(deletedMemoryIds)
+    memoriesStore.memories = memoriesStore.memories.filter((m) => !idSet.has(m.id))
+  }
+  if (deletedFeedbackIds.length > 0) {
+    const idSet = new Set(deletedFeedbackIds)
+    feedbackStore.feedbacks = feedbackStore.feedbacks.filter((f) => !idSet.has(f.id))
+  }
+}
+
+function closeContradictionModal() {
+  contradictionModalOpen.value = false
+  contradictionList.value = []
+  contradictionNewSummary.value = ''
+  contradictionNewCorrection.value = ''
+  pendingSaveData.value = null
+  falsePositiveSubmitting.value = false
+}
+
+async function handleContradictionResolve(data: {
+  action: 'save' | 'cancel'
+  itemsToDelete: Contradiction[]
+}) {
+  const pending = pendingSaveData.value
+  if (!pending) {
+    closeContradictionModal()
+    return
+  }
+
+  if (data.action === 'cancel') {
+    closeContradictionModal()
+    return
+  }
+
+  falsePositiveSubmitting.value = true
+  // Restore classification from pending data (FP modal may have been closed, resetting the ref)
+  falsePositiveClassification.value = pending.classification
+  try {
+    // Pass items to delete + related memory IDs into doSaveFeedback so it can handle memory updates vs deletions
+    await doSaveFeedback(pending, data.itemsToDelete, pending.relatedMemoryIds)
+    if (pending.classification === 'memory') {
+      showSuccessToast(
+        t(
+          pending.correction.trim()
+            ? 'feedback.falsePositive.memoryUpdated'
+            : 'feedback.falsePositive.memoryDeleted'
+        )
+      )
+    } else {
+      showSuccessToast(t('feedback.falsePositive.success'))
+    }
+    closeContradictionModal()
+  } catch (err) {
+    const errorMsg = err instanceof Error ? err.message : t('feedback.falsePositive.error')
+    showErrorToast(errorMsg)
+  } finally {
+    falsePositiveSubmitting.value = false
+  }
+}
+
+/**
+ * Handle "Regenerate" from False Positive Modal
+ * Regenerates the CORRECTION (bottom field) based on the summary (top field)
+ * Uses dedicated backend endpoint - no prompts from frontend
+ * Everything stays in the modal - nothing is sent to chat
+ */
+async function regenerateFalsePositiveSummary(data: { summary: string; correction: string }) {
+  if (!data.summary.trim()) {
+    showErrorToast(t('feedback.falsePositive.needSummaryFirst'))
+    return
+  }
+
+  falsePositivePreviewLoading.value = true
+  try {
+    // Call dedicated backend endpoint - prompt is handled server-side
+    const result = await regenerateCorrection({
+      falseClaim: data.summary.trim(),
+      oldCorrection: data.correction.trim() || undefined,
+    })
+
+    // Add the new correction as a new option at the top
+    if (result.correction) {
+      falsePositiveCorrectionOptions.value = [
+        result.correction,
+        ...falsePositiveCorrectionOptions.value,
+      ]
+    }
+  } catch (err) {
+    const errorMsg = err instanceof Error ? err.message : t('feedback.falsePositive.error')
+    showErrorToast(errorMsg)
+  } finally {
+    falsePositivePreviewLoading.value = false
   }
 }
 

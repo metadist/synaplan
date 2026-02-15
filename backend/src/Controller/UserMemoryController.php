@@ -86,6 +86,52 @@ class UserMemoryController extends AbstractController
         ]);
     }
 
+    #[Route('/{id}', methods: ['GET'], requirements: ['id' => '\d+'])]
+    #[OA\Get(
+        path: '/api/v1/user/memories/{id}',
+        summary: 'Get a single memory by ID',
+        description: 'Returns a single memory if it exists and belongs to the current user',
+        parameters: [
+            new OA\Parameter(
+                name: 'id',
+                in: 'path',
+                required: true,
+                schema: new OA\Schema(type: 'integer', example: 123)
+            ),
+        ],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Memory found',
+                content: new OA\JsonContent(
+                    properties: [
+                        new OA\Property(property: 'id', type: 'integer', example: 123),
+                        new OA\Property(property: 'category', type: 'string', example: 'preferences'),
+                        new OA\Property(property: 'key', type: 'string', example: 'tech_stack'),
+                        new OA\Property(property: 'value', type: 'string', example: 'Prefers TypeScript with Vue 3'),
+                        new OA\Property(property: 'source', type: 'string', example: 'auto_detected'),
+                        new OA\Property(property: 'messageId', type: 'integer', nullable: true, example: 456),
+                        new OA\Property(property: 'created', type: 'integer', example: 1705234567),
+                        new OA\Property(property: 'updated', type: 'integer', example: 1705234567),
+                    ]
+                )
+            ),
+            new OA\Response(response: 404, description: 'Memory not found'),
+        ]
+    )]
+    public function getMemory(
+        int $id,
+        #[CurrentUser] User $user,
+    ): JsonResponse {
+        $memory = $this->memoryService->getMemoryById($id, $user);
+
+        if (!$memory) {
+            return $this->json(['error' => 'Memory not found'], Response::HTTP_NOT_FOUND);
+        }
+
+        return $this->json($memory->toArray());
+    }
+
     #[Route('/categories', methods: ['GET'])]
     #[OA\Get(
         path: '/api/v1/user/memories/categories',
@@ -511,15 +557,11 @@ class UserMemoryController extends AbstractController
         $promptEntity = $promptData['prompt'] ?? null;
 
         if (!$promptEntity) {
-            $response = ['error' => 'Memory parse prompt not configured'];
-            if ($user->isAdmin()) {
-                $response['debug'] = 'Prompt "tools:memory_parse" not found in database. Run: php bin/console doctrine:fixtures:load --group=PromptFixtures --append';
-            }
-
-            return $this->json($response, Response::HTTP_SERVICE_UNAVAILABLE);
+            // Fallback: use a hardcoded prompt so the feature works even without fixtures
+            $systemPrompt = 'Parse the user input into a structured memory. Return valid JSON with: action (create/update/delete), memory (object with category, key, value), and optionally existingId and reason. Categories: personal, work, preferences, health, finance, education, relationships, goals, other.';
+        } else {
+            $systemPrompt = $promptEntity->getPrompt();
         }
-
-        $systemPrompt = $promptEntity->getPrompt();
 
         // Build user message with context
         $userMessage = "User input: \"{$input}\"";

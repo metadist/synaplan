@@ -225,9 +225,13 @@ class PromptsApi {
 
   /**
    * Link existing file to task prompt
+   * Returns the result including chunksLinked count (0 = file may not be vectorized)
    */
-  async linkFileToPrompt(topic: string, messageId: number): Promise<void> {
-    await httpClient<{ success: boolean; chunksLinked: number }>(
+  async linkFileToPrompt(
+    topic: string,
+    messageId: number
+  ): Promise<{ success: boolean; chunksLinked: number }> {
+    return await httpClient<{ success: boolean; chunksLinked: number }>(
       `/api/v1/prompts/${topic}/files/link`,
       {
         method: 'POST',

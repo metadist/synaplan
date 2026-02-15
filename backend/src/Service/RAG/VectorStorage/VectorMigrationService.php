@@ -42,15 +42,18 @@ final readonly class VectorMigrationService
         $qdrantChunks = 0;
         if ($this->config->isQdrantEnabled() && $this->qdrantClient->isAvailable()) {
             try {
-                // Fast check: probe only the first chunk (doc_{userId}_{fileId}_0)
-                $firstPointId = sprintf('doc_%d_%d_0', $userId, $fileId);
-                $doc = $this->qdrantClient->getDocument($firstPointId);
-                if (null !== $doc) {
-                    $qdrantChunks = 1; // At least one chunk exists
-                    $groupKey = $doc['payload']['group_key'] ?? $groupKey;
+                // Use the QdrantVectorStorage to get accurate chunk info (not just probe first chunk)
+                $qdrantInfo = $this->qdrantStorage->getFileChunkInfo($userId, $fileId);
+                $qdrantChunks = $qdrantInfo['chunks'];
+                if ($qdrantChunks > 0 && !empty($qdrantInfo['groupKey'])) {
+                    $groupKey = $qdrantInfo['groupKey'];
                 }
-            } catch (\Throwable) {
-                // Qdrant unavailable — treat as 0
+            } catch (\Throwable $e) {
+                $this->logger->warning('Qdrant unavailable during migration status check', [
+                    'user_id' => $userId,
+                    'file_id' => $fileId,
+                    'error' => $e->getMessage(),
+                ]);
             }
         }
 

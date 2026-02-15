@@ -259,6 +259,77 @@ final readonly class MariaDBVectorStorage implements VectorStorageInterface
         ];
     }
 
+    public function getFileIdsByGroupKey(int $userId, string $groupKey): array
+    {
+        $sql = <<<'SQL'
+            SELECT DISTINCT BMID as file_id
+            FROM BRAG
+            WHERE BUID = :userId AND BGROUPKEY = :groupKey
+        SQL;
+
+        $stmt = $this->connection->prepare($sql);
+        $stmt->bindValue('userId', $userId);
+        $stmt->bindValue('groupKey', $groupKey);
+        $rows = $stmt->executeQuery()->fetchAllAssociative();
+
+        return array_map(fn (array $row) => (int) $row['file_id'], $rows);
+    }
+
+    /**
+     * Get files with chunk counts for a specific group key.
+     * More efficient than getFilesWithChunks + filtering.
+     *
+     * @return array<int, array{chunks: int, groupKey: string}> Map of fileId => info
+     */
+    public function getFilesWithChunksByGroupKey(int $userId, string $groupKey): array
+    {
+        $sql = <<<'SQL'
+            SELECT BMID as file_id, COUNT(*) as chunks
+            FROM BRAG
+            WHERE BUID = :userId AND BGROUPKEY = :groupKey
+            GROUP BY BMID
+        SQL;
+
+        $stmt = $this->connection->prepare($sql);
+        $stmt->bindValue('userId', $userId);
+        $stmt->bindValue('groupKey', $groupKey);
+        $rows = $stmt->executeQuery()->fetchAllAssociative();
+
+        $result = [];
+        foreach ($rows as $row) {
+            $result[(int) $row['file_id']] = [
+                'chunks' => (int) $row['chunks'],
+                'groupKey' => $groupKey,
+            ];
+        }
+
+        return $result;
+    }
+
+    public function getFilesWithChunks(int $userId): array
+    {
+        $sql = <<<'SQL'
+            SELECT BMID as file_id, COUNT(*) as chunks, MIN(BGROUPKEY) as group_key
+            FROM BRAG
+            WHERE BUID = :userId
+            GROUP BY BMID
+        SQL;
+
+        $stmt = $this->connection->prepare($sql);
+        $stmt->bindValue('userId', $userId);
+        $rows = $stmt->executeQuery()->fetchAllAssociative();
+
+        $result = [];
+        foreach ($rows as $row) {
+            $result[(int) $row['file_id']] = [
+                'chunks' => (int) $row['chunks'],
+                'groupKey' => $row['group_key'],
+            ];
+        }
+
+        return $result;
+    }
+
     public function isAvailable(): bool
     {
         try {

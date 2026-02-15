@@ -478,15 +478,34 @@ class FileController extends AbstractController
             ->where('mf.userId = :userId')
             ->setParameter('userId', $user->getId());
 
-        // If group_key filter is provided, join with BRAG table
+        // If group_key filter is provided, get file IDs from active vector storage (Qdrant or MariaDB)
         if ($groupKey) {
-            $qb->innerJoin(
-                \App\Entity\RagDocument::class,
-                'r',
-                'WITH',
-                'r.messageId = mf.id AND r.userId = :userId AND r.groupKey = :groupKey'
-            )
-            ->setParameter('groupKey', $groupKey);
+            try {
+                $fileIds = $this->vectorStorageFacade->getFileIdsByGroupKey($user->getId(), $groupKey);
+                if (empty($fileIds)) {
+                    // No files in this group — return empty
+                    return $this->json([
+                        'success' => true,
+                        'files' => [],
+                        'pagination' => ['page' => $page, 'limit' => $limit, 'total' => 0, 'pages' => 0],
+                    ]);
+                }
+                $qb->andWhere('mf.id IN (:fileIds)')
+                   ->setParameter('fileIds', $fileIds);
+            } catch (\Throwable $e) {
+                $this->logger->warning('FileController: Failed to get file IDs by group key from vector storage', [
+                    'group_key' => $groupKey,
+                    'error' => $e->getMessage(),
+                ]);
+
+                // Return empty result instead of showing files from wrong group
+                return $this->json([
+                    'success' => false,
+                    'error' => 'Failed to filter files by group key',
+                    'files' => [],
+                    'pagination' => ['page' => $page, 'limit' => $limit, 'total' => 0, 'pages' => 0],
+                ]);
+            }
         }
 
         $qb->orderBy('mf.createdAt', 'DESC');
@@ -550,23 +569,7 @@ class FileController extends AbstractController
                 'groups' => $groups,
             ]);
 
-            // Transform to expected format
-            // Note: Facade returns simple array of strings, but frontend might expect objects with counts?
-            // The previous implementation returned `['groupKey' => '...', 'count' => 5]`
-            // The facade `getGroupKeys` currently returns `string[]`.
-            // Let's check `MariaDBVectorStorage::getGroupKeys`. It calls `ragRepository->findDistinctGroupKeysByUser`.
-            // `findDistinctGroupKeysByUser` likely returns array of arrays with counts.
-            // Let's check `RagDocumentRepository`.
-            // If Facade returns strings, we lose counts.
-            // Let's check `VectorStorageInterface`. `getGroupKeys` returns `string[]`.
-            // This is a regression if frontend uses counts.
-            // Let's check `MariaDBVectorStorage` implementation again.
-            // `return $this->ragRepository->findDistinctGroupKeysByUser($userId);`
-            // If that returns `[['groupKey' => 'A', 'count' => 1]]`, then interface return type `array` is loose but PHPDoc says `string[]`.
-            // I should update `VectorStorageInterface` and implementations to return `array` (of group info) or `string[]` and fetch stats separately.
-            // `getStats` returns `chunksByGroup`. I can use that!
-
-            // Better approach: Use getStats to get groups and counts.
+            // Use getStats to get groups with chunk counts (works with Qdrant and MariaDB).
             $stats = $this->vectorStorageFacade->getStats($user->getId());
             $chunksByGroup = $stats->chunksByGroup;
 
@@ -793,6 +796,8 @@ class FileController extends AbstractController
     /**
      * Get groupKey, vectorization info, and migration status for a file.
      *
+     * Uses the active vector storage provider (Qdrant or MariaDB) via the facade.
+     *
      * GET /api/v1/files/{id}/group-key
      */
     #[Route('/{id}/group-key', name: 'get_group_key', methods: ['GET'])]
@@ -810,17 +815,24 @@ class FileController extends AbstractController
         }
 
         try {
-            $status = $this->migrationService->getFileMigrationStatus($user->getId(), $id);
+            // Primary: use the active storage facade (routes to Qdrant or MariaDB)
+            $chunkInfo = $this->vectorStorageFacade->getFileChunkInfo($user->getId(), $id);
+            $chunks = $chunkInfo['chunks'];
+            $groupKey = $chunkInfo['groupKey'];
+            $isVectorized = $chunks > 0;
+
+            // Also check migration status for legacy MariaDB → Qdrant migration
+            $migrationStatus = $this->migrationService->getFileMigrationStatus($user->getId(), $id);
 
             return $this->json([
                 'success' => true,
-                'groupKey' => $status['groupKey'],
-                'isVectorized' => ($status['qdrantChunks'] > 0) || ($status['mariadbChunks'] > 0),
-                'chunks' => max($status['qdrantChunks'], $status['mariadbChunks']),
+                'groupKey' => $groupKey,
+                'isVectorized' => $isVectorized,
+                'chunks' => $chunks,
                 'status' => $messageFile->getStatus(),
-                'needsMigration' => $status['needsMigration'],
-                'mariadbChunks' => $status['mariadbChunks'],
-                'qdrantChunks' => $status['qdrantChunks'],
+                'needsMigration' => $migrationStatus['needsMigration'],
+                'mariadbChunks' => $migrationStatus['mariadbChunks'],
+                'qdrantChunks' => $migrationStatus['qdrantChunks'],
             ]);
         } catch (\Throwable $e) {
             $this->logger->warning('FileController: Failed to get group key', [

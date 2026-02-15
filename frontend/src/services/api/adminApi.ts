@@ -12,14 +12,9 @@ const FlexibleAdminUserSchema = originalUserSchema
     created: z.string(), // Accept any string for created date (more flexible than datetime format)
     // Email field can be: valid email, phone number (flexible format), or null
     // Backend provides phone from BUSERDETAILS['phone'] if email is missing
-    email: z
-      .union([
-        z.string().email(), // Valid email address
-        z.string().regex(/^\+?\d{5,15}$/), // Phone number: optional +, 5-15 digits (covers various formats)
-        z.null(),
-      ])
-      .nullable()
-      .optional(),
+    // Permissive: accept any non-empty string (admin display, not input validation)
+    // Strict .email() rejects valid edge cases like TLDs with digits
+    email: z.string().nullable().optional(),
     level: z.enum(['ANONYMOUS', 'NEW', 'PRO', 'TEAM', 'BUSINESS', 'ADMIN']).catch('NEW'), // Fallback to 'NEW' if invalid
   })
 

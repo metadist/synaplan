@@ -117,6 +117,36 @@ interface VectorStorageInterface
     public function getFileChunkInfo(int $userId, int $fileId): array;
 
     /**
+     * Get file IDs that have chunks in a specific group.
+     *
+     * @param int    $userId   User ID
+     * @param string $groupKey Group key to filter by
+     *
+     * @return int[] Array of file IDs
+     */
+    public function getFileIdsByGroupKey(int $userId, string $groupKey): array;
+
+    /**
+     * Get files with chunk counts for a specific group key.
+     * More efficient than getFilesWithChunks + filtering.
+     *
+     * @param int    $userId   User ID
+     * @param string $groupKey Group key to filter by
+     *
+     * @return array<int, array{chunks: int, groupKey: string}> Map of fileId => info
+     */
+    public function getFilesWithChunksByGroupKey(int $userId, string $groupKey): array;
+
+    /**
+     * Get all file IDs that have vectorized chunks.
+     *
+     * @param int $userId User ID
+     *
+     * @return array<int, array{chunks: int, groupKey: string|null}> Map of fileId => info
+     */
+    public function getFilesWithChunks(int $userId): array;
+
+    /**
      * Check if the storage backend is available.
      *
      * @return bool True if backend is operational

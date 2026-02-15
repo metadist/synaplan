@@ -184,6 +184,12 @@ class OidcTokenService
         $userInfo = $this->validateOidcToken($accessToken, $provider);
 
         if (!$userInfo || !isset($userInfo['sub'])) {
+            $this->logger->warning('OIDC token validation returned no user info', [
+                'provider' => $provider,
+                'has_user_info' => null !== $userInfo,
+                'has_sub' => isset($userInfo['sub']),
+            ]);
+
             return null;
         }
 
