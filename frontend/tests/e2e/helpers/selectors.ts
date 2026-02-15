@@ -12,6 +12,8 @@ export const selectors = {
     confirmPassword: '[data-testid="input-confirm-password"]',
     submit: '[data-testid="btn-register"]',
     successSection: '[data-testid="section-registration-success"]',
+    /** Shown when backend/register returns error (use with race(success, error) for fail-fast) */
+    errorAlert: '[data-testid="alert-register-error"]',
     backToLoginBtn: '[data-testid="btn-goto-login"]',
   },
   verifyEmail: {
@@ -49,16 +51,31 @@ export const selectors = {
     fileInput: '[data-testid="input-chat-file"]',
     messageContainer: '[data-testid="message-container"]',
     aiAnswerBubble: '[data-testid="assistant-message-bubble"]',
+    /** Terminal: present when streaming finished */
+    chatDone: '[data-testid="message-done"]',
+    /** Terminal: present when message ended in error */
+    chatError: '[data-testid="message-topic-error"]',
+    messageUser: '[data-testid="message-user"]',
+    messageAssistant: '[data-testid="message-assistant"]',
     /** Present inside assistant bubble when streaming finished (prefer over loader hidden) */
     messageDone: '[data-testid="message-done"]',
     loadIndicator: '[data-testid="loading-typing-indicator"]',
+    /** Wrapper that contains only the generated answer body (no timestamp, no footer). Use this for asserting reply text. */
+    assistantAnswerBody: '[data-testid="section-message-text"]',
     messageText: '[data-testid="message-text"]',
+    /** Present when message topic is ERROR (backend error path); use to assert no error in bubble */
+    messageTopicError: '[data-testid="message-topic-error"]',
     againDropdown: '[data-testid="btn-message-model-toggle"]',
     againDropdownItem: 'button.dropdown-item',
   },
   share: {
-    modal: '[data-testid="modal-chat-share"]',
+    shareButton: '[data-testid="btn-chat-share"]',
+    shareModal: '[data-testid="modal-chat-share"]',
     modalRoot: '[data-testid="modal-chat-share-root"]',
+    shareCreate: '[data-testid="btn-chat-share-make-public"]',
+    shareLinkInput: '[data-testid="share-link-input"]',
+    shareDone: '[data-testid="share-done"]',
+    shareError: '[data-testid="share-error"]',
     makePublicBtn: '[data-testid="btn-chat-share-make-public"]',
     copyBtn: '[data-testid="btn-chat-share-copy"]',
     closeBtn: '[data-testid="btn-chat-share-close"]',
@@ -69,23 +86,29 @@ export const selectors = {
     sidebarShareBtn: '[data-testid="btn-chat-entry-share"]',
     /** Chat dropdown (nav left): section visible when chat toggle is open */
     chatDropdownSection: '[data-testid="section-chat-dropdown"]',
-    /** Chat dropdown: menu button per chat (btn-chat-menu-{id}), then Share (btn-chat-share-{id}) */
-    chatDropdownMenu: '[data-testid^="btn-chat-menu-"]',
-    chatDropdownShare: '[data-testid^="btn-chat-share-"]',
-    /** First chat row in dropdown (for hover so menu button appears) */
-    chatDropdownFirstItem: '[data-testid^="btn-chat-item-"]',
+    /** Chat dropdown: one row per chat; scope menu/share to this row */
+    chatDropdownRow: '[data-testid="row-chat-item"]',
+    /** Scoped to chatDropdownRow: menu (three dots), share, rename, delete buttons */
+    chatMenuButton: '[data-testid="btn-chat-menu"]',
+    chatShareButton: '[data-testid="btn-chat-share"]',
+    chatRenameButton: '[data-testid="btn-chat-rename"]',
+    chatDeleteButton: '[data-testid="btn-chat-delete"]',
+    /** Chat dropdown: item button (title) – scope by chatDropdownRow */
+    chatDropdownFirstItem: '[data-testid="btn-chat-item"]',
     /** Chat browser: share button on chat card (no dropdown) */
     browserShareBtn: '[data-testid="btn-chat-share"]',
     /** Share link URL (read-only text in modal) */
-    shareLink: '[data-testid="text-share-url"]',
+    shareLink: '[data-testid="share-link-input"]',
   },
   sharedChat: {
+    sharedChatRoot: '[data-testid="shared-chat-root"]',
+    sharedMessageList: '[data-testid="shared-message-list"]',
     /** Shared page root (read-only view) */
     page: '[data-testid="page-shared-chat"]',
     loading: '[data-testid="state-loading"]',
     error: '[data-testid="state-error"]',
     content: '[data-testid="section-chat-content"]',
-    messagesSection: '[data-testid="section-messages"]',
+    messagesSection: '[data-testid="shared-message-list"]',
     messageItem: '[data-testid="item-message"]',
     /** Optional: add data-testid="badge-read-only" in app for explicit read-only indicator */
     badgeReadOnly: '[data-testid="badge-read-only"]',
