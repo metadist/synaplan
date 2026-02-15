@@ -15,6 +15,8 @@ npm run test:e2e:ui                     # Playwright UI
 
 ## Switching between dev stack and test stack
 
+Switching between the two stacks gives you a **CI-like environment**: the test stack uses the same config as CI (TestProvider, port 8001, tmpfs DB), so you can run locally what the pipeline runs.
+
 Both stacks share **MailHog ports** (8025/1025) — always stop one before starting the other.
 
 ### Dev → Test stack
@@ -58,10 +60,26 @@ Permission error on `frontend/dist/` (container creates it as root): `sudo rm -r
 | **MailHog**   | :8025 / :1025                   | :8025 / :1025 (shared ports!)                  |
 | **Login**     | admin@synaplan.com / admin123   | admin@synaplan.com / admin123                  |
 
-### TestProvider auch lokal (Dev-Stack) nutzen
+### Selecting TestProvider in the dev stack
 
-- **Wie CI:** Test-Stack starten (`make test-stack-build`), dann Tests mit `npm run test:e2e:teststack`.
-- **Ohne API-Keys im Dev-Stack:** Dev-Stack wie gewohnt; in der App **Einstellungen → AI-Modelle** → für Chat **„test-model“ (Test Provider)** wählen.
+In the **dev stack** (localhost:5173 + 8000) the TestProvider is shown in **Settings → AI Models** when `APP_ENV=dev` (default in docker-compose). The test model (id 900) must exist in the database; load only the model fixtures once if you don’t see it (avoids duplicate-key errors from other fixtures when using `--append`):
+
+```bash
+docker compose exec backend php bin/console doctrine:fixtures:load --append --group=ModelFixtures
+```
+
+Then:
+
+1. Open the app → **Settings** (sidebar) → **AI Models**.
+2. For the chat model, select **"test-model" (Test Provider)** and save.
+3. Run E2E tests with `npm run test:e2e` (no API keys needed; deterministic responses).
+
+You can e.g. run smoke tests (id=003) locally against the test provider.
+
+### TestProvider: CI-like environment (test stack)
+
+- **Same as CI:** Start the test stack (`make test-stack-build`), then run tests with `npm run test:e2e:teststack`. Matches the CI environment (port 8001, TestProvider, tmpfs DB).
+- **Switching stacks:** See [Switching between dev stack and test stack](#switching-between-dev-stack-and-test-stack) above.
 
 ## Test commands
 
