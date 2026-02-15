@@ -102,6 +102,7 @@ class CookieTokenAuthenticatorTest extends TestCase
         $request = new Request();
         $request->cookies->set(OidcTokenService::OIDC_ACCESS_COOKIE, 'expired-oidc-token');
         $request->cookies->set(OidcTokenService::OIDC_PROVIDER_COOKIE, 'keycloak');
+        // No app token cookie set -> should throw after OIDC fallback fails
 
         $this->oidcTokenService
             ->expects($this->once())
@@ -112,7 +113,7 @@ class CookieTokenAuthenticatorTest extends TestCase
         $this->logger
             ->expects($this->once())
             ->method('debug')
-            ->with('OIDC token validation failed, will trigger refresh');
+            ->with('OIDC token validation failed, falling back to app token');
 
         $this->expectException(AuthenticationException::class);
         $this->expectExceptionMessage('OIDC token expired');

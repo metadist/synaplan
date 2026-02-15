@@ -150,6 +150,8 @@ class InternalEmailService
     ): void {
         $fromEmail = $_ENV['APP_SENDER_EMAIL'] ?? 'smart@synaplan.net';
         $fromName = $_ENV['APP_SENDER_NAME'] ?? 'Synaplan AI';
+        // Reply-To must be the smart address so users can reply and continue the dialog
+        $replyToEmail = $_ENV['SMART_EMAIL_ADDRESS'] ?? \App\Service\Email\SmartEmailHelper::getBaseAddress();
 
         // Convert markdown to HTML using Parsedown
         $parsedown = new \Parsedown();
@@ -199,6 +201,7 @@ class InternalEmailService
 
         $email = (new Email())
             ->from(sprintf('%s <%s>', $fromName, $fromEmail))
+            ->replyTo($replyToEmail)
             ->to($to)
             ->subject('Re: '.$subject)
             ->text($textBody)

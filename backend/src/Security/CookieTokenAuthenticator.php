@@ -68,9 +68,14 @@ class CookieTokenAuthenticator extends AbstractAuthenticator
                 );
             }
 
-            // OIDC validation failed - token might be expired
-            $this->logger->debug('OIDC token validation failed, will trigger refresh');
-            throw new CustomUserMessageAuthenticationException('OIDC token expired');
+            // OIDC validation failed - fall back to app token if available
+            $this->logger->debug('OIDC token validation failed, falling back to app token');
+            $appToken = $request->cookies->get(TokenService::ACCESS_COOKIE);
+            if ($appToken) {
+                $token = $appToken;
+            } else {
+                throw new CustomUserMessageAuthenticationException('OIDC token expired');
+            }
         }
 
         // Fall back to app token validation

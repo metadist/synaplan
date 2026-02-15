@@ -190,16 +190,18 @@ final readonly class FeedbackExampleService
             throw new \RuntimeException('Memory service unavailable');
         }
 
-        // Verify ownership
-        $memory = $this->memoryService->getMemoryById($id, $user);
+        // Try both feedback namespaces since getMemoryById doesn't support namespaces
+        foreach ([FeedbackConstants::NAMESPACE_FALSE_POSITIVE, FeedbackConstants::NAMESPACE_POSITIVE] as $namespace) {
+            try {
+                $this->memoryService->deleteMemory($id, $user, $namespace);
 
-        if (!$memory) {
-            throw new \InvalidArgumentException('Feedback not found');
+                return;
+            } catch (\Exception) {
+                // Not found in this namespace, try the next one
+            }
         }
 
-        $namespace = 'feedback_negative' === $memory->category ? FeedbackConstants::NAMESPACE_FALSE_POSITIVE : FeedbackConstants::NAMESPACE_POSITIVE;
-
-        $this->memoryService->deleteMemory($id, $user, $namespace);
+        throw new \InvalidArgumentException('Feedback not found');
     }
 
     /**

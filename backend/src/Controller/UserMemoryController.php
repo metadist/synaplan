@@ -557,15 +557,11 @@ class UserMemoryController extends AbstractController
         $promptEntity = $promptData['prompt'] ?? null;
 
         if (!$promptEntity) {
-            $response = ['error' => 'Memory parse prompt not configured'];
-            if ($user->isAdmin()) {
-                $response['debug'] = 'Prompt "tools:memory_parse" not found in database. Run: php bin/console doctrine:fixtures:load --group=PromptFixtures --append';
-            }
-
-            return $this->json($response, Response::HTTP_SERVICE_UNAVAILABLE);
+            // Fallback: use a hardcoded prompt so the feature works even without fixtures
+            $systemPrompt = 'Parse the user input into a structured memory. Return valid JSON with: action (create/update/delete), memory (object with category, key, value), and optionally existingId and reason. Categories: personal, work, preferences, health, finance, education, relationships, goals, other.';
+        } else {
+            $systemPrompt = $promptEntity->getPrompt();
         }
-
-        $systemPrompt = $promptEntity->getPrompt();
 
         // Build user message with context
         $userMessage = "User input: \"{$input}\"";
