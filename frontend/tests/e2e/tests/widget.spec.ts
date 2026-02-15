@@ -175,8 +175,7 @@ test('@smoke @widget @security Widget blocked on non-whitelisted domain id=015',
 
     const configResponse = page.waitForResponse(
       (res) =>
-        res.url().includes(`/api/v1/widget/${widgetInfo.widgetId}/config`) &&
-        res.status() === 403,
+        res.url().includes(`/api/v1/widget/${widgetInfo.widgetId}/config`) && res.status() === 403,
       { timeout: TIMEOUTS.STANDARD }
     )
 
@@ -386,8 +385,6 @@ test('@noci @smoke @widget Widget task prompt works id=017', async ({ page }) =>
   expect(aiText.length).toBeGreaterThan(0)
 })
 
-// Like 013 but with the real embedded widget (script loaded on external page, Shadow DOM).
-// Uses widget-test.html — the real user flow.
 test('@smoke @widget User sends message via embedded widget and receives response id=020', async ({
   page,
 }) => {
@@ -403,6 +400,8 @@ test('@smoke @widget User sends message via embedded widget and receives respons
   })
 
   const widgetHost = page.locator(selectors.widget.host)
+  const messagesContainer = widgetHost.locator(selectors.widget.messagesContainer)
+  const messageContainers = messagesContainer.locator(selectors.widget.messageContainers)
   const input = widgetHost.locator(selectors.widget.input)
   await expect(input).toBeVisible({ timeout: TIMEOUTS.SHORT })
 
@@ -413,14 +412,27 @@ test('@smoke @widget User sends message via embedded widget and receives respons
     await widgetHost.locator(selectors.widget.sendButton).click()
   })
 
-  const userBubble = widgetHost.locator(selectors.widget.messageUserText).last()
-  await expect(userBubble).toBeVisible({ timeout: TIMEOUTS.SHORT })
-  await expect(userBubble).toContainText('smoke test')
+  const userContainer = messageContainers.nth(previousCount)
+  await expect(userContainer.locator(selectors.widget.messageUserText)).toBeVisible({
+    timeout: TIMEOUTS.SHORT,
+  })
+  await expect(userContainer).toContainText('smoke test')
 
-  const aiText = await waitForWidgetAnswer(page, previousCount)
+  const assistantIndex = previousCount + 1
+  const newBubble = messageContainers.nth(assistantIndex)
+  await newBubble.waitFor({ state: 'attached', timeout: TIMEOUTS.STANDARD })
+  await newBubble.scrollIntoViewIfNeeded()
+  await newBubble.waitFor({ state: 'visible', timeout: TIMEOUTS.SHORT })
+
+  await newBubble
+    .locator(selectors.widget.messageDone)
+    .waitFor({ state: 'visible', timeout: TIMEOUTS.VERY_LONG })
+
+  const aiText = (await newBubble.locator(selectors.widget.messageAiText).innerText())
+    .trim()
+    .toLowerCase()
 
   await test.step('Assert: stream ended (message-done) and assistant reply non-empty', async () => {
-    await expect(widgetHost.locator(selectors.widget.messageDone).last()).toBeVisible()
     expect(aiText.length).toBeGreaterThan(0)
   })
 })

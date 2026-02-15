@@ -1,8 +1,9 @@
 import type { APIRequestContext } from '@playwright/test'
+import { expect } from '@playwright/test'
 import { URLS, INTERVALS } from '../config/config'
 
-/** MailHog v2 message item shape (minimal for our use) */
-export interface MailHogMessage {
+/** MailHog message shape. API returns { items: [...] } or { messages: [...] }. */
+interface MailHogMessage {
   Content?: {
     Body?: string
     Parts?: Array<{ Body?: string }>
@@ -10,96 +11,94 @@ export interface MailHogMessage {
   }
 }
 
-/**
- * Decode quoted-printable email body (e.g. verification emails).
- */
-export function decodeQuotedPrintable(input: string): string {
-  const withoutSoftBreaks = input.replace(/=\r?\n/g, '')
-  return withoutSoftBreaks.replace(/=([0-9A-Fa-f]{2})/g, (_, hex: string) =>
+const VERIFY_MARKER = 'verify-email-callback?token='
+const HREF_RE = /href=["']([^"']*\/verify-email-callback\?token=[^"']*)["']/i
+
+/** GET MailHog messages. Non-OK tolerated (returns []); poll timeout = fail. */
+async function fetchMessages(request: APIRequestContext): Promise<MailHogMessage[]> {
+  const res = await request.get(`${URLS.MAILHOG_URL}/api/v2/messages`)
+  if (!res.ok()) return []
+  const data = await res.json()
+  const list = data.items ?? data.messages
+  return Array.isArray(list) ? list : []
+}
+
+/** Body from Content.Body or first Part. */
+function bodyOf(msg: MailHogMessage): string {
+  return msg.Content?.Body ?? msg.Content?.Parts?.[0]?.Body ?? ''
+}
+
+/** Quoted-printable decode (Symfony Mailer sends HTML as QP). */
+function decodeQP(s: string): string {
+  const noSoft = s.replace(/=\r?\n/g, '')
+  return noSoft.replace(/=([0-9A-Fa-f]{2})/g, (_, hex: string) =>
     String.fromCharCode(parseInt(hex, 16))
   )
 }
 
-/**
- * Extract verification link from decoded email body.
- * Handles href, raw URL, or token-only format.
- */
-export function extractVerificationLink(decodedBody: string): string | null {
-  const linkFromHref = decodedBody.match(
-    /href=["']([^"']*\/verify-email-callback\?token=[^"']*)["']/i
-  )?.[1]
-  if (linkFromHref) return linkFromHref
-  const linkFromUrl = decodedBody.match(
-    /(https?:\/\/[^\s<>"]+\/verify-email-callback\?token=[^\s<>"]+)/i
-  )?.[1]
-  if (linkFromUrl) return linkFromUrl
-  const token = decodedBody.match(/token=([a-zA-Z0-9_-]+)/i)?.[1]
-  if (token) return `/verify-email-callback?token=${token}`
-  return null
+/** To header matches email (normalizes once). "Name <addr>" or plain addr, case-insensitive. */
+function toMatches(msg: MailHogMessage, recipientEmail: string): boolean {
+  const want = recipientEmail.trim().toLowerCase()
+  const toHeader = msg.Content?.Headers?.To ?? []
+  const rawList = Array.isArray(toHeader) ? toHeader : [toHeader]
+  for (const raw of rawList) {
+    const s = String(raw).trim().toLowerCase()
+    const angle = /<([^>]+)>/g
+    let m: RegExpExecArray | null
+    while ((m = angle.exec(s)) !== null) {
+      if (m[1].trim() === want) return true
+    }
+    if (s === want) return true
+  }
+  return false
 }
 
-/** Clear MailHog inbox (e.g. before registration/verification tests). */
+/** Clear MailHog inbox. Throws on API error (fail-fast). */
 export async function clearMailHog(request: APIRequestContext): Promise<void> {
   const res = await request.delete(`${URLS.MAILHOG_URL}/api/v1/messages`)
   if (!res.ok()) {
-    throw new Error(`Failed to clear MailHog: ${res.status()}`)
+    throw new Error(`MailHog clear failed: ${res.status()}`)
   }
 }
 
-/** Decode full email body (Body + Parts) from a MailHog message. */
-export function getDecodedEmailBody(msg: MailHogMessage): string {
-  const body = msg.Content?.Body || ''
-  const parts = Array.isArray(msg.Content?.Parts)
-    ? msg.Content.Parts.map((p) => p.Body || '').filter(Boolean)
-    : []
-  const fullBody = parts.join('\n') || body
-  return decodeQuotedPrintable(fullBody)
+/** Poll until verification email; return href. Fails by timeout if mail never arrives or API stays non-OK. */
+export async function waitForVerificationHref(
+  request: APIRequestContext,
+  recipientEmail: string,
+  opts?: { timeout?: number; intervals?: [number, number] }
+): Promise<string> {
+  const timeout = opts?.timeout ?? 60_000
+  const intervals = opts?.intervals ?? INTERVALS.FAST()
+  let href: string | null = null
+  await expect
+    .poll(
+      async () => {
+        const messages = await fetchMessages(request)
+        for (const msg of messages) {
+          if (!toMatches(msg, recipientEmail)) continue
+          const decoded = decodeQP(bodyOf(msg))
+          if (!decoded.toLowerCase().includes(VERIFY_MARKER)) continue
+          const m = decoded.match(HREF_RE)
+          if (m?.[1]) {
+            href = m[1]
+            return href
+          }
+        }
+        return null
+      },
+      { timeout, intervals }
+    )
+    .not.toBeNull()
+  return href!
 }
 
-/** Turn verification link (path or absolute URL) into full URL with BASE_URL. */
-export function normalizeVerificationUrl(verificationLink: string): string {
-  let path = verificationLink
+/** Path or full URL → full URL with BASE_URL. */
+export function normalizeVerificationUrl(hrefOrUrl: string): string {
+  let path = hrefOrUrl
   if (path.startsWith('http://') || path.startsWith('https://')) {
     const url = new URL(path)
     path = url.pathname + url.search
   }
   if (!path.startsWith('/')) path = '/' + path
   return new URL(path, URLS.BASE_URL).toString()
-}
-
-/** Poll MailHog until a verification email for recipient appears; return that message. */
-export async function waitForVerificationEmail(
-  request: APIRequestContext,
-  recipientEmail: string,
-  options?: { timeout?: number; intervals?: [number, number] }
-): Promise<MailHogMessage> {
-  const timeout = options?.timeout ?? 60_000
-  const intervals = options?.intervals ?? INTERVALS.FAST()
-  let found: MailHogMessage | null = null
-  const { expect } = await import('@playwright/test')
-  await expect
-    .poll(
-      async () => {
-        const res = await request.get(`${URLS.MAILHOG_URL}/api/v2/messages`)
-        if (!res.ok()) return null
-        const data = await res.json()
-        const items: MailHogMessage[] = Array.isArray(data.items) ? data.items : []
-        found =
-          items.find((msg) => {
-            const toHeader = msg.Content?.Headers?.To ?? []
-            const toList = Array.isArray(toHeader) ? toHeader : [toHeader]
-            const toMatches = toList.some((to: string) => to.includes(recipientEmail))
-            const body = msg.Content?.Body || ''
-            const partBodies = Array.isArray(msg.Content?.Parts)
-              ? msg.Content.Parts.map((p) => p.Body || '').join(' ')
-              : ''
-            const contentLower = `${body} ${partBodies}`.toLowerCase()
-            return toMatches && contentLower.includes('verify-email-callback')
-          }) ?? null
-        return found
-      },
-      { timeout, intervals }
-    )
-    .not.toBeNull()
-  return found!
 }

@@ -7,6 +7,7 @@
 // Test prompts
 export const PROMPTS = {
   SMOKE_TEST: 'Ai, this is a smoke test. Answer with "success" add nothing else',
+  CHAT_SMOKE: 'Ai, this is a smoke test. Reply with one short sentence.',
   FIRST_MESSAGE: 'First message',
   SECOND_MESSAGE: 'Second message',
   CORS_TEST: 'Test CORS message',

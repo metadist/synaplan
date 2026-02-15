@@ -53,7 +53,7 @@ export async function openWidgetOnTestPage(
 export async function countWidgetMessages(page: Page): Promise<number> {
   const widgetHost = page.locator(selectors.widget.host)
   const messagesContainer = widgetHost.locator(selectors.widget.messagesContainer)
-  await messagesContainer.waitFor({ state: 'attached', timeout: TIMEOUTS.SHORT }).catch(() => {})
+  await messagesContainer.waitFor({ state: 'attached', timeout: TIMEOUTS.STANDARD })
   return messagesContainer.locator(selectors.widget.messageContainers).count()
 }
 

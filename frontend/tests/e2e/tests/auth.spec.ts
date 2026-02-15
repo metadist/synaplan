@@ -1,13 +1,7 @@
 import { test, expect } from '../test-setup'
 import { deleteUser, login } from '../helpers/auth'
 import { selectors } from '../helpers/selectors'
-import {
-  clearMailHog,
-  waitForVerificationEmail,
-  getDecodedEmailBody,
-  extractVerificationLink,
-  normalizeVerificationUrl,
-} from '../helpers/email'
+import { clearMailHog, waitForVerificationHref, normalizeVerificationUrl } from '../helpers/email'
 import { URLS, TIMEOUTS, INTERVALS } from '../config/config'
 
 test('@smoke @auth should successfully login id=002', async ({ page }) => {
@@ -46,16 +40,11 @@ test('@auth @smoke deleted user cannot login id=011', async ({ page, request }) 
   })
   expect(register.ok()).toBeTruthy()
 
-  const verificationEmail = await waitForVerificationEmail(request, email, {
+  const href = await waitForVerificationHref(request, email, {
     timeout: TIMEOUTS.LONG,
     intervals: INTERVALS.FAST(),
   })
-  const decodedBody = getDecodedEmailBody(verificationEmail)
-  const verificationLink = extractVerificationLink(decodedBody)
-  expect(verificationLink).not.toBeNull()
-
-  const normalizedVerificationLink = normalizeVerificationUrl(verificationLink!)
-  await page.goto(normalizedVerificationLink)
+  await page.goto(normalizeVerificationUrl(href))
   await page
     .locator(selectors.verifyEmail.successState)
     .waitFor({ state: 'visible', timeout: TIMEOUTS.STANDARD })
