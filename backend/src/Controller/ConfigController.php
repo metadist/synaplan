@@ -420,8 +420,8 @@ class ConfigController extends AbstractController
             }
         }
 
-        // In test/CI: add TestProvider (900) to every capability so UI shows "test-model (test)" for all
-        if ('test' === $this->kernelEnvironment) {
+        // In test or dev: add TestProvider (900) to every capability so UI shows "test-model (test)" for all
+        if (in_array($this->kernelEnvironment, ['test', 'dev'], true)) {
             $testModel = $this->modelRepository->find(900);
             if ($testModel) {
                 $testModelEntry = [
