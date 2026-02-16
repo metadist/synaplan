@@ -23,6 +23,9 @@ test: ## Run all tests (backend + frontend unit tests)
 test-e2e: ## Run e2e tests
 	$(MAKE) -C frontend test-e2e
 
+test-e2e-plugin-castingdata: ## Run Casting Data plugin e2e tests (CastApp + Synaplan must be running)
+	$(MAKE) -C frontend test-e2e-plugin-castingdata
+
 audit: ## Run security audit (backend)
 	$(MAKE) -C backend audit
 

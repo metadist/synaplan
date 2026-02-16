@@ -1,0 +1,27 @@
+{
+  "id": "castingdata",
+  "name": "castingdata",
+  "version": "1.0.0",
+  "displayName": "Casting Data Connector",
+  "description": "Connect external casting platforms to provide production, audition, and role data in chat",
+  "author": "Synaplan",
+  "license": "Apache-2.0",
+  "minSynaplanVersion": "2.1.0",
+  "capabilities": ["chat", "api", "frontend"],
+  "routes": [
+    { "path": "/config", "method": "GET", "description": "Get plugin configuration" },
+    { "path": "/config", "method": "PUT", "description": "Update plugin configuration" },
+    { "path": "/test-connection", "method": "POST", "description": "Test API connection" }
+  ],
+  "migrations": [
+    "001_setup.sql"
+  ],
+  "config": {
+    "group": "P_castingdata",
+    "settings": [
+      { "key": "api_url", "type": "string", "default": "", "description": "Base URL of the casting platform API (e.g. https://backstage.castapp.pro)" },
+      { "key": "api_key", "type": "string", "default": "", "description": "API key for authentication" },
+      { "key": "enabled", "type": "boolean", "default": false, "description": "Enable casting data injection in chat" }
+    ]
+  }
+}

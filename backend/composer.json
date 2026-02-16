@@ -82,6 +82,7 @@
             "App\\": "src/",
             "Plugin\\": "/plugins/",
             "Plugin\\SortX\\": "/plugins/sortx/backend/",
+            "Plugin\\CastingData\\": "/plugins/castingdata/backend/",
             "Inference\\": "lib/grpc/Inference/",
             "GPBMetadata\\": "lib/grpc/GPBMetadata/"
         }
