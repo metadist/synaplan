@@ -183,33 +183,48 @@ class OidcTokenService
     {
         $userInfo = $this->validateOidcToken($accessToken, $provider);
 
-        if (!$userInfo || !isset($userInfo['sub'])) {
+        if (!$userInfo) {
+            $this->logger->warning('OIDC token validation returned no user info', [
+                'provider' => $provider,
+            ]);
+
             return null;
         }
 
-        // Efficient query: Find user by OIDC sub in JSON column
-        $sub = $userInfo['sub'];
-        $sql = "SELECT BID FROM BUSER WHERE JSON_UNQUOTE(JSON_EXTRACT(BUSERDETAILS, '$.oidc_sub')) = :sub LIMIT 1";
+        // Try to find user by OIDC sub (if present in token)
+        $sub = $userInfo['sub'] ?? null;
+        if ($sub) {
+            $sql = "SELECT BID FROM BUSER WHERE JSON_UNQUOTE(JSON_EXTRACT(BUSERDETAILS, '$.oidc_sub')) = :sub LIMIT 1";
 
-        try {
-            $stmt = $this->connection->prepare($sql);
-            $stmt->bindValue('sub', $sub);
-            $result = $stmt->executeQuery();
-            $row = $result->fetchAssociative();
+            try {
+                $stmt = $this->connection->prepare($sql);
+                $stmt->bindValue('sub', $sub);
+                $result = $stmt->executeQuery();
+                $row = $result->fetchAssociative();
 
-            if ($row && isset($row['BID'])) {
-                return $this->userRepository->find($row['BID']);
+                if ($row && isset($row['BID'])) {
+                    return $this->userRepository->find($row['BID']);
+                }
+            } catch (\Exception $e) {
+                $this->logger->debug('OIDC sub lookup failed, falling back to email', [
+                    'error' => $e->getMessage(),
+                ]);
             }
-        } catch (\Exception $e) {
-            $this->logger->debug('OIDC sub lookup failed, falling back to email', [
-                'error' => $e->getMessage(),
-            ]);
         }
 
-        // Fallback: Try by email
+        // Fallback: Try by email (Keycloak access tokens may not have 'sub' but have 'email')
         if (isset($userInfo['email'])) {
             return $this->userRepository->findOneBy(['mail' => $userInfo['email']]);
         }
+
+        // Fallback: Try by preferred_username
+        if (isset($userInfo['preferred_username'])) {
+            return $this->userRepository->findOneBy(['mail' => $userInfo['preferred_username']]);
+        }
+
+        $this->logger->warning('OIDC token has no sub, email, or username to identify user', [
+            'provider' => $provider,
+        ]);
 
         return null;
     }
