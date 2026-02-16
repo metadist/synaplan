@@ -862,6 +862,7 @@
       "selectPromptDescription": "Wählen Sie einen vorhandenen Prompt zum Anzeigen oder Bearbeiten",
       "promptDetails": "Prompt-Details",
       "rulesForSelection": "Auswahlregeln",
+      "rulesHelp": "Wann soll dieses Prompt verwendet werden? Regeln für die automatische Auswahl",
       "aiModel": "KI-Modell",
       "availableTools": "Verfügbare Tools",
       "promptContent": "Prompt-Inhalt",

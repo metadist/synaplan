@@ -123,13 +123,16 @@ class PromptController extends AbstractController
             ->getResult();
 
         // Get all user-specific prompts
+        // Widget prompts (w_*) are not language-filtered — they are always visible
+        // regardless of UI language, similar to system prompts
         $userPrompts = $this->promptRepository->createQueryBuilder('p')
             ->where('p.ownerId = :userId')
-            ->andWhere('p.language = :lang')
             ->andWhere('p.topic NOT LIKE :toolsPrefix')
+            ->andWhere('p.language = :lang OR p.topic LIKE :widgetPrefix')
             ->setParameter('userId', $user->getId())
             ->setParameter('lang', $language)
             ->setParameter('toolsPrefix', 'tools:%')
+            ->setParameter('widgetPrefix', 'w\\_%')
             ->orderBy('p.topic', 'ASC')
             ->getQuery()
             ->getResult();

@@ -184,9 +184,8 @@ final class WidgetSetupService
         $prompt->setOwnerId($user->getId());
         $prompt->setLanguage('en');
         $prompt->setTopic($promptTopic);
-        $prompt->setShortDescription($metadata['description']);
+        $prompt->setShortDescription('');
         $prompt->setPrompt($generatedPrompt);
-        $prompt->setSelectionRules($metadata['selectionRules']);
 
         $this->em->persist($prompt);
 
@@ -214,7 +213,7 @@ final class WidgetSetupService
      *
      * @param array<int, string> $collectedAnswers
      *
-     * @return array{title: string, description: string, selectionRules: string}
+     * @return array{title: string, description: string}
      */
     private function generatePromptMetadata(User $user, Widget $widget, array $collectedAnswers): array
     {
@@ -250,8 +249,7 @@ Widget Name: {$widget->getName()}
 Generate a JSON response with EXACTLY this format (no markdown, just JSON):
 {
   "title": "Short catchy title (max 30 chars, e.g. 'Car Dealer Assistant')",
-  "description": "One sentence describing the assistant (max 100 chars)",
-  "selectionRules": "When to use this prompt, e.g. 'For customer inquiries about cars, pricing, test drives, and financing options'"
+  "description": "One sentence describing the assistant (max 100 chars)"
 }
 
 IMPORTANT: Respond ONLY with valid JSON, no explanations.
@@ -276,11 +274,10 @@ PROMPT;
                 // Try to extract JSON from response
                 if (preg_match('/\{[^{}]*\}/s', $content, $matches)) {
                     $json = json_decode($matches[0], true);
-                    if ($json && isset($json['title'], $json['description'], $json['selectionRules'])) {
+                    if ($json && isset($json['title'], $json['description'])) {
                         return [
                             'title' => mb_substr($json['title'], 0, 50),
                             'description' => mb_substr($json['description'], 0, 150),
-                            'selectionRules' => mb_substr($json['selectionRules'], 0, 500),
                         ];
                     }
                 }
@@ -298,7 +295,6 @@ PROMPT;
         return [
             'title' => mb_substr(sprintf('%s Assistant', ucfirst($widget->getName())), 0, 50),
             'description' => mb_substr(sprintf('AI assistant for %s - %s', $widget->getName(), $purpose), 0, 150),
-            'selectionRules' => mb_substr(sprintf('Use for customer inquiries on %s website', $widget->getName()), 0, 500),
         ];
     }
 
