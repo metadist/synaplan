@@ -178,8 +178,6 @@ PROMPT;
                 'line' => $e->getLine(),
             ]);
 
-            error_log('🔴 MEMORY EXTRACTION FAILED: '.$e->getMessage().' in '.$e->getFile().':'.$e->getLine());
-
             return [];
         }
     }
