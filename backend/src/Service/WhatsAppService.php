@@ -141,6 +141,8 @@ class WhatsAppService
             }
 
             // Cache MISS - our callback ran, this is a new message
+            $lock->release();
+
             return null;
         } catch (\Throwable $e) {
             // Graceful degradation: if cache/lock fails, process the message anyway
