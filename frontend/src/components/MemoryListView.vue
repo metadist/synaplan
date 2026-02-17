@@ -162,7 +162,7 @@
             <td class="p-3 text-xs txt-tertiary">
               {{ formatTimestamp(memory.updated) }}
             </td>
-            <td class="p-3">
+            <td class="p-3" @click.stop>
               <div class="flex items-center justify-end gap-1">
                 <button
                   class="p-2 rounded-lg hover:bg-brand-500/10 txt-brand transition-colors"
@@ -224,7 +224,7 @@
                 <div class="text-xs txt-tertiary">
                   {{ formatTimestamp(memory.updated) }}
                 </div>
-                <div class="flex items-center gap-1">
+                <div class="flex items-center gap-1" @click.stop>
                   <button
                     class="p-2 rounded-lg hover:bg-brand-500/10 txt-brand transition-colors"
                     :title="$t('common.edit')"

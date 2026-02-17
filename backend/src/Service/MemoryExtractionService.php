@@ -101,7 +101,8 @@ readonly class MemoryExtractionService
             $existingMemoriesText .= "Use action: 'create' for everything worth remembering.\n";
         }
 
-        // AI call
+        // AI call — the JSON format MUST be in the user prompt because the system prompt
+        // in the database only says "Return JSON array or null" without specifying the schema.
         $userPrompt = <<<PROMPT
 Conversation:
 {$contextText}
@@ -110,10 +111,19 @@ Current Message:
 {$message->getText()}
 {$existingMemoriesText}
 
+RESPONSE FORMAT (strict JSON, no markdown):
+[
+  {"action": "create", "category": "personal", "key": "short_key", "value": "the fact"},
+  {"action": "update", "memory_id": 123, "category": "personal", "key": "short_key", "value": "updated fact"},
+  {"action": "delete", "memory_id": 456}
+]
+Return [] if nothing to save, or null.
+
 RULES:
 - Only save facts the user states about THEMSELVES (name, age, preferences, skills, etc.)
 - Questions about topics are NOT memories ("Who is X?" → null, "Is Y true?" → null)
 - One fact per memory, short keys (snake_case, <= 24 chars)
+- category: personal, preferences, work, projects, or other relevant category
 - create = new fact, update = changed fact (needs memory_id), delete = user asks to forget (needs memory_id)
 - Already stored and unchanged → return []
 PROMPT;
@@ -136,11 +146,12 @@ PROMPT;
 
             $content = $response['content'] ?? '';
 
-            $this->logger->debug('Memory extraction AI response received', [
+            $this->logger->info('Memory extraction AI response received', [
                 'message_id' => $message->getId(),
                 'provider' => $extractionConfig['provider'],
                 'model' => $extractionConfig['model'],
                 'content_length' => strlen($content),
+                'content_preview' => substr($content, 0, 300),
                 'existing_memories_count' => count($existingMemories),
             ]);
 
@@ -163,7 +174,11 @@ PROMPT;
             $this->logger->error('Memory extraction failed', [
                 'message_id' => $message->getId(),
                 'error' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
             ]);
+
+            error_log('🔴 MEMORY EXTRACTION FAILED: '.$e->getMessage().' in '.$e->getFile().':'.$e->getLine());
 
             return [];
         }
@@ -176,7 +191,7 @@ PROMPT;
      */
     private function getExtractionPrompt(): string
     {
-        // Load English prompt from database
+        // Load English prompt from database (new topic with tools: namespace)
         $prompt = $this->promptRepository->findOneBy([
             'topic' => 'tools:memory_extraction',
             'language' => 'en',
@@ -184,6 +199,19 @@ PROMPT;
         ]);
 
         if ($prompt) {
+            return $prompt->getPrompt();
+        }
+
+        // Fallback: try the old topic name (before tools: namespace migration)
+        $prompt = $this->promptRepository->findOneBy([
+            'topic' => 'memory_extraction',
+            'language' => 'en',
+            'ownerId' => 0,
+        ]);
+
+        if ($prompt) {
+            $this->logger->info('Memory extraction prompt found under legacy topic "memory_extraction"');
+
             return $prompt->getPrompt();
         }
 

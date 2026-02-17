@@ -1219,9 +1219,10 @@ class StreamController extends AbstractController
                 return;
             }
 
-            // Get response content
-            $content = $result['content'] ?? '';
-            $metadata = $result['metadata'] ?? [];
+            // Unpack nested response (process() returns response under 'response' key)
+            $response = $result['response'] ?? [];
+            $content = $response['content'] ?? $result['content'] ?? '';
+            $metadata = $response['metadata'] ?? $result['metadata'] ?? [];
 
             // Extract reasoning if present (for o1 models)
             $reasoning = null;
@@ -1237,6 +1238,14 @@ class StreamController extends AbstractController
 
             // Send content in one chunk (simulating streaming)
             $this->sendSSE('data', ['chunk' => $content]);
+
+            // Send file event if media was generated
+            if (isset($metadata['file'])) {
+                $this->sendSSE('file', [
+                    'type' => $metadata['file']['type'] ?? 'image',
+                    'url' => $metadata['file']['path'] ?? '',
+                ]);
+            }
 
             // Send complete event
             $this->sendSSE('complete', [

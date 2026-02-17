@@ -584,8 +584,9 @@ class UserMemoryController extends AbstractController
             $userMessage .= "\n\nNo existing memories found.";
         }
 
-        // Get user's default chat model
-        $modelName = $this->getUserChatModel($user->getId());
+        // Get user's default chat model AND provider (both must come from the same model ID
+        // to avoid mismatch, e.g., sending an OpenAI model name to the Ollama provider)
+        $chatModelConfig = $this->getUserChatModelConfig($user->getId());
 
         try {
             $response = $this->aiFacade->chat(
@@ -594,11 +595,12 @@ class UserMemoryController extends AbstractController
                     ['role' => 'user', 'content' => $userMessage],
                 ],
                 userId: $user->getId(),
-                options: [
+                options: array_filter([
                     'json_mode' => true,
-                    'model' => $modelName,
+                    'model' => $chatModelConfig['model'],
+                    'provider' => $chatModelConfig['provider'],
                     'temperature' => 0.3, // Low temperature for consistent JSON output
-                ]
+                ])
             );
 
             $content = $response['content'] ?? '';
@@ -883,5 +885,27 @@ class UserMemoryController extends AbstractController
         }
 
         return null;
+    }
+
+    /**
+     * Get both model name AND provider for the user's default chat model.
+     *
+     * Resolves both from the same model ID to prevent provider/model mismatch
+     * (e.g., sending an OpenAI model name to Groq provider).
+     *
+     * @return array{model: string|null, provider: string|null}
+     */
+    private function getUserChatModelConfig(int $userId): array
+    {
+        $modelId = $this->modelConfigService->getDefaultModel('CHAT', $userId);
+
+        if ($modelId) {
+            return [
+                'model' => $this->modelConfigService->getModelName($modelId),
+                'provider' => $this->modelConfigService->getProviderForModel($modelId),
+            ];
+        }
+
+        return ['model' => null, 'provider' => null];
     }
 }
