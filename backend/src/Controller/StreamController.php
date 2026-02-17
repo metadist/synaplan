@@ -1223,8 +1223,8 @@ class StreamController extends AbstractController
             $response = $result['response'] ?? [];
 
             // Detect if we are falling back to flat structure; this may indicate an unexpected response format
-            $usedFlatContent = !isset($response['content']) && \is_array($result) && \array_key_exists('content', $result);
-            $usedFlatMetadata = !isset($response['metadata']) && \is_array($result) && \array_key_exists('metadata', $result);
+            $usedFlatContent = !isset($response['content']) && \array_key_exists('content', $result);
+            $usedFlatMetadata = !isset($response['metadata']) && \array_key_exists('metadata', $result);
 
             if ($usedFlatContent || $usedFlatMetadata) {
                 $this->logger->warning('StreamController: Fell back to flat response structure from process()', [
