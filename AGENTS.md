@@ -14,6 +14,7 @@ Full-stack AI knowledge management platform: RAG with MariaDB VECTOR, embeddable
 | Repo | Purpose |
 |------|---------|
 | `synaplan/` | Main app source code, local development environment |
+| `synaplan-base-php/` | Base Docker image (FrankenPHP + gRPC + whisper.cpp) |
 | `synaplan-platform/` | Production deployment configs, pulls pre-built images |
 | `synaplan-memories/` | Optional Qdrant vector storage for AI memories |
 
