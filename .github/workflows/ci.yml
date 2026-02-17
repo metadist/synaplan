@@ -86,7 +86,7 @@ jobs:
 
       - name: Install protoc from base image
         run: |
-          id=$(docker create ghcr.io/metadist/synaplan-base-php:latest)
+          id=$(docker create ghcr.io/metadist/synaplan-base-php:0.1.0)
           sudo docker cp $id:/usr/local/bin/protoc /usr/local/bin/protoc
           docker rm $id
           protoc --version
