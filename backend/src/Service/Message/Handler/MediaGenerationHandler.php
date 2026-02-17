@@ -45,6 +45,7 @@ class MediaGenerationHandler implements MessageHandlerInterface
 
     /**
      * Non-streaming handle method (required by interface).
+     * Delegates to handleStream with a blocking accumulator.
      */
     public function handle(
         Message $message,
@@ -52,11 +53,31 @@ class MediaGenerationHandler implements MessageHandlerInterface
         array $classification,
         ?callable $progressCallback = null,
     ): array {
-        // For media generation, we don't support non-streaming mode
-        // Just return a message that it needs streaming
+        $content = '';
+        $metadata = [];
+
+        // Simple accumulator callback
+        $streamCallback = function ($chunk) use (&$content) {
+            if (is_array($chunk)) {
+                $content .= $chunk['content'] ?? '';
+            } else {
+                $content .= $chunk;
+            }
+        };
+
+        // Call streaming handler
+        $result = $this->handleStream(
+            $message,
+            $thread,
+            $classification,
+            $streamCallback,
+            $progressCallback
+        );
+
+        // Return accumulated result
         return [
-            'content' => 'Media generation requires streaming mode',
-            'metadata' => [],
+            'content' => $content,
+            'metadata' => $result['metadata'] ?? [],
         ];
     }
 

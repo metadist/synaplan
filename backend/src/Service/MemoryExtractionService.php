@@ -190,7 +190,30 @@ PROMPT;
         // Fallback if not in DB (should not happen after fixtures)
         $this->logger->warning('Memory extraction prompt not found in DB, using fallback');
 
-        return 'Extract important user preferences and information. Return JSON array or null if nothing worth remembering.';
+        return <<<PROMPT
+Extract important user preferences and information.
+
+RESPONSE FORMAT (JSON):
+[
+  {
+    "action": "create",
+    "category": "personal",
+    "key": "short_key",
+    "value": "the information"
+  },
+  {
+    "action": "update",
+    "memory_id": 123,
+    "category": "personal",
+    "key": "short_key",
+    "value": "updated information"
+  }
+]
+
+RULES:
+- action: "create" for new info, "update" for changes (needs memory_id), "delete" to remove
+- Return [] if nothing to save
+PROMPT;
     }
 
     /**

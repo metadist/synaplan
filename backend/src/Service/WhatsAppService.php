@@ -111,16 +111,12 @@ class WhatsAppService
                 ];
             }
 
-            // Atomic get-or-create: callback only runs on cache miss (new message)
-            $cachedAt = $this->cache->get($cacheKey, function (ItemInterface $item): int {
-                $item->expiresAfter(self::DUPLICATE_CACHE_TTL);
-
-                return time();
-            });
-
-            // If cached time is more than 1 second ago, it's a duplicate
-            if (abs(time() - $cachedAt) > 1) {
-                $this->logger->info('WhatsApp: Duplicate message detected, skipping', [
+            // Atomic check-and-set using cache item
+            $item = $this->cache->getItem($cacheKey);
+            
+            if ($item->isHit()) {
+                $cachedAt = $item->get();
+                $this->logger->info('WhatsApp: Duplicate message detected (cache hit)', [
                     'message_id' => $dto->messageId,
                     'from' => $dto->from,
                     'cached_at' => $cachedAt,
@@ -136,6 +132,11 @@ class WhatsAppService
                     'response_sent' => false,
                 ];
             }
+
+            // Mark as processed
+            $item->set(time());
+            $item->expiresAfter(self::DUPLICATE_CACHE_TTL);
+            $this->cache->save($item);
 
             // New message - lock will auto-release, let processing continue
             return null;

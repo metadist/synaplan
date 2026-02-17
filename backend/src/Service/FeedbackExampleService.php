@@ -191,14 +191,18 @@ final readonly class FeedbackExampleService
         }
 
         // Try both feedback namespaces since getMemoryById doesn't support namespaces
+        $deleted = false;
         foreach ([FeedbackConstants::NAMESPACE_FALSE_POSITIVE, FeedbackConstants::NAMESPACE_POSITIVE] as $namespace) {
             try {
                 $this->memoryService->deleteMemory($id, $user, $namespace);
-
-                return;
+                $deleted = true;
             } catch (\Exception) {
                 // Not found in this namespace, try the next one
             }
+        }
+
+        if ($deleted) {
+            return;
         }
 
         throw new \InvalidArgumentException('Feedback not found');

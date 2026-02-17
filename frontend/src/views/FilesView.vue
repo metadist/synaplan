@@ -301,8 +301,9 @@
                 <tr
                   v-for="file in paginatedFiles"
                   :key="file.id"
-                  class="border-b border-light-border/10 dark:border-dark-border/10 hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+                  class="border-b border-light-border/10 dark:border-dark-border/10 hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer"
                   data-testid="item-file"
+                  @click="toggleFileSelection(file.id)"
                 >
                   <td class="py-3 px-2">
                     <input
@@ -310,6 +311,7 @@
                       :checked="selectedFileIds.includes(file.id)"
                       class="checkbox-brand"
                       @change="toggleFileSelection(file.id)"
+                      @click.stop
                     />
                   </td>
                   <td class="py-3 px-3 txt-secondary text-xs align-top">{{ file.id }}</td>
