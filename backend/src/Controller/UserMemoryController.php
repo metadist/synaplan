@@ -874,20 +874,6 @@ class UserMemoryController extends AbstractController
     }
 
     /**
-     * Get user's default chat model name.
-     */
-    private function getUserChatModel(int $userId): ?string
-    {
-        $modelId = $this->modelConfigService->getDefaultModel('CHAT', $userId);
-
-        if ($modelId) {
-            return $this->modelConfigService->getModelName($modelId);
-        }
-
-        return null;
-    }
-
-    /**
      * Get both model name AND provider for the user's default chat model.
      *
      * Resolves both from the same model ID to prevent provider/model mismatch

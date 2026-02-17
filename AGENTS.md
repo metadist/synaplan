@@ -40,6 +40,39 @@ When resolving merge conflicts:
 - Use conventional commits (feat:, fix:, refactor:, etc.)
 - **NEVER** add "Generated with Claude Code", "Co-Authored-By: Claude", or similar
 
+### MANDATORY Pre-Commit Gate - Run Tests BEFORE Every Commit
+
+**You MUST run and pass ALL of these before committing or allowing a commit.** This matches what CI runs on GitHub. If any step fails, fix the issue before committing. No exceptions.
+
+```bash
+# Step 1: Backend lint (PSR-12 formatting)
+make -C backend lint
+
+# Step 2: Backend static analysis (PHPStan)
+make -C backend phpstan
+
+# Step 3: Backend tests (PHPUnit - all tests, not just Unit/)
+make -C backend test
+
+# Step 4: Frontend lint (Prettier + ESLint)
+make -C frontend lint
+
+# Step 5: Frontend tests (Vitest)
+make -C frontend test
+```
+
+**Or run everything in one shot:**
+```bash
+make lint && make -C backend phpstan && make test
+```
+
+**Rules:**
+- Run the FULL test suite (`make test`), not just a subset like `tests/Unit/`
+- If `make -C backend phpstan` fails, fix the type errors before committing
+- If you changed frontend Vue/TS files, the frontend lint and tests are mandatory
+- If you only changed backend PHP files, you may skip frontend checks
+- **NEVER** commit with failing tests — this blocks the entire CI/CD pipeline
+
 ## Essential Commands
 
 ```bash
@@ -48,8 +81,7 @@ docker compose up -d
 docker compose down
 
 # Quality checks (ALWAYS before committing)
-make lint          # Backend PSR-12 + Frontend types
-make test          # All tests
+make lint && make -C backend phpstan && make test
 
 # Building
 make build         # Frontend app + widget
