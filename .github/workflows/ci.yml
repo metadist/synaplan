@@ -86,9 +86,10 @@ jobs:
 
       - name: Install protoc from base image
         run: |
-          id=$(docker create ghcr.io/metadist/synaplan-base-php:0.1.0)
+          BASE_IMAGE=$(grep -oP 'FROM \K\S+' _docker/backend/Dockerfile | head -1)
+          id=$(docker create "$BASE_IMAGE")
+          trap "docker rm $id" EXIT
           sudo docker cp $id:/usr/local/bin/protoc /usr/local/bin/protoc
-          docker rm $id
           protoc --version
 
       - name: Create .env file
