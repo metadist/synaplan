@@ -1221,6 +1221,19 @@ class StreamController extends AbstractController
 
             // Unpack nested response (process() returns response under 'response' key)
             $response = $result['response'] ?? [];
+
+            // Detect if we are falling back to flat structure; this may indicate an unexpected response format
+            $usedFlatContent = !isset($response['content']) && \is_array($result) && \array_key_exists('content', $result);
+            $usedFlatMetadata = !isset($response['metadata']) && \is_array($result) && \array_key_exists('metadata', $result);
+
+            if ($usedFlatContent || $usedFlatMetadata) {
+                $this->logger->warning('StreamController: Fell back to flat response structure from process()', [
+                    'usedFlatContent' => $usedFlatContent,
+                    'usedFlatMetadata' => $usedFlatMetadata,
+                    'messageId' => $message->getId(),
+                ]);
+            }
+
             $content = $response['content'] ?? $result['content'] ?? '';
             $metadata = $response['metadata'] ?? $result['metadata'] ?? [];
 

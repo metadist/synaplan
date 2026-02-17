@@ -57,9 +57,13 @@ class MediaGenerationHandler implements MessageHandlerInterface
         $metadata = [];
 
         // Simple accumulator callback
-        $streamCallback = function ($chunk) use (&$content) {
+        $streamCallback = function ($chunk) use (&$content, &$metadata) {
             if (is_array($chunk)) {
                 $content .= $chunk['content'] ?? '';
+                // Merge metadata if present in chunk
+                if (isset($chunk['metadata']) && is_array($chunk['metadata'])) {
+                    $metadata = array_merge($metadata, $chunk['metadata']);
+                }
             } else {
                 $content .= $chunk;
             }
