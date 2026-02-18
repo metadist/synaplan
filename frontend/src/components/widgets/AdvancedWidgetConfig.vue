@@ -712,37 +712,6 @@
                   </p>
                 </div>
 
-                <!-- Available Tools -->
-                <div>
-                  <label class="block text-sm font-medium txt-primary mb-3 flex items-center gap-2">
-                    <Icon icon="heroicons:wrench-screwdriver" class="w-4 h-4" />
-                    {{ $t('widgets.advancedConfig.availableTools') }}
-                  </label>
-                  <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                    <label
-                      v-for="tool in availableTools"
-                      :key="tool.value"
-                      :class="[
-                        'flex items-center gap-3 p-3 rounded-lg surface-chip transition-colors',
-                        isSystemPrompt
-                          ? 'cursor-not-allowed opacity-60'
-                          : 'cursor-pointer hover:bg-[var(--brand)]/5',
-                      ]"
-                      data-testid="item-tool"
-                    >
-                      <input
-                        v-model="promptData.availableTools"
-                        type="checkbox"
-                        :value="tool.value"
-                        :disabled="isSystemPrompt"
-                        class="w-5 h-5 rounded border-light-border/30 dark:border-dark-border/20 text-[var(--brand)] focus:ring-2 focus:ring-[var(--brand)]"
-                      />
-                      <Icon :icon="tool.icon" class="w-5 h-5 txt-secondary" />
-                      <span class="text-sm txt-primary">{{ tool.label }}</span>
-                    </label>
-                  </div>
-                </div>
-
                 <!-- Prompt Content -->
                 <div>
                   <label class="block text-sm font-medium txt-primary mb-2 flex items-center gap-2">
@@ -1203,7 +1172,6 @@ const promptData = reactive({
   name: '',
   rules: '',
   aiModel: 'AUTOMATED - Tries to define the best model for the task on SYNAPLAN [System Model]',
-  availableTools: [] as string[],
   content: '',
   isDefault: false, // true = system prompt (read-only), false = user-specific (editable)
 })
@@ -1232,13 +1200,6 @@ const excludedFileIds = computed(() => promptFiles.value.map((f) => f.id))
 // AI Models
 const allModels = ref<Partial<Record<Capability, AIModel[]>>>({})
 const loadingModels = ref(false)
-
-// Available tools
-const availableTools = [
-  { value: 'internet-search', label: 'Internet Search', icon: 'heroicons:magnifying-glass' },
-  { value: 'files-search', label: 'Files Search', icon: 'heroicons:document-magnifying-glass' },
-  { value: 'url-screenshot', label: 'URL Screenshot', icon: 'heroicons:camera' },
-]
 
 // Group models by capability for dropdown
 const groupedModels = computed(() => {
@@ -1310,7 +1271,6 @@ Be friendly, professional, and concise in your responses.`
     promptData.rules = ''
     promptData.aiModel =
       'AUTOMATED - Tries to define the best model for the task on SYNAPLAN [System Model]'
-    promptData.availableTools = []
     promptData.content = defaultPromptContent
 
     // Set flag to show the form (without closing modal)
@@ -1431,21 +1391,14 @@ const loadPromptData = async () => {
         }
       }
 
-      // Parse available tools from metadata
-      const tools: string[] = []
-      if (metadata.tool_internet_search) tools.push('internet-search')
-      if (metadata.tool_files_search) tools.push('files-search')
-      if (metadata.tool_url_screenshot) tools.push('url-screenshot')
-
       Object.assign(promptData, {
         id: prompt.id,
         topic: prompt.topic,
         name: prompt.shortDescription || prompt.name,
         rules: prompt.selectionRules || '',
         aiModel: aiModelString,
-        availableTools: tools,
         content: prompt.prompt,
-        isDefault: prompt.isDefault ?? false, // Track if this is a system prompt (read-only)
+        isDefault: prompt.isDefault ?? false,
       })
 
       // Load files for this prompt
@@ -1697,11 +1650,6 @@ const savePromptData = async () => {
   } else {
     metadata.aiModel = -1
   }
-
-  // Set tool flags
-  metadata.tool_internet_search = promptData.availableTools.includes('internet-search')
-  metadata.tool_files_search = promptData.availableTools.includes('files-search')
-  metadata.tool_url_screenshot = promptData.availableTools.includes('url-screenshot')
 
   // Build final prompt content with Knowledge Base section
   let finalContent = removeKnowledgeBaseSection(promptData.content)
