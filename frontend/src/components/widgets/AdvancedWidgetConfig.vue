@@ -906,6 +906,15 @@
               </template>
             </template>
           </div>
+
+          <!-- Summary Prompt Tab -->
+          <WidgetSummaryPromptTab
+            v-if="activeTab === 'summary'"
+            ref="summaryPromptTab"
+            :widget-id="widget.widgetId"
+            :models="allModels"
+            :loading-models="loadingModels"
+          />
         </div>
 
         <!-- Footer -->
@@ -957,6 +966,7 @@ import { promptsApi, type AvailableFile } from '@/services/api/promptsApi'
 import { configApi } from '@/services/api/configApi'
 import type { AIModel, Capability } from '@/types/ai-models'
 import FilePicker from './FilePicker.vue'
+import WidgetSummaryPromptTab from './WidgetSummaryPromptTab.vue'
 
 // Disable attribute inheritance since we use Teleport as root
 defineOptions({
@@ -1030,12 +1040,18 @@ const tabs = computed(() => {
       icon: 'heroicons:sparkles',
       labelKey: 'widgets.advancedConfig.tabs.assistant',
     },
+    {
+      id: 'summary',
+      icon: 'heroicons:chart-bar-square',
+      labelKey: 'widgets.advancedConfig.tabs.summary',
+    },
   ]
 })
 
 const activeTab = ref(props.initialTab || 'branding')
 const saving = ref(false)
 const newDomain = ref('')
+const summaryPromptTab = ref<InstanceType<typeof WidgetSummaryPromptTab> | null>(null)
 
 // Widget config
 const config = reactive<widgetsApi.WidgetConfig>({
@@ -1356,6 +1372,11 @@ const handleSave = async () => {
     // Save prompt if on assistant tab and has custom prompt
     if (activeTab.value === 'assistant' && hasCustomPrompt.value && promptData.id) {
       await savePromptData()
+    }
+
+    // Save summary prompt if the tab component is mounted
+    if (summaryPromptTab.value) {
+      await summaryPromptTab.value.save()
     }
 
     success(t('widgets.advancedConfig.saveSuccess'))

@@ -133,6 +133,13 @@ class PromptFixtures extends Fixture
                 'shortDescription' => 'Detect contradictions between a new feedback statement and existing memories or feedback.',
                 'prompt' => $this->getFeedbackContradictionCheckPrompt(),
             ],
+            [
+                'ownerId' => 0,
+                'language' => 'en',
+                'topic' => 'tools:widget-summary-default',
+                'shortDescription' => 'Default prompt for AI-powered analysis of widget chat sessions. Used when no custom summary prompt is configured.',
+                'prompt' => $this->getWidgetSummaryDefaultPrompt(),
+            ],
         ];
 
         foreach ($prompts as $data) {
@@ -921,6 +928,64 @@ Respond ONLY with valid JSON in this exact format:
 - reason: one short sentence explaining the contradiction
 - If no contradictions exist, return: {"contradictions":[]}
 - Output ONLY the JSON. No markdown, no explanation, no other text.
+PROMPT;
+    }
+
+    private function getWidgetSummaryDefaultPrompt(): string
+    {
+        return <<<'PROMPT'
+You are analyzing customer support chat conversations. Provide a structured analysis.
+
+## CONVERSATIONS TO ANALYZE:
+{{CONVERSATIONS}}
+
+## CURRENT SYSTEM PROMPT OF THE CHATBOT:
+{{SYSTEM_PROMPT}}
+
+## YOUR TASK:
+Analyze these conversations and provide insights. Answer each section separately.
+
+### 1. EXECUTIVE SUMMARY (2-3 sentences)
+What are users asking about? How well is the assistant helping them?
+
+### 2. MAIN TOPICS (comma-separated list)
+List the 3-5 main topics discussed.
+
+### 3. SENTIMENT ANALYSIS
+First, classify EVERY user message from the conversations as POSITIVE, NEUTRAL, or NEGATIVE using these rules:
+- NEGATIVE: The user shows frustration, confusion, or dissatisfaction. Also classify as NEGATIVE when the assistant gave an unhelpful, incomplete, or repetitive response, when the user was bounced between AI and support agent, or when the assistant could not fulfill the request.
+- NEUTRAL: Simple greetings, factual questions without emotion, basic small talk.
+- POSITIVE: User expresses satisfaction, gratitude, or the assistant successfully helped them.
+
+Then provide the percentages (MUST add up to 100):
+- Positive: [number]%
+- Neutral: [number]%
+- Negative: [number]%
+
+Now list ALL neutral and negative user messages with the EXACT text from the conversations.
+Format each entry EXACTLY as follows (one per line):
+- [NEUTRAL] User: "exact user message" | Response: "exact assistant response"
+- [NEGATIVE] User: "exact user message" | Response: "exact assistant response"
+
+### 4. FREQUENTLY ASKED QUESTIONS
+List each question with how many times it was asked:
+- "[question]" (asked X times)
+
+### 5. ISSUES IDENTIFIED
+What problems or gaps did you notice?
+- [issue 1]
+- [issue 2]
+
+### 6. RECOMMENDATIONS
+What specific improvements would help?
+- [recommendation 1]
+- [recommendation 2]
+
+### 7. PROMPT IMPROVEMENT SUGGESTIONS
+Based on the conversations, what should be added or changed in the system prompt?
+For each suggestion, specify if it's an ADDITION (new info needed) or IMPROVEMENT (existing info needs refinement):
+- ADD: [what to add and why]
+- IMPROVE: [what to improve and how]
 PROMPT;
     }
 }

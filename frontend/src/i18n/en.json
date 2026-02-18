@@ -1451,7 +1451,27 @@
         "branding": "Branding",
         "behavior": "Behavior",
         "security": "Security",
-        "assistant": "AI Assistant"
+        "assistant": "AI Assistant",
+        "summary": "Summary Prompt"
+      },
+      "summaryPrompt": {
+        "title": "Summary Analysis Prompt",
+        "description": "This prompt controls how the AI analyzes your widget's chat conversations. Customize it to focus on what matters most for your business.",
+        "modelLabel": "AI Model",
+        "modelAutomatic": "Automatic (System Default)",
+        "modelHelp": "Select which AI model should generate the conversation summaries.",
+        "placeholderInfo": "Available placeholders (automatically replaced at runtime):",
+        "placeholderConversations": "Replaced with the chat conversations to analyze",
+        "placeholderSystemPrompt": "Replaced with the widget's current system prompt",
+        "resetToDefault": "Reset to Default",
+        "resetConfirmTitle": "Reset Summary Prompt?",
+        "resetConfirmMessage": "This will discard your custom prompt and model selection and restore the system defaults. This action cannot be undone.",
+        "saveSuccess": "Summary prompt saved successfully",
+        "resetSuccess": "Summary prompt reset to default",
+        "loadError": "Failed to load summary prompt",
+        "saveError": "Failed to save summary prompt",
+        "customBadge": "Custom",
+        "defaultBadge": "Default"
       },
       "position": "Widget Position",
       "theme": "Default Theme",

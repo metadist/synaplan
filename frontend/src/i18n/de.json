@@ -1452,7 +1452,27 @@
         "branding": "Branding",
         "behavior": "Verhalten",
         "security": "Sicherheit",
-        "assistant": "KI-Assistent"
+        "assistant": "KI-Assistent",
+        "summary": "Zusammenfassungs-Prompt"
+      },
+      "summaryPrompt": {
+        "title": "Zusammenfassungs-Prompt",
+        "description": "Dieser Prompt steuert, wie die KI die Chat-Konversationen deines Widgets analysiert. Passe ihn an, um den Fokus auf das zu legen, was für dein Unternehmen am wichtigsten ist.",
+        "modelLabel": "KI-Modell",
+        "modelAutomatic": "Automatisch (Systemstandard)",
+        "modelHelp": "Wähle, welches KI-Modell die Konversationszusammenfassungen generieren soll.",
+        "placeholderInfo": "Verfügbare Platzhalter (werden automatisch zur Laufzeit ersetzt):",
+        "placeholderConversations": "Wird durch die zu analysierenden Chat-Konversationen ersetzt",
+        "placeholderSystemPrompt": "Wird durch den aktuellen System-Prompt des Widgets ersetzt",
+        "resetToDefault": "Auf Standard zurücksetzen",
+        "resetConfirmTitle": "Zusammenfassungs-Prompt zurücksetzen?",
+        "resetConfirmMessage": "Dein benutzerdefinierter Prompt und die Modellauswahl werden verworfen und die Systemstandards wiederhergestellt. Diese Aktion kann nicht rückgängig gemacht werden.",
+        "saveSuccess": "Zusammenfassungs-Prompt erfolgreich gespeichert",
+        "resetSuccess": "Zusammenfassungs-Prompt auf Standard zurückgesetzt",
+        "loadError": "Zusammenfassungs-Prompt konnte nicht geladen werden",
+        "saveError": "Zusammenfassungs-Prompt konnte nicht gespeichert werden",
+        "customBadge": "Benutzerdefiniert",
+        "defaultBadge": "Standard"
       },
       "position": "Widget-Position",
       "theme": "Standard-Theme",
