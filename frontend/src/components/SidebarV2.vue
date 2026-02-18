@@ -143,6 +143,28 @@
           <div class="border-t border-light-border/10 dark:border-dark-border/10">
             <button
               role="menuitem"
+              class="dropdown-item"
+              data-testid="btn-sidebar-v2-statistics"
+              @click="handleNavigate('/statistics')"
+            >
+              <ChartBarIcon class="w-4 h-4" />
+              <span>{{ $t('nav.statistics') }}</span>
+            </button>
+            <button
+              v-if="!authStore.isAdmin"
+              role="menuitem"
+              class="dropdown-item"
+              :class="{ 'text-amber-500 dark:text-amber-400': !authStore.isPro }"
+              data-testid="btn-sidebar-v2-subscription"
+              @click="handleNavigate('/subscription')"
+            >
+              <SparklesIcon class="w-4 h-4" />
+              <span>{{ authStore.isPro ? $t('nav.subscription') : $t('nav.upgrade') }}</span>
+            </button>
+          </div>
+          <div class="border-t border-light-border/10 dark:border-dark-border/10">
+            <button
+              role="menuitem"
               class="dropdown-item text-red-500 dark:text-red-400"
               data-testid="btn-sidebar-v2-logout"
               @click="handleLogout"
@@ -185,29 +207,40 @@
             </p>
           </div>
 
-          <!-- Children Links -->
+          <!-- Children Links (with optional group headers) -->
           <div class="py-1 max-h-[60vh] overflow-y-auto scroll-thin">
-            <router-link
-              v-for="child in activeFlyoutItem.children"
-              :key="child.path"
-              :to="child.path"
-              class="flex items-center gap-2.5 px-3 py-2 text-sm transition-colors"
-              :class="
-                route.path === child.path
-                  ? 'text-[var(--brand)] bg-[var(--brand)]/[0.06] font-medium'
-                  : 'txt-secondary hover:txt-primary hover:bg-black/[0.03] dark:hover:bg-white/[0.03]'
-              "
-              @click="closeFlyout(); sidebarStore.closeMobile()"
-            >
-              <span class="w-1.5 h-1.5 rounded-full flex-shrink-0" :class="route.path === child.path ? 'bg-[var(--brand)]' : 'bg-current opacity-20'" />
-              <span class="flex-1 truncate">{{ child.label }}</span>
-              <span
-                v-if="child.badge"
-                class="text-[10px] px-1.5 py-0.5 rounded-full bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-200 font-medium"
+            <template v-for="(section, sIdx) in groupedChildren" :key="sIdx">
+              <div
+                v-if="section.group"
+                class="px-3 pt-2.5 pb-1"
+                :class="{ 'border-t border-light-border/10 dark:border-dark-border/10 mt-1': sIdx > 0 }"
               >
-                {{ child.badge }}
-              </span>
-            </router-link>
+                <p class="text-[10px] font-semibold txt-secondary uppercase tracking-wider opacity-60">
+                  {{ section.group }}
+                </p>
+              </div>
+              <router-link
+                v-for="child in section.items"
+                :key="child.path"
+                :to="child.path"
+                class="flex items-center gap-2.5 px-3 py-2 text-sm transition-colors"
+                :class="
+                  route.path === child.path
+                    ? 'text-[var(--brand)] bg-[var(--brand)]/[0.06] font-medium'
+                    : 'txt-secondary hover:txt-primary hover:bg-black/[0.03] dark:hover:bg-white/[0.03]'
+                "
+                @click="closeFlyout(); sidebarStore.closeMobile()"
+              >
+                <span class="w-1.5 h-1.5 rounded-full flex-shrink-0" :class="route.path === child.path ? 'bg-[var(--brand)]' : 'bg-current opacity-20'" />
+                <span class="flex-1 truncate">{{ child.label }}</span>
+                <span
+                  v-if="child.badge"
+                  class="text-[10px] px-1.5 py-0.5 rounded-full bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-200 font-medium"
+                >
+                  {{ child.badge }}
+                </span>
+              </router-link>
+            </template>
           </div>
         </div>
       </div>
@@ -429,7 +462,6 @@ import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
   ChatBubbleLeftRightIcon,
-  WrenchScrewdriverIcon,
   FolderIcon,
   Cog6ToothIcon,
   ChartBarIcon,
@@ -519,7 +551,7 @@ onBeforeUnmount(() => {
 const toggleUserMenu = () => {
   if (!userMenuOpen.value && userBtnRef.value) {
     const rect = userBtnRef.value.getBoundingClientRect()
-    const dropdownHeight = 180
+    const dropdownHeight = 280
     const spaceBelow = window.innerHeight - rect.bottom
     const spaceAbove = rect.top
 
@@ -563,31 +595,43 @@ const initials = computed(() => {
   return email.charAt(0).toUpperCase()
 })
 
+interface NavChild {
+  path: string
+  label: string
+  badge?: string
+  group?: string
+}
+
 interface NavItem {
   path: string
   label: string
   icon: any
   isUpgrade?: boolean
-  children?: Array<{
-    path: string
-    label: string
-    badge?: string
-  }>
+  children?: NavChild[]
 }
 
 const navItems = computed<NavItem[]>(() => {
   const items: NavItem[] = [{ path: '/', label: t('nav.chat'), icon: ChatBubbleLeftRightIcon }]
 
+  items.push({ path: '/files', label: t('nav.files'), icon: FolderIcon })
+
   if (appModeStore.isAdvancedMode) {
+    const settingsChildren: NavChild[] = [
+      { path: '/tools/chat-widget', label: t('nav.toolsChatWidget'), group: t('nav.settingsChannels') },
+      { path: '/tools/mail-handler', label: t('nav.toolsMailHandler'), group: t('nav.settingsChannels') },
+      { path: '/config/inbound', label: t('nav.configInbound'), group: t('nav.settingsChannels') },
+      { path: '/config/ai-models', label: t('nav.configAiModels'), group: t('nav.settingsAiTools') },
+      { path: '/config/api-keys', label: t('nav.configApiKeys'), group: t('nav.settingsAiTools') },
+      { path: '/config/task-prompts', label: t('nav.configTaskPrompts'), group: t('nav.settingsAiTools') },
+      { path: '/config/sorting-prompt', label: t('nav.configSortingPrompt'), group: t('nav.settingsAiTools') },
+      { path: '/tools/doc-summary', label: t('nav.toolsDocSummary'), group: t('nav.settingsAiTools') },
+    ]
+
     items.push({
-      path: '/tools',
-      label: t('nav.tools'),
-      icon: WrenchScrewdriverIcon,
-      children: [
-        { path: '/tools/chat-widget', label: t('nav.toolsChatWidget') },
-        { path: '/tools/doc-summary', label: t('nav.toolsDocSummary') },
-        { path: '/tools/mail-handler', label: t('nav.toolsMailHandler') },
-      ],
+      path: '/settings',
+      label: t('nav.settings'),
+      icon: Cog6ToothIcon,
+      children: settingsChildren,
     })
   }
 
@@ -603,42 +647,12 @@ const navItems = computed<NavItem[]>(() => {
     })
   }
 
-  items.push({ path: '/files', label: t('nav.files'), icon: FolderIcon })
-
-  if (appModeStore.isAdvancedMode) {
-    items.push({
-      path: '/config',
-      label: t('nav.aiConfig'),
-      icon: Cog6ToothIcon,
-      children: [
-        { path: '/config/inbound', label: t('nav.configInbound') },
-        { path: '/config/ai-models', label: t('nav.configAiModels') },
-        { path: '/config/task-prompts', label: t('nav.configTaskPrompts') },
-        { path: '/config/sorting-prompt', label: t('nav.configSortingPrompt') },
-        { path: '/config/api-keys', label: t('nav.configApiKeys') },
-      ],
-    })
-  }
-
-  items.push({ path: '/statistics', label: t('nav.statistics'), icon: ChartBarIcon })
-
-  if (!authStore.isAdmin) {
-    const subscriptionLabel = authStore.isPro ? t('nav.subscription') : t('nav.upgrade')
-    const isUpgradeStyle = !authStore.isPro
-    items.push({
-      path: '/subscription',
-      label: subscriptionLabel,
-      icon: SparklesIcon,
-      isUpgrade: isUpgradeStyle,
-    })
-  }
-
   if (authStore.isAdmin) {
-    const adminChildren: Array<{ path: string; label: string; badge?: string }> = [
+    const adminChildren: NavChild[] = [
       { path: '/admin', label: t('nav.adminDashboard') },
     ]
 
-    const featureStatusItem: { path: string; label: string; badge?: string } = {
+    const featureStatusItem: NavChild = {
       path: '/admin/features',
       label: t('nav.adminFeatureStatus'),
     }
@@ -659,9 +673,31 @@ const navItems = computed<NavItem[]>(() => {
   return items
 })
 
+const groupedChildren = computed(() => {
+  if (!activeFlyoutItem.value?.children) return []
+  const children = activeFlyoutItem.value.children
+  const hasGroups = children.some((c) => c.group)
+  if (!hasGroups) return [{ group: null, items: children }]
+
+  const groups: Array<{ group: string | null; items: NavChild[] }> = []
+  let currentGroup: string | null = null
+  for (const child of children) {
+    const g = child.group ?? null
+    if (g !== currentGroup) {
+      currentGroup = g
+      groups.push({ group: g, items: [] })
+    }
+    groups[groups.length - 1].items.push(child)
+  }
+  return groups
+})
+
 const isItemActive = (item: NavItem): boolean => {
   if (item.path === '/') {
     return route.path === '/' || route.path.startsWith('/chat')
+  }
+  if (item.path === '/settings') {
+    return route.path.startsWith('/tools') || route.path.startsWith('/config')
   }
   return route.path.startsWith(item.path)
 }
@@ -716,11 +752,15 @@ const handleNavClick = (item: NavItem) => {
   sidebarStore.closeMobile()
 }
 
-const handleProfileSettings = () => {
+const handleNavigate = (path: string) => {
   userMenuOpen.value = false
   closeFlyout()
-  router.push('/profile')
+  router.push(path)
   sidebarStore.closeMobile()
+}
+
+const handleProfileSettings = () => {
+  handleNavigate('/profile')
 }
 
 const handleOpenMemories = () => {
