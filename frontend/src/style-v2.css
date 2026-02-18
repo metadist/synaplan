@@ -251,15 +251,6 @@
   background: transparent !important;
 }
 
-/* Textarea inside shell — transparent so only the shell glass effect shows */
-.design-v2 [data-testid="comp-chat-input-shell"] textarea {
-  background: transparent !important;
-  border-color: transparent !important;
-}
-.design-v2 [data-testid="comp-chat-input-shell"] textarea:focus {
-  background: transparent !important;
-  box-shadow: none !important;
-}
 
 /* ----------------------------------------------------------
    7. Chat Pills — Glass
@@ -911,4 +902,20 @@
 .design-v2.dark [data-testid="modal-memories-dialog"] .surface-chip {
   background: rgba(255, 255, 255, 0.04) !important;
   border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+/* ----------------------------------------------------------
+   OVERRIDE: Chat input textarea — must come AFTER section 17b
+   to beat global form element rules at equal specificity.
+   ---------------------------------------------------------- */
+.design-v2 [data-testid="comp-chat-input-shell"] textarea,
+.design-v2.dark [data-testid="comp-chat-input-shell"] textarea {
+  background: transparent !important;
+  border-color: transparent !important;
+  border-radius: 1rem;
+}
+.design-v2 [data-testid="comp-chat-input-shell"] textarea:focus,
+.design-v2.dark [data-testid="comp-chat-input-shell"] textarea:focus {
+  background: transparent !important;
+  box-shadow: none !important;
 }
