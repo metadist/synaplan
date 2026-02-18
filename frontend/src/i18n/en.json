@@ -593,7 +593,27 @@
     "uploadNew": "Upload New Files",
     "uploading": "Uploading {current} of {total}...",
     "orDragDrop": "or drag & drop files here",
-    "dropHere": "Drop files here to upload"
+    "dropHere": "Drop files here to upload",
+    "viewContent": "View content",
+    "download": "Download",
+    "downloadFailed": "Download failed",
+    "deleteFile": "Delete file",
+    "deleteSelected": "Delete selected",
+    "deleteConfirmTitle": "Delete File",
+    "deleteConfirmMessage": "Are you sure you want to delete this file? This action cannot be undone.",
+    "deleteConfirmButton": "Delete",
+    "fileDeleted": "File deleted successfully",
+    "deleteFailed": "Failed to delete file",
+    "bulkDeleteSuccess": "{count} file(s) deleted successfully",
+    "bulkDeletePartial": "{success} deleted, {failed} failed",
+    "reVectorize": "Re-vectorize",
+    "reVectorizeSuccess": "Re-vectorized successfully ({chunks} chunks created)",
+    "reVectorizeFailed": "Re-vectorization failed"
+  },
+  "fileMention": {
+    "hint": "Type to search files — press Enter to attach",
+    "noResults": "No files found",
+    "fileAttached": "{name} attached"
   },
   "config": {
     "inbound": {
@@ -2263,5 +2283,52 @@
     "dontAskAgain": "Don't show this warning again",
     "cancel": "Cancel",
     "open": "Open link"
+  },
+  "header": {
+    "switchToV2": "Switch to V2 design",
+    "switchToV1": "Switch to classic design"
+  },
+  "promoTips": {
+    "dontShowAgain": "Don't show again",
+    "chatWidget": {
+      "title": "Embed AI Chat on Your Website",
+      "description": "Create a customizable chat widget that you can embed on any website. Your visitors get instant AI-powered answers based on your knowledge base.",
+      "action": "Create Widget"
+    },
+    "filesUpload": {
+      "title": "Upload Documents for Smarter Answers",
+      "description": "Upload PDFs, Word docs, or text files. The AI will use them as context to give you more accurate, knowledge-based responses.",
+      "action": "Upload Files"
+    },
+    "aiConfig": {
+      "title": "Customize Your AI Models",
+      "description": "Switch between different AI providers and models. Fine-tune prompts and configure how the AI handles your requests.",
+      "action": "Configure AI"
+    },
+    "docSummary": {
+      "title": "Summarize Documents Instantly",
+      "description": "Upload any document and get a concise summary in seconds. Perfect for long reports, research papers, or meeting notes.",
+      "action": "Try Summarizer"
+    },
+    "upgradePro": {
+      "title": "Unlock More with Pro",
+      "description": "Get higher message limits, priority access to premium models, and advanced features like custom prompts and API access.",
+      "action": "View Plans"
+    },
+    "fileMention": {
+      "title": "Mention Files with @",
+      "description": "Type @ in the chat to quickly reference your uploaded files. The AI will read the file content and use it to answer your question.",
+      "action": ""
+    },
+    "widgetPreview": {
+      "aiGreeting": "Hi! How can I help you today?",
+      "userMessage": "What are your business hours?",
+      "aiResponse": "We're open Mon\u2013Fri, 9 AM \u2013 6 PM. How can I help?",
+      "inputPlaceholder": "Type a message...",
+      "featureCustomizable": "Fully customizable colors & branding",
+      "featureAiPowered": "AI-powered answers from your knowledge base",
+      "featureEasyEmbed": "One-line embed code for any website",
+      "featureResponsive": "Works perfectly on desktop & mobile"
+    }
   }
 }

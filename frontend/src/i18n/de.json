@@ -1273,7 +1273,27 @@
     "uploadNew": "Neue Dateien hochladen",
     "uploading": "Lade {current} von {total} hoch...",
     "orDragDrop": "oder Dateien hierher ziehen",
-    "dropHere": "Dateien hier ablegen zum Hochladen"
+    "dropHere": "Dateien hier ablegen zum Hochladen",
+    "viewContent": "Inhalt anzeigen",
+    "download": "Herunterladen",
+    "downloadFailed": "Download fehlgeschlagen",
+    "deleteFile": "Datei löschen",
+    "deleteSelected": "Ausgewählte löschen",
+    "deleteConfirmTitle": "Datei löschen",
+    "deleteConfirmMessage": "Möchten Sie diese Datei wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden.",
+    "deleteConfirmButton": "Löschen",
+    "fileDeleted": "Datei erfolgreich gelöscht",
+    "deleteFailed": "Datei konnte nicht gelöscht werden",
+    "bulkDeleteSuccess": "{count} Datei(en) erfolgreich gelöscht",
+    "bulkDeletePartial": "{success} gelöscht, {failed} fehlgeschlagen",
+    "reVectorize": "Neu vektorisieren",
+    "reVectorizeSuccess": "Erfolgreich neu vektorisiert ({chunks} Chunks erstellt)",
+    "reVectorizeFailed": "Neu-Vektorisierung fehlgeschlagen"
+  },
+  "fileMention": {
+    "hint": "Tippen um Dateien zu suchen — Enter zum Anhängen",
+    "noResults": "Keine Dateien gefunden",
+    "fileAttached": "{name} angehängt"
   },
   "storage": {
     "title": "Speicherplatz",
@@ -2159,5 +2179,52 @@
     "dontAskAgain": "Diese Warnung nicht mehr anzeigen",
     "cancel": "Abbrechen",
     "open": "Link öffnen"
+  },
+  "header": {
+    "switchToV2": "Zum V2-Design wechseln",
+    "switchToV1": "Zum klassischen Design wechseln"
+  },
+  "promoTips": {
+    "dontShowAgain": "Nicht mehr anzeigen",
+    "chatWidget": {
+      "title": "KI-Chat auf deiner Website einbetten",
+      "description": "Erstelle ein anpassbares Chat-Widget für jede Website. Deine Besucher erhalten sofort KI-gestützte Antworten basierend auf deiner Wissensdatenbank.",
+      "action": "Widget erstellen"
+    },
+    "filesUpload": {
+      "title": "Dokumente für bessere Antworten hochladen",
+      "description": "Lade PDFs, Word-Dokumente oder Textdateien hoch. Die KI nutzt sie als Kontext für genauere, wissensbasierte Antworten.",
+      "action": "Dateien hochladen"
+    },
+    "aiConfig": {
+      "title": "KI-Modelle anpassen",
+      "description": "Wechsle zwischen verschiedenen KI-Anbietern und Modellen. Passe Prompts an und konfiguriere, wie die KI deine Anfragen verarbeitet.",
+      "action": "KI konfigurieren"
+    },
+    "docSummary": {
+      "title": "Dokumente sofort zusammenfassen",
+      "description": "Lade ein beliebiges Dokument hoch und erhalte in Sekunden eine prägnante Zusammenfassung. Perfekt für lange Berichte, Forschungsarbeiten oder Meetingnotizen.",
+      "action": "Zusammenfasser testen"
+    },
+    "upgradePro": {
+      "title": "Mehr mit Pro freischalten",
+      "description": "Erhalte höhere Nachrichtenlimits, bevorzugten Zugang zu Premium-Modellen und erweiterte Funktionen wie benutzerdefinierte Prompts und API-Zugang.",
+      "action": "Pläne ansehen"
+    },
+    "fileMention": {
+      "title": "Dateien mit @ erwähnen",
+      "description": "Tippe @ im Chat, um schnell auf deine hochgeladenen Dateien zu verweisen. Die KI liest den Dateiinhalt und nutzt ihn zur Beantwortung deiner Frage.",
+      "action": ""
+    },
+    "widgetPreview": {
+      "aiGreeting": "Hallo! Wie kann ich Ihnen helfen?",
+      "userMessage": "Was sind Ihre Öffnungszeiten?",
+      "aiResponse": "Wir sind Mo\u2013Fr von 9\u201318 Uhr erreichbar. Wie kann ich helfen?",
+      "inputPlaceholder": "Nachricht eingeben...",
+      "featureCustomizable": "Farben & Branding vollständig anpassbar",
+      "featureAiPowered": "KI-gestützte Antworten aus deiner Wissensdatenbank",
+      "featureEasyEmbed": "Ein-Zeilen-Embed-Code für jede Website",
+      "featureResponsive": "Perfekt auf Desktop & Mobilgeräten"
+    }
   }
 }

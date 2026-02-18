@@ -168,7 +168,9 @@
               data-testid="item-source"
             >
               <div class="flex items-center gap-3">
-                <span class="text-2xl">{{ getSourceIcon(source) }}</span>
+                <div class="p-2 rounded-lg v2-source-icon" :class="getSourceIconBg(source)">
+                  <Icon :icon="getSourceIcon(source)" class="w-5 h-5" :class="getSourceIconColor(source)" />
+                </div>
                 <div>
                   <p class="text-sm font-medium txt-primary">{{ getSourceLabel(source) }}</p>
                   <p class="text-xs txt-secondary">
@@ -265,6 +267,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
+import { Icon } from '@iconify/vue'
 import { getUsageStats, downloadUsageExport, type UsageStats } from '@/api/usageApi'
 import { useNotification } from '@/composables/useNotification'
 import { useI18n } from 'vue-i18n'
@@ -340,13 +343,39 @@ const getSourceLabel = (source: string) => {
 const getSourceIcon = (source: string) => {
   switch (source.toUpperCase()) {
     case 'WHATSAPP':
-      return '💬'
+      return 'mdi:whatsapp'
     case 'EMAIL':
-      return '📧'
+      return 'heroicons:envelope'
     case 'WEB':
-      return '🌐'
+      return 'heroicons:globe-alt'
     default:
-      return '📱'
+      return 'heroicons:device-phone-mobile'
+  }
+}
+
+const getSourceIconBg = (source: string) => {
+  switch (source.toUpperCase()) {
+    case 'WHATSAPP':
+      return 'bg-green-500/10'
+    case 'EMAIL':
+      return 'bg-blue-500/10'
+    case 'WEB':
+      return 'bg-brand/10'
+    default:
+      return 'bg-gray-500/10'
+  }
+}
+
+const getSourceIconColor = (source: string) => {
+  switch (source.toUpperCase()) {
+    case 'WHATSAPP':
+      return 'text-green-500'
+    case 'EMAIL':
+      return 'text-blue-500'
+    case 'WEB':
+      return 'txt-brand'
+    default:
+      return 'txt-secondary'
   }
 }
 
