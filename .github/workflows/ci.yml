@@ -84,13 +84,12 @@ jobs:
           key: ${{ runner.os }}-composer-${{ hashFiles('backend/composer.lock') }}
           restore-keys: ${{ runner.os }}-composer-
 
-      - name: Install protobuf compiler
+      - name: Install protoc from base image
         run: |
-          PROTOC_VERSION=$(grep -oP 'ENV PROTOC_VERSION=\K[0-9.]+' _docker/backend/Dockerfile)
-          curl -Lo protoc.zip "https://github.com/protocolbuffers/protobuf/releases/download/v${PROTOC_VERSION}/protoc-${PROTOC_VERSION}-linux-x86_64.zip"
-          sudo unzip -q protoc.zip -d /usr/local
-          sudo chmod +x /usr/local/bin/protoc
-          rm protoc.zip
+          BASE_IMAGE=$(grep -oP 'FROM \K\S+' _docker/backend/Dockerfile | head -1)
+          id=$(docker create "$BASE_IMAGE")
+          trap "docker rm $id" EXIT
+          sudo docker cp $id:/usr/local/bin/protoc /usr/local/bin/protoc
           protoc --version
 
       - name: Create .env file
