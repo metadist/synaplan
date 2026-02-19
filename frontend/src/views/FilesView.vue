@@ -199,10 +199,7 @@
                       ? 'border-[var(--brand)] bg-[var(--brand)]/10 text-[var(--brand)]'
                       : 'border-light-border/30 dark:border-dark-border/20 txt-secondary hover:border-[var(--brand)]/50 hover:bg-[var(--brand)]/5'
                   "
-                  @click="
-                    clearFolderSelection()
-                    folderPickerOpen = false
-                  "
+                  @click="(clearFolderSelection(), (folderPickerOpen = false))"
                 >
                   <Icon icon="heroicons:home" class="w-4 h-4 shrink-0" />
                   <span class="text-sm font-medium">{{ $t('files.rootFolder') }}</span>
@@ -219,10 +216,7 @@
                         ? 'border-[var(--brand)] bg-[var(--brand)]/10 text-[var(--brand)]'
                         : 'border-light-border/30 dark:border-dark-border/20 txt-secondary hover:border-[var(--brand)]/50 hover:bg-[var(--brand)]/5'
                     "
-                    @click="
-                      selectExistingFolder(folder.name)
-                      folderPickerOpen = false
-                    "
+                    @click="(selectExistingFolder(folder.name), (folderPickerOpen = false))"
                   >
                     <Icon icon="heroicons:folder-solid" class="w-4 h-4 shrink-0" />
                     <span class="text-sm font-medium flex-1 text-left truncate">{{
@@ -249,18 +243,12 @@
                       class="flex-1 px-3 py-2 text-sm rounded-lg bg-black/[0.03] dark:bg-white/[0.03] txt-primary placeholder:txt-secondary/50 focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
                       :placeholder="$t('files.folderPicker.newPlaceholder')"
                       data-testid="input-new-folder"
-                      @keyup.enter="
-                        confirmNewFolder()
-                        folderPickerOpen = false
-                      "
+                      @keyup.enter="(confirmNewFolder(), (folderPickerOpen = false))"
                     />
                     <button
                       :disabled="!groupKeyword.trim()"
                       class="px-3 py-2 rounded-lg btn-primary text-sm disabled:opacity-40 disabled:cursor-not-allowed"
-                      @click="
-                        confirmNewFolder()
-                        folderPickerOpen = false
-                      "
+                      @click="(confirmNewFolder(), (folderPickerOpen = false))"
                     >
                       {{ $t('common.save') }}
                     </button>
