@@ -8,8 +8,9 @@
         <!-- Storage Quota Widget -->
         <StorageQuotaWidget ref="storageWidget" @upgrade="handleUpgrade" />
 
+        <!-- Compact Upload Bar -->
         <div
-          class="surface-card p-6 relative"
+          class="surface-card p-5 relative"
           data-testid="section-upload-form"
           @dragenter.prevent="handleDragEnter"
           @dragover.prevent="handleDragOver"
@@ -22,228 +23,111 @@
               v-if="isDragging"
               class="absolute inset-0 z-50 flex items-center justify-center bg-primary/10 dark:bg-primary/20 backdrop-blur-sm border-4 border-dashed border-primary rounded-lg pointer-events-none"
             >
-              <div class="flex flex-col items-center gap-4 p-8 surface-card rounded-xl shadow-2xl">
-                <div
-                  class="w-20 h-20 rounded-full bg-primary/20 flex items-center justify-center animate-bounce"
-                >
-                  <Icon icon="mdi:cloud-upload" class="w-10 h-10 text-primary" />
+              <div class="flex flex-col items-center gap-3 p-6 surface-card rounded-xl shadow-2xl">
+                <div class="w-16 h-16 rounded-full bg-primary/20 flex items-center justify-center animate-bounce">
+                  <Icon icon="mdi:cloud-upload" class="w-8 h-8 text-primary" />
                 </div>
                 <div class="text-center">
-                  <p class="text-xl font-bold txt-primary mb-1">{{ $t('files.dropFiles') }}</p>
+                  <p class="text-lg font-bold txt-primary mb-0.5">{{ $t('files.dropFiles') }}</p>
                   <p class="text-sm txt-secondary">{{ $t('files.dropFilesHint') }}</p>
                 </div>
               </div>
             </div>
           </Transition>
 
-          <h1 class="text-2xl font-semibold txt-primary mb-6 flex items-center gap-2">
-            <CloudArrowUpIcon class="w-6 h-6 text-[var(--brand)]" />
-            {{ $t('files.uploadTitle') }}
-          </h1>
+          <input
+            ref="fileInputRef"
+            type="file"
+            multiple
+            accept=".pdf,.docx,.txt,.jpg,.jpeg,.png,.mp3,.mp4,.xlsx,.csv"
+            class="hidden"
+            data-testid="input-files"
+            @change="handleFileSelect"
+          />
 
-          <!-- Folder Picker -->
-          <div class="mb-6" data-testid="section-folder-picker">
-            <div class="flex items-center gap-2 mb-2">
-              <Icon icon="heroicons:folder" class="w-5 h-5 text-[var(--brand)]" />
-              <span class="text-sm font-medium txt-primary">{{ $t('files.folderPicker.title') }}</span>
-            </div>
-            <p class="text-xs txt-secondary mb-4">{{ $t('files.folderPicker.hint') }}</p>
-
-            <div class="flex flex-wrap gap-2 items-center">
-              <!-- Existing folders as clickable chips -->
-              <button
-                v-for="folder in fileGroups"
-                :key="folder.name"
-                class="group/chip inline-flex items-center gap-2 pl-3 pr-3 py-2 rounded-xl border transition-all duration-200 text-sm"
-                :class="
-                  selectedGroup === folder.name && !groupKeyword
-                    ? 'border-[var(--brand)] bg-[var(--brand)]/10 text-[var(--brand)] shadow-sm shadow-[var(--brand)]/20'
-                    : 'border-light-border/30 dark:border-dark-border/20 txt-secondary hover:border-[var(--brand)]/50 hover:bg-[var(--brand)]/5 hover:txt-primary'
-                "
-                :data-testid="`btn-folder-${folder.name}`"
-                @click="selectExistingFolder(folder.name)"
-              >
-                <Icon
-                  :icon="selectedGroup === folder.name && !groupKeyword ? 'heroicons:folder-open-solid' : 'heroicons:folder-solid'"
-                  class="w-4 h-4 shrink-0"
-                  :class="selectedGroup === folder.name && !groupKeyword ? 'text-[var(--brand)]' : 'txt-secondary group-hover/chip:text-[var(--brand)]'"
-                />
-                <span class="truncate max-w-[10rem]">{{ folder.name }}</span>
-                <span
-                  class="inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1.5 rounded-full text-[10px] font-semibold leading-none"
-                  :class="
-                    selectedGroup === folder.name && !groupKeyword
-                      ? 'bg-[var(--brand)]/20 text-[var(--brand)]'
-                      : 'bg-black/5 dark:bg-white/10 txt-secondary'
-                  "
-                >
-                  {{ folder.count }}
-                </span>
-              </button>
-
-              <!-- New Folder inline input -->
-              <div
-                v-if="isCreatingNewFolder"
-                class="inline-flex items-center gap-1.5 pl-3 pr-1.5 py-1.5 rounded-xl border border-[var(--brand)] bg-[var(--brand)]/5 shadow-sm shadow-[var(--brand)]/10 animate-in"
-              >
-                <Icon icon="heroicons:folder-plus-solid" class="w-4 h-4 text-[var(--brand)] shrink-0" />
-                <input
-                  ref="newFolderInput"
-                  v-model="groupKeyword"
-                  type="text"
-                  class="w-32 sm:w-40 px-2 py-0.5 text-sm bg-transparent txt-primary placeholder:txt-secondary/50 focus:outline-none"
-                  :placeholder="$t('files.folderPicker.newPlaceholder')"
-                  data-testid="input-new-folder"
-                  @keyup.enter="confirmNewFolder"
-                  @keyup.escape="cancelNewFolder"
-                />
-                <button
-                  class="p-1 rounded-lg hover:bg-emerald-500/20 text-emerald-500 transition-colors"
-                  :title="$t('common.save')"
-                  data-testid="btn-confirm-folder"
-                  @click="confirmNewFolder"
-                >
-                  <Icon icon="heroicons:check" class="w-4 h-4" />
-                </button>
-                <button
-                  class="p-1 rounded-lg hover:bg-red-500/20 text-red-400 transition-colors"
-                  :title="$t('common.cancel')"
-                  data-testid="btn-cancel-folder"
-                  @click="cancelNewFolder"
-                >
-                  <Icon icon="heroicons:x-mark" class="w-4 h-4" />
-                </button>
+          <!-- Selected Files List -->
+          <div v-if="selectedFiles.length > 0" class="space-y-2 mb-4">
+            <div
+              v-for="(file, index) in selectedFiles"
+              :key="index"
+              class="flex items-center gap-3 p-3 rounded-lg border border-light-border/30 dark:border-dark-border/20 bg-black/[0.02] dark:bg-white/[0.02]"
+            >
+              <Icon :icon="getFileIcon(file.name)" class="w-5 h-5 txt-secondary" />
+              <div class="flex-1 min-w-0">
+                <p class="text-sm txt-primary truncate">{{ file.name }}</p>
+                <p class="text-xs txt-secondary">{{ formatFileSize(file.size) }}</p>
               </div>
-
-              <!-- Create New Folder button -->
               <button
-                v-else
-                class="inline-flex items-center gap-2 px-3 py-2 rounded-xl border border-dashed border-light-border/40 dark:border-dark-border/30 txt-secondary text-sm hover:border-[var(--brand)] hover:text-[var(--brand)] hover:bg-[var(--brand)]/5 transition-all duration-200"
-                data-testid="btn-new-folder"
-                @click="startNewFolder"
+                :disabled="isUploading"
+                class="p-1.5 rounded-lg hover:bg-red-500/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent"
+                :aria-label="$t('files.removeFile')"
+                @click="removeSelectedFile(index)"
               >
-                <Icon icon="heroicons:plus" class="w-4 h-4" />
-                {{ $t('files.folderPicker.createNew') }}
+                <XMarkIcon class="w-4 h-4 text-red-500" />
               </button>
             </div>
-
-            <!-- No folders hint -->
-            <p v-if="fileGroups.length === 0 && !isCreatingNewFolder" class="text-xs txt-secondary mt-3 italic">
-              {{ $t('files.folderPicker.noFolders') }}
-            </p>
-
-            <!-- Active folder indicator -->
-            <Transition name="fade">
-              <div
-                v-if="activeUploadFolder"
-                class="mt-3 inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[var(--brand)]/10 border border-[var(--brand)]/20"
-              >
-                <Icon icon="heroicons:arrow-up-tray" class="w-3.5 h-3.5 text-[var(--brand)]" />
-                <span class="text-xs txt-secondary">{{ $t('files.folderPicker.uploadTo') }}</span>
-                <span class="text-xs font-semibold text-[var(--brand)]">{{ activeUploadFolder }}</span>
-                <button
-                  class="p-0.5 rounded hover:bg-[var(--brand)]/20 text-[var(--brand)]/60 hover:text-[var(--brand)] transition-colors"
-                  @click="clearFolderSelection"
-                >
-                  <Icon icon="heroicons:x-mark" class="w-3 h-3" />
-                </button>
-              </div>
-            </Transition>
           </div>
 
-          <div class="mb-6" data-testid="section-file-picker">
-            <label class="block text-sm font-medium txt-primary mb-2">
-              {{ $t('files.selectFiles') }}
-            </label>
-            <div class="mb-3">
-              <label
-                class="px-4 py-2 rounded-lg border border-light-border/30 dark:border-dark-border/20 txt-primary hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer inline-flex items-center gap-2"
-                data-testid="btn-select-files"
+          <!-- Action row: smart button + target breadcrumb -->
+          <div class="flex items-center gap-4 flex-wrap">
+            <!-- Smart Upload Button -->
+            <button
+              :disabled="isUploading"
+              class="btn-primary px-6 py-2.5 rounded-lg flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+              data-testid="btn-upload"
+              @click="smartUploadAction"
+            >
+              <svg
+                v-if="isUploading"
+                class="animate-spin h-5 w-5"
+                xmlns="http://www.w3.org/2000/svg"
+                fill="none"
+                viewBox="0 0 24 24"
               >
-                <input
-                  type="file"
-                  multiple
-                  accept=".pdf,.docx,.txt,.jpg,.jpeg,.png,.mp3,.mp4,.xlsx,.csv"
-                  class="hidden"
-                  data-testid="input-files"
-                  @change="handleFileSelect"
-                />
-                <CloudArrowUpIcon class="w-5 h-5" />
-                {{ $t('files.selectFilesButton') }}
-              </label>
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+              <CloudArrowUpIcon v-else class="w-5 h-5" />
+              {{ smartButtonLabel }}
+            </button>
+
+            <button
+              v-if="selectedFiles.length > 0 && !isUploading"
+              class="px-4 py-2.5 rounded-lg border border-light-border/30 dark:border-dark-border/20 txt-secondary hover:txt-primary hover:border-[var(--brand)]/50 hover:bg-[var(--brand)]/5 transition-all text-sm flex items-center gap-1.5"
+              data-testid="btn-add-more"
+              @click="fileInputRef?.click()"
+            >
+              <Icon icon="heroicons:plus" class="w-4 h-4" />
+              {{ $t('files.addMore') }}
+            </button>
+
+            <!-- Separator dot -->
+            <span class="w-1 h-1 rounded-full bg-black/20 dark:bg-white/20 hidden sm:block"></span>
+
+            <!-- Upload target breadcrumb -->
+            <div class="flex items-center gap-2 text-xs">
+              <Icon icon="heroicons:folder-solid" class="w-3.5 h-3.5 text-[var(--brand)]" />
+              <span class="txt-secondary">{{ $t('files.target') }}:</span>
+              <span class="font-semibold txt-primary">{{ activeUploadFolder || $t('files.rootFolder') }}</span>
+              <button
+                class="txt-secondary hover:text-[var(--brand)] transition-colors underline underline-offset-2 decoration-dotted"
+                @click="folderPickerOpen = true"
+              >
+                {{ $t('files.changeTarget') }}
+              </button>
             </div>
 
-            <!-- Selected Files List -->
-            <div v-if="selectedFiles.length > 0" class="space-y-2 mb-3">
-              <div
-                v-for="(file, index) in selectedFiles"
-                :key="index"
-                class="flex items-center gap-3 p-3 rounded-lg border border-light-border/30 dark:border-dark-border/20 bg-black/[0.02] dark:bg-white/[0.02]"
-              >
-                <Icon :icon="getFileIcon(file.name)" class="w-5 h-5 txt-secondary" />
-                <div class="flex-1 min-w-0">
-                  <p class="text-sm txt-primary truncate">{{ file.name }}</p>
-                  <p class="text-xs txt-secondary">{{ formatFileSize(file.size) }}</p>
-                </div>
-                <button
-                  :disabled="isUploading"
-                  class="p-1.5 rounded-lg hover:bg-red-500/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent"
-                  :aria-label="$t('files.removeFile')"
-                  @click="removeSelectedFile(index)"
-                >
-                  <XMarkIcon class="w-4 h-4 text-red-500" />
-                </button>
-              </div>
-            </div>
-
-            <p class="text-xs txt-secondary mt-2">
+            <p class="text-xs txt-secondary ml-auto hidden sm:block">
               {{ $t('files.supportedFormats') }}
             </p>
-            <p class="text-sm alert-info mt-3">
-              <strong class="alert-info-text">{{ $t('files.autoProcessingTitle') }}:</strong>
-              <span class="alert-info-text">{{ $t('files.autoProcessingInfo') }}</span>
-            </p>
           </div>
-
-          <button
-            :disabled="selectedFiles.length === 0 || isUploading"
-            class="btn-primary px-6 py-2 rounded-lg flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-            data-testid="btn-upload"
-            @click="uploadFiles"
-          >
-            <CloudArrowUpIcon v-if="!isUploading" class="w-5 h-5" />
-            <svg
-              v-else
-              class="animate-spin h-5 w-5"
-              xmlns="http://www.w3.org/2000/svg"
-              fill="none"
-              viewBox="0 0 24 24"
-            >
-              <circle
-                class="opacity-25"
-                cx="12"
-                cy="12"
-                r="10"
-                stroke="currentColor"
-                stroke-width="4"
-              ></circle>
-              <path
-                class="opacity-75"
-                fill="currentColor"
-                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-              ></path>
-            </svg>
-            {{ isUploading ? $t('files.uploading') : $t('files.uploadAndProcess') }}
-          </button>
 
           <!-- Upload Progress Bar -->
           <Transition name="fade">
             <div v-if="isUploading && uploadProgress" class="mt-4" data-testid="upload-progress">
               <div class="flex items-center justify-between mb-1.5">
                 <span class="text-sm txt-secondary">{{ $t('files.uploadProgress') }}</span>
-                <span class="text-sm font-medium txt-primary"
-                  >{{ uploadProgress.percentage }}%</span
-                >
+                <span class="text-sm font-medium txt-primary">{{ uploadProgress.percentage }}%</span>
               </div>
               <div class="w-full h-2 rounded-full bg-black/10 dark:bg-white/10 overflow-hidden">
                 <div
@@ -264,6 +148,85 @@
             </div>
           </Transition>
         </div>
+
+        <!-- Folder Picker Modal -->
+        <Teleport to="body">
+          <Transition name="dialog-fade">
+            <div
+              v-if="folderPickerOpen"
+              class="fixed inset-0 z-50 flex items-center justify-center p-4"
+              @click.self="folderPickerOpen = false"
+            >
+              <div class="absolute inset-0 bg-black/50 dark:bg-black/70 backdrop-blur-sm"></div>
+              <div class="relative surface-card rounded-2xl shadow-2xl max-w-md w-full p-6 animate-scale-in">
+                <div class="flex items-center justify-between mb-5">
+                  <h3 class="text-lg font-semibold txt-primary flex items-center gap-2">
+                    <Icon icon="heroicons:folder" class="w-5 h-5 text-[var(--brand)]" />
+                    {{ $t('files.folderPicker.title') }}
+                  </h3>
+                  <button
+                    class="p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 txt-secondary transition-colors"
+                    @click="folderPickerOpen = false"
+                  >
+                    <XMarkIcon class="w-5 h-5" />
+                  </button>
+                </div>
+
+                <!-- Root / no folder option -->
+                <button
+                  class="w-full flex items-center gap-3 px-4 py-3 rounded-xl border transition-all duration-150 mb-2"
+                  :class="!selectedGroup && !groupKeyword
+                    ? 'border-[var(--brand)] bg-[var(--brand)]/10 text-[var(--brand)]'
+                    : 'border-light-border/30 dark:border-dark-border/20 txt-secondary hover:border-[var(--brand)]/50 hover:bg-[var(--brand)]/5'"
+                  @click="clearFolderSelection(); folderPickerOpen = false"
+                >
+                  <Icon icon="heroicons:home" class="w-4 h-4 shrink-0" />
+                  <span class="text-sm font-medium">{{ $t('files.rootFolder') }}</span>
+                </button>
+
+                <!-- Existing folders -->
+                <div class="space-y-1.5 max-h-60 overflow-y-auto scroll-thin">
+                  <button
+                    v-for="folder in fileGroups"
+                    :key="folder.name"
+                    class="w-full flex items-center gap-3 px-4 py-3 rounded-xl border transition-all duration-150"
+                    :class="selectedGroup === folder.name && !groupKeyword
+                      ? 'border-[var(--brand)] bg-[var(--brand)]/10 text-[var(--brand)]'
+                      : 'border-light-border/30 dark:border-dark-border/20 txt-secondary hover:border-[var(--brand)]/50 hover:bg-[var(--brand)]/5'"
+                    @click="selectExistingFolder(folder.name); folderPickerOpen = false"
+                  >
+                    <Icon icon="heroicons:folder-solid" class="w-4 h-4 shrink-0" />
+                    <span class="text-sm font-medium flex-1 text-left truncate">{{ folder.name }}</span>
+                    <span class="text-[10px] font-semibold bg-black/5 dark:bg-white/10 px-2 py-0.5 rounded-full">{{ folder.count }}</span>
+                  </button>
+                </div>
+
+                <!-- New folder input -->
+                <div class="mt-3 pt-3 border-t border-light-border/20 dark:border-dark-border/10">
+                  <div class="flex items-center gap-2">
+                    <Icon icon="heroicons:folder-plus" class="w-4 h-4 text-[var(--brand)] shrink-0" />
+                    <input
+                      ref="newFolderInput"
+                      v-model="groupKeyword"
+                      type="text"
+                      class="flex-1 px-3 py-2 text-sm rounded-lg bg-black/[0.03] dark:bg-white/[0.03] txt-primary placeholder:txt-secondary/50 focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+                      :placeholder="$t('files.folderPicker.newPlaceholder')"
+                      data-testid="input-new-folder"
+                      @keyup.enter="confirmNewFolder(); folderPickerOpen = false"
+                    />
+                    <button
+                      :disabled="!groupKeyword.trim()"
+                      class="px-3 py-2 rounded-lg btn-primary text-sm disabled:opacity-40 disabled:cursor-not-allowed"
+                      @click="confirmNewFolder(); folderPickerOpen = false"
+                    >
+                      {{ $t('common.save') }}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </Transition>
+        </Teleport>
 
         <div class="surface-card p-6" data-testid="section-files-list">
           <!-- ====== ROOT VIEW: Folders + All Files ====== -->
@@ -294,28 +257,44 @@
             </div>
 
             <template v-else>
-              <!-- Folder cards -->
+              <!-- Folder cards (with drag & drop) -->
               <div v-if="fileGroups.length > 0" class="mb-6" data-testid="section-folder-grid">
                 <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
                   <button
                     v-for="folder in fileGroups"
                     :key="folder.name"
-                    class="group/f flex flex-col items-center gap-3 p-5 rounded-2xl border border-light-border/20 dark:border-dark-border/15 hover:border-[var(--brand)]/30 hover:shadow-lg hover:shadow-[var(--brand)]/5 hover:bg-[var(--brand)]/[0.03] transition-all duration-200 cursor-pointer"
+                    class="group/f flex flex-col items-center gap-3 p-5 rounded-2xl border transition-all duration-200 cursor-pointer"
+                    :class="folderDropTarget === folder.name
+                      ? 'border-[var(--brand)] bg-[var(--brand)]/10 shadow-lg shadow-[var(--brand)]/20 scale-[1.03]'
+                      : 'border-light-border/20 dark:border-dark-border/15 hover:border-[var(--brand)]/30 hover:shadow-lg hover:shadow-[var(--brand)]/5 hover:bg-[var(--brand)]/[0.03]'"
                     :data-testid="`folder-card-${folder.name}`"
                     @click="enterFolder(folder.name)"
+                    @dragenter.prevent="onFolderDragEnter(folder.name)"
+                    @dragover.prevent
+                    @dragleave="onFolderDragLeave(folder.name)"
+                    @drop.prevent.stop="onFolderDrop($event, folder.name)"
                   >
                     <div class="relative">
                       <Icon
-                        icon="heroicons:folder-solid"
-                        class="w-12 h-12 text-[var(--brand)]/50 group-hover/f:text-[var(--brand)] group-hover/f:scale-110 transition-all duration-200"
+                        :icon="folderDropTarget === folder.name ? 'heroicons:folder-open-solid' : 'heroicons:folder-solid'"
+                        class="w-12 h-12 transition-all duration-200"
+                        :class="folderDropTarget === folder.name
+                          ? 'text-[var(--brand)] scale-110'
+                          : 'text-[var(--brand)]/50 group-hover/f:text-[var(--brand)] group-hover/f:scale-110'"
                       />
                       <span
-                        class="absolute -top-1 -right-2.5 inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1.5 rounded-full text-[10px] font-bold bg-[var(--brand)]/15 text-[var(--brand)] group-hover/f:bg-[var(--brand)] group-hover/f:text-white transition-all duration-200"
+                        class="absolute -top-1 -right-2.5 inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1.5 rounded-full text-[10px] font-bold transition-all duration-200"
+                        :class="folderDropTarget === folder.name
+                          ? 'bg-[var(--brand)] text-white'
+                          : 'bg-[var(--brand)]/15 text-[var(--brand)] group-hover/f:bg-[var(--brand)] group-hover/f:text-white'"
                       >
                         {{ folder.count }}
                       </span>
                     </div>
-                    <span class="text-xs font-medium txt-primary truncate max-w-full text-center group-hover/f:text-[var(--brand)] transition-colors">
+                    <span
+                      class="text-xs font-medium truncate max-w-full text-center transition-colors"
+                      :class="folderDropTarget === folder.name ? 'text-[var(--brand)]' : 'txt-primary group-hover/f:text-[var(--brand)]'"
+                    >
                       {{ folder.name }}
                     </span>
                   </button>
@@ -371,7 +350,7 @@
                           <div class="flex flex-col gap-0.5 min-w-0">
                             <span class="text-sm txt-primary truncate">{{ file.filename }}</span>
                             <button
-                              v-if="file.group_key && file.group_key !== 'DEFAULT'"
+                              v-if="file.group_key"
                               class="inline-flex items-center gap-1 self-start text-[10px] text-[var(--brand)]/70 hover:text-[var(--brand)] transition-colors"
                               @click="enterFolder(file.group_key!)"
                             >
@@ -756,7 +735,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import MainLayout from '@/components/MainLayout.vue'
 import FileContentModal from '@/components/FileContentModal.vue'
@@ -787,6 +766,7 @@ const groupKeyword = ref('')
 const selectedGroup = ref('')
 const isCreatingNewFolder = ref(false)
 const newFolderInput = ref<HTMLInputElement | null>(null)
+const fileInputRef = ref<HTMLInputElement | null>(null)
 // File upload state (removed processLevel - always vectorize)
 const selectedFiles = ref<File[]>([])
 const filterGroup = ref('')
@@ -805,6 +785,10 @@ const isLoading = ref(false)
 // Drag & Drop state
 const isDragging = ref(false)
 const dragCounter = ref(0)
+const folderDropTarget = ref<string | null>(null)
+
+// Folder picker modal
+const folderPickerOpen = ref(false)
 
 // Modal state
 const isModalOpen = ref(false)
@@ -836,10 +820,30 @@ const allSelected = computed(() => {
 
 const handleFileSelect = (event: Event) => {
   const target = event.target as HTMLInputElement
-  if (target.files) {
-    selectedFiles.value = Array.from(target.files)
-    // Save metadata for potential recovery after auth
+  if (target.files && target.files.length > 0) {
+    const newFiles = Array.from(target.files)
+    const existingNames = new Set(selectedFiles.value.map((f) => f.name + f.size))
+    const unique = newFiles.filter((f) => !existingNames.has(f.name + f.size))
+    selectedFiles.value = [...selectedFiles.value, ...unique]
     saveFileMetadata(selectedFiles.value)
+    target.value = ''
+  }
+}
+
+const smartButtonLabel = computed(() => {
+  if (isUploading.value) return t('files.uploading')
+  if (selectedFiles.value.length > 0) {
+    return t('files.uploadCount', { count: selectedFiles.value.length })
+  }
+  return t('files.selectAndUpload')
+})
+
+const smartUploadAction = () => {
+  if (isUploading.value) return
+  if (selectedFiles.value.length > 0) {
+    uploadFiles()
+  } else {
+    fileInputRef.value?.click()
   }
 }
 
@@ -850,8 +854,8 @@ const removeSelectedFile = (index: number) => {
   selectedFiles.value.splice(index, 1)
 }
 
-// Folder picker helpers
-const activeUploadFolder = computed(() => selectedGroup.value || groupKeyword.value || '')
+// Folder picker helpers — auto-target the open folder
+const activeUploadFolder = computed(() => selectedGroup.value || groupKeyword.value || openFolder.value || '')
 
 const selectExistingFolder = (name: string) => {
   if (selectedGroup.value === name) {
@@ -863,22 +867,11 @@ const selectExistingFolder = (name: string) => {
   }
 }
 
-const startNewFolder = () => {
-  isCreatingNewFolder.value = true
-  selectedGroup.value = ''
-  groupKeyword.value = ''
-  nextTick(() => newFolderInput.value?.focus())
-}
-
 const confirmNewFolder = () => {
   if (groupKeyword.value.trim()) {
+    selectedGroup.value = groupKeyword.value.trim()
     isCreatingNewFolder.value = false
   }
-}
-
-const cancelNewFolder = () => {
-  groupKeyword.value = ''
-  isCreatingNewFolder.value = false
 }
 
 const clearFolderSelection = () => {
@@ -984,13 +977,58 @@ const handleDrop = async (event: DragEvent) => {
   dragCounter.value = 0
   isDragging.value = false
 
-  const files = event.dataTransfer?.files
-  if (files && files.length > 0) {
-    // Add dropped files to selectedFiles array
-    selectedFiles.value = [...selectedFiles.value, ...Array.from(files)]
-    showSuccess(t('files.filesAddedToQueue', { count: files.length }))
-    // Save metadata for potential recovery after auth
+  const droppedFiles = event.dataTransfer?.files
+  if (droppedFiles && droppedFiles.length > 0) {
+    selectedFiles.value = [...selectedFiles.value, ...Array.from(droppedFiles)]
+    showSuccess(t('files.filesAddedToQueue', { count: droppedFiles.length }))
     saveFileMetadata(selectedFiles.value)
+  }
+}
+
+// Folder card drag & drop — upload directly into a folder
+const onFolderDragEnter = (folderName: string) => {
+  folderDropTarget.value = folderName
+}
+
+const onFolderDragLeave = (folderName: string) => {
+  if (folderDropTarget.value === folderName) {
+    folderDropTarget.value = null
+  }
+}
+
+const onFolderDrop = async (event: DragEvent, folderName: string) => {
+  folderDropTarget.value = null
+  isDragging.value = false
+  dragCounter.value = 0
+
+  const droppedFiles = event.dataTransfer?.files
+  if (!droppedFiles || droppedFiles.length === 0) return
+
+  isUploading.value = true
+  uploadProgress.value = { loaded: 0, total: 0, percentage: 0 }
+
+  try {
+    const result = await filesService.uploadFiles({
+      files: Array.from(droppedFiles),
+      groupKey: folderName,
+      processLevel: 'vectorize',
+      onProgress: (progress) => { uploadProgress.value = progress },
+    })
+
+    if (result.success) {
+      showSuccess(t('files.droppedToFolder', { count: result.files.length, folder: folderName }))
+      await loadFileGroups()
+      await loadFiles()
+      if (storageWidget.value) await storageWidget.value.refresh()
+    } else {
+      result.errors.forEach((err) => showError(`${err.filename}: ${err.error}`))
+    }
+  } catch (err) {
+    console.error('Upload error:', err)
+    showError('Failed to upload files: ' + (err as Error).message)
+  } finally {
+    isUploading.value = false
+    uploadProgress.value = null
   }
 }
 
@@ -1022,7 +1060,7 @@ const uploadFiles = async () => {
     return
   }
 
-  const groupKey = selectedGroup.value || groupKeyword.value || ''
+  const groupKey = activeUploadFolder.value
 
   isUploading.value = true
   uploadProgress.value = { loaded: 0, total: 0, percentage: 0 }
@@ -1040,11 +1078,13 @@ const uploadFiles = async () => {
     if (result.success) {
       showSuccess(`Successfully uploaded ${result.files.length} file(s)`)
 
-      // Clear form
       selectedFiles.value = []
-      groupKeyword.value = ''
-      selectedGroup.value = ''
+      if (!openFolder.value) {
+        groupKeyword.value = ''
+        selectedGroup.value = ''
+      }
       isCreatingNewFolder.value = false
+      if (fileInputRef.value) fileInputRef.value.value = ''
       clearFiles()
 
       await loadFileGroups()

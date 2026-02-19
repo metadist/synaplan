@@ -92,7 +92,7 @@ class FileController extends AbstractController
         $startTime = microtime(true);
 
         // Get parameters
-        $groupKey = $request->request->get('group_key', 'DEFAULT');
+        $groupKey = $request->request->get('group_key') ?: null;
         $processLevel = 'vectorize'; // Always vectorize for optimal RAG performance
 
         // Legacy support: Accept process_level parameter but ignore it
@@ -164,7 +164,7 @@ class FileController extends AbstractController
     private function processUploadedFile(
         $uploadedFile,
         User $user,
-        string $groupKey,
+        ?string $groupKey,
         string $processLevel,
     ): array {
         // Step 0a: Check rate limit for FILE_ANALYSIS BEFORE uploading
@@ -267,7 +267,7 @@ class FileController extends AbstractController
                     $extractedText,
                     $user->getId(),
                     $messageFile->getId(),
-                    $groupKey,
+                    $groupKey ?? '',
                     $this->getFileTypeCode($fileExtension)
                 );
 
@@ -566,6 +566,8 @@ class FileController extends AbstractController
                 ->select('f.groupKey AS name, COUNT(f.id) AS cnt')
                 ->where('f.userId = :userId')
                 ->andWhere('f.groupKey IS NOT NULL')
+                ->andWhere("f.groupKey != ''")
+                ->andWhere("f.groupKey != 'DEFAULT'")
                 ->setParameter('userId', $user->getId())
                 ->groupBy('f.groupKey')
                 ->orderBy('f.groupKey', 'ASC');
@@ -578,8 +580,10 @@ class FileController extends AbstractController
             try {
                 $stats = $this->vectorStorageFacade->getStats($user->getId());
                 foreach ($stats->chunksByGroup as $groupKey => $chunkCount) {
+                    if ($groupKey === 'DEFAULT' || $groupKey === '' || $groupKey === null) {
+                        continue;
+                    }
                     if (!isset($merged[$groupKey])) {
-                        // Legacy group not in DB yet — use chunk count as approximate file count
                         $fileIds = $this->vectorStorageFacade->getFileIdsByGroupKey($user->getId(), $groupKey);
                         $merged[$groupKey] = count($fileIds);
                     }

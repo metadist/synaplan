@@ -724,6 +724,9 @@ const handleNavClick = (item: NavItem) => {
     chatSearchQuery.value = ''
     chatMenuOpenId.value = null
     chatModalOpen.value = !chatModalOpen.value
+    if (chatModalOpen.value) {
+      chatsStore.loadChats()
+    }
     return
   }
 
