@@ -12,10 +12,7 @@
       v-if="sidebarStore.isMobileOpen"
       class="fixed inset-0 bg-black/50 z-40 md:hidden"
       data-testid="section-sidebar-v2-backdrop"
-      @click="
-        closeFlyout()
-        sidebarStore.closeMobile()
-      "
+      @click="(closeFlyout(), sidebarStore.closeMobile())"
     />
   </Transition>
 
@@ -234,10 +231,7 @@
                     ? 'text-[var(--brand)] bg-[var(--brand)]/[0.06] font-medium'
                     : 'txt-secondary hover:txt-primary hover:bg-black/[0.03] dark:hover:bg-white/[0.03]'
                 "
-                @click="
-                  closeFlyout()
-                  sidebarStore.closeMobile()
-                "
+                @click="(closeFlyout(), sidebarStore.closeMobile())"
               >
                 <span
                   class="w-1.5 h-1.5 rounded-full flex-shrink-0"
@@ -480,10 +474,7 @@
           >
             <button
               class="text-xs font-medium text-[var(--brand)] hover:underline transition-colors"
-              @click="
-                chatModalOpen = false
-                $router.push('/statistics#chats')
-              "
+              @click="((chatModalOpen = false), $router.push('/statistics#chats'))"
             >
               {{ $t('chat.showAll') }} →
             </button>
