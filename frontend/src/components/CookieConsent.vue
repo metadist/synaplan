@@ -1,5 +1,5 @@
 <template>
-  <Teleport to="body">
+  <Teleport to="#app">
     <Transition
       enter-active-class="transition-all duration-300 ease-out"
       enter-from-class="translate-y-full opacity-0"

@@ -6,6 +6,12 @@ import MessageImage from '@/components/MessageImage.vue'
 describe('MessageImage', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
+    // Provide #app teleport target
+    if (!document.getElementById('app')) {
+      const app = document.createElement('div')
+      app.id = 'app'
+      document.body.appendChild(app)
+    }
   })
 
   it('should render image with correct src', async () => {

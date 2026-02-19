@@ -85,8 +85,8 @@
     </div>
   </aside>
 
-  <!-- User Dropdown (teleported to body to escape stacking context) -->
-  <Teleport to="body">
+  <!-- User Dropdown (teleported to #app to escape local stacking context) -->
+  <Teleport to="#app">
     <Transition
       enter-active-class="transition ease-out duration-150"
       enter-from-class="opacity-0 scale-95"
@@ -176,8 +176,8 @@
     </Transition>
   </Teleport>
 
-  <!-- Nav Children Dropdown (teleported to body to escape stacking context) -->
-  <Teleport to="body">
+  <!-- Nav Children Dropdown (teleported to #app to escape local stacking context) -->
+  <Teleport to="#app">
     <Transition
       enter-active-class="transition ease-out duration-150"
       enter-from-class="opacity-0 scale-95"
@@ -253,7 +253,7 @@
   </Teleport>
 
   <!-- Chat Management Modal -->
-  <Teleport to="body">
+  <Teleport to="#app">
     <Transition name="modal">
       <div
         v-if="chatModalOpen"

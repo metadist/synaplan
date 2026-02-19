@@ -336,7 +336,7 @@
     </div>
 
     <!-- Delete Confirmation Dialog (single + bulk) -->
-    <Teleport to="body">
+    <Teleport to="#app">
       <Transition name="fade">
         <div
           v-if="deleteConfirmOpen"
