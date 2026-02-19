@@ -22,6 +22,21 @@ use Doctrine\DBAL\Connection;
  */
 class ModelCatalog
 {
+    /** Maps DEFAULTMODEL capabilities to the model tag they require. */
+    public const CAPABILITY_TAGS = [
+        'CHAT' => 'chat',
+        'TOOLS' => 'chat',
+        'SORT' => 'chat',
+        'SUMMARIZE' => 'chat',
+        'ANALYZE' => 'chat',
+        'TEXT2PIC' => 'text2pic',
+        'TEXT2VID' => 'text2vid',
+        'TEXT2SOUND' => 'text2sound',
+        'PIC2TEXT' => 'pic2text',
+        'SOUND2TEXT' => 'sound2text',
+        'VECTORIZE' => 'vectorize',
+    ];
+
     /**
      * Upsert a model into the database (INSERT ... ON DUPLICATE KEY UPDATE).
      */

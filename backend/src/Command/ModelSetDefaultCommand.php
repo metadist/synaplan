@@ -19,21 +19,6 @@ use Symfony\Component\Console\Style\SymfonyStyle;
 )]
 class ModelSetDefaultCommand extends Command
 {
-    /** Maps capabilities to compatible model tags. */
-    private const CAPABILITY_TAGS = [
-        'CHAT' => 'chat',
-        'TOOLS' => 'chat',
-        'SORT' => 'chat',
-        'SUMMARIZE' => 'chat',
-        'ANALYZE' => 'chat',
-        'TEXT2PIC' => 'text2pic',
-        'TEXT2VID' => 'text2vid',
-        'TEXT2SOUND' => 'text2sound',
-        'PIC2TEXT' => 'pic2text',
-        'SOUND2TEXT' => 'sound2text',
-        'VECTORIZE' => 'vectorize',
-    ];
-
     public function __construct(
         private Connection $connection,
     ) {
@@ -49,7 +34,7 @@ class ModelSetDefaultCommand extends Command
                 'Capabilities to set this model as default for (e.g. chat vectorize)')
             ->setHelp(
                 "Set a model as the default for one or more capabilities.\n\n".
-                'Valid capabilities: '.implode(', ', array_map('strtolower', array_keys(self::CAPABILITY_TAGS)))."\n\n".
+                'Valid capabilities: '.implode(', ', array_map('strtolower', array_keys(ModelCatalog::CAPABILITY_TAGS)))."\n\n".
                 "Example: <info>app:model:set-default ollama:bge-m3 vectorize</info>\n".
                 "Example: <info>app:model:set-default groq:openai/gpt-oss-120b chat tools sort summarize</info>\n\n".
                 'Run <info>app:model:list</info> to see all available models.'
@@ -75,14 +60,14 @@ class ModelSetDefaultCommand extends Command
         foreach ($capabilities as $capability) {
             $capUpper = strtoupper($capability);
 
-            if (!isset(self::CAPABILITY_TAGS[$capUpper])) {
-                $io->warning("Unknown capability: $capability (valid: ".implode(', ', array_map('strtolower', array_keys(self::CAPABILITY_TAGS))).')');
+            if (!isset(ModelCatalog::CAPABILITY_TAGS[$capUpper])) {
+                $io->warning("Unknown capability: $capability (valid: ".implode(', ', array_map('strtolower', array_keys(ModelCatalog::CAPABILITY_TAGS))).')');
                 $errors = true;
                 continue;
             }
 
             // Find a model matching the required tag for this capability
-            $requiredTag = self::CAPABILITY_TAGS[$capUpper];
+            $requiredTag = ModelCatalog::CAPABILITY_TAGS[$capUpper];
             $model = null;
             foreach ($models as $candidate) {
                 if (strtolower($candidate['tag']) === $requiredTag) {
