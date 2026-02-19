@@ -1009,7 +1009,6 @@ const toggleFolderMenu = (fileId: number) => {
 const moveFileToFolder = async (fileId: number, folderName: string) => {
   if (!folderName.trim()) return
   folderMenuOpen.value = null
-  newMoveTarget.value = ''
 
   try {
     await filesService.updateFileGroupKey(fileId, folderName.trim())
