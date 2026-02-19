@@ -70,6 +70,19 @@
           <SunIcon v-if="themeStore.theme.value === 'light'" class="w-5 h-5" />
           <MoonIcon v-else class="w-5 h-5" />
         </button>
+
+        <button
+          :aria-label="designVariant.isV2.value ? $t('header.switchToV1') : $t('header.switchToV2')"
+          :title="designVariant.isV2.value ? $t('header.switchToV1') : $t('header.switchToV2')"
+          class="icon-ghost h-[44px] min-w-[44px] flex items-center justify-center rounded-lg"
+          data-testid="btn-design-toggle"
+          @click="designVariant.toggleVariant()"
+        >
+          <SwatchIcon class="w-5 h-5" />
+          <span class="hidden md:inline text-sm font-medium ml-1">
+            {{ designVariant.isV2.value ? 'V2' : 'V1' }}
+          </span>
+        </button>
       </div>
     </div>
   </header>
@@ -83,13 +96,16 @@ import {
   GlobeAltIcon,
   Bars3Icon,
   AdjustmentsHorizontalIcon,
+  SwatchIcon,
 } from '@heroicons/vue/24/outline'
 import { useTheme } from '../composables/useTheme'
+import { useDesignVariant } from '../composables/useDesignVariant'
 import { useSidebarStore } from '../stores/sidebar'
 import { useAppModeStore } from '../stores/appMode'
 import { useI18n } from 'vue-i18n'
 
 const themeStore = useTheme()
+const designVariant = useDesignVariant()
 const sidebarStore = useSidebarStore()
 const appModeStore = useAppModeStore()
 const { locale } = useI18n()

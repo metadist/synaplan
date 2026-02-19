@@ -8,12 +8,12 @@
         @click.self="emit('close')"
       >
         <div
-          class="surface-card max-w-4xl w-full max-h-[80vh] overflow-hidden flex flex-col rounded-lg shadow-xl"
+          class="max-w-4xl w-full max-h-[80vh] overflow-hidden flex flex-col rounded-xl shadow-2xl bg-white dark:bg-[#0f1729] border border-light-border/20 dark:border-dark-border/20"
           data-testid="modal-file-selection"
         >
           <!-- Header -->
           <div
-            class="flex items-center justify-between p-6 border-b border-light-border/30 dark:border-dark-border/20"
+            class="flex items-center justify-between p-6 border-b border-light-border/20 dark:border-dark-border/15"
           >
             <h2 class="text-xl font-semibold txt-primary">
               {{ $t('fileSelection.title') }}
@@ -30,8 +30,8 @@
 
           <!-- Upload Area -->
           <div
-            class="p-4 border-b border-light-border/30 dark:border-dark-border/20 transition-colors"
-            :class="isDragging ? 'bg-brand-alpha-light' : 'bg-black/5 dark:bg-white/5'"
+            class="p-4 border-b border-light-border/20 dark:border-dark-border/15 transition-colors"
+            :class="isDragging ? 'bg-brand-alpha-light' : 'bg-gray-50 dark:bg-white/[0.03]'"
             data-testid="section-file-dropzone"
             @dragover.prevent="handleDragOver"
             @dragleave.prevent="handleDragLeave"
@@ -75,7 +75,7 @@
           </div>
 
           <!-- Search and Filter -->
-          <div class="p-4 border-b border-light-border/30 dark:border-dark-border/20">
+          <div class="p-4 border-b border-light-border/20 dark:border-dark-border/15">
             <div class="flex gap-3">
               <input
                 v-model="searchQuery"
@@ -111,8 +111,12 @@
               <div
                 v-for="file in filteredFiles"
                 :key="file.id"
-                class="flex items-center gap-4 p-4 rounded-lg border border-light-border/30 dark:border-dark-border/20 cursor-pointer transition-all hover:bg-black/5 dark:hover:bg-white/5"
-                :class="{ 'ring-2 ring-[var(--brand)]': isSelected(file.id) }"
+                class="group flex items-center gap-4 p-4 rounded-xl border cursor-pointer transition-all"
+                :class="
+                  isSelected(file.id)
+                    ? 'border-[var(--brand)]/40 bg-[var(--brand)]/[0.04] ring-1 ring-[var(--brand)]/30'
+                    : 'border-gray-200 dark:border-white/[0.08] hover:border-gray-300 dark:hover:border-white/[0.15] hover:bg-gray-50/50 dark:hover:bg-white/[0.02]'
+                "
                 @click="toggleFileSelection(file)"
               >
                 <input
@@ -132,7 +136,7 @@
                   <div class="font-medium txt-primary truncate">{{ file.filename }}</div>
                   <div class="text-sm txt-secondary flex items-center gap-2 mt-1">
                     <span>{{ formatFileSize(file.file_size) }}</span>
-                    <span>•</span>
+                    <span>·</span>
                     <span
                       :class="{
                         'text-green-600 dark:text-green-400': file.status === 'vectorized',
@@ -142,11 +146,51 @@
                     >
                       {{ $t(`files.status_${file.status}`) }}
                     </span>
-                    <span v-if="file.is_attached">•</span>
+                    <span v-if="file.is_attached">·</span>
                     <span v-if="file.is_attached" class="text-blue-600 dark:text-blue-400">
                       {{ $t('files.attached') }}
                     </span>
                   </div>
+                </div>
+
+                <!-- Per-file action buttons -->
+                <div
+                  class="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0"
+                  @click.stop
+                >
+                  <button
+                    v-if="file.status !== 'vectorized'"
+                    class="p-1.5 rounded hover:bg-purple-500/10 text-purple-600 dark:text-purple-400 transition-colors"
+                    :title="$t('fileSelection.reVectorize')"
+                    data-testid="btn-file-revectorize"
+                    @click="handleReVectorize(file.id)"
+                  >
+                    <Icon icon="heroicons:arrow-path" class="w-4 h-4" />
+                  </button>
+                  <button
+                    class="p-1.5 rounded hover:bg-[var(--brand)]/10 text-[var(--brand)] transition-colors"
+                    :title="$t('fileSelection.viewContent')"
+                    data-testid="btn-file-view"
+                    @click="openContentModal(file.id)"
+                  >
+                    <Icon icon="heroicons:eye" class="w-4 h-4" />
+                  </button>
+                  <button
+                    class="p-1.5 rounded hover:bg-blue-500/10 text-blue-400 transition-colors"
+                    :title="$t('fileSelection.download')"
+                    data-testid="btn-file-download"
+                    @click="handleDownload(file.id, file.filename)"
+                  >
+                    <ArrowDownTrayIcon class="w-4 h-4" />
+                  </button>
+                  <button
+                    class="p-1.5 rounded hover:bg-red-500/10 text-red-400 transition-colors"
+                    :title="$t('fileSelection.deleteFile')"
+                    data-testid="btn-file-delete"
+                    @click="confirmDeleteFile(file.id)"
+                  >
+                    <TrashIcon class="w-4 h-4" />
+                  </button>
                 </div>
               </div>
             </div>
@@ -154,10 +198,21 @@
 
           <!-- Footer with actions -->
           <div
-            class="flex items-center justify-between p-6 border-t border-light-border/30 dark:border-dark-border/20"
+            class="flex items-center justify-between p-6 border-t border-light-border/20 dark:border-dark-border/15"
           >
-            <div class="txt-secondary text-sm">
-              {{ $t('fileSelection.selectedCount', { count: selectedFiles.length }) }}
+            <div class="flex items-center gap-3">
+              <span class="txt-secondary text-sm">
+                {{ $t('fileSelection.selectedCount', { count: selectedFiles.length }) }}
+              </span>
+              <button
+                v-if="selectedFiles.length > 0"
+                class="px-3 py-1.5 rounded-lg bg-red-500/10 text-red-500 hover:bg-red-500/20 transition-colors text-sm flex items-center gap-1.5"
+                data-testid="btn-file-selection-delete-selected"
+                @click="confirmDeleteSelected"
+              >
+                <TrashIcon class="w-3.5 h-3.5" />
+                {{ $t('fileSelection.deleteSelected') }}
+              </button>
             </div>
             <div class="flex gap-3">
               <button
@@ -181,14 +236,37 @@
       </div>
     </Transition>
   </Teleport>
+
+  <!-- Sub-dialogs (rendered via Teleport inside their own templates) -->
+  <FileContentModal
+    :is-open="contentModalOpen"
+    :file-id="contentModalFileId"
+    @close="contentModalOpen = false"
+  />
+
+  <ConfirmDialog
+    :is-open="confirmDialogOpen"
+    :title="$t('fileSelection.deleteConfirmTitle')"
+    :message="$t('fileSelection.deleteConfirmMessage')"
+    :confirm-text="$t('fileSelection.deleteConfirmButton')"
+    :cancel-text="$t('common.cancel')"
+    variant="danger"
+    @confirm="executeDelete"
+    @cancel="confirmDialogOpen = false"
+  />
 </template>
 
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
-import { XMarkIcon } from '@heroicons/vue/24/outline'
+import { useI18n } from 'vue-i18n'
+import { XMarkIcon, ArrowDownTrayIcon, TrashIcon } from '@heroicons/vue/24/outline'
 import { Icon } from '@iconify/vue'
 import filesService, { type FileItem } from '@/services/filesService'
 import { useNotification } from '@/composables/useNotification'
+import FileContentModal from './FileContentModal.vue'
+import ConfirmDialog from './ConfirmDialog.vue'
+
+const { t } = useI18n()
 
 const props = defineProps<{
   visible: boolean
@@ -212,17 +290,21 @@ const fileInputRef = ref<HTMLInputElement | null>(null)
 const uploadProgress = ref<{ current: number; total: number } | null>(null)
 const isDragging = ref(false)
 
+// Sub-dialog state
+const contentModalOpen = ref(false)
+const contentModalFileId = ref<number | null>(null)
+const confirmDialogOpen = ref(false)
+const pendingDeleteIds = ref<number[]>([])
+
 // Computed
 const filteredFiles = computed(() => {
   let result = files.value
 
-  // Filter by search query
   if (searchQuery.value) {
     const query = searchQuery.value.toLowerCase()
     result = result.filter((f) => f.filename.toLowerCase().includes(query))
   }
 
-  // Filter by status
   if (filterStatus.value !== 'all') {
     result = result.filter((f) => f.status === filterStatus.value)
   }
@@ -240,8 +322,8 @@ const loadFiles = async () => {
   try {
     const response = await filesService.listFiles(undefined, 1, 100)
     files.value = response.files
-  } catch (error) {
-    console.error('Failed to load files:', error)
+  } catch (err) {
+    console.error('Failed to load files:', err)
   } finally {
     isLoading.value = false
   }
@@ -265,6 +347,76 @@ const attachFiles = () => {
   emit('close')
 }
 
+// File management actions
+const openContentModal = (fileId: number) => {
+  contentModalFileId.value = fileId
+  contentModalOpen.value = true
+}
+
+const handleDownload = async (fileId: number, filename: string) => {
+  try {
+    await filesService.downloadFile(fileId, filename)
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : t('fileSelection.downloadFailed')
+    showError(message)
+  }
+}
+
+const confirmDeleteFile = (fileId: number) => {
+  pendingDeleteIds.value = [fileId]
+  confirmDialogOpen.value = true
+}
+
+const confirmDeleteSelected = () => {
+  pendingDeleteIds.value = Array.from(selectedFileIds.value)
+  confirmDialogOpen.value = true
+}
+
+const executeDelete = async () => {
+  confirmDialogOpen.value = false
+  const ids = pendingDeleteIds.value
+
+  try {
+    if (ids.length === 1) {
+      await filesService.deleteFile(ids[0])
+      success(t('fileSelection.fileDeleted'))
+    } else {
+      const results = await filesService.deleteMultipleFiles(ids)
+      const successCount = results.filter((r) => r.success).length
+      const failCount = results.filter((r) => !r.success).length
+      if (failCount > 0) {
+        showError(
+          t('fileSelection.bulkDeletePartial', { success: successCount, failed: failCount })
+        )
+      } else {
+        success(t('fileSelection.bulkDeleteSuccess', { count: successCount }))
+      }
+    }
+
+    ids.forEach((id) => selectedFileIds.value.delete(id))
+    await loadFiles()
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : t('fileSelection.deleteFailed')
+    showError(msg)
+  } finally {
+    pendingDeleteIds.value = []
+  }
+}
+
+const handleReVectorize = async (fileId: number) => {
+  try {
+    const result = await filesService.reVectorizeFile(fileId)
+    if (result.success) {
+      success(t('fileSelection.reVectorizeSuccess', { chunks: result.chunksCreated }))
+      await loadFiles()
+    }
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : t('fileSelection.reVectorizeFailed')
+    showError(msg)
+  }
+}
+
+// Upload
 const triggerFileUpload = () => {
   fileInputRef.value?.click()
 }
@@ -293,8 +445,6 @@ const handleFileUpload = async (event: Event) => {
   if (!filesToUpload || filesToUpload.length === 0) return
 
   await uploadFiles(Array.from(filesToUpload))
-
-  // Reset input
   target.value = ''
 }
 
@@ -303,7 +453,6 @@ const uploadFiles = async (filesToUpload: File[]) => {
   uploadProgress.value = { current: 0, total: filesToUpload.length }
 
   try {
-    // Upload files with default processing level (vectorize)
     const result = await filesService.uploadFiles({
       files: filesToUpload,
       processLevel: 'vectorize',
@@ -313,11 +462,7 @@ const uploadFiles = async (filesToUpload: File[]) => {
       success(
         `${result.files.length} ${result.files.length === 1 ? 'file' : 'files'} uploaded successfully`
       )
-
-      // Reload file list to show newly uploaded files
       await loadFiles()
-
-      // Auto-select newly uploaded files
       result.files.forEach((file) => {
         if (file.id) {
           selectedFileIds.value.add(file.id)
@@ -325,15 +470,15 @@ const uploadFiles = async (filesToUpload: File[]) => {
       })
     }
 
-    // Show any errors
     if (result.errors && result.errors.length > 0) {
       result.errors.forEach((err) => {
         showError(`${err.filename}: ${err.error}`)
       })
     }
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error('Upload failed:', err)
-    showError(`Upload failed: ${err.message || 'Unknown error'}`)
+    const msg = err instanceof Error ? err.message : 'Unknown error'
+    showError(`Upload failed: ${msg}`)
   } finally {
     isUploading.value = false
     uploadProgress.value = null
@@ -360,15 +505,15 @@ const getFileIcon = (fileType: string): string => {
   return 'mdi:file'
 }
 
-// Watch for modal visibility
 watch(
   () => props.visible,
   (visible) => {
     if (visible) {
       loadFiles()
     } else {
-      // Reset selection when modal closes
       selectedFileIds.value.clear()
+      contentModalOpen.value = false
+      confirmDialogOpen.value = false
     }
   }
 )

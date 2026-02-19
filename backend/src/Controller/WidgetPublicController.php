@@ -889,6 +889,7 @@ class WidgetPublicController extends AbstractController
         $file->setFileSize($storageResult['size']);
         $file->setFileMime($storageResult['mime']);
         $file->setFileType($this->getFileTypeString($fileExtension));
+        $file->setGroupKey("WIDGET:{$widget->getWidgetId()}");
 
         $this->em->persist($file);
         $this->em->flush();

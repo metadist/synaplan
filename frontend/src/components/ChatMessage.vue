@@ -481,7 +481,7 @@
               >
                 <Icon :icon="getModelTypeIcon" class="w-3.5 h-3.5" />
                 <span class="hidden sm:inline">{{ getModelTypeLabel }}:</span>
-                <span class="font-semibold">{{ aiModels.chat.model }}</span>
+                <span class="font-semibold">{{ shortenModel(aiModels.chat.model) }}</span>
               </button>
 
               <!-- Sorting Model Badge -->
@@ -489,13 +489,13 @@
                 v-if="aiModels.sorting"
                 type="button"
                 class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-xs font-medium bg-purple-500/10 hover:bg-purple-500/20 text-purple-600 dark:text-purple-400 transition-colors cursor-pointer"
-                :title="$t('config.aiModels.messageClassification')"
+                :title="`${$t('config.aiModels.messageClassification')}: ${aiModels.sorting.model}`"
                 data-testid="btn-message-model-sorting"
                 @click="showModelDetails('sorting')"
               >
                 <Icon icon="mdi:sort" class="w-3.5 h-3.5" />
                 <span class="hidden sm:inline">{{ $t('config.aiModels.sorting') }}:</span>
-                <span class="font-semibold">{{ aiModels.sorting.model }}</span>
+                <span class="font-semibold">{{ shortenModel(aiModels.sorting.model) }}</span>
               </button>
 
               <span
@@ -977,6 +977,12 @@ const emit = defineEmits<{
 
 const router = useRouter()
 const modelDropdownOpen = ref(false)
+
+const shortenModel = (name: string): string => {
+  const stripped = name.replace(/^[^/]+\//, '')
+  if (stripped.length <= 24) return stripped
+  return stripped.slice(0, 22) + '…'
+}
 
 // Use model selection composable
 const againDataComputed = computed(() => props.againData)

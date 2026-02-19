@@ -62,6 +62,15 @@
           @close="closePalette"
         />
 
+        <!-- File Mention Palette (@mentions) -->
+        <FileMentionPalette
+          ref="mentionPaletteRef"
+          :visible="mentionPaletteVisible"
+          :query="mentionQuery"
+          @select="handleMentionSelect"
+          @close="mentionPaletteVisible = false"
+        />
+
         <!-- Scrollable container with padding for scrollbar alignment -->
         <div class="max-h-[40vh] overflow-y-auto chat-input-scroll">
           <div class="pl-[60px] pr-[140px] py-2">
@@ -222,6 +231,7 @@ import {
 import { Icon } from '@iconify/vue'
 import Textarea from './Textarea.vue'
 import CommandPalette from './CommandPalette.vue'
+import FileMentionPalette from './FileMentionPalette.vue'
 import ToolsDropdown from './ToolsDropdown.vue'
 import FileSelectionModal from './FileSelectionModal.vue'
 import { parseCommand } from '../commands/parse'
@@ -263,6 +273,9 @@ const enhanceLoading = ref(false)
 const thinkingEnabled = ref(false)
 const paletteVisible = ref(false)
 const paletteRef = ref<InstanceType<typeof CommandPalette> | null>(null)
+const mentionPaletteVisible = ref(false)
+const mentionPaletteRef = ref<InstanceType<typeof FileMentionPalette> | null>(null)
+const mentionQuery = ref('')
 const textareaRef = ref<InstanceType<typeof Textarea> | null>(null)
 const fileInputRef = ref<HTMLInputElement | null>(null)
 const activeCommand = ref<string | null>(null)
@@ -429,6 +442,16 @@ watch(
       activeCommand.value = null
     }
 
+    // Detect @mention trigger: match @ preceded by start-of-string or whitespace, at end of input
+    const mentionMatch = newValue.match(/(?:^|\s)@(\S*)$/)
+    if (mentionMatch && !paletteVisible.value) {
+      mentionQuery.value = mentionMatch[1]
+      mentionPaletteVisible.value = true
+    } else if (!mentionMatch) {
+      mentionPaletteVisible.value = false
+      mentionQuery.value = ''
+    }
+
     // Auto-disable enhance if message has been edited (differs from enhanced version)
     if (enhanceEnabled.value && enhancedMessage.value) {
       const currentText = newValue.trim()
@@ -470,8 +493,10 @@ const sendMessage = () => {
     message.value = ''
     uploadedFiles.value = []
     paletteVisible.value = false
+    mentionPaletteVisible.value = false
+    mentionQuery.value = ''
     activeCommand.value = null
-    voiceReply.value = false // Reset after send
+    voiceReply.value = false
     // Reset enhance state after sending
     enhanceEnabled.value = false
     originalMessage.value = ''
@@ -540,6 +565,13 @@ const handleKeyDown = (e: KeyboardEvent) => {
       e.stopPropagation()
       paletteRef.value.handleKeyDown(e)
     }
+  } else if (mentionPaletteVisible.value && mentionPaletteRef.value) {
+    const handled = ['ArrowUp', 'ArrowDown', 'Enter', 'Escape', 'Tab']
+    if (handled.includes(e.key)) {
+      e.preventDefault()
+      e.stopPropagation()
+      mentionPaletteRef.value.handleKeyDown(e)
+    }
   }
 }
 
@@ -554,7 +586,6 @@ const triggerFileUpload = () => {
 }
 
 const handleFilesSelected = async (selectedFiles: FileItem[]) => {
-  // Add selected files to uploadedFiles
   selectedFiles.forEach((file) => {
     uploadedFiles.value.push({
       file_id: file.id,
@@ -564,6 +595,28 @@ const handleFilesSelected = async (selectedFiles: FileItem[]) => {
     })
   })
   success(`${selectedFiles.length} file(s) attached`)
+}
+
+const handleMentionSelect = (file: FileItem) => {
+  const alreadyAttached = uploadedFiles.value.some((f) => f.file_id === file.id)
+  if (!alreadyAttached) {
+    uploadedFiles.value.push({
+      file_id: file.id,
+      filename: file.filename,
+      file_type: file.file_type,
+      processing: false,
+    })
+    success(t('fileMention.fileAttached', { name: file.filename }))
+  }
+
+  // Remove the @query text from the message
+  message.value = message.value.replace(/(?:^|\s)@\S*$/, '').trimEnd()
+  mentionPaletteVisible.value = false
+  mentionQuery.value = ''
+
+  nextTick(() => {
+    textareaRef.value?.focus()
+  })
 }
 
 const handleFileSelect = async (event: Event) => {

@@ -1,0 +1,934 @@
+/* ============================================================
+   Synaplan V2 Glass Design — Override Layer
+   All rules scoped under .design-v2 so V1 stays untouched.
+   Works with both light and dark modes.
+   ============================================================ */
+
+/* ----------------------------------------------------------
+   1. CSS Variable Overrides
+   ---------------------------------------------------------- */
+
+/* Light + V2 */
+.design-v2 {
+  --bg-app: #eef2f7;
+  --bg-sidebar: rgba(255, 255, 255, 0.55);
+  --bg-chat: #eef2f7;
+  --bg-card: rgba(255, 255, 255, 0.92);
+  --bg-chip: rgba(0, 0, 0, 0.03);
+  --border-light: rgba(0, 183, 157, 0.1);
+  --brand-alpha-light: rgba(0, 183, 157, 0.06);
+
+  --v2-glow: rgba(0, 183, 157, 0.12);
+  --v2-glow-strong: rgba(0, 183, 157, 0.25);
+  --v2-blur-sm: 8px;
+  --v2-blur-md: 16px;
+  --v2-blur-lg: 24px;
+  --v2-radius: 1rem;
+  --v2-border: rgba(0, 183, 157, 0.12);
+  --v2-border-hover: rgba(0, 183, 157, 0.22);
+}
+
+/* Dark + V2 */
+.design-v2.dark {
+  --bg-app: #050a16;
+  --bg-sidebar: rgba(10, 16, 30, 0.7);
+  --bg-chat: #050a16;
+  --bg-card: rgba(16, 24, 42, 0.9);
+  --bg-chip: rgba(255, 255, 255, 0.04);
+  --border-light: rgba(0, 240, 211, 0.08);
+  --brand-alpha-light: rgba(0, 240, 211, 0.1);
+
+  --v2-glow: rgba(0, 240, 211, 0.1);
+  --v2-glow-strong: rgba(0, 240, 211, 0.22);
+  --v2-border: rgba(0, 240, 211, 0.1);
+  --v2-border-hover: rgba(0, 240, 211, 0.2);
+}
+
+/* ----------------------------------------------------------
+   2. Surface Cards — Frosted Glass
+   ---------------------------------------------------------- */
+
+.design-v2 .surface-card {
+  background: var(--bg-card);
+  backdrop-filter: blur(var(--v2-blur-md));
+  -webkit-backdrop-filter: blur(var(--v2-blur-md));
+  border-radius: var(--v2-radius);
+  border: 1px solid var(--v2-border);
+  box-shadow:
+    0 2px 16px rgba(0, 0, 0, 0.06),
+    0 0 1px var(--v2-glow);
+  transition:
+    box-shadow 0.25s,
+    border-color 0.25s;
+}
+.design-v2.dark .surface-card {
+  box-shadow:
+    0 2px 16px rgba(0, 0, 0, 0.3),
+    0 0 1px var(--v2-glow);
+}
+
+.design-v2 .surface-chip {
+  background: var(--bg-chip);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  border-radius: 0.625rem;
+  box-shadow: none;
+}
+.design-v2.dark .surface-chip {
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.design-v2 .surface-elevated {
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(var(--v2-blur-md));
+  -webkit-backdrop-filter: blur(var(--v2-blur-md));
+  border: 1px solid var(--v2-border);
+  border-radius: var(--v2-radius);
+  box-shadow:
+    0 4px 24px rgba(0, 0, 0, 0.08),
+    0 0 1px var(--v2-glow);
+}
+.design-v2.dark .surface-elevated {
+  background: rgba(16, 24, 42, 0.95);
+  box-shadow:
+    0 4px 24px rgba(0, 0, 0, 0.4),
+    0 0 1px var(--v2-glow);
+}
+
+/* ----------------------------------------------------------
+   3. Sidebar & Header — Frosted
+   ---------------------------------------------------------- */
+
+.design-v2 .bg-sidebar {
+  background: var(--bg-sidebar);
+  backdrop-filter: blur(var(--v2-blur-lg));
+  -webkit-backdrop-filter: blur(var(--v2-blur-lg));
+  border-right: 1px solid var(--v2-border);
+  box-shadow: none;
+}
+.design-v2.dark .bg-sidebar {
+  box-shadow: 1px 0 24px rgba(0, 0, 0, 0.3);
+}
+
+.design-v2 .bg-header {
+  background: var(--bg-sidebar);
+  backdrop-filter: blur(var(--v2-blur-lg));
+  -webkit-backdrop-filter: blur(var(--v2-blur-lg));
+  border-bottom: 1px solid var(--v2-border);
+  box-shadow: none;
+}
+.design-v2.dark .bg-header {
+  box-shadow: 0 1px 16px rgba(0, 0, 0, 0.2);
+}
+
+/* ----------------------------------------------------------
+   4. Navigation Items — Glass + Glow
+   ---------------------------------------------------------- */
+
+.design-v2 .nav-item {
+  background: rgba(0, 0, 0, 0.03);
+  border-radius: 0.875rem;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  color: #444;
+  box-shadow: none;
+  transition: all 0.2s ease;
+}
+.design-v2 .nav-item:hover {
+  background: rgba(0, 183, 157, 0.06);
+  border-color: var(--v2-border);
+  box-shadow: 0 0 12px var(--v2-glow);
+}
+.design-v2 .nav-item--active {
+  background: rgba(0, 183, 157, 0.1) !important;
+  border-color: var(--v2-border-hover);
+  color: var(--brand);
+  box-shadow:
+    0 0 16px var(--v2-glow),
+    inset 0 0 0 1px rgba(0, 183, 157, 0.18);
+}
+
+.design-v2.dark .nav-item {
+  background: rgba(255, 255, 255, 0.03) !important;
+  border: 1px solid rgba(0, 240, 211, 0.06);
+  color: #d7dae0;
+  box-shadow: none;
+}
+.design-v2.dark .nav-item:hover {
+  background: rgba(0, 240, 211, 0.05) !important;
+  border-color: var(--v2-border);
+  box-shadow: 0 0 12px var(--v2-glow);
+}
+.design-v2.dark .nav-item--active {
+  background: rgba(0, 240, 211, 0.08) !important;
+  border-color: var(--v2-border-hover);
+  color: var(--brand-light);
+  box-shadow:
+    0 0 16px var(--v2-glow),
+    inset 0 0 0 1px rgba(0, 240, 211, 0.15) !important;
+}
+
+/* ----------------------------------------------------------
+   5. Buttons — Glow Effects
+   ---------------------------------------------------------- */
+
+.design-v2 .btn-primary {
+  background: var(--brand);
+  border: 1px solid rgba(0, 183, 157, 0.3);
+  box-shadow:
+    0 0 12px rgba(0, 183, 157, 0.25),
+    0 2px 8px rgba(0, 0, 0, 0.1);
+  transition: all 0.2s ease;
+}
+.design-v2 .btn-primary:hover {
+  background: var(--brand-hover);
+  box-shadow:
+    0 0 24px rgba(0, 183, 157, 0.35),
+    0 4px 16px rgba(0, 0, 0, 0.12);
+  transform: translateY(-1px);
+}
+.design-v2 .btn-primary:active {
+  transform: translateY(0);
+}
+
+.design-v2 .btn-secondary {
+  background: rgba(0, 0, 0, 0.04);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  transition: all 0.2s ease;
+}
+.design-v2.dark .btn-secondary {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+.design-v2 .btn-secondary:hover {
+  border-color: var(--v2-border-hover);
+  box-shadow: 0 0 12px var(--v2-glow);
+}
+
+.design-v2 .btn-danger {
+  box-shadow: 0 0 12px rgba(220, 38, 38, 0.2);
+}
+.design-v2 .btn-danger:hover {
+  box-shadow: 0 0 20px rgba(220, 38, 38, 0.3);
+  transform: translateY(-1px);
+}
+
+/* ----------------------------------------------------------
+   6. Chat Input — Floating Glass with Glow
+   ---------------------------------------------------------- */
+
+.design-v2 [data-testid='comp-chat-input-shell'] {
+  backdrop-filter: blur(var(--v2-blur-md));
+  -webkit-backdrop-filter: blur(var(--v2-blur-md));
+  background: rgba(255, 255, 255, 0.55) !important;
+  border: 1px solid var(--v2-border) !important;
+  border-radius: 1.25rem !important;
+  box-shadow:
+    0 4px 24px rgba(0, 0, 0, 0.06),
+    0 0 16px var(--v2-glow) !important;
+  transition:
+    box-shadow 0.3s ease,
+    border-color 0.3s ease;
+}
+.design-v2.dark [data-testid='comp-chat-input-shell'] {
+  background: rgba(255, 255, 255, 0.025) !important;
+  border: 1px solid rgba(255, 255, 255, 0.06) !important;
+  box-shadow:
+    0 2px 12px rgba(0, 0, 0, 0.15),
+    0 0 8px var(--v2-glow) !important;
+}
+
+/* Focus glow when typing */
+.design-v2 [data-testid='comp-chat-input-shell']:focus-within {
+  border-color: var(--v2-border-hover) !important;
+  box-shadow:
+    0 4px 32px rgba(0, 0, 0, 0.08),
+    0 0 28px var(--v2-glow-strong) !important;
+}
+.design-v2.dark [data-testid='comp-chat-input-shell']:focus-within {
+  border-color: var(--v2-border-hover) !important;
+  box-shadow:
+    0 4px 24px rgba(0, 0, 0, 0.25),
+    0 0 20px var(--v2-glow-strong) !important;
+}
+
+/* Floating chat input area — remove separate background band */
+.design-v2 [data-testid='comp-chat-input'] {
+  background: transparent !important;
+}
+
+/* ----------------------------------------------------------
+   7. Chat Pills — Glass
+   ---------------------------------------------------------- */
+
+.design-v2 .pill {
+  backdrop-filter: blur(var(--v2-blur-sm));
+  -webkit-backdrop-filter: blur(var(--v2-blur-sm));
+  background: rgba(0, 0, 0, 0.04);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 0.75rem;
+  color: #6b6b6b;
+  box-shadow: none;
+  transition: all 0.2s ease;
+}
+.design-v2.dark .pill {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  color: #a1a1a3;
+}
+.design-v2 .pill:hover {
+  background: rgba(0, 183, 157, 0.08);
+  border-color: var(--v2-border-hover);
+  box-shadow: 0 0 10px var(--v2-glow);
+}
+.design-v2.dark .pill:hover {
+  background: rgba(0, 240, 211, 0.08);
+}
+
+.design-v2 .pill--active {
+  background: rgba(0, 183, 157, 0.12) !important;
+  border-color: rgba(0, 183, 157, 0.3) !important;
+  color: var(--brand);
+  box-shadow:
+    0 0 14px var(--v2-glow),
+    inset 0 0 0 1px rgba(0, 183, 157, 0.15) !important;
+}
+.design-v2.dark .pill--active {
+  background: rgba(0, 240, 211, 0.1) !important;
+  border-color: rgba(0, 240, 211, 0.3) !important;
+  color: var(--brand-light);
+  box-shadow:
+    0 0 14px var(--v2-glow),
+    inset 0 0 0 1px rgba(0, 240, 211, 0.12) !important;
+}
+
+/* ----------------------------------------------------------
+   8. Chat Bubbles — Floating Glass
+   ---------------------------------------------------------- */
+
+/* Message container — subtle float + entrance */
+.design-v2 [data-testid='message-container'] {
+  transition:
+    transform 0.15s ease,
+    opacity 0.15s ease;
+}
+.design-v2 [data-testid='message-container']:hover {
+  transform: translateY(-1px);
+}
+
+/* AI Bubble — frosted glass with subtle glow */
+.design-v2 .bubble-ai {
+  background: rgba(248, 249, 252, 0.85) !important;
+  backdrop-filter: blur(var(--v2-blur-md));
+  -webkit-backdrop-filter: blur(var(--v2-blur-md));
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  border-radius: 1.125rem;
+  box-shadow:
+    0 2px 12px rgba(0, 0, 0, 0.04),
+    0 0 1px rgba(0, 183, 157, 0.06);
+  transition:
+    box-shadow 0.25s ease,
+    transform 0.15s ease;
+}
+.design-v2 .bubble-ai:hover {
+  box-shadow:
+    0 4px 20px rgba(0, 0, 0, 0.06),
+    0 0 8px var(--v2-glow);
+}
+.design-v2.dark .bubble-ai {
+  background: rgba(20, 30, 52, 0.55) !important;
+  border-color: rgba(0, 240, 211, 0.08);
+  box-shadow:
+    0 4px 20px rgba(0, 0, 0, 0.25),
+    0 0 1px rgba(0, 240, 211, 0.08);
+}
+.design-v2.dark .bubble-ai:hover {
+  box-shadow:
+    0 6px 28px rgba(0, 0, 0, 0.3),
+    0 0 10px var(--v2-glow);
+}
+
+/* User Bubble — brand glow, floating */
+.design-v2 .bubble-user {
+  border-radius: 1.125rem;
+  border: 1px solid rgba(0, 183, 157, 0.2);
+  box-shadow:
+    0 4px 20px rgba(0, 183, 157, 0.18),
+    0 0 12px rgba(0, 183, 157, 0.1);
+  transition:
+    box-shadow 0.25s ease,
+    transform 0.15s ease;
+}
+.design-v2 .bubble-user:hover {
+  box-shadow:
+    0 6px 28px rgba(0, 183, 157, 0.25),
+    0 0 18px rgba(0, 183, 157, 0.15);
+}
+.design-v2.dark .bubble-user {
+  border-color: rgba(0, 240, 211, 0.25);
+  box-shadow:
+    0 4px 20px rgba(0, 240, 211, 0.15),
+    0 0 12px rgba(0, 240, 211, 0.08);
+}
+.design-v2.dark .bubble-user:hover {
+  box-shadow:
+    0 6px 28px rgba(0, 240, 211, 0.2),
+    0 0 18px rgba(0, 240, 211, 0.12);
+}
+
+/* Avatar — glass circle with subtle glow */
+.design-v2 [data-testid='message-container'] .surface-card.rounded-full {
+  backdrop-filter: blur(var(--v2-blur-sm));
+  -webkit-backdrop-filter: blur(var(--v2-blur-sm));
+  border: 1px solid var(--v2-border);
+  box-shadow: 0 0 8px var(--v2-glow);
+}
+
+/* Date separator chips — glass */
+.design-v2 [data-testid='item-message-group'] .surface-chip {
+  backdrop-filter: blur(var(--v2-blur-sm));
+  -webkit-backdrop-filter: blur(var(--v2-blur-sm));
+  border: 1px solid var(--v2-border);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.03);
+}
+.design-v2.dark [data-testid='item-message-group'] .surface-chip {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+/* Empty state — subtle glow */
+.design-v2 [data-testid='state-empty'] {
+  opacity: 0.9;
+}
+.design-v2 [data-testid='state-empty'] h2 {
+  background: linear-gradient(135deg, var(--brand), var(--brand-light));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* ----------------------------------------------------------
+   9. Dropdowns — Glass Panel
+   ---------------------------------------------------------- */
+
+.design-v2 .dropdown-panel {
+  background: rgba(245, 245, 248, 0.95);
+  backdrop-filter: blur(var(--v2-blur-lg));
+  -webkit-backdrop-filter: blur(var(--v2-blur-lg));
+  border: 1px solid var(--v2-border);
+  border-radius: var(--v2-radius);
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.12),
+    0 0 1px var(--v2-glow);
+}
+.design-v2.dark .dropdown-panel {
+  background: rgba(14, 22, 40, 0.95);
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.5),
+    0 0 1px var(--v2-glow);
+}
+
+.design-v2 .dropdown-item:hover {
+  background: rgba(0, 183, 157, 0.06);
+}
+.design-v2.dark .dropdown-item:hover {
+  background: rgba(0, 240, 211, 0.08);
+}
+
+.design-v2 .dropdown-item--active {
+  background: rgba(0, 183, 157, 0.1);
+  box-shadow: inset 0 0 0 1px rgba(0, 183, 157, 0.12);
+}
+
+.design-v2 .dropdown-up {
+  background: rgba(245, 245, 248, 0.95);
+  backdrop-filter: blur(var(--v2-blur-lg));
+  -webkit-backdrop-filter: blur(var(--v2-blur-lg));
+  border: 1px solid var(--v2-border);
+  border-radius: var(--v2-radius);
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.15),
+    0 0 1px var(--v2-glow);
+}
+.design-v2.dark .dropdown-up {
+  background: rgba(14, 22, 40, 0.95);
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.55),
+    0 0 1px var(--v2-glow);
+}
+
+/* ----------------------------------------------------------
+   10. Icon Ghost — Subtler with Glow
+   ---------------------------------------------------------- */
+
+.design-v2 .icon-ghost:hover,
+.design-v2 .icon-ghost:focus-visible {
+  background: rgba(0, 183, 157, 0.08);
+  box-shadow: 0 0 10px var(--v2-glow);
+}
+.design-v2.dark .icon-ghost:hover,
+.design-v2.dark .icon-ghost:focus-visible {
+  background: rgba(0, 240, 211, 0.1);
+  box-shadow: 0 0 10px var(--v2-glow);
+}
+
+/* ----------------------------------------------------------
+   11. Alerts & Info Boxes — Glass
+   ---------------------------------------------------------- */
+
+.design-v2 .alert-info,
+.design-v2 .alert-success,
+.design-v2 .alert-warning,
+.design-v2 .alert-error {
+  backdrop-filter: blur(var(--v2-blur-sm));
+  -webkit-backdrop-filter: blur(var(--v2-blur-sm));
+}
+
+.design-v2 .info-box-blue,
+.design-v2 .info-box-yellow,
+.design-v2 .info-box-red {
+  backdrop-filter: blur(var(--v2-blur-sm));
+  -webkit-backdrop-filter: blur(var(--v2-blur-sm));
+}
+
+/* ----------------------------------------------------------
+   12. Scrollbars — Subtler
+   ---------------------------------------------------------- */
+
+.design-v2 .sidebar-scroll::-webkit-scrollbar-thumb,
+.design-v2 .chat-input-scroll::-webkit-scrollbar-thumb,
+.design-v2 .scroll-thin::-webkit-scrollbar-thumb {
+  background: rgba(0, 183, 157, 0.12);
+}
+.design-v2.dark .sidebar-scroll::-webkit-scrollbar-thumb,
+.design-v2.dark .chat-input-scroll::-webkit-scrollbar-thumb,
+.design-v2.dark .scroll-thin::-webkit-scrollbar-thumb {
+  background: rgba(0, 240, 211, 0.1);
+}
+
+/* ----------------------------------------------------------
+   13. V2 Sidebar Specific — Glass Rail & Flyout
+   ---------------------------------------------------------- */
+
+.design-v2 .v2-sidebar-rail {
+  background: var(--bg-sidebar);
+  backdrop-filter: blur(var(--v2-blur-lg));
+  -webkit-backdrop-filter: blur(var(--v2-blur-lg));
+  border-right: 1px solid var(--v2-border);
+}
+.design-v2.dark .v2-sidebar-rail {
+  box-shadow: 1px 0 20px rgba(0, 0, 0, 0.3);
+}
+
+.design-v2 .v2-sidebar-flyout {
+  background: var(--bg-card);
+  backdrop-filter: blur(var(--v2-blur-lg));
+  -webkit-backdrop-filter: blur(var(--v2-blur-lg));
+  border: 1px solid var(--v2-border);
+  border-radius: var(--v2-radius);
+  box-shadow:
+    0 8px 40px rgba(0, 0, 0, 0.12),
+    0 0 1px var(--v2-glow);
+}
+.design-v2.dark .v2-sidebar-flyout {
+  box-shadow:
+    0 8px 40px rgba(0, 0, 0, 0.5),
+    0 0 1px var(--v2-glow);
+}
+
+/* New Chat Button — branded glow, always prominent */
+.design-v2 .v2-new-chat-btn {
+  background: rgba(0, 183, 157, 0.1);
+  color: var(--brand);
+  border: 1px solid rgba(0, 183, 157, 0.2);
+  box-shadow: 0 0 10px rgba(0, 183, 157, 0.08);
+}
+.design-v2 .v2-new-chat-btn:hover {
+  background: rgba(0, 183, 157, 0.18);
+  border-color: rgba(0, 183, 157, 0.35);
+  box-shadow: 0 0 20px rgba(0, 183, 157, 0.2);
+  transform: scale(1.05);
+}
+.design-v2 .v2-new-chat-btn:active {
+  transform: scale(0.97);
+}
+.design-v2 .v2-new-chat-btn--creating {
+  opacity: 0.7;
+  pointer-events: none;
+}
+.design-v2.dark .v2-new-chat-btn {
+  background: rgba(0, 240, 211, 0.08);
+  color: var(--brand-light);
+  border: 1px solid rgba(0, 240, 211, 0.15);
+  box-shadow: 0 0 10px rgba(0, 240, 211, 0.06);
+}
+.design-v2.dark .v2-new-chat-btn:hover {
+  background: rgba(0, 240, 211, 0.15);
+  border-color: rgba(0, 240, 211, 0.3);
+  box-shadow: 0 0 20px rgba(0, 240, 211, 0.15);
+}
+
+.design-v2 .v2-rail-icon {
+  color: var(--txt-secondary);
+  border-radius: 0.75rem;
+  transition: all 0.2s ease;
+}
+.design-v2 .v2-rail-icon:hover {
+  background: rgba(0, 183, 157, 0.08);
+  color: var(--brand);
+  box-shadow: 0 0 10px var(--v2-glow);
+}
+.design-v2 .v2-rail-icon--active {
+  background: rgba(0, 183, 157, 0.1);
+  color: var(--brand);
+  box-shadow: 0 0 14px var(--v2-glow);
+}
+.design-v2.dark .v2-rail-icon:hover {
+  background: rgba(0, 240, 211, 0.08);
+  color: var(--brand-light);
+  box-shadow: 0 0 10px var(--v2-glow);
+}
+.design-v2.dark .v2-rail-icon--active {
+  background: rgba(0, 240, 211, 0.08);
+  color: var(--brand-light);
+  box-shadow: 0 0 14px var(--v2-glow);
+}
+
+/* ----------------------------------------------------------
+   14. Hover Surface — Glass
+   ---------------------------------------------------------- */
+
+.design-v2 .hover-surface:hover {
+  background: rgba(0, 183, 157, 0.06) !important;
+}
+.design-v2.dark .hover-surface:hover {
+  background: rgba(0, 240, 211, 0.08) !important;
+}
+
+/* ----------------------------------------------------------
+   15. Badge Level — Glass
+   ---------------------------------------------------------- */
+
+.design-v2 .badge-level {
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+
+/* ----------------------------------------------------------
+   16. Global Transitions — Smoother for V2
+   ---------------------------------------------------------- */
+
+.design-v2 *,
+.design-v2 *::before,
+.design-v2 *::after {
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* ----------------------------------------------------------
+   17. Modals — Solid readable background with glass border
+   ---------------------------------------------------------- */
+
+.design-v2 .surface-card.shadow-2xl {
+  background: rgba(252, 253, 255, 0.98);
+  backdrop-filter: blur(var(--v2-blur-lg));
+  -webkit-backdrop-filter: blur(var(--v2-blur-lg));
+  border: 1px solid var(--v2-border);
+  box-shadow:
+    0 16px 64px rgba(0, 0, 0, 0.1),
+    0 0 1px var(--v2-glow);
+}
+.design-v2.dark .surface-card.shadow-2xl {
+  background: rgba(12, 18, 34, 0.98);
+  box-shadow:
+    0 16px 64px rgba(0, 0, 0, 0.6),
+    0 0 1px var(--v2-glow);
+}
+
+/* ----------------------------------------------------------
+   17b. Form Elements — Harmonized for V2 (light + dark)
+   ---------------------------------------------------------- */
+
+/* Text inputs, selects, textareas inside V2 */
+.design-v2 input[type='text'],
+.design-v2 input[type='email'],
+.design-v2 input[type='password'],
+.design-v2 input[type='search'],
+.design-v2 input[type='number'],
+.design-v2 input[type='url'],
+.design-v2 input[type='tel'],
+.design-v2 select,
+.design-v2 textarea {
+  background: rgba(0, 0, 0, 0.02) !important;
+  border-color: rgba(0, 0, 0, 0.1) !important;
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
+}
+.design-v2 input[type='text']:focus,
+.design-v2 input[type='email']:focus,
+.design-v2 input[type='password']:focus,
+.design-v2 input[type='search']:focus,
+.design-v2 input[type='number']:focus,
+.design-v2 input[type='url']:focus,
+.design-v2 input[type='tel']:focus,
+.design-v2 select:focus,
+.design-v2 textarea:focus {
+  background: rgba(255, 255, 255, 0.6) !important;
+  border-color: var(--v2-border-hover) !important;
+  box-shadow: 0 0 0 3px rgba(0, 183, 157, 0.08);
+}
+
+.design-v2.dark input[type='text'],
+.design-v2.dark input[type='email'],
+.design-v2.dark input[type='password'],
+.design-v2.dark input[type='search'],
+.design-v2.dark input[type='number'],
+.design-v2.dark input[type='url'],
+.design-v2.dark input[type='tel'],
+.design-v2.dark select,
+.design-v2.dark textarea {
+  background: rgba(255, 255, 255, 0.03) !important;
+  border-color: rgba(255, 255, 255, 0.08) !important;
+}
+.design-v2.dark input[type='text']:focus,
+.design-v2.dark input[type='email']:focus,
+.design-v2.dark input[type='password']:focus,
+.design-v2.dark input[type='search']:focus,
+.design-v2.dark input[type='number']:focus,
+.design-v2.dark input[type='url']:focus,
+.design-v2.dark input[type='tel']:focus,
+.design-v2.dark select:focus,
+.design-v2.dark textarea:focus {
+  background: rgba(255, 255, 255, 0.06) !important;
+  border-color: var(--v2-border-hover) !important;
+  box-shadow: 0 0 0 3px rgba(0, 240, 211, 0.06);
+}
+
+/* Checkbox — blend into V2 surface instead of popping white */
+.design-v2 .checkbox-brand {
+  background: rgba(0, 0, 0, 0.02);
+  border-color: rgba(0, 0, 0, 0.18);
+}
+.design-v2 .checkbox-brand:hover {
+  border-color: var(--brand);
+  background: rgba(0, 183, 157, 0.04);
+}
+.design-v2 .checkbox-brand:checked {
+  background: var(--brand);
+  border-color: var(--brand);
+}
+.design-v2.dark .checkbox-brand {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.15);
+}
+.design-v2.dark .checkbox-brand:hover {
+  border-color: var(--brand-light);
+  background: rgba(0, 240, 211, 0.06);
+}
+
+/* Native checkboxes and radios (not .checkbox-brand) */
+.design-v2 input[type='checkbox']:not(.checkbox-brand),
+.design-v2 input[type='radio'] {
+  accent-color: var(--brand);
+}
+
+/* Select dropdown arrow area — prevent bright white box */
+.design-v2 select option {
+  background: rgba(252, 253, 255, 0.98);
+  color: var(--txt-primary);
+}
+.design-v2.dark select option {
+  background: rgba(12, 18, 34, 0.98);
+  color: var(--txt-primary);
+}
+
+/* Toggle switches — harmonize */
+.design-v2 [role='switch'],
+.design-v2 .toggle {
+  background: rgba(0, 0, 0, 0.08);
+}
+.design-v2.dark [role='switch'],
+.design-v2.dark .toggle {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+/* File Selection Modal — glass with clean readable background */
+.design-v2 [data-testid='modal-file-selection'] {
+  background: rgba(255, 255, 255, 0.97) !important;
+  backdrop-filter: blur(var(--v2-blur-lg));
+  -webkit-backdrop-filter: blur(var(--v2-blur-lg));
+  border: 1px solid var(--v2-border) !important;
+  box-shadow:
+    0 16px 64px rgba(0, 0, 0, 0.12),
+    0 0 1px var(--v2-glow);
+}
+.design-v2.dark [data-testid='modal-file-selection'] {
+  background: rgba(12, 18, 34, 0.98) !important;
+  box-shadow:
+    0 16px 64px rgba(0, 0, 0, 0.5),
+    0 0 1px var(--v2-glow);
+}
+
+/* ----------------------------------------------------------
+   18. Statistics Page — Fancy V2
+   ---------------------------------------------------------- */
+
+/* Page header gradient text */
+.design-v2 [data-testid='page-statistics'] h1 {
+  background: linear-gradient(135deg, var(--brand), var(--brand-light));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Stats cards — glass with subtle glow */
+.design-v2 [data-testid='page-statistics'] .surface-card {
+  transition:
+    box-shadow 0.25s ease,
+    transform 0.15s ease;
+}
+.design-v2 [data-testid='page-statistics'] .surface-card:hover {
+  box-shadow:
+    0 4px 24px rgba(0, 0, 0, 0.08),
+    0 0 12px var(--v2-glow);
+  transform: translateY(-1px);
+}
+.design-v2.dark [data-testid='page-statistics'] .surface-card:hover {
+  box-shadow:
+    0 4px 24px rgba(0, 0, 0, 0.35),
+    0 0 12px var(--v2-glow);
+}
+
+/* Progress bars — brand glow */
+.design-v2 [data-testid='item-usage'] .bg-green-500,
+.design-v2 [data-testid='item-usage'] .bg-brand,
+.design-v2 [data-testid='item-usage'] [class*='bg-green'] {
+  box-shadow: 0 0 8px rgba(0, 183, 157, 0.3);
+}
+
+/* Source icon containers — glass pill */
+.design-v2 [data-testid='page-statistics'] .v2-source-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 0.75rem;
+  backdrop-filter: blur(var(--v2-blur-sm));
+  -webkit-backdrop-filter: blur(var(--v2-blur-sm));
+  border: 1px solid var(--v2-border);
+}
+
+/* Table rows — subtle hover glow */
+.design-v2 [data-testid='item-activity']:hover {
+  background: rgba(0, 183, 157, 0.04) !important;
+}
+.design-v2.dark [data-testid='item-activity']:hover {
+  background: rgba(0, 240, 211, 0.04) !important;
+}
+
+/* Chat Manager Modal — glass overlay */
+.design-v2 [data-testid='modal-chat-manager'] {
+  background: rgba(255, 255, 255, 0.92) !important;
+  backdrop-filter: blur(var(--v2-blur-lg));
+  -webkit-backdrop-filter: blur(var(--v2-blur-lg));
+  border: 1px solid var(--v2-border) !important;
+  box-shadow:
+    0 20px 60px rgba(0, 0, 0, 0.1),
+    0 0 1px var(--v2-glow),
+    inset 0 1px 0 rgba(255, 255, 255, 0.3);
+}
+.design-v2.dark [data-testid='modal-chat-manager'] {
+  background: rgba(12, 18, 34, 0.92) !important;
+  box-shadow:
+    0 20px 60px rgba(0, 0, 0, 0.45),
+    0 0 1px var(--v2-glow),
+    inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+/* Chat Manager — user dropdown glass */
+.design-v2 [data-testid='dropdown-sidebar-v2-user'] {
+  backdrop-filter: blur(var(--v2-blur-lg));
+  -webkit-backdrop-filter: blur(var(--v2-blur-lg));
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.1),
+    0 0 1px var(--v2-glow);
+}
+.design-v2.dark [data-testid='dropdown-sidebar-v2-user'] {
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.4),
+    0 0 1px var(--v2-glow);
+}
+
+/* File Mention Palette — solid readable background */
+.design-v2 [data-testid='comp-file-mention-palette'] {
+  background: rgba(255, 255, 255, 0.98) !important;
+  backdrop-filter: blur(var(--v2-blur-lg));
+  -webkit-backdrop-filter: blur(var(--v2-blur-lg));
+  border: 1px solid var(--v2-border) !important;
+  box-shadow:
+    0 12px 40px rgba(0, 0, 0, 0.12),
+    0 0 1px var(--v2-glow);
+}
+.design-v2.dark [data-testid='comp-file-mention-palette'] {
+  background: rgba(15, 23, 42, 0.98) !important;
+  box-shadow:
+    0 12px 40px rgba(0, 0, 0, 0.5),
+    0 0 1px var(--v2-glow);
+}
+
+/* Nav Dropdown — glass with clean background */
+.design-v2 [data-testid='dropdown-sidebar-v2-nav'] {
+  backdrop-filter: blur(var(--v2-blur-lg));
+  -webkit-backdrop-filter: blur(var(--v2-blur-lg));
+  box-shadow:
+    0 12px 40px rgba(0, 0, 0, 0.1),
+    0 0 1px var(--v2-glow);
+}
+.design-v2.dark [data-testid='dropdown-sidebar-v2-nav'] {
+  box-shadow:
+    0 12px 40px rgba(0, 0, 0, 0.4),
+    0 0 1px var(--v2-glow);
+}
+
+/* Memories Dialog — glass with clean background */
+.design-v2 [data-testid='modal-memories-dialog'] {
+  background: rgba(255, 255, 255, 0.97) !important;
+  backdrop-filter: blur(var(--v2-blur-lg));
+  -webkit-backdrop-filter: blur(var(--v2-blur-lg));
+  border: 1px solid var(--v2-border) !important;
+  box-shadow:
+    0 20px 60px rgba(0, 0, 0, 0.1),
+    0 0 1px var(--v2-glow),
+    inset 0 1px 0 rgba(255, 255, 255, 0.3);
+}
+.design-v2.dark [data-testid='modal-memories-dialog'] {
+  background: rgba(12, 18, 34, 0.97) !important;
+  box-shadow:
+    0 20px 60px rgba(0, 0, 0, 0.5),
+    0 0 1px var(--v2-glow),
+    inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+/* Memories Dialog — inner controls glass override */
+.design-v2 [data-testid='modal-memories-dialog'] .surface-chip {
+  background: rgba(0, 0, 0, 0.03) !important;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+}
+.design-v2.dark [data-testid='modal-memories-dialog'] .surface-chip {
+  background: rgba(255, 255, 255, 0.04) !important;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+/* ----------------------------------------------------------
+   OVERRIDE: Chat input textarea — must come AFTER section 17b
+   to beat global form element rules at equal specificity.
+   ---------------------------------------------------------- */
+.design-v2 [data-testid='comp-chat-input-shell'] textarea,
+.design-v2.dark [data-testid='comp-chat-input-shell'] textarea {
+  background: transparent !important;
+  border-color: transparent !important;
+  border-radius: 1rem;
+}
+.design-v2 [data-testid='comp-chat-input-shell'] textarea:focus,
+.design-v2.dark [data-testid='comp-chat-input-shell'] textarea:focus {
+  background: transparent !important;
+  box-shadow: none !important;
+}

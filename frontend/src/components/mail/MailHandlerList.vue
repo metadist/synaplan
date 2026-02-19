@@ -1,89 +1,111 @@
 <template>
-  <div class="space-y-4">
-    <!-- Header with selection info and actions -->
-    <div class="flex flex-col gap-3">
-      <div class="flex items-center justify-between">
-        <div>
-          <h2 class="text-xl font-semibold txt-primary">{{ $t('mail.savedHandlers') }}</h2>
-          <p class="text-sm txt-secondary mt-1">{{ $t('mail.savedHandlersDesc') }}</p>
+  <div class="space-y-6">
+    <!-- Hero Header -->
+    <div class="relative overflow-hidden surface-card rounded-2xl">
+      <div
+        class="absolute inset-0 bg-gradient-to-br from-[var(--brand)]/5 via-transparent to-purple-500/5"
+      ></div>
+      <div
+        class="absolute top-0 right-0 w-64 h-64 bg-[var(--brand)]/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/3"
+      ></div>
+      <div class="relative px-8 py-8 flex items-center justify-between gap-6">
+        <div class="flex items-center gap-5 min-w-0">
+          <div
+            class="w-14 h-14 rounded-2xl bg-gradient-to-br from-[var(--brand)] to-purple-500 flex items-center justify-center shadow-lg shadow-[var(--brand)]/20 shrink-0"
+          >
+            <EnvelopeIcon class="w-7 h-7 text-white" />
+          </div>
+          <div class="min-w-0">
+            <h1 class="text-2xl font-bold txt-primary">{{ $t('mail.savedHandlers') }}</h1>
+            <p class="text-sm txt-secondary mt-1">{{ $t('mail.savedHandlersDesc') }}</p>
+          </div>
         </div>
         <button
-          class="btn-primary px-4 py-2 rounded-lg flex items-center gap-2"
+          v-if="handlers.length > 0"
+          class="btn-primary px-5 py-2.5 rounded-xl flex items-center gap-2 shadow-lg shadow-[var(--brand)]/20 hover:shadow-xl hover:shadow-[var(--brand)]/30 transition-all shrink-0"
           @click="$emit('create')"
         >
           <PlusIcon class="w-5 h-5" />
           {{ $t('mail.createHandler') }}
         </button>
       </div>
-
-      <!-- Bulk actions bar (only show when handlers are selected) -->
-      <transition
-        enter-active-class="transition-all duration-200"
-        enter-from-class="opacity-0 -translate-y-2"
-        enter-to-class="opacity-100 translate-y-0"
-        leave-active-class="transition-all duration-150"
-        leave-from-class="opacity-100 translate-y-0"
-        leave-to-class="opacity-0 -translate-y-2"
-      >
-        <div
-          v-if="selectedHandlers.length > 0"
-          class="surface-card p-3 rounded-lg border-2 border-[var(--brand)]/20 flex items-center justify-between gap-3"
-        >
-          <div class="flex items-center gap-2">
-            <div class="w-8 h-8 rounded-full bg-[var(--brand)]/10 flex items-center justify-center">
-              <span class="text-sm font-semibold text-[var(--brand)]">{{
-                selectedHandlers.length
-              }}</span>
-            </div>
-            <span class="text-sm font-medium txt-primary">
-              {{ $t('mail.selectedCount', { count: selectedHandlers.length }) }}
-            </span>
-          </div>
-          <div class="flex items-center gap-2">
-            <button
-              class="px-3 py-1.5 rounded-lg text-sm font-medium transition-colors bg-green-500/10 text-green-600 dark:text-green-400 hover:bg-green-500/20 flex items-center gap-1.5"
-              @click="activateSelected"
-            >
-              <CheckCircleIcon class="w-4 h-4" />
-              {{ $t('mail.activate') }}
-            </button>
-            <button
-              class="px-3 py-1.5 rounded-lg text-sm font-medium transition-colors bg-gray-500/10 txt-secondary hover:bg-gray-500/20 flex items-center gap-1.5"
-              @click="deactivateSelected"
-            >
-              <XCircleIcon class="w-4 h-4" />
-              {{ $t('mail.deactivate') }}
-            </button>
-            <button
-              class="px-3 py-1.5 rounded-lg text-sm font-medium transition-colors bg-red-500/10 text-red-600 dark:text-red-400 hover:bg-red-500/20 flex items-center gap-1.5"
-              @click="deleteSelected"
-            >
-              <TrashIcon class="w-4 h-4" />
-              {{ $t('mail.deleteSelected') }}
-            </button>
-            <button
-              class="p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 transition-colors txt-secondary"
-              :aria-label="$t('common.cancel')"
-              @click="selectedHandlers = []"
-            >
-              <XMarkIcon class="w-4 h-4" />
-            </button>
-          </div>
-        </div>
-      </transition>
     </div>
 
-    <div v-if="handlers.length === 0" class="surface-card p-12 text-center">
-      <EnvelopeIcon class="w-16 h-16 mx-auto mb-4 txt-secondary opacity-30" />
-      <h3 class="text-lg font-semibold txt-primary mb-2">{{ $t('mail.noHandlers') }}</h3>
-      <p class="txt-secondary mb-6">{{ $t('mail.noHandlersDesc') }}</p>
-      <button
-        class="btn-primary px-6 py-2 rounded-lg inline-flex items-center gap-2"
-        @click="$emit('create')"
+    <!-- Bulk actions bar -->
+    <transition
+      enter-active-class="transition-all duration-200"
+      enter-from-class="opacity-0 -translate-y-2"
+      enter-to-class="opacity-100 translate-y-0"
+      leave-active-class="transition-all duration-150"
+      leave-from-class="opacity-100 translate-y-0"
+      leave-to-class="opacity-0 -translate-y-2"
+    >
+      <div
+        v-if="selectedHandlers.length > 0"
+        class="surface-card p-3 rounded-xl border-2 border-[var(--brand)]/20 flex items-center justify-between gap-3"
       >
-        <PlusIcon class="w-5 h-5" />
-        {{ $t('mail.createFirst') }}
-      </button>
+        <div class="flex items-center gap-2">
+          <div class="w-8 h-8 rounded-full bg-[var(--brand)]/10 flex items-center justify-center">
+            <span class="text-sm font-semibold text-[var(--brand)]">{{
+              selectedHandlers.length
+            }}</span>
+          </div>
+          <span class="text-sm font-medium txt-primary">
+            {{ $t('mail.selectedCount', { count: selectedHandlers.length }) }}
+          </span>
+        </div>
+        <div class="flex items-center gap-2">
+          <button
+            class="px-3 py-1.5 rounded-lg text-sm font-medium transition-colors bg-green-500/10 text-green-600 dark:text-green-400 hover:bg-green-500/20 flex items-center gap-1.5"
+            @click="activateSelected"
+          >
+            <CheckCircleIcon class="w-4 h-4" />
+            {{ $t('mail.activate') }}
+          </button>
+          <button
+            class="px-3 py-1.5 rounded-lg text-sm font-medium transition-colors bg-gray-500/10 txt-secondary hover:bg-gray-500/20 flex items-center gap-1.5"
+            @click="deactivateSelected"
+          >
+            <XCircleIcon class="w-4 h-4" />
+            {{ $t('mail.deactivate') }}
+          </button>
+          <button
+            class="px-3 py-1.5 rounded-lg text-sm font-medium transition-colors bg-red-500/10 text-red-600 dark:text-red-400 hover:bg-red-500/20 flex items-center gap-1.5"
+            @click="deleteSelected"
+          >
+            <TrashIcon class="w-4 h-4" />
+            {{ $t('mail.deleteSelected') }}
+          </button>
+          <button
+            class="p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 transition-colors txt-secondary"
+            :aria-label="$t('common.cancel')"
+            @click="selectedHandlers = []"
+          >
+            <XMarkIcon class="w-4 h-4" />
+          </button>
+        </div>
+      </div>
+    </transition>
+
+    <!-- Empty State -->
+    <div v-if="handlers.length === 0" class="relative overflow-hidden surface-card rounded-2xl">
+      <div class="absolute inset-0 bg-gradient-to-b from-transparent to-[var(--brand)]/3"></div>
+      <div class="relative flex flex-col items-center py-16 px-8">
+        <div
+          class="w-20 h-20 rounded-3xl bg-gradient-to-br from-[var(--brand)]/10 to-purple-500/10 flex items-center justify-center mb-6"
+        >
+          <EnvelopeIcon class="w-10 h-10 text-[var(--brand)]/40" />
+        </div>
+        <h3 class="text-xl font-bold txt-primary mb-2">{{ $t('mail.noHandlers') }}</h3>
+        <p class="txt-secondary text-center max-w-md mb-8">{{ $t('mail.noHandlersDesc') }}</p>
+        <button
+          class="btn-primary px-8 py-3 rounded-xl inline-flex items-center gap-2 shadow-lg shadow-[var(--brand)]/20 hover:shadow-xl hover:shadow-[var(--brand)]/30 transition-all text-base font-medium"
+          @click="$emit('create')"
+        >
+          <PlusIcon class="w-5 h-5" />
+          {{ $t('mail.createFirst') }}
+        </button>
+      </div>
     </div>
 
     <div v-else class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">

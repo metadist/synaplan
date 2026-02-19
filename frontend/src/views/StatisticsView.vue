@@ -8,7 +8,12 @@
       <div class="max-w-7xl mx-auto w-full px-4 md:px-6 py-4 md:py-8 space-y-8 md:space-y-12">
         <!-- Header -->
         <div class="mb-8" data-testid="section-header">
-          <h1 class="text-3xl font-semibold txt-primary mb-2">📊 {{ $t('statistics.title') }}</h1>
+          <h1 class="text-3xl font-semibold txt-primary mb-2 flex items-center gap-3">
+            <div class="p-2 rounded-xl bg-brand/10">
+              <ChartBarIcon class="w-7 h-7 txt-brand" />
+            </div>
+            {{ $t('statistics.title') }}
+          </h1>
           <p class="txt-secondary">
             {{ $t('config.usage.description') }}
           </p>
@@ -34,6 +39,7 @@
 <script setup lang="ts">
 import { ref, onMounted, nextTick, watch } from 'vue'
 import { useRoute } from 'vue-router'
+import { ChartBarIcon } from '@heroicons/vue/24/outline'
 import MainLayout from '@/components/MainLayout.vue'
 import UsageStatistics from '@/components/config/UsageStatistics.vue'
 import ChatBrowser from '@/components/ChatBrowser.vue'

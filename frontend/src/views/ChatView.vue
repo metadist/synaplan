@@ -114,6 +114,16 @@
         </div>
       </div>
 
+      <!-- Contextual Promo Tips -->
+      <PromoTipBanner
+        :tip="promoTips.currentTip.value"
+        :expanded="promoTips.isExpanded.value"
+        @toggle="promoTips.toggleExpand()"
+        @dismiss="promoTips.dismissTip(false)"
+        @dismiss-permanent="promoTips.dismissTip(true)"
+        @action="handlePromoAction"
+      />
+
       <ChatInput
         ref="chatInputRef"
         :is-streaming="isStreaming"
@@ -240,6 +250,8 @@ import type { Contradiction } from '@/services/api/feedbackApi'
 import MemoryFormDialog from '@/components/MemoryFormDialog.vue'
 import MemoriesDialog from '@/components/MemoriesDialog.vue'
 import MemoryDeleteDialog from '@/components/memories/MemoryDeleteDialog.vue'
+import PromoTipBanner from '@/components/PromoTipBanner.vue'
+import { usePromoTips } from '@/composables/usePromoTips'
 
 const { t } = useI18n()
 const router = useRouter()
@@ -258,6 +270,13 @@ const aiConfigStore = useAiConfigStore()
 const authStore = useAuthStore()
 const memoriesStore = useMemoriesStore()
 const feedbackStore = useFeedbackStore()
+const promoTips = usePromoTips()
+
+const handlePromoAction = (route: string) => {
+  promoTips.dismissTip(false)
+  if (route) router.push(route)
+}
+
 let streamingAbortController: AbortController | null = null
 let stopStreamingFn: (() => void) | null = null // Store EventSource close function
 let currentTrackId: number | undefined = undefined // Store current trackId for stop request
@@ -678,6 +697,9 @@ const handleSendMessage = async (
     webSearchData, // webSearch
     toolData // tool
   )
+
+  // Notify promo tip system
+  promoTips.onMessageSent()
 
   // Stream to backend - use backendContent which may differ from displayContent
   await streamAIResponse(backendContent, options)
