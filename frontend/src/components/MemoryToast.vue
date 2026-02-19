@@ -1,5 +1,5 @@
 <template>
-  <Teleport to="body">
+  <Teleport to="#app">
     <TransitionGroup name="toast-slide" tag="div" class="fixed bottom-4 right-4 z-50 space-y-2">
       <div
         v-for="memory in memories"

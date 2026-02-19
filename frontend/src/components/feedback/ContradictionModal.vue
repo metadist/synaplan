@@ -96,7 +96,7 @@ function handleCancel() {
 </script>
 
 <template>
-  <Teleport to="body">
+  <Teleport to="#app">
     <Transition name="modal">
       <div
         v-if="isOpen"

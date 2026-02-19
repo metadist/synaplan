@@ -140,7 +140,7 @@
       </div>
 
       <!-- Fullscreen Overlay wenn Memories für User deaktiviert sind -->
-      <Teleport to="body">
+      <Teleport to="#app">
         <div
           v-if="!memoriesEnabledForUser"
           class="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/70 backdrop-blur-md"

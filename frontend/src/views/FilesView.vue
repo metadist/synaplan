@@ -167,7 +167,7 @@
         </div>
 
         <!-- Folder Picker Modal -->
-        <Teleport to="body">
+        <Teleport to="#app">
           <Transition name="dialog-fade">
             <div
               v-if="folderPickerOpen"
@@ -772,7 +772,7 @@
     />
 
     <!-- Confirm Delete Selected Dialog (Multiple Files) -->
-    <Teleport to="body">
+    <Teleport to="#app">
       <Transition name="dialog-fade">
         <div
           v-if="isDeleteSelectedOpen"

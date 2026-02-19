@@ -59,7 +59,7 @@
   </Transition>
 
   <!-- Expanded: Full-screen centered modal with blurred backdrop -->
-  <Teleport to="body">
+  <Teleport to="#app">
     <Transition
       enter-active-class="transition-all duration-300 ease-out"
       enter-from-class="opacity-0"

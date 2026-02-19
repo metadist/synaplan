@@ -274,7 +274,7 @@
     </div>
 
     <!-- API Key Created Modal -->
-    <Teleport to="body">
+    <Teleport to="#app">
       <Transition
         enter-active-class="transition-opacity duration-200"
         leave-active-class="transition-opacity duration-150"

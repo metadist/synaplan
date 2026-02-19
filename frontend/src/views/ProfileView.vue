@@ -408,7 +408,7 @@
     <UnsavedChangesBar :show="hasUnsavedChanges" @save="handleSave" @discard="handleDiscard" />
 
     <!-- Delete Account Modal -->
-    <Teleport to="body">
+    <Teleport to="#app">
       <div
         v-if="showDeleteModal"
         class="fixed inset-0 bg-black/50 dark:bg-black/70 flex items-center justify-center z-50 px-4"

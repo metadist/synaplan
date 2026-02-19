@@ -574,7 +574,7 @@
     </div>
 
     <!-- Delete Confirmation Modal -->
-    <Teleport to="body">
+    <Teleport to="#app">
       <Transition name="modal">
         <div
           v-if="showDeleteModal"

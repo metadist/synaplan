@@ -359,7 +359,7 @@ const isMemory = computed(() => props.classification === 'memory')
 </script>
 
 <template>
-  <Teleport to="body">
+  <Teleport to="#app">
     <Transition name="fade">
       <div
         v-if="isOpen"
