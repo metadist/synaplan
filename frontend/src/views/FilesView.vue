@@ -24,7 +24,9 @@
               class="absolute inset-0 z-50 flex items-center justify-center bg-primary/10 dark:bg-primary/20 backdrop-blur-sm border-4 border-dashed border-primary rounded-lg pointer-events-none"
             >
               <div class="flex flex-col items-center gap-3 p-6 surface-card rounded-xl shadow-2xl">
-                <div class="w-16 h-16 rounded-full bg-primary/20 flex items-center justify-center animate-bounce">
+                <div
+                  class="w-16 h-16 rounded-full bg-primary/20 flex items-center justify-center animate-bounce"
+                >
                   <Icon icon="mdi:cloud-upload" class="w-8 h-8 text-primary" />
                 </div>
                 <div class="text-center">
@@ -84,8 +86,19 @@
                 fill="none"
                 viewBox="0 0 24 24"
               >
-                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                <circle
+                  class="opacity-25"
+                  cx="12"
+                  cy="12"
+                  r="10"
+                  stroke="currentColor"
+                  stroke-width="4"
+                ></circle>
+                <path
+                  class="opacity-75"
+                  fill="currentColor"
+                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                ></path>
               </svg>
               <CloudArrowUpIcon v-else class="w-5 h-5" />
               {{ smartButtonLabel }}
@@ -108,7 +121,9 @@
             <div class="flex items-center gap-2 text-xs">
               <Icon icon="heroicons:folder-solid" class="w-3.5 h-3.5 text-[var(--brand)]" />
               <span class="txt-secondary">{{ $t('files.target') }}:</span>
-              <span class="font-semibold txt-primary">{{ activeUploadFolder || $t('files.rootFolder') }}</span>
+              <span class="font-semibold txt-primary">{{
+                activeUploadFolder || $t('files.rootFolder')
+              }}</span>
               <button
                 class="txt-secondary hover:text-[var(--brand)] transition-colors underline underline-offset-2 decoration-dotted"
                 @click="folderPickerOpen = true"
@@ -127,7 +142,9 @@
             <div v-if="isUploading && uploadProgress" class="mt-4" data-testid="upload-progress">
               <div class="flex items-center justify-between mb-1.5">
                 <span class="text-sm txt-secondary">{{ $t('files.uploadProgress') }}</span>
-                <span class="text-sm font-medium txt-primary">{{ uploadProgress.percentage }}%</span>
+                <span class="text-sm font-medium txt-primary"
+                  >{{ uploadProgress.percentage }}%</span
+                >
               </div>
               <div class="w-full h-2 rounded-full bg-black/10 dark:bg-white/10 overflow-hidden">
                 <div
@@ -158,7 +175,9 @@
               @click.self="folderPickerOpen = false"
             >
               <div class="absolute inset-0 bg-black/50 dark:bg-black/70 backdrop-blur-sm"></div>
-              <div class="relative surface-card rounded-2xl shadow-2xl max-w-md w-full p-6 animate-scale-in">
+              <div
+                class="relative surface-card rounded-2xl shadow-2xl max-w-md w-full p-6 animate-scale-in"
+              >
                 <div class="flex items-center justify-between mb-5">
                   <h3 class="text-lg font-semibold txt-primary flex items-center gap-2">
                     <Icon icon="heroicons:folder" class="w-5 h-5 text-[var(--brand)]" />
@@ -175,10 +194,15 @@
                 <!-- Root / no folder option -->
                 <button
                   class="w-full flex items-center gap-3 px-4 py-3 rounded-xl border transition-all duration-150 mb-2"
-                  :class="!selectedGroup && !groupKeyword
-                    ? 'border-[var(--brand)] bg-[var(--brand)]/10 text-[var(--brand)]'
-                    : 'border-light-border/30 dark:border-dark-border/20 txt-secondary hover:border-[var(--brand)]/50 hover:bg-[var(--brand)]/5'"
-                  @click="clearFolderSelection(); folderPickerOpen = false"
+                  :class="
+                    !selectedGroup && !groupKeyword
+                      ? 'border-[var(--brand)] bg-[var(--brand)]/10 text-[var(--brand)]'
+                      : 'border-light-border/30 dark:border-dark-border/20 txt-secondary hover:border-[var(--brand)]/50 hover:bg-[var(--brand)]/5'
+                  "
+                  @click="
+                    clearFolderSelection()
+                    folderPickerOpen = false
+                  "
                 >
                   <Icon icon="heroicons:home" class="w-4 h-4 shrink-0" />
                   <span class="text-sm font-medium">{{ $t('files.rootFolder') }}</span>
@@ -190,21 +214,34 @@
                     v-for="folder in fileGroups"
                     :key="folder.name"
                     class="w-full flex items-center gap-3 px-4 py-3 rounded-xl border transition-all duration-150"
-                    :class="selectedGroup === folder.name && !groupKeyword
-                      ? 'border-[var(--brand)] bg-[var(--brand)]/10 text-[var(--brand)]'
-                      : 'border-light-border/30 dark:border-dark-border/20 txt-secondary hover:border-[var(--brand)]/50 hover:bg-[var(--brand)]/5'"
-                    @click="selectExistingFolder(folder.name); folderPickerOpen = false"
+                    :class="
+                      selectedGroup === folder.name && !groupKeyword
+                        ? 'border-[var(--brand)] bg-[var(--brand)]/10 text-[var(--brand)]'
+                        : 'border-light-border/30 dark:border-dark-border/20 txt-secondary hover:border-[var(--brand)]/50 hover:bg-[var(--brand)]/5'
+                    "
+                    @click="
+                      selectExistingFolder(folder.name)
+                      folderPickerOpen = false
+                    "
                   >
                     <Icon icon="heroicons:folder-solid" class="w-4 h-4 shrink-0" />
-                    <span class="text-sm font-medium flex-1 text-left truncate">{{ folder.name }}</span>
-                    <span class="text-[10px] font-semibold bg-black/5 dark:bg-white/10 px-2 py-0.5 rounded-full">{{ folder.count }}</span>
+                    <span class="text-sm font-medium flex-1 text-left truncate">{{
+                      folder.name
+                    }}</span>
+                    <span
+                      class="text-[10px] font-semibold bg-black/5 dark:bg-white/10 px-2 py-0.5 rounded-full"
+                      >{{ folder.count }}</span
+                    >
                   </button>
                 </div>
 
                 <!-- New folder input -->
                 <div class="mt-3 pt-3 border-t border-light-border/20 dark:border-dark-border/10">
                   <div class="flex items-center gap-2">
-                    <Icon icon="heroicons:folder-plus" class="w-4 h-4 text-[var(--brand)] shrink-0" />
+                    <Icon
+                      icon="heroicons:folder-plus"
+                      class="w-4 h-4 text-[var(--brand)] shrink-0"
+                    />
                     <input
                       ref="newFolderInput"
                       v-model="groupKeyword"
@@ -212,12 +249,18 @@
                       class="flex-1 px-3 py-2 text-sm rounded-lg bg-black/[0.03] dark:bg-white/[0.03] txt-primary placeholder:txt-secondary/50 focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
                       :placeholder="$t('files.folderPicker.newPlaceholder')"
                       data-testid="input-new-folder"
-                      @keyup.enter="confirmNewFolder(); folderPickerOpen = false"
+                      @keyup.enter="
+                        confirmNewFolder()
+                        folderPickerOpen = false
+                      "
                     />
                     <button
                       :disabled="!groupKeyword.trim()"
                       class="px-3 py-2 rounded-lg btn-primary text-sm disabled:opacity-40 disabled:cursor-not-allowed"
-                      @click="confirmNewFolder(); folderPickerOpen = false"
+                      @click="
+                        confirmNewFolder()
+                        folderPickerOpen = false
+                      "
                     >
                       {{ $t('common.save') }}
                     </button>
@@ -234,10 +277,30 @@
             <h2 class="text-xl font-semibold txt-primary mb-6">{{ $t('files.yourFiles') }}</h2>
 
             <!-- Loading -->
-            <div v-if="isLoading" class="flex items-center justify-center py-20" data-testid="state-loading">
-              <svg class="animate-spin h-8 w-8 text-[var(--brand)]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            <div
+              v-if="isLoading"
+              class="flex items-center justify-center py-20"
+              data-testid="state-loading"
+            >
+              <svg
+                class="animate-spin h-8 w-8 text-[var(--brand)]"
+                xmlns="http://www.w3.org/2000/svg"
+                fill="none"
+                viewBox="0 0 24 24"
+              >
+                <circle
+                  class="opacity-25"
+                  cx="12"
+                  cy="12"
+                  r="10"
+                  stroke="currentColor"
+                  stroke-width="4"
+                ></circle>
+                <path
+                  class="opacity-75"
+                  fill="currentColor"
+                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                ></path>
               </svg>
             </div>
 
@@ -247,26 +310,36 @@
               class="flex flex-col items-center justify-center py-20 gap-4"
               data-testid="state-empty"
             >
-              <div class="w-20 h-20 rounded-2xl bg-[var(--brand)]/10 flex items-center justify-center">
+              <div
+                class="w-20 h-20 rounded-2xl bg-[var(--brand)]/10 flex items-center justify-center"
+              >
                 <Icon icon="heroicons:folder-plus" class="w-10 h-10 text-[var(--brand)]/40" />
               </div>
               <div class="text-center">
-                <p class="text-base font-medium txt-primary mb-1">{{ $t('files.emptyState.title') }}</p>
-                <p class="text-sm txt-secondary max-w-sm">{{ $t('files.emptyState.description') }}</p>
+                <p class="text-base font-medium txt-primary mb-1">
+                  {{ $t('files.emptyState.title') }}
+                </p>
+                <p class="text-sm txt-secondary max-w-sm">
+                  {{ $t('files.emptyState.description') }}
+                </p>
               </div>
             </div>
 
             <template v-else>
               <!-- Folder cards (with drag & drop) -->
               <div v-if="fileGroups.length > 0" class="mb-6" data-testid="section-folder-grid">
-                <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
+                <div
+                  class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3"
+                >
                   <button
                     v-for="folder in fileGroups"
                     :key="folder.name"
                     class="group/f flex flex-col items-center gap-3 p-5 rounded-2xl border transition-all duration-200 cursor-pointer"
-                    :class="folderDropTarget === folder.name
-                      ? 'border-[var(--brand)] bg-[var(--brand)]/10 shadow-lg shadow-[var(--brand)]/20 scale-[1.03]'
-                      : 'border-light-border/20 dark:border-dark-border/15 hover:border-[var(--brand)]/30 hover:shadow-lg hover:shadow-[var(--brand)]/5 hover:bg-[var(--brand)]/[0.03]'"
+                    :class="
+                      folderDropTarget === folder.name
+                        ? 'border-[var(--brand)] bg-[var(--brand)]/10 shadow-lg shadow-[var(--brand)]/20 scale-[1.03]'
+                        : 'border-light-border/20 dark:border-dark-border/15 hover:border-[var(--brand)]/30 hover:shadow-lg hover:shadow-[var(--brand)]/5 hover:bg-[var(--brand)]/[0.03]'
+                    "
                     :data-testid="`folder-card-${folder.name}`"
                     @click="enterFolder(folder.name)"
                     @dragenter.prevent="onFolderDragEnter(folder.name)"
@@ -276,24 +349,36 @@
                   >
                     <div class="relative">
                       <Icon
-                        :icon="folderDropTarget === folder.name ? 'heroicons:folder-open-solid' : 'heroicons:folder-solid'"
+                        :icon="
+                          folderDropTarget === folder.name
+                            ? 'heroicons:folder-open-solid'
+                            : 'heroicons:folder-solid'
+                        "
                         class="w-12 h-12 transition-all duration-200"
-                        :class="folderDropTarget === folder.name
-                          ? 'text-[var(--brand)] scale-110'
-                          : 'text-[var(--brand)]/50 group-hover/f:text-[var(--brand)] group-hover/f:scale-110'"
+                        :class="
+                          folderDropTarget === folder.name
+                            ? 'text-[var(--brand)] scale-110'
+                            : 'text-[var(--brand)]/50 group-hover/f:text-[var(--brand)] group-hover/f:scale-110'
+                        "
                       />
                       <span
                         class="absolute -top-1 -right-2.5 inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1.5 rounded-full text-[10px] font-bold transition-all duration-200"
-                        :class="folderDropTarget === folder.name
-                          ? 'bg-[var(--brand)] text-white'
-                          : 'bg-[var(--brand)]/15 text-[var(--brand)] group-hover/f:bg-[var(--brand)] group-hover/f:text-white'"
+                        :class="
+                          folderDropTarget === folder.name
+                            ? 'bg-[var(--brand)] text-white'
+                            : 'bg-[var(--brand)]/15 text-[var(--brand)] group-hover/f:bg-[var(--brand)] group-hover/f:text-white'
+                        "
                       >
                         {{ folder.count }}
                       </span>
                     </div>
                     <span
                       class="text-xs font-medium truncate max-w-full text-center transition-colors"
-                      :class="folderDropTarget === folder.name ? 'text-[var(--brand)]' : 'txt-primary group-hover/f:text-[var(--brand)]'"
+                      :class="
+                        folderDropTarget === folder.name
+                          ? 'text-[var(--brand)]'
+                          : 'txt-primary group-hover/f:text-[var(--brand)]'
+                      "
                     >
                       {{ folder.name }}
                     </span>
@@ -315,20 +400,36 @@
 
               <!-- All files table -->
               <div v-if="paginatedFiles.length > 0" data-testid="section-table">
-                <div v-if="fileGroups.length > 0" class="flex items-center gap-2 mb-3 pt-2 border-t border-light-border/10 dark:border-dark-border/10">
+                <div
+                  v-if="fileGroups.length > 0"
+                  class="flex items-center gap-2 mb-3 pt-2 border-t border-light-border/10 dark:border-dark-border/10"
+                >
                   <Icon icon="heroicons:document-text" class="w-4 h-4 txt-secondary" />
-                  <span class="text-xs font-medium txt-secondary uppercase tracking-wider">{{ $t('files.allFiles') }}</span>
+                  <span class="text-xs font-medium txt-secondary uppercase tracking-wider">{{
+                    $t('files.allFiles')
+                  }}</span>
                   <span class="text-xs txt-secondary">({{ totalCount }})</span>
                 </div>
                 <table class="w-full">
                   <thead>
                     <tr class="border-b border-light-border/30 dark:border-dark-border/20">
                       <th class="text-left py-2.5 px-2 w-8">
-                        <input type="checkbox" :checked="allSelected" class="checkbox-brand" @change="toggleSelectAll" />
+                        <input
+                          type="checkbox"
+                          :checked="allSelected"
+                          class="checkbox-brand"
+                          @change="toggleSelectAll"
+                        />
                       </th>
-                      <th class="text-left py-2.5 px-3 txt-secondary text-xs font-medium">{{ $t('files.name') }}</th>
-                      <th class="text-left py-2.5 px-3 txt-secondary text-xs font-medium w-24">{{ $t('files.size') }}</th>
-                      <th class="text-left py-2.5 px-3 txt-secondary text-xs font-medium w-28">{{ $t('files.uploaded') }}</th>
+                      <th class="text-left py-2.5 px-3 txt-secondary text-xs font-medium">
+                        {{ $t('files.name') }}
+                      </th>
+                      <th class="text-left py-2.5 px-3 txt-secondary text-xs font-medium w-24">
+                        {{ $t('files.size') }}
+                      </th>
+                      <th class="text-left py-2.5 px-3 txt-secondary text-xs font-medium w-28">
+                        {{ $t('files.uploaded') }}
+                      </th>
                       <th class="w-36"></th>
                     </tr>
                   </thead>
@@ -340,11 +441,19 @@
                       data-testid="item-file"
                     >
                       <td class="py-2.5 px-2">
-                        <input type="checkbox" :checked="selectedFileIds.includes(file.id)" class="checkbox-brand" @change="toggleFileSelection(file.id)" />
+                        <input
+                          type="checkbox"
+                          :checked="selectedFileIds.includes(file.id)"
+                          class="checkbox-brand"
+                          @change="toggleFileSelection(file.id)"
+                        />
                       </td>
                       <td class="py-2.5 px-3">
                         <div class="flex items-center gap-3 min-w-0">
-                          <div class="w-8 h-8 rounded-lg flex items-center justify-center shrink-0" :class="getFileColorClass(file.filename)">
+                          <div
+                            class="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
+                            :class="getFileColorClass(file.filename)"
+                          >
                             <Icon :icon="getFileIcon(file.filename)" class="w-4 h-4" />
                           </div>
                           <div class="flex flex-col gap-0.5 min-w-0">
@@ -360,10 +469,16 @@
                           </div>
                         </div>
                       </td>
-                      <td class="py-2.5 px-3 txt-secondary text-xs whitespace-nowrap">{{ formatFileSize(file.file_size) }}</td>
-                      <td class="py-2.5 px-3 txt-secondary text-xs whitespace-nowrap">{{ file.uploaded_date }}</td>
+                      <td class="py-2.5 px-3 txt-secondary text-xs whitespace-nowrap">
+                        {{ formatFileSize(file.file_size) }}
+                      </td>
+                      <td class="py-2.5 px-3 txt-secondary text-xs whitespace-nowrap">
+                        {{ file.uploaded_date }}
+                      </td>
                       <td class="py-2.5 px-3">
-                        <div class="flex gap-0.5 justify-end opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
+                        <div
+                          class="flex gap-0.5 justify-end opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity"
+                        >
                           <div class="relative">
                             <button
                               class="p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 txt-secondary hover:text-[var(--brand)] transition-colors"
@@ -377,7 +492,11 @@
                                 v-if="folderMenuOpen === file.id"
                                 class="absolute right-0 top-full mt-1 z-30 w-52 surface-card rounded-xl border border-light-border/30 dark:border-dark-border/20 shadow-xl py-1.5 overflow-hidden"
                               >
-                                <div class="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider txt-secondary">{{ $t('files.moveTo') }}</div>
+                                <div
+                                  class="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider txt-secondary"
+                                >
+                                  {{ $t('files.moveTo') }}
+                                </div>
                                 <button
                                   v-for="folder in fileGroups"
                                   :key="folder.name"
@@ -387,9 +506,14 @@
                                   <Icon icon="heroicons:folder-solid" class="w-4 h-4 shrink-0" />
                                   <span class="truncate">{{ folder.name }}</span>
                                 </button>
-                                <div class="border-t border-light-border/20 dark:border-dark-border/10 mt-1.5 pt-1.5">
+                                <div
+                                  class="border-t border-light-border/20 dark:border-dark-border/10 mt-1.5 pt-1.5"
+                                >
                                   <div class="flex items-center gap-1.5 px-3 py-1">
-                                    <Icon icon="heroicons:folder-plus" class="w-4 h-4 text-[var(--brand)] shrink-0" />
+                                    <Icon
+                                      icon="heroicons:folder-plus"
+                                      class="w-4 h-4 text-[var(--brand)] shrink-0"
+                                    />
                                     <input
                                       v-model="newMoveTarget"
                                       type="text"
@@ -403,13 +527,25 @@
                               </div>
                             </Transition>
                           </div>
-                          <button class="p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 txt-secondary hover:txt-primary transition-colors" :title="$t('files.download')" @click="downloadFile(file.id, file.filename)">
+                          <button
+                            class="p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 txt-secondary hover:txt-primary transition-colors"
+                            :title="$t('files.download')"
+                            @click="downloadFile(file.id, file.filename)"
+                          >
                             <ArrowDownTrayIcon class="w-4 h-4" />
                           </button>
-                          <button class="p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 txt-secondary hover:txt-primary transition-colors" :title="$t('common.view')" @click="viewFileContent(file.id)">
+                          <button
+                            class="p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 txt-secondary hover:txt-primary transition-colors"
+                            :title="$t('common.view')"
+                            @click="viewFileContent(file.id)"
+                          >
                             <Icon icon="heroicons:eye" class="w-4 h-4" />
                           </button>
-                          <button class="p-1.5 rounded-lg hover:bg-red-500/10 text-red-400/70 hover:text-red-500 transition-colors" :title="$t('files.delete')" @click="deleteFile(file.id)">
+                          <button
+                            class="p-1.5 rounded-lg hover:bg-red-500/10 text-red-400/70 hover:text-red-500 transition-colors"
+                            :title="$t('files.delete')"
+                            @click="deleteFile(file.id)"
+                          >
                             <TrashIcon class="w-4 h-4" />
                           </button>
                         </div>
@@ -419,11 +555,28 @@
                 </table>
 
                 <!-- Pagination -->
-                <div v-if="totalPages > 1" class="flex items-center justify-between mt-4 pt-4 border-t border-light-border/10 dark:border-dark-border/10">
-                  <span class="text-xs txt-secondary">{{ $t('files.page') }} {{ currentPage }} / {{ totalPages }}</span>
+                <div
+                  v-if="totalPages > 1"
+                  class="flex items-center justify-between mt-4 pt-4 border-t border-light-border/10 dark:border-dark-border/10"
+                >
+                  <span class="text-xs txt-secondary"
+                    >{{ $t('files.page') }} {{ currentPage }} / {{ totalPages }}</span
+                  >
                   <div class="flex gap-2">
-                    <button :disabled="currentPage === 1" class="px-3 py-1.5 rounded-lg border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm hover:bg-black/5 dark:hover:bg-white/5 transition-colors disabled:opacity-40 disabled:cursor-not-allowed" @click="previousPage">{{ $t('files.previous') }}</button>
-                    <button :disabled="currentPage >= totalPages" class="px-3 py-1.5 rounded-lg border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm hover:bg-black/5 dark:hover:bg-white/5 transition-colors disabled:opacity-40 disabled:cursor-not-allowed" @click="nextPage">{{ $t('files.next') }}</button>
+                    <button
+                      :disabled="currentPage === 1"
+                      class="px-3 py-1.5 rounded-lg border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm hover:bg-black/5 dark:hover:bg-white/5 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                      @click="previousPage"
+                    >
+                      {{ $t('files.previous') }}
+                    </button>
+                    <button
+                      :disabled="currentPage >= totalPages"
+                      class="px-3 py-1.5 rounded-lg border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm hover:bg-black/5 dark:hover:bg-white/5 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                      @click="nextPage"
+                    >
+                      {{ $t('files.next') }}
+                    </button>
                   </div>
                 </div>
               </div>
@@ -448,8 +601,14 @@
                 >
                   {{ $t('files.yourFiles') }}
                 </button>
-                <Icon icon="heroicons:chevron-right" class="w-3.5 h-3.5 txt-secondary/30 shrink-0" />
-                <Icon icon="heroicons:folder-open-solid" class="w-5 h-5 text-[var(--brand)] shrink-0" />
+                <Icon
+                  icon="heroicons:chevron-right"
+                  class="w-3.5 h-3.5 txt-secondary/30 shrink-0"
+                />
+                <Icon
+                  icon="heroicons:folder-open-solid"
+                  class="w-5 h-5 text-[var(--brand)] shrink-0"
+                />
                 <h2 class="text-lg font-semibold txt-primary truncate">{{ openFolder }}</h2>
                 <span
                   class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-[var(--brand)]/10 text-[var(--brand)]"
@@ -472,10 +631,30 @@
             </div>
 
             <!-- Loading inside folder -->
-            <div v-if="isLoading" class="flex items-center justify-center py-20" data-testid="state-loading-folder">
-              <svg class="animate-spin h-8 w-8 text-[var(--brand)]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            <div
+              v-if="isLoading"
+              class="flex items-center justify-center py-20"
+              data-testid="state-loading-folder"
+            >
+              <svg
+                class="animate-spin h-8 w-8 text-[var(--brand)]"
+                xmlns="http://www.w3.org/2000/svg"
+                fill="none"
+                viewBox="0 0 24 24"
+              >
+                <circle
+                  class="opacity-25"
+                  cx="12"
+                  cy="12"
+                  r="10"
+                  stroke="currentColor"
+                  stroke-width="4"
+                ></circle>
+                <path
+                  class="opacity-75"
+                  fill="currentColor"
+                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                ></path>
               </svg>
             </div>
 
@@ -485,7 +664,9 @@
               class="flex flex-col items-center justify-center py-20 gap-4"
               data-testid="state-empty-folder"
             >
-              <div class="w-16 h-16 rounded-2xl bg-[var(--brand)]/10 flex items-center justify-center">
+              <div
+                class="w-16 h-16 rounded-2xl bg-[var(--brand)]/10 flex items-center justify-center"
+              >
                 <Icon icon="heroicons:folder-open" class="w-8 h-8 text-[var(--brand)]/40" />
               </div>
               <p class="text-sm txt-secondary">{{ $t('files.emptyState.emptyFolder') }}</p>
@@ -497,11 +678,22 @@
                 <thead>
                   <tr class="border-b border-light-border/30 dark:border-dark-border/20">
                     <th class="text-left py-2.5 px-2 w-8">
-                      <input type="checkbox" :checked="allSelected" class="checkbox-brand" @change="toggleSelectAll" />
+                      <input
+                        type="checkbox"
+                        :checked="allSelected"
+                        class="checkbox-brand"
+                        @change="toggleSelectAll"
+                      />
                     </th>
-                    <th class="text-left py-2.5 px-3 txt-secondary text-xs font-medium">{{ $t('files.name') }}</th>
-                    <th class="text-left py-2.5 px-3 txt-secondary text-xs font-medium w-24">{{ $t('files.size') }}</th>
-                    <th class="text-left py-2.5 px-3 txt-secondary text-xs font-medium w-28">{{ $t('files.uploaded') }}</th>
+                    <th class="text-left py-2.5 px-3 txt-secondary text-xs font-medium">
+                      {{ $t('files.name') }}
+                    </th>
+                    <th class="text-left py-2.5 px-3 txt-secondary text-xs font-medium w-24">
+                      {{ $t('files.size') }}
+                    </th>
+                    <th class="text-left py-2.5 px-3 txt-secondary text-xs font-medium w-28">
+                      {{ $t('files.uploaded') }}
+                    </th>
                     <th class="w-32"></th>
                   </tr>
                 </thead>
@@ -538,7 +730,9 @@
                       {{ file.uploaded_date }}
                     </td>
                     <td class="py-2.5 px-3">
-                      <div class="flex gap-0.5 justify-end opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
+                      <div
+                        class="flex gap-0.5 justify-end opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity"
+                      >
                         <!-- Move to another folder -->
                         <div class="relative">
                           <button
@@ -553,26 +747,43 @@
                               v-if="folderMenuOpen === file.id"
                               class="absolute right-0 top-full mt-1 z-30 w-52 surface-card rounded-xl border border-light-border/30 dark:border-dark-border/20 shadow-xl py-1.5 overflow-hidden"
                             >
-                              <div class="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider txt-secondary">
+                              <div
+                                class="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider txt-secondary"
+                              >
                                 {{ $t('files.moveTo') }}
                               </div>
                               <button
                                 v-for="folder in fileGroups"
                                 :key="folder.name"
                                 class="w-full flex items-center gap-2 px-3 py-2 text-xs txt-primary hover:bg-[var(--brand)]/10 transition-colors text-left"
-                                :class="{ 'text-[var(--brand)] font-medium': folder.name === openFolder }"
+                                :class="{
+                                  'text-[var(--brand)] font-medium': folder.name === openFolder,
+                                }"
                                 @click="moveFileToFolder(file.id, folder.name)"
                               >
                                 <Icon
-                                  :icon="folder.name === openFolder ? 'heroicons:folder-open-solid' : 'heroicons:folder-solid'"
+                                  :icon="
+                                    folder.name === openFolder
+                                      ? 'heroicons:folder-open-solid'
+                                      : 'heroicons:folder-solid'
+                                  "
                                   class="w-4 h-4 shrink-0"
                                 />
                                 <span class="truncate">{{ folder.name }}</span>
-                                <Icon v-if="folder.name === openFolder" icon="heroicons:check" class="w-3.5 h-3.5 ml-auto text-[var(--brand)]" />
+                                <Icon
+                                  v-if="folder.name === openFolder"
+                                  icon="heroicons:check"
+                                  class="w-3.5 h-3.5 ml-auto text-[var(--brand)]"
+                                />
                               </button>
-                              <div class="border-t border-light-border/20 dark:border-dark-border/10 mt-1.5 pt-1.5">
+                              <div
+                                class="border-t border-light-border/20 dark:border-dark-border/10 mt-1.5 pt-1.5"
+                              >
                                 <div class="flex items-center gap-1.5 px-3 py-1">
-                                  <Icon icon="heroicons:folder-plus" class="w-4 h-4 text-[var(--brand)] shrink-0" />
+                                  <Icon
+                                    icon="heroicons:folder-plus"
+                                    class="w-4 h-4 text-[var(--brand)] shrink-0"
+                                  />
                                   <input
                                     v-model="newMoveTarget"
                                     type="text"
@@ -855,7 +1066,9 @@ const removeSelectedFile = (index: number) => {
 }
 
 // Folder picker helpers — auto-target the open folder
-const activeUploadFolder = computed(() => selectedGroup.value || groupKeyword.value || openFolder.value || '')
+const activeUploadFolder = computed(
+  () => selectedGroup.value || groupKeyword.value || openFolder.value || ''
+)
 
 const selectExistingFolder = (name: string) => {
   if (selectedGroup.value === name) {
@@ -1012,7 +1225,9 @@ const onFolderDrop = async (event: DragEvent, folderName: string) => {
       files: Array.from(droppedFiles),
       groupKey: folderName,
       processLevel: 'vectorize',
-      onProgress: (progress) => { uploadProgress.value = progress },
+      onProgress: (progress) => {
+        uploadProgress.value = progress
+      },
     })
 
     if (result.success) {

@@ -12,7 +12,10 @@
       v-if="sidebarStore.isMobileOpen"
       class="fixed inset-0 bg-black/50 z-40 md:hidden"
       data-testid="section-sidebar-v2-backdrop"
-      @click="closeFlyout(); sidebarStore.closeMobile()"
+      @click="
+        closeFlyout()
+        sidebarStore.closeMobile()
+      "
     />
   </Transition>
 
@@ -108,9 +111,7 @@
           data-testid="dropdown-sidebar-v2-user"
           @click.stop
         >
-          <div
-            class="px-3 py-2 border-b border-light-border/10 dark:border-dark-border/10"
-          >
+          <div class="px-3 py-2 border-b border-light-border/10 dark:border-dark-border/10">
             <p class="text-xs font-medium txt-primary truncate">
               {{ authStore.user?.email || 'guest@synaplan.com' }}
             </p>
@@ -213,9 +214,13 @@
               <div
                 v-if="section.group"
                 class="px-3 pt-2.5 pb-1"
-                :class="{ 'border-t border-light-border/10 dark:border-dark-border/10 mt-1': sIdx > 0 }"
+                :class="{
+                  'border-t border-light-border/10 dark:border-dark-border/10 mt-1': sIdx > 0,
+                }"
               >
-                <p class="text-[10px] font-semibold txt-secondary uppercase tracking-wider opacity-60">
+                <p
+                  class="text-[10px] font-semibold txt-secondary uppercase tracking-wider opacity-60"
+                >
                   {{ section.group }}
                 </p>
               </div>
@@ -229,9 +234,15 @@
                     ? 'text-[var(--brand)] bg-[var(--brand)]/[0.06] font-medium'
                     : 'txt-secondary hover:txt-primary hover:bg-black/[0.03] dark:hover:bg-white/[0.03]'
                 "
-                @click="closeFlyout(); sidebarStore.closeMobile()"
+                @click="
+                  closeFlyout()
+                  sidebarStore.closeMobile()
+                "
               >
-                <span class="w-1.5 h-1.5 rounded-full flex-shrink-0" :class="route.path === child.path ? 'bg-[var(--brand)]' : 'bg-current opacity-20'" />
+                <span
+                  class="w-1.5 h-1.5 rounded-full flex-shrink-0"
+                  :class="route.path === child.path ? 'bg-[var(--brand)]' : 'bg-current opacity-20'"
+                />
                 <span class="flex-1 truncate">{{ child.label }}</span>
                 <span
                   v-if="child.badge"
@@ -270,12 +281,19 @@
           <div class="flex-shrink-0 px-4 pt-3 pb-3 sm:px-6 sm:pt-6 sm:pb-4">
             <div class="flex items-center justify-between mb-4">
               <div class="flex items-center gap-3">
-                <div class="w-9 h-9 rounded-xl bg-[var(--brand)]/10 flex items-center justify-center">
+                <div
+                  class="w-9 h-9 rounded-xl bg-[var(--brand)]/10 flex items-center justify-center"
+                >
                   <ChatBubbleLeftRightIcon class="w-5 h-5 text-[var(--brand)]" />
                 </div>
                 <div>
-                  <h2 class="text-lg font-bold txt-primary leading-tight">{{ $t('chat.recent') }}</h2>
-                  <p class="text-xs txt-secondary mt-0.5">{{ chatList.length }} {{ chatList.length === 1 ? 'conversation' : 'conversations' }}</p>
+                  <h2 class="text-lg font-bold txt-primary leading-tight">
+                    {{ $t('chat.recent') }}
+                  </h2>
+                  <p class="text-xs txt-secondary mt-0.5">
+                    {{ chatList.length }}
+                    {{ chatList.length === 1 ? 'conversation' : 'conversations' }}
+                  </p>
                 </div>
               </div>
               <button
@@ -289,7 +307,10 @@
             <!-- Search + New Chat Row -->
             <div class="flex items-center gap-2">
               <div class="flex-1 relative">
-                <Icon icon="mdi:magnify" class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 txt-secondary pointer-events-none" />
+                <Icon
+                  icon="mdi:magnify"
+                  class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 txt-secondary pointer-events-none"
+                />
                 <input
                   v-model="chatSearchQuery"
                   type="text"
@@ -303,7 +324,10 @@
                 data-testid="btn-chat-modal-new"
                 @click="handleNewChat"
               >
-                <Icon :icon="isCreatingChat ? 'mdi:loading' : 'mdi:plus'" :class="['w-4 h-4', isCreatingChat && 'animate-spin']" />
+                <Icon
+                  :icon="isCreatingChat ? 'mdi:loading' : 'mdi:plus'"
+                  :class="['w-4 h-4', isCreatingChat && 'animate-spin']"
+                />
                 <span class="hidden sm:inline">{{ $t('chat.newChat') }}</span>
               </button>
             </div>
@@ -312,14 +336,24 @@
           <!-- Chat List -->
           <div class="flex-1 overflow-y-auto scroll-thin px-3 pb-4 sm:px-4">
             <!-- Empty State -->
-            <div v-if="filteredChatList.length === 0 && chatSearchQuery" class="flex flex-col items-center justify-center py-10 gap-3">
-              <div class="w-12 h-12 rounded-2xl bg-black/[0.04] dark:bg-white/[0.04] flex items-center justify-center">
+            <div
+              v-if="filteredChatList.length === 0 && chatSearchQuery"
+              class="flex flex-col items-center justify-center py-10 gap-3"
+            >
+              <div
+                class="w-12 h-12 rounded-2xl bg-black/[0.04] dark:bg-white/[0.04] flex items-center justify-center"
+              >
                 <Icon icon="mdi:chat-question-outline" class="w-6 h-6 txt-secondary" />
               </div>
               <p class="text-sm txt-secondary">{{ $t('common.noResults') }}</p>
             </div>
-            <div v-else-if="filteredChatList.length === 0" class="flex flex-col items-center justify-center py-10 gap-3">
-              <div class="w-14 h-14 rounded-2xl bg-[var(--brand)]/[0.06] flex items-center justify-center">
+            <div
+              v-else-if="filteredChatList.length === 0"
+              class="flex flex-col items-center justify-center py-10 gap-3"
+            >
+              <div
+                class="w-14 h-14 rounded-2xl bg-[var(--brand)]/[0.06] flex items-center justify-center"
+              >
                 <ChatBubbleLeftRightIcon class="w-7 h-7 text-[var(--brand)]/60" />
               </div>
               <div class="text-center">
@@ -359,7 +393,11 @@
                   <ChatBubbleLeftRightIcon
                     v-else
                     class="w-4.5 h-4.5"
-                    :class="chat.id === chatsStore.activeChatId ? 'text-[var(--brand)]' : 'txt-secondary opacity-60'"
+                    :class="
+                      chat.id === chatsStore.activeChatId
+                        ? 'text-[var(--brand)]'
+                        : 'txt-secondary opacity-60'
+                    "
                   />
                 </div>
 
@@ -367,12 +405,18 @@
                 <div class="flex-1 min-w-0">
                   <p
                     class="text-[13px] leading-snug truncate"
-                    :class="chat.id === chatsStore.activeChatId ? 'font-semibold text-[var(--brand)]' : 'font-medium txt-primary'"
+                    :class="
+                      chat.id === chatsStore.activeChatId
+                        ? 'font-semibold text-[var(--brand)]'
+                        : 'font-medium txt-primary'
+                    "
                   >
                     {{ getDisplayTitle(chat) }}
                   </p>
                   <div class="flex items-center gap-2 mt-0.5">
-                    <span class="text-[11px] txt-secondary">{{ formatTimestamp(chat.createdAt) }}</span>
+                    <span class="text-[11px] txt-secondary">{{
+                      formatTimestamp(chat.createdAt)
+                    }}</span>
                     <span v-if="chat.messageCount" class="text-[11px] txt-secondary opacity-60">
                       · {{ chat.messageCount }} msg
                     </span>
@@ -415,7 +459,10 @@
                         <Icon icon="mdi:pencil-outline" class="w-4 h-4" />
                         {{ $t('common.rename') }}
                       </button>
-                      <button class="dropdown-item dropdown-item--danger" @click="handleChatDelete(chat.id)">
+                      <button
+                        class="dropdown-item dropdown-item--danger"
+                        @click="handleChatDelete(chat.id)"
+                      >
                         <Icon icon="mdi:delete-outline" class="w-4 h-4" />
                         {{ $t('common.delete') }}
                       </button>
@@ -433,7 +480,10 @@
           >
             <button
               class="text-xs font-medium text-[var(--brand)] hover:underline transition-colors"
-              @click="chatModalOpen = false; $router.push('/statistics#chats')"
+              @click="
+                chatModalOpen = false
+                $router.push('/statistics#chats')
+              "
             >
               {{ $t('chat.showAll') }} →
             </button>
@@ -617,14 +667,38 @@ const navItems = computed<NavItem[]>(() => {
 
   if (appModeStore.isAdvancedMode) {
     const settingsChildren: NavChild[] = [
-      { path: '/tools/chat-widget', label: t('nav.toolsChatWidget'), group: t('nav.settingsChannels') },
-      { path: '/tools/mail-handler', label: t('nav.toolsMailHandler'), group: t('nav.settingsChannels') },
+      {
+        path: '/tools/chat-widget',
+        label: t('nav.toolsChatWidget'),
+        group: t('nav.settingsChannels'),
+      },
+      {
+        path: '/tools/mail-handler',
+        label: t('nav.toolsMailHandler'),
+        group: t('nav.settingsChannels'),
+      },
       { path: '/config/inbound', label: t('nav.configInbound'), group: t('nav.settingsChannels') },
-      { path: '/config/ai-models', label: t('nav.configAiModels'), group: t('nav.settingsAiTools') },
+      {
+        path: '/config/ai-models',
+        label: t('nav.configAiModels'),
+        group: t('nav.settingsAiTools'),
+      },
       { path: '/config/api-keys', label: t('nav.configApiKeys'), group: t('nav.settingsAiTools') },
-      { path: '/config/task-prompts', label: t('nav.configTaskPrompts'), group: t('nav.settingsAiTools') },
-      { path: '/config/sorting-prompt', label: t('nav.configSortingPrompt'), group: t('nav.settingsAiTools') },
-      { path: '/tools/doc-summary', label: t('nav.toolsDocSummary'), group: t('nav.settingsAiTools') },
+      {
+        path: '/config/task-prompts',
+        label: t('nav.configTaskPrompts'),
+        group: t('nav.settingsAiTools'),
+      },
+      {
+        path: '/config/sorting-prompt',
+        label: t('nav.configSortingPrompt'),
+        group: t('nav.settingsAiTools'),
+      },
+      {
+        path: '/tools/doc-summary',
+        label: t('nav.toolsDocSummary'),
+        group: t('nav.settingsAiTools'),
+      },
     ]
 
     items.push({
@@ -648,9 +722,7 @@ const navItems = computed<NavItem[]>(() => {
   }
 
   if (authStore.isAdmin) {
-    const adminChildren: NavChild[] = [
-      { path: '/admin', label: t('nav.adminDashboard') },
-    ]
+    const adminChildren: NavChild[] = [{ path: '/admin', label: t('nav.adminDashboard') }]
 
     const featureStatusItem: NavChild = {
       path: '/admin/features',
@@ -712,7 +784,9 @@ const handleQuickNewChat = async () => {
     chatModalOpen.value = false
     sidebarStore.closeMobile()
   } finally {
-    setTimeout(() => { isCreatingChat.value = false }, 300)
+    setTimeout(() => {
+      isCreatingChat.value = false
+    }, 300)
   }
 }
 
@@ -829,19 +903,27 @@ const formatTimestamp = (dateStr: string): string => {
 
 const getChannelIcon = (chat: StoreChat): string | null => {
   switch (chat.source) {
-    case 'whatsapp': return 'mdi:whatsapp'
-    case 'email': return 'mdi:email-outline'
-    case 'widget': return 'mdi:widgets-outline'
-    default: return null
+    case 'whatsapp':
+      return 'mdi:whatsapp'
+    case 'email':
+      return 'mdi:email-outline'
+    case 'widget':
+      return 'mdi:widgets-outline'
+    default:
+      return null
   }
 }
 
 const getChannelIconClass = (chat: StoreChat): string => {
   switch (chat.source) {
-    case 'whatsapp': return 'text-green-500'
-    case 'email': return 'text-blue-500'
-    case 'widget': return 'text-purple-500'
-    default: return ''
+    case 'whatsapp':
+      return 'text-green-500'
+    case 'email':
+      return 'text-blue-500'
+    case 'widget':
+      return 'text-purple-500'
+    default:
+      return ''
   }
 }
 
@@ -854,7 +936,9 @@ const handleNewChat = async () => {
     chatModalOpen.value = false
     sidebarStore.closeMobile()
   } finally {
-    setTimeout(() => { isCreatingChat.value = false }, 300)
+    setTimeout(() => {
+      isCreatingChat.value = false
+    }, 300)
   }
 }
 
@@ -913,7 +997,6 @@ const closeFlyout = () => {
   activeFlyoutItem.value = null
   userMenuOpen.value = false
 }
-
 </script>
 
 <style scoped>
@@ -925,12 +1008,14 @@ const closeFlyout = () => {
 .modal-leave-to {
   opacity: 0;
 }
-.modal-enter-active [data-testid="modal-chat-manager"],
-.modal-leave-active [data-testid="modal-chat-manager"] {
-  transition: transform 0.2s ease, opacity 0.2s ease;
+.modal-enter-active [data-testid='modal-chat-manager'],
+.modal-leave-active [data-testid='modal-chat-manager'] {
+  transition:
+    transform 0.2s ease,
+    opacity 0.2s ease;
 }
-.modal-enter-from [data-testid="modal-chat-manager"],
-.modal-leave-to [data-testid="modal-chat-manager"] {
+.modal-enter-from [data-testid='modal-chat-manager'],
+.modal-leave-to [data-testid='modal-chat-manager'] {
   transform: scale(0.95) translateY(10px);
   opacity: 0;
 }

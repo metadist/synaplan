@@ -169,7 +169,11 @@
             >
               <div class="flex items-center gap-3">
                 <div class="p-2 rounded-lg v2-source-icon" :class="getSourceIconBg(source)">
-                  <Icon :icon="getSourceIcon(source)" class="w-5 h-5" :class="getSourceIconColor(source)" />
+                  <Icon
+                    :icon="getSourceIcon(source)"
+                    class="w-5 h-5"
+                    :class="getSourceIconColor(source)"
+                  />
                 </div>
                 <div>
                   <p class="text-sm font-medium txt-primary">{{ getSourceLabel(source) }}</p>

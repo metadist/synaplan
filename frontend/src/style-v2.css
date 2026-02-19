@@ -57,7 +57,9 @@
   box-shadow:
     0 2px 16px rgba(0, 0, 0, 0.06),
     0 0 1px var(--v2-glow);
-  transition: box-shadow 0.25s, border-color 0.25s;
+  transition:
+    box-shadow 0.25s,
+    border-color 0.25s;
 }
 .design-v2.dark .surface-card {
   box-shadow:
@@ -213,7 +215,7 @@
    6. Chat Input — Floating Glass with Glow
    ---------------------------------------------------------- */
 
-.design-v2 [data-testid="comp-chat-input-shell"] {
+.design-v2 [data-testid='comp-chat-input-shell'] {
   backdrop-filter: blur(var(--v2-blur-md));
   -webkit-backdrop-filter: blur(var(--v2-blur-md));
   background: rgba(255, 255, 255, 0.55) !important;
@@ -222,9 +224,11 @@
   box-shadow:
     0 4px 24px rgba(0, 0, 0, 0.06),
     0 0 16px var(--v2-glow) !important;
-  transition: box-shadow 0.3s ease, border-color 0.3s ease;
+  transition:
+    box-shadow 0.3s ease,
+    border-color 0.3s ease;
 }
-.design-v2.dark [data-testid="comp-chat-input-shell"] {
+.design-v2.dark [data-testid='comp-chat-input-shell'] {
   background: rgba(255, 255, 255, 0.025) !important;
   border: 1px solid rgba(255, 255, 255, 0.06) !important;
   box-shadow:
@@ -233,13 +237,13 @@
 }
 
 /* Focus glow when typing */
-.design-v2 [data-testid="comp-chat-input-shell"]:focus-within {
+.design-v2 [data-testid='comp-chat-input-shell']:focus-within {
   border-color: var(--v2-border-hover) !important;
   box-shadow:
     0 4px 32px rgba(0, 0, 0, 0.08),
     0 0 28px var(--v2-glow-strong) !important;
 }
-.design-v2.dark [data-testid="comp-chat-input-shell"]:focus-within {
+.design-v2.dark [data-testid='comp-chat-input-shell']:focus-within {
   border-color: var(--v2-border-hover) !important;
   box-shadow:
     0 4px 24px rgba(0, 0, 0, 0.25),
@@ -247,10 +251,9 @@
 }
 
 /* Floating chat input area — remove separate background band */
-.design-v2 [data-testid="comp-chat-input"] {
+.design-v2 [data-testid='comp-chat-input'] {
   background: transparent !important;
 }
-
 
 /* ----------------------------------------------------------
    7. Chat Pills — Glass
@@ -302,10 +305,12 @@
    ---------------------------------------------------------- */
 
 /* Message container — subtle float + entrance */
-.design-v2 [data-testid="message-container"] {
-  transition: transform 0.15s ease, opacity 0.15s ease;
+.design-v2 [data-testid='message-container'] {
+  transition:
+    transform 0.15s ease,
+    opacity 0.15s ease;
 }
-.design-v2 [data-testid="message-container"]:hover {
+.design-v2 [data-testid='message-container']:hover {
   transform: translateY(-1px);
 }
 
@@ -319,7 +324,9 @@
   box-shadow:
     0 2px 12px rgba(0, 0, 0, 0.04),
     0 0 1px rgba(0, 183, 157, 0.06);
-  transition: box-shadow 0.25s ease, transform 0.15s ease;
+  transition:
+    box-shadow 0.25s ease,
+    transform 0.15s ease;
 }
 .design-v2 .bubble-ai:hover {
   box-shadow:
@@ -346,7 +353,9 @@
   box-shadow:
     0 4px 20px rgba(0, 183, 157, 0.18),
     0 0 12px rgba(0, 183, 157, 0.1);
-  transition: box-shadow 0.25s ease, transform 0.15s ease;
+  transition:
+    box-shadow 0.25s ease,
+    transform 0.15s ease;
 }
 .design-v2 .bubble-user:hover {
   box-shadow:
@@ -366,7 +375,7 @@
 }
 
 /* Avatar — glass circle with subtle glow */
-.design-v2 [data-testid="message-container"] .surface-card.rounded-full {
+.design-v2 [data-testid='message-container'] .surface-card.rounded-full {
   backdrop-filter: blur(var(--v2-blur-sm));
   -webkit-backdrop-filter: blur(var(--v2-blur-sm));
   border: 1px solid var(--v2-border);
@@ -374,21 +383,21 @@
 }
 
 /* Date separator chips — glass */
-.design-v2 [data-testid="item-message-group"] .surface-chip {
+.design-v2 [data-testid='item-message-group'] .surface-chip {
   backdrop-filter: blur(var(--v2-blur-sm));
   -webkit-backdrop-filter: blur(var(--v2-blur-sm));
   border: 1px solid var(--v2-border);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.03);
 }
-.design-v2.dark [data-testid="item-message-group"] .surface-chip {
+.design-v2.dark [data-testid='item-message-group'] .surface-chip {
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
 }
 
 /* Empty state — subtle glow */
-.design-v2 [data-testid="state-empty"] {
+.design-v2 [data-testid='state-empty'] {
   opacity: 0.9;
 }
-.design-v2 [data-testid="state-empty"] h2 {
+.design-v2 [data-testid='state-empty'] h2 {
   background: linear-gradient(135deg, var(--brand), var(--brand-light));
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
@@ -648,7 +657,9 @@
 .design-v2 textarea {
   background: rgba(0, 0, 0, 0.02) !important;
   border-color: rgba(0, 0, 0, 0.1) !important;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
 }
 .design-v2 input[type='text']:focus,
 .design-v2 input[type='email']:focus,
@@ -739,7 +750,7 @@
 }
 
 /* File Selection Modal — glass with clean readable background */
-.design-v2 [data-testid="modal-file-selection"] {
+.design-v2 [data-testid='modal-file-selection'] {
   background: rgba(255, 255, 255, 0.97) !important;
   backdrop-filter: blur(var(--v2-blur-lg));
   -webkit-backdrop-filter: blur(var(--v2-blur-lg));
@@ -748,7 +759,7 @@
     0 16px 64px rgba(0, 0, 0, 0.12),
     0 0 1px var(--v2-glow);
 }
-.design-v2.dark [data-testid="modal-file-selection"] {
+.design-v2.dark [data-testid='modal-file-selection'] {
   background: rgba(12, 18, 34, 0.98) !important;
   box-shadow:
     0 16px 64px rgba(0, 0, 0, 0.5),
@@ -760,7 +771,7 @@
    ---------------------------------------------------------- */
 
 /* Page header gradient text */
-.design-v2 [data-testid="page-statistics"] h1 {
+.design-v2 [data-testid='page-statistics'] h1 {
   background: linear-gradient(135deg, var(--brand), var(--brand-light));
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
@@ -768,30 +779,32 @@
 }
 
 /* Stats cards — glass with subtle glow */
-.design-v2 [data-testid="page-statistics"] .surface-card {
-  transition: box-shadow 0.25s ease, transform 0.15s ease;
+.design-v2 [data-testid='page-statistics'] .surface-card {
+  transition:
+    box-shadow 0.25s ease,
+    transform 0.15s ease;
 }
-.design-v2 [data-testid="page-statistics"] .surface-card:hover {
+.design-v2 [data-testid='page-statistics'] .surface-card:hover {
   box-shadow:
     0 4px 24px rgba(0, 0, 0, 0.08),
     0 0 12px var(--v2-glow);
   transform: translateY(-1px);
 }
-.design-v2.dark [data-testid="page-statistics"] .surface-card:hover {
+.design-v2.dark [data-testid='page-statistics'] .surface-card:hover {
   box-shadow:
     0 4px 24px rgba(0, 0, 0, 0.35),
     0 0 12px var(--v2-glow);
 }
 
 /* Progress bars — brand glow */
-.design-v2 [data-testid="item-usage"] .bg-green-500,
-.design-v2 [data-testid="item-usage"] .bg-brand,
-.design-v2 [data-testid="item-usage"] [class*="bg-green"] {
+.design-v2 [data-testid='item-usage'] .bg-green-500,
+.design-v2 [data-testid='item-usage'] .bg-brand,
+.design-v2 [data-testid='item-usage'] [class*='bg-green'] {
   box-shadow: 0 0 8px rgba(0, 183, 157, 0.3);
 }
 
 /* Source icon containers — glass pill */
-.design-v2 [data-testid="page-statistics"] .v2-source-icon {
+.design-v2 [data-testid='page-statistics'] .v2-source-icon {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -804,15 +817,15 @@
 }
 
 /* Table rows — subtle hover glow */
-.design-v2 [data-testid="item-activity"]:hover {
+.design-v2 [data-testid='item-activity']:hover {
   background: rgba(0, 183, 157, 0.04) !important;
 }
-.design-v2.dark [data-testid="item-activity"]:hover {
+.design-v2.dark [data-testid='item-activity']:hover {
   background: rgba(0, 240, 211, 0.04) !important;
 }
 
 /* Chat Manager Modal — glass overlay */
-.design-v2 [data-testid="modal-chat-manager"] {
+.design-v2 [data-testid='modal-chat-manager'] {
   background: rgba(255, 255, 255, 0.92) !important;
   backdrop-filter: blur(var(--v2-blur-lg));
   -webkit-backdrop-filter: blur(var(--v2-blur-lg));
@@ -822,7 +835,7 @@
     0 0 1px var(--v2-glow),
     inset 0 1px 0 rgba(255, 255, 255, 0.3);
 }
-.design-v2.dark [data-testid="modal-chat-manager"] {
+.design-v2.dark [data-testid='modal-chat-manager'] {
   background: rgba(12, 18, 34, 0.92) !important;
   box-shadow:
     0 20px 60px rgba(0, 0, 0, 0.45),
@@ -831,21 +844,21 @@
 }
 
 /* Chat Manager — user dropdown glass */
-.design-v2 [data-testid="dropdown-sidebar-v2-user"] {
+.design-v2 [data-testid='dropdown-sidebar-v2-user'] {
   backdrop-filter: blur(var(--v2-blur-lg));
   -webkit-backdrop-filter: blur(var(--v2-blur-lg));
   box-shadow:
     0 8px 32px rgba(0, 0, 0, 0.1),
     0 0 1px var(--v2-glow);
 }
-.design-v2.dark [data-testid="dropdown-sidebar-v2-user"] {
+.design-v2.dark [data-testid='dropdown-sidebar-v2-user'] {
   box-shadow:
     0 8px 32px rgba(0, 0, 0, 0.4),
     0 0 1px var(--v2-glow);
 }
 
 /* File Mention Palette — solid readable background */
-.design-v2 [data-testid="comp-file-mention-palette"] {
+.design-v2 [data-testid='comp-file-mention-palette'] {
   background: rgba(255, 255, 255, 0.98) !important;
   backdrop-filter: blur(var(--v2-blur-lg));
   -webkit-backdrop-filter: blur(var(--v2-blur-lg));
@@ -854,7 +867,7 @@
     0 12px 40px rgba(0, 0, 0, 0.12),
     0 0 1px var(--v2-glow);
 }
-.design-v2.dark [data-testid="comp-file-mention-palette"] {
+.design-v2.dark [data-testid='comp-file-mention-palette'] {
   background: rgba(15, 23, 42, 0.98) !important;
   box-shadow:
     0 12px 40px rgba(0, 0, 0, 0.5),
@@ -862,21 +875,21 @@
 }
 
 /* Nav Dropdown — glass with clean background */
-.design-v2 [data-testid="dropdown-sidebar-v2-nav"] {
+.design-v2 [data-testid='dropdown-sidebar-v2-nav'] {
   backdrop-filter: blur(var(--v2-blur-lg));
   -webkit-backdrop-filter: blur(var(--v2-blur-lg));
   box-shadow:
     0 12px 40px rgba(0, 0, 0, 0.1),
     0 0 1px var(--v2-glow);
 }
-.design-v2.dark [data-testid="dropdown-sidebar-v2-nav"] {
+.design-v2.dark [data-testid='dropdown-sidebar-v2-nav'] {
   box-shadow:
     0 12px 40px rgba(0, 0, 0, 0.4),
     0 0 1px var(--v2-glow);
 }
 
 /* Memories Dialog — glass with clean background */
-.design-v2 [data-testid="modal-memories-dialog"] {
+.design-v2 [data-testid='modal-memories-dialog'] {
   background: rgba(255, 255, 255, 0.97) !important;
   backdrop-filter: blur(var(--v2-blur-lg));
   -webkit-backdrop-filter: blur(var(--v2-blur-lg));
@@ -886,7 +899,7 @@
     0 0 1px var(--v2-glow),
     inset 0 1px 0 rgba(255, 255, 255, 0.3);
 }
-.design-v2.dark [data-testid="modal-memories-dialog"] {
+.design-v2.dark [data-testid='modal-memories-dialog'] {
   background: rgba(12, 18, 34, 0.97) !important;
   box-shadow:
     0 20px 60px rgba(0, 0, 0, 0.5),
@@ -895,11 +908,11 @@
 }
 
 /* Memories Dialog — inner controls glass override */
-.design-v2 [data-testid="modal-memories-dialog"] .surface-chip {
+.design-v2 [data-testid='modal-memories-dialog'] .surface-chip {
   background: rgba(0, 0, 0, 0.03) !important;
   border: 1px solid rgba(0, 0, 0, 0.06);
 }
-.design-v2.dark [data-testid="modal-memories-dialog"] .surface-chip {
+.design-v2.dark [data-testid='modal-memories-dialog'] .surface-chip {
   background: rgba(255, 255, 255, 0.04) !important;
   border: 1px solid rgba(255, 255, 255, 0.06);
 }
@@ -908,14 +921,14 @@
    OVERRIDE: Chat input textarea — must come AFTER section 17b
    to beat global form element rules at equal specificity.
    ---------------------------------------------------------- */
-.design-v2 [data-testid="comp-chat-input-shell"] textarea,
-.design-v2.dark [data-testid="comp-chat-input-shell"] textarea {
+.design-v2 [data-testid='comp-chat-input-shell'] textarea,
+.design-v2.dark [data-testid='comp-chat-input-shell'] textarea {
   background: transparent !important;
   border-color: transparent !important;
   border-radius: 1rem;
 }
-.design-v2 [data-testid="comp-chat-input-shell"] textarea:focus,
-.design-v2.dark [data-testid="comp-chat-input-shell"] textarea:focus {
+.design-v2 [data-testid='comp-chat-input-shell'] textarea:focus,
+.design-v2.dark [data-testid='comp-chat-input-shell'] textarea:focus {
   background: transparent !important;
   box-shadow: none !important;
 }

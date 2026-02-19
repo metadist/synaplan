@@ -23,7 +23,8 @@
         ></div>
       </div>
       <div class="text-xs txt-secondary">
-        {{ stats?.storage.usage_formatted || '0 B' }} / {{ stats?.storage.limit_formatted || '100 MB' }}
+        {{ stats?.storage.usage_formatted || '0 B' }} /
+        {{ stats?.storage.limit_formatted || '100 MB' }}
       </div>
     </div>
 

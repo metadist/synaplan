@@ -1,9 +1,7 @@
 <template>
   <div class="widget-preview-container" data-testid="comp-widget-promo-preview">
     <!-- Mock Browser -->
-    <div
-      class="relative rounded-xl overflow-hidden border border-black/[0.08] shadow-lg"
-    >
+    <div class="relative rounded-xl overflow-hidden border border-black/[0.08] shadow-lg">
       <!-- Browser Chrome -->
       <div class="flex items-center gap-2 px-3 py-1.5 border-b bg-gray-100/80 border-black/[0.04]">
         <div class="flex gap-1">
@@ -11,7 +9,9 @@
           <div class="w-2 h-2 rounded-full bg-yellow-400/80"></div>
           <div class="w-2 h-2 rounded-full bg-green-400/80"></div>
         </div>
-        <div class="flex-1 px-2.5 py-0.5 rounded-md text-[10px] font-mono truncate bg-white/70 text-gray-500">
+        <div
+          class="flex-1 px-2.5 py-0.5 rounded-md text-[10px] font-mono truncate bg-white/70 text-gray-500"
+        >
           your-website.com
         </div>
         <div class="flex gap-1 opacity-30">
@@ -168,7 +168,9 @@
               <!-- Chat Input -->
               <div class="px-2.5 py-2 border-t border-gray-200/50 bg-white">
                 <div class="flex gap-1.5">
-                  <div class="flex-1 px-2.5 py-1.5 text-[10px] rounded-lg border border-gray-200/60 bg-gray-50/50 text-gray-400 truncate">
+                  <div
+                    class="flex-1 px-2.5 py-1.5 text-[10px] rounded-lg border border-gray-200/60 bg-gray-50/50 text-gray-400 truncate"
+                  >
                     {{ $t('promoTips.widgetPreview.inputPlaceholder') }}
                   </div>
                   <button
@@ -238,17 +240,40 @@ function runAutoPlay() {
   showTyping.value = false
   showAiResponse.value = false
 
-  timeouts.push(setTimeout(() => { chatOpen.value = true }, 600))
-  timeouts.push(setTimeout(() => { showGreeting.value = true }, 1000))
-  timeouts.push(setTimeout(() => { showUserMsg.value = true }, 2200))
-  timeouts.push(setTimeout(() => { showTyping.value = true }, 3000))
-  timeouts.push(setTimeout(() => { showAiResponse.value = true }, 4200))
+  timeouts.push(
+    setTimeout(() => {
+      chatOpen.value = true
+    }, 600)
+  )
+  timeouts.push(
+    setTimeout(() => {
+      showGreeting.value = true
+    }, 1000)
+  )
+  timeouts.push(
+    setTimeout(() => {
+      showUserMsg.value = true
+    }, 2200)
+  )
+  timeouts.push(
+    setTimeout(() => {
+      showTyping.value = true
+    }, 3000)
+  )
+  timeouts.push(
+    setTimeout(() => {
+      showAiResponse.value = true
+    }, 4200)
+  )
 }
 
-watch(() => props.autoPlay, (val) => {
-  if (val) runAutoPlay()
-  else clearAllTimeouts()
-})
+watch(
+  () => props.autoPlay,
+  (val) => {
+    if (val) runAutoPlay()
+    else clearAllTimeouts()
+  }
+)
 
 onMounted(() => {
   if (props.autoPlay !== false) {
@@ -278,7 +303,9 @@ onBeforeUnmount(() => {
 }
 
 @keyframes typing-bounce {
-  0%, 60%, 100% {
+  0%,
+  60%,
+  100% {
     transform: translateY(0);
     opacity: 0.4;
   }

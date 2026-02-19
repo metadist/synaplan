@@ -8,11 +8,7 @@
     leave-from-class="opacity-100 translate-y-0 scale-100"
     leave-to-class="opacity-0 translate-y-2 scale-[0.98]"
   >
-    <div
-      v-if="tip && !expanded"
-      class="mx-auto max-w-4xl px-4 pb-2"
-      data-testid="comp-promo-tip"
-    >
+    <div v-if="tip && !expanded" class="mx-auto max-w-4xl px-4 pb-2" data-testid="comp-promo-tip">
       <div
         :class="[
           'relative overflow-hidden rounded-xl border transition-all duration-200',
@@ -79,10 +75,7 @@
       >
         <!-- Blurred backdrop — click to close -->
         <div
-          :class="[
-            'absolute inset-0 backdrop-blur-sm',
-            isDark ? 'bg-black/50' : 'bg-black/25',
-          ]"
+          :class="['absolute inset-0 backdrop-blur-sm', isDark ? 'bg-black/50' : 'bg-black/25']"
           @click="$emit('dismiss')"
         ></div>
 
@@ -107,9 +100,7 @@
             @click.stop
           >
             <!-- Gradient accent top bar -->
-            <div
-              :class="['h-1 bg-gradient-to-r', tip.gradient]"
-            ></div>
+            <div :class="['h-1 bg-gradient-to-r', tip.gradient]"></div>
 
             <!-- Close button -->
             <button
@@ -126,7 +117,9 @@
             <div v-if="hasPreview" class="p-5 sm:p-6">
               <!-- Header -->
               <div class="flex items-center gap-3 mb-4 pr-8">
-                <div class="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 bg-[var(--brand)]/10">
+                <div
+                  class="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 bg-[var(--brand)]/10"
+                >
                   <Icon :icon="tip.icon" class="w-5 h-5 text-[var(--brand)]" />
                 </div>
                 <div>
@@ -138,12 +131,7 @@
                   >
                     {{ $t(tip.titleKey) }}
                   </h3>
-                  <p
-                    :class="[
-                      'text-xs mt-0.5',
-                      isDark ? 'text-gray-400' : 'text-gray-500',
-                    ]"
-                  >
+                  <p :class="['text-xs mt-0.5', isDark ? 'text-gray-400' : 'text-gray-500']">
                     {{ $t(tip.descriptionKey) }}
                   </p>
                 </div>
@@ -162,7 +150,9 @@
                         isDark ? 'text-gray-400' : 'text-gray-600',
                       ]"
                     >
-                      <div class="w-6 h-6 rounded-md bg-[var(--brand)]/8 flex items-center justify-center flex-shrink-0 mt-0.5">
+                      <div
+                        class="w-6 h-6 rounded-md bg-[var(--brand)]/8 flex items-center justify-center flex-shrink-0 mt-0.5"
+                      >
                         <Icon :icon="feature.icon" class="w-3.5 h-3.5 text-[var(--brand)]" />
                       </div>
                       <span class="leading-snug pt-0.5">{{ $t(feature.key) }}</span>
@@ -197,14 +187,13 @@
             <!-- Standard layout (no preview) -->
             <div v-else class="p-5 sm:p-6">
               <div class="flex items-center gap-3 mb-3 pr-8">
-                <div class="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 bg-[var(--brand)]/10">
+                <div
+                  class="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 bg-[var(--brand)]/10"
+                >
                   <Icon :icon="tip.icon" class="w-5 h-5 text-[var(--brand)]" />
                 </div>
                 <h3
-                  :class="[
-                    'text-base font-semibold',
-                    isDark ? 'text-gray-100' : 'text-gray-800',
-                  ]"
+                  :class="['text-base font-semibold', isDark ? 'text-gray-100' : 'text-gray-800']"
                 >
                   {{ $t(tip.titleKey) }}
                 </h3>
@@ -287,13 +276,16 @@ function handleKeydown(e: KeyboardEvent) {
   }
 }
 
-watch(() => props.expanded, (isExpanded) => {
-  if (isExpanded) {
-    document.body.style.overflow = 'hidden'
-  } else {
-    document.body.style.overflow = ''
+watch(
+  () => props.expanded,
+  (isExpanded) => {
+    if (isExpanded) {
+      document.body.style.overflow = 'hidden'
+    } else {
+      document.body.style.overflow = ''
+    }
   }
-})
+)
 
 onMounted(() => {
   document.addEventListener('keydown', handleKeydown)

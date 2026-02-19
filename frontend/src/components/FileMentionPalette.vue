@@ -43,10 +43,7 @@
       </div>
 
       <!-- Content -->
-      <div
-        v-if="isLoading"
-        class="flex items-center justify-center px-4 py-6"
-      >
+      <div v-if="isLoading" class="flex items-center justify-center px-4 py-6">
         <Icon icon="mdi:loading" class="w-5 h-5 animate-spin txt-secondary" />
       </div>
       <div
@@ -72,11 +69,21 @@
           @click="selectFile(file)"
           @mouseenter="selectedIndex = index"
         >
-          <div class="w-8 h-8 rounded-lg bg-gray-100 dark:bg-gray-800 flex items-center justify-center flex-shrink-0">
-            <Icon :icon="getFileIcon(file.file_type)" class="w-4 h-4 text-gray-500 dark:text-gray-400" />
+          <div
+            class="w-8 h-8 rounded-lg bg-gray-100 dark:bg-gray-800 flex items-center justify-center flex-shrink-0"
+          >
+            <Icon
+              :icon="getFileIcon(file.file_type)"
+              class="w-4 h-4 text-gray-500 dark:text-gray-400"
+            />
           </div>
           <div class="flex-1 min-w-0">
-            <div class="text-sm font-medium truncate" :class="selectedIndex === index ? 'text-[var(--brand)]' : 'text-gray-900 dark:text-gray-100'">
+            <div
+              class="text-sm font-medium truncate"
+              :class="
+                selectedIndex === index ? 'text-[var(--brand)]' : 'text-gray-900 dark:text-gray-100'
+              "
+            >
               {{ file.filename }}
             </div>
             <div class="text-[11px] text-gray-500 dark:text-gray-400 flex items-center gap-1.5">
@@ -123,7 +130,7 @@ const allFiles = ref<FileItem[]>([])
 
 const setItemRef = (el: Element | ComponentPublicInstance | null, index: number) => {
   if (el) {
-    itemRefs.value[index] = (el as HTMLElement)
+    itemRefs.value[index] = el as HTMLElement
   }
 }
 
@@ -153,7 +160,7 @@ watch(
       itemRefs.value = []
       loadFiles()
     }
-  },
+  }
 )
 
 watch(filteredFiles, () => {

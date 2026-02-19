@@ -28,14 +28,18 @@ function loadState(): TipState {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
     if (raw) return JSON.parse(raw)
-  } catch { /* ignore */ }
+  } catch {
+    /* ignore */
+  }
   return { dismissed: [], lastShown: 0, messagesSinceLastTip: 0, sessionTipCount: 0 }
 }
 
 function saveState(state: TipState) {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state))
-  } catch { /* ignore */ }
+  } catch {
+    /* ignore */
+  }
 }
 
 const allTips: PromoTip[] = [
@@ -46,7 +50,8 @@ const allTips: PromoTip[] = [
     descriptionKey: 'promoTips.chatWidget.description',
     actionKey: 'promoTips.chatWidget.action',
     actionRoute: '/tools/chat-widget',
-    gradient: 'from-violet-500/10 to-blue-500/10 dark:from-violet-500/[0.07] dark:to-blue-500/[0.07]',
+    gradient:
+      'from-violet-500/10 to-blue-500/10 dark:from-violet-500/[0.07] dark:to-blue-500/[0.07]',
   },
   {
     id: 'files-upload',
@@ -55,7 +60,8 @@ const allTips: PromoTip[] = [
     descriptionKey: 'promoTips.filesUpload.description',
     actionKey: 'promoTips.filesUpload.action',
     actionRoute: '/files',
-    gradient: 'from-emerald-500/10 to-teal-500/10 dark:from-emerald-500/[0.07] dark:to-teal-500/[0.07]',
+    gradient:
+      'from-emerald-500/10 to-teal-500/10 dark:from-emerald-500/[0.07] dark:to-teal-500/[0.07]',
   },
   {
     id: 'ai-config',
@@ -64,7 +70,8 @@ const allTips: PromoTip[] = [
     descriptionKey: 'promoTips.aiConfig.description',
     actionKey: 'promoTips.aiConfig.action',
     actionRoute: '/config/ai-models',
-    gradient: 'from-orange-500/10 to-amber-500/10 dark:from-orange-500/[0.07] dark:to-amber-500/[0.07]',
+    gradient:
+      'from-orange-500/10 to-amber-500/10 dark:from-orange-500/[0.07] dark:to-amber-500/[0.07]',
   },
   {
     id: 'doc-summary',
@@ -82,7 +89,8 @@ const allTips: PromoTip[] = [
     descriptionKey: 'promoTips.upgradePro.description',
     actionKey: 'promoTips.upgradePro.action',
     actionRoute: '/subscription',
-    gradient: 'from-amber-500/10 to-yellow-500/10 dark:from-amber-500/[0.07] dark:to-yellow-500/[0.07]',
+    gradient:
+      'from-amber-500/10 to-yellow-500/10 dark:from-amber-500/[0.07] dark:to-yellow-500/[0.07]',
   },
   {
     id: 'file-mention',
@@ -193,7 +201,7 @@ export function usePromoTips() {
       if (!tip) {
         console.warn(
           `[PromoTips] Unknown tip "${tipId}". Available:`,
-          allTips.map((t) => t.id),
+          allTips.map((t) => t.id)
         )
         return
       }

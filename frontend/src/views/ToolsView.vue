@@ -2,7 +2,11 @@
   <MainLayout>
     <div class="flex flex-col h-full overflow-y-auto bg-chat scroll-thin" data-testid="page-tools">
       <div class="max-w-[1400px] mx-auto w-full px-6 py-8">
-        <div v-if="currentPage !== 'mail-handler'" class="mb-8" data-testid="section-header">
+        <div
+          v-if="currentPage !== 'mail-handler' && currentPage !== 'doc-summary'"
+          class="mb-8"
+          data-testid="section-header"
+        >
           <h1 class="text-3xl font-semibold txt-primary mb-2">
             {{ getPageTitle() }}
           </h1>

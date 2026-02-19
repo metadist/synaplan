@@ -2,11 +2,17 @@
   <div class="space-y-6">
     <!-- Hero Header -->
     <div class="relative overflow-hidden surface-card rounded-2xl">
-      <div class="absolute inset-0 bg-gradient-to-br from-[var(--brand)]/5 via-transparent to-purple-500/5"></div>
-      <div class="absolute top-0 right-0 w-64 h-64 bg-[var(--brand)]/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/3"></div>
+      <div
+        class="absolute inset-0 bg-gradient-to-br from-[var(--brand)]/5 via-transparent to-purple-500/5"
+      ></div>
+      <div
+        class="absolute top-0 right-0 w-64 h-64 bg-[var(--brand)]/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/3"
+      ></div>
       <div class="relative px-8 py-8 flex items-center justify-between gap-6">
         <div class="flex items-center gap-5 min-w-0">
-          <div class="w-14 h-14 rounded-2xl bg-gradient-to-br from-[var(--brand)] to-purple-500 flex items-center justify-center shadow-lg shadow-[var(--brand)]/20 shrink-0">
+          <div
+            class="w-14 h-14 rounded-2xl bg-gradient-to-br from-[var(--brand)] to-purple-500 flex items-center justify-center shadow-lg shadow-[var(--brand)]/20 shrink-0"
+          >
             <EnvelopeIcon class="w-7 h-7 text-white" />
           </div>
           <div class="min-w-0">
@@ -85,7 +91,9 @@
     <div v-if="handlers.length === 0" class="relative overflow-hidden surface-card rounded-2xl">
       <div class="absolute inset-0 bg-gradient-to-b from-transparent to-[var(--brand)]/3"></div>
       <div class="relative flex flex-col items-center py-16 px-8">
-        <div class="w-20 h-20 rounded-3xl bg-gradient-to-br from-[var(--brand)]/10 to-purple-500/10 flex items-center justify-center mb-6">
+        <div
+          class="w-20 h-20 rounded-3xl bg-gradient-to-br from-[var(--brand)]/10 to-purple-500/10 flex items-center justify-center mb-6"
+        >
           <EnvelopeIcon class="w-10 h-10 text-[var(--brand)]/40" />
         </div>
         <h3 class="text-xl font-bold txt-primary mb-2">{{ $t('mail.noHandlers') }}</h3>

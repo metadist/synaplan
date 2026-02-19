@@ -93,19 +93,29 @@
       to="/config/api-documentation"
       class="group block relative overflow-hidden surface-card rounded-xl hover:shadow-lg transition-all duration-300"
     >
-      <div class="absolute inset-0 bg-gradient-to-r from-[var(--brand)]/5 via-transparent to-purple-500/5 group-hover:from-[var(--brand)]/10 group-hover:to-purple-500/10 transition-all duration-300"></div>
-      <div class="absolute top-0 right-0 w-32 h-32 bg-[var(--brand)]/5 rounded-full blur-2xl -translate-y-1/2 translate-x-1/3 group-hover:bg-[var(--brand)]/10 transition-all"></div>
+      <div
+        class="absolute inset-0 bg-gradient-to-r from-[var(--brand)]/5 via-transparent to-purple-500/5 group-hover:from-[var(--brand)]/10 group-hover:to-purple-500/10 transition-all duration-300"
+      ></div>
+      <div
+        class="absolute top-0 right-0 w-32 h-32 bg-[var(--brand)]/5 rounded-full blur-2xl -translate-y-1/2 translate-x-1/3 group-hover:bg-[var(--brand)]/10 transition-all"
+      ></div>
       <div class="relative px-6 py-4 flex items-center gap-4">
-        <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-[var(--brand)] to-purple-500 flex items-center justify-center shadow-md shadow-[var(--brand)]/20 shrink-0">
+        <div
+          class="w-10 h-10 rounded-xl bg-gradient-to-br from-[var(--brand)] to-purple-500 flex items-center justify-center shadow-md shadow-[var(--brand)]/20 shrink-0"
+        >
           <BookOpenIcon class="w-5 h-5 text-white" />
         </div>
         <div class="flex-1 min-w-0">
-          <p class="text-sm font-semibold txt-primary group-hover:text-[var(--brand)] transition-colors">
+          <p
+            class="text-sm font-semibold txt-primary group-hover:text-[var(--brand)] transition-colors"
+          >
             {{ $t('config.apiKeys.docsTitle') }}
           </p>
           <p class="text-xs txt-secondary mt-0.5">{{ $t('config.apiKeys.docsDesc') }}</p>
         </div>
-        <ArrowRightIcon class="w-5 h-5 txt-secondary group-hover:text-[var(--brand)] group-hover:translate-x-1 transition-all shrink-0" />
+        <ArrowRightIcon
+          class="w-5 h-5 txt-secondary group-hover:text-[var(--brand)] group-hover:translate-x-1 transition-all shrink-0"
+        />
       </div>
     </router-link>
 
@@ -378,7 +388,14 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import { PlusIcon, KeyIcon, ClipboardDocumentIcon, CheckIcon, BookOpenIcon, ArrowRightIcon } from '@heroicons/vue/24/outline'
+import {
+  PlusIcon,
+  KeyIcon,
+  ClipboardDocumentIcon,
+  CheckIcon,
+  BookOpenIcon,
+  ArrowRightIcon,
+} from '@heroicons/vue/24/outline'
 import {
   listApiKeys,
   createApiKey,

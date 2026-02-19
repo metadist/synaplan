@@ -385,7 +385,9 @@ const executeDelete = async () => {
       const successCount = results.filter((r) => r.success).length
       const failCount = results.filter((r) => !r.success).length
       if (failCount > 0) {
-        showError(t('fileSelection.bulkDeletePartial', { success: successCount, failed: failCount }))
+        showError(
+          t('fileSelection.bulkDeletePartial', { success: successCount, failed: failCount })
+        )
       } else {
         success(t('fileSelection.bulkDeleteSuccess', { count: successCount }))
       }
@@ -458,7 +460,7 @@ const uploadFiles = async (filesToUpload: File[]) => {
 
     if (result.success) {
       success(
-        `${result.files.length} ${result.files.length === 1 ? 'file' : 'files'} uploaded successfully`,
+        `${result.files.length} ${result.files.length === 1 ? 'file' : 'files'} uploaded successfully`
       )
       await loadFiles()
       result.files.forEach((file) => {
@@ -513,7 +515,7 @@ watch(
       contentModalOpen.value = false
       confirmDialogOpen.value = false
     }
-  },
+  }
 )
 </script>
 
