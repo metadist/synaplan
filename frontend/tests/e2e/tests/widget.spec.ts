@@ -27,7 +27,7 @@ const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 
 // In-app Test Widget overlay (no cross-origin). Test stack: expect "success"; dev: any non-empty reply.
-test('@noci @smoke @widget @security User creates widget and receives response in test-widget-chat id=013', async ({
+test('@013 @noci @smoke @widget @security Widget: overlay receives response', async ({
   page,
 }) => {
   await login(page)
@@ -110,7 +110,7 @@ test('@noci @smoke @widget @security User creates widget and receives response i
   }
 })
 
-test('@smoke @widget Widget settings are correctly applied id=014', async ({ page }) => {
+test('@014 @smoke @widget Widget: applies settings and auto-open', async ({ page }) => {
   await login(page)
 
   const widgetName = WIDGET_NAMES.unique('Test Widget Settings')
@@ -154,7 +154,7 @@ test('@smoke @widget Widget settings are correctly applied id=014', async ({ pag
 })
 
 // Widget allows only example.com; page is localhost → backend returns 403 domain_not_whitelisted.
-test('@smoke @widget @security Widget blocked on non-whitelisted domain id=015', async ({
+test('@015 @smoke @widget @security Widget: blocked on non-whitelisted domain', async ({
   page,
 }) => {
   await login(page)
@@ -235,7 +235,7 @@ test('@smoke @widget @security Widget blocked on non-whitelisted domain id=015',
   })
 })
 
-test('@noci @smoke @widget Widget file upload works id=016', async ({ page }) => {
+test('@016 @noci @smoke @widget Widget: file upload returns answer', async ({ page }) => {
   await login(page)
 
   const widgetName = WIDGET_NAMES.unique('Test Widget File Upload')
@@ -277,7 +277,7 @@ test('@noci @smoke @widget Widget file upload works id=016', async ({ page }) =>
   await expect(widgetHost.locator(selectors.widget.errorFileUploadLimit)).toHaveCount(0)
 })
 
-test('@noci @smoke @widget Widget file upload limit enforced id=018', async ({ page }) => {
+test('@018 @noci @smoke @widget Widget: enforces file upload limit', async ({ page }) => {
   await login(page)
 
   const widgetName = WIDGET_NAMES.unique('Test Widget File Upload Limit')
@@ -328,7 +328,7 @@ test('@noci @smoke @widget Widget file upload limit enforced id=018', async ({ p
   expect(fileCount).toBe(1)
 })
 
-test('@noci @smoke @widget Widget max file size enforced id=019', async ({ page }) => {
+test('@019 @noci @smoke @widget Widget: enforces max file size', async ({ page }) => {
   await login(page)
 
   const widgetName = WIDGET_NAMES.unique('Test Widget Max File Size')
@@ -356,7 +356,7 @@ test('@noci @smoke @widget Widget max file size enforced id=019', async ({ page 
   await expect(fileName).not.toBeVisible({ timeout: TIMEOUTS.SHORT })
 })
 
-test('@noci @smoke @widget Widget task prompt works id=017', async ({ page }) => {
+test('@017 @noci @smoke @widget Widget: task prompt returns answer', async ({ page }) => {
   await login(page)
 
   const widgetName = WIDGET_NAMES.unique('Test Widget Task Prompt')
@@ -385,7 +385,7 @@ test('@noci @smoke @widget Widget task prompt works id=017', async ({ page }) =>
   expect(aiText.length).toBeGreaterThan(0)
 })
 
-test('@smoke @widget User sends message via embedded widget and receives response id=020', async ({
+test('@020 @smoke @widget Widget: embedded chat receives response', async ({
   page,
 }) => {
   await login(page)
