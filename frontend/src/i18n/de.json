@@ -1453,26 +1453,30 @@
         "behavior": "Verhalten",
         "security": "Sicherheit",
         "assistant": "KI-Assistent",
-        "summary": "Zusammenfassungs-Prompt"
+        "aiPrompts": "KI-Prompts"
       },
-      "summaryPrompt": {
-        "title": "Zusammenfassungs-Prompt",
-        "description": "Dieser Prompt steuert, wie die KI die Chat-Konversationen deines Widgets analysiert. Passe ihn an, um den Fokus auf das zu legen, was für dein Unternehmen am wichtigsten ist.",
+      "aiPrompts": {
         "modelLabel": "KI-Modell",
         "modelAutomatic": "Automatisch (Systemstandard)",
-        "modelHelp": "Wähle, welches KI-Modell die Konversationszusammenfassungen generieren soll.",
         "placeholderInfo": "Verfügbare Platzhalter (werden automatisch zur Laufzeit ersetzt):",
-        "placeholderConversations": "Wird durch die zu analysierenden Chat-Konversationen ersetzt",
-        "placeholderSystemPrompt": "Wird durch den aktuellen System-Prompt des Widgets ersetzt",
         "resetToDefault": "Auf Standard zurücksetzen",
-        "resetConfirmTitle": "Zusammenfassungs-Prompt zurücksetzen?",
+        "resetConfirmTitle": "Prompt zurücksetzen?",
         "resetConfirmMessage": "Dein benutzerdefinierter Prompt und die Modellauswahl werden verworfen und die Systemstandards wiederhergestellt. Diese Aktion kann nicht rückgängig gemacht werden.",
-        "saveSuccess": "Zusammenfassungs-Prompt erfolgreich gespeichert",
-        "resetSuccess": "Zusammenfassungs-Prompt auf Standard zurückgesetzt",
-        "loadError": "Zusammenfassungs-Prompt konnte nicht geladen werden",
-        "saveError": "Zusammenfassungs-Prompt konnte nicht gespeichert werden",
+        "resetSuccess": "Prompt auf Standard zurückgesetzt",
         "customBadge": "Benutzerdefiniert",
         "defaultBadge": "Standard"
+      },
+      "summaryPrompt": {
+        "title": "Zusammenfassungs-Analyse",
+        "description": "Steuert, wie die KI die Chat-Konversationen deines Widgets analysiert.",
+        "modelHelp": "Wähle, welches KI-Modell die Konversationszusammenfassungen generieren soll.",
+        "placeholderConversations": "Wird durch die zu analysierenden Chat-Konversationen ersetzt",
+        "placeholderSystemPrompt": "Wird durch den aktuellen System-Prompt des Widgets ersetzt"
+      },
+      "setupPrompt": {
+        "title": "KI-Setup-Interview",
+        "description": "Steuert den KI-Assistenten, der Nutzer durch die Widget-Konfiguration führt.",
+        "modelHelp": "Wähle, welches KI-Modell das Setup-Interview durchführen soll."
       },
       "position": "Widget-Position",
       "theme": "Standard-Theme",

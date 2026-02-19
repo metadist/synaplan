@@ -878,7 +878,7 @@
 
           <!-- Summary Prompt Tab -->
           <WidgetSummaryPromptTab
-            v-if="activeTab === 'summary'"
+            v-if="activeTab === 'ai-prompts'"
             ref="summaryPromptTab"
             :widget-id="widget.widgetId"
             :models="allModels"
@@ -1010,9 +1010,9 @@ const tabs = computed(() => {
       labelKey: 'widgets.advancedConfig.tabs.assistant',
     },
     {
-      id: 'summary',
-      icon: 'heroicons:chart-bar-square',
-      labelKey: 'widgets.advancedConfig.tabs.summary',
+      id: 'ai-prompts',
+      icon: 'heroicons:cpu-chip',
+      labelKey: 'widgets.advancedConfig.tabs.aiPrompts',
     },
   ]
 })

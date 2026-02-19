@@ -8,6 +8,7 @@ use App\AI\Service\AiFacade;
 use App\Entity\Prompt;
 use App\Entity\User;
 use App\Entity\Widget;
+use App\Repository\PromptRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 
@@ -20,16 +21,34 @@ use Psr\Log\LoggerInterface;
 final class WidgetSetupService
 {
     public const SETUP_INTERVIEW_TOPIC = 'tools:widget-setup-interview';
+    public const SETUP_TOPIC_PREFIX = 'wsetup_';
+    public const DEFAULT_SETUP_MODEL_ID = 73;
     private const START_MARKER = '__START_INTERVIEW__';
 
     public function __construct(
         private EntityManagerInterface $em,
         private AiFacade $aiFacade,
         private PromptService $promptService,
+        private PromptRepository $promptRepository,
         private WidgetService $widgetService,
         private ModelConfigService $modelConfigService,
         private LoggerInterface $logger,
     ) {
+    }
+
+    public static function getSetupTopicForWidget(Widget $widget): string
+    {
+        return self::SETUP_TOPIC_PREFIX.$widget->getWidgetId();
+    }
+
+    /**
+     * Parse the model ID stored in a setup prompt's shortDescription field.
+     */
+    public static function parseModelId(Prompt $prompt): int
+    {
+        $raw = $prompt->getShortDescription();
+
+        return ($raw !== '' && (int) $raw > 0) ? (int) $raw : -1;
     }
 
     /**
@@ -43,50 +62,18 @@ final class WidgetSetupService
      */
     public function sendSetupMessage(Widget $widget, User $user, string $text, array $history = [], string $language = 'en'): array
     {
-        // Get the setup interview prompt
-        $promptData = $this->promptService->getPromptWithMetadata(
-            self::SETUP_INTERVIEW_TOPIC,
-            $user->getId(),
-            'en'
-        );
+        $setupConfig = $this->resolveSetupConfig($widget);
+        $systemPrompt = $setupConfig['prompt'];
+        $modelId = $setupConfig['modelId'];
 
-        if (!$promptData || !$promptData['prompt']) {
-            $this->logger->error('Widget setup interview prompt not found', [
-                'topic' => self::SETUP_INTERVIEW_TOPIC,
-                'user_id' => $user->getId(),
-            ]);
-            throw new \RuntimeException('Setup interview prompt not configured. Please run database fixtures.');
-        }
+        $provider = $this->modelConfigService->getProviderForModel($modelId);
+        $modelName = $this->modelConfigService->getModelName($modelId);
 
-        $systemPrompt = $promptData['prompt']->getPrompt();
-
-        // Use a cheap, reliable model for the setup interview
-        // Priority: OpenAI gpt-4o-mini (ID 73), fallback to Groq Llama 3.3 70b (ID 9)
-        $provider = null;
-        $modelName = null;
-
-        // Try OpenAI gpt-4o-mini first ($0.15/1M in, $0.60/1M out) - most reliable
-        $openaiProvider = $this->modelConfigService->getProviderForModel(73);
-        $openaiModel = $this->modelConfigService->getModelName(73);
-
-        if ($openaiProvider && $openaiModel) {
-            $provider = $openaiProvider;
-            $modelName = $openaiModel;
-        } else {
-            // Fallback to Groq Llama 3.3 70b ($0.59/1M in, $0.79/1M out)
-            $groqProvider = $this->modelConfigService->getProviderForModel(9);
-            $groqModel = $this->modelConfigService->getModelName(9);
-
-            if ($groqProvider && $groqModel) {
-                $provider = $groqProvider;
-                $modelName = $groqModel;
-            } else {
-                // Last resort: use user's default model
-                $modelId = $this->modelConfigService->getDefaultModel('CHAT', $user->getId());
-                if ($modelId && $modelId > 0) {
-                    $provider = $this->modelConfigService->getProviderForModel($modelId);
-                    $modelName = $this->modelConfigService->getModelName($modelId);
-                }
+        if (!$provider || !$modelName) {
+            $fallbackId = $this->modelConfigService->getDefaultModel('CHAT', $user->getId());
+            if ($fallbackId && $fallbackId > 0) {
+                $provider = $this->modelConfigService->getProviderForModel($fallbackId);
+                $modelName = $this->modelConfigService->getModelName($fallbackId);
             }
         }
 
@@ -255,13 +242,13 @@ Generate a JSON response with EXACTLY this format (no markdown, just JSON):
 IMPORTANT: Respond ONLY with valid JSON, no explanations.
 PROMPT;
 
-                // Use reliable model for metadata generation (gpt-4o-mini)
                 $aiOptions = ['temperature' => 0.3];
-                $openaiProvider = $this->modelConfigService->getProviderForModel(73);
-                $openaiModel = $this->modelConfigService->getModelName(73);
-                if ($openaiProvider && $openaiModel) {
-                    $aiOptions['provider'] = $openaiProvider;
-                    $aiOptions['model'] = $openaiModel;
+                $metaModelId = self::DEFAULT_SETUP_MODEL_ID;
+                $metaProvider = $this->modelConfigService->getProviderForModel($metaModelId);
+                $metaModel = $this->modelConfigService->getModelName($metaModelId);
+                if ($metaProvider && $metaModel) {
+                    $aiOptions['provider'] = $metaProvider;
+                    $aiOptions['model'] = $metaModel;
                 }
 
                 $response = $this->aiFacade->chat(
@@ -465,5 +452,147 @@ PROMPT;
         }
 
         return 'none';
+    }
+
+    /**
+     * Resolve setup interview prompt and model for a widget.
+     *
+     * Fallback chain: custom per-widget -> system default -> hardcoded.
+     *
+     * @return array{prompt: string, modelId: int}
+     */
+    private function resolveSetupConfig(Widget $widget): array
+    {
+        $modelId = self::DEFAULT_SETUP_MODEL_ID;
+
+        // 1. Try custom per-widget prompt
+        $customTopic = self::getSetupTopicForWidget($widget);
+        $customPrompt = $this->promptRepository->findOneBy([
+            'topic' => $customTopic,
+            'ownerId' => $widget->getOwnerId(),
+        ]);
+        if ($customPrompt && '' !== trim($customPrompt->getPrompt())) {
+            $storedModelId = (int) $customPrompt->getShortDescription();
+            if ($storedModelId > 0) {
+                $modelId = $storedModelId;
+            }
+
+            return ['prompt' => $customPrompt->getPrompt(), 'modelId' => $modelId];
+        }
+
+        // 2. Fallback to system default
+        $promptData = $this->promptService->getPromptWithMetadata(
+            self::SETUP_INTERVIEW_TOPIC,
+            0,
+            'en'
+        );
+        if ($promptData && $promptData['prompt']) {
+            return ['prompt' => $promptData['prompt']->getPrompt(), 'modelId' => $modelId];
+        }
+
+        // 3. Ultimate fallback: hardcoded
+        $this->logger->warning('Setup interview prompt not found in DB, using hardcoded fallback', [
+            'widget_id' => $widget->getWidgetId(),
+        ]);
+
+        return ['prompt' => self::getDefaultPromptText(), 'modelId' => $modelId];
+    }
+
+    /**
+     * Return the default setup interview prompt text.
+     * Used as fallback when no DB entry exists yet.
+     */
+    public static function getDefaultPromptText(): string
+    {
+        return <<<'PROMPT'
+# Widget Setup Assistant
+
+You are a friendly assistant helping the user configure their chat widget. Have a casual conversation and collect 5 important pieces of information.
+
+## WHAT YOU NEED TO FIND OUT
+
+1. What does the company/website do? What products or services are offered?
+2. Who are the typical visitors? (Customers, business clients, job applicants, etc.)
+3. What should the chat assistant help with? (Support, sales, FAQ, appointments, etc.)
+4. What tone should the assistant use? (Formal, casual, friendly, professional)
+5. Are there topics the assistant should NOT discuss?
+
+## YOUR STYLE
+
+- Be casual and friendly, like a helpful colleague
+- No stiff questions! Keep it natural and conversational
+- Keep responses short (2-3 sentences), don't ramble
+- Briefly acknowledge answers before moving to the next question
+- If the user switches to a different language, follow their lead
+
+## IMPORTANT RULES
+
+- Ask ONE thing at a time
+- NEVER repeat a question that has already been answered
+- After a REAL answer → move to the next question
+- For follow-up questions or unclear answers → briefly explain, then ask again
+
+## ANSWER VALIDATION
+
+Check if the answer FITS the question - not if it's perfect!
+
+VALID ANSWERS (accept and continue):
+- Question 1 (Business): Any description of a company, service, product, or website. Short answers like "car dealership", "online shop", "pizzeria" are totally fine!
+- Question 2 (Visitors): Any description of target groups. "Private customers", "businesses", "everyone" are valid.
+- Question 3 (Tasks): Any description of tasks or topics. "Opening hours", "product questions", "support", "help with prices" are all valid - even with details!
+- Question 4 (Tone): "casual", "friendly", "professional", "like a friend", etc.
+- Question 5 (Taboos): Either specific topics or "nothing", "none", "everything is fine".
+
+IMPORTANT: If the user gives a REAL answer that fits the question → ACCEPT and move on!
+The user doesn't have to answer perfectly. An answer is valid if it somehow addresses the question.
+
+ONLY INVALID (ask again):
+- Completely incomprehensible (e.g., "asdf", "???", only emojis)
+- Pure counter-questions without an answer ("What do you mean?")
+- Obvious nonsense that has nothing to do with the question
+
+When in doubt: ACCEPT and move on! Better too flexible than too strict.
+
+## TRACKING
+
+At the END of each response, add on a new line:
+[QUESTION:X]
+
+X = the number of the question you JUST ASKED (1-5).
+
+IMPORTANT: If you ask the SAME question again (because the answer was invalid), use the SAME marker!
+Example: If answer to question 1 was invalid → ask again with [QUESTION:1]
+
+When all 5 are answered → [QUESTION:DONE]
+
+## AFTER QUESTION 5
+
+When all 5 pieces of information have REALLY been collected:
+
+1. **FIRST**: Show a brief summary with emojis:
+
+"Great, I've got everything! Here's a quick overview:
+
+📋 **Your Business**: [Brief summary of question 1]
+👥 **Your Visitors**: [Brief summary of question 2]
+🎯 **The Assistant Should**: [Brief summary of question 3]
+💬 **Tone**: [Brief summary of question 4]
+🚫 **Off-Limit Topics**: [Brief summary of question 5, or "No special restrictions"]
+
+I'm now creating your personalized assistant..."
+
+2. **THEN**: Generate the prompt:
+
+<<<GENERATED_PROMPT>>>
+[Here the system prompt for the chat assistant based on the collected information]
+<<<END_PROMPT>>>
+
+## START
+
+Greet the user casually and ask about their business/website. Be welcoming!
+Example: "Hey! Great to have you here. Tell me a bit about what you do – what's your business or website about?"
+
+[QUESTION:1]
+PROMPT;
     }
 }

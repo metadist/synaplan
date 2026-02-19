@@ -1452,26 +1452,30 @@
         "behavior": "Behavior",
         "security": "Security",
         "assistant": "AI Assistant",
-        "summary": "Summary Prompt"
+        "aiPrompts": "AI Prompts"
       },
-      "summaryPrompt": {
-        "title": "Summary Analysis Prompt",
-        "description": "This prompt controls how the AI analyzes your widget's chat conversations. Customize it to focus on what matters most for your business.",
+      "aiPrompts": {
         "modelLabel": "AI Model",
         "modelAutomatic": "Automatic (System Default)",
-        "modelHelp": "Select which AI model should generate the conversation summaries.",
         "placeholderInfo": "Available placeholders (automatically replaced at runtime):",
-        "placeholderConversations": "Replaced with the chat conversations to analyze",
-        "placeholderSystemPrompt": "Replaced with the widget's current system prompt",
         "resetToDefault": "Reset to Default",
-        "resetConfirmTitle": "Reset Summary Prompt?",
+        "resetConfirmTitle": "Reset Prompt?",
         "resetConfirmMessage": "This will discard your custom prompt and model selection and restore the system defaults. This action cannot be undone.",
-        "saveSuccess": "Summary prompt saved successfully",
-        "resetSuccess": "Summary prompt reset to default",
-        "loadError": "Failed to load summary prompt",
-        "saveError": "Failed to save summary prompt",
+        "resetSuccess": "Prompt reset to default",
         "customBadge": "Custom",
         "defaultBadge": "Default"
+      },
+      "summaryPrompt": {
+        "title": "Summary Analysis",
+        "description": "Controls how the AI analyzes your widget's chat conversations.",
+        "modelHelp": "Select which AI model should generate the conversation summaries.",
+        "placeholderConversations": "Replaced with the chat conversations to analyze",
+        "placeholderSystemPrompt": "Replaced with the widget's current system prompt"
+      },
+      "setupPrompt": {
+        "title": "AI Setup Interview",
+        "description": "Controls the AI assistant that guides users through widget configuration.",
+        "modelHelp": "Select which AI model should conduct the setup interview."
       },
       "position": "Widget Position",
       "theme": "Default Theme",

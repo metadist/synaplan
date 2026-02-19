@@ -561,3 +561,44 @@ export async function resetSummaryPrompt(
     { method: 'DELETE' }
   )
 }
+
+/**
+ * Get the AI setup interview prompt for a widget (custom or default).
+ */
+export async function getSetupPrompt(
+  widgetId: string
+): Promise<{ prompt: string; isDefault: boolean; modelId: number }> {
+  return await httpClient<{ success: boolean; prompt: string; isDefault: boolean; modelId: number }>(
+    `/api/v1/widgets/${widgetId}/setup/prompt`,
+    { method: 'GET' }
+  )
+}
+
+/**
+ * Create or update a custom setup interview prompt for a widget.
+ */
+export async function updateSetupPrompt(
+  widgetId: string,
+  prompt: string,
+  modelId: number = -1
+): Promise<{ success: boolean }> {
+  return await httpClient<{ success: boolean }>(
+    `/api/v1/widgets/${widgetId}/setup/prompt`,
+    {
+      method: 'PUT',
+      body: JSON.stringify({ prompt, modelId }),
+    }
+  )
+}
+
+/**
+ * Reset the setup interview prompt to the system default.
+ */
+export async function resetSetupPrompt(
+  widgetId: string
+): Promise<{ success: boolean }> {
+  return await httpClient<{ success: boolean }>(
+    `/api/v1/widgets/${widgetId}/setup/prompt`,
+    { method: 'DELETE' }
+  )
+}
