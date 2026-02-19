@@ -57,7 +57,8 @@ RUN composer install --prefer-dist --no-interaction --no-dev --no-scripts --opti
 
 # Copy and setup entrypoint scripts
 COPY _docker/backend/docker-entrypoint.sh /usr/local/bin/
-RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+COPY _docker/backend/synaplan /usr/local/bin/
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh /usr/local/bin/synaplan
 
 # Copy built frontend (built externally in CI, empty in dev)
 COPY frontend/dist /var/www/frontend

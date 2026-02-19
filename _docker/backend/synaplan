@@ -1,0 +1,11 @@
+#!/bin/sh
+# Scoped shortcut for synaplan app: console commands
+# Usage: synaplan model:enable ...  →  php bin/console app:model:enable ...
+#        synaplan                    →  php bin/console list app
+if [ $# -eq 0 ]; then
+  cd /var/www/backend && php bin/console list app
+  exit $?
+fi
+cmd="$1"
+shift
+cd /var/www/backend && php bin/console "app:${cmd}" "$@"
