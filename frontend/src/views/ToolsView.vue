@@ -317,7 +317,7 @@ const getPageTitle = () => {
     'doc-summary': 'Doc Summary',
     'mail-handler': 'Mail Handler',
   }
-  return titles[currentPage.value] || 'Tools'
+  return titles[currentPage.value] || 'Agents'
 }
 
 const getPageDescription = () => {

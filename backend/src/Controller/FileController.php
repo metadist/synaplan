@@ -213,6 +213,7 @@ class FileController extends AbstractController
         $messageFile->setFileName($uploadedFile->getClientOriginalName());
         $messageFile->setFileSize($storageResult['size']);
         $messageFile->setFileMime($storageResult['mime']);
+        $messageFile->setGroupKey($groupKey);
         $messageFile->setStatus('uploaded');
 
         $this->em->persist($messageFile);
@@ -478,33 +479,25 @@ class FileController extends AbstractController
             ->where('mf.userId = :userId')
             ->setParameter('userId', $user->getId());
 
-        // If group_key filter is provided, get file IDs from active vector storage (Qdrant or MariaDB)
+        // Filter by group_key: check DB column first, fall back to vector store for legacy files
         if ($groupKey) {
+            $vectorFileIds = [];
             try {
-                $fileIds = $this->vectorStorageFacade->getFileIdsByGroupKey($user->getId(), $groupKey);
-                if (empty($fileIds)) {
-                    // No files in this group — return empty
-                    return $this->json([
-                        'success' => true,
-                        'files' => [],
-                        'pagination' => ['page' => $page, 'limit' => $limit, 'total' => 0, 'pages' => 0],
-                    ]);
-                }
-                $qb->andWhere('mf.id IN (:fileIds)')
-                   ->setParameter('fileIds', $fileIds);
+                $vectorFileIds = $this->vectorStorageFacade->getFileIdsByGroupKey($user->getId(), $groupKey);
             } catch (\Throwable $e) {
-                $this->logger->warning('FileController: Failed to get file IDs by group key from vector storage', [
+                $this->logger->warning('FileController: Vector store group lookup failed, using DB only', [
                     'group_key' => $groupKey,
                     'error' => $e->getMessage(),
                 ]);
+            }
 
-                // Return empty result instead of showing files from wrong group
-                return $this->json([
-                    'success' => false,
-                    'error' => 'Failed to filter files by group key',
-                    'files' => [],
-                    'pagination' => ['page' => $page, 'limit' => $limit, 'total' => 0, 'pages' => 0],
-                ]);
+            if (!empty($vectorFileIds)) {
+                $qb->andWhere('(mf.groupKey = :groupKey OR mf.id IN (:vectorFileIds))')
+                   ->setParameter('groupKey', $groupKey)
+                   ->setParameter('vectorFileIds', $vectorFileIds);
+            } else {
+                $qb->andWhere('mf.groupKey = :groupKey')
+                   ->setParameter('groupKey', $groupKey);
             }
         }
 
@@ -531,8 +524,9 @@ class FileController extends AbstractController
             'text_preview' => mb_substr($mf->getFileText() ?? '', 0, 200),
             'uploaded_at' => $mf->getCreatedAt(),
             'uploaded_date' => date('Y-m-d H:i:s', $mf->getCreatedAt()),
-            'message_id' => null, // null if standalone
-            'is_attached' => null !== null,
+            'message_id' => null,
+            'is_attached' => false,
+            'group_key' => $mf->getGroupKey(),
         ], $messageFiles);
 
         return $this->json([
@@ -550,6 +544,10 @@ class FileController extends AbstractController
     /**
      * Get all file groups (unique group keys with file counts).
      *
+     * Merges two sources:
+     * 1. DB column BGROUPKEY (new files, immediately available)
+     * 2. Vector store groups (legacy files without BGROUPKEY, Qdrant/MariaDB)
+     *
      * GET /api/v1/files/groups
      */
     #[Route('/groups', name: 'groups', methods: ['GET'])]
@@ -561,25 +559,52 @@ class FileController extends AbstractController
         }
 
         try {
-            $groups = $this->vectorStorageFacade->getGroupKeys($user->getId());
+            // Source 1: Groups from DB column (fast, always available)
+            $merged = [];
 
-            $this->logger->debug('FileController: Retrieved file groups', [
-                'user_id' => $user->getId(),
-                'groups_count' => count($groups),
-                'groups' => $groups,
-            ]);
+            $qb = $this->fileRepository->createQueryBuilder('f')
+                ->select('f.groupKey AS name, COUNT(f.id) AS cnt')
+                ->where('f.userId = :userId')
+                ->andWhere('f.groupKey IS NOT NULL')
+                ->setParameter('userId', $user->getId())
+                ->groupBy('f.groupKey')
+                ->orderBy('f.groupKey', 'ASC');
 
-            // Use getStats to get groups with chunk counts (works with Qdrant and MariaDB).
-            $stats = $this->vectorStorageFacade->getStats($user->getId());
-            $chunksByGroup = $stats->chunksByGroup;
+            foreach ($qb->getQuery()->getResult() as $row) {
+                $merged[$row['name']] = (int) $row['cnt'];
+            }
 
+            // Source 2: Groups from vector store (legacy files, Qdrant/MariaDB)
+            try {
+                $stats = $this->vectorStorageFacade->getStats($user->getId());
+                foreach ($stats->chunksByGroup as $groupKey => $chunkCount) {
+                    if (!isset($merged[$groupKey])) {
+                        // Legacy group not in DB yet — use chunk count as approximate file count
+                        $fileIds = $this->vectorStorageFacade->getFileIdsByGroupKey($user->getId(), $groupKey);
+                        $merged[$groupKey] = count($fileIds);
+                    }
+                }
+            } catch (\Throwable $e) {
+                $this->logger->warning('FileController: Vector store group lookup failed, using DB only', [
+                    'user_id' => $user->getId(),
+                    'error' => $e->getMessage(),
+                ]);
+            }
+
+            // Build response sorted by name
+            ksort($merged);
             $groupsData = [];
-            foreach ($chunksByGroup as $groupKey => $count) {
+            foreach ($merged as $name => $count) {
                 $groupsData[] = [
-                    'name' => $groupKey,
+                    'name' => $name,
                     'count' => $count,
                 ];
             }
+
+            $this->logger->debug('FileController: Retrieved file groups (DB + vector store)', [
+                'user_id' => $user->getId(),
+                'groups_count' => count($groupsData),
+            ]);
 
             return $this->json([
                 'success' => true,
@@ -955,6 +980,10 @@ class FileController extends AbstractController
             return $this->json(['error' => 'groupKey is required'], Response::HTTP_BAD_REQUEST);
         }
 
+        // Update group_key on the File entity
+        $messageFile->setGroupKey($newGroupKey);
+        $this->em->flush();
+
         // Update all RAG documents for this file via facade
         $chunksUpdated = $this->vectorStorageFacade->updateGroupKey(
             $user->getId(),
@@ -1036,6 +1065,10 @@ class FileController extends AbstractController
 
         $data = json_decode($request->getContent(), true);
         $groupKey = $data['groupKey'] ?? 'DEFAULT';
+
+        // Keep DB column in sync
+        $messageFile->setGroupKey($groupKey);
+        $this->em->flush();
 
         // Step 1: Delete existing RAG documents for this file via facade
         $this->vectorStorageFacade->deleteByFile($user->getId(), $messageFile->getId());
