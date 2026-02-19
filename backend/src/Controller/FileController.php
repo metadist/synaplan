@@ -513,6 +513,44 @@ class FileController extends AbstractController
                           ->getQuery()
                           ->getResult();
 
+        // Enrich legacy files: resolve groupKey from vector store for files missing DB column
+        $vectorChunkMap = [];
+        $legacyFileIds = array_filter(
+            array_map(fn (File $mf) => null === $mf->getGroupKey() ? $mf->getId() : null, $messageFiles)
+        );
+
+        if (!empty($legacyFileIds)) {
+            try {
+                $allChunks = $this->vectorStorageFacade->getFilesWithChunks($user->getId());
+                foreach ($legacyFileIds as $fid) {
+                    if (isset($allChunks[$fid]) && !empty($allChunks[$fid]['groupKey'])) {
+                        $vectorChunkMap[$fid] = $allChunks[$fid]['groupKey'];
+                    }
+                }
+            } catch (\Throwable $e) {
+                $this->logger->warning('FileController: Vector store chunk lookup for legacy files failed', [
+                    'error' => $e->getMessage(),
+                ]);
+            }
+
+            // Lazy-backfill: persist resolved groupKeys to DB so future reads are fast
+            if (!empty($vectorChunkMap)) {
+                foreach ($messageFiles as $mf) {
+                    $resolvedKey = $vectorChunkMap[$mf->getId()] ?? null;
+                    if ($resolvedKey && null === $mf->getGroupKey()) {
+                        $mf->setGroupKey($resolvedKey);
+                    }
+                }
+                try {
+                    $this->em->flush();
+                } catch (\Throwable $e) {
+                    $this->logger->warning('FileController: Lazy backfill of groupKey failed', [
+                        'error' => $e->getMessage(),
+                    ]);
+                }
+            }
+        }
+
         $files = array_map(fn (File $mf) => [
             'id' => $mf->getId(),
             'filename' => $mf->getFileName(),
@@ -526,7 +564,7 @@ class FileController extends AbstractController
             'uploaded_date' => date('Y-m-d H:i:s', $mf->getCreatedAt()),
             'message_id' => null,
             'is_attached' => false,
-            'group_key' => $mf->getGroupKey(),
+            'group_key' => $mf->getGroupKey() ?: ($vectorChunkMap[$mf->getId()] ?? null),
         ], $messageFiles);
 
         return $this->json([
@@ -583,9 +621,14 @@ class FileController extends AbstractController
                     if ('DEFAULT' === $groupKey || '' === $groupKey) {
                         continue;
                     }
+                    $vectorFileIds = $this->vectorStorageFacade->getFileIdsByGroupKey($user->getId(), $groupKey);
+                    $vectorCount = count($vectorFileIds);
+
                     if (!isset($merged[$groupKey])) {
-                        $fileIds = $this->vectorStorageFacade->getFileIdsByGroupKey($user->getId(), $groupKey);
-                        $merged[$groupKey] = count($fileIds);
+                        $merged[$groupKey] = $vectorCount;
+                    } else {
+                        // Mixed group: DB has new files, vector store may have additional legacy files
+                        $merged[$groupKey] = max($merged[$groupKey], $vectorCount);
                     }
                 }
             } catch (\Throwable $e) {
@@ -1068,10 +1111,12 @@ class FileController extends AbstractController
         }
 
         $data = json_decode($request->getContent(), true);
-        $groupKey = $data['groupKey'] ?? 'DEFAULT';
+        $groupKey = $data['groupKey'] ?? $messageFile->getGroupKey() ?? '';
 
         // Keep DB column in sync
-        $messageFile->setGroupKey($groupKey);
+        if ('' !== $groupKey && 'DEFAULT' !== $groupKey) {
+            $messageFile->setGroupKey($groupKey);
+        }
         $this->em->flush();
 
         // Step 1: Delete existing RAG documents for this file via facade
