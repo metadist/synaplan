@@ -15,7 +15,7 @@ const VERIFY_MARKER = 'verify-email-callback?token='
 const HREF_RE = /href=["']([^"']*\/verify-email-callback\?token=[^"']*)["']/i
 
 /** GET MailHog messages. Non-OK tolerated (returns []); poll timeout = fail. */
-async function fetchMessages(request: APIRequestContext): Promise<MailHogMessage[]> {
+export async function fetchMessages(request: APIRequestContext): Promise<MailHogMessage[]> {
   const res = await request.get(`${URLS.MAILHOG_URL}/api/v2/messages`)
   if (!res.ok()) return []
   const data = await res.json()
@@ -24,12 +24,31 @@ async function fetchMessages(request: APIRequestContext): Promise<MailHogMessage
 }
 
 /** Body from Content.Body or first Part. */
-function bodyOf(msg: MailHogMessage): string {
+export function bodyOf(msg: MailHogMessage): string {
   return msg.Content?.Body ?? msg.Content?.Parts?.[0]?.Body ?? ''
 }
 
+/**
+ * Plain-text body for assertion. For multipart emails (e.g. text/plain + text/html),
+ * MailHog may return the full MIME in Body; this extracts the text/plain part.
+ */
+export function getPlainTextBody(msg: MailHogMessage): string {
+  const raw = bodyOf(msg)
+  const decoded = decodeQP(raw)
+  const plain = extractPlainFromMultipart(decoded)
+  return decodeQP(plain)
+}
+
+/** Extract text/plain part from a decoded MIME body, or return as-is if no boundary. */
+function extractPlainFromMultipart(decoded: string): string {
+  const ctPlain = /Content-Type:\s*text\/plain[\s\S]*?\r?\n\r?\n([\s\S]*?)(?=\r?\n--|\r?\nContent-Type:|$)/i
+  const m = decoded.match(ctPlain)
+  if (m?.[1]) return m[1].trim()
+  return decoded
+}
+
 /** Quoted-printable decode (Symfony Mailer sends HTML as QP). */
-function decodeQP(s: string): string {
+export function decodeQP(s: string): string {
   const noSoft = s.replace(/=\r?\n/g, '')
   return noSoft.replace(/=([0-9A-Fa-f]{2})/g, (_, hex: string) =>
     String.fromCharCode(parseInt(hex, 16))
@@ -37,7 +56,7 @@ function decodeQP(s: string): string {
 }
 
 /** To header matches email (normalizes once). "Name <addr>" or plain addr, case-insensitive. */
-function toMatches(msg: MailHogMessage, recipientEmail: string): boolean {
+export function toMatches(msg: MailHogMessage, recipientEmail: string): boolean {
   const want = recipientEmail.trim().toLowerCase()
   const toHeader = msg.Content?.Headers?.To ?? []
   const rawList = Array.isArray(toHeader) ? toHeader : [toHeader]
