@@ -25,23 +25,25 @@ class ModelCatalog
     /**
      * Upsert a model into the database (INSERT ... ON DUPLICATE KEY UPDATE).
      */
-    public static function upsert(Connection $connection, array $model): void
+    public static function upsert(Connection $connection, array $model, bool $system = false): void
     {
         $connection->executeStatement(
-            'INSERT INTO BMODELS (BID, BSERVICE, BNAME, BTAG, BSELECTABLE, BACTIVE, BPROVID, BPRICEIN, BINUNIT, BPRICEOUT, BOUTUNIT, BQUALITY, BRATING, BJSON)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            'INSERT INTO BMODELS (BID, BSERVICE, BNAME, BTAG, BSELECTABLE, BACTIVE, BPROVID, BPRICEIN, BINUNIT, BPRICEOUT, BOUTUNIT, BQUALITY, BRATING, BISDEFAULT, BJSON)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON DUPLICATE KEY UPDATE
                 BSERVICE = VALUES(BSERVICE), BNAME = VALUES(BNAME), BTAG = VALUES(BTAG),
                 BSELECTABLE = VALUES(BSELECTABLE), BACTIVE = VALUES(BACTIVE),
                 BPROVID = VALUES(BPROVID), BPRICEIN = VALUES(BPRICEIN),
                 BINUNIT = VALUES(BINUNIT), BPRICEOUT = VALUES(BPRICEOUT),
                 BOUTUNIT = VALUES(BOUTUNIT), BQUALITY = VALUES(BQUALITY),
-                BRATING = VALUES(BRATING), BJSON = VALUES(BJSON)',
+                BRATING = VALUES(BRATING), BISDEFAULT = VALUES(BISDEFAULT),
+                BJSON = VALUES(BJSON)',
             [
                 $model['id'], $model['service'], $model['name'], $model['tag'],
                 $model['selectable'], $model['active'], $model['providerId'],
                 $model['priceIn'], $model['inUnit'], $model['priceOut'],
                 $model['outUnit'], $model['quality'], $model['rating'],
+                $system ? 1 : 0,
                 json_encode($model['json']),
             ]
         );

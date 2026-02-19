@@ -10,6 +10,7 @@ use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputInterface;
+use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Style\SymfonyStyle;
 
@@ -30,9 +31,12 @@ class ModelEnableCommand extends Command
         $this
             ->addArgument('models', InputArgument::IS_ARRAY | InputArgument::REQUIRED,
                 'Model keys to enable (e.g. groq:llama-3.3-70b-versatile ollama:bge-m3)')
+            ->addOption('system', null, InputOption::VALUE_NONE,
+                'Mark enabled models as system models (locked, users cannot change)')
             ->setHelp(
                 "Enable one or more AI models from the built-in catalog.\n\n".
                 "Key format: service:providerId (or service:providerId:tag to target a specific variant)\n\n".
+                "Use <info>--system</info> to lock models so users cannot change them.\n\n".
                 'Run <info>app:model:list</info> to see all available models and their status.'
             );
     }
@@ -41,6 +45,7 @@ class ModelEnableCommand extends Command
     {
         $io = new SymfonyStyle($input, $output);
         $modelKeys = $input->getArgument('models');
+        $system = $input->getOption('system');
         $enabled = 0;
         $errors = false;
 
@@ -54,8 +59,9 @@ class ModelEnableCommand extends Command
             }
 
             foreach ($models as $model) {
-                ModelCatalog::upsert($this->connection, $model);
-                $io->writeln("  <info>Enabled</info> {$model['service']}: {$model['name']} ({$model['tag']})");
+                ModelCatalog::upsert($this->connection, $model, $system);
+                $label = $system ? 'Enabled (system)' : 'Enabled';
+                $io->writeln("  <info>$label</info> {$model['service']}: {$model['name']} ({$model['tag']})");
                 ++$enabled;
             }
         }
