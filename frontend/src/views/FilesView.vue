@@ -467,54 +467,12 @@
                         <div
                           class="flex gap-0.5 justify-end opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity"
                         >
-                          <div class="relative">
-                            <button
-                              class="p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 txt-secondary hover:text-[var(--brand)] transition-colors"
-                              :title="$t('files.moveTo')"
-                              @click.stop="toggleFolderMenu(file.id)"
-                            >
-                              <Icon icon="heroicons:folder-arrow-down" class="w-4 h-4" />
-                            </button>
-                            <Transition name="fade">
-                              <div
-                                v-if="folderMenuOpen === file.id"
-                                class="absolute right-0 top-full mt-1 z-30 w-52 surface-card rounded-xl border border-light-border/30 dark:border-dark-border/20 shadow-xl py-1.5 overflow-hidden"
-                              >
-                                <div
-                                  class="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider txt-secondary"
-                                >
-                                  {{ $t('files.moveTo') }}
-                                </div>
-                                <button
-                                  v-for="folder in fileGroups"
-                                  :key="folder.name"
-                                  class="w-full flex items-center gap-2 px-3 py-2 text-xs txt-primary hover:bg-[var(--brand)]/10 transition-colors text-left"
-                                  @click="moveFileToFolder(file.id, folder.name)"
-                                >
-                                  <Icon icon="heroicons:folder-solid" class="w-4 h-4 shrink-0" />
-                                  <span class="truncate">{{ folder.name }}</span>
-                                </button>
-                                <div
-                                  class="border-t border-light-border/20 dark:border-dark-border/10 mt-1.5 pt-1.5"
-                                >
-                                  <div class="flex items-center gap-1.5 px-3 py-1">
-                                    <Icon
-                                      icon="heroicons:folder-plus"
-                                      class="w-4 h-4 text-[var(--brand)] shrink-0"
-                                    />
-                                    <input
-                                      v-model="newMoveTarget"
-                                      type="text"
-                                      class="flex-1 text-xs bg-transparent txt-primary placeholder:txt-secondary/50 focus:outline-none"
-                                      :placeholder="$t('files.folderPicker.newPlaceholder')"
-                                      @keyup.enter="moveFileToFolder(file.id, newMoveTarget.trim())"
-                                      @click.stop
-                                    />
-                                  </div>
-                                </div>
-                              </div>
-                            </Transition>
-                          </div>
+                          <FolderMoveMenu
+                            :open="folderMenuOpen === file.id"
+                            :folders="fileGroups"
+                            @toggle="toggleFolderMenu(file.id)"
+                            @move="moveFileToFolder(file.id, $event)"
+                          />
                           <button
                             class="p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 txt-secondary hover:txt-primary transition-colors"
                             :title="$t('files.download')"
@@ -721,70 +679,13 @@
                       <div
                         class="flex gap-0.5 justify-end opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity"
                       >
-                        <!-- Move to another folder -->
-                        <div class="relative">
-                          <button
-                            class="p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 txt-secondary hover:text-[var(--brand)] transition-colors"
-                            :title="$t('files.moveTo')"
-                            @click.stop="toggleFolderMenu(file.id)"
-                          >
-                            <Icon icon="heroicons:folder-arrow-down" class="w-4 h-4" />
-                          </button>
-                          <Transition name="fade">
-                            <div
-                              v-if="folderMenuOpen === file.id"
-                              class="absolute right-0 top-full mt-1 z-30 w-52 surface-card rounded-xl border border-light-border/30 dark:border-dark-border/20 shadow-xl py-1.5 overflow-hidden"
-                            >
-                              <div
-                                class="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider txt-secondary"
-                              >
-                                {{ $t('files.moveTo') }}
-                              </div>
-                              <button
-                                v-for="folder in fileGroups"
-                                :key="folder.name"
-                                class="w-full flex items-center gap-2 px-3 py-2 text-xs txt-primary hover:bg-[var(--brand)]/10 transition-colors text-left"
-                                :class="{
-                                  'text-[var(--brand)] font-medium': folder.name === openFolder,
-                                }"
-                                @click="moveFileToFolder(file.id, folder.name)"
-                              >
-                                <Icon
-                                  :icon="
-                                    folder.name === openFolder
-                                      ? 'heroicons:folder-open-solid'
-                                      : 'heroicons:folder-solid'
-                                  "
-                                  class="w-4 h-4 shrink-0"
-                                />
-                                <span class="truncate">{{ folder.name }}</span>
-                                <Icon
-                                  v-if="folder.name === openFolder"
-                                  icon="heroicons:check"
-                                  class="w-3.5 h-3.5 ml-auto text-[var(--brand)]"
-                                />
-                              </button>
-                              <div
-                                class="border-t border-light-border/20 dark:border-dark-border/10 mt-1.5 pt-1.5"
-                              >
-                                <div class="flex items-center gap-1.5 px-3 py-1">
-                                  <Icon
-                                    icon="heroicons:folder-plus"
-                                    class="w-4 h-4 text-[var(--brand)] shrink-0"
-                                  />
-                                  <input
-                                    v-model="newMoveTarget"
-                                    type="text"
-                                    class="flex-1 text-xs bg-transparent txt-primary placeholder:txt-secondary/50 focus:outline-none"
-                                    :placeholder="$t('files.folderPicker.newPlaceholder')"
-                                    @keyup.enter="moveFileToFolder(file.id, newMoveTarget.trim())"
-                                    @click.stop
-                                  />
-                                </div>
-                              </div>
-                            </div>
-                          </Transition>
-                        </div>
+                        <FolderMoveMenu
+                          :open="folderMenuOpen === file.id"
+                          :folders="fileGroups"
+                          :current-folder="openFolder"
+                          @toggle="toggleFolderMenu(file.id)"
+                          @move="moveFileToFolder(file.id, $event)"
+                        />
                         <button
                           class="p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 txt-secondary hover:txt-primary transition-colors"
                           :title="$t('files.download')"
@@ -941,6 +842,7 @@ import FileContentModal from '@/components/FileContentModal.vue'
 import ShareModal from '@/components/ShareModal.vue'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
 import StorageQuotaWidget from '@/components/StorageQuotaWidget.vue'
+import FolderMoveMenu from '@/components/FolderMoveMenu.vue'
 import { Icon } from '@iconify/vue'
 import {
   CloudArrowUpIcon,
@@ -971,7 +873,6 @@ const selectedFiles = ref<File[]>([])
 const filterGroup = ref('')
 const openFolder = ref<string | null>(null)
 const folderMenuOpen = ref<number | null>(null)
-const newMoveTarget = ref('')
 const files = ref<FileItem[]>([])
 const fileGroups = ref<Array<{ name: string; count: number }>>([])
 const selectedFileIds = ref<number[]>([])
@@ -1100,10 +1001,8 @@ const exitFolder = () => {
 const toggleFolderMenu = (fileId: number) => {
   if (folderMenuOpen.value === fileId) {
     folderMenuOpen.value = null
-    newMoveTarget.value = ''
   } else {
     folderMenuOpen.value = fileId
-    newMoveTarget.value = ''
   }
 }
 
@@ -1128,7 +1027,6 @@ const closeFolderMenu = (e: MouseEvent) => {
     const target = e.target as HTMLElement
     if (!target.closest('[data-testid="section-table"]')) {
       folderMenuOpen.value = null
-      newMoveTarget.value = ''
     }
   }
 }

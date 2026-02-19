@@ -614,20 +614,21 @@ class FileController extends AbstractController
                 $merged[$row['name']] = (int) $row['cnt'];
             }
 
-            // Source 2: Groups from vector store (legacy files, Qdrant/MariaDB)
+            // Source 2: Groups from vector store (single batch call, no N+1)
             try {
-                $stats = $this->vectorStorageFacade->getStats($user->getId());
-                foreach ($stats->chunksByGroup as $groupKey => $chunkCount) {
-                    if ('DEFAULT' === $groupKey || '' === $groupKey) {
+                $allChunks = $this->vectorStorageFacade->getFilesWithChunks($user->getId());
+                $vectorGroups = [];
+                foreach ($allChunks as $info) {
+                    $gk = $info['groupKey'] ?? '';
+                    if ('' === $gk || 'DEFAULT' === $gk) {
                         continue;
                     }
-                    $vectorFileIds = $this->vectorStorageFacade->getFileIdsByGroupKey($user->getId(), $groupKey);
-                    $vectorCount = count($vectorFileIds);
-
+                    $vectorGroups[$gk] = ($vectorGroups[$gk] ?? 0) + 1;
+                }
+                foreach ($vectorGroups as $groupKey => $vectorCount) {
                     if (!isset($merged[$groupKey])) {
                         $merged[$groupKey] = $vectorCount;
                     } else {
-                        // Mixed group: DB has new files, vector store may have additional legacy files
                         $merged[$groupKey] = max($merged[$groupKey], $vectorCount);
                     }
                 }

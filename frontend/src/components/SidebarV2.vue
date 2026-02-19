@@ -707,7 +707,9 @@ const navItems = computed<NavItem[]>(() => {
       icon: PuzzlePieceIcon,
       children: configStore.plugins.map((plugin: { name?: string }) => ({
         path: `/plugins/${plugin.name}`,
-        label: plugin.name ? plugin.name.charAt(0).toUpperCase() + plugin.name.slice(1) : 'Unknown',
+        label: plugin.name
+          ? plugin.name.charAt(0).toUpperCase() + plugin.name.slice(1)
+          : t('common.unknown'),
       })),
     })
   }
@@ -856,7 +858,10 @@ const chatList = computed(() => {
     const isEmpty =
       (!c.messageCount || c.messageCount === 0) &&
       !c.firstMessagePreview &&
-      (c.title === 'New Chat' || c.title === 'Neuer Chat' || c.title.startsWith('Chat '))
+      (c.title === t('chat.newChat') ||
+        c.title === 'New Chat' ||
+        c.title === 'Neuer Chat' ||
+        c.title.startsWith('Chat '))
     return !isEmpty
   })
 })
@@ -873,7 +878,10 @@ const filteredChatList = computed(() => {
 const getDisplayTitle = (chat: StoreChat): string => {
   if (chat.firstMessagePreview) return chat.firstMessagePreview
   const isDefault =
-    chat.title === 'New Chat' || chat.title === 'Neuer Chat' || chat.title.startsWith('Chat ')
+    chat.title === t('chat.newChat') ||
+    chat.title === 'New Chat' ||
+    chat.title === 'Neuer Chat' ||
+    chat.title.startsWith('Chat ')
   if (!isDefault) return chat.title
   return t('chat.newChat')
 }
@@ -885,10 +893,10 @@ const formatTimestamp = (dateStr: string): string => {
   const diffMins = Math.floor(diffMs / 60000)
   const diffHours = Math.floor(diffMs / 3600000)
   const diffDays = Math.floor(diffMs / 86400000)
-  if (diffMins < 1) return 'now'
-  if (diffMins < 60) return `${diffMins}m`
-  if (diffHours < 24) return `${diffHours}h`
-  if (diffDays < 7) return `${diffDays}d`
+  if (diffMins < 1) return t('chat.timeNow')
+  if (diffMins < 60) return t('chat.timeMinutes', { n: diffMins })
+  if (diffHours < 24) return t('chat.timeHours', { n: diffHours })
+  if (diffDays < 7) return t('chat.timeDays', { n: diffDays })
   return `${String(date.getMonth() + 1).padStart(2, '0')}/${String(date.getDate()).padStart(2, '0')}`
 }
 

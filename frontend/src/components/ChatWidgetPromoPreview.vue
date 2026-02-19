@@ -80,11 +80,17 @@
               <!-- Chat Header -->
               <div
                 class="px-3 py-2 flex items-center justify-between"
-                style="background: linear-gradient(135deg, #00b79d, #00d4bc)"
+                style="
+                  background: linear-gradient(
+                    135deg,
+                    var(--brand),
+                    var(--brand-light, var(--brand))
+                  );
+                "
               >
                 <div class="flex items-center gap-1.5">
                   <Icon icon="heroicons:chat-bubble-left-right" class="w-4 h-4 text-white" />
-                  <span class="text-white font-medium text-xs">AI Assistant</span>
+                  <span class="text-white font-medium text-xs">{{ t('nav.toolsChatWidget') }}</span>
                 </div>
                 <button
                   class="text-white/70 hover:text-white transition-colors w-5 h-5 flex items-center justify-center"
@@ -110,7 +116,13 @@
                   <div v-if="showGreeting" class="flex gap-2 mb-2.5">
                     <div
                       class="w-6 h-6 rounded-full flex-shrink-0 flex items-center justify-center text-white text-[8px] font-bold"
-                      style="background: linear-gradient(135deg, #00b79d, #00d4bc)"
+                      style="
+                        background: linear-gradient(
+                          135deg,
+                          var(--brand),
+                          var(--brand-light, var(--brand))
+                        );
+                      "
                     >
                       AI
                     </div>
@@ -131,7 +143,13 @@
                   <div v-if="showUserMsg" class="flex gap-2 mb-2.5 justify-end">
                     <div
                       class="rounded-lg rounded-tr-sm px-2.5 py-1.5 text-[11px] text-white shadow-sm max-w-[85%] leading-relaxed"
-                      style="background: linear-gradient(135deg, #00b79d, #009e88)"
+                      style="
+                        background: linear-gradient(
+                          135deg,
+                          var(--brand),
+                          var(--brand-dark, var(--brand))
+                        );
+                      "
                     >
                       {{ $t('promoTips.widgetPreview.userMessage') }}
                     </div>
@@ -147,7 +165,13 @@
                   <div v-if="showTyping || showAiResponse" class="flex gap-2">
                     <div
                       class="w-6 h-6 rounded-full flex-shrink-0 flex items-center justify-center text-white text-[8px] font-bold"
-                      style="background: linear-gradient(135deg, #00b79d, #00d4bc)"
+                      style="
+                        background: linear-gradient(
+                          135deg,
+                          var(--brand),
+                          var(--brand-light, var(--brand))
+                        );
+                      "
                     >
                       AI
                     </div>
@@ -175,7 +199,13 @@
                   </div>
                   <button
                     class="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0"
-                    style="background: linear-gradient(135deg, #00b79d, #00d4bc)"
+                    style="
+                      background: linear-gradient(
+                        135deg,
+                        var(--brand),
+                        var(--brand-light, var(--brand))
+                      );
+                    "
                   >
                     <Icon icon="heroicons:paper-airplane" class="w-3.5 h-3.5 text-white" />
                   </button>
@@ -188,7 +218,9 @@
           <button
             class="relative group flex items-center justify-center rounded-full shadow-lg cursor-pointer transition-all duration-200 hover:scale-110 hover:shadow-xl"
             :class="compact ? 'w-10 h-10' : 'w-12 h-12'"
-            style="background: linear-gradient(135deg, #00b79d, #00d4bc)"
+            style="
+              background: linear-gradient(135deg, var(--brand), var(--brand-light, var(--brand)));
+            "
             @click.stop="chatOpen = !chatOpen"
           >
             <Icon
@@ -209,7 +241,10 @@
 
 <script setup lang="ts">
 import { ref, onMounted, onBeforeUnmount, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { Icon } from '@iconify/vue'
+
+const { t } = useI18n()
 
 const props = defineProps<{
   compact?: boolean
