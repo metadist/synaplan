@@ -136,7 +136,7 @@ readonly class UserMemoryService
         $pointId = "mem_{$user->getId()}_{$memoryId}";
 
         try {
-            $existing = $this->qdrantClient->getMemory($pointId);
+            $existing = $this->qdrantClient->getMemory($pointId, $namespace);
             if (!$existing) {
                 throw new \InvalidArgumentException('Memory not found');
             }
@@ -162,7 +162,7 @@ readonly class UserMemoryService
                 updated: time(),
             );
 
-            $this->storeInQdrant($dto, $user, $memoryId);
+            $this->storeInQdrant($dto, $user, $memoryId, $namespace);
 
             $this->logger->info('Memory updated', ['memory_id' => $memoryId]);
 
