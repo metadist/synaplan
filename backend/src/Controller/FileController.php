@@ -580,7 +580,7 @@ class FileController extends AbstractController
             try {
                 $stats = $this->vectorStorageFacade->getStats($user->getId());
                 foreach ($stats->chunksByGroup as $groupKey => $chunkCount) {
-                    if ('DEFAULT' === $groupKey || '' === $groupKey || null === $groupKey) {
+                    if ('DEFAULT' === $groupKey || '' === $groupKey) {
                         continue;
                     }
                     if (!isset($merged[$groupKey])) {
