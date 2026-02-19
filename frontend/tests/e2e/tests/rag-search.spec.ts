@@ -2,7 +2,7 @@ import { test, expect } from '../test-setup'
 import { login } from '../helpers/auth'
 import { selectors } from '../helpers/selectors'
 
-test('@noci @smoke semantic search completes and shows results summary id=007', async ({
+test('@007 @noci @smoke semantic search completes and shows results summary', async ({
   page,
 }) => {
   await login(page)

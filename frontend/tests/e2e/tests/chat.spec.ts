@@ -13,7 +13,7 @@ const e2eDir = path.join(__dirname, '..')
 
 const VISION_FIXTURE = readFileSync(path.join(e2eDir, FIXTURE_PATHS.VISION_PATTERN_64))
 
-test('@smoke Standard model generates answer id=003', async ({ page }) => {
+test('@003 @smoke Standard model generates answer', async ({ page }) => {
   await login(page)
   const chat = new ChatHelper(page)
 
@@ -35,7 +35,7 @@ test('@smoke Standard model generates answer id=003', async ({ page }) => {
   })
 })
 
-test('@noci @nightly User can chat with all models and get a "success" answer id=004', async ({
+test('@004 @noci @nightly User can chat with all models and get a "success" answer', async ({
   page,
 }) => {
   test.setTimeout(120_000)
@@ -66,7 +66,7 @@ test('@noci @nightly User can chat with all models and get a "success" answer id
   }
 })
 
-test('@noci @regression User can upload an image and gets a discription from all models id=008', async ({
+test('@008 @noci @regression User can upload an image and gets a discription from all models', async ({
   page,
 }) => {
   const failures: string[] = []
@@ -97,7 +97,7 @@ test('@noci @regression User can upload an image and gets a discription from all
   }
 })
 
-test('@noci @regression User can generate an image and test all models id=009', async ({
+test('@009 @noci @regression User can generate an image and test all models', async ({
   page,
 }) => {
   const failures: string[] = []
@@ -122,7 +122,7 @@ test('@noci @regression User can generate an image and test all models id=009', 
   }
 })
 
-test('@noci @regression User can generate a video and test all models id=010', async ({ page }) => {
+test('@010 @noci @regression User can generate a video and test all models', async ({ page }) => {
   const failures: string[] = []
   const chat = new ChatHelper(page)
 

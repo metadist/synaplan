@@ -19,7 +19,7 @@ async function acceptCookiesIfShown(page: import('@playwright/test').Page) {
   await button.click()
 }
 
-test('@auth @smoke User can register and login with email verification id=006', async ({
+test('@006 @auth @smoke User can register and login with email verification', async ({
   page,
   request,
 }) => {
