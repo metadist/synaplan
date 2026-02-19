@@ -9,7 +9,7 @@ use Doctrine\DBAL\Connection;
 /**
  * Built-in catalog of system prompts.
  *
- * Each prompt has a unique topic key (e.g. "general", "tools:sort").
+ * Each prompt is uniquely identified by (ownerId, topic, language).
  * System prompts have ownerId=0 and are shared across all users.
  *
  * Usage:
