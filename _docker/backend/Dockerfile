@@ -39,6 +39,10 @@ RUN mkdir -p /var/www/backend/var/cache /var/www/backend/var/log /var/www/backen
     chown -R www-data:www-data /var/www/backend/var /var/www/backend/public/up && \
     chmod -R 775 /var/www/backend/var /var/www/backend/public/up
 
+# Copy plugins BEFORE composer install so the autoloader includes plugin classes
+# Without this, --classmap-authoritative locks the autoloader to only backend classes
+COPY plugins/ /plugins/
+
 # Install dependencies with production optimizations
 # Flags explained:
 # --no-dev: Skip dev dependencies (phpunit, fixtures, etc.) for smaller image
@@ -60,9 +64,6 @@ COPY frontend/dist /var/www/frontend
 
 # Copy built widgets (built externally in CI, empty in dev)
 COPY frontend/dist-widget /var/www/widgets
-
-# Copy plugins directory (for SortX and other plugins)
-COPY plugins/ /plugins/
 
 # Copy Caddyfile for production routing (API vs SPA)
 COPY _docker/backend/Caddyfile /etc/caddy/Caddyfile
