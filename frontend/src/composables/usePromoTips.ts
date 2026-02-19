@@ -224,7 +224,7 @@ export function usePromoTips() {
   }
 
   if (import.meta.env.DEV) {
-    ;(window as Record<string, unknown>).__synaplanPromo = {
+    ;(window as unknown as Record<string, unknown>).__synaplanPromo = {
       show: forceShowTip,
       reset: resetState,
       tips: allTips.map((t) => t.id),
