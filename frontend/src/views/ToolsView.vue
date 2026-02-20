@@ -2,7 +2,11 @@
   <MainLayout>
     <div class="flex flex-col h-full overflow-y-auto bg-chat scroll-thin" data-testid="page-tools">
       <div class="max-w-[1400px] mx-auto w-full px-6 py-8">
-        <div class="mb-8" data-testid="section-header">
+        <div
+          v-if="currentPage !== 'mail-handler' && currentPage !== 'doc-summary'"
+          class="mb-8"
+          data-testid="section-header"
+        >
           <h1 class="text-3xl font-semibold txt-primary mb-2">
             {{ getPageTitle() }}
           </h1>
@@ -195,7 +199,7 @@ import SummaryConfiguration from '@/components/summary/SummaryConfiguration.vue'
 import SummaryResultModal from '@/components/summary/SummaryResultModal.vue'
 import MailHandlerConfiguration from '@/components/mail/MailHandlerConfiguration.vue'
 import MailHandlerList from '@/components/mail/MailHandlerList.vue'
-import { EyeIcon, XMarkIcon } from '@heroicons/vue/24/outline'
+import { EyeIcon, XMarkIcon, GlobeAltIcon } from '@heroicons/vue/24/outline'
 import { useAiConfigStore } from '@/stores/aiConfig'
 import type { Widget, WidgetConfig } from '@/mocks/widgets'
 import { mockWidgets } from '@/mocks/widgets'
@@ -313,18 +317,16 @@ watch(
 
 const getPageTitle = () => {
   const titles: Record<string, string> = {
-    'chat-widget': 'Chat Widget',
-    'doc-summary': 'Doc Summary',
-    'mail-handler': 'Mail Handler',
+    'chat-widget': t('pageTitles.chatWidget'),
+    'doc-summary': t('pageTitles.docSummary'),
   }
-  return titles[currentPage.value] || 'Tools'
+  return titles[currentPage.value] || t('pageTitles.tools')
 }
 
 const getPageDescription = () => {
   const descriptions: Record<string, string> = {
     'chat-widget': 'Create and manage chat widgets for your website',
     'doc-summary': 'Automatically summarize documents and extract key information',
-    'mail-handler': 'Process and manage email communications automatically',
   }
   return descriptions[currentPage.value] || ''
 }

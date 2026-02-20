@@ -261,8 +261,9 @@ class KeycloakAuthController extends AbstractController
 
         try {
             $response = $this->httpClient->request('GET', $discoveryEndpoint);
+            $config = $response->toArray();
 
-            return $response->toArray();
+            return $config;
         } catch (\Exception $e) {
             // Log detailed error information for debugging
             $errorDetails = [

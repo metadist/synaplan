@@ -739,13 +739,14 @@ final class QdrantClientHttp implements QdrantClientInterface
 
             return $result;
         } catch (\Throwable $e) {
-            $this->logger->error('Failed to get files by group from Qdrant', [
+            // TODO: Remove this fallback once synaplan-memories is updated with the /documents/files-by-group endpoint.
+            // The stats-based fallback returns potentially stale data, which is the bug this method was created to fix.
+            $this->logger->warning('Qdrant /documents/files-by-group endpoint unavailable, falling back to stats-based approach (may return stale data)', [
                 'user_id' => $userId,
                 'group_key' => $groupKey,
                 'error' => $e->getMessage(),
             ]);
 
-            // Fallback to stats-based approach if the new endpoint is not available
             $filesInfo = $this->getFilesWithChunks($userId);
             $result = [];
             foreach ($filesInfo as $fileId => $info) {

@@ -8,8 +8,9 @@
         <!-- Storage Quota Widget -->
         <StorageQuotaWidget ref="storageWidget" @upgrade="handleUpgrade" />
 
+        <!-- Compact Upload Bar -->
         <div
-          class="surface-card p-6 relative"
+          class="surface-card p-5 relative"
           data-testid="section-upload-form"
           @dragenter.prevent="handleDragEnter"
           @dragover.prevent="handleDragOver"
@@ -22,143 +23,119 @@
               v-if="isDragging"
               class="absolute inset-0 z-50 flex items-center justify-center bg-primary/10 dark:bg-primary/20 backdrop-blur-sm border-4 border-dashed border-primary rounded-lg pointer-events-none"
             >
-              <div class="flex flex-col items-center gap-4 p-8 surface-card rounded-xl shadow-2xl">
+              <div class="flex flex-col items-center gap-3 p-6 surface-card rounded-xl shadow-2xl">
                 <div
-                  class="w-20 h-20 rounded-full bg-primary/20 flex items-center justify-center animate-bounce"
+                  class="w-16 h-16 rounded-full bg-primary/20 flex items-center justify-center animate-bounce"
                 >
-                  <Icon icon="mdi:cloud-upload" class="w-10 h-10 text-primary" />
+                  <Icon icon="mdi:cloud-upload" class="w-8 h-8 text-primary" />
                 </div>
                 <div class="text-center">
-                  <p class="text-xl font-bold txt-primary mb-1">{{ $t('files.dropFiles') }}</p>
+                  <p class="text-lg font-bold txt-primary mb-0.5">{{ $t('files.dropFiles') }}</p>
                   <p class="text-sm txt-secondary">{{ $t('files.dropFilesHint') }}</p>
                 </div>
               </div>
             </div>
           </Transition>
 
-          <h1 class="text-2xl font-semibold txt-primary mb-6 flex items-center gap-2">
-            <CloudArrowUpIcon class="w-6 h-6 text-[var(--brand)]" />
-            {{ $t('files.uploadTitle') }}
-          </h1>
+          <input
+            ref="fileInputRef"
+            type="file"
+            multiple
+            accept=".pdf,.docx,.txt,.jpg,.jpeg,.png,.mp3,.mp4,.xlsx,.csv"
+            class="hidden"
+            data-testid="input-files"
+            @change="handleFileSelect"
+          />
 
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-            <div>
-              <label class="block text-sm font-medium txt-primary mb-2">
-                {{ $t('files.groupKeyword') }}
-              </label>
-              <input
-                v-model="groupKeyword"
-                type="text"
-                class="w-full px-4 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
-                :placeholder="$t('files.groupKeywordPlaceholder')"
-                data-testid="input-group-keyword"
-              />
-              <p class="text-xs txt-secondary mt-1">
-                {{ $t('files.groupKeywordHelp') }}
-              </p>
-            </div>
-
-            <div>
-              <label class="block text-sm font-medium txt-primary mb-2">
-                {{ $t('files.orSelectExisting') }}
-              </label>
-              <select
-                v-model="selectedGroup"
-                class="w-full px-4 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
-                data-testid="input-group-select"
+          <!-- Selected Files List -->
+          <div v-if="selectedFiles.length > 0" class="space-y-2 mb-4">
+            <div
+              v-for="(file, index) in selectedFiles"
+              :key="index"
+              class="flex items-center gap-3 p-3 rounded-lg border border-light-border/30 dark:border-dark-border/20 bg-black/[0.02] dark:bg-white/[0.02]"
+            >
+              <Icon :icon="getFileIcon(file.name)" class="w-5 h-5 txt-secondary" />
+              <div class="flex-1 min-w-0">
+                <p class="text-sm txt-primary truncate">{{ file.name }}</p>
+                <p class="text-xs txt-secondary">{{ formatFileSize(file.size) }}</p>
+              </div>
+              <button
+                :disabled="isUploading"
+                class="p-1.5 rounded-lg hover:bg-red-500/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent"
+                :aria-label="$t('files.removeFile')"
+                @click="removeSelectedFile(index)"
               >
-                <option value="">{{ $t('files.orSelectExisting') }}</option>
-                <option v-for="group in fileGroups" :key="group.name" :value="group.name">
-                  {{ group.name }} ({{ group.count }})
-                </option>
-              </select>
+                <XMarkIcon class="w-4 h-4 text-red-500" />
+              </button>
             </div>
           </div>
 
-          <div class="mb-6" data-testid="section-file-picker">
-            <label class="block text-sm font-medium txt-primary mb-2">
-              {{ $t('files.selectFiles') }}
-            </label>
-            <div class="mb-3">
-              <label
-                class="px-4 py-2 rounded-lg border border-light-border/30 dark:border-dark-border/20 txt-primary hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer inline-flex items-center gap-2"
-                data-testid="btn-select-files"
+          <!-- Action row: smart button + target breadcrumb -->
+          <div class="flex items-center gap-4 flex-wrap">
+            <!-- Smart Upload Button -->
+            <button
+              :disabled="isUploading"
+              class="btn-primary px-6 py-2.5 rounded-lg flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+              data-testid="btn-upload"
+              @click="smartUploadAction"
+            >
+              <svg
+                v-if="isUploading"
+                class="animate-spin h-5 w-5"
+                xmlns="http://www.w3.org/2000/svg"
+                fill="none"
+                viewBox="0 0 24 24"
               >
-                <input
-                  type="file"
-                  multiple
-                  accept=".pdf,.docx,.txt,.jpg,.jpeg,.png,.mp3,.mp4,.xlsx,.csv"
-                  class="hidden"
-                  data-testid="input-files"
-                  @change="handleFileSelect"
-                />
-                <CloudArrowUpIcon class="w-5 h-5" />
-                {{ $t('files.selectFilesButton') }}
-              </label>
+                <circle
+                  class="opacity-25"
+                  cx="12"
+                  cy="12"
+                  r="10"
+                  stroke="currentColor"
+                  stroke-width="4"
+                ></circle>
+                <path
+                  class="opacity-75"
+                  fill="currentColor"
+                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                ></path>
+              </svg>
+              <CloudArrowUpIcon v-else class="w-5 h-5" />
+              {{ smartButtonLabel }}
+            </button>
+
+            <button
+              v-if="selectedFiles.length > 0 && !isUploading"
+              class="px-4 py-2.5 rounded-lg border border-light-border/30 dark:border-dark-border/20 txt-secondary hover:txt-primary hover:border-[var(--brand)]/50 hover:bg-[var(--brand)]/5 transition-all text-sm flex items-center gap-1.5"
+              data-testid="btn-add-more"
+              @click="fileInputRef?.click()"
+            >
+              <Icon icon="heroicons:plus" class="w-4 h-4" />
+              {{ $t('files.addMore') }}
+            </button>
+
+            <!-- Separator dot -->
+            <span class="w-1 h-1 rounded-full bg-black/20 dark:bg-white/20 hidden sm:block"></span>
+
+            <!-- Upload target breadcrumb -->
+            <div class="flex items-center gap-2 text-xs">
+              <Icon icon="heroicons:folder-solid" class="w-3.5 h-3.5 text-[var(--brand)]" />
+              <span class="txt-secondary">{{ $t('files.target') }}:</span>
+              <span class="font-semibold txt-primary">{{
+                activeUploadFolder || $t('files.rootFolder')
+              }}</span>
+              <button
+                class="txt-secondary hover:text-[var(--brand)] transition-colors underline underline-offset-2 decoration-dotted"
+                @click="folderPickerOpen = true"
+              >
+                {{ $t('files.changeTarget') }}
+              </button>
             </div>
 
-            <!-- Selected Files List -->
-            <div v-if="selectedFiles.length > 0" class="space-y-2 mb-3">
-              <div
-                v-for="(file, index) in selectedFiles"
-                :key="index"
-                class="flex items-center gap-3 p-3 rounded-lg border border-light-border/30 dark:border-dark-border/20 bg-black/[0.02] dark:bg-white/[0.02]"
-              >
-                <Icon :icon="getFileIcon(file.name)" class="w-5 h-5 txt-secondary" />
-                <div class="flex-1 min-w-0">
-                  <p class="text-sm txt-primary truncate">{{ file.name }}</p>
-                  <p class="text-xs txt-secondary">{{ formatFileSize(file.size) }}</p>
-                </div>
-                <button
-                  :disabled="isUploading"
-                  class="p-1.5 rounded-lg hover:bg-red-500/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent"
-                  :aria-label="$t('files.removeFile')"
-                  @click="removeSelectedFile(index)"
-                >
-                  <XMarkIcon class="w-4 h-4 text-red-500" />
-                </button>
-              </div>
-            </div>
-
-            <p class="text-xs txt-secondary mt-2">
+            <p class="text-xs txt-secondary ml-auto hidden sm:block">
               {{ $t('files.supportedFormats') }}
             </p>
-            <p class="text-sm alert-info mt-3">
-              <strong class="alert-info-text">{{ $t('files.autoProcessingTitle') }}:</strong>
-              <span class="alert-info-text">{{ $t('files.autoProcessingInfo') }}</span>
-            </p>
           </div>
-
-          <button
-            :disabled="selectedFiles.length === 0 || isUploading"
-            class="btn-primary px-6 py-2 rounded-lg flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-            data-testid="btn-upload"
-            @click="uploadFiles"
-          >
-            <CloudArrowUpIcon v-if="!isUploading" class="w-5 h-5" />
-            <svg
-              v-else
-              class="animate-spin h-5 w-5"
-              xmlns="http://www.w3.org/2000/svg"
-              fill="none"
-              viewBox="0 0 24 24"
-            >
-              <circle
-                class="opacity-25"
-                cx="12"
-                cy="12"
-                r="10"
-                stroke="currentColor"
-                stroke-width="4"
-              ></circle>
-              <path
-                class="opacity-75"
-                fill="currentColor"
-                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-              ></path>
-            </svg>
-            {{ isUploading ? $t('files.uploading') : $t('files.uploadAndProcess') }}
-          </button>
 
           <!-- Upload Progress Bar -->
           <Transition name="fade">
@@ -189,313 +166,584 @@
           </Transition>
         </div>
 
-        <div class="surface-card p-6" data-testid="section-files-list">
-          <div class="flex items-center justify-between mb-6">
-            <h2 class="text-xl font-semibold txt-primary">
-              {{ $t('files.yourFiles') }}
-            </h2>
-          </div>
-
-          <div class="flex items-center gap-3 mb-6">
-            <div class="flex-1">
-              <label class="block text-sm font-medium txt-primary mb-2">
-                {{ $t('files.filterByGroup') }}
-              </label>
-              <select
-                v-model="filterGroup"
-                class="w-full px-4 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
-                data-testid="input-filter-group"
+        <!-- Folder Picker Modal -->
+        <Teleport to="#app">
+          <Transition name="dialog-fade">
+            <div
+              v-if="folderPickerOpen"
+              class="fixed inset-0 z-50 flex items-center justify-center p-4"
+              @click.self="folderPickerOpen = false"
+            >
+              <div class="absolute inset-0 bg-black/50 dark:bg-black/70 backdrop-blur-sm"></div>
+              <div
+                class="relative surface-card rounded-2xl shadow-2xl max-w-md w-full p-6 animate-scale-in"
               >
-                <option value="">{{ $t('files.allFiles') }}</option>
-                <option v-for="group in fileGroups" :key="group.name" :value="group.name">
-                  {{ group.name }}
-                </option>
-              </select>
-            </div>
-            <button
-              class="btn-primary px-6 py-2 rounded-lg mt-7"
-              data-testid="btn-filter"
-              @click="applyFilter"
-            >
-              {{ $t('files.filterButton') }}
-            </button>
-          </div>
-
-          <p class="text-xs txt-secondary mb-4">
-            {{ $t('files.filterHelp') }}
-          </p>
-
-          <div v-if="selectedFileIds.length > 0" class="mb-4">
-            <button
-              class="px-4 py-2 rounded-lg bg-red-500 text-white hover:bg-red-600 transition-colors flex items-center gap-2"
-              data-testid="btn-delete-selected"
-              @click="deleteSelected"
-            >
-              <TrashIcon class="w-4 h-4" />
-              {{ $t('files.deleteSelected') }}
-            </button>
-          </div>
-
-          <div v-if="isLoading" class="text-center py-12 txt-secondary" data-testid="state-loading">
-            <svg
-              class="animate-spin h-8 w-8 mx-auto mb-2"
-              xmlns="http://www.w3.org/2000/svg"
-              fill="none"
-              viewBox="0 0 24 24"
-            >
-              <circle
-                class="opacity-25"
-                cx="12"
-                cy="12"
-                r="10"
-                stroke="currentColor"
-                stroke-width="4"
-              ></circle>
-              <path
-                class="opacity-75"
-                fill="currentColor"
-                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-              ></path>
-            </svg>
-            Loading files...
-          </div>
-
-          <div
-            v-else-if="filteredFiles.length === 0"
-            class="text-center py-12 txt-secondary"
-            data-testid="state-empty"
-          >
-            {{ $t('files.noFiles') }}
-          </div>
-
-          <div v-else class="overflow-x-auto" data-testid="section-table">
-            <table class="w-full">
-              <thead>
-                <tr class="border-b border-light-border/30 dark:border-dark-border/20">
-                  <th class="text-left py-3 px-2 txt-secondary text-xs font-medium w-8">
-                    <input
-                      type="checkbox"
-                      :checked="allSelected"
-                      class="checkbox-brand"
-                      @change="toggleSelectAll"
-                    />
-                  </th>
-                  <th class="text-left py-3 px-3 txt-secondary text-xs font-medium w-12">ID</th>
-                  <th class="text-left py-3 px-3 txt-secondary text-xs font-medium">
-                    {{ $t('files.name') }}
-                  </th>
-                  <th
-                    class="text-left py-3 px-3 txt-secondary text-xs font-medium whitespace-nowrap"
+                <div class="flex items-center justify-between mb-5">
+                  <h3 class="text-lg font-semibold txt-primary flex items-center gap-2">
+                    <Icon icon="heroicons:folder" class="w-5 h-5 text-[var(--brand)]" />
+                    {{ $t('files.folderPicker.title') }}
+                  </h3>
+                  <button
+                    class="p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 txt-secondary transition-colors"
+                    @click="folderPickerOpen = false"
                   >
-                    {{ $t('files.groupKey') }}
-                  </th>
-                  <th class="text-left py-3 px-3 txt-secondary text-xs font-medium">
-                    {{ $t('files.uploaded') }}
-                  </th>
-                  <th class="text-left py-3 px-3 txt-secondary text-xs font-medium">
-                    {{ $t('files.action') }}
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr
-                  v-for="file in paginatedFiles"
-                  :key="file.id"
-                  class="border-b border-light-border/10 dark:border-dark-border/10 hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
-                  data-testid="item-file"
-                >
-                  <td class="py-3 px-2">
-                    <input
-                      type="checkbox"
-                      :checked="selectedFileIds.includes(file.id)"
-                      class="checkbox-brand"
-                      @change="toggleFileSelection(file.id)"
-                    />
-                  </td>
-                  <td class="py-3 px-3 txt-secondary text-xs align-top">{{ file.id }}</td>
-                  <td class="py-3 px-3">
-                    <div class="txt-primary text-sm truncate max-w-xs">{{ file.filename }}</div>
-                    <div class="flex items-center gap-2 mt-0.5">
-                      <span class="txt-secondary text-xs">{{
-                        formatFileSize(file.file_size)
-                      }}</span>
-                      <span class="txt-secondary text-xs">·</span>
-                      <span v-if="file.status === 'vectorized'" class="text-xs text-emerald-500">
-                        Vectorized<template v-if="fileGroupKeys[file.id]?.qdrantChunks > 0"
-                          >: Qdrant</template
-                        ><template v-else-if="fileGroupKeys[file.id]?.mariadbChunks > 0"
-                          >: MariaDB</template
-                        >
-                      </span>
-                      <span
-                        v-else
-                        :class="{
-                          'text-amber-500': file.status === 'extracted',
-                          'txt-secondary': file.status === 'uploaded',
-                        }"
-                        class="text-xs"
-                      >
-                        {{ $t(`files.status_${file.status}`) }}
-                      </span>
-                      <template v-if="file.is_attached">
-                        <span class="txt-secondary text-xs">·</span>
-                        <span class="text-xs text-blue-400" :title="$t('files.attachedToMessage')">
-                          {{ $t('files.attached') }}
-                        </span>
-                      </template>
-                    </div>
-                  </td>
-                  <!-- GroupKey Column with inline edit -->
-                  <td class="py-3 px-3 align-top">
-                    <div v-if="editingGroupKey === file.id" class="flex items-center gap-2">
-                      <input
-                        :ref="
-                          (el) => {
-                            if (el && editingGroupKey === file.id)
-                              groupKeyInput = el as HTMLInputElement
-                          }
-                        "
-                        v-model="tempGroupKey"
-                        type="text"
-                        class="px-2 py-1 text-xs rounded border border-[var(--brand)] focus:outline-none focus:ring-1 focus:ring-[var(--brand)] bg-transparent txt-primary"
-                        placeholder="GroupKey"
-                        :data-group-key-input="file.id"
-                        @keyup.enter="saveGroupKey(file.id)"
-                        @keyup.escape="cancelEditGroupKey"
-                      />
-                      <button
-                        class="icon-ghost icon-ghost--success"
-                        title="Save"
-                        @click="saveGroupKey(file.id)"
-                      >
-                        <Icon icon="heroicons:check" class="w-4 h-4" />
-                      </button>
-                      <button
-                        class="icon-ghost icon-ghost--danger"
-                        title="Cancel"
-                        @click="cancelEditGroupKey"
-                      >
-                        <Icon icon="heroicons:x-mark" class="w-4 h-4" />
-                      </button>
-                    </div>
-                    <div v-else class="flex items-center gap-2">
-                      <span
-                        v-if="fileGroupKeys[file.id]?.groupKey"
-                        class="pill text-xs font-mono cursor-pointer hover:bg-[var(--brand)]/20 transition-colors"
-                        :title="`Click to edit • ${fileGroupKeys[file.id]?.chunks || 0} chunks`"
-                        @click="startEditGroupKey(file.id, fileGroupKeys[file.id]?.groupKey)"
-                      >
-                        {{ fileGroupKeys[file.id].groupKey }}
-                      </span>
-                      <span
-                        v-else-if="fileGroupKeys[file.id]?.isVectorized === false"
-                        class="pill pill--warning text-xs"
-                        title="Not vectorized - click Re-Vectorize below"
-                      >
-                        Not vectorized
-                      </span>
-                      <span
-                        v-else-if="fileGroupKeys[file.id] !== undefined"
-                        class="pill pill--warning text-xs"
-                        title="No vector data found"
-                      >
-                        —
-                      </span>
-                      <span v-else class="pill text-xs opacity-50"> Loading... </span>
-                      <button
-                        v-if="fileGroupKeys[file.id]?.groupKey"
-                        class="p-1 rounded hover:bg-[var(--brand)]/10 text-[var(--brand)] opacity-0 group-hover:opacity-100 transition-opacity"
-                        title="Edit GroupKey"
-                        @click="startEditGroupKey(file.id, fileGroupKeys[file.id]?.groupKey)"
-                      >
-                        <Icon icon="heroicons:pencil" class="w-3 h-3" />
-                      </button>
-                    </div>
-                  </td>
-                  <td class="py-3 px-3 txt-secondary text-xs whitespace-nowrap align-top">
-                    {{ file.uploaded_date }}
-                  </td>
-                  <td class="py-3 px-3 align-top">
-                    <div class="flex gap-1">
-                      <!-- Migrate to Qdrant (MariaDB data exists, Qdrant empty) -->
-                      <button
-                        v-if="fileGroupKeys[file.id]?.needsMigration"
-                        class="p-1.5 rounded hover:bg-amber-500/10 text-amber-500 transition-colors"
-                        :title="$t('files.migrateToQdrant')"
-                        data-testid="btn-migrate"
-                        @click="migrateToQdrant(file.id)"
-                      >
-                        <Icon icon="heroicons:arrow-up-tray" class="w-4 h-4" />
-                      </button>
-                      <!-- Re-Vectorize (no vectors anywhere) -->
-                      <button
-                        v-else-if="fileGroupKeys[file.id]?.isVectorized === false"
-                        class="p-1.5 rounded hover:bg-purple-500/10 text-purple-600 dark:text-purple-400 transition-colors"
-                        :title="$t('files.reVectorize')"
-                        data-testid="btn-revectorize"
-                        @click="reVectorize(file.id)"
-                      >
-                        <Icon icon="heroicons:arrow-path" class="w-4 h-4" />
-                      </button>
-                      <button
-                        class="p-1.5 rounded hover:bg-[var(--brand)]/10 text-[var(--brand)] transition-colors"
-                        title="View content"
-                        data-testid="btn-view"
-                        @click="viewFileContent(file.id)"
-                      >
-                        <Icon icon="heroicons:eye" class="w-4 h-4" />
-                      </button>
-                      <button
-                        class="p-1.5 rounded hover:bg-blue-500/10 text-blue-400 transition-colors"
-                        title="Download file"
-                        data-testid="btn-download"
-                        @click="downloadFile(file.id, file.filename)"
-                      >
-                        <ArrowDownTrayIcon class="w-4 h-4" />
-                      </button>
-                      <button
-                        class="p-1.5 rounded hover:bg-red-500/10 text-red-400 transition-colors"
-                        title="Delete file"
-                        data-testid="btn-delete"
-                        @click="deleteFile(file.id)"
-                      >
-                        <TrashIcon class="w-4 h-4" />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
+                    <XMarkIcon class="w-5 h-5" />
+                  </button>
+                </div>
 
-          <div
-            v-if="filteredFiles.length > 0"
-            class="flex items-center justify-between mt-6"
-            data-testid="section-pagination"
-          >
-            <div class="txt-secondary text-sm">
-              {{ $t('files.page') }} {{ currentPage }} ({{ $t('files.showing') }}
-              {{ paginatedFiles.length }} {{ $t('files.files') }})
+                <!-- Root / no folder option -->
+                <button
+                  class="w-full flex items-center gap-3 px-4 py-3 rounded-xl border transition-all duration-150 mb-2"
+                  :class="
+                    !selectedGroup && !groupKeyword
+                      ? 'border-[var(--brand)] bg-[var(--brand)]/10 text-[var(--brand)]'
+                      : 'border-light-border/30 dark:border-dark-border/20 txt-secondary hover:border-[var(--brand)]/50 hover:bg-[var(--brand)]/5'
+                  "
+                  @click="(clearFolderSelection(), (folderPickerOpen = false))"
+                >
+                  <Icon icon="heroicons:home" class="w-4 h-4 shrink-0" />
+                  <span class="text-sm font-medium">{{ $t('files.rootFolder') }}</span>
+                </button>
+
+                <!-- Existing folders -->
+                <div class="space-y-1.5 max-h-60 overflow-y-auto scroll-thin">
+                  <button
+                    v-for="folder in fileGroups"
+                    :key="folder.name"
+                    class="w-full flex items-center gap-3 px-4 py-3 rounded-xl border transition-all duration-150"
+                    :class="
+                      selectedGroup === folder.name && !groupKeyword
+                        ? 'border-[var(--brand)] bg-[var(--brand)]/10 text-[var(--brand)]'
+                        : 'border-light-border/30 dark:border-dark-border/20 txt-secondary hover:border-[var(--brand)]/50 hover:bg-[var(--brand)]/5'
+                    "
+                    @click="(selectExistingFolder(folder.name), (folderPickerOpen = false))"
+                  >
+                    <Icon icon="heroicons:folder-solid" class="w-4 h-4 shrink-0" />
+                    <span class="text-sm font-medium flex-1 text-left truncate">{{
+                      folder.name
+                    }}</span>
+                    <span
+                      class="text-[10px] font-semibold bg-black/5 dark:bg-white/10 px-2 py-0.5 rounded-full"
+                      >{{ folder.count }}</span
+                    >
+                  </button>
+                </div>
+
+                <!-- New folder input -->
+                <div class="mt-3 pt-3 border-t border-light-border/20 dark:border-dark-border/10">
+                  <div class="flex items-center gap-2">
+                    <Icon
+                      icon="heroicons:folder-plus"
+                      class="w-4 h-4 text-[var(--brand)] shrink-0"
+                    />
+                    <input
+                      ref="newFolderInput"
+                      v-model="groupKeyword"
+                      type="text"
+                      class="flex-1 px-3 py-2 text-sm rounded-lg bg-black/[0.03] dark:bg-white/[0.03] txt-primary placeholder:txt-secondary/50 focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+                      :placeholder="$t('files.folderPicker.newPlaceholder')"
+                      data-testid="input-new-folder"
+                      @keyup.enter="(confirmNewFolder(), (folderPickerOpen = false))"
+                    />
+                    <button
+                      :disabled="!groupKeyword.trim()"
+                      class="px-3 py-2 rounded-lg btn-primary text-sm disabled:opacity-40 disabled:cursor-not-allowed"
+                      @click="(confirmNewFolder(), (folderPickerOpen = false))"
+                    >
+                      {{ $t('common.save') }}
+                    </button>
+                  </div>
+                </div>
+              </div>
             </div>
-            <div class="flex gap-2">
-              <button
-                :disabled="currentPage === 1"
-                class="px-4 py-2 rounded-lg border border-light-border/30 dark:border-dark-border/20 txt-primary hover:bg-black/5 dark:hover:bg-white/5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                data-testid="btn-prev-page"
-                @click="previousPage"
+          </Transition>
+        </Teleport>
+
+        <div class="surface-card p-6" data-testid="section-files-list">
+          <!-- ====== ROOT VIEW: Folders + All Files ====== -->
+          <template v-if="!openFolder">
+            <h2 class="text-xl font-semibold txt-primary mb-6">{{ $t('files.yourFiles') }}</h2>
+
+            <!-- Loading -->
+            <div
+              v-if="isLoading"
+              class="flex items-center justify-center py-20"
+              data-testid="state-loading"
+            >
+              <svg
+                class="animate-spin h-8 w-8 text-[var(--brand)]"
+                xmlns="http://www.w3.org/2000/svg"
+                fill="none"
+                viewBox="0 0 24 24"
               >
-                {{ $t('files.previous') }}
+                <circle
+                  class="opacity-25"
+                  cx="12"
+                  cy="12"
+                  r="10"
+                  stroke="currentColor"
+                  stroke-width="4"
+                ></circle>
+                <path
+                  class="opacity-75"
+                  fill="currentColor"
+                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                ></path>
+              </svg>
+            </div>
+
+            <!-- Empty: no folders AND no files -->
+            <div
+              v-else-if="fileGroups.length === 0 && paginatedFiles.length === 0"
+              class="flex flex-col items-center justify-center py-20 gap-4"
+              data-testid="state-empty"
+            >
+              <div
+                class="w-20 h-20 rounded-2xl bg-[var(--brand)]/10 flex items-center justify-center"
+              >
+                <Icon icon="heroicons:folder-plus" class="w-10 h-10 text-[var(--brand)]/40" />
+              </div>
+              <div class="text-center">
+                <p class="text-base font-medium txt-primary mb-1">
+                  {{ $t('files.emptyState.title') }}
+                </p>
+                <p class="text-sm txt-secondary max-w-sm">
+                  {{ $t('files.emptyState.description') }}
+                </p>
+              </div>
+            </div>
+
+            <template v-else>
+              <!-- Folder cards (with drag & drop) -->
+              <div v-if="fileGroups.length > 0" class="mb-6" data-testid="section-folder-grid">
+                <div
+                  class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3"
+                >
+                  <button
+                    v-for="folder in fileGroups"
+                    :key="folder.name"
+                    class="group/f flex flex-col items-center gap-3 p-5 rounded-2xl border transition-all duration-200 cursor-pointer"
+                    :class="
+                      folderDropTarget === folder.name
+                        ? 'border-[var(--brand)] bg-[var(--brand)]/10 shadow-lg shadow-[var(--brand)]/20 scale-[1.03]'
+                        : 'border-light-border/20 dark:border-dark-border/15 hover:border-[var(--brand)]/30 hover:shadow-lg hover:shadow-[var(--brand)]/5 hover:bg-[var(--brand)]/[0.03]'
+                    "
+                    :data-testid="`folder-card-${folder.name}`"
+                    @click="enterFolder(folder.name)"
+                    @dragenter.prevent="onFolderDragEnter(folder.name)"
+                    @dragover.prevent
+                    @dragleave="onFolderDragLeave(folder.name)"
+                    @drop.prevent.stop="onFolderDrop($event, folder.name)"
+                  >
+                    <div class="relative">
+                      <Icon
+                        :icon="
+                          folderDropTarget === folder.name
+                            ? 'heroicons:folder-open-solid'
+                            : 'heroicons:folder-solid'
+                        "
+                        class="w-12 h-12 transition-all duration-200"
+                        :class="
+                          folderDropTarget === folder.name
+                            ? 'text-[var(--brand)] scale-110'
+                            : 'text-[var(--brand)]/50 group-hover/f:text-[var(--brand)] group-hover/f:scale-110'
+                        "
+                      />
+                      <span
+                        class="absolute -top-1 -right-2.5 inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1.5 rounded-full text-[10px] font-bold transition-all duration-200"
+                        :class="
+                          folderDropTarget === folder.name
+                            ? 'bg-[var(--brand)] text-white'
+                            : 'bg-[var(--brand)]/15 text-[var(--brand)] group-hover/f:bg-[var(--brand)] group-hover/f:text-white'
+                        "
+                      >
+                        {{ folder.count }}
+                      </span>
+                    </div>
+                    <span
+                      class="text-xs font-medium truncate max-w-full text-center transition-colors"
+                      :class="
+                        folderDropTarget === folder.name
+                          ? 'text-[var(--brand)]'
+                          : 'txt-primary group-hover/f:text-[var(--brand)]'
+                      "
+                    >
+                      {{ folder.name }}
+                    </span>
+                  </button>
+                </div>
+              </div>
+
+              <!-- Bulk actions -->
+              <div v-if="selectedFileIds.length > 0" class="mb-4">
+                <button
+                  class="px-4 py-2 rounded-lg bg-red-500 text-white hover:bg-red-600 transition-colors flex items-center gap-2 text-sm"
+                  data-testid="btn-delete-selected"
+                  @click="deleteSelected"
+                >
+                  <TrashIcon class="w-4 h-4" />
+                  {{ $t('files.deleteSelected') }} ({{ selectedFileIds.length }})
+                </button>
+              </div>
+
+              <!-- All files table -->
+              <div v-if="paginatedFiles.length > 0" data-testid="section-table">
+                <div
+                  v-if="fileGroups.length > 0"
+                  class="flex items-center gap-2 mb-3 pt-2 border-t border-light-border/10 dark:border-dark-border/10"
+                >
+                  <Icon icon="heroicons:document-text" class="w-4 h-4 txt-secondary" />
+                  <span class="text-xs font-medium txt-secondary uppercase tracking-wider">{{
+                    $t('files.allFiles')
+                  }}</span>
+                  <span class="text-xs txt-secondary">({{ totalCount }})</span>
+                </div>
+                <table class="w-full">
+                  <thead>
+                    <tr class="border-b border-light-border/30 dark:border-dark-border/20">
+                      <th class="text-left py-2.5 px-2 w-8">
+                        <input
+                          type="checkbox"
+                          :checked="allSelected"
+                          class="checkbox-brand"
+                          @change="toggleSelectAll"
+                        />
+                      </th>
+                      <th class="text-left py-2.5 px-3 txt-secondary text-xs font-medium">
+                        {{ $t('files.name') }}
+                      </th>
+                      <th class="text-left py-2.5 px-3 txt-secondary text-xs font-medium w-24">
+                        {{ $t('files.size') }}
+                      </th>
+                      <th class="text-left py-2.5 px-3 txt-secondary text-xs font-medium w-28">
+                        {{ $t('files.uploaded') }}
+                      </th>
+                      <th class="w-36"></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr
+                      v-for="file in paginatedFiles"
+                      :key="file.id"
+                      class="group border-b border-light-border/10 dark:border-dark-border/10 hover:bg-black/[0.03] dark:hover:bg-white/[0.03] transition-colors"
+                      data-testid="item-file"
+                    >
+                      <td class="py-2.5 px-2">
+                        <input
+                          type="checkbox"
+                          :checked="selectedFileIds.includes(file.id)"
+                          class="checkbox-brand"
+                          @change="toggleFileSelection(file.id)"
+                        />
+                      </td>
+                      <td class="py-2.5 px-3">
+                        <div class="flex items-center gap-3 min-w-0">
+                          <div
+                            class="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
+                            :class="getFileColorClass(file.filename)"
+                          >
+                            <Icon :icon="getFileIcon(file.filename)" class="w-4 h-4" />
+                          </div>
+                          <div class="flex flex-col gap-0.5 min-w-0">
+                            <span class="text-sm txt-primary truncate">{{ file.filename }}</span>
+                            <button
+                              v-if="file.group_key"
+                              class="inline-flex items-center gap-1 self-start text-[10px] text-[var(--brand)]/70 hover:text-[var(--brand)] transition-colors"
+                              @click="enterFolder(file.group_key!)"
+                            >
+                              <Icon icon="heroicons:folder-solid" class="w-3 h-3" />
+                              {{ file.group_key }}
+                            </button>
+                          </div>
+                        </div>
+                      </td>
+                      <td class="py-2.5 px-3 txt-secondary text-xs whitespace-nowrap">
+                        {{ formatFileSize(file.file_size) }}
+                      </td>
+                      <td class="py-2.5 px-3 txt-secondary text-xs whitespace-nowrap">
+                        {{ file.uploaded_date }}
+                      </td>
+                      <td class="py-2.5 px-3">
+                        <div
+                          class="flex gap-0.5 justify-end opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity"
+                        >
+                          <FolderMoveMenu
+                            :open="folderMenuOpen === file.id"
+                            :folders="fileGroups"
+                            @toggle="toggleFolderMenu(file.id)"
+                            @move="moveFileToFolder(file.id, $event)"
+                          />
+                          <button
+                            class="p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 txt-secondary hover:txt-primary transition-colors"
+                            :title="$t('files.download')"
+                            @click="downloadFile(file.id, file.filename)"
+                          >
+                            <ArrowDownTrayIcon class="w-4 h-4" />
+                          </button>
+                          <button
+                            class="p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 txt-secondary hover:txt-primary transition-colors"
+                            :title="$t('common.view')"
+                            @click="viewFileContent(file.id)"
+                          >
+                            <Icon icon="heroicons:eye" class="w-4 h-4" />
+                          </button>
+                          <button
+                            class="p-1.5 rounded-lg hover:bg-red-500/10 text-red-400/70 hover:text-red-500 transition-colors"
+                            :title="$t('files.delete')"
+                            @click="deleteFile(file.id)"
+                          >
+                            <TrashIcon class="w-4 h-4" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+
+                <!-- Pagination -->
+                <div
+                  v-if="totalPages > 1"
+                  class="flex items-center justify-between mt-4 pt-4 border-t border-light-border/10 dark:border-dark-border/10"
+                >
+                  <span class="text-xs txt-secondary"
+                    >{{ $t('files.page') }} {{ currentPage }} / {{ totalPages }}</span
+                  >
+                  <div class="flex gap-2">
+                    <button
+                      :disabled="currentPage === 1"
+                      class="px-3 py-1.5 rounded-lg border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm hover:bg-black/5 dark:hover:bg-white/5 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                      @click="previousPage"
+                    >
+                      {{ $t('files.previous') }}
+                    </button>
+                    <button
+                      :disabled="currentPage >= totalPages"
+                      class="px-3 py-1.5 rounded-lg border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm hover:bg-black/5 dark:hover:bg-white/5 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                      @click="nextPage"
+                    >
+                      {{ $t('files.next') }}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </template>
+          </template>
+
+          <!-- ====== FOLDER VIEW: Files inside a folder ====== -->
+          <template v-else>
+            <!-- Breadcrumb header -->
+            <div class="flex items-center gap-3 mb-6">
+              <button
+                class="p-2 rounded-xl hover:bg-black/5 dark:hover:bg-white/5 txt-secondary hover:txt-primary transition-colors"
+                data-testid="btn-back-to-root"
+                @click="exitFolder"
+              >
+                <Icon icon="heroicons:arrow-left" class="w-5 h-5" />
               </button>
+              <div class="flex items-center gap-2.5 min-w-0">
+                <button
+                  class="text-sm txt-secondary hover:txt-primary hover:underline transition-colors shrink-0"
+                  @click="exitFolder"
+                >
+                  {{ $t('files.yourFiles') }}
+                </button>
+                <Icon
+                  icon="heroicons:chevron-right"
+                  class="w-3.5 h-3.5 txt-secondary/30 shrink-0"
+                />
+                <Icon
+                  icon="heroicons:folder-open-solid"
+                  class="w-5 h-5 text-[var(--brand)] shrink-0"
+                />
+                <h2 class="text-lg font-semibold txt-primary truncate">{{ openFolder }}</h2>
+                <span
+                  class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-[var(--brand)]/10 text-[var(--brand)]"
+                >
+                  {{ totalCount }} {{ $t('files.files') }}
+                </span>
+              </div>
+            </div>
+
+            <!-- Bulk actions -->
+            <div v-if="selectedFileIds.length > 0" class="mb-4 flex items-center gap-3">
               <button
-                :disabled="currentPage >= totalPages"
-                class="px-4 py-2 rounded-lg border border-light-border/30 dark:border-dark-border/20 txt-primary hover:bg-black/5 dark:hover:bg-white/5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                data-testid="btn-next-page"
-                @click="nextPage"
+                class="px-4 py-2 rounded-lg bg-red-500 text-white hover:bg-red-600 transition-colors flex items-center gap-2 text-sm"
+                data-testid="btn-delete-selected"
+                @click="deleteSelected"
               >
-                {{ $t('files.next') }}
+                <TrashIcon class="w-4 h-4" />
+                {{ $t('files.deleteSelected') }} ({{ selectedFileIds.length }})
               </button>
             </div>
-          </div>
+
+            <!-- Loading inside folder -->
+            <div
+              v-if="isLoading"
+              class="flex items-center justify-center py-20"
+              data-testid="state-loading-folder"
+            >
+              <svg
+                class="animate-spin h-8 w-8 text-[var(--brand)]"
+                xmlns="http://www.w3.org/2000/svg"
+                fill="none"
+                viewBox="0 0 24 24"
+              >
+                <circle
+                  class="opacity-25"
+                  cx="12"
+                  cy="12"
+                  r="10"
+                  stroke="currentColor"
+                  stroke-width="4"
+                ></circle>
+                <path
+                  class="opacity-75"
+                  fill="currentColor"
+                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                ></path>
+              </svg>
+            </div>
+
+            <!-- Empty folder -->
+            <div
+              v-else-if="paginatedFiles.length === 0"
+              class="flex flex-col items-center justify-center py-20 gap-4"
+              data-testid="state-empty-folder"
+            >
+              <div
+                class="w-16 h-16 rounded-2xl bg-[var(--brand)]/10 flex items-center justify-center"
+              >
+                <Icon icon="heroicons:folder-open" class="w-8 h-8 text-[var(--brand)]/40" />
+              </div>
+              <p class="text-sm txt-secondary">{{ $t('files.emptyState.emptyFolder') }}</p>
+            </div>
+
+            <!-- Finder-style file table -->
+            <div v-else data-testid="section-table">
+              <table class="w-full">
+                <thead>
+                  <tr class="border-b border-light-border/30 dark:border-dark-border/20">
+                    <th class="text-left py-2.5 px-2 w-8">
+                      <input
+                        type="checkbox"
+                        :checked="allSelected"
+                        class="checkbox-brand"
+                        @change="toggleSelectAll"
+                      />
+                    </th>
+                    <th class="text-left py-2.5 px-3 txt-secondary text-xs font-medium">
+                      {{ $t('files.name') }}
+                    </th>
+                    <th class="text-left py-2.5 px-3 txt-secondary text-xs font-medium w-24">
+                      {{ $t('files.size') }}
+                    </th>
+                    <th class="text-left py-2.5 px-3 txt-secondary text-xs font-medium w-28">
+                      {{ $t('files.uploaded') }}
+                    </th>
+                    <th class="w-32"></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr
+                    v-for="file in paginatedFiles"
+                    :key="file.id"
+                    class="group border-b border-light-border/10 dark:border-dark-border/10 hover:bg-black/[0.03] dark:hover:bg-white/[0.03] transition-colors"
+                    data-testid="item-file"
+                  >
+                    <td class="py-2.5 px-2">
+                      <input
+                        type="checkbox"
+                        :checked="selectedFileIds.includes(file.id)"
+                        class="checkbox-brand"
+                        @change="toggleFileSelection(file.id)"
+                      />
+                    </td>
+                    <td class="py-2.5 px-3">
+                      <div class="flex items-center gap-3 min-w-0">
+                        <div
+                          class="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
+                          :class="getFileColorClass(file.filename)"
+                        >
+                          <Icon :icon="getFileIcon(file.filename)" class="w-4 h-4" />
+                        </div>
+                        <span class="text-sm txt-primary truncate">{{ file.filename }}</span>
+                      </div>
+                    </td>
+                    <td class="py-2.5 px-3 txt-secondary text-xs whitespace-nowrap">
+                      {{ formatFileSize(file.file_size) }}
+                    </td>
+                    <td class="py-2.5 px-3 txt-secondary text-xs whitespace-nowrap">
+                      {{ file.uploaded_date }}
+                    </td>
+                    <td class="py-2.5 px-3">
+                      <div
+                        class="flex gap-0.5 justify-end opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity"
+                      >
+                        <FolderMoveMenu
+                          :open="folderMenuOpen === file.id"
+                          :folders="fileGroups"
+                          :current-folder="openFolder"
+                          @toggle="toggleFolderMenu(file.id)"
+                          @move="moveFileToFolder(file.id, $event)"
+                        />
+                        <button
+                          class="p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 txt-secondary hover:txt-primary transition-colors"
+                          :title="$t('files.download')"
+                          data-testid="btn-download"
+                          @click="downloadFile(file.id, file.filename)"
+                        >
+                          <ArrowDownTrayIcon class="w-4 h-4" />
+                        </button>
+                        <button
+                          class="p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 txt-secondary hover:txt-primary transition-colors"
+                          :title="$t('common.view')"
+                          data-testid="btn-view"
+                          @click="viewFileContent(file.id)"
+                        >
+                          <Icon icon="heroicons:eye" class="w-4 h-4" />
+                        </button>
+                        <button
+                          class="p-1.5 rounded-lg hover:bg-red-500/10 text-red-400/70 hover:text-red-500 transition-colors"
+                          :title="$t('files.delete')"
+                          data-testid="btn-delete"
+                          @click="deleteFile(file.id)"
+                        >
+                          <TrashIcon class="w-4 h-4" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+
+              <!-- Pagination -->
+              <div
+                v-if="totalPages > 1"
+                class="flex items-center justify-between mt-4 pt-4 border-t border-light-border/10 dark:border-dark-border/10"
+                data-testid="section-pagination"
+              >
+                <span class="text-xs txt-secondary">
+                  {{ $t('files.page') }} {{ currentPage }} / {{ totalPages }}
+                </span>
+                <div class="flex gap-2">
+                  <button
+                    :disabled="currentPage === 1"
+                    class="px-3 py-1.5 rounded-lg border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm hover:bg-black/5 dark:hover:bg-white/5 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                    @click="previousPage"
+                  >
+                    {{ $t('files.previous') }}
+                  </button>
+                  <button
+                    :disabled="currentPage >= totalPages"
+                    class="px-3 py-1.5 rounded-lg border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm hover:bg-black/5 dark:hover:bg-white/5 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                    @click="nextPage"
+                  >
+                    {{ $t('files.next') }}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </template>
         </div>
       </div>
     </div>
@@ -524,7 +772,7 @@
     />
 
     <!-- Confirm Delete Selected Dialog (Multiple Files) -->
-    <Teleport to="body">
+    <Teleport to="#app">
       <Transition name="dialog-fade">
         <div
           v-if="isDeleteSelectedOpen"
@@ -587,13 +835,14 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, nextTick } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import MainLayout from '@/components/MainLayout.vue'
 import FileContentModal from '@/components/FileContentModal.vue'
 import ShareModal from '@/components/ShareModal.vue'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
 import StorageQuotaWidget from '@/components/StorageQuotaWidget.vue'
+import FolderMoveMenu from '@/components/FolderMoveMenu.vue'
 import { Icon } from '@iconify/vue'
 import {
   CloudArrowUpIcon,
@@ -616,9 +865,14 @@ const storageWidget = ref<InstanceType<typeof StorageQuotaWidget> | null>(null)
 
 const groupKeyword = ref('')
 const selectedGroup = ref('')
+const isCreatingNewFolder = ref(false)
+const newFolderInput = ref<HTMLInputElement | null>(null)
+const fileInputRef = ref<HTMLInputElement | null>(null)
 // File upload state (removed processLevel - always vectorize)
 const selectedFiles = ref<File[]>([])
 const filterGroup = ref('')
+const openFolder = ref<string | null>(null)
+const folderMenuOpen = ref<number | null>(null)
 const files = ref<FileItem[]>([])
 const fileGroups = ref<Array<{ name: string; count: number }>>([])
 const selectedFileIds = ref<number[]>([])
@@ -631,27 +885,10 @@ const isLoading = ref(false)
 // Drag & Drop state
 const isDragging = ref(false)
 const dragCounter = ref(0)
+const folderDropTarget = ref<string | null>(null)
 
-// GroupKey management
-const fileGroupKeys = ref<
-  Record<
-    number,
-    {
-      groupKey: string | null
-      isVectorized: boolean
-      chunks: number
-      status: string
-      needsMigration: boolean
-      mariadbChunks: number
-      qdrantChunks: number
-    }
-  >
->({})
-// Track recently uploaded file IDs to prevent race condition with loadAllFileGroupKeys
-const recentlyUploadedFileIds = ref<Set<number>>(new Set())
-const editingGroupKey = ref<number | null>(null)
-const tempGroupKey = ref('')
-const groupKeyInput = ref<HTMLInputElement | null>(null)
+// Folder picker modal
+const folderPickerOpen = ref(false)
 
 // Modal state
 const isModalOpen = ref(false)
@@ -668,8 +905,6 @@ const fileToDelete = ref<number | null>(null)
 const isDeleteSelectedOpen = ref(false)
 const totalCount = ref(0)
 
-const filteredFiles = computed(() => files.value)
-
 const totalPages = computed(() => {
   return Math.ceil(totalCount.value / itemsPerPage)
 })
@@ -685,10 +920,30 @@ const allSelected = computed(() => {
 
 const handleFileSelect = (event: Event) => {
   const target = event.target as HTMLInputElement
-  if (target.files) {
-    selectedFiles.value = Array.from(target.files)
-    // Save metadata for potential recovery after auth
+  if (target.files && target.files.length > 0) {
+    const newFiles = Array.from(target.files)
+    const existingNames = new Set(selectedFiles.value.map((f) => f.name + f.size))
+    const unique = newFiles.filter((f) => !existingNames.has(f.name + f.size))
+    selectedFiles.value = [...selectedFiles.value, ...unique]
     saveFileMetadata(selectedFiles.value)
+    target.value = ''
+  }
+}
+
+const smartButtonLabel = computed(() => {
+  if (isUploading.value) return t('files.uploading')
+  if (selectedFiles.value.length > 0) {
+    return t('files.uploadCount', { count: selectedFiles.value.length })
+  }
+  return t('files.selectAndUpload')
+})
+
+const smartUploadAction = () => {
+  if (isUploading.value) return
+  if (selectedFiles.value.length > 0) {
+    uploadFiles()
+  } else {
+    fileInputRef.value?.click()
   }
 }
 
@@ -697,6 +952,100 @@ const removeSelectedFile = (index: number) => {
     return
   }
   selectedFiles.value.splice(index, 1)
+}
+
+// Folder picker helpers — auto-target the open folder
+const activeUploadFolder = computed(
+  () => selectedGroup.value || groupKeyword.value || openFolder.value || ''
+)
+
+const selectExistingFolder = (name: string) => {
+  if (selectedGroup.value === name) {
+    selectedGroup.value = ''
+  } else {
+    selectedGroup.value = name
+    groupKeyword.value = ''
+    isCreatingNewFolder.value = false
+  }
+}
+
+const confirmNewFolder = () => {
+  if (groupKeyword.value.trim()) {
+    selectedGroup.value = groupKeyword.value.trim()
+    isCreatingNewFolder.value = false
+  }
+}
+
+const clearFolderSelection = () => {
+  selectedGroup.value = ''
+  groupKeyword.value = ''
+  isCreatingNewFolder.value = false
+}
+
+// Folder navigation (file list)
+const enterFolder = (name: string) => {
+  openFolder.value = name
+  filterGroup.value = name
+  currentPage.value = 1
+  loadFiles(1)
+}
+
+const exitFolder = () => {
+  openFolder.value = null
+  filterGroup.value = ''
+  currentPage.value = 1
+  loadFiles(1)
+}
+
+// Folder move menu
+const toggleFolderMenu = (fileId: number) => {
+  if (folderMenuOpen.value === fileId) {
+    folderMenuOpen.value = null
+  } else {
+    folderMenuOpen.value = fileId
+  }
+}
+
+const moveFileToFolder = async (fileId: number, folderName: string) => {
+  if (!folderName.trim()) return
+  folderMenuOpen.value = null
+
+  try {
+    await filesService.updateFileGroupKey(fileId, folderName.trim())
+    showSuccess(t('files.movedSuccess', { folder: folderName.trim() }))
+    await loadFileGroups()
+    await loadFiles()
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : 'Failed to move file'
+    showError(msg)
+  }
+}
+
+const closeFolderMenu = (e: MouseEvent) => {
+  if (folderMenuOpen.value !== null) {
+    const target = e.target as HTMLElement
+    if (!target.closest('[data-testid="section-table"]')) {
+      folderMenuOpen.value = null
+    }
+  }
+}
+
+const getFileColorClass = (filename: string): string => {
+  const ext = filename.split('.').pop()?.toLowerCase() || ''
+  const colorMap: Record<string, string> = {
+    pdf: 'bg-red-500/10 text-red-500',
+    docx: 'bg-blue-500/10 text-blue-500',
+    doc: 'bg-blue-500/10 text-blue-500',
+    txt: 'bg-gray-500/10 text-gray-500',
+    jpg: 'bg-purple-500/10 text-purple-500',
+    jpeg: 'bg-purple-500/10 text-purple-500',
+    png: 'bg-purple-500/10 text-purple-500',
+    mp3: 'bg-pink-500/10 text-pink-500',
+    mp4: 'bg-pink-500/10 text-pink-500',
+    xlsx: 'bg-emerald-500/10 text-emerald-500',
+    csv: 'bg-emerald-500/10 text-emerald-500',
+  }
+  return colorMap[ext] || 'bg-[var(--brand)]/10 text-[var(--brand)]'
 }
 
 // Drag & Drop handlers
@@ -726,13 +1075,60 @@ const handleDrop = async (event: DragEvent) => {
   dragCounter.value = 0
   isDragging.value = false
 
-  const files = event.dataTransfer?.files
-  if (files && files.length > 0) {
-    // Add dropped files to selectedFiles array
-    selectedFiles.value = [...selectedFiles.value, ...Array.from(files)]
-    showSuccess(t('files.filesAddedToQueue', { count: files.length }))
-    // Save metadata for potential recovery after auth
+  const droppedFiles = event.dataTransfer?.files
+  if (droppedFiles && droppedFiles.length > 0) {
+    selectedFiles.value = [...selectedFiles.value, ...Array.from(droppedFiles)]
+    showSuccess(t('files.filesAddedToQueue', { count: droppedFiles.length }))
     saveFileMetadata(selectedFiles.value)
+  }
+}
+
+// Folder card drag & drop — upload directly into a folder
+const onFolderDragEnter = (folderName: string) => {
+  folderDropTarget.value = folderName
+}
+
+const onFolderDragLeave = (folderName: string) => {
+  if (folderDropTarget.value === folderName) {
+    folderDropTarget.value = null
+  }
+}
+
+const onFolderDrop = async (event: DragEvent, folderName: string) => {
+  folderDropTarget.value = null
+  isDragging.value = false
+  dragCounter.value = 0
+
+  const droppedFiles = event.dataTransfer?.files
+  if (!droppedFiles || droppedFiles.length === 0) return
+
+  isUploading.value = true
+  uploadProgress.value = { loaded: 0, total: 0, percentage: 0 }
+
+  try {
+    const result = await filesService.uploadFiles({
+      files: Array.from(droppedFiles),
+      groupKey: folderName,
+      processLevel: 'vectorize',
+      onProgress: (progress) => {
+        uploadProgress.value = progress
+      },
+    })
+
+    if (result.success) {
+      showSuccess(t('files.droppedToFolder', { count: result.files.length, folder: folderName }))
+      await loadFileGroups()
+      await loadFiles()
+      if (storageWidget.value) await storageWidget.value.refresh()
+    } else {
+      result.errors.forEach((err) => showError(`${err.filename}: ${err.error}`))
+    }
+  } catch (err) {
+    console.error('Upload error:', err)
+    showError('Failed to upload files: ' + (err as Error).message)
+  } finally {
+    isUploading.value = false
+    uploadProgress.value = null
   }
 }
 
@@ -764,7 +1160,7 @@ const uploadFiles = async () => {
     return
   }
 
-  const groupKey = selectedGroup.value || groupKeyword.value || 'DEFAULT'
+  const groupKey = activeUploadFolder.value
 
   isUploading.value = true
   uploadProgress.value = { loaded: 0, total: 0, percentage: 0 }
@@ -782,37 +1178,17 @@ const uploadFiles = async () => {
     if (result.success) {
       showSuccess(`Successfully uploaded ${result.files.length} file(s)`)
 
-      // Pre-populate fileGroupKeys from upload response to avoid Qdrant lookup race
-      result.files.forEach((file) => {
-        const details = `${file.filename}: ${file.extracted_text_length} chars extracted, ${file.chunks_created || 0} chunks created`
-        console.log(details)
-
-        // Immediately set group key from upload response — this is authoritative
-        fileGroupKeys.value[file.id] = {
-          groupKey: file.group_key || groupKey,
-          isVectorized: file.vectorized ?? (file.chunks_created ?? 0) > 0,
-          chunks: file.chunks_created || 0,
-          status: file.vectorized ? 'vectorized' : 'processed',
-          needsMigration: false,
-          mariadbChunks: 0,
-          qdrantChunks: file.chunks_created || 0,
-        }
-        // Mark as recently uploaded so loadAllFileGroupKeys won't overwrite
-        recentlyUploadedFileIds.value.add(file.id)
-      })
-      // Clear recently uploaded markers after a delay (allow Qdrant replication to settle)
-      setTimeout(() => recentlyUploadedFileIds.value.clear(), 30000)
-
-      // Clear form
       selectedFiles.value = []
-      groupKeyword.value = ''
-      selectedGroup.value = ''
-      // Clear persisted file metadata after successful upload
+      if (!openFolder.value) {
+        groupKeyword.value = ''
+        selectedGroup.value = ''
+      }
+      isCreatingNewFolder.value = false
+      if (fileInputRef.value) fileInputRef.value.value = ''
       clearFiles()
 
-      // Reload files list AND storage widget
-      await loadFiles()
       await loadFileGroups()
+      await loadFiles()
       if (storageWidget.value) {
         await storageWidget.value.refresh()
       }
@@ -849,9 +1225,6 @@ const loadFiles = async (page = currentPage.value) => {
     files.value = response.files
     totalCount.value = response.pagination.total
     currentPage.value = response.pagination.page
-
-    // Load groupKeys for all loaded files
-    await loadAllFileGroupKeys()
   } catch (error: any) {
     console.error('Failed to load files:', error)
 
@@ -880,11 +1253,6 @@ const loadFileGroups = async () => {
       fileGroups.value = []
     }
   }
-}
-
-const applyFilter = () => {
-  currentPage.value = 1
-  loadFiles(1)
 }
 
 const toggleFileSelection = (fileId: number) => {
@@ -1038,161 +1406,11 @@ const formatFileSize = (bytes: number): string => {
   return (bytes / (1024 * 1024 * 1024)).toFixed(1) + ' GB'
 }
 
-/**
- * Load groupKey for a file
- */
-const loadFileGroupKey = async (fileId: number) => {
-  // Skip if recently uploaded — upload response data is authoritative and fresher
-  // than what the API might return (Qdrant replication lag)
-  if (recentlyUploadedFileIds.value.has(fileId)) {
-    return
-  }
-
-  try {
-    const timeoutPromise = new Promise<never>((_, reject) =>
-      setTimeout(() => reject(new Error('Timeout')), 8000)
-    )
-    const result = await Promise.race([filesService.getFileGroupKey(fileId), timeoutPromise])
-    fileGroupKeys.value[fileId] = {
-      groupKey: result.groupKey,
-      isVectorized: result.isVectorized,
-      chunks: result.chunks,
-      status: result.status,
-      needsMigration: result.needsMigration ?? false,
-      mariadbChunks: result.mariadbChunks ?? 0,
-      qdrantChunks: result.qdrantChunks ?? 0,
-    }
-  } catch (err: any) {
-    console.error(`Failed to load groupKey for file ${fileId}:`, err)
-    // Preserve existing data (e.g. from upload response) instead of overwriting with error state
-    const existing = fileGroupKeys.value[fileId]
-    if (!existing || !existing.groupKey) {
-      fileGroupKeys.value[fileId] = {
-        groupKey: null,
-        isVectorized: false,
-        chunks: 0,
-        status: 'unknown',
-        needsMigration: false,
-        mariadbChunks: 0,
-        qdrantChunks: 0,
-      }
-    }
-  }
-}
-
-/**
- * Load groupKeys for all visible files — parallel for speed
- */
-const loadAllFileGroupKeys = async () => {
-  await Promise.allSettled(paginatedFiles.value.map((file) => loadFileGroupKey(file.id)))
-}
-
-/**
- * Start editing groupKey
- */
-const startEditGroupKey = async (fileId: number, currentGroupKey: string | null) => {
-  editingGroupKey.value = fileId
-  tempGroupKey.value = currentGroupKey || ''
-  await nextTick()
-  // Find the input element for this specific file
-  const inputElement = document.querySelector(
-    `[data-group-key-input="${fileId}"]`
-  ) as HTMLInputElement
-  if (inputElement) {
-    inputElement.focus()
-  } else if (groupKeyInput.value) {
-    groupKeyInput.value.focus()
-  }
-}
-
-/**
- * Cancel editing groupKey
- */
-const cancelEditGroupKey = () => {
-  editingGroupKey.value = null
-  tempGroupKey.value = ''
-}
-
-/**
- * Save groupKey
- */
-const saveGroupKey = async (fileId: number) => {
-  if (!tempGroupKey.value.trim()) {
-    showError('GroupKey cannot be empty')
-    return
-  }
-
-  try {
-    await filesService.updateFileGroupKey(fileId, tempGroupKey.value.trim())
-    showSuccess('GroupKey updated successfully!')
-
-    // Reload the groupKey for this file
-    await loadFileGroupKey(fileId)
-
-    cancelEditGroupKey()
-
-    // Reload file groups to update the dropdown
-    await loadFileGroups()
-  } catch (err: any) {
-    const errorMessage = err.message || 'Failed to update groupKey'
-    showError(errorMessage)
-  }
-}
-
-/**
- * Re-vectorize a file
- */
-const reVectorize = async (fileId: number) => {
-  const groupKey = tempGroupKey.value || 'DEFAULT'
-
-  try {
-    showInfo('Re-vectorizing file... This may take a moment.')
-
-    const result = await filesService.reVectorizeFile(fileId, groupKey)
-
-    showSuccess(
-      `File re-vectorized! Created ${result.chunksCreated} chunks from ${result.extractedTextLength} characters.`
-    )
-
-    // Reload the groupKey for this file
-    await loadFileGroupKey(fileId)
-
-    // Reload file groups
-    await loadFileGroups()
-  } catch (err: any) {
-    const errorMessage = err.message || 'Failed to re-vectorize file'
-    showError(errorMessage)
-  }
-}
-
-/**
- * Migrate file vectors from MariaDB to Qdrant
- */
-const migrateToQdrant = async (fileId: number) => {
-  try {
-    showInfo(t('files.migratingToQdrant'))
-
-    const result = await filesService.migrateFileToQdrant(fileId)
-
-    if (result.errors > 0) {
-      showError(t('files.migrationPartial', { migrated: result.migrated, errors: result.errors }))
-    } else {
-      showSuccess(t('files.migrationSuccess', { count: result.migrated }))
-    }
-
-    await loadFileGroupKey(fileId)
-    await loadFileGroups()
-  } catch (err: any) {
-    showError(err.message || t('files.migrationFailed'))
-  }
-}
-
 // Load initial data
 onMounted(async () => {
-  await loadFiles()
-  await loadFileGroups()
+  document.addEventListener('click', closeFolderMenu)
+  await Promise.all([loadFileGroups(), loadFiles()])
 
-  // Check for persisted file metadata (from before potential auth refresh)
   const persistedFiles = loadFileMetadata()
   if (persistedFiles && persistedFiles.length > 0) {
     showInfo(
@@ -1201,9 +1419,12 @@ onMounted(async () => {
         names: persistedFiles.map((f) => f.name).join(', '),
       })
     )
-    // Clear the persisted data now that we've shown the notice
     clearFiles()
   }
+})
+
+onUnmounted(() => {
+  document.removeEventListener('click', closeFolderMenu)
 })
 </script>
 

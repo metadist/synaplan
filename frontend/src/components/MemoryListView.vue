@@ -128,8 +128,9 @@
             v-for="memory in filteredMemories"
             :key="memory.id"
             :data-memory-id="memory.id"
-            class="border-b border-light-border/10 dark:border-dark-border/10 hover:bg-surface-soft transition-colors"
+            class="border-b border-light-border/10 dark:border-dark-border/10 hover:bg-surface-soft transition-colors cursor-pointer"
             :class="{ 'bg-brand-500/10': isSelected(memory.id) }"
+            @click="toggleSelect(memory.id)"
           >
             <td class="p-3">
               <input
@@ -137,6 +138,7 @@
                 :checked="isSelected(memory.id)"
                 class="checkbox-brand"
                 @change="toggleSelect(memory.id)"
+                @click.stop
               />
             </td>
             <td class="p-3">
@@ -160,7 +162,7 @@
             <td class="p-3 text-xs txt-tertiary">
               {{ formatTimestamp(memory.updated) }}
             </td>
-            <td class="p-3">
+            <td class="p-3" @click.stop>
               <div class="flex items-center justify-end gap-1">
                 <button
                   class="p-2 rounded-lg hover:bg-brand-500/10 txt-brand transition-colors"
@@ -188,8 +190,9 @@
           v-for="memory in filteredMemories"
           :key="memory.id"
           :data-memory-id="memory.id"
-          class="surface-card rounded-xl p-4"
+          class="surface-card rounded-xl p-4 cursor-pointer"
           :class="isSelected(memory.id) ? 'ring-2 ring-brand' : ''"
+          @click="toggleSelect(memory.id)"
         >
           <div class="flex items-start gap-3">
             <input
@@ -197,6 +200,7 @@
               class="checkbox-brand mt-1"
               :checked="isSelected(memory.id)"
               @change="toggleSelect(memory.id)"
+              @click.stop
             />
             <div class="min-w-0 flex-1">
               <div class="flex items-center gap-2 flex-wrap mb-1">
@@ -220,7 +224,7 @@
                 <div class="text-xs txt-tertiary">
                   {{ formatTimestamp(memory.updated) }}
                 </div>
-                <div class="flex items-center gap-1">
+                <div class="flex items-center gap-1" @click.stop>
                   <button
                     class="p-2 rounded-lg hover:bg-brand-500/10 txt-brand transition-colors"
                     :title="$t('common.edit')"

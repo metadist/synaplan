@@ -468,7 +468,7 @@ export async function reVectorizeFile(
     message: string
   }>(`/api/v1/files/${fileId}/re-vectorize`, {
     method: 'POST',
-    body: JSON.stringify({ groupKey: groupKey || 'DEFAULT' }),
+    body: JSON.stringify({ groupKey: groupKey || '' }),
   })
   return response
 }

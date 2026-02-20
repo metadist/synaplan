@@ -254,6 +254,7 @@
     "dropFilesHint": "Imágenes, documentos, archivos de audio...",
     "filesPasted": "{count} archivo pegado | {count} archivos pegados",
     "send": "Enviar mensaje",
+    "waitForStreaming": "Por favor espera a que la respuesta actual termine antes de enviar otro mensaje.",
     "share": "Compartir",
     "tools": {
       "label": "Herramientas",
@@ -269,7 +270,8 @@
   "chatMessage": {
     "again": "Otra vez",
     "againWith": "Otra vez con",
-    "regenerateWith": "Regenerar con"
+    "regenerateWith": "Regenerar con",
+    "copy": "Copiar mensaje"
   },
   "commands": {
     "noResults": "No se encontraron comandos",
@@ -516,7 +518,9 @@
     "authenticationRequired": "Autenticación requerida. Por favor inicia sesión para continuar.",
     "tokenRefreshFailed": "No se pudo renovar tu sesión. Por favor inicia sesión de nuevo.",
     "showPassword": "Mostrar contraseña",
-    "hidePassword": "Ocultar contraseña"
+    "hidePassword": "Ocultar contraseña",
+    "redirectingToSso": "Redirigiendo al SSO...",
+    "loginWithSso": "Iniciar sesión con SSO"
   },
   "unsavedChanges": {
     "title": "Tienes cambios sin guardar",
@@ -1021,8 +1025,11 @@
     "orSelectExisting": "O seleccionar existente...",
     "selectFiles": "Seleccionar Archivos:",
     "selectFilesButton": "Seleccionar archivos",
+    "selectAndUpload": "Seleccionar Archivos",
+    "uploadCount": "Subir {count} archivo | Subir {count} archivos",
+    "addMore": "Añadir más",
     "noFileSelected": "Ninguno seleccionado",
-    "supportedFormats": "Selecciona uno o más archivos (PDF, DOCX, TXT, JPG, PNG, MP3, MP4)",
+    "supportedFormats": "PDF, DOCX, TXT, JPG, PNG, MP3, MP4",
     "autoProcessingTitle": "Procesamiento Automático",
     "autoProcessingInfo": "Todos los archivos se extraen y vectorizan automáticamente para un rendimiento RAG óptimo con búsqueda semántica.",
     "uploadAndProcess": "Subir y Procesar Archivos",
@@ -1060,6 +1067,10 @@
     "dropFiles": "Suelta archivos aquí para subir",
     "dropFilesHint": "Suelta para agregar archivos a la cola de subida",
     "filesAddedToQueue": "{count} archivo agregado - listo para subir | {count} archivos agregados - listos para subir",
+    "droppedToFolder": "{count} archivo subido a {folder} | {count} archivos subidos a {folder}",
+    "target": "Destino",
+    "rootFolder": "Todos los archivos",
+    "changeTarget": "Cambiar",
     "filesLostAfterReload": "Nota: Después de recargar la página, se perdieron {count} archivo(s) seleccionado(s) ({names}). Por favor selecciona los archivos de nuevo.",
     "uploading": "Subiendo...",
     "uploadProgress": "Progreso de subida",
@@ -1208,6 +1219,8 @@
     "apiKeys": {
       "title": "Claves API",
       "description": "Crea y administra claves API para acceder a la API.",
+      "docsTitle": "Documentación de la API",
+      "docsDesc": "Explora todos los endpoints disponibles, formatos de solicitud y métodos de autenticación.",
       "createKey": "Crear Clave API",
       "namePlaceholder": "Nombre (ej. Servidor A)",
       "tableHeaders": {
@@ -1861,5 +1874,8 @@
     "dontAskAgain": "No mostrar esta advertencia de nuevo",
     "cancel": "Cancelar",
     "open": "Abrir enlace"
+  },
+  "system": {
+    "missingApiKeys": "Faltan algunas claves API — los siguientes proveedores están desactivados: {providers}"
   }
 }

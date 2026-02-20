@@ -1,5 +1,5 @@
 <template>
-  <Teleport to="body">
+  <Teleport to="#app">
     <div
       class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
       @click.self="$emit('close')"

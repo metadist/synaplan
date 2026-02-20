@@ -1,6 +1,7 @@
 <template>
   <div class="flex h-screen" data-testid="comp-main-layout">
-    <Sidebar />
+    <SidebarV2 v-if="isV2" />
+    <Sidebar v-else />
 
     <div class="flex-1 flex flex-col min-w-0" data-testid="section-main-shell">
       <Header>
@@ -21,11 +22,14 @@
 <script setup lang="ts">
 import { onMounted, onBeforeUnmount } from 'vue'
 import Sidebar from './Sidebar.vue'
+import SidebarV2 from './SidebarV2.vue'
 import Header from './Header.vue'
 import HelpHost from './help/HelpHost.vue'
 import { useSidebarStore } from '../stores/sidebar'
+import { useDesignVariant } from '../composables/useDesignVariant'
 
 const sidebarStore = useSidebarStore()
+const { isV2 } = useDesignVariant()
 
 const handleEscape = (event: KeyboardEvent) => {
   if (event.key === 'Escape') {

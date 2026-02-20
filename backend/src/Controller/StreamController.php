@@ -1219,9 +1219,23 @@ class StreamController extends AbstractController
                 return;
             }
 
-            // Get response content
-            $content = $result['content'] ?? '';
-            $metadata = $result['metadata'] ?? [];
+            // Unpack nested response (process() returns response under 'response' key)
+            $response = $result['response'] ?? [];
+
+            // Detect if we are falling back to flat structure; this may indicate an unexpected response format
+            $usedFlatContent = !isset($response['content']) && \array_key_exists('content', $result);
+            $usedFlatMetadata = !isset($response['metadata']) && \array_key_exists('metadata', $result);
+
+            if ($usedFlatContent || $usedFlatMetadata) {
+                $this->logger->warning('StreamController: Fell back to flat response structure from process()', [
+                    'usedFlatContent' => $usedFlatContent,
+                    'usedFlatMetadata' => $usedFlatMetadata,
+                    'messageId' => $message->getId(),
+                ]);
+            }
+
+            $content = $response['content'] ?? $result['content'] ?? '';
+            $metadata = $response['metadata'] ?? $result['metadata'] ?? [];
 
             // Extract reasoning if present (for o1 models)
             $reasoning = null;
@@ -1237,6 +1251,14 @@ class StreamController extends AbstractController
 
             // Send content in one chunk (simulating streaming)
             $this->sendSSE('data', ['chunk' => $content]);
+
+            // Send file event if media was generated
+            if (isset($metadata['file'])) {
+                $this->sendSSE('file', [
+                    'type' => $metadata['file']['type'] ?? 'image',
+                    'url' => $metadata['file']['path'] ?? '',
+                ]);
+            }
 
             // Send complete event
             $this->sendSSE('complete', [

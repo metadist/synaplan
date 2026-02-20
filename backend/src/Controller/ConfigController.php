@@ -173,6 +173,13 @@ class ConfigController extends AbstractController
                         ),
                     ]
                 ),
+                new OA\Property(
+                    property: 'unavailableProviders',
+                    type: 'array',
+                    description: 'AI providers that are disabled due to missing API keys (only for authenticated users)',
+                    items: new OA\Items(type: 'string', example: 'Anthropic'),
+                    nullable: true
+                ),
             ]
         )
     )]
@@ -250,14 +257,32 @@ class ConfigController extends AbstractController
             'ip' => $this->getInternalIp(),
         ];
 
-        return $this->json([
+        $unavailableProviders = [];
+        if ($user) {
+            foreach ($this->providerRegistry->getUniqueProviders() as $name => $provider) {
+                if ('test' === $name) {
+                    continue;
+                }
+                if (!$provider->isAvailable()) {
+                    $unavailableProviders[] = $provider->getDisplayName();
+                }
+            }
+        }
+
+        $response = [
             'recaptcha' => $recaptchaConfig,
             'features' => $features,
             'speech' => $speech,
             'plugins' => $plugins,
             'googleTag' => $googleTagConfig,
             'build' => $buildInfo,
-        ]);
+        ];
+
+        if ($user && !empty($unavailableProviders)) {
+            $response['unavailableProviders'] = $unavailableProviders;
+        }
+
+        return $this->json($response);
     }
 
     /**

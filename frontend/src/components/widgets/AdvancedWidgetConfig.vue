@@ -1,5 +1,5 @@
 <template>
-  <Teleport to="body">
+  <Teleport to="#app">
     <div
       class="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4"
       data-testid="modal-advanced-config"
