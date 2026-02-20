@@ -2,49 +2,48 @@
   <MainLayout>
     <div class="h-full flex flex-col bg-chat" data-testid="page-widget-sessions">
       <!-- Header -->
-      <div class="px-4 lg:px-6 py-4 bg-chat flex-shrink-0">
-        <div class="flex items-center justify-between">
-          <div class="flex items-center gap-3">
-            <button
-              class="p-2 rounded-xl hover:bg-white/5 dark:hover:bg-white/5 transition-all duration-200"
-              :title="$t('common.back')"
-              @click="goBack"
-            >
-              <Icon icon="heroicons:arrow-left" class="w-5 h-5 txt-secondary" />
-            </button>
-            <div>
-              <h1 class="text-lg font-semibold txt-primary flex items-center gap-2">
-                <div
-                  class="w-8 h-8 rounded-xl bg-gradient-to-br from-[var(--brand)] to-[var(--brand-light)] flex items-center justify-center"
-                >
-                  <Icon icon="heroicons:chat-bubble-left-right" class="w-4 h-4 text-white" />
-                </div>
-                {{ widget?.name || $t('widgetSessions.title') }}
-              </h1>
-              <div class="flex items-center gap-3 text-xs txt-secondary mt-1 ml-10">
-                <span class="flex items-center gap-1.5">
-                  <span
-                    class="w-2 h-2 rounded-full bg-blue-500 shadow-sm shadow-blue-500/50"
-                  ></span>
-                  {{ stats.ai }} {{ $t('widgetSessions.aiShort') }}
-                </span>
-                <span class="flex items-center gap-1.5">
-                  <span
-                    class="w-2 h-2 rounded-full bg-emerald-500 shadow-sm shadow-emerald-500/50"
-                  ></span>
-                  {{ stats.human }} {{ $t('widgetSessions.humanShort') }}
-                </span>
-                <span class="flex items-center gap-1.5">
-                  <span
-                    class="w-2 h-2 rounded-full bg-amber-500 shadow-sm shadow-amber-500/50"
-                  ></span>
-                  {{ stats.waiting }} {{ $t('widgetSessions.waitingShort') }}
-                </span>
-              </div>
-            </div>
+      <div class="px-4 lg:px-6 py-3 lg:py-4 bg-chat flex-shrink-0 space-y-2">
+        <!-- Row 1: Title + Stats (always visible) -->
+        <div class="flex items-center gap-2 lg:gap-3">
+          <button
+            class="p-2 rounded-xl hover:bg-white/5 dark:hover:bg-white/5 transition-all duration-200 flex-shrink-0"
+            :title="$t('common.back')"
+            @click="goBack"
+          >
+            <Icon icon="heroicons:arrow-left" class="w-5 h-5 txt-secondary" />
+          </button>
+          <div
+            class="w-8 h-8 rounded-xl bg-gradient-to-br from-[var(--brand)] to-[var(--brand-light)] flex items-center justify-center flex-shrink-0"
+          >
+            <Icon icon="heroicons:chat-bubble-left-right" class="w-4 h-4 text-white" />
+          </div>
+          <h1 class="text-base lg:text-lg font-semibold txt-primary truncate min-w-0">
+            {{ widget?.name || $t('widgetSessions.title') }}
+          </h1>
+
+          <!-- Stats (inline on desktop) -->
+          <div class="hidden md:flex items-center gap-3 text-xs txt-secondary flex-shrink-0">
+            <span class="flex items-center gap-1.5">
+              <span class="w-2 h-2 rounded-full bg-blue-500 shadow-sm shadow-blue-500/50"></span>
+              {{ stats.ai }} {{ $t('widgetSessions.aiShort') }}
+            </span>
+            <span class="flex items-center gap-1.5">
+              <span
+                class="w-2 h-2 rounded-full bg-emerald-500 shadow-sm shadow-emerald-500/50"
+              ></span>
+              {{ stats.human }} {{ $t('widgetSessions.humanShort') }}
+            </span>
+            <span class="flex items-center gap-1.5">
+              <span class="w-2 h-2 rounded-full bg-amber-500 shadow-sm shadow-amber-500/50"></span>
+              {{ stats.waiting }} {{ $t('widgetSessions.waitingShort') }}
+            </span>
           </div>
 
-          <div class="flex items-center gap-2">
+          <!-- Spacer -->
+          <div class="flex-1"></div>
+
+          <!-- Actions (inline on desktop) -->
+          <div class="hidden lg:flex items-center gap-2 flex-shrink-0">
             <!-- Selection indicator & actions -->
             <div
               v-if="selectedSessionIds.size > 0"
@@ -101,19 +100,100 @@
             </button>
           </div>
         </div>
+
+        <!-- Row 2: Stats + Actions (mobile only) -->
+        <div class="flex lg:hidden items-center gap-2 flex-wrap">
+          <!-- Stats (mobile) -->
+          <div class="flex md:hidden items-center gap-2 text-[11px] txt-secondary mr-auto">
+            <span class="flex items-center gap-1">
+              <span class="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
+              {{ stats.ai }} AI
+            </span>
+            <span class="flex items-center gap-1">
+              <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+              {{ stats.human }} Human
+            </span>
+            <span class="flex items-center gap-1">
+              <span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+              {{ stats.waiting }} Waiting
+            </span>
+          </div>
+
+          <!-- Mobile action buttons -->
+          <!-- Selection indicator -->
+          <div
+            v-if="selectedSessionIds.size > 0"
+            class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--brand)]/10"
+          >
+            <span class="text-xs font-medium txt-brand">
+              {{ selectedSessionIds.size }}
+            </span>
+            <button
+              class="p-0.5 rounded hover:bg-[var(--brand)]/20 transition-colors"
+              :title="$t('common.clearSelection')"
+              @click="clearSelection"
+            >
+              <Icon icon="heroicons:x-mark" class="w-3.5 h-3.5 txt-brand" />
+            </button>
+          </div>
+          <!-- Delete -->
+          <button
+            v-if="selectedSessionIds.size > 0"
+            class="p-2 rounded-xl bg-red-500/10 text-red-500 hover:bg-red-500/20 transition-all"
+            :disabled="deletingSessions"
+            :title="$t('common.delete')"
+            @click="confirmDeleteSelected"
+          >
+            <Icon
+              :icon="deletingSessions ? 'heroicons:arrow-path' : 'heroicons:trash'"
+              :class="['w-4 h-4', deletingSessions && 'animate-spin']"
+            />
+          </button>
+          <!-- Export -->
+          <button
+            class="p-2 rounded-xl transition-all"
+            :class="
+              selectedSessionIds.size > 0
+                ? 'bg-[var(--brand)] text-white'
+                : 'bg-white/5 txt-secondary hover:bg-white/10'
+            "
+            :title="$t('export.title')"
+            @click="showExportDialog = true"
+          >
+            <Icon icon="heroicons:arrow-down-tray" class="w-4 h-4" />
+          </button>
+          <!-- Summary -->
+          <button
+            class="p-2 rounded-xl transition-all"
+            :class="
+              showSummaryPanel
+                ? 'bg-[var(--brand)]/10 text-[var(--brand)]'
+                : 'bg-white/5 txt-secondary hover:bg-white/10'
+            "
+            :title="$t('widgetSessions.summary')"
+            @click="showSummaryPanel = !showSummaryPanel"
+          >
+            <Icon icon="heroicons:sparkles" class="w-4 h-4" />
+          </button>
+        </div>
       </div>
 
       <!-- Main Content: Split View -->
-      <div class="flex-1 flex overflow-hidden px-4 lg:px-6 pb-4 lg:pb-6 gap-4">
+      <div class="flex-1 flex overflow-hidden px-4 lg:px-6 pb-4 lg:pb-6">
         <!-- Left: Session List -->
         <div
           :class="[
-            'flex-shrink-0 flex flex-col overflow-hidden transition-all duration-300 rounded-2xl bg-[var(--bg-card)] shadow-sm',
-            selectedSession ? 'w-80 hidden lg:flex' : 'w-full lg:w-80',
+            'flex flex-col overflow-hidden rounded-2xl bg-[var(--bg-card)] shadow-sm',
+            selectedSession ? 'hidden lg:flex' : 'w-full lg:flex',
           ]"
+          :style="
+            isLgScreen
+              ? { width: leftPanelWidth + 'px', minWidth: LEFT_PANEL_MIN + 'px', flexShrink: '1' }
+              : undefined
+          "
         >
           <!-- Filters -->
-          <div class="p-3 flex gap-2">
+          <div class="p-3 flex flex-wrap gap-2">
             <!-- Select All Checkbox -->
             <button
               :class="[
@@ -150,6 +230,7 @@
             <select
               v-model="filters.mode"
               class="flex-1 px-3 py-2 rounded-xl bg-white/5 dark:bg-white/5 text-xs txt-primary border-0 focus:ring-2 focus:ring-[var(--brand)]/30 transition-all"
+              style="min-width: 80px"
               @change="loadSessions"
             >
               <option value="">{{ $t('widgetSessions.allModes') }}</option>
@@ -160,6 +241,7 @@
             <select
               v-model="filters.status"
               class="flex-1 px-3 py-2 rounded-xl bg-white/5 dark:bg-white/5 text-xs txt-primary border-0 focus:ring-2 focus:ring-[var(--brand)]/30 transition-all"
+              style="min-width: 80px"
               @change="loadSessions"
             >
               <option value="">{{ $t('widgetSessions.allStatus') }}</option>
@@ -283,8 +365,21 @@
           </div>
         </div>
 
-        <!-- Right: Chat View -->
-        <div class="flex-1 flex flex-col overflow-hidden rounded-2xl bg-[var(--bg-card)] shadow-sm">
+        <!-- Left Resize Handle -->
+        <div v-if="isLgScreen" class="resize-handle group" @mousedown="startResize('left', $event)">
+          <div
+            class="resize-handle-bar group-hover:bg-[var(--brand)] group-active:bg-[var(--brand)]"
+          ></div>
+        </div>
+
+        <!-- Center: Chat View -->
+        <div
+          :class="[
+            'flex-1 flex flex-col overflow-hidden rounded-2xl bg-[var(--bg-card)] shadow-sm',
+            !selectedSession ? 'hidden lg:flex' : '',
+          ]"
+          :style="isLgScreen ? { minWidth: CHAT_MIN_WIDTH + 'px' } : undefined"
+        >
           <!-- No Selection -->
           <div v-if="!selectedSession" class="flex-1 flex items-center justify-center">
             <div class="text-center p-8">
@@ -308,11 +403,14 @@
           <!-- Selected Session Chat -->
           <template v-else>
             <!-- Chat Header -->
-            <div class="p-4 flex items-center justify-between flex-shrink-0">
+            <div
+              class="p-4 flex-shrink-0 space-y-2 border-b border-white/5 dark:border-white/5 shadow-[0_1px_3px_rgba(0,0,0,0.08)]"
+            >
+              <!-- Top row: back button, session info, and actions -->
               <div class="flex items-center gap-3">
                 <!-- Back button on mobile -->
                 <button
-                  class="p-2 rounded-xl hover:bg-white/5 transition-all duration-200 lg:hidden"
+                  class="p-2 rounded-xl hover:bg-white/5 transition-all duration-200 lg:hidden flex-shrink-0"
                   @click="closeSessionDetail"
                 >
                   <Icon icon="heroicons:arrow-left" class="w-5 h-5 txt-secondary" />
@@ -320,14 +418,14 @@
 
                 <div
                   :class="[
-                    'w-11 h-11 rounded-xl flex items-center justify-center shadow-sm',
+                    'w-10 h-10 lg:w-11 lg:h-11 rounded-xl flex items-center justify-center shadow-sm flex-shrink-0',
                     getModeGradient(selectedSession.mode),
                   ]"
                 >
                   <Icon :icon="getModeIcon(selectedSession.mode)" class="w-5 h-5 text-white" />
                 </div>
-                <div class="min-w-0">
-                  <div class="flex items-center gap-2">
+                <div class="min-w-0 flex-1">
+                  <div class="flex items-center gap-1.5 flex-wrap">
                     <!-- Editable title -->
                     <div v-if="isEditingTitle" class="flex items-center gap-2">
                       <input
@@ -343,7 +441,9 @@
                       />
                     </div>
                     <template v-else>
-                      <p class="text-sm font-medium txt-primary truncate max-w-[200px]">
+                      <p
+                        class="text-sm font-medium txt-primary truncate max-w-[150px] lg:max-w-[200px]"
+                      >
                         {{ selectedSession.title || getModeLabel(selectedSession.mode) }}
                       </p>
                       <button
@@ -382,7 +482,7 @@
                       >{{ getModeLabel(selectedSession.mode) }}</span
                     >
                   </div>
-                  <p class="text-xs txt-secondary">
+                  <p class="text-xs txt-secondary truncate">
                     <template v-if="selectedSession.country">
                       {{ getCountryFlag(selectedSession.country) }}
                       {{ getCountryName(selectedSession.country) }} ·
@@ -391,12 +491,39 @@
                     {{ getTimeAgo(selectedSession.lastMessage) }}
                   </p>
                 </div>
+
+                <!-- Actions (inline on desktop) -->
+                <div class="hidden lg:flex items-center gap-2 flex-shrink-0">
+                  <button
+                    v-if="selectedSession.mode === 'ai'"
+                    class="px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white text-xs font-medium transition-all duration-200 shadow-sm shadow-emerald-500/25 flex items-center gap-1.5"
+                    @click="takeOver(selectedSession)"
+                  >
+                    <Icon icon="heroicons:hand-raised" class="w-4 h-4" />
+                    {{ $t('widgetSessions.takeOver') }}
+                  </button>
+                  <button
+                    v-if="selectedSession.mode === 'human' || selectedSession.mode === 'waiting'"
+                    class="px-4 py-2 rounded-xl bg-blue-500/10 hover:bg-blue-500/20 text-blue-500 text-xs font-medium transition-all duration-200 flex items-center gap-1.5"
+                    @click="handBack(selectedSession)"
+                  >
+                    <Icon icon="heroicons:arrow-uturn-left" class="w-4 h-4" />
+                    {{ $t('widgetSessions.handBack') }}
+                  </button>
+                </div>
               </div>
 
-              <!-- Actions -->
-              <div class="flex items-center gap-2">
+              <!-- Actions (separate row on mobile) -->
+              <div
+                v-if="
+                  selectedSession.mode === 'ai' ||
+                  selectedSession.mode === 'human' ||
+                  selectedSession.mode === 'waiting'
+                "
+                class="flex lg:hidden items-center gap-2 pl-10"
+              >
                 <button
-                  v-if="selectedSession.mode === 'ai' && !selectedSession.isExpired"
+                  v-if="selectedSession.mode === 'ai'"
                   class="px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white text-xs font-medium transition-all duration-200 shadow-sm shadow-emerald-500/25 flex items-center gap-1.5"
                   @click="takeOver(selectedSession)"
                 >
@@ -404,10 +531,7 @@
                   {{ $t('widgetSessions.takeOver') }}
                 </button>
                 <button
-                  v-else-if="
-                    (selectedSession.mode === 'human' || selectedSession.mode === 'waiting') &&
-                    !selectedSession.isExpired
-                  "
+                  v-if="selectedSession.mode === 'human' || selectedSession.mode === 'waiting'"
                   class="px-4 py-2 rounded-xl bg-blue-500/10 hover:bg-blue-500/20 text-blue-500 text-xs font-medium transition-all duration-200 flex items-center gap-1.5"
                   @click="handBack(selectedSession)"
                 >
@@ -500,7 +624,7 @@
             <!-- Message Input (Human/Waiting Mode) -->
             <div
               v-if="selectedSession.mode === 'human' || selectedSession.mode === 'waiting'"
-              class="p-4 flex-shrink-0"
+              class="p-4 flex-shrink-0 border-t border-white/5 dark:border-white/5 shadow-[0_-1px_3px_rgba(0,0,0,0.08)]"
             >
               <!-- File Preview -->
               <div v-if="selectedFiles.length > 0" class="mb-3 flex flex-wrap gap-2">
@@ -582,6 +706,17 @@
           </template>
         </div>
 
+        <!-- Right Resize Handle -->
+        <div
+          v-if="showSummaryPanel && isXlScreen"
+          class="resize-handle group"
+          @mousedown="startResize('right', $event)"
+        >
+          <div
+            class="resize-handle-bar group-hover:bg-[var(--brand)] group-active:bg-[var(--brand)]"
+          ></div>
+        </div>
+
         <!-- AI Summary Slide Panel (desktop only, xl+) -->
         <Transition
           enter-active-class="transition-all duration-300 ease-out"
@@ -593,7 +728,12 @@
         >
           <div
             v-if="showSummaryPanel"
-            class="hidden xl:flex w-80 2xl:w-96 flex-shrink-0 rounded-2xl bg-[var(--bg-card)] shadow-sm overflow-hidden flex-col"
+            class="hidden xl:flex rounded-2xl bg-[var(--bg-card)] shadow-sm overflow-hidden flex-col"
+            :style="{
+              width: rightPanelWidth + 'px',
+              minWidth: RIGHT_PANEL_MIN + 'px',
+              flexShrink: '1',
+            }"
           >
             <div class="p-4 flex items-center justify-between">
               <h3 class="text-sm font-semibold txt-primary flex items-center gap-2">
@@ -615,7 +755,7 @@
               <WidgetSummaryPanel
                 :widget-id="widgetId"
                 :compact="true"
-                :selected-session-ids="Array.from(selectedSessionIds)"
+                :selected-session-ids="selectedSessionIdsArray"
                 @edit-prompt="showWidgetConfig = true"
               />
             </div>
@@ -663,7 +803,7 @@
                 <WidgetSummaryPanel
                   :widget-id="widgetId"
                   :compact="false"
-                  :selected-session-ids="Array.from(selectedSessionIds)"
+                  :selected-session-ids="selectedSessionIdsArray"
                   @edit-prompt="showWidgetConfig = true"
                 />
               </div>
@@ -676,7 +816,7 @@
       <WidgetExportDialog
         v-if="showExportDialog"
         :widget-id="widgetId"
-        :selected-session-ids="Array.from(selectedSessionIds)"
+        :selected-session-ids="selectedSessionIdsArray"
         @close="handleExportDialogClose"
       />
 
@@ -728,6 +868,7 @@ const showExportDialog = ref(false)
 const showSummaryPanel = ref(window.innerWidth >= 1280)
 const showWidgetConfig = ref(false)
 const selectedSessionIds = ref<Set<string>>(new Set())
+const selectedSessionIdsArray = computed(() => Array.from(selectedSessionIds.value))
 const deletingSessions = ref(false)
 const messageText = ref('')
 const sendingMessage = ref(false)
@@ -744,6 +885,123 @@ const uploadedFileIds = ref<number[]>([])
 const isEditingTitle = ref(false)
 const editTitleValue = ref('')
 const titleInputRef = ref<HTMLInputElement | null>(null)
+
+// Resizable panels
+const LEFT_PANEL_MIN = 240
+const LEFT_PANEL_MAX = 500
+const LEFT_PANEL_DEFAULT = 320
+const RIGHT_PANEL_MIN = 260
+const RIGHT_PANEL_MAX = 500
+const RIGHT_PANEL_DEFAULT = 320
+const CHAT_MIN_WIDTH = 350
+
+const leftPanelWidth = ref(
+  parseInt(localStorage.getItem('synaplan_sessions_left_width') || '') || LEFT_PANEL_DEFAULT
+)
+const rightPanelWidth = ref(
+  parseInt(localStorage.getItem('synaplan_sessions_right_width') || '') || RIGHT_PANEL_DEFAULT
+)
+const isResizing = ref(false)
+const resizeSide = ref<'left' | 'right'>('left')
+const resizeStartX = ref(0)
+const resizeStartWidth = ref(0)
+const isLgScreen = ref(window.innerWidth >= 1024)
+const isXlScreen = ref(window.innerWidth >= 1280)
+
+function handleScreenResize() {
+  isLgScreen.value = window.innerWidth >= 1024
+  isXlScreen.value = window.innerWidth >= 1280
+  clampPanelWidths()
+}
+
+function clampPanelWidths() {
+  const container = document.querySelector('[data-testid="page-widget-sessions"]')
+  if (!container) return
+
+  const containerWidth = container.clientWidth
+  const handleWidth = 32
+  const padding = 48
+  const rightWidth = showSummaryPanel.value && isXlScreen.value ? rightPanelWidth.value : 0
+  const rightHandle = rightWidth > 0 ? handleWidth : 0
+
+  // Ensure chat min-width is always respected by shrinking panels
+  const available = containerWidth - padding - handleWidth - rightHandle - CHAT_MIN_WIDTH
+  if (available < LEFT_PANEL_MIN + rightWidth) {
+    // Not enough space — shrink panels proportionally
+    const totalPanels = leftPanelWidth.value + rightWidth
+    if (totalPanels > 0 && available > 0) {
+      const ratio = Math.max(0, available) / totalPanels
+      leftPanelWidth.value = Math.max(LEFT_PANEL_MIN, Math.floor(leftPanelWidth.value * ratio))
+      if (rightWidth > 0) {
+        rightPanelWidth.value = Math.max(RIGHT_PANEL_MIN, Math.floor(rightPanelWidth.value * ratio))
+      }
+    }
+  }
+}
+
+function startResize(side: 'left' | 'right', event: MouseEvent) {
+  event.preventDefault()
+  isResizing.value = true
+  resizeSide.value = side
+  resizeStartX.value = event.clientX
+  resizeStartWidth.value = side === 'left' ? leftPanelWidth.value : rightPanelWidth.value
+
+  document.addEventListener('mousemove', onResize)
+  document.addEventListener('mouseup', stopResize)
+  document.body.style.cursor = 'col-resize'
+  document.body.style.userSelect = 'none'
+}
+
+function onResize(event: MouseEvent) {
+  if (!isResizing.value) return
+
+  const containerWidth =
+    document.querySelector('[data-testid="page-widget-sessions"]')?.clientWidth ?? window.innerWidth
+
+  if (resizeSide.value === 'left') {
+    const delta = event.clientX - resizeStartX.value
+    let newWidth = resizeStartWidth.value + delta
+
+    // Clamp to min/max
+    newWidth = Math.max(LEFT_PANEL_MIN, Math.min(LEFT_PANEL_MAX, newWidth))
+
+    // Ensure chat area doesn't get too small
+    const rightWidth = showSummaryPanel.value && isXlScreen.value ? rightPanelWidth.value : 0
+    const handleWidth = 32 // resize handles
+    const padding = 48 // container padding
+    const availableForChat = containerWidth - newWidth - rightWidth - handleWidth - padding
+    if (availableForChat < CHAT_MIN_WIDTH) return
+
+    leftPanelWidth.value = newWidth
+  } else {
+    const delta = resizeStartX.value - event.clientX
+    let newWidth = resizeStartWidth.value + delta
+
+    // Clamp to min/max
+    newWidth = Math.max(RIGHT_PANEL_MIN, Math.min(RIGHT_PANEL_MAX, newWidth))
+
+    // Ensure chat area doesn't get too small
+    const handleWidth = 32
+    const padding = 48
+    const availableForChat =
+      containerWidth - leftPanelWidth.value - newWidth - handleWidth - padding
+    if (availableForChat < CHAT_MIN_WIDTH) return
+
+    rightPanelWidth.value = newWidth
+  }
+}
+
+function stopResize() {
+  isResizing.value = false
+  document.removeEventListener('mousemove', onResize)
+  document.removeEventListener('mouseup', stopResize)
+  document.body.style.cursor = ''
+  document.body.style.userSelect = ''
+
+  // Persist to localStorage
+  localStorage.setItem('synaplan_sessions_left_width', leftPanelWidth.value.toString())
+  localStorage.setItem('synaplan_sessions_right_width', rightPanelWidth.value.toString())
+}
 
 const filters = ref({
   status: '' as '' | 'active' | 'expired',
@@ -933,6 +1191,9 @@ const viewSession = async (session: widgetSessionsApi.WidgetSession) => {
     }
 
     // Subscribe to SSE for this specific session
+    // Use latestEventId to skip historical events and only receive new ones.
+    // This prevents replay of old takeover/handback events that would incorrectly
+    // change the session mode (e.g. 'waiting' → 'human' from a stale takeover event).
     const currentSessionId = response.session.sessionId
     eventSubscription.value = subscribeToSession(
       widgetId.value,
@@ -944,7 +1205,8 @@ const viewSession = async (session: widgetSessionsApi.WidgetSession) => {
         }
         handleSessionEvent(event)
       },
-      (err) => console.warn('[Admin SSE] Error:', err)
+      (err) => console.warn('[Admin SSE] Error:', err),
+      { initialLastEventId: response.latestEventId ?? 0 }
     )
   } catch (err: any) {
     error(err.message || 'Failed to load session details')
@@ -1611,12 +1873,52 @@ onMounted(() => {
   loadWidget()
   loadSessions()
   window.addEventListener('beforeunload', handleBeforeUnload)
+  window.addEventListener('resize', handleScreenResize)
 })
 
 onUnmounted(() => {
   window.removeEventListener('beforeunload', handleBeforeUnload)
+  window.removeEventListener('resize', handleScreenResize)
+  // Clean up resize listeners in case component unmounts during resize
+  document.removeEventListener('mousemove', onResize)
+  document.removeEventListener('mouseup', stopResize)
   if (eventSubscription.value) {
     eventSubscription.value.unsubscribe()
   }
 })
 </script>
+
+<style scoped>
+.resize-handle {
+  flex-shrink: 0;
+  width: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: col-resize;
+  position: relative;
+  z-index: 10;
+}
+
+.resize-handle-bar {
+  width: 5px;
+  height: 48px;
+  border-radius: 3px;
+  background: var(--txt-secondary, rgba(128, 128, 128, 0.4));
+  opacity: 0.5;
+  transition:
+    opacity 0.15s ease,
+    height 0.15s ease,
+    background-color 0.15s ease;
+}
+
+.resize-handle:hover .resize-handle-bar {
+  height: 64px;
+  opacity: 1;
+}
+
+.resize-handle:active .resize-handle-bar {
+  height: 64px;
+  opacity: 1;
+}
+</style>

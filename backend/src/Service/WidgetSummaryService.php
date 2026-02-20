@@ -5,10 +5,12 @@ declare(strict_types=1);
 namespace App\Service;
 
 use App\AI\Service\AiFacade;
+use App\Entity\Prompt;
 use App\Entity\Widget;
 use App\Entity\WidgetSummary;
 use App\Repository\ChatRepository;
 use App\Repository\MessageRepository;
+use App\Repository\PromptRepository;
 use App\Repository\WidgetSessionRepository;
 use App\Repository\WidgetSummaryRepository;
 use Doctrine\ORM\EntityManagerInterface;
@@ -25,16 +27,91 @@ use Psr\Log\LoggerInterface;
  */
 final class WidgetSummaryService
 {
+    public const SUMMARY_TOPIC_PREFIX = 'ws_';
+    public const DEFAULT_SUMMARY_TOPIC = 'tools:widget-summary-default';
+    public const DEFAULT_SUMMARY_MODEL_ID = 73;
+
     public function __construct(
         private EntityManagerInterface $em,
         private WidgetSessionRepository $sessionRepository,
         private WidgetSummaryRepository $summaryRepository,
         private ChatRepository $chatRepository,
         private MessageRepository $messageRepository,
+        private PromptRepository $promptRepository,
         private AiFacade $aiFacade,
         private ModelConfigService $modelConfigService,
         private LoggerInterface $logger,
     ) {
+    }
+
+    /**
+     * Derive the summary prompt topic from a widget's ID.
+     */
+    public static function getSummaryTopicForWidget(Widget $widget): string
+    {
+        return self::SUMMARY_TOPIC_PREFIX.$widget->getWidgetId();
+    }
+
+    /**
+     * Return the default summary prompt text with placeholders.
+     * Used as fallback when no DB entry exists yet.
+     */
+    public static function getDefaultPromptText(): string
+    {
+        return <<<'PROMPT'
+You are analyzing customer support chat conversations. Provide a structured analysis.
+
+## CONVERSATIONS TO ANALYZE:
+{{CONVERSATIONS}}
+
+## CURRENT SYSTEM PROMPT OF THE CHATBOT:
+{{SYSTEM_PROMPT}}
+
+## YOUR TASK:
+Analyze these conversations and provide insights. Answer each section separately.
+
+### 1. EXECUTIVE SUMMARY (2-3 sentences)
+What are users asking about? How well is the assistant helping them?
+
+### 2. MAIN TOPICS (comma-separated list)
+List the 3-5 main topics discussed.
+
+### 3. SENTIMENT ANALYSIS
+First, classify EVERY user message from the conversations as POSITIVE, NEUTRAL, or NEGATIVE using these rules:
+- NEGATIVE: The user shows frustration, confusion, or dissatisfaction. Also classify as NEGATIVE when the assistant gave an unhelpful, incomplete, or repetitive response, when the user was bounced between AI and support agent, or when the assistant could not fulfill the request.
+- NEUTRAL: Simple greetings, factual questions without emotion, basic small talk.
+- POSITIVE: User expresses satisfaction, gratitude, or the assistant successfully helped them.
+
+Then provide the percentages (MUST add up to 100):
+- Positive: [number]%
+- Neutral: [number]%
+- Negative: [number]%
+
+Now list ALL neutral and negative user messages with the EXACT text from the conversations.
+Format each entry EXACTLY as follows (one per line):
+- [NEUTRAL] User: "exact user message" | Response: "exact assistant response"
+- [NEGATIVE] User: "exact user message" | Response: "exact assistant response"
+
+### 4. FREQUENTLY ASKED QUESTIONS
+List each question with how many times it was asked:
+- "[question]" (asked X times)
+
+### 5. ISSUES IDENTIFIED
+What problems or gaps did you notice?
+- [issue 1]
+- [issue 2]
+
+### 6. RECOMMENDATIONS
+What specific improvements would help?
+- [recommendation 1]
+- [recommendation 2]
+
+### 7. PROMPT IMPROVEMENT SUGGESTIONS
+Based on the conversations, what should be added or changed in the system prompt?
+For each suggestion, specify if it's an ADDITION (new info needed) or IMPROVEMENT (existing info needs refinement):
+- ADD: [what to add and why]
+- IMPROVE: [what to improve and how]
+PROMPT;
     }
 
     /**
@@ -229,6 +306,7 @@ final class WidgetSummaryService
         // Collect all messages from sessions
         // Only include chats with 5-30 visitor messages for meaningful analysis
         $allConversations = [];
+        $allMessagePairs = []; // Collect user→assistant pairs for matching sentiment messages
         $totalMessages = 0;
         $userMessages = 0;
         $assistantMessages = 0;
@@ -245,12 +323,13 @@ final class WidgetSummaryService
                 continue;
             }
 
-            $messages = $this->messageRepository->findChatHistory($ownerId, $chatId, 100, 10000);
+            // Get ALL messages without any limits (findChatHistory truncates by character count)
+            $messages = $this->messageRepository->findAllByChatId($ownerId, $chatId);
 
-            // Count visitor messages for this session
+            // Count visitor messages for this session (exclude system messages)
             $visitorMessageCount = 0;
             foreach ($messages as $message) {
-                if ('IN' === $message->getDirection()) {
+                if ('IN' === $message->getDirection() && 'SYSTEM' !== $message->getProviderIndex()) {
                     ++$visitorMessageCount;
                 }
             }
@@ -262,14 +341,29 @@ final class WidgetSummaryService
 
             ++$filteredSessionCount;
             $conversationText = [];
+            $lastUserMessage = null;
 
             foreach ($messages as $message) {
+                // Skip system messages (takeover/handback notifications)
+                if ('SYSTEM' === $message->getProviderIndex()) {
+                    continue;
+                }
+
                 ++$totalMessages;
                 $role = 'IN' === $message->getDirection() ? 'User' : 'Assistant';
                 if ('IN' === $message->getDirection()) {
                     ++$userMessages;
+                    $lastUserMessage = $message->getText();
                 } else {
                     ++$assistantMessages;
+                    // Pair this assistant response with the last user message
+                    if (null !== $lastUserMessage) {
+                        $allMessagePairs[] = [
+                            'userMessage' => $lastUserMessage,
+                            'assistantResponse' => $message->getText(),
+                        ];
+                        $lastUserMessage = null;
+                    }
                 }
                 $conversationText[] = "{$role}: {$message->getText()}";
             }
@@ -298,7 +392,16 @@ final class WidgetSummaryService
         $systemPrompt = $config['systemPrompt'] ?? '';
 
         // Generate AI summary
-        $aiSummary = $this->generateAiAnalysis($allConversations, $systemPrompt, $ownerId);
+        $aiSummary = $this->generateAiAnalysis($allConversations, $systemPrompt, $ownerId, $widget);
+
+        // Replace AI-quoted responses with original full-text responses from the database.
+        // The AI may truncate or paraphrase long responses; the originals are always more accurate.
+        if (!empty($aiSummary['sentimentMessages']) && !empty($allMessagePairs)) {
+            $aiSummary['sentimentMessages'] = $this->matchOriginalResponses(
+                $aiSummary['sentimentMessages'],
+                $allMessagePairs
+            );
+        }
 
         // Create or update summary entity
         if ($summaryId) {
@@ -314,7 +417,7 @@ final class WidgetSummaryService
 
         $summary->setDate((int) date('Ymd'));
         $summary->setSessionCount($filteredSessionCount);
-        $summary->setMessageCount($totalMessages);
+        $summary->setMessageCount($userMessages);
         $summary->setTopics($aiSummary['topics'] ?? []);
         $summary->setFaqs($aiSummary['faqs'] ?? []);
         $summary->setSentiment($aiSummary['sentiment'] ?? ['positive' => 0, 'neutral' => 100, 'negative' => 0]);
@@ -322,6 +425,7 @@ final class WidgetSummaryService
         $summary->setRecommendations($aiSummary['recommendations'] ?? []);
         $summary->setSummaryText($aiSummary['summary'] ?? '');
         $summary->setPromptSuggestions($aiSummary['promptSuggestions'] ?? []);
+        $summary->setSentimentMessages($aiSummary['sentimentMessages'] ?? []);
         $summary->setFromDate($fromDate);
         $summary->setToDate($toDate);
         $summary->setCreated(time());
@@ -334,7 +438,7 @@ final class WidgetSummaryService
             'date' => $summary->getDate(),
             'formattedDate' => $summary->getFormattedDate(),
             'sessionCount' => $filteredSessionCount,
-            'messageCount' => $totalMessages,
+            'messageCount' => $userMessages,
             'userMessages' => $userMessages,
             'assistantMessages' => $assistantMessages,
             'topics' => $aiSummary['topics'] ?? [],
@@ -344,6 +448,7 @@ final class WidgetSummaryService
             'recommendations' => $aiSummary['recommendations'] ?? [],
             'summary' => $aiSummary['summary'] ?? '',
             'promptSuggestions' => $aiSummary['promptSuggestions'] ?? [],
+            'sentimentMessages' => $aiSummary['sentimentMessages'] ?? [],
             'fromDate' => $fromDate,
             'toDate' => $toDate,
             'dateRange' => $summary->getFormattedDateRange(),
@@ -354,7 +459,7 @@ final class WidgetSummaryService
     /**
      * Use AI to analyze conversations and generate insights.
      */
-    private function generateAiAnalysis(array $conversations, string $systemPrompt, int $userId): array
+    private function generateAiAnalysis(array $conversations, string $systemPrompt, int $userId, Widget $widget): array
     {
         // Limit conversation text to avoid token limits
         $conversationText = implode("\n\n---\n\n", array_slice($conversations, 0, 20));
@@ -362,59 +467,17 @@ final class WidgetSummaryService
             $conversationText = substr($conversationText, 0, 30000).'...';
         }
 
-        $analysisPrompt = <<<PROMPT
-You are analyzing customer support chat conversations. Provide a structured analysis.
-
-## CONVERSATIONS TO ANALYZE:
-{$conversationText}
-
-## CURRENT SYSTEM PROMPT OF THE CHATBOT:
-{$systemPrompt}
-
-## YOUR TASK:
-Analyze these conversations and provide insights. Answer each section separately.
-
-### 1. EXECUTIVE SUMMARY (2-3 sentences)
-What are users asking about? How well is the assistant helping them?
-
-### 2. MAIN TOPICS (comma-separated list)
-List the 3-5 main topics discussed.
-
-### 3. SENTIMENT ANALYSIS
-Rate the overall sentiment. The three values MUST add up to exactly 100.
-- Positive: [number]%
-- Neutral: [number]%  
-- Negative: [number]%
-
-### 4. FREQUENTLY ASKED QUESTIONS
-List each question with how many times it was asked:
-- "[question]" (asked X times)
-
-### 5. ISSUES IDENTIFIED
-What problems or gaps did you notice?
-- [issue 1]
-- [issue 2]
-
-### 6. RECOMMENDATIONS
-What specific improvements would help?
-- [recommendation 1]
-- [recommendation 2]
-
-### 7. PROMPT IMPROVEMENT SUGGESTIONS
-Based on the conversations, what should be added or changed in the system prompt?
-For each suggestion, specify if it's an ADDITION (new info needed) or IMPROVEMENT (existing info needs refinement):
-- ADD: [what to add and why]
-- IMPROVE: [what to improve and how]
-PROMPT;
+        $summaryConfig = $this->resolveSummaryConfig($widget, $conversationText, $systemPrompt);
+        $analysisPrompt = $summaryConfig['prompt'];
+        $modelId = $summaryConfig['modelId'];
 
         try {
-            // Use gpt-4o-mini (model ID 73) for cost-effective analysis
             $aiOptions = [
                 'temperature' => 0.3,
-                'max_tokens' => 2000,
+                'max_tokens' => 4000,
             ];
-            $provider = $this->modelConfigService->getProviderForModel(73);
-            $modelName = $this->modelConfigService->getModelName(73);
+            $provider = $this->modelConfigService->getProviderForModel($modelId);
+            $modelName = $this->modelConfigService->getModelName($modelId);
             if ($provider && $modelName) {
                 $aiOptions['provider'] = $provider;
                 $aiOptions['model'] = $modelName;
@@ -441,8 +504,73 @@ PROMPT;
                 'issues' => [],
                 'recommendations' => [],
                 'promptSuggestions' => [],
+                'sentimentMessages' => [],
             ];
         }
+    }
+
+    /**
+     * Resolve summary prompt and model for a widget.
+     *
+     * Fallback chain: custom per-widget -> system default -> hardcoded.
+     *
+     * @return array{prompt: string, modelId: int}
+     */
+    private function resolveSummaryConfig(Widget $widget, string $conversationText, string $systemPrompt): array
+    {
+        $promptText = null;
+        $modelId = self::DEFAULT_SUMMARY_MODEL_ID;
+
+        // 1. Try custom per-widget prompt
+        $customTopic = self::getSummaryTopicForWidget($widget);
+        $customPrompt = $this->promptRepository->findOneBy([
+            'topic' => $customTopic,
+            'ownerId' => $widget->getOwnerId(),
+        ]);
+        if ($customPrompt) {
+            $promptText = $customPrompt->getPrompt();
+            $storedModelId = (int) $customPrompt->getShortDescription();
+            if ($storedModelId > 0) {
+                $modelId = $storedModelId;
+            }
+        }
+
+        // 2. Fallback to system default
+        if (!$promptText) {
+            $defaultPrompt = $this->promptRepository->findOneBy([
+                'topic' => self::DEFAULT_SUMMARY_TOPIC,
+                'ownerId' => 0,
+            ]);
+            if ($defaultPrompt) {
+                $promptText = $defaultPrompt->getPrompt();
+            }
+        }
+
+        // 3. Ultimate fallback: hardcoded (safety net)
+        if (!$promptText) {
+            $this->logger->warning('Summary prompt not found in DB, using hardcoded fallback', [
+                'widget_id' => $widget->getWidgetId(),
+            ]);
+            $promptText = self::getDefaultPromptText();
+        }
+
+        $resolvedPrompt = str_replace(
+            ['{{CONVERSATIONS}}', '{{SYSTEM_PROMPT}}'],
+            [$conversationText, $systemPrompt],
+            $promptText
+        );
+
+        return ['prompt' => $resolvedPrompt, 'modelId' => $modelId];
+    }
+
+    /**
+     * Parse the model ID stored in a summary prompt's shortDescription field.
+     */
+    public static function parseModelId(Prompt $prompt): int
+    {
+        $raw = $prompt->getShortDescription();
+
+        return ('' !== $raw && (int) $raw > 0) ? (int) $raw : -1;
     }
 
     /**
@@ -458,6 +586,7 @@ PROMPT;
             'issues' => [],
             'recommendations' => [],
             'promptSuggestions' => [],
+            'sentimentMessages' => [],
         ];
 
         // Extract Executive Summary (section 1)
@@ -539,11 +668,86 @@ PROMPT;
             }
         }
 
+        // Extract Sentiment-Tagged Messages (embedded in section 3, search whole response)
+        preg_match_all(
+            '/\[(NEUTRAL|NEGATIVE)\]\s*User:\s*"(.+?)"\s*\|\s*Response:\s*"(.+?)"/si',
+            $response,
+            $taggedMatches,
+            PREG_SET_ORDER
+        );
+        foreach ($taggedMatches as $match) {
+            $result['sentimentMessages'][] = [
+                'sentiment' => strtolower(trim($match[1])),
+                'userMessage' => trim($match[2]),
+                'assistantResponse' => trim($match[3]),
+            ];
+        }
+
         // If no summary was parsed, use the full response as fallback
         if (empty($result['summary'])) {
             $result['summary'] = substr($response, 0, 500);
         }
 
         return $result;
+    }
+
+    /**
+     * Match AI-quoted sentiment messages back to the original full-text messages.
+     *
+     * The AI may truncate or paraphrase long responses. This method finds the
+     * best-matching original message pair and replaces the AI's quotes with the
+     * actual full text from the database.
+     *
+     * @param array<array{sentiment: string, userMessage: string, assistantResponse: string}> $taggedMessages
+     * @param array<array{userMessage: string, assistantResponse: string}>                    $originalPairs
+     *
+     * @return array<array{sentiment: string, userMessage: string, assistantResponse: string}>
+     */
+    private function matchOriginalResponses(array $taggedMessages, array $originalPairs): array
+    {
+        foreach ($taggedMessages as &$tagged) {
+            $bestMatch = null;
+            $bestSimilarity = 0.0;
+
+            foreach ($originalPairs as $pair) {
+                if ($pair['userMessage'] === $tagged['userMessage']) {
+                    $bestMatch = $pair;
+                    break;
+                }
+
+                $taggedNorm = mb_strtolower(trim($tagged['userMessage']));
+                $originalNorm = mb_strtolower(trim($pair['userMessage']));
+
+                if ($taggedNorm === $originalNorm) {
+                    $bestMatch = $pair;
+                    break;
+                }
+
+                // Substring match — convert to a 0-100 similarity score
+                if (str_contains($originalNorm, $taggedNorm) || str_contains($taggedNorm, $originalNorm)) {
+                    $maxLen = max(mb_strlen($taggedNorm), mb_strlen($originalNorm));
+                    $minLen = min(mb_strlen($taggedNorm), mb_strlen($originalNorm));
+                    $score = $maxLen > 0 ? ($minLen / $maxLen) * 100 : 0;
+                    if ($score > $bestSimilarity) {
+                        $bestSimilarity = $score;
+                        $bestMatch = $pair;
+                    }
+                }
+
+                similar_text($taggedNorm, $originalNorm, $percent);
+                if ($percent > 70 && $percent > $bestSimilarity) {
+                    $bestSimilarity = $percent;
+                    $bestMatch = $pair;
+                }
+            }
+
+            if ($bestMatch) {
+                $tagged['userMessage'] = $bestMatch['userMessage'];
+                $tagged['assistantResponse'] = $bestMatch['assistantResponse'];
+            }
+        }
+        unset($tagged);
+
+        return $taggedMessages;
     }
 }
