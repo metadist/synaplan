@@ -719,7 +719,7 @@
 }
 .design-v2.dark .checkbox-brand {
   background: rgba(255, 255, 255, 0.04);
-  border-color: rgba(255, 255, 255, 0.15);
+  border-color: rgba(255, 255, 255, 0.1);
 }
 .design-v2.dark .checkbox-brand:hover {
   border-color: var(--brand-light);

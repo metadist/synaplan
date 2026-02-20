@@ -1052,6 +1052,8 @@
     "standalone": "Bağımsız",
     "attachedToMessage": "Bu dosya bir mesaja ekli",
     "standaloneFile": "Bu dosya bağımsız (herhangi bir mesaja ekli değil)",
+    "selectAll": "Tümünü seç ({count})",
+    "deselectAll": "Seçimi kaldır",
     "deleteSelected": "Seçilenleri Sil",
     "deleteSelectedConfirmTitle": "Seçili Dosyalar Silinsin mi?",
     "deleteSelectedConfirmMessage": "{count} seçili dosyayı silmek istediğinizden emin misiniz? Bu işlem geri alınamaz ve dosyalar kalıcı olarak silinecektir.",

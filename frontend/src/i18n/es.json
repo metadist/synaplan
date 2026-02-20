@@ -1052,6 +1052,8 @@
     "standalone": "Independiente",
     "attachedToMessage": "Este archivo está adjunto a un mensaje",
     "standaloneFile": "Este archivo es independiente (no adjunto a ningún mensaje)",
+    "selectAll": "Seleccionar todo ({count})",
+    "deselectAll": "Deseleccionar todo",
     "deleteSelected": "Eliminar Seleccionados",
     "deleteSelectedConfirmTitle": "¿Eliminar Archivos Seleccionados?",
     "deleteSelectedConfirmMessage": "¿Estás seguro de que deseas eliminar {count} archivo(s) seleccionado(s)? Esta acción no se puede deshacer y los archivos se eliminarán permanentemente.",

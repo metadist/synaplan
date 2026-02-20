@@ -524,6 +524,8 @@
     "standalone": "Standalone",
     "attachedToMessage": "This file is attached to a message",
     "standaloneFile": "This file is standalone (not attached to any message)",
+    "selectAll": "Select all ({count})",
+    "deselectAll": "Deselect all",
     "deleteSelected": "Delete Selected",
     "deleteSelectedConfirmTitle": "Delete Selected Files?",
     "deleteSelectedConfirmMessage": "Are you sure you want to delete {count} selected file(s)? This action cannot be undone and the files will be permanently deleted.",
