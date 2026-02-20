@@ -26,13 +26,25 @@
     style="width: 64px; min-width: 64px"
     data-testid="comp-sidebar-v2"
   >
-    <!-- Logo -->
-    <div class="flex items-center justify-center py-5 flex-shrink-0">
-      <img :src="logoIconSrc" alt="synaplan" class="h-8 w-auto" />
+    <!-- Top section — height-synced with Header (px-6 py-4 = 76px) -->
+    <div
+      class="flex flex-col items-center justify-center flex-shrink-0 border-b border-white/[0.04]"
+      style="height: 76px"
+    >
+      <!-- Close button on mobile, logo on desktop -->
+      <button
+        class="md:hidden v2-rail-icon w-10 h-10 flex items-center justify-center"
+        aria-label="Close sidebar"
+        data-testid="btn-sidebar-v2-close"
+        @click="sidebarStore.closeMobile()"
+      >
+        <Icon icon="mdi:close" class="w-5 h-5" />
+      </button>
+      <img :src="logoIconSrc" alt="synaplan" class="h-7 w-auto hidden md:block" />
     </div>
 
     <!-- New Chat Button -->
-    <div class="flex items-center justify-center pb-2 flex-shrink-0">
+    <div class="flex items-center justify-center py-3 flex-shrink-0">
       <button
         class="v2-new-chat-btn w-10 h-10 flex items-center justify-center rounded-xl transition-all duration-200"
         :class="{ 'v2-new-chat-btn--creating': isCreatingChat }"
@@ -49,7 +61,7 @@
     </div>
 
     <!-- Nav Icons -->
-    <nav class="flex-1 flex flex-col items-center gap-1 py-2 overflow-y-auto sidebar-scroll">
+    <nav class="flex-1 flex flex-col items-center gap-1 py-1 overflow-y-auto sidebar-scroll">
       <button
         v-for="item in navItems"
         :key="item.path"
@@ -424,44 +436,14 @@
                 </div>
 
                 <!-- Actions -->
-                <div class="relative flex-shrink-0" @click.stop>
+                <div class="flex-shrink-0" @click.stop>
                   <button
-                    class="w-8 h-8 rounded-lg flex items-center justify-center opacity-0 group-hover/chat:opacity-100 focus:opacity-100 hover:bg-black/5 dark:hover:bg-white/5 transition-all"
-                    @click="toggleChatMenu(chat.id)"
+                    class="w-9 h-9 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center sm:opacity-0 sm:group-hover/chat:opacity-100 focus:opacity-100 hover:bg-black/5 dark:hover:bg-white/5 transition-all"
+                    :class="chatMenuOpenId === chat.id && '!opacity-100 bg-black/5 dark:bg-white/5'"
+                    @click="toggleChatMenu(chat.id, $event)"
                   >
                     <Icon icon="mdi:dots-horizontal" class="w-4.5 h-4.5 txt-secondary" />
                   </button>
-
-                  <!-- Context Menu -->
-                  <Transition
-                    enter-active-class="transition ease-out duration-100"
-                    enter-from-class="opacity-0 scale-95"
-                    enter-to-class="opacity-100 scale-100"
-                    leave-active-class="transition ease-in duration-75"
-                    leave-from-class="opacity-100 scale-100"
-                    leave-to-class="opacity-0 scale-95"
-                  >
-                    <div
-                      v-if="chatMenuOpenId === chat.id"
-                      class="absolute right-0 top-full mt-1 w-40 dropdown-panel z-10 origin-top-right"
-                    >
-                      <button class="dropdown-item" @click="handleChatShare(chat.id)">
-                        <Icon icon="mdi:share-variant-outline" class="w-4 h-4" />
-                        {{ $t('common.share') }}
-                      </button>
-                      <button class="dropdown-item" @click="handleChatRename(chat.id)">
-                        <Icon icon="mdi:pencil-outline" class="w-4 h-4" />
-                        {{ $t('common.rename') }}
-                      </button>
-                      <button
-                        class="dropdown-item dropdown-item--danger"
-                        @click="handleChatDelete(chat.id)"
-                      >
-                        <Icon icon="mdi:delete-outline" class="w-4 h-4" />
-                        {{ $t('common.delete') }}
-                      </button>
-                    </div>
-                  </Transition>
                 </div>
               </div>
             </div>
@@ -470,15 +452,60 @@
           <!-- Footer -->
           <div
             v-if="chatList.length > 5"
-            class="flex-shrink-0 px-5 py-3 border-t border-black/[0.04] dark:border-white/[0.04] flex justify-center"
+            class="flex-shrink-0 px-4 py-3 sm:px-5 border-t border-black/[0.04] dark:border-white/[0.04]"
           >
             <button
-              class="text-xs font-medium text-[var(--brand)] hover:underline transition-colors"
+              class="w-full flex items-center justify-center gap-2 px-4 py-2.5 sm:py-2 rounded-xl text-sm sm:text-xs font-medium text-[var(--brand)] bg-[var(--brand)]/[0.06] hover:bg-[var(--brand)]/[0.12] active:bg-[var(--brand)]/[0.18] transition-all duration-150 group/show"
               @click="((chatModalOpen = false), $router.push('/statistics#chats'))"
             >
-              {{ $t('chat.showAll') }} →
+              <ChartBarIcon class="w-4 h-4 sm:w-3.5 sm:h-3.5 opacity-70" />
+              {{ $t('chat.showAll') }}
+              <Icon
+                icon="mdi:arrow-right"
+                class="w-4 h-4 sm:w-3.5 sm:h-3.5 transition-transform duration-150 group-hover/show:translate-x-0.5"
+              />
             </button>
           </div>
+        </div>
+      </div>
+    </Transition>
+  </Teleport>
+
+  <!-- Chat Context Menu (teleported to escape overflow clipping) -->
+  <Teleport to="#app">
+    <Transition
+      enter-active-class="transition ease-out duration-100"
+      enter-from-class="opacity-0 scale-95"
+      enter-to-class="opacity-100 scale-100"
+      leave-active-class="transition ease-in duration-75"
+      leave-from-class="opacity-100 scale-100"
+      leave-to-class="opacity-0 scale-95"
+    >
+      <div
+        v-if="chatMenuOpenId !== null"
+        class="fixed inset-0 z-[150]"
+        @click="chatMenuOpenId = null"
+      >
+        <div
+          class="fixed w-44 dropdown-panel origin-top-right"
+          :style="chatMenuStyle"
+          @click.stop
+        >
+          <button class="dropdown-item" @click="handleChatShare(chatMenuOpenId!)">
+            <Icon icon="mdi:share-variant-outline" class="w-4 h-4" />
+            {{ $t('common.share') }}
+          </button>
+          <button class="dropdown-item" @click="handleChatRename(chatMenuOpenId!)">
+            <Icon icon="mdi:pencil-outline" class="w-4 h-4" />
+            {{ $t('common.rename') }}
+          </button>
+          <button
+            class="dropdown-item dropdown-item--danger"
+            @click="handleChatDelete(chatMenuOpenId!)"
+          >
+            <Icon icon="mdi:delete-outline" class="w-4 h-4" />
+            {{ $t('common.delete') }}
+          </button>
         </div>
       </div>
     </Transition>
@@ -549,6 +576,7 @@ const setNavBtnRef = (el: unknown, path: string) => {
 }
 const chatModalOpen = ref(false)
 const chatMenuOpenId = ref<number | null>(null)
+const chatMenuStyle = ref<Record<string, string>>({})
 const shareModalOpen = ref(false)
 const shareModalChatId = ref<number | null>(null)
 const shareModalChatTitle = ref('')
@@ -988,8 +1016,23 @@ const handleChatShare = (chatId: number) => {
   chatMenuOpenId.value = null
 }
 
-const toggleChatMenu = (chatId: number) => {
-  chatMenuOpenId.value = chatMenuOpenId.value === chatId ? null : chatId
+const toggleChatMenu = (chatId: number, event: MouseEvent) => {
+  if (chatMenuOpenId.value === chatId) {
+    chatMenuOpenId.value = null
+    return
+  }
+  const btn = event.currentTarget as HTMLElement
+  const rect = btn.getBoundingClientRect()
+  const menuHeight = 140
+  const menuWidth = 176
+  const spaceBelow = window.innerHeight - rect.bottom
+  const top = spaceBelow < menuHeight ? rect.top - menuHeight : rect.bottom + 4
+  const left = Math.max(8, rect.right - menuWidth)
+  chatMenuStyle.value = {
+    top: `${top}px`,
+    left: `${left}px`,
+  }
+  chatMenuOpenId.value = chatId
 }
 
 const closeFlyout = () => {

@@ -516,7 +516,13 @@ async function processContent(content: string, version: number): Promise<string 
   }
 
   // Process memory and feedback badges after markdown rendering
-  return processFeedbackBadges(processMemoryBadges(html))
+  html = processFeedbackBadges(processMemoryBadges(html))
+
+  // Wrap bare <table> elements in a scrollable container for mobile
+  html = html.replace(/<table(\s|>)/g, '<div class="table-scroll"><table$1')
+  html = html.replace(/<\/table>/g, '</table></div>')
+
+  return html
 }
 
 // Update rendered content when props change
@@ -688,5 +694,12 @@ watch(
 
 .markdown-content :deep(.inline-code) {
   box-shadow: inset 0 0 0 1px var(--border-light);
+}
+
+/* Table scroll wrapper — must override parent overflow-hidden */
+.markdown-content :deep(.table-scroll) {
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
 }
 </style>

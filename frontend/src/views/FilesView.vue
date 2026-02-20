@@ -1,7 +1,7 @@
 <template>
   <MainLayout>
     <div
-      class="min-h-screen bg-chat p-4 md:p-8 overflow-y-auto scroll-thin"
+      class="min-h-screen bg-chat px-3 py-4 sm:p-4 md:p-8 overflow-y-auto scroll-thin"
       data-testid="page-files-upload"
     >
       <div class="max-w-7xl mx-auto space-y-6">
@@ -10,7 +10,7 @@
 
         <!-- Compact Upload Bar -->
         <div
-          class="surface-card p-5 relative"
+          class="surface-card p-4 sm:p-5 relative"
           data-testid="section-upload-form"
           @dragenter.prevent="handleDragEnter"
           @dragover.prevent="handleDragOver"
@@ -71,7 +71,7 @@
           </div>
 
           <!-- Action row: smart button + target breadcrumb -->
-          <div class="flex items-center gap-4 flex-wrap">
+          <div class="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
             <!-- Smart Upload Button -->
             <button
               :disabled="isUploading"
@@ -114,11 +114,9 @@
               {{ $t('files.addMore') }}
             </button>
 
-            <!-- Separator dot -->
-            <span class="w-1 h-1 rounded-full bg-black/20 dark:bg-white/20 hidden sm:block"></span>
-
             <!-- Upload target breadcrumb -->
-            <div class="flex items-center gap-2 text-xs">
+            <div class="flex items-center gap-2 text-xs flex-wrap">
+              <span class="hidden sm:inline w-1 h-1 rounded-full bg-black/20 dark:bg-white/20"></span>
               <Icon icon="heroicons:folder-solid" class="w-3.5 h-3.5 text-[var(--brand)]" />
               <span class="txt-secondary">{{ $t('files.target') }}:</span>
               <span class="font-semibold txt-primary">{{
@@ -130,11 +128,10 @@
               >
                 {{ $t('files.changeTarget') }}
               </button>
+              <p class="text-xs txt-secondary ml-auto hidden sm:block">
+                {{ $t('files.supportedFormats') }}
+              </p>
             </div>
-
-            <p class="text-xs txt-secondary ml-auto hidden sm:block">
-              {{ $t('files.supportedFormats') }}
-            </p>
           </div>
 
           <!-- Upload Progress Bar -->
@@ -259,7 +256,7 @@
           </Transition>
         </Teleport>
 
-        <div class="surface-card p-6" data-testid="section-files-list">
+        <div class="surface-card p-4 sm:p-6" data-testid="section-files-list">
           <!-- ====== ROOT VIEW: Folders + All Files ====== -->
           <template v-if="!openFolder">
             <h2 class="text-xl font-semibold txt-primary mb-6">{{ $t('files.yourFiles') }}</h2>
@@ -317,12 +314,12 @@
               <!-- Folder cards (with drag & drop) -->
               <div v-if="fileGroups.length > 0" class="mb-6" data-testid="section-folder-grid">
                 <div
-                  class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3"
+                  class="grid grid-cols-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2 sm:gap-3"
                 >
                   <button
                     v-for="folder in fileGroups"
                     :key="folder.name"
-                    class="group/f flex flex-col items-center gap-3 p-5 rounded-2xl border transition-all duration-200 cursor-pointer"
+                    class="group/f flex flex-col items-center gap-2 sm:gap-3 p-3 sm:p-5 rounded-xl sm:rounded-2xl border transition-all duration-200 cursor-pointer"
                     :class="
                       folderDropTarget === folder.name
                         ? 'border-[var(--brand)] bg-[var(--brand)]/10 shadow-lg shadow-[var(--brand)]/20 scale-[1.03]'
@@ -342,7 +339,7 @@
                             ? 'heroicons:folder-open-solid'
                             : 'heroicons:folder-solid'
                         "
-                        class="w-12 h-12 transition-all duration-200"
+                        class="w-9 h-9 sm:w-12 sm:h-12 transition-all duration-200"
                         :class="
                           folderDropTarget === folder.name
                             ? 'text-[var(--brand)] scale-110'
@@ -398,7 +395,64 @@
                   }}</span>
                   <span class="text-xs txt-secondary">({{ totalCount }})</span>
                 </div>
-                <table class="w-full">
+
+                <!-- Mobile card list -->
+                <div class="sm:hidden space-y-2">
+                  <div
+                    v-for="file in paginatedFiles"
+                    :key="file.id"
+                    class="flex items-center gap-3 p-3 rounded-xl border border-light-border/15 dark:border-dark-border/10 hover:bg-black/[0.02] dark:hover:bg-white/[0.02] transition-colors"
+                    data-testid="item-file"
+                  >
+                    <input
+                      type="checkbox"
+                      :checked="selectedFileIds.includes(file.id)"
+                      class="checkbox-brand shrink-0"
+                      @change="toggleFileSelection(file.id)"
+                    />
+                    <div
+                      class="w-9 h-9 rounded-lg flex items-center justify-center shrink-0"
+                      :class="getFileColorClass(file.filename)"
+                    >
+                      <Icon :icon="getFileIcon(file.filename)" class="w-4.5 h-4.5" />
+                    </div>
+                    <div class="flex-1 min-w-0">
+                      <p class="text-sm txt-primary truncate">{{ file.filename }}</p>
+                      <div class="flex items-center gap-2 mt-0.5">
+                        <span class="text-[11px] txt-secondary">{{
+                          formatFileSize(file.file_size)
+                        }}</span>
+                        <button
+                          v-if="file.group_key"
+                          class="inline-flex items-center gap-0.5 text-[10px] text-[var(--brand)]/70"
+                          @click="enterFolder(file.group_key!)"
+                        >
+                          <Icon icon="heroicons:folder-solid" class="w-3 h-3" />
+                          {{ file.group_key }}
+                        </button>
+                      </div>
+                    </div>
+                    <div class="flex items-center gap-0.5 shrink-0">
+                      <button
+                        class="p-2 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 txt-secondary transition-colors"
+                        :title="$t('files.download')"
+                        @click="downloadFile(file.id, file.filename)"
+                      >
+                        <ArrowDownTrayIcon class="w-4 h-4" />
+                      </button>
+                      <button
+                        class="p-2 rounded-lg hover:bg-red-500/10 text-red-400/70 hover:text-red-500 transition-colors"
+                        :title="$t('files.delete')"
+                        @click="deleteFile(file.id)"
+                      >
+                        <TrashIcon class="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Desktop table -->
+                <table class="w-full hidden sm:table">
                   <thead>
                     <tr class="border-b border-light-border/30 dark:border-dark-border/20">
                       <th class="text-left py-2.5 px-2 w-8">
@@ -412,10 +466,14 @@
                       <th class="text-left py-2.5 px-3 txt-secondary text-xs font-medium">
                         {{ $t('files.name') }}
                       </th>
-                      <th class="text-left py-2.5 px-3 txt-secondary text-xs font-medium w-24">
+                      <th
+                        class="text-left py-2.5 px-3 txt-secondary text-xs font-medium w-24 hidden md:table-cell"
+                      >
                         {{ $t('files.size') }}
                       </th>
-                      <th class="text-left py-2.5 px-3 txt-secondary text-xs font-medium w-28">
+                      <th
+                        class="text-left py-2.5 px-3 txt-secondary text-xs font-medium w-28 hidden lg:table-cell"
+                      >
                         {{ $t('files.uploaded') }}
                       </th>
                       <th class="w-36"></th>
@@ -457,10 +515,14 @@
                           </div>
                         </div>
                       </td>
-                      <td class="py-2.5 px-3 txt-secondary text-xs whitespace-nowrap">
+                      <td
+                        class="py-2.5 px-3 txt-secondary text-xs whitespace-nowrap hidden md:table-cell"
+                      >
                         {{ formatFileSize(file.file_size) }}
                       </td>
-                      <td class="py-2.5 px-3 txt-secondary text-xs whitespace-nowrap">
+                      <td
+                        class="py-2.5 px-3 txt-secondary text-xs whitespace-nowrap hidden lg:table-cell"
+                      >
                         {{ file.uploaded_date }}
                       </td>
                       <td class="py-2.5 px-3">
@@ -532,30 +594,32 @@
           <!-- ====== FOLDER VIEW: Files inside a folder ====== -->
           <template v-else>
             <!-- Breadcrumb header -->
-            <div class="flex items-center gap-3 mb-6">
+            <div class="flex items-center gap-2 sm:gap-3 mb-4 sm:mb-6">
               <button
-                class="p-2 rounded-xl hover:bg-black/5 dark:hover:bg-white/5 txt-secondary hover:txt-primary transition-colors"
+                class="p-2 rounded-xl hover:bg-black/5 dark:hover:bg-white/5 txt-secondary hover:txt-primary transition-colors shrink-0"
                 data-testid="btn-back-to-root"
                 @click="exitFolder"
               >
                 <Icon icon="heroicons:arrow-left" class="w-5 h-5" />
               </button>
-              <div class="flex items-center gap-2.5 min-w-0">
+              <div class="flex items-center gap-1.5 sm:gap-2.5 min-w-0 flex-wrap">
                 <button
-                  class="text-sm txt-secondary hover:txt-primary hover:underline transition-colors shrink-0"
+                  class="text-xs sm:text-sm txt-secondary hover:txt-primary hover:underline transition-colors shrink-0"
                   @click="exitFolder"
                 >
                   {{ $t('files.yourFiles') }}
                 </button>
                 <Icon
                   icon="heroicons:chevron-right"
-                  class="w-3.5 h-3.5 txt-secondary/30 shrink-0"
+                  class="w-3 h-3 sm:w-3.5 sm:h-3.5 txt-secondary/30 shrink-0"
                 />
                 <Icon
                   icon="heroicons:folder-open-solid"
-                  class="w-5 h-5 text-[var(--brand)] shrink-0"
+                  class="w-4 h-4 sm:w-5 sm:h-5 text-[var(--brand)] shrink-0"
                 />
-                <h2 class="text-lg font-semibold txt-primary truncate">{{ openFolder }}</h2>
+                <h2 class="text-base sm:text-lg font-semibold txt-primary truncate max-w-[50vw] sm:max-w-none">
+                  {{ openFolder }}
+                </h2>
                 <span
                   class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-[var(--brand)]/10 text-[var(--brand)]"
                 >
@@ -618,9 +682,57 @@
               <p class="text-sm txt-secondary">{{ $t('files.emptyState.emptyFolder') }}</p>
             </div>
 
-            <!-- Finder-style file table -->
+            <!-- Finder-style file list -->
             <div v-else data-testid="section-table">
-              <table class="w-full">
+              <!-- Mobile card list -->
+              <div class="sm:hidden space-y-2">
+                <div
+                  v-for="file in paginatedFiles"
+                  :key="file.id"
+                  class="flex items-center gap-3 p-3 rounded-xl border border-light-border/15 dark:border-dark-border/10 hover:bg-black/[0.02] dark:hover:bg-white/[0.02] transition-colors"
+                  data-testid="item-file"
+                >
+                  <input
+                    type="checkbox"
+                    :checked="selectedFileIds.includes(file.id)"
+                    class="checkbox-brand shrink-0"
+                    @change="toggleFileSelection(file.id)"
+                  />
+                  <div
+                    class="w-9 h-9 rounded-lg flex items-center justify-center shrink-0"
+                    :class="getFileColorClass(file.filename)"
+                  >
+                    <Icon :icon="getFileIcon(file.filename)" class="w-4.5 h-4.5" />
+                  </div>
+                  <div class="flex-1 min-w-0">
+                    <p class="text-sm txt-primary truncate">{{ file.filename }}</p>
+                    <span class="text-[11px] txt-secondary">{{
+                      formatFileSize(file.file_size)
+                    }}</span>
+                  </div>
+                  <div class="flex items-center gap-0.5 shrink-0">
+                    <button
+                      class="p-2 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 txt-secondary transition-colors"
+                      :title="$t('files.download')"
+                      data-testid="btn-download"
+                      @click="downloadFile(file.id, file.filename)"
+                    >
+                      <ArrowDownTrayIcon class="w-4 h-4" />
+                    </button>
+                    <button
+                      class="p-2 rounded-lg hover:bg-red-500/10 text-red-400/70 hover:text-red-500 transition-colors"
+                      :title="$t('files.delete')"
+                      data-testid="btn-delete"
+                      @click="deleteFile(file.id)"
+                    >
+                      <TrashIcon class="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Desktop table -->
+              <table class="w-full hidden sm:table">
                 <thead>
                   <tr class="border-b border-light-border/30 dark:border-dark-border/20">
                     <th class="text-left py-2.5 px-2 w-8">
@@ -634,10 +746,14 @@
                     <th class="text-left py-2.5 px-3 txt-secondary text-xs font-medium">
                       {{ $t('files.name') }}
                     </th>
-                    <th class="text-left py-2.5 px-3 txt-secondary text-xs font-medium w-24">
+                    <th
+                      class="text-left py-2.5 px-3 txt-secondary text-xs font-medium w-24 hidden md:table-cell"
+                    >
                       {{ $t('files.size') }}
                     </th>
-                    <th class="text-left py-2.5 px-3 txt-secondary text-xs font-medium w-28">
+                    <th
+                      class="text-left py-2.5 px-3 txt-secondary text-xs font-medium w-28 hidden lg:table-cell"
+                    >
                       {{ $t('files.uploaded') }}
                     </th>
                     <th class="w-32"></th>
@@ -669,10 +785,14 @@
                         <span class="text-sm txt-primary truncate">{{ file.filename }}</span>
                       </div>
                     </td>
-                    <td class="py-2.5 px-3 txt-secondary text-xs whitespace-nowrap">
+                    <td
+                      class="py-2.5 px-3 txt-secondary text-xs whitespace-nowrap hidden md:table-cell"
+                    >
                       {{ formatFileSize(file.file_size) }}
                     </td>
-                    <td class="py-2.5 px-3 txt-secondary text-xs whitespace-nowrap">
+                    <td
+                      class="py-2.5 px-3 txt-secondary text-xs whitespace-nowrap hidden lg:table-cell"
+                    >
                       {{ file.uploaded_date }}
                     </td>
                     <td class="py-2.5 px-3">
