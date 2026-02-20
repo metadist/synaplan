@@ -1870,5 +1870,8 @@
     "dontAskAgain": "No mostrar esta advertencia de nuevo",
     "cancel": "Cancelar",
     "open": "Abrir enlace"
+  },
+  "system": {
+    "missingApiKeys": "Faltan algunas claves API — los siguientes proveedores están desactivados: {providers}"
   }
 }

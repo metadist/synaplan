@@ -50,7 +50,7 @@ services:
 
     App\AI\Provider\AnthropicProvider:
         arguments:
-            $apiKey: '%env(ANTHROPIC_API_KEY)%'
+            $apiKey: '%env(default::ANTHROPIC_API_KEY)%'
             $uploadDir: '%kernel.project_dir%/var/uploads'
         tags:
             - { name: 'app.ai.chat' }
@@ -58,7 +58,7 @@ services:
 
     App\AI\Provider\OpenAIProvider:
         arguments:
-            $apiKey: '%env(OPENAI_API_KEY)%'
+            $apiKey: '%env(default::OPENAI_API_KEY)%'
             $uploadDir: '%kernel.project_dir%/var/uploads'
         tags:
             - { name: 'app.ai.chat' }
@@ -83,7 +83,7 @@ services:
 
     App\AI\Provider\GroqProvider:
         arguments:
-            $apiKey: '%env(GROQ_API_KEY)%'
+            $apiKey: '%env(default::GROQ_API_KEY)%'
             $uploadDir: '%kernel.project_dir%/var/uploads'
         tags:
             - { name: 'app.ai.chat' }
@@ -92,7 +92,7 @@ services:
 
     App\AI\Provider\GoogleProvider:
         arguments:
-            $apiKey: '%env(GOOGLE_GEMINI_API_KEY)%'
+            $apiKey: '%env(default::GOOGLE_GEMINI_API_KEY)%'
             $projectId: '%env(string:default::GOOGLE_CLOUD_PROJECT_ID)%'
             $region: 'us-central1'
             $uploadDir: '%kernel.project_dir%/var/uploads'
@@ -105,7 +105,7 @@ services:
 
     App\AI\Provider\TheHiveProvider:
         arguments:
-            $apiKey: '%env(THEHIVE_API_KEY)%'
+            $apiKey: '%env(default::THEHIVE_API_KEY)%'
         tags:
             - { name: 'app.ai.image_generation' }
 
@@ -118,7 +118,7 @@ services:
 
     App\AI\Provider\HuggingFaceProvider:
         arguments:
-            $apiKey: '%env(HUGGINGFACE_API_KEY)%'
+            $apiKey: '%env(default::HUGGINGFACE_API_KEY)%'
             $uploadDir: '%kernel.project_dir%/var/uploads'
         tags:
             - { name: 'app.ai.chat' }
@@ -140,7 +140,7 @@ services:
     # Brave Search API Service
     App\Service\Search\BraveSearchService:
         arguments:
-            $braveSearchApiKey: '%env(BRAVE_SEARCH_API_KEY)%'
+            $braveSearchApiKey: '%env(default::BRAVE_SEARCH_API_KEY)%'
             $braveSearchApiUrl: '%env(BRAVE_SEARCH_API_URL)%'
             $braveSearchEnabled: '%env(bool:BRAVE_SEARCH_ENABLED)%'
             $braveSearchCount: '%env(int:BRAVE_SEARCH_COUNT)%'

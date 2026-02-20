@@ -2358,5 +2358,8 @@
       "featureEasyEmbed": "One-line embed code for any website",
       "featureResponsive": "Works perfectly on desktop & mobile"
     }
+  },
+  "system": {
+    "missingApiKeys": "Some API keys are missing — the following providers are disabled: {providers}"
   }
 }

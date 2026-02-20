@@ -477,6 +477,16 @@ const sendMessage = () => {
   }
 
   if (canSend.value) {
+    if (isRecording.value) {
+      if (webSpeechService.value) {
+        webSpeechService.value.stop()
+        webSpeechService.value = null
+      }
+      if (audioRecorder.value) {
+        audioRecorder.value.stopRecording()
+      }
+      isRecording.value = false
+    }
     const hasWebSearch = activeCommand.value === 'search'
 
     // Send the full message with command to backend (it needs it for /pic and /vid)

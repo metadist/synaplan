@@ -769,7 +769,7 @@ class WhatsAppService
         }
 
         // PRIORITY 2: Audio/Video input → Generate TTS response
-        if (!$responseSent && $shouldSendAudioResponse && !empty($responseText)) {
+        if (!$responseSent && $shouldSendAudioResponse && !empty($responseText) && !empty($this->appUrl)) {
             $detectedLanguage = $message->getLanguage() ?: 'en';
             $ttsResult = $this->generateTtsResponse($responseText, $effectiveUserId, $detectedLanguage);
 

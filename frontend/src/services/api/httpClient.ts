@@ -35,6 +35,7 @@ export function setApiBaseUrl(url: string): void {
 type RuntimeConfig = z.infer<typeof GetApiConfigRuntimeConfigResponseSchema>
 let runtimeConfig: RuntimeConfig | null = null
 let configPromise: Promise<RuntimeConfig> | null = null
+let lastUnavailableProviders: string[] = []
 
 /**
  * Load runtime configuration from backend API
@@ -70,6 +71,9 @@ async function loadRuntimeConfig(): Promise<RuntimeConfig> {
       }
 
       const data = await response.json()
+      lastUnavailableProviders = Array.isArray(data.unavailableProviders)
+        ? data.unavailableProviders
+        : []
       const validated = GetApiConfigRuntimeConfigResponseSchema.parse(data)
       runtimeConfig = validated
       return validated
@@ -120,6 +124,13 @@ export async function reloadConfig(): Promise<RuntimeConfig> {
   runtimeConfig = null
   configPromise = null
   return loadRuntimeConfig()
+}
+
+/**
+ * Get unavailable AI providers (extracted from last runtime config response)
+ */
+export function getUnavailableProviders(): string[] {
+  return lastUnavailableProviders
 }
 
 /**

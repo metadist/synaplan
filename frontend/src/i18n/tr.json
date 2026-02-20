@@ -1870,5 +1870,8 @@
     "dontAskAgain": "Bu uyarıyı bir daha gösterme",
     "cancel": "İptal",
     "open": "Bağlantıyı aç"
+  },
+  "system": {
+    "missingApiKeys": "Bazı API anahtarları eksik — şu sağlayıcılar devre dışı: {providers}"
   }
 }

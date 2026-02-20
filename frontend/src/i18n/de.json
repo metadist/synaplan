@@ -2277,5 +2277,8 @@
       "featureEasyEmbed": "Ein-Zeilen-Embed-Code für jede Website",
       "featureResponsive": "Perfekt auf Desktop & Mobilgeräten"
     }
+  },
+  "system": {
+    "missingApiKeys": "Einige API-Schlüssel fehlen — folgende Anbieter sind deaktiviert: {providers}"
   }
 }

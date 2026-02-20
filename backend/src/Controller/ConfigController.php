@@ -250,14 +250,34 @@ class ConfigController extends AbstractController
             'ip' => $this->getInternalIp(),
         ];
 
-        return $this->json([
+        // Unavailable AI providers (for authenticated users: show which providers are missing API keys)
+        $unavailableProviders = [];
+        if ($user) {
+            $providersMetadata = $this->providerRegistry->getProvidersMetadata();
+            foreach ($providersMetadata as $providerName => $providerData) {
+                if ('test' === $providerName) {
+                    continue;
+                }
+                if (!$providerData['enabled']) {
+                    $unavailableProviders[] = $providerData['name'];
+                }
+            }
+        }
+
+        $response = [
             'recaptcha' => $recaptchaConfig,
             'features' => $features,
             'speech' => $speech,
             'plugins' => $plugins,
             'googleTag' => $googleTagConfig,
             'build' => $buildInfo,
-        ]);
+        ];
+
+        if ($user && !empty($unavailableProviders)) {
+            $response['unavailableProviders'] = $unavailableProviders;
+        }
+
+        return $this->json($response);
     }
 
     /**
