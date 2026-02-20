@@ -1,6 +1,12 @@
 <template>
-  <header class="bg-header relative z-50" data-testid="comp-app-header">
-    <div class="flex items-center justify-between px-6 py-4" data-testid="section-header-bar">
+  <header
+    class="bg-header relative z-50 border-b border-black/[0.04] dark:border-white/[0.04]"
+    data-testid="comp-app-header"
+  >
+    <div
+      class="flex items-center justify-between px-4 sm:px-6 py-4"
+      data-testid="section-header-bar"
+    >
       <div class="flex items-center gap-3 flex-1" data-testid="section-header-left">
         <button
           class="md:hidden icon-ghost h-[44px] min-w-[44px] flex items-center justify-center rounded-lg"

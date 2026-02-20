@@ -17,7 +17,7 @@
     </div>
 
     <!-- Wrapper for thinking blocks + bubble -->
-    <div class="flex flex-col max-w-3xl gap-2">
+    <div class="flex flex-col max-w-3xl min-w-0 gap-2">
       <!-- Thinking blocks (ABOVE bubble, only for assistant) -->
       <template v-if="role === 'assistant'">
         <MessagePart
@@ -369,9 +369,11 @@
 
             <!-- Carousel Container (collapsible) -->
             <div v-show="sourcesExpanded" class="py-2 px-3">
-              <div class="relative overflow-x-hidden">
+              <div
+                class="relative overflow-x-auto sm:overflow-x-hidden scroll-thin snap-x snap-mandatory sm:snap-none"
+              >
                 <div
-                  class="flex gap-2 transition-transform duration-300"
+                  class="flex gap-2 sm:transition-transform sm:duration-300"
                   :style="{
                     transform: `translateX(calc(-${carouselPage * 100}%))`,
                   }"
@@ -380,8 +382,8 @@
                     v-for="(result, index) in searchResults"
                     :key="index"
                     :class="[
-                      'group flex flex-col gap-2 p-2 sm:p-3 rounded-lg transition-all cursor-pointer flex-shrink-0',
-                      'w-full sm:w-[calc(33.333%-0.5rem)]',
+                      'group flex flex-col gap-2 p-2 sm:p-3 rounded-lg transition-all cursor-pointer flex-shrink-0 snap-start',
+                      'w-[85%] sm:w-[calc(33.333%-0.5rem)]',
                       'bg-[var(--bg-chip)] border shadow-sm',
                       highlightedSource === index
                         ? '!border-[var(--brand)] border-2 bg-[var(--brand-alpha-light)] shadow-lg'
