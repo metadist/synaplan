@@ -276,6 +276,11 @@ services:
             $appUrl: '%env(APP_URL)%'
             $frontendUrl: '%env(FRONTEND_URL)%'
 
+    # OIDC Discovery Controller
+    App\Controller\OidcController:
+        arguments:
+            $oidcAutoRedirect: '%env(string:default::OIDC_AUTO_REDIRECT)%'
+
     # OIDC Token Service for Keycloak integration
     App\Service\OidcTokenService:
         arguments:
@@ -321,10 +326,11 @@ services:
     # Auth Providers Controller (returns enabled providers)
     App\Controller\AuthProvidersController:
         arguments:
-            $googleClientId: '%env(GOOGLE_CLIENT_ID)%'
-            $githubClientId: '%env(GITHUB_CLIENT_ID)%'
-            $oidcClientId: '%env(OIDC_CLIENT_ID)%'
-            $oidcDiscoveryUrl: '%env(OIDC_DISCOVERY_URL)%'
+            $googleClientId: '%env(string:default::GOOGLE_CLIENT_ID)%'
+            $githubClientId: '%env(string:default::GITHUB_CLIENT_ID)%'
+            $oidcClientId: '%env(string:default::OIDC_CLIENT_ID)%'
+            $oidcDiscoveryUrl: '%env(string:default::OIDC_DISCOVERY_URL)%'
+            $oidcAutoRedirect: '%env(string:default::OIDC_AUTO_REDIRECT)%'
 
     # OAuth State Service (signed tokens for CSRF protection)
     App\Service\OAuthStateService:

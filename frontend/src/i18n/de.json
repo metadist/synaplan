@@ -1850,7 +1850,9 @@
     "authenticationRequired": "Anmeldung erforderlich. Bitte melde dich an, um fortzufahren.",
     "tokenRefreshFailed": "Sitzung konnte nicht erneuert werden. Bitte melde dich erneut an.",
     "showPassword": "Passwort anzeigen",
-    "hidePassword": "Passwort ausblenden"
+    "hidePassword": "Passwort ausblenden",
+    "redirectingToSso": "Weiterleitung zum SSO...",
+    "loginWithSso": "Mit SSO anmelden"
   },
   "cookies": {
     "title": "Cookie-Einstellungen",
