@@ -55,6 +55,7 @@ async function loadRuntimeConfig(): Promise<RuntimeConfig> {
   // Fetch config from backend (use raw fetch to avoid circular dependency)
   configPromise = (async () => {
     try {
+      lastUnavailableProviders = [] // Reset before loading
       // Add timeout to fetch to prevent hanging
       const controller = new AbortController()
       const timeoutId = setTimeout(() => controller.abort(), 2000) // 2 second timeout

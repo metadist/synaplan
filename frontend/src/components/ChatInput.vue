@@ -290,6 +290,7 @@ const speechBaseMessage = ref('') // Message content before recording started
 const speechFinalTranscript = ref('') // Accumulated final transcripts during recording
 const fileSelectionModalVisible = ref(false)
 const voiceReply = ref(false)
+const discardNextRecording = ref(false)
 
 const aiConfigStore = useAiConfigStore()
 const chatsStore = useChatsStore()
@@ -483,6 +484,7 @@ const sendMessage = () => {
         webSpeechService.value = null
       }
       if (audioRecorder.value) {
+        discardNextRecording.value = true
         audioRecorder.value.stopRecording()
       }
       isRecording.value = false
@@ -936,6 +938,11 @@ const startWhisperRecording = async () => {
  * Called after AudioRecorder stops and provides recorded audio.
  */
 const transcribeAudio = async (audioBlob: Blob) => {
+  if (discardNextRecording.value) {
+    discardNextRecording.value = false
+    return
+  }
+
   uploading.value = true
 
   try {

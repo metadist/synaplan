@@ -38,6 +38,17 @@ parameters:
     env(OIDC_CLIENT_ID): ''
     env(OIDC_DISCOVERY_URL): ''
     env(RECAPTCHA_SECRET_KEY): ''
+    env(GOOGLE_CLIENT_SECRET): ''
+    env(GITHUB_CLIENT_SECRET): ''
+    env(OIDC_CLIENT_SECRET): ''
+    env(STRIPE_SECRET_KEY): ''
+    env(STRIPE_WEBHOOK_SECRET): ''
+    env(STRIPE_PRICE_PRO): ''
+    env(STRIPE_PRICE_TEAM): ''
+    env(STRIPE_PRICE_BUSINESS): ''
+    env(STRIPE_PAYMENT_METHODS): ''
+    env(WHATSAPP_ACCESS_TOKEN): ''
+    env(WHATSAPP_WEBHOOK_VERIFY_TOKEN): ''
 
     # Piper TTS Service default
     env(SYNAPLAN_TTS_URL): ''
