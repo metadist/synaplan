@@ -18,6 +18,7 @@ import { checkMemoryServiceAvailability } from '@/services/api/configApi'
 import { useNotification } from '@/composables/useNotification'
 import { i18n } from '@/i18n'
 import { ref } from 'vue'
+import { useAuthStore } from '@/stores/auth'
 
 // Async state for memory service availability
 const memoryServiceAvailable = ref<boolean | null>(null)
@@ -179,9 +180,15 @@ const config = {
   checkUnavailableProviders(): void {
     const unavailable = getUnavailableProviders()
     if (unavailable.length > 0) {
-      const { warning } = useNotification()
-      const t = i18n.global.t
-      warning(t('system.missingApiKeys', { providers: unavailable.join(', ') }), 10000)
+      const authStore = useAuthStore()
+      const msg = i18n.global.t('system.missingApiKeys', { providers: unavailable.join(', ') })
+
+      if (authStore.isAdmin) {
+        const { warning } = useNotification()
+        warning(msg, 10000)
+      } else {
+        console.warn(`[Synaplan] ${msg}`)
+      }
     }
   },
 
