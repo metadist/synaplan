@@ -269,6 +269,7 @@
     "voiceReply": "Voice reply",
     "voiceReplyTooltip": "Include audio response (MP3)",
     "send": "Send message",
+    "waitForStreaming": "Please wait for the current response to finish before sending another message.",
     "share": "Share",
     "tools": {
       "label": "Agents",
@@ -284,7 +285,8 @@
   "chatMessage": {
     "again": "Again",
     "againWith": "Again with",
-    "regenerateWith": "Regenerate with"
+    "regenerateWith": "Regenerate with",
+    "copy": "Copy message"
   },
   "commands": {
     "noResults": "No commands found",
@@ -2358,5 +2360,8 @@
       "featureEasyEmbed": "One-line embed code for any website",
       "featureResponsive": "Works perfectly on desktop & mobile"
     }
+  },
+  "system": {
+    "missingApiKeys": "Some API keys are missing — the following providers are disabled: {providers}"
   }
 }

@@ -254,6 +254,7 @@
     "dropFilesHint": "Imágenes, documentos, archivos de audio...",
     "filesPasted": "{count} archivo pegado | {count} archivos pegados",
     "send": "Enviar mensaje",
+    "waitForStreaming": "Por favor espera a que la respuesta actual termine antes de enviar otro mensaje.",
     "share": "Compartir",
     "tools": {
       "label": "Herramientas",
@@ -269,7 +270,8 @@
   "chatMessage": {
     "again": "Otra vez",
     "againWith": "Otra vez con",
-    "regenerateWith": "Regenerar con"
+    "regenerateWith": "Regenerar con",
+    "copy": "Copiar mensaje"
   },
   "commands": {
     "noResults": "No se encontraron comandos",
@@ -1870,5 +1872,8 @@
     "dontAskAgain": "No mostrar esta advertencia de nuevo",
     "cancel": "Cancelar",
     "open": "Abrir enlace"
+  },
+  "system": {
+    "missingApiKeys": "Faltan algunas claves API — los siguientes proveedores están desactivados: {providers}"
   }
 }

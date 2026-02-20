@@ -29,9 +29,25 @@
 
       <!-- Single bubble with content + footer -->
       <div
-        :class="['flex flex-col', role === 'user' ? 'bubble-user' : 'bubble-ai']"
+        :class="[
+          'flex flex-col relative group/bubble',
+          role === 'user' ? 'bubble-user' : 'bubble-ai',
+        ]"
         :data-testid="role === 'user' ? 'user-message-bubble' : 'assistant-message-bubble'"
       >
+        <!-- Copy button (assistant only, hidden during streaming) -->
+        <button
+          v-if="role === 'assistant' && !isStreaming"
+          type="button"
+          class="absolute top-2 right-2 z-10 p-1.5 rounded-md txt-secondary transition-opacity duration-150 bg-black/5 dark:bg-white/10 hover:bg-black/10 dark:hover:bg-white/20 hover:txt-primary pointer-fine:opacity-0 pointer-fine:group-hover/bubble:opacity-100"
+          :aria-label="t('chatMessage.copy')"
+          data-testid="btn-message-copy"
+          @click="copyMessageText"
+        >
+          <CheckIcon v-if="copied" class="w-4 h-4 text-green-500" />
+          <ClipboardDocumentIcon v-else class="w-4 h-4" />
+        </button>
+
         <!-- Processing Status (inside bubble, before content) -->
         <div
           v-if="isStreaming && processingStatus && role === 'assistant'"
@@ -686,7 +702,13 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { UserIcon, ArrowPathIcon, ChevronDownIcon } from '@heroicons/vue/24/outline'
+import {
+  UserIcon,
+  ArrowPathIcon,
+  ChevronDownIcon,
+  ClipboardDocumentIcon,
+  CheckIcon,
+} from '@heroicons/vue/24/outline'
 import { Icon } from '@iconify/vue'
 import { useModelSelection, type ModelOption } from '@/composables/useModelSelection'
 import { useNotification } from '@/composables/useNotification'
@@ -776,6 +798,27 @@ interface Props {
 }
 
 const props = defineProps<Props>()
+
+// Copy message text to clipboard
+const copied = ref(false)
+
+const copyMessageText = async () => {
+  const text = props.parts
+    .filter((p) => p.type !== 'thinking')
+    .map((p) => p.content ?? '')
+    .join('\n')
+    .trim()
+  if (!text) return
+  try {
+    await navigator.clipboard.writeText(text)
+    copied.value = true
+    setTimeout(() => {
+      copied.value = false
+    }, 2000)
+  } catch {
+    console.error('Failed to copy message text')
+  }
+}
 
 // Badge collapse state
 const showAllBadges = ref(false)

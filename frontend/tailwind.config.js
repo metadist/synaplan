@@ -45,7 +45,9 @@ export default {
     'nav-item--active',
   ],
   plugins: [
-    plugin(function ({ addBase, theme, addComponents, addUtilities }) {
+    plugin(function ({ addBase, theme, addComponents, addUtilities, addVariant }) {
+      addVariant('pointer-fine', '@media (pointer: fine)')
+
       // CSS Vars (Light/Dark)
       addBase({
         ':root': {

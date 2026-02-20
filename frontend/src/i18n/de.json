@@ -248,6 +248,7 @@
     "voiceReply": "Sprachantwort",
     "voiceReplyTooltip": "Audioantwort (MP3) anhängen",
     "send": "Nachricht senden",
+    "waitForStreaming": "Bitte warten Sie, bis die aktuelle Antwort abgeschlossen ist, bevor Sie eine weitere Nachricht senden.",
     "share": "Teilen",
     "enhance": "Verbessern",
     "thinking": "Denken",
@@ -279,7 +280,8 @@
   "chatMessage": {
     "again": "Nochmal",
     "againWith": "Nochmal mit",
-    "regenerateWith": "Neu generieren mit"
+    "regenerateWith": "Neu generieren mit",
+    "copy": "Nachricht kopieren"
   },
   "commands": {
     "noResults": "Keine Befehle gefunden",
@@ -2277,5 +2279,8 @@
       "featureEasyEmbed": "Ein-Zeilen-Embed-Code für jede Website",
       "featureResponsive": "Perfekt auf Desktop & Mobilgeräten"
     }
+  },
+  "system": {
+    "missingApiKeys": "Einige API-Schlüssel fehlen — folgende Anbieter sind deaktiviert: {providers}"
   }
 }

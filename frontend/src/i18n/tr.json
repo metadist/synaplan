@@ -254,6 +254,7 @@
     "dropFilesHint": "Resimler, belgeler, ses dosyaları...",
     "filesPasted": "{count} dosya yapıştırıldı",
     "send": "Mesaj gönder",
+    "waitForStreaming": "Lütfen başka bir mesaj göndermeden önce mevcut yanıtın tamamlanmasını bekleyin.",
     "share": "Paylaş",
     "tools": {
       "label": "Araçlar",
@@ -269,7 +270,8 @@
   "chatMessage": {
     "again": "Tekrar",
     "againWith": "Şununla tekrar",
-    "regenerateWith": "Şununla yeniden oluştur"
+    "regenerateWith": "Şununla yeniden oluştur",
+    "copy": "Mesajı kopyala"
   },
   "commands": {
     "noResults": "Komut bulunamadı",
@@ -1870,5 +1872,8 @@
     "dontAskAgain": "Bu uyarıyı bir daha gösterme",
     "cancel": "İptal",
     "open": "Bağlantıyı aç"
+  },
+  "system": {
+    "missingApiKeys": "Bazı API anahtarları eksik — şu sağlayıcılar devre dışı: {providers}"
   }
 }
