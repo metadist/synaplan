@@ -369,7 +369,9 @@
 
             <!-- Carousel Container (collapsible) -->
             <div v-show="sourcesExpanded" class="py-2 px-3">
-              <div class="relative overflow-x-auto sm:overflow-x-hidden scroll-thin snap-x snap-mandatory sm:snap-none">
+              <div
+                class="relative overflow-x-auto sm:overflow-x-hidden scroll-thin snap-x snap-mandatory sm:snap-none"
+              >
                 <div
                   class="flex gap-2 sm:transition-transform sm:duration-300"
                   :style="{

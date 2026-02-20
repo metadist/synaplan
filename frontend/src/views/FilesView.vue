@@ -116,7 +116,9 @@
 
             <!-- Upload target breadcrumb -->
             <div class="flex items-center gap-2 text-xs flex-wrap">
-              <span class="hidden sm:inline w-1 h-1 rounded-full bg-black/20 dark:bg-white/20"></span>
+              <span
+                class="hidden sm:inline w-1 h-1 rounded-full bg-black/20 dark:bg-white/20"
+              ></span>
               <Icon icon="heroicons:folder-solid" class="w-3.5 h-3.5 text-[var(--brand)]" />
               <span class="txt-secondary">{{ $t('files.target') }}:</span>
               <span class="font-semibold txt-primary">{{
@@ -617,7 +619,9 @@
                   icon="heroicons:folder-open-solid"
                   class="w-4 h-4 sm:w-5 sm:h-5 text-[var(--brand)] shrink-0"
                 />
-                <h2 class="text-base sm:text-lg font-semibold txt-primary truncate max-w-[50vw] sm:max-w-none">
+                <h2
+                  class="text-base sm:text-lg font-semibold txt-primary truncate max-w-[50vw] sm:max-w-none"
+                >
                   {{ openFolder }}
                 </h2>
                 <span

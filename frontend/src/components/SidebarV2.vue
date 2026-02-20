@@ -486,11 +486,7 @@
         class="fixed inset-0 z-[150]"
         @click="chatMenuOpenId = null"
       >
-        <div
-          class="fixed w-44 dropdown-panel origin-top-right"
-          :style="chatMenuStyle"
-          @click.stop
-        >
+        <div class="fixed w-44 dropdown-panel origin-top-right" :style="chatMenuStyle" @click.stop>
           <button class="dropdown-item" @click="handleChatShare(chatMenuOpenId!)">
             <Icon icon="mdi:share-variant-outline" class="w-4 h-4" />
             {{ $t('common.share') }}
