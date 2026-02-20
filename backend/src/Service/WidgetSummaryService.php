@@ -570,7 +570,7 @@ PROMPT;
     {
         $raw = $prompt->getShortDescription();
 
-        return ($raw !== '' && (int) $raw > 0) ? (int) $raw : -1;
+        return ('' !== $raw && (int) $raw > 0) ? (int) $raw : -1;
     }
 
     /**

@@ -527,10 +527,12 @@ export async function uploadWidgetIcon(
 export async function getSummaryPrompt(
   widgetId: string
 ): Promise<{ prompt: string; isDefault: boolean; modelId: number }> {
-  return await httpClient<{ success: boolean; prompt: string; isDefault: boolean; modelId: number }>(
-    `/api/v1/widgets/${widgetId}/summaries/prompt`,
-    { method: 'GET' }
-  )
+  return await httpClient<{
+    success: boolean
+    prompt: string
+    isDefault: boolean
+    modelId: number
+  }>(`/api/v1/widgets/${widgetId}/summaries/prompt`, { method: 'GET' })
 }
 
 /**
@@ -541,25 +543,19 @@ export async function updateSummaryPrompt(
   prompt: string,
   modelId: number = -1
 ): Promise<{ success: boolean }> {
-  return await httpClient<{ success: boolean }>(
-    `/api/v1/widgets/${widgetId}/summaries/prompt`,
-    {
-      method: 'PUT',
-      body: JSON.stringify({ prompt, modelId }),
-    }
-  )
+  return await httpClient<{ success: boolean }>(`/api/v1/widgets/${widgetId}/summaries/prompt`, {
+    method: 'PUT',
+    body: JSON.stringify({ prompt, modelId }),
+  })
 }
 
 /**
  * Reset the summary prompt to the system default.
  */
-export async function resetSummaryPrompt(
-  widgetId: string
-): Promise<{ success: boolean }> {
-  return await httpClient<{ success: boolean }>(
-    `/api/v1/widgets/${widgetId}/summaries/prompt`,
-    { method: 'DELETE' }
-  )
+export async function resetSummaryPrompt(widgetId: string): Promise<{ success: boolean }> {
+  return await httpClient<{ success: boolean }>(`/api/v1/widgets/${widgetId}/summaries/prompt`, {
+    method: 'DELETE',
+  })
 }
 
 /**
@@ -568,10 +564,12 @@ export async function resetSummaryPrompt(
 export async function getSetupPrompt(
   widgetId: string
 ): Promise<{ prompt: string; isDefault: boolean; modelId: number }> {
-  return await httpClient<{ success: boolean; prompt: string; isDefault: boolean; modelId: number }>(
-    `/api/v1/widgets/${widgetId}/setup/prompt`,
-    { method: 'GET' }
-  )
+  return await httpClient<{
+    success: boolean
+    prompt: string
+    isDefault: boolean
+    modelId: number
+  }>(`/api/v1/widgets/${widgetId}/setup/prompt`, { method: 'GET' })
 }
 
 /**
@@ -582,23 +580,17 @@ export async function updateSetupPrompt(
   prompt: string,
   modelId: number = -1
 ): Promise<{ success: boolean }> {
-  return await httpClient<{ success: boolean }>(
-    `/api/v1/widgets/${widgetId}/setup/prompt`,
-    {
-      method: 'PUT',
-      body: JSON.stringify({ prompt, modelId }),
-    }
-  )
+  return await httpClient<{ success: boolean }>(`/api/v1/widgets/${widgetId}/setup/prompt`, {
+    method: 'PUT',
+    body: JSON.stringify({ prompt, modelId }),
+  })
 }
 
 /**
  * Reset the setup interview prompt to the system default.
  */
-export async function resetSetupPrompt(
-  widgetId: string
-): Promise<{ success: boolean }> {
-  return await httpClient<{ success: boolean }>(
-    `/api/v1/widgets/${widgetId}/setup/prompt`,
-    { method: 'DELETE' }
-  )
+export async function resetSetupPrompt(widgetId: string): Promise<{ success: boolean }> {
+  return await httpClient<{ success: boolean }>(`/api/v1/widgets/${widgetId}/setup/prompt`, {
+    method: 'DELETE',
+  })
 }

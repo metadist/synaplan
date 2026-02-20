@@ -16,15 +16,18 @@ const summarySection = ref<InstanceType<typeof WidgetAiPromptSection> | null>(nu
 const setupSection = ref<InstanceType<typeof WidgetAiPromptSection> | null>(null)
 
 const summaryPlaceholders = [
-  { key: '{{CONVERSATIONS}}', descriptionKey: 'widgets.advancedConfig.summaryPrompt.placeholderConversations' },
-  { key: '{{SYSTEM_PROMPT}}', descriptionKey: 'widgets.advancedConfig.summaryPrompt.placeholderSystemPrompt' },
+  {
+    key: '{{CONVERSATIONS}}',
+    descriptionKey: 'widgets.advancedConfig.summaryPrompt.placeholderConversations',
+  },
+  {
+    key: '{{SYSTEM_PROMPT}}',
+    descriptionKey: 'widgets.advancedConfig.summaryPrompt.placeholderSystemPrompt',
+  },
 ]
 
 const save = async () => {
-  await Promise.all([
-    summarySection.value?.save(),
-    setupSection.value?.save(),
-  ])
+  await Promise.all([summarySection.value?.save(), setupSection.value?.save()])
 }
 
 defineExpose({ save })

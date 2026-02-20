@@ -1044,7 +1044,7 @@ const loadPrompts = async () => {
       return {
         ...p,
         content: p.prompt,
-        rules: (p.selectionRules || p.shortDescription) || '',
+        rules: p.selectionRules || p.shortDescription || '',
         aiModel: aiModelString,
         availableTools,
       }
@@ -1181,7 +1181,7 @@ const handleSave = saveChanges(async () => {
         prompts.value[index] = {
           ...newPrompt,
           content: newPrompt.prompt,
-          rules: (newPrompt.selectionRules || newPrompt.shortDescription) || '',
+          rules: newPrompt.selectionRules || newPrompt.shortDescription || '',
           aiModel: formData.value.aiModel,
           availableTools: formData.value.availableTools,
           isUserOverride: true,
@@ -1214,7 +1214,7 @@ const handleSave = saveChanges(async () => {
         prompts.value[index] = {
           ...updated,
           content: updated.prompt,
-          rules: (updated.selectionRules || updated.shortDescription) || '',
+          rules: updated.selectionRules || updated.shortDescription || '',
           aiModel: formData.value.aiModel,
           availableTools: formData.value.availableTools,
         }
@@ -1345,7 +1345,7 @@ const handleCreateNew = async () => {
     const mappedPrompt: TaskPrompt = {
       ...newPrompt,
       content: newPrompt.prompt,
-      rules: (newPrompt.selectionRules || newPrompt.shortDescription) || '',
+      rules: newPrompt.selectionRules || newPrompt.shortDescription || '',
       aiModel:
         formData.value.aiModel ||
         'AUTOMATED - Tries to define the best model for the task on SYNAPLAN [System Model]',

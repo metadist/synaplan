@@ -804,7 +804,9 @@
                           />
                           <div class="min-w-0">
                             <p class="text-sm txt-primary truncate">{{ file.fileName }}</p>
-                            <p v-if="file.chunks > 0" class="text-xs txt-secondary">{{ file.chunks }} chunks</p>
+                            <p v-if="file.chunks > 0" class="text-xs txt-secondary">
+                              {{ file.chunks }} chunks
+                            </p>
                           </div>
                         </div>
                         <div class="flex items-center gap-2">

@@ -76,7 +76,9 @@
                   : 'surface-chip txt-primary rounded-bl-md',
               ]"
             >
-              <p v-if="message.role === 'user'" class="text-sm whitespace-pre-wrap">{{ message.content }}</p>
+              <p v-if="message.role === 'user'" class="text-sm whitespace-pre-wrap">
+                {{ message.content }}
+              </p>
               <div
                 v-else
                 class="text-sm prose prose-sm dark:prose-invert max-w-none"

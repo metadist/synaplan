@@ -28,7 +28,9 @@
               {{ stats.ai }} {{ $t('widgetSessions.aiShort') }}
             </span>
             <span class="flex items-center gap-1.5">
-              <span class="w-2 h-2 rounded-full bg-emerald-500 shadow-sm shadow-emerald-500/50"></span>
+              <span
+                class="w-2 h-2 rounded-full bg-emerald-500 shadow-sm shadow-emerald-500/50"
+              ></span>
               {{ stats.human }} {{ $t('widgetSessions.humanShort') }}
             </span>
             <span class="flex items-center gap-1.5">
@@ -184,7 +186,11 @@
             'flex flex-col overflow-hidden rounded-2xl bg-[var(--bg-card)] shadow-sm',
             selectedSession ? 'hidden lg:flex' : 'w-full lg:flex',
           ]"
-          :style="isLgScreen ? { width: leftPanelWidth + 'px', minWidth: LEFT_PANEL_MIN + 'px', flexShrink: '1' } : undefined"
+          :style="
+            isLgScreen
+              ? { width: leftPanelWidth + 'px', minWidth: LEFT_PANEL_MIN + 'px', flexShrink: '1' }
+              : undefined
+          "
         >
           <!-- Filters -->
           <div class="p-3 flex flex-wrap gap-2">
@@ -360,12 +366,10 @@
         </div>
 
         <!-- Left Resize Handle -->
-        <div
-          v-if="isLgScreen"
-          class="resize-handle group"
-          @mousedown="startResize('left', $event)"
-        >
-          <div class="resize-handle-bar group-hover:bg-[var(--brand)] group-active:bg-[var(--brand)]"></div>
+        <div v-if="isLgScreen" class="resize-handle group" @mousedown="startResize('left', $event)">
+          <div
+            class="resize-handle-bar group-hover:bg-[var(--brand)] group-active:bg-[var(--brand)]"
+          ></div>
         </div>
 
         <!-- Center: Chat View -->
@@ -399,7 +403,9 @@
           <!-- Selected Session Chat -->
           <template v-else>
             <!-- Chat Header -->
-            <div class="p-4 flex-shrink-0 space-y-2 border-b border-white/5 dark:border-white/5 shadow-[0_1px_3px_rgba(0,0,0,0.08)]">
+            <div
+              class="p-4 flex-shrink-0 space-y-2 border-b border-white/5 dark:border-white/5 shadow-[0_1px_3px_rgba(0,0,0,0.08)]"
+            >
               <!-- Top row: back button, session info, and actions -->
               <div class="flex items-center gap-3">
                 <!-- Back button on mobile -->
@@ -435,7 +441,9 @@
                       />
                     </div>
                     <template v-else>
-                      <p class="text-sm font-medium txt-primary truncate max-w-[150px] lg:max-w-[200px]">
+                      <p
+                        class="text-sm font-medium txt-primary truncate max-w-[150px] lg:max-w-[200px]"
+                      >
                         {{ selectedSession.title || getModeLabel(selectedSession.mode) }}
                       </p>
                       <button
@@ -704,7 +712,9 @@
           class="resize-handle group"
           @mousedown="startResize('right', $event)"
         >
-          <div class="resize-handle-bar group-hover:bg-[var(--brand)] group-active:bg-[var(--brand)]"></div>
+          <div
+            class="resize-handle-bar group-hover:bg-[var(--brand)] group-active:bg-[var(--brand)]"
+          ></div>
         </div>
 
         <!-- AI Summary Slide Panel (desktop only, xl+) -->
@@ -719,7 +729,11 @@
           <div
             v-if="showSummaryPanel"
             class="hidden xl:flex rounded-2xl bg-[var(--bg-card)] shadow-sm overflow-hidden flex-col"
-            :style="{ width: rightPanelWidth + 'px', minWidth: RIGHT_PANEL_MIN + 'px', flexShrink: '1' }"
+            :style="{
+              width: rightPanelWidth + 'px',
+              minWidth: RIGHT_PANEL_MIN + 'px',
+              flexShrink: '1',
+            }"
           >
             <div class="p-4 flex items-center justify-between">
               <h3 class="text-sm font-semibold txt-primary flex items-center gap-2">
@@ -941,7 +955,8 @@ function startResize(side: 'left' | 'right', event: MouseEvent) {
 function onResize(event: MouseEvent) {
   if (!isResizing.value) return
 
-  const containerWidth = document.querySelector('[data-testid="page-widget-sessions"]')?.clientWidth ?? window.innerWidth
+  const containerWidth =
+    document.querySelector('[data-testid="page-widget-sessions"]')?.clientWidth ?? window.innerWidth
 
   if (resizeSide.value === 'left') {
     const delta = event.clientX - resizeStartX.value
@@ -968,7 +983,8 @@ function onResize(event: MouseEvent) {
     // Ensure chat area doesn't get too small
     const handleWidth = 32
     const padding = 48
-    const availableForChat = containerWidth - leftPanelWidth.value - newWidth - handleWidth - padding
+    const availableForChat =
+      containerWidth - leftPanelWidth.value - newWidth - handleWidth - padding
     if (availableForChat < CHAT_MIN_WIDTH) return
 
     rightPanelWidth.value = newWidth
@@ -1890,7 +1906,10 @@ onUnmounted(() => {
   border-radius: 3px;
   background: var(--txt-secondary, rgba(128, 128, 128, 0.4));
   opacity: 0.5;
-  transition: opacity 0.15s ease, height 0.15s ease, background-color 0.15s ease;
+  transition:
+    opacity 0.15s ease,
+    height 0.15s ease,
+    background-color 0.15s ease;
 }
 
 .resize-handle:hover .resize-handle-bar {

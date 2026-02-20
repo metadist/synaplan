@@ -49,7 +49,11 @@ const groupedModels = computed(() => {
   const ordered: Capability[] = ['CHAT', 'ANALYZE', 'PIC2TEXT']
   ordered.forEach((cap) => {
     if (props.models[cap]?.length) {
-      groups.push({ label: capabilityLabels[cap] || cap, models: props.models[cap]!, capability: cap })
+      groups.push({
+        label: capabilityLabels[cap] || cap,
+        models: props.models[cap]!,
+        capability: cap,
+      })
     }
   })
   return groups
@@ -125,13 +129,16 @@ onMounted(load)
         <span
           v-if="!loading"
           class="px-2 py-0.5 rounded-full text-xs font-medium"
-          :class="isDefault
-            ? 'bg-[var(--brand)]/10 text-[var(--brand)]'
-            : 'bg-amber-500/10 text-amber-600 dark:text-amber-400'"
+          :class="
+            isDefault
+              ? 'bg-[var(--brand)]/10 text-[var(--brand)]'
+              : 'bg-amber-500/10 text-amber-600 dark:text-amber-400'
+          "
         >
-          {{ isDefault
-            ? $t('widgets.advancedConfig.aiPrompts.defaultBadge')
-            : $t('widgets.advancedConfig.aiPrompts.customBadge')
+          {{
+            isDefault
+              ? $t('widgets.advancedConfig.aiPrompts.defaultBadge')
+              : $t('widgets.advancedConfig.aiPrompts.customBadge')
           }}
         </span>
       </div>
@@ -142,7 +149,10 @@ onMounted(load)
     </button>
 
     <!-- Content -->
-    <div v-if="!collapsed" class="px-4 sm:px-5 pb-5 space-y-5 border-t border-light-border/20 dark:border-dark-border/10 pt-5">
+    <div
+      v-if="!collapsed"
+      class="px-4 sm:px-5 pb-5 space-y-5 border-t border-light-border/20 dark:border-dark-border/10 pt-5"
+    >
       <!-- Loading -->
       <div v-if="loading" class="flex items-center justify-center py-8">
         <Icon icon="heroicons:arrow-path" class="w-6 h-6 txt-secondary animate-spin" />
@@ -163,16 +173,8 @@ onMounted(load)
               ✨ {{ $t('widgets.advancedConfig.aiPrompts.modelAutomatic') }}
             </option>
             <template v-if="!loadingModels && groupedModels.length > 0">
-              <optgroup
-                v-for="group in groupedModels"
-                :key="group.capability"
-                :label="group.label"
-              >
-                <option
-                  v-for="model in group.models"
-                  :key="model.id"
-                  :value="model.id"
-                >
+              <optgroup v-for="group in groupedModels" :key="group.capability" :label="group.label">
+                <option v-for="model in group.models" :key="model.id" :value="model.id">
                   {{ model.name }} ({{ model.service }})
                 </option>
               </optgroup>
@@ -183,17 +185,16 @@ onMounted(load)
         </div>
 
         <!-- Placeholder Info -->
-        <div v-if="placeholders?.length" class="p-3 rounded-lg bg-[var(--brand)]/5 border border-[var(--brand)]/20">
+        <div
+          v-if="placeholders?.length"
+          class="p-3 rounded-lg bg-[var(--brand)]/5 border border-[var(--brand)]/20"
+        >
           <p class="text-xs font-medium text-[var(--brand)] mb-2 flex items-center gap-1.5">
             <Icon icon="heroicons:information-circle" class="w-3.5 h-3.5" />
             {{ $t('widgets.advancedConfig.aiPrompts.placeholderInfo') }}
           </p>
           <div class="space-y-1">
-            <div
-              v-for="ph in placeholders"
-              :key="ph.key"
-              class="flex items-start gap-2 text-xs"
-            >
+            <div v-for="ph in placeholders" :key="ph.key" class="flex items-start gap-2 text-xs">
               <code
                 class="px-1.5 py-0.5 rounded bg-[var(--brand)]/10 text-[var(--brand)] font-mono whitespace-nowrap"
                 v-text="ph.key"
