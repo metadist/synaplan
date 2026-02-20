@@ -513,6 +513,9 @@
   -webkit-backdrop-filter: blur(var(--v2-blur-lg));
   border-right: 1px solid var(--v2-border);
 }
+.design-v2 .v2-sidebar-rail .sidebar-scroll {
+  scrollbar-gutter: auto;
+}
 .design-v2.dark .v2-sidebar-rail {
   box-shadow: 1px 0 20px rgba(0, 0, 0, 0.3);
 }

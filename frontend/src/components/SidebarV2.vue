@@ -28,11 +28,11 @@
   >
     <!-- Logo -->
     <div class="flex items-center justify-center py-5 flex-shrink-0">
-      <img :src="logoIconSrc" alt="synaplan" class="h-7 w-7" />
+      <img :src="logoIconSrc" alt="synaplan" class="h-8 w-auto" />
     </div>
 
     <!-- New Chat Button -->
-    <div class="flex items-center justify-center px-2 pb-2 flex-shrink-0">
+    <div class="flex items-center justify-center pb-2 flex-shrink-0">
       <button
         class="v2-new-chat-btn w-10 h-10 flex items-center justify-center rounded-xl transition-all duration-200"
         :class="{ 'v2-new-chat-btn--creating': isCreatingChat }"
@@ -49,7 +49,7 @@
     </div>
 
     <!-- Nav Icons -->
-    <nav class="flex-1 flex flex-col items-center gap-1 px-2 py-2 overflow-y-auto sidebar-scroll">
+    <nav class="flex-1 flex flex-col items-center gap-1 py-2 overflow-y-auto sidebar-scroll">
       <button
         v-for="item in navItems"
         :key="item.path"
@@ -63,7 +63,7 @@
         :data-testid="`btn-sidebar-v2-${item.path.replace(/\//g, '-')}`"
         @click="handleNavClick(item)"
       >
-        <component :is="item.icon" class="w-5 h-5" />
+        <component :is="item.icon" class="w-6 h-6" />
       </button>
     </nav>
 
@@ -628,7 +628,8 @@ const isDark = computed(() => {
 })
 
 const logoIconSrc = computed(
-  () => `${import.meta.env.BASE_URL}${isDark.value ? 'synaplan-light.svg' : 'synaplan-dark.svg'}`
+  () =>
+    `${import.meta.env.BASE_URL}${isDark.value ? 'single_bird-light.svg' : 'single_bird-dark.svg'}`
 )
 
 const initials = computed(() => {
