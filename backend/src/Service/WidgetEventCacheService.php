@@ -125,6 +125,32 @@ final class WidgetEventCacheService
     }
 
     /**
+     * Get the latest event ID for a session.
+     *
+     * Used to initialize SSE subscriptions so they only receive new events,
+     * avoiding replay of historical events that could cause stale state changes.
+     */
+    public function getLatestEventId(string $widgetId, string $sessionId): int
+    {
+        $cacheKey = $this->getEventsCacheKey($widgetId, $sessionId);
+        $item = $this->cache->getItem($cacheKey);
+
+        if (!$item->isHit()) {
+            return 0;
+        }
+
+        $events = $item->get();
+        if (empty($events)) {
+            return 0;
+        }
+
+        // Return the ID of the last event
+        $lastEvent = end($events);
+
+        return $lastEvent['id'] ?? 0;
+    }
+
+    /**
      * Publish notification for widget owner.
      *
      * @param array<string, mixed> $payload
