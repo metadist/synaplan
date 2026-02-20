@@ -270,7 +270,8 @@
   "chatMessage": {
     "again": "Otra vez",
     "againWith": "Otra vez con",
-    "regenerateWith": "Regenerar con"
+    "regenerateWith": "Regenerar con",
+    "copy": "Copiar mensaje"
   },
   "commands": {
     "noResults": "No se encontraron comandos",

@@ -285,7 +285,8 @@
   "chatMessage": {
     "again": "Again",
     "againWith": "Again with",
-    "regenerateWith": "Regenerate with"
+    "regenerateWith": "Regenerate with",
+    "copy": "Copy message"
   },
   "commands": {
     "noResults": "No commands found",

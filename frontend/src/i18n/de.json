@@ -280,7 +280,8 @@
   "chatMessage": {
     "again": "Nochmal",
     "againWith": "Nochmal mit",
-    "regenerateWith": "Neu generieren mit"
+    "regenerateWith": "Neu generieren mit",
+    "copy": "Nachricht kopieren"
   },
   "commands": {
     "noResults": "Keine Befehle gefunden",

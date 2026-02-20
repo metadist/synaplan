@@ -270,7 +270,8 @@
   "chatMessage": {
     "again": "Tekrar",
     "againWith": "Şununla tekrar",
-    "regenerateWith": "Şununla yeniden oluştur"
+    "regenerateWith": "Şununla yeniden oluştur",
+    "copy": "Mesajı kopyala"
   },
   "commands": {
     "noResults": "Komut bulunamadı",
