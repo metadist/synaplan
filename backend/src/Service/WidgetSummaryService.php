@@ -707,16 +707,14 @@ PROMPT;
     {
         foreach ($taggedMessages as &$tagged) {
             $bestMatch = null;
-            $bestScore = 0;
+            $bestSimilarity = 0.0;
 
             foreach ($originalPairs as $pair) {
-                // Try exact match first
                 if ($pair['userMessage'] === $tagged['userMessage']) {
                     $bestMatch = $pair;
                     break;
                 }
 
-                // Fuzzy match: check if the AI's quoted text is contained in the original or vice versa
                 $taggedNorm = mb_strtolower(trim($tagged['userMessage']));
                 $originalNorm = mb_strtolower(trim($pair['userMessage']));
 
@@ -725,19 +723,20 @@ PROMPT;
                     break;
                 }
 
-                // Substring match (AI might have trimmed the message)
+                // Substring match — convert to a 0-100 similarity score
                 if (str_contains($originalNorm, $taggedNorm) || str_contains($taggedNorm, $originalNorm)) {
-                    $score = min(mb_strlen($taggedNorm), mb_strlen($originalNorm));
-                    if ($score > $bestScore) {
-                        $bestScore = $score;
+                    $maxLen = max(mb_strlen($taggedNorm), mb_strlen($originalNorm));
+                    $minLen = min(mb_strlen($taggedNorm), mb_strlen($originalNorm));
+                    $score = $maxLen > 0 ? ($minLen / $maxLen) * 100 : 0;
+                    if ($score > $bestSimilarity) {
+                        $bestSimilarity = $score;
                         $bestMatch = $pair;
                     }
                 }
 
-                // Similar text match for slight paraphrasing
                 similar_text($taggedNorm, $originalNorm, $percent);
-                if ($percent > 70 && $percent > $bestScore) {
-                    $bestScore = $percent;
+                if ($percent > 70 && $percent > $bestSimilarity) {
+                    $bestSimilarity = $percent;
                     $bestMatch = $pair;
                 }
             }

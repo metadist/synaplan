@@ -128,7 +128,7 @@ class PromptController extends AbstractController
         $userPrompts = $this->promptRepository->createQueryBuilder('p')
             ->where('p.ownerId = :userId')
             ->andWhere('p.topic NOT LIKE :toolsPrefix')
-            ->andWhere('p.language = :lang OR p.topic LIKE :widgetPrefix')
+            ->andWhere('(p.language = :lang OR p.topic LIKE :widgetPrefix)')
             ->setParameter('userId', $user->getId())
             ->setParameter('lang', $language)
             ->setParameter('toolsPrefix', 'tools:%')

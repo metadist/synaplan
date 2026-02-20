@@ -100,7 +100,7 @@ class WidgetSessionRepository extends ServiceEntityRepository
             ->select('ws.mode, COUNT(ws.id) as cnt')
             ->where('ws.widgetId = :widgetId')
             ->andWhere('ws.sessionId NOT LIKE :testPrefix')
-            ->andWhere('ws.expires > :now OR ws.mode IN (:activeModes)')
+            ->andWhere('(ws.expires > :now OR ws.mode IN (:activeModes))')
             ->setParameter('widgetId', $widgetId)
             ->setParameter('now', $now)
             ->setParameter('testPrefix', 'test_%')

@@ -1660,7 +1660,7 @@ const savePromptData = async () => {
   await promptsApi.updatePrompt(promptData.id, {
     shortDescription: promptData.name,
     prompt: finalContent,
-    selectionRules: null,
+    selectionRules: promptData.rules || null,
     metadata,
   })
 
