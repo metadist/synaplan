@@ -20,6 +20,7 @@ class OidcController extends AbstractController
 {
     public function __construct(
         private LoggerInterface $logger,
+        private ?string $oidcAutoRedirect = null,
     ) {
     }
 
@@ -69,11 +70,14 @@ class OidcController extends AbstractController
             ], Response::HTTP_SERVICE_UNAVAILABLE);
         }
 
+        $autoRedirect = filter_var($this->oidcAutoRedirect ?? 'false', FILTER_VALIDATE_BOOLEAN);
+
         return $this->json([
             'success' => true,
             'discovery_url' => rtrim($discoveryUrl, '/').'/.well-known/openid-configuration',
             'issuer' => $discoveryUrl,
             'client_id' => $clientId,
+            'auto_redirect' => $autoRedirect,
             // Client secret is NEVER exposed!
         ]);
     }

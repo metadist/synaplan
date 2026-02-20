@@ -518,7 +518,9 @@
     "authenticationRequired": "Autenticación requerida. Por favor inicia sesión para continuar.",
     "tokenRefreshFailed": "No se pudo renovar tu sesión. Por favor inicia sesión de nuevo.",
     "showPassword": "Mostrar contraseña",
-    "hidePassword": "Ocultar contraseña"
+    "hidePassword": "Ocultar contraseña",
+    "redirectingToSso": "Redirigiendo al SSO...",
+    "loginWithSso": "Iniciar sesión con SSO"
   },
   "unsavedChanges": {
     "title": "Tienes cambios sin guardar",

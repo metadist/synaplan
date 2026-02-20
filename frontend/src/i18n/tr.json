@@ -518,7 +518,9 @@
     "authenticationRequired": "Kimlik doğrulama gerekli. Devam etmek için lütfen giriş yapın.",
     "tokenRefreshFailed": "Oturumunuz yenilenemedi. Lütfen tekrar giriş yapın.",
     "showPassword": "Şifreyi göster",
-    "hidePassword": "Şifreyi gizle"
+    "hidePassword": "Şifreyi gizle",
+    "redirectingToSso": "SSO'ya yönlendiriliyor...",
+    "loginWithSso": "SSO ile Giriş Yap"
   },
   "unsavedChanges": {
     "title": "Kaydedilmemiş değişiklikleriniz var",

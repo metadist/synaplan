@@ -66,5 +66,13 @@ export const selectors = {
     button: '[data-testid="btn-user-menu-toggle"]',
     logoutBtn: '[data-testid="btn-user-logout"]',
   },
+  oidc: {
+    keycloakButton: '[data-testid="btn-social-keycloak"]',
+    keycloakUsername: '#username',
+    keycloakPassword: '#password',
+    keycloakSubmit: '#kc-login',
+    redirectSection: '[data-testid="section-oidc-redirect"]',
+    sessionExpiredSection: '[data-testid="section-oidc-session-expired"]',
+  },
   toast: {},
 } as const

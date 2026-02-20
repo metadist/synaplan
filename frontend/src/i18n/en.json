@@ -1161,7 +1161,9 @@
     "authenticationRequired": "Authentication required. Please log in to continue.",
     "tokenRefreshFailed": "Failed to refresh your session. Please log in again.",
     "showPassword": "Show password",
-    "hidePassword": "Hide password"
+    "hidePassword": "Hide password",
+    "redirectingToSso": "Redirecting to SSO...",
+    "loginWithSso": "Login with SSO"
   },
   "unsavedChanges": {
     "title": "You have unsaved changes",
