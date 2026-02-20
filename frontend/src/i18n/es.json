@@ -254,6 +254,7 @@
     "dropFilesHint": "Imágenes, documentos, archivos de audio...",
     "filesPasted": "{count} archivo pegado | {count} archivos pegados",
     "send": "Enviar mensaje",
+    "waitForStreaming": "Por favor espera a que la respuesta actual termine antes de enviar otro mensaje.",
     "share": "Compartir",
     "tools": {
       "label": "Herramientas",

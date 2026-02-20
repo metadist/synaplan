@@ -248,6 +248,7 @@
     "voiceReply": "Sprachantwort",
     "voiceReplyTooltip": "Audioantwort (MP3) anhängen",
     "send": "Nachricht senden",
+    "waitForStreaming": "Bitte warten Sie, bis die aktuelle Antwort abgeschlossen ist, bevor Sie eine weitere Nachricht senden.",
     "share": "Teilen",
     "enhance": "Verbessern",
     "thinking": "Denken",

@@ -173,6 +173,13 @@ class ConfigController extends AbstractController
                         ),
                     ]
                 ),
+                new OA\Property(
+                    property: 'unavailableProviders',
+                    type: 'array',
+                    description: 'AI providers that are disabled due to missing API keys (only for authenticated users)',
+                    items: new OA\Items(type: 'string', example: 'Anthropic'),
+                    nullable: true
+                ),
             ]
         )
     )]
@@ -250,16 +257,14 @@ class ConfigController extends AbstractController
             'ip' => $this->getInternalIp(),
         ];
 
-        // Unavailable AI providers (for authenticated users: show which providers are missing API keys)
         $unavailableProviders = [];
         if ($user) {
-            $providersMetadata = $this->providerRegistry->getProvidersMetadata();
-            foreach ($providersMetadata as $providerName => $providerData) {
-                if ('test' === $providerName) {
+            foreach ($this->providerRegistry->getUniqueProviders() as $name => $provider) {
+                if ('test' === $name) {
                     continue;
                 }
-                if (!$providerData['enabled']) {
-                    $unavailableProviders[] = $providerData['name'];
+                if (!$provider->isAvailable()) {
+                    $unavailableProviders[] = $provider->getDisplayName();
                 }
             }
         }

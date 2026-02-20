@@ -472,7 +472,7 @@ watch(
 
 const sendMessage = () => {
   if (isStreaming.value) {
-    warning('Please wait for the current response to finish before sending another message.')
+    warning(t('chat.waitForStreaming'))
     return
   }
 
@@ -486,6 +486,11 @@ const sendMessage = () => {
         audioRecorder.value.stopRecording()
       }
       isRecording.value = false
+
+      // Clear speech tracking to prevent onEnd from restoring text
+      speechBaseMessage.value = ''
+      speechFinalTranscript.value = ''
+      interimTranscript.value = ''
     }
     const hasWebSearch = activeCommand.value === 'search'
 
