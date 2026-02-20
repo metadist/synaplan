@@ -10,7 +10,7 @@ interface Props {
   loadingModels: boolean
 }
 
-const props = defineProps<Props>()
+defineProps<Props>()
 
 const summarySection = ref<InstanceType<typeof WidgetAiPromptSection> | null>(null)
 const setupSection = ref<InstanceType<typeof WidgetAiPromptSection> | null>(null)
