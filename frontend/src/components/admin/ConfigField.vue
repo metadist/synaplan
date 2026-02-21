@@ -225,6 +225,6 @@ const statusColor = computed(() => {
 }
 
 :root.dark .config-field {
-  border-color: var(--dark-border-20, rgba(255, 255, 255, 0.1));
+  border-color: var(--dark-border-20, rgba(255, 255, 255, 0.06));
 }
 </style>

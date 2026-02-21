@@ -52,7 +52,7 @@
             <div
               v-for="(file, index) in selectedFiles"
               :key="index"
-              class="flex items-center gap-3 p-3 rounded-lg border border-light-border/30 dark:border-dark-border/20 bg-black/[0.02] dark:bg-white/[0.02]"
+              class="flex items-center gap-3 p-3 rounded-lg border border-light-border/30 dark:border-dark-border/8 bg-black/[0.02] dark:bg-white/[0.02]"
             >
               <Icon :icon="getFileIcon(file.name)" class="w-5 h-5 txt-secondary" />
               <div class="flex-1 min-w-0">
@@ -106,7 +106,7 @@
 
             <button
               v-if="selectedFiles.length > 0 && !isUploading"
-              class="px-4 py-2.5 rounded-lg border border-light-border/30 dark:border-dark-border/20 txt-secondary hover:txt-primary hover:border-[var(--brand)]/50 hover:bg-[var(--brand)]/5 transition-all text-sm flex items-center gap-1.5"
+              class="px-4 py-2.5 rounded-lg border border-light-border/30 dark:border-dark-border/8 txt-secondary hover:txt-primary hover:border-[var(--brand)]/50 hover:bg-[var(--brand)]/5 transition-all text-sm flex items-center gap-1.5"
               data-testid="btn-add-more"
               @click="fileInputRef?.click()"
             >
@@ -196,7 +196,7 @@
                   :class="
                     !selectedGroup && !groupKeyword
                       ? 'border-[var(--brand)] bg-[var(--brand)]/10 text-[var(--brand)]'
-                      : 'border-light-border/30 dark:border-dark-border/20 txt-secondary hover:border-[var(--brand)]/50 hover:bg-[var(--brand)]/5'
+                      : 'border-light-border/30 dark:border-dark-border/8 txt-secondary hover:border-[var(--brand)]/50 hover:bg-[var(--brand)]/5'
                   "
                   @click="(clearFolderSelection(), (folderPickerOpen = false))"
                 >
@@ -213,7 +213,7 @@
                     :class="
                       selectedGroup === folder.name && !groupKeyword
                         ? 'border-[var(--brand)] bg-[var(--brand)]/10 text-[var(--brand)]'
-                        : 'border-light-border/30 dark:border-dark-border/20 txt-secondary hover:border-[var(--brand)]/50 hover:bg-[var(--brand)]/5'
+                        : 'border-light-border/30 dark:border-dark-border/8 txt-secondary hover:border-[var(--brand)]/50 hover:bg-[var(--brand)]/5'
                     "
                     @click="(selectExistingFolder(folder.name), (folderPickerOpen = false))"
                   >
@@ -229,7 +229,7 @@
                 </div>
 
                 <!-- New folder input -->
-                <div class="mt-3 pt-3 border-t border-light-border/20 dark:border-dark-border/10">
+                <div class="mt-3 pt-3 border-t border-light-border/20 dark:border-dark-border/5">
                   <div class="flex items-center gap-2">
                     <Icon
                       icon="heroicons:folder-plus"
@@ -325,7 +325,7 @@
                     :class="
                       folderDropTarget === folder.name
                         ? 'border-[var(--brand)] bg-[var(--brand)]/10 shadow-lg shadow-[var(--brand)]/20 scale-[1.03]'
-                        : 'border-light-border/20 dark:border-dark-border/15 hover:border-[var(--brand)]/30 hover:shadow-lg hover:shadow-[var(--brand)]/5 hover:bg-[var(--brand)]/[0.03]'
+                        : 'border-light-border/20 dark:border-dark-border/7 hover:border-[var(--brand)]/30 hover:shadow-lg hover:shadow-[var(--brand)]/5 hover:bg-[var(--brand)]/[0.03]'
                     "
                     :data-testid="`folder-card-${folder.name}`"
                     @click="enterFolder(folder.name)"
@@ -389,7 +389,7 @@
               <div v-if="paginatedFiles.length > 0" data-testid="section-table">
                 <div
                   v-if="fileGroups.length > 0"
-                  class="flex items-center gap-2 mb-3 pt-2 border-t border-light-border/10 dark:border-dark-border/10"
+                  class="flex items-center gap-2 mb-3 pt-2 border-t border-light-border/10 dark:border-dark-border/5"
                 >
                   <Icon icon="heroicons:document-text" class="w-4 h-4 txt-secondary" />
                   <span class="text-xs font-medium txt-secondary uppercase tracking-wider">{{
@@ -400,10 +400,27 @@
 
                 <!-- Mobile card list -->
                 <div class="sm:hidden space-y-2">
+                  <button
+                    class="flex items-center gap-2 px-3 py-2 text-xs txt-secondary"
+                    @click="toggleSelectAll"
+                  >
+                    <input
+                      type="checkbox"
+                      :checked="allSelected"
+                      class="checkbox-brand shrink-0"
+                      @click.stop
+                      @change="toggleSelectAll"
+                    />
+                    {{
+                      allSelected
+                        ? $t('files.deselectAll')
+                        : $t('files.selectAll', { count: totalCount })
+                    }}
+                  </button>
                   <div
                     v-for="file in paginatedFiles"
                     :key="file.id"
-                    class="flex items-center gap-3 p-3 rounded-xl border border-light-border/15 dark:border-dark-border/10 hover:bg-black/[0.02] dark:hover:bg-white/[0.02] transition-colors"
+                    class="flex items-center gap-3 p-3 rounded-xl border border-light-border/15 dark:border-dark-border/5 hover:bg-black/[0.02] dark:hover:bg-white/[0.02] transition-colors"
                     data-testid="item-file"
                   >
                     <input
@@ -420,17 +437,17 @@
                     </div>
                     <div class="flex-1 min-w-0">
                       <p class="text-sm txt-primary truncate">{{ file.filename }}</p>
-                      <div class="flex items-center gap-2 mt-0.5">
-                        <span class="text-[11px] txt-secondary">{{
+                      <div class="flex items-center gap-2 mt-0.5 min-w-0">
+                        <span class="text-[11px] txt-secondary shrink-0">{{
                           formatFileSize(file.file_size)
                         }}</span>
                         <button
                           v-if="file.group_key"
-                          class="inline-flex items-center gap-0.5 text-[10px] text-[var(--brand)]/70"
+                          class="inline-flex items-center gap-0.5 text-[10px] text-[var(--brand)]/70 min-w-0"
                           @click="enterFolder(file.group_key!)"
                         >
-                          <Icon icon="heroicons:folder-solid" class="w-3 h-3" />
-                          {{ file.group_key }}
+                          <Icon icon="heroicons:folder-solid" class="w-3 h-3 shrink-0" />
+                          <span class="truncate">{{ file.group_key }}</span>
                         </button>
                       </div>
                     </div>
@@ -456,7 +473,7 @@
                 <!-- Desktop table -->
                 <table class="w-full hidden sm:table">
                   <thead>
-                    <tr class="border-b border-light-border/30 dark:border-dark-border/20">
+                    <tr class="border-b border-light-border/30 dark:border-dark-border/8">
                       <th class="text-left py-2.5 px-2 w-8">
                         <input
                           type="checkbox"
@@ -485,7 +502,7 @@
                     <tr
                       v-for="file in paginatedFiles"
                       :key="file.id"
-                      class="group border-b border-light-border/10 dark:border-dark-border/10 hover:bg-black/[0.03] dark:hover:bg-white/[0.03] transition-colors"
+                      class="group border-b border-light-border/10 dark:border-dark-border/5 hover:bg-black/[0.03] dark:hover:bg-white/[0.03] transition-colors"
                       data-testid="item-file"
                     >
                       <td class="py-2.5 px-2">
@@ -567,7 +584,7 @@
                 <!-- Pagination -->
                 <div
                   v-if="totalPages > 1"
-                  class="flex items-center justify-between mt-4 pt-4 border-t border-light-border/10 dark:border-dark-border/10"
+                  class="flex items-center justify-between mt-4 pt-4 border-t border-light-border/10 dark:border-dark-border/5"
                 >
                   <span class="text-xs txt-secondary"
                     >{{ $t('files.page') }} {{ currentPage }} / {{ totalPages }}</span
@@ -575,14 +592,14 @@
                   <div class="flex gap-2">
                     <button
                       :disabled="currentPage === 1"
-                      class="px-3 py-1.5 rounded-lg border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm hover:bg-black/5 dark:hover:bg-white/5 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                      class="px-3 py-1.5 rounded-lg border border-light-border/30 dark:border-dark-border/8 txt-primary text-sm hover:bg-black/5 dark:hover:bg-white/5 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                       @click="previousPage"
                     >
                       {{ $t('files.previous') }}
                     </button>
                     <button
                       :disabled="currentPage >= totalPages"
-                      class="px-3 py-1.5 rounded-lg border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm hover:bg-black/5 dark:hover:bg-white/5 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                      class="px-3 py-1.5 rounded-lg border border-light-border/30 dark:border-dark-border/8 txt-primary text-sm hover:bg-black/5 dark:hover:bg-white/5 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                       @click="nextPage"
                     >
                       {{ $t('files.next') }}
@@ -690,10 +707,27 @@
             <div v-else data-testid="section-table">
               <!-- Mobile card list -->
               <div class="sm:hidden space-y-2">
+                <button
+                  class="flex items-center gap-2 px-3 py-2 text-xs txt-secondary"
+                  @click="toggleSelectAll"
+                >
+                  <input
+                    type="checkbox"
+                    :checked="allSelected"
+                    class="checkbox-brand shrink-0"
+                    @click.stop
+                    @change="toggleSelectAll"
+                  />
+                  {{
+                    allSelected
+                      ? $t('files.deselectAll')
+                      : $t('files.selectAll', { count: totalCount })
+                  }}
+                </button>
                 <div
                   v-for="file in paginatedFiles"
                   :key="file.id"
-                  class="flex items-center gap-3 p-3 rounded-xl border border-light-border/15 dark:border-dark-border/10 hover:bg-black/[0.02] dark:hover:bg-white/[0.02] transition-colors"
+                  class="flex items-center gap-3 p-3 rounded-xl border border-light-border/15 dark:border-dark-border/5 hover:bg-black/[0.02] dark:hover:bg-white/[0.02] transition-colors"
                   data-testid="item-file"
                 >
                   <input
@@ -738,7 +772,7 @@
               <!-- Desktop table -->
               <table class="w-full hidden sm:table">
                 <thead>
-                  <tr class="border-b border-light-border/30 dark:border-dark-border/20">
+                  <tr class="border-b border-light-border/30 dark:border-dark-border/8">
                     <th class="text-left py-2.5 px-2 w-8">
                       <input
                         type="checkbox"
@@ -767,7 +801,7 @@
                   <tr
                     v-for="file in paginatedFiles"
                     :key="file.id"
-                    class="group border-b border-light-border/10 dark:border-dark-border/10 hover:bg-black/[0.03] dark:hover:bg-white/[0.03] transition-colors"
+                    class="group border-b border-light-border/10 dark:border-dark-border/5 hover:bg-black/[0.03] dark:hover:bg-white/[0.03] transition-colors"
                     data-testid="item-file"
                   >
                     <td class="py-2.5 px-2">
@@ -843,7 +877,7 @@
               <!-- Pagination -->
               <div
                 v-if="totalPages > 1"
-                class="flex items-center justify-between mt-4 pt-4 border-t border-light-border/10 dark:border-dark-border/10"
+                class="flex items-center justify-between mt-4 pt-4 border-t border-light-border/10 dark:border-dark-border/5"
                 data-testid="section-pagination"
               >
                 <span class="text-xs txt-secondary">
@@ -852,14 +886,14 @@
                 <div class="flex gap-2">
                   <button
                     :disabled="currentPage === 1"
-                    class="px-3 py-1.5 rounded-lg border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm hover:bg-black/5 dark:hover:bg-white/5 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                    class="px-3 py-1.5 rounded-lg border border-light-border/30 dark:border-dark-border/8 txt-primary text-sm hover:bg-black/5 dark:hover:bg-white/5 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                     @click="previousPage"
                   >
                     {{ $t('files.previous') }}
                   </button>
                   <button
                     :disabled="currentPage >= totalPages"
-                    class="px-3 py-1.5 rounded-lg border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm hover:bg-black/5 dark:hover:bg-white/5 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                    class="px-3 py-1.5 rounded-lg border border-light-border/30 dark:border-dark-border/8 txt-primary text-sm hover:bg-black/5 dark:hover:bg-white/5 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                     @click="nextPage"
                   >
                     {{ $t('files.next') }}
@@ -937,7 +971,7 @@
             <!-- Actions -->
             <div class="flex gap-3 justify-end pt-2">
               <button
-                class="px-4 py-2 rounded-lg border border-light-border/30 dark:border-dark-border/20 txt-secondary hover:bg-black/5 dark:hover:bg-white/5 transition-all text-sm font-medium"
+                class="px-4 py-2 rounded-lg border border-light-border/30 dark:border-dark-border/8 txt-secondary hover:bg-black/5 dark:hover:bg-white/5 transition-all text-sm font-medium"
                 data-testid="btn-delete-selected-cancel"
                 @click="cancelDeleteSelected"
               >
@@ -1036,10 +1070,7 @@ const totalPages = computed(() => {
 const paginatedFiles = computed(() => files.value)
 
 const allSelected = computed(() => {
-  return (
-    paginatedFiles.value.length > 0 &&
-    paginatedFiles.value.every((file) => selectedFileIds.value.includes(file.id))
-  )
+  return totalCount.value > 0 && selectedFileIds.value.length === totalCount.value
 })
 
 const handleFileSelect = (event: Event) => {
@@ -1388,20 +1419,24 @@ const toggleFileSelection = (fileId: number) => {
   }
 }
 
-const toggleSelectAll = () => {
+const toggleSelectAll = async () => {
   if (allSelected.value) {
-    paginatedFiles.value.forEach((file) => {
-      const index = selectedFileIds.value.indexOf(file.id)
-      if (index > -1) {
-        selectedFileIds.value.splice(index, 1)
-      }
-    })
+    selectedFileIds.value = []
   } else {
-    paginatedFiles.value.forEach((file) => {
-      if (!selectedFileIds.value.includes(file.id)) {
-        selectedFileIds.value.push(file.id)
-      }
-    })
+    try {
+      const response = await filesService.listFiles(
+        filterGroup.value || undefined,
+        1,
+        totalCount.value || 1000
+      )
+      selectedFileIds.value = response.files.map((f) => f.id)
+    } catch {
+      paginatedFiles.value.forEach((file) => {
+        if (!selectedFileIds.value.includes(file.id)) {
+          selectedFileIds.value.push(file.id)
+        }
+      })
+    }
   }
 }
 
